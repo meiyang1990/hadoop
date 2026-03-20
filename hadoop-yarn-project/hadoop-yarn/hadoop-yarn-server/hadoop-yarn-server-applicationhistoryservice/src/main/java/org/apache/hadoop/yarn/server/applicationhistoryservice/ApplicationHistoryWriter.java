@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,56 +31,41 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.Container
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerStartData;
 
 /**
- * It is the interface of writing the application history, exposing the methods
- * of writing {@link ApplicationStartData}, {@link ApplicationFinishData}
- * {@link ApplicationAttemptStartData}, {@link ApplicationAttemptFinishData},
- * {@link ContainerStartData} and {@link ContainerFinishData}.
+ * 应用历史数据写入器接口，用于写入应用、应用尝试和容器的生命周期数据。
  */
 @Private
 @Unstable
 public interface ApplicationHistoryWriter {
 
   /**
-   * This method writes the information of <code>RMApp</code> that is available
-   * when it starts.
+   * 写入应用启动时的信息。
    * 
-   * @param appStart
-   *          the record of the information of <code>RMApp</code> that is
-   *          available when it starts
+   * @param appStart 应用启动数据
    * @throws IOException
    */
   void applicationStarted(ApplicationStartData appStart) throws IOException;
 
   /**
-   * This method writes the information of <code>RMApp</code> that is available
-   * when it finishes.
+   * 写入应用结束时的信息。
    * 
-   * @param appFinish
-   *          the record of the information of <code>RMApp</code> that is
-   *          available when it finishes
+   * @param appFinish 应用结束数据
    * @throws IOException
    */
   void applicationFinished(ApplicationFinishData appFinish) throws IOException;
 
   /**
-   * This method writes the information of <code>RMAppAttempt</code> that is
-   * available when it starts.
+   * 写入应用尝试启动时的信息。
    * 
-   * @param appAttemptStart
-   *          the record of the information of <code>RMAppAttempt</code> that is
-   *          available when it starts
+   * @param appAttemptStart 应用尝试启动数据
    * @throws IOException
    */
   void applicationAttemptStarted(ApplicationAttemptStartData appAttemptStart)
       throws IOException;
 
   /**
-   * This method writes the information of <code>RMAppAttempt</code> that is
-   * available when it finishes.
+   * 写入应用尝试结束时的信息。
    * 
-   * @param appAttemptFinish
-   *          the record of the information of <code>RMAppAttempt</code> that is
-   *          available when it finishes
+   * @param appAttemptFinish 应用尝试结束数据
    * @throws IOException
    */
   void
@@ -87,23 +73,17 @@ public interface ApplicationHistoryWriter {
           throws IOException;
 
   /**
-   * This method writes the information of <code>RMContainer</code> that is
-   * available when it starts.
+   * 写入容器启动时的信息。
    * 
-   * @param containerStart
-   *          the record of the information of <code>RMContainer</code> that is
-   *          available when it starts
+   * @param containerStart 容器启动数据
    * @throws IOException
    */
   void containerStarted(ContainerStartData containerStart) throws IOException;
 
   /**
-   * This method writes the information of <code>RMContainer</code> that is
-   * available when it finishes.
+   * 写入容器结束时的信息。
    * 
-   * @param containerFinish
-   *          the record of the information of <code>RMContainer</code> that is
-   *          available when it finishes
+   * @param containerFinish 容器结束数据
    * @throws IOException
    */
   void containerFinished(ContainerFinishData containerFinish)

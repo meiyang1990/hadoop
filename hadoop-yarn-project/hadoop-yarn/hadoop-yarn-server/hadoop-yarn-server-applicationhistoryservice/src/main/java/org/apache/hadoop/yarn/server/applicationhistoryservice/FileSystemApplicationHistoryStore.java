@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -76,13 +77,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * File system implementation of {@link ApplicationHistoryStore}. In this
- * implementation, one application will have just one file in the file system,
- * which contains all the history data of one application, and its attempts and
- * containers. {@link #applicationStarted(ApplicationStartData)} is supposed to
- * be invoked first when writing any history data of one application and it will
- * open a file, while {@link #applicationFinished(ApplicationFinishData)} is
- * supposed to be last writing operation and will close the file.
+ * 基于文件系统的应用历史存储实现。
+ * 
+ * 每个应用对应一个历史文件，包含该应用及其尝试和容器的所有历史数据。
+ * 写入时，{@link #applicationStarted(ApplicationStartData)} 首先被调用并打开文件，
+ * {@link #applicationFinished(ApplicationFinishData)} 最后被调用并关闭文件。
  */
 @Public
 @Unstable
@@ -92,18 +91,27 @@ public class FileSystemApplicationHistoryStore extends AbstractService
   private static final Logger LOG = LoggerFactory
       .getLogger(FileSystemApplicationHistoryStore.class);
 
+  // 根目录名称
   private static final String ROOT_DIR_NAME = "ApplicationHistoryDataRoot";
+  // TFile 最小块大小
   private static final int MIN_BLOCK_SIZE = 256 * 1024;
+  // 启动数据后缀
   private static final String START_DATA_SUFFIX = "_start";
+  // 结束数据后缀
   private static final String FINISH_DATA_SUFFIX = "_finish";
+  // 根目录权限
   private static final FsPermission ROOT_DIR_UMASK = FsPermission
     .createImmutable((short) 0740);
+  // 历史文件权限
   private static final FsPermission HISTORY_FILE_UMASK = FsPermission
     .createImmutable((short) 0640);
 
+  // 文件系统实例
   private FileSystem fs;
+  // 根目录路径
   private Path rootDirPath;
 
+  // 正在写入的历史文件映射（应用 ID -> 写入器）
   private ConcurrentMap<ApplicationId, HistoryFileWriter> outstandingWriters =
       new ConcurrentHashMap<ApplicationId, HistoryFileWriter>();
 
@@ -115,6 +123,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     return path.getFileSystem(conf);
   }
 
+  /**
+   * 启动服务：初始化文件系统和根目录
+   */
   @Override
   public void serviceStart() throws Exception {
     Configuration conf = getConfig();
@@ -132,6 +143,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     super.serviceStart();
   }
 
+  /**
+   * 停止服务：关闭所有打开的写入器和文件系统
+   */
   @Override
   public void serviceStop() throws Exception {
     try {
@@ -146,6 +160,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     super.serviceStop();
   }
 
+  /**
+   * 获取指定应用的历史数据
+   */
   @Override
   public ApplicationHistoryData getApplication(ApplicationId appId)
       throws IOException {
@@ -157,6 +174,7 @@ public class FileSystemApplicationHistoryStore extends AbstractService
           ApplicationHistoryData.newInstance(appId, null, null, null, null,
             Long.MIN_VALUE, Long.MIN_VALUE, Long.MAX_VALUE, null,
             FinalApplicationStatus.UNDEFINED, null);
+      // 遍历历史文件，查找启动和结束数据
       while ((!readStartData || !readFinishData) && hfReader.hasNext()) {
         HistoryFileReader.Entry entry = hfReader.next();
         if (entry.key.id.equals(appId.toString())) {
@@ -192,6 +210,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     }
   }
 
+  /**
+   * 获取所有应用的历史数据
+   */
   @Override
   public Map<ApplicationId, ApplicationHistoryData> getAllApplications()
       throws IOException {
@@ -207,8 +228,7 @@ public class FileSystemApplicationHistoryStore extends AbstractService
           historyDataMap.put(appId, historyData);
         }
       } catch (IOException e) {
-        // Eat the exception not to disturb the getting the next
-        // ApplicationHistoryData
+        // 忽略异常，继续处理下一个应用
         LOG.error("History information of application " + appId
             + " is not included into the result due to the exception", e);
       }
@@ -216,6 +236,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     return historyDataMap;
   }
 
+  /**
+   * 获取指定应用的所有尝试历史数据
+   */
   @Override
   public Map<ApplicationAttemptId, ApplicationAttemptHistoryData>
       getApplicationAttempts(ApplicationId appId) throws IOException {
@@ -259,6 +282,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     return historyDataMap;
   }
 
+  /**
+   * 获取指定应用尝试的历史数据
+   */
   @Override
   public ApplicationAttemptHistoryData getApplicationAttempt(
       ApplicationAttemptId appAttemptId) throws IOException {
@@ -309,6 +335,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     }
   }
 
+  /**
+   * 获取指定容器的历史数据
+   */
   @Override
   public ContainerHistoryData getContainer(ContainerId containerId)
       throws IOException {
@@ -357,6 +386,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     }
   }
 
+  /**
+   * 获取指定应用尝试的 AM 容器历史数据
+   */
   @Override
   public ContainerHistoryData getAMContainer(ApplicationAttemptId appAttemptId)
       throws IOException {
@@ -369,6 +401,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     return getContainer(attemptHistoryData.getMasterContainerId());
   }
 
+  /**
+   * 获取指定应用尝试的所有容器历史数据
+   */
   @Override
   public Map<ContainerId, ContainerHistoryData> getContainers(
       ApplicationAttemptId appAttemptId) throws IOException {
@@ -412,6 +447,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     return historyDataMap;
   }
 
+  /**
+   * 写入应用启动数据，同时打开历史文件
+   */
   @Override
   public void applicationStarted(ApplicationStartData appStart)
       throws IOException {
@@ -448,6 +486,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     }
   }
 
+  /**
+   * 写入应用结束数据，同时关闭历史文件
+   */
   @Override
   public void applicationFinished(ApplicationFinishData appFinish)
       throws IOException {
@@ -470,6 +511,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     }
   }
 
+  /**
+   * 写入应用尝试启动数据
+   */
   @Override
   public void applicationAttemptStarted(
       ApplicationAttemptStartData appAttemptStart) throws IOException {
@@ -491,6 +535,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     }
   }
 
+  /**
+   * 写入应用尝试结束数据
+   */
   @Override
   public void applicationAttemptFinished(
       ApplicationAttemptFinishData appAttemptFinish) throws IOException {
@@ -512,6 +559,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     }
   }
 
+  /**
+   * 写入容器启动数据
+   */
   @Override
   public void containerStarted(ContainerStartData containerStart)
       throws IOException {
@@ -532,6 +582,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     }
   }
 
+  /**
+   * 写入容器结束数据
+   */
   @Override
   public void containerFinished(ContainerFinishData containerFinish)
       throws IOException {
@@ -550,6 +603,8 @@ public class FileSystemApplicationHistoryStore extends AbstractService
           + containerFinish.getContainerId(), e);
     }
   }
+
+  // ========== Protocol Buffer 解析方法 ==========
 
   private static ApplicationStartData parseApplicationStartData(byte[] value)
       throws InvalidProtocolBufferException {
@@ -587,6 +642,8 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     return new ContainerFinishDataPBImpl(
       ContainerFinishDataProto.parseFrom(value));
   }
+
+  // ========== 数据合并方法 ==========
 
   private static void mergeApplicationHistoryData(
       ApplicationHistoryData historyData, ApplicationStartData startData) {
@@ -642,6 +699,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     historyData.setContainerState(finishData.getContainerState());
   }
 
+  /**
+   * 获取指定应用的历史文件写入器
+   */
   private HistoryFileWriter getHistoryFileWriter(ApplicationId appId)
       throws IOException {
     HistoryFileWriter hfWriter = outstandingWriters.get(appId);
@@ -652,6 +712,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     return hfWriter;
   }
 
+  /**
+   * 获取指定应用的历史文件读取器
+   */
   private HistoryFileReader getHistoryFileReader(ApplicationId appId)
       throws IOException {
     Path applicationHistoryFile = new Path(rootDirPath, appId.toString());
@@ -661,7 +724,7 @@ public class FileSystemApplicationHistoryStore extends AbstractService
       throw (FileNotFoundException) new FileNotFoundException("History file for"
           + " application " + appId + " is not found: " + e).initCause(e);
     }
-    // The history file is still under writing
+    // 如果文件正在写入，则不允许读取
     if (outstandingWriters.containsKey(appId)) {
       throw new IOException("History file for application " + appId
           + " is under writing");
@@ -669,10 +732,13 @@ public class FileSystemApplicationHistoryStore extends AbstractService
     return new HistoryFileReader(applicationHistoryFile);
   }
 
+  /**
+   * 历史文件读取器，基于 TFile 格式
+   */
   private class HistoryFileReader {
 
+    /** 历史文件条目 */
     private class Entry {
-
       private HistoryDataKey key;
       private byte[] value;
 
@@ -721,6 +787,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
 
   }
 
+  /**
+   * 历史文件写入器，基于 TFile 格式
+   */
   private class HistoryFileWriter {
 
     private FSDataOutputStream fsdos;
@@ -749,6 +818,9 @@ public class FileSystemApplicationHistoryStore extends AbstractService
       IOUtils.cleanupWithLogger(LOG, writer, fsdos);
     }
 
+    /**
+     * 写入历史数据条目
+     */
     public synchronized void writeHistoryData(HistoryDataKey key, byte[] value)
         throws IOException {
       DataOutputStream dos = null;
@@ -768,10 +840,12 @@ public class FileSystemApplicationHistoryStore extends AbstractService
 
   }
 
+  /**
+   * 历史数据键，包含实体 ID 和后缀（标识启动或结束数据）
+   */
   private static class HistoryDataKey implements Writable {
 
     private String id;
-
     private String suffix;
 
     public HistoryDataKey() {

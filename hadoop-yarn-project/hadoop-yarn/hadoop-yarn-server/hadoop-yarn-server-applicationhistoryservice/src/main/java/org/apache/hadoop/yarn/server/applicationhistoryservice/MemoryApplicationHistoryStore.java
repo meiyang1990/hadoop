@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,21 +43,22 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.Container
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerStartData;
 
 /**
- * In-memory implementation of {@link ApplicationHistoryStore}. This
- * implementation is for test purpose only. If users improperly instantiate it,
- * they may encounter reading and writing history data in different memory
- * store.
+ * 基于内存的应用历史存储实现，仅供测试使用。
  * 
+ * 注意：如果不当实例化，可能会在不同内存存储之间读写历史数据。
  */
 @Private
 @Unstable
 public class MemoryApplicationHistoryStore extends AbstractService implements
     ApplicationHistoryStore {
 
+  // 应用历史数据映射
   private final ConcurrentMap<ApplicationId, ApplicationHistoryData> applicationData =
       new ConcurrentHashMap<ApplicationId, ApplicationHistoryData>();
+  // 应用尝试历史数据映射（应用 ID -> 尝试 ID -> 数据）
   private final ConcurrentMap<ApplicationId, ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData>> applicationAttemptData =
       new ConcurrentHashMap<ApplicationId, ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData>>();
+  // 容器历史数据映射（应用尝试 ID -> 容器 ID -> 数据）
   private final ConcurrentMap<ApplicationAttemptId, ConcurrentMap<ContainerId, ContainerHistoryData>> containerData =
       new ConcurrentHashMap<ApplicationAttemptId, ConcurrentMap<ContainerId, ContainerHistoryData>>();
 
@@ -74,6 +76,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     return applicationData.get(appId);
   }
 
+  /**
+   * 获取指定应用的所有尝试列表
+   */
   @Override
   public Map<ApplicationAttemptId, ApplicationAttemptHistoryData>
       getApplicationAttempts(ApplicationId appId) {
@@ -88,6 +93,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     }
   }
 
+  /**
+   * 获取指定应用尝试的历史数据
+   */
   @Override
   public ApplicationAttemptHistoryData getApplicationAttempt(
       ApplicationAttemptId appAttemptId) {
@@ -100,6 +108,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     }
   }
 
+  /**
+   * 获取指定应用尝试的 AM 容器历史数据
+   */
   @Override
   public ContainerHistoryData getAMContainer(ApplicationAttemptId appAttemptId) {
     ApplicationAttemptHistoryData appAttempt =
@@ -111,6 +122,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     }
   }
 
+  /**
+   * 获取指定容器的历史数据
+   */
   @Override
   public ContainerHistoryData getContainer(ContainerId containerId) {
     Map<ContainerId, ContainerHistoryData> subMap =
@@ -122,6 +136,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     }
   }
 
+  /**
+   * 获取指定应用尝试的所有容器列表
+   */
   @Override
   public Map<ContainerId, ContainerHistoryData> getContainers(
       ApplicationAttemptId appAttemptId) throws IOException {
@@ -134,6 +151,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     }
   }
 
+  /**
+   * 写入应用启动数据
+   */
   @Override
   public void applicationStarted(ApplicationStartData appStart)
       throws IOException {
@@ -149,6 +169,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     }
   }
 
+  /**
+   * 写入应用结束数据
+   */
   @Override
   public void applicationFinished(ApplicationFinishData appFinish)
       throws IOException {
@@ -159,8 +182,7 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
           + appFinish.getApplicationId() + " is stored before the start"
           + " information.");
     }
-    // Make the assumption that YarnApplicationState should not be null if
-    // the finish information is already recorded
+    // 假设如果结束信息已记录，则 YarnApplicationState 不为空
     if (data.getYarnApplicationState() != null) {
       throw new IOException("The finish information of application "
           + appFinish.getApplicationId() + " is already stored.");
@@ -171,6 +193,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     data.setYarnApplicationState(appFinish.getYarnApplicationState());
   }
 
+  /**
+   * 写入应用尝试启动数据
+   */
   @Override
   public void applicationAttemptStarted(
       ApplicationAttemptStartData appAttemptStart) throws IOException {
@@ -188,6 +213,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     }
   }
 
+  /**
+   * 写入应用尝试结束数据
+   */
   @Override
   public void applicationAttemptFinished(
       ApplicationAttemptFinishData appAttemptFinish) throws IOException {
@@ -200,8 +228,7 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
           + appAttemptFinish.getApplicationAttemptId() + " is stored before"
           + " the start information.");
     }
-    // Make the assumption that YarnApplicationAttemptState should not be null
-    // if the finish information is already recorded
+    // 假设如果结束信息已记录，则 YarnApplicationAttemptState 不为空
     if (data.getYarnApplicationAttemptState() != null) {
       throw new IOException("The finish information of application attempt "
           + appAttemptFinish.getApplicationAttemptId() + " is already stored.");
@@ -214,6 +241,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
       .getYarnApplicationAttemptState());
   }
 
+  /**
+   * 获取或创建应用尝试数据的子映射
+   */
   private ConcurrentMap<ApplicationAttemptId, ApplicationAttemptHistoryData>
       getSubMap(ApplicationId appId) {
     applicationAttemptData
@@ -223,6 +253,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     return applicationAttemptData.get(appId);
   }
 
+  /**
+   * 写入容器启动数据
+   */
   @Override
   public void containerStarted(ContainerStartData containerStart)
       throws IOException {
@@ -241,6 +274,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     }
   }
 
+  /**
+   * 写入容器结束数据
+   */
   @Override
   public void containerFinished(ContainerFinishData containerFinish)
       throws IOException {
@@ -252,8 +288,7 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
           + containerFinish.getContainerId() + " is stored before"
           + " the start information.");
     }
-    // Make the assumption that ContainerState should not be null if
-    // the finish information is already recorded
+    // 假设如果结束信息已记录，则 ContainerState 不为空
     if (data.getContainerState() != null) {
       throw new IOException("The finish information of container "
           + containerFinish.getContainerId() + " is already stored.");
@@ -264,6 +299,9 @@ public class MemoryApplicationHistoryStore extends AbstractService implements
     data.setContainerState(containerFinish.getContainerState());
   }
 
+  /**
+   * 获取或创建容器数据的子映射
+   */
   private ConcurrentMap<ContainerId, ContainerHistoryData> getSubMap(
       ApplicationAttemptId appAttemptId) {
     containerData.putIfAbsent(appAttemptId,

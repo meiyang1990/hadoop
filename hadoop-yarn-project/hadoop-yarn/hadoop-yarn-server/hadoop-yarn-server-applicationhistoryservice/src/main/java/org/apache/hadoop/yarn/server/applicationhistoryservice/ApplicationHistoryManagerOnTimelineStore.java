@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -71,6 +72,12 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 基于 Timeline Store 的应用历史管理器实现。
+ * 
+ * 该类从 Timeline 服务读取应用、应用尝试和容器的历史数据，
+ * 并将其转换为 YARN API 标准的报告格式。支持 ACL 访问控制。
+ */
 public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     implements
     ApplicationHistoryManager {
@@ -80,9 +87,13 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
   @VisibleForTesting
   static final String UNAVAILABLE = "N/A";
 
+  // Timeline 数据管理器，用于读取历史数据
   private TimelineDataManager timelineDataManager;
+  // ACL 管理器，用于访问控制检查
   private ApplicationACLsManager aclsManager;
+  // 服务器 HTTP 地址，用于构建日志 URL
   private String serverHttpAddress;
+  // 最大加载应用数
   private long maxLoadedApplications;
 
   public ApplicationHistoryManagerOnTimelineStore(
@@ -103,16 +114,23 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     super.serviceInit(conf);
   }
 
+  /**
+   * 获取指定应用的报告
+   */
   @Override
   public ApplicationReport getApplication(ApplicationId appId)
       throws YarnException, IOException {
     return getApplication(appId, ApplicationReportField.ALL).appReport;
   }
 
+  /**
+   * 获取指定时间范围内的应用列表
+   */
   @Override
   public Map<ApplicationId, ApplicationReport> getApplications(long appsNum,
       long appStartedTimeBegin, long appStartedTimeEnd) throws YarnException,
       IOException {
+    // 从 Timeline 服务查询应用实体
     TimelineEntities entities =
         timelineDataManager.getEntities(
           ApplicationMetricsConstants.ENTITY_TYPE, null, null,
@@ -136,13 +154,18 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     return apps;
   }
 
+  /**
+   * 获取指定应用的所有尝试列表
+   */
   @Override
   public Map<ApplicationAttemptId, ApplicationAttemptReport>
       getApplicationAttempts(ApplicationId appId)
           throws YarnException, IOException {
+    // 先检查访问权限
     ApplicationReportExt app = getApplication(
         appId, ApplicationReportField.USER_AND_ACLS);
     checkAccess(app);
+    // 从 Timeline 服务查询应用尝试实体
     TimelineEntities entities = timelineDataManager.getEntities(
         AppAttemptMetricsConstants.ENTITY_TYPE,
         new NameValuePair(
@@ -160,12 +183,18 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     return appAttempts;
   }
 
+  /**
+   * 获取指定应用尝试的报告
+   */
   @Override
   public ApplicationAttemptReport getApplicationAttempt(
       ApplicationAttemptId appAttemptId) throws YarnException, IOException {
     return getApplicationAttempt(appAttemptId, true);
   }
 
+  /**
+   * 获取应用尝试报告，可选是否检查 ACL
+   */
   private ApplicationAttemptReport getApplicationAttempt(
       ApplicationAttemptId appAttemptId, boolean checkACLs)
       throws YarnException, IOException {
@@ -188,6 +217,9 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     }
   }
 
+  /**
+   * 获取指定容器的报告
+   */
   @Override
   public ContainerReport getContainer(ContainerId containerId)
       throws YarnException, IOException {
@@ -209,6 +241,9 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     }
   }
 
+  /**
+   * 获取指定应用尝试的 AM 容器报告
+   */
   @Override
   public ContainerReport getAMContainer(ApplicationAttemptId appAttemptId)
       throws YarnException, IOException {
@@ -217,12 +252,16 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     return getContainer(appAttempt.getAMContainerId());
   }
 
+  /**
+   * 获取指定应用尝试的所有容器列表
+   */
   @Override
   public Map<ContainerId, ContainerReport> getContainers(
       ApplicationAttemptId appAttemptId) throws YarnException, IOException {
     ApplicationReportExt app = getApplication(
         appAttemptId.getApplicationId(), ApplicationReportField.USER_AND_ACLS);
     checkAccess(app);
+    // 从 Timeline 服务查询容器实体
     TimelineEntities entities = timelineDataManager.getEntities(
         ContainerMetricsConstants.ENTITY_TYPE,
         new NameValuePair(
@@ -242,6 +281,9 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     return containers;
   }
 
+  /**
+   * 将 Timeline 实体转换为应用报告
+   */
   private static ApplicationReportExt convertToApplicationReport(
       TimelineEntity entity, ApplicationReportField field) {
     String user = null;
@@ -265,6 +307,8 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
         new HashMap<ApplicationAccessType, String>();
     String appNodeLabelExpression = null;
     String amNodeLabelExpression = null;
+    
+    // 从实体信息中提取应用元数据
     Map<String, Object> entityInfo = entity.getOtherInfo();
     if (entityInfo != null) {
       if (entityInfo.containsKey(ApplicationMetricsConstants.USER_ENTITY_INFO)) {
@@ -279,6 +323,7 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
           appViewACLs.put(ApplicationAccessType.VIEW_APP, appViewACLsStr);
         }
       }
+      // 如果只需要用户和 ACL 信息，提前返回
       if (field == ApplicationReportField.USER_AND_ACLS) {
         return new ApplicationReportExt(ApplicationReport.newInstance(
             ApplicationId.fromString(entity.getEntityId()),
@@ -335,6 +380,7 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
       submittedTime = parseLong(entityInfo,
           ApplicationMetricsConstants.SUBMITTED_TIME_ENTITY_INFO);
 
+      // 解析资源使用指标
       if (entityInfo.containsKey(ApplicationMetricsConstants.APP_CPU_METRICS)) {
         long vcoreSeconds = parseLong(entityInfo,
             ApplicationMetricsConstants.APP_CPU_METRICS);
@@ -360,6 +406,7 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
                 preemptedResourceSecondsMap);
       }
 
+      // 解析应用标签
       if (entityInfo.containsKey(ApplicationMetricsConstants.APP_TAGS_INFO)) {
         appTags = new HashSet<String>();
         Object obj = entityInfo.get(ApplicationMetricsConstants.APP_TAGS_INFO);
@@ -372,6 +419,8 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
         }
       }
     }
+    
+    // 解析事件信息
     List<TimelineEvent> events = entity.getEvents();
     long updatedTimeStamp = 0L;
     if (events != null) {
@@ -384,10 +433,7 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
           launchTime = event.getTimestamp();
         } else if (event.getEventType().equals(
             ApplicationMetricsConstants.UPDATED_EVENT_TYPE)) {
-          // This type of events are parsed in time-stamp descending order
-          // which means the previous event could override the information
-          // from the later same type of event. Hence compare timestamp
-          // before over writing.
+          // UPDATE 事件按时间戳降序解析，需要比较时间戳避免旧数据覆盖新数据
           if (event.getTimestamp() > updatedTimeStamp) {
             updatedTimeStamp = event.getTimestamp();
           } else {
@@ -465,6 +511,9 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
         appNodeLabelExpression, amNodeLabelExpression), appViewACLs);
   }
 
+  /**
+   * 从实体信息中解析长整型值
+   */
   private static long parseLong(Map<String, Object> entityInfo,
       String infoKey) {
     long result = 0;
@@ -475,6 +524,9 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     return result;
   }
 
+  /**
+   * 将 Timeline 实体转换为应用尝试报告
+   */
   private static ApplicationAttemptReport convertToApplicationAttemptReport(
       TimelineEntity entity) {
     String host = null;
@@ -562,6 +614,9 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
         state, amContainerId);
   }
 
+  /**
+   * 将 Timeline 实体转换为容器报告
+   */
   private static ContainerReport convertToContainerReport(
       TimelineEntity entity, String serverHttpAddress, String user) {
     int allocatedMem = 0;
@@ -577,6 +632,7 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     String nodeHttpAddress = null;
     Map<String, List<Map<String, String>>> exposedPorts = null;
 
+    // 从实体信息中提取容器分配信息
     Map<String, Object> entityInfo = entity.getOtherInfo();
     if (entityInfo != null) {
       if (entityInfo
@@ -619,6 +675,8 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
                 .get(ContainerMetricsConstants.ALLOCATED_EXPOSED_PORTS);
       }
     }
+    
+    // 解析容器生命周期事件
     List<TimelineEvent> events = entity.getEvents();
     if (events != null) {
       for (TimelineEvent event : events) {
@@ -657,6 +715,7 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
         ContainerId.fromString(entity.getEntityId());
     String logUrl = null;
     NodeId allocatedNode = null;
+    // 生成聚合日志 URL
     if (allocatedHost != null) {
       allocatedNode = NodeId.newInstance(allocatedHost, allocatedPort);
       logUrl = WebAppUtils.getAggregatedLogURL(
@@ -677,16 +736,19 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     return container;
   }
 
+  /**
+   * 生成应用报告，包含完整的尝试信息
+   */
   private ApplicationReportExt generateApplicationReport(TimelineEntity entity,
       ApplicationReportField field) throws YarnException, IOException {
     ApplicationReportExt app = convertToApplicationReport(entity, field);
-    // If only user and acls are pulled to check attempt(s)/container(s) access
-    // control, we can return immediately
+    // 如果只是为了检查 ACL 获取用户信息，直接返回
     if (field == ApplicationReportField.USER_AND_ACLS) {
       return app;
     }
     try {
       checkAccess(app);
+      // 补充最新尝试的运行时信息
       if (app.appReport.getCurrentApplicationAttemptId() != null) {
         ApplicationAttemptReport appAttempt = getApplicationAttempt(
             app.appReport.getCurrentApplicationAttemptId(), false);
@@ -696,20 +758,21 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
         app.appReport.setOriginalTrackingUrl(appAttempt.getOriginalTrackingUrl());
       }
     } catch (AuthorizationException | ApplicationAttemptNotFoundException e) {
-      // AuthorizationException is thrown because the user doesn't have access
+      // 无权限或尝试不存在时的处理
       if (e instanceof AuthorizationException) {
         LOG.warn("Failed to authorize when generating application report for "
             + app.appReport.getApplicationId()
             + ". Use a placeholder for its latest attempt id. ", e);
-      } else { // Attempt not found
+      } else {
         LOG.info("No application attempt found for "
             + app.appReport.getApplicationId()
             + ". Use a placeholder for its latest attempt id. ", e);
       }
-      // It's possible that the app is finished before the first attempt is created.
+      // 应用可能在第一次尝试创建前就结束了，使用占位符
       app.appReport.setDiagnostics(null);
       app.appReport.setCurrentApplicationAttemptId(null);
     }
+    // 设置默认值避免空指针
     if (app.appReport.getCurrentApplicationAttemptId() == null) {
       app.appReport.setCurrentApplicationAttemptId(
           ApplicationAttemptId.newInstance(app.appReport.getApplicationId(), -1));
@@ -732,6 +795,9 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     return app;
   }
 
+  /**
+   * 从 Timeline 服务获取应用实体并生成报告
+   */
   private ApplicationReportExt getApplication(ApplicationId appId,
       ApplicationReportField field) throws YarnException, IOException {
     TimelineEntity entity = timelineDataManager.getEntity(
@@ -746,6 +812,9 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
     }
   }
 
+  /**
+   * 检查当前用户是否有权限访问该应用
+   */
    private void checkAccess(ApplicationReportExt app)
            throws YarnException, IOException {
      if (app.appViewACLs != null) {
@@ -766,11 +835,17 @@ public class ApplicationHistoryManagerOnTimelineStore extends AbstractService
      }
    }
 
+  /**
+   * 应用报告字段选择枚举
+   */
   private enum ApplicationReportField {
-    ALL, // retrieve all the fields
-    USER_AND_ACLS // retrieve user and ACLs info only
+    ALL, // 获取所有字段
+    USER_AND_ACLS // 仅获取用户和 ACL 信息
   }
 
+  /**
+   * 应用报告扩展类，包含 ACL 信息
+   */
   private static class ApplicationReportExt {
      private ApplicationReport appReport;
      private Map<ApplicationAccessType, String> appViewACLs;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -62,47 +63,69 @@ import org.apache.hadoop.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 应用历史客户端服务，提供 RPC 接口供客户端查询应用、尝试和容器的历史数据。
+ * 
+ * 该服务作为应用历史服务器的入口点，实现了 ApplicationHistoryProtocol 协议，
+ * 将客户端请求委托给底层 ApplicationHistoryManager 处理。
+ */
 public class ApplicationHistoryClientService extends AbstractService implements
     ApplicationHistoryProtocol {
   private static final Logger LOG =
           LoggerFactory.getLogger(ApplicationHistoryClientService.class);
+  
+  // 应用历史管理器，负责实际的历史数据查询
   private ApplicationHistoryManager history;
+  // RPC 服务器，处理客户端请求
   private Server server;
+  // 服务绑定的地址
   private InetSocketAddress bindAddress;
 
+  /**
+   * 构造函数，注入应用历史管理器
+   */
   public ApplicationHistoryClientService(ApplicationHistoryManager history) {
     super("ApplicationHistoryClientService");
     this.history = history;
   }
 
+  /**
+   * 启动服务：创建并启动 RPC 服务器
+   */
   protected void serviceStart() throws Exception {
     Configuration conf = getConfig();
     YarnRPC rpc = YarnRPC.create(conf);
+    
+    // 从配置中获取服务绑定地址
     InetSocketAddress address = conf.getSocketAddr(
         YarnConfiguration.TIMELINE_SERVICE_BIND_HOST,
         YarnConfiguration.TIMELINE_SERVICE_ADDRESS,
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_ADDRESS,
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_PORT);
 
+    // 校验处理线程数必须大于 0
     Preconditions.checkArgument(conf.getInt(
         YarnConfiguration.TIMELINE_SERVICE_HANDLER_THREAD_COUNT,
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_CLIENT_THREAD_COUNT) > 0,
         "%s property value should be greater than zero",
         YarnConfiguration.TIMELINE_SERVICE_HANDLER_THREAD_COUNT);
 
+    // 创建 RPC 服务器
     server =
         rpc.getServer(ApplicationHistoryProtocol.class, this,
           address, conf, null, conf.getInt(
             YarnConfiguration.TIMELINE_SERVICE_HANDLER_THREAD_COUNT,
             YarnConfiguration.DEFAULT_TIMELINE_SERVICE_CLIENT_THREAD_COUNT));
 
-    // Enable service authorization?
+    // 如果启用了服务授权，则刷新 ACL 配置
     if (conf.getBoolean(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       refreshServiceAcls(conf, new TimelinePolicyProvider());
     }
 
     server.start();
+    
+    // 更新实际绑定地址到配置中
     this.bindAddress =
         conf.updateConnectAddr(YarnConfiguration.TIMELINE_SERVICE_BIND_HOST,
                                YarnConfiguration.TIMELINE_SERVICE_ADDRESS,
@@ -114,6 +137,9 @@ public class ApplicationHistoryClientService extends AbstractService implements
     super.serviceStart();
   }
 
+  /**
+   * 停止服务：关闭 RPC 服务器
+   */
   @Override
   protected void serviceStop() throws Exception {
     if (server != null) {
@@ -127,6 +153,9 @@ public class ApplicationHistoryClientService extends AbstractService implements
     return this.bindAddress;
   }
 
+  /**
+   * 刷新服务访问控制列表
+   */
   private void refreshServiceAcls(Configuration configuration,
       PolicyProvider policyProvider) {
     this.server.refreshServiceAcl(configuration, policyProvider);
@@ -135,10 +164,13 @@ public class ApplicationHistoryClientService extends AbstractService implements
   @Override
   public CancelDelegationTokenResponse cancelDelegationToken(
       CancelDelegationTokenRequest request) throws YarnException, IOException {
-    // TODO Auto-generated method stub
+    // TODO 尚未实现
     return null;
   }
 
+  /**
+   * 获取指定应用尝试的报告
+   */
   @Override
   public GetApplicationAttemptReportResponse getApplicationAttemptReport(
       GetApplicationAttemptReportRequest request) throws YarnException,
@@ -155,6 +187,9 @@ public class ApplicationHistoryClientService extends AbstractService implements
     }
   }
 
+  /**
+   * 获取指定应用的所有尝试列表
+   */
   @Override
   public GetApplicationAttemptsResponse getApplicationAttempts(
       GetApplicationAttemptsRequest request) throws YarnException, IOException {
@@ -165,6 +200,9 @@ public class ApplicationHistoryClientService extends AbstractService implements
     return response;
   }
 
+  /**
+   * 获取指定应用的报告
+   */
   @Override
   public GetApplicationReportResponse getApplicationReport(
       GetApplicationReportRequest request) throws YarnException, IOException {
@@ -180,10 +218,14 @@ public class ApplicationHistoryClientService extends AbstractService implements
     }
   }
 
+  /**
+   * 获取应用列表，支持按启动时间范围过滤
+   */
   @Override
   public GetApplicationsResponse
       getApplications(GetApplicationsRequest request) throws YarnException,
           IOException {
+    // 解析启动时间范围，未指定则使用默认的全范围
     long startedBegin =
         request.getStartRange() == null ? 0L : request.getStartRange()
           .getMinimum();
@@ -197,6 +239,9 @@ public class ApplicationHistoryClientService extends AbstractService implements
     return response;
   }
 
+  /**
+   * 获取指定容器的报告
+   */
   @Override
   public GetContainerReportResponse getContainerReport(
       GetContainerReportRequest request) throws YarnException, IOException {
@@ -212,6 +257,9 @@ public class ApplicationHistoryClientService extends AbstractService implements
     }
   }
 
+  /**
+   * 获取指定应用尝试的所有容器列表
+   */
   @Override
   public GetContainersResponse getContainers(GetContainersRequest request)
       throws YarnException, IOException {

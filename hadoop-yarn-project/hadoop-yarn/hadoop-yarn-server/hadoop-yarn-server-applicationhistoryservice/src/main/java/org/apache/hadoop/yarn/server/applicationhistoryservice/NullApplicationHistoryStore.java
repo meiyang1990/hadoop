@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -39,9 +40,9 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.Container
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerStartData;
 
 /**
- * Dummy implementation of {@link ApplicationHistoryStore}. If this
- * implementation is used, no history data will be persisted.
+ * 空实现的应用历史存储，所有操作都是空操作。
  * 
+ * 使用此实现时，历史数据不会被持久化，读取操作返回空结果。
  */
 @Unstable
 @Private

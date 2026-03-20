@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,86 +31,78 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.Applicati
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationHistoryData;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerHistoryData;
 
+/**
+ * 应用历史数据读取器接口，定义了读取应用历史数据的标准 API。
+ * 
+ * 该接口提供了从存储后端读取应用、应用尝试和容器历史数据的能力。
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public interface ApplicationHistoryReader {
 
   /**
-   * This method returns Application {@link ApplicationHistoryData} for the
-   * specified {@link ApplicationId}.
+   * 获取指定应用的历史数据。
    * 
-   * @param appId
-   * 
-   * @return {@link ApplicationHistoryData} for the ApplicationId.
+   * @param appId 应用 ID
+   * @return 应用历史数据
    * @throws IOException
    */
   ApplicationHistoryData getApplication(ApplicationId appId) throws IOException;
 
   /**
-   * This method returns all Application {@link ApplicationHistoryData}s
+   * 获取所有应用的历史数据。
    * 
-   * @return map of {@link ApplicationId} to {@link ApplicationHistoryData}s.
+   * @return 应用 ID 到应用历史数据的映射
    * @throws IOException
    */
   Map<ApplicationId, ApplicationHistoryData> getAllApplications()
       throws IOException;
 
   /**
-   * Application can have multiple application attempts
-   * {@link ApplicationAttemptHistoryData}. This method returns the all
-   * {@link ApplicationAttemptHistoryData}s for the Application.
+   * 获取指定应用的所有尝试历史数据。
+   * 一个应用可能包含多次尝试。
    * 
-   * @param appId
-   * 
-   * @return all {@link ApplicationAttemptHistoryData}s for the Application.
+   * @param appId 应用 ID
+   * @return 应用尝试 ID 到尝试历史数据的映射
    * @throws IOException
    */
   Map<ApplicationAttemptId, ApplicationAttemptHistoryData>
       getApplicationAttempts(ApplicationId appId) throws IOException;
 
   /**
-   * This method returns {@link ApplicationAttemptHistoryData} for specified
-   * {@link ApplicationId}.
+   * 获取指定应用尝试的历史数据。
    * 
-   * @param appAttemptId
-   *          {@link ApplicationAttemptId}
-   * @return {@link ApplicationAttemptHistoryData} for ApplicationAttemptId
+   * @param appAttemptId 应用尝试 ID
+   * @return 应用尝试历史数据
    * @throws IOException
    */
   ApplicationAttemptHistoryData getApplicationAttempt(
       ApplicationAttemptId appAttemptId) throws IOException;
 
   /**
-   * This method returns {@link ContainerHistoryData} for specified
-   * {@link ContainerId}.
+   * 获取指定容器的历史数据。
    * 
-   * @param containerId
-   *          {@link ContainerId}
-   * @return {@link ContainerHistoryData} for ContainerId
+   * @param containerId 容器 ID
+   * @return 容器历史数据
    * @throws IOException
    */
   ContainerHistoryData getContainer(ContainerId containerId) throws IOException;
 
   /**
-   * This method returns {@link ContainerHistoryData} for specified
-   * {@link ApplicationAttemptId}.
+   * 获取指定应用尝试的 AM 容器历史数据。
    * 
-   * @param appAttemptId
-   *          {@link ApplicationAttemptId}
-   * @return {@link ContainerHistoryData} for ApplicationAttemptId
+   * @param appAttemptId 应用尝试 ID
+   * @return AM 容器历史数据
    * @throws IOException
    */
   ContainerHistoryData getAMContainer(ApplicationAttemptId appAttemptId)
       throws IOException;
 
   /**
-   * This method returns Map{@link ContainerId} to {@link ContainerHistoryData}
-   * for specified {@link ApplicationAttemptId}.
+   * 获取指定应用尝试的所有容器历史数据。
    * 
-   * @param appAttemptId
-   *          {@link ApplicationAttemptId}
-   * @return Map{@link ContainerId} to {@link ContainerHistoryData} for
-   *         ApplicationAttemptId
+   * @param appAttemptId 应用尝试 ID
+   * @return 容器 ID 到容器历史数据的映射
    * @throws IOException
    */
   Map<ContainerId, ContainerHistoryData> getContainers(

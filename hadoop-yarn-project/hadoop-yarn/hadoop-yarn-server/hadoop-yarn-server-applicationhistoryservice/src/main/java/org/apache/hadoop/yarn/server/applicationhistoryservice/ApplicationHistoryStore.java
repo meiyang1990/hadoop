@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,12 +24,10 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.service.Service;
 
 /**
- * This class is the abstract of the storage of the application history data. It
- * is a {@link Service}, such that the implementation of this class can make use
- * of the service life cycle to initialize and cleanup the storage. Users can
- * access the storage via {@link ApplicationHistoryReader} and
- * {@link ApplicationHistoryWriter} interfaces.
+ * 应用历史数据存储接口，继承了读取和写入接口。
  * 
+ * 作为 {@link Service} 的实现，可利用服务生命周期来初始化和清理存储。
+ * 用户通过 {@link ApplicationHistoryReader} 和 {@link ApplicationHistoryWriter} 接口访问存储。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable

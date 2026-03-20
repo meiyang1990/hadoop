@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,24 +44,36 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 应用历史管理器的具体实现类，负责管理应用历史数据的读写和转换。
+ * 
+ * 该类通过底层的 ApplicationHistoryStore 持久化历史数据，
+ * 并将历史数据转换为 YARN API 定义的标准报告格式供客户端查询。
+ */
 public class ApplicationHistoryManagerImpl extends AbstractService implements
     ApplicationHistoryManager {
   private static final Logger LOG =
           LoggerFactory.getLogger(ApplicationHistoryManagerImpl.class);
   private static final String UNAVAILABLE = "N/A";
 
+  // 历史数据存储后端
   private ApplicationHistoryStore historyStore;
+  // 服务 HTTP 地址，用于构建日志 URL
   private String serverHttpAddress;
 
   public ApplicationHistoryManagerImpl() {
     super(ApplicationHistoryManagerImpl.class.getName());
   }
 
+  /**
+   * 初始化服务：创建并初始化历史存储后端
+   */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     LOG.info("ApplicationHistory Init");
     historyStore = createApplicationHistoryStore(conf);
     historyStore.init(conf);
+    // 构建服务器 HTTP 地址，用于生成聚合日志 URL
     serverHttpAddress = WebAppUtils.getHttpSchemePrefix(conf) +
         WebAppUtils.getAHSWebAppURLWithoutScheme(conf);
     super.serviceInit(conf);
@@ -80,6 +93,9 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
     super.serviceStop();
   }
 
+  /**
+   * 根据配置创建历史存储实例，默认使用文件系统存储
+   */
   protected ApplicationHistoryStore createApplicationHistoryStore(
       Configuration conf) {
     return ReflectionUtils.newInstance(conf.getClass(
@@ -88,6 +104,9 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
       ApplicationHistoryStore.class), conf);
   }
 
+  /**
+   * 获取指定应用尝试的 AM 容器报告
+   */
   @Override
   public ContainerReport getAMContainer(ApplicationAttemptId appAttemptId)
       throws IOException {
@@ -97,6 +116,9 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
         app == null ? null : app.getUser());
   }
 
+  /**
+   * 获取指定时间范围内的应用列表
+   */
   @Override
   public Map<ApplicationId, ApplicationReport> getApplications(long appsNum,
       long appStartedTimeBegin, long appStartedTimeEnd) throws IOException {
@@ -105,12 +127,14 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
     HashMap<ApplicationId, ApplicationReport> applicationsReport =
         new HashMap<ApplicationId, ApplicationReport>();
     int count = 0;
+    // 遍历所有应用，按启动时间过滤并限制返回数量
     for (Entry<ApplicationId, ApplicationHistoryData> entry : histData
       .entrySet()) {
       if (count == appsNum) {
         break;
       }
       long appStartTime = entry.getValue().getStartTime();
+      // 跳过不在时间范围内的应用
       if (appStartTime < appStartedTimeBegin
           || appStartTime > appStartedTimeEnd) {
         continue;
@@ -122,12 +146,18 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
     return applicationsReport;
   }
 
+  /**
+   * 获取指定应用的报告
+   */
   @Override
   public ApplicationReport getApplication(ApplicationId appId)
       throws IOException {
     return convertToApplicationReport(historyStore.getApplication(appId));
   }
 
+  /**
+   * 将应用历史数据转换为应用报告格式
+   */
   private ApplicationReport convertToApplicationReport(
       ApplicationHistoryData appHistory) throws IOException {
     ApplicationAttemptId currentApplicationAttemptId = null;
@@ -135,6 +165,7 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
     String host = UNAVAILABLE;
     int rpcPort = -1;
 
+    // 获取最后一次尝试的信息，用于填充当前尝试 ID、跟踪 URL 等
     ApplicationAttemptHistoryData lastAttempt =
         getLastAttempt(appHistory.getApplicationId());
     if (lastAttempt != null) {
@@ -152,11 +183,15 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
       null, "", 100, appHistory.getApplicationType(), null);
   }
 
+  /**
+   * 获取指定应用的最后一次尝试记录
+   */
   private ApplicationAttemptHistoryData getLastAttempt(ApplicationId appId)
       throws IOException {
     Map<ApplicationAttemptId, ApplicationAttemptHistoryData> attempts =
         historyStore.getApplicationAttempts(appId);
     ApplicationAttemptId prevMaxAttemptId = null;
+    // 找出尝试 ID 最大的记录（即最后一次尝试）
     for (ApplicationAttemptId attemptId : attempts.keySet()) {
       if (prevMaxAttemptId == null) {
         prevMaxAttemptId = attemptId;
@@ -169,6 +204,9 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
     return attempts.get(prevMaxAttemptId);
   }
 
+  /**
+   * 将应用尝试历史数据转换为尝试报告格式
+   */
   private ApplicationAttemptReport convertToApplicationAttemptReport(
       ApplicationAttemptHistoryData appAttemptHistory) {
     return ApplicationAttemptReport.newInstance(
@@ -179,6 +217,9 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
       appAttemptHistory.getMasterContainerId());
   }
 
+  /**
+   * 获取指定应用尝试的报告
+   */
   @Override
   public ApplicationAttemptReport getApplicationAttempt(
       ApplicationAttemptId appAttemptId) throws IOException {
@@ -186,6 +227,9 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
       .getApplicationAttempt(appAttemptId));
   }
 
+  /**
+   * 获取指定应用的所有尝试列表
+   */
   @Override
   public Map<ApplicationAttemptId, ApplicationAttemptReport>
       getApplicationAttempts(ApplicationId appId) throws IOException {
@@ -201,6 +245,9 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
     return applicationAttemptsReport;
   }
 
+  /**
+   * 获取指定容器的报告
+   */
   @Override
   public ContainerReport getContainer(ContainerId containerId)
       throws IOException {
@@ -210,9 +257,13 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
         app == null ? null: app.getUser());
   }
 
+  /**
+   * 将容器历史数据转换为容器报告格式
+   * 同时生成聚合日志的访问 URL
+   */
   private ContainerReport convertToContainerReport(
       ContainerHistoryData containerHistory, String user) {
-    // If the container has the aggregated log, add the server root url
+    // 如果容器有聚合日志，添加服务器根 URL
     String logUrl = WebAppUtils.getAggregatedLogURL(
         serverHttpAddress,
         containerHistory.getAssignedNode().toString(),
@@ -231,6 +282,9 @@ public class ApplicationHistoryManagerImpl extends AbstractService implements
     return container;
   }
 
+  /**
+   * 获取指定应用尝试的所有容器列表
+   */
   @Override
   public Map<ContainerId, ContainerReport> getContainers(
       ApplicationAttemptId appAttemptId) throws IOException {

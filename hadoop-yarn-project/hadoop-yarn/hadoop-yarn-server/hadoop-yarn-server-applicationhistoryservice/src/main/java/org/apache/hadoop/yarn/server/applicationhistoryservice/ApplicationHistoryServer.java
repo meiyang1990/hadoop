@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -75,8 +76,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * History server that keeps track of all types of history in the cluster.
- * Application specific history to start with.
+ * 应用历史服务器，负责跟踪集群中所有类型的历史数据。
+ * 主要提供应用级别的历史记录服务。
  */
 public class ApplicationHistoryServer extends CompositeService {
 
@@ -84,29 +85,40 @@ public class ApplicationHistoryServer extends CompositeService {
   private static final Logger LOG = LoggerFactory
       .getLogger(ApplicationHistoryServer.class);
 
+  // 客户端 RPC 服务
   private ApplicationHistoryClientService ahsClientService;
+  // ACL 管理器
   private ApplicationACLsManager aclsManager;
+  // 应用历史管理器
   private ApplicationHistoryManager historyManager;
+  // Timeline 数据存储
   private TimelineStore timelineStore;
+  // 代理令牌密钥管理服务
   private TimelineV1DelegationTokenSecretManagerService secretManagerService;
+  // Timeline 数据管理器
   private TimelineDataManager timelineDataManager;
+  // Web 应用
   private WebApp webApp;
+  // JVM 暂停监控器
   private JvmPauseMonitor pauseMonitor;
 
   public ApplicationHistoryServer() {
     super(ApplicationHistoryServer.class.getName());
   }
 
+  /**
+   * 初始化服务：安全登录、创建各子服务并注册
+   */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
 
-    // do security login first.
+    // 首先执行安全登录
     try {
       doSecureLogin(conf);
     } catch(IOException ie) {
       throw new YarnRuntimeException("Failed to login", ie);
     }
-    // init timeline services
+    // 初始化 Timeline 相关服务
     timelineStore = createTimelineStore(conf);
     addIfService(timelineStore);
     secretManagerService = createTimelineDelegationTokenSecretManagerService(conf);
@@ -114,13 +126,14 @@ public class ApplicationHistoryServer extends CompositeService {
     timelineDataManager = createTimelineDataManager(conf);
     addService(timelineDataManager);
 
-    // init generic history service afterwards
+    // 初始化通用历史服务
     aclsManager = createApplicationACLsManager(conf);
     historyManager = createApplicationHistoryManager(conf);
     ahsClientService = createApplicationHistoryClientService(historyManager);
     addService(ahsClientService);
     addService((Service) historyManager);
 
+    // 初始化监控系统
     DefaultMetricsSystem.initialize("ApplicationHistoryServer");
     JvmMetrics jm = JvmMetrics.initSingleton("ApplicationHistoryServer", null);
     pauseMonitor = new JvmPauseMonitor();
@@ -129,12 +142,18 @@ public class ApplicationHistoryServer extends CompositeService {
     super.serviceInit(conf);
   }
 
+  /**
+   * 启动服务，包括 Web 应用
+   */
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
     startWebApp();
   }
 
+  /**
+   * 停止服务
+   */
   @Override
   protected void serviceStop() throws Exception {
     if (webApp != null) {
@@ -161,7 +180,7 @@ public class ApplicationHistoryServer extends CompositeService {
   }
 
   /**
-   * @return ApplicationTimelineStore
+   * @return Timeline 存储
    */
   @Private
   @VisibleForTesting
@@ -175,6 +194,9 @@ public class ApplicationHistoryServer extends CompositeService {
     return this.historyManager;
   }
 
+  /**
+   * 启动应用历史服务器的静态入口
+   */
   static ApplicationHistoryServer launchAppHistoryServer(String[] args) {
     Thread
       .setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
@@ -212,11 +234,13 @@ public class ApplicationHistoryServer extends CompositeService {
     return new ApplicationACLsManager(conf);
   }
 
+  /**
+   * 创建应用历史管理器，支持向后兼容
+   * 如果未显式配置旧版存储，默认使用 Timeline 存储
+   */
   private ApplicationHistoryManager createApplicationHistoryManager(
       Configuration conf) {
-    // Backward compatibility:
-    // APPLICATION_HISTORY_STORE is neither null nor empty, it means that the
-    // user has enabled it explicitly.
+    // 向后兼容：如果显式配置了旧版存储，则使用旧实现
     if (conf.get(YarnConfiguration.APPLICATION_HISTORY_STORE) == null ||
         conf.get(YarnConfiguration.APPLICATION_HISTORY_STORE).length() == 0 ||
         conf.get(YarnConfiguration.APPLICATION_HISTORY_STORE).equals(
@@ -247,17 +271,18 @@ public class ApplicationHistoryServer extends CompositeService {
     return new TimelineDataManager(timelineStore, aclsMgr);
   }
 
+  /**
+   * 启动 Web 应用，配置 CORS、认证过滤器和 UI 插件
+   */
   @SuppressWarnings("unchecked")
   private void startWebApp() {
     Configuration conf = getConfig();
-    // Always load pseudo authentication filter to parse "user.name" in an URL
-    // to identify a HTTP request's user in insecure mode.
-    // When Kerberos authentication type is set (i.e., secure mode is turned on),
-    // the customized filter will be loaded by the timeline server to do Kerberos
-    // + DT authentication.
+    // 始终加载伪认证过滤器以解析 URL 中的 "user.name"
+    // 在非安全模式下用于识别 HTTP 请求的用户
+    // 当启用 Kerberos 认证时，加载自定义过滤器进行 Kerberos + DT 认证
     String initializers = conf.get("hadoop.http.filter.initializers", "");
     Set<String> defaultInitializers = new LinkedHashSet<>();
-    // Add CORS filter
+    // 添加 CORS 过滤器
     if (!initializers.contains(CrossOriginFilterInitializer.class.getName())) {
       if(conf.getBoolean(YarnConfiguration.
           TIMELINE_SERVICE_HTTP_CROSS_ORIGIN_ENABLED,
@@ -296,6 +321,7 @@ public class ApplicationHistoryServer extends CompositeService {
               .at(bindAddress).build(ahsWebApp);
        HttpServer2 httpServer = webApp.httpServer();
 
+       // 加载配置的 UI 插件
        String[] names = conf.getTrimmedStrings(
            YarnConfiguration.TIMELINE_SERVICE_UI_NAMES);
        WebAppContext webAppContext = httpServer.getWebAppContext();
@@ -313,6 +339,7 @@ public class ApplicationHistoryServer extends CompositeService {
           uiWebAppContext.setResourceBase(onDiskPath);
         }
         final String[] ALL_URLS = {"/*"};
+        // 复制过滤器到 UI 上下文
         FilterHolder[] filterHolders =
             webAppContext.getServletHandler().getFilters();
         for (FilterHolder filterHolder : filterHolders) {
@@ -338,6 +365,9 @@ public class ApplicationHistoryServer extends CompositeService {
     }
   }
 
+  /**
+   * 执行安全登录
+   */
   private void doSecureLogin(Configuration conf) throws IOException {
     InetSocketAddress socAddr = getBindAddress(conf);
     SecurityUtil.login(conf, YarnConfiguration.TIMELINE_SERVICE_KEYTAB,
@@ -345,10 +375,7 @@ public class ApplicationHistoryServer extends CompositeService {
   }
 
   /**
-   * Retrieve the timeline server bind address from configuration
-   *
-   * @param conf
-   * @return InetSocketAddress
+   * 从配置中获取 Timeline 服务器绑定地址
    */
   private static InetSocketAddress getBindAddress(Configuration conf) {
     return conf.getSocketAddr(YarnConfiguration.TIMELINE_SERVICE_ADDRESS,
@@ -356,6 +383,9 @@ public class ApplicationHistoryServer extends CompositeService {
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_PORT);
   }
 
+  /**
+   * 配置 Jersey REST 资源
+   */
   protected ResourceConfig configure() {
     ResourceConfig config = new ResourceConfig();
     config.packages("org.apache.hadoop.yarn.server.timeline.webapp");
@@ -375,6 +405,9 @@ public class ApplicationHistoryServer extends CompositeService {
     return config;
   }
 
+  /**
+   * Jersey 依赖注入绑定器
+   */
   private class JerseyBinder extends AbstractBinder {
     @Override
     protected void configure() {
