@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,6 +23,10 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.yarn.proto.CollectorNodemanagerProtocol.CollectorNodemanagerProtocolService;
 
+/**
+ * CollectorNodemanagerProtocol 的 PB RPC 接口定义，
+ * 指定协议名和版本，并复用编译生成的阻塞式 Service 接口。
+ */
 @Private
 @Unstable
 @ProtocolInfo(

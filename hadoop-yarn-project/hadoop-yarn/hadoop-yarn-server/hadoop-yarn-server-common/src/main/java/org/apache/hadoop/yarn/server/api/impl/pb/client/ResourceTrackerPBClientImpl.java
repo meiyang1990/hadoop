@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,10 +48,12 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.UnRegisterNodeM
 
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+// PB 客户端实现，负责与 RM 的 ResourceTracker 服务进行 RPC 交互
 public class ResourceTrackerPBClientImpl implements ResourceTracker, Closeable {
 
-private ResourceTrackerPB proxy;
+  private ResourceTrackerPB proxy;
   
+  // 构造代理客户端，使用 ProtobufRpcEngine2 与目标地址建立阻塞式连接
   public ResourceTrackerPBClientImpl(long clientVersion, InetSocketAddress addr, Configuration conf) throws IOException {
     RPC.setProtocolEngine(conf, ResourceTrackerPB.class,
         ProtobufRpcEngine2.class);
@@ -58,6 +61,7 @@ private ResourceTrackerPB proxy;
         ResourceTrackerPB.class, clientVersion, addr, conf);
   }
 
+  // 关闭底层代理
   @Override
   public void close() {
     if(this.proxy != null) {
@@ -65,6 +69,7 @@ private ResourceTrackerPB proxy;
     }
   }
 
+  // 注册新 NodeManager，将请求转换为 proto 并处理 ServiceException
   @Override
   public RegisterNodeManagerResponse registerNodeManager(
       RegisterNodeManagerRequest request) throws YarnException,
@@ -78,6 +83,7 @@ private ResourceTrackerPB proxy;
     }
   }
 
+  // NodeManager 心跳 RPC，包装/解包 proto 与异常
   @Override
   public NodeHeartbeatResponse nodeHeartbeat(NodeHeartbeatRequest request)
       throws YarnException, IOException {
@@ -90,6 +96,7 @@ private ResourceTrackerPB proxy;
     }
   }
 
+  // 注销 NodeManager，沿用统一的 proto 转换和异常处理
   @Override
   public UnRegisterNodeManagerResponse unRegisterNodeManager(
       UnRegisterNodeManagerRequest request) throws YarnException, IOException {

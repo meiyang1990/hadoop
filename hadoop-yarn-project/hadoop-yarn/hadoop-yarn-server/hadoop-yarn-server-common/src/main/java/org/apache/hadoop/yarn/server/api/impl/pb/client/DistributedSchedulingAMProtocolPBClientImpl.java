@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -55,11 +56,13 @@ import java.net.InetSocketAddress;
  * Implementation of {@link DistributedSchedulingAMProtocol}, used when
  * distributed scheduling is enabled.
  */
+// PB 客户端实现，兼容分布式调度开启时 AM 的所有 RPC 接口
 public class DistributedSchedulingAMProtocolPBClientImpl implements
     DistributedSchedulingAMProtocol, Closeable {
 
   private DistributedSchedulingAMProtocolPB proxy;
 
+  // 依据给定地址与版本构建阻塞式 PB 代理，复用 ProtobufRpcEngine2
   public DistributedSchedulingAMProtocolPBClientImpl(long clientVersion,
       InetSocketAddress addr, Configuration conf) throws IOException {
     RPC.setProtocolEngine(conf, DistributedSchedulingAMProtocolPB.class,
@@ -68,6 +71,7 @@ public class DistributedSchedulingAMProtocolPBClientImpl implements
         addr, conf);
   }
 
+  // 释放底层代理
   @Override
   public void close() {
     if (this.proxy != null) {
@@ -75,6 +79,7 @@ public class DistributedSchedulingAMProtocolPBClientImpl implements
     }
   }
 
+  // 注册 AM 以便启用分布式调度，转换请求为 proto 并解包异常
   @Override
   public RegisterDistributedSchedulingAMResponse
       registerApplicationMasterForDistributedScheduling(
@@ -92,6 +97,7 @@ public class DistributedSchedulingAMProtocolPBClientImpl implements
     }
   }
 
+  // 分布式调度版的 allocate，直接调用对应 RPC 并返回 PB 封装响应
   @Override
   public DistributedSchedulingAllocateResponse allocateForDistributedScheduling(
       DistributedSchedulingAllocateRequest request)
@@ -108,6 +114,7 @@ public class DistributedSchedulingAMProtocolPBClientImpl implements
     }
   }
 
+  // 常规 AM 注册 RPC，沿用同样的 proto 转换与异常解包流程
   @Override
   public RegisterApplicationMasterResponse registerApplicationMaster(
       RegisterApplicationMasterRequest request)
@@ -123,6 +130,7 @@ public class DistributedSchedulingAMProtocolPBClientImpl implements
     }
   }
 
+  // 结束 AM 的 RPC，负责包装/解包 proto 请求响应
   @Override
   public FinishApplicationMasterResponse finishApplicationMaster(
       FinishApplicationMasterRequest request)
@@ -138,6 +146,7 @@ public class DistributedSchedulingAMProtocolPBClientImpl implements
     }
   }
 
+  // 常规 allocate 接口，保持同一的异常处理模式
   @Override
   public AllocateResponse allocate(AllocateRequest request)
       throws YarnException, IOException {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,10 +46,11 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.ReportNewCollec
 
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+// PB 客户端实现，封装与 NM Collector 服务的 RPC 交互
 public class CollectorNodemanagerProtocolPBClientImpl implements
     CollectorNodemanagerProtocol, Closeable {
 
-  // Not a documented config. Only used for tests internally
+  // 未公开的配置键，仅内部测试使用
   static final String NM_COMMAND_TIMEOUT = YarnConfiguration.YARN_PREFIX
       + "rpc.nm-command-timeout";
 
@@ -59,6 +61,7 @@ public class CollectorNodemanagerProtocolPBClientImpl implements
 
   private CollectorNodemanagerProtocolPB proxy;
 
+  // 初始化 PB 代理客户端，按配置超时创建与目标 NM 的阻塞式 RPC 连接
   @Private
   public CollectorNodemanagerProtocolPBClientImpl(long clientVersion,
       InetSocketAddress addr, Configuration conf) throws IOException {
@@ -74,6 +77,7 @@ public class CollectorNodemanagerProtocolPBClientImpl implements
             NetUtils.getDefaultSocketFactory(conf), expireIntvl);
   }
 
+  // 向 NM 上报新的 collector 注册信息，失败时解包 ServiceException 为 YarnException/IOException
   @Override
   public ReportNewCollectorInfoResponse reportNewCollectorInfo(
       ReportNewCollectorInfoRequest request) throws YarnException, IOException {
@@ -89,6 +93,7 @@ public class CollectorNodemanagerProtocolPBClientImpl implements
     }
   }
 
+  // 查询指定应用的 collector 运行上下文，同样做 proto 转换与异常解包
   @Override
   public GetTimelineCollectorContextResponse getTimelineCollectorContext(
       GetTimelineCollectorContextRequest request)
@@ -104,6 +109,7 @@ public class CollectorNodemanagerProtocolPBClientImpl implements
     }
   }
 
+  // 关闭底层 RPC 代理，释放网络资源
   @Override
   public void close() {
     if (this.proxy != null) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,11 +43,13 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.SCMUploaderNoti
 
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+// PB 客户端实现，封装与 SCM 上传服务的 RPC 调用
 public class SCMUploaderProtocolPBClientImpl implements
     SCMUploaderProtocol, Closeable {
 
   private SCMUploaderProtocolPB proxy;
 
+  // 构造上传协议的 PB 代理，配置 RPC 引擎并建立连接
   public SCMUploaderProtocolPBClientImpl(long clientVersion,
       InetSocketAddress addr, Configuration conf) throws IOException {
     RPC.setProtocolEngine(conf, SCMUploaderProtocolPB.class,
@@ -55,6 +58,7 @@ public class SCMUploaderProtocolPBClientImpl implements
         RPC.getProxy(SCMUploaderProtocolPB.class, clientVersion, addr, conf);
   }
 
+  // 释放代理资源
   @Override
   public void close() {
     if (this.proxy != null) {
@@ -63,6 +67,7 @@ public class SCMUploaderProtocolPBClientImpl implements
     }
   }
 
+  // 上报上传完成/出错的通知，转换请求为 proto 并解包 ServiceException
   @Override
   public SCMUploaderNotifyResponse notify(SCMUploaderNotifyRequest request)
       throws YarnException, IOException {
@@ -77,6 +82,7 @@ public class SCMUploaderProtocolPBClientImpl implements
     }
   }
 
+  // 询问是否允许上传，保持统一的 proto 转换与异常解包流程
   @Override
   public SCMUploaderCanUploadResponse canUpload(
       SCMUploaderCanUploadRequest request) throws YarnException, IOException {

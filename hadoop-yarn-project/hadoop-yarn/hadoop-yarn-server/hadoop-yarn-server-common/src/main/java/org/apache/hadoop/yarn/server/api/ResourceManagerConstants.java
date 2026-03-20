@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,12 +19,13 @@
 
 package org.apache.hadoop.yarn.server.api;
 
+/**
+ * ResourceManager 相关的公共常量定义。
+ */
 public interface ResourceManagerConstants {
 
   /**
-   * This states the invalid identifier of Resource Manager. This is used as a
-   * default value for initializing RM identifier. Currently, RM is using time
-   * stamp as RM identifier.
+   * RM 标识符的无效值，初始化时的默认占位；实际标识通常使用时间戳生成。
    */
   public static final long RM_INVALID_IDENTIFIER = -1;
 }

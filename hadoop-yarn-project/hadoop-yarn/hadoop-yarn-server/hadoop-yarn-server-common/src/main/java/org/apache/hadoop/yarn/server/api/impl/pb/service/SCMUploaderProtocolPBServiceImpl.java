@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,15 +38,18 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.SCMUploaderNoti
 import org.apache.hadoop.thirdparty.protobuf.RpcController;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+// PB Service 端实现，负责将 SCM 上传协议的 proto 请求委派给真实实现
 public class SCMUploaderProtocolPBServiceImpl implements
     SCMUploaderProtocolPB {
 
   private SCMUploaderProtocol real;
 
+  // 保存真实实现，后续方法统一转发
   public SCMUploaderProtocolPBServiceImpl(SCMUploaderProtocol impl) {
     this.real = impl;
   }
 
+  // 处理上传完成/失败通知，转换请求对象并统一包装异常
   @Override
   public SCMUploaderNotifyResponseProto notify(RpcController controller,
       SCMUploaderNotifyRequestProto proto) throws ServiceException {
@@ -61,6 +65,7 @@ public class SCMUploaderProtocolPBServiceImpl implements
     }
   }
 
+  // 处理上传权限校验，同样负责 proto 与内部对象互转
   @Override
   public SCMUploaderCanUploadResponseProto canUpload(RpcController controller,
       SCMUploaderCanUploadRequestProto proto)

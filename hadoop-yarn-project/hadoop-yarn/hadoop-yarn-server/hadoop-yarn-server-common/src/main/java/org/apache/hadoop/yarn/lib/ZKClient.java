@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -33,6 +34,7 @@ import org.apache.zookeeper.data.Stat;
 /** ZK Registration Library
  * currently does not use any authorization
  */
+// ZooKeeper 客户端，用于服务注册与发现
 public class ZKClient {
   private ZooKeeper zkClient;
   
@@ -42,6 +44,7 @@ public class ZKClient {
    * @param string the host
    * @throws IOException if there are I/O errors.
    */
+  // 创建 ZooKeeper 客户端连接，连接超时时间为 30 秒
   public ZKClient(String string) throws IOException {
     zkClient = new ZooKeeper(string, 30000, new ZKWatcher());
   }
@@ -54,6 +57,7 @@ public class ZKClient {
    * @throws IOException if there are I/O errors.
    * @throws InterruptedException if any thread has interrupted.
    */
+  // 注册服务到指定路径，数据以 UTF-8 编码存储，节点为临时节点
   public void registerService(String path, String data) throws
     IOException, InterruptedException {
     try {
@@ -71,6 +75,7 @@ public class ZKClient {
    * @throws IOException if there are I/O errors.
    * @throws InterruptedException if any thread has interrupted.
    */
+  // 注销指定路径的服务，删除对应的 ZooKeeper 节点
   public void unregisterService(String path) throws IOException,
       InterruptedException {
     try {
@@ -89,6 +94,7 @@ public class ZKClient {
    * @throws IOException if there are I/O errors.
    * @throws InterruptedException if any thread has interrupted.
    */
+  // 列出指定路径下注册的所有服务节点名称
   public List<String> listServices(String path) throws IOException, 
       InterruptedException {
     List<String> children = null;
@@ -108,6 +114,7 @@ public class ZKClient {
    * @throws IOException if there are I/O errors.
    * @throws InterruptedException  if any thread has interrupted.
    */
+  // 获取指定路径下服务节点存储的数据内容
   public String getServiceData(String path) throws IOException,
       InterruptedException {
     String data;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,19 +31,28 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerRe
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerResponse;
 
 /**
- * This is used by the Node Manager to register/nodeHeartbeat/unregister with
- * the ResourceManager.
+ * NodeManager 用于与 ResourceManager 通信的核心接口，
+ * 负责节点的注册、心跳汇报和注销。
  */
 public interface ResourceTracker {
   
+  /**
+   * 注册 NodeManager 到 ResourceManager。
+   */
   @Idempotent
   RegisterNodeManagerResponse registerNodeManager(
       RegisterNodeManagerRequest request) throws YarnException, IOException;
 
+  /**
+   * 向 ResourceManager 发送心跳，汇报节点状态。
+   */
   @AtMostOnce
   NodeHeartbeatResponse nodeHeartbeat(NodeHeartbeatRequest request)
       throws YarnException, IOException;
 
+  /**
+   * 从 ResourceManager 注销 NodeManager。
+   */
   @Idempotent
   UnRegisterNodeManagerResponse unRegisterNodeManager(
       UnRegisterNodeManagerRequest request) throws YarnException, IOException;

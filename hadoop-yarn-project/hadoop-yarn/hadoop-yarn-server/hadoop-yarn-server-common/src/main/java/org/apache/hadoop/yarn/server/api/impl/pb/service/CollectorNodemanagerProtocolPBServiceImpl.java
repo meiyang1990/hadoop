@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,16 +37,19 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.ReportNewCollec
 import org.apache.hadoop.thirdparty.protobuf.RpcController;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+// PB Service 端实现，桥接 NM Collector 协议的 proto 请求与真实实现
 public class CollectorNodemanagerProtocolPBServiceImpl implements
     CollectorNodemanagerProtocolPB {
 
   private CollectorNodemanagerProtocol real;
 
+  // 保存真实实现，后续直接委派
   public CollectorNodemanagerProtocolPBServiceImpl(
       CollectorNodemanagerProtocol impl) {
     this.real = impl;
   }
 
+  // 处理 collector 注册上报，将 proto 包装成内部请求并传递给真实实现
   @Override
   public ReportNewCollectorInfoResponseProto reportNewCollectorInfo(
       RpcController arg0, ReportNewCollectorInfoRequestProto proto)
@@ -63,6 +67,7 @@ public class CollectorNodemanagerProtocolPBServiceImpl implements
     }
   }
 
+  // 处理 collector 上下文查询，负责 proto 与内部对象的双向转换
   @Override
   public GetTimelineCollectorContextResponseProto getTimelineCollectorContext(
       RpcController controller,

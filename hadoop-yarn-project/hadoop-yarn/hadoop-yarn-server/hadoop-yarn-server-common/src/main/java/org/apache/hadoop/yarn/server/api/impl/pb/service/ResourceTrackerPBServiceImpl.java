@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,6 +43,10 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.UnRegisterNodeM
 import org.apache.hadoop.thirdparty.protobuf.RpcController;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+/**
+ * ResourceTracker 协议的 Protobuf 服务实现类，
+ * 将 RPC 请求转换为实际的业务逻辑调用。
+ */
 public class ResourceTrackerPBServiceImpl implements ResourceTrackerPB {
 
   private ResourceTracker real;
@@ -50,6 +55,10 @@ public class ResourceTrackerPBServiceImpl implements ResourceTrackerPB {
     this.real = impl;
   }
   
+  /**
+   * 处理节点注册请求，将 ProtocolBuffer 格式转换为内部对象，
+   * 调用实际业务实现并返回响应。
+   */
   @Override
   public RegisterNodeManagerResponseProto registerNodeManager(
       RpcController controller, RegisterNodeManagerRequestProto proto)
@@ -63,6 +72,9 @@ public class ResourceTrackerPBServiceImpl implements ResourceTrackerPB {
     }
   }
 
+  /**
+   * 处理节点心跳请求，转换协议格式并调用实际业务逻辑。
+   */
   @Override
   public NodeHeartbeatResponseProto nodeHeartbeat(RpcController controller,
       NodeHeartbeatRequestProto proto) throws ServiceException {
@@ -75,6 +87,9 @@ public class ResourceTrackerPBServiceImpl implements ResourceTrackerPB {
     }
   }
 
+  /**
+   * 处理节点注销请求，转换协议格式并调用实际业务逻辑。
+   */
   @Override
   public UnRegisterNodeManagerResponseProto unRegisterNodeManager(
       RpcController controller, UnRegisterNodeManagerRequestProto proto)

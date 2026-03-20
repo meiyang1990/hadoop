@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,16 +48,19 @@ import java.io.IOException;
 /**
  * Implementation of {@link DistributedSchedulingAMProtocolPB}.
  */
+// PB Service 端实现，负责将分布式调度 AM 的 proto 请求转换并委派给真实实现
 public class DistributedSchedulingAMProtocolPBServiceImpl implements
     DistributedSchedulingAMProtocolPB {
 
   private DistributedSchedulingAMProtocol real;
 
+  // 保存真实协议实现，后续方法统一转发
   public DistributedSchedulingAMProtocolPBServiceImpl(
       DistributedSchedulingAMProtocol impl) {
     this.real = impl;
   }
 
+  // 处理 AM 分布式调度注册，转换请求并捕获异常为 ServiceException
   @Override
   public YarnServerCommonServiceProtos.
       RegisterDistributedSchedulingAMResponseProto
@@ -77,6 +81,7 @@ public class DistributedSchedulingAMProtocolPBServiceImpl implements
     }
   }
 
+  // 分布式调度版 allocate，负责 proto 与内部对象互转并回传响应 proto
   @Override
   public YarnServerCommonServiceProtos.
       DistributedSchedulingAllocateResponseProto
@@ -98,6 +103,7 @@ public class DistributedSchedulingAMProtocolPBServiceImpl implements
     }
   }
 
+  // 常规 allocate RPC 的 PB 封装
   @Override
   public YarnServiceProtos.AllocateResponseProto allocate(RpcController arg0,
       AllocateRequestProto proto) throws ServiceException {
@@ -112,6 +118,7 @@ public class DistributedSchedulingAMProtocolPBServiceImpl implements
     }
   }
 
+  // 结束 AM 的 RPC，保持一致的转换和异常包装
   @Override
   public YarnServiceProtos.FinishApplicationMasterResponseProto
   finishApplicationMaster(
@@ -131,6 +138,7 @@ public class DistributedSchedulingAMProtocolPBServiceImpl implements
     }
   }
 
+  // AM 注册的常规 RPC，负责转换请求与响应 proto
   @Override
   public YarnServiceProtos.RegisterApplicationMasterResponseProto
   registerApplicationMaster(

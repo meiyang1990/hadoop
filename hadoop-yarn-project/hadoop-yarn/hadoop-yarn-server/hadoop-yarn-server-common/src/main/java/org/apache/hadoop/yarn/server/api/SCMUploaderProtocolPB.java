@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,6 +21,10 @@ package org.apache.hadoop.yarn.server.api;
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.yarn.proto.SCMUploaderProtocol.SCMUploaderProtocolService;
 
+/**
+ * SCMUploaderProtocol 的 PB RPC 接口定义，
+ * 指定协议名与版本并复用编译生成的阻塞式 Service 接口。
+ */
 @ProtocolInfo(protocolName = "org.apache.hadoop.yarn.server.api.SCMUploaderProtocolPB",
     protocolVersion = 1)
 public interface SCMUploaderProtocolPB extends

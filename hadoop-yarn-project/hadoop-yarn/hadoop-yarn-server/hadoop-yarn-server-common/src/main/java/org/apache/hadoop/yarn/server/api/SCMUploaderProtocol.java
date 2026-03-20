@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,52 +30,21 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.SCMUploaderNotifyReques
 import org.apache.hadoop.yarn.server.api.protocolrecords.SCMUploaderNotifyResponse;
 
 /**
- * <p>
- * The protocol between a <code>NodeManager's</code>
- * <code>SharedCacheUploadService</code> and the
- * <code>SharedCacheManager.</code>
- * </p>
+ * NodeManager 的 SharedCacheUploadService 与 SharedCacheManager 之间的协议，
+ * 用于通知上传的共享缓存资源及查询是否允许上传。
  */
 @Private
 @Unstable
 public interface SCMUploaderProtocol {
   /**
-   * <p>
-   * The method used by the NodeManager's <code>SharedCacheUploadService</code>
-   * to notify the shared cache manager of a newly cached resource.
-   * </p>
-   *
-   * <p>
-   * The <code>SharedCacheManager</code> responds with whether or not the
-   * NodeManager should delete the uploaded file.
-   * </p>
-   *
-   * @param request notify the shared cache manager of a newly uploaded resource
-   *          to the shared cache
-   * @return response indicating if the newly uploaded resource should be
-   *         deleted
-   * @throws YarnException exceptions from yarn servers.
-   * @throws IOException if there are I/O errors.
+   * 汇报新上传的共享缓存资源，并由 SharedCacheManager 决定是否需要删除本地文件。
    */
   public SCMUploaderNotifyResponse
       notify(SCMUploaderNotifyRequest request)
       throws YarnException, IOException;
 
   /**
-   * <p>
-   * The method used by the NodeManager's <code>SharedCacheUploadService</code>
-   * to request whether a resource can be uploaded.
-   * </p>
-   *
-   * <p>
-   * The <code>SharedCacheManager</code> responds with whether or not the
-   * NodeManager can upload the file.
-   * </p>
-   *
-   * @param request whether the resource can be uploaded to the shared cache
-   * @return response indicating if resource can be uploaded to the shared cache
-   * @throws YarnException exceptions from yarn servers.
-   * @throws IOException if there are I/O errors.
+   * 询问指定资源是否允许上传到共享缓存，返回可否上传的决策结果。
    */
   public SCMUploaderCanUploadResponse
       canUpload(SCMUploaderCanUploadRequest request)

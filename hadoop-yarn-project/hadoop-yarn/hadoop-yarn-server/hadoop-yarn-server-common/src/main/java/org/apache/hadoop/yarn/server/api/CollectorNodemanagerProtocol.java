@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,45 +28,23 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.ReportNewCollectorInfoR
 import org.apache.hadoop.yarn.server.api.protocolrecords.ReportNewCollectorInfoResponse;
 
 /**
- * <p>The protocol between an <code>TimelineCollectorManager</code> and a
- * <code>NodeManager</code> to report a new application collector get launched.
- * </p>
- *
+ * TimelineCollectorManager 与 NodeManager 之间的协议接口，
+ * 用于通知节点有新的应用级 collector 启动并同步上下文信息。
  */
 @Private
 public interface CollectorNodemanagerProtocol {
 
   /**
-   *
-   * <p>
-   * The <code>TimelineCollectorManager</code> provides a list of mapping
-   * between application and collector's address in
-   * {@link ReportNewCollectorInfoRequest} to a <code>NodeManager</code> to
-   * <em>register</em> collector's info, include: applicationId and REST URI to
-   * access collector. NodeManager will add them into registered collectors
-   * and register them into <code>ResourceManager</code> afterwards.
-   * </p>
-   *
-   * @param request the request of registering a new collector or a list of
-   *                collectors
-   * @return the response for registering the new collector
-   * @throws YarnException if the request is invalid
-   * @throws IOException if there are I/O errors
+   * 注册新的应用 collector 信息（应用 ID 与 REST 访问地址），
+   * 让 NodeManager 建立本地映射并随后汇报给 ResourceManager。
    */
   ReportNewCollectorInfoResponse reportNewCollectorInfo(
       ReportNewCollectorInfoRequest request)
       throws YarnException, IOException;
 
   /**
-   * <p>
-   * The collector needs to get the context information including user, flow
-   * and flow run ID to associate with every incoming put-entity requests.
-   * </p>
-   * @param request the request of getting the aggregator context information of
-   *                the given application
-   * @return the response for registering the new collector
-   * @throws YarnException if the request is invalid
-   * @throws IOException if there are I/O errors
+   * 供 collector 查询应用的上下文（用户、flow、flow run），
+   * 以便在后续 put-entity 请求中附带正确关联信息。
    */
   GetTimelineCollectorContextResponse getTimelineCollectorContext(
       GetTimelineCollectorContextRequest request)

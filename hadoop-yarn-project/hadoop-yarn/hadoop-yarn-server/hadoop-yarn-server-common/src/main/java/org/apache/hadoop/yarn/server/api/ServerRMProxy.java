@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -30,6 +31,10 @@ import org.apache.hadoop.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Server 侧 RMProxy，集中管理到 ResourceManager 的代理创建与地址解析，
+ * 只允许 DistributedSchedulingAMProtocol 与 ResourceTracker 两种协议。
+ */
 public class ServerRMProxy<T> extends RMProxy<T> {
   private static final Logger LOG =
       LoggerFactory.getLogger(ServerRMProxy.class);
@@ -44,12 +49,7 @@ public class ServerRMProxy<T> extends RMProxy<T> {
   }
 
   /**
-   * Create a proxy to the ResourceManager for the specified protocol.
-   * @param configuration Configuration with all the required information.
-   * @param protocol Server protocol for which proxy is being requested.
-   * @param <T> Type of proxy.
-   * @return Proxy to the ResourceManager for the specified server protocol.
-   * @throws IOException if there are I/O errors.
+   * 创建指定协议的 ResourceManager 代理，读取连接等待与重试配置并复用 RMProxy 工具方法。
    */
   public static <T> T createRMProxy(final Configuration configuration,
       final Class<T> protocol) throws IOException {
@@ -97,6 +97,9 @@ public class ServerRMProxy<T> extends RMProxy<T> {
     }
   }
 
+  /**
+   * 校验是否为允许的 RM 协议，只接受 ServerRMProtocols 声明的组合。
+   */
   @InterfaceAudience.Private
   @Override
   public void checkAllowedProtocols(Class<?> protocol) {

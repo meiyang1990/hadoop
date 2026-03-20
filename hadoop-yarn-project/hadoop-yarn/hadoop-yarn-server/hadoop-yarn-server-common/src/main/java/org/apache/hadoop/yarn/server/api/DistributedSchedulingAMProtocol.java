@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,30 +32,14 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import java.io.IOException;
 
 /**
- * <p>
- * This protocol extends the <code>ApplicationMasterProtocol</code>. It is used
- * by the <code>DistributedScheduler</code> running on the NodeManager to wrap
- * the request / response objects of the <code>registerApplicationMaster</code>
- * and <code>allocate</code> methods of the protocol with additional information
- * required to perform distributed scheduling.
- * </p>
+ * 扩展 ApplicationMasterProtocol，供运行在 NodeManager 上的 DistributedScheduler 使用，
+ * 在注册和分配 RPC 中封装分布式调度所需的额外元数据。
  */
 public interface DistributedSchedulingAMProtocol
     extends ApplicationMasterProtocol {
 
   /**
-   * <p>
-   * Extends the <code>registerApplicationMaster</code> to wrap the response
-   * with additional metadata.
-   * </p>
-   *
-   * @param request
-   *          ApplicationMaster registration request
-   * @return A <code>RegisterDistributedSchedulingAMResponse</code> that
-   *         contains a standard AM registration response along with additional
-   *         information required for distributed scheduling
-   * @throws YarnException YarnException
-   * @throws IOException IOException
+   * 扩展 registerApplicationMaster，返回包含分布式调度附加信息的注册响应。
    */
   @Public
   @Unstable
@@ -65,18 +50,7 @@ public interface DistributedSchedulingAMProtocol
             throws YarnException, IOException;
 
   /**
-   * <p>
-   * Extends the <code>allocate</code> to wrap the response with additional
-   * metadata.
-   * </p>
-   *
-   * @param request
-   *          ApplicationMaster allocate request
-   * @return A <code>DistributedSchedulingAllocateResponse</code> that contains
-   *         a standard AM allocate response along with additional information
-   *         required for distributed scheduling
-   * @throws YarnException YarnException
-   * @throws IOException IOException
+   * 扩展 allocate，返回带有分布式调度附加信息的分配响应。
    */
   @Public
   @Unstable
