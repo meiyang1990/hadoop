@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,27 +26,32 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.MasterKeyProto;
 import org.apache.hadoop.yarn.proto.YarnServerCommonProtos.MasterKeyProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 
+// MasterKey 的 PB 实现，线程安全地在本地字段与 proto 之间切换
 public class MasterKeyPBImpl extends ProtoBase<MasterKeyProto> implements
     MasterKey {
   MasterKeyProto proto = MasterKeyProto.getDefaultInstance();
   MasterKeyProto.Builder builder = null;
   boolean viaProto = false;
   
+  // 默认构造新的 builder，供 RM 生成主密钥时使用
   public MasterKeyPBImpl() {
     builder = MasterKeyProto.newBuilder();
   }
 
+  // 使用已有的 proto 包装，保持与上游消息一致
   public MasterKeyPBImpl(MasterKeyProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  // 同步方法，返回当前的 proto 表示
   public synchronized MasterKeyProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
   }
 
+  // 切换到可写模式，确保 builder 可用
   private synchronized void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = MasterKeyProto.newBuilder(proto);

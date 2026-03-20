@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,9 +28,11 @@ import org.apache.hadoop.yarn.util.Records;
  * pertaining to the state of execution of the opportunistic containers within a
  * node. </p>
  */
+// 节点上 Opportunistic 容器的运行与排队指标，供 RM 调整资源决策
 @Private
 @Unstable
 public abstract class OpportunisticContainersStatus {
+  // 构造空的 PB 对象，后续由调用方填充指标
   public static OpportunisticContainersStatus newInstance() {
     return Records.newRecord(OpportunisticContainersStatus.class);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,6 +25,7 @@ import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
+// NodeHealthStatus 的 PB 实现，延迟在本地对象与 proto 之间同步字段
 public class NodeHealthStatusPBImpl extends NodeHealthStatus {
 
   private NodeHealthStatusProto.Builder builder;
@@ -67,6 +69,7 @@ public class NodeHealthStatusPBImpl extends NodeHealthStatus {
     return TextFormat.shortDebugString(getProto());
   }
 
+  // 将本地 builder 内容刷新到 proto，后续可直接返回不可变对象
   private void mergeLocalToProto() {
     if (this.viaProto)
       maybeInitBuilder();
@@ -75,6 +78,7 @@ public class NodeHealthStatusPBImpl extends NodeHealthStatus {
     this.viaProto = true;
   }
 
+  // 当当前处于 proto 模式或 builder 为空时，初始化可写 builder
   private void maybeInitBuilder() {
     if (this.viaProto || this.builder == null) {
       this.builder = NodeHealthStatusProto.newBuilder(this.proto);

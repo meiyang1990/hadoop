@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,6 +24,7 @@ package org.apache.hadoop.yarn.server.api.records;
  * 
  */
 
+// NodeManager 需要执行的动作：保持正常、重新同步或关闭
 public enum NodeAction {
   NORMAL, RESYNC, SHUTDOWN
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,9 +44,11 @@ import org.apache.hadoop.yarn.util.Records;
  */
 @Public
 @Stable
+// NodeManager 节点健康信息的摘要：是否健康、诊断报告与最近上报时间
 public abstract class NodeHealthStatus {
 
   @Private
+  // 工厂方法，构造 PB 实现并填充健康状态与时间戳
   public static NodeHealthStatus newInstance(boolean isNodeHealthy,
       String healthReport, long lastHealthReport) {
     NodeHealthStatus status = Records.newRecord(NodeHealthStatus.class);

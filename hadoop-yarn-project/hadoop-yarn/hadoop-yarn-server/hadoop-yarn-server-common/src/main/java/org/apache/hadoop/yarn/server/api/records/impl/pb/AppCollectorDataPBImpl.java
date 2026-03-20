@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -32,6 +33,7 @@ import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 @Private
 @Unstable
+// AppCollectorData 的 PB 实现，维护本地缓存并在需要时与 Protobuf 对象互转
 public class AppCollectorDataPBImpl extends AppCollectorData {
 
   private AppCollectorDataProto proto =
@@ -46,15 +48,18 @@ public class AppCollectorDataPBImpl extends AppCollectorData {
   private Long version = null;
   private Token collectorToken = null;
 
+  // 默认构造新的 builder，供上层填充字段
   public AppCollectorDataPBImpl() {
     builder = AppCollectorDataProto.newBuilder();
   }
 
+  // 直接包裹已有的 proto，懒加载本地字段
   public AppCollectorDataPBImpl(AppCollectorDataProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  // 将本地字段合并回 proto，并返回可发送的消息体
   public AppCollectorDataProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -83,6 +88,7 @@ public class AppCollectorDataPBImpl extends AppCollectorData {
     return TextFormat.shortDebugString(getProto());
   }
 
+  // 懒加载 ApplicationId，本地缓存为空时从 proto 转换
   @Override
   public ApplicationId getApplicationId() {
     AppCollectorDataProtoOrBuilder p = viaProto ? proto : builder;
@@ -122,6 +128,7 @@ public class AppCollectorDataPBImpl extends AppCollectorData {
 
   @Override
   public long getRMIdentifier() {
+    // 优先返回本地缓存，未命中则从 proto 取值，缺失时给出默认时间戳
     AppCollectorDataProtoOrBuilder p = viaProto ? proto : builder;
     if (this.rmIdentifier == null && p.hasRmIdentifier()) {
       this.rmIdentifier = p.getRmIdentifier();
@@ -142,6 +149,7 @@ public class AppCollectorDataPBImpl extends AppCollectorData {
 
   @Override
   public long getVersion() {
+    // 版本号同样走本地缓存优先策略，未设置时返回默认占位
     AppCollectorDataProtoOrBuilder p = viaProto ? proto : builder;
     if (this.version == null && p.hasRmIdentifier()) {
       this.version = p.getRmIdentifier();
@@ -160,6 +168,7 @@ public class AppCollectorDataPBImpl extends AppCollectorData {
     builder.setVersion(version);
   }
 
+  // 懒加载 collector token，只有 proto 中存在时才转换为 PB 实现
   @Override
   public Token getCollectorToken() {
     AppCollectorDataProtoOrBuilder p = viaProto ? proto : builder;
@@ -190,6 +199,7 @@ public class AppCollectorDataPBImpl extends AppCollectorData {
     return ((ApplicationIdPBImpl) t).getProto();
   }
 
+  // 在需要写入时创建 builder，并切换到本地可变模式
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = AppCollectorDataProto.newBuilder(proto);
@@ -197,6 +207,7 @@ public class AppCollectorDataPBImpl extends AppCollectorData {
     viaProto = false;
   }
 
+  // 将本地字段写回 builder，再生成不可变的 proto 对象
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -206,6 +217,7 @@ public class AppCollectorDataPBImpl extends AppCollectorData {
     viaProto = true;
   }
 
+  // 将本地缓存的字段逐个写入 builder，避免重复序列化
   private void mergeLocalToBuilder() {
     if (this.appId != null) {
       builder.setAppId(convertToProtoFormat(this.appId));

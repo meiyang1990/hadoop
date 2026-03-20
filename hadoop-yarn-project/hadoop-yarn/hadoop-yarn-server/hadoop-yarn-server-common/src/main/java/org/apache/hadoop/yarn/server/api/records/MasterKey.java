@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,6 +21,7 @@ package org.apache.hadoop.yarn.server.api.records;
 
 import java.nio.ByteBuffer;
 
+// 表示 RM 生成的主密钥元数据（ID 与字节内容），用于 token 验证
 public interface MasterKey {
 
   int getKeyId();

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,10 @@ import org.apache.hadoop.yarn.util.Records;
  * Used to hold max wait time / queue length information to be
  * passed back to the NodeManager.
  */
+// 表示 NodeManager 返回给 AM 的排队上限（等待时长和队列长度）
 public abstract class ContainerQueuingLimit {
 
+  // 构造默认的无上限实例（值为 -1），供队列限制协商使用
   public static ContainerQueuingLimit newInstance() {
     ContainerQueuingLimit containerQueuingLimit =
         Records.newRecord(ContainerQueuingLimit.class);

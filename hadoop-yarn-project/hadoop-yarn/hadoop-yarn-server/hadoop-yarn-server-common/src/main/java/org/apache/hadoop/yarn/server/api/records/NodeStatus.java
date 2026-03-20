@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -39,6 +40,7 @@ import org.apache.hadoop.yarn.util.Records;
  *   <li>Container status.</li>
  * </ul>
  */
+// NodeManager 向 RM 汇报的节点状态快照，包括心跳响应序号、容器状态、健康度和资源利用率
 public abstract class NodeStatus {
 
   /**
@@ -53,6 +55,7 @@ public abstract class NodeStatus {
    * @param increasedContainers Containers whose resource has been increased.
    * @return New {@code NodeStatus} with the provided information.
    */
+  // 组装完整 NodeStatus，打包本次心跳的容器列表、健康状态和资源利用率
   public static NodeStatus newInstance(NodeId nodeId, int responseId,
       List<ContainerStatus> containerStatuses,
       List<ApplicationId> keepAliveApplications,
@@ -125,11 +128,13 @@ public abstract class NodeStatus {
 
   @Private
   @Unstable
+  // Opportunistic 容器队列状态，用于向 RM 汇报当前排队/运行情况
   public abstract OpportunisticContainersStatus
       getOpportunisticContainersStatus();
 
   @Private
   @Unstable
+  // 更新 Opportunistic 容器状态以便 RM 调整调度策略
   public abstract void setOpportunisticContainersStatus(
       OpportunisticContainersStatus opportunisticContainersStatus);
 }

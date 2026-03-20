@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,13 +28,16 @@ import org.apache.hadoop.yarn.util.Records;
 
 @Private
 @InterfaceStability.Unstable
+// 应用级 Timeline collector 的元数据，记录地址、RM 时间戳与版本以便比较新旧
 public abstract class AppCollectorData {
 
   protected static final long DEFAULT_TIMESTAMP_VALUE = -1;
 
+  // 工厂方法，创建包含完整 RM 时间戳、版本和访问 token 的 collector 记录
   public static AppCollectorData newInstance(
       ApplicationId id, String collectorAddr, long rmIdentifier, long version,
       Token token) {
+    // 通过 PB record 创建实例并填充 collector 地址、RM 时间戳和版本
     AppCollectorData appCollectorData =
         Records.newRecord(AppCollectorData.class);
     appCollectorData.setApplicationId(id);
@@ -46,11 +50,13 @@ public abstract class AppCollectorData {
 
   public static AppCollectorData newInstance(
       ApplicationId id, String collectorAddr, long rmIdentifier, long version) {
+    // 便捷重载，缺省 collector token 但仍携带 RM 时间戳与版本
     return newInstance(id, collectorAddr, rmIdentifier, version, null);
   }
 
   public static AppCollectorData newInstance(ApplicationId id,
       String collectorAddr, Token token) {
+    // 用默认时间戳占位，表示还未被 RM 认可，仅提供 collector 地址和 token
     return newInstance(id, collectorAddr, DEFAULT_TIMESTAMP_VALUE,
         DEFAULT_TIMESTAMP_VALUE, token);
   }
@@ -71,6 +77,7 @@ public abstract class AppCollectorData {
    * @param dataB second collector data item.
    * @return true if dataA happens before dataB.
    */
+  // 比较两条 collector 记录的先后顺序：null 视为最旧，先比 RM 时间戳再比版本号
   public static boolean happensBefore(AppCollectorData dataA,
       AppCollectorData dataB) {
     if (dataA == null && dataB == null) {
@@ -93,6 +100,7 @@ public abstract class AppCollectorData {
    * Otherwise, it means the RM has not recognized the existence of this
    * collector.
    */
+  // 判断是否已被 RM 赋予时间戳和版本号，未赋值意味着 RM 尚未确认该 collector
   public boolean isStamped() {
     return (getRMIdentifier() != DEFAULT_TIMESTAMP_VALUE)
         || (getVersion() != DEFAULT_TIMESTAMP_VALUE);
