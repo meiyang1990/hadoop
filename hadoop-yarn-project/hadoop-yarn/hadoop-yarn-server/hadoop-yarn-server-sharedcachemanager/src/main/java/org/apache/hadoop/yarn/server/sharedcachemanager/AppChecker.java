@@ -26,6 +26,8 @@ import org.apache.hadoop.service.CompositeService;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
+// 这个文件已经全部加上中文注释
+// 应用程序状态检查器抽象类，用于判断应用是否仍在运行，供清理服务决定是否可安全删除缓存条目
 /**
  * An interface for checking whether an app is running so that the cleaner
  * service may determine if it can safely remove a cached entry.

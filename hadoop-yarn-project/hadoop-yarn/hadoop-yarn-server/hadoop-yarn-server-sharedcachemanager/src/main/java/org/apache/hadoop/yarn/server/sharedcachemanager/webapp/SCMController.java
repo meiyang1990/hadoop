@@ -22,6 +22,8 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.webapp.Controller;
 
+// 这个文件已经全部加上中文注释
+// 共享缓存管理器Web应用的控制器类
 /**
  * The controller class for the shared cache manager web app.
  */

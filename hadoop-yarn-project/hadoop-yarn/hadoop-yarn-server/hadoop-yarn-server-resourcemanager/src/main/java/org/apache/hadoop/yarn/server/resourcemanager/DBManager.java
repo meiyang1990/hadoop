@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,24 +41,40 @@ import java.util.function.Consumer;
 
 import static org.fusesource.leveldbjni.JniDBFactory.bytes;
 
+/**
+ * LevelDB 数据库管理器
+ * 封装 LevelDB 的初始化、版本管理和定期压缩功能，用于 RM 状态存储
+ * 主要功能：
+ * - 数据库初始化（自动创建不存在的数据库）
+ * - 版本信息存储和加载
+ * - 定时触发数据库全量压缩以优化性能
+ */
 public class DBManager implements Closeable {
   public static final Logger LOG =
       LoggerFactory.getLogger(DBManager.class);
-  private DB db;
-  private Timer compactionTimer;
+  private DB db;  // LevelDB 实例
+  private Timer compactionTimer;  // 定时压缩任务的定时器
 
+  /**
+   * 初始化数据库：打开或创建 LevelDB 实例
+   * @param configurationFile 数据库文件路径
+   * @param options LevelDB 选项
+   * @param initMethod 数据库初始化回调方法（首次创建时调用）
+   * @return 打开的数据库实例
+   */
   public DB initDatabase(File configurationFile, Options options,
                          Consumer<DB> initMethod) throws Exception {
     try {
       db = JniDBFactory.factory.open(configurationFile, options);
     } catch (NativeDB.DBException e) {
+      // 数据库不存在时自动创建
       if (e.isNotFound() || e.getMessage().contains(" does not exist ")) {
         LOG.info("Creating configuration version/database at {}",
             configurationFile);
         options.createIfMissing(true);
         try {
           db = JniDBFactory.factory.open(configurationFile, options);
-          initMethod.accept(db);
+          initMethod.accept(db);  // 执行初始化逻辑（如写入初始版本）
         } catch (DBException dbErr) {
           throw new IOException(dbErr.getMessage(), dbErr);
         }
@@ -69,6 +86,9 @@ public class DBManager implements Closeable {
     return db;
   }
 
+  /**
+   * 关闭数据库并停止压缩定时器
+   */
   public void close() throws IOException {
     if (compactionTimer != null) {
       compactionTimer.cancel();
@@ -80,11 +100,17 @@ public class DBManager implements Closeable {
     }
   }
 
+  /**
+   * 存储版本信息到数据库
+   */
   public void storeVersion(String versionKey, Version versionValue) {
     byte[] data = ((VersionPBImpl) versionValue).getProto().toByteArray();
     db.put(bytes(versionKey), data);
   }
 
+  /**
+   * 从数据库加载版本信息
+   */
   public Version loadVersion(String versionKey) throws Exception {
     Version version = null;
     try {
@@ -104,6 +130,11 @@ public class DBManager implements Closeable {
     this.db = db;
   }
 
+  /**
+   * 启动定时压缩任务：定期触发 LevelDB 的全量压缩以优化性能
+   * @param compactionIntervalMsec 压缩间隔（毫秒），0 表示禁用
+   * @param className 用于命名压缩线程
+   */
   public void startCompactionTimer(long compactionIntervalMsec,
                                     String className) {
     if (compactionIntervalMsec > 0) {
@@ -114,13 +145,16 @@ public class DBManager implements Closeable {
     }
   }
 
+  /**
+   * 压缩任务：调用 LevelDB 的 compactRange 执行全量压缩
+   */
   private class CompactionTimerTask extends TimerTask {
     @Override
     public void run() {
       long start = Time.monotonicNow();
       LOG.info("Starting full compaction cycle");
       try {
-        db.compactRange(null, null);
+        db.compactRange(null, null);  // null 参数表示压缩整个数据库
       } catch (DBException e) {
         LOG.error("Error compacting database", e);
       }

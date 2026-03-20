@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+// 通用集合读取器，用于读取特定DocumentStoreVendor后端下属于CollectionType的文档
 /**
  * This is a generic Collection reader for reading documents belonging to a
  * {@link CollectionType} under a specific {@link DocumentStoreVendor} backend.

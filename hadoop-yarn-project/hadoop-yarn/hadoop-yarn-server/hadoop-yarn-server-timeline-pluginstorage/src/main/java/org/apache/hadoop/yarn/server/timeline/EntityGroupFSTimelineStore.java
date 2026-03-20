@@ -92,6 +92,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+// 插件式时间线存储，支持时间线服务器v1.5 API。使用文件系统按组存储时间线实体
+// 这个文件已经全部加上中文注释
+// 插件式时间线存储，支持时间线服务器v1.5 API。使用文件系统按组存储时间线实体
 /**
  * Plugin timeline storage to support timeline server v1.5 API. This storage
  * uses a file system to store timeline entities in their groups.

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,7 +36,9 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import java.io.IOException;
 
 /**
- * Leader election implementation that uses Curator.
+ * 基于 Curator 的 Leader 选举服务
+ * 使用 Apache Curator 框架的 LeaderLatch 实现 RM 高可用的自动故障转移
+ * 当获得领导权时自动转换为 Active 状态，失去领导权时自动转换为 Standby 状态
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -43,10 +46,10 @@ public class CuratorBasedElectorService extends AbstractService
     implements EmbeddedElector, LeaderLatchListener {
   public static final Logger LOG =
       LoggerFactory.getLogger(CuratorBasedElectorService.class);
-  private LeaderLatch leaderLatch;
+  private LeaderLatch leaderLatch;  // Curator LeaderLatch 用于领导选举
   private CuratorFramework curator;
-  private String latchPath;
-  private String rmId;
+  private String latchPath;  // ZooKeeper 上的选举路径
+  private String rmId;  // RM 实例 ID（HA 模式下每个 RM 唯一标识）
   private ResourceManager rm;
 
   public CuratorBasedElectorService(ResourceManager rm) {
@@ -54,6 +57,10 @@ public class CuratorBasedElectorService extends AbstractService
     this.rm = rm;
   }
 
+  /**
+   * 服务初始化：构建 ZK 选举路径并启动 LeaderLatch
+   * 路径格式：{zkBasePath}/{clusterId}
+   */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     rmId = HAUtil.getRMHAId(conf);
@@ -67,6 +74,9 @@ public class CuratorBasedElectorService extends AbstractService
     super.serviceInit(conf);
   }
 
+  /**
+   * 初始化并启动 LeaderLatch，注册当前 RM 为监听器
+   */
   private void initAndStartLeaderLatch() throws Exception {
     leaderLatch = new LeaderLatch(curator, latchPath, rmId);
     leaderLatch.addListener(this);
@@ -79,6 +89,10 @@ public class CuratorBasedElectorService extends AbstractService
     super.serviceStop();
   }
 
+  /**
+   * 重新加入选举：关闭当前 Latch，短暂等待后重新创建并启动
+   * 常用于失败后重试场景
+   */
   @Override
   public void rejoinElection() {
     try {
@@ -96,6 +110,10 @@ public class CuratorBasedElectorService extends AbstractService
         curator.getZookeeperClient().isConnected();
   }
 
+  /**
+   * LeaderLatchListener 回调：当前 RM 当选为 Leader
+   * 自动触发到 Active 状态的转换
+   */
   @Override
   public void isLeader() {
     LOG.info(rmId + "is elected leader, transitioning to active");
@@ -107,6 +125,7 @@ public class CuratorBasedElectorService extends AbstractService
     } catch (Exception e) {
       LOG.info(rmId + " failed to transition to active, giving up leadership",
           e);
+      // 转换失败时放弃领导权并重新加入选举
       notLeader();
       rejoinElection();
     }
@@ -118,6 +137,10 @@ public class CuratorBasedElectorService extends AbstractService
     }
   }
 
+  /**
+   * LeaderLatchListener 回调：当前 RM 失去 Leader 身份
+   * 自动触发到 Standby 状态的转换
+   */
   @Override
   public void notLeader() {
     LOG.info(rmId + " relinquish leadership");

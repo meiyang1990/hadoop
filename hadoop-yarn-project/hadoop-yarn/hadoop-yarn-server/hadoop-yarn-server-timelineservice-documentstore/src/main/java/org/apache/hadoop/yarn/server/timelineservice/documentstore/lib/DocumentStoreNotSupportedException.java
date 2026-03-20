@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.timelineservice.documentstore.lib;
 
+// 文档存储不支持异常，表示配置的文档存储供应商不属于支持的DocumentStoreVendor之一
 /**
  * Indicates that the document store vendor that was
  * configured does not belong to one of the {@link DocumentStoreVendor}.

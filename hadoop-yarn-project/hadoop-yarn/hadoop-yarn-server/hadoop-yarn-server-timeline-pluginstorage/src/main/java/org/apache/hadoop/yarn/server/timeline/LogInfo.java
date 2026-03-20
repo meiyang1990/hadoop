@@ -43,6 +43,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 
+// 这个文件已经全部加上中文注释
+// 日志信息抽象基类，用于处理时间线日志文件的解析和存储
 abstract class LogInfo {
   public static final String ENTITY_FILE_NAME_DELIMITERS = "_.";
 
@@ -185,6 +187,7 @@ abstract class LogInfo {
       throws IOException;
 }
 
+// 实体日志信息类，继承自LogInfo，专门处理实体日志文件的解析
 class EntityLogInfo extends LogInfo {
   private static final Logger LOG = LoggerFactory.getLogger(
       EntityGroupFSTimelineStore.class);

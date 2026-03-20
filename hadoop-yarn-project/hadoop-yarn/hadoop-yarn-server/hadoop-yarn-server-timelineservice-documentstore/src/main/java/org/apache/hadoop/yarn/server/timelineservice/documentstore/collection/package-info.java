@@ -17,6 +17,7 @@
  */
 
 
+// 包org.apache.hadoop.yarn.server.timelineservice.documentstore.collection包含用于存储文档的不同集合类型
 /**
  * Package org.apache.hadoop.yarn.server.timelineservice.
  * documentstore.collection contains different collection types

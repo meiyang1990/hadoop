@@ -29,6 +29,7 @@ import org.apache.hadoop.yarn.server.timelineservice.documentstore.writer.Docume
 
 import static org.apache.hadoop.yarn.server.timelineservice.documentstore.DocumentStoreUtils.getStoreVendor;
 
+// 文档存储工厂类，提供创建时间线文档存储读写器的工厂方法。根据配置的DocumentStoreVendor实例化相应的读写器
 /**
  * Factory methods for instantiating a timeline Document Store reader or
  * writer. Based on the {@link DocumentStoreVendor} that is configured,

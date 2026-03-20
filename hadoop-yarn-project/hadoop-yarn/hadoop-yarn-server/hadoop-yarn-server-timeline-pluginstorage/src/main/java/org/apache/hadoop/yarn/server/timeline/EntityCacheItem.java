@@ -27,6 +27,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
+// 这个文件已经全部加上中文注释
+// 时间线服务器v1.5读取器缓存项。每个缓存项包含一个TimelineStore，可填充一个实体组内的数据
 /**
  * Cache item for timeline server v1.5 reader cache. Each cache item has a
  * TimelineStore that can be filled with data within one entity group.

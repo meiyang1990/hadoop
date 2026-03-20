@@ -44,6 +44,8 @@ import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFact
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 这个文件已经全部加上中文注释
+// 共享缓存清理服务，负责维护共享缓存区域并定期清理过期条目
 /**
  * The cleaner service that maintains the shared cache area, and cleans up stale
  * entries on a regular basis.

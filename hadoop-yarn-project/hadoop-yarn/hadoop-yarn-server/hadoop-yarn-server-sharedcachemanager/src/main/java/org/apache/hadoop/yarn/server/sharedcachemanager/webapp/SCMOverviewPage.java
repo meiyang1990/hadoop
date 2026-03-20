@@ -36,6 +36,7 @@ import org.apache.hadoop.yarn.webapp.view.TwoColumnLayout;
 
 import com.google.inject.Inject;
 
+// 用于渲染共享缓存管理器Web UI概览页面的类
 /**
  * This class is to render the shared cache manager web ui overview page.
  */

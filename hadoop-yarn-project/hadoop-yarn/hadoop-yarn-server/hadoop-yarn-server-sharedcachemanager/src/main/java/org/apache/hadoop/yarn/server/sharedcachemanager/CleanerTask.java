@@ -35,6 +35,8 @@ import org.apache.hadoop.yarn.server.sharedcachemanager.store.SCMStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 这个文件已经全部加上中文注释
+// 共享缓存清理任务，负责清理过期条目和孤立文件。同一时间只能有一个清理任务运行
 /**
  * The task that runs and cleans up the shared cache area for stale entries and
  * orphaned files. It is expected that only one cleaner task runs at any given

@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Set;
 
+// 通用文档存储时间线写入器实现类，用于存储时间线条目信息。根据配置的DocumentStoreVendor将文档写入相应后端
 /**
  * This is a generic document store timeline writer for storing the timeline
  * entity information. Based on the {@link DocumentStoreVendor} that is

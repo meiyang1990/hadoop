@@ -37,6 +37,8 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.SCMUploaderNotifyRespon
 import org.apache.hadoop.yarn.server.sharedcachemanager.metrics.SharedCacheUploaderMetrics;
 import org.apache.hadoop.yarn.server.sharedcachemanager.store.SCMStore;
 
+// 这个文件已经全部加上中文注释
+// 共享缓存上传服务，处理来自NodeManager上传器的所有RPC调用到共享缓存管理器
 /**
  * This service handles all rpc calls from the NodeManager uploader to the
  * shared cache manager.

@@ -26,6 +26,7 @@ import org.apache.hadoop.yarn.server.timelineservice.documentstore.lib.DocumentS
 import java.util.List;
 import java.util.Set;
 
+// 文档存储读取器接口，所有DocumentStoreVendor都必须实现此接口以创建其后端读取器
 /**
  * Every {@link DocumentStoreVendor} have to implement this for creating
  * reader to its backend.

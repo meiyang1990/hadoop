@@ -34,6 +34,8 @@ import org.apache.hadoop.yarn.client.api.YarnClient;
 import org.apache.hadoop.yarn.exceptions.ApplicationNotFoundException;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
+// 这个文件已经全部加上中文注释
+// 远程应用检查器实现，通过查询资源管理器远程判断应用是否仍在运行
 /**
  * An implementation of AppChecker that queries the resource manager remotely to
  * determine whether the app is running.

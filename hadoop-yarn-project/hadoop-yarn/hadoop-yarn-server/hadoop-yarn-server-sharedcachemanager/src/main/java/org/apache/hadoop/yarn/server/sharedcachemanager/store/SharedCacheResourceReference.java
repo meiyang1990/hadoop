@@ -22,6 +22,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
+// 共享缓存资源引用对象，表示对共享缓存资源的引用关系
 /**
  * This is an object that represents a reference to a shared cache resource.
  */

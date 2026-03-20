@@ -16,12 +16,7 @@
  * limitations under the License.
  */
 
-/**
- * Package org.apache.hadoop.yarn.server.timelineservice.
- * documentstore.lib contains factory class for instantiating
- * different DocumentStore reader writer client based on the DocumentVendor
- * configured.
- */
+// 包org.apache.hadoop.yarn.server.timelineservice.documentstore.lib包含工厂类，用于根据配置的DocumentVendor实例化不同的文档存储读写器客户端
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 package org.apache.hadoop.yarn.server.timelineservice.documentstore.lib;

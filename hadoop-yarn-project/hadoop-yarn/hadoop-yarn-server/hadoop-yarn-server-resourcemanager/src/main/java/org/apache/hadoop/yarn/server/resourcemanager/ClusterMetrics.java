@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,12 +44,25 @@ import org.apache.hadoop.yarn.metrics.CustomResourceMetricValue;
 import org.apache.hadoop.yarn.metrics.CustomResourceMetrics;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 
+/**
+ * YARN 集群指标统计
+ * 使用 Hadoop Metrics2 框架收集和暴露集群级别的运行时指标，包括：
+ * - NodeManager 状态统计（active、decommissioning、decommissioned、lost、unhealthy 等）
+ * - 资源容量和利用率（内存、虚拟核心、自定义资源）
+ * - 应用性能指标（AM 启动延迟、注册延迟、容器分配延迟）
+ * - 事件队列大小（RM 和调度器事件队列）
+ * - 容器分配速率（每秒分配数）
+ * 
+ * 采用单例模式，通过定时任务统计容器分配速率
+ */
 @InterfaceAudience.Private
 @Metrics(context="yarn")
 public class ClusterMetrics {
   
+  // 确保单例只初始化一次
   private static AtomicBoolean isInitialized = new AtomicBoolean(false);
   
+  // NodeManager 状态相关指标
   @Metric("# of active NMs") MutableGaugeInt numActiveNMs;
   @Metric("# of decommissioning NMs") MutableGaugeInt numDecommissioningNMs;
   @Metric("# of decommissioned NMs") MutableGaugeInt numDecommissionedNMs;
@@ -56,20 +70,30 @@ public class ClusterMetrics {
   @Metric("# of unhealthy NMs") MutableGaugeInt numUnhealthyNMs;
   @Metric("# of Rebooted NMs") MutableGaugeInt numRebootedNMs;
   @Metric("# of Shutdown NMs") MutableGaugeInt numShutdownNMs;
+  
+  // ApplicationMaster 性能指标
   @Metric("AM container launch delay") MutableRate aMLaunchDelay;
   @Metric("AM register delay") MutableRate aMRegisterDelay;
   @Metric("AM container allocation delay")
   private MutableRate aMContainerAllocationDelay;
+  
+  // 集群资源利用率和容量
   @Metric("Memory Utilization") MutableGaugeLong utilizedMB;
   @Metric("Vcore Utilization") MutableGaugeLong utilizedVirtualCores;
   @Metric("Memory Capability") MutableGaugeLong capabilityMB;
   @Metric("Vcore Capability") MutableGaugeLong capabilityVirtualCores;
+  
+  // RM 事件处理器 CPU 使用率监控
   @Metric("RM Event Processor CPU Usage 60 second Avg") MutableGaugeLong
     rmEventProcCPUAvg;
   @Metric("RM Event Processor CPU Usage 60 second Max") MutableGaugeLong
     rmEventProcCPUMax;
+    
+  // 容器分配速率
   @Metric("# of Containers assigned in the last second") MutableGaugeInt
     containerAssignedPerSecond;
+    
+  // 事件队列大小
   @Metric("# of rm dispatcher event queue size")
     MutableGaugeInt rmDispatcherEventQueueSize;
   @Metric("# of scheduler dispatcher event queue size")
@@ -96,11 +120,16 @@ public class ClusterMetrics {
   private AtomicInteger numContainersAssigned =  new AtomicInteger(0);
   private ScheduledThreadPoolExecutor assignCounterExecutor;
 
+  /**
+   * 构造方法：初始化定时任务统计每秒容器分配数
+   * 使用定时线程池每秒将累计分配数更新到指标，并重置计数器
+   */
   ClusterMetrics() {
     assignCounterExecutor  = new ScheduledThreadPoolExecutor(1,
             new ThreadFactoryBuilder().
             setDaemon(true).setNameFormat("ContainerAssignmentCounterThread").
             build());
+    // 每秒执行一次：将分配计数器的值更新到指标并归零
     assignCounterExecutor.scheduleAtFixedRate(new Runnable() {
       @Override
       public void run() {
@@ -109,6 +138,10 @@ public class ClusterMetrics {
     }, 1, 1, TimeUnit.SECONDS);
   }
 
+  /**
+   * 单例模式获取指标实例
+   * 使用双重检查锁定确保线程安全的延迟初始化
+   */
   public static ClusterMetrics getMetrics() {
     if(!isInitialized.get()){
       synchronized (ClusterMetrics.class) {
@@ -122,6 +155,10 @@ public class ClusterMetrics {
     return INSTANCE;
   }
 
+  /**
+   * 注册指标到 Hadoop Metrics2 系统
+   * 对于自定义资源类型（超过 Memory 和 VCore），动态注册额外指标
+   */
   private static void registerMetrics() {
     registry = new MetricsRegistry(RECORD_INFO);
     registry.tag(RECORD_INFO, "ResourceManager");
@@ -130,6 +167,7 @@ public class ClusterMetrics {
       ms.register("ClusterMetrics", "Metrics for the Yarn Cluster", INSTANCE);
     }
 
+    // 如果存在自定义资源类型（如 GPU、FPGA 等），动态注册对应指标
     if (ResourceUtils.getNumberOfKnownResourceTypes() > 2) {
       customResourceMetrics =
           new CustomResourceMetrics();

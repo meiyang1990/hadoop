@@ -53,6 +53,8 @@ import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFact
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 线程安全的内存SCM存储实现。通过ConcurrentHashMap实现资源并发访问，使用键级锁确保同一键操作的互斥性。
+// 采用弱引用字符串实习机制避免死锁风险，基于时间陈旧性标准自动驱逐过期资源
 /**
  * A thread safe version of an in-memory SCM store. The thread safety is
  * implemented with two key pieces: (1) at the mapping level a ConcurrentHashMap

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,19 +36,22 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * This maintains a chain of {@link ApplicationMasterServiceProcessor}s.
+ * ApplicationMaster 服务处理链
+ * 维护一个 ApplicationMasterServiceProcessor 处理器链，支持动态添加处理器到链首，
+ * 通过责任链模式依次处理 AM 的注册、资源分配和完成等请求
  */
 class AMSProcessingChain implements ApplicationMasterServiceProcessor {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AMSProcessingChain.class);
 
+  // 处理链的头节点，所有请求从这里开始处理
   private ApplicationMasterServiceProcessor head;
   private RMContext rmContext;
 
   /**
-   * This has to be initialized with at-least 1 Processor.
-   * @param rootProcessor Root processor.
+   * 构造方法：必须提供至少一个根处理器来初始化处理链
+   * @param rootProcessor 处理链的根处理器
    */
   AMSProcessingChain(ApplicationMasterServiceProcessor rootProcessor) {
     if (rootProcessor == null) {
@@ -57,19 +61,22 @@ class AMSProcessingChain implements ApplicationMasterServiceProcessor {
     this.head = rootProcessor;
   }
 
+  /**
+   * 初始化处理链：将根处理器的 next 设为 null（作为链尾）
+   */
   @Override
   public void init(ApplicationMasterServiceContext amsContext,
       ApplicationMasterServiceProcessor nextProcessor) {
     LOG.info("Initializing AMS Processing chain. Root Processor=["
         + this.head.getClass().getName() + "].");
     this.rmContext = (RMContext)amsContext;
-    // The head is initialized with a null 'next' processor
+    // 根处理器的 next 为 null，表示链的末端
     this.head.init(amsContext, null);
   }
 
   /**
-   * Add an processor to the top of the chain.
-   * @param processor ApplicationMasterServiceProcessor
+   * 动态添加处理器到链首（支持运行时扩展）
+   * 新处理器的 next 指向原 head，实现插入操作
    */
   public synchronized void addProcessor(
       ApplicationMasterServiceProcessor processor) {
@@ -79,6 +86,9 @@ class AMSProcessingChain implements ApplicationMasterServiceProcessor {
     this.head = processor;
   }
 
+  /**
+   * AM 注册请求：委托给处理链头部处理
+   */
   @Override
   public void registerApplicationMaster(
       ApplicationAttemptId applicationAttemptId,
@@ -87,12 +97,18 @@ class AMSProcessingChain implements ApplicationMasterServiceProcessor {
     this.head.registerApplicationMaster(applicationAttemptId, request, resp);
   }
 
+  /**
+   * 资源分配请求：委托给处理链头部处理
+   */
   @Override
   public void allocate(ApplicationAttemptId appAttemptId,
       AllocateRequest request, AllocateResponse response) throws YarnException {
     this.head.allocate(appAttemptId, request, response);
   }
 
+  /**
+   * AM 完成通知：委托给处理链头部处理
+   */
   @Override
   public void finishApplicationMaster(
       ApplicationAttemptId applicationAttemptId,

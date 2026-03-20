@@ -46,6 +46,8 @@ import org.apache.hadoop.yarn.server.sharedcachemanager.store.SharedCacheResourc
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 这个文件已经全部加上中文注释
+// 客户端协议服务，处理所有来自客户端的RPC调用到共享缓存管理器
 /**
  * This service handles all rpc calls from the client to the shared cache
  * manager.

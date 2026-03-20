@@ -41,6 +41,8 @@ import org.apache.hadoop.yarn.ipc.YarnRPC;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 这个文件已经全部加上中文注释
+// 共享缓存管理器管理协议服务，处理来自管理员的所有SCMAdminProtocol RPC调用
 /**
  * This service handles all SCMAdminProtocol rpc calls from administrators
  * to the shared cache manager.

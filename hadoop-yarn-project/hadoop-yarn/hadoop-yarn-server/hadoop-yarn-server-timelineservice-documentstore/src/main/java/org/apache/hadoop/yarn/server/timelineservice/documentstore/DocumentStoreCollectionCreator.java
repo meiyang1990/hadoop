@@ -28,6 +28,7 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.SchemaCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 文档存储集合创建器，为配置的DocumentStoreVendor后端创建存储应用时间线信息的集合
 /**
  * This creates the Collection for a {@link DocumentStoreVendor} backend
  * configured for storing  application timeline information.

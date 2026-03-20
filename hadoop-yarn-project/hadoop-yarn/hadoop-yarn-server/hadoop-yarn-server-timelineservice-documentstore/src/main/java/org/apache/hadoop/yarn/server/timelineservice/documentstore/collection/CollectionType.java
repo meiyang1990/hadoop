@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.timelineservice.documentstore.collection;
 
+// 集合类型枚举，定义当前用于存储文档的不同集合类型
 /**
  * Specifies the different collections that are currently used for storing
  * documents.

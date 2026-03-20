@@ -57,6 +57,7 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.TreeSet;
 
+// 文档存储工具类，包含读取和写入DocumentStoreVendor文档所需的所有静态工具方法
 /**
  * This class consists of all the utils required for reading or writing
  * documents for a {@link DocumentStoreVendor}.

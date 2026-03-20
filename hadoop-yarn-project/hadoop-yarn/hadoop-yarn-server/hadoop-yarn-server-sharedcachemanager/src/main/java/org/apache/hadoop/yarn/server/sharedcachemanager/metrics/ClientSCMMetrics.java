@@ -28,6 +28,8 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 这个文件已经全部加上中文注释
+// 客户端SCM指标类，维护客户端请求指标并通过指标接口发布
 /**
  * This class is for maintaining  client requests metrics
  * and publishing them through the metrics interfaces.

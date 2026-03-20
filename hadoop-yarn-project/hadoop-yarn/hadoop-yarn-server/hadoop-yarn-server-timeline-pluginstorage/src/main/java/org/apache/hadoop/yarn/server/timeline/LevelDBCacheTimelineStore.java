@@ -40,6 +40,11 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
+// 这个文件已经全部加上中文注释
+// LevelDB实现的键值对时间线存储。将实体哈希映射存储到LevelDB实例中，使用两个键空间分区：
+// 1) 实体ID到开始时间的映射(i!ENTITY_ID!ENTITY_TYPE → ENTITY_START_TIME)
+// 2) 实际数据存储(e!START_TIME!ENTITY_ID!ENTITY_TYPE → ENTITY_BYTES)
+// 主要用于缓存用途，无垃圾回收机制
 /**
  * LevelDB implementation of {@link KeyValueBasedTimelineStore}. This
  * implementation stores the entity hash map into a LevelDB instance.

@@ -29,6 +29,7 @@ import org.apache.hadoop.yarn.webapp.WebApps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 共享缓存管理器的简单Web界面，展示由SharedCacheManager报告的指标
 /**
  * A very simple web interface for the metrics reported by
  * {@link org.apache.hadoop.yarn.server.sharedcachemanager.SharedCacheManager}

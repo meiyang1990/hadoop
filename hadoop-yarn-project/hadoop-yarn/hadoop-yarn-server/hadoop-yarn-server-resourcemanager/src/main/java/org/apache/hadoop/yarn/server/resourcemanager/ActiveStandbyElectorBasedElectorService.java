@@ -45,9 +45,10 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
-/**
- * Leader election implementation that uses {@link ActiveStandbyElector}.
- */
+  /**
+   * 基于 ActiveStandbyElector 实现的 ResourceManager Leader 选举服务。
+   * 负责在 HA 模式下通过 ZooKeeper 自动选举 Active RM。
+   */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class ActiveStandbyElectorBasedElectorService extends AbstractService

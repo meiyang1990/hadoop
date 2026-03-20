@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
+// 共享缓存资源封装类。实例非线程安全，使用时必须通过线程安全机制确保访问安全（文件名除外）
 /**
  * Class that encapsulates the cache resource. The instances are not thread
  * safe. Any operation that uses the resource must use thread-safe mechanisms to

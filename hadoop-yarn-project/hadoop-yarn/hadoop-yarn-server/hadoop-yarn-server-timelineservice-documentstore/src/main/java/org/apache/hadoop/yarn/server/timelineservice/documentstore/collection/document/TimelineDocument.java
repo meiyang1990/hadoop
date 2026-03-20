@@ -19,6 +19,7 @@
 package org.apache.hadoop.yarn.server.timelineservice.documentstore.collection.document;
 
 
+// 时间线条目文档接口，定义所有时间线条目文档的通用方法。任何需要持久化到文档存储的新文档都应实现此接口
 /**
  * This is an interface for all the Timeline Documents. Any new document that
  * has to be persisted in the document store should implement this.

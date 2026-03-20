@@ -22,6 +22,7 @@ import org.apache.hadoop.yarn.server.timelineservice.documentstore.lib.DocumentS
 
 import java.io.IOException;
 
+// 文档未找到异常，当从文档存储中读取时未找到请求的文档时抛出。适用于所有DocumentStoreVendor的通用异常
 /**
  * Indicates that the document that was requested is not found from the
  * Document Store. This is a generic exception that will be thrown for all

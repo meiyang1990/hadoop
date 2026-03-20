@@ -32,6 +32,8 @@ import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 这个文件已经全部加上中文注释
+// 清理服务指标类，维护各种清理活动统计数据并通过指标接口发布
 /**
  * This class is for maintaining the various Cleaner activity statistics and
  * publishing them through the metrics interfaces.

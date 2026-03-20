@@ -28,6 +28,7 @@ import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 共享缓存上传器指标类，维护共享缓存上传器请求指标并通过指标接口发布
 /**
  * This class is for maintaining shared cache uploader requests metrics
  * and publishing them through the metrics interfaces.

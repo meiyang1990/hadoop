@@ -38,6 +38,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+// 通用文档存储时间线读取器实现类，用于读取时间线条目信息。根据配置的DocumentStoreVendor从相应后端读取文档
 /**
  * This is a generic document store timeline reader for reading the timeline
  * entity information. Based on the {@link DocumentStoreVendor} that is

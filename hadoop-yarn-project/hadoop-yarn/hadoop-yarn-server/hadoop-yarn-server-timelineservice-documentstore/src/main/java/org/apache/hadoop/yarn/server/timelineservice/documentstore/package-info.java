@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+// 包org.apache.hadoop.yarn.server.timelineservice.documentstore包含TimelineService的DocumentStore读写器实现，用于从文档存储中读写文档
 /**
  * Package org.apache.hadoop.yarn.server.timelineservice.documentstore
  * contains DocumentStore Reader and Writer Implementation of TimelineService

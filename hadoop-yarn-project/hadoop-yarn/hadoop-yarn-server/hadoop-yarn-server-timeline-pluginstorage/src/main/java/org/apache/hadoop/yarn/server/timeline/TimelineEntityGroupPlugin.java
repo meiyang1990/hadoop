@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.SortedSet;
 
+// 这个文件已经全部加上中文注释
+// 时间线条目组插件抽象类，将查询请求映射到缓存ID。缓存ID是需要查询的数据集标识符
 /**
  * Plugin to map a requested query ( or an Entity/set of Entities ) to a CacheID.
  * The Cache ID is an identifier to the data set that needs to be queried to

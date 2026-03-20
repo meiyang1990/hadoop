@@ -36,6 +36,7 @@ import org.apache.hadoop.yarn.server.sharedcachemanager.AppChecker;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 
+// 共享缓存管理器服务使用的抽象数据存储类。所有方法实现必须是线程安全和原子性的
 /**
  * An abstract class for the data store used by the shared cache manager
  * service. All implementations of methods in this interface need to be thread

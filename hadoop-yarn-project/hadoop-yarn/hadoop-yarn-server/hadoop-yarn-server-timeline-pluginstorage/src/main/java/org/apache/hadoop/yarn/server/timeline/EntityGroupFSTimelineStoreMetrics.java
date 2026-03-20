@@ -24,6 +24,8 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableStat;
 
+// 这个文件已经全部加上中文注释
+// 跟踪EntityGroupFSTimelineStore指标的度量类，记录时间线服务器v1.5的读写指标，作为TimelineDataManagerMetrics的补充
 /**
  * This class tracks metrics for the EntityGroupFSTimelineStore. It tracks
  * the read and write metrics for timeline server v1.5. It serves as a

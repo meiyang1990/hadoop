@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.yarn.server.timelineservice.documentstore.lib;
 
+// 文档存储供应商枚举，定义支持的文档存储厂商类型
 /**
  * Represents the different vendors for DocumentStore.
  */

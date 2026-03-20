@@ -28,6 +28,8 @@ import org.apache.hadoop.yarn.server.sharedcachemanager.metrics.CleanerMetrics;
 import org.apache.hadoop.yarn.server.sharedcachemanager.metrics.ClientSCMMetrics;
 import org.apache.hadoop.yarn.server.sharedcachemanager.metrics.SharedCacheUploaderMetrics;
 
+// 这个文件已经全部加上中文注释
+// 用于汇总共享缓存管理器指标以供WebUI显示的JavaBean类
 /**
  * This class is used to summarize useful shared cache manager metrics for the
  * webUI display.
