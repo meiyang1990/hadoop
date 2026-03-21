@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,8 +35,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Auto deletion policy for auto created queue V2.
- * Just for weight based auto created queues.
+ * 自动创建队列V2的自动删除策略，仅适用于基于权重的自动创建队列。
+ * 定期扫描符合删除条件的空闲自动队列，分两轮标记后触发删除。
  */
 public class AutoCreatedQueueDeletionPolicy implements SchedulingEditPolicy {
   private static final Logger LOG =
@@ -43,19 +44,17 @@ public class AutoCreatedQueueDeletionPolicy implements SchedulingEditPolicy {
 
   private Clock clock;
 
-  // Pointer to other RM components
+  // 指向RM其他组件的引用
   private RMContext rmContext;
   private ResourceCalculator rc;
   private CapacityScheduler scheduler;
 
+  // 队列删除检查间隔（毫秒）
   private long monitoringInterval;
 
-  // markedForDeletion: in each interval,
-  // this set is extended by queues that are eligible for auto deletion.
+  // 标记待删除队列：每个检查周期中，新增符合删除条件的队列加入该集合
   private Set<String> markedForDeletion = new HashSet<>();
-  // sentForDeletion: if in the next interval,
-  // there is queue, that is eligible for auto deletion,
-  // and is already marked for deletion, move it to this queue.
+  // 确认待删除队列：若下个检查周期中，队列仍符合删除条件且已被标记，则移入该集合等待删除
   private Set<String> sentForDeletion = new HashSet<>();
 
   @Override
@@ -76,8 +75,7 @@ public class AutoCreatedQueueDeletionPolicy implements SchedulingEditPolicy {
 
     CapacitySchedulerConfiguration csConfig = scheduler.getConfiguration();
 
-    // The monitor time will equal the
-    // auto deletion expired time default.
+    // 默认监控间隔等于队列自动删除过期时间
     monitoringInterval =
         csConfig.getLong(CapacitySchedulerConfiguration.
                 AUTO_CREATE_CHILD_QUEUE_EXPIRED_TIME,
@@ -87,18 +85,25 @@ public class AutoCreatedQueueDeletionPolicy implements SchedulingEditPolicy {
     prepareForAutoDeletion();
   }
 
+  /**
+   * 扫描所有队列，筛选符合自动删除条件的队列并更新标记状态。
+   * 已经连续两次扫描符合条件的队列会被移入待删除集合。
+   */
   public void prepareForAutoDeletion() {
     Set<String> newMarks = new HashSet<>();
+    // 遍历所有队列检查删除资格
     for (Map.Entry<String, CSQueue> queueEntry :
         scheduler.getCapacitySchedulerQueueManager().getQueues().entrySet()) {
       String queuePath = queueEntry.getKey();
       CSQueue queue = queueEntry.getValue();
       if (queue instanceof AbstractCSQueue &&
           ((AbstractCSQueue) queue).isEligibleForAutoDeletion()) {
+        // 已经标记过的队列，确认后移入待删除集合
         if (markedForDeletion.contains(queuePath)) {
           sentForDeletion.add(queuePath);
           markedForDeletion.remove(queuePath);
         } else {
+          // 首次符合条件，加入标记集合
           newMarks.add(queuePath);
         }
       }
@@ -119,8 +124,11 @@ public class AutoCreatedQueueDeletionPolicy implements SchedulingEditPolicy {
     }
   }
 
+  /**
+   * 对所有确认待删除的队列触发删除操作。
+   */
   public void triggerAutoDeletionForExpiredQueues() {
-    // Proceed new auto created queues
+    // 遍历待删除队列执行删除
     for (String queueName : sentForDeletion) {
       CSQueue checkQueue =
           scheduler.getCapacitySchedulerQueueManager().
@@ -132,6 +140,7 @@ public class AutoCreatedQueueDeletionPolicy implements SchedulingEditPolicy {
 
   private void deleteAutoCreatedQueue(CSQueue queue) {
     if (queue != null) {
+      // 创建队列删除事件，分发到事件处理器执行实际删除
       AutoCreatedQueueDeletionEvent autoCreatedQueueDeletionEvent =
           new AutoCreatedQueueDeletionEvent(queue);
       LOG.info("Queue:" + queue.getQueuePath() +

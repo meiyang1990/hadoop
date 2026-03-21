@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,20 +33,26 @@ import org.apache.hadoop.thirdparty.com.google.common.collect.ArrayListMultimap;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ListMultimap;
 
 /**
- * Handles tracking and enforcement for user and queue maxRunningApps
- * constraints.
+ * CS最大运行应用限制执行器，负责跟踪和实施用户与队列的最大运行应用数量约束。
+ * 当应用超过限制时会被置为不可运行，等待有应用退出后再恢复运行。
  */
 public class CSMaxRunningAppsEnforcer {
   private static final Logger LOG = LoggerFactory.getLogger(
       CSMaxRunningAppsEnforcer.class);
 
+  // 关联的容量调度器实例
   private final CapacityScheduler scheduler;
 
-  // Tracks the number of running applications by user.
+  // 按用户统计当前可运行应用数量
   private final Map<String, Integer> usersNumRunnableApps;
 
+  // 按用户保存当前不可运行的应用列表（超过限制被限流的应用）
   private final ListMultimap<String, FiCaSchedulerApp> usersNonRunnableApps;
 
+  /**
+   * 构造函数，初始化统计容器。
+   * @param scheduler 关联的容量调度器实例
+   */
   public CSMaxRunningAppsEnforcer(CapacityScheduler scheduler) {
     this.scheduler = scheduler;
     this.usersNumRunnableApps = new HashMap<String, Integer>();
@@ -53,12 +60,10 @@ public class CSMaxRunningAppsEnforcer {
   }
 
   /**
-   * Checks whether making the application runnable would exceed any
-   * maxRunningApps limits. Also sets the "runnable" flag on the
-   * attempt.
+   * 检查将应用设为可运行是否会超过任何最大运行应用限制，同时更新应用的runnable标记。
    *
-   * @param attempt the app attempt being checked
-   * @return true if the application is runnable; false otherwise
+   * @param attempt 待检查的应用尝试
+   * @return true 应用可运行；false 应用不可运行
    */
   public boolean checkRunnabilityWithUpdate(
       FiCaSchedulerApp attempt) {
@@ -71,10 +76,10 @@ public class CSMaxRunningAppsEnforcer {
   }
 
   /**
-   * Checks whether the number of user runnable apps exceeds the limitation.
+   * 检查用户当前可运行应用数量是否已超过限制。
    *
-   * @param user the user name
-   * @return true if the number hits the limit; false otherwise
+   * @param user 用户名
+   * @return true 已超过限制；false 未超过限制
    */
   private boolean exceedUserMaxParallelApps(String user) {
     Integer userNumRunnable = usersNumRunnableApps.get(user);
@@ -90,14 +95,13 @@ public class CSMaxRunningAppsEnforcer {
   }
 
   /**
-   * Recursively checks whether the number of queue runnable apps exceeds the
-   * limitation.
+   * 递归检查当前队列及所有父队列的可运行应用数量是否已超过限制。
    *
-   * @param queue the current queue
-   * @return true if the number hits the limit; false otherwise
+   * @param queue 当前队列
+   * @return true 已超过限制；false 未超过限制
    */
   private boolean exceedQueueMaxParallelApps(AbstractCSQueue queue) {
-    // Check queue and all parent queues
+    // 从当前队列向上检查所有父队列
     while (queue != null) {
       if (queue.getNumRunnableApps() >= queue.getMaxParallelApps()) {
         LOG.info("Maximum runnable apps exceeded for queue {}",
@@ -110,6 +114,10 @@ public class CSMaxRunningAppsEnforcer {
     return false;
   }
 
+  /**
+   * 跟踪新添加的应用，根据应用是否可运行分别统计。
+   * @param app 待跟踪的应用
+   */
   public void trackApp(FiCaSchedulerApp app) {
     if (app.isRunnable()) {
       trackRunnableApp(app);
@@ -117,14 +125,15 @@ public class CSMaxRunningAppsEnforcer {
       trackNonRunnableApp(app);
     }
   }
+  
   /**
-   * Tracks the given new runnable app for purposes of maintaining max running
-   * app limits.
+   * 跟踪新添加的可运行应用，更新用户和各级父队列的可运行应用计数。
+   * @param app 待跟踪的可运行应用
    */
   private void trackRunnableApp(FiCaSchedulerApp app) {
     String user = app.getUser();
     AbstractCSQueue queue = (AbstractCSQueue) app.getQueue();
-    // Increment running counts for all parent queues
+    // 递增所有父队列的可运行应用计数
     AbstractParentQueue parent = (AbstractParentQueue) queue.getParent();
     while (parent != null) {
       parent.incrementRunnableApps();
@@ -137,8 +146,8 @@ public class CSMaxRunningAppsEnforcer {
   }
 
   /**
-   * Tracks the given new non runnable app so that it can be made runnable when
-   * it would not violate max running app limits.
+   * 跟踪新添加的不可运行应用，存入用户等待列表。
+   * @param app 待跟踪的不可运行应用
    */
   private void trackNonRunnableApp(FiCaSchedulerApp app) {
     String user = app.getUser();
@@ -146,14 +155,8 @@ public class CSMaxRunningAppsEnforcer {
   }
 
   /**
-   * This is called after reloading the allocation configuration when the
-   * scheduler is reinitialized
-   *
-   * Checks to see whether any non-runnable applications become runnable
-   * now that the max running apps of given queue has been changed
-   *
-   * Runs in O(n) where n is the number of apps that are non-runnable and in
-   * the queues that went from having no slack to having slack.
+   * 调度器重新初始化、配置重新加载后，检查是否有原本不可运行的应用现在可以运行。
+   * 当队列最大运行应用数被调大后，原被限流的应用可能恢复运行。
    */
 
   public void updateRunnabilityOnReload() {
@@ -161,29 +164,24 @@ public class CSMaxRunningAppsEnforcer {
     List<List<FiCaSchedulerApp>> appsNowMaybeRunnable =
         new ArrayList<List<FiCaSchedulerApp>>();
 
+    // 收集所有可能现在可以运行的应用列表
     gatherPossiblyRunnableAppLists(rootQueue, appsNowMaybeRunnable);
 
+    // 更新应用可运行状态
     updateAppsRunnability(appsNowMaybeRunnable, Integer.MAX_VALUE);
   }
 
   /**
-   * Checks to see whether any other applications runnable now that the given
-   * application has been removed from the given queue.  And makes them so.
+   * 当某个应用被移除后，检查是否有其他不可运行应用现在可以运行，并恢复其运行状态。
+   * 仅在移除应用后原队列达到最大限制减一的情况下，才需要检查，优化性能。
    *
-   * Runs in O(n log(n)) where n is the number of queues that are under the
-   * highest queue that went from having no slack to having slack.
-   *
-   * @param app FiCaSchedulerApp.
+   * @param app 被移除的应用
    */
   public void updateRunnabilityOnAppRemoval(FiCaSchedulerApp app) {
-    // childqueueX might have no pending apps itself, but if a queue higher up
-    // in the hierarchy parentqueueY has a maxRunningApps set, an app completion
-    // in childqueueX could allow an app in some other distant child of
-    // parentqueueY to become runnable.
-    // An app removal will only possibly allow another app to become runnable if
-    // the queue was already at its max before the removal.
-    // Thus we find the ancestor queue highest in the tree for which the app
-    // that was at its maxRunningApps before the removal.
+    // childqueueX本身可能没有待处理应用，但如果上层父队列parentqueueY设置了最大运行应用数，
+    // childqueueX中一个应用完成，可能允许parentqueueY下其他远距离子节点的应用变为可运行。
+    // 只有在移除应用前队列已达到最大限制，移除后才会腾出空间，因此我们找到树中最高的那个
+    // 之前达到最大限制，现在腾出空间的祖先队列，只需要检查该队列下的等待应用。
     AbstractLeafQueue queue = app.getCSLeafQueue();
     AbstractCSQueue highestQueueWithAppsNowRunnable =
         (queue.getNumRunnableApps() == queue.getMaxParallelApps() - 1)
@@ -200,10 +198,8 @@ public class CSMaxRunningAppsEnforcer {
     List<List<FiCaSchedulerApp>> appsNowMaybeRunnable =
         new ArrayList<List<FiCaSchedulerApp>>();
 
-    // Compile lists of apps which may now be runnable
-    // We gather lists instead of building a set of all non-runnable apps so
-    // that this whole operation can be O(number of queues) instead of
-    // O(number of apps)
+    // 编译所有可能现在可运行的应用列表
+    // 我们收集列表而不是直接构建所有不可运行应用集合，使得整个操作复杂度是O(队列数)而非O(应用数)
     if (highestQueueWithAppsNowRunnable != null) {
       gatherPossiblyRunnableAppLists(highestQueueWithAppsNowRunnable,
           appsNowMaybeRunnable);
@@ -213,6 +209,7 @@ public class CSMaxRunningAppsEnforcer {
     if (userNumRunning == null) {
       userNumRunning = 0;
     }
+    // 如果用户移除应用后也腾出了空间，将该用户的等待应用加入检查列表
     if (userNumRunning == getUserMaxParallelApps(user) - 1) {
       List<FiCaSchedulerApp> userWaitingApps = usersNonRunnableApps.get(user);
       if (userWaitingApps != null) {
@@ -225,15 +222,14 @@ public class CSMaxRunningAppsEnforcer {
   }
 
   /**
-   * Checks to see whether applications are runnable now by iterating
-   * through each one of them and check if the queue and user have slack.
-   *
-   * if we know how many apps can be runnable, there is no need to iterate
-   * through all apps, maxRunnableApps is used to break out of the iteration.
+   * 遍历所有可能变为可运行的应用，逐个检查用户和队列是否有剩余空间，
+   * 符合条件的应用恢复为可运行状态。如果知道最多能恢复多少个应用，可以提前退出循环。
+   * @param appsNowMaybeRunnable 所有可能可运行的应用分组列表
+   * @param maxRunnableApps 最多可恢复的应用数量，达到该数量后提前退出
    */
   private void updateAppsRunnability(List<List<FiCaSchedulerApp>>
       appsNowMaybeRunnable, int maxRunnableApps) {
-    // Scan through and check whether this means that any apps are now runnable
+    // 按应用启动时间排序遍历所有候选应用
     Iterator<FiCaSchedulerApp> iter = new MultiListStartTimeIterator(
         appsNowMaybeRunnable);
     FiCaSchedulerApp prev = null;
@@ -244,15 +240,18 @@ public class CSMaxRunningAppsEnforcer {
         continue;
       }
 
+      // 检查并更新应用可运行状态
       if (checkRunnabilityWithUpdate(next)) {
         AbstractLeafQueue nextQueue = next.getCSLeafQueue();
         LOG.info("{} is now runnable in {}",
             next.getApplicationAttemptId(), nextQueue);
         trackRunnableApp(next);
         FiCaSchedulerApp appSched = next;
+        // 将应用重新提交到队列调度
         nextQueue.submitApplicationAttempt(next, next.getUser());
         noLongerPendingApps.add(appSched);
 
+        // 达到最大可恢复数量后提前退出
         if (noLongerPendingApps.size() >= maxRunnableApps) {
           break;
         }
@@ -261,9 +260,7 @@ public class CSMaxRunningAppsEnforcer {
       prev = next;
     }
 
-    // We remove the apps from their pending lists afterwards so that we don't
-    // pull them out from under the iterator.  If they are not in these lists
-    // in the first place, there is a bug.
+    // 遍历完成后再从不可运行列表移除已恢复的应用，避免干扰迭代器
     for (FiCaSchedulerApp appSched : noLongerPendingApps) {
       if (!(appSched.getCSLeafQueue().removeNonRunnableApp(appSched))) {
         LOG.error("Can't make app runnable that does not already exist in queue"
@@ -279,6 +276,10 @@ public class CSMaxRunningAppsEnforcer {
     }
   }
 
+  /**
+   * 取消对应用的跟踪，应用完成或被移除时调用。
+   * @param app 待取消跟踪的应用
+   */
   public void untrackApp(FiCaSchedulerApp app) {
     if (app.isRunnable()) {
       untrackRunnableApp(app);
@@ -288,11 +289,11 @@ public class CSMaxRunningAppsEnforcer {
   }
 
   /**
-   * Updates the relevant tracking variables after a runnable app with the given
-   * queue and user has been removed.
+   * 取消对可运行应用的跟踪，更新用户和各级父队列的计数。
+   * @param app 待取消跟踪的可运行应用
    */
   private void untrackRunnableApp(FiCaSchedulerApp app) {
-    // Update usersRunnableApps
+    // 更新用户可运行应用计数
     String user = app.getUser();
     int newUserNumRunning = usersNumRunnableApps.get(user) - 1;
     if (newUserNumRunning == 0) {
@@ -301,7 +302,7 @@ public class CSMaxRunningAppsEnforcer {
       usersNumRunnableApps.put(user, newUserNumRunning);
     }
 
-    // Update runnable app bookkeeping for queues
+    // 更新各级队列的可运行应用计数
     AbstractCSQueue queue = (AbstractCSQueue) app.getQueue();
     AbstractParentQueue parent = (AbstractParentQueue) queue.getParent();
     while (parent != null) {
@@ -311,23 +312,28 @@ public class CSMaxRunningAppsEnforcer {
   }
 
   /**
-   * Stops tracking the given non-runnable app.
+   * 取消对不可运行应用的跟踪，从用户等待列表移除。
+   * @param app 待取消跟踪的不可运行应用
    */
   private void untrackNonRunnableApp(FiCaSchedulerApp app) {
     usersNonRunnableApps.remove(app.getUser(), app);
   }
 
   /**
-   * Traverses the queue hierarchy under the given queue to gather all lists
-   * of non-runnable applications.
+   * 遍历给定队列下的队列层次结构，收集所有有剩余空间的队列中的不可运行应用列表。
+   * @param queue 根队列
+   * @param appLists 输出参数，收集得到的不可运行应用列表
    */
   private void gatherPossiblyRunnableAppLists(AbstractCSQueue queue,
       List<List<FiCaSchedulerApp>> appLists) {
+    // 如果该队列还有剩余空间，才需要检查它的子队列/自身应用
     if (queue.getNumRunnableApps() < queue.getMaxParallelApps()) {
       if (queue instanceof AbstractLeafQueue) {
+        // 叶子队列直接添加自身的不可运行应用副本列表
         appLists.add(
             ((AbstractLeafQueue)queue).getCopyOfNonRunnableAppSchedulables());
       } else {
+        // 父队列递归遍历所有子队列
         for (CSQueue child : queue.getChildQueues()) {
           gatherPossiblyRunnableAppLists((AbstractCSQueue) child, appLists);
         }
@@ -335,6 +341,11 @@ public class CSMaxRunningAppsEnforcer {
     }
   }
 
+  /**
+   * 从调度配置中获取用户允许的最大并行运行应用数量。
+   * @param user 用户名
+   * @return 用户最大并行运行应用数，无配置时返回Integer.MAX_VALUE
+   */
   private int getUserMaxParallelApps(String user) {
     CapacitySchedulerConfiguration conf = scheduler.getConfiguration();
     if (conf == null) {
@@ -347,20 +358,18 @@ public class CSMaxRunningAppsEnforcer {
   }
 
   /**
-   * Takes a list of lists, each of which is ordered by start time, and returns
-   * their elements in order of start time.
-   *
-   * We maintain positions in each of the lists.  Each next() call advances
-   * the position in one of the lists.  We maintain a heap that orders lists
-   * by the start time of the app in the current position in that list.
-   * This allows us to pick which list to advance in O(log(num lists)) instead
-   * of O(num lists) time.
+   * 多列表启动时间迭代器，接收多个按启动时间排序的应用列表，
+   * 合并输出一个整体按启动时间排序的应用迭代器。
+   * 使用优先队列维护每个列表当前位置的最早应用，实现O(log n)每次获取下一个元素。
    */
   static class MultiListStartTimeIterator implements
       Iterator<FiCaSchedulerApp> {
 
+    // 存储所有输入应用列表
     private List<FiCaSchedulerApp>[] appLists;
+    // 每个列表当前遍历到的位置索引
     private int[] curPositionsInAppLists;
+    // 优先队列，按当前位置应用的启动时间排序，每次取出最早的
     private PriorityQueue<IndexAndTime> appListsByCurStartTime;
 
     @SuppressWarnings("unchecked")
@@ -368,6 +377,7 @@ public class CSMaxRunningAppsEnforcer {
       appLists = appListList.toArray(new List[appListList.size()]);
       curPositionsInAppLists = new int[appLists.length];
       appListsByCurStartTime = new PriorityQueue<IndexAndTime>();
+      // 初始化，将每个列表第一个元素加入优先队列
       for (int i = 0; i < appLists.length; i++) {
         long time = appLists[i].isEmpty() ? Long.MAX_VALUE : appLists[i].get(0)
             .getStartTime();
@@ -377,62 +387,28 @@ public class CSMaxRunningAppsEnforcer {
 
     @Override
     public boolean hasNext() {
+      // 堆不为空，且堆顶元素时间不是Long.MAX_VALUE说明还有未遍历的应用
       return !appListsByCurStartTime.isEmpty()
           && appListsByCurStartTime.peek().time != Long.MAX_VALUE;
     }
 
     @Override
     public FiCaSchedulerApp next() {
+      // 取出当前最早启动的应用
       IndexAndTime indexAndTime = appListsByCurStartTime.remove();
       int nextListIndex = indexAndTime.index;
       FiCaSchedulerApp next = appLists[nextListIndex]
           .get(curPositionsInAppLists[nextListIndex]);
+      // 递增该列表当前位置
       curPositionsInAppLists[nextListIndex]++;
 
+      // 更新该列表下一个元素的时间，重新加入堆
       if (curPositionsInAppLists[nextListIndex] <
           appLists[nextListIndex].size()) {
         indexAndTime.time = appLists[nextListIndex]
             .get(curPositionsInAppLists[nextListIndex]).getStartTime();
       } else {
+        // 该列表已经遍历完成，设为最大时间
         indexAndTime.time = Long.MAX_VALUE;
       }
-      appListsByCurStartTime.add(indexAndTime);
-
-      return next;
-    }
-
-    @Override
-    public void remove() {
-      throw new UnsupportedOperationException("Remove not supported");
-    }
-
-    private static class IndexAndTime implements Comparable<IndexAndTime> {
-      private int index;
-      private long time;
-
-      IndexAndTime(int index, long time) {
-        this.index = index;
-        this.time = time;
-      }
-
-      @Override
-      public int compareTo(IndexAndTime o) {
-        return time < o.time ? -1 : (time > o.time ? 1 : 0);
-      }
-
-      @Override
-      public boolean equals(Object o) {
-        if (!(o instanceof IndexAndTime)) {
-          return false;
-        }
-        IndexAndTime other = (IndexAndTime)o;
-        return other.time == time;
-      }
-
-      @Override
-      public int hashCode() {
-        return (int)time;
-      }
-    }
-  }
-}
+      app

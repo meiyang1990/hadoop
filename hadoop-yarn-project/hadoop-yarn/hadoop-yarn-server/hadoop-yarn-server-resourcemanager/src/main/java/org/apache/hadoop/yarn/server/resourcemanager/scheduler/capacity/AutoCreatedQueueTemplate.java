@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,61 +30,78 @@ import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.C
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueuePrefixes.getQueuePrefix;
 
 /**
- * A handler for storing and setting auto created queue template settings.
+ * 自动创建队列模板处理器，存储并管理自动创建队列的模板配置
+ * 为动态自动创建的队列提供默认配置模板，支持通用模板、叶子队列模板和父队列模板三种类型
  */
 public class AutoCreatedQueueTemplate {
+  // 通用自动队列模板配置前缀
   public static final String AUTO_QUEUE_TEMPLATE_PREFIX =
       AUTO_QUEUE_CREATION_V2_PREFIX + "template.";
+  // 仅叶子队列自动模板配置前缀
   public static final String AUTO_QUEUE_LEAF_TEMPLATE_PREFIX =
       AUTO_QUEUE_CREATION_V2_PREFIX + "leaf-template.";
+  // 仅父队列自动模板配置前缀
   public static final String AUTO_QUEUE_PARENT_TEMPLATE_PREFIX =
       AUTO_QUEUE_CREATION_V2_PREFIX + "parent-template.";
 
+  // 通配符队列，表示匹配任意队列路径
   public static final String WILDCARD_QUEUE = "*";
 
+  // 存储通用模板配置属性
   private final Map<String, String> templateProperties = new HashMap<>();
+  // 存储仅叶子队列专属模板配置属性
   private final Map<String, String> leafOnlyProperties = new HashMap<>();
+  // 存储仅父队列专属模板配置属性
   private final Map<String, String> parentOnlyProperties = new HashMap<>();
 
+  /**
+   * 构造函数，从配置中加载模板配置
+   * @param configuration 容量调度器配置
+   * @param queuePath 当前父队列路径
+   */
   public AutoCreatedQueueTemplate(CapacitySchedulerConfiguration configuration,
                                   QueuePath queuePath) {
     setTemplateConfigEntries(configuration, queuePath);
   }
 
   @VisibleForTesting
+  /**
+   * 获取指定队列路径的自动队列模板配置前缀
+   * @param queuePath 队列路径
+   * @return 完整配置前缀
+   */
   public static String getAutoQueueTemplatePrefix(QueuePath queuePath) {
     return getQueuePrefix(queuePath) + AUTO_QUEUE_TEMPLATE_PREFIX;
   }
 
   /**
-   * Get the common template properties specified for a parent queue.
-   * @return template property names and values
+   * 获取父队列指定的所有通用模板属性
+   * @return 模板属性键值对
    */
   public Map<String, String> getTemplateProperties() {
     return templateProperties;
   }
 
   /**
-   * Get the leaf specific template properties specified for a parent queue.
-   * @return template property names and values
+   * 获取父队列指定的仅叶子队列专属模板属性
+   * @return 模板属性键值对
    */
   public Map<String, String> getLeafOnlyProperties() {
     return leafOnlyProperties;
   }
 
   /**
-   * Get the parent specific template properties specified for a parent queue.
-   * @return template property names and values
+   * 获取父队列指定的仅父队列专属模板属性
+   * @return 模板属性键值对
    */
   public Map<String, String> getParentOnlyProperties() {
     return parentOnlyProperties;
   }
 
   /**
-   * Sets the common template properties and parent specific template
-   * properties of a child queue based on its parent template settings.
-   * @param conf configuration to set
-   * @param childQueuePath child queue path used for prefixing the properties
+   * 根据父队列模板，为子队列设置通用和类型专属模板配置（默认父队列类型）
+   * @param conf 目标配置对象
+   * @param childQueuePath 子队列路径，用于生成配置前缀
    */
   public void setTemplateEntriesForChild(CapacitySchedulerConfiguration conf,
                                          QueuePath childQueuePath) {
@@ -91,60 +109,61 @@ public class AutoCreatedQueueTemplate {
   }
 
   /**
-   * Sets the common template properties and leaf or parent specific template
-   * properties of a child queue based on its parent template settings.
-   * template settings.
-   * @param conf configuration to set
-   * @param isLeaf whether to include leaf specific template properties, or
-   *               parent specific template properties
-   * @param childQueuePath child queue path used for prefixing the properties
+   * 根据父队列模板，为子队列设置通用和类型专属模板配置
+   * @param conf 目标配置对象
+   * @param childQueuePath 子队列路径，用于生成配置前缀
+   * @param isLeaf 是否为叶子队列，决定使用叶子还是父队列专属模板
    */
   public void setTemplateEntriesForChild(CapacitySchedulerConfiguration conf,
                                          QueuePath childQueuePath,
                                          boolean isLeaf) {
+    // 根队列不应用模板，直接返回
     if (childQueuePath.isRoot()) {
       return;
     }
 
+    // 获取配置对象中的全部属性
     ConfigurationProperties configurationProperties =
         conf.getConfigurationProperties();
 
-    // Get all properties that are explicitly set
+    // 获取该子队列已经显式配置的所有属性，避免覆盖用户自定义配置
     Set<String> alreadySetProps = configurationProperties
         .getPropertiesWithPrefix(getQueuePrefix(childQueuePath)).keySet();
 
-    // Check template properties only set for leaf or parent queues
+    // 根据队列类型选择对应的专属模板
     Map<String, String> queueTypeSpecificTemplates = parentOnlyProperties;
     if (isLeaf) {
       queueTypeSpecificTemplates = leafOnlyProperties;
     }
 
+    // 先应用队列类型专属模板配置
     for (Map.Entry<String, String> entry :
         queueTypeSpecificTemplates.entrySet()) {
-      // Do not overwrite explicitly configured properties
+      // 用户已经显式配置的属性不覆盖
       if (alreadySetProps.contains(entry.getKey())) {
         continue;
       }
+      // 设置模板配置到子队列
       conf.set(getQueuePrefix(childQueuePath) + entry.getKey(), entry.getValue());
     }
 
+    // 再应用通用模板配置
     for (Map.Entry<String, String> entry : templateProperties.entrySet()) {
-      // Do not overwrite explicitly configured properties or properties set
-      // by queue type specific templates (parent-template and leaf-template)
+      // 用户已显式配置 或 已经被类型专属模板覆盖的属性不覆盖
       if (alreadySetProps.contains(entry.getKey())
           || queueTypeSpecificTemplates.containsKey(entry.getKey())) {
         continue;
       }
+      // 设置模板配置到子队列
       conf.set(getQueuePrefix(childQueuePath) + entry.getKey(), entry.getValue());
     }
   }
 
   /**
-   * Store the template configuration properties. Explicit templates always take
-   * precedence over wildcard values. An example template precedence
-   * hierarchy for root.a ParentQueue from highest to lowest:
-   * yarn.scheduler.capacity.root.a.auto-queue-creation-v2.template.capacity
-   * yarn.scheduler.capacity.root.*.auto-queue-creation-v2.template.capacity
+   * 从配置中解析并存储模板配置属性，遵循优先级规则：
+   * 精确匹配队列路径 > 通配符路径，显式配置 > 模板默认值
+   * @param configuration 容量调度器配置
+   * @param queuePath 当前父队列路径
    */
   private void setTemplateConfigEntries(CapacitySchedulerConfiguration configuration,
                                         QueuePath queuePath) {
@@ -152,18 +171,20 @@ public class AutoCreatedQueueTemplate {
       ConfigurationProperties configurationProperties =
           configuration.getConfigurationProperties();
 
+      // 获取当前队列允许的最大自动创建队列深度
       int maxAutoCreatedQueueDepth = configuration
           .getMaximumAutoCreatedQueueDepth(queuePath);
+      // 生成所有带通配符的队列路径（从精确匹配逐步添加通配符到上层），按优先级从高到低排序
       List<QueuePath> wildcardedQueuePaths =
           queuePath.getWildcardedQueuePaths(maxAutoCreatedQueueDepth);
 
+      // 按优先级从高到低遍历所有通配路径，高优先级已经设置的模板不会被低优先级覆盖
       for (QueuePath templateQueuePath: wildcardedQueuePaths) {
-        // Get all configuration entries with
-        // yarn.scheduler.capacity.<queuePath> prefix
+        // 获取该通配路径下的所有配置属性
         Map<String, String> queueProps = configurationProperties
             .getPropertiesWithPrefix(getQueuePrefix(templateQueuePath));
 
-        // Store template, parent-template and leaf-template properties
+        // 分类存储模板属性
         for (Map.Entry<String, String> entry : queueProps.entrySet()) {
           storeConfiguredTemplates(entry.getKey(), entry.getValue());
         }
@@ -171,26 +192,35 @@ public class AutoCreatedQueueTemplate {
     }
   }
 
+  /**
+   * 将解析到的模板配置分类存储到对应的属性映射中，遵循高优先级优先原则
+   * @param templateKey 模板配置键
+   * @param templateValue 模板配置值
+   */
   private void storeConfiguredTemplates(
       String templateKey, String templateValue) {
     String prefix = "";
     Map<String, String> properties = templateProperties;
 
+    // 判断模板类型，分类存储
     if (templateKey.startsWith(AUTO_QUEUE_TEMPLATE_PREFIX)) {
+      // 通用模板
       prefix = AUTO_QUEUE_TEMPLATE_PREFIX;
     } else if (templateKey.startsWith(AUTO_QUEUE_LEAF_TEMPLATE_PREFIX)) {
+      // 叶子队列专属模板
       prefix = AUTO_QUEUE_LEAF_TEMPLATE_PREFIX;
       properties = leafOnlyProperties;
     } else if (templateKey.startsWith(
         AUTO_QUEUE_PARENT_TEMPLATE_PREFIX)) {
+      // 父队列专属模板
       prefix = AUTO_QUEUE_PARENT_TEMPLATE_PREFIX;
       properties = parentOnlyProperties;
     }
 
     if (!prefix.isEmpty()) {
-      // Trim template prefix from key
+      // 裁剪掉模板前缀，保留实际配置键名
       String key = templateKey.substring(prefix.length());
-      // If an entry is already present, it had a higher precedence
+      // 高优先级先存储，低优先级不会覆盖，使用putIfAbsent保证优先级
       properties.putIfAbsent(key, templateValue);
     }
   }

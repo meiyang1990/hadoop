@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,13 +23,19 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCap
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCapacityVector.ResourceUnitCapacityType;
 
 /**
- * A storage class that wraps arguments used in a resource calculation iteration.
+ * 容量调度器资源计算迭代过程的上下文参数封装类，用于传递当前计算所需的资源、队列等信息
  */
 public class CalculationContext {
   private final String resourceName;
   private final ResourceUnitCapacityType capacityType;
   private final CSQueue queue;
 
+  /**
+   * 构造计算上下文对象
+   * @param resourceName 当前计算的资源名称
+   * @param capacityType 容量计算类型
+   * @param queue 当前计算对应的队列
+   */
   public CalculationContext(String resourceName, ResourceUnitCapacityType capacityType,
                             CSQueue queue) {
     this.resourceName = resourceName;
@@ -49,22 +56,20 @@ public class CalculationContext {
   }
 
   /**
-   * A shorthand to return the minimum capacity vector entry for the currently evaluated child and
-   * resource name.
+   * 快捷获取当前队列指定标签下当前资源的最小容量配置项
    *
-   * @param label node label
-   * @return capacity vector entry
+   * @param label 节点标签
+   * @return 最小容量向量条目
    */
   public QueueCapacityVectorEntry getCurrentMinimumCapacityEntry(String label) {
     return queue.getConfiguredCapacityVector(label).getResource(resourceName);
   }
 
   /**
-   * A shorthand to return the maximum capacity vector entry for the currently evaluated child and
-   * resource name.
+   * 快捷获取当前队列指定标签下当前资源的最大容量配置项
    *
-   * @param label node label
-   * @return capacity vector entry
+   * @param label 节点标签
+   * @return 最大容量向量条目
    */
   public QueueCapacityVectorEntry getCurrentMaximumCapacityEntry(String label) {
     return queue.getConfiguredMaxCapacityVector(label).getResource(resourceName);
