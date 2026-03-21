@@ -1,6 +1,7 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.  See the NOTICE
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
@@ -22,29 +23,46 @@ import org.apache.hadoop.yarn.metrics.CustomResourceMetricValue;
 import java.util.Map;
 
 /**
- * This class is a main entry-point for any kind of CSQueueMetrics for
- * custom resources.
- * It provides increase and decrease methods for all types of metrics.
+ * 容量调度器自定义资源队列指标入口，负责管理自定义资源相关容量指标的存储与获取
+ * 提供保障容量、最大容量等自定义资源指标的增删改查能力
  */
 public class CSQueueMetricsForCustomResources
     extends QueueMetricsForCustomResources {
+  // 自定义资源保障容量指标存储
   private final CustomResourceMetricValue guaranteedCapacity =
       new CustomResourceMetricValue();
+  // 自定义资源最大容量指标存储
   private final CustomResourceMetricValue maxCapacity =
       new CustomResourceMetricValue();
 
+  /**
+   * 设置自定义资源保障容量指标值
+   * @param res 待设置的资源值
+   */
   public void setGuaranteedCapacity(Resource res) {
     guaranteedCapacity.set(res);
   }
 
+  /**
+   * 设置自定义资源最大容量指标值
+   * @param res 待设置的资源值
+   */
   public void setMaxCapacity(Resource res) {
     maxCapacity.set(res);
   }
 
+  /**
+   * 获取所有自定义资源保障容量指标值
+   * @return 资源名称->指标值的映射
+   */
   public Map<String, Long> getGuaranteedCapacity() {
     return guaranteedCapacity.getValues();
   }
 
+  /**
+   * 获取所有自定义资源最大容量指标值
+   * @return 资源名称->指标值的映射
+   */
   public Map<String, Long> getMaxCapacity() {
     return maxCapacity.getValues();
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,9 +22,18 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregatio
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.server.api.ContainerLogContext;
 
+/**
+ * 禁用水日志聚合策略，始终不触发容器日志聚合
+ */
 @Private
 public class NoneContainerLogAggregationPolicy extends
     AbstractContainerLogAggregationPolicy {
+  
+  /**
+   * 判断是否需要进行日志聚合，该策略始终返回false不聚合
+   * @param logContext 容器日志上下文信息
+   * @return false 表示不需要聚合日志
+   */
   public boolean shouldDoLogAggregation(ContainerLogContext logContext) {
     return false;
   }

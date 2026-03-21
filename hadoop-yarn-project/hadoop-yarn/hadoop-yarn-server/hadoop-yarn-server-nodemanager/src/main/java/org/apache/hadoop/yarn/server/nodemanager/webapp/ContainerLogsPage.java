@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -59,6 +60,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.google.inject.Inject;
 
+/**
+ * NodeManager Web UI 容器日志查看页面，支持查看本地日志和聚合后的远程日志
+ */
 public class ContainerLogsPage extends NMView {
   public static final Logger LOG = LoggerFactory.getLogger(
       ContainerLogsPage.class);
@@ -70,6 +74,7 @@ public class ContainerLogsPage extends NMView {
 
   @Override protected void preHead(Page.HTML<__> html) {
     String redirectUrl = $(REDIRECT_URL);
+    // 设置页面标题，根据重定向状态区分
     if (redirectUrl == null || redirectUrl.isEmpty()) {
       set(TITLE, join("Logs for ", $(CONTAINER_ID)));
     } else {
@@ -79,15 +84,20 @@ public class ContainerLogsPage extends NMView {
       }
     }
     
+    // 初始化导航手风琴菜单配置
     set(ACCORDION_ID, "nav");
     set(initID(ACCORDION, "nav"), "{autoHeight:false, active:0}");
   }
 
   @Override
   protected Class<? extends SubView> content() {
+    // 返回容器日志内容块类
     return ContainersLogsBlock.class;
   }
 
+  /**
+   * 容器日志内容渲染块，负责输出本地日志和聚合日志列表/内容
+   */
   public static class ContainersLogsBlock extends HtmlBlock implements
       YarnWebParams {    
     private final Context nmContext;
@@ -102,7 +112,7 @@ public class ContainerLogsPage extends NMView {
 
     @Override
     protected void render(Block html) {
-
+      // 处理重定向失败场景
       String redirectUrl = $(REDIRECT_URL);
       if (redirectUrl !=null && redirectUrl.equals("false")) {
         html.h1("Failed while trying to construct the redirect url to the log" +
@@ -112,6 +122,7 @@ public class ContainerLogsPage extends NMView {
 
       ContainerId containerId;
       ApplicationId appId;
+      // 解析容器ID，处理非法格式
       try {
         containerId = ContainerId.fromString($(CONTAINER_ID));
         appId = containerId.getApplicationAttemptId().getApplicationId();
@@ -122,6 +133,7 @@ public class ContainerLogsPage extends NMView {
 
       LogAggregationFileController fileController = null;
       boolean foundAggregatedLogs = false;
+      // 尝试获取聚合日志读取控制器
       try {
         fileController = this.factory.getFileControllerForRead(
             appId, $(APP_OWNER));
@@ -131,21 +143,26 @@ public class ContainerLogsPage extends NMView {
       }
 
       try {
+        // 未指定具体日志文件，输出日志文件列表
         if ($(CONTAINER_LOG_TYPE).isEmpty()) {
           html.h2("Local Logs:");
+          // 获取容器本地日志目录列表
           List<File> logFiles = ContainerLogsUtils.getContainerLogDirs(containerId,
               request().getRemoteUser(), nmContext);
+          // 输出本地日志文件目录列表
           printLocalLogFileDirectory(html, logFiles);
+          // 如果存在聚合日志，输出聚合日志列表
           if (foundAggregatedLogs) {
-            // print out the aggregated logs if exists
             try {
               ContainerLogsRequest logRequest = new ContainerLogsRequest();
               logRequest.setAppId(appId);
               logRequest.setAppOwner($(APP_OWNER));
               logRequest.setContainerId($(CONTAINER_ID));
               logRequest.setNodeId(this.nmContext.getNodeId().toString());
+              // 读取聚合日志元数据
               List<ContainerLogMeta> containersLogMeta = fileController
                   .readAggregatedLogsMeta(logRequest);
+              // 输出聚合日志文件列表
               if (containersLogMeta != null && !containersLogMeta.isEmpty()) {
                 html.h2("Aggregated Logs:");
                 printAggregatedLogFileDirectory(html, containersLogMeta);
@@ -155,7 +172,9 @@ public class ContainerLogsPage extends NMView {
             }
           }
         } else {
+          // 指定了具体日志文件，输出日志内容
           String aggregationType = $(LOG_AGGREGATION_TYPE);
+          // 默认或本地类型，读取本地日志文件
           if (aggregationType == null || aggregationType.isEmpty() ||
               aggregationType.trim().toLowerCase().equals(
                   LOG_AGGREGATION_LOCAL_TYPE)) {
@@ -165,6 +184,7 @@ public class ContainerLogsPage extends NMView {
           } else if (!LOG_AGGREGATION_LOCAL_TYPE.trim().toLowerCase().equals(
               aggregationType) && !LOG_AGGREGATION_REMOTE_TYPE.trim()
                   .toLowerCase().equals(aggregationType)) {
+            // 聚合类型参数非法，返回错误信息
             html.h1("Invalid value for query parameter: "
                 + LOG_AGGREGATION_TYPE + ". "
                 + "The valid value could be either "
@@ -179,15 +199,21 @@ public class ContainerLogsPage extends NMView {
       }
     }
     
+    /**
+     * 输出指定本地日志文件的内容，支持按字节范围读取
+     */
     private void printLocalLogFile(Block html, File logFile) {
+      // 解析起始字节位置，负数表示从末尾向前读取
       long start =
           $("start").isEmpty() ? -4 * 1024 : Long.parseLong($("start"));
       start = start < 0 ? logFile.length() + start : start;
       start = start < 0 ? 0 : start;
+      // 解析结束字节位置
       long end =
           $("end").isEmpty() ? logFile.length() : Long.parseLong($("end"));
       end = end < 0 ? logFile.length() + end : end;
       end = end < 0 ? logFile.length() : end;
+      // 参数校验
       if (start > end) {
         html.h1("Invalid start and end values. Start: [" + start + "]"
             + ", end[" + end + "]");
@@ -195,6 +221,7 @@ public class ContainerLogsPage extends NMView {
       } else {
         FileInputStream logByteStream = null;
 
+        // 打开日志文件
         try {
           logByteStream = ContainerLogsUtils.openLogFileForRead($(CONTAINER_ID),
               logFile, nmContext);
@@ -205,6 +232,7 @@ public class ContainerLogsPage extends NMView {
         
         try {
           long toRead = end - start;
+          // 如果不是读取完整日志，提示用户并提供完整日志链接
           if (toRead < logFile.length()) {
             html.p().__("Showing " + toRead + " bytes. Click ")
                 .a(url("containerlogs", $(CONTAINER_ID), $(APP_OWNER), 
@@ -212,6 +240,7 @@ public class ContainerLogsPage extends NMView {
                 __(" for full log").__();
           }
           
+          // 跳转到起始读取位置
           IOUtils.skipFully(logByteStream, start);
           InputStreamReader reader =
               new InputStreamReader(logByteStream, StandardCharsets.UTF_8);
@@ -222,6 +251,7 @@ public class ContainerLogsPage extends NMView {
           int currentToRead = toRead > bufferSize ? bufferSize : (int) toRead;
           PRE<Hamlet> pre = html.pre();
 
+          // 分块读取并输出日志内容
           while ((len = reader.read(cbuf, 0, currentToRead)) > 0
               && toRead > 0) {
             pre.__(new String(cbuf, 0, len));
@@ -238,6 +268,7 @@ public class ContainerLogsPage extends NMView {
           html.h1("Exception reading log file. It might be because log "
                 + "file was aggregated : " + logFile.getName());
         } finally {
+          // 关闭输入流
           if (logByteStream != null) {
             try {
               logByteStream.close();
@@ -249,9 +280,12 @@ public class ContainerLogsPage extends NMView {
       }
     }
     
+    /**
+     * 输出本地日志文件列表，生成每个日志文件的查看链接
+     */
     private void printLocalLogFileDirectory(Block html,
         List<File> containerLogsDirs) {
-      // Print out log types in lexical order
+      // 按字典序排序日志文件
       Collections.sort(containerLogsDirs);
       boolean foundLogFile = false;
       for (File containerLogsDir : containerLogsDirs) {
@@ -268,20 +302,25 @@ public class ContainerLogsPage extends NMView {
           }
         }
       }
+      // 未找到日志文件提示
       if (!foundLogFile) {
         html.h1("No logs available for container " + $(CONTAINER_ID));
         return;
       }
     }
 
+    /**
+     * 输出聚合日志文件列表，生成每个日志文件的查看链接
+     */
     private void printAggregatedLogFileDirectory(Block html,
         List<ContainerLogMeta> containersLogMeta) throws ParseException {
       List<ContainerLogFileInfo> filesInfo = new ArrayList<>();
+      // 收集所有聚合日志文件信息
       for (ContainerLogMeta logMeta : containersLogMeta) {
         filesInfo.addAll(logMeta.getContainerLogMeta());
       }
 
-      //sort the list, so we could list the log file in order.
+      // 按文件名和修改时间排序日志文件
       Collections.sort(filesInfo, new Comparator<ContainerLogFileInfo>() {
         @Override
         public int compare(ContainerLogFileInfo o1,
@@ -294,6 +333,7 @@ public class ContainerLogsPage extends NMView {
       });
 
       boolean foundLogFile = false;
+      // 生成每个聚合日志的查看链接
       for (ContainerLogFileInfo fileInfo : filesInfo) {
         long timestamp = convertDateToTimeStamp(fileInfo.getLastModifiedTime());
         foundLogFile = true;
@@ -308,6 +348,7 @@ public class ContainerLogsPage extends NMView {
                 + fileInfo.getFileSize() + " bytes.").__();
       }
 
+      // 未找到聚合日志提示
       if (!foundLogFile) {
         html.h4("No aggregated logs available for container "
             + $(CONTAINER_ID));
@@ -315,11 +356,17 @@ public class ContainerLogsPage extends NMView {
       }
     }
 
+    /**
+     * 生成聚合日志文件名，包含文件名和修改时间
+     */
     private String createAggregatedLogFileName(String fileName,
         String modificationTime) {
       return fileName + "_" + modificationTime;
     }
 
+    /**
+     * 将日期字符串转换为时间戳
+     */
     private long convertDateToTimeStamp(String dateTime)
         throws ParseException {
       SimpleDateFormat sdf = new SimpleDateFormat(

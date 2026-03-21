@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,11 +46,11 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * The Hooks into container lifecycle.
- * Get device list from device plugin in {@code bootstrap}
- * Assign devices for a container in {@code preStart}
- * Restore statue in {@code reacquireContainer}
- * Recycle devices from container in {@code postComplete}
+ * 设备资源处理实现类，挂载到容器生命周期，管理节点设备资源的分配与回收
+ * 在{@code bootstrap}阶段从设备插件获取可用设备列表
+ * 在{@code preStart}阶段为容器分配对应设备
+ * 在{@code reacquireContainer}阶段恢复设备分配状态
+ * 在{@code postComplete}阶段回收容器占用的设备
  * */
 public class DeviceResourceHandlerImpl implements ResourceHandler {
 
@@ -65,11 +66,20 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
   private final Context nmContext;
   private ShellWrapper shellWrapper;
 
-  // This will be used by container-executor to add necessary clis
+  // 容器执行器命令行参数，用于添加设备隔离配置
   public static final String EXCLUDED_DEVICES_CLI_OPTION = "--excluded_devices";
   public static final String ALLOWED_DEVICES_CLI_OPTION = "--allowed_devices";
   public static final String CONTAINER_ID_CLI_OPTION = "--container_id";
 
+  /**
+   * 构造函数，初始化设备资源处理器
+   * @param resName 资源名称
+   * @param devPluginAdapter 设备插件适配器
+   * @param devMappingManager 设备映射管理器
+   * @param cgHandler cgroups处理器
+   * @param operation 特权操作执行器
+   * @param ctx NodeManager上下文
+   */
   public DeviceResourceHandlerImpl(String resName,
       DevicePluginAdapter devPluginAdapter,
       DeviceMappingManager devMappingManager,
@@ -87,6 +97,16 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
   }
 
   @VisibleForTesting
+  /**
+   * 测试用构造函数，支持注入自定义ShellWrapper
+   * @param resName 资源名称
+   * @param devPluginAdapter 设备插件适配器
+   * @param devMappingManager 设备映射管理器
+   * @param cgHandler cgroups处理器
+   * @param operation 特权操作执行器
+   * @param ctx NodeManager上下文
+   * @param shell 自定义Shell包装器
+   */
   public DeviceResourceHandlerImpl(String resName,
       DevicePluginAdapter devPluginAdapter,
       DeviceMappingManager devMappingManager,
@@ -104,10 +124,17 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
   }
 
   @Override
+  /**
+   * 资源处理器初始化，从设备插件获取设备并初始化cgroups
+   * @param configuration NodeManager配置
+   * @return 需要执行的特权操作列表
+   * @throws ResourceHandlerException 初始化失败抛出异常
+   */
   public List<PrivilegedOperation> bootstrap(Configuration configuration)
       throws ResourceHandlerException {
     Set<Device> availableDevices = null;
     try {
+      // 从设备插件获取节点上所有可用设备
       availableDevices = devicePlugin.getDevices();
     } catch (Exception e) {
       throw new ResourceHandlerException("Exception thrown from"
@@ -121,23 +148,31 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
           + " failed. Null value got from plugin's getDevices method");
       return null;
     }
-    // Add device set. Here we trust the plugin's return value
+    // 将获取到的设备添加到映射管理器
     deviceMappingManager.addDeviceSet(resourceName, availableDevices);
-    // Init cgroups
+    // 初始化devices cgroup控制器
     this.cGroupsHandler.initializeCGroupController(
         CGroupsHandler.CGroupController.DEVICES);
     return null;
   }
 
   @Override
+  /**
+   * 容器启动前准备，为容器分配设备并完成cgroups隔离配置
+   * @param container 待启动容器
+   * @return 需要执行的特权操作列表
+   * @throws ResourceHandlerException 分配失败抛出异常
+   */
   public synchronized List<PrivilegedOperation> preStart(Container container)
       throws ResourceHandlerException {
     String containerIdStr = container.getContainerId().toString();
+    // 为容器分配指定数量的设备
     DeviceMappingManager.DeviceAllocation allocation =
         deviceMappingManager.assignDevices(resourceName, container);
     LOG.debug("Allocated to {}: {}", containerIdStr, allocation);
     DeviceRuntimeSpec spec;
     try {
+      // 通知设备插件设备已分配，获取运行时配置
       spec = devicePlugin.onDevicesAllocated(
           allocation.getAllowed(), YarnRuntimeType.RUNTIME_DEFAULT);
     } catch (Exception e) {
@@ -145,19 +180,21 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
           + " plugin's \"onDeviceAllocated\"" + e.getMessage());
     }
 
-    // cgroups operation based on allocation
+    // 目前不支持非Docker容器使用自定义运行时配置
     if (spec != null) {
       LOG.warn("Runtime spec in non-Docker container is not supported yet!");
     }
-    // Create device cgroups for the container
+    // 为当前容器创建设备cgroup
     cGroupsHandler.createCGroup(CGroupsHandler.CGroupController.DEVICES,
         containerIdStr);
-    // non-Docker, use cgroups to do isolation
+    // 非OCI兼容容器，使用cgroups实现设备隔离
     if (!OCIContainerRuntime.isOCICompliantContainerRequested(
         nmContext.getConf(),
         container.getLaunchContext().getEnvironment())) {
+      // 执行设备隔离配置
       tryIsolateDevices(allocation, containerIdStr);
       List<PrivilegedOperation> ret = new ArrayList<>();
+      // 添加将容器PID加入设备cgroup的操作
       ret.add(new PrivilegedOperation(
           PrivilegedOperation.OperationType.ADD_PID_TO_CGROUP,
           PrivilegedOperation.CGROUP_ARG_PREFIX + cGroupsHandler
@@ -170,16 +207,16 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
   }
 
   /**
-   * Try set cgroup devices params for the container using container-executor.
-   * If it has real device major number, minor number or dev path,
-   * we'll do the enforcement. Otherwise, won't do it.
-   *
+   * 使用容器执行器配置容器cgroup设备隔离规则，仅当存在设备编号时执行隔离
+   * @param allocation 设备分配结果
+   * @param containerIdStr 容器ID字符串
+   * @throws ResourceHandlerException 配置失败抛出异常
    * */
   private void tryIsolateDevices(
       DeviceMappingManager.DeviceAllocation allocation,
       String containerIdStr) throws ResourceHandlerException {
     try {
-      // Execute c-e to setup device isolation before launch the container
+      // 创建设备隔离特权操作，传入容器ID
       PrivilegedOperation privilegedOperation = new PrivilegedOperation(
           PrivilegedOperation.OperationType.DEVICE,
           Arrays.asList(CONTAINER_ID_CLI_OPTION, containerIdStr));
@@ -187,18 +224,20 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
       int majorNumber;
       int minorNumber;
       List<String> devNumbers = new ArrayList<>();
+      // 处理禁止访问的设备
       if (!allocation.getDenied().isEmpty()) {
         DeviceType devType;
         for (Device deniedDevice : allocation.getDenied()) {
           majorNumber = deniedDevice.getMajorNumber();
           minorNumber = deniedDevice.getMinorNumber();
-          // Add device type
+          // 获取设备类型
           devType = getDeviceType(deniedDevice);
           if (devType != null) {
             devNumbers.add(devType.getName() + "-" + majorNumber + ":"
                 + minorNumber + "-rwm");
           }
         }
+        // 如果有可禁止的设备，添加禁止参数
         if (devNumbers.size() != 0) {
           privilegedOperation.appendArgs(
               Arrays.asList(EXCLUDED_DEVICES_CLI_OPTION,
@@ -207,15 +246,18 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
         }
       }
 
+      // 处理允许访问的设备
       if (!allocation.getAllowed().isEmpty()) {
         devNumbers.clear();
         for (Device allowedDevice : allocation.getAllowed()) {
           majorNumber = allowedDevice.getMajorNumber();
           minorNumber = allowedDevice.getMinorNumber();
+          // 只处理编号合法的设备
           if (majorNumber != -1 && minorNumber != -1) {
             devNumbers.add(majorNumber + ":" + minorNumber);
           }
         }
+        // 如果有可允许的设备，添加允许参数
         if (devNumbers.size() > 0) {
           privilegedOperation.appendArgs(
               Arrays.asList(ALLOWED_DEVICES_CLI_OPTION,
@@ -223,11 +265,13 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
           needNativeDeviceOperation = true;
         }
       }
+      // 如果需要设备隔离操作，调用容器执行器执行
       if (needNativeDeviceOperation) {
         privilegedOperationExecutor.executePrivilegedOperation(
             privilegedOperation, true);
       }
     } catch (PrivilegedOperationException e) {
+      // 操作失败，清理已创建的cgroup
       cGroupsHandler.deleteCGroup(CGroupsHandler.CGroupController.DEVICES,
           containerIdStr);
       LOG.warn("Could not update cgroup for container", e);
@@ -236,6 +280,12 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
   }
 
   @Override
+  /**
+   * 恢复容器重启后已分配设备的状态
+   * @param containerId 容器ID
+   * @return 需要执行的特权操作列表
+   * @throws ResourceHandlerException 恢复失败抛出异常
+   */
   public synchronized List<PrivilegedOperation> reacquireContainer(
       ContainerId containerId) throws ResourceHandlerException {
     deviceMappingManager.recoverAssignedDevices(resourceName, containerId);
@@ -249,6 +299,12 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
   }
 
   @Override
+  /**
+   * 容器完成后清理，回收设备并删除对应cgroup
+   * @param containerId 容器ID
+   * @return 需要执行的特权操作列表
+   * @throws ResourceHandlerException 清理失败抛出异常
+   */
   public synchronized List<PrivilegedOperation> postComplete(
       ContainerId containerId) throws ResourceHandlerException {
     deviceMappingManager.cleanupAssignedDevices(resourceName, containerId);
@@ -272,6 +328,11 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
         '}';
   }
 
+  /**
+   * 根据设备信息获取设备类型（块设备/字符设备）
+   * @param device 设备对象
+   * @return 设备类型，无法确定返回null
+   */
   public DeviceType getDeviceType(Device device) {
     String devName = device.getDevPath();
     if (devName.isEmpty()) {
@@ -283,15 +344,17 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
         LOG.warn("Non device number provided, cannot decide the device type");
         return null;
       }
-      // Get type from the device numbers
+      // 设备编号判断设备类型
       return getDeviceTypeFromDeviceNumber(device.getMajorNumber(),
           device.getMinorNumber());
     }
     DeviceType deviceType;
     try {
       LOG.debug("Try to get device type from device path: {}", devName);
+      // 通过stat命令获取设备文件类型
       String output = shellWrapper.getDeviceFileType(devName);
       LOG.debug("stat output:{}", output);
+      // stat输出首字符c表示字符设备，b表示块设备
       deviceType = output.startsWith("c") ? DeviceType.CHAR : DeviceType.BLOCK;
     } catch (IOException e) {
       String msg =
@@ -303,10 +366,11 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
   }
 
   /**
-   * Get the device type used for cgroups value set.
-   * If sys file "/sys/dev/block/major:minor" exists, it's block device.
-   * Otherwise, it's char device. An exception is that Nvidia GPU doesn't
-   * create this sys file. so assume character device by default.
+   * 根据设备主从编号判断设备类型，通过检查/sys/dev/block下是否存在对应目录判断
+   * 如果目录存在则为块设备，否则默认为字符设备（NVIDIA GPU不存在该目录，按字符设备处理）
+   * @param major 设备主编号
+   * @param minor 设备从编号
+   * @return 设备类型
    */
   public DeviceType getDeviceTypeFromDeviceNumber(int major, int minor) {
     if (shellWrapper.existFile("/sys/dev/block/"
@@ -317,9 +381,9 @@ public class DeviceResourceHandlerImpl implements ResourceHandler {
   }
 
   /**
-   * Enum for Linux device type. Used when updating device cgroups params.
-   * "b" represents block device
-   * "c" represents character device
+   * Linux设备类型枚举，用于配置cgroups设备规则
+   * "b" 代表块设备
+   * "c" 代表字符设备
    * */
   private enum DeviceType {
     BLOCK("b"),

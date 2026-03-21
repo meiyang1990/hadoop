@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,9 +21,17 @@ package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * 写入应用历史事件基类，为应用历史存储服务提供事件抽象，
+ * 封装写入应用历史操作的事件类型信息。
+ */
 public class WritingApplicationHistoryEvent extends
     AbstractEvent<WritingHistoryEventType> {
 
+  /**
+   * 构造写入应用历史事件，指定事件类型。
+   * @param type 写入历史事件类型
+   */
   public WritingApplicationHistoryEvent(WritingHistoryEventType type) {
     super(type);
   }

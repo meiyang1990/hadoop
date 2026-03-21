@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * JMX bean for RM info.
+ * ResourceManager运行信息的JMX MBean实现，提供通过JMX暴露RM状态信息的能力。
  */
 public class RMInfo implements RMInfoMXBean {
   private static final Logger LOG = LoggerFactory.getLogger(RMNMInfo.class);
@@ -37,18 +38,23 @@ public class RMInfo implements RMInfoMXBean {
   private ObjectName rmStatusBeanName;
 
   /**
-   * Constructor for RMInfo registers the bean with JMX.
+   * 构造RMInfo对象，持有ResourceManager实例引用。
    *
-   * @param resourceManager resource manager's context object
+   * @param resourceManager ResourceManager实例
    */
   RMInfo(ResourceManager resourceManager) {
     this.resourceManager = resourceManager;
   }
 
+  /**
+   * 向MBean服务器注册当前RMInfo MBean，暴露RM运行信息供JMX监控。
+   */
   public void register() {
     StandardMBean bean;
     try {
+      // 创建标准MBean实例，使用RMInfoMXBean接口
       bean = new StandardMBean(this, RMInfoMXBean.class);
+      // 注册MBean到MBean服务器，存储注册后的对象名
       rmStatusBeanName = MBeans.register("ResourceManager", "RMInfo", bean);
     } catch (NotCompliantMBeanException e) {
       LOG.warn("Error registering RMInfo MBean", e);
@@ -56,22 +62,31 @@ public class RMInfo implements RMInfoMXBean {
     LOG.info("Registered RMInfo MBean");
   }
 
+  /**
+   * 从MBean服务器注销当前RMInfo MBean。
+   */
   public void unregister() {
     if (rmStatusBeanName != null) {
       MBeans.unregister(rmStatusBeanName);
     }
   }
 
-  @Override public String getState() {
+  @Override 
+  public String getState() {
+    // 获取并返回当前ResourceManager的高可用状态
     return this.resourceManager.getRMContext().getHAServiceState().toString();
   }
 
-  @Override public String getHostAndPort() {
+  @Override 
+  public String getHostAndPort() {
+    // 获取并返回当前ResourceManager绑定的服务地址
     return NetUtils.getHostPortString(ResourceManager.getBindAddress(
         this.resourceManager.getRMContext().getYarnConfiguration()));
   }
 
-  @Override public boolean isSecurityEnabled() {
+  @Override 
+  public boolean isSecurityEnabled() {
+    // 返回集群安全认证是否启用
     return UserGroupInformation.isSecurityEnabled();
   }
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -17,11 +18,21 @@
 */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event;
 
+/**
+ * 容器资源本地化事件类型枚举
+ * 定义了NM节点本地化过程中所有可能的事件类型，用于状态机流转
+ */
 public enum LocalizationEventType {
+  /** 初始化应用程序资源本地化 */
   INIT_APPLICATION_RESOURCES,
+  /** 本地化容器所需资源 */
   LOCALIZE_CONTAINER_RESOURCES,
+  /** 缓存清理请求 */
   CACHE_CLEANUP,
+  /** 清理容器资源 */
   CLEANUP_CONTAINER_RESOURCES,
+  /** 销毁应用程序所有资源 */
   DESTROY_APPLICATION_RESOURCES,
+  /** 容器资源本地化完成通知 */
   CONTAINER_RESOURCES_LOCALIZED,
 }

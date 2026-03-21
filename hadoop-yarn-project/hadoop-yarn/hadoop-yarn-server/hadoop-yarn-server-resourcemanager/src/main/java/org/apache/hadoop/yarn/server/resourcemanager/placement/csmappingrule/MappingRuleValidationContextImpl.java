@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,6 +32,9 @@ import java.util.*;
 
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration.DOT;
 
+/**
+ * 容量调度器映射规则验证上下文实现类，保存验证所需上下文信息，提供队列路径验证能力
+ */
 public class MappingRuleValidationContextImpl
     implements MappingRuleValidationContext {
   /**
@@ -49,23 +53,26 @@ public class MappingRuleValidationContextImpl
    */
   private final CapacitySchedulerQueueManager queueManager;
 
+  /**
+   * 构造方法，使用队列管理器初始化验证上下文
+   * @param qm 容量调度器队列管理器
+   */
   public MappingRuleValidationContextImpl(CapacitySchedulerQueueManager qm) {
     queueManager = qm;
   }
 
   /**
-   * This method will determine if a static queue path is valid.
-   * We consider a path static (in the target path validation context)
-   * If non if it's parts contain any substitutable variables.
-   * eg. root.groups.bob is static, while root.groups.%user is dynamic
-   * @param path The static path of the queue
-   * @return true if the path is valid
-   * @throws YarnException if the path is invalid
+   * 验证静态队列路径是否合法（路径不包含任何可替换变量）
+   * @param path 待验证的静态队列路径
+   * @return 验证通过返回true
+   * @throws YarnException 路径不合法时抛出异常
    */
   private boolean validateStaticQueuePath(QueuePath path)
       throws YarnException {
+    // 规范化根路径格式
     String normalizedPath = MappingRuleValidationHelper.normalizeQueuePathRoot(
         queueManager, path.getFullPath());
+    // 执行队列路径自动创建合法性检查
     MappingRuleValidationHelper.ValidationResult validity =
         MappingRuleValidationHelper.validateQueuePathAutoCreation(
             queueManager, normalizedPath);
@@ -90,6 +97,7 @@ public class MappingRuleValidationContextImpl
           "and no queue exists with name '" + path.getLeafName() +
           "' under it.");
     case QUEUE_EXISTS:
+      // 队列已存在时，验证必须是叶子队列才能放置应用
       CSQueue queue = queueManager.getQueue(normalizedPath);
       if (!(queue instanceof AbstractLeafQueue)) {
         throw new YarnException("Target queue '" + path.getFullPath() +
@@ -97,10 +105,10 @@ public class MappingRuleValidationContextImpl
       }
       break;
     case CREATABLE:
+      // 队列不存在但支持自动创建，验证通过
       break;
     default:
-      //Probably the QueueCreationValidation have
-      //new items, which are not handled here
+      // 未知验证结果，抛出异常
       throw new YarnException("Unknown queue path validation result. '" +
           validity + "'.");
     }
@@ -109,84 +117,81 @@ public class MappingRuleValidationContextImpl
   }
 
   /**
-   * This method will determine if a dynamic queue path (a path which contains
-   * variables) is valid.
-   * @param path The dynamic path of the queue
-   * @return true of the path is valid
-   * @throws YarnException if the path is invalid
+   * 验证包含变量的动态队列路径是否合法
+   * @param path 待验证的动态队列路径
+   * @return 验证通过返回true
+   * @throws YarnException 路径不合法时抛出异常
    */
   private boolean validateDynamicQueuePath(QueuePath path)
       throws YarnException{
+    // 按点分割路径为多个片段
     ArrayList<String> parts = new ArrayList<>();
     Collections.addAll(parts, path.getFullPath().split("\\."));
-    //How deep is the path to be created after the root element
 
     Iterator<String> pointer = parts.iterator();
     if (!pointer.hasNext()) {
-      //This should not happen since we only call validateDynamicQueuePath
-      //if we have found at least ONE dynamic part, which implies the path is
-      //not empty, so if we get here, I'm really curious what the path was,
-      //that's the reason we give back a theoretically "empty" path
+      // 空路径异常（理论上不会触发）
       throw new YarnException("Empty queue path provided '" + path + "'");
     }
+    // 初始化静态部分缓冲区，取第一个路径片段
     StringBuilder staticPartBuffer = new StringBuilder(pointer.next());
     String staticPartParent = null;
 
-    //If not even the root of the reference is static we cannot validate
+    // 如果根路径本身就是动态的，无法进一步验证，直接通过
     if (!isPathStatic(staticPartBuffer.toString())) {
       return true;
     }
 
-    //getting the static part of the queue, we can only validate that
+    // 遍历收集前缀所有静态片段，直到遇到第一个动态片段停止
     while (pointer.hasNext()) {
       String nextPart = pointer.next();
       if (isPathStatic(nextPart)) {
         staticPartParent = staticPartBuffer.toString();
         staticPartBuffer.append(DOT).append(nextPart);
       } else {
-        //when we find the first dynamic part, we stop the search
+        // 找到第一个动态片段，停止遍历
         break;
       }
     }
     String staticPart = staticPartBuffer.toString();
 
+    // 规范化静态前缀路径
     String normalizedStaticPart =
         MappingRuleValidationHelper.normalizeQueuePathRoot(
             queueManager, staticPart);
     CSQueue queue = queueManager.getQueue(normalizedStaticPart);
-    //if the static part of our queue exists, and it's not a leaf queue,
-    //we cannot do any deeper validation
+    // 静态前缀已存在的情况
     if (queue != null) {
+      // 如果静态前缀本身是叶子队列，无法再创建子队列，验证失败
       if (queue instanceof AbstractLeafQueue) {
         throw new YarnException("Queue path '" + path +"' is invalid " +
             "because '" + normalizedStaticPart + "' is a leaf queue, " +
             "which can have no other queues under it.");
       }
+      // 静态前缀是父队列，验证通过
       return true;
     }
 
+    // 静态前缀不存在，检查其父节点是否支持动态创建
     if (staticPartParent != null) {
       String normalizedStaticPartParent
           = MappingRuleValidationHelper.normalizeQueuePathRoot(
               queueManager, staticPartParent);
       queue = queueManager.getQueue(normalizedStaticPartParent);
-      //if the parent of our static part is eligible for creation, we validate
-      //this rule
+      // 父节点支持动态创建子队列，验证通过
       if (isDynamicParent(queue)) {
         return true;
       }
     }
 
-    //at this point we cannot find any parent which is eligible for creating
-    //this path
+    // 找不到符合要求的父节点支持动态创建，验证失败
     throw new YarnException("No eligible parent found on path '" + path + "'.");
   }
 
   /**
-   * This method determines if a queue is eligible for being a parent queue.
-   * Since YARN-10506 not only managed parent queues can have child queues.
-   * @param queue The queue object
-   * @return true if queues can be created under this queue otherwise false
+   * 判断队列是否支持作为动态父队列（可以自动创建子队列）
+   * @param queue 待判断的队列对象
+   * @return 支持自动创建子队列返回true，否则返回false
    */
   private boolean isDynamicParent(CSQueue queue) {
     if (queue == null) {
@@ -206,12 +211,10 @@ public class MappingRuleValidationContextImpl
 
 
   /**
-   * This method should determine if the provided queue path can result in
-   * a possible placement. It should fail if the provided path cannot be placed
-   * into any of the known queues regardless of the variable context.
-   * @param queuePath The path to check
-   * @return true if the validation was successful
-   * @throws YarnException if the provided queue path is invalid
+   * 对外暴露的队列路径验证入口方法，区分静态和动态路径分别验证
+   * @param queuePath 待验证的队列路径
+   * @return 验证通过返回true
+   * @throws YarnException 路径不合法时抛出异常
    */
   public boolean validateQueuePath(String queuePath) throws YarnException {
     if (queuePath == null || queuePath.isEmpty()) {
@@ -227,11 +230,10 @@ public class MappingRuleValidationContextImpl
   }
 
   /**
-   * Method to determine if the provided queue path contains any dynamic parts
-   * A part is dynamic if a known variable is referenced in it.
-   * @param queuePath The path to check
-   * @return true if no dynamic parts were found
-   * @throws YarnException if a path part is invalid (eg. empty)
+   * 判断整个队列路径是否是静态（不包含任何动态变量片段）
+   * @param queuePath 待检查的队列路径
+   * @return 无动态片段返回true
+   * @throws YarnException 路径包含空片段时抛出异常
    */
   public boolean isPathStatic(String queuePath) throws YarnException {
     String[] parts = queuePath.split("\\.");
@@ -250,10 +252,9 @@ public class MappingRuleValidationContextImpl
   }
 
   /**
-   * Method to determine if the provided queue path part is dynamic.
-   * A part is dynamic if a known variable is referenced in it.
-   * @param pathPart The path part to check
-   * @return true if part is not dynamic
+   * 判断单个路径片段是否是静态（不匹配已知变量）
+   * @param pathPart 待检查的路径片段
+   * @return 不是动态变量返回true
    */
   private boolean isPathPartStatic(String pathPart) {
     if (knownVariables.contains(pathPart)) {
@@ -264,11 +265,9 @@ public class MappingRuleValidationContextImpl
   }
 
   /**
-   * This method will add a known variable to the validation context, known
-   * variables can be used to determine if a path is static or dynamic.
-   * @param variable Name of the variable
-   * @throws YarnException If the variable to be added has already added as an
-   * immutable one, an exception is thrown
+   * 添加上下文已知的可变变量，用于判断路径是否为动态
+   * @param variable 变量名称
+   * @throws YarnException 变量已被标记为不可变时抛出异常
    */
   public void addVariable(String variable) throws YarnException {
     if (immutableVariables.contains(variable)) {
@@ -279,11 +278,9 @@ public class MappingRuleValidationContextImpl
   }
 
   /**
-   * This method will add a known immutable variable to the validation context,
-   * known variables can be used to determine if a path is static or dynamic.
-   * @param variable Name of the immutable variable
-   * @throws YarnException If the variable to be added has already added as a
-   * regular, mutable variable an exception is thrown
+   * 添加上下文已知的不可变变量，用于判断路径是否为动态
+   * @param variable 不可变变量名称
+   * @throws YarnException 变量已作为可变变量添加时抛出异常
    */
   public void addImmutableVariable(String variable) throws YarnException {
     if (knownVariables.contains(variable) &&
@@ -296,8 +293,8 @@ public class MappingRuleValidationContextImpl
   }
 
   /**
-   * This method will return all the known variables.
-   * @return Set of the known variables
+   * 获取所有已知变量的不可变拷贝
+   * @return 所有已知变量的不可变集合
    */
   public Set<String> getVariables() {
     return ImmutableSet.copyOf(knownVariables);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,16 +34,21 @@ import org.apache.hadoop.yarn.util.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 适配 FairScheduler 的预订计划跟随实现，将预订资源规划同步到公平调度器队列结构
+ */
 public class FairSchedulerPlanFollower extends AbstractSchedulerPlanFollower {
   private static final Logger LOG = LoggerFactory
       .getLogger(FairSchedulerPlanFollower.class);
 
+  // 持有的公平调度器实例引用
   private FairScheduler fs;
 
   @Override
   public void init(Clock clock, ResourceScheduler sched,
       Collection<Plan> plans) {
     super.init(clock, sched, plans);
+    // 强转调度器类型为FairScheduler
     fs = (FairScheduler)sched;
     LOG.info("Initializing Plan Follower Policy:"
         + this.getClass().getCanonicalName());
@@ -50,6 +56,7 @@ public class FairSchedulerPlanFollower extends AbstractSchedulerPlanFollower {
 
   @Override
   protected Queue getPlanQueue(String planQueueName) {
+    // 从公平调度器队列管理器获取计划对应的父队列
     Queue planQueue = fs.getQueueManager().getParentQueue(planQueueName, false);
     if (planQueue == null) {
       LOG.error("The queue " + planQueueName + " cannot be found or is not a " +
@@ -61,6 +68,7 @@ public class FairSchedulerPlanFollower extends AbstractSchedulerPlanFollower {
   @Override
   protected List<? extends Queue> getChildReservationQueues(Queue queue) {
     FSQueue planQueue = (FSQueue)queue;
+    // 获取计划队列下所有子队列（都是预订队列）
     List<FSQueue> childQueues = planQueue.getChildQueues();
     return childQueues;
   }
@@ -69,15 +77,19 @@ public class FairSchedulerPlanFollower extends AbstractSchedulerPlanFollower {
   @Override
   protected void addReservationQueue(String planQueueName, Queue queue,
       String currResId) {
+    // 生成预订队列完整名称
     String leafQueueName = getReservationQueueName(planQueueName, currResId);
+    // 通过队列管理器创建叶子预订队列
     fs.getQueueManager().getLeafQueue(leafQueueName, true);
   }
 
   @Override
   protected void createDefaultReservationQueue(String planQueueName,
       Queue queue, String defReservationId) {
+    // 生成默认预订队列完整名称
     String defReservationQueueName = getReservationQueueName(planQueueName,
         defReservationId);
+    // 队列不存在则创建默认预订叶子队列
     if (!fs.getQueueManager().exists(defReservationQueueName)) {
       fs.getQueueManager().getLeafQueue(defReservationQueueName, true);
     }
@@ -87,6 +99,7 @@ public class FairSchedulerPlanFollower extends AbstractSchedulerPlanFollower {
   protected Resource getPlanResources(Plan plan, Queue queue,
       Resource clusterResources) {
     FSParentQueue planQueue = (FSParentQueue)queue;
+    // 获取计划队列的稳定公平份额作为计划可使用资源
     Resource planResources = planQueue.getSteadyFairShare();
     return planResources;
   }
@@ -94,12 +107,15 @@ public class FairSchedulerPlanFollower extends AbstractSchedulerPlanFollower {
   @Override
   protected Resource getReservationQueueResourceIfExists(Plan plan,
       ReservationId reservationId) {
+    // 生成预订队列完整名称
     String reservationQueueName = getReservationQueueName(plan.getQueueName(),
         reservationId.toString());
+    // 从队列管理器获取预订叶子队列
     FSLeafQueue reservationQueue =
         fs.getQueueManager().getLeafQueue(reservationQueueName, false);
     Resource reservationResource = null;
     if (reservationQueue != null) {
+      // 队列存在则获取其稳定公平份额作为预留资源量
       reservationResource = reservationQueue.getSteadyFairShare();
     }
     return reservationResource;
@@ -108,12 +124,13 @@ public class FairSchedulerPlanFollower extends AbstractSchedulerPlanFollower {
   @Override
   protected String getReservationQueueName(String planQueueName,
       String reservationQueueName) {
+    // 获取计划队列的完整路径名称
     String planQueueNameFullPath = fs.getQueueManager().getQueue
         (planQueueName).getName();
 
     if (!reservationQueueName.startsWith(planQueueNameFullPath)) {
-      // If name is not a path we need full path for FairScheduler. See
-      // YARN-2773 for the root cause
+      // FairScheduler需要完整路径名，拼接父队列路径生成完整名称
+      // 参见YARN-2773了解根因
       return planQueueNameFullPath + "." + reservationQueueName;
     }
     return reservationQueueName;
@@ -121,6 +138,7 @@ public class FairSchedulerPlanFollower extends AbstractSchedulerPlanFollower {
 
   @Override
   protected String getReservationIdFromQueueName(String resQueueName) {
+    // 从完整队列名称中提取最后一段作为预订ID
     return resQueueName.substring(resQueueName.lastIndexOf(".") + 1);
   }
 }

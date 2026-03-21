@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,7 +27,8 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationSchedulerConfiguration;
 
 /**
- *
+ * 队列状态管理器，供资源调度器统一管理队列运行状态，支持队列的启停和删除检查
+ * 
  * QueueStateManager which can be used by Scheduler to manage the queue state.
  *
  */
@@ -41,57 +43,67 @@ public class QueueStateManager<T extends SchedulerQueue,
   private static final Logger LOG =
       LoggerFactory.getLogger(QueueStateManager.class);
 
+  // 队列管理器引用，用于获取队列实例
   private SchedulerQueueManager<T, E> queueManager;
 
+  /**
+   * 初始化队列状态管理器，绑定队列管理器实例
+   * @param newQueueManager 队列管理器实例
+   */
   public synchronized void initialize(SchedulerQueueManager<T, E>
       newQueueManager) {
     this.queueManager = newQueueManager;
   }
 
   /**
-   * Stop the queue.
-   * @param queueName the queue name
-   * @throws YarnException if the queue does not exist
+   * 停止指定队列，将队列状态设置为停止
+   * @param queueName 目标队列名称
+   * @throws YarnException 如果指定队列不存在则抛出异常
    */
   @SuppressWarnings("unchecked")
   public synchronized void stopQueue(String queueName) throws YarnException {
+    // 从队列管理器获取目标队列
     SchedulerQueue<T> queue = queueManager.getQueue(queueName);
     if (queue == null) {
       throw new YarnException("The specified queue:" + queueName
           + " does not exist!");
     }
+    // 调用队列自身的停止方法更新状态
     queue.stopQueue();
   }
 
   /**
-   * Active the queue.
-   * @param queueName the queue name
-   * @throws YarnException if the queue does not exist
-   *         or the queue can not be activated.
+   * 激活指定队列，将队列状态恢复为运行中
+   * @param queueName 目标队列名称
+   * @throws YarnException 如果指定队列不存在或无法激活则抛出异常
    */
   @SuppressWarnings("unchecked")
   public synchronized void activateQueue(String queueName)
       throws YarnException {
+    // 从队列管理器获取目标队列
     SchedulerQueue<T> queue = queueManager.getQueue(queueName);
     if (queue == null) {
       throw new YarnException("The specified queue:" + queueName
           + " does not exist!");
     }
+    // 调用队列自身的激活方法更新状态
     queue.activateQueue();
   }
 
   /**
-   * Whether this queue can be deleted.
-   * @param queueName the queue name
-   * @return true if the queue can be deleted
+   * 检查指定队列是否满足删除条件
+   * @param queueName 目标队列名称
+   * @return true 如果队列可以删除，否则返回false
    */
   @SuppressWarnings("unchecked")
   public boolean canDelete(String queueName) {
+    // 从队列管理器获取目标队列
     SchedulerQueue<T> queue = queueManager.getQueue(queueName);
     if (queue == null) {
       LOG.info("The specified queue:" + queueName + " does not exist!");
       return false;
     }
+    // 只有已停止的队列才能删除
     if (queue.getState() == QueueState.STOPPED){
       return true;
     }

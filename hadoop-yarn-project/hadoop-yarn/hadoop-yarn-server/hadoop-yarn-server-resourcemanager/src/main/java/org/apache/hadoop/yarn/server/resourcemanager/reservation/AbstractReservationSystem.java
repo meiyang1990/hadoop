@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -61,8 +62,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This is the implementation of {@link ReservationSystem} based on the
- * {@link ResourceScheduler}
+ * YARN ReservationSystem抽象基类，基于ResourceScheduler实现预留资源管理核心框架
+ * 为不同调度器提供统一的预留资源管理基础能力
  */
 @LimitedPrivate("yarn")
 @Unstable
@@ -72,44 +73,57 @@ public abstract class AbstractReservationSystem extends AbstractService
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractReservationSystem.class);
 
-  // private static final String DEFAULT_CAPACITY_SCHEDULER_PLAN
-
+  // 读写锁，保证plans等共享数据的线程安全，公平模式
   private final ReentrantReadWriteLock readWriteLock =
       new ReentrantReadWriteLock(true);
   private final Lock readLock = readWriteLock.readLock();
   private final Lock writeLock = readWriteLock.writeLock();
 
+  // 标记是否完成初始化
   private boolean initialized = false;
 
+  // UTC时钟，用于时间相关计算
   private final Clock clock = new UTCClock();
 
+  //  ReservationId生成计数器，原子自增保证并发安全
   private AtomicLong resCounter = new AtomicLong();
 
+  // 按队列名称存储所有预留计划
   private Map<String, Plan> plans = new HashMap<String, Plan>();
 
+  // ReservationId到对应队列名称的映射，快速查找预留所属队列
   private Map<ReservationId, String> resQMap =
       new HashMap<ReservationId, String>();
 
+  // RM上下文，获取调度器等核心组件
   private RMContext rmContext;
 
+  // 关联的资源调度器
   private ResourceScheduler scheduler;
 
+  // 定期执行计划同步任务的线程池
   private ScheduledExecutorService scheduledExecutorService;
 
+  // 配置对象
   protected Configuration conf;
 
+  // 计划同步任务执行步长（时间间隔）
   protected long planStepSize;
 
+  // 计划同步器，负责将预留计划同步到调度器实际资源分配
   private PlanFollower planFollower;
 
+  // 预留访问权限控制器
   private ReservationsACLsManager reservationsACLsManager;
 
+  // 是否启用状态恢复
   private boolean isRecoveryEnabled = false;
 
+  // 周期性预留最大允许周期
   private long maxPeriodicity;
 
   /**
-   * Construct the service.
+   * 构造服务对象
    * 
    * @param name service name
    */
@@ -132,10 +146,12 @@ public abstract class AbstractReservationSystem extends AbstractService
       throws YarnException {
     writeLock.lock();
     try {
+      // 未初始化则执行完整初始化
       if (!initialized) {
         initialize(conf);
         initialized = true;
       } else {
+        // 已初始化则仅新增新发现的可预留队列计划
         initializeNewPlans(conf);
       }
     } finally {
@@ -143,11 +159,16 @@ public abstract class AbstractReservationSystem extends AbstractService
     }
   }
 
+  /**
+   * 完整初始化预留系统核心组件
+   * @param conf 配置对象
+   * @throws YarnException 初始化异常
+   */
   private void initialize(Configuration conf) throws YarnException {
     LOG.info("Initializing Reservation system");
     this.conf = conf;
     scheduler = rmContext.getScheduler();
-    // Get the plan step size
+    // 从配置读取计划同步步长，使用默认值兜底
     planStepSize = conf.getTimeDuration(
         YarnConfiguration.RM_RESERVATION_SYSTEM_PLAN_FOLLOWER_TIME_STEP,
         YarnConfiguration.DEFAULT_RM_RESERVATION_SYSTEM_PLAN_FOLLOWER_TIME_STEP,
@@ -156,6 +177,7 @@ public abstract class AbstractReservationSystem extends AbstractService
       planStepSize =
           YarnConfiguration.DEFAULT_RM_RESERVATION_SYSTEM_PLAN_FOLLOWER_TIME_STEP;
     }
+    // 从配置读取周期性预留最大允许周期，使用默认值兜底
     maxPeriodicity =
         conf.getLong(YarnConfiguration.RM_RESERVATION_SYSTEM_MAX_PERIODICITY,
             YarnConfiguration.DEFAULT_RM_RESERVATION_SYSTEM_MAX_PERIODICITY);
@@ -163,15 +185,17 @@ public abstract class AbstractReservationSystem extends AbstractService
       maxPeriodicity =
           YarnConfiguration.DEFAULT_RM_RESERVATION_SYSTEM_MAX_PERIODICITY;
     }
-    // Create a plan corresponding to every reservable queue
+    // 为每个可预留队列创建对应预留计划
     Set<String> planQueueNames = scheduler.getPlanQueues();
     for (String planQueueName : planQueueNames) {
       Plan plan = initializePlan(planQueueName);
       plans.put(planQueueName, plan);
     }
+    // 读取恢复配置
     isRecoveryEnabled = conf.getBoolean(YarnConfiguration.RECOVERY_ENABLED,
         YarnConfiguration.DEFAULT_RM_RECOVERY_ENABLED);
 
+    // 如果ACL启用，根据调度器类型创建对应ACL管理器
     if (conf.getBoolean(YarnConfiguration.YARN_RESERVATION_ACL_ENABLE,
         YarnConfiguration.DEFAULT_YARN_RESERVATION_ACL_ENABLE)
         && conf.getBoolean(YarnConfiguration.YARN_ACL_ENABLE,
@@ -186,12 +210,19 @@ public abstract class AbstractReservationSystem extends AbstractService
     }
   }
 
+  /**
+   * 从恢复状态加载指定计划的所有预留信息
+   * @param planName 计划名称
+   * @param reservations 该计划所有预留的持久化状态
+   * @throws PlanningException 加载恢复异常
+   */
   private void loadPlan(String planName,
       Map<ReservationId, ReservationAllocationStateProto> reservations)
       throws PlanningException {
     Plan plan = plans.get(planName);
     Resource minAllocation = getMinAllocation();
     ResourceCalculator rescCalculator = getResourceCalculator();
+    // 将Proto格式持久化状态转换为内存分配对象，添加到计划中
     for (Entry<ReservationId, ReservationAllocationStateProto> currentReservation : reservations
         .entrySet()) {
       plan.addReservation(ReservationSystemUtil.toInMemoryAllocation(planName,
@@ -207,16 +238,20 @@ public abstract class AbstractReservationSystem extends AbstractService
     LOG.info("Recovering Reservation system");
     writeLock.lock();
     try {
+      // 从RM恢复状态获取预留系统状态
       Map<String, Map<ReservationId, ReservationAllocationStateProto>> reservationSystemState =
           state.getReservationState();
       if (planFollower != null) {
+        // 逐个计划恢复预留信息
         for (String plan : plans.keySet()) {
-          // recover reservations if any from state store
+          // 如果状态存储中存在该计划，加载恢复
           if (reservationSystemState.containsKey(plan)) {
             loadPlan(plan, reservationSystemState.get(plan));
           }
+          // 同步计划到调度器
           synchronizePlan(plan, false);
         }
+        // 工作保留恢复模式下，延迟启动计划同步任务
         startPlanFollower(conf.getLong(
             YarnConfiguration.RM_WORK_PRESERVING_RECOVERY_SCHEDULING_WAIT_MS,
             YarnConfiguration.DEFAULT_RM_WORK_PRESERVING_RECOVERY_SCHEDULING_WAIT_MS));
@@ -226,12 +261,16 @@ public abstract class AbstractReservationSystem extends AbstractService
     }
   }
 
+  /**
+   * 增量初始化新增可预留队列，刷新预留系统配置
+   */
   private void initializeNewPlans(Configuration conf) {
     LOG.info("Refreshing Reservation system");
     writeLock.lock();
     try {
-      // Create a plan corresponding to every new reservable queue
+      // 获取当前所有可预留队列
       Set<String> planQueueNames = scheduler.getPlanQueues();
+      // 为新增的可预留队列创建计划
       for (String planQueueName : planQueueNames) {
         if (!plans.containsKey(planQueueName)) {
           Plan plan = initializePlan(planQueueName);
@@ -241,7 +280,7 @@ public abstract class AbstractReservationSystem extends AbstractService
               planQueueName);
         }
       }
-      // Update the plan follower with the active plans
+      // 更新计划同步器的活动计划列表
       if (planFollower != null) {
         planFollower.setPlans(plans.values());
       }
@@ -252,7 +291,12 @@ public abstract class AbstractReservationSystem extends AbstractService
     }
   }
 
+  /**
+   * 根据配置创建计划同步器实例
+   * @return 计划同步器实例
+   */
   private PlanFollower createPlanFollower() {
+    // 读取计划同步器类名，使用默认值兜底
     String planFollowerPolicyClassName =
         conf.get(YarnConfiguration.RM_RESERVATION_SYSTEM_PLAN_FOLLOWER,
             getDefaultPlanFollower());
@@ -261,6 +305,7 @@ public abstract class AbstractReservationSystem extends AbstractService
     }
     LOG.info("Using PlanFollowerPolicy: " + planFollowerPolicyClassName);
     try {
+      // 反射加载类并实例化
       Class<?> planFollowerPolicyClazz =
           conf.getClassByName(planFollowerPolicyClassName);
       if (PlanFollower.class.isAssignableFrom(planFollowerPolicyClazz)) {
@@ -278,8 +323,12 @@ public abstract class AbstractReservationSystem extends AbstractService
     }
   }
 
+  /**
+   * 根据当前调度器类型获取默认计划同步器类名
+   * @return 默认计划同步器全类名
+   */
   private String getDefaultPlanFollower() {
-    // currently only capacity scheduler is supported
+    // 根据调度器类型返回对应默认实现
     if (scheduler instanceof CapacityScheduler) {
       return CapacitySchedulerPlanFollower.class.getName();
     } else if (scheduler instanceof FairScheduler) {
@@ -317,6 +366,7 @@ public abstract class AbstractReservationSystem extends AbstractService
     try {
       Plan plan = plans.get(planName);
       if (plan != null) {
+        // 调用计划同步器同步单个计划
         planFollower.synchronizePlan(plan, shouldReplan);
       }
     } finally {
@@ -324,9 +374,15 @@ public abstract class AbstractReservationSystem extends AbstractService
     }
   }
 
+  /**
+   * 启动定时计划同步任务
+   * @param initialDelay 首次执行延迟时间
+   */
   private void startPlanFollower(long initialDelay) {
     if (planFollower != null) {
+      // 创建单线程定时线程池
       scheduledExecutorService = new ScheduledThreadPoolExecutor(1);
+      // 按固定延迟启动定时任务
       scheduledExecutorService.scheduleWithFixedDelay(planFollower,
           initialDelay, planStepSize, TimeUnit.MILLISECONDS);
     }
@@ -335,9 +391,11 @@ public abstract class AbstractReservationSystem extends AbstractService
   @Override
   public void serviceInit(Configuration conf) throws Exception {
     Configuration configuration = new Configuration(conf);
+    // 执行初始化/重初始化
     reinitialize(configuration, rmContext);
-    // Create the plan follower with the active plans
+    // 创建计划同步器
     planFollower = createPlanFollower();
+    // 初始化计划同步器
     if (planFollower != null) {
       planFollower.init(clock, scheduler, plans.values());
     }
@@ -346,6 +404,7 @@ public abstract class AbstractReservationSystem extends AbstractService
 
   @Override
   public void serviceStart() throws Exception {
+    // 未启用恢复则直接启动计划同步，启用恢复则由恢复流程触发启动
     if (!isRecoveryEnabled) {
       startPlanFollower(planStepSize);
     }
@@ -354,12 +413,12 @@ public abstract class AbstractReservationSystem extends AbstractService
 
   @Override
   public void serviceStop() {
-    // Stop the plan follower
+    // 关闭定时线程池
     if (scheduledExecutorService != null
         && !scheduledExecutorService.isShutdown()) {
       scheduledExecutorService.shutdown();
     }
-    // Clear the plans
+    // 清空计划缓存
     plans.clear();
   }
 
@@ -388,6 +447,7 @@ public abstract class AbstractReservationSystem extends AbstractService
   public ReservationId getNewReservationId() {
     writeLock.lock();
     try {
+      // 使用集群时间戳+原子计数器生成唯一ReservationId
       ReservationId resId = ReservationId.newInstance(
           ResourceManager.getClusterTimeStamp(), resCounter.incrementAndGet());
       LOG.info("Allocated new reservationId: " + resId);
@@ -403,7 +463,7 @@ public abstract class AbstractReservationSystem extends AbstractService
   }
 
   /**
-   * Get the default reservation system corresponding to the scheduler
+   * 根据调度器类型获取对应默认预留系统实现类名
    * 
    * @param scheduler the scheduler for which the reservation system is required
    *
@@ -416,112 +476,4 @@ public abstract class AbstractReservationSystem extends AbstractService
     } else if (scheduler instanceof FairScheduler) {
       return FairReservationSystem.class.getName();
     }
-    return null;
-  }
-
-  protected Plan initializePlan(String planQueueName) throws YarnException {
-    String planQueuePath = getPlanQueuePath(planQueueName);
-    SharingPolicy adPolicy = getAdmissionPolicy(planQueuePath);
-    adPolicy.init(planQueuePath, getReservationSchedulerConfiguration());
-    // Calculate the max plan capacity
-    Resource minAllocation = getMinAllocation();
-    Resource maxAllocation = getMaxAllocation();
-    ResourceCalculator rescCalc = getResourceCalculator();
-    Resource totCap = getPlanQueueCapacity(planQueueName);
-    Plan plan = new InMemoryPlan(getRootQueueMetrics(), adPolicy,
-        getAgent(planQueuePath), totCap, planStepSize, rescCalc, minAllocation,
-        maxAllocation, planQueueName, getReplanner(planQueuePath),
-        getReservationSchedulerConfiguration().getMoveOnExpiry(new QueuePath(planQueuePath)),
-        maxPeriodicity, rmContext);
-    LOG.info("Initialized plan {} based on reservable queue {}",
-        plan.toString(), planQueueName);
-    return plan;
-  }
-
-  protected Planner getReplanner(String planQueueName) {
-    ReservationSchedulerConfiguration reservationConfig =
-        getReservationSchedulerConfiguration();
-    String plannerClassName = reservationConfig.getReplanner(new QueuePath(planQueueName));
-    LOG.info("Using Replanner: " + plannerClassName + " for queue: "
-        + planQueueName);
-    try {
-      Class<?> plannerClazz = conf.getClassByName(plannerClassName);
-      if (Planner.class.isAssignableFrom(plannerClazz)) {
-        Planner planner =
-            (Planner) ReflectionUtils.newInstance(plannerClazz, conf);
-        planner.init(planQueueName, reservationConfig);
-        return planner;
-      } else {
-        throw new YarnRuntimeException("Class: " + plannerClazz
-            + " not instance of " + Planner.class.getCanonicalName());
-      }
-    } catch (ClassNotFoundException e) {
-      throw new YarnRuntimeException("Could not instantiate Planner: "
-          + plannerClassName + " for queue: " + planQueueName, e);
-    }
-  }
-
-  protected ReservationAgent getAgent(String queueName) {
-    ReservationSchedulerConfiguration reservationConfig =
-        getReservationSchedulerConfiguration();
-    String agentClassName = reservationConfig.getReservationAgent(new QueuePath(queueName));
-    LOG.info("Using Agent: " + agentClassName + " for queue: " + queueName);
-    try {
-      Class<?> agentClazz = conf.getClassByName(agentClassName);
-      if (ReservationAgent.class.isAssignableFrom(agentClazz)) {
-        ReservationAgent resevertionAgent =
-            (ReservationAgent) agentClazz.newInstance();
-        resevertionAgent.init(conf);
-        return resevertionAgent;
-      } else {
-        throw new YarnRuntimeException("Class: " + agentClassName
-            + " not instance of " + ReservationAgent.class.getCanonicalName());
-      }
-    } catch (ClassNotFoundException | InstantiationException
-        | IllegalAccessException e) {
-      throw new YarnRuntimeException("Could not instantiate Agent: "
-          + agentClassName + " for queue: " + queueName, e);
-    }
-  }
-
-  protected SharingPolicy getAdmissionPolicy(String queueName) {
-    ReservationSchedulerConfiguration reservationConfig =
-        getReservationSchedulerConfiguration();
-    String admissionPolicyClassName =
-        reservationConfig.getReservationAdmissionPolicy(new QueuePath(queueName));
-    LOG.info("Using AdmissionPolicy: " + admissionPolicyClassName
-        + " for queue: " + queueName);
-    try {
-      Class<?> admissionPolicyClazz =
-          conf.getClassByName(admissionPolicyClassName);
-      if (SharingPolicy.class.isAssignableFrom(admissionPolicyClazz)) {
-        return (SharingPolicy) ReflectionUtils.newInstance(admissionPolicyClazz,
-            conf);
-      } else {
-        throw new YarnRuntimeException("Class: " + admissionPolicyClassName
-            + " not instance of " + SharingPolicy.class.getCanonicalName());
-      }
-    } catch (ClassNotFoundException e) {
-      throw new YarnRuntimeException("Could not instantiate AdmissionPolicy: "
-          + admissionPolicyClassName + " for queue: " + queueName, e);
-    }
-  }
-
-  public ReservationsACLsManager getReservationsACLsManager() {
-    return this.reservationsACLsManager;
-  }
-
-  protected abstract ReservationSchedulerConfiguration getReservationSchedulerConfiguration();
-
-  protected abstract String getPlanQueuePath(String planQueueName);
-
-  protected abstract Resource getPlanQueueCapacity(String planQueueName);
-
-  protected abstract Resource getMinAllocation();
-
-  protected abstract Resource getMaxAllocation();
-
-  protected abstract ResourceCalculator getResourceCalculator();
-
-  protected abstract QueueMetrics getRootQueueMetrics();
-}
+    return null

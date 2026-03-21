@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,14 +28,12 @@ import org.apache.hadoop.yarn.api.records.NodeLabel;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 /**
- * The class which provides functionality of getting the labels of the node
- * using the configured node labels provider script. "NODE_PARTITION:" is the
- * pattern which will be used to search node label partition from the out put of
- * the NodeLabels provider script
+ * 基于外部脚本实现的节点标签提供者，通过执行用户配置的脚本获取当前节点的标签信息。
+ * 脚本输出中以 "NODE_PARTITION:" 开头的行会被识别为节点分区标签。
  */
 public class ScriptBasedNodeLabelsProvider extends NodeLabelsProvider {
 
-  /** Pattern used for searching in the output of the node labels script */
+  /** 脚本输出中匹配节点分区标签的前缀模式 */
   public static final String NODE_LABEL_PARTITION_PATTERN = "NODE_PARTITION:";
 
   private NodeDescriptorsScriptRunner runner;
@@ -48,20 +47,27 @@ public class ScriptBasedNodeLabelsProvider extends NodeLabelsProvider {
    */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 从配置中获取脚本路径
     String nodeLabelsScriptPath =
         conf.get(YarnConfiguration.NM_SCRIPT_BASED_NODE_LABELS_PROVIDER_PATH);
+    // 从配置中获取脚本执行超时时间，使用默认值兜底
     long scriptTimeout =
         conf.getLong(YarnConfiguration.NM_NODE_LABELS_PROVIDER_FETCH_TIMEOUT_MS,
             YarnConfiguration.DEFAULT_NM_NODE_LABELS_PROVIDER_FETCH_TIMEOUT_MS);
+    // 从配置中获取脚本参数
     String[] scriptArgs = conf.getStrings(
         YarnConfiguration.NM_SCRIPT_BASED_NODE_LABELS_PROVIDER_SCRIPT_OPTS,
         new String[] {});
+    // 校验脚本配置正确性
     verifyConfiguredScript(nodeLabelsScriptPath);
 
+    // 从配置中获取脚本执行间隔，使用默认值兜底
     long taskInterval = conf.getLong(
         YarnConfiguration.NM_NODE_LABELS_PROVIDER_FETCH_INTERVAL_MS,
         YarnConfiguration.DEFAULT_NM_NODE_LABELS_PROVIDER_FETCH_INTERVAL_MS);
+    // 设置标签刷新间隔
     this.setIntervalTime(taskInterval);
+    // 初始化节点标签脚本执行器
     this.runner = new NodeLabelScriptRunner(nodeLabelsScriptPath, scriptArgs,
             scriptTimeout, this);
 
@@ -69,7 +75,7 @@ public class ScriptBasedNodeLabelsProvider extends NodeLabelsProvider {
   }
 
   /**
-   * Method used to terminate the Node Labels Fetch script.
+   * 清理脚本执行资源，终止标签获取脚本。
    */
   @Override
   public void cleanUp() {
@@ -78,8 +84,9 @@ public class ScriptBasedNodeLabelsProvider extends NodeLabelsProvider {
     }
   }
 
-  // A script runner periodically runs a script to get node labels,
-  // and sets these labels to the given provider.
+  /**
+   * 定期执行脚本获取节点标签，并更新提供者的标签信息。
+   */
   private static class NodeLabelScriptRunner extends
       NodeDescriptorsScriptRunner<NodeLabel> {
 
@@ -89,25 +96,28 @@ public class ScriptBasedNodeLabelsProvider extends NodeLabelsProvider {
     }
 
     /**
-     * Method which collect lines from the output string which begins with
-     * Patterns provided.
+     * 解析脚本输出，提取节点分区标签。
      *
-     * @param scriptOutput string
-     * @return true if output string has error pattern in it.
-     * @throws IOException
+     * @param scriptOutput 脚本执行输出字符串
+     * @return 解析得到的节点标签集合
+     * @throws IOException 解析失败时抛出
      */
     @Override
     Set<NodeLabel> parseOutput(String scriptOutput)
         throws IOException {
       String nodePartitionLabel = null;
+      // 按行分割脚本输出
       String[] splits = scriptOutput.split("\n");
+      // 遍历每一行输出寻找匹配前缀的标签
       for (String line : splits) {
         String trimmedLine = line.trim();
         if (trimmedLine.startsWith(NODE_LABEL_PARTITION_PATTERN)) {
+          // 提取前缀后的标签内容
           nodePartitionLabel =
               trimmedLine.substring(NODE_LABEL_PARTITION_PATTERN.length());
         }
       }
+      // 将提取到的标签转换为标准NodeLabel集合返回
       return convertToNodeLabelSet(nodePartitionLabel);
     }
   }

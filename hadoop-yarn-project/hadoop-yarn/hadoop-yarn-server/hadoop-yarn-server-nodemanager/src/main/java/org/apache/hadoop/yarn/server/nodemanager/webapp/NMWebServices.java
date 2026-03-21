@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /** * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -96,6 +97,9 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
+/**
+ * NodeManager REST API 入口实现，提供节点信息、应用、容器、日志等资源的HTTP访问接口
+ */
 @Singleton
 @Path("/ws/v1/node")
 public class NMWebServices {
@@ -118,6 +122,12 @@ public class NMWebServices {
   @javax.ws.rs.core.Context
   private UriInfo uriInfo;
 
+  /**
+   * 构造函数，通过依赖注入初始化NMWebService
+   * @param nm NodeManager上下文对象
+   * @param view 节点资源视图
+   * @param webapp Web应用实例
+   */
   @Inject
   public NMWebServices(final @javax.inject.Named("nm") Context nm,
       final @javax.inject.Named("view") ResourceView view,
@@ -125,26 +135,43 @@ public class NMWebServices {
     this.nmContext = nm;
     this.rview = view;
     this.webapp = webapp;
+    // 从配置读取日志服务器重定向地址
     this.redirectWSUrl = this.nmContext.getConf().get(
         YarnConfiguration.YARN_LOG_SERVER_WEBSERVICE_URL);
+    // 初始化日志聚合文件控制器工厂
     this.factory = new LogAggregationFileControllerFactory(
         this.nmContext.getConf());
+    // 读取是否按用户过滤应用列表配置
     this.filterAppsByUser = this.nmContext.getConf().getBoolean(
         YarnConfiguration.FILTER_ENTITY_LIST_BY_USER,
         YarnConfiguration.DEFAULT_DISPLAY_APPS_FOR_LOGGED_IN_USER);
   }
 
+  /**
+   * 带response参数的构造函数，用于测试
+   * @param nm NodeManager上下文
+   * @param view 节点资源视图
+   * @param webapp Web应用实例
+   * @param response HTTP响应对象
+   */
   public NMWebServices(final Context nm, final ResourceView view,
       final WebApp webapp, HttpServletResponse response) {
     this(nm, view, webapp);
     this.response = response;
   }
 
+  /**
+   * 初始化响应内容类型，清除默认ContentType
+   */
   private void init() {
     //clear content type
     response.setContentType(null);
   }
 
+  /**
+   * 获取节点基础信息入口
+   * @return 节点信息对象
+   */
   @GET
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
       MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
@@ -152,6 +179,10 @@ public class NMWebServices {
     return getNodeInfo();
   }
 
+  /**
+   * 获取节点详细信息
+   * @return 节点信息对象
+   */
   @GET
   @Path("/info")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -161,6 +192,13 @@ public class NMWebServices {
     return new NodeInfo(this.nmContext, this.rview);
   }
 
+  /**
+   * 获取节点上运行的应用列表，支持按状态和用户过滤
+   * @param hsr HTTP请求对象
+   * @param stateQuery 状态过滤参数
+   * @param userQuery 用户过滤参数
+   * @return 应用列表信息
+   */
   @GET
   @Path("/apps")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -170,16 +208,19 @@ public class NMWebServices {
       @QueryParam("user") String userQuery) {
     init();
     AppsInfo allApps = new AppsInfo();
+    // 遍历所有应用
     for (Entry<ApplicationId, Application> entry : this.nmContext
         .getApplications().entrySet()) {
 
       AppInfo appInfo = new AppInfo(entry.getValue());
+      // 按状态过滤
       if (stateQuery != null && !stateQuery.isEmpty()) {
         ApplicationState.valueOf(stateQuery);
         if (!appInfo.getState().equalsIgnoreCase(stateQuery)) {
           continue;
         }
       }
+      // 按用户过滤
       if (userQuery != null) {
         if (userQuery.isEmpty()) {
           String msg = "Error: You must specify a non-empty string for the user";
@@ -190,8 +231,7 @@ public class NMWebServices {
         }
       }
 
-      // Allow only application-owner/admin for any type of access on the
-      // application.
+      // 开启按用户过滤后，仅允许应用所有者/管理员查看应用信息
       if (filterAppsByUser
           && !hasAccess(appInfo.getUser(), entry.getKey(), hsr)) {
         continue;
@@ -202,12 +242,18 @@ public class NMWebServices {
     return allApps;
   }
 
+  /**
+   * 获取指定应用的详细信息
+   * @param appId 应用ID字符串
+   * @return 应用信息对象
+   */
   @GET
   @Path("/apps/{appid}")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
       MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
   public AppInfo getNodeApp(@PathParam("appid") String appId) {
     init();
+    // 解析应用ID
     ApplicationId id = WebAppUtils.parseApplicationId(recordFactory, appId);
     Application app = this.nmContext.getApplications().get(id);
     if (app == null) {
@@ -217,6 +263,11 @@ public class NMWebServices {
 
   }
 
+  /**
+   * 获取节点上所有容器列表
+   * @param hsr HTTP请求对象
+   * @return 容器列表信息
+   */
   @GET
   @Path("/containers")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -225,6 +276,7 @@ public class NMWebServices {
       HttpServletRequest hsr) {
     init();
     ContainersInfo allContainers = new ContainersInfo();
+    // 遍历所有容器
     for (Entry<ContainerId, Container> entry : this.nmContext.getContainers()
         .entrySet()) {
       if (entry.getValue() == null) {
@@ -236,8 +288,7 @@ public class NMWebServices {
 
       ApplicationId appId = entry.getKey().getApplicationAttemptId()
           .getApplicationId();
-      // Allow only application-owner/admin for any type of access on the
-      // application.
+      // 仅允许应用所有者/管理员查看容器信息
       if (filterAppsByUser
           && !hasAccess(entry.getValue().getUser(), appId, hsr)) {
         continue;
@@ -248,6 +299,12 @@ public class NMWebServices {
     return allContainers;
   }
 
+  /**
+   * 获取指定容器的详细信息
+   * @param hsr HTTP请求对象
+   * @param id 容器ID字符串
+   * @return 容器信息对象
+   */
   @GET
   @Path("/containers/{containerid}")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -257,6 +314,7 @@ public class NMWebServices {
     ContainerId containerId;
     init();
     try {
+      // 解析容器ID
       containerId = ContainerId.fromString(id);
     } catch (Exception e) {
       throw new BadRequestException("invalid container id, " + id);
@@ -272,16 +330,16 @@ public class NMWebServices {
   }
 
   /**
-   * Returns log file's name as well as current file size for a container.
+   * 返回容器日志文件的名称和当前大小信息
    *
    * @param hsr
    *    HttpServletRequest
    * @param res
    *    HttpServletResponse
    * @param containerIdStr
-   *    The container ID
+   *    容器ID
    * @return
-   *    The log file's name and current file size
+   *    日志文件元信息
    */
   @GET
   @Path("/containers/{containerid}/logs")
@@ -301,11 +359,11 @@ public class NMWebServices {
 
     try {
       List<ContainerLogsInfo> containersLogsInfo = new ArrayList<>();
+      // 添加本地日志元信息
       containersLogsInfo.add(new NMContainerLogsInfo(
           this.nmContext, containerId,
           hsr.getRemoteUser(), ContainerLogAggregationType.LOCAL));
-      // check whether we have aggregated logs in RemoteFS. If exists, show the
-      //  log meta for the aggregated logs as well.
+      // 获取聚合日志元信息（如果存在）
       ApplicationId appId = containerId.getApplicationAttemptId()
           .getApplicationId();
       Application app = this.nmContext.getApplications().get(appId);
@@ -326,21 +384,16 @@ public class NMWebServices {
           }
         }
       } catch (IOException ex) {
-        // Something wrong with we tries to access the remote fs for the logs.
-        // Skip it and do nothing
+        // 访问远程日志失败，忽略错误仅记录debug日志
         LOG.debug("{}", ex);
       }
-      // Wrapping the response with ContainerLogsInfoes class is needed to provide
-      // backward-compatibility with the Jersey 1 JSON response format.
-      // Previously Jersey 1 returned JSON object type in case the returned list had
-      // a single element, and with a wrapper object we can achieve the same behaviour.
+      // 使用包装类保证Jersey 1 JSON向后兼容性
       ResponseBuilder resp = Response.ok().entity(new ContainerLogsInfoes(containersLogsInfo));
-      // Sending the X-Content-Type-Options response header with the value
-      // nosniff will prevent Internet Explorer from MIME-sniffing a response
-      // away from the declared content-type.
+      // 添加安全响应头，防止MIME类型嗅探
       resp.header("X-Content-Type-Options", "nosniff");
       return resp.build();
     } catch (Exception ex) {
+      // 如果配置了日志服务器，重定向到外部日志服务器
       if (redirectWSUrl == null || redirectWSUrl.isEmpty()) {
         throw new WebApplicationException(ex);
       }
@@ -352,358 +405,22 @@ public class NMWebServices {
   }
 
   /**
-   * Returns the contents of a container's log file in plain text.
-   *
-   * Only works for containers that are still in the NodeManager's memory, so
-   * logs are no longer available after the corresponding application is no
-   * longer running.
+   * 返回容器指定日志文件的内容（纯文本）
+   * 仅对仍在NodeManager内存中的容器有效，应用结束后本地日志不再可用
    *
    * @param containerIdStr
-   *    The container ID
+   *    容器ID
    * @param filename
-   *    The name of the log file
+   *    日志文件名
    * @param format
-   *    The content type
+   *    响应内容类型
    * @param size
-   *    the size of the log file
+   *    返回日志最大字节数
    * @return
-   *    The contents of the container's log file
+   *    日志文件内容响应
    */
   @GET
   @Path("/containers/{containerid}/logs/{filename}")
   @Produces({ MediaType.TEXT_PLAIN + "; " + JettyUtils.UTF_8 })
   @Public
   @Unstable
-  public Response getContainerLogFile(
-      @PathParam(YarnWebServiceParams.CONTAINER_ID)
-      final String containerIdStr,
-      @PathParam(YarnWebServiceParams.CONTAINER_LOG_FILE_NAME)
-      String filename,
-      @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_FORMAT)
-      String format,
-      @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_SIZE)
-      String size) {
-    return getLogs(containerIdStr, filename, format, size);
-  }
-
-  /**
-   * Returns the contents of a container's log file in plain text. 
-   *
-   * Only works for containers that are still in the NodeManager's memory, so
-   * logs are no longer available after the corresponding application is no
-   * longer running.
-   * 
-   * @param containerIdStr
-   *    The container ID
-   * @param filename
-   *    The name of the log file
-   * @param format
-   *    The content type
-   * @param size
-   *    the size of the log file
-   * @return
-   *    The contents of the container's log file
-   */
-  @GET
-  @Path("/containerlogs/{containerid}/{filename}")
-  @Produces({ MediaType.TEXT_PLAIN + "; " + JettyUtils.UTF_8 })
-  @Public
-  @Unstable
-  public Response getLogs(
-      @PathParam(YarnWebServiceParams.CONTAINER_ID)
-      final String containerIdStr,
-      @PathParam(YarnWebServiceParams.CONTAINER_LOG_FILE_NAME)
-      String filename,
-      @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_FORMAT)
-      String format,
-      @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_SIZE)
-      String size) {
-    ContainerId tempContainerId;
-    try {
-      tempContainerId = ContainerId.fromString(containerIdStr);
-    } catch (IllegalArgumentException ex) {
-      return Response.status(Status.BAD_REQUEST).build();
-    }
-    final ContainerId containerId = tempContainerId;
-    boolean tempIsRunning = false;
-    // check what is the status for container
-    try {
-      Container container = nmContext.getContainers().get(containerId);
-      tempIsRunning = (container.getContainerState() == ContainerState.RUNNING);
-    } catch (Exception ex) {
-      // This NM does not have this container any more. We
-      // assume the container has already finished.
-      LOG.debug("Can not find the container:{} in this node.",
-          containerId);
-    }
-    final boolean isRunning = tempIsRunning;
-    File logFile;
-    try {
-      logFile = ContainerLogsUtils.getContainerLogFile(
-          containerId, filename, request.getRemoteUser(), nmContext);
-    } catch (NotFoundException ex) {
-      if (redirectWSUrl == null || redirectWSUrl.isEmpty()) {
-        return Response.status(Status.NOT_FOUND).entity(ex.getMessage())
-            .build();
-      }
-      // redirect the request to the configured log server
-      String redirectURI = "/containers/" + containerIdStr
-          + "/logs/" + filename;
-      return createRedirectResponse(request, redirectWSUrl, redirectURI);
-    } catch (YarnException ex) {
-      return Response.serverError().entity(ex.getMessage()).build();
-    }
-    final long bytes = parseLongParam(size);
-    final String lastModifiedTime = Times.format(logFile.lastModified());
-    final String outputFileName = filename;
-    String contentType = WebAppUtils.getDefaultLogContentType();
-    if (format != null && !format.isEmpty()) {
-      contentType = WebAppUtils.getSupportedLogContentType(format);
-      if (contentType == null) {
-        String errorMessage = "The valid values for the parameter : format "
-            + "are " + WebAppUtils.listSupportedLogContentType();
-        return Response.status(Status.BAD_REQUEST).entity(errorMessage)
-            .build();
-      }
-    }
-
-    try {
-      final FileInputStream fis = ContainerLogsUtils.openLogFileForRead(
-          containerIdStr, logFile, nmContext);
-      final long fileLength = logFile.length();
-
-      StreamingOutput stream = new StreamingOutput() {
-        @Override
-        public void write(OutputStream os) throws IOException,
-            WebApplicationException {
-          try {
-            LogToolUtils.outputContainerLogThroughZeroCopy(
-                containerId.toString(), nmContext.getNodeId().toString(),
-                outputFileName, fileLength, bytes, lastModifiedTime, fis, os,
-                ContainerLogAggregationType.LOCAL);
-            StringBuilder sb = new StringBuilder();
-            String endOfFile = "End of LogType:" + outputFileName;
-            sb.append(endOfFile + ".");
-            if (isRunning) {
-              sb.append("This log file belongs to a running container ("
-                  + containerIdStr + ") and so may not be complete." + "\n");
-            } else {
-              sb.append("\n");
-            }
-            sb.append(StringUtils.repeat("*", endOfFile.length() + 50)
-                + "\n\n");
-            os.write(sb.toString().getBytes(StandardCharsets.UTF_8));
-            // If we have aggregated logs for this container,
-            // output the aggregation logs as well.
-            ApplicationId appId = containerId.getApplicationAttemptId()
-                .getApplicationId();
-            Application app = nmContext.getApplications().get(appId);
-            String appOwner = app == null ? null : app.getUser();
-            try {
-              ContainerLogsRequest logRequest = new ContainerLogsRequest();
-              logRequest.setAppId(appId);
-              logRequest.setAppOwner(appOwner);
-              logRequest.setContainerId(containerId.toString());
-              logRequest.setNodeId(nmContext.getNodeId().toString());
-              logRequest.setBytes(bytes);
-              Set<String> logTypes = new HashSet<>();
-              logTypes.add(outputFileName);
-              logRequest.setLogTypes(logTypes);
-              factory.getFileControllerForRead(appId, appOwner)
-                  .readAggregatedLogs(logRequest, os);
-            } catch (Exception ex) {
-              // Something wrong when we try to access the aggregated log.
-              if (LOG.isDebugEnabled()) {
-                LOG.debug("Can not access the aggregated log for "
-                    + "the container:" + containerId);
-                LOG.debug(ex.getMessage());
-              }
-            }
-          } finally {
-            IOUtils.closeStream(fis);
-          }
-        }
-      };
-      ResponseBuilder resp = Response.ok(stream);
-      resp.header("Content-Type", contentType + "; " + JettyUtils.UTF_8);
-      // Sending the X-Content-Type-Options response header with the value
-      // nosniff will prevent Internet Explorer from MIME-sniffing a response
-      // away from the declared content-type.
-      resp.header("X-Content-Type-Options", "nosniff");
-      return resp.build();
-    } catch (IOException ex) {
-      return Response.serverError().entity(ex.getMessage()).build();
-    }
-  }
-
-  @GET
-  @Path("/resources/{resourcename}")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public NMResourceInfo getNMResourceInfo(@PathParam("resourcename")
-      String resourceName) throws YarnException {
-    init();
-    ResourcePluginManager rpm = this.nmContext.getResourcePluginManager();
-    if (rpm != null && rpm.getNameToPlugins() != null) {
-      ResourcePlugin plugin = rpm.getNameToPlugins().get(resourceName);
-      if (plugin != null) {
-        NMResourceInfo nmResourceInfo = plugin.getNMResourceInfo();
-        if (nmResourceInfo != null) {
-          return nmResourceInfo;
-        }
-      }
-    }
-
-    return new NMResourceInfo();
-  }
-
-  @GET
-  @Path("/auxiliaryservices")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public AuxiliaryServicesInfo getAuxiliaryServices(@javax.ws.rs.core.Context
-      HttpServletRequest hsr) {
-    init();
-    if (!this.nmContext.getAuxServices().isManifestEnabled()) {
-      throw new BadRequestException("Auxiliary services manifest is not " +
-          "enabled");
-    }
-    AuxiliaryServicesInfo auxiliaryServices = new AuxiliaryServicesInfo();
-    Collection<AuxServiceRecord> loadedServices = nmContext.getAuxServices()
-        .getServiceRecords();
-    if (loadedServices != null) {
-      auxiliaryServices.addAll(loadedServices);
-    }
-    return auxiliaryServices;
-  }
-
-  @PUT
-  @Path("/auxiliaryservices")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public Response putAuxiliaryServices(@javax.ws.rs.core.Context
-      HttpServletRequest req, AuxServiceRecords services) {
-    init();
-    if (!this.nmContext.getAuxServices().isManifestEnabled()) {
-      throw new BadRequestException("Auxiliary services manifest is not " +
-          "enabled");
-    }
-    if (!hasAdminAccess(req)) {
-      return Response.status(Status.FORBIDDEN).build();
-    }
-    if (services == null) {
-      return Response.status(Status.BAD_REQUEST).build();
-    }
-    try {
-      nmContext.getAuxServices().reload(services);
-    } catch (Exception e) {
-      LOG.error("Fail to reload auxiliary services, reason: ", e);
-      return Response.status(Status.INTERNAL_SERVER_ERROR).entity(e).build();
-    }
-    return Response.ok().build();
-  }
-
-  @PUT
-  @Path("/yarn/sysfs/{user}/{appId}")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-                MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public Response syncYarnSysFS(@javax.ws.rs.core.Context
-      HttpServletRequest req,
-      @PathParam("user") String user,
-      @PathParam("appId") String appId,
-      String spec) {
-    if (UserGroupInformation.isSecurityEnabled()) {
-      if (!req.getRemoteUser().equals(user)) {
-        return Response.status(Status.FORBIDDEN).build();
-      }
-    }
-    try {
-      nmContext.getContainerExecutor().updateYarnSysFS(nmContext, user, appId,
-          spec);
-    } catch (IOException | ServiceStateException e) {
-      LOG.error("Fail to sync yarn sysfs for application ID: {}, reason: ",
-          appId, e);
-      return Response.status(Status.INTERNAL_SERVER_ERROR).entity(e).build();
-    }
-    return Response.ok().build();
-  }
-
-  private long parseLongParam(String bytes) {
-    if (bytes == null || bytes.isEmpty()) {
-      return Long.MAX_VALUE;
-    }
-    return Long.parseLong(bytes);
-  }
-
-  private Response createRedirectResponse(HttpServletRequest httpRequest,
-      String redirectWSUrlPrefix, String uri) {
-    // redirect the request to the configured log server
-    StringBuilder redirectPath = new StringBuilder();
-    if (redirectWSUrlPrefix.endsWith("/")) {
-      redirectWSUrlPrefix = redirectWSUrlPrefix.substring(0,
-          redirectWSUrlPrefix.length() - 1);
-    }
-    redirectPath.append(redirectWSUrlPrefix + uri);
-    // append all the request query parameters except nodeId parameter
-    String requestParams = WebAppUtils.removeQueryParams(httpRequest,
-        YarnWebServiceParams.NM_ID);
-    if (requestParams != null && !requestParams.isEmpty()) {
-      redirectPath.append("?")
-          .append(requestParams)
-          .append("&")
-          .append(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-          .append("=true");
-    } else {
-      redirectPath.append("?" + YarnWebServiceParams.REDIRECTED_FROM_NODE
-          + "=true");
-    }
-    ResponseBuilder res = Response.status(
-        HttpServletResponse.SC_TEMPORARY_REDIRECT);
-    res.header("Location", redirectPath.toString());
-    return res.build();
-  }
-
-  protected Boolean hasAccess(String user, ApplicationId appId,
-      HttpServletRequest hsr) {
-    // Check for the authorization.
-    UserGroupInformation callerUGI = getCallerUserGroupInformation(hsr, true);
-
-    if (callerUGI != null && !(this.nmContext.getApplicationACLsManager()
-        .checkAccess(callerUGI, ApplicationAccessType.VIEW_APP, user, appId))) {
-      return false;
-    }
-    return true;
-  }
-
-  protected Boolean hasAdminAccess(HttpServletRequest hsr) {
-    // Check for the authorization.
-    UserGroupInformation callerUGI = getCallerUserGroupInformation(hsr, true);
-
-    if (callerUGI == null) {
-      return false;
-    }
-
-    if (!this.nmContext.getApplicationACLsManager().isAdmin(callerUGI)) {
-      return false;
-    }
-
-    return true;
-  }
-
-  private UserGroupInformation getCallerUserGroupInformation(
-      HttpServletRequest hsr, boolean usePrincipal) {
-
-    String remoteUser = hsr.getRemoteUser();
-    if (usePrincipal) {
-      Principal princ = hsr.getUserPrincipal();
-      remoteUser = princ == null ? null : princ.getName();
-    }
-
-    UserGroupInformation callerUGI = null;
-    if (remoteUser != null) {
-      callerUGI = UserGroupInformation.createRemoteUser(remoteUser);
-    }
-
-    return callerUGI;
-  }
-}

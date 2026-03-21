@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,14 +22,15 @@ package org.apache.hadoop.yarn.server.resourcemanager.preprocessor;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 
-
 /**
- * Processor will add queue to application submission context.
+ * 应用提交队列预处理器，将指定队列名称设置到应用提交上下文中
+ * 属于YARN应用提交前置处理链的一部分，用于覆盖应用提交时指定的队列
  */
 class QueueProcessor implements ContextProcessor {
   @Override
   public void process(String host, String value, ApplicationId applicationId,
       ApplicationSubmissionContext submissionContext) {
+    // 将处理得到的队列名称设置到应用提交上下文
     submissionContext.setQueue(value);
   }
 }

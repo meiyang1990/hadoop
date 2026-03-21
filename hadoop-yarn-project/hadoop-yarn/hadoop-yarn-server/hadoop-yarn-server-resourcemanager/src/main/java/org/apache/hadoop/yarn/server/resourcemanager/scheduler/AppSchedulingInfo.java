@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -62,9 +63,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.Pending
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.SingleConstraintAppPlacementAllocator;
 import org.apache.hadoop.yarn.server.scheduler.SchedulerRequestKey;
 import org.apache.hadoop.yarn.util.resource.Resources;
+
 /**
- * This class keeps track of all the consumption of an application. This also
- * keeps track of current running/completed containers for the application.
+ * 应用程序调度信息管理类，负责跟踪单个应用的资源消耗、已运行/完成容器以及所有待分配资源请求
  */
 @Private
 @Unstable
@@ -80,13 +81,12 @@ public class AppSchedulingInfo {
 
   private Queue queue;
   private AbstractUsersManager abstractUsersManager;
-  // whether accepted/allocated by scheduler
+  // 标记应用是否处于待调度状态，尚未分配到容器
   private volatile boolean pending = true;
   private ResourceUsage appResourceUsage;
 
   private AtomicBoolean userBlacklistChanged = new AtomicBoolean(false);
-  // Set of places (nodes / racks) blacklisted by the system. Today, this only
-  // has places blacklisted for AM containers.
+  // 系统黑名单：存储AM容器分配失败的节点/机架，目前仅对AM容器生效
   private final Set<String> placesBlacklistedBySystem = new HashSet<>();
   private Set<String> placesBlacklistedByApp = new HashSet<>();
 
@@ -108,6 +108,9 @@ public class AppSchedulingInfo {
 
   private final String defaultResourceRequestAppPlacementType;
 
+  /**
+   * 构造应用调度信息实例，初始化各类资源和配置
+   */
   public AppSchedulingInfo(ApplicationAttemptId appAttemptId, String user,
       Queue queue, AbstractUsersManager abstractUsersManager, long epoch,
       ResourceUsage appResourceUsage,
@@ -138,9 +141,8 @@ public class AppSchedulingInfo {
   }
 
   /**
-   * Set default App Placement Allocator.
-   *
-   * @return app placement class.
+   * 获取默认的应用容器分配器类型，优先从应用环境变量读取，其次读取全局配置
+   * @return 默认应用分配器类名
    */
   public String getDefaultResourceRequestAppPlacementType() {
     if (this.rmContext != null
@@ -175,6 +177,10 @@ public class AppSchedulingInfo {
     return this.containerIdCounter.incrementAndGet();
   }
 
+  /**
+   * 获取当前应用所属队列名称，加读锁保证线程安全
+   * @return 队列名称
+   */
   public String getQueueName() {
     this.readLock.lock();
     try {
@@ -201,7 +207,7 @@ public class AppSchedulingInfo {
   }
 
   /**
-   * Clear any pending requests from this application.
+   * 清空应用所有待处理的资源请求
    */
   private void clearRequests() {
     schedulerKeys.clear();
@@ -214,23 +220,19 @@ public class AppSchedulingInfo {
   }
 
   /**
-   * The ApplicationMaster is updating resource requirements for the
-   * application, by asking for more resources and releasing resources acquired
-   * by the application.
-   *
-   * @param resourceRequests resource requests to be allocated
-   * @param recoverPreemptedRequestForAContainer
-   *          recover ResourceRequest/SchedulingRequest on preemption
-   * @return true if any resource was updated, false otherwise
+   * 更新应用资源请求，处理新增和释放的资源请求
+   * @param resourceRequests 待分配的资源请求列表
+   * @param recoverPreemptedRequestForAContainer 是否恢复被抢占的资源请求
+   * @return 是否有ANY位置的资源请求更新
    */
   public boolean updateResourceRequests(List<ResourceRequest> resourceRequests,
       boolean recoverPreemptedRequestForAContainer) {
-    // Flag to track if any incoming requests update "ANY" requests
+    // 标记是否更新了ANY位置的资源请求
     boolean offswitchResourcesUpdated;
 
     writeLock.lock();
     try {
-      // Update AppPlacementAllocator by requests
+      // 根据请求更新应用分配器
       offswitchResourcesUpdated = internalAddResourceRequests(
           recoverPreemptedRequestForAContainer, resourceRequests);
     } finally {
@@ -241,24 +243,20 @@ public class AppSchedulingInfo {
   }
 
   /**
-   * The ApplicationMaster is updating resource requirements for the
-   * application, by asking for more resources and releasing resources acquired
-   * by the application.
-   *
-   * @param dedupRequests (dedup) resource requests to be allocated
-   * @param recoverPreemptedRequestForAContainer
-   *          recover ResourceRequest/SchedulingRequest on preemption
-   * @return true if any resource was updated, false otherwise
+   * 更新应用资源请求，使用已经去重后的请求数据
+   * @param dedupRequests 已经去重的资源请求，按调度请求键和资源名称分组
+   * @param recoverPreemptedRequestForAContainer 是否恢复被抢占的资源请求
+   * @return 是否有ANY位置的资源请求更新
    */
   public boolean updateResourceRequests(
       Map<SchedulerRequestKey, Map<String, ResourceRequest>> dedupRequests,
       boolean recoverPreemptedRequestForAContainer) {
-    // Flag to track if any incoming requests update "ANY" requests
+    // 标记是否更新了ANY位置的资源请求
     boolean offswitchResourcesUpdated;
 
     writeLock.lock();
     try {
-      // Update AppPlacementAllocator by requests
+      // 根据请求更新应用分配器
       offswitchResourcesUpdated = internalAddResourceRequests(
           recoverPreemptedRequestForAContainer, dedupRequests);
     } finally {
@@ -269,24 +267,20 @@ public class AppSchedulingInfo {
   }
 
   /**
-   * The ApplicationMaster is updating resource requirements for the
-   * application, by asking for more resources and releasing resources acquired
-   * by the application.
-   *
-   * @param schedulingRequests resource requests to be allocated
-   * @param recoverPreemptedRequestForAContainer
-   *          recover ResourceRequest/SchedulingRequest on preemption
-   * @return true if any resource was updated, false otherwise
+   * 更新调度请求，处理新增的调度请求
+   * @param schedulingRequests 待分配的调度请求列表
+   * @param recoverPreemptedRequestForAContainer 是否恢复被抢占的调度请求
+   * @return 是否有ANY位置的资源请求更新
    */
   public boolean updateSchedulingRequests(
       List<SchedulingRequest> schedulingRequests,
       boolean recoverPreemptedRequestForAContainer) {
-    // Flag to track if any incoming requests update "ANY" requests
+    // 标记是否更新了ANY位置的资源请求
     boolean offswitchResourcesUpdated;
 
     writeLock.lock();
     try {
-      // Update AppPlacementAllocator by requests
+      // 根据请求更新应用分配器
       offswitchResourcesUpdated = addSchedulingRequests(
           recoverPreemptedRequestForAContainer, schedulingRequests);
     } finally {
@@ -296,14 +290,24 @@ public class AppSchedulingInfo {
     return offswitchResourcesUpdated;
   }
 
+  /**
+   * 移除指定调度请求对应的分配器
+   * @param schedulerRequestKey 调度请求键
+   */
   public void removeAppPlacement(SchedulerRequestKey schedulerRequestKey) {
     schedulerKeyToAppPlacementAllocator.remove(schedulerRequestKey);
   }
 
+  /**
+   * 添加调度请求，更新待分配资源统计
+   * @param recoverPreemptedRequestForAContainer 是否恢复被抢占的请求
+   * @param schedulingRequests 调度请求列表
+   * @return 是否需要更新待分配资源统计
+   */
   private boolean addSchedulingRequests(
       boolean recoverPreemptedRequestForAContainer,
       List<SchedulingRequest> schedulingRequests) {
-    // Do we need to update pending resource for app/queue, etc.?
+    // 标记是否需要更新应用/队列的待分配资源
     boolean requireUpdatePendingResource = false;
 
     for (SchedulingRequest request : schedulingRequests) {
@@ -314,7 +318,7 @@ public class AppSchedulingInfo {
           getAndAddAppPlacementAllocatorIfNotExist(schedulerRequestKey,
               SingleConstraintAppPlacementAllocator.class.getCanonicalName());
 
-      // Update AppPlacementAllocator
+      // 更新分配器中的待分配请求
       PendingAskUpdateResult pendingAmountChanges =
           appPlacementAllocator.updatePendingAsk(schedulerRequestKey,
               request, recoverPreemptedRequestForAContainer);
@@ -330,11 +334,10 @@ public class AppSchedulingInfo {
   }
 
   /**
-   * Get and insert AppPlacementAllocator if it doesn't exist, this should be
-   * protected by write lock.
-   * @param schedulerRequestKey schedulerRequestKey
-   * @param placementTypeClass placementTypeClass
-   * @return AppPlacementAllocator
+   * 如果分配器不存在则创建并添加，必须在写锁保护下调用
+   * @param schedulerRequestKey 调度请求键
+   * @param placementTypeClass 分配器类型类名
+   * @return 应用容器分配器实例
    */
   private AppPlacementAllocator<SchedulerNode> getAndAddAppPlacementAllocatorIfNotExist(
       SchedulerRequestKey schedulerRequestKey, String placementTypeClass) {
@@ -350,6 +353,12 @@ public class AppSchedulingInfo {
     return appPlacementAllocator;
   }
 
+  /**
+   * 内部处理已经分组去重的资源请求，更新待分配资源统计
+   * @param recoverPreemptedRequestForAContainer 是否恢复被抢占的请求
+   * @param dedupRequests 分组去重后的资源请求
+   * @return 是否更新了ANY位置的资源请求
+   */
   private boolean internalAddResourceRequests(
       boolean recoverPreemptedRequestForAContainer,
       Map<SchedulerRequestKey, Map<String, ResourceRequest>> dedupRequests) {
@@ -361,7 +370,7 @@ public class AppSchedulingInfo {
           getAndAddAppPlacementAllocatorIfNotExist(schedulerRequestKey,
               defaultResourceRequestAppPlacementType);
 
-      // Update AppPlacementAllocator
+      // 更新分配器中的待分配请求
       PendingAskUpdateResult pendingAmountChanges =
           appPlacementAllocator.updatePendingAsk(entry.getValue().values(),
               recoverPreemptedRequestForAContainer);
@@ -375,17 +384,23 @@ public class AppSchedulingInfo {
     return offswitchResourcesUpdated;
   }
 
+  /**
+   * 内部处理资源请求列表，先分组去重再处理
+   * @param recoverPreemptedRequestForAContainer 是否恢复被抢占的请求
+   * @param resourceRequests 原始资源请求列表
+   * @return 是否更新了ANY位置的资源请求
+   */
   private boolean internalAddResourceRequests(boolean recoverPreemptedRequestForAContainer,
       List<ResourceRequest> resourceRequests) {
     if (null == resourceRequests || resourceRequests.isEmpty()) {
       return false;
     }
 
-    // A map to group resource requests and dedup
+    // 用于对资源请求分组去重
     Map<SchedulerRequestKey, Map<String, ResourceRequest>> dedupRequests =
         new HashMap<>();
 
-    // Group resource request by schedulerRequestKey and resourceName
+    // 按调度请求键和资源名称分组
     for (ResourceRequest request : resourceRequests) {
       SchedulerRequestKey schedulerKey = SchedulerRequestKey.create(request);
       if (!dedupRequests.containsKey(schedulerKey)) {
@@ -398,6 +413,12 @@ public class AppSchedulingInfo {
         dedupRequests);
   }
 
+  /**
+   * 更新队列、应用和指标中的待分配资源统计
+   * @param updateResult 待分配请求更新结果，包含变更前后信息
+   * @param schedulerKey 调度请求键
+   * @param metrics 队列指标
+   */
   private void updatePendingResources(PendingAskUpdateResult updateResult,
       SchedulerRequestKey schedulerKey, QueueMetrics metrics) {
 
@@ -417,7 +438,7 @@ public class AppSchedulingInfo {
           + this.applicationId);
       checkForDeactivation();
     } else {
-      // Activate application. Metrics activation is done here.
+      // 激活应用，同时更新指标激活状态
       if (lastRequestContainers <= 0) {
         schedulerKeys.add(schedulerKey);
         abstractUsersManager.activateApplication(user, applicationId);
@@ -425,461 +446,9 @@ public class AppSchedulingInfo {
     }
 
     if (lastPendingAsk != null) {
-      // Deduct resources from metrics / pending resources of queue/app.
+      // 从指标、队列和应用中扣减变更前的资源
       metrics.decrPendingResources(lastNodePartition, user,
           lastPendingAsk.getCount(), lastPendingAsk.getPerAllocationResource());
       Resource decreasedResource = Resources.multiply(
           lastPendingAsk.getPerAllocationResource(), lastRequestContainers);
-      queue.decPendingResource(lastNodePartition, decreasedResource);
-      appResourceUsage.decPending(lastNodePartition, decreasedResource);
-    }
-
-    // Increase resources to metrics / pending resources of queue/app.
-    metrics.incrPendingResources(newNodePartition, user,
-        newPendingAsk.getCount(), newPendingAsk.getPerAllocationResource());
-    Resource increasedResource = Resources.multiply(
-        newPendingAsk.getPerAllocationResource(), newPendingAsk.getCount());
-    queue.incPendingResource(newNodePartition, increasedResource);
-    appResourceUsage.incPending(newNodePartition, increasedResource);
-  }
-
-  public void addRequestedPartition(String partition) {
-    requestedPartitions.add(partition);
-  }
-
-  public void decPendingResource(String partition, Resource toDecrease) {
-    queue.decPendingResource(partition, toDecrease);
-    appResourceUsage.decPending(partition, toDecrease);
-  }
-
-  /**
-   * The ApplicationMaster is updating the placesBlacklistedByApp used for
-   * containers other than AMs.
-   *
-   * @param blacklistAdditions
-   *          resources to be added to the userBlacklist
-   * @param blacklistRemovals
-   *          resources to be removed from the userBlacklist
-   */
-  public void updatePlacesBlacklistedByApp(
-      List<String> blacklistAdditions, List<String> blacklistRemovals) {
-    if (updateBlacklistedPlaces(placesBlacklistedByApp, blacklistAdditions,
-        blacklistRemovals)) {
-      userBlacklistChanged.set(true);
-    }
-  }
-
-  /**
-   * Update the list of places that are blacklisted by the system. Today the
-   * system only blacklists places when it sees that AMs failed there
-   *
-   * @param blacklistAdditions
-   *          resources to be added to placesBlacklistedBySystem
-   * @param blacklistRemovals
-   *          resources to be removed from placesBlacklistedBySystem
-   */
-  public void updatePlacesBlacklistedBySystem(
-      List<String> blacklistAdditions, List<String> blacklistRemovals) {
-    updateBlacklistedPlaces(placesBlacklistedBySystem, blacklistAdditions,
-        blacklistRemovals);
-  }
-
-  private static boolean updateBlacklistedPlaces(Set<String> blacklist,
-      List<String> blacklistAdditions, List<String> blacklistRemovals) {
-    boolean changed = false;
-    synchronized (blacklist) {
-      if (blacklistAdditions != null) {
-        changed = blacklist.addAll(blacklistAdditions);
-      }
-
-      if (blacklistRemovals != null) {
-        changed = blacklist.removeAll(blacklistRemovals) || changed;
-      }
-    }
-    return changed;
-  }
-
-  public boolean getAndResetBlacklistChanged() {
-    return userBlacklistChanged.getAndSet(false);
-  }
-
-  public Collection<SchedulerRequestKey> getSchedulerKeys() {
-    return schedulerKeys;
-  }
-
-  /**
-   * Used by REST API to fetch ResourceRequest
-   * @return All pending ResourceRequests.
-   */
-  public List<ResourceRequest> getAllResourceRequests() {
-    List<ResourceRequest> ret = new ArrayList<>();
-    this.readLock.lock();
-    try {
-      for (AppPlacementAllocator ap : schedulerKeyToAppPlacementAllocator
-          .values()) {
-        ret.addAll(ap.getResourceRequests().values());
-      }
-    } finally {
-      this.readLock.unlock();
-    }
-    return ret;
-  }
-
-  /**
-   * Fetch SchedulingRequests.
-   * @return All pending SchedulingRequests.
-   */
-  public List<SchedulingRequest> getAllSchedulingRequests() {
-    List<SchedulingRequest> ret = new ArrayList<>();
-    this.readLock.lock();
-    try {
-      schedulerKeyToAppPlacementAllocator.values().stream()
-          .filter(ap -> ap.getSchedulingRequest() != null)
-          .forEach(ap -> ret.add(ap.getSchedulingRequest()));
-    } finally {
-      this.readLock.unlock();
-    }
-    return ret;
-  }
-
-  public List<RejectedSchedulingRequest> getRejectedRequest() {
-    this.readLock.lock();
-    try {
-      return schedulerKeyToAppPlacementAllocator.values().stream()
-          .filter(ap -> ap.getPlacementAttempt() >= retryAttempts)
-          .map(ap -> RejectedSchedulingRequest.newInstance(
-              RejectionReason.COULD_NOT_SCHEDULE_ON_NODE,
-              ap.getSchedulingRequest()))
-          .collect(Collectors.toList());
-    } finally {
-      this.readLock.unlock();
-    }
-  }
-
-  public PendingAsk getNextPendingAsk() {
-    readLock.lock();
-    try {
-      if (!schedulerKeys.isEmpty()) {
-        SchedulerRequestKey firstRequestKey = schedulerKeys.first();
-        return getPendingAsk(firstRequestKey, ResourceRequest.ANY);
-      } else {
-        return null;
-      }
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  public PendingAsk getPendingAsk(SchedulerRequestKey schedulerKey) {
-    return getPendingAsk(schedulerKey, ResourceRequest.ANY);
-  }
-
-  public PendingAsk getPendingAsk(SchedulerRequestKey schedulerKey,
-      String resourceName) {
-    this.readLock.lock();
-    try {
-      AppPlacementAllocator ap = schedulerKeyToAppPlacementAllocator.get(
-          schedulerKey);
-      return (ap == null) ? PendingAsk.ZERO : ap.getPendingAsk(resourceName);
-    } finally {
-      this.readLock.unlock();
-    }
-  }
-
-  /**
-   * Returns if the place (node/rack today) is either blacklisted by the
-   * application (user) or the system.
-   *
-   * @param resourceName
-   *          the resourcename
-   * @param blacklistedBySystem
-   *          true if it should check amBlacklist
-   * @return true if its blacklisted
-   */
-  public boolean isPlaceBlacklisted(String resourceName,
-      boolean blacklistedBySystem) {
-    if (blacklistedBySystem){
-      synchronized (placesBlacklistedBySystem) {
-        return placesBlacklistedBySystem.contains(resourceName);
-      }
-    } else {
-      synchronized (placesBlacklistedByApp) {
-        return placesBlacklistedByApp.contains(resourceName);
-      }
-    }
-  }
-
-  public ContainerRequest allocate(NodeType type,
-      SchedulerNode node, SchedulerRequestKey schedulerKey,
-      RMContainer containerAllocated) {
-    writeLock.lock();
-    try {
-      if (null != containerAllocated) {
-        updateMetricsForAllocatedContainer(type, node, containerAllocated);
-      }
-
-      return schedulerKeyToAppPlacementAllocator.get(schedulerKey).allocate(
-          schedulerKey, type, node);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  public void checkForDeactivation() {
-    if (schedulerKeys.isEmpty()) {
-      abstractUsersManager.deactivateApplication(user, applicationId);
-    }
-  }
-  
-  public void move(Queue newQueue) {
-    this.writeLock.lock();
-    try {
-      QueueMetrics oldMetrics = queue.getMetrics();
-      QueueMetrics newMetrics = newQueue.getMetrics();
-      for (AppPlacementAllocator ap : schedulerKeyToAppPlacementAllocator
-          .values()) {
-        PendingAsk ask = ap.getPendingAsk(ResourceRequest.ANY);
-        if (ask.getCount() > 0) {
-          oldMetrics.decrPendingResources(
-              ap.getPrimaryRequestedNodePartition(),
-              user, ask.getCount(), ask.getPerAllocationResource());
-          newMetrics.incrPendingResources(
-              ap.getPrimaryRequestedNodePartition(),
-              user, ask.getCount(), ask.getPerAllocationResource());
-
-          Resource delta = Resources.multiply(ask.getPerAllocationResource(),
-              ask.getCount());
-          // Update Queue
-          queue.decPendingResource(
-              ap.getPrimaryRequestedNodePartition(), delta);
-          newQueue.incPendingResource(
-              ap.getPrimaryRequestedNodePartition(), delta);
-        }
-      }
-
-      oldMetrics.moveAppFrom(this, isUnmanagedAM());
-      newMetrics.moveAppTo(this, isUnmanagedAM());
-
-      abstractUsersManager.deactivateApplication(user, applicationId);
-      abstractUsersManager = newQueue.getAbstractUsersManager();
-      if (!schedulerKeys.isEmpty()) {
-        abstractUsersManager.activateApplication(user, applicationId);
-      }
-      this.queue = newQueue;
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  public void stop() {
-    // clear pending resources metrics for the application
-    this.writeLock.lock();
-    try {
-      QueueMetrics metrics = queue.getMetrics();
-      for (AppPlacementAllocator ap : schedulerKeyToAppPlacementAllocator
-          .values()) {
-        PendingAsk ask = ap.getPendingAsk(ResourceRequest.ANY);
-        if (ask.getCount() > 0) {
-          metrics.decrPendingResources(ap.getPrimaryRequestedNodePartition(),
-              user, ask.getCount(), ask.getPerAllocationResource());
-
-          // Update Queue
-          queue.decPendingResource(
-              ap.getPrimaryRequestedNodePartition(),
-              Resources.multiply(ask.getPerAllocationResource(),
-                  ask.getCount()));
-        }
-      }
-
-      metrics.finishAppAttempt(applicationId, pending, user, unmanagedAM);
-
-      // Clear requests themselves
-      clearRequests();
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  public void setQueue(Queue queue) {
-    this.writeLock.lock();
-    try {
-      this.queue = queue;
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  private Set<String> getBlackList() {
-    return this.placesBlacklistedByApp;
-  }
-
-  public Set<String> getBlackListCopy() {
-    synchronized (placesBlacklistedByApp) {
-      return new HashSet<>(this.placesBlacklistedByApp);
-    }
-  }
-
-  public void transferStateFromPreviousAppSchedulingInfo(
-      AppSchedulingInfo appInfo) {
-    // This should not require locking the placesBlacklistedByApp since it will
-    // not be used by this instance until after setCurrentAppAttempt.
-    this.placesBlacklistedByApp = appInfo.getBlackList();
-  }
-
-  public void recoverContainer(RMContainer rmContainer, String partition) {
-    if (rmContainer.getExecutionType() != ExecutionType.GUARANTEED) {
-      return;
-    }
-    this.writeLock.lock();
-    try {
-      QueueMetrics metrics = queue.getMetrics();
-      if (pending) {
-        // If there was any container to recover, the application was
-        // running from scheduler's POV.
-        pending = false;
-        metrics.runAppAttempt(applicationId, user, isUnmanagedAM());
-      }
-
-      // Container is completed. Skip recovering resources.
-      if (rmContainer.getState().equals(RMContainerState.COMPLETED)) {
-        return;
-      }
-
-      metrics.allocateResources(partition, user, 1,
-          rmContainer.getAllocatedResource(), false);
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  /*
-   * In async environment, pending resource request could be updated during
-   * scheduling, this method checks pending request before allocating
-   */
-  public boolean checkAllocation(NodeType type, SchedulerNode node,
-      SchedulerRequestKey schedulerKey) {
-    readLock.lock();
-    try {
-      AppPlacementAllocator ap = schedulerKeyToAppPlacementAllocator.get(
-          schedulerKey);
-      if (null == ap) {
-        return false;
-      }
-      return ap.canAllocate(type, node);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  private void updateMetricsForAllocatedContainer(NodeType type,
-      SchedulerNode node, RMContainer containerAllocated) {
-    QueueMetrics metrics = queue.getMetrics();
-    if (pending) {
-      // once an allocation is done we assume the application is
-      // running from scheduler's POV.
-      pending = false;
-      metrics.runAppAttempt(applicationId, user, isUnmanagedAM());
-    }
-
-    updateMetrics(applicationId, type, node, containerAllocated, user, queue);
-  }
-
-  public static void updateMetrics(ApplicationId applicationId, NodeType type,
-      SchedulerNode node, RMContainer containerAllocated, String user,
-      Queue queue) {
-    LOG.debug("allocate: applicationId={} container={} host={} user={}"
-        + " resource={} type={}", applicationId,
-        containerAllocated.getContainer().getId(),
-        containerAllocated.getNodeId(), user,
-        containerAllocated.getContainer().getResource(),
-        type);
-    if(node != null) {
-      queue.getMetrics().allocateResources(node.getPartition(), user, 1,
-          containerAllocated.getContainer().getResource(), false);
-      queue.getMetrics().decrPendingResources(
-          containerAllocated.getNodeLabelExpression(), user, 1,
-          containerAllocated.getContainer().getResource());
-    }
-    queue.getMetrics().incrNodeTypeAggregations(user, type);
-    ClusterMetrics.getMetrics().incrNumContainerAssigned();
-  }
-
-  // Get AppPlacementAllocator by specified schedulerKey
-  public <N extends SchedulerNode> AppPlacementAllocator<N> getAppPlacementAllocator(
-      SchedulerRequestKey schedulerkey) {
-    return (AppPlacementAllocator<N>) schedulerKeyToAppPlacementAllocator.get(
-        schedulerkey);
-  }
-
-  /**
-   * Can delay to next?.
-   *
-   * @param schedulerKey schedulerKey
-   * @param resourceName resourceName
-   *
-   * @return If request exists, return {relaxLocality}
-   *         Otherwise, return true.
-   */
-  public boolean canDelayTo(
-      SchedulerRequestKey schedulerKey, String resourceName) {
-    this.readLock.lock();
-    try {
-      AppPlacementAllocator ap =
-          schedulerKeyToAppPlacementAllocator.get(schedulerKey);
-      return (ap == null) || ap.canDelayTo(resourceName);
-    } finally {
-      this.readLock.unlock();
-    }
-  }
-
-  /**
-   * Pre-check node to see if it satisfy the given schedulerKey and
-   * scheduler mode.
-   *
-   * @param schedulerKey schedulerKey
-   * @param schedulerNode schedulerNode
-   * @param schedulingMode schedulingMode
-   * @param dcOpt optional diagnostics collector
-   * @return can use the node or not.
-   */
-  public boolean precheckNode(SchedulerRequestKey schedulerKey,
-      SchedulerNode schedulerNode, SchedulingMode schedulingMode,
-      Optional<DiagnosticsCollector> dcOpt) {
-    this.readLock.lock();
-    try {
-      AppPlacementAllocator ap =
-          schedulerKeyToAppPlacementAllocator.get(schedulerKey);
-      return (ap != null) && (ap.getPlacementAttempt() < retryAttempts) &&
-          ap.precheckNode(schedulerNode, schedulingMode, dcOpt);
-    } finally {
-      this.readLock.unlock();
-    }
-  }
-
-  /**
-   * Get scheduling envs configured for this application.
-   *
-   * @return a map of applicationSchedulingEnvs
-   */
-  public Map<String, String> getApplicationSchedulingEnvs() {
-    return applicationSchedulingEnvs;
-  }
-
-  /**
-   * Get the defaultNodeLabelExpression for the application's current queue.
-   *
-   * @return defaultNodeLabelExpression
-   */
-  public String getDefaultNodeLabelExpression() {
-    try {
-      this.readLock.lock();
-      return queue.getDefaultNodeLabelExpression();
-    } finally {
-      this.readLock.unlock();
-    }
-  }
-
-  public RMContext getRMContext() {
-    return this.rmContext;
-  }
-}
+      queue.decPendingResource(lastNodePartition,

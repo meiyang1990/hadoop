@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,11 +22,16 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.logaggregatio
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.server.api.ContainerLogAggregationPolicy;
 
-// The class provides no-op implementation for parseParameters. Polices
-// that don't need parameters can derive from this class.
+/**
+ * 容器日志聚合策略抽象基类，为参数解析方法提供空实现，
+ * 不需要额外参数的策略可以直接继承此类，无需重复实现空方法。
+ */
 @Private
 public abstract class AbstractContainerLogAggregationPolicy implements
     ContainerLogAggregationPolicy {
+  /**
+   * 空实现策略参数解析方法，供不需要参数的策略继承使用。
+   */
   public void parseParameters(String parameters) {
   }
 }

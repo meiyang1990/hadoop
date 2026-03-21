@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,18 +21,27 @@ package org.apache.hadoop.yarn.server.resourcemanager;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * ResourceManager致命事件类型枚举
+ * 定义了会导致RM终止服务的各类严重错误事件类型
+ */
 @InterfaceAudience.Private
 public enum RMFatalEventType {
   // Source <- Store
+  /** 状态存储被隔离（共享存储 fencing 触发，当前RM失去所有权） */
   STATE_STORE_FENCED,
+  /** 状态存储操作失败 */
   STATE_STORE_OP_FAILED,
 
   // Source <- Embedded Elector
+  /** 嵌入式选举器服务失败 */
   EMBEDDED_ELECTOR_FAILED,
 
   // Source <- Admin Service
+  /** 切换到Active状态失败 */
   TRANSITION_TO_ACTIVE_FAILED,
 
   // Source <- Critical Thread Crash
+  /** 关键工作线程崩溃 */
   CRITICAL_THREAD_CRASH
 }

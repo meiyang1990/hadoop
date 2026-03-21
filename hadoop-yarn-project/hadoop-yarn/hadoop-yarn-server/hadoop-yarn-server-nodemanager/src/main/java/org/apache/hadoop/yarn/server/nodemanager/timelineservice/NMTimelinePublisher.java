@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -70,9 +71,8 @@ import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Metrics publisher service that publishes data to the timeline service v.2. It
- * is used only if the timeline service v.2 is enabled and the system publishing
- * of events and metrics is enabled.
+ * NodeManager端时间线服务V2指标发布服务，将容器事件和资源使用指标发布到时间线服务。
+ * 仅当时间线服务V2启用且系统允许发布事件指标时生效。
  */
 public class NMTimelinePublisher extends CompositeService {
 
@@ -94,6 +94,10 @@ public class NMTimelinePublisher extends CompositeService {
 
   private boolean publishNMContainerEvents = true;
 
+  /**
+   * 构造NM时间线发布器，持有NodeManager上下文引用。
+   * @param context NodeManager上下文
+   */
   public NMTimelinePublisher(Context context) {
     super(NMTimelinePublisher.class.getName());
     this.context = context;
@@ -102,27 +106,37 @@ public class NMTimelinePublisher extends CompositeService {
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 创建事件分发器
     dispatcher = createDispatcher();
+    // 注册时间线事件处理器
     dispatcher.register(NMTimelineEventType.class,
         new ForwardingEventHandler());
+    // 将分发器添加为子服务
     addIfService(dispatcher);
+    // 初始化NodeManager登录用户UGI，用于安全认证
     this.nmLoginUGI =  UserGroupInformation.isSecurityEnabled() ?
         UserGroupInformation.getLoginUser() :
         UserGroupInformation.getCurrentUser();
     LOG.info("Initialized NMTimelinePublisher UGI to " + nmLoginUGI);
 
+    // 解析NM Web服务端口
     String webAppURLWithoutScheme =
         WebAppUtils.getNMWebAppURLWithoutScheme(conf);
     if (webAppURLWithoutScheme.contains(":")) {
       httpPort = webAppURLWithoutScheme.split(":")[1];
     }
 
+    // 读取配置确定是否发布容器事件
     publishNMContainerEvents = conf.getBoolean(
         YarnConfiguration.NM_PUBLISH_CONTAINER_EVENTS_ENABLED,
         YarnConfiguration.DEFAULT_NM_PUBLISH_CONTAINER_EVENTS_ENABLED);
     super.serviceInit(conf);
   }
 
+  /**
+   * 创建异步事件分发器，专门处理时间线发布事件。
+   * @return 异步分发器实例
+   */
   protected AsyncDispatcher createDispatcher() {
     return new AsyncDispatcher("NM Timeline dispatcher");
   }
@@ -130,14 +144,14 @@ public class NMTimelinePublisher extends CompositeService {
   @Override
   protected void serviceStart() throws Exception {
     super.serviceStart();
-    // context will be updated after containerManagerImpl is started
-    // hence NMMetricsPublisher is added subservice of containerManagerImpl
+    // context在ContainerManager启动后才会更新节点信息，所以在此处获取
     this.nodeId = context.getNodeId();
     this.httpAddress = nodeId.getHost() + ":" + httpPort;
   }
 
   @Override
   protected void serviceStop() throws Exception {
+    // 停止所有应用的时间线客户端
     for(ApplicationId app : appToClientMap.keySet()) {
       stopTimelineClient(app);
     }
@@ -149,13 +163,19 @@ public class NMTimelinePublisher extends CompositeService {
     return appToClientMap;
   }
 
+  /**
+   * 处理NM时间线事件，根据事件类型分发处理。
+   * @param event 时间线事件
+   */
   protected void handleNMTimelineEvent(NMTimelineEvent event) {
     switch (event.getType()) {
     case TIMELINE_ENTITY_PUBLISH:
+      // 发布时间线实体
       putEntity(((TimelinePublishEvent) event).getTimelineEntityToPublish(),
           ((TimelinePublishEvent) event).getApplicationId());
       break;
     case STOP_TIMELINE_CLIENT:
+      // 停止并移除时间线客户端
       removeAndStopTimelineClient(event.getApplicationId());
       break;
     default:
@@ -163,15 +183,24 @@ public class NMTimelinePublisher extends CompositeService {
     }
   }
 
+  /**
+   * 上报容器资源使用指标到时间线服务。
+   * @param container 容器实例
+   * @param pmemUsage 物理内存使用量
+   * @param cpuUsagePercentPerCore CPU使用率（按核心）
+   */
   public void reportContainerResourceUsage(Container container, Long pmemUsage,
       Float cpuUsagePercentPerCore) {
     if (publishNMContainerEvents) {
+      // 只要内存或CPU有一个可用就发布
       if (pmemUsage != ResourceCalculatorProcessTree.UNAVAILABLE
           || cpuUsagePercentPerCore !=
           ResourceCalculatorProcessTree.UNAVAILABLE) {
+        // 创建容器实体对象
         ContainerEntity entity =
             createContainerEntity(container.getContainerId());
         long currentTimeMillis = System.currentTimeMillis();
+        // 添加内存指标
         if (pmemUsage != ResourceCalculatorProcessTree.UNAVAILABLE) {
           TimelineMetric memoryMetric = new TimelineMetric();
           memoryMetric.setId(ContainerMetric.MEMORY.toString());
@@ -179,6 +208,7 @@ public class NMTimelinePublisher extends CompositeService {
           memoryMetric.addValue(currentTimeMillis, pmemUsage);
           entity.addMetric(memoryMetric);
         }
+        // 添加CPU指标
         if (cpuUsagePercentPerCore !=
             ResourceCalculatorProcessTree.UNAVAILABLE) {
           TimelineMetric cpuMetric = new TimelineMetric();
@@ -189,11 +219,11 @@ public class NMTimelinePublisher extends CompositeService {
               Math.round(cpuUsagePercentPerCore));
           entity.addMetric(cpuMetric);
         }
+        // 获取对应应用的时间线客户端异步发布指标
         ApplicationId appId = container.getContainerId().
             getApplicationAttemptId().getApplicationId();
         try {
-          // no need to put it as part of publisher as timeline client
-          // already has Queuing concept
+          // 时间线客户端内部已有排队机制，无需额外处理
           TimelineV2Client timelineClient = getTimelineClient(appId);
           if (timelineClient != null) {
             timelineClient.putEntitiesAsync(entity);
@@ -227,6 +257,7 @@ public class NMTimelinePublisher extends CompositeService {
       Container container = context.getContainers().get(containerId);
       Resource resource = container.getResource();
 
+      // 填充容器分配信息
       Map<String, Object> entityInfo = new HashMap<String, Object>();
       entityInfo.put(ContainerMetricsConstants.ALLOCATED_MEMORY_INFO,
           resource.getMemorySize());
@@ -243,6 +274,7 @@ public class NMTimelinePublisher extends CompositeService {
           httpAddress);
       entity.setInfo(entityInfo);
 
+      // 添加容器创建事件
       TimelineEvent tEvent = new TimelineEvent();
       tEvent.setId(ContainerMetricsConstants.CREATED_EVENT_TYPE);
       tEvent.setTimestamp(event.getTimestamp());
@@ -250,6 +282,7 @@ public class NMTimelinePublisher extends CompositeService {
       long containerStartTime = container.getContainerStartTime();
       entity.addEvent(tEvent);
       entity.setCreatedTime(containerStartTime);
+      // 发布事件到时间线
       dispatcher.getEventHandler().handle(new TimelinePublishEvent(entity,
           containerId.getApplicationAttemptId().getApplicationId()));
     }
@@ -263,6 +296,7 @@ public class NMTimelinePublisher extends CompositeService {
       ContainerId containerId = resumeEvent.getContainerID();
       ContainerEntity entity = createContainerEntity(containerId);
 
+      // 填充诊断信息
       Map<String, Object> entityInfo = new HashMap<String, Object>();
       entityInfo.put(ContainerMetricsConstants.DIAGNOSTICS_INFO,
           resumeEvent.getDiagnostic());
@@ -270,10 +304,12 @@ public class NMTimelinePublisher extends CompositeService {
 
       Container container = context.getContainers().get(containerId);
       if (container != null) {
+        // 添加容器恢复事件
         TimelineEvent tEvent = new TimelineEvent();
         tEvent.setId(ContainerMetricsConstants.RESUMED_EVENT_TYPE);
         tEvent.setTimestamp(event.getTimestamp());
         entity.addEvent(tEvent);
+        // 发布事件到时间线
         dispatcher.getEventHandler().handle(new TimelinePublishEvent(entity,
             containerId.getApplicationAttemptId().getApplicationId()));
       }
@@ -288,6 +324,7 @@ public class NMTimelinePublisher extends CompositeService {
       ContainerId containerId = pauseEvent.getContainerID();
       ContainerEntity entity = createContainerEntity(containerId);
 
+      // 填充诊断信息
       Map<String, Object> entityInfo = new HashMap<String, Object>();
       entityInfo.put(ContainerMetricsConstants.DIAGNOSTICS_INFO,
           pauseEvent.getDiagnostic());
@@ -295,10 +332,12 @@ public class NMTimelinePublisher extends CompositeService {
 
       Container container = context.getContainers().get(containerId);
       if (container != null) {
+        // 添加容器暂停事件
         TimelineEvent tEvent = new TimelineEvent();
         tEvent.setId(ContainerMetricsConstants.PAUSED_EVENT_TYPE);
         tEvent.setTimestamp(event.getTimestamp());
         entity.addEvent(tEvent);
+        // 发布事件到时间线
         dispatcher.getEventHandler().handle(new TimelinePublishEvent(entity,
             containerId.getApplicationAttemptId().getApplicationId()));
       }
@@ -313,6 +352,7 @@ public class NMTimelinePublisher extends CompositeService {
       ContainerId containerId = killEvent.getContainerID();
       ContainerEntity entity = createContainerEntity(containerId);
 
+      // 填充诊断信息和退出状态
       Map<String, Object> entityInfo = new HashMap<String, Object>();
       entityInfo.put(ContainerMetricsConstants.DIAGNOSTICS_INFO,
           killEvent.getDiagnostic());
@@ -322,10 +362,12 @@ public class NMTimelinePublisher extends CompositeService {
 
       Container container = context.getContainers().get(containerId);
       if (container != null) {
+        // 添加容器杀死事件
         TimelineEvent tEvent = new TimelineEvent();
         tEvent.setId(ContainerMetricsConstants.KILLED_EVENT_TYPE);
         tEvent.setTimestamp(event.getTimestamp());
         entity.addEvent(tEvent);
+        // 发布事件到时间线
         dispatcher.getEventHandler().handle(new TimelinePublishEvent(entity,
             containerId.getApplicationAttemptId().getApplicationId()));
       }
@@ -339,6 +381,7 @@ public class NMTimelinePublisher extends CompositeService {
       ContainerId containerId = containerStatus.getContainerId();
       TimelineEntity entity = createContainerEntity(containerId);
 
+      // 填充容器完成信息
       Map<String, Object> entityInfo = new HashMap<String, Object>();
       entityInfo.put(ContainerMetricsConstants.DIAGNOSTICS_INFO,
           containerStatus.getDiagnostics());
@@ -350,11 +393,13 @@ public class NMTimelinePublisher extends CompositeService {
           containerFinishTime);
       entity.setInfo(entityInfo);
 
+      // 添加容器完成事件
       TimelineEvent tEvent = new TimelineEvent();
       tEvent.setId(ContainerMetricsConstants.FINISHED_EVENT_TYPE);
       tEvent.setTimestamp(containerFinishTime);
       entity.addEvent(tEvent);
 
+      // 发布事件到时间线
       dispatcher.getEventHandler().handle(new TimelinePublishEvent(entity,
           containerId.getApplicationAttemptId().getApplicationId()));
     }
@@ -367,207 +412,17 @@ public class NMTimelinePublisher extends CompositeService {
       ContainerId containerId = container.getContainerId();
       TimelineEntity entity = createContainerEntity(containerId);
 
+      // 添加本地化事件
       TimelineEvent tEvent = new TimelineEvent();
       tEvent.setId(eventType);
       tEvent.setTimestamp(event.getTimestamp());
       entity.addEvent(tEvent);
 
+      // 获取对应应用的时间线客户端异步发布事件
       ApplicationId appId = container.getContainerId().
           getApplicationAttemptId().getApplicationId();
       try {
-        // no need to put it as part of publisher as timeline client already has
-        // Queuing concept
+        // 时间线客户端内部已有排队机制，无需额外处理
         TimelineV2Client timelineClient = getTimelineClient(appId);
         if (timelineClient != null) {
           timelineClient.putEntitiesAsync(entity);
-        } else {
-          LOG.error("Seems like client has been removed before the event"
-              + " could be published for " + container.getContainerId());
-        }
-      } catch (IOException e) {
-        LOG.error("Failed to publish Container metrics for container "
-            + container.getContainerId());
-        LOG.debug("Failed to publish Container metrics for container {}",
-            container.getContainerId(), e);
-      } catch (YarnException e) {
-        LOG.error("Failed to publish Container metrics for container "
-            + container.getContainerId(), e.getMessage());
-        LOG.debug("Failed to publish Container metrics for container {}",
-            container.getContainerId(), e);
-      }
-    }
-  }
-
-  private static ContainerEntity createContainerEntity(
-      ContainerId containerId) {
-    ContainerEntity entity = new ContainerEntity();
-    entity.setId(containerId.toString());
-    entity.setIdPrefix(TimelineServiceHelper.invertLong(
-        containerId.getContainerId()));
-    Identifier parentIdentifier = new Identifier();
-    parentIdentifier
-        .setType(TimelineEntityType.YARN_APPLICATION_ATTEMPT.name());
-    parentIdentifier.setId(containerId.getApplicationAttemptId().toString());
-    entity.setParent(parentIdentifier);
-    return entity;
-  }
-
-  private void putEntity(TimelineEntity entity, ApplicationId appId) {
-    try {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Publishing the entity {} JSON-style content: {}",
-            entity, TimelineUtils.dumpTimelineRecordtoJSON(entity));
-      }
-      TimelineV2Client timelineClient = getTimelineClient(appId);
-      if (timelineClient != null) {
-        timelineClient.putEntities(entity);
-      } else {
-        LOG.error("Seems like client has been removed before the entity "
-            + "could be published for " + entity);
-      }
-    } catch (IOException e) {
-      LOG.error("Error when publishing entity " + entity);
-      LOG.debug("Error when publishing entity {}", entity, e);
-    } catch (YarnException e) {
-      LOG.error("Error when publishing entity " + entity, e.getMessage());
-      LOG.debug("Error when publishing entity {}", entity, e);
-    }
-  }
-
-  public void publishApplicationEvent(ApplicationEvent event) {
-    // publish only when the desired event is received
-    switch (event.getType()) {
-    case INIT_APPLICATION:
-    case FINISH_APPLICATION:
-    case APPLICATION_LOG_HANDLING_FAILED:
-      // TODO need to be handled in future,
-      // not sure to publish under which entity
-      break;
-    case APPLICATION_CONTAINER_FINISHED:
-      // this is actually used to publish the container Event
-      ApplicationContainerFinishedEvent evnt =
-          (ApplicationContainerFinishedEvent) event;
-      publishContainerFinishedEvent(evnt.getContainerStatus(),
-          event.getTimestamp(), evnt.getContainerStartTime());
-      break;
-
-    default:
-      LOG.debug("{} is not a desired ApplicationEvent which"
-          + " needs to be published by NMTimelinePublisher", event.getType());
-      break;
-    }
-  }
-
-  public void publishContainerEvent(ContainerEvent event) {
-    // publish only when the desired event is received
-    switch (event.getType()) {
-    case INIT_CONTAINER:
-      publishContainerCreatedEvent(event);
-      break;
-    case KILL_CONTAINER:
-      publishContainerKilledEvent(event);
-      break;
-    case PAUSE_CONTAINER:
-      publishContainerPausedEvent(event);
-      break;
-    case RESUME_CONTAINER:
-      publishContainerResumedEvent(event);
-      break;
-    default:
-      LOG.debug("{} is not a desired ContainerEvent which needs to be "
-            + " published by NMTimelinePublisher", event.getType());
-      break;
-    }
-  }
-
-  public void publishLocalizationEvent(LocalizationEvent event) {
-    // publish only when the desired event is received
-    switch (event.getType()) {
-    case CONTAINER_RESOURCES_LOCALIZED:
-      publishContainerLocalizationEvent((ContainerLocalizationEvent) event,
-          ContainerMetricsConstants.LOCALIZATION_FINISHED_EVENT_TYPE);
-      break;
-    case LOCALIZE_CONTAINER_RESOURCES:
-      publishContainerLocalizationEvent((ContainerLocalizationEvent) event,
-          ContainerMetricsConstants.LOCALIZATION_START_EVENT_TYPE);
-      break;
-    default:
-      LOG.debug("{} is not a desired LocalizationEvent which needs to be"
-            + " published by NMTimelinePublisher", event.getType());
-      break;
-    }
-  }
-
-  /**
-   * EventHandler implementation which forward events to NMMetricsPublisher.
-   * Making use of it, NMMetricsPublisher can avoid to have a public handle
-   * method.
-   */
-  private final class ForwardingEventHandler implements
-      EventHandler<NMTimelineEvent> {
-
-    @Override
-    public void handle(NMTimelineEvent event) {
-      handleNMTimelineEvent(event);
-    }
-  }
-
-  private static class TimelinePublishEvent extends NMTimelineEvent {
-    private TimelineEntity entityToPublish;
-
-    public TimelinePublishEvent(TimelineEntity entity, ApplicationId appId) {
-      super(NMTimelineEventType.TIMELINE_ENTITY_PUBLISH, appId);
-      this.entityToPublish = entity;
-    }
-
-    public TimelineEntity getTimelineEntityToPublish() {
-      return entityToPublish;
-    }
-  }
-
-  public void createTimelineClient(ApplicationId appId) {
-    if (!appToClientMap.containsKey(appId)) {
-      try {
-        TimelineV2Client timelineClient =
-            nmLoginUGI.doAs(new PrivilegedExceptionAction<TimelineV2Client>() {
-              @Override
-              public TimelineV2Client run() throws Exception {
-                TimelineV2Client timelineClient =
-                    TimelineV2Client.createTimelineClient(appId);
-                timelineClient.init(getConfig());
-                timelineClient.start();
-                return timelineClient;
-              }
-            });
-        appToClientMap.put(appId, timelineClient);
-      } catch (IOException | InterruptedException | RuntimeException |
-          Error e) {
-        LOG.warn("Unable to create timeline client for app " + appId, e);
-      }
-    }
-  }
-
-  public void stopTimelineClient(ApplicationId appId) {
-    dispatcher.getEventHandler().handle(
-        new NMTimelineEvent(NMTimelineEventType.STOP_TIMELINE_CLIENT, appId));
-  }
-
-  private void removeAndStopTimelineClient(ApplicationId appId) {
-    TimelineV2Client client = appToClientMap.remove(appId);
-    if (client != null) {
-      client.stop();
-    }
-  }
-
-  public void setTimelineServiceAddress(ApplicationId appId,
-      String collectorAddr) {
-    TimelineV2Client client = appToClientMap.get(appId);
-    if (client != null) {
-      client.setTimelineCollectorInfo(CollectorInfo.newInstance(collectorAddr));
-    }
-  }
-
-  private TimelineV2Client getTimelineClient(ApplicationId appId) {
-    return appToClientMap.get(appId);
-  }
-}

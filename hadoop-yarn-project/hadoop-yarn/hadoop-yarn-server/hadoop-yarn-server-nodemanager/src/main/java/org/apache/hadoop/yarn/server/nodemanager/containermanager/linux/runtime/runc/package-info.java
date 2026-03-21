@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -15,8 +16,15 @@
  * limitations under the License.
  */
 /**
- * Package containing classes related to runC commands and common operations
- * used within the @{link RuncContainerRuntime}.
+ * <p>
+ * 该包包含Runc容器运行时相关的核心类，封装了runc命令调用和通用操作，
+ * 供{@link org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.runc.RuncContainerRuntime}
+ * 容器运行时实现使用。
+ * </p>
+ * <p>
+ * 本包是YARN NodeManager Linux容器运行时层的一部分，用于支持基于runc OCI运行时
+ * 的容器生命周期管理，实现容器的隔离与运行。
+ * </p>
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

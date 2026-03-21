@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,12 +22,21 @@ package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationAttemptFinishData;
 
+/**
+ * 应用尝试完成事件写入应用历史服务的事件类.
+ * 封装了应用尝试完成时需要写入历史存储的相关信息
+ */
 public class WritingApplicationAttemptFinishEvent extends
     WritingApplicationHistoryEvent {
 
   private ApplicationAttemptId appAttemptId;
   private ApplicationAttemptFinishData appAttemptFinish;
 
+  /**
+   * 构造应用尝试完成写入事件.
+   * @param appAttemptId 应用尝试ID
+   * @param appAttemptFinish 应用尝试完成数据
+   */
   public WritingApplicationAttemptFinishEvent(
       ApplicationAttemptId appAttemptId,
       ApplicationAttemptFinishData appAttemptFinish) {

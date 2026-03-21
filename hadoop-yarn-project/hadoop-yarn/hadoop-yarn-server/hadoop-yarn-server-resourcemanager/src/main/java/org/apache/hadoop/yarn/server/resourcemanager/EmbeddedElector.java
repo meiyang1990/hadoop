@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,20 +23,21 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.service.Service;
 
 /**
- * Interface that all embedded leader electors must implement.
+ * YARN ResourceManager 嵌入式领导者选举接口，所有内置选举实现都需要实现该接口。
+ * 用于HA场景下多ResourceManager的主节点选举。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface EmbeddedElector extends Service{
   /**
-   * Leave and rejoin leader election.
+   * 退出并重新加入领导者选举流程。
    */
   void rejoinElection();
 
   /**
-   * Get information about the elector's connection to Zookeeper.
+   * 获取选举器与Zookeeper的连接状态信息。
    *
-   * @return zookeeper connection state
+   * @return zookeeper连接状态字符串
    */
   String getZookeeperConnectionState();
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,6 +16,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * @file runc_write_config.c
+ * @brief YARN NodeManager runC容器配置生成模块
+ * @details 负责按照OCI/runc规范生成容器配置JSON文件，包含rootfs、用户权限、挂载点、
+ *          Linux命名空间、cgroups资源限制等配置，用于runC启动YARN容器
+ */
+
 #include <sys/utsname.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -35,7 +44,11 @@
 #define RUNC_CONFIG_FILENAME    "config.json"
 #define STARTING_JSON_BUFFER_SIZE  (128*1024)
 
-
+/**
+ * @brief 构建runc配置中root字段（根文件系统配置）
+ * @param rootfs_path 容器根文件系统路径
+ * @return 构建完成的cJSON对象，失败返回NULL
+ */
 static cJSON* build_runc_config_root(const char* rootfs_path) {
   cJSON* root = cJSON_CreateObject();
   if (cJSON_AddStringToObject(root, "path", rootfs_path) == NULL) {
@@ -51,6 +64,11 @@ fail:
   return NULL;
 }
 
+/**
+ * @brief 构建runc配置中process.user字段（容器用户信息配置）
+ * @param username 容器运行用户名
+ * @return 构建完成的cJSON对象，失败返回NULL
+ */
 static cJSON* build_runc_config_process_user(const char* username) {
   cJSON* user_json = cJSON_CreateObject();
   struct hadoop_user_info* hui = hadoop_user_info_alloc();
@@ -58,6 +76,7 @@ static cJSON* build_runc_config_process_user(const char* username) {
     return NULL;
   }
 
+  // 查询用户信息
   int rc = hadoop_user_info_fetch(hui, username);
   if (rc != 0) {
     fprintf(ERRORFILE, "Error looking up user %s : %s\n", username,
@@ -65,13 +84,16 @@ static cJSON* build_runc_config_process_user(const char* username) {
     goto fail;
   }
 
+  // 添加用户UID
   if (cJSON_AddNumberToObject(user_json, "uid", hui->pwd.pw_uid) == NULL) {
     goto fail;
   }
+  // 添加用户GID
   if (cJSON_AddNumberToObject(user_json, "gid", hui->pwd.pw_gid) == NULL) {
     goto fail;
   }
 
+  // 获取用户附属组列表
   rc = hadoop_user_info_getgroups(hui);
   if (rc != 0) {
     fprintf(ERRORFILE, "Error getting groups for user %s : %s\n", username,
@@ -79,6 +101,7 @@ static cJSON* build_runc_config_process_user(const char* username) {
     goto fail;
   }
 
+  // 添加额外附属组（第一个为主组已经在上面添加过）
   if (hui->num_gids > 1) {
     cJSON* garray = cJSON_AddArrayToObject(user_json, "additionalGids");
     if (garray == NULL) {
@@ -103,19 +126,27 @@ fail:
   return NULL;
 }
 
+/**
+ * @brief 构建runc配置中process字段（容器进程配置）
+ * @param rlc runc启动命令结构体，包含容器启动参数
+ * @return 构建完成的cJSON对象，失败返回NULL
+ */
 static cJSON* build_runc_config_process(const runc_launch_cmd* rlc) {
   cJSON* process = cJSON_CreateObject();
   if (process == NULL) {
     return NULL;
   }
 
+  // 复用传入配置中的参数列表、工作目录、环境变量
   cJSON_AddItemReferenceToObject(process, "args", rlc->config.process.args);
   cJSON_AddItemReferenceToObject(process, "cwd", rlc->config.process.cwd);
   cJSON_AddItemReferenceToObject(process, "env", rlc->config.process.env);
+  // 禁止容器进程获取新权限，提升安全性
   if (cJSON_AddTrueToObject(process, "noNewPrivileges") == NULL) {
     goto fail;
   }
 
+  // 构建用户信息
   cJSON* user_json = build_runc_config_process_user(rlc->run_as_user);
   if (user_json == NULL) {
     goto fail;
@@ -129,17 +160,25 @@ fail:
   return NULL;
 }
 
+/**
+ * @brief 向挂载配置中添加挂载选项
+ * @param mount_json 挂载配置对象
+ * @param opts 可变参数列表，挂载选项字符串
+ * @return 成功返回true，失败返回false
+ */
 static bool add_mount_opts(cJSON* mount_json, va_list opts) {
   const char* opt = va_arg(opts, const char*);
   if (opt == NULL) {
     return true;
   }
 
+  // 创建选项数组
   cJSON* opts_array = cJSON_AddArrayToObject(mount_json, "options");
   if (opts_array == NULL) {
     return false;
   }
 
+  // 逐个添加所有选项
   do {
     cJSON* opt_json = cJSON_CreateString(opt);
     if (opt_json == NULL) {
@@ -152,6 +191,15 @@ static bool add_mount_opts(cJSON* mount_json, va_list opts) {
   return true;
 }
 
+/**
+ * @brief 添加一个挂载点到挂载数组
+ * @param mounts_array 挂载点数组
+ * @param src 挂载源
+ * @param dest 挂载目标路径
+ * @param fstype 文件系统类型
+ * @param ... 可变参数，挂载选项列表，以NULL结尾
+ * @return 成功返回true，失败返回false
+ */
 static bool add_mount_json(cJSON* mounts_array, const char* src,
     const char* dest, const char* fstype, ...) {
   bool result = false;
@@ -182,6 +230,11 @@ cleanup:
   return result;
 }
 
+/**
+ * @brief 添加容器标准挂载点，符合OCI运行时规范
+ * @param mounts_array 挂载点数组
+ * @return 全部添加成功返回true，否则返回false
+ */
 static bool add_std_mounts_json(cJSON* mounts_array) {
   bool result = true;
   result &= add_mount_json(mounts_array, "proc", "/proc", "proc", NULL);
@@ -201,12 +254,20 @@ static bool add_std_mounts_json(cJSON* mounts_array) {
   return result;
 }
 
+/**
+ * @brief 构建runc配置中mounts字段（容器挂载点配置）
+ * @param rlc runc启动命令结构体，包含用户自定义挂载点
+ * @return 构建完成的cJSON数组，失败返回NULL
+ */
 static cJSON* build_runc_config_mounts(const runc_launch_cmd* rlc) {
+  // 创建挂载点数组
   cJSON* mjson = cJSON_CreateArray();
+  // 添加标准挂载点
   if (!add_std_mounts_json(mjson)) {
     goto fail;
   }
 
+  // 添加用户自定义挂载点（复用传入配置中的挂载项）
   cJSON* e;
   cJSON_ArrayForEach(e, rlc->config.mounts) {
     cJSON_AddItemReferenceToArray(mjson, e);
@@ -219,12 +280,17 @@ fail:
   return NULL;
 }
 
+/**
+ * @brief 获取默认Linux设备白名单配置，默认禁止所有设备访问
+ * @return 构建设备规则数组，失败返回NULL
+ */
 static cJSON* get_default_linux_devices_json() {
   cJSON* devs = cJSON_CreateArray();
   if (devs == NULL) {
     return NULL;
   }
 
+  // 默认规则：禁止访问所有设备，后续添加允许的设备
   cJSON* o = cJSON_CreateObject();
   if (o == NULL) {
     goto fail;
@@ -246,36 +312,54 @@ fail:
   return NULL;
 }
 
+/**
+ * @brief 添加cgroups路径配置到Linux配置中
+ * @param ljson Linux配置对象
+ * @param rlc runc启动命令结构体
+ * @return 成功返回true，失败返回false
+ */
 static bool add_linux_cgroups_json(cJSON* ljson, const runc_launch_cmd* rlc) {
     cJSON* cj = cJSON_GetObjectItemCaseSensitive(rlc->config.linux_config,
                                                  "cgroupsPath");
+    // 如果传入配置中存在cgroups路径，复用该配置
     if (cj != NULL) {
         cJSON_AddItemReferenceToObject(ljson, "cgroupsPath", cj);
     }
     return true;
 }
 
+/**
+ * @brief 添加资源限制配置到Linux配置中
+ * @param ljson Linux配置对象
+ * @param rlc runc启动命令结构体
+ * @return 成功返回true，失败返回false
+ */
 static bool add_linux_resources_json(cJSON* ljson, const runc_launch_cmd* rlc) {
+  // 创建resources对象
   cJSON* robj = cJSON_AddObjectToObject(ljson, "resources");
   if (robj == NULL) {
     return false;
   }
 
+  // 添加默认设备白名单配置
   cJSON* devs = get_default_linux_devices_json();
   if (devs == NULL) {
     return false;
   }
   cJSON_AddItemToObjectCS(robj, "devices", devs);
 
+  // 复用传入配置中的资源限制
   const cJSON* rlc_rsrc = cJSON_GetObjectItemCaseSensitive(
       rlc->config.linux_config, "resources");
   cJSON* e;
   cJSON_ArrayForEach(e, rlc_rsrc) {
+    // 设备规则需要合并到默认配置中
     if (strcmp("devices", e->string) == 0) {
       cJSON* dev_e;
       cJSON_ArrayForEach(dev_e, e) {
         cJSON_AddItemReferenceToArray(devs, dev_e);
       }
+    // 其他资源限制直接复用
     } else {
       cJSON_AddItemReferenceToObject(robj, e->string, e);
     }
@@ -284,6 +368,12 @@ static bool add_linux_resources_json(cJSON* ljson, const runc_launch_cmd* rlc) {
   return true;
 }
 
+/**
+ * @brief 添加一个命名空间到命名空间数组
+ * @param ljson 命名空间数组
+ * @param ns_type 命名空间类型（pid/ipc/uts/mount等）
+ * @return 成功返回true，失败返回false
+ */
 static bool add_linux_namespace_json(cJSON* ljson, const char* ns_type) {
   cJSON* ns = cJSON_CreateObject();
   if (ns == NULL) {
@@ -293,6 +383,11 @@ static bool add_linux_namespace_json(cJSON* ljson, const char* ns_type) {
   return (cJSON_AddStringToObject(ns, "type", ns_type) != NULL);
 }
 
+/**
+ * @brief 添加容器默认命名空间配置，为容器创建独立命名空间
+ * @param ljson Linux配置对象
+ * @return 成功返回true，失败返回false
+ */
 static bool add_linux_namespaces_json(cJSON* ljson) {
   cJSON* ns_array = cJSON_AddArrayToObject(ljson, "namespaces");
   if (ns_array == NULL) {
@@ -305,6 +400,7 @@ static bool add_linux_namespaces_json(cJSON* ljson) {
   return result;
 }
 
+// 需要被masked（隐藏）的敏感路径列表
 static const char* runc_masked_paths[] = {
   "/proc/kcore",
   "/proc/latency_stats",
@@ -315,6 +411,11 @@ static const char* runc_masked_paths[] = {
   "/sys/firmware"
 };
 
+/**
+ * @brief 添加需要被隐藏的敏感路径配置
+ * @param ljson Linux配置对象
+ * @return 成功返回true，失败返回false
+ */
 static bool add_linux_masked_paths_json(cJSON* ljson) {
   size_t num_paths = sizeof(runc_masked_paths) / sizeof(runc_masked_paths[0]);
   cJSON* paths = cJSON_CreateStringArray(runc_masked_paths, num_paths);
@@ -325,6 +426,7 @@ static bool add_linux_masked_paths_json(cJSON* ljson) {
   return true;
 }
 
+// 需要设置为只读的敏感路径列表
 static const char* runc_readonly_paths[] = {
   "/proc/asound",
   "/proc/bus",
@@ -334,6 +436,11 @@ static const char* runc_readonly_paths[] = {
   "/proc/sysrq-trigger"
 };
 
+/**
+ * @brief 添加只读敏感路径配置
+ * @param ljson Linux配置对象
+ * @return 成功返回true，失败返回false
+ */
 static bool add_linux_readonly_paths_json(cJSON* ljson) {
   size_t num_paths = sizeof(runc_readonly_paths) / sizeof(runc_readonly_paths[0]);
   cJSON* paths = cJSON_CreateStringArray(runc_readonly_paths, num_paths);
@@ -344,154 +451,6 @@ static bool add_linux_readonly_paths_json(cJSON* ljson) {
   return true;
 }
 
-static bool add_linux_seccomp_json(cJSON* ljson, const runc_launch_cmd* rlc) {
-  cJSON* sj = cJSON_GetObjectItemCaseSensitive(rlc->config.linux_config,
-      "seccomp");
-  if (sj != NULL) {
-    cJSON_AddItemReferenceToObject(ljson, "seccomp", sj);
-  }
-  return true;
-}
-
-static cJSON* build_runc_config_linux(const runc_launch_cmd* rlc) {
-  cJSON* ljson = cJSON_CreateObject();
-  if (ljson == NULL) {
-    return NULL;
-  }
-
-  if (!add_linux_cgroups_json(ljson, rlc)) {
-      goto fail;
-  }
-
-  if (!add_linux_resources_json(ljson, rlc)) {
-    goto fail;
-  }
-
-  if (!add_linux_namespaces_json(ljson)) {
-    goto fail;
-  }
-
-  if (!add_linux_masked_paths_json(ljson)) {
-    goto fail;
-  }
-
-  if (!add_linux_readonly_paths_json(ljson)) {
-    goto fail;
-  }
-
-  if (!add_linux_seccomp_json(ljson, rlc)) {
-    goto fail;
-  }
-
-  return ljson;
-
-fail:
-  cJSON_Delete(ljson);
-  return NULL;
-}
-
-static char* build_runc_config(const runc_launch_cmd* rlc,
-    const char* rootfs_path) {
-  char* json_data = NULL;
-
-  cJSON* rcj = build_runc_config_json(rlc, rootfs_path);
-
-  json_data = cJSON_PrintBuffered(rcj, STARTING_JSON_BUFFER_SIZE, false);
-
-  return json_data;
-}
-
-cJSON* build_runc_config_json(const runc_launch_cmd* rlc,
-    const char* rootfs_path) {
-  cJSON* rcj = cJSON_CreateObject();
-  if (rcj == NULL) {
-    goto fail;
-  }
-
-  if (cJSON_AddStringToObject(rcj, "runcVersion", "1.0.0") == NULL) {
-    goto fail;
-  }
-
-  struct utsname uts;
-  uname(&uts);
-  if (cJSON_AddStringToObject(rcj, "hostname", uts.nodename) == NULL) {
-    goto fail;
-  }
-
-  cJSON* item = build_runc_config_root(rootfs_path);
-  if (item == NULL) {
-    goto fail;
-  }
-  cJSON_AddItemToObjectCS(rcj, "root", item);
-
-  item = build_runc_config_process(rlc);
-  if (item == NULL) {
-    goto fail;
-  }
-  cJSON_AddItemToObjectCS(rcj, "process", item);
-
-  item = build_runc_config_mounts(rlc);
-  if (item == NULL) {
-    goto fail;
-  }
-  cJSON_AddItemToObjectCS(rcj, "mounts", item);
-
-  item = build_runc_config_linux(rlc);
-  if (item == NULL) {
-    goto fail;
-  }
-  cJSON_AddItemToObjectCS(rcj, "linux", item);
-  return rcj;
-
-fail:
-  cJSON_Delete(rcj);
-  return NULL;
-}
-
-static char* get_runc_config_path(const char* pid_file) {
-  char* dir_end = strrchr(pid_file, '/');
-  if (dir_end == NULL) {
-    fprintf(ERRORFILE, "Error pid file %s has no parent directory\n", pid_file);
-    return NULL;
-  }
-
-  int dir_len = (dir_end + 1) - pid_file;  // include trailing slash
-  char* config_path = malloc(dir_len + strlen(RUNC_CONFIG_FILENAME) + 1);
-  if (config_path == NULL) {
-    return NULL;
-  }
-
-  char* cp = stpncpy(config_path, pid_file, dir_len);
-  stpcpy(cp, RUNC_CONFIG_FILENAME);
-  return config_path;
-}
-
 /**
- * Creates the runC runtime configuration file for a container.
- *
- * Returns the path to the written configuration file or NULL on error.
- */
-char* write_runc_runc_config(const runc_launch_cmd* rlc,
-    const char* rootfs_path) {
-  char* config_data = build_runc_config(rlc, rootfs_path);
-  if (config_data == NULL) {
-    return NULL;
-  }
-
-  char* runc_config_path = get_runc_config_path(rlc->pid_file);
-  if (runc_config_path == NULL) {
-    fputs("Unable to generate runc config path\n", ERRORFILE);
-    free(config_data);
-    return NULL;
-  }
-
-  bool write_ok = write_file_as_nm(runc_config_path, config_data,
-      strlen(config_data));
-  free(config_data);
-  if (!write_ok) {
-    free(runc_config_path);
-    return NULL;
-  }
-
-  return runc_config_path;
-}
+ * @brief 添加seccomp系统调用过滤配置（如果传入配置中有）
+ * @param

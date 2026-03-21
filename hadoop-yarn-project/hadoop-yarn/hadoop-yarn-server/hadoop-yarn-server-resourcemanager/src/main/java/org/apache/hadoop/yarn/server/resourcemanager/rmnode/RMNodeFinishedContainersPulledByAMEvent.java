@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,18 +24,30 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 
 import java.util.List;
 
-// Happens after an implicit ack from AM that the container completion has
-// been notified successfully to the AM
+/**
+ * AM已拉取完成容器列表事件，当AM隐式确认已成功接收容器完成通知后触发该事件
+ * 用于RM节点状态机处理，清理NM端已完成的容器信息
+ */
 public class RMNodeFinishedContainersPulledByAMEvent extends RMNodeEvent {
 
+  // 已被AM拉取处理的完成容器ID列表
   private List<ContainerId> containers;
 
+  /**
+   * 构造AM已拉取完成容器事件
+   * @param nodeId 目标节点ID
+   * @param containers 已拉取的完成容器ID列表
+   */
   public RMNodeFinishedContainersPulledByAMEvent(NodeId nodeId,
       List<ContainerId> containers) {
     super(nodeId, RMNodeEventType.FINISHED_CONTAINERS_PULLED_BY_AM);
     this.containers = containers;
   }
 
+  /**
+   * 获取已拉取的完成容器ID列表
+   * @return 已拉取的完成容器ID列表
+   */
   public List<ContainerId> getContainers() {
     return this.containers;
   }

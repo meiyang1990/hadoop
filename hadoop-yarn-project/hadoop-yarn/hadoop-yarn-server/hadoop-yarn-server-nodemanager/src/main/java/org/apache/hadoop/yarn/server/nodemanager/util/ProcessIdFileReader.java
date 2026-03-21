@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,7 +33,7 @@ import org.apache.hadoop.util.Shell;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
 /**
- * Helper functionality to read the pid from a file.
+ * 从进程ID文件中读取进程ID的工具类
  */
 public class ProcessIdFileReader {
 
@@ -40,11 +41,10 @@ public class ProcessIdFileReader {
        LoggerFactory.getLogger(ProcessIdFileReader.class);
   
   /**
-   * Get the process id from specified file path.
-   * Parses each line to find a valid number
-   * and returns the first one found.
-   * @return Process Id if obtained from path specified else null
-   * @throws IOException
+   * 从指定路径的进程ID文件中读取进程ID，返回找到的第一个有效ID
+   * @param path 进程ID文件路径
+   * @return 读取到的进程ID，若未找到则返回null
+   * @throws IOException IO异常
    */
   public static String getProcessId(Path path) throws IOException {
     if (path == null) {
@@ -57,9 +57,11 @@ public class ProcessIdFileReader {
     try {
       File file = new File(path.toString());
       if (file.exists()) {
+        // 打开PID文件并构建缓冲读取器
         FileInputStream fis = new FileInputStream(file);
         bufReader = new BufferedReader(new InputStreamReader(fis, StandardCharsets.UTF_8));
 
+        // 逐行查找第一个有效的进程ID
         while (true) {
           String line = bufReader.readLine();
           if (line == null) {
@@ -68,8 +70,7 @@ public class ProcessIdFileReader {
           String temp = line.trim(); 
           if (!temp.isEmpty()) {
             if (Shell.WINDOWS) {
-              // On Windows, pid is expected to be a container ID, so find first
-              // line that parses successfully as a container ID.
+              // Windows平台下，进程ID存储为容器ID格式，验证并返回第一个有效容器ID
               try {
                 ContainerId.fromString(temp);
                 processId = temp;
@@ -79,7 +80,7 @@ public class ProcessIdFileReader {
               }
             }
             else {
-              // Otherwise, find first line containing a numeric pid.
+              // 非Windows平台下，验证并返回第一个正整数格式的PID
               try {
                 long pid = Long.parseLong(temp);
                 if (pid > 0) {
@@ -94,6 +95,7 @@ public class ProcessIdFileReader {
         }
       }
     } finally {
+      // 关闭文件读取流
       if (bufReader != null) {
         bufReader.close();
       }

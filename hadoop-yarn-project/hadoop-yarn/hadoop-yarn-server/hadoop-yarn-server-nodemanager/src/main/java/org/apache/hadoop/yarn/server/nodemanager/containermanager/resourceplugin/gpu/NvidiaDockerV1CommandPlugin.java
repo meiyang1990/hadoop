@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,7 +49,8 @@ import java.util.Set;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker.DockerVolumeCommand.VOLUME_NAME_PATTERN;
 
 /**
- * Implementation to use nvidia-docker v1 as GPU docker command plugin.
+ * 基于nvidia-docker v1实现的GPU Docker命令插件，用于在Docker容器中配置GPU资源
+ * 实现了DockerCommandPlugin接口，为GPU容器生成正确的Docker运行命令参数
  */
 public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
   final static Logger LOG = LoggerFactory.
@@ -58,17 +60,25 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
   private Map<String, Set<String>> additionalCommands = null;
   private String volumeDriver = "local";
 
-  // Known option
+  // 已知命令选项
   private String DEVICE_OPTION = "--device";
   private String VOLUME_DRIVER_OPTION = "--volume-driver";
   private String MOUNT_RO_OPTION = "--volume";
 
+  /**
+   * 构造函数，传入Yarn配置
+   * @param conf Yarn配置对象
+   */
   public NvidiaDockerV1CommandPlugin(Configuration conf) {
     this.conf = conf;
   }
 
-  // Get value from key=value
-  // Throw exception if '=' not found
+  /**
+   * 从key=value格式字符串中提取value部分
+   * @param input 输入字符串
+   * @return 提取出的value
+   * @throws IllegalArgumentException 当未找到=分隔符时抛出
+   */
   private String getValue(String input) throws IllegalArgumentException {
     int index = input.indexOf('=');
     if (index < 0) {
@@ -78,6 +88,11 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
     return input.substring(index + 1);
   }
 
+  /**
+   * 添加命令选项到内部存储
+   * @param key 选项名称
+   * @param value 选项值
+   */
   private void addToCommand(String key, String value) {
     if (additionalCommands == null) {
       additionalCommands = new HashMap<>();
@@ -88,7 +103,12 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
     additionalCommands.get(key).add(value);
   }
 
+  /**
+   * 初始化插件，从nvidia-docker v1插件服务端获取所需的Docker命令参数
+   * @throws ContainerExecutionException 初始化失败时抛出
+   */
   private void init() throws ContainerExecutionException {
+    // 从配置中获取nvidia-docker插件端点地址
     String endpoint = conf.get(
         YarnConfiguration.NVIDIA_DOCKER_PLUGIN_V1_ENDPOINT,
         YarnConfiguration.DEFAULT_NVIDIA_DOCKER_PLUGIN_V1_ENDPOINT);
@@ -99,7 +119,7 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
     }
     String cliOptions;
     try {
-      // Talk to plugin server and get options
+      // 连接插件服务端获取CLI选项
       URL url = new URL(endpoint);
       URLConnection uc = url.openConnection();
       uc.setRequestProperty("X-Requested-With", "Curl");
@@ -111,8 +131,7 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
       LOG.info("Additional docker CLI options from plugin to run GPU "
           + "containers:" + cliOptions);
 
-      // Parse cli options
-      // Examples like:
+      // 解析CLI选项，示例格式：
       // --device=/dev/nvidiactl --device=/dev/nvidia-uvm --device=/dev/nvidia0
       // --volume-driver=nvidia-docker
       // --volume=nvidia_driver_352.68:/usr/local/nvidia:ro
@@ -148,13 +167,18 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
     }
   }
 
+  /**
+   * 从设备路径中提取GPU索引号
+   * @param device 设备路径，如/dev/nvidia0
+   * @return GPU索引号，提取失败返回-1
+   */
   private int getGpuIndexFromDeviceName(String device) {
     final String NVIDIA = "nvidia";
     int idx = device.lastIndexOf(NVIDIA);
     if (idx < 0) {
       return -1;
     }
-    // Get last part
+    // 获取nvidia后的字符串部分
     String str = device.substring(idx + NVIDIA.length());
     for (int i = 0; i < str.length(); i++) {
       if (!Character.isDigit(str.charAt(i))) {
@@ -164,10 +188,15 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
     return Integer.parseInt(str);
   }
 
+  /**
+   * 获取当前容器被分配的GPU设备集合
+   * @param container YARN容器对象
+   * @return 分配给容器的GPU设备集合，无分配则返回空集合
+   */
   private Set<GpuDevice> getAssignedGpus(Container container) {
     ResourceMappings resourceMappings = container.getResourceMappings();
 
-    // Copy of assigned Resources
+    // 已分配资源副本
     Set<GpuDevice> assignedResources = null;
     if (resourceMappings != null) {
       assignedResources = new HashSet<>();
@@ -178,23 +207,28 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
     }
 
     if (assignedResources == null || assignedResources.isEmpty()) {
-      // When no GPU resource assigned, don't need to update docker command.
+      // 没有分配GPU资源，不需要修改Docker命令
       return Collections.emptySet();
     }
 
     return assignedResources;
   }
 
+  /**
+   * 检查容器是否请求了GPU资源
+   * @param container YARN容器对象
+   * @return true表示容器请求了GPU，false否则
+   */
   @VisibleForTesting
   protected boolean requestsGpu(Container container) {
     return GpuResourceAllocator.getRequestedGpus(container.getResource()) > 0;
   }
 
   /**
-   * Do initialize when GPU requested
-   * @param container nmContainer
-   * @return if #GPU-requested > 0
-   * @throws ContainerExecutionException when any issue happens
+   * 当容器请求GPU时执行懒初始化
+   * @param container YARN容器对象
+   * @return true表示请求了GPU且初始化完成，false否则
+   * @throws ContainerExecutionException 初始化失败时抛出
    */
   private boolean initializeWhenGpuRequested(Container container)
       throws ContainerExecutionException {
@@ -202,7 +236,7 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
       return false;
     }
 
-    // Do lazy initialization of gpu-docker plugin
+    // 对gpu-docker插件执行懒初始化
     if (additionalCommands == null) {
       init();
     }
@@ -211,6 +245,12 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
   }
 
   @Override
+  /**
+   * 更新Docker运行命令，添加GPU相关配置参数
+   * @param dockerRunCommand Docker运行命令对象
+   * @param container YARN容器对象
+   * @throws ContainerExecutionException 处理失败时抛出
+   */
   public synchronized void updateDockerRunCommand(
       DockerRunCommand dockerRunCommand, Container container)
       throws ContainerExecutionException {
@@ -223,7 +263,7 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
       return;
     }
 
-    // Write to dockerRunCommand
+    // 将GPU配置写入Docker运行命令
     for (Map.Entry<String, Set<String>> option : additionalCommands
         .entrySet()) {
       String key = option.getKey();
@@ -231,12 +271,11 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
       if (key.equals(DEVICE_OPTION)) {
         int foundGpuDevices = 0;
         for (String deviceName : values) {
-          // When specified is a GPU card (device name like /dev/nvidia[n]
-          // Get index of the GPU (which is [n]).
+          // 对于GPU卡设备，格式为/dev/nvidia[n]
+          // 提取索引号[n]
           Integer gpuIdx = getGpuIndexFromDeviceName(deviceName);
           if (gpuIdx >= 0) {
-            // Use assignedResources to filter --device given by
-            // nvidia-docker-plugin.
+            // 使用分配的GPU列表过滤nvidia-docker-plugin返回的设备
             for (GpuDevice gpuDevice : assignedResources) {
               if (gpuDevice.getIndex() == gpuIdx) {
                 foundGpuDevices++;
@@ -244,13 +283,12 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
               }
             }
           } else{
-            // When gpuIdx < 0, it is a controller device (such as
-            // /dev/nvidiactl). In this case, add device directly.
+            // GPU索引号小于0说明是控制设备（如/dev/nvidiactl），直接添加
             dockerRunCommand.addDevice(deviceName, deviceName);
           }
         }
 
-        // Cannot get all assigned Gpu devices from docker plugin output
+        // 未找到所有已分配的GPU设备，抛出异常
         if (foundGpuDevices < assignedResources.size()) {
           throw new ContainerExecutionException(
               "Cannot get all assigned Gpu devices from docker plugin output");
@@ -269,6 +307,12 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
   }
 
   @Override
+  /**
+   * 获取创建GPU相关Docker数据卷的命令
+   * @param container YARN容器对象
+   * @return 创建卷命令，不需要创建则返回null
+   * @throws ContainerExecutionException 处理失败时抛出
+   */
   public DockerVolumeCommand getCreateDockerVolumeCommand(Container container)
       throws ContainerExecutionException {
     if (!initializeWhenGpuRequested(container)) {
@@ -277,14 +321,14 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
 
     String newVolumeName = null;
 
-    // Get volume name
+    // 从挂载配置中提取卷名
     Set<String> mounts = additionalCommands.get(MOUNT_RO_OPTION);
     for (String mount : mounts) {
       int idx = mount.indexOf(':');
       if (idx >= 0) {
         String mountSource = mount.substring(0, idx);
         if (VOLUME_NAME_PATTERN.matcher(mountSource).matches()) {
-          // This is a valid named volume
+          // 匹配到有效的命名卷
           newVolumeName = mountSource;
           LOG.debug("Found volume name for GPU:{}", newVolumeName);
           break;
@@ -307,9 +351,15 @@ public class NvidiaDockerV1CommandPlugin implements DockerCommandPlugin {
   }
 
   @Override
+  /**
+   * 获取清理Docker数据卷的命令
+   * @param container YARN容器对象
+   * @return 清理命令，本实现不需要清理，返回null
+   * @throws ContainerExecutionException 处理失败时抛出
+   */
   public DockerVolumeCommand getCleanupDockerVolumesCommand(Container container)
       throws ContainerExecutionException {
-    // No cleanup needed.
+    // 不需要清理
     return null;
   }
 }

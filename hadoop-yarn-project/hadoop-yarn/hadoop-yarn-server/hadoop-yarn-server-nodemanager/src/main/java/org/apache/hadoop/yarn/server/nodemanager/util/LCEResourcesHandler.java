@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements. See the NOTICE file
@@ -25,9 +26,19 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor;
 
+/**
+ * Linux容器执行器(LCE)资源处理器接口，已废弃。
+ * 用于在Linux容器执行器启动/退出容器时管理容器资源限制，扩展资源控制能力。
+ * 本接口已标记为过时，不再推荐新代码使用。
+ */
 @Deprecated
 public interface LCEResourcesHandler extends Configurable {
 
+  /**
+   * 初始化资源处理器，关联到Linux容器执行器实例。
+   * @param lce Linux容器执行器实例
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   void init(LinuxContainerExecutor lce) throws IOException;
 
   /**
@@ -46,5 +57,10 @@ public interface LCEResourcesHandler extends Configurable {
    */
   void postExecute(ContainerId containerId);
   
+  /**
+   * 获取容器资源限制参数，拼接为启动命令行选项。
+   * @param containerId 目标容器ID
+   * @return 资源限制命令行参数字符串
+   */
   String getResourcesOption(ContainerId containerId);
 }

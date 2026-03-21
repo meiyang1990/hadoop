@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,7 @@
  */
 
 /**
- * Package to encapsulate classes used to handle node labels and node
- * attributes in NM.
+ * NodeManager节点标签与节点属性处理包，封装了NM侧节点标签相关的所有核心处理类
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

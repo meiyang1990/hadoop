@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,18 +16,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/**
+ * YARN NodeManager runC 容器执行器头文件
+ * 提供基于 runC 的容器生命周期管理接口，支持使用OCI runC 运行YARN容器
+ */
 #ifndef RUNC_RUNC_H
 #define RUNC_RUNC_H
 
 #include <stdbool.h>
 
 /**
- * Check to see if runC is enabled.
+ * 检查runC模块是否在配置中启用
+ * @param conf 节点管理器配置对象指针
+ * @return 1 表示启用，0 表示禁用
  */
 int runc_module_enabled(const struct configuration *conf);
 
 /**
- * Run a container via runC.
+ * 通过runC启动并运行YARN容器
+ * @param command_file 容器启动命令配置文件路径
+ * @return 0 表示执行成功，非0表示执行失败
  */
 int run_runc_container(const char* command_file);
 

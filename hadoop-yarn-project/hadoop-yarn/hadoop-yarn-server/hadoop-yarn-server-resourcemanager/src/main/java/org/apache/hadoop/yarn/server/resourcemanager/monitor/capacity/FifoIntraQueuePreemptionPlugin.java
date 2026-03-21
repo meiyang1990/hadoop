@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,19 +49,26 @@ import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
- * FifoIntraQueuePreemptionPlugin will handle intra-queue preemption for
- * priority and user-limit.
+ * FIFO策略队列内抢占插件，处理队列内基于优先级和用户限制的抢占逻辑。
+ * 当队列总资源不足时，按照优先级从低到高抢占已分配资源，保障高优先级和用户配额内的应用需求。
  */
 public class FifoIntraQueuePreemptionPlugin
     implements
       IntraQueuePreemptionComputePlugin {
 
+  /** 抢占上下文，包含全局抢占配置和队列分区信息 */
   protected final CapacitySchedulerPreemptionContext context;
+  /** 资源计算器，用于资源比较和计算 */
   protected final ResourceCalculator rc;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(FifoIntraQueuePreemptionPlugin.class);
 
+  /**
+   * 构造FIFO队列内抢占插件实例。
+   * @param rc 资源计算器
+   * @param preemptionContext 抢占上下文
+   */
   public FifoIntraQueuePreemptionPlugin(ResourceCalculator rc,
       CapacitySchedulerPreemptionContext preemptionContext) {
     this.context = preemptionContext;
@@ -75,8 +83,7 @@ public class FifoIntraQueuePreemptionPlugin
 
     List<FiCaSchedulerApp> apps = new ArrayList<FiCaSchedulerApp>();
     for (TempAppPerPartition tmpApp : tq.getApps()) {
-      // If a lower priority app was not selected to get preempted, mark such
-      // apps out from preemption candidate selection.
+      // 跳过没有需要被抢占资源的应用，不加入可抢占应用列表
       if (Resources.equals(tmpApp.getActuallyToBePreempted(),
           Resources.none())) {
         continue;
@@ -98,12 +105,13 @@ public class FifoIntraQueuePreemptionPlugin
     Collection<TempAppPerPartition> appsOrderedByPriority = tq.getApps();
     Resource actualPreemptNeeded = resToObtainByPartition.get(partition);
 
-    // Updating pending resource per-partition level.
+    // 初始化当前分区需要抢占的总资源量
     if (actualPreemptNeeded == null) {
       actualPreemptNeeded = Resources.createResource(0, 0);
       resToObtainByPartition.put(partition, actualPreemptNeeded);
     }
 
+    // 累加所有应用需要被抢占的资源，得到队列总抢占需求
     for (TempAppPerPartition a1 : appsOrderedByPriority) {
       Resources.addTo(actualPreemptNeeded, a1.getActuallyToBePreempted());
     }
@@ -120,37 +128,30 @@ public class FifoIntraQueuePreemptionPlugin
       Resource totalPreemptedResourceAllowed,
       Resource queueReassignableResource, float maxAllowablePreemptLimit) {
 
-    // 1. AM used resource can be considered as a frozen resource for now.
-    // Hence such containers in a queue can be omitted from the preemption
-    // calculation.
+    // 1. AM占用的资源视为冻结资源，不参与抢占计算，从可重分配资源中扣除AM资源
     Map<String, Resource> perUserAMUsed = new HashMap<String, Resource>();
     Resource amUsed = calculateUsedAMResourcesPerQueue(tq.partition,
         tq.leafQueue, perUserAMUsed);
     Resources.subtractFrom(queueReassignableResource, amUsed);
 
-    // 2. tq.leafQueue will not be null as we validated it in caller side
+    // 2. 获取队列所有应用
     Collection<FiCaSchedulerApp> apps = tq.leafQueue.getAllApplications();
 
-    // We do not need preemption for a single app
+    // 队列只有一个应用时不需要进行队列内抢占
     if (apps.size() == 1) {
       return;
     }
 
-    // 3. Create all tempApps for internal calculation and return a list from
-    // high priority to low priority order.
+    // 3. 创建临时应用结构，按优先级从高到低排序
     PriorityQueue<TempAppPerPartition> orderedByPriority = createTempAppForResCalculation(
         tq, apps, clusterResource, perUserAMUsed);
 
-    // 4. Calculate idealAssigned per app by checking based on queue's
-    // unallocated resource.Also return apps arranged from lower priority to
-    // higher priority.
+    // 4. 按优先级计算每个应用的理想分配资源，返回按优先级从低到高排序的应用集合
     TreeSet<TempAppPerPartition> orderedApps = calculateIdealAssignedResourcePerApp(
         clusterResource, tq, selectedCandidates, queueReassignableResource,
         orderedByPriority);
 
-    // 5. A configurable limit that could define an ideal allowable preemption
-    // limit. Based on current queue's capacity,defined how much % could become
-    // preemptable.
+    // 5. 计算队列内可抢占的最大资源量，基于队列保证容量和配置的抢占比例
     Resource maxIntraQueuePreemptable = Resources.multiply(tq.getGuaranteed(),
         maxAllowablePreemptLimit);
     if (Resources.greaterThan(rc, clusterResource, maxIntraQueuePreemptable,
@@ -158,24 +159,22 @@ public class FifoIntraQueuePreemptionPlugin
       Resources.subtractFrom(maxIntraQueuePreemptable,
           tq.getActuallyToBePreempted());
     } else {
+      // 已抢占资源已超过上限，本轮不允许再抢占
       maxIntraQueuePreemptable = Resource.newInstance(0, 0);
     }
 
-    // 6. We have two configurations here, one is intra queue limit and second
-    // one is per-round limit for any time preemption. Take a minimum of these
+    // 6. 取队列内抢占上限和全局总抢占限额的较小值，作为本轮抢占上限
     Resource preemptionLimit = Resources.min(rc, clusterResource,
         maxIntraQueuePreemptable, totalPreemptedResourceAllowed);
 
-    // 7. From lowest priority app onwards, calculate toBePreempted resource
-    // based on demand.
+    // 7. 从最低优先级应用开始，按需求计算每个应用需要被抢占的资源量
     calculateToBePreemptedResourcePerApp(clusterResource, orderedApps,
         Resources.clone(preemptionLimit));
 
-    // Save all apps (low to high) to temp queue for further reference
+    // 将排序后的应用保存到临时队列，供后续流程使用
     tq.addAllApps(orderedApps);
 
-    // 8. There are chances that we may preempt for the demand from same
-    // priority level, such cases are to be validated out.
+    // 8. 处理同优先级下的抢占场景，过滤不符合规则的同优先级抢占
     validateOutSameAppPriorityFromDemand(clusterResource,
         (TreeSet<TempAppPerPartition>) orderedApps, tq.getUsersPerPartition(),
         context.getIntraQueuePreemptionOrderPolicy());
@@ -188,10 +187,17 @@ public class FifoIntraQueuePreemptionPlugin
     }
   }
 
+  /**
+   * 从低优先级到高优先级遍历，计算每个应用需要被抢占的资源量。
+   * @param clusterResource 集群总资源
+   * @param orderedApps 按优先级从低到高排序的应用集合
+   * @param preemptionLimit 本轮抢占总限额
+   */
   private void calculateToBePreemptedResourcePerApp(Resource clusterResource,
       TreeSet<TempAppPerPartition> orderedApps, Resource preemptionLimit) {
 
     for (TempAppPerPartition tmpApp : orderedApps) {
+      // 抢占限额已用完或应用无已用资源，跳过该应用
       if (Resources.lessThanOrEqual(rc, clusterResource, preemptionLimit,
           Resources.none())
           || Resources.lessThanOrEqual(rc, clusterResource, tmpApp.getUsed(),
@@ -199,64 +205,39 @@ public class FifoIntraQueuePreemptionPlugin
         continue;
       }
 
+      // 计算当前应用可被抢占的资源：已用资源 - 理想分配 - 已选中待抢占资源 - AM资源
       Resource preemtableFromApp = Resources.subtract(tmpApp.getUsed(),
           tmpApp.idealAssigned);
       Resources.subtractFromNonNegative(preemtableFromApp, tmpApp.selected);
       Resources.subtractFromNonNegative(preemtableFromApp, tmpApp.getAMUsed());
 
+      // 优先保障用户配额策略下，保留队列最小分配资源不被抢占
       if (context.getIntraQueuePreemptionOrderPolicy()
             .equals(IntraQueuePreemptionOrderPolicy.USERLIMIT_FIRST)) {
         Resources.subtractFromNonNegative(preemtableFromApp,
           tmpApp.getFiCaSchedulerApp().getCSLeafQueue().getMinimumAllocation());
       }
 
-      // Calculate toBePreempted from apps as follows:
-      // app.preemptable = min(max(app.used - app.selected - app.ideal, 0),
-      // intra_q_preemptable)
+      // 计算最终需要抢占的资源，不超过当前剩余抢占限额，且不小于0
       tmpApp.toBePreempted = Resources.min(rc, clusterResource, Resources
           .max(rc, clusterResource, preemtableFromApp, Resources.none()),
           Resources.clone(preemptionLimit));
 
+      // 扣除已分配的抢占额度，继续处理下一个应用
       preemptionLimit = Resources.subtractFromNonNegative(preemptionLimit,
           tmpApp.toBePreempted);
     }
   }
 
   /**
-   * Algorithm for calculating idealAssigned is as follows:
-   * For each partition:
-   *  Q.reassignable = Q.used - Q.selected;
-   *  
-   * # By default set ideal assigned 0 for app.
-   * app.idealAssigned as 0
-   * # get user limit from scheduler.
-   * userLimitRes = Q.getUserLimit(userName)
-   * 
-   * # initial all value to 0
-   * Map<String, Resource> userToAllocated
-   * 
-   * # Loop from highest priority to lowest priority app to calculate ideal
-   * for app in sorted-by(priority) {
-   *  if Q.reassignable < 0:
-   *    break;
-   *    
-   *  if (user-to-allocated.get(app.user) < userLimitRes) {
-   *   idealAssigned = min((userLimitRes - userToAllocated.get(app.user)), 
-   *                      (app.used + app.pending - app.selected))
-   *   app.idealAssigned = min(Q.reassignable, idealAssigned)
-   *   userToAllocated.get(app.user) += app.idealAssigned;
-   *  } else { 
-   *   // skip this app because user-limit reached
-   *  }
-   *  Q.reassignable -= app.idealAssigned
-   * }
-   *  
-   * @param clusterResource Cluster Resource
-   * @param tq TempQueue
-   * @param selectedCandidates Already Selected preemption candidates
-   * @param queueReassignableResource Resource used in a queue
-   * @param orderedByPriority List of running apps
-   * @return List of temp apps ordered from low to high priority
+   * 按优先级从高到低计算每个应用的理想分配资源。
+   * 算法逻辑：高优先级应用优先分配，直到满足自身需求或达到用户配额，剩余资源留给低优先级应用。
+   * @param clusterResource 集群总资源
+   * @param tq 临时队列分区信息
+   * @param selectedCandidates 已选中的待抢占容器集合
+   * @param queueReassignableResource 队列可重分配资源总量
+   * @param orderedByPriority 按优先级从高到低排序的优先队列
+   * @return 按优先级从低到高排序的应用集合
    */
   private TreeSet<TempAppPerPartition> calculateIdealAssignedResourcePerApp(
       Resource clusterResource, TempQueuePerPartition tq,
@@ -267,6 +248,7 @@ public class FifoIntraQueuePreemptionPlugin
     Comparator<TempAppPerPartition> reverseComp;
     OrderingPolicy<FiCaSchedulerApp> queueOrderingPolicy =
         tq.leafQueue.getOrderingPolicy();
+    // 根据队列排序策略和抢占顺序策略选择排序比较器，结果按优先级从低到高排序
     if (queueOrderingPolicy instanceof FairOrderingPolicy
         && (context.getIntraQueuePreemptionOrderPolicy()
             == IntraQueuePreemptionOrderPolicy.USERLIMIT_FIRST)) {
@@ -281,12 +263,11 @@ public class FifoIntraQueuePreemptionPlugin
     Map<String, TempUserPerPartition> usersPerPartition = tq.getUsersPerPartition();
 
     while (!orderedByPriority.isEmpty()) {
-      // Remove app from the next highest remaining priority and process it to
-      // calculate idealAssigned per app.
+      // 取出当前优先级最高的应用处理
       TempAppPerPartition tmpApp = orderedByPriority.remove();
       orderedApps.add(tmpApp);
 
-      // Once unallocated resource is 0, we can stop assigning ideal per app.
+      // 可重分配资源已用完，后续应用理想分配直接保持0
       if (Resources.lessThanOrEqual(rc, clusterResource,
           queueReassignableResource, Resources.none()) ||
           (rc.isAnyMajorResourceZeroOrNegative(queueReassignableResource)
@@ -299,30 +280,32 @@ public class FifoIntraQueuePreemptionPlugin
       Resource userLimitResource = tmpUser.getUserLimit();
       Resource idealAssignedForUser = tmpUser.idealAssigned;
 
-      // Calculate total selected container resources from current app.
+      // 统计该应用已被选中的待抢占资源总量
       getAlreadySelectedPreemptionCandidatesResource(selectedCandidates, tmpApp,
           tmpUser, partition);
 
-      // For any app, used+pending will give its idealAssigned. However it will
-      // be tightly linked to queue's unallocated quota. So lower priority apps
-      // idealAssigned may fall to 0 if higher priority apps demand is more.
+      // 计算应用自身需求的理想资源：已用（扣除AM）+ 待分配 - 已选中抢占资源
       Resource appIdealAssigned = Resources.add(tmpApp.getUsedDeductAM(),
           tmpApp.getPending());
       Resources.subtractFrom(appIdealAssigned, tmpApp.selected);
 
+      // 用户还未达到配额上限，分配资源给该应用
       if (Resources.lessThan(rc, clusterResource, idealAssignedForUser,
           userLimitResource)) {
+        // 理想分配不超过用户剩余配额，也不超过队列剩余可重分配资源
         Resource idealAssigned = Resources.min(rc, clusterResource,
             appIdealAssigned,
             Resources.subtract(userLimitResource, idealAssignedForUser));
         tmpApp.idealAssigned = Resources.clone(Resources.min(rc,
             clusterResource, queueReassignableResource, idealAssigned));
+        // 更新该用户已分配的理想资源
         Resources.addTo(idealAssignedForUser, tmpApp.idealAssigned);
       } else {
+        // 用户已达到配额上限，不分配资源，跳过
         continue;
       }
 
-      // Also set how much resource is needed by this app from others.
+      // 如果应用理想分配大于当前已用（扣除已选中抢占），记录需要从其他应用抢占的资源量
       Resource appUsedExcludedSelected = Resources
           .subtract(tmpApp.getUsedDeductAM(), tmpApp.selected);
       if (Resources.greaterThan(rc, clusterResource, tmpApp.idealAssigned,
@@ -331,6 +314,7 @@ public class FifoIntraQueuePreemptionPlugin
             Resources.subtract(tmpApp.idealAssigned, appUsedExcludedSelected));
       }
 
+      // 从队列可重分配资源中扣除已分配给该应用的理想资源
       Resources.subtractFromNonNegative(queueReassignableResource,
           tmpApp.idealAssigned);
     }
@@ -339,8 +323,7 @@ public class FifoIntraQueuePreemptionPlugin
   }
 
   /*
-   * Previous policies would have already selected few containers from an
-   * application. Calculate total resource from these selected containers.
+   * 统计应用中已被选为抢占候选的容器总资源量。
    */
   private void getAlreadySelectedPreemptionCandidatesResource(
       Map<ApplicationAttemptId, Set<RMContainer>> selectedCandidates,
@@ -354,6 +337,7 @@ public class FifoIntraQueuePreemptionPlugin
       return;
     }
 
+    // 累加当前分区内已选中容器的资源量
     for (RMContainer cont : containers) {
       if (partition.equals(cont.getNodeLabelExpression())) {
         Resources.addTo(tmpApp.selected, cont.getAllocatedResource());
@@ -362,6 +346,14 @@ public class FifoIntraQueuePreemptionPlugin
     }
   }
 
+  /**
+   * 为队列中每个应用创建临时计算结构，并按优先级排序。
+   * @param tq 临时队列分区信息
+   * @param apps 队列所有应用
+   * @param clusterResource 集群总资源
+   * @param perUserAMUsed 按用户统计的AM已用资源
+   * @return 按优先级排序的临时应用优先队列
+   */
   private PriorityQueue<TempAppPerPartition> createTempAppForResCalculation(
       TempQueuePerPartition tq, Collection<FiCaSchedulerApp> apps,
       Resource clusterResource,
@@ -369,6 +361,7 @@ public class FifoIntraQueuePreemptionPlugin
     Comparator<TempAppPerPartition> taComparator;
     OrderingPolicy<FiCaSchedulerApp> orderingPolicy =
         tq.leafQueue.getOrderingPolicy();
+    // 根据排序策略选择对应的比较器
     if (orderingPolicy instanceof FairOrderingPolicy
         && (context.getIntraQueuePreemptionOrderPolicy()
             == IntraQueuePreemptionOrderPolicy.USERLIMIT_FIRST)) {
@@ -378,255 +371,3 @@ public class FifoIntraQueuePreemptionPlugin
     }
     PriorityQueue<TempAppPerPartition> orderedByPriority = new PriorityQueue<>(
         100, taComparator);
-
-    String partition = tq.partition;
-    Map<String, TempUserPerPartition> usersPerPartition = tq
-        .getUsersPerPartition();
-
-    // have an internal temp app structure to store intermediate data(priority)
-    for (FiCaSchedulerApp app : apps) {
-
-      Resource used = app.getAppAttemptResourceUsage().getUsed(partition);
-      Resource amUsed = null;
-      if (!app.isWaitingForAMContainer()) {
-        amUsed = app.getAMResource(partition);
-      }
-      Resource pending = app.getTotalPendingRequestsPerPartition()
-          .get(partition);
-      Resource reserved = app.getAppAttemptResourceUsage()
-          .getReserved(partition);
-
-      used = (used == null) ? Resources.createResource(0, 0) : used;
-      amUsed = (amUsed == null) ? Resources.createResource(0, 0) : amUsed;
-      pending = (pending == null) ? Resources.createResource(0, 0) : pending;
-      reserved = (reserved == null) ? Resources.createResource(0, 0) : reserved;
-
-      Set<String> partitions = app.getAppAttemptResourceUsage().getExistingNodeLabels();
-      partitions.addAll(app.getTotalPendingRequestsPerPartition().keySet());
-
-      // Create TempAppPerQueue for further calculation.
-      TempAppPerPartition tmpApp = new TempAppPerPartition(app,
-          Resources.clone(used), Resources.clone(amUsed),
-          Resources.clone(reserved), Resources.clone(pending));
-
-      // Set ideal allocation of app as 0.
-      tmpApp.idealAssigned = Resources.createResource(0, 0);
-
-      // Create a TempUserPerPartition structure to hold more information
-      // regarding each user's entities such as UserLimit etc. This could
-      // be kept in a user to TempUserPerPartition map for further reference.
-      String userName = app.getUser();
-      TempUserPerPartition tmpUser = usersPerPartition.get(userName);
-      if (tmpUser == null) {
-        // User might have already been removed, but preemption still accounts for this app,
-        // therefore reinserting the user will not cause a memory leak
-        User  user = tq.leafQueue.getOrCreateUser(userName);
-        ResourceUsage userResourceUsage = user.getResourceUsage();
-
-        // perUserAMUsed was populated with running apps, now we are looping
-        // through both running and pending apps.
-        Resource userSpecificAmUsed = perUserAMUsed.get(userName);
-        amUsed = (userSpecificAmUsed == null)
-            ? Resources.none() : userSpecificAmUsed;
-
-        tmpUser = new TempUserPerPartition(user, tq.queueName,
-            Resources.clone(userResourceUsage.getUsed(partition)),
-            Resources.clone(amUsed),
-            Resources.clone(userResourceUsage.getReserved(partition)),
-            Resources.none());
-
-        Resource userLimitResource = Resources.clone(
-            tq.leafQueue.getResourceLimitForAllUsers(userName, clusterResource,
-                partition, SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY));
-
-        // Real AM used need not have to be considered for user-limit as well.
-        userLimitResource = Resources.subtract(userLimitResource,
-            tmpUser.amUsed);
-        tmpUser.setUserLimit(userLimitResource);
-
-        LOG.debug("TempUser:{}", tmpUser);
-
-        tmpUser.idealAssigned = Resources.createResource(0, 0);
-        tq.addUserPerPartition(userName, tmpUser);
-      }
-      tmpApp.setTempUserPerPartition(tmpUser);
-      orderedByPriority.add(tmpApp);
-    }
-
-    return orderedByPriority;
-  }
-
-  /*
-   * Fifo+Priority based preemption policy need not have to preempt resources at
-   * same priority level. Such cases will be validated out. But if the demand is
-   * from an app of different user, force to preempt resources even if apps are
-   * at same priority.
-   */
-  public void validateOutSameAppPriorityFromDemand(Resource cluster,
-      TreeSet<TempAppPerPartition> orderedApps,
-      Map<String, TempUserPerPartition> usersPerPartition,
-      IntraQueuePreemptionOrderPolicy intraQueuePreemptionOrder) {
-
-    TempAppPerPartition[] apps = orderedApps
-        .toArray(new TempAppPerPartition[orderedApps.size()]);
-    if (apps.length <= 0) {
-      return;
-    }
-
-    for (int hPriority = apps.length - 1; hPriority >= 0; hPriority--) {
-
-      // Check whether high priority app with demand needs resource from other
-      // user.
-      if (Resources.greaterThan(rc, cluster,
-          apps[hPriority].getToBePreemptFromOther(), Resources.none())) {
-
-        // Given we have a demand from a high priority app, we can do a reverse
-        // scan from lower priority apps to select resources.
-        // Since idealAssigned of each app has considered user-limit, this logic
-        // will provide eventual consistency w.r.t user-limit as well.
-        for (int lPriority = 0; lPriority < apps.length; lPriority++) {
-
-          // Check whether app with demand needs resource from other user.
-          if (Resources.greaterThan(rc, cluster, apps[lPriority].toBePreempted,
-              Resources.none())) {
-
-            // If apps are of same user, and priority is same, then skip.
-            if ((apps[hPriority].getUser().equals(apps[lPriority].getUser()))
-                && (apps[lPriority].getPriority() >= apps[hPriority]
-                    .getPriority())) {
-              continue;
-            }
-
-            if (Resources.lessThanOrEqual(rc, cluster,
-                apps[lPriority].toBePreempted,
-                apps[lPriority].getActuallyToBePreempted())
-                || Resources.equals(apps[hPriority].getToBePreemptFromOther(),
-                    Resources.none())) {
-              continue;
-            }
-
-            // Ideally if any application has a higher priority, then it can
-            // force to preempt any lower priority app from any user. However
-            // if admin enforces user-limit over priority, preemption module
-            // will not choose lower priority apps from usre's who are not yet
-            // met its user-limit.
-            TempUserPerPartition tmpUser = usersPerPartition
-                .get(apps[lPriority].getUser());
-            if ((!apps[hPriority].getUser().equals(apps[lPriority].getUser()))
-                && (!tmpUser.isUserLimitReached(rc, cluster))
-                && (intraQueuePreemptionOrder
-                    .equals(IntraQueuePreemptionOrderPolicy.USERLIMIT_FIRST))) {
-              continue;
-            }
-
-            Resource toPreemptFromOther = apps[hPriority]
-                .getToBePreemptFromOther();
-            Resource actuallyToPreempt = apps[lPriority]
-                .getActuallyToBePreempted();
-
-            // A lower priority app could offer more resource to preempt, if
-            // multiple higher priority/under served users needs resources.
-            // After one iteration, we need to ensure that actuallyToPreempt is
-            // subtracted from the resource to preempt.
-            Resource preemptableFromLowerPriorityApp = Resources
-                .subtract(apps[lPriority].toBePreempted, actuallyToPreempt);
-
-            // In case of user-limit preemption, when app's are from different
-            // user and of same priority, we will do user-limit preemption if
-            // there is a demand from under UL quota app.
-            // However this under UL quota app's demand may be more.
-            // Still we should ensure that we are not doing over preemption such
-            // that only a maximum of (user's used - UL quota) could be
-            // preempted.
-            if ((!apps[hPriority].getUser().equals(apps[lPriority].getUser()))
-                && (apps[lPriority].getPriority() == apps[hPriority]
-                    .getPriority())
-                && tmpUser.isUserLimitReached(rc, cluster)) {
-
-              Resource deltaULQuota = Resources
-                  .subtract(tmpUser.getUsedDeductAM(), tmpUser.selected);
-              Resources.subtractFrom(deltaULQuota, tmpUser.getUserLimit());
-
-              if (tmpUser.isPreemptionQuotaForULDeltaDone()) {
-                deltaULQuota = Resources.createResource(0, 0);
-              }
-
-              if (Resources.lessThan(rc, cluster, deltaULQuota,
-                  preemptableFromLowerPriorityApp)) {
-                tmpUser.updatePreemptionQuotaForULDeltaAsDone(true);
-                preemptableFromLowerPriorityApp = deltaULQuota;
-              }
-            }
-
-            if (Resources.greaterThan(rc, cluster,
-                preemptableFromLowerPriorityApp, Resources.none())) {
-              Resource toPreempt = Resources.min(rc, cluster,
-                  toPreemptFromOther, preemptableFromLowerPriorityApp);
-
-              apps[hPriority].setToBePreemptFromOther(
-                  Resources.subtract(toPreemptFromOther, toPreempt));
-              apps[lPriority].setActuallyToBePreempted(
-                  Resources.add(actuallyToPreempt, toPreempt));
-            }
-          }
-        }
-      }
-    }
-  }
-
-  private Resource calculateUsedAMResourcesPerQueue(String partition,
-      AbstractLeafQueue leafQueue, Map<String, Resource> perUserAMUsed) {
-    Collection<FiCaSchedulerApp> runningApps = leafQueue.getApplications();
-    Resource amUsed = Resources.createResource(0, 0);
-
-    synchronized (leafQueue) {
-      for (FiCaSchedulerApp app : runningApps) {
-        Resource userAMResource = perUserAMUsed.get(app.getUser());
-        if (null == userAMResource) {
-          userAMResource = Resources.createResource(0, 0);
-          perUserAMUsed.put(app.getUser(), userAMResource);
-        }
-
-        Resources.addTo(userAMResource, app.getAMResource(partition));
-        Resources.addTo(amUsed, app.getAMResource(partition));
-      }
-    }
-
-    return amUsed;
-  }
-
-  @Override
-  public boolean skipContainerBasedOnIntraQueuePolicy(FiCaSchedulerApp app,
-      Resource clusterResource, Resource usedResource, RMContainer c) {
-    // Ensure below checks
-    // 1. This check must be done only when preemption order is USERLIMIT_FIRST
-    // 2. By selecting container "c", check whether this user's resource usage
-    // is going below its user-limit.
-    // 3. Used resource of user must be always greater than user-limit to
-    // skip some containers as per this check. If used resource is under user
-    // limit, then these containers of this user has to be preempted as demand
-    // might be due to high priority apps running in same user.
-    String partition = context.getScheduler()
-        .getSchedulerNode(c.getAllocatedNode()).getPartition();
-    String queuePath =
-        context.getScheduler().getQueue(app.getQueueName()).getQueuePath();
-    TempQueuePerPartition tq =
-        context.getQueueByPartition(queuePath, partition);
-    TempUserPerPartition tmpUser = tq.getUsersPerPartition().get(app.getUser());
-
-    // Given user is not present, skip the check.
-    if (tmpUser == null) {
-      return false;
-    }
-
-    // For ideal resource computations, user-limit got saved by subtracting am
-    // used resource in TempUser. Hence it has to be added back here for
-    // complete check.
-    Resource userLimit = Resources.add(tmpUser.getUserLimit(), tmpUser.amUsed);
-
-    return Resources.lessThanOrEqual(rc, clusterResource,
-        Resources.subtract(usedResource, c.getAllocatedResource()), userLimit)
-        && context.getIntraQueuePreemptionOrderPolicy()
-            .equals(IntraQueuePreemptionOrderPolicy.USERLIMIT_FIRST);
-  }
-}

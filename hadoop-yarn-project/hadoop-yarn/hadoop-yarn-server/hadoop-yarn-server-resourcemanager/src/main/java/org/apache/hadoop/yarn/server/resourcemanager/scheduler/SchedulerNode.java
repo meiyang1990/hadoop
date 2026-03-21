@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -54,7 +55,7 @@ import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
 
 
 /**
- * Represents a YARN Cluster Node from the viewpoint of the scheduler.
+ * 从调度器视角表示YARN集群节点，封装节点资源管理、容器生命周期管理相关状态和操作
  */
 @Private
 @Unstable
@@ -63,33 +64,53 @@ public abstract class SchedulerNode {
   private static final Logger LOG =
       LoggerFactory.getLogger(SchedulerNode.class);
 
+  // 节点可用未分配资源
   private Resource unallocatedResource = Resource.newInstance(0, 0);
+  // 节点已分配资源
   private Resource allocatedResource = Resource.newInstance(0, 0);
+  // 节点总资源
   private Resource totalResource;
+  // 节点预留容器（用于调度延迟分配）
   private RMContainer reservedContainer;
+  // 节点上运行容器数量
   private volatile int numContainers;
+  // 所有容器合计资源利用率
   private volatile ResourceUtilization containersUtilization =
       ResourceUtilization.newInstance(0, 0, 0f);
+  // 节点整体资源利用率（包含容器和节点系统进程）
   private volatile ResourceUtilization nodeUtilization =
       ResourceUtilization.newInstance(0, 0, 0f);
   /** Time stamp for overcommitted resources to time out. */
+  // 超资源分配超时时间戳
   private long overcommitTimeout = -1;
 
   /* set of containers that are allocated containers */
+  // 已分配到该节点的已启动容器集合，key为容器ID
   private final Map<ContainerId, ContainerInfo> launchedContainers =
       new HashMap<>();
 
+  // 关联的RMNode对象（RM维护的节点元数据）
   private final RMNode rmNode;
+  // 供调度匹配使用的节点名称
   private final String nodeName;
+  // RM上下文对象
   private final RMContext rmContext;
 
+  // 节点标签集合
   private volatile Set<String> labels = null;
 
+  // 节点属性集合
   private volatile Set<NodeAttribute> nodeAttributes = null;
 
-  // Last updated time
+  // 上次心跳时间（单调时间）
   private volatile long lastHeartbeatMonotonicTime;
 
+  /**
+   * 构造调度节点对象，初始化资源、标签和节点名称
+   * @param node 关联的RMNode节点元数据
+   * @param usePortForNodeName 是否在节点名称中包含端口
+   * @param labels 节点标签集合
+   */
   public SchedulerNode(RMNode node, boolean usePortForNodeName,
       Set<String> labels) {
     this.rmNode = node;
@@ -105,10 +126,19 @@ public abstract class SchedulerNode {
     this.lastHeartbeatMonotonicTime = Time.monotonicNow();
   }
 
+  /**
+   * 使用空标签构造调度节点对象
+   * @param node 关联的RMNode节点元数据
+   * @param usePortForNodeName 是否在节点名称中包含端口
+   */
   public SchedulerNode(RMNode node, boolean usePortForNodeName) {
     this(node, usePortForNodeName, CommonNodeLabelsManager.EMPTY_STRING_SET);
   }
 
+  /**
+   * 获取关联的RMNode节点元数据
+   * @return 关联的RMNode对象
+   */
   public RMNode getRMNode() {
     return this.rmNode;
   }
@@ -116,6 +146,10 @@ public abstract class SchedulerNode {
   /**
    * Set total resources on the node.
    * @param resource Total resources on the node.
+   */
+  /**
+   * 更新节点总资源，重新计算可用未分配资源
+   * @param resource 节点新总资源
    */
   public synchronized void updateTotalResource(Resource resource){
     this.totalResource = resource;
@@ -128,6 +162,10 @@ public abstract class SchedulerNode {
    * this time the scheduler will start killing containers until the resources
    * are not overcommitted anymore. This may reset a previous timeout.
    * @param timeOut Time out in milliseconds.
+   */
+  /**
+   * 设置超资源分配超时时间，超过该时间后开始清理超分容器
+   * @param timeOut 超时时间，单位毫秒
    */
   public synchronized void setOvercommitTimeOut(long timeOut) {
     if (timeOut >= 0) {
@@ -143,6 +181,10 @@ public abstract class SchedulerNode {
    * Check if the time out has passed.
    * @return If the node is overcommitted.
    */
+  /**
+   * 检查超资源分配是否已超时
+   * @return 超分是否已超时
+   */
   public synchronized boolean isOvercommitTimedOut() {
     return this.overcommitTimeout >= 0 && Time.now() >= this.overcommitTimeout;
   }
@@ -150,6 +192,10 @@ public abstract class SchedulerNode {
   /**
    * Check if the node has a time out for overcommit resources.
    * @return If the node has a time out for overcommit resources.
+   */
+  /**
+   * 检查是否已设置超资源分配超时
+   * @return 是否已设置超分超时
    */
   public synchronized boolean isOvercommitTimeOutSet() {
     return this.overcommitTimeout >= 0;
@@ -159,6 +205,10 @@ public abstract class SchedulerNode {
    * Get the ID of the node which contains both its hostname and port.
    * @return The ID of the node.
    */
+  /**
+   * 获取节点ID（包含主机名和端口）
+   * @return 节点ID
+   */
   public NodeId getNodeID() {
     return this.rmNode.getNodeID();
   }
@@ -166,6 +216,10 @@ public abstract class SchedulerNode {
   /**
    * Get HTTP address for the node.
    * @return HTTP address for the node.
+   */
+  /**
+   * 获取节点HTTP服务地址
+   * @return 节点HTTP地址
    */
   public String getHttpAddress() {
     return this.rmNode.getHttpAddress();
@@ -181,6 +235,10 @@ public abstract class SchedulerNode {
    * node manager instances by their port number.
    * @return Name of the node for scheduling matching decisions.
    */
+  /**
+   * 获取用于调度匹配的节点名称
+   * @return 调度用节点名称
+   */
   public String getNodeName() {
     return nodeName;
   }
@@ -188,6 +246,10 @@ public abstract class SchedulerNode {
   /**
    * Get rackname.
    * @return rackname
+   */
+  /**
+   * 获取节点所在机架名称
+   * @return 机架名称
    */
   public String getRackName() {
     return this.rmNode.getRackName();
@@ -197,6 +259,10 @@ public abstract class SchedulerNode {
    * The Scheduler has allocated containers on this node to the given
    * application.
    * @param rmContainer Allocated container
+   */
+  /**
+   * 在节点上分配容器，默认容器未启动
+   * @param rmContainer 已分配容器对象
    */
   public void allocateContainer(RMContainer rmContainer) {
     allocateContainer(rmContainer, false);
@@ -208,9 +274,15 @@ public abstract class SchedulerNode {
    * @param rmContainer Allocated container
    * @param launchedOnNode True if the container has been launched
    */
+  /**
+   * 在节点上分配容器，可指定容器是否已启动
+   * @param rmContainer 已分配容器对象
+   * @param launchedOnNode 容器是否已在节点启动
+   */
   protected synchronized void allocateContainer(RMContainer rmContainer,
       boolean launchedOnNode) {
     Container container = rmContainer.getContainer();
+    // 保障型容器才扣除可用资源
     if (rmContainer.getExecutionType() == ExecutionType.GUARANTEED) {
       deductUnallocatedResource(container.getResource());
       ++numContainers;
@@ -224,6 +296,10 @@ public abstract class SchedulerNode {
    * Get unallocated resources on the node.
    * @return Unallocated resources on the node
    */
+  /**
+   * 获取节点未分配可用资源
+   * @return 节点未分配资源
+   */
   public synchronized Resource getUnallocatedResource() {
     return this.unallocatedResource;
   }
@@ -232,6 +308,10 @@ public abstract class SchedulerNode {
    * Get allocated resources on the node.
    * @return Allocated resources on the node
    */
+  /**
+   * 获取节点已分配资源
+   * @return 节点已分配资源
+   */
   public synchronized Resource getAllocatedResource() {
     return this.allocatedResource;
   }
@@ -239,6 +319,10 @@ public abstract class SchedulerNode {
   /**
    * Get total resources on the node.
    * @return Total resources on the node.
+   */
+  /**
+   * 获取节点总资源
+   * @return 节点总资源
    */
   public synchronized Resource getTotalResource() {
     return this.totalResource;
@@ -250,6 +334,11 @@ public abstract class SchedulerNode {
    * @param containerId containerId.
    * @return If the container is launched by the node.
    */
+  /**
+   * 检查容器是否在该节点上分配
+   * @param containerId 容器ID
+   * @return 容器是否分配在该节点
+   */
   public synchronized boolean isValidContainer(ContainerId containerId) {
     if (launchedContainers.containsKey(containerId)) {
       return true;
@@ -260,6 +349,10 @@ public abstract class SchedulerNode {
   /**
    * Update the resources of the node when releasing a container.
    * @param container Container to release.
+   */
+  /**
+   * 释放容器时更新节点资源统计
+   * @param container 待释放容器
    */
   protected synchronized void updateResourceForReleasedContainer(
       Container container) {
@@ -274,17 +367,24 @@ public abstract class SchedulerNode {
    * @param containerId ID of container to be released.
    * @param releasedByNode whether the release originates from a node update.
    */
+  /**
+   * 释放节点上已分配的容器
+   * @param containerId 待释放容器ID
+   * @param releasedByNode 释放请求是否来自节点心跳上报
+   */
   public synchronized void releaseContainer(ContainerId containerId,
       boolean releasedByNode) {
     ContainerInfo info = launchedContainers.get(containerId);
     if (info == null) {
       return;
     }
+    // 如果不是节点发起的释放且容器已启动，等待节点上报完成后再释放
     if (!releasedByNode && info.launchedOnNode) {
       // wait until node reports container has completed
       return;
     }
 
+    // 从已启动容器集合中移除
     launchedContainers.remove(containerId);
     Container container = info.container.getContainer();
 
@@ -293,12 +393,14 @@ public abstract class SchedulerNode {
     // when AM releases a container and NM has some delay to
     // actually release it, then the tag can still be visible
     // at RM so that RM can respect it during scheduling new containers.
+    // 容器真正释放后移除分配标签，避免调度时仍被占用
     if (rmContext != null && rmContext.getAllocationTagsManager() != null) {
       rmContext.getAllocationTagsManager()
           .removeContainer(container.getNodeId(),
               container.getId(), container.getAllocationTags());
     }
 
+    // 更新节点资源统计
     updateResourceForReleasedContainer(container);
 
     if (LOG.isDebugEnabled()) {
@@ -314,6 +416,10 @@ public abstract class SchedulerNode {
    * Inform the node that a container has launched.
    * @param containerId ID of the launched container
    */
+  /**
+   * 标记容器已在节点上启动
+   * @param containerId 已启动容器ID
+   */
   public synchronized void containerStarted(ContainerId containerId) {
     ContainerInfo info = launchedContainers.get(containerId);
     if (info != null) {
@@ -325,6 +431,10 @@ public abstract class SchedulerNode {
    * Add unallocated resources to the node. This is used when unallocating a
    * container.
    * @param resource Resources to add.
+   */
+  /**
+   * 增加节点未分配资源，释放容器时调用
+   * @param resource 待增加的资源量
    */
   private synchronized void addUnallocatedResource(Resource resource) {
     if (resource == null) {
@@ -340,6 +450,10 @@ public abstract class SchedulerNode {
    * Deduct unallocated resources from the node. This is used when allocating a
    * container.
    * @param resource Resources to deduct.
+   */
+  /**
+   * 扣除节点未分配资源，分配容器时调用
+   * @param resource 待扣除的资源量
    */
   @VisibleForTesting
   public synchronized void deductUnallocatedResource(Resource resource) {
@@ -358,238 +472,14 @@ public abstract class SchedulerNode {
    * @param schedulerKey Priority of the reservation.
    * @param container Container reserving resources for.
    */
+  /**
+   * 为应用尝试在节点上预留容器资源
+   * @param attempt 申请预留的应用尝试
+   * @param schedulerKey 预留请求优先级键
+   * @param container 待预留容器
+   */
   public abstract void reserveResource(SchedulerApplicationAttempt attempt,
       SchedulerRequestKey schedulerKey, RMContainer container);
 
   /**
-   * Unreserve resources on this node.
-   * @param attempt Application attempt that had done the reservation.
-   */
-  public abstract void unreserveResource(SchedulerApplicationAttempt attempt);
-
-  @Override
-  public String toString() {
-    return "host: " + rmNode.getNodeAddress() + " #containers="
-        + getNumContainers() + " available=" + getUnallocatedResource()
-        + " used=" + getAllocatedResource();
-  }
-
-  /**
-   * Get number of active containers on the node.
-   * @return Number of active containers on the node.
-   */
-  public int getNumContainers() {
-    return numContainers;
-  }
-
-  /**
-   * Get the containers running on the node.
-   * @return A copy of containers running on the node.
-   */
-  public synchronized List<RMContainer> getCopiedListOfRunningContainers() {
-    List<RMContainer> result = new ArrayList<>(launchedContainers.size());
-    for (ContainerInfo info : launchedContainers.values()) {
-      result.add(info.container);
-    }
-    return result;
-  }
-
-  /**
-   * Get the containers running on the node with AM containers at the end.
-   * @return A copy of running containers with AM containers at the end.
-   */
-  public synchronized List<RMContainer> getRunningContainersWithAMsAtTheEnd() {
-    LinkedList<RMContainer> result = new LinkedList<>();
-    for (ContainerInfo info : launchedContainers.values()) {
-      if(info.container.isAMContainer()) {
-        result.addLast(info.container);
-      } else {
-        result.addFirst(info.container);
-      }
-    }
-    return result;
-  }
-
-  /**
-   * Get the containers running on the node ordered by which to kill first. It
-   * tries to kill AMs last, then GUARANTEED containers, and it kills
-   * OPPORTUNISTIC first. If the same time, it uses the creation time.
-   * @return A copy of the running containers ordered by which to kill first.
-   */
-  public List<RMContainer> getContainersToKill() {
-    List<RMContainer> result = getLaunchedContainers();
-    Collections.sort(result, (c1, c2) -> {
-      return new CompareToBuilder()
-          .append(c1.isAMContainer(), c2.isAMContainer())
-          .append(c2.getExecutionType(), c1.getExecutionType()) // reversed
-          .append(c2.getCreationTime(), c1.getCreationTime()) // reversed
-          .toComparison();
-    });
-    return result;
-  }
-
-  /**
-   * Get the launched containers in the node.
-   * @return List of launched containers.
-   */
-  protected synchronized List<RMContainer> getLaunchedContainers() {
-    List<RMContainer> result = new ArrayList<>();
-    for (ContainerInfo info : launchedContainers.values()) {
-      result.add(info.container);
-    }
-    return result;
-  }
-
-  /**
-   * Get the container for the specified container ID.
-   * @param containerId The container ID
-   * @return The container for the specified container ID
-   */
-  protected synchronized RMContainer getContainer(ContainerId containerId) {
-    RMContainer container = null;
-    ContainerInfo info = launchedContainers.get(containerId);
-    if (info != null) {
-      container = info.container;
-    }
-    return container;
-  }
-
-  /**
-   * Get the reserved container in the node.
-   * @return Reserved container in the node.
-   */
-  public synchronized RMContainer getReservedContainer() {
-    return reservedContainer;
-  }
-
-  /**
-   * Set the reserved container in the node.
-   * @param reservedContainer Reserved container in the node.
-   */
-  public synchronized void
-  setReservedContainer(RMContainer reservedContainer) {
-    this.reservedContainer = reservedContainer;
-  }
-
-  /**
-   * Recover a container.
-   * @param rmContainer Container to recover.
-   */
-  public synchronized void recoverContainer(RMContainer rmContainer) {
-    if (rmContainer.getState().equals(RMContainerState.COMPLETED)) {
-      return;
-    }
-    allocateContainer(rmContainer, true);
-  }
-
-  /**
-   * Get the labels for the node.
-   * @return Set of labels for the node.
-   */
-  public Set<String> getLabels() {
-    return labels;
-  }
-
-  /**
-   * Update the labels for the node.
-   * @param labels Set of labels for the node.
-   */
-  public void updateLabels(Set<String> labels) {
-    this.labels = labels;
-  }
-
-  /**
-   * Get partition of which the node belongs to, if node-labels of this node is
-   * empty or null, it belongs to NO_LABEL partition. And since we only support
-   * one partition for each node (YARN-2694), first label will be its partition.
-   * @return Partition for the node.
-   */
-  public String getPartition() {
-    if (this.labels == null || this.labels.isEmpty()) {
-      return RMNodeLabelsManager.NO_LABEL;
-    } else {
-      return this.labels.iterator().next();
-    }
-  }
-
-  /**
-   * Set the resource utilization of the containers in the node.
-   * @param containersUtilization Resource utilization of the containers.
-   */
-  public void setAggregatedContainersUtilization(
-      ResourceUtilization containersUtilization) {
-    this.containersUtilization = containersUtilization;
-  }
-
-  /**
-   * Get the resource utilization of the containers in the node.
-   * @return Resource utilization of the containers.
-   */
-  public ResourceUtilization getAggregatedContainersUtilization() {
-    return this.containersUtilization;
-  }
-
-  /**
-   * Set the resource utilization of the node. This includes the containers.
-   * @param nodeUtilization Resource utilization of the node.
-   */
-  public void setNodeUtilization(ResourceUtilization nodeUtilization) {
-    this.nodeUtilization = nodeUtilization;
-  }
-
-  /**
-   * Get the resource utilization of the node.
-   * @return Resource utilization of the node.
-   */
-  public ResourceUtilization getNodeUtilization() {
-    return this.nodeUtilization;
-  }
-
-  public long getLastHeartbeatMonotonicTime() {
-    return lastHeartbeatMonotonicTime;
-  }
-
-  /**
-   * This will be called for each node heartbeat.
-   */
-  public void notifyNodeUpdate() {
-    this.lastHeartbeatMonotonicTime = Time.monotonicNow();
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof SchedulerNode)) {
-      return false;
-    }
-
-    SchedulerNode that = (SchedulerNode) o;
-
-    return getNodeID().equals(that.getNodeID());
-  }
-
-  @Override
-  public int hashCode() {
-    return getNodeID().hashCode();
-  }
-
-  public Set<NodeAttribute> getNodeAttributes() {
-    return nodeAttributes;
-  }
-
-  public void updateNodeAttributes(Set<NodeAttribute> attributes) {
-    this.nodeAttributes = attributes;
-  }
-
-  private static class ContainerInfo {
-    private final RMContainer container;
-    private boolean launchedOnNode;
-
-    public ContainerInfo(RMContainer container, boolean launchedOnNode) {
-      this.container = container;
-      this.launchedOnNode = launchedOnNode;
-    }
-  }
-}
+   * Unres

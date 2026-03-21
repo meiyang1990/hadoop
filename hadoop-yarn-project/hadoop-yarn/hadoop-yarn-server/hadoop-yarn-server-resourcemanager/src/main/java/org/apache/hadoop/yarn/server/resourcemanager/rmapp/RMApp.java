@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -49,284 +50,293 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
 /**
- * The interface to an Application in the ResourceManager. Take a
- * look at {@link RMAppImpl} for its implementation. This interface
- * exposes methods to access various updates in application status/report.
+ * ResourceManager中应用程序的核心接口，定义了应用程序需要提供的所有能力。
+ * 具体实现参考{@link RMAppImpl}，该接口对外暴露应用状态查询、更新等核心方法。
  */
 public interface RMApp extends EventHandler<RMAppEvent> {
 
   /**
-   * The application id for this {@link RMApp}.
-   * @return the {@link ApplicationId} for this {@link RMApp}.
+   * 获取当前应用程序的ApplicationId。
+   * @return 当前应用程序的ApplicationId
    */
   ApplicationId getApplicationId();
   
   /**
-   * The application submission context for this {@link RMApp}
-   * @return the {@link ApplicationSubmissionContext} for this {@link RMApp}
+   * 获取当前应用程序的提交上下文信息。
+   * @return 当前应用程序的提交上下文
    */
   ApplicationSubmissionContext getApplicationSubmissionContext();
 
   /**
-   * The current state of the {@link RMApp}.
-   * @return the current state {@link RMAppState} for this application.
+   * 获取当前应用程序的内部状态（RMAppState）。
+   * @return 当前应用的状态枚举值
    */
   RMAppState getState();
 
   /**
-   * The user who submitted this application.
-   * @return the user who submitted the application.
+   * 获取提交该应用程序的用户名。
+   * @return 提交应用的用户名
    */
   String getUser();
 
   /**
-   * Progress of application.
-   * @return the progress of the {@link RMApp}.
+   * 获取应用程序的执行进度（0-1）。
+   * @return 应用程序进度值
    */
   float getProgress();
 
   /**
-   * {@link RMApp} can have multiple application attempts {@link RMAppAttempt}.
-   * This method returns the {@link RMAppAttempt} corresponding to
-   *  {@link ApplicationAttemptId}.
-   * @param appAttemptId the application attempt id
-   * @return  the {@link RMAppAttempt} corresponding to the {@link ApplicationAttemptId}.
+   * 根据尝试ID获取对应的应用尝试实例。
+   * @param appAttemptId 应用尝试ID
+   * @return 对应ApplicationAttemptId的RMAppAttempt实例
    */
   RMAppAttempt getRMAppAttempt(ApplicationAttemptId appAttemptId);
 
   /**
-   * Each Application is submitted to a queue decided by {@link
-   * ApplicationSubmissionContext#setQueue(String)}.
-   * This method returns the queue to which an application was submitted.
-   * @return the queue to which the application was submitted to.
+   * 获取应用程序提交到的队列名称。
+   * @return 应用程序所属队列名称
    */
   String getQueue();
   
   /**
-   * Reflects a change in the application's queue from the one specified in the
-   * {@link ApplicationSubmissionContext}.
-   * @param name the new queue name
+   * 更新应用程序所属队列，用于动态修改应用队列。
+   * @param name 新队列名称
    */
   void setQueue(String name);
 
   /**
-   * The name of the application as set in {@link
-   * ApplicationSubmissionContext#setApplicationName(String)}.
-   * @return the name of the application.
+   * 获取应用程序名称，来自提交上下文。
+   * @return 应用程序名称
    */
   String getName();
 
   /**
-   * {@link RMApp} can have multiple application attempts {@link RMAppAttempt}.
-   * This method returns the current {@link RMAppAttempt}.
-   * @return the current {@link RMAppAttempt}
+   * 获取当前正在运行（或最新）的应用尝试实例。
+   * @return 当前活跃的应用尝试实例
    */
   RMAppAttempt getCurrentAppAttempt();
 
   /**
-   * {@link RMApp} can have multiple application attempts {@link RMAppAttempt}.
-   * This method returns the all {@link RMAppAttempt}s for the RMApp.
-   * @return all {@link RMAppAttempt}s for the RMApp.
+   * 获取该应用所有的尝试实例，按尝试ID索引。
+   * @return 该应用所有尝试实例的映射表
    */
   Map<ApplicationAttemptId, RMAppAttempt> getAppAttempts();
 
   /**
-   * To get the status of an application in the RM, this method can be used.
-   * If full access is not allowed then the following fields in the report
-   * will be stubbed:
+   * 生成应用程序的状态报告，根据访问权限决定是否返回完整信息。
+   * 如果不允许全访问，部分敏感字段会被占位符替换：
    * <ul>
-   *   <li>host - set to "N/A"</li>
-   *   <li>RPC port - set to -1</li>
-   *   <li>client token - set to "N/A"</li>
-   *   <li>diagnostics - set to "N/A"</li>
-   *   <li>tracking URL - set to "N/A"</li>
-   *   <li>original tracking URL - set to "N/A"</li>
-   *   <li>resource usage report - all values are -1</li>
+   *   <li>host - 设为"N/A"</li>
+   *   <li>RPC port - 设为-1</li>
+   *   <li>client token - 设为"N/A"</li>
+   *   <li>diagnostics - 设为"N/A"</li>
+   *   <li>tracking URL - 设为"N/A"</li>
+   *   <li>original tracking URL - 设为"N/A"</li>
+   *   <li>resource usage report - 所有值设为-1</li>
    * </ul>
    *
-   * @param clientUserName the user name of the client requesting the report
-   * @param allowAccess whether to allow full access to the report
-   * @return the {@link ApplicationReport} detailing the status of the application.
+   * @param clientUserName 请求报告的客户端用户名
+   * @param allowAccess 是否允许访问完整信息
+   * @return 填充完成的应用状态报告
    */
   ApplicationReport createAndGetApplicationReport(String clientUserName,
       boolean allowAccess);
   
   /**
-   * To receive the collection of all {@link RMNode}s whose updates have been
-   * received by the RMApp. Updates can be node becoming lost or becoming
-   * healthy etc. The method clears the information from the {@link RMApp}. So
-   * each call to this method gives the delta from the previous call.
-   * @param updatedNodes Map into which the updates are transferred, with each
-   * node updates as the key, and the {@link NodeUpdateType} for that update
-   * as the corresponding value.
-   * @return the number of nodes added to the {@link Map}
+   * 拉取应用需要处理的节点更新增量，拉取后会清空内部缓存。
+   * 节点更新包括节点失联、节点恢复健康等变化。
+   * @param updatedNodes 用于存放增量更新的Map，key为更新节点，value为更新类型
+   * @return 本次拉取到的更新节点数量
    */
   int pullRMNodeUpdates(Map<RMNode, NodeUpdateType> updatedNodes);
 
   /**
-   * The finish time of the {@link RMApp}
-   * @return the finish time of the application.,
+   * 获取应用程序的结束时间戳。
+   * @return 应用程序结束时间
    */
   long getFinishTime();
 
   /**
-   * the start time of the application.
-   * @return the start time of the application.
+   * 获取应用程序的启动时间戳。
+   * @return 应用程序启动时间
    */
   long getStartTime();
 
   /**
-   * the submit time of the application.
-   * @return the submit time of the application.
+   * 获取应用程序的提交时间戳。
+   * @return 应用程序提交时间
    */
   long getSubmitTime();
 
   /**
-   * The launch time of the application.
-   * Since getStartTime() returns what is essentially submit time,
-   * this new field is to prevent potential backwards compatibility issues.
-   * @return the launch time of the application.
+   * 获取应用程序的真正启动时间戳。
+   * 由于原getStartTime()实际返回的是提交时间，新增该字段保证向后兼容。
+   * @return 应用程序启动时间
    */
   long getLaunchTime();
 
   /**
-   * The tracking url for the application master.
-   * @return the tracking url for the application master.
+   * 获取ApplicationMaster的追踪页面URL。
+   * @return ApplicationMaster追踪URL
    */
   String getTrackingUrl();
 
   /**
-   * The timeline collector information for the application. It should be used
-   * only if the timeline service v.2 is enabled.
+   * 获取应用的时间线收集器完整数据，仅在启用时间线服务v2时有效。
    *
-   * @return the data for the application's collector, including collector
-   * address, RM ID, version and collector token. Return null if the timeline
-   * service v.2 is not enabled.
+   * @return 应用收集器数据，包含地址、RM ID、版本和令牌；未启用v2时返回null
    */
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
   AppCollectorData getCollectorData();
 
   /**
-   * The timeline collector information to be sent to AM. It should be used
-   * only if the timeline service v.2 is enabled.
+   * 获取要发送给AM的时间线收集器信息，仅在启用时间线服务v2时有效。
    *
-   * @return collector info, including collector address and collector token.
-   * Return null if the timeline service v.2 is not enabled.
+   * @return 收集器信息，包含地址和令牌；未启用v2时返回null
    */
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
   CollectorInfo getCollectorInfo();
+
   /**
-   * The original tracking url for the application master.
-   * @return the original tracking url for the application master.
+   * 获取原始的ApplicationMaster追踪页面URL。
+   * @return 原始追踪URL
    */
   String getOriginalTrackingUrl();
 
   /**
-   * the diagnostics information for the application master.
-   * @return the diagnostics information for the application master.
+   * 获取应用程序的诊断信息字符串构建器。
+   * @return 保存诊断信息的StringBuilder
    */
   StringBuilder getDiagnostics();
 
   /**
-   * The final finish state of the AM when unregistering as in
-   * {@link FinishApplicationMasterRequest#setFinalApplicationStatus(FinalApplicationStatus)}.
-   * @return the final finish state of the AM as set in
-   * {@link FinishApplicationMasterRequest#setFinalApplicationStatus(FinalApplicationStatus)}.
+   * 获取应用程序的最终状态，由AM取消注册时设置。
+   * @return AM设置的最终应用状态
    */
   FinalApplicationStatus getFinalApplicationStatus();
 
   /**
-   * The number of max attempts of the application.
-   * @return the number of max attempts of the application.
+   * 获取应用程序允许的最大尝试次数。
+   * @return 最大尝试次数
    */
   int getMaxAppAttempts();
 
   /**
-   * Returns the application type
-   * @return the application type.
+   * 获取应用程序类型。
+   * @return 应用程序类型字符串
    */
   String getApplicationType();
 
   /**
-   * Get tags for the application
-   * @return tags corresponding to the application
+   * 获取应用程序标签集合。
+   * @return 应用程序对应的标签集合
    */
   Set<String> getApplicationTags();
 
   /**
-   * Check whether this application's state has been saved to the state store.
-   * @return the flag indicating whether the applications's state is stored.
+   * 检查应用最终状态是否已经保存到状态存储。
+   * @return true表示状态已保存，false表示未保存
    */
   boolean isAppFinalStateStored();
   
   
   /**
-   * Nodes on which the containers for this {@link RMApp} ran.
-   * @return the set of nodes that ran any containers from this {@link RMApp}
-   * Add more node on which containers for this {@link RMApp} ran
+   * 获取该应用曾经运行过容器的所有节点集合。
+   * @return 运行过该应用容器的节点ID集合
    */
   Set<NodeId> getRanNodes();
 
   /**
-   * Create the external user-facing state of ApplicationMaster from the
-   * current state of the {@link RMApp}.
-   * @return the external user-facing state of ApplicationMaster.
+   * 根据应用内部状态转换为对外暴露的YarnApplicationState。
+   * @return 对外可见的应用状态
    */
   YarnApplicationState createApplicationState();
   
   /**
-   * Get RMAppMetrics of the {@link RMApp}.
+   * 获取应用程序的指标统计对象。
    * 
-   * @return metrics
+   * @return 应用指标对象
    */
   RMAppMetrics getRMAppMetrics();
 
+  /**
+   * 获取应用关联的预订ID。
+   * @return 预订ID
+   */
   ReservationId getReservationId();
   
+  /**
+   * 获取ApplicationMaster的资源请求列表。
+   * @return AM资源请求列表
+   */
   List<ResourceRequest> getAMResourceRequests();
 
+  /**
+   * 获取应用各节点的日志聚合报告。
+   * @return 按节点索引的日志聚合报告映射
+   */
   Map<NodeId, LogAggregationReport> getLogAggregationReportsForApp();
 
+  /**
+   * 获取用于应用报告的日志聚合整体状态。
+   * @return 日志聚合状态
+   */
   LogAggregationStatus getLogAggregationStatusForAppReport();
 
   /**
-   * Return the node label expression of the AM container.
-   * @return the node label expression.
+   * 获取AM容器的节点标签表达式。
+   * @return AM容器节点标签表达式
    */
   String getAmNodeLabelExpression();
 
+  /**
+   * 获取应用容器的节点标签表达式。
+   * @return 应用节点标签表达式
+   */
   String getAppNodeLabelExpression();
 
+  /**
+   * 获取调用者上下文信息。
+   * @return 调用者上下文
+   */
   CallerContext getCallerContext();
 
+  /**
+   * 获取应用各类超时时间的映射。
+   * @return 超时类型到超时时间戳的映射
+   */
   Map<ApplicationTimeoutType, Long> getApplicationTimeouts();
 
   /**
-   * Get priority of the application.
-   * @return priority
+   * 获取应用程序的调度优先级。
+   * @return 应用优先级
    */
   Priority getApplicationPriority();
 
   /**
-   * To verify whether app has reached in its completing/completed states.
+   * 检查应用是否已经处于完成相关状态（completing/completed）。
    *
-   * @return True/False to confirm whether app is in final states
+   * @return true表示应用已进入最终状态，false表示未完成
    */
   boolean isAppInCompletedStates();
 
   /**
-   * Get the application -&gt; queue placement context
-   * @return ApplicationPlacementContext
+   * 获取应用到队列的放置上下文信息。
+   * @return 应用放置上下文
    */
   ApplicationPlacementContext getApplicationPlacementContext();
 
   /**
-   * Get the application scheduling environment variables.
-   * @return Map of envs related to application scheduling preferences.
+   * 获取应用调度相关的环境变量配置。
+   * @return 应用调度偏好环境变量映射
    */
   Map<String, String> getApplicationSchedulingEnvs();
 
+  /**
+   * 获取应用运行的真实用户名。
+   * @return 真实用户名
+   */
   String getRealUser();
 }

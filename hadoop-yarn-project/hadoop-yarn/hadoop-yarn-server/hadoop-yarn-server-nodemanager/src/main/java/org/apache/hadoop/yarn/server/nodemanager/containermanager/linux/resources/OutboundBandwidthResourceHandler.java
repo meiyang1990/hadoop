@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -18,11 +19,19 @@
  * /
  */
 
+/**
+ * YARN NodeManager 出站网络带宽资源处理接口，定义容器出站带宽资源的隔离与管控能力
+ * 属于Linux容器资源管理模块，基于cgroup等机制实现网络带宽限流
+ */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+/**
+ * 出站网络带宽资源处理器接口，继承通用资源处理器接口
+ * 负责对容器的出站网络带宽进行资源隔离和流量控制，保障集群节点网络资源公平分配
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface OutboundBandwidthResourceHandler extends ResourceHandler {

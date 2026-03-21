@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlAdapter;
 
 /**
- * Capture single GPU device information such as memory size, temperature,
- * utilization.
+ * 单块GPU设备信息数据对象，存储显存大小、温度、使用率等监控信息，用于YARN NodeManager Web UI展示
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -42,7 +42,7 @@ public class PerGpuDeviceInformation {
   private PerGpuTemperature temperature;
 
   /**
-   * Convert formats like "34 C", "75.6 %" to float.
+   * XML序列化适配器，将带单位的字符串（如"34 C"、"75.6 %"）转换为Float数值
    */
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
@@ -67,7 +67,7 @@ public class PerGpuDeviceInformation {
   }
 
   /**
-   * Convert formats like "725 MiB" to long.
+   * XML序列化适配器，将带单位的显存字符串（如"725 MiB"）转换为Long数值
    */
   @InterfaceAudience.Private
   @InterfaceStability.Unstable

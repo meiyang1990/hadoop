@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,24 +44,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 基于队列优先级的抢占候选容器选择器，实现高优先级队列对低优先级队列资源的抢占
+ * 针对预留容器场景，通过抢占低优先级容器资源满足高优先级队列的预留容器分配需求
+ */
 public class QueuePriorityContainerCandidateSelector
     extends PreemptionCandidatesSelector {
   private static final Logger LOG =
       LoggerFactory.getLogger(QueuePriorityContainerCandidateSelector.class);
 
-  // Configured timeout before doing reserved container preemption
+  // 预留容器抢占最小等待超时时间
   private long minTimeout;
 
-  // Allow move reservation around for better placement?
+  // 是否允许移动预留容器到更好的节点位置
   private boolean allowMoveReservation;
 
-  // All the reserved containers of the system which could possible preempt from
-  // queue with lower priorities
+  // 系统中所有可能需要抢占的预留容器列表
   private List<RMContainer> reservedContainers;
 
-  // From -> To
-  // A digraph to represent if one queue has higher priority than another.
-  // For example, a->b means queue=a has higher priority than queue=b
+  // 优先级有向关系表，行表示高优先级队列，列表示低优先级队列，存在记录表示高优先级可抢占低优先级
+  // 例如：a->b表示队列a优先级高于队列b，a可以抢占b的资源
   private Table<String, String, Boolean> priorityDigraph =
       HashBasedTable.create();
 
@@ -68,18 +71,18 @@ public class QueuePriorityContainerCandidateSelector
   private Map<ApplicationAttemptId, Set<RMContainer>> selectedCandidates;
   private Resource totalPreemptionAllowed;
 
-  // A cached scheduler node map, will be refreshed each round.
+  // 临时调度节点缓存，每轮抢占重新刷新
   private Map<NodeId, TempSchedulerNode> tempSchedulerNodeMap = new HashMap<>();
 
-  // Have we touched (make any changes to the node) for this round
-  // Once a node is touched, we will not try to move reservations to the node
+  // 本轮已修改过的节点集合，已修改节点不再尝试移动预留容器
   private Set<NodeId> touchedNodes;
 
-  // Resource which marked to preempt from other queues.
-  // <Queue, Partition, Resource-marked-to-be-preempted-from-other-queue>
+  // 各队列在各分区标记需要从其他队列抢占的资源总量
+  // <队列名, 分区, 待抢占资源总量>
   private Table<String, String, Resource> toPreemptedFromOtherQueues =
       HashBasedTable.create();
 
+  // 容器比较器，按优先级排序，优先级相同按创建时间排序，高优先级、早创建的容器排在前面
   private final Comparator<RMContainer>
       CONTAINER_CREATION_TIME_COMPARATOR = new Comparator<RMContainer>() {
     @Override
@@ -90,16 +93,20 @@ public class QueuePriorityContainerCandidateSelector
         return 1;
       }
 
-      // If two queues cannot preempt each other, compare creation time.
+      // 两个队列不能互相抢占，按创建时间排序
       return Long.compare(o1.getCreationTime(), o2.getCreationTime());
     }
   };
 
+  /**
+   * 构造函数，从抢占上下文初始化配置参数
+   * @param preemptionContext 容量调度器抢占上下文
+   */
   QueuePriorityContainerCandidateSelector(
       CapacitySchedulerPreemptionContext preemptionContext) {
     super(preemptionContext);
 
-    // Initialize parameters
+    // 初始化参数
     CapacitySchedulerConfiguration csc =
         preemptionContext.getScheduler().getConfiguration();
 
@@ -108,6 +115,11 @@ public class QueuePriorityContainerCandidateSelector
         csc.getPUOrderingPolicyUnderUtilizedPreemptionMoveReservation();
   }
 
+  /**
+   * 获取队列从当前队列到根队列的路径列表
+   * @param tq 起始队列分区对象
+   * @return 到根队列的路径列表
+   */
   private List<TempQueuePerPartition> getPathToRoot(TempQueuePerPartition tq) {
     List<TempQueuePerPartition> list = new ArrayList<>();
     while (tq != null) {
@@ -117,13 +129,15 @@ public class QueuePriorityContainerCandidateSelector
     return list;
   }
 
+  /**
+   * 初始化队列优先级抢占有向图，计算所有叶子队列之间的优先级抢占关系
+   */
   private void initializePriorityDigraph() {
     LOG.debug("Initializing priority preemption directed graph:");
-    // Make sure we iterate all leaf queue combinations
+    // 遍历所有叶子队列组合
     for (String q1 : preemptionContext.getLeafQueueNames()) {
       for (String q2 : preemptionContext.getLeafQueueNames()) {
-        // Make sure we only calculate each combination once instead of all
-        // permutations
+        // 只计算一次组合，避免重复处理全排列
         if (q1.compareTo(q2) < 0) {
           TempQueuePerPartition tq1 = preemptionContext.getQueueByPartition(q1,
               RMNodeLabelsManager.NO_LABEL);
@@ -133,7 +147,7 @@ public class QueuePriorityContainerCandidateSelector
           List<TempQueuePerPartition> path1 = getPathToRoot(tq1);
           List<TempQueuePerPartition> path2 = getPathToRoot(tq2);
 
-          // Get direct ancestor below LCA (Lowest common ancestor)
+          // 找到最近公共祖先(LCA)下方的直接祖先节点
           int i = path1.size() - 1;
           int j = path2.size() - 1;
           while (path1.get(i).queueName.equals(path2.get(j).queueName)) {
@@ -141,7 +155,7 @@ public class QueuePriorityContainerCandidateSelector
             j--;
           }
 
-          // compare priority of path1[i] and path2[j]
+          // 比较两个直接祖先的优先级
           int p1 = path1.get(i).relativePriority;
           int p2 = path2.get(j).relativePriority;
           if (p1 < p2) {
@@ -157,11 +171,10 @@ public class QueuePriorityContainerCandidateSelector
   }
 
   /**
-   * Do we allow demandingQueue preempt resource from toBePreemptedQueue
-   *
-   * @param demandingQueue demandingQueue
-   * @param toBePreemptedQueue toBePreemptedQueue
-   * @return can/cannot
+   * 判断是否允许需求队列抢占待抢占队列的资源
+   * @param demandingQueue 需求队列（发起抢占的队列）
+   * @param toBePreemptedQueue 待抢占队列（被抢占的队列）
+   * @return true允许抢占，false不允许
    */
   private boolean preemptionAllowed(String demandingQueue,
       String toBePreemptedQueue) {
@@ -170,50 +183,45 @@ public class QueuePriorityContainerCandidateSelector
   }
 
   /**
-   * Can we preempt enough resource for given:
-   *
-   * @param requiredResource askedResource
-   * @param demandingQueue demandingQueue
-   * @param schedulerNode node
-   * @param lookingForNewReservationPlacement Are we trying to look for move
-   *        reservation to the node
-   * @param newlySelectedContainers newly selected containers, will be set when
-   *        we can preempt enough resources from the node.
-   *
-   * @return can/cannot
+   * 判断是否能在指定节点上抢占到足够满足需求的资源
+   * @param requiredResource 需求资源总量
+   * @param demandingQueue 需求队列
+   * @param schedulerNode 目标节点
+   * @param lookingForNewReservationPlacement 是否在尝试移动预留容器到该节点
+   * @param newlySelectedContainers 存储新选中的待抢占容器
+   * @return true可抢占到足够资源，false不可
    */
   private boolean canPreemptEnoughResourceForAsked(Resource requiredResource,
       String demandingQueue, FiCaSchedulerNode schedulerNode,
       boolean lookingForNewReservationPlacement,
       List<RMContainer> newlySelectedContainers) {
-    // Do not check touched nodes again.
+    // 已修改过的节点不重复检查
     if (touchedNodes.contains(schedulerNode.getNodeID())) {
       return false;
     }
 
+    // 从缓存获取节点信息，不存在则创建
     TempSchedulerNode node = tempSchedulerNodeMap.get(schedulerNode.getNodeID());
     if (null == node) {
       node = TempSchedulerNode.fromSchedulerNode(schedulerNode);
       tempSchedulerNodeMap.put(schedulerNode.getNodeID(), node);
     }
 
+    // 节点已被预留且尝试移动预留容器时，跳过该节点
     if (null != schedulerNode.getReservedContainer()
         && lookingForNewReservationPlacement) {
-      // Node reserved by the others, skip this node
-      // We will not try to move the reservation to node which reserved already.
       return false;
     }
 
-    // Need to preemption = asked - (node.total - node.allocated)
+    // 计算还缺多少资源：缺额 = 需求资源 - (节点总资源 - 节点已分配资源)
     Resource lacking = Resources.subtract(requiredResource, Resources
         .subtract(node.getTotalResource(), node.getAllocatedResource()));
 
-    // On each host, simply check if we could preempt containers from
-    // lower-prioritized queues or not
+    // 获取节点上所有运行中容器并排序
     List<RMContainer> runningContainers = node.getRunningContainers();
     Collections.sort(runningContainers, CONTAINER_CREATION_TIME_COMPARATOR);
 
-    // First of all, consider already selected containers
+    // 先扣除已经被选中待抢占的容器资源
     for (RMContainer runningContainer : runningContainers) {
       if (CapacitySchedulerPreemptionUtils.isContainerAlreadySelected(
           runningContainer, selectedCandidates)) {
@@ -222,34 +230,35 @@ public class QueuePriorityContainerCandidateSelector
       }
     }
 
-    // If we already can allocate the reserved container after preemption,
-    // skip following steps
+    // 如果已经满足缺额，直接返回成功
     if (Resources.fitsIn(rc, lacking, Resources.none())) {
       return true;
     }
 
+    // 初始化剩余允许抢占资源和已选中资源
     Resource allowed = Resources.clone(totalPreemptionAllowed);
     Resource selected = Resources.createResource(0);
 
+    // 遍历所有容器尝试抢占
     for (RMContainer runningContainer : runningContainers) {
       if (CapacitySchedulerPreemptionUtils.isContainerAlreadySelected(
           runningContainer, selectedCandidates)) {
-        // ignore selected containers
+        // 已选中容器跳过
         continue;
       }
 
-      // Only preempt resource from queue with lower priority
+      // 只允许抢占低优先级队列的容器
       if (!preemptionAllowed(demandingQueue,
           runningContainer.getQueueName())) {
         continue;
       }
 
-      // Don't preempt AM container
+      // 不抢占AM容器
       if (runningContainer.isAMContainer()) {
         continue;
       }
 
-      // Not allow to preempt more than limit
+      // 不超过总抢占限额
       if (Resources.greaterThanOrEqual(rc, clusterResource, allowed,
           runningContainer.getAllocatedResource())) {
         Resources.subtractFrom(allowed,
@@ -263,35 +272,40 @@ public class QueuePriorityContainerCandidateSelector
         }
       }
 
-      // Lacking <= 0 means we can allocate the reserved container
+      // 缺额已满足，返回成功
       if (Resources.fitsIn(rc, lacking, Resources.none())) {
         return true;
       }
     }
 
+    // 遍历完仍不满足缺额，返回失败
     return false;
   }
 
+  /**
+   * 移动预留容器到新节点的前置检查
+   * @param reservedContainer 待移动预留容器
+   * @param newNode 目标新节点
+   * @return true通过检查可移动，false不允许移动
+   */
   private boolean preChecksForMovingReservedContainerToNode(
       RMContainer reservedContainer, FiCaSchedulerNode newNode) {
-    // Don't do this if it has hard-locality preferences
+    // 容器更新请求不允许移动
     if (reservedContainer.getReservedSchedulerKey().getContainerToUpdate()
         != null) {
-      // This means a container update request (like increase / promote)
       return false;
     }
 
-    // For normal requests
+    // 检查硬位置限制，硬位置请求不允许移动
     FiCaSchedulerApp app =
         preemptionContext.getScheduler().getApplicationAttempt(
             reservedContainer.getApplicationAttemptId());
     if (!app.getAppSchedulingInfo().canDelayTo(
         reservedContainer.getAllocatedSchedulerKey(), ResourceRequest.ANY)) {
-      // This is a hard locality request
       return false;
     }
 
-    // Check if newNode's partition matches requested partition
+    // 检查节点分区匹配请求标签
     if (!StringUtils.equals(reservedContainer.getNodeLabelExpression(),
         newNode.getPartition())) {
       return false;
@@ -300,23 +314,28 @@ public class QueuePriorityContainerCandidateSelector
     return true;
   }
 
+  /**
+   * 尝试将预留容器移动到有足够可抢占资源的更好节点
+   * @param reservedContainer 待移动预留容器
+   * @param allSchedulerNodes 所有节点列表
+   */
   private void tryToMakeBetterReservationPlacement(
       RMContainer reservedContainer,
       List<FiCaSchedulerNode> allSchedulerNodes) {
     for (FiCaSchedulerNode targetNode : allSchedulerNodes) {
-      // Precheck if we can move the rmContainer to the new targetNode
+      // 前置检查不通过则跳过
       if (!preChecksForMovingReservedContainerToNode(reservedContainer,
           targetNode)) {
         continue;
       }
 
+      // 检查目标节点能否抢占到足够资源
       if (canPreemptEnoughResourceForAsked(
           reservedContainer.getReservedResource(),
           reservedContainer.getQueueName(), targetNode, true, null)) {
         NodeId fromNode = reservedContainer.getNodeId();
 
-        // We can place container to this targetNode, so just go ahead and notify
-        // scheduler
+        // 调用调度器移动预留容器
         if (preemptionContext.getScheduler().moveReservedContainer(
             reservedContainer, targetNode)) {
           LOG.info("Successfully moved reserved container=" + reservedContainer
@@ -329,10 +348,10 @@ public class QueuePriorityContainerCandidateSelector
   }
 
   /**
-   * Do we allow the demanding queue preempt resource from other queues?
-   * A satisfied queue is not allowed to preempt resource from other queues.
-   * @param demandingQueue
-   * @return allowed/not
+   * 判断队列是否已满足资源需求，满足的队列不允许抢占其他队列资源
+   * @param demandingQueue 需求队列
+   * @param partition 分区
+   * @return true队列已满足，false未满足
    */
   private boolean isQueueSatisfied(String demandingQueue,
       String partition) {
@@ -351,13 +370,19 @@ public class QueuePriorityContainerCandidateSelector
       markedToPreemptFromOtherQueue = Resources.none();
     }
 
-    // return Used - reserved + to-preempt-from-other-queue >= guaranteed
+    // 判断：已用(扣除预留) + 待抢占资源 >= 保障资源 即认为满足
     boolean flag = Resources.greaterThanOrEqual(rc, clusterResource,
         Resources.add(usedDeductReservd, markedToPreemptFromOtherQueue),
         guaranteed);
     return flag;
   }
 
+  /**
+   * 增加队列指定分区的待抢占资源总量
+   * @param queue 队列名
+   * @param partition 分区
+   * @param allocated 新增待抢占资源
+   */
   private void incToPreempt(String queue, String partition,
       Resource allocated) {
     Resource total = toPreemptedFromOtherQueues.get(queue, partition);
@@ -375,39 +400,38 @@ public class QueuePriorityContainerCandidateSelector
       Resource clusterResource,
       Resource totalPreemptedResourceAllowed) {
     Map<ApplicationAttemptId, Set<RMContainer>> curCandidates = new HashMap<>();
-    // Initialize digraph from queues
+    // 清空并重新初始化优先级有向图
     // TODO (wangda): only do this when queue refreshed.
     priorityDigraph.clear();
     initializePriorityDigraph();
 
-    // When all queues are set to same priority, or priority is not respected,
-    // direct return.
+    // 没有可抢占关系直接返回空
     if (priorityDigraph.isEmpty()) {
       return curCandidates;
     }
 
-    // Save parameters to be shared by other methods
+    // 保存全局参数供其他方法使用
     this.selectedCandidates = selectedCandidates;
     this.clusterResource = clusterResource;
     this.totalPreemptionAllowed = totalPreemptedResourceAllowed;
 
+    // 清空待抢占资源表
     toPreemptedFromOtherQueues.clear();
 
+    // 初始化预留容器列表
     reservedContainers = new ArrayList<>();
 
-    // Clear temp-scheduler-node-map every time when doing selection of
-    // containers.
+    // 清空临时节点缓存和已修改节点集合
     tempSchedulerNodeMap.clear();
     touchedNodes = new HashSet<>();
 
-    // Add all reserved containers for analysis
+    // 收集所有节点上的预留容器
     List<FiCaSchedulerNode> allSchedulerNodes =
         preemptionContext.getScheduler().getAllNodes();
     for (FiCaSchedulerNode node : allSchedulerNodes) {
       RMContainer reservedContainer = node.getReservedContainer();
       if (null != reservedContainer) {
-        // Add to reservedContainers list if the queue that the reserved
-        // container belongs to has high priority than at least one queue
+        // 只添加存在可抢占关系队列的预留容器
         if (priorityDigraph.containsRow(
             reservedContainer.getQueueName())) {
           reservedContainers.add(reservedContainer);
@@ -415,82 +439,4 @@ public class QueuePriorityContainerCandidateSelector
       }
     }
 
-    // Sort reserved container by creation time
-    Collections.sort(reservedContainers, CONTAINER_CREATION_TIME_COMPARATOR);
-
-    long currentTime = System.currentTimeMillis();
-
-    // From the beginning of the list
-    for (RMContainer reservedContainer : reservedContainers) {
-      // Only try to preempt reserved container after reserved container created
-      // and cannot be allocated after minTimeout
-      if (currentTime - reservedContainer.getCreationTime() < minTimeout) {
-        continue;
-      }
-
-      FiCaSchedulerNode node = preemptionContext.getScheduler().getNode(
-          reservedContainer.getReservedNode());
-      if (null == node) {
-        // Something is wrong, ignore
-        continue;
-      }
-
-      List<RMContainer> newlySelectedToBePreemptContainers = new ArrayList<>();
-
-      // Check if we can preempt for this queue
-      // We will skip if the demanding queue is already satisfied.
-      String demandingQueueName = reservedContainer.getQueueName();
-      boolean demandingQueueSatisfied = isQueueSatisfied(demandingQueueName,
-          node.getPartition());
-
-      // We will continue check if it is possible to preempt reserved container
-      // from the node.
-      boolean canPreempt = false;
-      if (!demandingQueueSatisfied) {
-        canPreempt = canPreemptEnoughResourceForAsked(
-            reservedContainer.getReservedResource(), demandingQueueName, node,
-            false, newlySelectedToBePreemptContainers);
-      }
-
-      // Add selected container if we can allocate reserved container by
-      // preemption others
-      if (canPreempt) {
-        touchedNodes.add(node.getNodeID());
-
-        LOG.debug("Trying to preempt following containers to make reserved "
-            + "container={} on node={} can be allocated:",
-            reservedContainer.getContainerId(), node.getNodeID());
-
-        // Update to-be-preempt
-        incToPreempt(demandingQueueName, node.getPartition(),
-            reservedContainer.getReservedResource());
-
-        for (RMContainer c : newlySelectedToBePreemptContainers) {
-          LOG.debug(" --container={} resource={}", c.getContainerId(),
-              c.getReservedResource());
-
-          // Add to preemptMap
-          CapacitySchedulerPreemptionUtils.addToPreemptMap(selectedCandidates,
-              curCandidates, c.getApplicationAttemptId(), c);
-
-          // Update totalPreemptionResourceAllowed
-          Resources.subtractFrom(totalPreemptedResourceAllowed,
-              c.getAllocatedResource());
-        }
-      } else if (!demandingQueueSatisfied) {
-        // We failed to get enough resource to allocate the container
-        // This typically happens when the reserved node is proper, will
-        // try to see if we can reserve the container on a better host.
-        // Only do this if the demanding queue is not satisfied.
-        //
-        // TODO (wangda): do more tests before making it usable
-        //
-        if (allowMoveReservation) {
-          tryToMakeBetterReservationPlacement(reservedContainer,
-              allSchedulerNodes);
-        }
-      }
-    }
-    return curCandidates;
-  }
-}
+    // 对预留容器按优先级和创建

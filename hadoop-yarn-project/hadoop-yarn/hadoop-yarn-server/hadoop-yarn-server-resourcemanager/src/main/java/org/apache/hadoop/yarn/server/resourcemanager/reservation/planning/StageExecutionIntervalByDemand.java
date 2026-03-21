@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,14 +28,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationInte
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.planning.IterativePlanner.StageProvider;
 
 /**
- * An implementation of {@link StageExecutionInterval}, which sets the execution
- * interval of the stage. For ANY and ALL jobs, the interval is
- * [jobArrival,jobDeadline]. For ORDER jobs, the the maximal possible time
- * interval is divided as follows: First, each stage is guaranteed at least its
- * requested duration. Then, the stage receives a fraction of the remaining
- * time. The fraction is calculated as the ratio between the weight (total
- * requested resources) of the stage and the total weight of all remaining
- * stages.
+ * 文件说明：YARN资源预留规划中按负载需求分配执行区间的实现类，继承StageExecutionInterval接口
+ * 
+ * 实现逻辑说明：
+ * 1. 对于ANY和ALL类型的作业，执行区间直接使用[作业到达时间, 作业截止时间]
+ * 2. 对于ORDER类型的作业，在保证每个阶段最小请求时长的前提下，将剩余时间按各阶段总资源权重比例分配
+ * 权重为当前阶段的总资源需求量占所有未分配阶段总需求量的比例
  */
 
 public class StageExecutionIntervalByDemand implements StageExecutionInterval {
@@ -47,7 +46,7 @@ public class StageExecutionIntervalByDemand implements StageExecutionInterval {
       ReservationRequest currentReservationStage, boolean allocateLeft,
       RLESparseResourceAllocation allocations) {
 
-    // Use StageExecutionIntervalUnconstrained to get the maximal interval
+    // 先调用无约束实现获取当前阶段可使用的最大时间区间
     ReservationInterval maxInterval =
         (new StageExecutionIntervalUnconstrained()).computeExecutionInterval(
             plan, reservation, currentReservationStage, allocateLeft,
@@ -56,75 +55,70 @@ public class StageExecutionIntervalByDemand implements StageExecutionInterval {
     ReservationRequestInterpreter jobType =
         reservation.getReservationRequests().getInterpreter();
 
-    // For unconstrained jobs, such as ALL & ANY, we can use the unconstrained
-    // version
+    // 非ORDER类型作业直接返回最大区间，不做约束切割
     if ((jobType != ReservationRequestInterpreter.R_ORDER)
         && (jobType != ReservationRequestInterpreter.R_ORDER_NO_GAP)) {
       return maxInterval;
     }
 
-    // For ORDER and ORDER_NO_GAP, take a sub-interval of maxInterval
+    // 对ORDER和ORDER_NO_GAP类型，从最大区间中切割出当前阶段的子区间
     step = plan.getStep();
 
     double totalWeight = 0.0;
     long totalDuration = 0;
 
-    // Iterate over the stages that haven't been allocated.
-    // For allocateLeft == True, we iterate in reverse order, starting from the
-    // last
-    // stage, until we reach the current stage.
-    // For allocateLeft == False, we do the opposite.
+    // 根据分配方向创建阶段遍历器：allocateLeft为true时从后往前遍历，false时从前往后遍历
     StageProvider stageProvider = new StageProvider(!allocateLeft, reservation);
 
+    // 遍历所有未分配阶段，累加总权重和总最小时长
     while (stageProvider.hasNext()) {
       ReservationRequest rr = stageProvider.next();
       totalWeight += calcWeight(rr);
       totalDuration += getRoundedDuration(rr, step);
 
-      // Stop once we reach current
+      // 遍历到当前阶段停止
       if (rr == currentReservationStage) {
         break;
       }
     }
 
-    // Compute the weight of the current stage as compared to remaining ones
+    // 计算当前阶段占所有未分配阶段总权重的比例
     double ratio = calcWeight(currentReservationStage) / totalWeight;
 
-    // Estimate an early start time, such that:
-    // 1. Every stage is guaranteed to receive at least its duration
-    // 2. The remainder of the window is divided between stages
-    // proportionally to its workload (total memory consumption)
+    // 计算当前区间参数：保证每个阶段至少获得请求时长，剩余窗口按权重比例分配给各阶段
     long maxIntervalArrival = maxInterval.getStartTime();
     long maxIntervalDeadline = maxInterval.getEndTime();
     long window = maxIntervalDeadline - maxIntervalArrival;
     long windowRemainder = window - totalDuration;
 
     if (allocateLeft) {
+      // 从左向右分配：计算当前阶段最晚结束时间
       long latestEnd =
           (long) (maxIntervalArrival
               + getRoundedDuration(currentReservationStage, step)
               + (windowRemainder * ratio));
 
-      // Realign if necessary (since we did some arithmetic)
+      // 按规划步长向下对齐时间
       latestEnd = stepRoundDown(latestEnd, step);
 
-      // Return new interval
+      // 返回当前阶段区间：从最大区间开始到计算出的最晚结束时间
       return new ReservationInterval(maxIntervalArrival, latestEnd);
     } else {
+      // 从右向左分配：计算当前阶段最早开始时间
       long earlyStart =
           (long) (maxIntervalDeadline
               - getRoundedDuration(currentReservationStage, step)
               - (windowRemainder * ratio));
 
-      // Realign if necessary (since we did some arithmetic)
+      // 按规划步长向上对齐时间
       earlyStart = stepRoundUp(earlyStart, step);
 
-      // Return new interval
+      // 返回当前阶段区间：从计算出的最早开始时间到最大区间结束
       return new ReservationInterval(earlyStart, maxIntervalDeadline);
     }
   }
 
-  // Weight = total memory consumption of stage
+  // 计算阶段权重：总资源需求量 = 时长 * 单容器内存 * 容器数
   protected double calcWeight(ReservationRequest stage) {
     return (stage.getDuration() * stage.getCapability().getMemorySize())
         * (stage.getNumContainers());

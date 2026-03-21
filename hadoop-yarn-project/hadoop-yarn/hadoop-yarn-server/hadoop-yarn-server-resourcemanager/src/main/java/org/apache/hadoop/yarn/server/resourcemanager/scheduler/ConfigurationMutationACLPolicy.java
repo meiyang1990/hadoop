@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,22 +25,22 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.webapp.dao.SchedConfUpdateInfo;
 
 /**
- * Interface for determining whether configuration mutations are allowed.
+ * YARN调度器配置修改访问控制策略接口，定义判断用户是否有权限修改调度配置的契约。
  */
 public interface ConfigurationMutationACLPolicy {
 
   /**
-   * Initialize ACL policy with configuration and RMContext.
-   * @param conf Configuration to initialize with.
-   * @param rmContext rmContext
+   * 使用配置和RM上下文初始化ACL策略。
+   * @param conf 初始化所用的配置对象
+   * @param rmContext ResourceManager上下文对象
    */
   void init(Configuration conf, RMContext rmContext);
 
   /**
-   * Check if mutation is allowed.
-   * @param user User issuing the request
-   * @param confUpdate configurations to be updated
-   * @return whether provided mutation is allowed or not
+   * 检查当前用户是否允许执行指定的配置修改操作。
+   * @param user 发起配置修改请求的用户信息
+   * @param confUpdate 待修改的调度配置信息
+   * @return true表示允许修改，false表示拒绝修改
    */
   boolean isMutationAllowed(UserGroupInformation user, SchedConfUpdateInfo
       confUpdate);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,10 +26,11 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resource
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.fpga.FpgaDevice;
 
 /**
- * FPGA device discovery strategy which parses a string.
- * The string must consist of a single line and be in a specific format.
+ * 基于静态配置的FPGA设备发现策略，从用户配置字符串解析FPGA设备信息
+ * 配置字符串必须为单行且满足特定格式要求
  *
- * See DeviceSpecParser for details.
+ * 格式详情参见DeviceSpecParser
+ * 本策略用于用户提前静态指定节点上可用FPGA设备，不需要自动探测
  */
 public class SettingsBasedFPGADiscoveryStrategy
     implements FPGADiscoveryStrategy {
@@ -36,6 +38,11 @@ public class SettingsBasedFPGADiscoveryStrategy
   private final String type;
   private final String availableDevices;
 
+  /**
+   * 构造基于静态配置的FPGA发现策略
+   * @param fpgaType FPGA设备类型
+   * @param devices 设备配置字符串
+   */
   public SettingsBasedFPGADiscoveryStrategy(
       String fpgaType, String devices) {
     this.type = fpgaType;
@@ -44,8 +51,10 @@ public class SettingsBasedFPGADiscoveryStrategy
 
   @Override
   public List<FpgaDevice> discover() throws ResourceHandlerException {
+    // 从配置字符串解析FPGA设备列表
     List<FpgaDevice> list =
         DeviceSpecParser.getDevicesFromString(type, availableDevices);
+    // 配置为空时抛出异常
     if (list.isEmpty()) {
       throw new ResourceHandlerException("No FPGA devices were specified");
     }

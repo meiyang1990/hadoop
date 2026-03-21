@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,15 +21,29 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.eve
 
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Application;
 
+/**
+ * 应用本地化事件，封装应用级别的本地化操作相关事件
+ * 用于NodeManager本地资源本地化流程中传递应用上下文信息
+ */
 public class ApplicationLocalizationEvent extends LocalizationEvent {
 
+  // 关联的应用实例
   final Application app;
 
+  /**
+   * 构造应用本地化事件
+   * @param type 本地化事件类型
+   * @param app 关联的应用实例
+   */
   public ApplicationLocalizationEvent(LocalizationEventType type, Application app) {
     super(type);
     this.app = app;
   }
 
+  /**
+   * 获取事件关联的应用实例
+   * @return 关联的应用实例
+   */
   public Application getApplication() {
     return app;
   }

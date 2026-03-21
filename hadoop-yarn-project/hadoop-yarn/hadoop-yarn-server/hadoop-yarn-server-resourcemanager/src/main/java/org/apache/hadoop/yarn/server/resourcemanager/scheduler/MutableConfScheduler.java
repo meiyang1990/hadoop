@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,34 +21,33 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * Interface for a scheduler that supports changing configuration at runtime.
- *
+ * 支持运行时动态修改配置的YARN调度器接口，扩展了基础ResourceScheduler能力。
+ * 允许在不重启ResourceManager的情况下更新调度配置，提供动态配置变更能力。
  */
 public interface MutableConfScheduler extends ResourceScheduler {
 
   /**
-   * Get the scheduler configuration.
-   * @return the scheduler configuration
+   * 获取调度器当前生效的配置对象。
+   * @return 调度器当前配置
    */
   Configuration getConfiguration();
 
   /**
-   * Get queue object based on queue name.
-   * @param queueName the queue name
-   * @return the queue object
+   * 根据队列名称获取对应的队列对象。
+   * @param queueName 队列名称
+   * @return 对应队列对象，不存在则返回null
    */
   Queue getQueue(String queueName);
 
   /**
-   * Return whether the scheduler configuration is mutable.
-   * @return whether scheduler configuration is mutable or not.
+   * 返回当前调度器配置是否支持动态修改。
+   * @return true表示支持动态修改配置，false表示不支持
    */
   boolean isConfigurationMutable();
 
   /**
-   * Get scheduler's configuration provider, so other classes can directly
-   * call mutation APIs on configuration provider.
-   * @return scheduler's configuration provider
+   * 获取调度器的可变配置提供者，允许其他组件直接调用配置变更API修改调度配置。
+   * @return 调度器的可变配置提供者实例
    */
   MutableConfigurationProvider getMutableConfProvider();
 }

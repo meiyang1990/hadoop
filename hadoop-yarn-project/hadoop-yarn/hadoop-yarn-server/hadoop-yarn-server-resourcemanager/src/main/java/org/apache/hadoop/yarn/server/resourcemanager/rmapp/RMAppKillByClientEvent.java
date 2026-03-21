@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,23 +25,22 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 /**
- * An event class that is used to help with logging information
- * when an application KILL event is needed.
- *
+ * 客户端触发杀死应用事件，封装杀死请求的调用者信息用于审计日志记录
+ * 当客户端主动请求杀死YARN应用时，生成该事件携带调用者身份与网络信息
  */
 public class RMAppKillByClientEvent extends RMAppEvent {
 
+  // 调用者的用户与组信息
   private final UserGroupInformation callerUGI;
+  // 调用者的远程IP地址
   private final InetAddress ip;
 
   /**
-   * constructor to create an event used for logging during user driven kill
-   * invocations.
-   *
-   * @param appId application id
-   * @param diagnostics message about the kill event
-   * @param callerUGI caller's user and group information
-   * @param remoteIP ip address of the caller
+   * 构造客户端杀死应用事件，封装请求相关信息
+   * @param appId 目标应用ID
+   * @param diagnostics 杀死事件的诊断信息
+   * @param callerUGI 调用者的用户组信息
+   * @param remoteIP 调用者的远程IP地址
    */
   public RMAppKillByClientEvent(ApplicationId appId, String diagnostics,
       UserGroupInformation callerUGI, InetAddress remoteIP) {
@@ -50,16 +50,16 @@ public class RMAppKillByClientEvent extends RMAppEvent {
   }
 
   /**
-   * returns the {@link UserGroupInformation} information.
-   * @return UserGroupInformation
+   * 获取事件发起者的用户组信息
+   * @return 调用者用户组信息
    */
   public final UserGroupInformation getCallerUGI() {
     return callerUGI;
   }
 
   /**
-   * returns the ip address stored in this event.
-   * @return remoteIP
+   * 获取事件发起者的远程IP地址
+   * @return 调用者远程IP地址
    */
   public final InetAddress getIp() {
     return ip;

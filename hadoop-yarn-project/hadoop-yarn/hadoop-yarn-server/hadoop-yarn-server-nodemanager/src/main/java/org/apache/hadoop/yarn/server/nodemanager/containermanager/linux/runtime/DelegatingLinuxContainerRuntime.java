@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -46,12 +47,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * This class is a {@link ContainerRuntime} implementation that delegates all
- * operations to a {@link DefaultLinuxContainerRuntime} instance, a
- * {@link DockerLinuxContainerRuntime} instance, a
- * {@link JavaSandboxLinuxContainerRuntime} instance, or a custom instance
- * depending on whether each instance believes the operation to be within its
- * scope.
+ * 委托式Linux容器运行时，根据容器请求的类型选择对应具体运行时执行操作
+ * 支持默认运行时、Docker、Java沙箱、Runc以及自定义可插拔运行时
+ * 根据运行时声明的匹配规则自动路由请求到对应实现
  *
  * @see LinuxContainerRuntime#isRuntimeRequested
  */
@@ -60,22 +58,38 @@ import java.util.Set;
 public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   private static final Logger LOG =
       LoggerFactory.getLogger(DelegatingLinuxContainerRuntime.class);
+  // 默认Linux容器运行时实例
   private DefaultLinuxContainerRuntime defaultLinuxContainerRuntime;
+  // Docker容器运行时实例
   private DockerLinuxContainerRuntime dockerLinuxContainerRuntime;
+  // Runc容器运行时实例
   private RuncContainerRuntime runcContainerRuntime;
+  // Java沙箱容器运行时实例
   private JavaSandboxLinuxContainerRuntime javaSandboxLinuxContainerRuntime;
+  // 允许启用的运行时类型集合
   private Set<String> allowedRuntimes = new HashSet<>();
+  // 自定义可插拔运行时列表
   private List<LinuxContainerRuntime> pluggableRuntimes = new ArrayList<>();
 
+  /**
+   * 初始化所有允许的容器运行时实例
+   * @param conf 配置对象
+   * @param nmContext NodeManager上下文
+   * @throws ContainerExecutionException 初始化失败抛出异常
+   */
   @Override
   public void initialize(Configuration conf, Context nmContext)
       throws ContainerExecutionException {
+    // 从配置读取允许的运行时列表
     String[] configuredRuntimes = conf.getTrimmedStrings(
         YarnConfiguration.LINUX_CONTAINER_RUNTIME_ALLOWED_RUNTIMES,
         YarnConfiguration.DEFAULT_LINUX_CONTAINER_RUNTIME_ALLOWED_RUNTIMES);
+    // 遍历配置的运行时
     for (String configuredRuntime : configuredRuntimes) {
       String normRuntime = configuredRuntime.toUpperCase();
+      // 添加到允许列表
       allowedRuntimes.add(normRuntime);
+      // 如果是可插拔自定义运行时，创建并初始化
       if (isPluggableRuntime(normRuntime)) {
         LinuxContainerRuntime runtime = createPluggableRuntime(conf,
             configuredRuntime);
@@ -83,24 +97,28 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
         pluggableRuntimes.add(runtime);
       }
     }
+    // 初始化Java沙箱运行时（如果允许）
     if (isRuntimeAllowed(
         LinuxContainerRuntimeConstants.RuntimeType.JAVASANDBOX.name())) {
       javaSandboxLinuxContainerRuntime = new JavaSandboxLinuxContainerRuntime(
           PrivilegedOperationExecutor.getInstance(conf));
       javaSandboxLinuxContainerRuntime.initialize(conf, nmContext);
     }
+    // 初始化Docker运行时（如果允许）
     if (isRuntimeAllowed(
         LinuxContainerRuntimeConstants.RuntimeType.DOCKER.name())) {
       dockerLinuxContainerRuntime = new DockerLinuxContainerRuntime(
           PrivilegedOperationExecutor.getInstance(conf));
       dockerLinuxContainerRuntime.initialize(conf, nmContext);
     }
+    // 初始化Runc运行时（如果允许）
     if (isRuntimeAllowed(
         LinuxContainerRuntimeConstants.RuntimeType.RUNC.name())) {
       runcContainerRuntime = new RuncContainerRuntime(
           PrivilegedOperationExecutor.getInstance(conf));
       runcContainerRuntime.initialize(conf, nmContext);
     }
+    // 初始化默认运行时（如果允许）
     if (isRuntimeAllowed(
         LinuxContainerRuntimeConstants.RuntimeType.DEFAULT.name())) {
       defaultLinuxContainerRuntime = new DefaultLinuxContainerRuntime(
@@ -114,11 +132,18 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
     return true;
   }
 
+  /**
+   * 根据容器环境选择匹配的容器运行时
+   * 优先匹配Java沙箱，然后是Docker、Runc、可插拔运行时，最后回退到默认运行时
+   * @param environment 容器环境变量
+   * @return 匹配到的容器运行时
+   * @throws ContainerExecutionException 没有匹配到允许的运行时抛出异常
+   */
   @VisibleForTesting
   LinuxContainerRuntime pickContainerRuntime(
       Map<String, String> environment) throws ContainerExecutionException {
     LinuxContainerRuntime runtime;
-    //Sandbox checked first to ensure DockerRuntime doesn't circumvent controls
+    // 优先检查Java沙箱，确保Docker不会绕过沙箱控制
     if (javaSandboxLinuxContainerRuntime != null &&
         javaSandboxLinuxContainerRuntime.isRuntimeRequested(environment)){
       runtime = javaSandboxLinuxContainerRuntime;
@@ -129,6 +154,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
         runcContainerRuntime.isRuntimeRequested(environment)) {
       runtime = runcContainerRuntime;
     } else {
+      // 先查找可插拔自定义运行时
       LinuxContainerRuntime pluggableRuntime = pickPluggableRuntime(
           environment);
       if (pluggableRuntime != null) {
@@ -147,6 +173,11 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
     return runtime;
   }
 
+  /**
+   * 遍历可插拔运行时列表查找匹配的运行时
+   * @param environment 容器环境变量
+   * @return 第一个匹配到的可插拔运行时，没有则返回null
+   */
   private LinuxContainerRuntime pickPluggableRuntime(
       Map<String, String> environment) {
     for (LinuxContainerRuntime runtime : pluggableRuntimes) {
@@ -157,6 +188,12 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
     return null;
   }
 
+  /**
+   * 根据容器对象选择对应运行时
+   * @param container 容器对象
+   * @return 匹配到的容器运行时
+   * @throws ContainerExecutionException 匹配失败抛出异常
+   */
   private LinuxContainerRuntime pickContainerRuntime(Container container)
       throws ContainerExecutionException {
     return pickContainerRuntime(container.getLaunchContext().getEnvironment());
@@ -165,6 +202,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   @Override
   public void prepareContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException {
+    // 选择对应运行试，委托执行容器准备操作
     LinuxContainerRuntime runtime = pickContainerRuntime(ctx.getContainer());
     runtime.prepareContainer(ctx);
   }
@@ -173,6 +211,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   public void launchContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException {
     Container container = ctx.getContainer();
+    // 选择对应运行试，委托执行容器启动操作
     LinuxContainerRuntime runtime = pickContainerRuntime(container);
 
     runtime.launchContainer(ctx);
@@ -182,6 +221,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   public void relaunchContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException {
     Container container = ctx.getContainer();
+    // 选择对应运行试，委托执行容器重新启动操作
     LinuxContainerRuntime runtime = pickContainerRuntime(container);
 
     runtime.relaunchContainer(ctx);
@@ -191,6 +231,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   public void signalContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException {
     Container container = ctx.getContainer();
+    // 选择对应运行试，委托执行容器信号发送操作
     LinuxContainerRuntime runtime = pickContainerRuntime(container);
 
     runtime.signalContainer(ctx);
@@ -200,6 +241,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   public void reapContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException {
     Container container = ctx.getContainer();
+    // 选择对应运行试，委托执行容器回收操作
     LinuxContainerRuntime runtime = pickContainerRuntime(container);
 
     runtime.reapContainer(ctx);
@@ -208,6 +250,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   @Override
   public String[] getIpAndHost(Container container)
       throws ContainerExecutionException {
+    // 选择对应运行试，委托获取容器IP和主机名
     LinuxContainerRuntime runtime = pickContainerRuntime(container);
     return runtime.getIpAndHost(container);
   }
@@ -215,10 +258,16 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   @Override
   public String getExposedPorts(Container container)
       throws ContainerExecutionException {
+    // 选择对应运行试，委托获取容器暴露端口
     LinuxContainerRuntime runtime = pickContainerRuntime(container);
     return runtime.getExposedPorts(container);
   }
 
+  /**
+   * 判断运行时类型是否是自定义可插拔类型
+   * @param runtimeType 运行时类型名称
+   * @return 是自定义可插拔返回true，否则返回false
+   */
   private boolean isPluggableRuntime(String runtimeType) {
     for (LinuxContainerRuntimeConstants.RuntimeType type :
         LinuxContainerRuntimeConstants.RuntimeType.values()) {
@@ -229,10 +278,19 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
     return true;
   }
 
+  /**
+   * 根据配置创建自定义可插拔运行时实例
+   * @param conf 配置对象
+   * @param runtimeType 运行时类型名称
+   * @return 创建好的运行时实例
+   * @throws ContainerExecutionException 配置缺失或创建失败抛出异常
+   */
   private LinuxContainerRuntime createPluggableRuntime(Configuration conf,
       String runtimeType) throws ContainerExecutionException {
+    // 构造运行时类名配置key
     String confKey = String.format(
         YarnConfiguration.LINUX_CONTAINER_RUNTIME_CLASS_FMT, runtimeType);
+    // 从配置加载运行时类
     Class<? extends LinuxContainerRuntime> clazz = conf.getClass(
         confKey, null, LinuxContainerRuntime.class);
     if (clazz == null) {
@@ -240,9 +298,15 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
           + YarnConfiguration.LINUX_CONTAINER_RUNTIME_ALLOWED_RUNTIMES + " : "
           + runtimeType + " : Missing configuration " + confKey);
     }
+    // 反射创建实例
     return ReflectionUtils.newInstance(clazz, conf);
   }
 
+  /**
+   * 判断运行时是否被允许启用
+   * @param runtimeType 运行时类型名称
+   * @return 允许返回true，否则返回false
+   */
   @VisibleForTesting
   boolean isRuntimeAllowed(String runtimeType) {
     return runtimeType != null && allowedRuntimes.contains(
@@ -253,6 +317,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   public IOStreamPair execContainer(ContainerExecContext ctx)
       throws ContainerExecutionException {
     Container container = ctx.getContainer();
+    // 选择对应运行试，委托执行容器命令执行
     LinuxContainerRuntime runtime = pickContainerRuntime(container);
     return runtime.execContainer(ctx);
   }
@@ -262,6 +327,7 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
   public Map<String, LocalResource> getLocalResources(Container container)
       throws IOException {
     try {
+      // 选择对应运行试，委托获取容器本地资源
       LinuxContainerRuntime runtime = pickContainerRuntime(container);
       return runtime.getLocalResources(container);
     } catch (ContainerExecutionException e) {
@@ -269,6 +335,9 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
     }
   }
 
+  /**
+   * 启动所有已允许的运行时
+   */
   @Override
   public void start() {
     if (isRuntimeAllowed(
@@ -290,6 +359,9 @@ public class DelegatingLinuxContainerRuntime implements LinuxContainerRuntime {
 
   }
 
+  /**
+   * 停止所有已允许的运行时
+   */
   @Override
   public void stop() {
     if (isRuntimeAllowed(

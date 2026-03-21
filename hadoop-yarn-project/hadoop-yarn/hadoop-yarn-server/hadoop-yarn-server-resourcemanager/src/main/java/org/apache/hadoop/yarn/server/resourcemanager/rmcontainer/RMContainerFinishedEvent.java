@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,30 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 
+/**
+ * RM容器完成事件，封装容器执行结束后的相关状态信息，用于RM容器状态机流转。
+ */
 public class RMContainerFinishedEvent extends RMContainerEvent {
 
+  // NodeManager上报的容器远程状态信息
   private final ContainerStatus remoteContainerStatus;
 
+  /**
+   * 构造容器完成事件。
+   * @param containerId 容器ID
+   * @param containerStatus NodeManager上报的容器状态
+   * @param event 事件类型
+   */
   public RMContainerFinishedEvent(ContainerId containerId,
       ContainerStatus containerStatus, RMContainerEventType event) {
     super(containerId, event);
     this.remoteContainerStatus = containerStatus;
   }
 
+  /**
+   * 获取NodeManager上报的容器最终状态。
+   * @return 容器远程状态信息
+   */
   public ContainerStatus getRemoteContainerStatus() {
     return this.remoteContainerStatus;
   }

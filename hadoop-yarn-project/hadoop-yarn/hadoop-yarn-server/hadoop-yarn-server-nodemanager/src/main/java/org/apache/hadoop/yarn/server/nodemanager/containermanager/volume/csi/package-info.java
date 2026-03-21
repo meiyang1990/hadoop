@@ -1,6 +1,7 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.  See the NOTICE
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
@@ -17,6 +18,7 @@
  */
 
 /**
- * CSI volumes.
+ * NodeManager端YARN容器的CSI存储卷支持模块，提供符合CSI标准的外部存储卷挂载管理能力。
+ * 负责在NodeManager节点上处理容器请求的CSI存储卷的创建、挂载、卸载与清理工作。
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.volume.csi;

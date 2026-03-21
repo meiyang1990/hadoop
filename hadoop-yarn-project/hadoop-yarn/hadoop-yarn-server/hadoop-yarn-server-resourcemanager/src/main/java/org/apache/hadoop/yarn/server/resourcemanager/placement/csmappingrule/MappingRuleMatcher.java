@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,11 +21,15 @@ package org.apache.hadoop.yarn.server.resourcemanager.placement.csmappingrule;
 
 import org.apache.hadoop.yarn.server.resourcemanager.placement.VariableContext;
 
+/**
+ * YARN容量调度器映射规则匹配器接口，定义匹配规则的统一执行接口。
+ * 用于根据应用提交上下文信息，判断是否匹配当前映射规则。
+ */
 public interface MappingRuleMatcher {
   /**
-   * Returns true if the matcher matches the current context.
-   * @param variables The variable context, which contains all the variables
-   * @return true if this matcher matches to the provided variable set
+   * 根据当前变量上下文判断是否匹配该规则
+   * @param variables 变量上下文，包含匹配所需的所有上下文变量（如用户、队列名等）
+   * @return 如果匹配当前规则返回true，否则返回false
    */
   boolean match(VariableContext variables);
 }

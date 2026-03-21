@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -34,21 +35,30 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * NodeManager Web UI 容器详情页面，展示单个容器的详细信息
+ */
 public class ContainerPage extends NMView implements YarnWebParams {
 
   @Override
   protected void preHead(Page.HTML<__> html) {
     commonPreHead(html);
 
+    // 设置页面标题，包含请求的容器ID
     setTitle("Container " + $(CONTAINER_ID));
+    // 初始化导航手风琴组件，关闭自动高度，默认展开第一个
     set(initID(ACCORDION, "nav"), "{autoHeight:false, active:0}");
   }
 
   @Override
   protected Class<? extends SubView> content() {
+    // 返回容器内容块渲染类
     return ContainerBlock.class;
   }
 
+  /**
+   * 容器详情内容块，负责渲染容器的具体信息
+   */
   public static class ContainerBlock extends HtmlBlock implements YarnWebParams {
 
     private final Context nmContext;
@@ -62,21 +72,27 @@ public class ContainerPage extends NMView implements YarnWebParams {
     protected void render(Block html) {
       ContainerId containerID;
       try {
+        // 从请求参数解析容器ID
         containerID = ContainerId.fromString($(CONTAINER_ID));
       } catch (IllegalArgumentException e) {
+        // 容器ID格式错误，提示用户
         html.p().__("Invalid containerId " + $(CONTAINER_ID)).__();
         return;
       }
 
       DIV<Hamlet> div = html.div("#content");
+      // 从NodeManager上下文获取容器实例
       Container container = this.nmContext.getContainers().get(containerID);
       if (container == null) {
+        // 容器不存在，可能已完成退出，提示用户
         div.h1("Unknown Container. Container might have completed, "
                 + "please go back to the previous page and retry.").__();
         return;
       }
+      // 构造容器信息传输对象
       ContainerInfo info = new ContainerInfo(this.nmContext, container);
 
+      // 填充容器基础信息表格
       info("Container information")
         .__("ContainerID", info.getId())
         .__("ContainerState", info.getState())
@@ -87,6 +103,7 @@ public class ContainerPage extends NMView implements YarnWebParams {
         .__("TotalVCoresNeeded", info.getVCoresNeeded())
         .__("ExecutionType", info.getExecutionType())
         .__("logs", info.getShortLogLink(), "Link to logs");
+      // 渲染信息块到页面
       html.__(InfoBlock.class);
     }
   }

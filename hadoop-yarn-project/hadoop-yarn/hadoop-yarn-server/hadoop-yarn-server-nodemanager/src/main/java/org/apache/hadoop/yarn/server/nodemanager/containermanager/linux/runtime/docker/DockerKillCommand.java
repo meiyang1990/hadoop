@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,21 +18,25 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker;
 
 /**
- * Encapsulates the docker kill command and its command line arguments.
+ * 封装Docker kill命令及其命令行参数，用于向Docker容器发送终止信号
  */
 public class DockerKillCommand extends DockerCommand {
   private static final String KILL_COMMAND = "kill";
 
+  /**
+   * 构造指定容器的Docker kill命令对象
+   * @param containerName 目标Docker容器名称
+   */
   public DockerKillCommand(String containerName) {
     super(KILL_COMMAND);
     super.addCommandArguments("name", containerName);
   }
 
   /**
-   * Set the signal for the {@link DockerKillCommand}.
+   * 设置要发送给Docker容器的终止信号
    *
-   * @param signal  the signal to send to the container.
-   * @return the {@link DockerKillCommand} with the signal set.
+   * @param signal  要发送给容器的信号
+   * @return 设置完信号参数的DockerKillCommand对象
    */
   public DockerKillCommand setSignal(String signal) {
     super.addCommandArguments("signal", signal);

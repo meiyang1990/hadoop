@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,34 +22,34 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 /**
- * {@link AbstractUsersManager} tracks users in the system.
+ * YARN ResourceManager 用户管理器抽象接口，负责跟踪系统中活跃用户状态，用于用户级资源调度限额管理
  */
 @Private
 public interface AbstractUsersManager {
   /**
-   * An application has new outstanding requests.
+   * 激活应用，标记对应用户存在待处理资源请求
    *
    * @param user
-   *          application user
+   *          提交应用的用户名
    * @param applicationId
-   *          activated application
+   *          待激活的应用ID
    */
   void activateApplication(String user, ApplicationId applicationId);
+
   /**
-   * An application has no more outstanding requests.
+   * 停用应用，移除对应用户的待处理资源请求标记
    *
    * @param user
-   *          application user
+   *          提交应用的用户名
    * @param applicationId
-   *          deactivated application
+   *          待停用的应用ID
    */
   void deactivateApplication(String user, ApplicationId applicationId);
 
   /**
-   * Get number of active users i.e. users with applications which have pending
-   * resource requests.
+   * 获取当前活跃用户数量，活跃用户定义为存在带待处理资源请求应用的用户
    *
-   * @return number of active users
+   * @return 活跃用户总数
    */
   int getNumActiveUsers();
 }

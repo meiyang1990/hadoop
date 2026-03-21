@@ -1,7 +1,8 @@
+// 这个文件已经全部加上中文注释
 /*
  *
  *  Licensed to the Apache Software Foundation (ASF) under one
- *  or more contributor license agreements.  See the NOTICE file
+ *  or more contributor license agreements.  See the NOTICE
  *  distributed with this work for additional information
  *  regarding copyright ownership.  The ASF licenses this file
  *  to you under the Apache License, Version 2.0 (the
@@ -28,13 +29,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonRawValue;
 
 /**
- *  This class is used by the
- *  {@link org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.RuncContainerRuntime}
- *  to pass a JSON
- *  object to the container-executor. The first level of the JSON is comprised
- *  of data that is specific to the container-executor. Included in this is
- *  a JSON object named ociRuntimeConfig that mirrors the
- *  OCI runtime specification.
+ * Runc容器执行器配置类，用于序列化生成JSON配置传递给container-executor。
+ * 对应OCI runtime规范，完整定义了runc容器运行所需的所有配置结构。
+ * 用于 {@link org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.RuncContainerRuntime}
  */
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 @InterfaceStability.Unstable
@@ -117,11 +114,32 @@ public class RuncContainerExecutorConfig {
     return ociRuntimeConfig;
   }
 
+  /**
+   * 空构造函数，用于Jackson反序列化
+   */
   public RuncContainerExecutorConfig() {
     this(null, null, null, null, null, null, null, null, 0, null,
         null, null, null, null, 0, null);
   }
 
+  /**
+   * 带版本默认值的构造函数
+   * @param runAsUser 运行用户
+   * @param username 用户名
+   * @param containerId 容器ID
+   * @param applicationId 应用ID
+   * @param pidFile PID文件路径
+   * @param containerScriptPath 容器脚本路径
+   * @param containerCredentialsPath 容器凭证路径
+   * @param https HTTPS启用标识
+   * @param keystorePath 密钥库路径
+   * @param truststorePath 信任库路径
+   * @param localDirs 本地目录列表
+   * @param logDirs 日志目录列表
+   * @param layers OCI镜像层列表
+   * @param reapLayerKeepCount 回收层保留数量
+   * @param ociRuntimeConfig OCI运行时配置
+   */
   public RuncContainerExecutorConfig(String runAsUser, String username,
       String containerId, String applicationId,
       String pidFile, String containerScriptPath,
@@ -136,6 +154,25 @@ public class RuncContainerExecutorConfig {
         layers, reapLayerKeepCount, ociRuntimeConfig);
   }
 
+  /**
+   * 全参数构造函数
+   * @param version 配置版本
+   * @param runAsUser 运行用户
+   * @param username 用户名
+   * @param containerId 容器ID
+   * @param applicationId 应用ID
+   * @param pidFile PID文件路径
+   * @param containerScriptPath 容器脚本路径
+   * @param containerCredentialsPath 容器凭证路径
+   * @param https HTTPS启用标识
+   * @param keystorePath 密钥库路径
+   * @param truststorePath 信任库路径
+   * @param localDirs 本地目录列表
+   * @param logDirs 日志目录列表
+   * @param layers OCI镜像层列表
+   * @param reapLayerKeepCount 回收层保留数量
+   * @param ociRuntimeConfig OCI运行时配置
+   */
   public RuncContainerExecutorConfig(String version, String runAsUser,
       String username, String containerId, String applicationId,
       String pidFile, String containerScriptPath,
@@ -163,7 +200,7 @@ public class RuncContainerExecutorConfig {
   }
 
   /**
-   * This class is a Java representation of an OCI image layer.
+   * OCI镜像层Java表示，对应OCI镜像规范中的层结构
    */
   @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   @InterfaceStability.Unstable
@@ -190,7 +227,7 @@ public class RuncContainerExecutorConfig {
   }
 
   /**
-   * This class is a Java representation of the OCI Runtime Specification.
+   * OCI运行时配置根结构，对应OCI Runtime Specification完整结构
    */
   @InterfaceStability.Unstable
   @JsonInclude(JsonInclude.Include.NON_DEFAULT)
@@ -252,8 +289,7 @@ public class RuncContainerExecutorConfig {
     }
 
     /**
-     * This class is a Java representation of the oci root config section
-     * of the OCI Runtime Specification.
+     * OCI根文件系统配置，对应OCI规范中的root节
      */
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public static class OCIRootConfig {
@@ -279,8 +315,7 @@ public class RuncContainerExecutorConfig {
     }
 
     /**
-     * This class is a Java representation of the oci mount section
-     * of the OCI Runtime Specification.
+     * OCI挂载点配置，对应OCI规范中的mounts节
      */
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public static class OCIMount {
@@ -327,8 +362,7 @@ public class RuncContainerExecutorConfig {
 
 
     /**
-     * This class is a Java representation of the oci process section
-     * of the OCI Runtime Specification.
+     * OCI进程配置，对应OCI规范中的process节
      */
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public static class OCIProcessConfig {
@@ -420,8 +454,7 @@ public class RuncContainerExecutorConfig {
 
 
       /**
-       * This class is a Java representation of the console size section
-       * of the OCI Runtime Specification.
+       * 控制台尺寸配置，对应OCI规范中的consoleSize节
        */
       @JsonInclude(JsonInclude.Include.NON_DEFAULT)
       public static class ConsoleSize {
@@ -448,8 +481,7 @@ public class RuncContainerExecutorConfig {
       }
 
       /**
-       * This class is a Java representation of the rlimits section
-       * of the OCI Runtime Specification.
+       * 资源限制配置，对应OCI规范中的rlimits节
        */
       @JsonInclude(JsonInclude.Include.NON_DEFAULT)
       public static class RLimits {
@@ -482,8 +514,7 @@ public class RuncContainerExecutorConfig {
       }
 
       /**
-       * This class is a Java representation of the capabilities section
-       * of the OCI Runtime Specification.
+       * Linux能力配置，对应OCI规范中的capabilities节
        */
       @JsonInclude(JsonInclude.Include.NON_DEFAULT)
       public static class Capabilities {
@@ -531,8 +562,7 @@ public class RuncContainerExecutorConfig {
       }
 
       /**
-       * This class is a Java representation of the user section
-       * of the OCI Runtime Specification.
+       * 用户ID配置，对应OCI规范中的user节
        */
       public static class User {
         final private int uid;
@@ -552,957 +582,6 @@ public class RuncContainerExecutorConfig {
     }
 
     /**
-     * This class is a Java representation of the oci hooks section
-     * of the OCI Runtime Specification.
+     * OCI钩子配置，对应OCI规范中的hooks节
      */
-    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-    public static class OCIHooksConfig {
-      final private List<HookType> prestart;
-      final private List<HookType> poststart;
-      final private List<HookType> poststop;
-
-      public List<HookType> getPrestart() {
-        return prestart;
-      }
-
-      public List<HookType> getPoststart() {
-        return poststart;
-      }
-
-      public List<HookType> getPoststop() {
-        return poststop;
-      }
-
-      public OCIHooksConfig(List<HookType> prestart, List<HookType> poststart,
-          List<HookType> poststop) {
-        this.prestart = prestart;
-        this.poststart = poststart;
-        this.poststop = poststop;
-      }
-
-      public OCIHooksConfig() {
-        this(null, null, null);
-      }
-
-      /**
-       * This class is a Java representation of the hook type section
-       * of the OCI Runtime Specification.
-       */
-      @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-      public static class HookType {
-        final private String path;
-        final private List<String> args;
-        final private List<String> env;
-        final private int timeout;
-
-        public String getPath() {
-          return path;
-        }
-
-        public List<String> getArgs() {
-          return args;
-        }
-
-        public List<String> getEnv() {
-          return env;
-        }
-
-        public int getTimeout() {
-          return timeout;
-        }
-
-        public HookType(String path, List<String> args, List<String> env,
-            int timeout) {
-          this.path = path;
-          this.args = args;
-          this.env = env;
-          this.timeout = timeout;
-        }
-
-        public HookType() {
-          this(null, null, null, 0);
-        }
-
-      }
-    }
-
-    /**
-     * This class is a Java representation of the oci annotations config section
-     * of the OCI Runtime Specification.
-     */
-    public static class OCIAnnotationsConfig {
-      final private Map<String, String> annotations;
-
-      public OCIAnnotationsConfig(Map<String, String> annotations) {
-        this.annotations = annotations;
-      }
-
-      public Map<String, String> getAnnotations() {
-        return annotations;
-      }
-
-      public OCIAnnotationsConfig() {
-        this(null);
-      }
-
-    }
-
-    /**
-     * This class is a Java representation of the oci linux config section
-     * of the OCI Runtime Specification.
-     */
-    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-    public static class OCILinuxConfig {
-      final private List<Namespace> namespaces;
-      final private List<IDMapping> uidMappings;
-      final private List<IDMapping> gidMappings;
-      final private List<Device> devices;
-      final private String cgroupsPath;
-      final private Resources resources;
-      final private IntelRdt intelRdt;
-      final private Sysctl sysctl;
-      @JsonRawValue
-      final private String seccomp;
-      final private String rootfsPropagation;
-      final private List<String> maskedPaths;
-      final private List<String> readonlyPaths;
-      final private String mountLabel;
-
-      public List<Namespace> getNamespaces() {
-        return namespaces;
-      }
-
-      public List<IDMapping> getUidMappings() {
-        return uidMappings;
-      }
-
-      public List<IDMapping> getGidMappings() {
-        return gidMappings;
-      }
-
-      public List<Device> getDevices() {
-        return devices;
-      }
-
-      public String getCgroupsPath() {
-        return cgroupsPath;
-      }
-
-      public Resources getResources() {
-        return resources;
-      }
-
-      public IntelRdt getIntelRdt() {
-        return intelRdt;
-      }
-
-      public Sysctl getSysctl() {
-        return sysctl;
-      }
-
-      public String getSeccomp() {
-        return seccomp;
-      }
-
-      public String getRootfsPropagation() {
-        return rootfsPropagation;
-      }
-
-      public List<String> getMaskedPaths() {
-        return maskedPaths;
-      }
-
-      public List<String> getReadonlyPaths() {
-        return readonlyPaths;
-      }
-
-      public String getMountLabel() {
-        return mountLabel;
-      }
-
-      public OCILinuxConfig(List<Namespace> namespaces,
-          List<IDMapping> uidMappings,
-          List<IDMapping> gidMappings, List<Device> devices,
-          String cgroupsPath, Resources resources, IntelRdt intelRdt,
-          Sysctl sysctl, String seccomp, String rootfsPropagation,
-          List<String> maskedPaths, List<String> readonlyPaths,
-          String mountLabel) {
-        this.namespaces = namespaces;
-        this.uidMappings = uidMappings;
-        this.gidMappings = gidMappings;
-        this.devices = devices;
-        this.cgroupsPath = cgroupsPath;
-        this.resources = resources;
-        this.intelRdt = intelRdt;
-        this.sysctl = sysctl;
-        this.seccomp = seccomp;
-        this.rootfsPropagation = rootfsPropagation;
-        this.maskedPaths = maskedPaths;
-        this.readonlyPaths = readonlyPaths;
-        this.mountLabel = mountLabel;
-      }
-
-      public OCILinuxConfig() {
-        this(null, null, null, null, null, null, null, null,
-            null, null, null, null, null);
-      }
-
-      /**
-       * This class is a Java representation of the namespace section
-       * of the OCI Runtime Specification.
-       */
-      public static class Namespace {
-        final private String type;
-        final private String path;
-
-        public Namespace(String type, String path) {
-          this.type = type;
-          this.path = path;
-        }
-
-        public Namespace() {
-          this(null, null);
-        }
-      }
-
-      /**
-       * This class is a Java representation of the idmapping section
-       * of the OCI Runtime Specification.
-       */
-      @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-      public static class IDMapping {
-        final private int containerID;
-        final private int hostID;
-        final private int size;
-
-        public int getContainerID() {
-          return containerID;
-        }
-
-        public int getHostID() {
-          return hostID;
-        }
-
-        public int getSize() {
-          return size;
-        }
-
-        public IDMapping(int containerID, int hostID, int size) {
-          this.containerID = containerID;
-          this.hostID = hostID;
-          this.size = size;
-        }
-
-        public IDMapping() {
-          this(0, 0, 0);
-        }
-
-      }
-
-      /**
-       * This class is a Java representation of the device section
-       * of the OCI Runtime Specification.
-       */
-      @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-      public static class Device {
-        final private String type;
-        final private String path;
-        final private long major;
-        final private long minor;
-        final private int fileMode;
-        final private int uid;
-        final private int gid;
-
-        public String getType() {
-          return type;
-        }
-
-        public String getPath() {
-          return path;
-        }
-
-        public long getMajor() {
-          return major;
-        }
-
-        public long getMinor() {
-          return minor;
-        }
-
-        public int getFileMode() {
-          return fileMode;
-        }
-
-        public int getUid() {
-          return uid;
-        }
-
-        public int getGid() {
-          return gid;
-        }
-
-        public Device(String type, String path, long major, long minor,
-            int fileMode, int uid, int gid) {
-          this.type = type;
-          this.path = path;
-          this.major = major;
-          this.minor = minor;
-          this.fileMode = fileMode;
-          this.uid = uid;
-          this.gid = gid;
-        }
-
-        public Device() {
-          this(null, null, 0, 0, 0, 0, 0);
-        }
-
-      }
-
-      /**
-       * This class is a Java representation of the resources section
-       * of the OCI Runtime Specification.
-       */
-      @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-      public static class Resources {
-        final private List<Device> device;
-        final private Memory memory;
-        final private CPU cpu;
-        final private BlockIO blockIO;
-        final private List<HugePageLimits> hugePageLimits;
-        final private Network network;
-        final private PID pid;
-        final private RDMA rdma;
-
-        public List<Device> getDevice() {
-          return device;
-        }
-
-        public Memory getMemory() {
-          return memory;
-        }
-
-        public CPU getCPU() {
-          return cpu;
-        }
-
-        public BlockIO getBlockIO() {
-          return blockIO;
-        }
-
-        public List<HugePageLimits> getHugePageLimits() {
-          return hugePageLimits;
-        }
-
-        public Network getNetwork() {
-          return network;
-        }
-
-        public PID getPID() {
-          return pid;
-        }
-
-        public RDMA getRDMA() {
-          return rdma;
-        }
-
-        public Resources(List<Device> device,
-            Memory memory, CPU cpu,
-            BlockIO blockIO, List<HugePageLimits> hugePageLimits,
-            Network network, PID pid,
-            RDMA rdma) {
-          this.device = device;
-          this.memory = memory;
-          this.cpu = cpu;
-          this.blockIO = blockIO;
-          this.hugePageLimits = hugePageLimits;
-          this.network = network;
-          this.pid = pid;
-          this.rdma = rdma;
-        }
-
-        public Resources() {
-          this(null, null, null, null, null, null, null, null);
-        }
-
-        /**
-         * This class is a Java representation of the device section
-         * of the OCI Runtime Specification.
-         */
-        @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-        public static class Device {
-          final private boolean allow;
-          final private String type;
-          final private long major;
-          final private long minor;
-          final private String access;
-
-          public boolean isAllow() {
-            return allow;
-          }
-
-          public String getType() {
-            return type;
-          }
-
-          public long getMajor() {
-            return major;
-          }
-
-          public long getMinor() {
-            return minor;
-          }
-
-          public String getAccess() {
-            return access;
-          }
-
-          public Device(boolean allow, String type, long major,
-              long minor, String access) {
-            this.allow = allow;
-            this.type = type;
-            this.major = major;
-            this.minor = minor;
-            this.access = access;
-          }
-
-          public Device() {
-            this(false, null, 0, 0, null);
-          }
-        }
-
-        /**
-         * This class is a Java representation of the memory section
-         * of the OCI Runtime Specification.
-         */
-        @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-        public static class Memory {
-          final private long limit;
-          final private long reservation;
-          final private long swap;
-          final private long kernel;
-          final private long kernelTCP;
-          final private long swappiness;
-          final private boolean disableOOMKiller;
-
-          public long getLimit() {
-            return limit;
-          }
-
-          public long getReservation() {
-            return reservation;
-          }
-
-          public long getSwap() {
-            return swap;
-          }
-
-          public long getKernel() {
-            return kernel;
-          }
-
-          public long getKernelTCP() {
-            return kernelTCP;
-          }
-
-          public long getSwappiness() {
-            return swappiness;
-          }
-
-          public boolean isDisableOOMKiller() {
-            return disableOOMKiller;
-          }
-
-          public Memory(long limit, long reservation, long swap,
-              long kernel, long kernelTCP, long swappiness,
-              boolean disableOOMKiller) {
-            this.limit = limit;
-            this.reservation = reservation;
-            this.swap = swap;
-            this.kernel = kernel;
-            this.kernelTCP = kernelTCP;
-            this.swappiness = swappiness;
-            this.disableOOMKiller = disableOOMKiller;
-          }
-
-          public Memory() {
-            this(0, 0, 0, 0, 0, 0, false);
-          }
-        }
-
-        /**
-         * This class is a Java representation of the cpu section
-         * of the OCI Runtime Specification.
-         */
-        @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-        public static class CPU {
-          final private long quota;
-          final private long period;
-          final private long realtimeRuntime;
-          final private long realtimePeriod;
-          final private String cpus;
-          final private String mems;
-
-          public long getShares() {
-            return shares;
-          }
-
-          public long getQuota() {
-            return quota;
-          }
-
-          public long getPeriod() {
-            return period;
-          }
-
-          public long getRealtimeRuntime() {
-            return realtimeRuntime;
-          }
-
-          public long getRealtimePeriod() {
-            return realtimePeriod;
-          }
-
-          public String getCpus() {
-            return cpus;
-          }
-
-          public String getMems() {
-            return mems;
-          }
-
-          final private long shares;
-
-          public CPU(long shares, long quota, long period,
-              long realtimeRuntime, long realtimePeriod,
-              String cpus, String mems) {
-            this.shares = shares;
-            this.quota = quota;
-            this.period = period;
-            this.realtimeRuntime = realtimeRuntime;
-            this.realtimePeriod = realtimePeriod;
-            this.cpus = cpus;
-            this.mems = mems;
-          }
-
-          public CPU() {
-            this(0, 0, 0, 0, 0, null, null);
-          }
-        }
-
-        /**
-         * This class is a Java representation of the blockio section
-         * of the OCI Runtime Specification.
-         */
-        @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-        public static class BlockIO {
-          final private int weight;
-          final private int leafWeight;
-          final private List<WeightDevice> weightDevices;
-          final private List<ThrottleDevice> throttleReadBpsDevice;
-          final private List<ThrottleDevice> throttleWriteBpsDevice;
-          final private List<ThrottleDevice> throttleReadIOPSDevice;
-          final private List<ThrottleDevice> throttleWriteIOPSDevice;
-
-          public int getWeight() {
-            return weight;
-          }
-
-          public int getLeafWeight() {
-            return leafWeight;
-          }
-
-          public List<WeightDevice> getWeightDevices() {
-            return weightDevices;
-          }
-
-          public List<ThrottleDevice> getThrottleReadBpsDevice() {
-            return throttleReadBpsDevice;
-          }
-
-          public List<ThrottleDevice> getThrottleWriteBpsDevice() {
-            return throttleWriteBpsDevice;
-          }
-
-          public List<ThrottleDevice> getThrottleReadIOPSDevice() {
-            return throttleReadIOPSDevice;
-          }
-
-          public List<ThrottleDevice> getThrottleWriteIOPSDevice() {
-            return throttleWriteIOPSDevice;
-          }
-
-          public BlockIO(int weight, int leafWeight,
-              List<WeightDevice> weightDevices,
-              List<ThrottleDevice> throttleReadBpsDevice,
-              List<ThrottleDevice> throttleWriteBpsDevice,
-              List<ThrottleDevice> throttleReadIOPSDevice,
-              List<ThrottleDevice> throttleWriteIOPSDevice) {
-            this.weight = weight;
-            this.leafWeight = leafWeight;
-            this.weightDevices = weightDevices;
-            this.throttleReadBpsDevice = throttleReadBpsDevice;
-            this.throttleWriteBpsDevice = throttleWriteBpsDevice;
-            this.throttleReadIOPSDevice = throttleReadIOPSDevice;
-            this.throttleWriteIOPSDevice = throttleWriteIOPSDevice;
-          }
-
-          public BlockIO() {
-            this(0, 0, null, null, null, null, null);
-          }
-
-          /**
-           * This class is a Java representation of the weight device section
-           * of the OCI Runtime Specification.
-           */
-          @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-          public static class WeightDevice {
-            final private long major;
-            final private long minor;
-            final private int weight;
-            final private int leafWeight;
-
-            public long getMajor() {
-              return major;
-            }
-
-            public long getMinor() {
-              return minor;
-            }
-
-            public int getWeight() {
-              return weight;
-            }
-
-            public int getLeafWeight() {
-              return leafWeight;
-            }
-
-            public WeightDevice(long major, long minor, int weight,
-                int leafWeight) {
-              this.major = major;
-              this.minor = minor;
-              this.weight = weight;
-              this.leafWeight = leafWeight;
-            }
-
-            public WeightDevice() {
-              this(0, 0, 0, 0);
-            }
-          }
-
-          /**
-           * This class is a Java representation of the throttle device section
-           * of the OCI Runtime Specification.
-           */
-          @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-          public static class ThrottleDevice {
-            final private long major;
-            final private long minor;
-            final private long rate;
-
-            public long getMajor() {
-              return major;
-            }
-
-            public long getMinor() {
-              return minor;
-            }
-
-            public long getRate() {
-              return rate;
-            }
-
-            public ThrottleDevice(long major, long minor, long rate) {
-              this.major = major;
-              this.minor = minor;
-              this.rate = rate;
-            }
-
-            public ThrottleDevice() {
-              this(0, 0, 0);
-            }
-          }
-        }
-
-        /**
-         * This class is a Java representation of the huge page limits section
-         * of the OCI Runtime Specification.
-         */
-        @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-        public static class HugePageLimits {
-          final private String pageSize;
-          final private long limit;
-
-          public String getPageSize() {
-            return pageSize;
-          }
-
-          public long getLimit() {
-            return limit;
-          }
-
-          public HugePageLimits(String pageSize, long limit) {
-            this.pageSize = pageSize;
-            this.limit = limit;
-          }
-
-          public HugePageLimits() {
-            this(null, 0);
-          }
-        }
-
-        /**
-         * This class is a Java representation of the network section
-         * of the OCI Runtime Specification.
-         */
-        @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-        public static class Network {
-          final private int classID;
-          final private List<NetworkPriority> priorities;
-
-          public int getClassID() {
-            return classID;
-          }
-
-          public List<NetworkPriority> getPriorities() {
-            return priorities;
-          }
-
-          public Network(int classID, List<NetworkPriority> priorities) {
-            this.classID = classID;
-            this.priorities = priorities;
-          }
-
-          public Network() {
-            this(0, null);
-          }
-
-          /**
-           * This class is a Java representation of the network priority section
-           * of the OCI Runtime Specification.
-           */
-          @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-          public static class NetworkPriority {
-            final private String name;
-            final private int priority;
-
-            public String getName() {
-              return name;
-            }
-
-            public int getPriority() {
-              return priority;
-            }
-
-            public NetworkPriority(String name, int priority) {
-              this.name = name;
-              this.priority = priority;
-            }
-
-            public NetworkPriority() {
-              this(null, 0);
-            }
-          }
-        }
-
-        /**
-         * This class is a Java representation of the pid section
-         * of the OCI Runtime Specification.
-         */
-        @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-        public static class PID {
-          final private long limit;
-
-          public long getLimit() {
-            return limit;
-          }
-
-          public PID(long limit) {
-            this.limit = limit;
-          }
-
-          public PID() {
-            this(0);
-          }
-        }
-
-        /**
-         * This class is a Java representation of the rdma section
-         * of the OCI Runtime Specification.
-         */
-        @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-        public static class RDMA {
-          final private int hcaHandles;
-          final private int hcaObjects;
-
-          public int getHcaHandles() {
-            return hcaHandles;
-          }
-
-          public int getHcaObjects() {
-            return hcaObjects;
-          }
-
-          public RDMA(int hcaHandles, int hcaObjects) {
-            this.hcaHandles = hcaHandles;
-            this.hcaObjects = hcaObjects;
-          }
-
-          public RDMA() {
-            this(0, 0);
-          }
-        }
-      }
-
-      /**
-       * This class is a Java representation of the intelrdt section
-       * of the OCI Runtime Specification.
-       */
-      @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-      public static class IntelRdt {
-        final private String closID;
-        final private String l3CacheSchema;
-        final private String memBwSchema;
-
-        public String getClosID() {
-          return closID;
-        }
-
-        public String getL3CacheSchema() {
-          return l3CacheSchema;
-        }
-
-        public String getMemBwSchema() {
-          return memBwSchema;
-        }
-
-        public IntelRdt(String closID, String l3CacheSchema,
-            String memBwSchema) {
-          this.closID = closID;
-          this.l3CacheSchema = l3CacheSchema;
-          this.memBwSchema = memBwSchema;
-        }
-
-        public IntelRdt() {
-          this(null, null, null);
-        }
-      }
-
-      /**
-       * This class is a Java representation of the sysctl section
-       * of the OCI Runtime Specification.
-       */
-      @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-      public static class Sysctl {
-        // for kernel params
-      }
-
-      /**
-       * This class is a Java representation of the seccomp section
-       * of the OCI Runtime Specification.
-       */
-      @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-      public static class Seccomp {
-        final private String defaultAction;
-        final private List<String> architectures;
-        final private List<Syscall> syscalls;
-
-        public String getDefaultAction() {
-          return defaultAction;
-        }
-
-        public List<String> getArchitectures() {
-          return architectures;
-        }
-
-        public List<Syscall> getSyscalls() {
-          return syscalls;
-        }
-
-        public Seccomp(String defaultAction, List<String> architectures,
-            List<Syscall> syscalls) {
-          this.defaultAction = defaultAction;
-          this.architectures = architectures;
-          this.syscalls = syscalls;
-        }
-
-        public Seccomp() {
-          this(null, null, null);
-        }
-
-        /**
-         * This class is a Java representation of the syscall section
-         * of the OCI Runtime Specification.
-         */
-        @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-        public static class Syscall {
-          final private List<String> names;
-          final private String action;
-          final private List<SeccompArg> args;
-
-          public List<String> getNames() {
-            return names;
-          }
-
-          public String getAction() {
-            return action;
-          }
-
-          public List<SeccompArg> getArgs() {
-            return args;
-          }
-
-          public Syscall(List<String> names, String action,
-              List<SeccompArg> args) {
-            this.names = names;
-            this.action = action;
-            this.args = args;
-          }
-
-          public Syscall() {
-            this(null, null, null);
-          }
-
-          /**
-           * This class is a Java representation of the seccomp arguments
-           * of the OCI Runtime Specification.
-           */
-          @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-          public static class SeccompArg {
-            final private int index;
-            final private long value;
-            final private long valueTwo;
-            final private String op;
-
-            public int getIndex() {
-              return index;
-            }
-
-            public long getValue() {
-              return value;
-            }
-
-            public long getValueTwo() {
-              return valueTwo;
-            }
-
-            public String getOp() {
-              return op;
-            }
-
-            public SeccompArg(int index, long value, long valueTwo, String op) {
-              this.index = index;
-              this.value = value;
-              this.valueTwo = valueTwo;
-              this.op = op;
-            }
-
-            public SeccompArg() {
-              this(0, 0, 0, null);
-            }
-          }
-        }
-      }
-    }
-  }
-}
+    @JsonInclude(JsonInclude

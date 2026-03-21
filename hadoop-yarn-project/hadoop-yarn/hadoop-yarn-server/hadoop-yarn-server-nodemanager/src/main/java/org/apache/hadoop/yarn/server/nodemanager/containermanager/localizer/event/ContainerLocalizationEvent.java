@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,15 +20,28 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.eve
 
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
+/**
+ * 容器本地化事件，封装容器资源本地化操作相关的事件信息
+ */
 public class ContainerLocalizationEvent extends LocalizationEvent {
 
+  // 关联的目标容器实例
   final Container container;
 
+  /**
+   * 构造容器本地化事件
+   * @param event 本地化事件类型
+   * @param c 关联的目标容器
+   */
   public ContainerLocalizationEvent(LocalizationEventType event, Container c) {
     super(event);
     this.container = c;
   }
 
+  /**
+   * 获取事件关联的容器实例
+   * @return 关联的容器对象
+   */
   public Container getContainer() {
     return container;
   }

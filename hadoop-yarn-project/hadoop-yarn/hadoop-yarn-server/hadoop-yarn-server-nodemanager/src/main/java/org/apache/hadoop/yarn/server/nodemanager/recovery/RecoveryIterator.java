@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,18 +24,24 @@ import java.io.IOException;
 import java.util.NoSuchElementException;
 
 /**
- * A wrapper for a Iterator to translate the raw RuntimeExceptions that
- * can be thrown into IOException.
+ * NodeManager恢复数据读取迭代器接口，对原始迭代器进行封装，
+ * 将迭代过程中抛出的运行时异常统一转换为IOException，方便错误处理。
+ * @param <T> 迭代元素类型
  */
 public interface RecoveryIterator<T> extends Closeable {
 
   /**
-   * Returns true if the iteration has more elements.
+   * 检查迭代是否还有更多元素
+   * @return 如果还有元素返回true，否则返回false
+   * @throws IOException 读取恢复数据时发生I/O错误
    */
   boolean hasNext() throws IOException;
 
   /**
-   * Returns the next element in the iteration.
+   * 获取迭代的下一个元素
+   * @return 下一个恢复数据元素
+   * @throws IOException 读取恢复数据时发生I/O错误
+   * @throws NoSuchElementException 迭代已没有更多元素
    */
   T next() throws IOException, NoSuchElementException;
 

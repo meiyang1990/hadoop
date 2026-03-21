@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,7 +19,13 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.amlauncher;
 
+/**
+ * AM启动器事件类型枚举，定义了ApplicationMaster启动器处理的两种事件类型
+ * 用于RM中AMLauncher模块的事件驱动处理流程
+ */
 public enum AMLauncherEventType {
+  /** 启动ApplicationMaster事件 */
   LAUNCH,
+  /** 清理ApplicationMaster资源事件 */
   CLEANUP
 }

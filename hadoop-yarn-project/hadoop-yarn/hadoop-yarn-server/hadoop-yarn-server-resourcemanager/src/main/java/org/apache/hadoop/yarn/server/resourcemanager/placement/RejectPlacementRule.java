@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,7 +20,7 @@
 package org.apache.hadoop.yarn.server.resourcemanager.placement;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+import org.apache.classification.InterfaceStability;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 import org.slf4j.Logger;
@@ -28,7 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * Rejects all placements.
+ * 文件说明：YARN应用队列放置规则，拒绝所有应用的放置请求，用于拒绝不满足条件的应用提交
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -37,16 +38,21 @@ public class RejectPlacementRule extends FSPlacementRule {
       LoggerFactory.getLogger(RejectPlacementRule.class);
 
   /**
-   * The Reject rule does not use any configuration. Override and ignore all
-   * configuration.
-   * @param initArg the config to be set
+   * 覆盖配置方法，本规则不使用任何配置，忽略所有传入配置
+   * @param initArg 传入的配置参数
    */
   @Override
   public void setConfig(Object initArg) {
-    // This rule ignores all config, just log and return
+    // 本规则忽略所有配置，仅打日志返回
     LOG.debug("RejectPlacementRule instantiated");
   }
 
+  /**
+   * 初始化规则，检查是否配置了父规则，Reject规则不允许有父规则
+   * @param scheduler 资源调度器实例
+   * @return 初始化成功返回true，失败抛出异常
+   * @throws IOException 当配置了父规则时抛出IO异常
+   */
   @Override
   public boolean initialize(ResourceScheduler scheduler) throws IOException {
     super.initialize(scheduler);
@@ -57,6 +63,12 @@ public class RejectPlacementRule extends FSPlacementRule {
     return true;
   }
 
+  /**
+   * 获取应用放置上下文，本规则拒绝所有放置，返回null表示放置失败
+   * @param asc 应用提交上下文
+   * @param user 提交应用的用户名
+   * @return 总是返回null，表示拒绝本次放置
+   */
   @Override
   public ApplicationPlacementContext getPlacementForApp(
       ApplicationSubmissionContext asc, String user) {

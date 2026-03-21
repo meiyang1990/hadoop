@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,27 +28,30 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import java.util.List;
 
 /**
- * This class will save necessary information which copied from
- * FiCaSchedulerNode. This is added majorly for performance consideration, this
- * can be cached to avoid hitting scheduler again and again. In addition,
- * we can add some preemption-required fields to the class.
+ * 容量调度抢占计算使用的临时调度节点信息类，从FiCaSchedulerNode复制核心数据。
+ * 主要出于性能考虑设计，可以缓存节点信息避免重复查询调度器，同时添加抢占计算需要的额外字段。
  */
 public class TempSchedulerNode {
   private List<RMContainer> runningContainers;
   private RMContainer reservedContainer;
   private Resource totalResource;
 
-  // excluded reserved resource
+  // 已分配资源（不包含预留资源）
   private Resource allocatedResource;
 
-  // total - allocated
+  // 可用资源 = 总资源 - 已分配资源
   private Resource availableResource;
 
-  // just a shortcut of reservedContainer.getResource.
+  // 预留资源，是reservedContainer.getResource()的缓存快捷方式
   private Resource reservedResource;
 
   private NodeId nodeId;
 
+  /**
+   * 从FiCaSchedulerNode创建临时调度节点，复制所需核心信息
+   * @param schedulerNode 原始调度节点对象
+   * @return 填充好信息的临时调度节点
+   */
   public static TempSchedulerNode fromSchedulerNode(
       FiCaSchedulerNode schedulerNode) {
     TempSchedulerNode n = new TempSchedulerNode();

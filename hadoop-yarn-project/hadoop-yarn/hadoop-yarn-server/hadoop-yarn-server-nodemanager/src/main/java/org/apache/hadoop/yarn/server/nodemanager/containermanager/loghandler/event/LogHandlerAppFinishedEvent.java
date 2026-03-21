@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,15 +21,26 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.ev
 
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
+/**
+ * 应用程序结束日志处理事件，通知日志处理器完成对应应用的日志收尾工作。
+ */
 public class LogHandlerAppFinishedEvent extends LogHandlerEvent {
 
   private final ApplicationId applicationId;
 
+  /**
+   * 构造应用结束日志处理事件。
+   * @param appId 已结束的应用程序ID
+   */
   public LogHandlerAppFinishedEvent(ApplicationId appId) {
     super(LogHandlerEventType.APPLICATION_FINISHED);
     this.applicationId = appId;
   }
 
+  /**
+   * 获取已结束应用的ID。
+   * @return 应用程序ID
+   */
   public ApplicationId getApplicationId() {
     return this.applicationId;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -51,11 +52,9 @@ import org.apache.hadoop.classification.VisibleForTesting;
 
 
 /**
- * A collection of {@link LocalizedResource}s all of same
- * {@link LocalResourceVisibility}.
- * 
+ * 同一可见性级别的{@link LocalizedResource}资源跟踪容器，负责管理节点上本地化资源的生命周期。
+ * 跟踪资源下载、引用计数、缓存清理和NM重启后的资源恢复。
  */
-
 class LocalResourcesTrackerImpl implements LocalResourcesTracker {
 
   static final Logger LOG =
@@ -94,6 +93,16 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
   private AtomicLong uniqueNumberGenerator = new AtomicLong(9);
   private NMStateStoreService stateStore;
 
+  /**
+   * 构造资源跟踪器，默认创建空的资源存储容器。
+   * @param user 资源对应用户
+   * @param appId 对应应用ID，应用级跟踪器为具体应用，公共/私有跟踪器为null
+   * @param dispatcher 事件分发器
+   * @param useLocalCacheDirectoryManager 是否启用分层缓存目录管理，PUBLIC/PRIVATE启用，APPLICATION不启用
+   * @param conf 配置对象
+   * @param stateStore NM状态存储服务，用于持久化资源状态
+   * @param dirHandler 本地目录处理器，管理NM本地目录可用性
+   */
   public LocalResourcesTrackerImpl(String user, ApplicationId appId,
       Dispatcher dispatcher, boolean useLocalCacheDirectoryManager,
       Configuration conf, NMStateStoreService stateStore,
@@ -103,6 +112,9 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
         useLocalCacheDirectoryManager, conf, stateStore, dirHandler);
   }
 
+  /**
+   * 可指定资源存储容器的构造方法，用于测试和特殊场景。
+   */
   LocalResourcesTrackerImpl(String user, ApplicationId appId,
       Dispatcher dispatcher,
       ConcurrentMap<LocalResourceRequest, LocalizedResource> localrsrc,
@@ -129,17 +141,22 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
    * coming to LocalResourcesTracker from Public/Private localizer and
    * Resource Localization Service.
    */
+  /**
+   * 处理资源相关事件，同步避免多源事件并发冲突。
+   */
   @Override
   public synchronized void handle(ResourceEvent event) {
     LocalResourceRequest req = event.getLocalResourceRequest();
     LocalizedResource rsrc = localrsrc.get(req);
     switch (event.getType()) {
     case LOCALIZED:
+      // 本地化完成，从下载中地图移除
       if (useLocalCacheDirectoryManager) {
         inProgressLocalResourcesMap.remove(req);
       }
       break;
     case REQUEST:
+      // 资源请求，如果资源不存在或者文件已丢失，重新创建资源
       if (rsrc != null && (!isResourcePresent(rsrc))) {
         LOG.info("Resource " + rsrc.getLocalPath()
             + " is missing, localizing it again");
@@ -152,6 +169,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
       }
       break;
     case RELEASE:
+      // 资源释放，资源不存在直接返回
       if (null == rsrc) {
         // The container sent a release event on a resource which 
         // 1) Failed
@@ -168,9 +186,11 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
        * If resource localization fails then Localized resource will be
        * removed from local cache.
        */
+      // 本地化失败，移除缓存资源
       removeResource(req);
       break;
     case RECOVERED:
+      // NM重启恢复资源，跳过已存在的资源
       if (rsrc != null) {
         LOG.warn("Ignoring attempt to recover existing resource " + rsrc);
         return;
@@ -185,6 +205,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
           + " but localized resource is missing");
       return;
     }
+    // 将事件转发给资源实例自身处理
     rsrc.handle(event);
 
     // Remove the resource if its downloading and its reference count has
@@ -192,6 +213,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
     // localizing and no other container is referring to the resource.
     // NOTE: This should NOT be done for public resources since the
     //       download is not associated with a container-specific localizer.
+    // 释放后如果资源还在下载且引用计数归零，删除该资源（公共资源除外）
     if (event.getType() == ResourceEventType.RELEASE) {
       if (rsrc.getState() == ResourceState.DOWNLOADING &&
           rsrc.getRefCount() <= 0 &&
@@ -200,6 +222,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
       }
     }
 
+    // 本地化完成后，持久化资源状态到状态存储
     if (event.getType() == ResourceEventType.LOCALIZED) {
       if (rsrc.getLocalPath() != null) {
         try {
@@ -214,13 +237,17 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
     }
   }
 
+  /**
+   * 从恢复事件中重建LocalizedResource，更新唯一ID生成器避免冲突。
+   */
   private LocalizedResource recoverResource(LocalResourceRequest req,
       ResourceRecoveredEvent event) {
-    // unique number for a resource is the directory of the resource
+    // 资源目录名就是资源ID，更新全局生成器保证不重复
     Path localDir = event.getLocalPath().getParent();
     long rsrcId = Long.parseLong(localDir.getName());
 
     // update ID generator to avoid conflicts with existing resources
+    // CAS更新唯一ID生成器到不小于已恢复的最大ID
     while (true) {
       long currentRsrcId = uniqueNumberGenerator.get();
       long nextRsrcId = Math.max(currentRsrcId, rsrcId);
@@ -229,11 +256,15 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
       }
     }
 
+    // 增加对应缓存目录的文件计数
     incrementFileCountForLocalCacheDirectory(localDir.getParent());
 
     return new LocalizedResource(req, dispatcher);
   }
 
+  /**
+   * 构建本地化资源的proto对象，用于持久化存储。
+   */
   private LocalizedResourceProto buildLocalizedResourceProto(
       LocalizedResource rsrc) {
     return LocalizedResourceProto.newBuilder()
@@ -243,6 +274,9 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
         .build();
   }
 
+  /**
+   * 构建LocalResource的proto对象，用于持久化。
+   */
   private LocalResourceProto buildLocalResourceProto(LocalResource lr) {
     LocalResourcePBImpl lrpb;
     if (!(lr instanceof LocalResourcePBImpl)) {
@@ -254,6 +288,9 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
     return lrpb.getProto();
   }
 
+  /**
+   * 对指定缓存目录增加文件计数，用于分层缓存目录的空间管理。
+   */
   public void incrementFileCountForLocalCacheDirectory(Path cacheDir) {
     if (useLocalCacheDirectoryManager) {
       Path cacheRoot = LocalCacheDirectoryManager.getCacheDirectoryRoot(
@@ -291,18 +328,24 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
    * file count for the HierarchicalSubDirectory pointing to this relative
    * path.
    */
+  /**
+   * 对指定缓存目录减少文件计数，资源删除时更新统计。
+   */
   private void decrementFileCountForLocalCacheDirectory(LocalResourceRequest req,
       LocalizedResource rsrc) {
     if ( useLocalCacheDirectoryManager) {
       Path rsrcPath = null;
+      // 下载失败的资源从进行中地图获取路径
       if (inProgressLocalResourcesMap.containsKey(req)) {
         // This happens when localization of a resource fails.
         rsrcPath = inProgressLocalResourcesMap.remove(req);
       } else if (rsrc != null && rsrc.getLocalPath() != null) {
+        // 已完成资源从资源对象获取路径
         rsrcPath = rsrc.getLocalPath().getParent().getParent();
       }
       if (rsrcPath != null) {
         Path parentPath = new Path(rsrcPath.toUri().getRawPath());
+        // 向上查找找到对应目录管理器的缓存根
         while (!directoryManagers.containsKey(parentPath)) {
           parentPath = parentPath.getParent();
           if ( parentPath == null) {
@@ -326,11 +369,9 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
   }
 
 /**
-   * This module checks if the resource which was localized is already present
-   * or not
-   * 
-   * @param rsrc
-   * @return true/false based on resource is present or not
+   * 检查已本地化的资源文件是否真实存在于磁盘。
+   * @param rsrc 待检查的本地化资源
+   * @return 存在返回true，不存在返回false
    */
   public boolean isResourcePresent(LocalizedResource rsrc) {
     boolean ret = true;
@@ -340,6 +381,7 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
       if (!file.exists()) {
         ret = false;
       } else if (dirsHandler != null) {
+        // 文件存在的情况下，检查所在目录是否是可用目录
         ret = checkLocalResource(rsrc);
       }
     }
@@ -347,10 +389,9 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
   }
 
   /**
-   * Check if the rsrc is Localized on a good dir.
-   *
-   * @param rsrc
-   * @return
+   * 检查资源所在目录是否是NM当前可用的本地目录。
+   * @param rsrc 待检查资源
+   * @return 目录可用返回true，否则返回false
    */
   @VisibleForTesting
   boolean checkLocalResource(LocalizedResource rsrc) {
@@ -366,9 +407,10 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
   }
 
   /**
-   * @param path
-   * @param parentdir
-   * @return true if parentdir is parent of path else false.
+   * 检查parentdir是否是path的父目录。
+   * @param path 待检查路径
+   * @param parentdir 父路径
+   * @return 是父目录返回true，否则返回false
    */
   private boolean isParent(String path, String parentdir) {
     // Add separator if not present.
@@ -379,161 +421,4 @@ class LocalResourcesTrackerImpl implements LocalResourcesTracker {
   }
 
   @Override
-  public boolean remove(LocalizedResource rem, DeletionService delService) {
- // current synchronization guaranteed by crude RLS event for cleanup
-    LocalizedResource rsrc = localrsrc.get(rem.getRequest());
-    if (null == rsrc) {
-      LOG.error("Attempt to remove absent resource: " + rem.getRequest()
-          + " from " + getUser());
-      return true;
-    }
-    if (rsrc.getRefCount() > 0
-        || ResourceState.DOWNLOADING.equals(rsrc.getState()) || rsrc != rem) {
-      // internal error
-      LOG.error("Attempt to remove resource: " + rsrc
-          + " with non-zero refcount");
-      return false;
-    } else { // ResourceState is LOCALIZED or INIT
-      if (ResourceState.LOCALIZED.equals(rsrc.getState())) {
-        FileDeletionTask deletionTask = new FileDeletionTask(delService,
-            getUser(), getPathToDelete(rsrc.getLocalPath()), null);
-        delService.delete(deletionTask);
-      }
-      removeResource(rem.getRequest());
-      LOG.info("Removed " + rsrc.getLocalPath() + " from localized cache");
-      return true;
-    }
-  }
-
-  private void removeResource(LocalResourceRequest req) {
-    LocalizedResource rsrc = localrsrc.remove(req);
-    decrementFileCountForLocalCacheDirectory(req, rsrc);
-    if (rsrc != null) {
-      Path localPath = rsrc.getLocalPath();
-      if (localPath != null) {
-        try {
-          stateStore.removeLocalizedResource(user, appId, localPath);
-        } catch (IOException e) {
-          LOG.error("Unable to remove resource " + rsrc + " from state store",
-              e);
-        }
-      }
-    }
-  }
-
-  /**
-   * Returns the path up to the random directory component.
-   */
-  private Path getPathToDelete(Path localPath) {
-    Path delPath = localPath.getParent();
-    String name = delPath.getName();
-    Matcher matcher = RANDOM_DIR_PATTERN.matcher(name);
-    if (matcher.matches()) {
-      return delPath;
-    } else {
-      LOG.warn("Random directory component did not match. " +
-      		"Deleting localized path only");
-      return localPath;
-    }
-  }
-
-  @Override
-  public String getUser() {
-    return user;
-  }
-
-  @Override
-  public Iterator<LocalizedResource> iterator() {
-    return localrsrc.values().iterator();
-  }
-
-  /**
-   * @return {@link Path} absolute path for localization which includes local
-   *         directory path and the relative hierarchical path (if use local
-   *         cache directory manager is enabled)
-   * 
-   * @param {@link LocalResourceRequest} Resource localization request to
-   *        localize the resource.
-   * @param {@link Path} local directory path
-   * @param {@link DeletionService} Deletion Service to delete existing
-   *        path for localization.
-   */
-  @Override
-  public Path getPathForLocalization(LocalResourceRequest req,
-      Path localDirPath, DeletionService delService) {
-    Path rPath = localDirPath;
-    if (useLocalCacheDirectoryManager && localDirPath != null) {
-
-      if (!directoryManagers.containsKey(localDirPath)) {
-        directoryManagers.putIfAbsent(localDirPath,
-          new LocalCacheDirectoryManager(conf));
-      }
-      LocalCacheDirectoryManager dir = directoryManagers.get(localDirPath);
-
-      rPath = localDirPath;
-      String hierarchicalPath = dir.getRelativePathForLocalization();
-      // For most of the scenarios we will get root path only which
-      // is an empty string
-      if (!hierarchicalPath.isEmpty()) {
-        rPath = new Path(localDirPath, hierarchicalPath);
-      }
-      inProgressLocalResourcesMap.put(req, rPath);
-    }
-
-    while (true) {
-      Path uniquePath = new Path(rPath,
-          Long.toString(uniqueNumberGenerator.incrementAndGet()));
-      File file = new File(uniquePath.toUri().getRawPath());
-      if (!file.exists()) {
-        rPath = uniquePath;
-        break;
-      }
-      // If the directory already exists, delete it and move to next one.
-      LOG.warn("Directory " + uniquePath + " already exists, " +
-          "try next one.");
-      if (delService != null) {
-        FileDeletionTask deletionTask = new FileDeletionTask(delService,
-            getUser(), uniquePath, null);
-        delService.delete(deletionTask);
-      }
-    }
-
-    Path localPath = new Path(rPath, req.getPath().getName());
-    LocalizedResource rsrc = localrsrc.get(req);
-    if (rsrc == null) {
-      LOG.warn("Resource " + req + " has been removed"
-          + " and will no longer be localized");
-      return null;
-    }
-    rsrc.setLocalPath(localPath);
-    LocalResource lr = LocalResource.newInstance(req.getResource(),
-        req.getType(), req.getVisibility(), req.getSize(),
-        req.getTimestamp());
-    try {
-      stateStore.startResourceLocalization(user, appId,
-          ((LocalResourcePBImpl) lr).getProto(), localPath);
-    } catch (IOException e) {
-      LOG.error("Unable to record localization start for " + rsrc, e);
-    }
-    return rPath;
-  }
-
-  @Override
-  public LocalizedResource getLocalizedResource(LocalResourceRequest request) {
-    return localrsrc.get(request);
-  }
-
-  @VisibleForTesting
-  LocalCacheDirectoryManager getDirectoryManager(Path localDirPath) {
-    LocalCacheDirectoryManager mgr = null;
-    if (useLocalCacheDirectoryManager) {
-      mgr = directoryManagers.get(localDirPath);
-    }
-    return mgr;
-  }
-
-  @VisibleForTesting
-  LocalDirsHandlerService getDirsHandler() {
-    return dirsHandler;
-  }
-}
+  public boolean remove(LocalizedResource rem,

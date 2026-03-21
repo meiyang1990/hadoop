@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,14 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event;
 
+/**
+ * 日志聚合令牌更新事件，用于通知日志处理器更新日志聚合访问令牌
+ */
 public class LogHandlerTokenUpdatedEvent extends LogHandlerEvent {
 
+  /**
+   * 构造日志聚合令牌更新事件
+   */
   public LogHandlerTokenUpdatedEvent() {
     super(LogHandlerEventType.LOG_AGG_TOKEN_UPDATE);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,6 +29,9 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.application.Application;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
+/**
+ * NodeManager Web界面应用信息数据访问对象，封装当前Node节点上运行的应用信息，用于JSON/XML序列化返回给前端。
+ */
 @XmlRootElement(name = "app")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppInfo {
@@ -37,9 +41,16 @@ public class AppInfo {
   protected String user;
   protected ArrayList<String> containerids;
 
+  /**
+   * 无参构造函数，供JAXB序列化框架使用。
+   */
   public AppInfo() {
   } // JAXB needs this
 
+  /**
+   * 根据NM端的Application对象构造AppInfo，提取并转换需要展示给Web界面的信息。
+   * @param app NM端的应用对象
+   */
   public AppInfo(final Application app) {
     this.id = app.getAppId().toString();
     this.state = app.getApplicationState().toString();
@@ -47,6 +58,7 @@ public class AppInfo {
 
     this.containerids = new ArrayList<String>();
     Map<ContainerId, Container> appContainers = app.getContainers();
+    // 遍历所有容器，将容器ID转为字符串存储
     for (ContainerId containerId : appContainers.keySet()) {
       String containerIdStr = containerId.toString();
       containerids.add(containerIdStr);

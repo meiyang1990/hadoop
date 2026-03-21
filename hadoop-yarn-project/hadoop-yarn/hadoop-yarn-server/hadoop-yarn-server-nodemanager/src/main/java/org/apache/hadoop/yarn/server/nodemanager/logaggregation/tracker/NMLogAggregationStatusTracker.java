@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,9 +42,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * {@link NMLogAggregationStatusTracker} is used to cache log aggregation
- * status for finished applications. It will also delete the old cached
- * log aggregation status periodically.
+ * NodeManager日志聚合状态跟踪器，用于缓存已完成应用的日志聚合状态，
+ * 并定期清理过期的缓存状态，供RM恢复时获取日志聚合进度。
  *
  */
 public class NMLogAggregationStatusTracker extends CompositeService {
@@ -51,19 +51,31 @@ public class NMLogAggregationStatusTracker extends CompositeService {
   private static final Logger LOG =
        LoggerFactory.getLogger(NMLogAggregationStatusTracker.class);
 
+  /** 读锁，保护缓存并发访问 */
   private final ReadLock readLocker;
+  /** 写锁，保护缓存并发访问 */
   private final WriteLock writeLocker;
+  /** NodeManager上下文引用 */
   private final Context nmContext;
+  /** 缓存过期滚动清理间隔（毫秒） */
   private final long rollingInterval;
+  /** 定期清理任务定时器 */
   private final Timer timer;
+  /** 应用日志聚合状态缓存，键为应用ID，值为聚合状态信息 */
   private final Map<ApplicationId, AppLogAggregationStatusForRMRecovery>
       recoveryStatuses;
+  /** 日志聚合功能是否禁用标记 */
   private boolean disabled = false;
 
+  /**
+   * 构造日志聚合状态跟踪器
+   * @param context NodeManager上下文
+   */
   public NMLogAggregationStatusTracker(Context context) {
     super(NMLogAggregationStatusTracker.class.getName());
     this.nmContext = context;
     Configuration conf = context.getConf();
+    // 检查日志聚合是否启用，未启用则禁用本跟踪器
     if (!conf.getBoolean(YarnConfiguration.LOG_AGGREGATION_ENABLED,
         YarnConfiguration.DEFAULT_LOG_AGGREGATION_ENABLED)) {
       disabled = true;
@@ -73,10 +85,12 @@ public class NMLogAggregationStatusTracker extends CompositeService {
     this.readLocker = lock.readLock();
     this.writeLocker = lock.writeLock();
     this.timer = new Timer();
+    // 读取配置的缓存过期时间
     long configuredRollingInterval = conf.getLong(
         YarnConfiguration.LOG_AGGREGATION_STATUS_TIME_OUT_MS,
         YarnConfiguration.DEFAULT_LOG_AGGREGATION_STATUS_TIME_OUT_MS);
     if (configuredRollingInterval <= 0) {
+      // 配置非法，使用默认值
       this.rollingInterval = YarnConfiguration
           .DEFAULT_LOG_AGGREGATION_STATUS_TIME_OUT_MS;
       LOG.warn("The configured log-aggregation-status.time-out.ms is "
@@ -95,6 +109,7 @@ public class NMLogAggregationStatusTracker extends CompositeService {
       LOG.warn("Log Aggregation is disabled."
           + "So is the LogAggregationStatusTracker.");
     } else {
+      // 启动定期清理任务，按滚动间隔执行
       this.timer.scheduleAtFixedRate(new LogAggregationStatusRoller(),
           rollingInterval, rollingInterval);
     }
@@ -105,6 +120,14 @@ public class NMLogAggregationStatusTracker extends CompositeService {
     this.timer.cancel();
   }
 
+  /**
+   * 更新指定应用的日志聚合状态缓存
+   * @param appId 应用ID
+   * @param logAggregationStatus 日志聚合状态
+   * @param updateTime 更新时间戳
+   * @param diagnosis 诊断信息
+   * @param finalized 是否聚合完成
+   */
   public void updateLogAggregationStatus(ApplicationId appId,
       LogAggregationStatus logAggregationStatus, long updateTime,
       String diagnosis, boolean finalized) {
@@ -112,17 +135,16 @@ public class NMLogAggregationStatusTracker extends CompositeService {
       LOG.warn("The log aggregation is disabled. No need to update "
           + "the log aggregation status");
     }
-    // In NM, each application has exactly one appLogAggregator thread
-    // to handle the log aggregation. So, it is fine which multiple
-    // appLogAggregator thread to update log aggregation status for its
-    // own application. This is why we are using readLocker here.
+    // 每个应用仅单个聚合线程更新状态，使用读锁允许并发更新不同应用
     this.readLocker.lock();
     try {
       AppLogAggregationStatusForRMRecovery tracker = recoveryStatuses
           .get(appId);
       if (tracker == null) {
+        // 新增缓存条目
         Application application = this.nmContext.getApplications().get(appId);
         if (application == null) {
+          // 应用已被NM移除，忽略更新
           LOG.warn("The application:" + appId + " has already finished,"
               + " and has been removed from NodeManager, we should not "
               + "receive the log aggregation status update for "
@@ -136,17 +158,21 @@ public class NMLogAggregationStatusTracker extends CompositeService {
         newTracker.setFinalized(finalized);
         recoveryStatuses.put(appId, newTracker);
       } else {
+        // 更新已有缓存条目
         if (tracker.isFinalized()) {
+          // 已完成聚合，忽略后续更新
           LOG.warn("Ignore the log aggregation status update request "
               + "for the application:" + appId + ". The cached log aggregation "
               + "status is " + tracker.getLogAggregationStatus() + ".");
         } else {
           if (tracker.getLastModifiedTime() > updateTime) {
+            // 新请求时间早于缓存时间，忽略过时更新
             LOG.warn("Ignore the log aggregation status update request "
                 + "for the application:" + appId + ". The request log "
                 + "aggregation status update is older than the cached "
                 + "log aggregation status.");
           } else {
+            // 更新缓存状态
             tracker.setLogAggregationStatus(logAggregationStatus);
             tracker.setDiagnosis(diagnosis);
             tracker.setLastModifiedTime(updateTime);
@@ -160,6 +186,10 @@ public class NMLogAggregationStatusTracker extends CompositeService {
     }
   }
 
+  /**
+   * 拉取当前NM所有缓存的日志聚合报告，供RM获取
+   * @return 日志聚合报告列表
+   */
   public List<LogAggregationReport> pullCachedLogAggregationReports() {
     List<LogAggregationReport> reports = new ArrayList<>();
     if (disabled) {
@@ -167,11 +197,10 @@ public class NMLogAggregationStatusTracker extends CompositeService {
           + "There is no cached log aggregation status.");
       return reports;
     }
-    // When we pull cached Log aggregation reports for all application in
-    // this NM, we should make sure that we need to block all of the
-    // updateLogAggregationStatus calls. So, the writeLocker is used here.
+    // 拉取全量缓存需要阻塞所有更新操作，使用写锁
     this.writeLocker.lock();
     try {
+      // 遍历所有缓存生成报告
       for(Entry<ApplicationId, AppLogAggregationStatusForRMRecovery> tracker :
           recoveryStatuses.entrySet()) {
         AppLogAggregationStatusForRMRecovery current = tracker.getValue();
@@ -186,6 +215,9 @@ public class NMLogAggregationStatusTracker extends CompositeService {
     }
   }
 
+  /**
+   * 定时滚动清理任务实现类
+   */
   private class LogAggregationStatusRoller extends TimerTask {
     @Override
     public void run() {
@@ -193,12 +225,11 @@ public class NMLogAggregationStatusTracker extends CompositeService {
     }
   }
 
+  /**
+   * 滚动清理过期的日志聚合状态缓存
+   */
   private void rollLogAggregationStatus() {
-    // When we call rollLogAggregationStatus, basically fetch all
-    // cached log aggregation status and delete the out-of-timeout period
-    // log aggregation status, we should block the rollLogAggregationStatus
-    // calls as well as pullCachedLogAggregationReports call. So, the
-    // writeLocker is used here.
+    // 清理全量过期缓存需要阻塞更新和拉取操作，使用写锁
     this.writeLocker.lock();
     try {
       long currentTimeStamp = System.currentTimeMillis();
@@ -208,8 +239,9 @@ public class NMLogAggregationStatusTracker extends CompositeService {
       while (it.hasNext()) {
         Entry<ApplicationId, AppLogAggregationStatusForRMRecovery> tracker =
             it.next();
-        // the application has finished.
+        // 仅清理NM中已经移除的应用
         if (nmContext.getApplications().get(tracker.getKey()) == null) {
+          // 删除超过过期时间的缓存
           if (currentTimeStamp - tracker.getValue().getLastModifiedTime()
               > rollingInterval) {
             it.remove();
@@ -221,6 +253,9 @@ public class NMLogAggregationStatusTracker extends CompositeService {
     }
   }
 
+  /**
+   * 存储单个应用日志聚合状态的内部数据结构，供RM恢复使用
+   */
   private static class AppLogAggregationStatusForRMRecovery {
     private LogAggregationStatus logAggregationStatus;
     private long lastModifiedTime;

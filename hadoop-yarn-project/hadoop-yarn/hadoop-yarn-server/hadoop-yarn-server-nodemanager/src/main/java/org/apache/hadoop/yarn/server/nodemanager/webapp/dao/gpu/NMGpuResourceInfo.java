@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,6 +30,7 @@ import javax.xml.bind.annotation.XmlType;
 import java.util.List;
 
 /**
+ * 节点管理器GPU资源信息DAO，供NMWebServices获取节点资源信息时返回给客户端
  * Gpu device information return to client when
  * {@link org.apache.hadoop.yarn.server.nodemanager.webapp.NMWebServices#getNMResourceInfo(String)}
  * is invoked.
@@ -37,11 +39,20 @@ import java.util.List;
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "NMGpuResourceInfo")
 public class NMGpuResourceInfo extends NMResourceInfo {
+  /** GPU设备整体信息，包含从节点获取的硬件详情 */
   GpuDeviceInformation gpuDeviceInformation;
 
+  /** 当前节点上所有GPU设备列表 */
   List<GpuDevice> totalGpuDevices;
+  /** 当前节点上已分配给容器的GPU设备列表 */
   List<AssignedGpuDevice> assignedGpuDevices;
 
+  /**
+   * 构造包含完整GPU信息的对象
+   * @param gpuDeviceInformation GPU硬件整体信息
+   * @param totalGpuDevices 节点全部GPU设备列表
+   * @param assignedGpuDevices 节点已分配GPU设备列表
+   */
   public NMGpuResourceInfo(GpuDeviceInformation gpuDeviceInformation,
       List<GpuDevice> totalGpuDevices,
       List<AssignedGpuDevice> assignedGpuDevices) {
@@ -50,30 +61,57 @@ public class NMGpuResourceInfo extends NMResourceInfo {
     this.assignedGpuDevices = assignedGpuDevices;
   }
 
+  /**
+   * 无参构造函数，用于XML反序列化
+   */
   public NMGpuResourceInfo() {
   }
 
+  /**
+   * 获取GPU硬件整体信息
+   * @return GPU硬件整体信息对象
+   */
   public GpuDeviceInformation getGpuDeviceInformation() {
     return gpuDeviceInformation;
   }
 
+  /**
+   * 设置GPU硬件整体信息
+   * @param gpuDeviceInformation GPU硬件整体信息对象
+   */
   public void setGpuDeviceInformation(
       GpuDeviceInformation gpuDeviceInformation) {
     this.gpuDeviceInformation = gpuDeviceInformation;
   }
 
+  /**
+   * 获取当前节点全部GPU设备列表
+   * @return 全部GPU设备列表
+   */
   public List<GpuDevice> getTotalGpuDevices() {
     return totalGpuDevices;
   }
 
+  /**
+   * 设置当前节点全部GPU设备列表
+   * @param totalGpuDevices 全部GPU设备列表
+   */
   public void setTotalGpuDevices(List<GpuDevice> totalGpuDevices) {
     this.totalGpuDevices = totalGpuDevices;
   }
 
+  /**
+   * 获取当前节点已分配GPU设备列表
+   * @return 已分配GPU设备列表
+   */
   public List<AssignedGpuDevice> getAssignedGpuDevices() {
     return assignedGpuDevices;
   }
 
+  /**
+   * 设置当前节点已分配GPU设备列表
+   * @param assignedGpuDevices 已分配GPU设备列表
+   */
   public void setAssignedGpuDevices(
       List<AssignedGpuDevice> assignedGpuDevices) {
     this.assignedGpuDevices = assignedGpuDevices;

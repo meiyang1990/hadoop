@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*******************************************************************************
  *   Licensed to the Apache Software Foundation (ASF) under one
  *   or more contributor license agreements.  See the NOTICE file
@@ -24,68 +25,65 @@ import org.apache.hadoop.yarn.server.resourcemanager.reservation.Plan;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.PlanningException;
 
 /**
- * An entity that seeks to acquire resources to satisfy an user's contract
+ * YARN资源预留代理接口，负责为用户预留请求分配集群资源，满足用户的资源使用约定
  */
 public interface ReservationAgent {
 
   /**
-   * Constant defining the preferential treatment of time for equally valid
-   * allocations.
+   * 配置项：对于多个同等有效的分配方案，是否优先选择更早开始的分配
    */
   final static String FAVOR_EARLY_ALLOCATION =
       "yarn.resourcemanager.reservation-system.favor-early-allocation";
   /**
-   * By default favor early allocations.
+   * 默认配置：默认优先选择更早开始的分配
    */
   final static boolean DEFAULT_GREEDY_FAVOR_EARLY_ALLOCATION = true;
 
   /**
-   * Create a reservation for the user that abides by the specified contract
+   * 根据用户约定创建新的资源预留
    *
-   * @param reservationId the identifier of the reservation to be created.
-   * @param user the user who wants to create the reservation
-   * @param plan the Plan to which the reservation must be fitted
-   * @param contract encapsulates the resources the user requires for his
-   *          session
+   * @param reservationId 待创建的资源预留ID
+   * @param user 发起创建请求的用户
+   * @param plan 资源预留计划，本次预留需要嵌入该计划
+   * @param contract 用户资源需求定义，包含会话所需资源规格
    *
-   * @return whether the create operation was successful or not
-   * @throws PlanningException if the session cannot be fitted into the plan
+   * @return 创建操作是否成功
+   * @throws PlanningException 当无法将预留嵌入计划时抛出
    */
   public boolean createReservation(ReservationId reservationId, String user,
       Plan plan, ReservationDefinition contract) throws PlanningException;
 
   /**
-   * Update a reservation for the user that abides by the specified contract
+   * 根据新约定更新已有资源预留
    *
-   * @param reservationId the identifier of the reservation to be updated
-   * @param user the user who wants to create the session
-   * @param plan the Plan to which the reservation must be fitted
-   * @param contract encapsulates the resources the user requires for his
-   *          reservation
+   * @param reservationId 待更新的资源预留ID
+   * @param user 发起更新请求的用户
+   * @param plan 资源预留计划，本次更新需要嵌入该计划
+   * @param contract 更新后的用户资源需求定义
    *
-   * @return whether the update operation was successful or not
-   * @throws PlanningException if the reservation cannot be fitted into the plan
+   * @return 更新操作是否成功
+   * @throws PlanningException 当无法将更新后的预留嵌入计划时抛出
    */
   public boolean updateReservation(ReservationId reservationId, String user,
       Plan plan, ReservationDefinition contract) throws PlanningException;
 
   /**
-   * Delete an user reservation
+   * 删除用户指定的资源预留
    *
-   * @param reservationId the identifier of the reservation to be deleted
-   * @param user the user who wants to create the reservation
-   * @param plan the Plan to which the session must be fitted
+   * @param reservationId 待删除的资源预留ID
+   * @param user 发起删除请求的用户
+   * @param plan 资源预留计划所属的计划
    *
-   * @return whether the delete operation was successful or not
-   * @throws PlanningException if the reservation cannot be fitted into the plan
+   * @return 删除操作是否成功
+   * @throws PlanningException 当删除操作失败时抛出
    */
   public boolean deleteReservation(ReservationId reservationId, String user,
       Plan plan) throws PlanningException;
 
   /**
-   * Init configuration.
+   * 使用配置初始化代理
    *
-   * @param conf Configuration
+   * @param conf Hadoop配置对象
    */
   void init(Configuration conf);
 

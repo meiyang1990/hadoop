@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -48,6 +49,9 @@ import static org.apache.hadoop.yarn.conf.YarnConfiguration.NM_RUNC_STAT_CACHE_S
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.NM_RUNC_STAT_CACHE_TIMEOUT;
 
 /**
+ * 文件级注释：HDFS存储的runC容器镜像清单转YARN本地资源插件，为RuncContainerRuntime提供
+ * HDFS上镜像配置层和网络层的资源定位转换能力
+ *
  * This class is a plugin for the
  * {@link org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.RuncContainerRuntime}
  * that maps runC image manifests into their associated config and
@@ -81,17 +85,28 @@ public class HdfsManifestToResourcesPlugin extends AbstractService implements
 
   private static final String ALPHA_NUMERIC = "[a-zA-Z0-9]+";
 
+  /**
+   * 构造函数，初始化服务名称
+   */
   public HdfsManifestToResourcesPlugin() {
     super(HdfsManifestToResourcesPlugin.class.getName());
   }
 
+  /**
+   * 服务初始化方法，加载配置并创建文件状态缓存
+   * @param configuration YARN配置对象
+   */
   @Override
   public void serviceInit(Configuration configuration) {
     this.conf = configuration;
+    // 读取HDFS镜像根目录配置
     String toplevelDir = conf.get(NM_RUNC_IMAGE_TOPLEVEL_DIR,
         DEFAULT_NM_RUNC_IMAGE_TOPLEVEL_DIR);
+    // 拼接层文件目录路径
     this.layersDir = toplevelDir + "/layers/";
+    // 拼接配置文件目录路径
     this.configDir = toplevelDir + "/config/";
+    // 创建缓存加载器，从HDFS获取文件状态
     CacheLoader<Path, FileStatus> cacheLoader =
         new CacheLoader<Path, FileStatus>() {
         @Override
@@ -99,26 +114,40 @@ public class HdfsManifestToResourcesPlugin extends AbstractService implements
           return statBlob(path);
         }
     };
+    // 读取缓存最大容量配置
     int statCacheSize = conf.getInt(NM_RUNC_STAT_CACHE_SIZE,
         DEFAULT_RUNC_STAT_CACHE_SIZE);
+    // 读取缓存超时配置
     int statCacheTimeout = conf.getInt(NM_RUNC_STAT_CACHE_TIMEOUT,
         DEFAULT_NM_RUNC_STAT_CACHE_TIMEOUT);
+    // 构建Guava加载缓存，设置容量和刷新间隔
     this.statCache = CacheBuilder.newBuilder().maximumSize(statCacheSize)
         .refreshAfterWrite(statCacheTimeout, TimeUnit.SECONDS)
         .build(cacheLoader);
   }
 
+  /**
+   * 服务启动方法，获取HDFS文件系统实例
+   * @throws IOException 获取文件系统失败时抛出
+   */
   @Override
   public void serviceStart() throws IOException {
     Path path = new Path(layersDir);
     this.fs = path.getFileSystem(conf);
   }
 
+  /**
+   * 从镜像清单转换所有层为YARN本地资源列表
+   * @param manifest runC镜像清单对象
+   * @return 层资源列表
+   * @throws IOException 校验或资源获取失败时抛出
+   */
   @Override
   public List<LocalResource> getLayerResources(ImageManifest manifest)
       throws IOException  {
     List<LocalResource> localRsrcs = new ArrayList<>();
 
+    // 遍历所有层blob，逐个转换为本地资源
     for(ImageManifest.Blob blob : manifest.getLayers()) {
       LocalResource rsrc = getResource(blob, layersDir,
           LAYER_TAR_GZIP_MEDIA_TYPE, LAYER_HASH_ALGORITHM, ".sqsh");
@@ -127,6 +156,12 @@ public class HdfsManifestToResourcesPlugin extends AbstractService implements
     return localRsrcs;
   }
 
+  /**
+   * 从镜像清单转换配置blob为YARN本地资源
+   * @param manifest runC镜像清单对象
+   * @return 配置本地资源
+   * @throws IOException 校验或资源获取失败时抛出
+   */
   public LocalResource getConfigResource(ImageManifest manifest)
       throws IOException {
     ImageManifest.Blob config = manifest.getConfig();
@@ -134,35 +169,53 @@ public class HdfsManifestToResourcesPlugin extends AbstractService implements
         CONFIG_HASH_ALGORITHM, "");
   }
 
+  /**
+   * 根据blob信息在HDFS定位资源，转换为YARN LocalResource对象
+   * @param blob 镜像清单中的blob描述
+   * @param dir HDFS中对应blob类型的存储目录
+   * @param expectedMediaType 期望的媒体类型
+   * @param expectedHashAlgorithm 期望的哈希算法
+   * @param resourceSuffix 资源文件后缀
+   * @return 转换完成的YARN本地资源对象
+   * @throws IOException 校验失败或获取文件状态失败时抛出
+   */
   public LocalResource getResource(ImageManifest.Blob blob,
       String dir, String expectedMediaType,
       String expectedHashAlgorithm, String resourceSuffix) throws IOException {
     String mediaType = blob.getMediaType();
+    // 校验媒体类型是否匹配
     if (!mediaType.equals(expectedMediaType)) {
       throw new IOException("Invalid blob mediaType: " + mediaType);
     }
 
+    // 拆分摘要为算法和哈希两部分
     String[] blobDigest = blob.getDigest().split(":", 2);
 
     String algorithm = blobDigest[0];
+    // 校验哈希算法是否匹配
     if (!algorithm.equals(expectedHashAlgorithm)) {
       throw new IOException("Invalid blob digest algorithm: " + algorithm);
     }
 
     String hash = blobDigest[1];
+    // 校验哈希格式是否合法
     if (!hash.matches(ALPHA_NUMERIC) || hash.length() != SHA256_HASH_LENGTH) {
       throw new IOException("Malformed blob digest: " + hash);
     }
 
     long size = blob.getSize();
+    // 拼接HDFS资源路径
     Path path = new Path(dir, hash + resourceSuffix);
     LocalResource rsrc;
 
     try {
+      // 从缓存获取文件状态，不存在则自动加载
       FileStatus stat = statCache.get(path);
       long timestamp = stat.getModificationTime();
+      // 转换路径为YARN URL
       URL url = URL.fromPath(path);
 
+      // 创建公开可见的文件类型本地资源
       rsrc = LocalResource.newInstance(url,
         LocalResourceType.FILE, LocalResourceVisibility.PUBLIC,
         size, timestamp);
@@ -173,6 +226,12 @@ public class HdfsManifestToResourcesPlugin extends AbstractService implements
     return rsrc;
   }
 
+  /**
+   * 从HDFS获取指定路径的文件状态
+   * @param path HDFS文件路径
+   * @return 文件状态对象
+   * @throws IOException 获取失败时抛出
+   */
   protected FileStatus statBlob(Path path) throws IOException {
     return fs.getFileStatus(path);
   }

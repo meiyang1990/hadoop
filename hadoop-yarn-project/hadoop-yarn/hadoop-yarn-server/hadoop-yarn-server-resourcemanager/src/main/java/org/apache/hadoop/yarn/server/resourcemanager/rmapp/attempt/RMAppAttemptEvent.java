@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,33 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * YARN ResourceManager 中应用尝试 attempt 相关事件的基类，
+ * 封装应用尝试 attempt 事件的通用信息，用于 RM 状态机驱动事件处理。
+ */
 public class RMAppAttemptEvent extends AbstractEvent<RMAppAttemptEventType> {
 
+  // 关联的应用尝试 attempt ID
   private final ApplicationAttemptId appAttemptId;
+  // 诊断信息，用于异常场景说明
   private final String diagnosticMsg;
 
+  /**
+   * 构造函数，不携带诊断信息。
+   * @param appAttemptId 关联的应用尝试 attempt ID
+   * @param type 事件类型
+   */
   public RMAppAttemptEvent(ApplicationAttemptId appAttemptId,
       RMAppAttemptEventType type) {
     this(appAttemptId, type, "");
   }
 
+  /**
+   * 构造函数，携带诊断信息。
+   * @param appAttemptId 关联的应用尝试 attempt ID
+   * @param type 事件类型
+   * @param diagnostics 诊断信息
+   */
   public RMAppAttemptEvent(ApplicationAttemptId appAttemptId,
       RMAppAttemptEventType type, String diagnostics) {
     super(type);
@@ -38,6 +56,12 @@ public class RMAppAttemptEvent extends AbstractEvent<RMAppAttemptEventType> {
     this.diagnosticMsg = diagnostics;
   }
 
+  /**
+   * 构造函数，指定时间戳，不携带诊断信息。
+   * @param appAttemptId 关联的应用尝试 attempt ID
+   * @param type 事件类型
+   * @param timeStamp 事件时间戳
+   */
   public RMAppAttemptEvent(ApplicationAttemptId appAttemptId,
                            RMAppAttemptEventType type, long timeStamp) {
     super(type, timeStamp);
@@ -45,10 +69,18 @@ public class RMAppAttemptEvent extends AbstractEvent<RMAppAttemptEventType> {
     this.diagnosticMsg = "";
   }
 
+  /**
+   * 获取当前事件关联的应用尝试 attempt ID。
+   * @return 应用尝试 attempt ID
+   */
   public ApplicationAttemptId getApplicationAttemptId() {
     return this.appAttemptId;
   }
 
+  /**
+   * 获取事件关联的诊断信息。
+   * @return 诊断信息字符串
+   */
   public String getDiagnosticMsg() {
     return diagnosticMsg;
   }

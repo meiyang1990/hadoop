@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,16 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.ev
 
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * 日志处理器事件基类，封装日志处理相关事件的通用结构
+ * 用于NodeManager容器日志处理模块的事件驱动模型
+ */
 public class LogHandlerEvent extends AbstractEvent<LogHandlerEventType>{
 
+  /**
+   * 构造指定类型的日志处理器事件
+   * @param type 日志处理器事件类型
+   */
   public LogHandlerEvent(LogHandlerEventType type) {
     super(type);
   }

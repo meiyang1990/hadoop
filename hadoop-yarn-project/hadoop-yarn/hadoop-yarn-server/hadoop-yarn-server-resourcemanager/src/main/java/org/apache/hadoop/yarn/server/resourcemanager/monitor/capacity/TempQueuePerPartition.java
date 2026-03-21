@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,43 +35,50 @@ import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
- * Temporary data-structure tracking resource availability, pending resource
- * need, current utilization. This is per-queue-per-partition data structure
+ * 容量调度抢占计算时使用的临时数据结构，跟踪单个队列在单个节点分区上的资源可用情况、待分配资源需求和当前资源使用情况
  */
 public class TempQueuePerPartition extends AbstractPreemptionEntity {
-  // Following fields are copied from scheduler
+  // 当前队列所属的节点分区
   final String partition;
 
   private final Resource killable;
   private final float absCapacity;
   private final float absMaxCapacity;
+  // 该分区的总资源量
   final Resource totalPartitionResource;
 
-  // Following fields are settled and used by candidate selection policies
+  // 以下字段由抢占候选选择策略计算和使用
+  // 不可抢占的超额资源
   Resource untouchableExtra;
+  // 可抢占的超额资源
   Resource preemptableExtra;
 
+  // 各资源类型的归一化保证资源占比
   double[] normalizedGuarantee;
 
+  // 生效的最小资源配额
   private Resource effMinRes;
+  // 生效的最大资源配额
   private Resource effMaxRes;
 
+  // 子队列临时数据列表
   final ArrayList<TempQueuePerPartition> children;
   private Collection<TempAppPerPartition> apps;
+  // 叶队列引用，若为父队列则为null
   AbstractLeafQueue leafQueue;
+  // 父队列引用，若为根队列则为null
   AbstractParentQueue parentQueue;
+  // 当前队列是否禁用抢占
   boolean preemptionDisabled;
 
+  // 扣除预留资源后的待分配资源
   protected Resource pendingDeductReserved;
 
-  // Relative priority of this queue to its parent
-  // If parent queue's ordering policy doesn't respect priority,
-  // this will be always 0
+  // 相对于父队列的优先级，若父队列不支持优先级排序则恒为0
   int relativePriority = 0;
   TempQueuePerPartition parent = null;
 
-  // This will hold a temp user data structure and will hold userlimit,
-  // idealAssigned, used etc.
+  // 当前队列在该分区下各用户的临时数据，存储用户限额、理想分配、已用资源等信息
   Map<String, TempUserPerPartition> usersPerPartition = new LinkedHashMap<>();
 
   @SuppressWarnings("checkstyle:parameternumber")
@@ -82,6 +90,7 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
     super(queueName, current, Resource.newInstance(0, 0), reserved,
         Resource.newInstance(0, 0));
 
+    // 从原调度队列获取待分配资源信息
     if (queue instanceof AbstractLeafQueue) {
       AbstractLeafQueue l = (AbstractLeafQueue) queue;
       pending = l.getTotalPendingResourcesConsideringUserLimit(
@@ -90,6 +99,7 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
           totalPartitionResource, partition, true);
       leafQueue = l;
     } else {
+      // 父队列待分配资源由子队列聚合，初始化为0
       pending = Resources.createResource(0);
       pendingDeductReserved = Resources.createResource(0);
     }
@@ -114,16 +124,19 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
     this.effMaxRes = effMaxRes;
   }
 
+  /**
+   * 设置叶队列引用，仅允许空子队列队列（即本身为叶队列）调用。
+   * @param l 叶队列对象
+   */
   public void setLeafQueue(AbstractLeafQueue l) {
     assert children.size() == 0;
     this.leafQueue = l;
   }
 
   /**
-   * When adding a child we also aggregate its pending resource needs.
+   * 添加子队列，同时聚合子队列的待分配资源需求。
    *
-   * @param q
-   *          the child queue to add to this queue
+   * @param q 要添加的子队列临时数据
    */
   public void addChild(TempQueuePerPartition q) {
     assert leafQueue == null;
@@ -136,67 +149,45 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
     return children;
   }
 
-  // This function "accepts" all the resources it can (pending) and return
-  // the unused ones
+  /**
+   * 接受可用资源分配，计算当前队列可接受的理想资源量，返回剩余未分配资源。
+   * @param avail 可供分配的剩余资源
+   * @param rc 资源计算器
+   * @param clusterResource 集群总资源
+   * @param considersReservedResource 是否考虑预留资源
+   * @param allowQueueBalanceAfterAllSafisfied 所有队列满足后是否允许继续均衡分配
+   * @return 分配后剩余的资源
+   */
   Resource offer(Resource avail, ResourceCalculator rc,
       Resource clusterResource, boolean considersReservedResource,
       boolean allowQueueBalanceAfterAllSafisfied) {
+    // 计算理想分配可增加的最大资源量（最大配额-当前理想分配），不小于0
     Resource absMaxCapIdealAssignedDelta = Resources.componentwiseMax(
         Resources.subtract(getMax(), idealAssigned),
         Resource.newInstance(0, 0));
-    // accepted = min{avail,
-    //               max - assigned,
-    //               current + pending - assigned,
-    //               # Make sure a queue will not get more than max of its
-    //               # used/guaranteed, this is to make sure preemption won't
-    //               # happen if all active queues are beyond their guaranteed
-    //               # This is for leaf queue only.
-    //               max(guaranteed, used) - assigned}
-    // remain = avail - accepted
+    // 计算当前可接受的资源量，取最小值限制：1)最大可增量 2)可用资源 3)(已用+待分配) - 当前理想分配
     Resource accepted = Resources.componentwiseMin(
         absMaxCapIdealAssignedDelta,
         Resources.min(rc, clusterResource, avail, Resources
-            /*
-             * When we're using FifoPreemptionSelector (considerReservedResource
-             * = false).
-             *
-             * We should deduct reserved resource from pending to avoid excessive
-             * preemption:
-             *
-             * For example, if an under-utilized queue has used = reserved = 20.
-             * Preemption policy will try to preempt 20 containers (which is not
-             * satisfied) from different hosts.
-             *
-             * In FifoPreemptionSelector, there's no guarantee that preempted
-             * resource can be used by pending request, so policy will preempt
-             * resources repeatly.
-             */
             .subtract(Resources.add(getUsed(),
                 (considersReservedResource ? pending : pendingDeductReserved)),
                 idealAssigned)));
 
-    // For leaf queue: accept = min(accept, max(guaranteed, used) - assigned)
-    // Why only for leaf queue?
-    // Because for a satisfied parent queue, it could have some under-utilized
-    // leaf queues. Such under-utilized leaf queue could preemption resources
-    // from over-utilized leaf queue located at other hierarchies.
-
-    // Allow queues can continue grow and balance even if all queues are satisfied.
+    // 所有队列满足后仍允许均衡，不做额外限制
     if (!allowQueueBalanceAfterAllSafisfied) {
       accepted = filterByMaxDeductAssigned(rc, clusterResource, accepted);
     }
 
-    // accepted so far contains the "quota acceptable" amount, we now filter by
-    // locality acceptable
-
+    // 根据节点位置过滤可接受资源量，子类可覆盖实现
     accepted = acceptedByLocality(rc, accepted);
 
-    // accept should never be < 0
+    // 确保可接受资源不小于0
     accepted = Resources.componentwiseMax(accepted, Resources.none());
 
-    // or more than offered
+    // 确保不超过提供的可用资源
     accepted = Resources.componentwiseMin(accepted, avail);
 
+    // 计算剩余资源，更新当前队列理想分配量，返回剩余
     Resource remain = Resources.subtract(avail, accepted);
     Resources.addTo(idealAssigned, accepted);
     return remain;
@@ -206,6 +197,10 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
     return absCapacity;
   }
 
+  /**
+   * 获取当前队列的保证资源配额。
+   * @return 保证资源对象
+   */
   public Resource getGuaranteed() {
     if(!effMinRes.equals(Resources.none())) {
       return Resources.clone(effMinRes);
@@ -214,6 +209,10 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
     return Resources.multiply(totalPartitionResource, absCapacity);
   }
 
+  /**
+   * 获取当前队列的最大资源配额。
+   * @return 最大资源对象
+   */
   public Resource getMax() {
     if(!effMaxRes.equals(Resources.none())) {
       return Resources.clone(effMaxRes);
@@ -222,11 +221,16 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
     return Resources.multiply(totalPartitionResource, absMaxCapacity);
   }
 
+  /**
+   * 更新当前队列可抢占和不可抢占的超额资源量，递归聚合子队列资源。
+   * @param rc 资源计算器
+   */
   public void updatePreemptableExtras(ResourceCalculator rc) {
-    // Reset untouchableExtra and preemptableExtra
+    // 重置统计值
     untouchableExtra = Resources.none();
     preemptableExtra = Resources.none();
 
+    // 计算超额资源 = 已用资源 - 保证资源，不小于0
     Resource extra = Resources.subtract(getUsed(), getGuaranteed());
     if (Resources.lessThan(rc, totalPartitionResource, extra,
         Resources.none())) {
@@ -234,25 +238,26 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
     }
 
     if (null == children || children.isEmpty()) {
-      // If it is a leaf queue
+      // 叶队列：禁用抢占则全部不可抢占，否则全部可抢占
       if (preemptionDisabled) {
         untouchableExtra = extra;
       } else {
         preemptableExtra = extra;
       }
     } else {
-      // If it is a parent queue
+      // 父队列：聚合所有子队列的可抢占超额资源
       Resource childrensPreemptable = Resource.newInstance(0, 0);
       for (TempQueuePerPartition child : children) {
         Resources.addTo(childrensPreemptable, child.preemptableExtra);
       }
-      // untouchableExtra = max(extra - childrenPreemptable, 0)
+      // 本层不可抢占超额 = max(总超额 - 子队列可抢占超额, 0)
       if (Resources.greaterThanOrEqual(rc, totalPartitionResource,
           childrensPreemptable, extra)) {
         untouchableExtra = Resource.newInstance(0, 0);
       } else {
         untouchableExtra = Resources.subtract(extra, childrensPreemptable);
       }
+      // 本层可抢占超额为子队列可抢占和总超额的较小值
       preemptableExtra = Resources.min(rc, totalPartitionResource,
           childrensPreemptable, extra);
     }
@@ -274,33 +279,43 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
     return sb.toString();
   }
 
+  /**
+   * 计算当前队列需要被抢占的资源量。
+   * @param scalingFactor 抢占缩放比例
+   * @param rc 资源计算器
+   * @param clusterResource 集群总资源
+   */
   public void assignPreemption(float scalingFactor, ResourceCalculator rc,
       Resource clusterResource) {
+    // 扣除可kill资源后的已用资源
     Resource usedDeductKillable = Resources.subtract(getUsed(), killable);
+    // 已用+待分配总资源
     Resource totalResource = Resources.add(getUsed(), pending);
 
-    // The minimum resource that we need to keep for a queue is:
-    // max(idealAssigned, min(used + pending, guaranteed)).
-    //
-    // Doing this because when we calculate ideal allocation doesn't consider
-    // reserved resource, ideal-allocation calculated could be less than
-    // guaranteed and total. We should avoid preempt from a queue if it is
-    // already
-    // <= its guaranteed resource.
+    // 计算队列需要保留的最小资源：max(理想分配, min(总资源, 保证资源))
+    // 避免在队列资源已低于保证配额时仍然执行抢占
     Resource minimumQueueResource = Resources.max(rc, clusterResource,
         Resources.min(rc, clusterResource, totalResource, getGuaranteed()),
         idealAssigned);
 
+    // 若扣除可kill后仍大于最小保留资源，则计算需要抢占的资源量
     if (Resources.greaterThan(rc, clusterResource, usedDeductKillable,
         minimumQueueResource)) {
       toBePreempted = Resources.multiply(
           Resources.subtract(usedDeductKillable, minimumQueueResource),
           scalingFactor);
     } else {
+      // 不需要抢占
       toBePreempted = Resources.none();
     }
   }
 
+  /**
+   * 扣除实际已完成抢占的资源量，更新待抢占资源。
+   * @param rc 资源计算器
+   * @param cluster 集群总资源
+   * @param toBeDeduct 需要扣除的资源量
+   */
   public void deductActuallyToBePreempted(ResourceCalculator rc,
       Resource cluster, Resource toBeDeduct) {
     if (Resources.greaterThan(rc, cluster, getActuallyToBePreempted(),
@@ -361,15 +376,12 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
   }
 
   /**
-   * This method is visible to allow sub-classes to override the behavior,
-   * specifically to take into account locality-based limitations of how much
-   * the queue can consumed.
+   * 根据节点位置过滤可接受资源量，子类可覆盖实现自定义限制。
+   * 默认实现直接返回输入资源，不做限制。
    *
-   * @param rc the ResourceCalculator to be used.
-   * @param offered the input amount of Resource offered to this queue.
-   *
-   * @return  the subset of Resource(s) that the queue can consumed after
-   *          accounting for locality effects.
+   * @param rc 资源计算器
+   * @param offered 分配给当前队列的资源
+   * @return 考虑位置限制后可接受的资源量
    */
   protected Resource acceptedByLocality(ResourceCalculator rc,
       Resource offered) {
@@ -377,15 +389,13 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
   }
 
   /**
-   * This method is visible to allow sub-classes to override the behavior,
-   * specifically for federation purposes we do not want to cap resources as it
-   * is done here.
+   * 根据最大允许增量过滤可接受资源量，子类可覆盖实现（如联邦场景修改此逻辑）。
+   * 叶队列限制：可接受资源不超过 max(保证资源, 已用资源) - 已分配理想资源，避免过度抢占。
    *
-   * @param rc the {@code ResourceCalculator} to be used
-   * @param clusterResource the total cluster resources
-   * @param offered the resources offered to this queue
-   * @return the amount of resources accepted after considering max and
-   *         deducting assigned.
+   * @param rc 资源计算器
+   * @param clusterResource 集群总资源
+   * @param offered 待过滤的可接受资源
+   * @return 过滤后的可接受资源量
    */
   protected Resource filterByMaxDeductAssigned(ResourceCalculator rc,
       Resource clusterResource, Resource offered) {
@@ -402,12 +412,6 @@ public class TempQueuePerPartition extends AbstractPreemptionEntity {
   }
 
   /**
-   * This method is visible to allow sub-classes to ovverride the behavior,
-   * specifically for federation purposes we need to initialize per-sub-cluster
-   * roots as well as the global one.
+   * 初始化根队列的理想分配为保证资源，子类可覆盖实现（如联邦场景需要初始化多个根队列）。
    */
   protected void initializeRootIdealWithGuarangeed() {
-    idealAssigned = Resources.clone(getGuaranteed());
-  }
-
-}

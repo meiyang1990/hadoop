@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,11 +26,12 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 /**
- * Factory class for creating instances of
- * {@link ConfigurationMutationACLPolicy}.
+ * 配置修改ACL策略工厂类，用于创建 {@link ConfigurationMutationACLPolicy} 实例。
+ * 负责从YARN配置中加载指定的ACL策略实现类并实例化。
  */
 public final class ConfigurationMutationACLPolicyFactory {
 
+  /** 日志记录器 */
   private static final Logger LOG = LoggerFactory.getLogger(
       ConfigurationMutationACLPolicyFactory.class);
 
@@ -37,13 +39,20 @@ public final class ConfigurationMutationACLPolicyFactory {
     // Unused.
   }
 
+  /**
+   * 根据YARN配置创建并返回配置修改ACL策略实例。
+   * @param conf YARN配置对象
+   * @return 配置修改ACL策略实例
+   */
   public static ConfigurationMutationACLPolicy getPolicy(Configuration conf) {
+    // 从配置中读取ACL策略实现类，默认使用DefaultConfigurationMutationACLPolicy
     Class<? extends ConfigurationMutationACLPolicy> policyClass =
         conf.getClass(YarnConfiguration.RM_SCHEDULER_MUTATION_ACL_POLICY_CLASS,
             DefaultConfigurationMutationACLPolicy.class,
             ConfigurationMutationACLPolicy.class);
     LOG.info("Using ConfigurationMutationACLPolicy implementation - " +
         policyClass);
+    // 通过反射实例化策略对象
     return ReflectionUtils.newInstance(policyClass, conf);
   }
 }

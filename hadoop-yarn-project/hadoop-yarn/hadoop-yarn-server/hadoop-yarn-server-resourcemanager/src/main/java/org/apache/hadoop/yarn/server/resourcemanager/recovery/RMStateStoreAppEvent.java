@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,15 +21,28 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
 
+/**
+ * RM状态存储应用事件，用于存储应用状态信息到状态存储的事件
+ * 是RM恢复流程中处理应用状态持久化的事件载体
+ */
 public class RMStateStoreAppEvent extends RMStateStoreEvent {
 
+  // 待持久化的应用状态数据
   private final ApplicationStateData appState;
 
+  /**
+   * 构造存储应用状态的事件
+   * @param appState 待存储的应用状态数据
+   */
   public RMStateStoreAppEvent(ApplicationStateData appState) {
     super(RMStateStoreEventType.STORE_APP);
     this.appState = appState;
   }
 
+  /**
+   * 获取待存储的应用状态数据
+   * @return 应用状态数据对象
+   */
   public ApplicationStateData getAppState() {
     return appState;
   }

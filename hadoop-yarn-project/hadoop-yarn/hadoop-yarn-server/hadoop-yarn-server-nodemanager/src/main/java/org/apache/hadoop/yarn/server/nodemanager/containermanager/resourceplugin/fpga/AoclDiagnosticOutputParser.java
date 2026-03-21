@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,9 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 解析 Intel FPGA aocl diagnose 命令的输出，提取可用FPGA设备信息
+ */
 final class AoclDiagnosticOutputParser {
   private AoclDiagnosticOutputParser() {
     // no instances
@@ -82,39 +86,51 @@ final class AoclDiagnosticOutputParser {
    * DIAGNOSTIC_PASSED
    * "
    * But this method only support the first output
+   *
+   * 解析aocl diagnose命令输出，提取可用FPGA设备信息
+   * @param output aocl diagnose命令的标准输出
+   * @param shellExecutor shell执行器，用于获取设备主从设备号
+   * @param fpgaType FPGA设备类型
+   * @return 解析得到的可用FPGA设备列表，解析失败返回空列表
    * */
   public static List<FpgaDevice> parseDiagnosticOutput(
       String output, InnerShellExecutor shellExecutor, String fpgaType) {
+    // 检查诊断是否成功完成
     if (output.contains("DIAGNOSTIC_PASSED")) {
       List<FpgaDevice> devices = new ArrayList<>();
+      // 匹配FPGA设备别名开头（acl0~acl31）
       Matcher headerStartMatcher = Pattern.compile("acl[0-31]")
           .matcher(output);
+      // 匹配诊断结束标记，不区分大小写
       Matcher headerEndMatcher = Pattern.compile("(?i)DIAGNOSTIC_PASSED")
           .matcher(output);
       int sectionStartIndex;
       int sectionEndIndex;
       String aliasName;
 
+      // 遍历所有匹配到的FPGA设备
       while (headerStartMatcher.find()) {
+        // 获取设备块起始位置
         sectionStartIndex = headerStartMatcher.end();
         String section = null;
+        // 获取当前设备别名
         aliasName = headerStartMatcher.group();
+        // 查找当前设备块结束位置
         while (headerEndMatcher.find(sectionStartIndex)) {
           sectionEndIndex = headerEndMatcher.start();
+          // 截取当前设备的文本块
           section = output.substring(sectionStartIndex, sectionEndIndex);
           break;
         }
 
+        // 未找到合法设备块，返回空列表
         if (section == null) {
           LOG.warn("Unsupported diagnose output");
           LOG.warn("aocl output is: " + output);
           return Collections.emptyList();
         }
 
-        // devName, \(.*\)
-        // busNum, bus:slot.func\s=\s.*,
-        // FPGA temperature\s=\s.*
-        // Total\sCard\sPower\sUsage\s=\s.*
+        // 定义需要提取的字段正则表达式：设备名、总线信息、温度、功耗
         String[] fieldRegexes = new String[]{"\\(.*\\)\n",
             "(?i)bus:slot.func\\s=\\s.*,",
             "(?i)FPGA temperature\\s=\\s.*",
@@ -122,6 +138,7 @@ final class AoclDiagnosticOutputParser {
         String[] fields = new String[4];
         String tempFieldValue;
 
+        // 逐个提取字段
         for (int i = 0; i < fieldRegexes.length; i++) {
           Matcher fieldMatcher = Pattern.compile(fieldRegexes[i])
               .matcher(section);
@@ -130,22 +147,27 @@ final class AoclDiagnosticOutputParser {
             fields[i] = "";
             continue;
           }
+          // 获取匹配到的字段值并去除首尾空白
           tempFieldValue = fieldMatcher.group().trim();
           if (i == 0) {
-            // special case for Device name
+            // 设备名字段特殊处理：去除括号
             fields[i] = tempFieldValue.substring(1,
                 tempFieldValue.length() - 1);
           } else {
+            // 其他字段分割出=号后的值，并去除末尾逗号
             String ss = tempFieldValue.split("=")[1].trim();
             fields[i] = ss.substring(0, ss.length() - 1);
           }
         }
 
+        // 通过shell执行器获取设备主从设备号
         String majorMinorNumber = shellExecutor
             .getMajorAndMinorNumber(fields[0]);
         if (null != majorMinorNumber) {
+          // 分割主设备号和从设备号
           String[] mmn = majorMinorNumber.split(":");
 
+          // 添加解析完成的FPGA设备到列表
           devices.add(new FpgaDevice(fpgaType,
               Integer.parseInt(mmn[0]),
               Integer.parseInt(mmn[1]),
@@ -155,8 +177,10 @@ final class AoclDiagnosticOutputParser {
         }
       }
 
+      // 返回解析得到的所有FPGA设备
       return devices;
     } else {
+      // 诊断执行失败，记录日志返回空列表
       LOG.warn("The diagnostic has failed");
       LOG.warn("Output of aocl is: " + output);
       return Collections.emptyList();

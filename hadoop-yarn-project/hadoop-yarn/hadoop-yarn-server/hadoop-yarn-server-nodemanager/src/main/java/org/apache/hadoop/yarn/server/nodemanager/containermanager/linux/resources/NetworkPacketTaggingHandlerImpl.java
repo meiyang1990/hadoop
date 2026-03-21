@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -35,7 +36,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The network packet tagging handler implementation.
+ * YARN NodeManager 网络数据包标签处理器实现，基于 Linux cgroups net_cls 控制器实现容器网络流量标记，支持后续流量限流、QoS管控。
  *
  */
 @InterfaceAudience.Private
@@ -51,6 +52,11 @@ public class NetworkPacketTaggingHandlerImpl
   private Configuration conf;
   private NetworkTagMappingManager tagMappingManager;
 
+  /**
+   * 构造网络数据包标签处理器。
+   * @param privilegedOperationExecutor 特权操作执行器
+   * @param cGroupsHandler cgroups处理器
+   */
   public NetworkPacketTaggingHandlerImpl(
       PrivilegedOperationExecutor privilegedOperationExecutor,
       CGroupsHandler cGroupsHandler) {
@@ -58,50 +64,49 @@ public class NetworkPacketTaggingHandlerImpl
   }
 
   /**
-   * Bootstrapping network-tagging-handler - mounts net_cls
-   * controller.
-   * @param configuration yarn configuration in use
-   * @return (potentially empty) list of privileged operations to execute.
-   * @throws ResourceHandlerException
+   * 启动初始化网络数据包标签处理器，挂载 net_cls cgroup控制器，初始化标签映射管理器。
+   * @param configuration YARN配置对象
+   * @return 需要执行的特权操作列表，返回null表示无额外操作
+   * @throws ResourceHandlerException 资源处理异常
    */
-
   @Override
   public List<PrivilegedOperation> bootstrap(Configuration configuration)
       throws ResourceHandlerException {
     conf = configuration;
 
+    // 初始化net_cls cgroup控制器
     cGroupsHandler
         .initializeCGroupController(CGroupsHandler.CGroupController.NET_CLS);
 
+    // 创建并初始化网络标签映射管理器
     this.tagMappingManager = createNetworkTagMappingManager(conf);
     this.tagMappingManager.initialize(conf);
     return null;
   }
 
   /**
-   * Pre-start hook for network-tagging-handler. A cgroup is created
-   * and a net_cls classid is generated and written to a cgroup file.
+   * 容器启动前预处理，为容器创建独立net_cls cgroup，分配并写入网络标签，添加容器进程ID到cgroup任务文件。
    *
-   * @param container Container being launched
-   * @return privileged operations for some cgroups operations.
-   * @throws ResourceHandlerException
+   * @param container 待启动的容器对象
+   * @return 需要执行的特权操作列表
+   * @throws ResourceHandlerException 资源处理异常
    */
   @Override
   public List<PrivilegedOperation> preStart(Container container)
       throws ResourceHandlerException {
     String containerIdStr = container.getContainerId().toString();
+    // 为容器分配十六进制格式的网络标签ID
     String classIdStr = this.tagMappingManager.getNetworkTagHexID(
         container);
 
+    // 为容器创建独立的net_cls cgroup
     cGroupsHandler.createCGroup(CGroupsHandler.CGroupController
             .NET_CLS, containerIdStr);
+    // 将分配的标签ID写入cgroup配置文件
     cGroupsHandler.updateCGroupParam(CGroupsHandler.CGroupController.NET_CLS,
         containerIdStr, CGroupsHandler.CGROUP_PARAM_CLASSID, classIdStr);
 
-    //Now create a privileged operation in order to update the tasks file with
-    //the pid of the running container process (root of process tree). This can
-    //only be done at the time of launching the container, in a privileged
-    //executable.
+    // 构造将容器根进程ID写入cgroup tasks文件的特权操作，该操作需要特权权限执行
     String tasksFile = cGroupsHandler.getPathForCGroupTasks(
         CGroupsHandler.CGroupController.NET_CLS, containerIdStr);
     String opArg = new StringBuilder(PrivilegedOperation.CGROUP_ARG_PREFIX)
@@ -115,13 +120,11 @@ public class NetworkPacketTaggingHandlerImpl
   }
 
   /**
-   * Reacquires state for a container - reads the classid from the cgroup
-   * being used for the container being reacquired.
-   * @param containerId if of the container being reacquired.
-   * @return (potentially empty) list of privileged operations
-   * @throws ResourceHandlerException
+   * 重新获取已存在容器状态，当前不需要额外操作。
+   * @param containerId 容器ID
+   * @return 需要执行的特权操作列表，返回null表示无操作
+   * @throws ResourceHandlerException 资源处理异常
    */
-
   @Override
   public List<PrivilegedOperation> reacquireContainer(ContainerId containerId)
       throws ResourceHandlerException {
@@ -135,16 +138,17 @@ public class NetworkPacketTaggingHandlerImpl
   }
 
   /**
-   * Cleanup operation once container is completed - deletes cgroup.
+   * 容器完成后清理，删除容器对应的net_cls cgroup。
    *
-   * @param containerId of the container that was completed.
-   * @return a list of PrivilegedOperations.
-   * @throws ResourceHandlerException
+   * @param containerId 已完成容器的ID
+   * @return 需要执行的特权操作列表，返回null表示无额外操作
+   * @throws ResourceHandlerException 资源处理异常
    */
   @Override
   public List<PrivilegedOperation> postComplete(ContainerId containerId)
       throws ResourceHandlerException {
     LOG.info("postComplete for container: " + containerId.toString());
+    // 删除容器对应的net_cls cgroup目录
     cGroupsHandler.deleteCGroup(CGroupsHandler.CGroupController.NET_CLS,
         containerId.toString());
     return null;
@@ -158,6 +162,11 @@ public class NetworkPacketTaggingHandlerImpl
     return null;
   }
 
+  /**
+   * 创建网络标签映射管理器，工厂方法，供测试覆盖。
+   * @param conf YARN配置对象
+   * @return 网络标签映射管理器实例
+   */
   @Private
   @VisibleForTesting
   public NetworkTagMappingManager createNetworkTagMappingManager(

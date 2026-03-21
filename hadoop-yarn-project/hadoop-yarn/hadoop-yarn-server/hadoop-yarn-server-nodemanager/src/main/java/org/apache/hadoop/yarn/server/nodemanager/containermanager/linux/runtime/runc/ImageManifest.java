@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -25,20 +26,36 @@ import java.util.ArrayList;
 import java.util.Map;
 
 /**
- * This class is a Java representation of the OCI Image Manifest Specification.
+ * OCI镜像清单规范的Java实现类，用于解析和存储runc容器镜像的清单信息。
  */
 @InterfaceStability.Unstable
 public class ImageManifest {
+  // 清单schema版本号
   final private int schemaVersion;
+  // 清单媒体类型
   final private String mediaType;
+  // 镜像配置Blob对象
   final private Blob config;
+  // 镜像分层Blob列表
   final private ArrayList<Blob> layers;
+  // 镜像注解信息
   final private Map<String, String> annotations;
 
+  /**
+   * 默认构造函数，使用空参数初始化。
+   */
   public ImageManifest() {
     this(0, null, null, null, null);
   }
 
+  /**
+   * 全参数构造函数，初始化镜像清单所有字段。
+   * @param schemaVersion 清单schema版本号
+   * @param mediaType 清单媒体类型
+   * @param config 镜像配置Blob
+   * @param layers 镜像分层Blob列表
+   * @param annotations 镜像注解信息
+   */
   public ImageManifest(int schemaVersion, String mediaType, Blob config,
       ArrayList<Blob> layers, Map<String, String> annotations) {
     this.schemaVersion = schemaVersion;
@@ -81,20 +98,36 @@ public class ImageManifest {
   }
 
   /**
-   * This class is a Java representation of an OCI Image Blob.
+   * OCI镜像Blob的Java实现类，代表镜像中的数据块（配置或分层）。
    */
   @InterfaceStability.Unstable
   public static class Blob {
+    // Blob媒体类型
     final private String mediaType;
+    // Blob内容摘要
     final private String digest;
+    // Blob大小（字节）
     final private long size;
+    // Blob下载地址列表
     final private ArrayList<String> urls;
+    // Blob注解信息
     final private Map<String, String> annotations;
 
+    /**
+     * 默认构造函数，使用空参数初始化。
+     */
     public Blob() {
       this(null, null, 0, null, null);
     }
 
+    /**
+     * 全参数构造函数，初始化Blob所有字段。
+     * @param mediaType Blob媒体类型
+     * @param digest Blob内容摘要
+     * @param size Blob大小（字节）
+     * @param urls Blob下载地址列表
+     * @param annotations Blob注解信息
+     */
     public Blob(String mediaType, String digest, long size,
         ArrayList<String> urls, Map<String, String> annotations) {
       this.mediaType = mediaType;
@@ -131,4 +164,3 @@ public class ImageManifest {
     }
   }
 }
-

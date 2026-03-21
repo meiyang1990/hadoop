@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,7 +25,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.UpdateContainerTokenEvent;
 
 /**
- * Update Event consumed by the {@link ContainerScheduler}.
+ * 容器调度器处理的容器更新事件，封装容器令牌更新相关信息，供NodeManager容器调度器处理容器资源/执行类型更新请求。
  */
 public class UpdateContainerSchedulerEvent extends ContainerSchedulerEvent {
 
@@ -32,11 +33,11 @@ public class UpdateContainerSchedulerEvent extends ContainerSchedulerEvent {
   private final ContainerTokenIdentifier originalToken;
 
   /**
-   * Create instance of Event.
+   * 构造容器更新调度事件。
    *
-   * @param container Container.
-   * @param origToken The Original Container Token.
-   * @param event The Container Event.
+   * @param container 目标容器
+   * @param origToken 更新前的原始容器令牌
+   * @param event 容器令牌更新事件
    */
   public UpdateContainerSchedulerEvent(Container container,
       ContainerTokenIdentifier origToken, UpdateContainerTokenEvent event) {
@@ -46,42 +47,42 @@ public class UpdateContainerSchedulerEvent extends ContainerSchedulerEvent {
   }
 
   /**
-   * Original Token before update.
+   * 获取更新前的原始容器令牌。
    *
-   * @return Container Token.
+   * @return 原始容器令牌
    */
   public ContainerTokenIdentifier getOriginalToken() {
     return this.originalToken;
   }
 
   /**
-   * Update Container Token.
+   * 获取更新后的新容器令牌。
    *
-   * @return Container Token.
+   * @return 更新后的容器令牌
    */
   public ContainerTokenIdentifier getUpdatedToken() {
     return containerEvent.getUpdatedToken();
   }
 
   /**
-   * isResourceChange.
-   * @return isResourceChange.
+   * 判断本次更新是否为资源变更更新。
+   * @return true表示本次更新是资源变更，false否则
    */
   public boolean isResourceChange() {
     return containerEvent.isResourceChange();
   }
 
   /**
-   * isExecTypeUpdate.
-   * @return isExecTypeUpdate.
+   * 判断本次更新是否为执行类型更新。
+   * @return true表示本次更新是执行类型变更，false否则
    */
   public boolean isExecTypeUpdate() {
     return containerEvent.isExecTypeUpdate();
   }
 
   /**
-   * isIncrease.
-   * @return isIncrease.
+   * 判断本次资源更新是否为资源增加。
+   * @return true表示本次更新是增加容器资源，false表示减少资源
    */
   public boolean isIncrease() {
     return containerEvent.isIncrease();

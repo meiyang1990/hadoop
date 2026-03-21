@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,7 @@ import java.io.Serializable;
 import java.util.Objects;
 
 /**
- * Device wrapper class used for NM REST API.
+ * 已分配设备封装类，供NodeManager REST API对外展示设备分配信息使用
  * */
 public class AssignedDevice implements Serializable, Comparable {
 
@@ -34,18 +35,34 @@ public class AssignedDevice implements Serializable, Comparable {
   private Device device;
   private String containerId;
 
+  /**
+   * 空构造器，供序列化框架使用
+   */
   public AssignedDevice() {
   }
 
+  /**
+   * 构造已分配设备对象，封装设备ID和所属容器ID
+   * @param cId 分配设备的容器ID
+   * @param dev 被分配的设备对象
+   */
   public AssignedDevice(ContainerId cId, Device dev) {
     this.device = dev;
     this.containerId = cId.toString();
   }
 
+  /**
+   * 获取被分配的设备对象
+   * @return 设备对象
+   */
   public Device getDevice() {
     return device;
   }
 
+  /**
+   * 获取分配该设备的容器ID字符串
+   * @return 容器ID字符串
+   */
   public String getContainerId() {
     return containerId;
   }
@@ -56,10 +73,12 @@ public class AssignedDevice implements Serializable, Comparable {
       return -1;
     }
     AssignedDevice other = (AssignedDevice) o;
+    // 先按设备比较
     int result = getDevice().compareTo(other.getDevice());
     if (0 != result) {
       return result;
     }
+    // 设备相同则按容器ID比较
     return getContainerId().compareTo(other.getContainerId());
   }
 
@@ -69,12 +88,14 @@ public class AssignedDevice implements Serializable, Comparable {
       return false;
     }
     AssignedDevice other = (AssignedDevice) o;
+    // 设备和容器ID都相同才判定为相等
     return getDevice().equals(other.getDevice())
         && getContainerId().equals(other.getContainerId());
   }
 
   @Override
   public int hashCode() {
+    // 基于设备和容器ID计算哈希值
     return Objects.hash(getDevice(), getContainerId());
   }
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,15 +21,29 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.eve
 import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalResourceRequest;
 
+/**
+ * 资源本地化事件，封装本地资源请求相关事件信息
+ * 用于节点管理器本地化流程中传递资源请求事件
+ */
 public class ResourceEvent extends AbstractEvent<ResourceEventType> {
 
+  // 关联的本地资源请求
   private final LocalResourceRequest rsrc;
 
+  /**
+   * 构造资源事件
+   * @param rsrc 本地资源请求
+   * @param type 事件类型
+   */
   public ResourceEvent(LocalResourceRequest rsrc, ResourceEventType type) {
     super(type);
     this.rsrc = rsrc;
   }
 
+  /**
+   * 获取关联的本地资源请求
+   * @return 本地资源请求对象
+   */
   public LocalResourceRequest getLocalResourceRequest() {
     return rsrc;
   }

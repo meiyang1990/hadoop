@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,12 +22,16 @@ package org.apache.hadoop.yarn.server.nodemanager.nodelabels;
 import org.apache.hadoop.yarn.api.records.NodeLabel;
 
 /**
- * Abstract class which will be responsible for fetching the node labels.
+ * 节点标签提供者抽象基类，负责获取当前节点的标签信息，为YARN节点标签调度提供标签数据。
  *
  */
 public abstract class NodeLabelsProvider
     extends AbstractNodeDescriptorsProvider<NodeLabel>{
 
+  /**
+   * 构造节点标签提供者实例
+   * @param name 提供者名称
+   */
   public NodeLabelsProvider(String name) {
     super(name);
   }

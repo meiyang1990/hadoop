@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,7 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 
 /**
- * NumaNodeResource class holds the NUMA node topology with the total and used
- * resources.
+ * 存储单个NUMA节点的拓扑信息与资源使用情况，负责管理该节点上内存和CPU资源的分配与释放，为YARN NUMA感知调度提供资源状态管理。
  */
 public class NumaNodeResource {
   private String nodeId;
@@ -39,11 +39,19 @@ public class NumaNodeResource {
   private static final Logger LOG = LoggerFactory.
       getLogger(NumaNodeResource.class);
 
+  // 记录每个容器在本NUMA节点占用的内存
   private Map<ContainerId, Long> containerVsMemUsage =
       new ConcurrentHashMap<>();
+  // 记录每个容器在本NUMA节点占用的CPU核数
   private Map<ContainerId, Integer> containerVsCpusUsage =
       new ConcurrentHashMap<>();
 
+  /**
+   * 构造NUMA节点资源对象，初始化节点总资源容量。
+   * @param nodeId NUMA节点ID
+   * @param totalMemory 该节点总内存容量(MB)
+   * @param totalCpus 该节点总CPU核数
+   */
   public NumaNodeResource(String nodeId, long totalMemory, int totalCpus) {
     this.nodeId = nodeId;
     this.totalMemory = totalMemory;
@@ -51,12 +59,13 @@ public class NumaNodeResource {
   }
 
   /**
-   * Checks whether the specified resources available or not.
+   * 检查当前NUMA节点是否有足够的可用资源满足容器请求。
    *
-   * @param resource resource
-   * @return whether the specified resources available or not
+   * @param resource 容器请求的资源量
+   * @return true表示资源足够可分配，false表示资源不足
    */
   public boolean isResourcesAvailable(Resource resource) {
+    // 调试日志：输出当前可用资源与请求资源
     LOG.debug(
         "Memory available:" + (totalMemory - usedMemory) + ", CPUs available:"
             + (totalCpus - usedCpus) + ", requested:" + resource);
@@ -68,11 +77,11 @@ public class NumaNodeResource {
   }
 
   /**
-   * Assigns available memory and returns the remaining needed memory.
+   * 为容器分配本节点可用内存，若本节点内存不足则分配全部可用内存，返回剩余需要的内存量。
    *
-   * @param memreq required memory
-   * @param containerId which container memory to assign
-   * @return remaining needed memory
+   * @param memreq 容器需要的内存总量
+   * @param containerId 目标容器ID
+   * @return 本节点无法满足的剩余内存需求量，0表示完全满足
    */
   public long assignAvailableMemory(long memreq, ContainerId containerId) {
     long memAvailable = totalMemory - usedMemory;
@@ -88,11 +97,11 @@ public class NumaNodeResource {
   }
 
   /**
-   * Assigns available cpu's and returns the remaining needed cpu's.
+   * 为容器分配本节点可用CPU，若本节点CPU不足则分配全部可用CPU，返回剩余需要的CPU数量。
    *
-   * @param cpusreq required cpu's
-   * @param containerId which container cpu's to assign
-   * @return remaining needed cpu's
+   * @param cpusreq 容器需要的CPU总核数
+   * @param containerId 目标容器ID
+   * @return 本节点无法满足的剩余CPU需求量，0表示完全满足
    */
   public int assignAvailableCpus(int cpusreq, ContainerId containerId) {
     int cpusAvailable = totalCpus - usedCpus;
@@ -108,10 +117,10 @@ public class NumaNodeResource {
   }
 
   /**
-   * Assigns the requested resources for Container.
+   * 直接为容器分配全部请求的资源，假定资源已经过可用性检查，不会检查容量。
    *
-   * @param resource resource to assign
-   * @param containerId to which container the resources to assign
+   * @param resource 请求分配的资源量
+   * @param containerId 目标容器ID
    */
   public void assignResources(Resource resource, ContainerId containerId) {
     containerVsMemUsage.put(containerId, resource.getMemorySize());
@@ -121,9 +130,9 @@ public class NumaNodeResource {
   }
 
   /**
-   * Releases the assigned resources for Container.
+   * 释放容器占用的本节点资源，回收已使用的内存和CPU。
    *
-   * @param containerId to which container the assigned resources to release
+   * @param containerId 需要释放资源的容器ID
    */
   public void releaseResources(ContainerId containerId) {
     if (containerVsMemUsage.containsKey(containerId)) {
@@ -137,10 +146,10 @@ public class NumaNodeResource {
   }
 
   /**
-   * Recovers the memory resources for Container.
+   * 恢复容器占用的内存资源，用于NM重启后恢复已有容器的资源分配状态。
    *
-   * @param containerId recover the memory resources for the Container
-   * @param memory memory to recover
+   * @param containerId 需要恢复的容器ID
+   * @param memory 容器占用的内存量
    */
   public void recoverMemory(ContainerId containerId, long memory) {
     containerVsMemUsage.put(containerId, memory);
@@ -148,10 +157,10 @@ public class NumaNodeResource {
   }
 
   /**
-   * Recovers the cpu's resources for Container.
+   * 恢复容器占用的CPU资源，用于NM重启后恢复已有容器的资源分配状态。
    *
-   * @param containerId recover the cpu's resources for the Container
-   * @param cpus cpu's to recover
+   * @param containerId 需要恢复的容器ID
+   * @param cpus 容器占用的CPU核数
    */
   public void recoverCpus(ContainerId containerId, int cpus) {
     containerVsCpusUsage.put(containerId, cpus);
@@ -199,6 +208,10 @@ public class NumaNodeResource {
     return true;
   }
 
+  /**
+   * 获取当前NUMA节点的ID。
+   * @return NUMA节点ID
+   */
   public String getNodeId() {
     return nodeId;
   }

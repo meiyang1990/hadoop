@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -49,13 +50,14 @@ import org.apache.hadoop.yarn.util.FSDownload;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * The callable class that handles the actual upload to the shared cache.
+ * 共享缓存上传任务可调用类，负责将本地化资源实际上传到YARN共享缓存
+ * 当资源已存在或上传被拒绝时返回false，上传成功返回true
  */
 class SharedCacheUploader implements Callable<Boolean> {
-  // rwxr-xr-x
+  // 共享缓存目录权限 rwxr-xr-x
   static final FsPermission DIRECTORY_PERMISSION =
       new FsPermission((short)00755);
-  // r-xr-xr-x
+  // 共享缓存文件权限 r-xr-xr-x
   static final FsPermission FILE_PERMISSION =
       new FsPermission((short)00555);
 
@@ -82,11 +84,13 @@ class SharedCacheUploader implements Callable<Boolean> {
   }
 
   /**
-   * @param resource the local resource that contains the original remote path
-   * @param localPath the path in the local filesystem where the resource is
-   * localized
-   * @param fs the filesystem of the shared cache
-   * @param localFs the local filesystem
+   * @param resource 包含原始远程路径的本地化资源
+   * @param localPath 资源本地化后在本地文件系统的路径
+   * @param user 提交应用的用户名
+   * @param conf YARN配置对象
+   * @param scmClient 共享缓存管理器客户端协议
+   * @param fs 共享缓存所在的文件系统
+   * @param localFs 节点本地文件系统
    */
   public SharedCacheUploader(LocalResource resource, Path localPath,
       String user, Configuration conf, SCMUploaderProtocol scmClient,
@@ -107,43 +111,43 @@ class SharedCacheUploader implements Callable<Boolean> {
   }
 
   /**
-   * Uploads the file under the shared cache, and notifies the shared cache
-   * manager. If it is unable to upload the file because it already exists, it
-   * returns false.
+   * 执行共享缓存上传流程：权限验证、计算校验和、创建目录、上传临时文件、设置权限、重命名为最终文件、通知共享缓存管理器
+   * 文件已存在或上传被拒绝则返回false，成功上传返回true
    */
   @Override
   public Boolean call() throws Exception {
     Path tempPath = null;
     try {
+      // 验证用户是否有权限上传该资源
       if (!verifyAccess()) {
         LOG.warn("User " + user + " is not authorized to upload file " +
             localPath.getName());
         return false;
       }
 
-      // first determine the actual local path that will be used for upload
+      // 获取实际待上传的本地文件路径
       Path actualPath = getActualPath();
-      // compute the checksum
+      // 计算文件校验和，作为共享缓存的资源键
       String checksumVal = computeChecksum(actualPath);
-      // create the directory (if it doesn't exist)
+      // 根据嵌套层级和校验和计算共享缓存条目目录路径
       Path directoryPath =
           new Path(SharedCacheUtil.getCacheEntryPath(nestedLevel,
               sharedCacheRootDir, checksumVal));
-      // let's not check if the directory already exists: in the vast majority
-      // of the cases, the directory does not exist; as long as mkdirs does not
-      // error out if it exists, we should be fine
+      // 创建目录，已存在时也不会报错，直接复用
       fs.mkdirs(directoryPath, DIRECTORY_PERMISSION);
-      // create the temporary file
+      // 生成临时文件路径
       tempPath = new Path(directoryPath, getTemporaryFileName(actualPath));
+      // 执行文件上传到临时路径
       if (!uploadFile(actualPath, tempPath)) {
         LOG.warn("Could not copy the file to the shared cache at " + tempPath);
         return false;
       }
 
-      // set the permission so that it is readable but not writable
+      // 设置文件权限为只读，符合共享缓存要求
       fs.setPermission(tempPath, FILE_PERMISSION);
-      // rename it to the final filename
+      // 构造最终文件路径
       Path finalPath = new Path(directoryPath, actualPath.getName());
+      // 将临时文件重命名为最终文件，原子操作，如果目标已存在则重命名失败
       if (!fs.rename(tempPath, finalPath)) {
         LOG.warn("The file already exists under " + finalPath +
             ". Ignoring this attempt.");
@@ -151,16 +155,14 @@ class SharedCacheUploader implements Callable<Boolean> {
         return false;
       }
 
-      // notify the SCM
+      // 通知共享缓存管理器新资源上传完成
       if (!notifySharedCacheManager(checksumVal, actualPath.getName())) {
-        // the shared cache manager rejected the upload (as it is likely
-        // uploaded under a different name
-        // clean up this file and exit
+        // 共享缓存管理器拒绝本次上传，通常是因为已存在其他同名资源，需要清理已创建文件
         fs.delete(finalPath, false);
         return false;
       }
 
-      // set the replication factor
+      // 根据配置设置共享缓存文件的副本数
       short replication =
           (short)conf.getInt(YarnConfiguration.SHARED_CACHE_NM_UPLOADER_REPLICATION_FACTOR,
               YarnConfiguration.DEFAULT_SHARED_CACHE_NM_UPLOADER_REPLICATION_FACTOR);
@@ -170,21 +172,21 @@ class SharedCacheUploader implements Callable<Boolean> {
       return true;
     } catch (IOException e) {
       LOG.warn("Exception while uploading the file " + localPath.getName(), e);
-      // in case an exception is thrown, delete the temp file
+      // 发生异常，清理临时文件
       deleteTempFile(tempPath);
       throw e;
     }
   }
 
+  /**
+   * 获取实际待上传的文件路径，处理解压后资源存放在同名子目录的情况
+   */
   @VisibleForTesting
   Path getActualPath() throws IOException {
     Path path = localPath;
     FileStatus status = localFs.getFileStatus(path);
     if (status != null && status.isDirectory()) {
-      // for certain types of resources that get unpacked, the original file may
-      // be found under the directory with the same name (see
-      // FSDownload.unpack); check if the path is a directory and if so look
-      // under it
+      // 对于解压后的资源，原始文件通常位于同名子目录下，参考FSDownload.unpack的逻辑
       path = new Path(path, path.getName());
     }
     return path;
@@ -201,38 +203,39 @@ class SharedCacheUploader implements Callable<Boolean> {
   }
 
   /**
-   * Checks that the (original) remote file is either owned by the user who
-   * started the app or public.
+   * 验证用户上传权限：公共资源直接允许；私有资源需要用户拥有或公开可读
+   * 同时验证远程文件未被修改过，修改后的文件不允许上传
    */
   @VisibleForTesting
   boolean verifyAccess() throws IOException {
-    // if it is in the public cache, it's trivially OK
+    // 公共资源直接允许上传
     if (resource.getVisibility() == LocalResourceVisibility.PUBLIC) {
       return true;
     }
 
     final Path remotePath;
     try {
+      // 从资源描述符获取原始远程路径
       remotePath = resource.getResource().toPath();
     } catch (URISyntaxException e) {
       throw new IOException("Invalid resource", e);
     }
 
-    // get the file status of the HDFS file
+    // 获取原始远程文件的状态信息
     FileSystem remoteFs = remotePath.getFileSystem(conf);
     FileStatus status = remoteFs.getFileStatus(remotePath);
-    // check to see if the file has been modified in any way
+    // 检查本地化后原始文件是否被修改，修改过则拒绝上传
     if (status.getModificationTime() != resource.getTimestamp()) {
       LOG.warn("The remote file " + remotePath +
           " has changed since it's localized; will not consider it for upload");
       return false;
     }
 
-    // check for the user ownership
+    // 用户是文件所有者，允许上传
     if (status.getOwner().equals(user)) {
-      return true; // the user owns the file
+      return true;
     }
-    // check if the file is publicly readable otherwise
+    // 否则检查文件是否公开可读，公开可读则允许上传
     return fileIsPublic(remotePath, remoteFs, status);
   }
 
@@ -243,14 +246,16 @@ class SharedCacheUploader implements Callable<Boolean> {
   }
 
   /**
-   * Uploads the file to the shared cache under a temporary name, and returns
-   * the result.
+   * 将本地源文件上传到共享缓存临时路径
    */
   @VisibleForTesting
   boolean uploadFile(Path sourcePath, Path tempPath) throws IOException {
     return FileUtil.copy(localFs, sourcePath, fs, tempPath, false, conf);
   }
 
+  /**
+   * 计算指定文件的校验和，作为共享缓存资源键
+   */
   @VisibleForTesting
   String computeChecksum(Path path) throws IOException {
     InputStream is = localFs.open(path);
@@ -261,23 +266,29 @@ class SharedCacheUploader implements Callable<Boolean> {
     }
   }
 
+  // 生成带随机后缀的临时文件名，避免冲突
   private String getTemporaryFileName(Path path) {
     return path.getName() + "-" + ThreadLocalRandom.current().nextLong();
   }
 
+  /**
+   * 向共享缓存管理器发送上传完成通知，获取是否接受本次上传
+   */
   @VisibleForTesting
   boolean notifySharedCacheManager(String checksumVal, String fileName)
       throws IOException {
     try {
+      // 创建通知请求对象，设置校验和资源键与文件名
       SCMUploaderNotifyRequest request =
           recordFactory.newRecordInstance(SCMUploaderNotifyRequest.class);
       request.setResourceKey(checksumVal);
       request.setFilename(fileName);
+      // 发送请求，返回是否接受
       return scmClient.notify(request).getAccepted();
     } catch (YarnException e) {
       throw new IOException(e);
     } catch (UndeclaredThrowableException e) {
-      // retrieve the cause of the exception and throw it as an IOException
+      // 处理反射调用抛出的未声明异常，转为IOException抛出
       throw new IOException(e.getCause() == null ? e : e.getCause());
     }
   }

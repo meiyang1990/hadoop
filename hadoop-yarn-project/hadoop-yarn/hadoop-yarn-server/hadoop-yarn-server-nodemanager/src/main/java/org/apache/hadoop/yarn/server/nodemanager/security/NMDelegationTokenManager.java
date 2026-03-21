@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,20 +27,28 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
 
+/**
+ * NodeManager 代理令牌管理器，负责处理NodeManager上代理令牌的更新操作。
+ * 提供以登录用户身份代理续期 delegation token 的能力。
+ */
 public class NMDelegationTokenManager {
 
   private final Configuration conf;
 
+  /**
+   * 构造方法，传入配置对象。
+   * @param conf Hadoop配置对象
+   */
   public NMDelegationTokenManager(Configuration conf) {
     this.conf = conf;
   }
 
   /**
-   * Renews a token on behalf of the user logged in.
-   * @param token Token to be renewed
-   * @return Expiration time for the token
-   * @throws IOException raised on errors performing I/O.
-   * @throws InterruptedException if the thread is interrupted.
+   * 以当前登录用户身份续期指定令牌。
+   * @param token 需要续期的代理令牌
+   * @return 续期后令牌的过期时间戳
+   * @throws IOException IO操作异常
+   * @throws InterruptedException 线程中断异常
    */
   public Long renewToken(Token<? extends TokenIdentifier> token)
       throws IOException, InterruptedException {

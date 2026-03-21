@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -26,8 +27,8 @@ import org.apache.hadoop.classification.InterfaceStability;
 import java.util.Objects;
 
 /**
- * A config file that needs to be created and made available as a volume in an
- * service component container.
+ * 辅助服务文件描述，定义需要在辅助服务容器中作为卷提供的配置文件信息
+ * 用于YARN NodeManager辅助服务容器化场景，描述需要为容器准备的配置文件元数据
  **/
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
@@ -35,10 +36,13 @@ import java.util.Objects;
 public class AuxServiceFile {
 
   /**
-   * Config Type.
+   * 辅助服务文件类型枚举
    **/
   public enum TypeEnum {
-    STATIC("STATIC"), ARCHIVE("ARCHIVE");
+    /**静态文件类型*/
+    STATIC("STATIC"),
+    /**归档文件类型*/
+    ARCHIVE("ARCHIVE");
 
     private String value;
 
@@ -57,8 +61,9 @@ public class AuxServiceFile {
   private String srcFile = null;
 
   /**
-   * Config file in the standard format like xml, properties, json, yaml,
-   * template.
+   * 设置文件类型，支持xml、properties、json、yaml、template等标准格式
+   * @param t 文件类型枚举
+   * @return 当前AuxServiceFile实例，支持链式调用
    **/
   public AuxServiceFile type(TypeEnum t) {
     this.type = t;
@@ -75,11 +80,10 @@ public class AuxServiceFile {
   }
 
   /**
-   * This provides the source location of the configuration file, the content
-   * of which is dumped to dest_file post property substitutions, in the format
-   * as specified in type. Typically the src_file would point to a source
-   * controlled network accessible file maintained by tools like puppet, chef,
-   * or hdfs etc. Currently, only hdfs is supported.
+   * 设置源文件路径，源文件会经过变量替换后转储到容器目标路径
+   * 源文件通常由配置管理工具(Puppet/Chef)或HDFS等统一存储维护，当前仅支持HDFS
+   * @param file 源文件路径
+   * @return 当前AuxServiceFile实例，支持链式调用
    **/
   public AuxServiceFile srcFile(String file) {
     this.srcFile = file;
@@ -125,8 +129,9 @@ public class AuxServiceFile {
   }
 
   /**
-   * Convert the given object to string with each line indented by 4 spaces
-   * (except the first line).
+   * 将对象转换为带缩进格式的字符串，便于日志输出可读性
+   * @param o 需要转换的对象
+   * @return 缩进格式化后的字符串
    */
   private String toIndentedString(java.lang.Object o) {
     if (o == null) {

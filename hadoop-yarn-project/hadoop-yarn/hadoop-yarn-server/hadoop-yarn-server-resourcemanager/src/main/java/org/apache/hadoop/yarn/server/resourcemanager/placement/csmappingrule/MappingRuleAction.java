@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,57 +23,47 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.placement.VariableContext;
 
 /**
- * This interface represents the action part of a MappingRule, action are
- * responsible to decide what should happen with the actual application
- * submission.
+ * 容量调度器映射规则的动作接口，定义匹配规则命中后对应用提交的处理动作，
+ * 负责决定应用最终应该放置到哪个队列，以及执行失败后的回退策略。
  */
 public interface MappingRuleAction {
   /**
-   * Returns the fallback action to be taken if the main action (result returned
-   * by the execute method) fails.
-   * e.g. Target queue does not exist, or reference is ambiguous
-   * @return The fallback action to be taken if the main action fails
+   * 获取主动作执行失败时的回退动作（例如目标队列不存在、引用不明确等场景）
+   * @return 主动作失败时需要执行的回退动作
    */
   MappingRuleResult getFallback();
 
   /**
-   * This method is the main logic of the action, it shall determine based on
-   * the mapping context, what should be the action's result.
-   * @param variables The variable context, which contains all the variables
-   * @return The result of the action
+   * 动作的核心执行逻辑，根据映射上下文变量计算得到动作结果
+   * @param variables 变量上下文，包含规则匹配所需的所有变量
+   * @return 本次动作执行的结果
    */
   MappingRuleResult execute(VariableContext variables);
 
 
   /**
-   * Sets the fallback method to reject, if the action cannot be executed the
-   * application will get rejected.
-   * @return MappingRuleAction The same object for method chaining.
+   * 设置回退动作为拒绝应用提交，动作执行失败时将直接拒绝该应用
+   * @return 当前动作对象，支持方法链式调用
    */
   MappingRuleAction setFallbackReject();
 
   /**
-   * Sets the fallback method to skip, if the action cannot be executed
-   * We move onto the next rule, ignoring this one.
-   * @return MappingRuleAction The same object for method chaining.
+   * 设置回退动作为跳过当前规则，动作执行失败时跳过本规则，继续尝试下一条匹配规则
+   * @return 当前动作对象，支持方法链式调用
    */
   MappingRuleAction setFallbackSkip();
 
   /**
-   * Sets the fallback method to place to default, if the action cannot be
-   * executed. The application will be placed into the default queue, if the
-   * default queue does not exist the application will get rejected
-   * @return MappingRuleAction The same object for method chaining.
+   * 设置回退动作为放置到默认队列，动作执行失败时将应用放入默认队列；
+   * 如果默认队列也不存在，则会拒绝应用提交
+   * @return 当前动作对象，支持方法链式调用
    */
   MappingRuleAction setFallbackDefaultPlacement();
 
   /**
-   * This method is responsible for config validation, the context contains all
-   * information required for validation, method should throw an exception on
-   * detectable setup errors.
-   * @param ctx Validation context with all the necessary objects and helper
-   *            methods required during validation
-   * @throws YarnException is thrown on validation error
+   * 验证当前动作配置的合法性，检测到配置错误时需要抛出异常
+   * @param ctx 验证上下文，包含验证所需的所有对象和辅助方法
+   * @throws YarnException 验证失败时抛出该异常
    */
   void validate(MappingRuleValidationContext ctx) throws YarnException;
 }

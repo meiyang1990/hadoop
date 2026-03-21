@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,16 +23,24 @@ import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 
 /**
- * A event used to store ProxyCA information.
+ * 用于持久化存储ProxyCA证书和私钥信息的RM状态存储事件，在YARN HA恢复场景中保存代理CA凭证状态。
  */
 public class RMStateStoreProxyCAEvent extends RMStateStoreEvent {
+  // CA根证书
   private X509Certificate caCert;
+  // CA私钥
   private PrivateKey caPrivateKey;
 
   public RMStateStoreProxyCAEvent(RMStateStoreEventType type) {
     super(type);
   }
 
+  /**
+   * 构造包含CA证书和私钥的状态存储事件。
+   * @param caCert CA根证书
+   * @param caPrivateKey CA私钥
+   * @param type 事件类型
+   */
   public RMStateStoreProxyCAEvent(X509Certificate caCert,
       PrivateKey caPrivateKey, RMStateStoreEventType type) {
     this(type);

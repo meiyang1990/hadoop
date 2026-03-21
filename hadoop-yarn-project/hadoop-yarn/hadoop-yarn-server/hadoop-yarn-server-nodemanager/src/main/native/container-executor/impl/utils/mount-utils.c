@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,15 @@
  * limitations under the License.
  */
 
+/**
+ * @file mount-utils.c
+ * @brief YARN NodeManager容器执行器挂载工具实现，提供挂载权限校验、路径规范化等核心能力
+ *
+ * 该文件属于YARN NodeManager本地容器执行器的底层工具模块，负责处理用户容器挂载请求的合法性校验，
+ * 基于配置的允许挂载列表，通过路径规范化、正则匹配、目录前缀匹配等方式控制容器可挂载范围，
+ * 保障集群节点安全性，防止用户容器越权访问敏感路径。
+ */
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
@@ -27,9 +37,9 @@
 #include "configuration.h"
 
 /**
- * Function to free an options struct.
- * @param options - options struct to be freed.
- * @return void.
+ * 释放挂载选项结构体占用的内存
+ * @param options 待释放的挂载选项结构体指针
+ * @return 无
  */
 void free_mount_options(mount_options *options) {
   if (options == NULL) {
@@ -47,10 +57,10 @@ void free_mount_options(mount_options *options) {
 }
 
 /**
- * Function to free an array of mounts.
- * @param mounts - Array of mounts to be freed.
- * @param num_mounts - Number of mounts to be freed.
- * @return void.
+ * 释放挂载信息数组占用的内存
+ * @param mounts 待释放的挂载信息数组指针
+ * @param num_mounts 数组中挂载信息的数量
+ * @return 无
  */
 void free_mounts(mount *mounts, const unsigned int num_mounts) {
     if (mounts == NULL) {
@@ -66,37 +76,32 @@ void free_mounts(mount *mounts, const unsigned int num_mounts) {
 }
 
 /**
- * Function to determine whether a string is a volume name.
- * @param volume_name - string to check.
- * @return 1 on match, 0 on no match.
+ * 检查输入字符串是否符合命名卷的命名规则
+ * @param volume_name 待检查的字符串
+ * @return 1表示符合规则，0表示不符合规则
  */
 static int is_volume_name(const char *volume_name) {
     const char *regex_str = "^[a-zA-Z0-9]([a-zA-Z0-9_.-]*)$";
-    // execute_regex_match return 0 is matched success
+    // execute_regex_match 返回0表示匹配成功
     return execute_regex_match(regex_str, volume_name) == 0;
 }
 
 /**
- * Function to determine whether a string is a valid volume name and if
- * it matches a passed in regex.
- * @param requested - string to check.
- * @param pattern - regular expression to check against.
- * @return 1 on match, 0 on no match.
+ * 检查输入卷名是否满足正则表达式匹配要求
+ * @param requested 待检查的卷名字符串
+ * @param pattern 配置的正则表达式模式（前缀包含regex:）
+ * @return 1表示匹配成功，0表示匹配失败
  */
 static int is_volume_name_matched_by_regex(const char* requested, const char* pattern) {
-    // execute_regex_match return 0 is matched success
+    // execute_regex_match 返回0表示匹配成功
     return is_volume_name(requested) && (execute_regex_match(pattern + sizeof("regex:"), requested) == 0);
 }
 
 /**
- * Helper function to help normalize mounts for checking if mounts are
- * permitted. The function does the following -
- * 1. Find the canonical path for mount using realpath
- * 2. If the path is a directory, add a '/' at the end (if not present)
- * 3. Return a copy of the canonicalised path(to be freed by the caller)
- * @param mount path to be canonicalised.
- * @param isRegexAllowed whether regex matching is allowed for normalize mount.
- * @return pointer to canonicalised path, NULL on error.
+ * 规范化挂载路径，处理获取绝对路径和目录尾斜杠标准化
+ * @param mount 待规范化的原始挂载路径
+ * @param isRegexAllowed 是否允许正则表达式模式匹配
+ * @return 规范化后的路径指针（需要调用者释放），失败返回NULL
  */
 static char* normalize_mount(const char* mount, const int isRegexAllowed) {
     int ret = 0;
@@ -105,15 +110,15 @@ static char* normalize_mount(const char* mount, const int isRegexAllowed) {
     if (mount == NULL) {
         return NULL;
     }
+    // 调用realpath获取绝对路径
     real_mount = realpath(mount, NULL);
     if (real_mount == NULL) {
-        // If mount is a valid named volume, just return it and let the container runtime decide
+        // 如果是合法命名卷，直接返回原字符串，由容器运行时后续处理
         if (is_volume_name(mount)) {
             ret_ptr = strdup(mount);
             goto free_and_exit;
         }
-        // we only allow permitted mount to be REGEX, for permitted mount, we check
-        // if it's a valid REGEX return; for user mount, we need to strictly check
+        // 仅允许允许挂载列表使用正则，若为正则模式则直接返回
         if (isRegexAllowed) {
             if (is_regex(mount)) {
                 ret_ptr = strdup(mount);
@@ -124,8 +129,10 @@ static char* normalize_mount(const char* mount, const int isRegexAllowed) {
         ret_ptr = NULL;
         goto free_and_exit;
     }
+    // stat获取路径文件属性
     ret = stat(real_mount, &buff);
     if (ret == 0) {
+        // 如果是目录，确保结尾有斜杠
         if (S_ISDIR(buff.st_mode)) {
             size_t len = strlen(real_mount);
             if (len <= 0) {
@@ -154,15 +161,10 @@ free_and_exit:
 }
 
 /**
- * Function to normalize an array of strings. Each string in the array will
- * be normalized to its real path in the file system.
- * @param mounts - An array of strings to normalize. The contents of this
- * string array will be modified and replaced with their normalized equivalents.
- * If a string is replaced, the original string will be freed. The caller is responsible
- * for freeing the mounts string array.
- * @param isRegexAllowed - Integer to determine whether or not regex is allowed.
- * for any of the strings. 1 for allowed, 0 for not allowed.
- * @return 0 on success, -1 on failure.
+ * 批量规范化挂载路径数组中的所有路径
+ * @param mounts 待规范化的路径数组，结果会覆盖原数组内容，原字符串会被释放
+ * @param isRegexAllowed 是否允许正则表达式模式
+ * @return 0成功，-1失败
  */
 static int normalize_mounts(char **mounts, const int isRegexAllowed) {
     unsigned int i = 0;
@@ -182,11 +184,9 @@ static int normalize_mounts(char **mounts, const int isRegexAllowed) {
 }
 
 /**
- * Function to get the normalized path of the container-executor config file.
- * @param container_executor_cfg_path - A pointer to a string. This pointer will
- * point to an allocated string containing the normalized path to the container-executor
- * config file. The caller is responsible for freeing this memory.
- * @return 0 on success, MOUNT_ACCESS_ERROR on failure.
+ * 获取容器执行器配置文件的规范化路径
+ * @param container_executor_cfg_path 输出参数，指向分配得到的规范化路径，需要调用者释放
+ * @return 0成功，MOUNT_ACCESS_ERROR失败
  */
 static int get_normalized_config_path(const char **container_executor_cfg_path) {
     char *config_path = NULL;
@@ -205,14 +205,10 @@ free_and_exit:
 }
 
 /**
- * Function to determine whether or not a requested string path is allowed as a mount.
- * The requested string will be normalized and checked against the normalized paths in the
- * permitted_mounts string array. Volumes that match a regex in the permitted_mounts list
- * will also be allowed.
- * @param permitted_mounts - An array of strings that define the permitted list of paths
- * for the requested string.
- * @param requested - A string that is requested to be mounted.
- * @return 0 on not permitted, 1 on permitted, -1 on error.
+ * 检查请求挂载路径是否在允许挂载列表范围内
+ * @param permitted_mounts 允许挂载路径数组
+ * @param requested 请求挂载的源路径
+ * @return 0不允许，1允许，-1内部错误
  */
 static int check_mount_permitted(const char **permitted_mounts, const char *requested) {
     int ret = 0;
@@ -221,23 +217,26 @@ static int check_mount_permitted(const char **permitted_mounts, const char *requ
     if (permitted_mounts == NULL) {
         return 0;
     }
+    // 规范化请求路径
     char *normalized_path = normalize_mount(requested, 0);
     if (normalized_path == NULL) {
         return -1;
     }
+    // 遍历允许列表逐一匹配
     for (i = 0; permitted_mounts[i] != NULL; ++i) {
+        // 精确路径匹配
         if (strcmp(normalized_path, permitted_mounts[i]) == 0) {
             ret = 1;
             break;
         }
-        // if (permitted_mounts[i] is a REGEX): use REGEX to compare; return
+        // 如果允许列表项是正则，尝试正则匹配卷名
         if (is_regex(permitted_mounts[i]) &&
             is_volume_name_matched_by_regex(normalized_path, permitted_mounts[i])) {
             ret = 1;
             break;
         }
 
-        // directory check
+        // 目录前缀匹配：允许路径是目录，则请求路径在该目录下都允许
         permitted_mount_len = strlen(permitted_mounts[i]);
         struct stat path_stat;
         stat(permitted_mounts[i], &path_stat);
@@ -253,14 +252,11 @@ static int check_mount_permitted(const char **permitted_mounts, const char *requ
 }
 
 /**
- * Function to validate whether a requested mount path is permitted or not. The normalized mount path
- * must be in the correct permitted list based on the type of mount (ro or rw) and must not be a
- * parent of the container-executor config file.
- * @param permitted_ro_mounts - Array of permitted read-only mounts.
- * @param permitted_rw_mounts - Array of permitted read-write mounts.
- * @param requested  - Mount path to be validated
- * @return 0 on valid mount, INVALID_MOUNT, INVALID_RW_MOUNT, INVALID_RO_MOUNT,
- * or MOUNT_ACCESS_ERROR on error.
+ * 验证单个挂载请求是否合法，检查是否在允许列表且不包含容器执行器配置文件
+ * @param permitted_ro_mounts 允许只读挂载路径数组
+ * @param permitted_rw_mounts 允许读写挂载路径数组
+ * @param requested 待验证的挂载信息结构体
+ * @return 0合法，否则返回对应错误码（INVALID_MOUNT/INVALID_RW_MOUNT等）
  */
 static int validate_mount(const char **permitted_ro_mounts, const char **permitted_rw_mounts, const mount *requested) {
     const char *container_executor_cfg_path = NULL;
@@ -272,11 +268,13 @@ static int validate_mount(const char **permitted_ro_mounts, const char **permitt
         goto free_and_exit;
     }
 
+    // 获取容器执行器配置文件规范化路径
     ret = get_normalized_config_path(&container_executor_cfg_path);
     if (ret != 0) {
         goto free_and_exit;
     }
 
+    // 分别检查是否在只读和读写允许列表中
     permitted_rw = check_mount_permitted(permitted_rw_mounts, requested->src);
     permitted_ro = check_mount_permitted(permitted_ro_mounts, requested->src);
 
@@ -288,17 +286,16 @@ static int validate_mount(const char **permitted_ro_mounts, const char **permitt
     }
 
     if (requested->options != NULL && requested->options->rw == 1) {
-        // rw mount
+        // 处理读写挂载
         if (permitted_rw == 0) {
             fprintf(ERRORFILE, "Configuration does not allow mount src='%s', dest='%s'\n",
                     requested->src, requested->dest);
             ret = INVALID_RW_MOUNT;
             goto free_and_exit;
         } else {
-            // determine if the user can modify the container-executor.cfg file
+            // 安全检查：禁止读写挂载包含容器执行器配置文件的路径，防止篡改配置
             tmp_path_buffer[0] = normalize_mount(requested->src, 0);
-            // just re-use the function, flip the args to check if the container-executor path is in the requested
-            // mount point
+            // 反转参数检查配置文件路径是否在请求挂载路径范围内
             ret = check_mount_permitted(tmp_path_buffer, container_executor_cfg_path);
             free((void *) tmp_path_buffer[0]);
             if (ret == 1) {
@@ -309,7 +306,7 @@ static int validate_mount(const char **permitted_ro_mounts, const char **permitt
             }
         }
     } else {
-        // ro mount
+        // 处理只读挂载，只要在任意允许列表中即可
         if (permitted_ro == 0 && permitted_rw == 0) {
             fprintf(ERRORFILE, "Configuration does not allow mount src='%s', dest='%s'\n",
                     requested->src, requested->dest);
@@ -324,18 +321,18 @@ free_and_exit:
 }
 
 /**
- * Function to validate an array of mounts.
- * @param permitted_ro_mounts - Array of permitted read-only mounts.
- * @param permitted_rw_mounts - Array of permitted read-write mounts.
- * @param mounts - Array of mounts to be validated.
- * @param num_mounts - Number of mounts to be valildated.
- * @return 0 on valid mounts, INVALID_MOUNT, INVALID_RW_MOUNT, INVALID_RO_MOUNT,
- * or MOUNT_ACCESS_ERROR on error.
+ * 批量验证所有挂载请求的合法性
+ * @param permitted_ro_mounts 允许只读挂载路径数组
+ * @param permitted_rw_mounts 允许读写挂载路径数组
+ * @param mounts 待验证的挂载信息数组
+ * @param num_mounts 待验证挂载数量
+ * @return 0全部合法，否则返回对应错误码
  */
 int validate_mounts(char **permitted_ro_mounts, char **permitted_rw_mounts, mount *mounts, const unsigned int num_mounts) {
     int ret = 0;
     unsigned int i;
 
+    // 先规范化允许列表中的所有路径
     ret = normalize_mounts(permitted_ro_mounts, 1);
     ret |= normalize_mounts(permitted_rw_mounts, 1);
     if (ret != 0) {
@@ -344,6 +341,7 @@ int validate_mounts(char **permitted_ro_mounts, char **permitted_rw_mounts, moun
         goto free_and_exit;
     }
 
+    // 逐个验证每个挂载请求
     for (i = 0; i < num_mounts; i++) {
         ret = validate_mount((const char **) permitted_ro_mounts, (const char **) permitted_rw_mounts, &mounts[i]);
         if (ret != 0) {

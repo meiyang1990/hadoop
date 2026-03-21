@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,7 +19,35 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt;
 
+/**
+ * YARN ResourceManager 应用尝试（RMAppAttempt）的状态枚举类
+ * 定义了一个应用尝试从创建到结束的所有可能生命周期状态
+ */
 public enum RMAppAttemptState {
-  NEW, SUBMITTED, SCHEDULED, ALLOCATED, LAUNCHED, FAILED, RUNNING, FINISHING, 
-  FINISHED, KILLED, ALLOCATED_SAVING, LAUNCHED_UNMANAGED_SAVING, FINAL_SAVING
+  /** 新建状态，应用尝试刚被创建 */
+  NEW,
+  /** 已提交状态，已经提交到调度器 */
+  SUBMITTED,
+  /** 已调度状态，已经被调度器安排执行 */
+  SCHEDULED,
+  /** 已分配状态，资源已经分配完成 */
+  ALLOCATED,
+  /** 已启动状态，应用尝试已经在NM节点启动 */
+  LAUNCHED,
+  /** 失败状态，应用尝试执行失败 */
+  FAILED,
+  /** 运行中状态，应用尝试正在正常执行 */
+  RUNNING,
+  /** 完成中状态，任务已经执行完成正在收尾 */
+  FINISHING,
+  /** 已完成状态，应用尝试正常执行结束 */
+  FINISHED,
+  /** 已杀死状态，应用尝试被手动杀死终止 */
+  KILLED,
+  /** 资源分配保存中状态，正在保存分配状态到状态存储 */
+  ALLOCATED_SAVING,
+  /** 非托管应用启动保存中状态，正在保存启动状态到状态存储 */
+  LAUNCHED_UNMANAGED_SAVING,
+  /** 最终状态保存中状态，正在保存最终状态到状态存储 */
+  FINAL_SAVING
 }

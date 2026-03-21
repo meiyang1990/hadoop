@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -21,8 +22,13 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.sha
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
+/**
+ * 共享缓存上传事件类型枚举
+ * 定义NodeManager共享缓存模块中支持的上传事件类型
+ */
 @Private
 @Unstable
 public enum SharedCacheUploadEventType {
+  /** 触发资源上传到共享缓存的事件 */
   UPLOAD
 }

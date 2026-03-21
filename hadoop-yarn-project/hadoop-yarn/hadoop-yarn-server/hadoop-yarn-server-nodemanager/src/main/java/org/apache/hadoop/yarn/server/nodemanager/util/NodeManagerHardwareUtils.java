@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements. See the NOTICE file
@@ -33,8 +34,8 @@ import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import java.util.Map;
 
 /**
- * Helper class to determine hardware related characteristics such as the
- * number of processors and the amount of memory on the node.
+ * NodeManager硬件信息工具类，用于获取节点CPU、内存等硬件特征信息，
+ * 结合配置计算可分配给YARN容器的资源量。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -43,6 +44,11 @@ public class NodeManagerHardwareUtils {
   private static final Logger LOG =
        LoggerFactory.getLogger(NodeManagerHardwareUtils.class);
 
+  /**
+   * 检查是否开启硬件能力自动检测。
+   * @param conf 配置对象
+   * @return 是否开启自动检测
+   */
   private static boolean isHardwareDetectionEnabled(Configuration conf) {
     return conf.getBoolean(
         YarnConfiguration.NM_ENABLE_HARDWARE_CAPABILITY_DETECTION,
@@ -50,14 +56,9 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   *
-   * Returns the number of CPUs on the node. This value depends on the
-   * configuration setting which decides whether to count logical processors
-   * (such as hyperthreads) as cores or not.
-   *
-   * @param conf
-   *          - Configuration object
-   * @return Number of CPUs
+   * 获取节点CPU总数，根据配置决定是否将逻辑处理器（超线程）计入核数。
+   * @param conf 配置对象
+   * @return 节点CPU总数
    */
   public static int getNodeCPUs(Configuration conf) {
     ResourceCalculatorPlugin plugin =
@@ -66,16 +67,10 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   *
-   * Returns the number of CPUs on the node. This value depends on the
-   * configuration setting which decides whether to count logical processors
-   * (such as hyperthreads) as cores or not.
-   *
-   * @param plugin
-   *          - ResourceCalculatorPlugin object to determine hardware specs
-   * @param conf
-   *          - Configuration object
-   * @return Number of CPU cores on the node.
+   * 获取节点CPU总数，根据配置决定是否将逻辑处理器（超线程）计入核数。
+   * @param plugin 资源计算器插件
+   * @param conf 配置对象
+   * @return 节点CPU总数
    */
   public static int getNodeCPUs(ResourceCalculatorPlugin plugin,
       Configuration conf) {
@@ -90,14 +85,9 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   *
-   * Returns the fraction of CPUs that should be used for YARN containers.
-   * The number is derived based on various configuration params such as
-   * YarnConfiguration.NM_RESOURCE_PERCENTAGE_PHYSICAL_CPU_LIMIT
-   *
-   * @param conf
-   *          - Configuration object
-   * @return Fraction of CPUs to be used for YARN containers
+   * 计算可分配给YARN容器的CPU数量，根据配置的CPU占比计算。
+   * @param conf 配置对象
+   * @return 可分配给容器的CPU数量
    */
   public static float getContainersCPUs(Configuration conf) {
     ResourceCalculatorPlugin plugin =
@@ -106,16 +96,10 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   *
-   * Returns the fraction of CPUs that should be used for YARN containers.
-   * The number is derived based on various configuration params such as
-   * YarnConfiguration.NM_RESOURCE_PERCENTAGE_PHYSICAL_CPU_LIMIT
-   *
-   * @param plugin
-   *          - ResourceCalculatorPlugin object to determine hardware specs
-   * @param conf
-   *          - Configuration object
-   * @return Fraction of CPUs to be used for YARN containers
+   * 计算可分配给YARN容器的CPU数量，根据配置的CPU占比计算。
+   * @param plugin 资源计算器插件
+   * @param conf 配置对象
+   * @return 可分配给容器的CPU数量
    */
   public static float getContainersCPUs(ResourceCalculatorPlugin plugin,
       Configuration conf) {
@@ -126,11 +110,9 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   * Gets the percentage of physical CPU that is configured for YARN containers.
-   * This is percent {@literal >} 0 and {@literal <=} 100 based on
-   * {@link YarnConfiguration#NM_RESOURCE_PERCENTAGE_PHYSICAL_CPU_LIMIT}
-   * @param conf Configuration object
-   * @return percent {@literal >} 0 and {@literal <=} 100
+   * 获取配置的节点CPU可分配给YARN的百分比。
+   * @param conf 配置对象
+   * @return 百分比(0 < 值 <= 100)
    */
   public static int getNodeCpuPercentage(Configuration conf) {
     int nodeCpuPercentage =
@@ -150,6 +132,11 @@ public class NodeManagerHardwareUtils {
     return nodeCpuPercentage;
   }
 
+  /**
+   * 获取配置文件中指定的vcore数量，处理默认值。
+   * @param conf 配置对象
+   * @return 配置的vcore数量
+   */
   private static int getConfiguredVCores(Configuration conf) {
     int cores = conf.getInt(YarnConfiguration.NM_VCORES,
         YarnConfiguration.DEFAULT_NM_VCORES);
@@ -160,25 +147,16 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   * Function to return the number of vcores on the system that can be used for
-   * YARN containers. If a number is specified in the configuration file, then
-   * that number is returned. If nothing is specified - 1. If the OS is an
-   * "unknown" OS(one for which we don't have ResourceCalculatorPlugin
-   * implemented), return the default NodeManager cores. 2. If the config
-   * variable yarn.nodemanager.cpu.use_logical_processors is set to true, it
-   * returns the logical processor count(count hyperthreads as cores), else it
-   * returns the physical cores count.
-   *
-   * @param conf
-   *          - the configuration for the NodeManager
-   * @return the number of cores to be used for YARN containers
-   *
+   * 获取可分配给YARN容器的vcore总数。
+   * 若配置中指定了数值则直接返回，否则根据硬件信息自动计算。
+   * @param conf NodeManager配置对象
+   * @return 可分配的vcore总数
    */
   public static int getVCores(Configuration conf) {
     if (!isHardwareDetectionEnabled(conf)) {
       return getConfiguredVCores(conf);
     }
-    // is this os for which we can determine cores?
+    // 获取资源计算器插件，判断当前系统是否支持硬件检测
     ResourceCalculatorPlugin plugin =
         ResourceCalculatorPlugin.getResourceCalculatorPlugin(null, conf);
     if (plugin == null) {
@@ -188,21 +166,11 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   * Function to return the number of vcores on the system that can be used for
-   * YARN containers. If a number is specified in the configuration file, then
-   * that number is returned. If nothing is specified - 1. If the OS is an
-   * "unknown" OS(one for which we don't have ResourceCalculatorPlugin
-   * implemented), return the default NodeManager cores. 2. If the config
-   * variable yarn.nodemanager.cpu.use_logical_processors is set to true, it
-   * returns the logical processor count(count hyperthreads as cores), else it
-   * returns the physical cores count.
-   *
-   * @param plugin
-   *          - ResourceCalculatorPlugin object to determine hardware specs
-   * @param conf
-   *          - the configuration for the NodeManager
-   * @return the number of cores to be used for YARN containers
-   *
+   * 获取可分配给YARN容器的vcore总数。
+   * 若配置中指定了数值则直接返回，否则根据硬件信息自动计算。
+   * @param plugin 资源计算器插件
+   * @param conf NodeManager配置对象
+   * @return 可分配的vcore总数
    */
   public static int getVCores(ResourceCalculatorPlugin plugin,
       Configuration conf) {
@@ -212,10 +180,17 @@ public class NodeManagerHardwareUtils {
     return getVCoresInternal(plugin, conf);
   }
 
+  /**
+   * 内部方法：根据物理CPU数和配置的乘数计算vcore总数。
+   * @param plugin 资源计算器插件
+   * @param conf 配置对象
+   * @return 计算得到的vcore总数
+   */
   private static int getVCoresInternal(ResourceCalculatorPlugin plugin,
       Configuration conf) {
     String message;
     int cores = conf.getInt(YarnConfiguration.NM_VCORES, -1);
+    // 配置未指定vcore数，自动计算
     if (cores == -1) {
       float physicalCores =
           NodeManagerHardwareUtils.getContainersCPUs(plugin, conf);
@@ -225,7 +200,7 @@ public class NodeManagerHardwareUtils {
       if (multiplier > 0) {
         float tmp = physicalCores * multiplier;
         if (tmp > 0 && tmp < 1) {
-          // on a single core machine - tmp can be between 0 and 1
+          // 单核节点计算结果不足1时，至少分配1个vcore
           cores = 1;
         } else {
           cores = Math.round(tmp);
@@ -246,6 +221,11 @@ public class NodeManagerHardwareUtils {
     return cores;
   }
 
+  /**
+   * 获取配置文件中指定的容器可用内存（单位MB），处理默认值。
+   * @param conf 配置对象
+   * @return 配置的内存大小(MB)
+   */
   private static long getConfiguredMemoryMB(Configuration conf) {
     long memoryMb = conf.getLong(YarnConfiguration.NM_PMEM_MB,
         YarnConfiguration.DEFAULT_NM_PMEM_MB);
@@ -256,19 +236,10 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   * Function to return how much memory we should set aside for YARN containers.
-   * If a number is specified in the configuration file, then that number is
-   * returned. If nothing is specified - 1. If the OS is an "unknown" OS(one for
-   * which we don't have ResourceCalculatorPlugin implemented), return the
-   * default NodeManager physical memory. 2. If the OS has a
-   * ResourceCalculatorPlugin implemented, the calculation is 0.8 * (RAM - 2 *
-   * JVM-memory) i.e. use 80% of the memory after accounting for memory used by
-   * the DataNode and the NodeManager. If the number is less than 1GB, log a
-   * warning message.
-   *
-   * @param conf
-   *          - the configuration for the NodeManager
-   * @return the amount of memory that will be used for YARN containers in MB.
+   * 获取可分配给YARN容器的内存总数（单位MB）。
+   * 若配置中指定了数值则直接返回，否则根据硬件信息自动计算。
+   * @param conf NodeManager配置对象
+   * @return 可分配的内存大小(MB)
    */
   public static long getContainerMemoryMB(Configuration conf) {
     if (!isHardwareDetectionEnabled(conf)) {
@@ -283,21 +254,11 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   * Function to return how much memory we should set aside for YARN containers.
-   * If a number is specified in the configuration file, then that number is
-   * returned. If nothing is specified - 1. If the OS is an "unknown" OS(one for
-   * which we don't have ResourceCalculatorPlugin implemented), return the
-   * default NodeManager physical memory. 2. If the OS has a
-   * ResourceCalculatorPlugin implemented, the calculation is 0.8 * (RAM - 2 *
-   * JVM-memory) i.e. use 80% of the memory after accounting for memory used by
-   * the DataNode and the NodeManager. If the number is less than 1GB, log a
-   * warning message.
-   *
-   * @param plugin
-   *          - ResourceCalculatorPlugin object to determine hardware specs
-   * @param conf
-   *          - the configuration for the NodeManager
-   * @return the amount of memory that will be used for YARN containers in MB.
+   * 获取可分配给YARN容器的内存总数（单位MB）。
+   * 若配置中指定了数值则直接返回，否则根据硬件信息自动计算。
+   * @param plugin 资源计算器插件
+   * @param conf NodeManager配置对象
+   * @return 可分配的内存大小(MB)
    */
   public static long getContainerMemoryMB(ResourceCalculatorPlugin plugin,
       Configuration conf) {
@@ -307,15 +268,26 @@ public class NodeManagerHardwareUtils {
     return getContainerMemoryMBInternal(plugin, conf);
   }
 
+  /**
+   * 内部方法：根据节点总内存和预留内存计算可分配给容器的内存。
+   * @param plugin 资源计算器插件
+   * @param conf 配置对象
+   * @return 计算得到的可分配内存(MB)
+   */
   private static long getContainerMemoryMBInternal(ResourceCalculatorPlugin plugin,
       Configuration conf) {
     long memoryMb = conf.getInt(YarnConfiguration.NM_PMEM_MB, -1);
+    // 配置未指定内存大小，自动计算
     if (memoryMb == -1) {
+      // 获取节点总物理内存，转换为MB单位
       long physicalMemoryMB = (plugin.getPhysicalMemorySize() / (1024 * 1024));
+      // 获取当前NM JVM的最大堆内存，转换为MB单位
       long hadoopHeapSizeMB = (Runtime.getRuntime().maxMemory()
           / (1024 * 1024));
+      // 默认算法：80% * (总内存 - 预留2倍JVM内存，给DataNode和NM各留一份)
       long containerPhysicalMemoryMB = (long) (0.8f
           * (physicalMemoryMB - (2 * hadoopHeapSizeMB)));
+      // 若配置了系统预留内存，则使用配置值替换默认计算
       long reservedMemoryMB = conf
           .getInt(YarnConfiguration.NM_SYSTEM_RESERVED_PMEM_MB, -1);
       if (reservedMemoryMB != -1) {
@@ -326,6 +298,7 @@ public class NodeManagerHardwareUtils {
             + " Node memory is " + physicalMemoryMB
             + " MB, system reserved memory is " + reservedMemoryMB + " MB.");
       }
+      // 保证结果不小于0
       containerPhysicalMemoryMB = Math.max(containerPhysicalMemoryMB, 0);
       memoryMb = containerPhysicalMemoryMB;
     }
@@ -338,9 +311,9 @@ public class NodeManagerHardwareUtils {
   }
 
   /**
-   * Get the resources for the node.
-   * @param configuration configuration file
-   * @return the resources for the node
+   * 获取节点完整资源信息，合并自定义资源和自动计算的内存/vcore。
+   * @param configuration 配置对象
+   * @return 节点总资源信息
    */
   public static Resource getNodeResources(Configuration configuration) {
     Configuration conf = new Configuration(configuration);
@@ -348,13 +321,16 @@ public class NodeManagerHardwareUtils {
     String vcores = ResourceInformation.VCORES.getName();
 
     Resource ret = Resource.newInstance(0, 0);
+    // 从配置中加载节点资源信息
     Map<String, ResourceInformation> resourceInformation =
         ResourceUtils.getNodeResourceInformation(conf);
+    // 将所有配置的资源添加到返回结果中
     for (Map.Entry<String, ResourceInformation> entry : resourceInformation
         .entrySet()) {
       ret.setResourceInformation(entry.getKey(), entry.getValue());
       LOG.debug("Setting key {} to {}", entry.getKey(), entry.getValue());
     }
+    // 处理内存资源：若配置中内存值为0，自动计算
     if (resourceInformation.containsKey(memory)) {
       Long value = resourceInformation.get(memory).getValue();
       if (value > Integer.MAX_VALUE) {
@@ -367,6 +343,7 @@ public class NodeManagerHardwareUtils {
         LOG.debug("Set memory to {}", ret.getMemorySize());
       }
     }
+    // 处理vcore资源：若配置中vcore值为0，自动计算
     if (resourceInformation.containsKey(vcores)) {
       Long value = resourceInformation.get(vcores).getValue();
       if (value > Integer.MAX_VALUE) {

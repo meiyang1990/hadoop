@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,11 @@
  * limitations under the License.
  */
 
+/**
+ * YARN NodeManager 容器执行器可扩展模块通用配置头文件
+ * 本文件提供模块启用状态检查功能，支持模块化扩展容器执行器能力
+ */
+
 #ifdef __FreeBSD__
 #define _WITH_GETLINE
 #endif
@@ -26,8 +32,10 @@
 #include "configuration.h"
 
 /**
- * check if module enabled given name of module.
- * return 0 if disabled
+ * 根据模块名称检查指定模块是否启用
+ * @param section_cfg 配置段指针，对应模块所在的配置段
+ * @param module_name 待检查的模块名称
+ * @return 0 表示模块禁用，非0表示模块启用
  */
 int module_enabled(const struct section* section_cfg, const char* module_name);
 

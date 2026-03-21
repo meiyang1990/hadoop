@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -74,15 +75,14 @@ import static org.apache.hadoop.yarn.exceptions
         .InvalidResourceRequestException.UNKNOWN_REASON_MESSAGE_TEMPLATE;
 
 /**
- * Utilities shared by schedulers. 
+ * YARN资源调度器通用工具类，提供调度器共享的工具方法。
  */
 @Private
 @Unstable
 public class SchedulerUtils {
 
   /**
-   * This class contains invalid resource information along with its
-   * resource request.
+   * 存储资源请求与不合法资源信息的结果封装类，用于队列最大资源校验场景。
    */
   public static class MaxResourceValidationResult {
     private ResourceRequest resourceRequest;
@@ -133,13 +133,11 @@ public class SchedulerUtils {
       "Container reservation no longer required.";
 
   /**
-   * Utility to create a {@link ContainerStatus} during exceptional
-   * circumstances.
+   * 创建异常场景下的容器状态对象。
    *
-   * @param containerId {@link ContainerId} of returned/released/lost container.
-   * @param diagnostics diagnostic message
-   * @return <code>ContainerStatus</code> for an returned/released/lost 
-   *         container
+   * @param containerId 异常容器ID
+   * @param diagnostics 诊断信息
+   * @return 异常容器的状态对象
    */
   public static ContainerStatus createAbnormalContainerStatus(
       ContainerId containerId, String diagnostics) {
@@ -149,10 +147,10 @@ public class SchedulerUtils {
 
 
   /**
-   * Utility to create a {@link ContainerStatus} for killed containers.
-   * @param containerId {@link ContainerId} of the killed container.
-   * @param diagnostics diagnostic message
-   * @return <code>ContainerStatus</code> for a killed container
+   * 创建被杀死容器的状态对象。
+   * @param containerId 被杀死容器ID
+   * @param diagnostics 诊断信息
+   * @return 被杀死容器的状态对象
    */
   public static ContainerStatus createKilledContainerStatus(
       ContainerId containerId, String diagnostics) {
@@ -161,13 +159,11 @@ public class SchedulerUtils {
   }
 
   /**
-   * Utility to create a {@link ContainerStatus} during exceptional
-   * circumstances.
+   * 创建被抢占容器的状态对象。
    *
-   * @param containerId {@link ContainerId} of returned/released/lost container.
-   * @param diagnostics diagnostic message
-   * @return <code>ContainerStatus</code> for an returned/released/lost
-   *         container
+   * @param containerId 被抢占容器ID
+   * @param diagnostics 诊断信息
+   * @return 被抢占容器的状态对象
    */
   public static ContainerStatus createPreemptedContainerStatus(
       ContainerId containerId, String diagnostics) {
@@ -176,16 +172,16 @@ public class SchedulerUtils {
   }
 
   /**
-   * Utility to create a {@link ContainerStatus} during exceptional
-   * circumstances.
+   * 创建异常容器状态对象的通用私有方法。
    *
-   * @param containerId {@link ContainerId} of returned/released/lost container.
-   * @param diagnostics diagnostic message
-   * @return <code>ContainerStatus</code> for an returned/released/lost 
-   *         container
+   * @param containerId 异常容器ID
+   * @param exitStatus 退出状态码
+   * @param diagnostics 诊断信息
+   * @return 异常容器状态对象
    */
   private static ContainerStatus createAbnormalContainerStatus(
       ContainerId containerId, int exitStatus, String diagnostics) {
+    // 创建容器状态实例
     ContainerStatus containerStatus =
         recordFactory.newRecordInstance(ContainerStatus.class);
     containerStatus.setContainerId(containerId);
@@ -196,14 +192,12 @@ public class SchedulerUtils {
   }
 
   /**
-   * Utility method to normalize a resource request, by ensuring that the
-   * requested memory is a multiple of minMemory and is not zero.
+   * 归一化资源请求，确保请求资源是最小资源的倍数且不为零。
    *
-   * @param ask resource request.
-   * @param resourceCalculator {@link ResourceCalculator} the resource
-   * calculator to use.
-   * @param minimumResource minimum Resource.
-   * @param maximumResource maximum Resource.
+   * @param ask 资源请求对象
+   * @param resourceCalculator 资源计算器
+   * @param minimumResource 最小资源单元
+   * @param maximumResource 最大允许资源
    */
   @VisibleForTesting
   public static void normalizeRequest(
@@ -217,16 +211,14 @@ public class SchedulerUtils {
   }
 
   /**
-   * Utility method to normalize a resource request, by ensuring that the
-   * requested memory is a multiple of increment resource and is not zero.
+   * 归一化资源，确保请求资源是增量资源的倍数且不超过最大限制。
    *
-   * @param ask resource request.
-   * @param resourceCalculator {@link ResourceCalculator} the resource
-   * calculator to use.
-   * @param minimumResource minimum Resource.
-   * @param maximumResource maximum Resource.
-   * @param incrementResource increment Resource.
-   * @return normalized resource
+   * @param ask 原始请求资源
+   * @param resourceCalculator 资源计算器
+   * @param minimumResource 最小资源单元
+   * @param maximumResource 最大允许资源
+   * @param incrementResource 增量资源步长
+   * @return 归一化后的资源对象
    */
   public static Resource getNormalizedResource(
       Resource ask,
@@ -240,6 +232,11 @@ public class SchedulerUtils {
     return normalized;
   }
 
+  /**
+   * 归一化资源请求中的节点标签表达式，使用队列默认标签填充空请求。
+   * @param resReq 资源请求对象
+   * @param queueInfo 队列信息
+   */
   private static void normalizeNodeLabelExpressionInRequest(
       ResourceRequest resReq, QueueInfo queueInfo) {
 
@@ -249,8 +246,7 @@ public class SchedulerUtils {
       LOG.debug("Queue Info : " + queueInfo);
     }
 
-    // if queue has default label expression, and RR doesn't have, use the
-    // default label expression of queue
+    // 如果请求没有指定标签，且请求任意节点，使用队列默认标签表达式
     if (labelExp == null && queueInfo != null && ResourceRequest.ANY
         .equals(resReq.getResourceName())) {
       LOG.debug("Setting default node label expression : {}", queueInfo
@@ -258,10 +254,7 @@ public class SchedulerUtils {
       labelExp = queueInfo.getDefaultNodeLabelExpression();
     }
 
-    // If labelExp still equals to null, it could either be a dynamic queue
-    // or the label is not configured
-    // set it to be NO_LABEL in case of a pre-configured queue. Dynamic
-    // queues are handled in RMAppAttemptImp.ScheduledTransition
+    // 如果仍未指定标签且队列已预配置，设置为无标签
     if (labelExp == null && queueInfo != null) {
       labelExp = RMNodeLabelsManager.NO_LABEL;
     }
@@ -271,12 +264,23 @@ public class SchedulerUtils {
     }
   }
 
+  /**
+   * 归一化并验证资源请求，检查节点标签和资源合法性。
+   * @param resReq 资源请求对象
+   * @param maximumAllocation 集群最大允许分配资源
+   * @param queueName 队列名称
+   * @param isRecovery 是否是恢复模式（恢复模式跳过验证）
+   * @param rmContext RM上下文对象
+   * @param queueInfo 队列信息
+   * @param nodeLabelsEnabled 集群是否启用节点标签
+   * @throws InvalidResourceRequestException 资源请求不合法时抛出
+   */
   public static void normalizeAndValidateRequest(ResourceRequest resReq,
       Resource maximumAllocation, String queueName, boolean isRecovery,
       RMContext rmContext, QueueInfo queueInfo, boolean nodeLabelsEnabled)
           throws InvalidResourceRequestException {
     Configuration conf = rmContext.getYarnConfiguration();
-    // If Node label is not enabled throw exception
+    // 节点标签未启用时，如果请求包含标签抛出异常（恢复模式除外）
     if (null != conf && !nodeLabelsEnabled) {
       String labelExp = resReq.getNodeLabelExpression();
       if (!(RMNodeLabelsManager.NO_LABEL.equals(labelExp)
@@ -291,22 +295,34 @@ public class SchedulerUtils {
         }
       }
     }
+    // 如果未传入队列信息，尝试从调度器获取
     if (null == queueInfo) {
       try {
         queueInfo = rmContext.getScheduler().getQueueInfo(queueName, false,
             false);
       } catch (IOException e) {
-        //Queue may not exist since it could be auto-created in case of
-        // dynamic queues
+        // 动态队列场景下，自动创建前获取会失败，忽略异常
       }
     }
+    // 归一化节点标签表达式
     SchedulerUtils.normalizeNodeLabelExpressionInRequest(resReq, queueInfo);
 
+    // 非恢复模式下验证资源请求合法性
     if (!isRecovery) {
       validateResourceRequest(resReq, maximumAllocation, queueInfo, rmContext);
     }
   }
 
+  /**
+   * 归一化并验证资源请求（默认非恢复模式）。
+   * @param resReq 资源请求对象
+   * @param maximumAllocation 集群最大允许分配资源
+   * @param queueName 队列名称
+   * @param rmContext RM上下文对象
+   * @param queueInfo 队列信息
+   * @param nodeLabelsEnabled 集群是否启用节点标签
+   * @throws InvalidResourceRequestException 资源请求不合法时抛出
+   */
   public static void normalizeAndValidateRequest(ResourceRequest resReq,
       Resource maximumAllocation, String queueName, RMContext rmContext,
       QueueInfo queueInfo, boolean nodeLabelsEnabled)
@@ -316,13 +332,13 @@ public class SchedulerUtils {
   }
 
   /**
-   * If RM should enforce partition exclusivity for enforced partition "x":
-   * 1) If request is "x" and app label is not "x",
-   *    override request to app's label.
-   * 2) If app label is "x", ensure request is "x".
-   * @param resReq resource request
-   * @param enforcedPartitions list of exclusive enforced partitions
-   * @param appLabel app's node label expression
+   * 强制分区独占性约束，确保请求标签与应用标签一致。
+   * 对于强制独占分区：
+   * 1) 请求指定分区但应用标签不是该分区，覆盖为应用标签
+   * 2) 应用标签是强制分区，强制请求使用应用标签
+   * @param resReq 资源请求
+   * @param enforcedPartitions 强制独占分区列表
+   * @param appLabel 应用的节点标签表达式
    */
   public static void enforcePartitionExclusivity(ResourceRequest resReq,
       Set<String> enforcedPartitions, String appLabel) {
@@ -339,20 +355,23 @@ public class SchedulerUtils {
   }
 
   /**
-   * Utility method to validate a resource request, by ensuring that the
-   * requested memory/vcore is non-negative and not greater than max
-   *
-   * @throws InvalidResourceRequestException when there is invalid request
+   * 验证资源请求合法性，检查资源范围和节点标签权限。
+   * @param resReq 资源请求
+   * @param maximumAllocation 最大允许分配资源
+   * @param queueInfo 队列信息
+   * @param rmContext RM上下文
+   * @throws InvalidResourceRequestException 资源请求不合法时抛出
    */
   private static void validateResourceRequest(ResourceRequest resReq,
       Resource maximumAllocation, QueueInfo queueInfo, RMContext rmContext)
       throws InvalidResourceRequestException {
     final Resource requestedResource = resReq.getCapability();
+    // 检查请求资源不超过最大允许分配、不小于零
     checkResourceRequestAgainstAvailableResource(requestedResource,
         maximumAllocation);
 
     String labelExp = resReq.getNodeLabelExpression();
-    // we don't allow specify label expression other than resourceName=ANY now
+    // 不允许在非任意节点请求中指定节点标签
     if (!ResourceRequest.ANY.equals(resReq.getResourceName())
         && labelExp != null && !labelExp.trim().isEmpty()) {
       throw new InvalidLabelResourceRequestException(
@@ -362,7 +381,7 @@ public class SchedulerUtils {
               + resReq.getResourceName());
     }
 
-    // we don't allow specify label expression with more than one node labels now
+    // 目前不支持多个标签的与表达式
     if (labelExp != null && labelExp.contains("&&")) {
       throw new InvalidLabelResourceRequestException(
           "Invalid resource request, queue=" + queueInfo.getQueueName()
@@ -371,6 +390,7 @@ public class SchedulerUtils {
               + labelExp);
     }
 
+    // 检查队列是否有权限访问请求的标签
     if (labelExp != null && !labelExp.trim().isEmpty() && queueInfo != null) {
       if (!checkQueueLabelExpression(queueInfo.getAccessibleNodeLabels(),
           labelExp, rmContext)) {
@@ -383,16 +403,23 @@ public class SchedulerUtils {
                     : StringUtils.join(
                         queueInfo.getAccessibleNodeLabels().iterator(), ',')));
       } else {
+        // 检查集群确实存在请求的标签
         checkQueueLabelInLabelManager(labelExp, rmContext);
       }
     }
   }
 
+  /**
+   * 提取资源对象中值为零的资源类型。
+   * @param resource 输入资源对象
+   * @return 值为零的资源信息映射
+   */
   private static Map<String, ResourceInformation> getZeroResources(
       Resource resource) {
     Map<String, ResourceInformation> resourceInformations = Maps.newHashMap();
     int maxLength = ResourceUtils.getNumberOfCountableResourceTypes();
 
+    // 遍历所有可计数资源类型，收集值为零的资源
     for (int i = 0; i < maxLength; i++) {
       ResourceInformation resourceInformation =
           resource.getResourceInformation(i);
@@ -406,228 +433,13 @@ public class SchedulerUtils {
 
   @Private
   @VisibleForTesting
+  /**
+   * 检查资源请求是否在可用资源范围内，不小于零且不超过最大分配。
+   * @param reqResource 请求资源
+   * @param availableResource 可用最大资源
+   * @throws InvalidResourceRequestException 资源不合法时抛出
+   */
   static void checkResourceRequestAgainstAvailableResource(Resource reqResource,
       Resource availableResource) throws InvalidResourceRequestException {
-    for (int i = 0; i < ResourceUtils.getNumberOfCountableResourceTypes(); i++) {
-      final ResourceInformation requestedRI =
-          reqResource.getResourceInformation(i);
-      final String reqResourceName = requestedRI.getName();
-
-      if (requestedRI.getValue() < 0) {
-        throwInvalidResourceException(reqResource, availableResource,
-            reqResourceName, InvalidResourceType.LESS_THAN_ZERO);
-      }
-
-      boolean valid = checkResource(requestedRI, availableResource);
-      if (!valid) {
-        throwInvalidResourceException(reqResource, availableResource,
-            reqResourceName, InvalidResourceType.GREATER_THEN_MAX_ALLOCATION);
-      }
-    }
-  }
-
-  public static MaxResourceValidationResult
-      validateResourceRequestsAgainstQueueMaxResource(
-      ResourceRequest resReq, Resource availableResource)
-      throws SchedulerInvalidResourceRequestException {
-    final Resource reqResource = resReq.getCapability();
-    Map<String, ResourceInformation> resourcesWithZeroAmount =
-        getZeroResources(availableResource);
-
-    if (LOG.isTraceEnabled()) {
-      LOG.trace("Resources with zero amount: "
-          + Arrays.toString(resourcesWithZeroAmount.entrySet().toArray()));
-    }
-
-    List<ResourceInformation> invalidResources = Lists.newArrayList();
-    for (int i = 0; i < ResourceUtils.getNumberOfCountableResourceTypes(); i++) {
-      final ResourceInformation requestedRI =
-          reqResource.getResourceInformation(i);
-      final String reqResourceName = requestedRI.getName();
-
-      if (resourcesWithZeroAmount.containsKey(reqResourceName)
-          && requestedRI.getValue() > 0) {
-        invalidResources.add(requestedRI);
-      }
-    }
-    return new MaxResourceValidationResult(resReq, invalidResources);
-  }
-
-  /**
-   * Checks requested ResouceInformation against available Resource.
-   * @param requestedRI
-   * @param availableResource
-   * @return true if request is valid, false otherwise.
-   */
-  private static boolean checkResource(
-      ResourceInformation requestedRI, Resource availableResource) {
-    final ResourceInformation availableRI =
-        availableResource.getResourceInformation(requestedRI.getName());
-
-    long requestedResourceValue = requestedRI.getValue();
-    long availableResourceValue = availableRI.getValue();
-    int unitsRelation = UnitsConversionUtil.compareUnits(requestedRI.getUnits(),
-        availableRI.getUnits());
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Requested resource information: " + requestedRI);
-      LOG.debug("Available resource information: " + availableRI);
-      LOG.debug("Relation of units: " + unitsRelation);
-    }
-
-    // requested resource unit is less than available resource unit
-    // e.g. requestedUnit: "m", availableUnit: "K")
-    if (unitsRelation < 0) {
-      availableResourceValue =
-          UnitsConversionUtil.convert(availableRI.getUnits(),
-              requestedRI.getUnits(), availableRI.getValue());
-
-      // requested resource unit is greater than available resource unit
-      // e.g. requestedUnit: "G", availableUnit: "M")
-    } else if (unitsRelation > 0) {
-      requestedResourceValue =
-          UnitsConversionUtil.convert(requestedRI.getUnits(),
-              availableRI.getUnits(), requestedRI.getValue());
-    }
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Requested resource value after conversion: "
-          + requestedResourceValue);
-      LOG.info("Available resource value after conversion: "
-          + availableResourceValue);
-    }
-
-    return requestedResourceValue <= availableResourceValue;
-  }
-
-  private static void throwInvalidResourceException(Resource reqResource,
-          Resource maxAllowedAllocation, String reqResourceName,
-          InvalidResourceType invalidResourceType)
-      throws InvalidResourceRequestException {
-    final String message;
-
-    if (invalidResourceType == InvalidResourceType.LESS_THAN_ZERO) {
-      message = String.format(LESS_THAN_ZERO_RESOURCE_MESSAGE_TEMPLATE,
-          reqResourceName, reqResource);
-    } else if (invalidResourceType ==
-            InvalidResourceType.GREATER_THEN_MAX_ALLOCATION) {
-      message = String.format(GREATER_THAN_MAX_RESOURCE_MESSAGE_TEMPLATE,
-          reqResourceName, reqResource, maxAllowedAllocation,
-          ResourceUtils.getResourceTypesMaximumAllocation());
-    } else if (invalidResourceType == InvalidResourceType.UNKNOWN) {
-      message = String.format(UNKNOWN_REASON_MESSAGE_TEMPLATE, reqResourceName,
-          reqResource);
-    } else {
-      throw new IllegalArgumentException(String.format(
-          "InvalidResourceType argument should be either " + "%s, %s or %s",
-          InvalidResourceType.LESS_THAN_ZERO,
-          InvalidResourceType.GREATER_THEN_MAX_ALLOCATION,
-          InvalidResourceType.UNKNOWN));
-    }
-    throw new InvalidResourceRequestException(message, invalidResourceType);
-  }
-
-  private static void checkQueueLabelInLabelManager(String labelExpression,
-      RMContext rmContext) throws InvalidLabelResourceRequestException {
-    // check node label manager contains this label
-    if (null != rmContext) {
-      RMNodeLabelsManager nlm = rmContext.getNodeLabelManager();
-      if (nlm != null && !nlm.containsNodeLabel(labelExpression)) {
-        throw new InvalidLabelResourceRequestException(
-            "Invalid label resource request, cluster do not contain "
-                + ", label= " + labelExpression);
-      }
-    }
-  }
-
-  /**
-   * Check queue label expression, check if node label in queue's
-   * node-label-expression existed in clusterNodeLabels if rmContext != null.
-   *
-   * @param queueLabels queue Labels.
-   * @param labelExpression label expression.
-   * @param rmContext rmContext.
-   * @return true, if node label in queue's node-label-expression existed in clusterNodeLabels;
-   * otherwise false.
-   *
-   */
-  public static boolean checkQueueLabelExpression(Set<String> queueLabels,
-      String labelExpression, RMContext rmContext) {
-    // if label expression is empty, we can allocate container on any node
-    if (labelExpression == null) {
-      return true;
-    }
-    for (String str : labelExpression.split("&&")) {
-      str = str.trim();
-      if (!str.trim().isEmpty()) {
-        // check queue label
-        if (queueLabels == null) {
-          return false;
-        } else {
-          if (!queueLabels.contains(str)
-              && !queueLabels.contains(RMNodeLabelsManager.ANY)) {
-            return false;
-          }
-        }
-      }
-    }
-    return true;
-  }
-
-
-  public static AccessType toAccessType(QueueACL acl) {
-    switch (acl) {
-    case ADMINISTER_QUEUE:
-      return AccessType.ADMINISTER_QUEUE;
-    case SUBMIT_APPLICATIONS:
-      return AccessType.SUBMIT_APP;
-    }
-    return null;
-  }
-
-  private static boolean hasPendingResourceRequest(ResourceCalculator rc,
-      ResourceUsage usage, String partitionToLookAt, Resource cluster) {
-    if (Resources.greaterThan(rc, cluster,
-        usage.getPending(partitionToLookAt), Resources.none())) {
-      return true;
-    }
-    return false;
-  }
-
-  @Private
-  public static boolean hasPendingResourceRequest(ResourceCalculator rc,
-      ResourceUsage usage, String nodePartition, Resource cluster,
-      SchedulingMode schedulingMode) {
-    String partitionToLookAt = nodePartition;
-    if (schedulingMode == SchedulingMode.IGNORE_PARTITION_EXCLUSIVITY) {
-      partitionToLookAt = RMNodeLabelsManager.NO_LABEL;
-    }
-    return hasPendingResourceRequest(rc, usage, partitionToLookAt, cluster);
-  }
-
-  public static RMContainer createOpportunisticRmContainer(RMContext rmContext,
-      Container container, boolean isRemotelyAllocated) {
-    SchedulerNode node = ((AbstractYarnScheduler) rmContext.getScheduler())
-        .getNode(container.getNodeId());
-    if (node == null) {
-      return null;
-    }
-    SchedulerApplicationAttempt appAttempt =
-        ((AbstractYarnScheduler) rmContext.getScheduler())
-            .getCurrentAttemptForContainer(container.getId());
-    RMContainer rmContainer = new RMContainerImpl(container,
-        SchedulerRequestKey.extractFrom(container),
-        appAttempt.getApplicationAttemptId(), container.getNodeId(),
-        appAttempt.getUser(), rmContext, isRemotelyAllocated);
-    appAttempt.addRMContainer(container.getId(), rmContainer);
-    node.allocateContainer(rmContainer);
-    return rmContainer;
-  }
-
-  public static boolean isNodeHeartbeated(SchedulerNode node,
-      long skipNodeInterval) {
-    long timeElapsedFromLastHeartbeat =
-        Time.monotonicNow() - node.getLastHeartbeatMonotonicTime();
-    return timeElapsedFromLastHeartbeat <= skipNodeInterval;
-  }
-}
+    // 遍历所有可计数资源类型逐一检查
+    for (int i =

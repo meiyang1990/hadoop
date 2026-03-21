@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,10 +21,17 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
+/**
+ * 调度器动态编辑异常，用于表示调度器配置动态修改过程中发生的错误
+ */
 public class SchedulerDynamicEditException extends YarnException {
 
   private static final long serialVersionUID = 7100374511387193257L;
 
+  /**
+   * 构造带有错误消息的异常实例
+   * @param string 错误描述信息
+   */
   public SchedulerDynamicEditException(String string) {
     super(string);
   }

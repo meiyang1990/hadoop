@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,26 +22,23 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.scheduler;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 /**
- * Determines how to schedule opportunistic containers at the NodeManager,
- * i.e., whether or not to accept, queue, or reject a container run request.
+ * 定义NodeManager上机会容器的排队策略，
+ * 用于决定接受、排队还是拒绝机会容器的运行请求。
  */
 public enum OpportunisticContainersQueuePolicy {
   /**
-   * Determines whether or not to run a container by the queue capacity:
-   * {@link YarnConfiguration#NM_OPPORTUNISTIC_CONTAINERS_MAX_QUEUE_LENGTH}.
-   * If there's enough capacity in the queue,
-   * queues the container, otherwise rejects it.
+   * 根据队列容量限制决定是否排队容器，
+   * 容量限制由配置项{@link YarnConfiguration#NM_OPPORTUNISTIC_CONTAINERS_MAX_QUEUE_LENGTH}指定。
+   * 如果队列还有剩余容量则将容器加入排队，否则拒绝该请求。
    */
   BY_QUEUE_LEN,
   /**
-   * Determines whether or not to run a container based on the amount of
-   * resource capacity the node has.
-   * Sums up the resources running + already queued at the node, compares
-   * it with the total capacity of the node, and accepts the new container only
-   * if the computed resources above + resources used by the container
-   * is less than or equal to the node capacity.
+   * 根据节点剩余资源容量决定是否排队容器。
+   * 汇总节点上正在运行和已经排队的资源总量，与节点总容量比较，
+   * 仅当现有资源加上当前容器所需资源不超过节点总容量时，才接受该容器排队。
    */
   BY_RESOURCES;
 
+  /** 默认排队策略，使用按队列长度限制 */
   public static final OpportunisticContainersQueuePolicy DEFAULT = BY_QUEUE_LEN;
 }

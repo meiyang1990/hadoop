@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,7 +21,15 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * RM状态存储事件基类，用于RM恢复模块中状态存储相关事件的封装，
+ * 配合YARN事件驱动模型处理状态存储操作。
+ */
 public class RMStateStoreEvent extends AbstractEvent<RMStateStoreEventType> {
+  /**
+   * 构造指定类型的RM状态存储事件。
+   * @param type 事件类型
+   */
   public RMStateStoreEvent(RMStateStoreEventType type) {
     super(type);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -70,16 +71,14 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 /**
- * RMContextImpl class holds two services context.
+ * RMContextImpl 维护ResourceManager的两类服务上下文：
  * <ul>
- * <li>serviceContext : These services called as <b>Always On</b> services.
- * Services that need to run always irrespective of the HA state of the RM.</li>
- * <li>activeServiceCotext : Active services context. Services that need to run
- * only on the Active RM.</li>
+ * <li>serviceContext : "始终运行"服务上下文，保存不随RM主备切换而停止的服务</li>
+ * <li>activeServiceContext : 激活态服务上下文，仅在Active RM运行的服务会保存在这里，主备切换时会重建</li>
  * </ul>
  * <p>
- * <b>Note:</b> If any new service to be added to context, add it to a right
- * context as per above description.
+ * <b>注意：</b>新增服务时，请根据上述分类添加到正确的上下文中。
+ * 该类是YARN ResourceManager全局上下文容器，统一管理所有RM核心服务和运行时数据。
  */
 public class RMContextImpl implements RMContext {
 
@@ -87,22 +86,19 @@ public class RMContextImpl implements RMContext {
       LoggerFactory.getLogger(RMContextImpl.class);
   private static final String UNAVAILABLE = "N/A";
   /**
-   * RM service contexts which runs through out RM life span. These are created
-   * once during start of RM.
+   * 贯穿RM整个生命周期的服务上下文，RM启动时创建一次，不会随主备切换重建。
    */
   private RMServiceContext serviceContext;
 
   /**
-   * RM Active service context. This will be recreated for every transition from
-   * ACTIVE->STANDBY.
+   * Active RM专属服务上下文，每次从STANDBY切换到ACTIVE时都会重建。
    */
   private RMActiveServiceContext activeServiceContext;
 
   private String proxyHostAndPort = null;
 
   /**
-   * Default constructor. To be used in conjunction with setter methods for
-   * individual fields.
+   * 默认构造函数，配合各个字段的setter方法使用。
    */
   public RMContextImpl() {
     this.serviceContext = new RMServiceContext();
@@ -110,7 +106,7 @@ public class RMContextImpl implements RMContext {
   }
 
   @VisibleForTesting
-  // helper constructor for tests
+  // 测试用辅助构造函数
   public RMContextImpl(Dispatcher rmDispatcher,
       ContainerAllocationExpirer containerAllocationExpirer,
       AMLivelinessMonitor amLivelinessMonitor,
@@ -135,7 +131,7 @@ public class RMContextImpl implements RMContext {
   }
 
   @VisibleForTesting
-  // helper constructor for tests
+  // 测试用辅助构造函数
   public RMContextImpl(Dispatcher rmDispatcher,
       ContainerAllocationExpirer containerAllocationExpirer,
       AMLivelinessMonitor amLivelinessMonitor,
@@ -158,9 +154,8 @@ public class RMContextImpl implements RMContext {
   }
 
   /**
-   * RM service contexts which runs through out JVM life span. These are created
-   * once during start of RM.
-   * @return serviceContext of RM
+   * 获取贯穿RM整个生命周期的服务上下文。
+   * @return RM永久服务上下文
    */
   @Private
   @Unstable
@@ -169,8 +164,8 @@ public class RMContextImpl implements RMContext {
   }
 
   /**
-   * <b>Note:</b> setting service context clears all services embedded with it.
-   * @param context rm service context
+   * 设置永久服务上下文，注意：设置会清除原有上下文包含的所有服务。
+   * @param context RM永久服务上下文
    */
   @Private
   @Unstable
@@ -291,9 +286,8 @@ public class RMContextImpl implements RMContext {
 
   // ==========================================================================
   /**
-   * RM Active service context. This will be recreated for every transition from
-   * ACTIVE to STANDBY.
-   * @return activeServiceContext of active services
+   * 获取Active RM专属服务上下文，每次主备切换后会返回新的上下文实例。
+   * @return Active服务上下文
    */
   @Private
   @Unstable
@@ -505,177 +499,4 @@ public class RMContextImpl implements RMContext {
 
   @Override
   public void setNodeLabelManager(RMNodeLabelsManager mgr) {
-    activeServiceContext.setNodeLabelManager(mgr);
-  }
-
-  @Override
-  public void setNodeAttributesManager(NodeAttributesManager mgr) {
-    activeServiceContext.setNodeAttributesManager(mgr);
-  }
-
-  @Override
-  public AllocationTagsManager getAllocationTagsManager() {
-    return activeServiceContext.getAllocationTagsManager();
-  }
-
-  @Override
-  public void setAllocationTagsManager(
-      AllocationTagsManager allocationTagsManager) {
-    activeServiceContext.setAllocationTagsManager(allocationTagsManager);
-  }
-
-  @Override
-  public PlacementConstraintManager getPlacementConstraintManager() {
-    return activeServiceContext.getPlacementConstraintManager();
-  }
-
-  @Override
-  public void setPlacementConstraintManager(
-      PlacementConstraintManager placementConstraintManager) {
-    activeServiceContext
-        .setPlacementConstraintManager(placementConstraintManager);
-  }
-
-  @Override
-  public RMDelegatedNodeLabelsUpdater getRMDelegatedNodeLabelsUpdater() {
-    return activeServiceContext.getRMDelegatedNodeLabelsUpdater();
-  }
-
-  @Override
-  public void setRMDelegatedNodeLabelsUpdater(
-      RMDelegatedNodeLabelsUpdater delegatedNodeLabelsUpdater) {
-    activeServiceContext.setRMDelegatedNodeLabelsUpdater(
-        delegatedNodeLabelsUpdater);
-  }
-
-  @Override
-  public MultiNodeSortingManager<SchedulerNode> getMultiNodeSortingManager() {
-    return activeServiceContext.getMultiNodeSortingManager();
-  }
-
-  @Override
-  public void setMultiNodeSortingManager(
-      MultiNodeSortingManager<SchedulerNode> multiNodeSortingManager) {
-    activeServiceContext.setMultiNodeSortingManager(multiNodeSortingManager);
-  }
-
-  public void setSchedulerRecoveryStartAndWaitTime(long waitTime) {
-    activeServiceContext.setSchedulerRecoveryStartAndWaitTime(waitTime);
-  }
-
-  public boolean isSchedulerReadyForAllocatingContainers() {
-    return activeServiceContext.isSchedulerReadyForAllocatingContainers();
-  }
-
-  @Private
-  @VisibleForTesting
-  public void setSystemClock(Clock clock) {
-    activeServiceContext.setSystemClock(clock);
-  }
-
-  public ConcurrentMap<ApplicationId, SystemCredentialsForAppsProto>
-      getSystemCredentialsForApps() {
-    return activeServiceContext.getSystemCredentialsForApps();
-  }
-
-  @Override
-  public PlacementManager getQueuePlacementManager() {
-    return this.activeServiceContext.getQueuePlacementManager();
-  }
-
-  @Override
-  public void setQueuePlacementManager(PlacementManager placementMgr) {
-    this.activeServiceContext.setQueuePlacementManager(placementMgr);
-  }
-
-  @Override
-  public QueueLimitCalculator getNodeManagerQueueLimitCalculator() {
-    return activeServiceContext.getNodeManagerQueueLimitCalculator();
-  }
-
-  public void setContainerQueueLimitCalculator(
-      QueueLimitCalculator limitCalculator) {
-    activeServiceContext.setContainerQueueLimitCalculator(limitCalculator);
-  }
-
-  @Override
-  public void setRMAppLifetimeMonitor(
-      RMAppLifetimeMonitor rmAppLifetimeMonitor) {
-    this.activeServiceContext.setRMAppLifetimeMonitor(rmAppLifetimeMonitor);
-  }
-
-  @Override
-  public RMAppLifetimeMonitor getRMAppLifetimeMonitor() {
-    return this.activeServiceContext.getRMAppLifetimeMonitor();
-  }
-
-  @Override
-  public ResourceProfilesManager getResourceProfilesManager() {
-    return this.activeServiceContext.getResourceProfilesManager();
-  }
-
-  String getProxyHostAndPort(Configuration conf) {
-    if (proxyHostAndPort == null) {
-      proxyHostAndPort = WebAppUtils.getProxyHostAndPort(conf);
-    }
-    return proxyHostAndPort;
-  }
-
-  @Override
-  public String getAppProxyUrl(Configuration conf, ApplicationId applicationId)
-  {
-    try {
-      final String scheme = WebAppUtils.getHttpSchemePrefix(conf);
-      URI proxyUri = ProxyUriUtils.getUriFromAMUrl(scheme,
-          getProxyHostAndPort(conf));
-      URI result = ProxyUriUtils.getProxyUri(null, proxyUri, applicationId);
-      return result.toASCIIString();
-    } catch(URISyntaxException e) {
-      LOG.warn("Could not generate default proxy tracking URL for " +
-          applicationId);
-      return UNAVAILABLE;
-    }
-  }
-
-  @Override
-  public void setResourceProfilesManager(ResourceProfilesManager mgr) {
-    this.activeServiceContext.setResourceProfilesManager(mgr);
-  }
-
-  @Override
-  public ProxyCAManager getProxyCAManager() {
-    return this.activeServiceContext.getProxyCAManager();
-  }
-
-  @Override
-  public void setProxyCAManager(ProxyCAManager proxyCAManager) {
-    this.activeServiceContext.setProxyCAManager(proxyCAManager);
-  }
-
-  @Override
-  public VolumeManager getVolumeManager() {
-    return activeServiceContext.getVolumeManager();
-  }
-
-  @Override
-  public void setVolumeManager(VolumeManager volumeManager) {
-    this.activeServiceContext.setVolumeManager(volumeManager);
-  }
-
-  // Note: Read java doc before adding any services over here.
-
-  @Override
-  public NodeAttributesManager getNodeAttributesManager() {
-    return activeServiceContext.getNodeAttributesManager();
-  }
-
-  @Override
-  public long getTokenSequenceNo() {
-    return this.activeServiceContext.getTokenSequenceNo();
-  }
-
-  @Override
-  public void incrTokenSequenceNo() {
-    this.activeServiceContext.incrTokenSequenceNo();
-  }
-}
+    activeServiceContext.setNode

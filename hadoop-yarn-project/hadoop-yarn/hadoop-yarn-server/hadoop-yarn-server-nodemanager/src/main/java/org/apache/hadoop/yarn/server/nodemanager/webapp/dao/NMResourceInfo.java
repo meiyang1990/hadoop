@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,6 +23,9 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * NodeManager节点资源信息DAO，用于NodeManager Web UI序列化输出节点资源数据
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class NMResourceInfo {
@@ -29,10 +33,18 @@ public class NMResourceInfo {
 
   public NMResourceInfo() {} // JAXB needs this
 
+  /**
+   * 获取资源数值
+   * @return 资源数值
+   */
   public long getResourceValue() {
     return resourceValue;
   }
 
+  /**
+   * 设置资源数值
+   * @param resourceValue 资源数值
+   */
   public void setResourceValue(long resourceValue) {
     this.resourceValue = resourceValue;
   }

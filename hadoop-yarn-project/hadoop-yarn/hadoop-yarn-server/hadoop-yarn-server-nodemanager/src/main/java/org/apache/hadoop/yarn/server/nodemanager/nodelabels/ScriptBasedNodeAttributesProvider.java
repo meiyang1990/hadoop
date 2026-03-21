@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,16 +42,22 @@ import static org.apache.hadoop.yarn.conf.YarnConfiguration.
     DEFAULT_NM_NODE_ATTRIBUTES_PROVIDER_FETCH_TIMEOUT_MS;
 
 /**
- * Node attribute provider that periodically runs a script to collect
- * node attributes.
+ * 基于外部脚本实现的节点属性提供者，定期执行自定义脚本采集节点属性。
+ * 属于YARN NodeManager节点标签模块，支持用户通过自定义脚本动态上报节点属性。
  */
 public class ScriptBasedNodeAttributesProvider extends NodeAttributesProvider{
 
+  // 节点属性输出行前缀标记
   private static final String NODE_ATTRIBUTE_PATTERN = "NODE_ATTRIBUTE:";
+  // 节点属性字段分隔符
   private static final String NODE_ATTRIBUTE_DELIMITER = ",";
 
+  // 脚本执行器实例
   private NodeAttributeScriptRunner runner;
 
+  /**
+   * 构造函数，初始化脚本-based节点属性提供者。
+   */
   public ScriptBasedNodeAttributesProvider() {
     super(ScriptBasedNodeAttributesProvider.class.getName());
   }
@@ -58,35 +65,47 @@ public class ScriptBasedNodeAttributesProvider extends NodeAttributesProvider{
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
+    // 从配置中读取脚本路径
     String nodeAttributeProviderScript = conf.get(
         NM_SCRIPT_BASED_NODE_ATTRIBUTES_PROVIDER_PATH);
+    // 从配置中读取脚本执行超时时间
     long scriptTimeout = conf.getLong(
         NM_NODE_ATTRIBUTES_PROVIDER_FETCH_TIMEOUT_MS,
         DEFAULT_NM_NODE_ATTRIBUTES_PROVIDER_FETCH_TIMEOUT_MS);
+    // 从配置中读取脚本参数
     String[] scriptArgs = conf.getStrings(
         NM_SCRIPT_BASED_NODE_ATTRIBUTES_PROVIDER_OPTS,
         new String[] {});
+    // 验证脚本配置有效性
     verifyConfiguredScript(nodeAttributeProviderScript);
 
+    // 从配置中读取属性采集间隔时间
     long intervalTime = conf.getLong(
         NM_NODE_ATTRIBUTES_PROVIDER_FETCH_INTERVAL_MS,
         DEFAULT_NM_NODE_ATTRIBUTES_PROVIDER_FETCH_INTERVAL_MS);
+    // 设置采集间隔
     this.setIntervalTime(intervalTime);
 
+    // 初始化脚本执行器
     this.runner = new NodeAttributeScriptRunner(nodeAttributeProviderScript,
         scriptArgs, scriptTimeout, this);
   }
 
   @Override
   protected void cleanUp() throws Exception {
+    // 清理脚本执行器资源
     runner.cleanUp();
   }
 
   @Override
   public TimerTask createTimerTask() {
+    // 返回用于定时执行的任务实例
     return runner;
   }
 
+  /**
+   * 节点属性脚本执行器，负责执行用户脚本并解析输出结果。
+   */
   private static class NodeAttributeScriptRunner extends
       NodeDescriptorsScriptRunner<NodeAttribute> {
 
@@ -100,16 +119,20 @@ public class ScriptBasedNodeAttributesProvider extends NodeAttributesProvider{
       Set<NodeAttribute> attributeSet = new HashSet<>();
       // TODO finalize format
 
-      // each line is a record of ndoe attribute like following:
-      // NODE_ATTRIBUTE:ATTRIBUTE_NAME,ATTRIBUTE_TYPE,ATTRIBUTE_VALUE
+      // 按行分割脚本输出
       String[] splits = scriptOutput.split("\n");
+      // 遍历每一行输出
       for (String line : splits) {
         String trimmedLine = line.trim();
+        // 仅处理带有NODE_ATTRIBUTE前缀的行
         if (trimmedLine.startsWith(NODE_ATTRIBUTE_PATTERN)) {
+          // 截取前缀之后的属性内容
           String nodeAttribute = trimmedLine
               .substring(NODE_ATTRIBUTE_PATTERN.length());
+          // 按分隔符拆分属性字段
           String[] attributeStrs = nodeAttribute
               .split(NODE_ATTRIBUTE_DELIMITER);
+          // 校验字段数量必须为3（名称、类型、值）
           if (attributeStrs.length != 3) {
             throw new IOException("Malformed output, expecting format "
                 + NODE_ATTRIBUTE_PATTERN + ":" + "ATTRIBUTE_NAME"
@@ -118,24 +141,20 @@ public class ScriptBasedNodeAttributesProvider extends NodeAttributesProvider{
                 + nodeAttribute);
           }
 
-          // We don't allow script to overwrite our dist prefix,
-          // so disallow any prefix set in the script.
+          // 禁止脚本中设置前缀，所有动态属性统一由系统添加分布式前缀
           if (attributeStrs[0].contains("/")) {
             throw new IOException("Node attributes reported by script"
                 + " should not contain any prefix.");
           }
 
-          // Automatically setup prefix for collected attributes
+          // 自动添加分布式节点属性前缀，构造节点属性对象
           NodeAttribute na = NodeAttribute
               .newInstance(NodeAttribute.PREFIX_DISTRIBUTED,
                   attributeStrs[0],
                   NodeAttributeType.valueOf(attributeStrs[1]),
                   attributeStrs[2]);
 
-          // Since a NodeAttribute is identical with another one as long as
-          // their prefix and name are same, to avoid attributes getting
-          // overwritten by ambiguous attribute, make sure it fails in such
-          // case.
+          // 校验是否存在重复属性（前缀+名称唯一确定属性），重复则抛出异常避免歧义
           if (!attributeSet.add(na)) {
             throw new IOException("Ambiguous node attribute is found: "
                 + na.toString() + ", a same attribute already exists");
@@ -143,8 +162,7 @@ public class ScriptBasedNodeAttributesProvider extends NodeAttributesProvider{
         }
       }
 
-      // Before updating the attributes to the provider,
-      // verify if they are valid
+      // 更新到提供者前，校验所有采集到的节点属性合法性
       try {
         NodeLabelUtil.validateNodeAttributes(attributeSet);
       } catch (IOException e) {

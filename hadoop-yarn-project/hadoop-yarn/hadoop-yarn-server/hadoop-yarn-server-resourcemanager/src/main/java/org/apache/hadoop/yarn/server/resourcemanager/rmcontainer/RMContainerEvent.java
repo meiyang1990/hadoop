@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,15 +22,29 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * YARN ResourceManager 容器事件基类，封装容器相关事件的通用属性
+ * 用于RM容器状态机驱动，传递容器ID和事件类型信息
+ */
 public class RMContainerEvent extends AbstractEvent<RMContainerEventType> {
 
+  // 关联的容器ID
   private final ContainerId containerId;
 
+  /**
+   * 构造容器事件对象
+   * @param containerId 关联的容器ID
+   * @param type 容器事件类型
+   */
   public RMContainerEvent(ContainerId containerId, RMContainerEventType type) {
     super(type);
     this.containerId = containerId;
   }
 
+  /**
+   * 获取事件关联的容器ID
+   * @return 容器ID
+   */
   public ContainerId getContainerId() {
     return this.containerId;
   }

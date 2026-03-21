@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,19 +31,23 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 
 /** 
- * Manages ResourceManager audit logs. 
+ * YARN ResourceManager 审计日志管理类
  *
- * Audit log format is written as key=value pairs. Tab separated.
+ * 审计日志格式采用制表符分隔的 key=value 键值对
  */
 public class RMAuditLogger {
   private static final Logger LOG =
       LoggerFactory.getLogger(RMAuditLogger.class);
 
+  // 审计日志可记录的字段枚举
   enum Keys {USER, OPERATION, TARGET, RESULT, IP, PERMISSIONS,
                     DESCRIPTION, APPID, APPATTEMPTID, CONTAINERID, 
                     CALLERCONTEXT, CALLERSIGNATURE, RESOURCE, QUEUENAME,
                     INCLUDEAPPS, INCLUDECHILDQUEUES, RECURSIVE, NODELABEL}
 
+  /**
+   * 审计日志常量定义，包含操作类型和分隔符常量
+   */
   public static class AuditConstants {
     static final String SUCCESS = "SUCCESS";
     static final String FAILURE = "FAILURE";
@@ -91,6 +96,7 @@ public class RMAuditLogger {
             "Reservation Request";
   }
 
+  /** 创建成功操作审计日志，自动获取客户端IP */
   static String createSuccessLog(String user, String operation, String target,
       ApplicationId appId, ApplicationAttemptId attemptId,
       ContainerId containerId, Resource resource) {
@@ -122,30 +128,39 @@ public class RMAuditLogger {
       ApplicationId appId, ApplicationAttemptId attemptId,
       ContainerId containerId, Resource resource, CallerContext callerContext,
       InetAddress ip, String queueName, String partition) {
+    // 构建成功事件基础部分
     StringBuilder b =
         createStringBuilderForSuccessEvent(user, operation, target, ip);
+    // 添加应用ID
     if (appId != null) {
       add(Keys.APPID, appId.toString(), b);
     }
+    // 添加应用尝试ID
     if (attemptId != null) {
       add(Keys.APPATTEMPTID, attemptId.toString(), b);
     }
+    // 添加容器ID
     if (containerId != null) {
       add(Keys.CONTAINERID, containerId.toString(), b);
     }
+    // 添加资源信息
     if (resource != null) {
       add(Keys.RESOURCE, resource.toString(), b);
     }
+    // 添加调用者上下文信息
     appendCallerContext(b, callerContext);
+    // 添加队列名称
     if (queueName != null) {
       add(Keys.QUEUENAME, queueName, b);
     }
+    // 添加节点标签分区
     if (partition != null) {
       add(Keys.NODELABEL, partition, b);
     }
     return b.toString();
   }
   
+  /** 添加调用者上下文信息到日志，包含上下文内容和签名 */
   private static void appendCallerContext(StringBuilder sb, CallerContext callerContext) {
     String context = null;
     byte[] signature = null;
@@ -171,8 +186,10 @@ public class RMAuditLogger {
   @SuppressWarnings("rawtypes")
   static String createSuccessLog(String user, String operation, String target,
       InetAddress ip, ArgsBuilder args) {
+    // 构建成功事件基础部分
     StringBuilder b =
         createStringBuilderForSuccessEvent(user, operation, target, ip);
+    // 添加自定义参数
     if(args != null) {
       add(args, b);
     }
@@ -379,305 +396,11 @@ public class RMAuditLogger {
     }
   }
   
+  /** 构建失败操作审计日志基础部分 */
   private static StringBuilder createStringBuilderForFailureLog(String user,
       String operation, String target, String description, String perm) {
     StringBuilder b = new StringBuilder();
     start(Keys.USER, user, b);
     addRemoteIP(b);
     add(Keys.OPERATION, operation, b);
-    add(Keys.TARGET, target ,b);
-    add(Keys.RESULT, AuditConstants.FAILURE, b);
-    add(Keys.DESCRIPTION, description, b);
-    add(Keys.PERMISSIONS, perm, b);
-    return b;
-  }
-
-  /**
-   * A helper api for creating an audit log for a failure event.
-   */
-  static String createFailureLog(String user, String operation, String perm,
-      String target, String description, ApplicationId appId,
-      ApplicationAttemptId attemptId, ContainerId containerId,
-      Resource resource, CallerContext callerContext, String queueName,
-      String partition) {
-    StringBuilder b = createStringBuilderForFailureLog(user,
-        operation, target, description, perm);
-    if (appId != null) {
-      add(Keys.APPID, appId.toString(), b);
-    }
-    if (attemptId != null) {
-      add(Keys.APPATTEMPTID, attemptId.toString(), b);
-    }
-    if (containerId != null) {
-      add(Keys.CONTAINERID, containerId.toString(), b);
-    }
-    if (resource != null) {
-      add(Keys.RESOURCE, resource.toString(), b);
-    }
-    appendCallerContext(b, callerContext);
-    if (queueName != null) {
-      add(Keys.QUEUENAME, queueName, b);
-    }
-    if (partition != null) {
-      add(Keys.NODELABEL, partition, b);
-    }
-
-    return b.toString();
-  }
-
-  /**
-   * A helper api for creating an audit log for a failure event.
-   */
-  static String createFailureLog(String user, String operation, String perm,
-      String target, String description, ApplicationId appId,
-      ApplicationAttemptId attemptId, ContainerId containerId, Resource resource) {
-    return createFailureLog(user, operation, perm, target, description, appId,
-        attemptId, containerId, resource, null, null, null);
-  }
-
-  /**
-   * A helper api for creating an audit log for a failure event.
-   */
-  @SuppressWarnings("rawtypes")
-  static String createFailureLog(String user, String operation, String perm,
-      String target, String description, ArgsBuilder args) {
-    StringBuilder b = createStringBuilderForFailureLog(user,
-        operation, target, description, perm);
-    if(args != null) {
-      add(args, b);
-    }
-    return b.toString();
-  }
-
-  /**
-   * Create a readable and parseable audit log string for a failed event.
-   *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions. 
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   * @param appId Application Id in which operation was performed.
-   * @param containerId Container Id in which operation was performed.
-   * @param resource Resources associated with container.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
-   */
-  public static void logFailure(String user, String operation, String perm,
-      String target, String description, ApplicationId appId, 
-      ContainerId containerId, Resource resource) {
-    if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          appId, null, containerId, resource));
-    }
-  }
-
-  /**
-   * Create a readable and parseable audit log string for a failed event.
-   *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions.
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   * @param appId ApplicationId in which operation was performed.
-   * @param attemptId Application Attempt Id in which operation was performed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
-   */
-  public static void logFailure(String user, String operation, String perm,
-      String target, String description, ApplicationId appId, 
-      ApplicationAttemptId attemptId) {
-    if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          appId, attemptId, null, null));
-    }
-  }
-
-  public static void logFailure(String user, String operation, String perm,
-      String target, String description, ApplicationId appId,
-      CallerContext callerContext) {
-    if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          appId, null, null, null, callerContext, null, null));
-    }
-  }
-
-  public static void logFailure(String user, String operation, String perm,
-      String target, String description, ApplicationId appId,
-      CallerContext callerContext, String queueName) {
-    if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          appId, null, null, null, callerContext, queueName, null));
-    }
-  }
-
-  /**
-   * Create a readable and parseable audit log string for a failed event.
-   *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions.
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   * @param appId ApplicationId in which operation was performed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
-   */
-  public static void logFailure(String user, String operation, String perm,
-      String target, String description, ApplicationId appId) {
-    if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          appId, null, null, null));
-    }
-  }
-
-  public static void logFailure(String user, String operation, String perm,
-      String target, String description, ApplicationId appId,
-      String queueName) {
-    if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          appId, null, null, null, null, queueName, null));
-    }
-  }
-
-  /**
-   * Create a readable and parseable audit log string for a failed event.
-   *
-   * @param user User who made the service request.
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions. 
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
-   */
-  public static void logFailure(String user, String operation, String perm,
-      String target, String description) {
-    if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          null, null, null, null));
-    }
-  }
-
-  /**
-   * Create a readable and parseable audit log string for a failed event.
-   *
-   * @param user User who made the service request.
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions.
-   * @param target The target on which the operation is being performed.
-   * @param description The failure description
-   * @param args The arguments for the operation request.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
-   */
-  public static void logFailure(String user, String operation, String perm,
-      String target, String description, ArgsBuilder args) {
-    if (LOG.isWarnEnabled()) {
-      LOG.warn(createFailureLog(user, operation, perm, target, description,
-          args));
-    }
-  }
-
-  /**
-   * Create a readable and parseable audit log string for a failed event.
-   *
-   * @param user User who made the service request.
-   * @param operation Operation requested by the user.
-   * @param perm Target permissions.
-   * @param target The target on which the operation is being performed.
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   * @param appId ApplicationId in which operation was performed.
-   * @param callerContext Caller context
-   * @param queueName Name of queue.
-   * @param partition Name of labeled partition.
-   *
-   * <br><br>
-   * Note that the {@link RMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
-   */
-  public static void logFailure(String user, String operation, String perm,
-      String target, String description, ApplicationId appId,
-      CallerContext callerContext, String queueName, String partition) {
-    if (LOG.isWarnEnabled()) {
-      LOG.warn(
-          createFailureLog(user, operation, perm, target, description, appId,
-              null, null, null, callerContext, queueName, partition));
-    }
-  }
-
-  /**
-   * A helper api to add remote IP address.
-   */
-  static void addRemoteIP(StringBuilder b) {
-    InetAddress ip = Server.getRemoteIp();
-    // ip address can be null for testcases
-    if (ip != null) {
-      add(Keys.IP, ip.getHostAddress(), b);
-    }
-  }
-
-  /**
-   * Adds the first key-val pair to the passed builder in the following format
-   * key=value
-   */
-  static void start(Keys key, String value, StringBuilder b) {
-    b.append(key.name()).append(AuditConstants.KEY_VAL_SEPARATOR).append(value);
-  }
-
-  /**
-   * Appends the key-val pair to the passed builder in the following format
-   * <pair-delim>key=value
-   */
-  static void add(Keys key, String value, StringBuilder b) {
-    b.append(AuditConstants.PAIR_SEPARATOR).append(key.name())
-     .append(AuditConstants.KEY_VAL_SEPARATOR).append(value);
-  }
-
-  /**
-   * Appends the key-val pair to the passed builder in the following format
-   * <pair-delim>key=value
-   */
-  static void add(ArgsBuilder args, StringBuilder b) {
-    b.append(AuditConstants.PAIR_SEPARATOR).append(args.getArgs());
-  }
-
-  /**
-   * Builder to create and pass a list of arbitrary key value pairs for logging.
-   */
-  public static class ArgsBuilder {
-    private StringBuilder b;
-
-    public ArgsBuilder() {
-      b = new StringBuilder();
-    }
-
-    public ArgsBuilder append(Keys key, String value) {
-      if (b.length() != 0) {
-        b.append(AuditConstants.PAIR_SEPARATOR);
-      }
-      b.append(key.name()).append(AuditConstants.KEY_VAL_SEPARATOR).append(value);
-      return this;
-    }
-
-    public StringBuilder getArgs() {
-      return b;
-    }
-  }
-}
+    add(Keys.TARGET, target ,

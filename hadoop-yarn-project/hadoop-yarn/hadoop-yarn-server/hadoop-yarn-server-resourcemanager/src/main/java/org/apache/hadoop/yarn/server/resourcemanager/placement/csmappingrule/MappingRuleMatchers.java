@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,21 +25,22 @@ import java.util.Arrays;
 import java.util.Set;
 
 /**
- * This class contains all the matcher and some helper methods to generate them.
+ * 容量调度器队列映射规则匹配器集合，定义多种匹配器实现并提供工厂方法创建匹配器。
+ * 用于YARN应用提交时根据规则匹配目标队列。
  */
 public class MappingRuleMatchers {
   /**
-   * Utility class, hiding constructor.
+   * 工具类，私有构造函数防止实例化。
    */
   private MappingRuleMatchers() {}
 
   /**
-   * MatchAllMatcher is a matcher which matches everything.
+   * 全匹配匹配器，匹配所有应用提交请求。
    */
   public static class MatchAllMatcher implements MappingRuleMatcher {
     /**
-     * The match will return true in all cases, to match all submissions.
-     * @param variables The variable context, which contains all the variables
+     * 始终返回true，匹配所有应用提交。
+     * @param variables 变量上下文，包含所有可用变量
      * @return true
      */
     @Override
@@ -53,17 +55,16 @@ public class MappingRuleMatchers {
   }
 
   /**
-   * VariableMatcher will check if a provided variable's value matches the
-   * provided value. The provided value might contain variables as well, which
-   * will get evaluated before the comparison.
+   * 变量匹配器，检查指定上下文变量是否与给定值匹配。
+   * 匹配值本身也可以包含变量，匹配前会先进行变量替换。
    */
   public static class VariableMatcher implements MappingRuleMatcher {
     /**
-     * Name of the variable to be checked.
+     * 待检查的上下文变量名称。
      */
     private String variable;
     /**
-     * The value which should match the variable's value.
+     * 用于匹配的目标值，可包含占位变量。
      */
     private String value;
 
@@ -73,26 +74,24 @@ public class MappingRuleMatchers {
     }
 
     /**
-     * The method will replace all variables in the value, then compares this
-     * substituted value against the variable's value, if they match we return
-     * true.
-     * If the variable is null we always return false.
-     * @param variables The variable context, which contains all the variables
-     * @return true if the value matches the variable's value, false otherwise
+     * 先对目标值进行变量替换，再与上下文变量的值进行相等匹配。
+     * 如果待检查变量不存在则返回false。
+     * @param variables 变量上下文，包含所有可用变量
+     * @return 变量值匹配返回true，否则返回false
      */
     @Override
     public boolean match(VariableContext variables) {
       if (variable == null) {
         return false;
       }
-
+      // 对目标值中的变量进行替换
       String substituted = variables.replaceVariables(value);
-
+      // 获取变量原始值（未替换的）
       String originalVariableValue = variables.getOriginal(variable);
       if (originalVariableValue != null) {
         return substituted.equals(originalVariableValue);
       }
-
+      // 如果没有原始值则使用替换后的值比较
       return substituted.equals(variables.get(variable));
     }
 
@@ -106,13 +105,12 @@ public class MappingRuleMatchers {
   }
 
   /**
-   * The GroupMatcher will check if any of the user's groups match the provided
-   * group name. It does not care if it's primary or secondary group, it just
-   * checks if the user is member of the expected group.
+   * 用户组匹配器，检查提交应用的用户是否属于指定用户组。
+   * 不区分主组还是辅助组，只要用户是该组成员即匹配成功。
    */
   public static class UserGroupMatcher implements MappingRuleMatcher {
     /**
-     * The group which should match the users's groups.
+     * 待匹配的目标用户组名称，可包含占位变量。
      */
     private String group;
 
@@ -121,21 +119,21 @@ public class MappingRuleMatchers {
     }
 
     /**
-     * The method will match (return true) if the user is in the provided group.
-     * This matcher expect an extraVariableSet to be present in the variable
-     * context, if it's not present, we return false.
-     * If the expected group is null we always return false.
-     * @param variables The variable context, which contains all the variables
-     * @return true if user is member of the group
+     * 检查用户是否属于目标用户组，匹配成功返回true。
+     * 需要变量上下文中存在用户组数据集，如果不存在则返回false。
+     * 如果目标组为null也返回false。
+     * @param variables 变量上下文，包含所有可用变量
+     * @return 用户属于目标组返回true，否则返回false
      */
     @Override
     public boolean match(VariableContext variables) {
+      // 从上下文获取用户所属所有用户组集合
       Set<String> groups = variables.getExtraDataset("groups");
 
       if (group == null || groups == null) {
         return false;
       }
-
+      // 替换目标组名称中的变量
       String substituted = variables.replaceVariables(group);
       return groups.contains(substituted);
     }
@@ -147,29 +145,28 @@ public class MappingRuleMatchers {
           '}';
     }
   }
+
   /**
-   * AndMatcher is a basic boolean matcher which takes multiple other
-   * matcher as it's arguments, and on match it checks if all of them are true.
+   * 逻辑与复合匹配器，所有子匹配器都匹配成功才返回true。
    */
   public static class AndMatcher implements MappingRuleMatcher {
     /**
-     * The list of matchers to be checked during evaluation.
+     * 待检查的子匹配器列表。
      */
     private MappingRuleMatcher[] matchers;
 
     /**
-     * Constructor.
-     * @param matchers List of matchers to be checked during evaluation
+     * 构造方法。
+     * @param matchers 待检查的子匹配器列表
      */
     AndMatcher(MappingRuleMatcher...matchers) {
       this.matchers = matchers;
     }
 
     /**
-     * This match method will go through all the provided matchers and call
-     * their match method, if all match we return true.
-     * @param variables The variable context, which contains all the variables
-     * @return true if all matchers match
+     * 遍历所有子匹配器，全部匹配成功才返回true，任意一个匹配失败即返回false。
+     * @param variables 变量上下文，包含所有可用变量
+     * @return 所有子匹配器都匹配返回true，否则返回false
      */
     @Override
     public boolean match(VariableContext variables) {
@@ -191,28 +188,26 @@ public class MappingRuleMatchers {
   }
 
   /**
-   * OrMatcher is a basic boolean matcher which takes multiple other
-   * matcher as its arguments, and on match it checks if any of them are true.
+   * 逻辑或复合匹配器，任意一个子匹配器匹配成功即返回true。
    */
   public static class OrMatcher implements MappingRuleMatcher {
     /**
-     * The list of matchers to be checked during evaluation.
+     * 待检查的子匹配器列表。
      */
     private MappingRuleMatcher[] matchers;
 
     /**
-     * Constructor.
-     * @param matchers List of matchers to be checked during evaluation
+     * 构造方法。
+     * @param matchers 待检查的子匹配器列表
      */
     OrMatcher(MappingRuleMatcher...matchers) {
       this.matchers = matchers;
     }
 
     /**
-     * This match method will go through all the provided matchers and call
-     * their match method, if any of them match we return true.
-     * @param variables The variable context, which contains all the variables
-     * @return true if any of the matchers match
+     * 遍历所有子匹配器，任意一个匹配成功即返回true，全部失败才返回false。
+     * @param variables 变量上下文，包含所有可用变量
+     * @return 任意子匹配器匹配返回true，否则返回false
      */
     @Override
     public boolean match(VariableContext variables) {
@@ -234,33 +229,29 @@ public class MappingRuleMatchers {
   }
 
   /**
-   * Convenience method to create a variable matcher which matches against the
-   * username.
-   * @param userName The username to be matched
-   * @return VariableMatcher with %user as the variable
+   * 创建匹配用户名的变量匹配器工厂方法。
+   * @param userName 待匹配的用户名
+   * @return 绑定%user变量的变量匹配器
    */
   public static MappingRuleMatcher createUserMatcher(String userName) {
     return new VariableMatcher("%user", userName);
   }
 
   /**
-   * Convenience method to create a group matcher which matches against the
-   * groups of the user.
-   * @param groupName The groupName to be matched
-   * @return UserGroupMatcher
+   * 创建匹配用户组的匹配器工厂方法。
+   * @param groupName 待匹配的用户组名称
+   * @return 用户组匹配器实例
    */
   public static MappingRuleMatcher createUserGroupMatcher(String groupName) {
     return new UserGroupMatcher(groupName);
   }
 
   /**
-   * Convenience method to create a composite matcher which matches against the
-   * user's user name and the user's primary group. Only matches if both
-   * matches.
-   * @param userName The username to be matched
-   * @param groupName The groupName to be matched
-   * @return AndMatcher with two matchers one for userName and one for
-   * primaryGroup
+   * 创建用户名+用户组的复合与匹配器工厂方法。
+   * 只有用户名和用户组同时匹配才会匹配成功。
+   * @param userName 待匹配的用户名
+   * @param groupName 待匹配的用户组名称
+   * @return 包含两个匹配器的逻辑与匹配器
    */
   public static MappingRuleMatcher createUserGroupMatcher(
       String userName, String groupName) {
@@ -270,10 +261,9 @@ public class MappingRuleMatchers {
   }
 
   /**
-   * Convenience method to create a variable matcher which matches against the
-   * submitted application's name.
-   * @param name The name to be matched
-   * @return VariableMatcher with %application as the variable
+   * 创建匹配应用名称的变量匹配器工厂方法。
+   * @param name 待匹配的应用名称
+   * @return 绑定%application变量的变量匹配器
    */
   public static MappingRuleMatcher createApplicationNameMatcher(String name) {
     return new VariableMatcher("%application", name);
@@ -281,8 +271,8 @@ public class MappingRuleMatchers {
 
 
   /**
-   * Convenience method to create a matcher that matches all
-   * @return MatchAllMatcher.
+   * 创建全匹配匹配器工厂方法。
+   * @return 全匹配匹配器实例
    */
   public static MappingRuleMatcher createAllMatcher() {
     return new MatchAllMatcher();

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -42,6 +43,10 @@ import org.apache.hadoop.yarn.server.nodemanager.webapp.dao.NMResourceInfo;
 import org.apache.hadoop.yarn.server.nodemanager.webapp.dao.gpu.NMGpuResourceInfo;
 import org.apache.hadoop.yarn.webapp.RemoteExceptionData;
 
+/**
+ * NodeManager Web UI JAXB上下文解析器，为REST JSON/XML序列化提供上下文支持
+ * 注册所有需要序列化的DAO类，统一配置JSON输出格式
+ */
 @Singleton
 @Provider
 public class JAXBContextResolver implements ContextResolver<JAXBContext> {
@@ -49,23 +54,28 @@ public class JAXBContextResolver implements ContextResolver<JAXBContext> {
   private JAXBContext context;
   private final Set<Class> types;
 
-  // you have to specify all the dao classes here
+  // 所有需要JAXB序列化的DAO类列表
   private final Class[] cTypes = {AppInfo.class, AppsInfo.class,
       AuxiliaryServicesInfo.class, AuxiliaryServiceInfo.class,
       ContainerInfo.class, ContainersInfo.class, NodeInfo.class,
       RemoteExceptionData.class, NMGpuResourceInfo.class, NMResourceInfo.class,
       NMDeviceResourceInfo.class};
 
+  /**
+   * 构造函数，初始化JAXB上下文并配置序列化参数
+   * @throws Exception 初始化失败时抛出异常
+   */
   public JAXBContextResolver() throws Exception {
+    // 将所有需要序列化的类存入集合方便查询
     this.types = new HashSet<>(Arrays.asList(cTypes));
-    // sets the json configuration so that the json output looks like
-    // the xml output
+    // 配置JSON输出格式，使JSON输出结构与XML输出保持一致，不包含根节点包装
     this.context = JAXBContextFactory.createContext(cTypes, Collections.singletonMap(
         MarshallerProperties.JSON_INCLUDE_ROOT, false));
   }
 
   @Override
   public JAXBContext getContext(Class<?> objectType) {
+    // 当前类已注册时返回共享上下文，否则返回null交由其他处理
     return (types.contains(objectType)) ? context : null;
   }
 }

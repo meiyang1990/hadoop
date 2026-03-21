@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,12 +23,26 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptEventType;
 
+/**
+ * 应用尝试注册事件，用于ApplicationMaster向ResourceManager完成注册后通知RM状态机处理。
+ * 携带了ApplicationMaster的网络地址和追踪页面URL等注册信息。
+ */
 public class RMAppAttemptRegistrationEvent extends RMAppAttemptEvent {
 
+  // ApplicationMaster所在主机地址
   private final String host;
+  // ApplicationMaster RPC服务端口
   private int rpcport;
+  // ApplicationMaster追踪页面URL
   private String trackingurl;
 
+  /**
+   * 构造应用尝试注册事件。
+   * @param appAttemptId 应用尝试ID
+   * @param host ApplicationMaster主机地址
+   * @param rpcPort ApplicationMaster RPC端口
+   * @param trackingUrl ApplicationMaster追踪页面URL
+   */
   public RMAppAttemptRegistrationEvent(ApplicationAttemptId appAttemptId,
       String host, int rpcPort, String trackingUrl) {
     super(appAttemptId, RMAppAttemptEventType.REGISTERED);

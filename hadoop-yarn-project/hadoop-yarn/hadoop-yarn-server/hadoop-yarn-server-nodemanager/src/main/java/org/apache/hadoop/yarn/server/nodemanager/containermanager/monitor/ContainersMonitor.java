@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -24,12 +25,28 @@ import org.apache.hadoop.yarn.api.records.ResourceUtilization;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.server.nodemanager.ResourceView;
 
+/**
+ * 容器监控接口，定义NodeManager上所有容器资源监控的核心能力
+ * 负责跟踪容器资源使用情况，提供资源利用率统计信息
+ */
 public interface ContainersMonitor extends Service,
     EventHandler<ContainersMonitorEvent>, ResourceView {
+  /**
+   * 获取当前所有容器的资源利用率信息
+   * @return 容器资源利用率统计结果
+   */
   ResourceUtilization getContainersUtilization();
 
+  /**
+   * 获取虚拟内存与物理内存的比值
+   * @return 虚拟内存比例系数
+   */
   float getVmemRatio();
 
+  /**
+   * 从当前资源利用率中减去节点预留资源
+   * @param resourceUtil 待调整的资源利用率对象
+   */
   void subtractNodeResourcesFromResourceUtilization(
       ResourceUtilization resourceUtil);
 

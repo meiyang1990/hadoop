@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,12 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.TokenIdentifier;
 
+/**
+ * 本地化服务令牌标识符，用于NM与本地化服务之间的RPC身份认证
+ */
 public class LocalizerTokenIdentifier extends TokenIdentifier {
 
+  /** 令牌类型标识 */
   public static final Text KIND = new Text("Localizer");
 
   @Override
@@ -51,6 +56,7 @@ public class LocalizerTokenIdentifier extends TokenIdentifier {
   @Override
   public UserGroupInformation getUser() {
     // TODO Auto-generated method stub
+    // 返回测试用远程用户
     return UserGroupInformation.createRemoteUser("testing");
   }
 

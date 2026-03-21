@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +22,10 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resourc
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+/**
+ * YARN NodeManager Linux环境下内存资源处理器接口，
+ * 负责容器内存资源的隔离、管控与统计。
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface MemoryResourceHandler extends ResourceHandler {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,78 +28,68 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 
 /**
- * Abstract base for all Placement Rules.
+ * 文件说明：YARN资源管理器应用队列放置规则抽象基类，所有具体放置规则都需要继承此类
+ * 核心职责：定义放置规则的统一接口，为PlacementManager提供规则执行的标准契约
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public abstract class PlacementRule {
 
   /**
-   * Set the config based on the passed in argument. This construct is used to
-   * not pollute this abstract class with implementation specific references.
-   * @param initArg initialization arguments.
+   * 设置规则配置，避免抽象类引入具体实现类的依赖
+   * @param initArg 初始化配置参数
    */
   public void setConfig(Object initArg) {
-    // Default is a noop
+    // 默认空实现，子类按需覆盖
   }
 
   /**
-   * Return the name of the rule.
-   * @return The name of the rule, the fully qualified class name.
+   * 获取当前规则的名称
+   * @return 规则名称，默认返回规则类的全限定名
    */
   public String getName() {
     return this.getClass().getName();
   }
 
   /**
-   * Initialize the rule with the scheduler.
-   * @param scheduler the scheduler using the rule
-   * @return <code>true</code> or <code>false</code> The outcome of the
-   * initialisation, rule dependent response which might not be persisted in
-   * the rule.
-   * @throws IOException for any errors
+   * 使用调度器上下文初始化规则
+   * @param scheduler 使用该规则的资源调度器
+   * @return 初始化结果，true表示成功，false表示失败，结果由具体规则定义
+   * @throws IOException 初始化过程中发生IO错误时抛出
    */
   public abstract boolean initialize(ResourceScheduler scheduler)
       throws IOException;
 
   /**
-   * Return the scheduler queue name the application should be placed in
-   * wrapped in an {@link ApplicationPlacementContext} object.
-   *
-   * A non <code>null</code> return value places the application in a queue,
-   * a <code>null</code> value means the queue is not yet determined. The
-   * next {@link PlacementRule} in the list maintained in the
-   * {@link PlacementManager} will be executed.
-   *
-   * @param asc The context of the application created on submission
-   * @param user The name of the user submitting the application
+   * 根据应用上下文和用户信息计算应用应该放置到的目标队列
    * 
-   * @throws YarnException for any error while executing the rule
+   * 返回非null表示已经确定目标队列，应用将被放置到该队列；
+   * 返回null表示当前规则无法确定队列，将由PlacementManager执行下一条规则
+   *
+   * @param asc 应用提交时的上下文信息
+   * @param user 提交应用的用户名
    * 
-   * @return The queue name wrapped in {@link ApplicationPlacementContext} or
-   * <code>null</code> if no queue was resolved
+   * @throws YarnException 规则执行过程中发生错误时抛出
+   * 
+   * @return 包装了目标队列名的ApplicationPlacementContext，无法确定时返回null
    */
   public abstract ApplicationPlacementContext getPlacementForApp(
       ApplicationSubmissionContext asc, String user) throws YarnException;
 
 
   /**
-   * Return the scheduler queue name the application should be placed in
-   * wrapped in an {@link ApplicationPlacementContext} object.
+   * 带恢复标识的应用放置计算方法，支持应用恢复场景
+   * 
+   * 返回非null表示已经确定目标队列，应用将被放置到该队列；
+   * 返回null表示当前规则无法确定队列，将由PlacementManager执行下一条规则
    *
-   * A non <code>null</code> return value places the application in a queue,
-   * a <code>null</code> value means the queue is not yet determined. The
-   * next {@link PlacementRule} in the list maintained in the
-   * {@link PlacementManager} will be executed.
+   * @param asc 应用提交时的上下文信息
+   * @param user 提交应用的用户名
+   * @param recovery 标识本次提交是否是应用恢复
    *
-   * @param asc The context of the application created on submission
-   * @param user The name of the user submitting the application
-   * @param recovery Indicates if the submission is a recovery
+   * @throws YarnException 规则执行过程中发生错误时抛出
    *
-   * @throws YarnException for any error while executing the rule
-   *
-   * @return The queue name wrapped in {@link ApplicationPlacementContext} or
-   * <code>null</code> if no queue was resolved
+   * @return 包装了目标队列名的ApplicationPlacementContext，无法确定时返回null
    */
   public ApplicationPlacementContext getPlacementForApp(
       ApplicationSubmissionContext asc, String user, boolean recovery)

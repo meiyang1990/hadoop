@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -21,17 +22,30 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * 容器监控事件，用于NodeManager容器监控模块的事件驱动处理
+ */
 public class ContainersMonitorEvent extends
     AbstractEvent<ContainersMonitorEventType> {
 
+  // 关联的容器ID
   private final ContainerId containerId;
 
+  /**
+   * 构造容器监控事件
+   * @param containerId 关联的容器ID
+   * @param eventType 事件类型
+   */
   public ContainersMonitorEvent(ContainerId containerId,
       ContainersMonitorEventType eventType) {
     super(eventType);
     this.containerId = containerId;
   }
 
+  /**
+   * 获取事件关联的容器ID
+   * @return 容器ID
+   */
   public ContainerId getContainerId() {
     return this.containerId;
   }

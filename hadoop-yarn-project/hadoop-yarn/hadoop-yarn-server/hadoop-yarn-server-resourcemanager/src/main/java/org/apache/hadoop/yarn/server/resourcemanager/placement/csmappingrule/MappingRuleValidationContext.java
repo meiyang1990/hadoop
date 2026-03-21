@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,54 +24,44 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import java.util.Set;
 
 /**
- * This interface represents a context which contains all methods and data
- * required by the mapping rules to validate the initial configuration. The
- * reason this is moved to a separate interface is to minimize the dependencies
- * of the MappingRules, MappingRuleMatchers and MappingRule actions. This
- * interface should contain all validation related data and functions, this way
- * schedulers or engines can be changed without changing the MappingRules.
+ * YARN容量调度器应用队列映射规则验证上下文接口
+ * 提供映射规则配置验证所需的所有方法和数据，通过抽离此接口降低映射规则相关代码对调度器核心模块的依赖，
+ * 使得调度器核心逻辑可以独立修改不影响映射规则实现。
  */
 public interface MappingRuleValidationContext {
   /**
-   * This method should determine if the provided queue path can result in
-   * a possible placement. It should fail if the provided path cannot be placed
-   * into any of the known queues regardless of the variable context.
-   * @param queuePath The path to check
-   * @return true if the validation was successful
-   * @throws YarnException if the provided queue path is invalid
+   * 验证队列路径是否合法，检查该路径是否能匹配到已知队列，不考虑动态变量上下文。
+   * @param queuePath 需要验证的队列路径
+   * @return 验证通过返回true
+   * @throws YarnException 如果提供的队列路径非法则抛出异常
    */
   boolean validateQueuePath(String queuePath) throws YarnException;
 
   /**
-   * Method to determine if the provided queue path contains any dynamic parts
-   * A part is dynamic if a known variable is referenced in it.
-   * @param queuePath The path to check
-   * @return true if no dynamic parts were found
-   * @throws YarnException if invalid path parts are found (eg. empty)
+   * 检查队列路径是否为静态路径（不包含任何已定义的动态变量）。
+   * @param queuePath 需要检查的队列路径
+   * @return 没有动态片段返回true
+   * @throws YarnException 如果路径包含非法片段（例如空片段）则抛出异常
    */
   boolean isPathStatic(String queuePath) throws YarnException;
 
   /**
-   * This method will add a known variable to the validation context, known
-   * variables can be used to determine if a path is static or dynamic.
-   * @param variable Name of the variable
-   * @throws YarnException If the variable to be added has already added as an
-   * immutable one, an exception is thrown
+   * 向验证上下文添加一个可变动态变量，用于判断路径是否包含动态片段。
+   * @param variable 变量名称
+   * @throws YarnException 如果该变量已经作为不可变变量存在则抛出异常
    */
   void addVariable(String variable) throws YarnException;
 
   /**
-   * This method will add a known immutable variable to the validation context,
-   * known variables can be used to determine if a path is static or dynamic.
-   * @param variable Name of the immutable variable
-   * @throws YarnException If the variable to be added has already added as a
-   * regular, mutable variable an exception is thrown
+   * 向验证上下文添加一个不可变动态变量，用于判断路径是否包含动态片段。
+   * @param variable 不可变变量名称
+   * @throws YarnException 如果该变量已经作为可变变量存在则抛出异常
    */
   void addImmutableVariable(String variable) throws YarnException;
 
   /**
-   * This method will return all the known variables.
-   * @return Set of the known variables
+   * 获取上下文所有已知动态变量集合。
+   * @return 所有已知变量的集合
    */
   Set<String> getVariables();
 }

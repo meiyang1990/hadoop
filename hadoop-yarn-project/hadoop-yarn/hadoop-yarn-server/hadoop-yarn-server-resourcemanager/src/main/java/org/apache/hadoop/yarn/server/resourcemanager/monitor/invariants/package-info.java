@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,7 @@
  */
 
 /**
- * Monitoring policies, used to check invariants.
+ * YARN ResourceManager 不变性监控策略包，用于检查集群资源调度过程中的不变量约束验证，保障集群状态一致性。
+ * 本包提供各类监控策略实现，检查调度器内部状态必须满足的不变条件，及早发现异常状态。
  */
 package org.apache.hadoop.yarn.server.resourcemanager.monitor.invariants;

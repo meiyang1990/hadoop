@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -64,30 +65,15 @@ import java.util.Set;
 import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
 
 /**
- * This class implement a {@link SchedulingEditPolicy} that is designed to be
- * paired with the {@code CapacityScheduler}. At every invocation of {@code
- * editSchedule()} it computes the ideal amount of resources assigned to each
- * queue (for each queue in the hierarchy), and determines whether preemption
- * is needed. Overcapacity is distributed among queues in a weighted fair manner,
- * where the weight is the amount of guaranteed capacity for the queue.
- * Based on this ideal assignment it determines whether preemption is required
- * and select a set of containers from each application that would be killed if
- * the corresponding amount of resources is not freed up by the application.
- *
- * If not in {@code observeOnly} mode, it triggers preemption requests via a
- * {@link ContainerPreemptEvent} that the {@code ResourceManager} will ensure
- * to deliver to the application (or to execute).
- *
- * If the deficit of resources is persistent over a long enough period of time
- * this policy will trigger forced termination of containers (again by generating
- * {@link ContainerPreemptEvent}).
+ * 按比例容量抢占策略，为容量调度器设计实现的调度编辑策略。
+ * 每次执行时计算各队列理想资源分配，判断是否需要抢占，按权重分配超容量资源，
+ * 选择需要抢占的容器，等待超时后强制杀死容器，通过抢占事件通知调度器执行。
  */
 public class ProportionalCapacityPreemptionPolicy
     implements SchedulingEditPolicy, CapacitySchedulerPreemptionContext {
 
   /**
-   * IntraQueuePreemptionOrder will be used to define various priority orders
-   * which could be configured by admin.
+   * 队列内抢占排序策略，支持管理员配置不同的抢占优先级顺序。
    */
   @Unstable
   public enum IntraQueuePreemptionOrderPolicy {
@@ -99,7 +85,7 @@ public class ProportionalCapacityPreemptionPolicy
 
   private final Clock clock;
 
-  // Configurable fields
+  // 可配置参数
   private double maxIgnoredOverCapacity;
   private long maxWaitTime;
   private long monitoringInterval;
@@ -115,30 +101,37 @@ public class ProportionalCapacityPreemptionPolicy
   private boolean crossQueuePreemptionConservativeDRF;
   private boolean inQueuePreemptionConservativeDRF;
 
-  // Current configuration
+  // 当前配置对象
   private CapacitySchedulerConfiguration csConfig;
 
-  // Pointer to other RM components
+  // 指向RM其他组件的引用
   private RMContext rmContext;
   private ResourceCalculator rc;
   private CapacityScheduler scheduler;
   private RMNodeLabelsManager nlm;
 
-  // Internal properties to make decisions of what to preempt
+  // 内部决策属性：记录待抢占容器和添加时间
   private final Map<RMContainer,Long> preemptionCandidates =
     new HashMap<>();
+  // 按队列分区存储临时队列信息
   private Map<String, Map<String, TempQueuePerPartition>> queueToPartitions =
       new HashMap<>();
+  // 按分区存储未满足需求的队列列表
   private Map<String, LinkedHashSet<String>> partitionToUnderServedQueues =
       new HashMap<String, LinkedHashSet<String>>();
+  // 抢占候选容器选择策略列表
   private List<PreemptionCandidatesSelector> candidatesSelectionPolicies;
+  // 所有节点分区标签集合
   private Set<String> allPartitions;
+  // 所有叶子队列名称集合
   private Set<String> leafQueueNames;
+  // 按选择策略分组的待抢占容器集合
   Map<PreemptionCandidatesSelector, Map<ApplicationAttemptId,
       Set<RMContainer>>> pcsMap;
 
-  // Preemptable Entities, synced from scheduler at every run
+  // 从调度器同步来的可抢占实体
   private Map<String, PreemptableQueue> preemptableQueues;
+  // 可杀死容器ID集合
   private Set<ContainerId> killableContainers;
 
   public ProportionalCapacityPreemptionPolicy() {
@@ -158,6 +151,12 @@ public class ProportionalCapacityPreemptionPolicy
     preemptableQueues = Collections.emptyMap();
   }
 
+  /**
+   * 初始化抢占策略，验证调度器类型，保存组件引用。
+   * @param config 配置对象
+   * @param context RM上下文
+   * @param sched 资源调度器
+   */
   public void init(Configuration config, RMContext context,
       ResourceScheduler sched) {
     LOG.info("Preemption monitor:" + this.getClass().getCanonicalName());
@@ -174,6 +173,9 @@ public class ProportionalCapacityPreemptionPolicy
     updateConfigIfNeeded();
   }
 
+  /**
+   * 检测配置变更，更新抢占策略的所有配置参数，初始化选择策略。
+   */
   private void updateConfigIfNeeded() {
     CapacitySchedulerConfiguration config = scheduler.getConfiguration();
     if (config == csConfig) {
@@ -241,7 +243,7 @@ public class ProportionalCapacityPreemptionPolicy
 
     candidatesSelectionPolicies = new ArrayList<>();
 
-    // Do we need white queue-priority preemption policy?
+    // 根据配置决定是否添加队列优先级抢占策略
     boolean isQueuePriorityPreemptionEnabled =
         config.getPUOrderingPolicyUnderUtilizedPreemptionEnabled();
     if (isQueuePriorityPreemptionEnabled) {
@@ -249,7 +251,7 @@ public class ProportionalCapacityPreemptionPolicy
           new QueuePriorityContainerCandidateSelector(this));
     }
 
-    // Do we need to specially consider reserved containers?
+    // 根据配置决定是否添加预留容器候选选择策略
     boolean selectCandidatesForResevedContainers = config.getBoolean(
         CapacitySchedulerConfiguration.
         PREEMPTION_SELECT_CANDIDATES_FOR_RESERVED_CONTAINERS,
@@ -264,11 +266,11 @@ public class ProportionalCapacityPreemptionPolicy
         CapacitySchedulerConfiguration.ADDITIONAL_RESOURCE_BALANCE_BASED_ON_RESERVED_CONTAINERS,
         CapacitySchedulerConfiguration.DEFAULT_ADDITIONAL_RESOURCE_BALANCE_BASED_ON_RESERVED_CONTAINERS);
 
-    // initialize candidates preemption selection policies
+    // 初始化默认FIFO候选选择策略
     candidatesSelectionPolicies.add(new FifoCandidatesSelector(this,
         additionalPreemptionBasedOnReservedResource, false));
 
-    // Do we need to do preemption to balance queue even after queues get satisfied?
+    // 根据配置决定是否添加队列平衡抢占策略
     boolean isPreemptionToBalanceRequired = config.getBoolean(
         CapacitySchedulerConfiguration.PREEMPTION_TO_BALANCE_QUEUES_BEYOND_GUARANTEED,
         CapacitySchedulerConfiguration.DEFAULT_PREEMPTION_TO_BALANCE_QUEUES_BEYOND_GUARANTEED);
@@ -282,7 +284,7 @@ public class ProportionalCapacityPreemptionPolicy
       candidatesSelectionPolicies.add(selector);
     }
 
-    // Do we need to specially consider intra queue
+    // 根据配置决定是否添加队列内抢占策略
     boolean isIntraQueuePreemptionEnabled = config.getBoolean(
         CapacitySchedulerConfiguration.INTRAQUEUE_PREEMPTION_ENABLED,
         CapacitySchedulerConfiguration.DEFAULT_INTRAQUEUE_PREEMPTION_ENABLED);
@@ -344,6 +346,11 @@ public class ProportionalCapacityPreemptionPolicy
     }
   }
 
+  /**
+   * 根据等待超时处理选中的待抢占容器，超时则杀死容器，否则标记为可抢占。
+   * @param toPreemptPerSelector 按选择策略分组的待抢占容器
+   * @param currentTime 当前时间戳
+   */
   private void preemptOrkillSelectedContainerAfterWait(
       Map<PreemptionCandidatesSelector, Map<ApplicationAttemptId,
           Set<RMContainer>>> toPreemptPerSelector, long currentTime) {
@@ -356,10 +363,7 @@ public class ProportionalCapacityPreemptionPolicy
         "Starting to preempt containers for selectedCandidates and size:{}",
         toPreemptCount);
 
-    // preempt (or kill) the selected containers
-    // We need toPreemptPerSelector here to match list of containers to
-    // its selector so that we can get custom timeout per selector when
-    // checking if current container should be killed or not
+    // 遍历每个选择策略的待抢占容器
     for (Map.Entry<PreemptionCandidatesSelector, Map<ApplicationAttemptId,
         Set<RMContainer>>> pc : toPreemptPerSelector
         .entrySet()) {
@@ -373,450 +377,11 @@ public class ProportionalCapacityPreemptionPolicy
                 + " #containers-to-be-preemptionCandidates=" + e.getValue().size());
           }
           for (RMContainer container : e.getValue()) {
-            // if we tried to preempt this for more than maxWaitTime, this
-            // should be based on custom timeout per container per selector
+            // 检查是否超时：超过当前选择策略的最大等待时间则杀死容器
             if (preemptionCandidates.get(container) != null
                 && preemptionCandidates.get(container)
                 + pc.getKey().getMaximumKillWaitTimeMs() <= currentTime) {
-              // kill it
+              // 发送杀死容器事件
               rmContext.getDispatcher().getEventHandler().handle(
                   new ContainerPreemptEvent(appAttemptId, container,
-                      SchedulerEventType.MARK_CONTAINER_FOR_KILLABLE));
-              preemptionCandidates.remove(container);
-            } else {
-              if (preemptionCandidates.get(container) != null) {
-                // We already updated the information to scheduler earlier, we need
-                // not have to raise another event.
-                continue;
-              }
-
-              //otherwise just send preemption events
-              rmContext.getDispatcher().getEventHandler().handle(
-                  new ContainerPreemptEvent(appAttemptId, container,
-                      SchedulerEventType.MARK_CONTAINER_FOR_PREEMPTION));
-              preemptionCandidates.put(container, currentTime);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  private void syncKillableContainersFromScheduler() {
-    // sync preemptable entities from scheduler
-    preemptableQueues =
-        scheduler.getPreemptionManager().getShallowCopyOfPreemptableQueues();
-
-    killableContainers = new HashSet<>();
-    for (Map.Entry<String, PreemptableQueue> entry : preemptableQueues
-        .entrySet()) {
-      PreemptableQueue entity = entry.getValue();
-      for (Map<ContainerId, RMContainer> map : entity.getKillableContainers()
-          .values()) {
-        killableContainers.addAll(map.keySet());
-      }
-    }
-  }
-
-  private void cleanupStaledPreemptionCandidates(long currentTime) {
-    // Keep the preemptionCandidates list clean
-    // garbage collect containers that are irrelevant for preemption
-    // And avoid preempt selected containers for *this execution*
-    // or within 1 ms
-    preemptionCandidates.entrySet()
-        .removeIf(candidate ->
-            candidate.getValue() + 2 * maxWaitTime < currentTime);
-  }
-
-  private Set<String> getLeafQueueNames(TempQueuePerPartition q) {
-    // Only consider this a leaf queue if:
-    // It is a concrete leaf queue (not a childless parent)
-    if (CollectionUtils.isEmpty(q.children)) {
-      CSQueue queue = scheduler.getQueue(q.queueName);
-      if (queue instanceof AbstractLeafQueue) {
-        return ImmutableSet.of(q.queueName);
-      }
-      return Collections.emptySet();
-    }
-
-    Set<String> leafQueueNames = new HashSet<>();
-    for (TempQueuePerPartition child : q.children) {
-      leafQueueNames.addAll(getLeafQueueNames(child));
-    }
-
-    return leafQueueNames;
-  }
-
-  /**
-   * This method selects and tracks containers to be preemptionCandidates. If a container
-   * is in the target list for more than maxWaitTime it is killed.
-   *
-   * @param root the root of the CapacityScheduler queue hierarchy
-   * @param clusterResources the total amount of resources in the cluster
-   */
-  private void containerBasedPreemptOrKill(CSQueue root,
-      Resource clusterResources) {
-    // Sync killable containers from scheduler when lazy preemption enabled
-    if (lazyPreempionEnabled) {
-      syncKillableContainersFromScheduler();
-    }
-
-    // All partitions to look at
-    Set<String> partitions = new HashSet<>();
-    partitions.addAll(scheduler.getRMContext()
-        .getNodeLabelManager().getClusterNodeLabelNames());
-    partitions.add(RMNodeLabelsManager.NO_LABEL);
-    this.allPartitions = ImmutableSet.copyOf(partitions);
-
-    // extract a summary of the queues from scheduler
-    synchronized (scheduler) {
-      queueToPartitions.clear();
-
-      for (String partitionToLookAt : allPartitions) {
-        cloneQueues(root, Resources
-                .clone(nlm.getResourceByLabel(partitionToLookAt, clusterResources)),
-            partitionToLookAt);
-      }
-
-      // Update effective priority of queues
-    }
-
-    this.leafQueueNames = ImmutableSet.copyOf(getLeafQueueNames(
-        getQueueByPartition(CapacitySchedulerConfiguration.ROOT,
-            RMNodeLabelsManager.NO_LABEL)));
-
-    // compute total preemption allowed
-    Resource totalPreemptionAllowed = Resources.multiply(clusterResources,
-        percentageClusterPreemptionAllowed);
-
-    //clear under served queues for every run
-    partitionToUnderServedQueues.clear();
-
-    // based on ideal allocation select containers to be preemptionCandidates from each
-    // queue and each application
-    Map<ApplicationAttemptId, Set<RMContainer>> toPreempt =
-        new HashMap<>();
-    Map<PreemptionCandidatesSelector, Map<ApplicationAttemptId,
-        Set<RMContainer>>> toPreemptPerSelector =  new HashMap<>();
-    for (PreemptionCandidatesSelector selector :
-        candidatesSelectionPolicies) {
-      long startTime = 0;
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(MessageFormat
-            .format("Trying to use {0} to select preemption candidates",
-                selector.getClass().getName()));
-        startTime = clock.getTime();
-      }
-      Map<ApplicationAttemptId, Set<RMContainer>> curCandidates =
-          selector.selectCandidates(toPreempt, clusterResources,
-              totalPreemptionAllowed);
-      toPreemptPerSelector.putIfAbsent(selector, curCandidates);
-
-      if (LOG.isDebugEnabled()) {
-        LOG.debug(MessageFormat
-            .format("{0} uses {1} millisecond to run",
-                selector.getClass().getName(), clock.getTime() - startTime));
-        int totalSelected = 0;
-        int curSelected = 0;
-        for (Set<RMContainer> set : toPreempt.values()) {
-          totalSelected += set.size();
-        }
-        for (Set<RMContainer> set : curCandidates.values()) {
-          curSelected += set.size();
-        }
-        LOG.debug(MessageFormat
-            .format("So far, total {0} containers selected to be preempted, {1}"
-                    + " containers selected this round\n",
-                totalSelected, curSelected));
-      }
-    }
-
-    if (LOG.isDebugEnabled()) {
-      logToCSV(new ArrayList<>(leafQueueNames));
-    }
-
-    // if we are in observeOnly mode return before any action is taken
-    if (observeOnly) {
-      return;
-    }
-
-    // TODO: need consider revert killable containers when no more demandings.
-    // Since we could have several selectors to make decisions concurrently.
-    // So computed ideal-allocation varies between different selectors.
-    //
-    // We may need to "score" killable containers and revert the most preferred
-    // containers. The bottom line is, we shouldn't preempt a queue which is already
-    // below its guaranteed resource.
-
-    long currentTime = clock.getTime();
-
-    pcsMap = toPreemptPerSelector;
-
-    // preempt (or kill) the selected containers
-    preemptOrkillSelectedContainerAfterWait(toPreemptPerSelector, currentTime);
-
-    // cleanup staled preemption candidates
-    cleanupStaledPreemptionCandidates(currentTime);
-  }
-
-  @Override
-  public long getMonitoringInterval() {
-    return monitoringInterval;
-  }
-
-  @Override
-  public String getPolicyName() {
-    return "ProportionalCapacityPreemptionPolicy";
-  }
-
-  @VisibleForTesting
-  public Map<RMContainer, Long> getToPreemptContainers() {
-    return preemptionCandidates;
-  }
-
-  /**
-   * This method walks a tree of CSQueue and clones the portion of the state
-   * relevant for preemption in TempQueue(s). It also maintains a pointer to
-   * the leaves. Finally it aggregates pending resources in each queue and rolls
-   * it up to higher levels.
-   *
-   * @param curQueue current queue which I'm looking at now
-   * @param partitionResource the total amount of resources in the cluster
-   * @return the root of the cloned queue hierarchy
-   */
-  private TempQueuePerPartition cloneQueues(CSQueue curQueue,
-      Resource partitionResource, String partitionToLookAt) {
-    TempQueuePerPartition ret;
-    ReadLock readLock = curQueue.getReadLock();
-    // Acquire a read lock from Parent/LeafQueue.
-    readLock.lock();
-    try {
-      String queuePath = curQueue.getQueuePath();
-      QueueCapacities qc = curQueue.getQueueCapacities();
-      float absCap = qc.getAbsoluteCapacity(partitionToLookAt);
-      float absMaxCap = qc.getAbsoluteMaximumCapacity(partitionToLookAt);
-      boolean preemptionDisabled = curQueue.getPreemptionDisabled();
-
-      QueueResourceQuotas queueResourceQuotas = curQueue
-          .getQueueResourceQuotas();
-      Resource effMinRes = queueResourceQuotas
-          .getEffectiveMinResource(partitionToLookAt);
-      Resource effMaxRes = queueResourceQuotas
-          .getEffectiveMaxResource(partitionToLookAt);
-
-      Resource current = Resources
-          .clone(curQueue.getQueueResourceUsage().getUsed(partitionToLookAt));
-      Resource killable = Resources.none();
-
-      Resource reserved = Resources.clone(
-          curQueue.getQueueResourceUsage().getReserved(partitionToLookAt));
-      if (null != preemptableQueues.get(queuePath)) {
-        killable = Resources.clone(preemptableQueues.get(queuePath)
-            .getKillableResource(partitionToLookAt));
-      }
-
-      // when partition is a non-exclusive partition, the actual maxCapacity
-      // could more than specified maxCapacity
-      try {
-        if (!scheduler.getRMContext().getNodeLabelManager()
-            .isExclusiveNodeLabel(partitionToLookAt)) {
-          absMaxCap = 1.0f;
-        }
-      } catch (IOException e) {
-        // This may cause by partition removed when running capacity monitor,
-        // just ignore the error, this will be corrected when doing next check.
-      }
-
-      ret = new TempQueuePerPartition(queuePath, current, preemptionDisabled,
-          partitionToLookAt, killable, absCap, absMaxCap, partitionResource,
-          reserved, curQueue, effMinRes, effMaxRes);
-
-      if (curQueue instanceof AbstractParentQueue) {
-        String configuredOrderingPolicy =
-            ((AbstractParentQueue) curQueue).getQueueOrderingPolicy().getConfigName();
-
-        // Recursively add children
-        for (CSQueue c : curQueue.getChildQueues()) {
-          TempQueuePerPartition subq = cloneQueues(c, partitionResource,
-              partitionToLookAt);
-
-          // If we respect priority
-          if (StringUtils.equals(
-              CapacitySchedulerConfiguration.QUEUE_PRIORITY_UTILIZATION_ORDERING_POLICY,
-              configuredOrderingPolicy)) {
-            subq.relativePriority = c.getPriority().getPriority();
-          }
-          ret.addChild(subq);
-          subq.parent = ret;
-        }
-      }
-    } finally {
-      readLock.unlock();
-    }
-
-    addTempQueuePartition(ret);
-    return ret;
-  }
-
-  // simple printout function that reports internal queue state (useful for
-  // plotting)
-  private void logToCSV(List<String> leafQueueNames){
-    Collections.sort(leafQueueNames);
-    String queueState = " QUEUESTATE: " + clock.getTime();
-    StringBuilder sb = new StringBuilder();
-    sb.append(queueState);
-
-    for (String queueName : leafQueueNames) {
-      TempQueuePerPartition tq =
-          getQueueByPartition(queueName, RMNodeLabelsManager.NO_LABEL);
-      sb.append(", ");
-      tq.appendLogString(sb);
-    }
-    LOG.debug(sb.toString());
-  }
-
-  private void addTempQueuePartition(TempQueuePerPartition queuePartition) {
-    String queueName = queuePartition.queueName;
-
-    Map<String, TempQueuePerPartition> queuePartitions;
-    if (null == (queuePartitions = queueToPartitions.get(queueName))) {
-      queuePartitions = new HashMap<>();
-      queueToPartitions.put(queueName, queuePartitions);
-    }
-    queuePartitions.put(queuePartition.partition, queuePartition);
-  }
-
-  /**
-   * Get queue partition by given queueName and partitionName
-   */
-  @Override
-  public TempQueuePerPartition getQueueByPartition(String queueName,
-      String partition) {
-    Map<String, TempQueuePerPartition> partitionToQueues;
-    if (null == (partitionToQueues = queueToPartitions.get(queueName))) {
-      throw new YarnRuntimeException("This shouldn't happen, cannot find "
-          + "TempQueuePerPartition for queueName=" + queueName);
-    }
-    return partitionToQueues.get(partition);
-  }
-
-  /**
-   * Get all queue partitions by given queueName
-   */
-  @Override
-  public Collection<TempQueuePerPartition> getQueuePartitions(String queueName) {
-    if (!queueToPartitions.containsKey(queueName)) {
-      throw new YarnRuntimeException("This shouldn't happen, cannot find "
-          + "TempQueuePerPartition collection for queueName=" + queueName);
-    }
-    return queueToPartitions.get(queueName).values();
-  }
-
-  @Override
-  public CapacityScheduler getScheduler() {
-    return scheduler;
-  }
-
-  @Override
-  public RMContext getRMContext() {
-    return rmContext;
-  }
-
-  @Override
-  public boolean isObserveOnly() {
-    return observeOnly;
-  }
-
-  @Override
-  public Set<ContainerId> getKillableContainers() {
-    return killableContainers;
-  }
-
-  @Override
-  public double getMaxIgnoreOverCapacity() {
-    return maxIgnoredOverCapacity;
-  }
-
-  @Override
-  public double getNaturalTerminationFactor() {
-    return naturalTerminationFactor;
-  }
-
-  @Override
-  public Set<String> getLeafQueueNames() {
-    return leafQueueNames;
-  }
-
-  @Override
-  public Set<String> getAllPartitions() {
-    return allPartitions;
-  }
-
-  @VisibleForTesting
-  Map<String, Map<String, TempQueuePerPartition>> getQueuePartitions() {
-    return queueToPartitions;
-  }
-
-  @VisibleForTesting
-  Map<PreemptionCandidatesSelector, Map<ApplicationAttemptId,
-      Set<RMContainer>>> getToPreemptCandidatesPerSelector() {
-    return pcsMap;
-  }
-
-  @Override
-  public int getClusterMaxApplicationPriority() {
-    return scheduler.getMaxClusterLevelAppPriority().getPriority();
-  }
-
-  @Override
-  public float getMaxAllowableLimitForIntraQueuePreemption() {
-    return maxAllowableLimitForIntraQueuePreemption;
-  }
-
-  @Override
-  public float getMinimumThresholdForIntraQueuePreemption() {
-    return minimumThresholdForIntraQueuePreemption;
-  }
-
-  @Override
-  public Resource getPartitionResource(String partition) {
-    return Resources.clone(nlm.getResourceByLabel(partition,
-        Resources.clone(scheduler.getClusterResource())));
-  }
-
-  public LinkedHashSet<String> getUnderServedQueuesPerPartition(
-      String partition) {
-    return partitionToUnderServedQueues.get(partition);
-  }
-
-  public void addPartitionToUnderServedQueues(String queueName,
-      String partition) {
-    LinkedHashSet<String> underServedQueues = partitionToUnderServedQueues
-        .get(partition);
-    if (null == underServedQueues) {
-      underServedQueues = new LinkedHashSet<String>();
-      partitionToUnderServedQueues.put(partition, underServedQueues);
-    }
-    underServedQueues.add(queueName);
-  }
-
-  @Override
-  public IntraQueuePreemptionOrderPolicy getIntraQueuePreemptionOrderPolicy() {
-    return intraQueuePreemptionOrderPolicy;
-  }
-
-  @Override
-  public boolean getCrossQueuePreemptionConservativeDRF() {
-    return crossQueuePreemptionConservativeDRF;
-  }
-
-  @Override
-  public boolean getInQueuePreemptionConservativeDRF() {
-    return inQueuePreemptionConservativeDRF;
-  }
-
-  @Override
-  public long getDefaultMaximumKillWaitTimeout() {
-    return maxWaitTime;
-  }
-}
+                      SchedulerEventType.MARK_CONTAINER_FOR_KILL

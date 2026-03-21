@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,29 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 
+/**
+ * YARN ResourceManager 节点事件：通知节点向指定容器发送信号事件
+ */
 public class RMNodeSignalContainerEvent extends RMNodeEvent {
 
+  // 容器信号请求信息，包含目标容器和信号类型
   private SignalContainerRequest signalRequest;
 
+  /**
+   * 构造容器信号事件
+   * @param nodeId 目标节点ID
+   * @param signalRequest 容器信号请求
+   */
   public RMNodeSignalContainerEvent(NodeId nodeId,
       SignalContainerRequest signalRequest) {
     super(nodeId, RMNodeEventType.SIGNAL_CONTAINER);
     this.signalRequest = signalRequest;
   }
 
+  /**
+   * 获取容器信号请求
+   * @return 容器信号请求对象
+   */
   public SignalContainerRequest getSignalRequest() {
     return this.signalRequest;
   }

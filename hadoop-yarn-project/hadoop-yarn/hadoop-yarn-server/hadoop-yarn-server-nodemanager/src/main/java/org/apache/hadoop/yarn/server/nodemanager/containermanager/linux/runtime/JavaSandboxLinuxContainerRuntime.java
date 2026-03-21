@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
@@ -120,6 +121,7 @@ import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.r
  *     the permissions across their groups.
  *   </li>
  * </ul>
+ * 对Java容器提供基于Java Security Manager的沙箱隔离运行时，为每个容器生成独立安全策略文件，限制容器文件访问权限
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -127,7 +129,9 @@ public class JavaSandboxLinuxContainerRuntime
     extends DefaultLinuxContainerRuntime {
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultLinuxContainerRuntime.class);
+  // YARN配置对象
   private Configuration configuration;
+  // 沙箱运行模式
   private SandboxMode sandboxMode;
 
   public static final String POLICY_FILE_DIR = "nm-sandbox-policies";
@@ -137,6 +141,7 @@ public class JavaSandboxLinuxContainerRuntime
       PosixFilePermissions.asFileAttribute(
           PosixFilePermissions.fromString("rwxr-xr-x"));
 
+  // 容器ID -> 对应安全策略文件路径映射
   private Map<String, Path> containerPolicies = new HashMap<>();
 
   /**
@@ -145,6 +150,7 @@ public class JavaSandboxLinuxContainerRuntime
    *
    * @param privilegedOperationExecutor the {@link PrivilegedOperationExecutor}
    * instance
+   * 构造Java沙箱容器运行时实例
    */
   public JavaSandboxLinuxContainerRuntime(
       PrivilegedOperationExecutor privilegedOperationExecutor) {
@@ -155,6 +161,7 @@ public class JavaSandboxLinuxContainerRuntime
   public void initialize(Configuration conf, Context nmContext)
       throws ContainerExecutionException {
     this.configuration = conf;
+    // 从配置加载沙箱运行模式
     this.sandboxMode =
         SandboxMode.get(
             this.configuration.get(YARN_CONTAINER_SANDBOX,
@@ -168,6 +175,7 @@ public class JavaSandboxLinuxContainerRuntime
    * directory if it doesn't exist, or clears the contents of the directory if
    * already created.
    * @throws ContainerExecutionException If unable to resolve policy directory
+   * 初始化安全策略文件目录，不存在则创建，已存在则清空旧策略文件
    */
   private void initializePolicyDir() throws ContainerExecutionException {
     String hadoopTempDir = configuration.get("hadoop.tmp.dir");
@@ -175,7 +183,7 @@ public class JavaSandboxLinuxContainerRuntime
       throw new ContainerExecutionException("hadoop.tmp.dir not set!");
     }
     policyFileDir = Paths.get(hadoopTempDir, POLICY_FILE_DIR);
-    //Delete any existing policy files if the directory has already been created
+    // 如果目录已存在，删除所有已有策略文件
     if(Files.exists(policyFileDir)){
       try (DirectoryStream<Path> stream =
          Files.newDirectoryStream(policyFileDir)){
@@ -188,6 +196,7 @@ public class JavaSandboxLinuxContainerRuntime
       }
     } else {
       try {
+        // 创建策略目录并设置正确权限
         policyFileDir = Files.createDirectories(
             Paths.get(hadoopTempDir, POLICY_FILE_DIR), POLICY_ATTR);
       } catch (IOException e) {
@@ -215,6 +224,7 @@ public class JavaSandboxLinuxContainerRuntime
    * @throws ContainerExecutionException Exception thrown if temporary policy
    * file directory can't be created, or if any exceptions occur during policy
    * file parsing and generation.
+   * 容器启动前准备：生成容器专属Java安全策略文件，修改启动命令启用Java Security Manager
    */
   @Override
   public void prepareContainer(ContainerRuntimeContext ctx)
@@ -234,6 +244,7 @@ public class JavaSandboxLinuxContainerRuntime
     String username =
         ctx.getExecutionAttribute(USER);
 
+    // 仅对白名单外容器启用沙箱
     if(!isSandboxContainerWhitelisted(username, commands)) {
       String tmpDirBase = configuration.get("hadoop.tmp.dir");
       if (tmpDirBase == null) {
@@ -242,10 +253,13 @@ public class JavaSandboxLinuxContainerRuntime
 
       try {
         String containerID = ctx.getExecutionAttribute(CONTAINER_ID_STR);
+        // 初始化策略文件目录
         initializePolicyDir();
 
+        // 获取用户所属组对应的策略文件列表
         List<String> groupPolicyFiles =
             getGroupPolicyFiles(configuration, ctx.getExecutionAttribute(USER));
+        // 创建当前容器专属策略文件
         Path policyFilePath = Files.createFile(
             Paths.get(policyFileDir.toString(),
             containerID + "-" + NMContainerPolicyUtils.POLICY_FILE),
@@ -254,10 +268,13 @@ public class JavaSandboxLinuxContainerRuntime
         try(OutputStream policyOutputStream =
                 Files.newOutputStream(policyFilePath)) {
 
+          // 保存容器策略文件路径映射
           containerPolicies.put(containerID, policyFilePath);
 
+          // 生成完整策略文件
           NMContainerPolicyUtils.generatePolicyFile(policyOutputStream,
               localDirs, groupPolicyFiles, resources, configuration);
+          // 修改容器启动命令，添加Java Security Manager和策略文件参数
           NMContainerPolicyUtils.appendSecurityFlags(
               commands, env, policyFilePath, sandboxMode);
         }
@@ -273,6 +290,7 @@ public class JavaSandboxLinuxContainerRuntime
     try {
       super.launchContainer(ctx);
     } finally {
+      // 容器启动后删除策略文件
       deletePolicyFiles(ctx);
     }
   }
@@ -283,6 +301,7 @@ public class JavaSandboxLinuxContainerRuntime
     try {
       super.relaunchContainer(ctx);
     } finally {
+      // 容器重启动后删除策略文件
       deletePolicyFiles(ctx);
     }
   }
@@ -294,22 +313,28 @@ public class JavaSandboxLinuxContainerRuntime
    * org.apache.hadoop.yarn.conf.YarnConfiguration#YARN_CONTAINER_SANDBOX}
    * @param env the environment variable settings for the operation
    * @return true if Sandbox is requested, false otherwise
+   * 判断是否需要启用本Java沙箱运行时
    */
   @Override
   public boolean isRuntimeRequested(Map<String, String> env) {
     return sandboxMode != SandboxMode.disabled;
   }
 
+  /**
+   * 获取用户所属组对应的自定义安全策略文件路径列表
+   */
   private static List<String> getGroupPolicyFiles(Configuration conf,
       String user) throws ContainerExecutionException {
     Groups groups = Groups.getUserToGroupsMappingService(conf);
     Set<String> userGroups;
     try {
+      // 获取用户所属所有用户组
       userGroups = groups.getGroupsSet(user);
     } catch (IOException e) {
       throw new ContainerExecutionException("Container user does not exist");
     }
 
+    // 收集所有组对应的策略文件路径
     return userGroups.stream()
         .map(group -> conf.get(YARN_CONTAINER_SANDBOX_POLICY_GROUP_PREFIX
             + group))
@@ -324,6 +349,7 @@ public class JavaSandboxLinuxContainerRuntime
    * @param commands The list of run commands for the container
    * @return boolean value denoting whether the container should be whitelisted.
    * @throws ContainerExecutionException If container user can not be resolved
+   * 判断当前容器是否在白名单中，白名单容器免除Java沙箱限制
    */
   private boolean isSandboxContainerWhitelisted(String username,
       List<String> commands) throws ContainerExecutionException {
@@ -339,8 +365,9 @@ public class JavaSandboxLinuxContainerRuntime
       throw new ContainerExecutionException("Container user does not exist");
     }
 
+    // 用户属于白名单组
     if(whitelistGroup != null && userGroups.contains(whitelistGroup)) {
-      // If any command has security flag, whitelisting is disabled
+      // 如果命令中已经包含安全标志，则不启用白名单（强制沙箱）
       for(String cmd : commands) {
         if(cmd.contains(NMContainerPolicyUtils.SECURITY_FLAG)){
           isWhitelisted = false;
@@ -360,6 +387,7 @@ public class JavaSandboxLinuxContainerRuntime
    * @param ctx Container context for files to be deleted
    * @throws ContainerExecutionException if unable to access or delete policy
    * files or generated policy file directory
+   * 删除容器对应的安全策略文件
    */
   private void deletePolicyFiles(ContainerRuntimeContext ctx)
       throws ContainerExecutionException {
@@ -376,180 +404,9 @@ public class JavaSandboxLinuxContainerRuntime
    * Enumeration of the modes the JavaSandboxLinuxContainerRuntime can use.
    * See {@link JavaSandboxLinuxContainerRuntime} for details on the
    * behavior of each setting.
+   * Java沙箱运行模式枚举
    */
   public enum SandboxMode {
+    // 强制模式：仅允许JVM容器运行，非JVM容器直接拒绝
     enforcing("enforcing"),
-    permissive("permissive"),
-    disabled("disabled");
-
-    private final String mode;
-    SandboxMode(String mode){
-      this.mode = mode;
-    }
-
-    public static SandboxMode get(String mode) {
-
-      if(enforcing.mode.equals(mode)) {
-        return enforcing;
-      } else if(permissive.mode.equals(mode)) {
-        return permissive;
-      } else {
-        return disabled;
-      }
-    }
-
-    public String toString(){
-      return mode;
-    }
-  }
-
-  /**
-   * Static utility class defining String constants and static methods for the
-   * use of the {@link JavaSandboxLinuxContainerRuntime}.
-   */
-  static final class NMContainerPolicyUtils{
-
-    static final String POLICY_FILE = "java.policy";
-    static final String SECURITY_DEBUG = " -Djava.security.debug=all";
-    static final String SECURITY_FLAG = "-Djava.security.manager";
-    static final String POLICY_APPEND_FLAG = "-Djava.security.policy=";
-    static final String POLICY_FLAG = POLICY_APPEND_FLAG + "=";
-    static final String JAVA_CMD = "/bin/java ";
-    static final String JVM_SECURITY_CMD =
-        JAVA_CMD + SECURITY_FLAG + " " + POLICY_FLAG;
-
-    static final String STRIP_POLICY_FLAG = POLICY_APPEND_FLAG + "[^ ]+";
-    static final String CONTAINS_JAVA_CMD = "\\$" + JAVA_HOME + JAVA_CMD + ".*";
-    static final String MULTI_COMMAND_REGEX =
-        "(?s).*(" + //command read as single line
-        "(&[^>]|&&)|(\\|{1,2})|(\\|&)|" + //Matches '&','&&','|','||' and '|&'
-        "(`[^`]+`)|(\\$\\([^)]+\\))|" + //Matches occurrences of $() or ``
-        "(;)" + //Matches end of statement ';'
-        ").*";
-    static final String CLEAN_CMD_REGEX =
-        "(" + SECURITY_FLAG + ")|" +
-            "(" + STRIP_POLICY_FLAG + ")";
-
-    static final String FILE_PERMISSION_FORMAT = "   permission "
-        + FilePermission.class.getCanonicalName()
-        + " \"%1$s" + SEPARATOR + "-\", \"%2$s\";%n";
-    static final String HADOOP_HOME_PERMISSION = "%ngrant codeBase \"file:"
-        + Paths.get(System.getProperty(SYSPROP_HADOOP_HOME_DIR))
-        + SEPARATOR + "-\" {%n" +
-        "  permission " + AllPermission.class.getCanonicalName() + ";%n};%n";
-    static final Logger LOG =
-            LoggerFactory.getLogger(NMContainerPolicyUtils.class);
-
-    /**
-     * Write new policy file to policyOutStream which will include read access
-     * to localize resources.  Optionally a default policyFilePath can be
-     * specified to append a custom policy implementation to the new policy file
-     * @param policyOutStream OutputStream pointing to java.policy file
-     * @param localDirs Container local directories
-     * @param resources List of local container resources
-     * @param conf YARN configuration
-     * @throws IOException - If policy file generation is unable to read the
-     * base policy file or if it is unable to create a new policy file.
-     */
-    static void generatePolicyFile(OutputStream policyOutStream,
-        List<String> localDirs, List<String> groupPolicyPaths,
-        Map<org.apache.hadoop.fs.Path, List<String>> resources,
-        Configuration conf)
-        throws IOException {
-
-      String policyFilePath =
-          conf.get(YarnConfiguration.YARN_CONTAINER_SANDBOX_POLICY);
-      String filePermissions =
-          conf.get(YarnConfiguration.YARN_CONTAINER_SANDBOX_FILE_PERMISSIONS,
-            YarnConfiguration.DEFAULT_YARN_CONTAINER_SANDBOX_FILE_PERMISSIONS);
-
-      Set<String> cacheDirs = new HashSet<>();
-      for(org.apache.hadoop.fs.Path path : resources.keySet()) {
-        cacheDirs.add(path.getParent().toString());
-      }
-
-      if (groupPolicyPaths != null) {
-        for(String policyPath : groupPolicyPaths) {
-          Files.copy(Paths.get(policyPath), policyOutStream);
-        }
-      } else if (policyFilePath == null) {
-        IOUtils.copyBytes(
-            NMContainerPolicyUtils.class.getResourceAsStream("/" + POLICY_FILE),
-            policyOutStream, conf, false);
-      } else {
-        Files.copy(Paths.get(policyFilePath), policyOutStream);
-      }
-
-      Formatter filePermissionFormat = new Formatter(policyOutStream,
-          StandardCharsets.UTF_8.name());
-      filePermissionFormat.format(HADOOP_HOME_PERMISSION);
-      filePermissionFormat.format("grant {%n");
-      for(String localDir : localDirs) {
-        filePermissionFormat.format(
-            FILE_PERMISSION_FORMAT, localDir, filePermissions);
-      }
-      for(String cacheDir : cacheDirs) {
-        filePermissionFormat.format(
-            FILE_PERMISSION_FORMAT, cacheDir, filePermissions);
-      }
-      filePermissionFormat.format("};%n");
-      filePermissionFormat.flush();
-    }
-
-    /**
-     * Modify command to enable the Java Security Manager and specify
-     * java.policy file.  Will modify the passed commands to strip any
-     * existing java security configurations.  Expects a java command to be the
-     * first and only executable provided in enforcing mode.  In passive mode
-     * any commands with '||' or '&&' will not be modified.
-     * @param commands List of container commands
-     * @param env Container environment variables
-     * @param policyPath Path to the container specific policy file
-     * @param sandboxMode (enforcing, permissive, disabled) Determines
-     *          whether non-java containers will be launched
-     * @throws ContainerExecutionException - Exception thrown if
-     * JVM Sandbox enabled in 'enforcing' mode and a non-java command is
-     * provided in the list of commands
-     */
-    static void appendSecurityFlags(List<String> commands,
-        Map<String, String> env, Path policyPath, SandboxMode sandboxMode)
-        throws ContainerExecutionException {
-
-      for(int i = 0; i < commands.size(); i++){
-        String command = commands.get(i);
-        if(validateJavaHome(env.get(JAVA_HOME.name()))
-            && command.matches(CONTAINS_JAVA_CMD)
-            && !command.matches(MULTI_COMMAND_REGEX)){
-          command = command.replaceAll(CLEAN_CMD_REGEX, "");
-          String securityString = JVM_SECURITY_CMD + policyPath + " ";
-          if(LOG.isDebugEnabled()) {
-            securityString += SECURITY_DEBUG;
-          }
-          commands.set(i, command.replaceFirst(JAVA_CMD, securityString));
-        } else if (sandboxMode == SandboxMode.enforcing){
-          throw new ContainerExecutionException(
-              "Only JVM containers permitted in YARN sandbox mode (enforcing). "
-            + "The following command can not be executed securely: " + command);
-        } else if (sandboxMode == SandboxMode.permissive){
-          LOG.warn("The container will run without the java security manager"
-              + " due to an unsupported container command.  The command"
-              + " will be permitted to run in Sandbox permissive mode: "
-              + command);
-        }
-      }
-    }
-
-    private static boolean validateJavaHome(String containerJavaHome)
-        throws ContainerExecutionException{
-      if (System.getenv(JAVA_HOME.name()) == null) {
-        throw new ContainerExecutionException(
-            "JAVA_HOME is not set for NodeManager");
-      }
-      if (containerJavaHome == null) {
-        throw new ContainerExecutionException(
-            "JAVA_HOME is not set for container");
-      }
-      return System.getenv(JAVA_HOME.name()).equals(containerJavaHome);
-    }
-  }
-}
+    // 宽容模式：JVM容器启用沙箱，

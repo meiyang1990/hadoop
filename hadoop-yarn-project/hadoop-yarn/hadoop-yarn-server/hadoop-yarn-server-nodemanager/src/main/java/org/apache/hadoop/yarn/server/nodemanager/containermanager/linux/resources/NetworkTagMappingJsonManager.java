@@ -1,5 +1,5 @@
+// 这个文件已经全部加上中文注释
 /*
- * *
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements. See the NOTICE file
  *  distributed with this work for additional information
@@ -15,7 +15,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- * /
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources;
 
@@ -38,26 +37,29 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
 /**
- * The NetworkTagMapping JsonManager implementation.
+ * 从JSON配置文件加载用户/用户组到网络流量标记ID的映射关系管理器实现
+ * 用于YARN NodeManager网络流量隔离功能，为容器分配对应的net_cls cgroup类ID
  */
 public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
 
-  /** Format of the classid that is to be used with the net_cls cgroup. Needs
-   * to be of the form 0xAAAABBBB */
+  /** net_cls cgroup类ID的格式要求，必须为0xAAAABBBB形式 */
   private static final String FORMAT_NET_CLS_CLASS_ID = "0x[0-9]{8}";
 
   private NetworkTagMapping networkTagMapping = null;
 
   @Override
   public void initialize(Configuration conf) {
+    // 从配置获取JSON映射文件路径，使用默认值兜底
     String mappingJsonFile = conf.get(
         YarnConfiguration.NM_NETWORK_TAG_MAPPING_FILE_PATH,
         YarnConfiguration.DEFAULT_NM_NETWORK_RESOURCE_TAG_MAPPING_FILE_PATH);
+    // 路径为空时抛出异常，要求必须配置
     if (mappingJsonFile == null || mappingJsonFile.isEmpty()) {
       throw new YarnRuntimeException("To use NetworkTagMappingJsonManager,"
           + " we have to set the configuration:" +
           YarnConfiguration.NM_NETWORK_TAG_MAPPING_FILE_PATH);
     }
+    // 使用Jackson解析JSON配置文件
     ObjectMapper mapper = new ObjectMapper();
     try {
       networkTagMapping = mapper.readValue(new File(mappingJsonFile),
@@ -66,11 +68,13 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
       throw new YarnRuntimeException(e);
     }
 
+    // JSON解析结果为空抛出异常
     if (networkTagMapping == null) {
       throw new YarnRuntimeException("Fail to load the specific JSON file: "
           + mappingJsonFile);
     }
 
+    // 依次验证用户、用户组和默认配置的合法性
     networkTagMapping.validateUsers();
     networkTagMapping.validateGroups();
     networkTagMapping.validateDefaultClass();
@@ -78,12 +82,14 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
 
   @Override
   public String getNetworkTagHexID(Container container) {
+    // 优先查找用户级别配置的标记ID
     String userNetworkTagID = this.networkTagMapping.getUserNetworkTagID(
         container.getUser());
     if (userNetworkTagID != null) {
       return userNetworkTagID;
     }
 
+    // 用户未配置，查找用户所属用户组的配置
     UserGroupInformation userUGI = UserGroupInformation.createRemoteUser(
         container.getUser());
     List<Group> groups = this.networkTagMapping.getGroups();
@@ -93,11 +99,12 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
       }
     }
 
+    // 用户和用户组都未配置，返回默认标记ID
     return this.networkTagMapping.getDefaultNetworkTagID();
   }
 
   /**
-   * The NetworkTagMapping object.
+   * 封装从JSON加载的网络标记映射关系，包含用户、用户组映射和默认值，并提供验证功能
    *
    */
   @VisibleForTesting
@@ -173,14 +180,13 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
       return false;
     }
 
-    // Make sure that we do not have the duplicate user names.
-    // If it exists, we would only keep the user name which is
-    // set first.
-    // Also, make sure the class_id set for the user match the
-    // 0xAAAABBBB format
+    /**
+     * 验证用户配置合法性：检查标记ID格式，拆分多用户配置，去重保留第一个配置
+     */
     public void validateUsers() {
       List<User> validateUsers = new LinkedList<>();
       for(User user : this.users) {
+        // 验证标记ID格式是否符合要求
         Matcher m = pattern.matcher(user.getNetworkTagID());
         if (!m.matches()) {
           throw new YarnRuntimeException(
@@ -189,16 +195,19 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
               + " 's configured network-tag-id:" + user.getNetworkTagID()
               + " does not match the '0xAAAABBBB' format.");
         }
+        // 支持逗号分隔多个用户名共用同一个标记ID
         String[] userSplits = user.getUserName().split(",");
         if (userSplits.length > 1) {
           String networkTagID = user.getNetworkTagID();
           for(String split : userSplits) {
+            // 去重，只保留第一个配置的用户
             if (!containsUser(split.trim(), validateUsers)) {
               User addUsers = new User(split.trim(), networkTagID);
               validateUsers.add(addUsers);
             }
           }
         } else {
+          // 单个用户名，去重后添加
           if (!containsUser(user.getUserName(), validateUsers)) {
             validateUsers.add(user);
           }
@@ -207,15 +216,15 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
       this.users = validateUsers;
     }
 
-    // Make sure that we do not have the duplicate group names.
-    // If it exists, we would only keep the group name which is
-    // set first.
-    // Also, make sure the class_id set for the group match the
-    // 0xAAAABBBB format
+    /**
+     * 验证用户组配置合法性：检查标记ID格式，去重保留第一个配置
+     */
     public void validateGroups() {
       List<Group> validateGroups = new LinkedList<>();
       for(Group group : this.groups) {
+        // 去重，只保留第一个配置的用户组
         if (!containsGroup(group.getGroupName(), validateGroups)) {
+          // 验证标记ID格式
           Matcher m = pattern.matcher(group.getNetworkTagID());
           if (!m.matches()) {
             throw new YarnRuntimeException(
@@ -230,15 +239,17 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
       this.groups = validateGroups;
     }
 
-    // make sure that we set the value for default-network-tag-id.
-    // Also, make sure the default class id match the
-    // 0xAAAABBBB format
+    /**
+     * 验证默认标记ID配置合法性：检查非空和格式要求
+     */
     public void validateDefaultClass() {
+      // 检查默认ID非空要求
       if (getDefaultNetworkTagID() == null ||
           getDefaultNetworkTagID().isEmpty()) {
         throw new YarnRuntimeException("Missing value for defaultNetworkTagID."
             + " We have to set non-empty value for defaultNetworkTagID");
       }
+      // 验证格式
       Matcher m = pattern.matcher(getDefaultNetworkTagID());
       if (!m.matches()) {
         throw new YarnRuntimeException("Configuration error on "
@@ -250,7 +261,7 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
   }
 
   /**
-   * The user object.
+   * 封装单个用户到网络标记ID的映射
    *
    */
   @VisibleForTesting
@@ -283,7 +294,7 @@ public class NetworkTagMappingJsonManager implements NetworkTagMappingManager {
   }
 
   /**
-   * The group object.
+   * 封装单个用户组到网络标记ID的映射
    *
    */
   @VisibleForTesting

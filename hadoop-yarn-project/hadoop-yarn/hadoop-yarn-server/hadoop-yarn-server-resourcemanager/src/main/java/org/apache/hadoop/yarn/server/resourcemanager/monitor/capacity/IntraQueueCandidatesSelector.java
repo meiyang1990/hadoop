@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,12 +44,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Identifies over utilized resources within a queue and tries to normalize
- * them to resolve resource allocation anomalies w.r.t priority and user-limit.
+ * 队列内抢占候选容器选择器，识别队列内资源分配异常，基于优先级和用户限额进行资源再分配，解决分配不均衡问题。
+ * 属于YARN容量调度器抢占机制的一部分，负责处理同一个队列内部不同应用/用户之间的资源抢占。
  */
 public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
 
   @SuppressWarnings("serial")
+  /**
+   * 按应用优先级比较，优先级高的排在前面，优先级相同则按应用ID排序
+   */
   static class TAPriorityComparator
       implements
         Serializable,
@@ -69,6 +73,10 @@ public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
   /*
    * Order first by amount used from least to most. Then order from oldest to
    * youngest if amount used is the same.
+   */
+  /**
+   * 公平排序比较器，按用户已使用资源量从小到大排序，资源量相同则按应用ID排序
+   * 用于用户限额优先的抢占场景，让使用资源多的用户更容易被抢占
    */
   static class TAFairOrderingComparator
       implements Comparator<TempAppPerPartition> {
@@ -110,6 +118,10 @@ public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
   private static final Logger LOG =
       LoggerFactory.getLogger(IntraQueueCandidatesSelector.class);
 
+  /**
+   * 构造函数，初始化队列内抢占候选选择器
+   * @param preemptionContext 抢占上下文，包含预计算的队列、应用资源信息
+   */
   IntraQueueCandidatesSelector(
       CapacitySchedulerPreemptionContext preemptionContext) {
     super(preemptionContext);
@@ -119,65 +131,65 @@ public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
   }
 
   @Override
+  /**
+   * 选择需要被抢占的容器候选集合
+   * @param selectedCandidates 已被其他选择器选中的抢占容器
+   * @param clusterResource 集群总资源
+   * @param totalPreemptedResourceAllowed 本轮允许抢占的总资源上限
+   * @return 本轮选中的需要被抢占的容器集合
+   */
   public Map<ApplicationAttemptId, Set<RMContainer>> selectCandidates(
       Map<ApplicationAttemptId, Set<RMContainer>> selectedCandidates,
       Resource clusterResource, Resource totalPreemptedResourceAllowed) {
     Map<ApplicationAttemptId, Set<RMContainer>> curCandidates = new HashMap<>();
-    // 1. Calculate the abnormality within each queue one by one.
+    // 1. 逐个队列计算队列内的资源分配异常和抢占需求
     computeIntraQueuePreemptionDemand(
         clusterResource, totalPreemptedResourceAllowed, selectedCandidates);
 
-    // 2. Previous selectors (with higher priority) could have already
-    // selected containers. We need to deduct pre-emptable resources
-    // based on already selected candidates.
+    // 2. 根据已被选中的候选容器，扣减可抢占资源配额
     CapacitySchedulerPreemptionUtils
         .deductPreemptableResourcesBasedSelectedCandidates(preemptionContext,
             selectedCandidates);
 
-    // 3. Loop through all partitions to select containers for preemption.
+    // 3. 遍历所有资源分区选择待抢占容器
     for (String partition : preemptionContext.getAllPartitions()) {
       LinkedHashSet<String> queueNames = preemptionContext
           .getUnderServedQueuesPerPartition(partition);
 
-      // Error check to handle non-mapped labels to queue.
+      // 跳过未映射标签的队列
       if (null == queueNames) {
         continue;
       }
 
-      // 4. Iterate from most under-served queue in order.
+      // 4. 按资源不足程度从高到低遍历队列
       for (String queueName : queueNames) {
         AbstractLeafQueue leafQueue = preemptionContext.getQueueByPartition(queueName,
             RMNodeLabelsManager.NO_LABEL).leafQueue;
 
-        // skip if not a leafqueue
+        // 跳过非叶子队列
         if (null == leafQueue) {
           continue;
         }
 
-        // Don't preempt if intra-queue preemption is disabled for this queue.
+        // 如果该队列关闭了队列内抢占，直接跳过
         if (leafQueue.getIntraQueuePreemptionDisabled()) {
           continue;
         }
 
-        // 5. Calculate the resource to obtain per partition
+        // 5. 计算每个分区需要获取的资源量
         Map<String, Resource> resToObtainByPartition = fifoPreemptionComputePlugin
             .getResourceDemandFromAppsPerQueue(queueName, partition);
 
-        // Default preemption iterator considers only FIFO+priority. For
-        // userlimit preemption, its possible that some lower priority apps
-        // needs from high priority app of another user. Hence use apps
-        // ordered by userlimit starvation as well.
+        // 获取符合抢占条件的应用列表
         Collection<FiCaSchedulerApp> apps = fifoPreemptionComputePlugin
             .getPreemptableApps(queueName, partition);
 
-        // 6. Get user-limit to ensure that we do not preempt resources which
-        // will force user's resource to come under its UL.
+        // 6. 初始化每个用户的滚动资源使用量，确保抢占后不会低于用户限额
         Map<String, Resource> rollingResourceUsagePerUser = new HashMap<>();
         initializeUsageAndUserLimitForCompute(clusterResource, partition,
             leafQueue, rollingResourceUsagePerUser);
 
-        // 7. Based on the selected resource demand per partition, select
-        // containers with known policy from inter-queue preemption.
+        // 7. 遍历应用选择待抢占容器，获取队列读锁保证安全
         leafQueue.getReadLock().lock();
         try {
           for (FiCaSchedulerApp app : apps) {
@@ -194,11 +206,18 @@ public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
     return curCandidates;
   }
 
+  /**
+   * 初始化用户滚动资源使用量，用于计算抢占后是否低于用户限额
+   * @param clusterResource 集群总资源
+   * @param partition 资源分区
+   * @param leafQueue 叶子队列
+   * @param rollingResourceUsagePerUser 输出参数，存储每个用户的初始资源使用量
+   */
   private void initializeUsageAndUserLimitForCompute(Resource clusterResource,
       String partition, AbstractLeafQueue leafQueue,
       Map<String, Resource> rollingResourceUsagePerUser) {
     for (String user : leafQueue.getAllUsers()) {
-      // Initialize used resource of a given user for rolling computation.
+      // 克隆用户当前已使用资源作为初始滚动计算值
       rollingResourceUsagePerUser.put(user, Resources.clone(
           leafQueue.getUser(user).getResourceUsage().getUsed(partition)));
       LOG.debug("Rolling resource usage for user:{} is : {}", user,
@@ -206,6 +225,16 @@ public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
     }
   }
 
+  /**
+   * 从资源过剩的应用中选择容器进行抢占，优先选择满足需求的容器
+   * @param app 当前待检查的应用
+   * @param selectedCandidates 已被选中的抢占容器集合
+   * @param curCandidates 本轮新增选中的容器集合
+   * @param clusterResource 集群总资源
+   * @param totalPreemptedResourceAllowed 本轮允许抢占总资源上限
+   * @param resToObtainByPartition 各分区还需要获取的资源量
+   * @param rollingResourceUsagePerUser 各用户滚动资源使用量记录
+   */
   private void preemptFromLeastStarvedApp(FiCaSchedulerApp app,
       Map<ApplicationAttemptId, Set<RMContainer>> selectedCandidates,
       Map<ApplicationAttemptId, Set<RMContainer>> curCandidates,
@@ -224,30 +253,29 @@ public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
         .get(app.getUser());
     for (RMContainer c : liveContainers) {
 
-      // if there are no demand, return.
+      // 如果已经满足所有抢占需求，直接返回
       if (resToObtainByPartition.isEmpty()) {
         return;
       }
 
-      // skip preselected containers.
+      // 跳过已被其他选择器选中的容器
       if (CapacitySchedulerPreemptionUtils.isContainerAlreadySelected(c,
           selectedCandidates)) {
         continue;
       }
 
-      // Skip already marked to killable containers
+      // 跳过已被标记为可杀死的容器
       if (null != preemptionContext.getKillableContainers() && preemptionContext
           .getKillableContainers().contains(c.getContainerId())) {
         continue;
       }
 
-      // Skip AM Container from preemption for now.
+      // 当前不抢占AM容器
       if (c.isAMContainer()) {
         continue;
       }
 
-      // If selected container brings down resource usage under its user's
-      // UserLimit (or equals to), we must skip such containers.
+      // 如果抢占该容器会导致用户资源低于限额，则跳过该容器及后续容器
       if (fifoPreemptionComputePlugin.skipContainerBasedOnIntraQueuePolicy(app,
           clusterResource, rollingUsedResourcePerUser, c)) {
         LOG.debug("Skipping container: {} with resource:{} as UserLimit for"
@@ -258,15 +286,14 @@ public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
         break;
       }
 
-      // Try to preempt this container
+      // 尝试将该容器加入抢占候选，扣减对应分区的资源需求
       boolean ret = CapacitySchedulerPreemptionUtils
           .tryPreemptContainerAndDeductResToObtain(rc, preemptionContext,
               resToObtainByPartition, c, clusterResource, selectedCandidates,
               curCandidates, totalPreemptedResourceAllowed,
               preemptionContext.getInQueuePreemptionConservativeDRF());
 
-      // Subtract from respective user's resource usage once a container is
-      // selected for preemption.
+      // 选中容器后，更新用户滚动资源使用量
       if (ret && preemptionContext.getIntraQueuePreemptionOrderPolicy()
           .equals(IntraQueuePreemptionOrderPolicy.USERLIMIT_FIRST)) {
         Resources.subtractFrom(rollingUsedResourcePerUser,
@@ -275,11 +302,17 @@ public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
     }
   }
 
+  /**
+   * 计算所有队列内的抢占需求，计算每个应用的理想分配资源，确定需要抢占的总资源量
+   * @param clusterResource 集群总资源
+   * @param totalPreemptedResourceAllowed 本轮允许抢占总资源上限
+   * @param selectedCandidates 已被选中的抢占容器集合
+   */
   private void computeIntraQueuePreemptionDemand(Resource clusterResource,
       Resource totalPreemptedResourceAllowed,
       Map<ApplicationAttemptId, Set<RMContainer>> selectedCandidates) {
 
-    // 1. Iterate through all partition to calculate demand within a partition.
+    // 1. 遍历所有资源分区计算抢占需求
     for (String partition : context.getAllPartitions()) {
       LinkedHashSet<String> queueNames = context
           .getUnderServedQueuesPerPartition(partition);
@@ -288,31 +321,28 @@ public class IntraQueueCandidatesSelector extends PreemptionCandidatesSelector {
         continue;
       }
 
-      // 2. loop through all queues corresponding to a partition.
+      // 2. 遍历分区下所有资源不足的队列
       for (String queueName : queueNames) {
         TempQueuePerPartition tq = context.getQueueByPartition(queueName,
             partition);
         AbstractLeafQueue leafQueue = tq.leafQueue;
 
-        // skip if its parent queue
+        // 跳过非叶子队列
         if (null == leafQueue) {
           continue;
         }
 
-        // 3. Consider reassignableResource as (used - actuallyToBePreempted).
-        // This provides as upper limit to split apps quota in a queue.
+        // 3. 计算队列可重新分配的资源 = 已使用资源 - 已经计划抢占的资源
         Resource queueReassignableResource = Resources.subtract(tq.getUsed(),
             tq.getActuallyToBePreempted());
 
-        // 4. Check queue's used capacity. Make sure that the used capacity is
-        // above certain limit to consider for intra queue preemption.
+        // 4. 队列使用率低于最小阈值时，不触发队列内抢占
         if (leafQueue.getQueueCapacities().getUsedCapacity(partition) < context
             .getMinimumThresholdForIntraQueuePreemption()) {
           continue;
         }
 
-        // 5. compute the allocation of all apps based on queue's unallocated
-        // capacity
+        // 5. 基于队列可分配资源，计算所有应用的理想资源分配，确定抢占需求
         fifoPreemptionComputePlugin.computeAppsIdealAllocation(clusterResource,
             tq, selectedCandidates, totalPreemptedResourceAllowed,
             queueReassignableResource,

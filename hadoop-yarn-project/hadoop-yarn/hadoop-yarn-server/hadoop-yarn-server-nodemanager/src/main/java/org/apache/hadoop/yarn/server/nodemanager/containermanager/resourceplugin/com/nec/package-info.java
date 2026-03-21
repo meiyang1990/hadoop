@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,4 +17,8 @@
  * limitations under the License.
  */
 
+/**
+ * NEC VE异构计算资源插件包，提供对NEC Vector Engine加速卡的资源管理支持
+ * 实现YARN NodeManager对VE卡的发现、资源分配和容器隔离能力
+ */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.com.nec;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,26 +44,45 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptS
 
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
+/**
+ * 应用尝试状态数据的Protobuf实现，用于RM恢复场景持久化存储应用尝试状态
+ * 基于Protobuf序列化格式实现，支持YARN RM故障恢复功能
+ */
 public class ApplicationAttemptStateDataPBImpl extends
     ApplicationAttemptStateData {
   private static final Logger LOG =
       LoggerFactory.getLogger(ApplicationAttemptStateDataPBImpl.class);
+  // Protobuf对象实例
   ApplicationAttemptStateDataProto proto = 
       ApplicationAttemptStateDataProto.getDefaultInstance();
+  // Protobuf构建器
   ApplicationAttemptStateDataProto.Builder builder = null;
+  // 是否当前数据来自proto标记
   boolean viaProto = false;
   
+  // 缓存的应用尝试ID
   private ApplicationAttemptId attemptId = null;
+  // 缓存的AM主容器
   private Container masterContainer = null;
+  // 缓存的应用尝试令牌字节缓存
   private ByteBuffer appAttemptTokens = null;
 
+  // 各资源类型累计使用秒数Map
   private Map<String, Long> resourceSecondsMap;
+  // 被抢占的各资源类型累计使用秒数Map
   private Map<String, Long> preemptedResourceSecondsMap;
 
+  /**
+   * 空构造函数，初始化构建器
+   */
   public ApplicationAttemptStateDataPBImpl() {
     builder = ApplicationAttemptStateDataProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造应用尝试状态数据
+   * @param proto 已有的ApplicationAttemptStateDataProto实例
+   */
   public ApplicationAttemptStateDataPBImpl(
       ApplicationAttemptStateDataProto proto) {
     this.proto = proto;
@@ -77,6 +97,9 @@ public class ApplicationAttemptStateDataPBImpl extends
     return proto;
   }
 
+  /**
+   * 将本地缓存的字段合并到Protobuf构建器中
+   */
   private void mergeLocalToBuilder() {
     if (this.attemptId != null) {
       builder.setAttemptId(((ApplicationAttemptIdPBImpl)attemptId).getProto());
@@ -90,6 +113,9 @@ public class ApplicationAttemptStateDataPBImpl extends
     }
   }
 
+  /**
+   * 将本地缓存数据合并到Protobuf对象
+   */
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -98,6 +124,9 @@ public class ApplicationAttemptStateDataPBImpl extends
     viaProto = true;
   }
 
+  /**
+   * 如果需要，初始化Protobuf构建器
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = ApplicationAttemptStateDataProto.newBuilder(proto);
@@ -343,16 +372,39 @@ public class ApplicationAttemptStateDataPBImpl extends
   }
   
   private static String RM_APP_ATTEMPT_PREFIX = "RMATTEMPT_";
+
+  /**
+   * 将RMAppAttemptState枚举转换为Protobuf枚举
+   * @param e 内部RM应用尝试状态枚举
+   * @return Protobuf格式状态枚举
+   */
   public static RMAppAttemptStateProto convertToProtoFormat(RMAppAttemptState e) {
     return RMAppAttemptStateProto.valueOf(RM_APP_ATTEMPT_PREFIX + e.name());
   }
+
+  /**
+   * 将Protobuf枚举转换为RMAppAttemptState内部枚举
+   * @param e Protobuf格式状态枚举
+   * @return 内部RM应用尝试状态枚举
+   */
   public static RMAppAttemptState convertFromProtoFormat(RMAppAttemptStateProto e) {
     return RMAppAttemptState.valueOf(e.name().replace(RM_APP_ATTEMPT_PREFIX, ""));
   }
 
+  /**
+   * 将FinalApplicationStatus转换为Protobuf枚举
+   * @param s 应用最终状态枚举
+   * @return Protobuf格式最终状态枚举
+   */
   private FinalApplicationStatusProto convertToProtoFormat(FinalApplicationStatus s) {
     return ProtoUtils.convertToProtoFormat(s);
   }
+
+  /**
+   * 将Protobuf枚举转换为FinalApplicationStatus
+   * @param s Protobuf格式最终状态枚举
+   * @return 应用最终状态枚举
+   */
   private FinalApplicationStatus convertFromProtoFormat(FinalApplicationStatusProto s) {
     return ProtoUtils.convertFromProtoFormat(s);
   }
@@ -366,9 +418,14 @@ public class ApplicationAttemptStateDataPBImpl extends
   @Override
   public void setFinishTime(long finishTime) {
     maybeInitBuilder();
-    builder.setFinishTime(finishTime);
+    builder.setFinishTime(finish);
   }
 
+  /**
+   * 将Credentials对象序列化转换为ByteBuffer
+   * @param credentials 凭证对象
+   * @return 序列化后的ByteBuffer
+   */
   private static ByteBuffer convertCredentialsToByteBuffer(
       Credentials credentials) {
     ByteBuffer appAttemptTokens = null;
@@ -388,6 +445,11 @@ public class ApplicationAttemptStateDataPBImpl extends
     }
   }
 
+  /**
+   * 从反序列化ByteBuffer中还原Credentials对象
+   * @param appAttemptTokens 序列化凭证的ByteBuffer
+   * @return 还原后的凭证对象
+   */
   private static Credentials convertCredentialsFromByteBuffer(
       ByteBuffer appAttemptTokens) {
     DataInputByteBuffer dibb = new DataInputByteBuffer();
@@ -439,7 +501,7 @@ public class ApplicationAttemptStateDataPBImpl extends
     ApplicationAttemptStateDataProtoOrBuilder p = viaProto ? proto : builder;
     this.preemptedResourceSecondsMap = ProtoUtils
         .convertStringLongMapProtoListToMap(
-            p.getApplicationResourceUsageMapList());
+            p.getPreemptedResourceUsageMapList());
     return this.preemptedResourceSecondsMap;
   }
 

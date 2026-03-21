@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,4 +17,8 @@
  * limitations under the License.
  */
 
+/**
+ * FPGA设备发现模块包，提供节点上FPGA设备的探测、枚举能力
+ * 为YARN NodeManager的FPGA资源插件提供底层设备信息支持，负责发现当前节点可用的FPGA设备
+ */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.fpga.discovery;

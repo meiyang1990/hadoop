@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,19 +36,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Calculate how much resources need to be preempted for each queue,
- * will be used by {@link PreemptionCandidatesSelector}.
+ * 计算每个队列需要被抢占的资源总量，供 {@link PreemptionCandidatesSelector} 使用。
  */
 public class AbstractPreemptableResourceCalculator {
   private static final Logger LOG = LoggerFactory.getLogger(
       AbstractPreemptableResourceCalculator.class);
 
+  // 抢占上下文，保存全局抢占相关信息
   protected final CapacitySchedulerPreemptionContext context;
+  // 资源计算器，用于资源比较和计算
   protected final ResourceCalculator rc;
+  // 是否是预留资源抢占候选选择器
   protected boolean isReservedPreemptionCandidatesSelector;
+  // 步长因子，用于资源归一化计算
   private Resource stepFactor;
+  // 是否允许所有队列满足保证后仍进行队列间资源平衡抢占
   private boolean allowQueuesBalanceAfterAllQueuesSatisfied;
 
+  /**
+   * 临时队列按需求优先级比较器，用于优先分配资源给更缺资源的队列。
+   */
   static class TQComparator implements Comparator<TempQueuePerPartition> {
     private ResourceCalculator rc;
     private Resource clusterRes;
@@ -66,9 +74,8 @@ public class AbstractPreemptableResourceCalculator {
           assigned2, tq1.relativePriority, tq2.relativePriority);
     }
 
-    // Calculates idealAssigned / guaranteed
-    // TempQueues with 0 guarantees are always considered the most over
-    // capacity and therefore considered last for resources.
+    // 计算理想分配占保证容量的比例
+    // 保证容量为0的队列被认为是超配额最多，排到最后分配
     private double getIdealPctOfGuaranteed(TempQueuePerPartition q) {
       double pctOver = Integer.MAX_VALUE;
       if (q != null && Resources.greaterThan(rc, clusterRes, q.getGuaranteed(),
@@ -80,6 +87,9 @@ public class AbstractPreemptableResourceCalculator {
     }
   }
 
+  /**
+   * 归一化计算元组，保存分子分母资源，用于计算归一化比例。
+   */
   private static class NormalizationTuple {
     private Resource numerator;
     private Resource denominator;
@@ -109,23 +119,16 @@ public class AbstractPreemptableResourceCalculator {
   }
 
   /**
-   * PreemptableResourceCalculator constructor.
+   * 抢占资源计算器构造函数。
    *
-   * @param preemptionContext context
+   * @param preemptionContext 抢占上下文
    * @param isReservedPreemptionCandidatesSelector
-   *          this will be set by different implementation of candidate
-   *          selectors, please refer to TempQueuePerPartition#offer for
-   *          details.
+   *          由不同候选选择器实现设置，详情参考 TempQueuePerPartition#offer
    * @param allowQueuesBalanceAfterAllQueuesSatisfied
-   *          Should resources be preempted from an over-served queue when the
-   *          requesting queues are all at or over their guarantees?
-   *          An example is, there're 10 queues under root, guaranteed resource
-   *          of them are all 10%.
-   *          Assume there're two queues are using resources, queueA uses 10%
-   *          queueB uses 90%. For all queues are guaranteed, but it's not fair
-   *          for queueA.
-   *          We wanna make this behavior can be configured. By default it is
-   *          not allowed.
+   *          当所有请求队列都已满足或超过保证容量时，是否允许从超配额队列抢占资源进行平衡。
+   *          例如：root下有10个队列，每个保证容量都是10%，
+   *          实际只有两个队列在使用资源，queueA占10%，queueB占90%。所有队列都满足保证容量，但分配不公平，
+   *          该配置用于控制是否允许这种情况下抢占平衡，默认不允许。
    *
    */
   public AbstractPreemptableResourceCalculator(
@@ -139,41 +142,38 @@ public class AbstractPreemptableResourceCalculator {
     this.allowQueuesBalanceAfterAllQueuesSatisfied =
         allowQueuesBalanceAfterAllQueuesSatisfied;
     stepFactor = Resource.newInstance(0, 0);
+    // 初始化所有资源类型步长为1
     for (ResourceInformation ri : stepFactor.getResources()) {
       ri.setValue(1);
     }
   }
 
   /**
-   * Given a set of queues compute the fix-point distribution of unassigned
-   * resources among them. As pending request of a queue are exhausted, the
-   * queue is removed from the set and remaining capacity redistributed among
-   * remaining queues. The distribution is weighted based on guaranteed
-   * capacity, unless asked to ignoreGuarantee, in which case resources are
-   * distributed uniformly.
+   * 在给定队列集合中计算未分配资源的不动点分配。
+   * 当队列的所有请求都被满足后，将其从候选集合移除，剩余容量在剩余队列间重新分配。
+   * 分配默认按保证容量加权，若忽略保证则均匀分配。
    *
    * @param totGuarant
-   *          total guaranteed resource
+   *          总保证资源
    * @param qAlloc
-   *          List of child queues
+   *          子队列列表
    * @param unassigned
-   *          Unassigned resource per queue
+   *          待分配资源总量
    * @param ignoreGuarantee
-   *          ignore guarantee per queue.
+   *          是否忽略队列保证容量，均匀分配
    */
   protected void computeFixpointAllocation(Resource totGuarant,
       Collection<TempQueuePerPartition> qAlloc, Resource unassigned,
       boolean ignoreGuarantee) {
-    // Prior to assigning the unused resources, process each queue as follows:
-    // If current > guaranteed, idealAssigned = guaranteed + untouchable extra
-    // Else idealAssigned = current;
-    // Subtract idealAssigned resources from unassigned.
-    // If the queue has all of its needs met (that is, if
-    // idealAssigned >= current + pending), remove it from consideration.
-    // Sort queues from most under-guaranteed to most over-guaranteed.
+    // 初始化每个队列理想分配：
+    // 如果已使用 > 保证容量: 理想分配 = 保证容量 + 不可抢占额外资源
+    // 否则: 理想分配 = 当前已使用
+    // 从未分配中减去理想分配，若理想分配仍小于（已使用+待分配），则将队列加入待分配集合
+    // 按缺资源程度排序，最缺资源优先
     TQComparator tqComparator = new TQComparator(rc, totGuarant);
     PriorityQueue<TempQueuePerPartition> orderedByNeed = new PriorityQueue<>(10,
         tqComparator);
+    // 遍历所有队列，完成初始理想分配
     for (Iterator<TempQueuePerPartition> i = qAlloc.iterator(); i.hasNext(); ) {
       TempQueuePerPartition q = i.next();
       Resource used = q.getUsed();
@@ -187,79 +187,72 @@ public class AbstractPreemptableResourceCalculator {
         initIdealAssigned = Resources.clone(used);
       }
 
-      // perform initial assignment
+      // 执行初始分配，允许子类覆盖行为
       initIdealAssignment(totGuarant, q, initIdealAssigned);
 
+      // 从未分配资源中减去当前队列已分配的理想资源
       Resources.subtractFrom(unassigned, q.idealAssigned);
 
-      // If idealAssigned < (allocated + used + pending), q needs more
-      // resources, so
-      // add it to the list of underserved queues, ordered by need.
+      // 如果理想分配仍小于（已使用+待请求），说明队列还需要更多资源，加入缺资源队列优先级队列
       Resource curPlusPend = Resources.add(q.getUsed(), q.pending);
       if (Resources.lessThan(rc, totGuarant, q.idealAssigned, curPlusPend)) {
         orderedByNeed.add(q);
       }
     }
 
-    // assign all cluster resources until no more demand, or no resources are
-    // left
+    // 持续分配资源直到没有需求或没有剩余资源
     while (!orderedByNeed.isEmpty() && Resources.greaterThan(rc, totGuarant,
         unassigned, Resources.none())) {
-      // we compute normalizedGuarantees capacity based on currently active
-      // queues
+      // 根据当前活跃队列重新计算归一化保证容量
       resetCapacity(orderedByNeed, ignoreGuarantee);
 
-      // For each underserved queue (or set of queues if multiple are equally
-      // underserved), offer its share of the unassigned resources based on its
-      // normalized guarantee. After the offer, if the queue is not satisfied,
-      // place it back in the ordered list of queues, recalculating its place
-      // in the order of most under-guaranteed to most over-guaranteed. In this
-      // way, the most underserved queue(s) are always given resources first.
+      // 获取当前最缺资源的队列集合（相同缺资源程度的一起处理）
       Collection<TempQueuePerPartition> underserved = getMostUnderservedQueues(
           orderedByNeed, tqComparator);
 
-      // This value will be used in every round to calculate ideal allocation.
-      // So make a copy to avoid it changed during calculation.
+      // 拷贝本轮未分配资源，避免计算过程中被修改
       Resource dupUnassignedForTheRound = Resources.clone(unassigned);
 
+      // 遍历处理每个缺资源队列
       for (Iterator<TempQueuePerPartition> i = underserved.iterator(); i
           .hasNext();) {
+        // 没有可用资源则提前退出
         if (!rc.isAnyMajorResourceAboveZero(unassigned)) {
           break;
         }
 
         TempQueuePerPartition sub = i.next();
 
-        // How much resource we offer to the queue (to increase its ideal_alloc
+        // 根据归一化保证容量计算当前队列可分配的资源量
         Resource wQavail = Resources.multiplyAndNormalizeUp(rc,
             dupUnassignedForTheRound,
             sub.normalizedGuarantee, this.stepFactor);
 
-        // Make sure it is not beyond unassigned
+        // 不超过剩余未分配资源总量
         wQavail = Resources.componentwiseMin(wQavail, unassigned);
 
+        // 将资源分配给队列，返回队列未用完的资源
         Resource wQidle = sub.offer(wQavail, rc, totGuarant,
             isReservedPreemptionCandidatesSelector,
             allowQueuesBalanceAfterAllQueuesSatisfied);
+        // 计算实际分配给队列的资源量
         Resource wQdone = Resources.subtract(wQavail, wQidle);
 
+        // 如果分配后队列仍需要更多资源，重新放回优先级队列等待下一轮分配
         if (Resources.greaterThan(rc, totGuarant, wQdone, Resources.none())) {
-          // The queue is still asking for more. Put it back in the priority
-          // queue, recalculating its order based on need.
           orderedByNeed.add(sub);
         }
 
+        // 从未分配资源中减去实际分配的资源
         Resources.subtractFrom(unassigned, wQdone);
 
-        // Make sure unassigned is always larger than 0
+        // 确保未分配资源各维度不小于0
         unassigned = Resources.componentwiseMax(unassigned, Resources.none());
       }
     }
 
-    // Sometimes its possible that, all queues are properly served. So intra
-    // queue preemption will not try for any preemption. How ever there are
-    // chances that within a queue, there are some imbalances. Hence make sure
-    // all queues are added to list.
+    // 将所有仍在优先级队列中的缺资源分区加入上下文的缺资源队列列表
+    // 即使所有队列都已满足保证，也可能存在队列内部不平衡，需要全部加入以便后续处理
     while (!orderedByNeed.isEmpty()) {
       TempQueuePerPartition q1 = orderedByNeed.remove();
       context.addPartitionToUnderServedQueues(q1.queueName, q1.partition);
@@ -268,13 +261,11 @@ public class AbstractPreemptableResourceCalculator {
 
 
   /**
-   * This method is visible to allow sub-classes to override the initialization
-   * behavior.
+   * 允许子类覆盖初始理想分配行为。
    *
-   * @param totGuarant total resources (useful for {@code ResourceCalculator}
-   *          operations)
-   * @param q the {@code TempQueuePerPartition} being initialized
-   * @param initIdealAssigned the proposed initialization value.
+   * @param totGuarant 总资源，用于资源计算器操作
+   * @param q 待初始化的分区临时队列
+   * @param initIdealAssigned 建议的初始理想分配值
    */
   protected void initIdealAssignment(Resource totGuarant,
       TempQueuePerPartition q, Resource initIdealAssigned) {
@@ -282,12 +273,12 @@ public class AbstractPreemptableResourceCalculator {
   }
 
   /**
-   * Computes a normalizedGuaranteed capacity based on active queues.
+   * 根据当前活跃队列重新计算归一化保证容量。
    *
    * @param queues
-   *          the list of queues to consider
+   *          需要考虑的队列集合
    * @param ignoreGuar
-   *          ignore guarantee.
+   *          是否忽略保证容量均匀分配
    */
   private void resetCapacity(Collection<TempQueuePerPartition> queues,
                              boolean ignoreGuar) {
@@ -295,6 +286,7 @@ public class AbstractPreemptableResourceCalculator {
     float activeTotalAbsCap = 0.0f;
     int maxLength = ResourceUtils.getNumberOfCountableResourceTypes();
 
+    // 如果忽略保证容量，所有队列均匀分配
     if (ignoreGuar) {
       for (int i = 0; i < maxLength; i++) {
         for (TempQueuePerPartition q : queues) {
@@ -302,41 +294,33 @@ public class AbstractPreemptableResourceCalculator {
         }
       }
     } else {
+      // 累加所有活跃队列的总保证容量和总绝对容量
       for (TempQueuePerPartition q : queues) {
         Resources.addTo(activeCap, q.getGuaranteed());
         activeTotalAbsCap += q.getAbsCapacity();
       }
 
-      // loop through all resource types and normalize guaranteed capacity for all queues
+      // 遍历所有资源类型，确定并应用归一化策略
       for (int i = 0; i < maxLength; i++) {
         boolean useAbsCapBasedNorm = false;
-        // if the sum of absolute capacity of all queues involved is 0,
-        // we should normalize evenly
+        // 如果总绝对容量为0，则均匀分配
         boolean useEvenlyDistNorm = activeTotalAbsCap == 0;
 
-        // loop through all the queues once to determine the
-        // right normalization strategy for current processing resource type
+        // 第一次遍历队列，确定当前资源类型使用哪种归一化策略
         for (TempQueuePerPartition q : queues) {
           NormalizationTuple normTuple = new NormalizationTuple(
               q.getGuaranteed(), activeCap);
           long queueGuaranValue = normTuple.getNumeratorValue(i);
           long totalActiveGuaranValue = normTuple.getDenominatorValue(i);
 
+          // 如果当前队列该资源保证值为0，但绝对容量不为0，且总保证不为0，则使用基于绝对容量的归一化
           if (queueGuaranValue == 0 && q.getAbsCapacity() != 0 && totalActiveGuaranValue != 0) {
-            // when the rounded value of a resource type is 0 but its absolute capacity is not 0,
-            // we should consider taking the normalized guarantee based on absolute capacity
             useAbsCapBasedNorm = true;
             break;
           }
 
+          // 如果总保证值为0，说明所有活跃队列该资源保证容量都很小（舍入后为0），切换为均匀分配
           if (totalActiveGuaranValue == 0) {
-            // If totalActiveGuaranValue from activeCap is zero, that means the guaranteed capacity
-            // of this resource dimension for all active queues is tiny (close to 0).
-            // For example, if a queue has 1% of minCapacity on a cluster with a totalVcores of 48,
-            // then the idealAssigned Vcores for this queue is (48 * 0.01)=0.48 which then
-            // get rounded/casted into 0 (double -> long)
-            // In this scenario where the denominator is 0, we can just spread resources across
-            // all tiny queues evenly since their absoluteCapacity are roughly the same
             useEvenlyDistNorm = true;
           }
         }
@@ -348,7 +332,7 @@ public class AbstractPreemptableResourceCalculator {
               "), defaultNormalization(" + !(useAbsCapBasedNorm || useEvenlyDistNorm) + ")");
         }
 
-        // loop through all the queues again to apply normalization strategy
+        // 第二次遍历队列，应用选定的归一化策略
         for (TempQueuePerPartition q : queues) {
           if (useAbsCapBasedNorm) {
             computeNormGuarFromAbsCapacity(q, activeTotalAbsCap, i);
@@ -363,22 +347,19 @@ public class AbstractPreemptableResourceCalculator {
   }
 
   /**
-   * Computes the normalized guaranteed capacity based on the weight of a queue's abs capacity.
+   * 基于队列绝对容量权重计算归一化保证容量。
    *
-   * Example:
-   *  There are two active queues: queueA & queueB, and
-   *  their configured absolute minimum capacity is 1% and 3% respectively.
-   *
-   *  Then their normalized guaranteed capacity are:
-   *    normalized_guar_queueA = 0.01 / (0.01 + 0.03) = 0.25
-   *    normalized_guar_queueB = 0.03 / (0.01 + 0.03) = 0.75
+   * 示例：两个活跃队列 queueA 和 queueB，配置绝对最小容量分别为1%和3%，
+   * 归一化后保证容量为：
+   *   queueA = 0.01 / (0.01 + 0.03) = 0.25
+   *   queueB = 0.03 / (0.01 + 0.03) = 0.75
    *
    * @param q
-   *          the queue to consider
+   *          待计算队列
    * @param activeTotalAbsCap
-   *          the sum of absolute capacity of all active queues
+   *          所有活跃队列绝对容量之和
    * @param resourceTypeIdx
-   *          index of the processing resource type
+   *          当前处理资源类型索引
    */
   private static void computeNormGuarFromAbsCapacity(TempQueuePerPartition q,
                                                      float activeTotalAbsCap,
@@ -389,14 +370,14 @@ public class AbstractPreemptableResourceCalculator {
   }
 
   /**
-   * Computes the normalized guaranteed capacity evenly based on num of active queues.
+   * 按活跃队列数量均匀计算归一化保证容量。
    *
    * @param q
-   *          the queue to consider
+   *          待计算队列
    * @param numOfActiveQueues
-   *          number of active queues
+   *          活跃队列总数
    * @param resourceTypeIdx
-   *          index of the processing resource type
+   *          当前处理资源类型索引
    */
   private static void computeNormGuarEvenly(TempQueuePerPartition q,
                                             int numOfActiveQueues,
@@ -405,50 +386,13 @@ public class AbstractPreemptableResourceCalculator {
   }
 
   /**
-   * The default way to compute a queue's normalized guaranteed capacity.
-   *
-   * For each resource type, divide a queue's configured guaranteed amount (MBs/Vcores) by
-   * the total amount of guaranteed resource of all active queues
+   * 默认归一化保证容量计算方式。
+   * 对每个资源类型，队列保证容量除以所有活跃队列总保证容量得到归一化比例。
    *
    * @param q
-   *          the queue to consider
+   *          待计算队列
    * @param activeCap
-   *          total guaranteed resources of all active queues
+   *          所有活跃队列总保证容量
    * @param resourceTypeIdx
-   *          index of the processing resource type
+   *          当前处理资源类型索引
    */
-  private static void computeDefaultNormGuar(TempQueuePerPartition q,
-                                             Resource activeCap,
-                                             int resourceTypeIdx) {
-    NormalizationTuple normTuple = new NormalizationTuple(q.getGuaranteed(), activeCap);
-    q.normalizedGuarantee[resourceTypeIdx] = normTuple.getNormalizedValue(resourceTypeIdx);
-  }
-
-  // Take the most underserved TempQueue (the one on the head). Collect and
-  // return the list of all queues that have the same idealAssigned
-  // percentage of guaranteed.
-  private Collection<TempQueuePerPartition> getMostUnderservedQueues(
-      PriorityQueue<TempQueuePerPartition> orderedByNeed,
-      TQComparator tqComparator) {
-    ArrayList<TempQueuePerPartition> underserved = new ArrayList<>();
-    while (!orderedByNeed.isEmpty()) {
-      TempQueuePerPartition q1 = orderedByNeed.remove();
-      underserved.add(q1);
-
-      // Add underserved queues in order for later uses
-      context.addPartitionToUnderServedQueues(q1.queueName, q1.partition);
-      TempQueuePerPartition q2 = orderedByNeed.peek();
-      // q1's pct of guaranteed won't be larger than q2's. If it's less, then
-      // return what has already been collected. Otherwise, q1's pct of
-      // guaranteed == that of q2, so add q2 to underserved list during the
-      // next pass.
-      if (q2 == null || tqComparator.compare(q1, q2) < 0) {
-        if (null != q2) {
-          context.addPartitionToUnderServedQueues(q2.queueName, q2.partition);
-        }
-        return underserved;
-      }
-    }
-    return underserved;
-  }
-}

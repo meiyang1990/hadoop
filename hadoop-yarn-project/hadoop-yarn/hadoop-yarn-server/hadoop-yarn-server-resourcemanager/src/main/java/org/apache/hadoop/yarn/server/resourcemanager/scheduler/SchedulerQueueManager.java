@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -25,9 +26,11 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationSchedulerConfiguration;
 
 /**
+ * YARN资源调度器队列管理器接口，定义了调度队列的统一管理接口
+ * 负责调度队列的增删查改和重新初始化，为资源调度提供队列管理能力
  *
- * Context of the Queues in Scheduler.
- *
+ * @param <T> 调度队列类型
+ * @param <E> 预约调度配置类型
  */
 @SuppressWarnings("rawtypes")
 @Private
@@ -36,41 +39,41 @@ public interface SchedulerQueueManager<T extends SchedulerQueue,
     E extends ReservationSchedulerConfiguration> {
 
   /**
-   * Get the root queue.
-   * @return root queue
+   * 获取根调度队列
+   * @return 根调度队列实例
    */
   T getRootQueue();
 
   /**
-   * Get all the queues.
-   * @return a map contains all the queues as well as related queue names
+   * 获取所有调度队列的映射表
+   * @return 队列名到队列实例的映射，包含所有调度队列
    */
   Map<String, T> getQueues();
 
   /**
-   * Remove the queue from the existing queue.
-   * @param queueName the queue name
+   * 从现有队列集合中移除指定队列
+   * @param queueName 待删除的队列名称
    */
   void removeQueue(String queueName);
 
   /**
-   * Add a new queue to the existing queues.
-   * @param queueName the queue name
-   * @param queue the queue object
+   * 新增一个调度队列到现有队列集合
+   * @param queueName 新队列名称
+   * @param queue 新队列实例
    */
   void addQueue(String queueName, T queue);
 
   /**
-   * Get a queue matching the specified queue name.
-   * @param queueName the queue name
-   * @return a queue object
+   * 根据队列名称获取对应调度队列
+   * @param queueName 目标队列名称
+   * @return 匹配的队列实例，不存在则返回null
    */
   T getQueue(String queueName);
 
   /**
-   * Reinitialize the queues.
-   * @param newConf the configuration
-   * @throws IOException if fails to re-initialize queues
+   * 根据新配置重新初始化所有调度队列，支持动态队列配置更新
+   * @param newConf 新的预约调度配置
+   * @throws IOException 重新初始化队列失败时抛出异常
    */
   void reinitializeQueues(E newConf) throws IOException;
 }

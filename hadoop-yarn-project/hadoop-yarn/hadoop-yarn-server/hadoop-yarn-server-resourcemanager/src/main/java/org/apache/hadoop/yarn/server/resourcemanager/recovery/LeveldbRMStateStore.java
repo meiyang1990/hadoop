@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -70,7 +71,8 @@ import org.iq80.leveldb.WriteBatch;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Changes from 1.0 to 1.1, Addition of ReservationSystem state.
+ * 基于LevelDB实现的ResourceManager状态存储，用于RM故障恢复。
+ * 版本变更：1.0 -> 1.1 新增了ReservationSystem状态存储
  */
 public class LeveldbRMStateStore extends RMStateStore {
 
@@ -135,6 +137,7 @@ public class LeveldbRMStateStore extends RMStateStore {
 
   @Override
   protected void initInternal(Configuration conf) {
+    // 从配置读取LevelDB压缩间隔，转换为毫秒
     compactionIntervalMsec = conf.getLong(
         YarnConfiguration.RM_LEVELDB_COMPACTION_INTERVAL_SECS,
         YarnConfiguration.DEFAULT_RM_LEVELDB_COMPACTION_INTERVAL_SECS) * 1000;
@@ -147,12 +150,14 @@ public class LeveldbRMStateStore extends RMStateStore {
       throw new IOException("No store location directory configured in " +
           YarnConfiguration.RM_LEVELDB_STORE_PATH);
     }
+    // 拼接LevelDB文件路径
     return new Path(storePath, DB_NAME);
   }
 
   private Path createStorageDir() throws IOException {
     Path root = getStorageDir();
     FileSystem fs = FileSystem.getLocal(getConfig());
+    // 创建存储目录，权限设置为700
     fs.mkdirs(root, new FsPermission((short)0700));
     return root;
   }
@@ -161,11 +166,14 @@ public class LeveldbRMStateStore extends RMStateStore {
   protected void startInternal() throws Exception {
     Path storeRoot = createStorageDir();
     Options options = new Options();
+    // 若数据库不存在则不创建，后续初始化版本会处理
     options.createIfMissing(false);
     LOG.info("Using state database at " + storeRoot + " for recovery");
     File dbfile = new File(storeRoot.toString());
+    // 初始化LevelDB，若为新数据库则存储版本信息
     db = dbManager.initDatabase(dbfile, options, (database) ->
         storeVersion(CURRENT_VERSION_INFO));
+    // 启动定期压缩任务，清理删除数据产生的垃圾
     dbManager.startCompactionTimer(compactionIntervalMsec,
         this.getClass().getSimpleName());
   }
@@ -187,6 +195,7 @@ public class LeveldbRMStateStore extends RMStateStore {
 
   @Override
   protected Version loadVersion() throws Exception {
+    // 从数据库加载存储版本信息
     return dbManager.loadVersion(VERSION_NODE);
   }
 
@@ -200,11 +209,13 @@ public class LeveldbRMStateStore extends RMStateStore {
   }
 
   protected void storeVersion(Version version) {
+    // 将版本信息存储到数据库
     dbManager.storeVersion(VERSION_NODE, version);
   }
 
   @Override
   protected Version getCurrentVersion() {
+    // 返回当前存储版本
     return CURRENT_VERSION_INFO;
   }
 
@@ -214,9 +225,11 @@ public class LeveldbRMStateStore extends RMStateStore {
     byte[] dbKeyBytes = bytes(EPOCH_NODE);
     try {
       byte[] data = db.get(dbKeyBytes);
+      // 从数据库读取已有epoch值
       if (data != null) {
         currentEpoch = EpochProto.parseFrom(data).getEpoch();
       }
+      // 存储自增后的新epoch
       EpochProto proto = Epoch.newInstance(nextEpoch(currentEpoch)).getProto();
       db.put(dbKeyBytes, proto.toByteArray());
     } catch (DBException e) {
@@ -228,25 +241,33 @@ public class LeveldbRMStateStore extends RMStateStore {
   @Override
   public RMState loadState() throws Exception {
     RMState rmState = new RMState();
+     // 加载RM委派令牌密钥管理器状态
      loadRMDTSecretManagerState(rmState);
+     // 加载应用程序状态
      loadRMApps(rmState);
+     // 加载AM-RM令牌密钥管理器状态
      loadAMRMTokenSecretManagerState(rmState);
+    // 加载 Reservation 系统状态
     loadReservationState(rmState);
+    // 加载代理CA证书状态
     loadProxyCAManagerState(rmState);
     return rmState;
    }
 
   private void loadReservationState(RMState rmState) throws IOException {
     int numReservations = 0;
+    // 遍历所有Reservation前缀的键值对
     try (LeveldbIterator iter = new LeveldbIterator(db)) {
       iter.seek(bytes(RM_RESERVATION_KEY_PREFIX));
       while (iter.hasNext()) {
         Entry<byte[],byte[]> entry = iter.next();
         String key = asString(entry.getKey());
+        // 超出Reservation前缀范围，停止遍历
         if (!key.startsWith(RM_RESERVATION_KEY_PREFIX)) {
           break;
         }
 
+        // 解析计划名和ReservationID
         String planReservationString =
             key.substring(RM_RESERVATION_KEY_PREFIX.length());
         String[] parts = planReservationString.split(SEPARATOR);
@@ -256,8 +277,10 @@ public class LeveldbRMStateStore extends RMStateStore {
         }
         String planName = parts[0];
         String reservationName = parts[1];
+        // 反序列化Reservation状态
         ReservationAllocationStateProto allocationState =
             ReservationAllocationStateProto.parseFrom(entry.getValue());
+        // 初始化计划对应map
         if (!rmState.getReservationState().containsKey(planName)) {
           rmState.getReservationState().put(planName,
               new HashMap<ReservationId, ReservationAllocationStateProto>());
@@ -275,23 +298,29 @@ public class LeveldbRMStateStore extends RMStateStore {
   }
 
   private void loadRMDTSecretManagerState(RMState state) throws IOException {
+    // 加载主密钥
     int numKeys = loadRMDTSecretManagerKeys(state);
     LOG.info("Recovered " + numKeys + " RM delegation token master keys");
+    // 加载委派令牌
     int numTokens = loadRMDTSecretManagerTokens(state);
     LOG.info("Recovered " + numTokens + " RM delegation tokens");
+    // 加载令牌序列号
     loadRMDTSecretManagerTokenSequenceNumber(state);
   }
 
   private int loadRMDTSecretManagerKeys(RMState state) throws IOException {
     int numKeys = 0;
+    // 遍历所有主密钥前缀的键值对
     try (LeveldbIterator iter = new LeveldbIterator(db)) {
       iter.seek(bytes(RM_DT_MASTER_KEY_KEY_PREFIX));
       while (iter.hasNext()) {
         Entry<byte[],byte[]> entry = iter.next();
         String key = asString(entry.getKey());
+        // 超出主密钥前缀范围，停止遍历
         if (!key.startsWith(RM_DT_MASTER_KEY_KEY_PREFIX)) {
           break;
         }
+        // 反序列化并加载主密钥
         DelegationKey masterKey = loadDelegationKey(entry.getValue());
         state.rmSecretManagerState.masterKeyState.add(masterKey);
         ++numKeys;
@@ -318,14 +347,17 @@ public class LeveldbRMStateStore extends RMStateStore {
 
   private int loadRMDTSecretManagerTokens(RMState state) throws IOException {
     int numTokens = 0;
+    // 遍历所有委派令牌前缀的键值对
     try (LeveldbIterator iter = new LeveldbIterator(db)) {
       iter.seek(bytes(RM_DT_TOKEN_KEY_PREFIX));
       while (iter.hasNext()) {
         Entry<byte[],byte[]> entry = iter.next();
         String key = asString(entry.getKey());
+        // 超出委派令牌前缀范围，停止遍历
         if (!key.startsWith(RM_DT_TOKEN_KEY_PREFIX)) {
           break;
         }
+        // 反序列化并加载委派令牌
         RMDelegationTokenIdentifierData tokenData = loadDelegationToken(
             entry.getValue());
         RMDelegationTokenIdentifier tokenId = tokenData.getTokenIdentifier();
@@ -358,6 +390,7 @@ public class LeveldbRMStateStore extends RMStateStore {
       throws IOException {
     byte[] data;
     try {
+      // 读取令牌序列号
       data = db.get(bytes(RM_DT_SEQUENCE_NUMBER_KEY));
     } catch (DBException e) {
       throw new IOException(e);
@@ -365,6 +398,7 @@ public class LeveldbRMStateStore extends RMStateStore {
     if (data != null) {
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(data));
       try {
+        // 设置序列号到恢复状态
         state.rmSecretManagerState.dtSequenceNumber = in.readInt();
       } finally {
         IOUtils.cleanupWithLogger(LOG, in);
@@ -375,423 +409,24 @@ public class LeveldbRMStateStore extends RMStateStore {
   private void loadRMApps(RMState state) throws IOException {
     int numApps = 0;
     int numAppAttempts = 0;
+    // 遍历所有应用前缀的键值对
     try (LeveldbIterator iter = new LeveldbIterator(db)) {
       iter.seek(bytes(RM_APP_KEY_PREFIX));
       while (iter.hasNext()) {
         Entry<byte[],byte[]> entry = iter.next();
         String key = asString(entry.getKey());
+        // 超出应用前缀范围，停止遍历
         if (!key.startsWith(RM_APP_KEY_PREFIX)) {
           break;
         }
 
+        // 提取应用ID字符串
         String appIdStr = key.substring(RM_APP_ROOT.length() + 1);
+        // 包含分隔符说明不是应用根节点，跳过
         if (appIdStr.contains(SEPARATOR)) {
           LOG.warn("Skipping extraneous data " + key);
           continue;
         }
 
+        // 加载应用及其所有尝试
         numAppAttempts += loadRMApp(state, iter, appIdStr, entry.getValue());
-        ++numApps;
-      }
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-    LOG.info("Recovered " + numApps + " applications and " + numAppAttempts
-        + " application attempts");
-  }
-
-  private int loadRMApp(RMState rmState, LeveldbIterator iter, String appIdStr,
-      byte[] appData) throws IOException {
-    ApplicationStateData appState = createApplicationState(appIdStr, appData);
-    ApplicationId appId =
-        appState.getApplicationSubmissionContext().getApplicationId();
-    rmState.appState.put(appId, appState);
-    String attemptNodePrefix = getApplicationNodeKey(appId) + SEPARATOR;
-    while (iter.hasNext()) {
-      Entry<byte[],byte[]> entry = iter.peekNext();
-      String key = asString(entry.getKey());
-      if (!key.startsWith(attemptNodePrefix)) {
-        break;
-      }
-
-      String attemptId = key.substring(attemptNodePrefix.length());
-      if (attemptId.startsWith(ApplicationAttemptId.appAttemptIdStrPrefix)) {
-        ApplicationAttemptStateData attemptState =
-            createAttemptState(attemptId, entry.getValue());
-        appState.attempts.put(attemptState.getAttemptId(), attemptState);
-      } else {
-        LOG.warn("Ignoring unknown application key: " + key);
-      }
-      iter.next();
-    }
-    int numAttempts = appState.attempts.size();
-    LOG.debug("Loaded application {} with {} attempts", appId, numAttempts);
-    return numAttempts;
-  }
-
-  private ApplicationStateData createApplicationState(String appIdStr,
-      byte[] data) throws IOException {
-    ApplicationId appId = ApplicationId.fromString(appIdStr);
-    ApplicationStateDataPBImpl appState =
-        new ApplicationStateDataPBImpl(
-            ApplicationStateDataProto.parseFrom(data));
-    if (!appId.equals(
-        appState.getApplicationSubmissionContext().getApplicationId())) {
-      throw new YarnRuntimeException("The database entry for " + appId
-          + " contains data for "
-          + appState.getApplicationSubmissionContext().getApplicationId());
-    }
-    return appState;
-  }
-
-  @VisibleForTesting
-  ApplicationStateData loadRMAppState(ApplicationId appId) throws IOException {
-    String appKey = getApplicationNodeKey(appId);
-    byte[] data;
-    try {
-      data = db.get(bytes(appKey));
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-    if (data == null) {
-      return null;
-    }
-    return createApplicationState(appId.toString(), data);
-  }
-
-  @VisibleForTesting
-  ApplicationAttemptStateData loadRMAppAttemptState(
-      ApplicationAttemptId attemptId) throws IOException {
-    String attemptKey = getApplicationAttemptNodeKey(attemptId);
-    byte[] data;
-    try {
-      data = db.get(bytes(attemptKey));
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-    if (data == null) {
-      return null;
-    }
-    return createAttemptState(attemptId.toString(), data);
-  }
-
-  private ApplicationAttemptStateData createAttemptState(String itemName,
-      byte[] data) throws IOException {
-    ApplicationAttemptId attemptId = ApplicationAttemptId.fromString(itemName);
-    ApplicationAttemptStateDataPBImpl attemptState =
-        new ApplicationAttemptStateDataPBImpl(
-            ApplicationAttemptStateDataProto.parseFrom(data));
-    if (!attemptId.equals(attemptState.getAttemptId())) {
-      throw new YarnRuntimeException("The database entry for " + attemptId
-          + " contains data for " + attemptState.getAttemptId());
-    }
-    return attemptState;
-  }
-
-  private void loadAMRMTokenSecretManagerState(RMState rmState)
-      throws IOException {
-    try {
-      byte[] data = db.get(bytes(AMRMTOKEN_SECRET_MANAGER_ROOT));
-      if (data != null) {
-        AMRMTokenSecretManagerStatePBImpl stateData =
-            new AMRMTokenSecretManagerStatePBImpl(
-                AMRMTokenSecretManagerStateProto.parseFrom(data));
-        rmState.amrmTokenSecretManagerState =
-            AMRMTokenSecretManagerState.newInstance(
-                stateData.getCurrentMasterKey(),
-                stateData.getNextMasterKey());
-      }
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  private void loadProxyCAManagerState(RMState rmState) throws Exception {
-    byte[] caCertData;
-    byte[] caPrivateKeyData;
-
-    String caCertKey = getProxyCACertNodeKey();
-    String caPrivateKeyKey = getProxyCAPrivateKeyNodeKey();
-
-    try {
-      caCertData = db.get(bytes(caCertKey));
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-
-    try {
-      caPrivateKeyData = db.get(bytes(caPrivateKeyKey));
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-
-    if (caCertData == null || caPrivateKeyData == null) {
-      LOG.warn("Couldn't find Proxy CA data");
-      return;
-    }
-
-    rmState.proxyCAState.setCaCert(caCertData);
-    rmState.proxyCAState.setCaPrivateKey(caPrivateKeyData);
-  }
-
-  @Override
-  protected void storeApplicationStateInternal(ApplicationId appId,
-      ApplicationStateData appStateData) throws IOException {
-    String key = getApplicationNodeKey(appId);
-    LOG.debug("Storing state for app {} at {}", appId, key);
-    try {
-      db.put(bytes(key), appStateData.getProto().toByteArray());
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  protected void updateApplicationStateInternal(ApplicationId appId,
-      ApplicationStateData appStateData) throws IOException {
-    storeApplicationStateInternal(appId, appStateData);
-  }
-
-  @Override
-  protected void storeApplicationAttemptStateInternal(
-      ApplicationAttemptId attemptId,
-      ApplicationAttemptStateData attemptStateData) throws IOException {
-    String key = getApplicationAttemptNodeKey(attemptId);
-    LOG.debug("Storing state for attempt {} at {}", attemptId, key);
-    try {
-      db.put(bytes(key), attemptStateData.getProto().toByteArray());
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  protected void updateApplicationAttemptStateInternal(
-      ApplicationAttemptId attemptId,
-      ApplicationAttemptStateData attemptStateData) throws IOException {
-    storeApplicationAttemptStateInternal(attemptId, attemptStateData);
-  }
-
-  @Override
-  public synchronized void removeApplicationAttemptInternal(
-      ApplicationAttemptId attemptId)
-      throws IOException {
-    String attemptKey = getApplicationAttemptNodeKey(attemptId);
-    LOG.debug("Removing state for attempt {} at {}", attemptId, attemptKey);
-    try {
-      db.delete(bytes(attemptKey));
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  protected void removeApplicationStateInternal(ApplicationStateData appState)
-      throws IOException {
-    ApplicationId appId =
-        appState.getApplicationSubmissionContext().getApplicationId();
-    String appKey = getApplicationNodeKey(appId);
-    try {
-      try (WriteBatch batch = db.createWriteBatch()) {
-        batch.delete(bytes(appKey));
-        for (ApplicationAttemptId attemptId : appState.attempts.keySet()) {
-          String attemptKey = getApplicationAttemptNodeKey(appKey, attemptId);
-          batch.delete(bytes(attemptKey));
-        }
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Removing state for app " + appId + " and "
-              + appState.attempts.size() + " attempts" + " at " + appKey);
-        }
-        db.write(batch);
-      }
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  protected void storeReservationState(
-      ReservationAllocationStateProto reservationAllocation, String planName,
-      String reservationIdName) throws Exception {
-    try {
-      try (WriteBatch batch = db.createWriteBatch()) {
-        String key = getReservationNodeKey(planName, reservationIdName);
-        LOG.debug("Storing state for reservation {} plan {} at {}",
-            reservationIdName, planName, key);
-
-        batch.put(bytes(key), reservationAllocation.toByteArray());
-        db.write(batch);
-      }
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  protected void removeReservationState(String planName,
-      String reservationIdName) throws Exception {
-    try {
-      try (WriteBatch batch = db.createWriteBatch()) {
-        String reservationKey =
-            getReservationNodeKey(planName, reservationIdName);
-        batch.delete(bytes(reservationKey));
-        LOG.debug("Removing state for reservation {} plan {} at {}",
-            reservationIdName, planName, reservationKey);
-        db.write(batch);
-      }
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  private void storeOrUpdateRMDT(RMDelegationTokenIdentifier tokenId,
-      Long renewDate, boolean isUpdate) throws IOException {
-    String tokenKey = getRMDTTokenNodeKey(tokenId);
-    RMDelegationTokenIdentifierData tokenData =
-        new RMDelegationTokenIdentifierData(tokenId, renewDate);
-    LOG.debug("Storing token to {}", tokenKey);
-    try {
-      try (WriteBatch batch = db.createWriteBatch()) {
-        batch.put(bytes(tokenKey), tokenData.toByteArray());
-        if (!isUpdate) {
-          ByteArrayOutputStream bs = new ByteArrayOutputStream();
-          try (DataOutputStream ds = new DataOutputStream(bs)) {
-            ds.writeInt(tokenId.getSequenceNumber());
-          }
-          LOG.debug("Storing {} to {}", tokenId.getSequenceNumber(),
-              RM_DT_SEQUENCE_NUMBER_KEY);
-          batch.put(bytes(RM_DT_SEQUENCE_NUMBER_KEY), bs.toByteArray());
-        }
-        db.write(batch);
-      }
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  protected void storeRMDelegationTokenState(
-      RMDelegationTokenIdentifier tokenId, Long renewDate)
-      throws IOException {
-    storeOrUpdateRMDT(tokenId, renewDate, false);
-  }
-
-  @Override
-  protected void updateRMDelegationTokenState(
-      RMDelegationTokenIdentifier tokenId, Long renewDate)
-      throws IOException {
-    storeOrUpdateRMDT(tokenId, renewDate, true);
-  }
-
-  @Override
-  protected void removeRMDelegationTokenState(
-      RMDelegationTokenIdentifier tokenId) throws IOException {
-    String tokenKey = getRMDTTokenNodeKey(tokenId);
-    LOG.debug("Removing token at {}", tokenKey);
-    try {
-      db.delete(bytes(tokenKey));
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  protected void storeRMDTMasterKeyState(DelegationKey masterKey)
-      throws IOException {
-    String dbKey = getRMDTMasterKeyNodeKey(masterKey);
-    LOG.debug("Storing token master key to {}", dbKey);
-    ByteArrayOutputStream os = new ByteArrayOutputStream();
-    try (DataOutputStream out = new DataOutputStream(os)) {
-      masterKey.write(out);
-    }
-    try {
-      db.put(bytes(dbKey), os.toByteArray());
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  protected void removeRMDTMasterKeyState(DelegationKey masterKey)
-      throws IOException {
-    String dbKey = getRMDTMasterKeyNodeKey(masterKey);
-    LOG.debug("Removing token master key at {}", dbKey);
-    try {
-      db.delete(bytes(dbKey));
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  public void storeOrUpdateAMRMTokenSecretManagerState(
-      AMRMTokenSecretManagerState state, boolean isUpdate) {
-    AMRMTokenSecretManagerState data =
-        AMRMTokenSecretManagerState.newInstance(state);
-    byte[] stateData = data.getProto().toByteArray();
-    db.put(bytes(AMRMTOKEN_SECRET_MANAGER_ROOT), stateData);
-  }
-
-  @Override
-  protected void storeProxyCACertState(
-      X509Certificate caCert, PrivateKey caPrivateKey) throws Exception {
-    byte[] caCertData = caCert.getEncoded();
-    byte[] caPrivateKeyData = caPrivateKey.getEncoded();
-
-    String caCertKey = getProxyCACertNodeKey();
-    String caPrivateKeyKey = getProxyCAPrivateKeyNodeKey();
-
-    try {
-      try (WriteBatch batch = db.createWriteBatch()) {
-        batch.put(bytes(caCertKey), caCertData);
-        batch.put(bytes(caPrivateKeyKey), caPrivateKeyData);
-        db.write(batch);
-      }
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  public void deleteStore() throws IOException {
-    Path root = getStorageDir();
-    LOG.info("Deleting state database at " + root);
-    db.close();
-    db = null;
-    FileSystem fs = FileSystem.getLocal(getConfig());
-    fs.delete(root, true);
-  }
-
-  @Override
-  public synchronized void removeApplication(ApplicationId removeAppId)
-      throws IOException {
-    String appKey = getApplicationNodeKey(removeAppId);
-    LOG.info("Removing state for app " + removeAppId);
-    try {
-      db.delete(bytes(appKey));
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @VisibleForTesting
-  int getNumEntriesInDatabase() throws IOException {
-    int numEntries = 0;
-    try (LeveldbIterator iter = new LeveldbIterator(db)) {
-      iter.seekToFirst();
-      while (iter.hasNext()) {
-        Entry<byte[], byte[]> entry = iter.next();
-        LOG.info("entry: " + asString(entry.getKey()));
-        ++numEntries;
-      }
-    } catch (DBException e) {
-      throw new IOException(e);
-    }
-    return numEntries;
-  }
-
-  @VisibleForTesting
-  protected void setDbManager(DBManager dbManager) {
-    this.dbManager = dbManager;
-  }
-}

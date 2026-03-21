@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -34,6 +35,9 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * NodeManager Web UI 节点信息页面，展示节点的资源、健康状态和版本等基础信息
+ */
 public class NodePage extends NMView {
 
   private static final long BYTES_IN_MB = 1024 * 1024;
@@ -41,15 +45,21 @@ public class NodePage extends NMView {
   @Override
   protected void commonPreHead(HTML<__> html) {
     super.commonPreHead(html);
+    // 设置页面标题
     setTitle("NodeManager information");
+    // 初始化导航手风琴组件，默认激活第二个菜单项
     set(initID(ACCORDION, "nav"), "{autoHeight:false, active:1}");
   }
 
   @Override
   protected Class<? extends SubView> content() {
+    // 返回节点信息内容块类
     return NodeBlock.class;
   }
 
+  /**
+   * 节点信息内容块，渲染NodeManager详细信息表格
+   */
   public static class NodeBlock extends HtmlBlock {
 
     private final Context context;
@@ -63,7 +73,9 @@ public class NodePage extends NMView {
 
     @Override
     protected void render(Block html) {
+      // 构建节点信息数据对象
       NodeInfo info = new NodeInfo(this.context, this.resourceView);
+      // 添加节点信息行
       info("NodeManager information")
           .__("Total Vmem allocated for Containers",
               StringUtils.byteDesc(info.getTotalVmemAllocated() * BYTES_IN_MB))
@@ -89,6 +101,7 @@ public class NodePage extends NMView {
               " on " + info.getNMVersionBuiltOn())
           .__("Hadoop Version:", info.getHadoopBuildVersion() +
               " on " + info.getHadoopVersionBuiltOn());
+      // 渲染信息块到页面
       html.__(InfoBlock.class);
     }
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,25 +26,27 @@ import org.apache.hadoop.yarn.server.resourcemanager.reservation.Plan;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationSchedulerConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.PlanningException;
 
+/**
+ * YARN资源预留规划器接口，定义预留资源规划的核心方法
+ * 负责根据预留请求在现有集群资源计划上完成资源分配规划
+ */
 public interface Planner {
 
   /**
-   * Update the existing {@link Plan}, by adding/removing/updating existing
-   * reservations, and adding a subset of the reservation requests in the
-   * contracts parameter.
+   * 更新现有资源计划，处理新增/删除/修改已有预留，并批量处理新的预留请求
    *
-   * @param plan the {@link Plan} to replan
-   * @param contracts the list of reservation requests
-   * @throws PlanningException if operation is unsuccessful
+   * @param plan 待重新规划的资源计划对象
+   * @param contracts 需要处理的预留请求列表
+   * @throws PlanningException 规划失败时抛出异常
    */
   public void plan(Plan plan, List<ReservationDefinition> contracts)
       throws PlanningException;
 
   /**
-   * Initialize the replanner
+   * 初始化规划器实例，绑定队列和配置参数
    *
-   * @param planQueueName the name of the queue for this plan
-   * @param conf the scheduler configuration
+   * @param planQueueName 当前规划对应的队列名称
+   * @param conf 预留调度器配置对象
    */
   void init(String planQueueName, ReservationSchedulerConfiguration conf);
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,18 +19,20 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.activities;
 
-/*
- * Collection of allocation final states.
+/**
+ * 资源分配最终状态枚举集合，用于记录YARN资源分配活动的结果状态。
  */
 public enum AllocationState {
+  /** 默认状态，分配未完成处理 */
   DEFAULT,
-  // queue or application voluntarily give up to use the resource
-  // OR nothing allocated
+  /** 
+   * 队列或应用主动放弃使用资源，或者未分配到任何资源
+   */
   SKIPPED,
-  // successfully allocate a new non-reserved container
+  /** 成功分配一个新的非预留容器 */
   ALLOCATED,
-  // successfully allocate a new container from an existing reserved container
+  /** 成功从已有预留容器中分配出新容器 */
   ALLOCATED_FROM_RESERVED,
-  // successfully reserve a new container
+  /** 成功预留出新容器 */
   RESERVED
 }

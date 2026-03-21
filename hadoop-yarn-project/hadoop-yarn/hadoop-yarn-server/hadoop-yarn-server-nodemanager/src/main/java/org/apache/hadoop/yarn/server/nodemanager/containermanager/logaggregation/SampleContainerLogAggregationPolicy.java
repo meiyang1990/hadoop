@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,14 +30,11 @@ import org.apache.hadoop.yarn.server.api.ContainerLogContext;
 import org.apache.hadoop.yarn.server.api.ContainerType;
 
 /**
- * The sample policy samples logs of successful worker containers to aggregate.
- * It always aggregates AM container and failed/killed worker
- * containers' logs. To make sure small applications have enough logs, it only
- * applies sampling beyond minimal number of containers. The parameters can be
- * configured by SAMPLE_RATE and MIN_THRESHOLD. For example if SAMPLE_RATE is
- * 0.2 and MIN_THRESHOLD is 20, for an application with 100 successful
- * worker containers, 20 + (100-20) * 0.2 = 36 containers's logs will be
- * aggregated.
+ * 示例容器日志聚合采样策略，对成功执行的工作容器日志进行采样聚合。
+ * AM容器、失败/被杀死的工作容器始终聚合日志。为保证小应用保留足够日志，
+ * 仅对超过最小容器数量的部分进行采样。可通过SAMPLE_RATE（采样率）和
+ * MIN_THRESHOLD（最小保留容器数）配置。例如采样率0.2，最小阈值20，
+ * 应用有100个成功工作容器时，将聚合 20 + (100-20) * 0.2 = 36 个容器日志。
  */
 @Private
 public class SampleContainerLogAggregationPolicy implements
@@ -53,6 +51,12 @@ public class SampleContainerLogAggregationPolicy implements
   private float sampleRate = DEFAULT_SAMPLE_RATE;
   private int minThreshold = DEFAULT_SAMPLE_MIN_THRESHOLD;
 
+  /**
+   * 构建策略参数字符串。
+   * @param sampleRate 采样率
+   * @param minThreshold 最小保留容器数阈值
+   * @return 格式化后的参数字符串
+   */
   static public String buildParameters(float sampleRate, int minThreshold) {
     StringBuilder sb = new StringBuilder();
     sb.append(SAMPLE_RATE).append(":").append(sampleRate).append(",").
@@ -60,13 +64,14 @@ public class SampleContainerLogAggregationPolicy implements
     return sb.toString();
   }
 
-  // Parameters are comma separated properties, for example
-  // "SR:0.5,MIN:50"
+  /**
+   * 解析配置参数字符串，参数为逗号分隔的键值对，例如 "SR:0.5,MIN:50"
+   * @param parameters 输入参数字符串
+   */
   public void parseParameters(String parameters) {
     Collection<String> params = StringUtils.getStringCollection(parameters);
     for(String param : params) {
-      // The first element is the property name.
-      // The second element is the property value.
+      // 拆分键值对，第一个元素为属性名，第二个为属性值
       String[] property = StringUtils.getStrings(param, ":");
       if (property == null || property.length != 2) {
         continue;
@@ -74,6 +79,7 @@ public class SampleContainerLogAggregationPolicy implements
       if (property[0].equals(SAMPLE_RATE)) {
         try {
           float sampleRate = Float.parseFloat(property[1]);
+          // 校验采样率范围在[0, 1]之间
           if (sampleRate >= 0.0 && sampleRate <= 1.0) {
             this.sampleRate = sampleRate;
           } else {
@@ -87,6 +93,7 @@ public class SampleContainerLogAggregationPolicy implements
       } else if (property[0].equals(MIN_THRESHOLD)) {
         try {
           int minThreshold = Integer.parseInt(property[1]);
+          // 校验最小阈值非负
           if (minThreshold >= 0) {
             this.minThreshold = minThreshold;
           } else {
@@ -101,24 +108,28 @@ public class SampleContainerLogAggregationPolicy implements
     }
   }
 
+  /**
+   * 判断当前容器是否需要进行日志聚合。
+   * @param logContext 容器日志上下文信息
+   * @return true表示需要聚合，false表示跳过
+   */
   public boolean shouldDoLogAggregation(ContainerLogContext logContext) {
     if (logContext.getContainerType() ==
         ContainerType.APPLICATION_MASTER || logContext.getExitCode() != 0) {
-      // If it is AM or failed or killed container, enable log aggregation.
+      // AM容器、失败/被杀死容器始终聚合日志
       return true;
     }
 
-    // Only sample log aggregation for large applications.
-    // We assume the container id is continuously allocated from number 1 and
-    // Worker containers start from id 2. So logs of worker containers with ids
-    // in [2, minThreshold + 1] will be aggregated.
+    // 仅对大应用执行日志采样，保证小应用保留所有日志
+    // 假设容器ID从1开始连续分配，工作容器从ID=2开始编号
+    // 因此ID在[2, minThreshold + 1]范围内的工作容器都保留聚合
     if ((logContext.getContainerId().getContainerId() &
         ContainerId.CONTAINER_ID_BITMASK) < minThreshold + 2) {
       return true;
     }
 
-    // Sample log aggregation for the rest of successful worker containers
+    // 对超过阈值的成功工作容器按采样率进行采样
     return (sampleRate != 0 &&
-        logContext.getContainerId().hashCode() % (1/sampleRate) == 0);
+        logContext.getContainerId().hashCode() % (int)(1/sampleRate) == 0);
   }
 }

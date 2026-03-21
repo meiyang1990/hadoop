@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -24,11 +25,25 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 
+/**
+ * 节点重连事件，当NodeManager重新连接ResourceManager时触发
+ * 携带重连后的节点信息、正在运行的应用列表和容器状态信息
+ */
 public class RMNodeReconnectEvent extends RMNodeEvent {
+  // 重连后的RMNode对象
   private RMNode reconnectedNode;
+  // 该节点上正在运行的应用ID列表
   private List<ApplicationId> runningApplications;
+  // 该节点上所有容器的状态列表
   private List<NMContainerStatus> containerStatuses;
 
+  /**
+   * 构造节点重连事件
+   * @param nodeId 重连节点ID
+   * @param newNode 重连后的RMNode对象
+   * @param runningApps 节点上正在运行的应用ID列表
+   * @param containerReports 节点上容器状态列表
+   */
   public RMNodeReconnectEvent(NodeId nodeId, RMNode newNode,
       List<ApplicationId> runningApps, List<NMContainerStatus> containerReports) {
     super(nodeId, RMNodeEventType.RECONNECTED);
@@ -37,14 +52,26 @@ public class RMNodeReconnectEvent extends RMNodeEvent {
     containerStatuses = containerReports;
   }
 
+  /**
+   * 获取重连后的节点对象
+   * @return 重连后的RMNode
+   */
   public RMNode getReconnectedNode() {
     return reconnectedNode;
   }
 
+  /**
+   * 获取节点重连时正在运行的应用列表
+   * @return 正在运行的应用ID列表
+   */
   public List<ApplicationId> getRunningApplications() {
     return runningApplications;
   }
 
+  /**
+   * 获取节点重连时所有容器的状态列表
+   * @return 容器状态列表
+   */
   public List<NMContainerStatus> getNMContainerStatuses() {
     return containerStatuses;
   }

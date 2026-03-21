@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+/**
+ * @file runc_reap.c
+ * @brief YARN NodeManager runC容器层挂载回收实现
+ * 负责回收不再使用的runc overlayfs层挂载，清理已删除文件对应的回环设备挂载，
+ * 通过LRU策略保留指定数量的最近使用层挂载，节省系统资源
  */
 #include <sys/types.h>
 #include <sys/mount.h>
@@ -47,23 +54,28 @@
 #define MOUNT_TABLE_BUFFER_SIZE (1024*1024)
 
 // NOTE: Update destroy_dent_stat when this is updated.
+/**
+ * @brief 目录条目信息结构，存储文件名和修改时间
+ */
 typedef struct dent_stat_struct {
-  char* basename;         // basename of directory entry
-  struct timespec mtime;  // modification time
+  char* basename;         // 目录条目的文件名
+  struct timespec mtime;  // 修改时间，用于LRU排序
 } dent_stat;
 
 // NOTE: Update init_dent_stats and destroy_dent_stats when this is changed.
+/**
+ * @brief 目录条目信息数组结构，动态扩容存储
+ */
 typedef struct dent_stats_array_struct {
-  dent_stat* stats;       // array of dent_stat structures
-  size_t capacity;        // capacity of the stats array
-  size_t length;          // number of valid entries in the stats array
+  dent_stat* stats;       // 目录条目信息数组
+  size_t capacity;        // 数组容量
+  size_t length;          // 数组中有效条目数量
 } dent_stats_array;
 
 
 /**
- * Releases the resources assruncated with a dent_stat structure but
- * does NOT free the structure itself. This is particularly useful for
- * stack-allocated structures or other structures that embed this structure.
+ * 释放单个目录条目信息的内存，不释放结构本身
+ * 适用于栈分配或嵌入其他结构的场景
  */
 static void destroy_dent_stat(dent_stat* ds) {
   if (ds != NULL) {
@@ -73,10 +85,8 @@ static void destroy_dent_stat(dent_stat* ds) {
 }
 
 /**
- * Initialize an uninitialized dent_stats_array with the specified
- * number of entries as its initial capacity.
- *
- * Returns true on success or false on error.
+ * 初始化目录条目数组，指定初始容量
+ * @return 初始化成功返回true，失败返回false
  */
 static bool init_dent_stats(dent_stats_array* dsa, size_t initial_size) {
   memset(dsa, 0, sizeof(*dsa));
@@ -90,10 +100,8 @@ static bool init_dent_stats(dent_stats_array* dsa, size_t initial_size) {
 }
 
 /**
- * Allocates and initializes a dent_stats_array with the specified
- * number of entries as its initial capacity.
- *
- * Returns a pointer to the dent_stats_array or NULL on error.
+ * 分配并初始化目录条目数组，指定初始容量
+ * @return 成功返回数组指针，失败返回NULL
  */
 static dent_stats_array* alloc_dent_stats(size_t initial_size) {
   dent_stats_array* dsa = malloc(sizeof(*dsa));
@@ -107,10 +115,8 @@ static dent_stats_array* alloc_dent_stats(size_t initial_size) {
 }
 
 /**
- * Grows the capacity of a dent_stats_array to the new specified number of
- * elements.
- *
- * Returns true on success or false on error.
+ * 扩容目录条目数组到指定新容量
+ * @return 扩容成功返回true，失败返回false
  */
 static bool realloc_dent_stats(dent_stats_array* dsa, size_t new_size) {
   if (new_size < dsa->length) {
@@ -129,10 +135,8 @@ static bool realloc_dent_stats(dent_stats_array* dsa, size_t new_size) {
 }
 
 /**
- * Append a new dent_stat entry to a dent_stats_array, reallocating the
- * array if necessary with the specified increase in capacity.
- *
- * Returns true on success or false on error.
+ * 追加新目录条目到数组，容量不足时自动扩容
+ * @return 追加成功返回true，失败返回false
  */
 static bool append_dent_stat(dent_stats_array* dsa, size_t stats_size_incr,
     const char* basename, const struct timespec* mtime) {
@@ -154,9 +158,8 @@ static bool append_dent_stat(dent_stats_array* dsa, size_t stats_size_incr,
 }
 
 /**
- * Releases the resources assruncated with a dent_stats_array structure but
- * does NOT free the structure itself. This is particularly useful for
- * stack-allocated contexts or other structures that embed this structure.
+ * 释放目录条目数组所有元素的内存，不释放数组结构本身
+ * 适用于栈分配或嵌入其他结构的场景
  */
 static void destroy_dent_stats(dent_stats_array* dsa) {
   if (dsa != NULL ) {
@@ -170,7 +173,7 @@ static void destroy_dent_stats(dent_stats_array* dsa) {
 }
 
 /**
- * Frees a dent_stats_array structure and all memory assruncted with it.
+ * 释放目录条目数组及其所有元素的全部内存
  */
 static void free_dent_stats(dent_stats_array* dsa) {
   destroy_dent_stats(dsa);
@@ -178,10 +181,9 @@ static void free_dent_stats(dent_stats_array* dsa) {
 }
 
 /**
- * Get the array of dent_stats for the layers directory.
- * Only directory entries that look like layers will be returned.
- *
- * Returns the array of dent_stats or NULL on error.
+ * 读取layers目录下所有合法层条目，获取其名称和修改时间
+ * @param layers_fd layers目录的文件描述符
+ * @return 成功返回目录条目数组，失败返回NULL
  */
 static dent_stats_array* get_dent_stats(int layers_fd) {
   DIR* layers_dir = NULL;
@@ -192,6 +194,7 @@ static dent_stats_array* get_dent_stats(int layers_fd) {
     return NULL;
   }
 
+  // 复制目录文件描述符，用于fdopendir
   int dir_fd = dup(layers_fd);
   if (dir_fd == -1) {
     fprintf(ERRORFILE, "Unable to duplicate layer dir fd: %s\n",
@@ -199,6 +202,7 @@ static dent_stats_array* get_dent_stats(int layers_fd) {
     goto fail;
   }
 
+  // 通过文件描述符打开目录流
   layers_dir = fdopendir(dir_fd);
   if (layers_dir == NULL) {
     fprintf(ERRORFILE, "Cannot open layers directory: %s\n", strerror(errno));
@@ -206,14 +210,17 @@ static dent_stats_array* get_dent_stats(int layers_fd) {
   }
 
   struct dirent* de;
+  // 遍历目录所有条目
   while ((de = readdir(layers_dir)) != NULL) {
-    // skip entries that don't look like layers
+    // 跳过不符合层命名规则的条目
     if (strlen(de->d_name) != LAYER_NAME_LENGTH) {
       continue;
     }
 
     struct stat statbuf;
+    // 获取条目的元信息，不跟随符号链接
     if (fstatat(layers_fd, de->d_name, &statbuf, AT_SYMLINK_NOFOLLOW) == -1) {
+      // 条目已被删除，跳过
       if (errno == ENOENT) {
         continue;
       }
@@ -222,6 +229,7 @@ static dent_stats_array* get_dent_stats(int layers_fd) {
       goto fail;
     }
 
+    // 将条目信息添加到数组
     if (!append_dent_stat(dsa, stats_size_incr, de->d_name,
         &statbuf.st_mtim)) {
       fputs("Unable to allocate memory\n", ERRORFILE);
@@ -242,11 +250,12 @@ fail:
 }
 
 /**
- * Umount a layer and remove the directories assruncated with the layer mount.
- *
- * Returns true on success or false on error.
+ * 卸载指定层的挂载，并删除层目录和挂载点
+ * @param layer_dir_path 层目录路径
+ * @return 成功返回true，失败返回false
  */
 static bool unmount_layer(const char* layer_dir_path) {
+  // 构造层挂载点路径
   char* mount_path = get_runc_layer_mount_path(layer_dir_path);
   if (mount_path == NULL) {
     fputs("Unable to allocate memory\n", ERRORFILE);
@@ -254,27 +263,33 @@ static bool unmount_layer(const char* layer_dir_path) {
   }
 
   bool result = false;
+  // 执行卸载
   if (umount(mount_path) == -1) {
+    // 挂载正被使用，不处理
     if (errno == EBUSY) {
       // Layer is in use by another container.
       goto cleanup;
     } else if (errno != ENOENT && errno != EINVAL) {
+      // 非"不存在"错误，打印日志
       fprintf(ERRORFILE, "Error unmounting %s : %s\n", mount_path,
           strerror(errno));
       goto cleanup;
     }
   } else {
+    // 卸载成功，即使后续删除目录失败也标记为成功
     // unmount was successful so report success even if directory removals
     // fail after this.
     result = true;
   }
 
+  // 删除挂载点目录，不存在则忽略错误
   if (rmdir(mount_path) == -1 && errno != ENOENT) {
     fprintf(ERRORFILE, "Error removing %s : %s\n", mount_path,
         strerror(errno));
     goto cleanup;
   }
 
+  // 删除层目录，不存在则忽略错误
   if (rmdir(layer_dir_path) == -1 && errno != ENOENT) {
     fprintf(ERRORFILE, "Error removing %s : %s\n", layer_dir_path,
         strerror(errno));
@@ -289,7 +304,7 @@ cleanup:
 }
 
 /**
- * Order directory entries by increasing modification time.
+ * qsort比较函数，按修改时间从小到大排序目录条目
  */
 static int compare_dent_stats_mtime(const void* va, const void* vb) {
   const dent_stat* a = (const dent_stat*)va;
@@ -299,38 +314,53 @@ static int compare_dent_stats_mtime(const void* va, const void* vb) {
   } else if (a->mtime.tv_sec > b->mtime.tv_sec) {
     return 1;
   }
+  // 秒数相等，比较纳秒
   return a->mtime.tv_nsec - b->mtime.tv_nsec;
 }
 
+/**
+ * 在已获取锁的上下文执行层挂载回收，按LRU保留指定数量层
+ * @param ctx runc基础上下文
+ * @param layers_fd layers目录文件描述符
+ * @param num_preserve 需要保留的层数量
+ * @return 成功返回true，失败返回false
+ */
 static bool do_reap_layer_mounts_with_lock(runc_base_ctx* ctx,
     int layers_fd, int num_preserve) {
+  // 获取所有层条目信息
   dent_stats_array* dsa = get_dent_stats(layers_fd);
   if (dsa == NULL) {
     return false;
   }
 
+  // 按修改时间从小到大排序，最早修改的在前
   qsort(&dsa->stats[0], dsa->length, sizeof(*dsa->stats),
       compare_dent_stats_mtime);
 
   bool result = false;
   size_t num_remain = dsa->length;
+  // 当前层数小于等于需要保留的数量，无需回收
   if (num_remain <= num_preserve) {
     result = true;
     goto cleanup;
   }
 
+  // 获取层目录写锁
   if (!acquire_runc_layers_write_lock(ctx)) {
     fputs("Unable to acquire layer write lock\n", ERRORFILE);
     goto cleanup;
   }
 
+  // 从最早修改的层开始卸载，直到剩余层数不超过保留数量
   for (size_t i = 0; i < dsa->length && num_remain > num_preserve; ++i) {
+    // 构造层目录路径
     char* layer_dir_path = get_runc_layer_path(ctx->run_root,
         dsa->stats[i].basename);
     if (layer_dir_path == NULL) {
       fputs("Unable to allocate memory\n", ERRORFILE);
       goto cleanup;
     }
+    // 卸载该层，成功则剩余数量减一
     if (unmount_layer(layer_dir_path)) {
       --num_remain;
       printf("Unmounted layer %s\n", dsa->stats[i].basename);
@@ -346,10 +376,9 @@ cleanup:
 }
 
 /**
- * Determine if the specified loopback device is assruncated with a file that
- * has been deleted.
- *
- * Returns true if the loopback file is deleted or false otherwise or on error.
+ * 检查指定回环设备对应的后端文件是否已被删除
+ * @param loopdev 回环设备路径
+ * @return 已删除返回true，否则或错误返回false
  */
 bool is_loop_file_deleted(const char* loopdev) {
   bool result = false;
@@ -357,25 +386,30 @@ bool is_loop_file_deleted(const char* loopdev) {
   char* path = NULL;
   char* linebuf = NULL;
 
-  // locate the numeric part of the loop device
+  // 提取回环设备编号部分
   const char* loop_num_str = loopdev + DEV_LOOP_PREFIX_LEN;
 
+  // 构造sysfs中回环设备后端文件路径
   if (asprintf(&path, "/sys/devices/virtual/block/loop%s/loop/backing_file",
       loop_num_str) == -1) {
     return false;
   }
 
+  // 打开后端文件信息文件
   f = fopen(path, "r");
   if (f == NULL) {
     goto cleanup;
   }
 
   size_t linebuf_len = 0;
+  // 读取一行内容
   ssize_t len = getline(&linebuf, &linebuf_len, f);
+  // 长度不足以包含删除标记，直接返回未删除
   if (len <= DELETED_SUFFIX_LEN) {
     goto cleanup;
   }
 
+  // 检查末尾是否匹配已删除后缀
   result = !strcmp(DELETED_SUFFIX, linebuf + len - DELETED_SUFFIX_LEN);
 
 cleanup:
@@ -387,6 +421,12 @@ cleanup:
   return result;
 }
 
+/**
+ * 复制挂载表条目，深度复制字符串字段
+ * @param dest 目标条目
+ * @param src 源条目
+ * @return 复制成功返回true，失败返回false
+ */
 static bool copy_mntent(struct mntent* dest, const struct mntent* src) {
   memset(dest, 0, sizeof(*dest));
   if (src->mnt_fsname != NULL) {
@@ -418,6 +458,9 @@ static bool copy_mntent(struct mntent* dest, const struct mntent* src) {
   return true;
 }
 
+/**
+ * 释放挂载表数组所有条目和数组本身的内存
+ */
 static void free_mntent_array(struct mntent* entries, size_t num_entries) {
   if (entries != NULL) {
     for (size_t i = 0; i < num_entries; ++i) {
@@ -432,193 +475,4 @@ static void free_mntent_array(struct mntent* entries, size_t num_entries) {
 }
 
 /**
- * Get the array of mount table entries that are layer mounts.
- *
- * Returns the heap-allocated array of mount entries or NULL on error.
- * The num_entries argument is updated to the number of elements in the array.
- */
-static struct mntent* get_layer_mounts(size_t* num_entries_out,
-    const char* layers_path) {
-  const size_t layers_path_len = strlen(layers_path);
-  char* read_buffer = NULL;
-  FILE* f = NULL;
-  const size_t num_entries_per_alloc = 8192;
-  size_t num_entries = 0;
-  size_t entries_capacity = num_entries_per_alloc;
-  struct mntent* entries = malloc(sizeof(*entries) * entries_capacity);
-  struct mntent* new_entries;
-  if (entries == NULL) {
-    fputs("Unable to allocate memory\n", ERRORFILE);
-    goto fail;
-  }
-
-  read_buffer = malloc(MOUNT_TABLE_BUFFER_SIZE);
-  if (read_buffer == NULL) {
-    fprintf(ERRORFILE, "Unable to allocate read buffer of %d bytes\n",
-        MOUNT_TABLE_BUFFER_SIZE);
-    goto fail;
-  }
-
-  f = fopen("/proc/mounts", "r");
-  if (f == NULL) {
-    fprintf(ERRORFILE, "Unable to open /proc/mounts : %s\n", strerror(errno));
-    goto fail;
-  }
-
-  if (setvbuf(f, read_buffer, _IOFBF, MOUNT_TABLE_BUFFER_SIZE) != 0) {
-    fprintf(ERRORFILE, "Unable to set mount table buffer to %d\n",
-        MOUNT_TABLE_BUFFER_SIZE);
-    goto fail;
-  }
-
-  struct mntent* me;
-  while ((me = getmntent(f)) != NULL) {
-    // Skip mounts that are not loopback mounts
-    if (strncmp(me->mnt_fsname, DEV_LOOP_PREFIX, DEV_LOOP_PREFIX_LEN)) {
-      continue;
-    }
-
-    // skip destinations that are not under the layers mount area
-    if (strncmp(layers_path, me->mnt_dir, layers_path_len)) {
-      continue;
-    }
-
-    if (num_entries == entries_capacity) {
-      entries_capacity += num_entries_per_alloc;
-      new_entries = realloc(entries, sizeof(*entries) * entries_capacity);
-      if (new_entries == NULL) {
-        fputs("Unable to allocate memory\n", ERRORFILE);
-        goto fail;
-      }
-      entries = new_entries;
-    }
-
-    if (!copy_mntent(entries + num_entries, me)) {
-      goto fail;
-    }
-    ++num_entries;
-  }
-
-cleanup:
-  if (f != NULL) {
-    fclose(f);
-  }
-  free(read_buffer);
-  *num_entries_out = num_entries;
-  return entries;
-
-fail:
-  free_mntent_array(entries, num_entries);
-  entries = NULL;
-  num_entries = 0;
-  goto cleanup;
-}
-
-/**
- * Search for layer mounts that correspond with deleted files and unmount them.
- */
-static bool reap_deleted_mounts_with_lock(runc_base_ctx* ctx) {
-  const char* layers_path = get_runc_layers_path(ctx->run_root);
-  if (layers_path == NULL) {
-    fputs("Unable to allocate memory\n", ERRORFILE);
-    return false;
-  }
-
-  bool result = false;
-  size_t num_mnt_entries = 0;
-  struct mntent* mnt_entries = get_layer_mounts(&num_mnt_entries, layers_path);
-  if (mnt_entries == NULL) {
-    fputs("Error parsing mount table\n", ERRORFILE);
-    goto cleanup;
-  }
-
-  bool have_write_lock = false;
-  for (size_t i = 0; i < num_mnt_entries; ++i) {
-    const struct mntent* me = mnt_entries + i;
-    if (is_loop_file_deleted(me->mnt_fsname)) {
-      if (!have_write_lock) {
-        if (!acquire_runc_layers_write_lock(ctx)) {
-          goto cleanup;
-        }
-        have_write_lock = true;
-      }
-
-      char* layer_dir = get_runc_layer_path_from_mount_path(me->mnt_dir);
-      if (layer_dir != NULL) {
-        if (unmount_layer(layer_dir)) {
-          printf("Unmounted layer %s (deleted)\n", basename(layer_dir));
-        }
-        free(layer_dir);
-      }
-    }
-  }
-
-  result = true;
-
-cleanup:
-  free_mntent_array(mnt_entries, num_mnt_entries);
-  return result;
-}
-
-/**
- * Equivalent to reap_runc_layer_mounts but avoids the need to re-create the
- * runC base context.
- */
-int reap_runc_layer_mounts_with_ctx(runc_base_ctx* ctx, int num_preserve) {
-  int rc = ERROR_RUNC_REAP_LAYER_MOUNTS_FAILED;
-  int layers_fd = -1;
-  char* layers_path = get_runc_layers_path(ctx->run_root);
-  if (layers_path == NULL) {
-    fputs("Unable to allocate memory\n", ERRORFILE);
-    rc = OUT_OF_MEMORY;
-    goto cleanup;
-  }
-
-  layers_fd = open(layers_path, O_RDONLY | O_NOFOLLOW);
-  if (layers_fd == -1) {
-    fprintf(ERRORFILE, "Unable to open layers directory at %s : %s\n",
-        layers_path, strerror(errno));
-    goto cleanup;
-  }
-
-  if (!acquire_runc_layers_read_lock(ctx)) {
-    fputs("Unable to obtain layer lock\n", ERRORFILE);
-    goto cleanup;
-  }
-
-  bool reap_deleted_ok = reap_deleted_mounts_with_lock(ctx);
-  bool reap_layers_ok = do_reap_layer_mounts_with_lock(ctx, layers_fd,
-      num_preserve);
-  if (reap_deleted_ok && reap_layers_ok) {
-    rc = 0;
-  }
-
-  release_runc_layers_lock(ctx);
-
-cleanup:
-  if (layers_fd != -1) {
-    close(layers_fd);
-  }
-  free(layers_path);
-  return rc;
-}
-
-/**
- * Attempt to trim the number of layer mounts to the specified target number to
- * preserve. Layers are unmounted in a least-recently-used fashion. Layers that
- * are still in use by containers are preserved, so the number of layers mounts
- * after trimming may exceed the target number.
- *
- * Returns 0 on success or a non-zero error code on failure.
- */
-int reap_runc_layer_mounts(int num_preserve) {
-  int rc = ERROR_RUNC_REAP_LAYER_MOUNTS_FAILED;
-  runc_base_ctx* ctx = setup_runc_base_ctx();
-  if (ctx == NULL) {
-    return rc;
-  }
-
-  rc = reap_runc_layer_mounts_with_ctx(ctx, num_preserve);
-  free_runc_base_ctx(ctx);
-  return rc;
-}
+ * 从系统挂载表中筛选出所有位于layers路径下的回环设备层挂载

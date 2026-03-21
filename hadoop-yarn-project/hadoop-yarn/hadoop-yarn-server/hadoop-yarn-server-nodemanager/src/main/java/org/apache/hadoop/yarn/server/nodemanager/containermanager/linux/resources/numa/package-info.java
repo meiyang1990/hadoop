@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.
- * resources.numa contains classes related to NM local scheduler allocators.
+ * 文件包级注释：本包包含NodeManager本地NUMA感知容器资源分配相关实现类，为YARN容器调度提供
+ * 基于NUMA架构的内存/CPU亲和性分配能力，提升容器在非一致内存访问架构下的运行性能。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

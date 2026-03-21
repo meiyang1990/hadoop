@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,10 @@ import static org.apache.hadoop.yarn.api.records.ResourceInformation.MEMORY_URI;
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueUpdateWarning.QueueUpdateWarningType.BRANCH_DOWNSCALED;
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.ResourceCalculationDriver.MB_UNIT;
 
+/**
+ * 绝对资源容量计算器，用于容量调度器中按绝对资源值计算队列容量
+ * 负责处理子队列使用绝对资源配置时的容量归一化计算
+ */
 public class AbsoluteResourceCapacityCalculator extends AbstractQueueCapacityCalculator {
 
   @Override
@@ -69,20 +74,16 @@ public class AbsoluteResourceCapacityCalculator extends AbstractQueueCapacityCal
   }
 
   /**
-   * Calculates the normalized resource ratio of a parent queue, under which children are defined
-   * with absolute capacity type. If the effective resource of the parent is less, than the
-   * aggregated configured absolute resource of its children, the resource ratio will be less,
-   * than 1.
+   * 计算父队列下所有使用绝对容量的子队列的归一化资源比例
+   * 若父队列有效资源小于子队列配置资源总和，会按比例缩小所有子队列资源
    *
-   * @param calculationDriver the driver, which contains the parent queue that will form the base
-   *                          of the normalization calculation
+   * @param calculationDriver 包含当前待计算父队列的计算驱动
    */
   public static void setNormalizedResourceRatio(ResourceCalculationDriver calculationDriver) {
     CSQueue queue = calculationDriver.getQueue();
 
     for (String label : queue.getConfiguredNodeLabels()) {
-      // ManagedParents assign zero capacity to queues in case of overutilization, downscaling is
-      // turned off for their children
+      // 托管父队列在资源超配时会自动分配零容量，无需对子队列进行降容
       if (queue instanceof ManagedParentQueue) {
         return;
       }
@@ -92,7 +93,7 @@ public class AbsoluteResourceCapacityCalculator extends AbstractQueueCapacityCal
         long effectiveMinResource = queue.getQueueResourceQuotas().getEffectiveMinResource(
             label).getResourceValue(resourceName);
 
-        // Total configured min resources of direct children of the queue
+        // 累加所有直接子队列配置的绝对最小资源总和
         for (CSQueue childQueue : queue.getChildQueues()) {
           if (!childQueue.getConfiguredNodeLabels().contains(label)) {
             continue;
@@ -103,21 +104,21 @@ public class AbsoluteResourceCapacityCalculator extends AbstractQueueCapacityCal
                 .getResourceValue();
           }
         }
-        // If no children is using ABSOLUTE capacity type, normalization is not needed
+        // 没有子队列使用绝对容量类型，无需归一化计算
         if (childrenConfiguredResource == 0) {
           continue;
         }
-        // Factor to scale down effective resource: When cluster has sufficient
-        // resources, effective_min_resources will be same as configured
-        // min_resources.
+        // 计算缩容比例分子：集群资源充足时和配置总和一致
         float numeratorForMinRatio = childrenConfiguredResource;
         if (effectiveMinResource < childrenConfiguredResource) {
           numeratorForMinRatio = queue.getQueueResourceQuotas().getEffectiveMinResource(label)
               .getResourceValue(resourceName);
+          // 添加队列分支降容警告
           calculationDriver.getUpdateContext().addUpdateWarning(BRANCH_DOWNSCALED.ofQueue(
               queue.getQueuePath()));
         }
 
+        // 单位转换：将子队列配置资源转换为集群资源使用的单位
         String unit = resourceName.equals(MEMORY_URI) ? MB_UNIT : "";
         long convertedValue = UnitsConversionUtil.convert(unit, calculationDriver.getUpdateContext()
             .getUpdatedClusterResource(label).getResourceInformation(resourceName).getUnits(),
@@ -127,6 +128,7 @@ public class AbsoluteResourceCapacityCalculator extends AbstractQueueCapacityCal
           Map<String, ResourceVector> normalizedResourceRatios =
               calculationDriver.getNormalizedResourceRatios();
           normalizedResourceRatios.putIfAbsent(label, ResourceVector.newInstance());
+          // 存储当前资源的归一化比例
           normalizedResourceRatios.get(label).setValue(resourceName, numeratorForMinRatio /
               convertedValue);
         }

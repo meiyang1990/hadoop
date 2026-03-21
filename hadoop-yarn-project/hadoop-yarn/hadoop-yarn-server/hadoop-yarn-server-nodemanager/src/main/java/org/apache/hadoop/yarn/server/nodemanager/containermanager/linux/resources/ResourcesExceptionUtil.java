@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,13 +26,18 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
- * Small utility class which only re-throws YarnException if
- * NM_RESOURCE_PLUGINS_FAIL_FAST property is true.
- *
+ * 资源插件异常处理工具类，根据配置决定是否快速失败抛出异常。
+ * 当NM_RESOURCE_PLUGINS_FAIL_FAST配置为true时抛出异常，否则忽略异常继续执行。
  */
 public final class ResourcesExceptionUtil {
   private ResourcesExceptionUtil() {}
 
+  /**
+   * 根据fail-fast配置决定是否抛出传入的异常。
+   * @param e 需要处理的Yarn异常
+   * @param conf Yarn配置对象
+   * @throws YarnException 当fail-fast开启时抛出原异常
+   */
   public static void throwIfNecessary(YarnException e, Configuration conf)
       throws YarnException {
     if (conf.getBoolean(NM_RESOURCE_PLUGINS_FAIL_FAST,

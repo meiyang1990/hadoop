@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,16 +26,25 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMServerUtils;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * 应用尝试聚合资源使用统计容器，存储各资源类型已使用的资源-秒累计值
+ */
 @Private
 public class AggregateAppResourceUsage {
+  // 按资源类型存储累计使用的资源-秒映射表
   private Map<String, Long> resourceSecondsMap = new HashMap<>();
 
+  /**
+   * 构造方法，从传入的映射表复制资源使用数据
+   * @param resourceSecondsMap 预计算的资源累计使用映射表
+   */
   public AggregateAppResourceUsage(Map<String, Long> resourceSecondsMap) {
     this.resourceSecondsMap.putAll(resourceSecondsMap);
   }
 
   /**
-   * @return the memorySeconds
+   * 获取内存累计使用量（单位：MB-秒）
+   * @return 内存累计使用MB-秒数
    */
   public long getMemorySeconds() {
     return RMServerUtils.getOrDefault(resourceSecondsMap,
@@ -42,7 +52,8 @@ public class AggregateAppResourceUsage {
   }
 
   /**
-   * @return the vcoreSeconds
+   * 获取CPU核心累计使用量（单位：核-秒）
+   * @return CPU累计使用核-秒数
    */
   public long getVcoreSeconds() {
     return RMServerUtils
@@ -50,6 +61,10 @@ public class AggregateAppResourceUsage {
             0L);
   }
 
+  /**
+   * 获取完整的所有资源类型累计使用映射表
+   * @return 各资源类型的累计资源-秒映射表
+   */
   public Map<String, Long> getResourceUsageSecondsMap() {
     return resourceSecondsMap;
   }

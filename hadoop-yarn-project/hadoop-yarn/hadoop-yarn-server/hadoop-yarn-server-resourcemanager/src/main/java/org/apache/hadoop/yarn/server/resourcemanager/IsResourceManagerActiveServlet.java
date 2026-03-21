@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,18 +22,24 @@ import org.apache.hadoop.http.IsActiveServlet;
 import org.apache.hadoop.ha.HAServiceProtocol;
 
 /**
- * Used by Load Balancers to find the active ResourceManager.
+ * 供负载均衡器判断当前ResourceManager是否为活跃状态的Servlet
+ * 用于HA高可用部署场景，帮助负载均衡器将请求路由到当前活跃的ResourceManager
  */
 public class IsResourceManagerActiveServlet extends IsActiveServlet {
 
+  /** Servlet上下文存储ResourceManager实例的属性键 */
   public static final String RM_ATTRIBUTE = "rm";
 
   @Override
   protected boolean isActive() {
+    // 从Servlet上下文获取ResourceManager实例
     ResourceManager rm = (ResourceManager)
         getServletContext().getAttribute(RM_ATTRIBUTE);
+    // 获取ResourceManager上下文
     RMContext rmContext = rm.getRMContext();
+    // 获取当前HA服务状态
     HAServiceProtocol.HAServiceState state = rmContext.getHAServiceState();
+    // 判断并返回当前是否为活跃状态
     return state == HAServiceProtocol.HAServiceState.ACTIVE;
   }
 }

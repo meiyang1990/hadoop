@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,29 +30,26 @@ import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationInte
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.PlanningException;
 
 /**
- * Interface for allocating a single stage in IterativePlanner.
+ * YARN容量调度预约规划中，为迭代规划器分配单个预约阶段资源的接口。
+ * 定义了在指定时间窗口内为单个预约阶段计算资源分配的契约，不同实现可提供不同的分配策略。
  */
 public interface StageAllocator {
 
   /**
-   * Computes the allocation of a stage inside a defined time interval.
+   * 在给定时间区间内计算单个预约阶段的资源分配。
    *
-   * @param plan the Plan to which the reservation must be fitted
-   * @param planLoads a 'dirty' read of the plan loads at each time
-   * @param planModifications the allocations performed by the planning
-   *          algorithm which are not yet reflected by plan
-   * @param rr the stage
-   * @param stageArrival the arrival time (earliest starting time) set for
-   *          the stage by the two phase planning algorithm
-   * @param stageDeadline the deadline of the stage set by the two phase
-   *          planning algorithm
-   * @param period the periodicity with which this stage appears
-   * @param user name of the user
-   * @param oldId identifier of the old reservation
+   * @param plan 预约规划对象，本次预约需要适配到该规划中
+   * @param planLoads 对规划各时间点资源负载的"脏读"快照，用于快速计算可用资源
+   * @param planModifications 规划算法已执行但尚未同步到原规划的分配修改记录
+   * @param rr 当前待分配的预约阶段请求，包含资源需求
+   * @param stageArrival 两阶段规划算法为该阶段设定的最早开始时间（到达时间）
+   * @param stageDeadline 两阶段规划算法为该阶段设定的截止时间
+   * @param period 当前阶段重复出现的周期（周期性预约场景使用，非周期为0）
+   * @param user 提交本次预约的用户名
+   * @param oldId 更新预约场景中原预约的ID，新增预约为null
    *
-   * @return The computed allocation (or null if the stage could not be
-   *         allocated)
-   * @throws PlanningException if operation is unsuccessful
+   * @return 计算得到的资源分配映射表，键为时间区间、值为对应资源；无法分配则返回null
+   * @throws PlanningException 当分配过程发生错误时抛出
    */
   Map<ReservationInterval, Resource> computeStageAllocation(Plan plan,
       RLESparseResourceAllocation planLoads,

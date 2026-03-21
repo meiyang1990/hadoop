@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,11 +19,13 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.reservation;
 
+/**
+ * YARN 资源预留系统常量定义接口，定义资源预留功能使用的全局公共常量
+ */
 public interface ReservationConstants {
 
   /**
-   * The suffix used for a queue under a reservable queue that will be used
-   * as a default queue whenever no reservation is used
+   * 可预留队列下默认队列的后缀名，当不使用预留时，作业会提交到该默认队列
    */
   String DEFAULT_QUEUE_SUFFIX = "-default";
 }

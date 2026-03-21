@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,12 +18,15 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker;
 
 /**
- * Encapsulates the docker pull command and its command
- * line arguments.
+ * 封装Docker pull拉取镜像命令及其命令行参数，用于在YARN NodeManager上拉取容器镜像
  */
 public class DockerPullCommand extends DockerCommand {
   private static final String PULL_COMMAND = "pull";
 
+  /**
+   * 构造Docker拉取镜像命令对象
+   * @param imageName 要拉取的Docker镜像名称
+   */
   public DockerPullCommand(String imageName) {
     super(PULL_COMMAND);
     super.addCommandArguments("image", imageName);

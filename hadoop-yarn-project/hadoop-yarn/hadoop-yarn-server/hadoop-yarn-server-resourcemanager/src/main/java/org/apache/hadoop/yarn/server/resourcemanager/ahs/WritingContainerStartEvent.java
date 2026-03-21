@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,11 +22,19 @@ package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerStartData;
 
+/**
+ * 容器启动事件写入应用历史服务的事件类，用于RM将容器启动事件转储到应用历史服务。
+ */
 public class WritingContainerStartEvent extends WritingApplicationHistoryEvent {
 
   private ContainerId containerId;
   private ContainerStartData containerStart;
 
+  /**
+   * 构造容器启动写入事件。
+   * @param containerId 容器ID
+   * @param containerStart 容器启动数据
+   */
   public WritingContainerStartEvent(ContainerId containerId,
       ContainerStartData containerStart) {
     super(WritingHistoryEventType.CONTAINER_START);
@@ -35,13 +44,22 @@ public class WritingContainerStartEvent extends WritingApplicationHistoryEvent {
 
   @Override
   public int hashCode() {
+    // 基于所属应用ID计算哈希值
     return containerId.getApplicationAttemptId().getApplicationId().hashCode();
   }
 
+  /**
+   * 获取事件对应的容器ID。
+   * @return 容器ID
+   */
   public ContainerId getContainerId() {
     return containerId;
   }
 
+  /**
+   * 获取容器启动数据。
+   * @return 容器启动数据
+   */
   public ContainerStartData getContainerStartData() {
     return containerStart;
   }

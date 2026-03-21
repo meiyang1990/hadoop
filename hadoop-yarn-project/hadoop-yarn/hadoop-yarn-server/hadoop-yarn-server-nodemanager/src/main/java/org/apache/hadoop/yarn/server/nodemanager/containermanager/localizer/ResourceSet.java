@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,34 +39,46 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * All Resources requested by the container.
+ * 容器请求的所有本地化资源集合，管理资源按本地化状态和可见性的分类存储与状态流转。
  */
 public class ResourceSet {
 
   private static final Logger LOG =
        LoggerFactory.getLogger(ResourceSet.class);
 
-  // resources by localization state (localized, pending, failed)
+  // 按本地化状态分组存储资源：已完成本地化
   private Map<String, Path> localizedResources =
       new ConcurrentHashMap<>();
+  // 按本地化状态分组存储资源：等待本地化
   private Map<LocalResourceRequest, Set<String>> pendingResources =
       new ConcurrentHashMap<>();
+  // 按本地化状态分组存储资源：本地化失败
   private final List<LocalizationStatus> resourcesFailedToBeLocalized =
       new ArrayList<>();
 
-  // resources by visibility (public, private, app)
+  // 按可见性分组存储资源：公共资源
   private final List<LocalResourceRequest> publicRsrcs =
       new ArrayList<>();
+  // 按可见性分组存储资源：私有资源
   private final List<LocalResourceRequest> privateRsrcs =
       new ArrayList<>();
+  // 按可见性分组存储资源：应用私有资源
   private final List<LocalResourceRequest> appRsrcs =
       new ArrayList<>();
 
+  // 需要上传到共享缓存的资源集合
   private final Map<LocalResourceRequest, Path> resourcesToBeUploaded =
       new ConcurrentHashMap<>();
+  // 资源是否需要上传到共享缓存的策略集合
   private final Map<LocalResourceRequest, Boolean> resourcesUploadPolicies =
       new ConcurrentHashMap<>();
 
+  /**
+   * 添加容器申请的本地资源，按可见性分类并加入等待本地化队列。
+   * @param localResourceMap 资源ID到本地资源定义的映射
+   * @return 按可见性分组的资源请求集合，输入为空时返回null
+   * @throws URISyntaxException 资源路径语法错误时抛出
+   */
   public Map<LocalResourceVisibility, Collection<LocalResourceRequest>>
       addResources(Map<String, LocalResource> localResourceMap)
       throws URISyntaxException {
@@ -77,13 +90,16 @@ public class ResourceSet {
     List<LocalResourceRequest> privateList = new ArrayList<>();
     List<LocalResourceRequest> appList = new ArrayList<>();
 
+    // 遍历所有输入资源，封装请求并按可见性分类
     for (Map.Entry<String, LocalResource> rsrc : localResourceMap.entrySet()) {
       LocalResource resource = rsrc.getValue();
       LocalResourceRequest req = new LocalResourceRequest(rsrc.getValue());
       allResources.putIfAbsent(req, new HashSet<>());
       allResources.get(req).add(rsrc.getKey());
+      // 存储共享缓存上传策略
       storeSharedCacheUploadPolicy(req,
           resource.getShouldBeUploadedToSharedCache());
+      // 按可见性分组
       switch (resource.getVisibility()) {
       case PUBLIC:
         publicList.add(req);
@@ -100,6 +116,7 @@ public class ResourceSet {
     }
     Map<LocalResourceVisibility, Collection<LocalResourceRequest>> req =
         new LinkedHashMap<>();
+    // 将分类后的资源添加到全局集合，并返回待本地化请求
     if (!publicList.isEmpty()) {
       publicRsrcs.addAll(publicList);
       req.put(LocalResourceVisibility.PUBLIC, publicList);
@@ -119,10 +136,10 @@ public class ResourceSet {
   }
 
   /**
-   * Called when resource localized.
-   * @param request The original request for the localized resource
-   * @param location The path where the resource is localized
-   * @return The list of symlinks for the localized resources.
+   * 资源本地化完成后的处理：移出等待队列，添加到已完成集合。
+   * @param request 本地化资源请求
+   * @param location 本地化完成后的资源路径
+   * @return 需要创建的软链接列表，资源不存在时返回null
    */
   public Set<String> resourceLocalized(LocalResourceRequest request,
       Path location) {
@@ -137,9 +154,14 @@ public class ResourceSet {
     }
   }
 
+  /**
+   * 处理资源本地化失败，记录失败状态到失败集合。
+   * @param request 本地化失败的资源请求
+   * @param diagnostics 失败诊断信息
+   */
   public void resourceLocalizationFailed(LocalResourceRequest request,
       String diagnostics) {
-    // Skip null request when localization failed for running container
+    // 运行中容器本地化失败时请求可能为null，直接跳过
     if (request == null) {
       return;
     }
@@ -153,6 +175,10 @@ public class ResourceSet {
     }
   }
 
+  /**
+   * 获取按可见性分组的所有资源请求集合。
+   * @return 可见性到对应资源请求集合的映射
+   */
   public synchronized Map<LocalResourceVisibility,
       Collection<LocalResourceRequest>> getAllResourcesByVisibility() {
 
@@ -185,11 +211,16 @@ public class ResourceSet {
   private void storeSharedCacheUploadPolicy(
       LocalResourceRequest resourceRequest, Boolean uploadPolicy) {
     Boolean storedUploadPolicy = resourcesUploadPolicies.get(resourceRequest);
+    // 策略合并规则：只要存在一个请求要求上传，就设置为需要上传
     if (storedUploadPolicy == null || (!storedUploadPolicy && uploadPolicy)) {
       resourcesUploadPolicies.put(resourceRequest, uploadPolicy);
     }
   }
 
+  /**
+   * 获取已完成本地化的资源，按资源路径分组软链接。
+   * @return 本地化路径到对应软链接列表的映射
+   */
   public Map<Path, List<String>> getLocalizedResources() {
     Map<Path, List<String>> map = new HashMap<>();
     for (Map.Entry<String, Path> entry : localizedResources.entrySet()) {
@@ -211,10 +242,15 @@ public class ResourceSet {
     return pendingResources;
   }
 
+  /**
+   * 合并多个ResourceSet为一个新的ResourceSet。
+   * @param resourceSets 待合并的ResourceSet数组
+   * @return 合并后的新ResourceSet
+   */
   public static ResourceSet merge(ResourceSet... resourceSets) {
     ResourceSet merged = new ResourceSet();
     for (ResourceSet rs : resourceSets) {
-      // This should overwrite existing symlinks
+      // 相同软链接会覆盖已有条目
       merged.localizedResources.putAll(rs.localizedResources);
 
       merged.resourcesToBeUploaded.putAll(rs.resourcesToBeUploaded);
@@ -230,17 +266,19 @@ public class ResourceSet {
   }
 
   /**
-   * Get all the localization statuses.
-   * @return the localization statuses.
+   * 获取所有资源的本地化状态列表。
+   * @return 所有资源本地化状态集合，包含完成、等待、失败三种状态
    */
   public List<LocalizationStatus> getLocalizationStatuses() {
     List<LocalizationStatus> statuses = new ArrayList<>();
+    // 添加已完成本地化的资源状态
     localizedResources.forEach((key, path) -> {
       LocalizationStatus status = LocalizationStatus.newInstance(key,
           LocalizationState.COMPLETED);
       statuses.add(status);
     });
 
+    // 添加等待本地化的资源状态
     pendingResources.forEach((lrReq, keys) ->
         keys.forEach(key -> {
           LocalizationStatus status = LocalizationStatus.newInstance(key,
@@ -248,6 +286,7 @@ public class ResourceSet {
           statuses.add(status);
         }));
 
+    // 添加本地化失败的资源状态
     synchronized (resourcesFailedToBeLocalized) {
       statuses.addAll(resourcesFailedToBeLocalized);
     }

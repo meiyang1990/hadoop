@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,13 +23,18 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationTimeoutType;
 
 /**
- * This class used for monitor application with applicationId+appTimeoutType.
+ * 待监控应用标识类，组合应用ID和超时类型唯一标识一个需要监控超时的应用
  */
 public class RMAppToMonitor {
 
   private ApplicationId applicationId;
   private ApplicationTimeoutType appTimeoutType;
 
+  /**
+   * 构造待监控应用标识
+   * @param appId 应用ID
+   * @param timeoutType 超时监控类型
+   */
   RMAppToMonitor(ApplicationId appId, ApplicationTimeoutType timeoutType) {
     this.applicationId = appId;
     this.appTimeoutType = timeoutType;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,4 +17,17 @@
  * limitations under the License.
  */
 
+/**
+ * FPGA 资源插件包，提供YARN NodeManager上的FPGA加速器资源管理能力
+ * <p>
+ * 核心功能：
+ * <ul>
+ *   <li>发现当前节点上的可用FPGA设备</li>
+ *   <li>为容器分配和释放FPGA资源</li>
+ *   <li>支持容器运行时对FPGA设备的隔离与配置</li>
+ *   <li>对接不同厂商FPGA平台的设备发现与编程下载逻辑</li>
+ * </ul>
+ * 该模块属于YARN NodeManager的自定义资源插件扩展，允许YARN调度和管理集群中的FPGA异构计算资源，
+ * 满足AI、深度学习、信号处理等对FPGA加速有需求的应用场景。
+ */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.fpga;

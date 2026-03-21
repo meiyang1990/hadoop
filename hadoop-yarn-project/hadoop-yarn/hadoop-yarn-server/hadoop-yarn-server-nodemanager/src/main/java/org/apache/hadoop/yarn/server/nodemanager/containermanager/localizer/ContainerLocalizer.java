@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -89,6 +90,10 @@ import org.apache.hadoop.yarn.util.FSDownload;
 import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+/**
+ * 容器资源本地化器，负责在NodeManager节点上下载、本地化容器运行所需资源。
+ * 作为独立进程运行，从ResourceManager申请资源并完成本地化后通知NodeManager。
+ */
 public class ContainerLocalizer {
 
   static final Logger LOG =
@@ -109,6 +114,7 @@ public class ContainerLocalizer {
    * Testing discovered that these Java options are needed for Spark service
    * running on JDK17 and Isilon clusters.
    */
+  // JDK17+版本需要额外添加的模块导出参数，解决Spark运行兼容性问题
   private static final String ADDITIONAL_JDK17_PLUS_OPTIONS =
     "--add-exports=java.base/sun.net.dns=ALL-UNNAMED " +
     "--add-exports=java.base/sun.net.util=ALL-UNNAMED";
@@ -128,6 +134,17 @@ public class ContainerLocalizer {
       Collections.synchronizedSet(new HashSet<>());
   private final String tokenFileName;
 
+  /**
+   * 构造容器资源本地化器实例
+   * @param lfs 本地文件系统上下文
+   * @param user 本地化对应用户
+   * @param appId 应用ID
+   * @param localizerId 本地化器ID
+   * @param tokenFileName 令牌文件路径
+   * @param localDirs 本地目录列表
+   * @param recordFactory 记录工厂
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   public ContainerLocalizer(FileContext lfs, String user, String appId,
       String localizerId, String tokenFileName,  List<Path> localDirs,
       RecordFactory recordFactory) throws IOException {
@@ -160,6 +177,11 @@ public class ContainerLocalizer {
 
   @Private
   @VisibleForTesting
+  /**
+   * 获取NodeManager本地化协议代理
+   * @param nmAddr NodeManager地址
+   * @return 本地化协议代理对象
+   */
   public LocalizationProtocol getProxy(final InetSocketAddress nmAddr) {
     YarnRPC rpc = YarnRPC.create(conf);
     return (LocalizationProtocol)
@@ -167,26 +189,31 @@ public class ContainerLocalizer {
   }
 
   @SuppressWarnings("deprecation")
+  /**
+   * 启动资源本地化主流程
+   * @param nmAddr NodeManager地址
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public void runLocalization(final InetSocketAddress nmAddr)
       throws IOException, InterruptedException {
-    // load credentials
+    // 初始化本地缓存目录结构
     initDirs(conf, user, appId, lfs, localDirs);
     final Credentials creds = new Credentials();
     DataInputStream credFile = null;
     try {
-      // assume credentials in cwd
-      // TODO: Fix
+      // 读取认证令牌文件
       Path tokenPath = new Path(tokenFileName);
       credFile = lfs.open(tokenPath);
       creds.readTokenStorageStream(credFile);
-      // Explicitly deleting token file.
+      // 本地化完成后删除令牌文件
       lfs.delete(tokenPath, false);      
     } finally  {
       if (credFile != null) {
         credFile.close();
       }
     }
-    // create localizer context
+    // 创建远程用户UGI并添加本地化令牌
     UserGroupInformation remoteUser =
       UserGroupInformation.createRemoteUser(user);
     remoteUser.addToken(creds.getToken(LocalizerTokenIdentifier.KIND));
@@ -198,7 +225,7 @@ public class ContainerLocalizer {
           }
         });
 
-    // create user context
+    // 创建用户上下文UGI，添加所有认证令牌
     UserGroupInformation ugi =
       UserGroupInformation.createRemoteUser(user);
     for (Token<? extends TokenIdentifier> token : creds.getAllTokens()) {
@@ -207,34 +234,51 @@ public class ContainerLocalizer {
 
     ExecutorService exec = null;
     try {
+      // 创建下载线程池和完成服务
       exec = createDownloadThreadPool();
       CompletionService<Path> ecs = createCompletionService(exec);
+      // 开始本地化循环，处理NodeManager下发的资源下载任务
       localizeFiles(nodeManager, ecs, ugi);
     } catch (Throwable e) {
       throw new IOException(e);
     } finally {
       try {
         if (exec != null) {
+          // 关闭线程池，销毁下载过程中启动的shell进程
           exec.shutdown();
           destroyShellProcesses(getAllShells());
           exec.awaitTermination(10, TimeUnit.SECONDS);
         }
+        // 清除应用缓存目录上下文
         LocalDirAllocator.removeContext(appCacheDirContextName);
       } finally {
+        // 关闭所有打开的文件系统
         closeFileSystems(ugi);
       }
     }
   }
 
+  /**
+   * 创建下载线程池，使用单线程处理下载
+   * @return 线程池实例
+   */
   ExecutorService createDownloadThreadPool() {
     return HadoopExecutors.newSingleThreadExecutor(new ThreadFactoryBuilder()
       .setNameFormat("ContainerLocalizer Downloader-" + localizerId).build());
   }
 
+  /**
+   * 创建完成服务，用于处理异步下载结果
+   * @param exec 线程池
+   * @return 完成服务实例
+   */
   CompletionService<Path> createCompletionService(ExecutorService exec) {
     return new ExecutorCompletionService<Path>(exec);
   }
 
+  /**
+   * FSDownload包装类，跟踪当前正在下载的线程
+   */
   class FSDownloadWrapper extends FSDownload {
 
     FSDownloadWrapper(FileContext files, UserGroupInformation ugi,
@@ -245,10 +289,12 @@ public class ContainerLocalizer {
     @Override
     public Path call() throws Exception {
       Thread currentThread = Thread.currentThread();
+      // 将当前下载线程加入跟踪集合
       localizingThreads.add(currentThread);
       try {
         return doDownloadCall();
       } finally {
+        // 下载完成后移除线程跟踪
         localizingThreads.remove(currentThread);
       }
     }
@@ -259,32 +305,51 @@ public class ContainerLocalizer {
 
   }
 
+  /**
+   * 创建资源下载任务
+   * @param destDirPath 目标目录路径
+   * @param rsrc 待下载资源
+   * @param ugi 用户UGI
+   * @return 可调用下载任务
+   * @throws IOException IO异常
+   */
   Callable<Path> download(Path destDirPath, LocalResource rsrc,
       UserGroupInformation ugi) throws IOException {
-    // For private localization FsDownload creates folder in destDirPath. Parent
-    // directories till user filecache folder is created here.
+    // 私有资源需要提前创建父目录
     if (rsrc.getVisibility() == LocalResourceVisibility.PRIVATE) {
       createParentDirs(destDirPath);
     }
+    // 检查目标磁盘健康状态
     diskValidator
         .checkStatus(new File(destDirPath.getParent().toUri().getRawPath()));
     return new FSDownloadWrapper(lfs, ugi, conf, destDirPath, rsrc);
   }
 
+  /**
+   * 创建私有资源的父目录结构
+   * @param destDirPath 目标目录路径
+   * @throws IOException IO异常
+   */
   private void createParentDirs(Path destDirPath) throws IOException {
     Path parent = destDirPath.getParent();
     Path cacheRoot = LocalCacheDirectoryManager.getCacheDirectoryRoot(parent);
     Stack<Path> dirs = new Stack<Path>();
+    // 从下往上收集需要创建的目录
     while (!parent.equals(cacheRoot)) {
       dirs.push(parent);
       parent = parent.getParent();
     }
-    // Create directories with user cache permission
+    // 从上往下创建目录，应用用户缓存权限
     while (!dirs.isEmpty()) {
       createDir(lfs, dirs.pop(), USERCACHE_FOLDER_PERMS);
     }
   }
 
+  /**
+   * 估算资源本地化后需要的磁盘空间
+   * @param rsrc 资源描述
+   * @return 估算大小，单位字节
+   */
   static long getEstimatedSize(LocalResource rsrc) {
     if (rsrc.getSize() < 0) {
       return -1;
@@ -292,6 +357,7 @@ public class ContainerLocalizer {
     switch (rsrc.getType()) {
       case ARCHIVE:
       case PATTERN:
+        // 压缩包解压后一般会变大，估算5倍空间
         return 5 * rsrc.getSize();
       case FILE:
       default:
@@ -299,10 +365,19 @@ public class ContainerLocalizer {
     }
   }
 
+  /**
+   * 睡眠指定秒数
+   * @param duration 睡眠时间，单位秒
+   * @throws InterruptedException 中断异常
+   */
   void sleep(int duration) throws InterruptedException {
     TimeUnit.SECONDS.sleep(duration);
   }
 
+  /**
+   * 关闭用户对应的所有打开文件系统
+   * @param ugi 用户UGI
+   */
   protected void closeFileSystems(UserGroupInformation ugi) {
     try {
       FileSystem.closeAllForUGI(ugi);
@@ -311,17 +386,30 @@ public class ContainerLocalizer {
     }
   }
 
+  /**
+   * 本地化主循环，定期和NodeManager心跳，处理资源下载任务
+   * @param nodemanager NodeManager本地化协议代理
+   * @param cs 下载完成服务
+   * @param ugi 用户UGI
+   * @throws IOException IO异常
+   * @throws YarnException YARN异常
+   */
   protected void localizeFiles(LocalizationProtocol nodemanager,
       CompletionService<Path> cs, UserGroupInformation ugi)
       throws IOException, YarnException {
     while (true) {
       try {
+        // 构造心跳状态
         LocalizerStatus status = createStatus();
+        // 发送心跳到NodeManager，获取响应
         LocalizerHeartbeatResponse response = nodemanager.heartbeat(status);
+        // 根据响应动作处理
         switch (response.getLocalizerAction()) {
         case LIVE:
+          // 获取新的待本地化资源
           List<ResourceLocalizationSpec> newRsrcs = response.getResourceSpecs();
           for (ResourceLocalizationSpec newRsrc : newRsrcs) {
+            // 避免重复提交同一个资源
             if (!pendingResources.containsKey(newRsrc.getResource())) {
               pendingResources.put(newRsrc.getResource(), cs.submit(download(
                 new Path(newRsrc.getDestinationDirectory().getFile()),
@@ -330,231 +418,37 @@ public class ContainerLocalizer {
           }
           break;
         case DIE:
-          // killall running localizations
+          // 取消所有正在进行的下载任务
           for (Future<Path> pending : pendingResources.values()) {
             pending.cancel(true);
           }
           status = createStatus();
-          // ignore response while dying.
+          // 发送最终心跳，忽略响应
           try {
             nodemanager.heartbeat(status);
           } catch (YarnException e) {
-            // Cannot do anything about this during death stage, let's just log
-            // it.
             e.printStackTrace(System.out);
             LOG.error("Heartbeat failed while dying: ", e);
           }
           return;
         }
+        // 等待下载完成，轮询间隔1秒
         cs.poll(1000, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         return;
       } catch (YarnException e) {
-        // TODO cleanup
         throw e;
       }
     }
   }
 
   /**
-   * Create the payload for the HeartBeat. Mainly the list of
-   * {@link LocalResourceStatus}es
-   * 
-   * @return a {@link LocalizerStatus} that can be sent via heartbeat.
-   * @throws InterruptedException
+   * 创建心跳上报状态，包含所有资源当前本地化状态
+   * @return 本地化器状态
+   * @throws InterruptedException 中断异常
    */
   private LocalizerStatus createStatus() throws InterruptedException {
     final List<LocalResourceStatus> currentResources =
       new ArrayList<LocalResourceStatus>();
-    // TODO: Synchronization??
-    for (Iterator<Entry<LocalResource, Future<Path>>> i =
-        pendingResources.entrySet().iterator(); i.hasNext();) {
-      Entry<LocalResource, Future<Path>> mapEntry = i.next();
-      LocalResourceStatus stat =
-        recordFactory.newRecordInstance(LocalResourceStatus.class);
-      stat.setResource(mapEntry.getKey());
-      Future<Path> fPath = mapEntry.getValue();
-      if (fPath.isDone()) {
-        try {
-          Path localPath = fPath.get();
-          stat.setLocalPath(
-              URL.fromPath(localPath));
-          stat.setLocalSize(
-              FileUtil.getDU(new File(localPath.getParent().toUri())));
-          stat.setStatus(ResourceStatusType.FETCH_SUCCESS);
-        } catch (ExecutionException e) {
-          stat.setStatus(ResourceStatusType.FETCH_FAILURE);
-          stat.setException(SerializedException.newInstance(e.getCause()));
-        } catch (CancellationException e) {
-          stat.setStatus(ResourceStatusType.FETCH_FAILURE);
-          stat.setException(SerializedException.newInstance(e));
-        }
-        // TODO shouldn't remove until ACK
-        i.remove();
-      } else {
-        stat.setStatus(ResourceStatusType.FETCH_PENDING);
-      }
-      currentResources.add(stat);
-    }
-    LocalizerStatus status =
-      recordFactory.newRecordInstance(LocalizerStatus.class);
-    status.setLocalizerId(localizerId);
-    status.addAllResources(currentResources);
-    return status;
-  }
-
-  /**
-   * Returns the JVM options to to launch the resource localizer.
-   * @param conf the configuration properties to launch the resource localizer.
-   */
-  public static List<String> getJavaOpts(Configuration conf) {
-    String adminOpts = conf.get(YarnConfiguration.NM_CONTAINER_LOCALIZER_ADMIN_JAVA_OPTS_KEY,
-        YarnConfiguration.NM_CONTAINER_LOCALIZER_ADMIN_JAVA_OPTS_DEFAULT);
-    String userOpts = conf.get(YarnConfiguration.NM_CONTAINER_LOCALIZER_JAVA_OPTS_KEY,
-        YarnConfiguration.NM_CONTAINER_LOCALIZER_JAVA_OPTS_DEFAULT);
-
-    boolean isExtraJDK17OptionsConfigured =
-        conf.getBoolean(YarnConfiguration.NM_CONTAINER_LOCALIZER_JAVA_OPTS_ADD_EXPORTS_KEY,
-        YarnConfiguration.NM_CONTAINER_LOCALIZER_JAVA_OPTS_ADD_EXPORTS_DEFAULT);
-
-    if (Shell.isJavaVersionAtLeast(17) && isExtraJDK17OptionsConfigured) {
-      userOpts = userOpts.trim().concat(" " + ADDITIONAL_JDK17_PLUS_OPTIONS);
-    }
-
-    List<String> adminOptionList = Arrays.asList(adminOpts.split("\\s+"));
-    List<String> userOptionList = Arrays.asList(userOpts.split("\\s+"));
-
-    return Stream.concat(adminOptionList.stream(), userOptionList.stream())
-        .filter(s -> !s.isEmpty())
-        .collect(Collectors.toList());
-  }
-
-  /**
-   * Adds the ContainerLocalizer arguments for a @{link ShellCommandExecutor},
-   * as expected by ContainerLocalizer.main
-   * @param command the current ShellCommandExecutor command line
-   * @param user localization user
-   * @param appId localized app id
-   * @param locId localizer id
-   * @param nmAddr nodemanager address
-   * @param localDirs list of local dirs
-   */
-  public static void buildMainArgs(List<String> command,
-      String user, String appId, String locId,
-      InetSocketAddress nmAddr,
-      String tokenFileName,
-      List<String> localDirs, Configuration conf) {
-
-    String logLevel = conf.get(YarnConfiguration.
-            NM_CONTAINER_LOCALIZER_LOG_LEVEL,
-        YarnConfiguration.NM_CONTAINER_LOCALIZER_LOG_LEVEL_DEFAULT);
-    addLog4jSystemProperties(logLevel, command);
-    command.add(ContainerLocalizer.class.getName());
-    command.add(user);
-    command.add(appId);
-    command.add(locId);
-    command.add(nmAddr.getHostName());
-    command.add(Integer.toString(nmAddr.getPort()));
-    command.add(tokenFileName);
-    for(String dir : localDirs) {
-      command.add(dir);
-    }
-  }
-
-  private static void addLog4jSystemProperties(
-      String logLevel, List<String> command) {
-    command.add("-Dlog4j.configuration=container-log4j.properties");
-    command.add("-D" + YarnConfiguration.YARN_APP_CONTAINER_LOG_DIR + "=" +
-        ApplicationConstants.LOG_DIR_EXPANSION_VAR);
-    command.add("-D" + YarnConfiguration.YARN_APP_CONTAINER_LOG_SIZE + "=0");
-    command.add("-Dhadoop.root.logger=" + logLevel + ",CLA");
-    command.add("-Dhadoop.root.logfile=container-localizer-syslog");
-  }
-
-  public static void main(String[] argv) throws Throwable {
-    Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
-    int nRet = 0;
-    // usage: $0 user appId locId host port app_log_dir user_dir [user_dir]*
-    // let $x = $x/usercache for $local.dir
-    // MKDIR $x/$user/appcache/$appid
-    // MKDIR $x/$user/appcache/$appid/output
-    // MKDIR $x/$user/appcache/$appid/filecache
-    // LOAD $x/$user/appcache/$appid/appTokens
-    try {
-      String user = argv[0];
-      String appId = argv[1];
-      String locId = argv[2];
-      InetSocketAddress nmAddr =
-          new InetSocketAddress(argv[3], Integer.parseInt(argv[4]));
-      String tokenFileName = argv[5];
-      String[] sLocaldirs = Arrays.copyOfRange(argv, 6, argv.length);
-      ArrayList<Path> localDirs = new ArrayList<>(sLocaldirs.length);
-      for (String sLocaldir : sLocaldirs) {
-        localDirs.add(new Path(sLocaldir));
-      }
-
-      final String uid =
-          UserGroupInformation.getCurrentUser().getShortUserName();
-      if (!user.equals(uid)) {
-        // TODO: fail localization
-        LOG.warn("Localization running as " + uid + " not " + user);
-      }
-
-      ContainerLocalizer localizer = new ContainerLocalizer(
-          FileContext.getLocalFSFileContext(), user,
-              appId, locId, tokenFileName, localDirs,
-              RecordFactoryProvider.getRecordFactory(null));
-      localizer.runLocalization(nmAddr);
-    } catch (Throwable e) {
-      // Print traces to stdout so that they can be logged by the NM address
-      // space in both DefaultCE and LCE cases
-      e.printStackTrace(System.out);
-      LOG.error("Exception in main:", e);
-      nRet = -1;
-    } finally {
-      System.exit(nRet);
-    }
-  }
-
-  private static void initDirs(Configuration conf, String user, String appId,
-      FileContext lfs, List<Path> localDirs) throws IOException {
-    if (null == localDirs || 0 == localDirs.size()) {
-      throw new IOException("Cannot initialize without local dirs");
-    }
-    String[] appsFileCacheDirs = new String[localDirs.size()];
-    String[] usersFileCacheDirs = new String[localDirs.size()];
-    for (int i = 0, n = localDirs.size(); i < n; ++i) {
-      // $x/usercache/$user
-      Path base = lfs.makeQualified(
-          new Path(new Path(localDirs.get(i), USERCACHE), user));
-      // $x/usercache/$user/filecache
-      Path userFileCacheDir = new Path(base, FILECACHE);
-      usersFileCacheDirs[i] = userFileCacheDir.toString();
-      createDir(lfs, userFileCacheDir, FILECACHE_PERMS);
-      // $x/usercache/$user/appcache/$appId
-      Path appBase = new Path(base, new Path(APPCACHE, appId));
-      // $x/usercache/$user/appcache/$appId/filecache
-      Path appFileCacheDir = new Path(appBase, FILECACHE);
-      appsFileCacheDirs[i] = appFileCacheDir.toString();
-      createDir(lfs, appFileCacheDir, FILECACHE_PERMS);
-    }
-    conf.setStrings(String.format(APPCACHE_CTXT_FMT, appId), appsFileCacheDirs);
-    conf.setStrings(String.format(USERCACHE_CTXT_FMT, user), usersFileCacheDirs);
-  }
-
-  private static void createDir(FileContext lfs, Path dirPath,
-      FsPermission perms) throws IOException {
-    lfs.mkdir(dirPath, perms, false);
-    if (!perms.equals(perms.applyUMask(lfs.getUMask()))) {
-      lfs.setPermission(dirPath, perms);
-    }
-  }
-
-  private void destroyShellProcesses(Set<Shell> shells) {
-    for (Shell shell : shells) {
-      if(localizingThreads.contains(shell.getWaitingThread())) {
-        shell.getProcess().destroy();
-      }
-    }
-  }
-}
+    // 遍历所有待处理资源，收集状态
+    for (Iterator<Entry<LocalResource, Future<

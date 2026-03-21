@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,10 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 
 import org.apache.hadoop.thirdparty.com.google.common.cache.LoadingCache;
 
+/**
+ * 本地化器上下文，保存容器本地化过程所需的上下文信息，
+ * 包含用户信息、容器ID、安全凭证和文件状态缓存，用于容器资源本地化流程。
+ */
 public class LocalizerContext {
 
   private final String user;
@@ -34,11 +39,24 @@ public class LocalizerContext {
   private final Credentials credentials;
   private final LoadingCache<Path,Future<FileStatus>> statCache;
 
+  /**
+   * 构造不包含文件状态缓存的本地化器上下文。
+   * @param user 提交容器的用户
+   * @param containerId 容器ID
+   * @param credentials 安全凭证
+   */
   public LocalizerContext(String user, ContainerId containerId,
       Credentials credentials) {
     this(user, containerId, credentials, null);
   }
 
+  /**
+   * 构造完整的本地化器上下文，支持传入文件状态缓存。
+   * @param user 提交容器的用户
+   * @param containerId 容器ID
+   * @param credentials 安全凭证，用于访问远程资源时的身份认证
+   * @param statCache 文件状态缓存，缓存远程文件系统路径的状态信息，减少重复查询
+   */
   public LocalizerContext(String user, ContainerId containerId,
       Credentials credentials,
       LoadingCache<Path,Future<FileStatus>> statCache) {
@@ -48,18 +66,34 @@ public class LocalizerContext {
     this.statCache = statCache;
   }
 
+  /**
+   * 获取提交容器的用户名。
+   * @return 用户名
+   */
   public String getUser() {
     return user;
   }
 
+  /**
+   * 获取对应的容器ID。
+   * @return 容器ID
+   */
   public ContainerId getContainerId() {
     return containerId;
   }
 
+  /**
+   * 获取访问资源所需的安全凭证。
+   * @return 安全凭证对象
+   */
   public Credentials getCredentials() {
     return credentials;
   }
 
+  /**
+   * 获取文件状态缓存，用于缓存远程路径的FileStatus信息。
+   * @return 文件状态缓存实例
+   */
   public LoadingCache<Path,Future<FileStatus>> getStatCache() {
     return statCache;
   }

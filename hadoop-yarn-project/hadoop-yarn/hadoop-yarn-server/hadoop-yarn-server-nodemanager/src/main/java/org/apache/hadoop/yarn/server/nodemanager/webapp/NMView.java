@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -25,17 +26,31 @@ import static org.apache.hadoop.yarn.webapp.view.JQueryUI.initID;
 import org.apache.hadoop.yarn.webapp.SubView;
 import org.apache.hadoop.yarn.webapp.view.TwoColumnLayout;
 
+/**
+ * NodeManager Web UI 基础视图类，提供双栏布局基础框架
+ */
 public class NMView extends TwoColumnLayout {
 
+  /**
+   * HTML头渲染前的预处理，注入页面公共配置
+   */
   @Override protected void preHead(Page.HTML<__> html) {
       commonPreHead(html);
     }
 
+  /**
+   * 公共预处理逻辑，配置左侧导航手风琴菜单
+   */
   protected void commonPreHead(Page.HTML<__> html) {
+    // 设置导航手风琴组件ID
     set(ACCORDION_ID, "nav");
+    // 初始化手风琴组件，禁用自动高度，默认展开第一个菜单项
     set(initID(ACCORDION, "nav"), "{autoHeight:false, active:0}");
   }
 
+  /**
+   * 获取左侧导航栏子视图类
+   */
   @Override
   protected Class<? extends SubView> nav() {
     return NavBlock.class;

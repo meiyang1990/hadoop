@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -31,24 +32,23 @@ import java.io.DataInputStream;
 import java.io.IOException;
 
 /**
- * Utility methods for {@link RMStateStore} and subclasses.
+ * RM状态存储工具类，为RMStateStore及其子类提供通用工具方法。
  */
 @Private
 @Unstable
 public class RMStateStoreUtils {
 
+  /** 日志记录器 */
   public static final Logger LOG =
       LoggerFactory.getLogger(RMStateStoreUtils.class);
 
   /**
-   * Returns the RM Delegation Token data from the {@link DataInputStream} as a
-   * {@link RMDelegationTokenIdentifierData}.  It can handle both the current
-   * and old (non-protobuf) formats.
+   * 从输入流读取RM代理令牌数据，兼容当前Protobuf格式和旧版非Protobuf格式，
+   * 用于恢复RM状态时读取持久化存储的代理令牌信息。
    *
-   * @param fsIn The {@link DataInputStream} containing RM Delegation Token data
-   * @return An {@link RMDelegationTokenIdentifierData} containing the read in
-   * RM Delegation Token
-   * @throws IOException an I/O exception has occurred.
+   * @param fsIn 包含RM代理令牌数据的输入流
+   * @return 读取完成的RM代理令牌数据对象
+   * @throws IOException 读取过程中发生I/O错误
    */
   public static RMDelegationTokenIdentifierData
       readRMDelegationTokenIdentifierData(DataInputStream fsIn)
@@ -56,14 +56,20 @@ public class RMStateStoreUtils {
     RMDelegationTokenIdentifierData identifierData =
         new RMDelegationTokenIdentifierData();
     try {
+      // 尝试按新版Protobuf格式读取
       identifierData.readFields(fsIn);
     } catch (InvalidProtocolBufferException e) {
+      // Protobuf解析失败说明是旧版格式，回退到旧格式读取逻辑
       LOG.warn("Recovering old formatted token");
+      // 重置输入流到起始位置，重新读取
       fsIn.reset();
       YARNDelegationTokenIdentifier identifier =
           new RMDelegationTokenIdentifier();
+      // 按旧版格式读取令牌标识信息
       identifier.readFieldsInOldFormat(fsIn);
+      // 设置读取到的标识信息
       identifierData.setIdentifier(identifier);
+      // 读取并设置令牌更新时间
       identifierData.setRenewDate(fsIn.readLong());
     }
     return identifierData;

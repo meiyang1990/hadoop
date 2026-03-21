@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,11 +25,10 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 
 
 /**
- * Abstract temporary data-structure for tracking resource availability,pending
- * resource need, current utilization for app/queue.
+ * 容量调度抢占计算的抽象基类，用于跟踪队列或应用的资源可用性、待分配资源和当前利用率等临时计算数据
  */
 public class AbstractPreemptionEntity {
-  // Following fields are copied from scheduler
+  // 从调度器复制的基础信息，所属队列名称
   final String queueName;
 
   protected final Resource current;
@@ -36,13 +36,21 @@ public class AbstractPreemptionEntity {
   protected final Resource reserved;
   protected Resource pending;
 
-  // Following fields are settled and used by candidate selection policies
+  // 抢占候选选择过程中使用的计算字段
   Resource idealAssigned;
   Resource toBePreempted;
   Resource selected;
   private Resource actuallyToBePreempted;
   private Resource toBePreemptFromOther;
 
+  /**
+   * 构造抢占计算实体，初始化从调度器复制的基础资源信息
+   * @param queueName 所属队列名称
+   * @param usedPerPartition 当前分区已用资源
+   * @param amUsedPerPartition 当前分区ApplicationMaster占用资源
+   * @param reserved 当前预留资源
+   * @param pendingPerPartition 当前分区待分配资源
+   */
   AbstractPreemptionEntity(String queueName, Resource usedPerPartition,
       Resource amUsedPerPartition, Resource reserved,
       Resource pendingPerPartition) {

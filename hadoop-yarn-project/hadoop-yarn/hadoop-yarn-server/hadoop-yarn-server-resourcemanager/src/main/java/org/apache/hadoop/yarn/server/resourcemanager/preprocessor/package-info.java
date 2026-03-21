@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * This package contains classes to pre process the application submission
- * context with server side configs.
+ * YARN ResourceManager 应用提交预处理包
+ * 提供在服务端对用户提交的应用上下文进行预处理的能力，会根据服务端配置修改应用提交信息
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,10 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.TokenSelector;
 
+/**
+ * 本地化服务令牌选择器，从用户凭据集合中挑选出匹配的本地化服务安全令牌。
+ * 用于NodeManager拉取容器本地化资源时的RPC身份认证。
+ */
 public class LocalizerTokenSelector implements
     TokenSelector<LocalizerTokenIdentifier> {
 
@@ -40,8 +45,10 @@ public class LocalizerTokenSelector implements
 
     LOG.debug("Using localizerTokenSelector.");
 
+    // 遍历所有令牌查找匹配类型
     for (Token<? extends TokenIdentifier> token : tokens) {
       LOG.debug("Token of kind {} is found", token.getKind());
+      // 匹配令牌类型，找到则返回匹配结果
       if (LocalizerTokenIdentifier.KIND.equals(token.getKind())) {
         return (Token<LocalizerTokenIdentifier>) token;
       }

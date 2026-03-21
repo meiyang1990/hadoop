@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,12 +31,10 @@ import java.util.ListIterator;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/*
- * It contains allocation information for one allocation in a node heartbeat.
- * Detailed allocation activities are first stored in "AllocationActivity"
- * as operations, then transformed to a tree structure.
- * Tree structure starts from root queue and ends in leaf queue,
- * application or container allocation.
+/**
+ * 存储节点一次心跳周期内的单次容器分配活动信息。
+ * 先将分配操作记录为线性列表，再转换为树形结构，用于前端展示分配决策过程：
+ * 从根队列开始，逐级到叶子队列、应用、最终容器分配尝试。
  */
 public class NodeAllocation {
   private NodeId nodeId;
@@ -50,11 +49,26 @@ public class NodeAllocation {
   private static final Logger LOG =
       LoggerFactory.getLogger(NodeAllocation.class);
 
+  /**
+   * 构造指定节点的分配活动记录对象。
+   * @param nodeId 目标节点ID
+   */
   public NodeAllocation(NodeId nodeId) {
     this.nodeId = nodeId;
     this.allocationOperations = new ArrayList<>();
   }
 
+  /**
+   * 添加一条分配操作记录到当前节点分配活动中。
+   * @param parentName 父节点名称（队列名）
+   * @param childName 子节点名称（子队列/应用名）
+   * @param priority 分配优先级
+   * @param state 活动状态
+   * @param diagnostic 诊断信息
+   * @param level 活动层级（队列/应用/容器）
+   * @param nId 节点ID
+   * @param allocationRequestId 分配请求ID
+   */
   public void addAllocationActivity(String parentName, String childName,
       Integer priority, ActivityState state, String diagnostic,
       ActivityLevel level, NodeId nId, Long allocationRequestId) {
@@ -63,27 +77,28 @@ public class NodeAllocation {
     this.allocationOperations.add(allocate);
   }
 
+  /**
+   * 更新当前分配对应的容器状态。
+   * @param containerId 容器ID
+   * @param containerState 容器分配状态
+   */
   public void updateContainerState(ContainerId containerId,
       AllocationState containerState) {
     this.containerId = containerId;
     this.containerState = containerState;
   }
 
-  // In node allocation, transform each activity to a tree-like structure
-  // for frontend activity display.
-  // eg:    root
-  //         / \
-  //        a   b
-  //       / \
-  //    app1 app2
-  //    / \
-  //  CA1 CA2
-  // CA means Container Attempt
+  /**
+   * 将线性存储的分配操作列表转换为树形结构，用于前端可视化展示分配过程。
+   * 会去重重复节点，并按父子关系构建层级结构。
+   */
   public void transformToTree() {
     List<ActivityNode> allocationTree = new ArrayList<>();
 
     if (root == null) {
+      // 使用ConcurrentHashMap构建并发安全的去重集合
       Set<String> names = Collections.newSetFromMap(new ConcurrentHashMap<>());
+      // 从后向前遍历去重，保留靠前出现的节点
       ListIterator<AllocationActivity> ite = allocationOperations.listIterator(
           allocationOperations.size());
       while (ite.hasPrevious()) {
@@ -92,24 +107,29 @@ public class NodeAllocation {
           if (!names.contains(name)) {
             names.add(name);
           } else {
+            // 重复节点，移除该记录
             ite.remove();
           }
         }
       }
 
+      // 构建树形结构，子节点会被添加到对应父节点下
       for (AllocationActivity allocationOperation : allocationOperations) {
         ActivityNode node = allocationOperation.createTreeNode();
         String name = node.getName();
+        // 从后向前匹配已经在列表中的子节点
         for (int i = allocationTree.size() - 1; i > -1; i--) {
           if (allocationTree.get(i).getParentName().equals(name)) {
             node.addChild(allocationTree.get(i));
             allocationTree.remove(i);
           } else {
+            // 不匹配则停止，因为节点按顺序排列
             break;
           }
         }
         allocationTree.add(node);
       }
+      // 根节点是列表第一个元素
       root = allocationTree.get(0);
     }
   }

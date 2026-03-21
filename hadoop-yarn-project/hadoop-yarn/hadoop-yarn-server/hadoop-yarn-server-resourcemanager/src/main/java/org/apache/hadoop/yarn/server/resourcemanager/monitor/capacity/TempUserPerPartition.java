@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,10 +24,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.UsersMan
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-
 /**
- * Temporary data-structure tracking resource availability, pending resource
- * need, current utilization for an application.
+ * 容量抢占计算器使用的临时数据结构，记录单个分区下单个用户的资源使用、待分配资源等抢占计算相关临时信息
  */
 public class TempUserPerPartition extends AbstractPreemptionEntity {
 
@@ -34,6 +33,9 @@ public class TempUserPerPartition extends AbstractPreemptionEntity {
   private Resource userLimit;
   private boolean donePreemptionQuotaForULDelta = false;
 
+  /**
+   * 构造单个分区下用户的临时抢占计算数据
+   */
   TempUserPerPartition(User user, String queueName, Resource usedPerPartition,
       Resource amUsedPerPartition, Resource reserved,
       Resource pendingPerPartition) {
@@ -57,18 +59,36 @@ public class TempUserPerPartition extends AbstractPreemptionEntity {
     return sb.toString();
   }
 
+  /**
+   * 获取用户名
+   * @return 用户名
+   */
   public String getUserName() {
     return user.getUserName();
   }
 
+  /**
+   * 获取该用户在当前分区的资源限额
+   * @return 用户资源限额
+   */
   public Resource getUserLimit() {
     return userLimit;
   }
 
+  /**
+   * 设置该用户在当前分区的资源限额
+   * @param userLimitResource 资源限额
+   */
   public void setUserLimit(Resource userLimitResource) {
     this.userLimit = userLimitResource;
   }
 
+  /**
+   * 检查当前用户已用资源（扣除AM资源）是否超过用户限额
+   * @param rc 资源计算器
+   * @param clusterResource 集群总资源
+   * @return 是否超过限额
+   */
   public boolean isUserLimitReached(ResourceCalculator rc,
       Resource clusterResource) {
     if (Resources.greaterThan(rc, clusterResource, getUsedDeductAM(),
@@ -78,10 +98,18 @@ public class TempUserPerPartition extends AbstractPreemptionEntity {
     return false;
   }
 
+  /**
+   * 检查是否已完成针对用户限额差额的抢占配额计算
+   * @return 是否已完成
+   */
   public boolean isPreemptionQuotaForULDeltaDone() {
     return this.donePreemptionQuotaForULDelta;
   }
 
+  /**
+   * 更新针对用户限额差额的抢占配额计算完成状态
+   * @param done 完成状态
+   */
   public void updatePreemptionQuotaForULDeltaAsDone(boolean done) {
     this.donePreemptionQuotaForULDelta = done;
   }

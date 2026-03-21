@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,17 @@ import org.apache.hadoop.yarn.server.nodemanager.api.ResourceLocalizationSpec;
 import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * NodeManager节点管理器工具类，用于构建各类NM相关的实体对象。
+ */
 public class NodeManagerBuilderUtils {
 
+  /**
+   * 构造新的资源本地化描述对象，用于容器资源本地化流程。
+   * @param rsrc 待本地化的资源描述
+   * @param path 本地化目标路径
+   * @return 完整构造的资源本地化描述对象
+   */
   public static ResourceLocalizationSpec newResourceLocalizationSpec(
       LocalResource rsrc, Path path) {
     URL local = URL.fromPath(path);

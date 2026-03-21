@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,29 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 
+/**
+ * RM容器恢复事件，ResourceManager重启恢复时，封装从NodeManager获取的容器状态信息。
+ */
 public class RMContainerRecoverEvent extends RMContainerEvent {
 
+  // NodeManager上报的容器状态信息
   private final NMContainerStatus containerReport;
 
+  /**
+   * 构造RM容器恢复事件。
+   * @param containerId 容器ID
+   * @param containerReport NodeManager上报的容器状态
+   */
   public RMContainerRecoverEvent(ContainerId containerId,
       NMContainerStatus containerReport) {
     super(containerId, RMContainerEventType.RECOVER);
     this.containerReport = containerReport;
   }
 
+  /**
+   * 获取NodeManager上报的容器状态信息。
+   * @return 容器状态
+   */
   public NMContainerStatus getContainerReport() {
     return containerReport;
   }

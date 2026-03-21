@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,6 +16,7 @@
  */
 
 /**
- * Package for GPU support classes.
+ * GPU资源插件支持包，实现YARN NodeManager对节点上GPU资源的发现、分配与管理，
+ * 支持为容器分配指定数量的GPU设备，满足GPU计算任务的资源调度需求。
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.gpu;

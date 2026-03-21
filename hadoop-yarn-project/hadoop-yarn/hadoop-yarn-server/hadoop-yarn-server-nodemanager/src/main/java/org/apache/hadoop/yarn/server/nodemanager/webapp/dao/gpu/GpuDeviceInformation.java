@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,7 +27,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.List;
 
 /**
- * All GPU Device Information in the system, fetched from nvidia-smi.
+ * 存储节点上全部GPU设备信息，从nvidia-smi输出解析得到，用于YARN NodeManager Web UI展示GPU资源状态
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -55,11 +56,14 @@ public class GpuDeviceInformation {
 
   @Override
   public String toString() {
+    // 构建GPU信息字符串输出
     StringBuilder sb = new StringBuilder();
+    // 添加系统GPU总标题和驱动版本信息
     sb.append("=== GPUs in the system ===\n")
         .append("\tDriver Version:")
         .append(getDriverVersion()).append("\n");
 
+    // 遍历添加每个GPU设备的详细信息
     if (gpus != null) {
       for (PerGpuDeviceInformation gpu : gpus) {
         sb.append("\t").append(gpu.toString()).append("\n");

@@ -1,5 +1,5 @@
+// 这个文件已经全部加上中文注释
 /*
- * *
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
  *  distributed with this work for additional information
@@ -15,14 +15,20 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- * /
  */
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker;
 
+/**
+ * Docker load命令封装，用于从本地镜像文件加载Docker镜像。
+ */
 public class DockerLoadCommand extends DockerCommand {
   private static final String LOAD_COMMAND = "load";
 
+  /**
+   * 构造Docker load命令对象。
+   * @param localImageFile 本地Docker镜像文件路径
+   */
   public DockerLoadCommand(String localImageFile) {
     super(LOAD_COMMAND);
     super.addCommandArguments("image", localImageFile);

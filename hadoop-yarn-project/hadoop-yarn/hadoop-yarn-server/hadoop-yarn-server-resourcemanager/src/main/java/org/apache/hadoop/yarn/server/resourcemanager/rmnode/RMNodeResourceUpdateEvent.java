@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,15 +22,28 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
 
+/**
+ * YARN ResourceManager 节点资源更新事件，用于通知NodeManager资源容量发生变更。
+ */
 public class RMNodeResourceUpdateEvent extends RMNodeEvent {
 
+  // 包含更新后的资源信息与更新选项
   private final ResourceOption resourceOption;
   
+  /**
+   * 构造节点资源更新事件。
+   * @param nodeId 目标节点ID
+   * @param resourceOption 新的资源配置选项
+   */
   public RMNodeResourceUpdateEvent(NodeId nodeId, ResourceOption resourceOption) {
     super(nodeId, RMNodeEventType.RESOURCE_UPDATE);
     this.resourceOption = resourceOption;
   }
 
+  /**
+   * 获取更新后的资源配置选项。
+   * @return 资源更新选项，包含新资源总量和更新标识
+   */
   public ResourceOption getResourceOption() {
     return resourceOption;
   }

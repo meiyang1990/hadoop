@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,14 +21,27 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationStateData;
 
+/**
+ * RM状态存储删除应用事件，封装删除应用所需的状态信息。
+ * 用于通知RM状态存储从恢复数据中移除已完成应用的状态信息。
+ */
 public class RMStateStoreRemoveAppEvent extends RMStateStoreEvent {
+  // 待删除应用的状态数据
   ApplicationStateData appState;
   
+  /**
+   * 构造删除应用事件。
+   * @param appState 待删除应用的状态数据
+   */
   RMStateStoreRemoveAppEvent(ApplicationStateData appState) {
     super(RMStateStoreEventType.REMOVE_APP);
     this.appState = appState;
   }
   
+  /**
+   * 获取待删除应用的状态数据。
+   * @return 应用状态数据
+   */
   public ApplicationStateData getAppState() {
     return appState;
   }

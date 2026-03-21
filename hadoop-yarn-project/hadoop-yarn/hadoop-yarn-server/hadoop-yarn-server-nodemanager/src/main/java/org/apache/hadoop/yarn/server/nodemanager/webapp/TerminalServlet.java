@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,23 +28,27 @@ import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.servlet.DefaultServlet;
 
 /**
- * TerminalServlet host the static html and javascript for
- * connecting to a text terminal over websocket.
+ * NodeManager Web UI终端页面Servlet，提供基于Xterm.js的Web终端前端静态资源托管，支持通过WebSocket连接容器执行命令
  */
 @WebServlet(urlPatterns="/terminal/*")
 public class TerminalServlet extends DefaultServlet {
 
   /**
-   * Servlet for hosting html page for xtermjs.
+   * Servlet序列化版本ID
    */
   private static final long serialVersionUID = 1336699L;
 
+  /**
+   * 处理GET请求，针对模板文件特殊设置Content-Type后交给父类处理静态资源
+   */
   @Override
   protected void doGet(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
+    // 如果请求的是模板文件，设置正确的HTML响应类型
     if (request.getRequestURI().endsWith(".template")) {
       response.setHeader("Content-Type", "text/html;charset=utf-8");
     }
+    // 交给DefaultServlet处理静态资源返回
     super.doGet(request, response);
   }
 }

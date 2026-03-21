@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,10 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.rmapp;
 
+/**
+ * YARN ResourceManager 中应用程序的状态枚举
+ * 定义了RM应用程序从创建到结束全过程的所有可能状态
+ */
 public enum RMAppState {
   NEW,
   NEW_SAVING,

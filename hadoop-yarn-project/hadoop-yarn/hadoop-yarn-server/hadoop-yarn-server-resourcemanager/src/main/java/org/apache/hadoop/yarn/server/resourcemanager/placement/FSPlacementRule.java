@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,7 +33,7 @@ import org.w3c.dom.Element;
 import java.io.IOException;
 
 /**
- * Abstract base for all {@link FairScheduler} Placement Rules.
+ * 公平调度器所有应用队列放置规则的抽象基类，提供所有放置规则共享的基础能力
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -40,36 +41,31 @@ public abstract class FSPlacementRule extends PlacementRule {
   private static final Logger LOG =
       LoggerFactory.getLogger(FSPlacementRule.class);
 
-  // Flag to show if the rule can create a queue
+  // 标记是否允许规则创建新队列
   @VisibleForTesting
   protected boolean createQueue = true;
   private QueueManager queueManager;
   private PlacementRule parentRule;
 
   /**
-   * Get the {@link QueueManager} loaded from the scheduler when the rule is
-   * initialised. All rules are initialised before the can be called to place
-   * an application.
-   * @return The queue manager from the scheduler, this can never be
-   * <code>null</code> for an initialised rule.
+   * 获取规则初始化时从调度器加载的队列管理器
+   * @return 调度器提供的队列管理器，初始化完成后不可能为null
    */
   QueueManager getQueueManager() {
     return queueManager;
   }
 
   /**
-   * Set a rule to generate the parent queue dynamically. The parent rule
-   * should only be called on rule creation when the policy is read from the
-   * configuration.
-   * @param parent A PlacementRule
+   * 设置用于动态生成父队列的规则
+   * @param parent 父队列生成规则
    */
   public void setParentRule(PlacementRule parent) {
     this.parentRule = parent;
   }
 
   /**
-   * Get the rule that is set to generate the parent queue dynamically.
-   * @return The rule set or <code>null</code> if not set.
+   * 获取动态生成父队列的规则
+   * @return 父队列生成规则，未设置则返回null
    */
   @VisibleForTesting
   public PlacementRule getParentRule() {
@@ -77,8 +73,8 @@ public abstract class FSPlacementRule extends PlacementRule {
   }
 
   /**
-   * Set the config based on the type of object passed in.
-   * @param initArg the config to be set
+   * 根据传入配置对象的类型设置规则配置
+   * @param initArg 配置对象
    */
   @Override
   public void setConfig(Object initArg) {
@@ -99,29 +95,28 @@ public abstract class FSPlacementRule extends PlacementRule {
   }
 
   /**
-   * Set the rule config from the xml config.
-   * @param conf An xml element from the {@link FairScheduler#conf}
+   * 从XML配置元素中设置规则配置
+   * @param conf 公平调度器配置中的XML元素
    */
   protected void setConfig(Element conf) {
-    // Get the flag from the config (defaults to true if not set)
+    // 从配置获取创建标志，未设置默认值为true
     createQueue = getCreateFlag(conf);
   }
 
   /**
-   * Set the rule config just setting the create flag.
-   * @param create flag to allow queue creation for this rule
+   * 仅通过布尔值设置规则配置
+   * @param create 是否允许本规则创建队列
    */
   protected void setConfig(Boolean create) {
     createQueue = create;
   }
 
   /**
-   * Standard initialisation for {@link FairScheduler} rules, shared by all
-   * rules. Each rule that extends this abstract and overrides this method must
-   * call <code>super.initialize()</code> to run this basic initialisation.
-   * @param scheduler the scheduler using the rule
-   * @return <code>true</code> in all cases
-   * @throws IOException for any errors
+   * 公平调度器放置规则的标准初始化逻辑，所有具体规则共享
+   * 继承该类并重写此方法的规则必须调用super.initialize()完成基础初始化
+   * @param scheduler 使用该规则的调度器
+   * @return 始终返回true表示初始化成功
+   * @throws IOException 初始化错误时抛出
    */
   @Override
   public boolean initialize(ResourceScheduler scheduler) throws IOException {
@@ -142,10 +137,9 @@ public abstract class FSPlacementRule extends PlacementRule {
   }
 
   /**
-   * Check if the queue exists and is part of the configuration i.e. not
-   * a {@link FSQueue#isDynamic()} queue.
-   * @param queueName name of the queue to check
-   * @return <code>true</code> if the queue exists and is a "configured" queue
+   * 检查队列是否为静态配置队列（非动态创建队列）且存在
+   * @param queueName 待检查队列名
+   * @return 队列存在且是静态配置队列返回true，否则返回false
    */
   boolean configuredQueue(String queueName) {
     FSQueue queue = queueManager.getQueue(queueName);
@@ -153,19 +147,17 @@ public abstract class FSPlacementRule extends PlacementRule {
   }
 
   /**
-   * Get the create flag as set during the config setup.
-   * @return The value of the {@link #createQueue} flag
+   * 获取配置设置的队列创建允许标志
+   * @return 队列创建标志值
    */
   public boolean getCreateFlag() {
     return createQueue;
   }
 
   /**
-   * Get the create flag from the xml configuration element.
-   * @param conf The FS configuration element for the queue
-   * @return <code>false</code> only if the flag is set in the configuration to
-   * a text that is not case ignored "true", <code>true</code> in all other
-   * cases
+   * 从XML配置元素解析队列创建标志
+   * @param conf 调度器配置中的队列配置XML元素
+   * @return 只有配置显式设置为非true值返回false，其他情况都返回true
    */
   boolean getCreateFlag(Element conf) {
     if (conf != null) {

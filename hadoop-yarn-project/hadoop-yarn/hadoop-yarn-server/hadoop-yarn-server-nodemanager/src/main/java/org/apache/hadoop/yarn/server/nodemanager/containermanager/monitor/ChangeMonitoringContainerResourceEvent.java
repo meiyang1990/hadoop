@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,9 +22,19 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 
+/**
+ * YARN NodeManager 容器监控资源变更事件，用于通知监控系统更新容器资源配置。
+ * 当容器资源发生动态调整时，触发该事件更新监控使用的资源配额。
+ */
 public class ChangeMonitoringContainerResourceEvent extends ContainersMonitorEvent {
+  // 容器更新后的目标资源配置
   private final Resource resource;
 
+  /**
+   * 构造容器资源变更事件
+   * @param containerId 目标容器ID
+   * @param resource 更新后的容器资源配置
+   */
   public ChangeMonitoringContainerResourceEvent(ContainerId containerId,
       Resource resource) {
     super(containerId,
@@ -31,6 +42,10 @@ public class ChangeMonitoringContainerResourceEvent extends ContainersMonitorEve
     this.resource = resource;
   }
 
+  /**
+   * 获取更新后的容器资源配置
+   * @return 更新后的容器资源
+   */
   public Resource getResource() {
     return this.resource;
   }

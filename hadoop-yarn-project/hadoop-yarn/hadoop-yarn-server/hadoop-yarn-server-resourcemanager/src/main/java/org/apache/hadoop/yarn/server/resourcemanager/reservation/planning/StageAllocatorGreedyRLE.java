@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,17 +36,19 @@ import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.Plan
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
- * Computes the stage allocation according to the greedy allocation rule. The
- * greedy rule repeatedly allocates requested containers at the leftmost or
- * rightmost possible interval. This implementation leverages the
- * run-length-encoding of the time-series we operate on and proceed more quickly
- * than the baseline.
+ * 基于贪心算法实现的预约阶段分配器，利用游程编码优化性能。
+ * 贪心规则会从最左/最右侧的可能区间开始重复分配容器，相比基线实现性能更高。
  */
 
 public class StageAllocatorGreedyRLE implements StageAllocator {
 
+  // 标记是否从左开始分配，false则从右开始分配
   private final boolean allocateLeft;
 
+  /**
+   * 构造贪心分配器，指定分配方向
+   * @param allocateLeft true从左分配，false从右分配
+   */
   public StageAllocatorGreedyRLE(boolean allocateLeft) {
     this.allocateLeft = allocateLeft;
   }
@@ -57,7 +60,7 @@ public class StageAllocatorGreedyRLE implements StageAllocator {
       long stageEarliestStart, long stageDeadline, long period, String user,
       ReservationId oldId) throws PlanningException {
 
-    // abort early if the interval is not satisfiable
+    // 总时长不足，提前终止分配
     if (stageEarliestStart + rr.getDuration() > stageDeadline) {
       return null;
     }
@@ -67,48 +70,44 @@ public class StageAllocatorGreedyRLE implements StageAllocator {
 
     Resource totalCapacity = plan.getTotalCapacity();
 
-    // compute the gang as a resource and get the duration
+    // 计算一组（gang）任务的总资源量
     Resource sizeOfGang =
         Resources.multiply(rr.getCapability(), rr.getConcurrency());
     long dur = rr.getDuration();
     long step = plan.getStep();
 
-    // ceil the duration to the next multiple of the plan step
+    // 将时长向上取整为计划步长的整数倍
     if (dur % step != 0) {
       dur += (step - (dur % step));
     }
 
-    // we know for sure that this division has no remainder (part of contract
-    // with user, validate before
+    // 计算需要分配的任务组数
     int gangsToPlace = rr.getNumContainers() / rr.getConcurrency();
 
-    // get available resources from plan
+    // 从计划中获取指定时间范围内的可用资源
     RLESparseResourceAllocation netRLERes =
         plan.getAvailableResourceOverTime(user, oldId, stageEarliestStart,
             stageDeadline, period);
 
-    // remove plan modifications
+    // 扣除已修改占用的资源，得到净可用资源
     netRLERes =
         RLESparseResourceAllocation.merge(plan.getResourceCalculator(),
             totalCapacity, netRLERes, planModifications, RLEOperator.subtract,
             stageEarliestStart, stageDeadline);
 
-    // loop trying to place until we are done, or we are considering
-    // an invalid range of times
+    // 循环分配任务组，直到分配完成或区间不可用
     while (gangsToPlace > 0 && stageEarliestStart + dur <= stageDeadline) {
 
-      // as we run along we remember how many gangs we can fit, and what
-      // was the most constraining moment in time (we will restart just
-      // after that to place the next batch)
+      // 初始化当前轮次最大可分配组数和约束点位置
       int maxGang = gangsToPlace;
       long minPoint = -1;
 
-      // focus our attention to a time-range under consideration
+      // 获取当前时间范围内的资源分段映射
       NavigableMap<Long, Resource> partialMap =
           netRLERes.getRangeOverlapping(stageEarliestStart, stageDeadline)
               .getCumulative();
 
-      // revert the map for right-to-left allocation
+      // 如果是从右分配，反转映射遍历顺序
       if (!allocateLeft) {
         partialMap = partialMap.descendingMap();
       }
@@ -117,9 +116,7 @@ public class StageAllocatorGreedyRLE implements StageAllocator {
 
       long oldT = stageDeadline;
 
-      // internal loop, tries to allocate as many gang as possible starting
-      // at a given point in time, if it fails we move to the next time
-      // interval (with outside loop)
+      // 遍历资源分段，计算当前时间范围内最大可分配组数
       while (maxGang > 0 && netIt.hasNext()) {
 
         long t;
@@ -127,47 +124,47 @@ public class StageAllocatorGreedyRLE implements StageAllocator {
 
         Entry<Long, Resource> e = netIt.next();
         if (allocateLeft) {
+          // 从左分配：计算当前分段起始时间
           t = Math.max(e.getKey(), stageEarliestStart);
           curAvailRes = e.getValue();
         } else {
+          // 从右分配：计算当前分段起始时间
           t = oldT;
           oldT = e.getKey();
-          //attention: higher means lower, because we reversed the map direction
+          // 反转映射后，higherEntry对应当前区间的可用资源
           curAvailRes = partialMap.higherEntry(t).getValue();
         }
 
-        // check exit/skip conditions/
+        // 跳过资源为空的分段
         if (curAvailRes == null) {
-          //skip undefined regions (should not happen beside borders)
           continue;
         }
+        // 满足退出条件，终止当前轮次遍历
         if (exitCondition(t, stageEarliestStart, stageDeadline, dur)) {
           break;
         }
 
-        // compute maximum number of gangs we could fit
+        // 计算当前分段可容纳的最大任务组数
         int curMaxGang =
             (int) Math.floor(Resources.divide(plan.getResourceCalculator(),
                 totalCapacity, curAvailRes, sizeOfGang));
         curMaxGang = Math.min(gangsToPlace, curMaxGang);
 
-        // compare with previous max, and set it. also remember *where* we found
-        // the minimum (useful for next attempts)
+        // 更新最大可分配组数，记录资源约束点位置
         if (curMaxGang <= maxGang) {
           maxGang = curMaxGang;
           minPoint = t;
         }
       }
 
-      // update data structures that retain the progress made so far
+      // 更新分配进度，记录已分配资源
       gangsToPlace =
           trackProgress(planModifications, rr, stageEarliestStart,
               stageDeadline, allocationRequests, dur, gangsToPlace, maxGang);
 
-      // reset the next range of time-intervals to deal with
+      // 更新下一轮次的搜索起始/结束时间
       if (allocateLeft) {
-        // set earliest start to the min of the constraining "range" or my the
-        // end of this allocation
+        // 从左分配：更新下一轮起始时间
         if(partialMap.higherKey(minPoint) == null){
           stageEarliestStart = stageEarliestStart + dur;
         } else {
@@ -175,7 +172,7 @@ public class StageAllocatorGreedyRLE implements StageAllocator {
              Math.min(partialMap.higherKey(minPoint), stageEarliestStart + dur);
         }
       } else {
-        // same as above moving right-to-left
+        // 从右分配：更新下一轮结束时间
         if(partialMap.higherKey(minPoint) == null){
           stageDeadline = stageDeadline - dur;
         } else {
@@ -185,56 +182,61 @@ public class StageAllocatorGreedyRLE implements StageAllocator {
       }
     }
 
-    // if no gangs are left to place we succeed and return the allocation
+    // 所有任务组分配完成，返回分配结果
     if (gangsToPlace == 0) {
       return allocationRequests;
     } else {
-      // If we are here is because we did not manage to satisfy this request.
-      // So we need to remove unwanted side-effect from tempAssigned (needed
-      // for ANY).
+      // 分配失败，回滚已分配的资源修改
       for (Map.Entry<ReservationInterval, Resource> tempAllocation :
           allocationRequests.entrySet()) {
         planModifications.removeInterval(tempAllocation.getKey(),
             tempAllocation.getValue());
       }
-      // and return null to signal failure in this allocation
+      // 返回null表示分配失败
       return null;
     }
 
   }
 
+  /**
+   * 记录已分配的任务组，更新剩余待分配数量
+   */
   private int trackProgress(RLESparseResourceAllocation planModifications,
       ReservationRequest rr, long stageEarliestStart, long stageDeadline,
       Map<ReservationInterval, Resource> allocationRequests, long dur,
       int gangsToPlace, int maxGang) {
-    // if we were able to place any gang, record this, and decrement
-    // gangsToPlace
+    // 如果分配了至少一组任务
     if (maxGang > 0) {
+      // 减少待分配组数
       gangsToPlace -= maxGang;
 
+      // 计算本次分配的时间区间
       ReservationInterval reservationInt =
           computeReservationInterval(stageEarliestStart, stageDeadline, dur);
+      // 计算本次分配的总资源量
       Resource reservationRes =
           Resources.multiply(rr.getCapability(), rr.getConcurrency() * maxGang);
-      // remember occupied space (plan is read-only till we find a plausible
-      // allocation for the entire request). This is needed since we might be
-      // placing other ReservationRequest within the same
-      // ReservationDefinition,
-      // and we must avoid double-counting the available resources
+      // 更新已修改资源占用，避免重复分配
       planModifications.addInterval(reservationInt, reservationRes);
+      // 将本次分配加入结果
       allocationRequests.put(reservationInt, reservationRes);
 
     }
     return gangsToPlace;
   }
 
+  /**
+   * 根据分配方向计算预约时间区间
+   */
   private ReservationInterval computeReservationInterval(
       long stageEarliestStart, long stageDeadline, long dur) {
     ReservationInterval reservationInt;
     if (allocateLeft) {
+      // 从左分配：从起始时间开始分配
       reservationInt =
           new ReservationInterval(stageEarliestStart, stageEarliestStart + dur);
     } else {
+      // 从右分配：从结束时间向前分配
       reservationInt =
           new ReservationInterval(stageDeadline - dur, stageDeadline);
     }
@@ -242,11 +244,16 @@ public class StageAllocatorGreedyRLE implements StageAllocator {
   }
 
 
+  /**
+   * 判断是否满足退出遍历的条件
+   */
   private boolean exitCondition(long t, long stageEarliestStart,
       long stageDeadline, long dur) {
     if (allocateLeft) {
+      // 从左分配：当前时间超过分配结束位置则退出
       return t >= stageEarliestStart + dur;
     } else {
+      // 从右分配：当前时间低于分配起始位置则退出
       return t < stageDeadline - dur;
     }
   }

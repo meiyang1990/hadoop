@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,6 +39,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+/**
+ * FIFO抢占候选容器选择器，按照先进先出原则选择需要被抢占的容器
+ * 优先抢占后提交应用的容器，保障先提交应用的资源分配，满足队列资源均衡需求
+ */
 public class FifoCandidatesSelector
     extends PreemptionCandidatesSelector {
   private static final Logger LOG =
@@ -45,6 +50,12 @@ public class FifoCandidatesSelector
   private PreemptableResourceCalculator preemptableAmountCalculator;
   private boolean allowQueuesBalanceAfterAllQueuesSatisfied;
 
+  /**
+   * 构造FIFO抢占候选选择器
+   * @param preemptionContext 容量调度抢占上下文
+   * @param includeReservedResource 是否包含预留资源参与可抢占计算
+   * @param allowQueuesBalanceAfterAllQueuesSatisfied 所有队列满足最低保障后是否允许继续抢占均衡
+   */
   FifoCandidatesSelector(CapacitySchedulerPreemptionContext preemptionContext,
       boolean includeReservedResource,
       boolean allowQueuesBalanceAfterAllQueuesSatisfied) {
@@ -62,22 +73,20 @@ public class FifoCandidatesSelector
       Map<ApplicationAttemptId, Set<RMContainer>> selectedCandidates,
       Resource clusterResource, Resource totalPreemptionAllowed) {
     Map<ApplicationAttemptId, Set<RMContainer>> curCandidates = new HashMap<>();
-    // Calculate how much resources we need to preempt
+    // 计算各队列需要抢占的资源总量
     preemptableAmountCalculator.computeIdealAllocation(clusterResource,
         totalPreemptionAllowed);
 
-    // Previous selectors (with higher priority) could have already
-    // selected containers. We need to deduct preemptable resources
-    // based on already selected candidates.
+    // 高优先级选择器已经选中的容器，需要从可抢占资源中扣除已选资源
     CapacitySchedulerPreemptionUtils
         .deductPreemptableResourcesBasedSelectedCandidates(preemptionContext,
             selectedCandidates);
 
     List<RMContainer> skippedAMContainerlist = new ArrayList<>();
 
-    // Loop all leaf queues
+    // 遍历所有叶子队列选择可抢占容器
     for (String queueName : preemptionContext.getLeafQueueNames()) {
-      // check if preemption disabled for the queue
+      // 检查该队列是否禁用抢占
       if (preemptionContext.getQueueByPartition(queueName,
           RMNodeLabelsManager.NO_LABEL).preemptionDisabled) {
         LOG.debug("skipping from queue={} because it's a"
@@ -85,7 +94,7 @@ public class FifoCandidatesSelector
         continue;
       }
 
-      // compute resToObtainByPartition considered inter-queue preemption
+      // 获取队列信息，计算各分区需要抢占的资源
       AbstractLeafQueue leafQueue = preemptionContext.getQueueByPartition(queueName,
           RMNodeLabelsManager.NO_LABEL).leafQueue;
 
@@ -94,22 +103,21 @@ public class FifoCandidatesSelector
               .getResToObtainByPartitionForLeafQueue(preemptionContext,
                   queueName, clusterResource);
 
+      // 获取队列读锁，保证遍历容器过程中队列结构不变化
       leafQueue.getReadLock().lock();
       try {
-        // go through all ignore-partition-exclusivity containers first to make
-        // sure such containers will be preemptionCandidates first
+        // 优先处理忽略分区排他性的容器，确保这类容器优先被选为抢占候选
         Map<String, TreeSet<RMContainer>> ignorePartitionExclusivityContainers =
             leafQueue.getIgnoreExclusivityRMContainers();
         for (String partition : resToObtainByPartition.keySet()) {
           if (ignorePartitionExclusivityContainers.containsKey(partition)) {
             TreeSet<RMContainer> rmContainers =
                 ignorePartitionExclusivityContainers.get(partition);
-            // We will check container from reverse order, so latter submitted
-            // application's containers will be preemptionCandidates first.
+            // 逆序遍历，后提交的容器优先被抢占
             for (RMContainer c : rmContainers.descendingSet()) {
               if (CapacitySchedulerPreemptionUtils.isContainerAlreadySelected(c,
                   selectedCandidates)) {
-                // Skip already selected containers
+                // 跳过已被选中的容器
                 continue;
               }
               boolean preempted = CapacitySchedulerPreemptionUtils
@@ -126,27 +134,24 @@ public class FifoCandidatesSelector
           }
         }
 
-        // preempt other containers
+        // 处理普通容器
         Resource skippedAMSize = Resource.newInstance(0, 0);
         Iterator<FiCaSchedulerApp> desc =
             leafQueue.getOrderingPolicy().getPreemptionIterator();
         while (desc.hasNext()) {
           FiCaSchedulerApp fc = desc.next();
-          // When we complete preempt from one partition, we will remove from
-          // resToObtainByPartition, so when it becomes empty, we can get no
-          // more preemption is needed
+          // 所有分区已获取足够可抢占资源，无需继续
           if (resToObtainByPartition.isEmpty()) {
             break;
           }
 
+          // 从当前应用中选择容器抢占
           preemptFrom(fc, clusterResource, resToObtainByPartition,
               skippedAMContainerlist, skippedAMSize, selectedCandidates,
               curCandidates, totalPreemptionAllowed);
         }
 
-        // Can try preempting AMContainers (still saving atmost
-        // maxAMCapacityForThisQueue AMResource's) if more resources are
-        // required to be preemptionCandidates from this Queue.
+        // 如果仍需要更多资源，尝试抢占AM容器，保留队列最大AM容量限制
         Resource maxAMCapacityForThisQueue = Resources
             .multiply(
                 leafQueue.getEffectiveCapacity(RMNodeLabelsManager.NO_LABEL),
@@ -156,6 +161,7 @@ public class FifoCandidatesSelector
             skippedAMContainerlist, resToObtainByPartition, skippedAMSize,
             maxAMCapacityForThisQueue, totalPreemptionAllowed);
       } finally {
+        // 释放队列读锁
         leafQueue.getReadLock().unlock();
       }
     }
@@ -164,15 +170,16 @@ public class FifoCandidatesSelector
   }
 
   /**
-   * As more resources are needed for preemption, saved AMContainers has to be
-   * rescanned. Such AMContainers can be preemptionCandidates based on resToObtain, but
-   * maxAMCapacityForThisQueue resources will be still retained.
+   * 仍需要更多抢占资源时，重新扫描之前跳过的AM容器进行抢占
+   * 保证抢占后仍保留队列配置的最大AM容量资源不被抢占
    *
-   * @param clusterResource
-   * @param preemptMap
-   * @param skippedAMContainerlist
-   * @param skippedAMSize
-   * @param maxAMCapacityForThisQueue
+   * @param clusterResource 集群总资源
+   * @param preemptMap 已选中的抢占容器集合
+   * @param skippedAMContainerlist 之前跳过的AM容器列表
+   * @param skippedAMSize 跳过AM容器总资源大小
+   * @param maxAMCapacityForThisQueue 队列需要保留的最大AM容量
+   * @param resToObtainByPartition 各分区仍需要抢占的资源
+   * @param totalPreemptionAllowed 允许抢占的总资源
    */
   private void preemptAMContainers(Resource clusterResource,
       Map<ApplicationAttemptId, Set<RMContainer>> preemptMap,
@@ -181,12 +188,11 @@ public class FifoCandidatesSelector
       Map<String, Resource> resToObtainByPartition, Resource skippedAMSize,
       Resource maxAMCapacityForThisQueue, Resource totalPreemptionAllowed) {
     for (RMContainer c : skippedAMContainerlist) {
-      // Got required amount of resources for preemption, can stop now
+      // 已获取足够资源，停止抢占
       if (resToObtainByPartition.isEmpty()) {
         break;
       }
-      // Once skippedAMSize reaches down to maxAMCapacityForThisQueue,
-      // container selection iteration for preemption will be stopped.
+      // 剩余保留资源已低于最大AM容量限制，停止抢占
       if (Resources.lessThanOrEqual(rc, clusterResource, skippedAMSize,
           maxAMCapacityForThisQueue)) {
         break;
@@ -205,8 +211,8 @@ public class FifoCandidatesSelector
   }
 
   /**
-   * Given a target preemption for a specific application, select containers
-   * to preempt (after unreserving all reservation for that app).
+   * 从指定应用中选择容器进行抢占，先处理预留容器，再处理普通容器
+   * AM容器暂时跳过，后续统一处理
    */
   private void preemptFrom(FiCaSchedulerApp app,
       Resource clusterResource, Map<String, Resource> resToObtainByPartition,
@@ -216,7 +222,7 @@ public class FifoCandidatesSelector
       Resource totalPreemptionAllowed) {
     ApplicationAttemptId appId = app.getApplicationAttemptId();
 
-    // first drop reserved containers towards rsrcPreempt
+    // 优先抢占预留容器
     List<RMContainer> reservedContainers =
         new ArrayList<>(app.getReservedContainers());
     for (RMContainer c : reservedContainers) {
@@ -228,13 +234,14 @@ public class FifoCandidatesSelector
         return;
       }
 
-      // Try to preempt this container
+      // 尝试抢占该容器
      CapacitySchedulerPreemptionUtils
           .tryPreemptContainerAndDeductResToObtain(rc, preemptionContext,
               resToObtainByPartition, c, clusterResource, selectedContainers,
               curCandidates, totalPreemptionAllowed,
               preemptionContext.getCrossQueuePreemptionConservativeDRF());
 
+      // 非观察模式下，发送事件杀死该预留容器
       if (!preemptionContext.isObserveOnly()) {
         preemptionContext.getRMContext().getDispatcher().getEventHandler()
             .handle(new ContainerPreemptEvent(appId, c,
@@ -242,9 +249,7 @@ public class FifoCandidatesSelector
       }
     }
 
-    // if more resources are to be freed go through all live containers in
-    // reverse priority and reverse allocation order and mark them for
-    // preemption
+    // 如果还需要更多资源，遍历所有活跃容器选择抢占
     List<RMContainer> liveContainers =
         new ArrayList<>(app.getLiveContainers());
 
@@ -260,20 +265,20 @@ public class FifoCandidatesSelector
         continue;
       }
 
-      // Skip already marked to killable containers
+      // 跳过已经标记为可杀死的容器
       if (null != preemptionContext.getKillableContainers() && preemptionContext
           .getKillableContainers().contains(c.getContainerId())) {
         continue;
       }
 
-      // Skip AM Container from preemption for now.
+      // AM容器暂时跳过，后续统一抢占
       if (c.isAMContainer()) {
         skippedAMContainerlist.add(c);
         Resources.addTo(skippedAMSize, c.getAllocatedResource());
         continue;
       }
 
-      // Try to preempt this container
+      // 尝试抢占该容器
       CapacitySchedulerPreemptionUtils
           .tryPreemptContainerAndDeductResToObtain(rc, preemptionContext,
               resToObtainByPartition, c, clusterResource, selectedContainers,

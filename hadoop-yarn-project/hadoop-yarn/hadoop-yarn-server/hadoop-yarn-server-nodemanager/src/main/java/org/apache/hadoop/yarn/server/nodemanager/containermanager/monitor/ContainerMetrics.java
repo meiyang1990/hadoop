@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,6 +47,9 @@ import java.util.TreeMap;
 
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
+/**
+ * 单个容器的资源使用指标管理，负责采集、存储和输出容器的内存、CPU等资源使用 metrics 信息
+ */
 @InterfaceAudience.Private
 @Metrics(context="container")
 public class ContainerMetrics implements MetricsSource {
@@ -62,8 +66,7 @@ public class ContainerMetrics implements MetricsSource {
   private static final String PHY_CPU_USAGE_QUANTILES_NAME =
       "pCpuUsagePercentHistogram";
 
-  // Use a multiplier of 1000 to avoid losing too much precision when
-  // converting to integers
+  // 乘以1000倍避免转换为整数时丢失精度
   private static final String VCORE_USAGE_METRIC_NAME = "milliVcoreUsage";
 
   @Metric
@@ -120,7 +123,7 @@ public class ContainerMetrics implements MetricsSource {
   final ContainerId containerId;
   final MetricsSystem metricsSystem;
 
-  // Metrics publishing status
+  // 指标发布状态
   private final long flushPeriodMs;
   private final long unregisterDelayMs;
   private boolean flushOnPeriod = false; // true if period elapsed
@@ -128,15 +131,23 @@ public class ContainerMetrics implements MetricsSource {
   private Timer timer; // lazily initialized
 
   /**
-   * Simple metrics cache to help prevent re-registrations.
+   * 简单指标缓存，避免重复注册
    */
   private final static Map<ContainerId, ContainerMetrics>
       usageMetrics = new HashMap<>();
   // Create a timer to unregister container metrics,
   // whose associated thread run as a daemon.
+  /** 全局定时器，负责延迟注销容器指标，后台守护线程运行 */
   private final static Timer unregisterContainerMetricsTimer =
       new Timer("Container metrics unregistration", true);
 
+  /**
+   * 构造容器指标实例，初始化所有指标
+   * @param ms 指标系统
+   * @param containerId 容器ID
+   * @param flushPeriodMs 指标刷新间隔
+   * @param delayMs 容器结束后注销指标的延迟时间
+   */
   ContainerMetrics(
       MetricsSystem ms, ContainerId containerId, long flushPeriodMs,
       long delayMs) {
@@ -192,18 +203,38 @@ public class ContainerMetrics implements MetricsSource {
     return RECORD_INFO.name() + "_" + containerId.toString();
   }
 
+  /**
+   * 获取指定容器的指标实例，使用默认指标系统
+   * @param containerId 容器ID
+   * @param flushPeriodMs 指标刷新间隔
+   * @param delayMs 注销延迟
+   * @return 容器指标实例
+   */
   public static ContainerMetrics forContainer(
       ContainerId containerId, long flushPeriodMs, long delayMs) {
     return forContainer(
         DefaultMetricsSystem.instance(), containerId, flushPeriodMs, delayMs);
   }
 
+  /**
+   * 根据容器ID获取已缓存的指标实例
+   * @param containerId 容器ID
+   * @return 指标实例，不存在返回null
+   */
   public synchronized static ContainerMetrics getContainerMetrics(
       ContainerId containerId) {
     // could be null
     return usageMetrics.get(containerId);
   }
 
+  /**
+   * 获取或创建指定容器的指标实例，不存在则新建并注册到指标系统
+   * @param ms 指标系统
+   * @param containerId 容器ID
+   * @param flushPeriodMs 指标刷新间隔
+   * @param delayMs 注销延迟
+   * @return 容器指标实例
+   */
   synchronized static ContainerMetrics forContainer(
       MetricsSystem ms, ContainerId containerId, long flushPeriodMs,
       long delayMs) {
@@ -224,6 +255,10 @@ public class ContainerMetrics implements MetricsSource {
     return metrics;
   }
 
+  /**
+   * 从指标系统注销指定容器的指标，并移除缓存
+   * @param cm 容器指标实例
+   */
   synchronized static void unregisterContainerMetrics(ContainerMetrics cm) {
     cm.metricsSystem.unregisterSource(cm.recordInfo.name());
     usageMetrics.remove(cm.containerId);
@@ -232,16 +267,22 @@ public class ContainerMetrics implements MetricsSource {
   @Override
   public synchronized void getMetrics(MetricsCollector collector, boolean all) {
     //Container goes through registered -> finished -> unregistered.
+    //容器已结束或到刷新周期，输出指标快照
     if (finished || flushOnPeriod) {
       registry.snapshot(collector.addRecord(registry.info()), all);
     }
 
+    //周期刷新完成，重置标记并重设定时器
     if (!finished && flushOnPeriod) {
       flushOnPeriod = false;
       scheduleTimerTaskIfRequired();
     }
   }
 
+  /**
+   * 标记容器已结束，处理指标注销逻辑
+   * @param unregisterWithoutDelay 是否立即注销，不等待延迟
+   */
   public synchronized void finished(boolean unregisterWithoutDelay) {
     if (!finished) {
       this.finished = true;
@@ -259,6 +300,10 @@ public class ContainerMetrics implements MetricsSource {
     }
   }
 
+  /**
+   * 记录物理内存使用量
+   * @param memoryMBs 物理内存使用量，单位MB
+   */
   public void recordMemoryUsage(int memoryMBs) {
     if (memoryMBs >= 0) {
       this.pMemMBsStat.add(memoryMBs);
@@ -266,6 +311,11 @@ public class ContainerMetrics implements MetricsSource {
     }
   }
 
+  /**
+   * 记录CPU使用量
+   * @param totalPhysicalCpuPercent 物理CPU使用率，以单核心百分比计算（占用2核=200%）
+   * @param milliVcoresUsed vcore使用量，单位毫vcore（1 vcore = 1000 milliVcore）
+   */
   public void recordCpuUsage(
       int totalPhysicalCpuPercent, int milliVcoresUsed) {
     if (totalPhysicalCpuPercent >=0) {
@@ -277,34 +327,61 @@ public class ContainerMetrics implements MetricsSource {
     }
   }
 
+  /**
+   * 记录容器进程ID
+   * @param processId 进程ID字符串
+   */
   public void recordProcessId(String processId) {
     registry.tag(PROCESSID_INFO, processId, true);
   }
 
+  /**
+   * 记录容器资源配额
+   * @param vmemLimit 虚拟内存配额，单位MB
+   * @param pmemLimit 物理内存配额，单位MB
+   * @param cpuVcores CPU vcore配额
+   */
   public void recordResourceLimit(int vmemLimit, int pmemLimit, int cpuVcores) {
     this.vMemLimitMbs.set(vmemLimit);
     this.pMemLimitMbs.set(pmemLimit);
     this.cpuVcoreLimit.set(cpuVcores);
   }
 
+  /**
+   * 记录容器启动和本地化阶段耗时
+   * @param launchDuration 容器启动耗时，单位毫秒
+   * @param localizationDuration 资源本地化耗时，单位毫秒
+   */
   public void recordStateChangeDurations(long launchDuration,
       long localizationDuration) {
     this.launchDurationMs.set(launchDuration);
     this.localizationDurationMs.set(localizationDuration);
   }
 
+  /**
+   * 记录容器启动时间
+   * @param startTime 启动时间戳
+   */
   public void recordStartTime(long startTime) {
     this.startTime.set(startTime);
   }
 
+  /**
+   * 记录容器结束时间和退出码
+   * @param finishTime 结束时间戳
+   * @param exitCode 容器退出码
+   */
   public void recordFinishTimeAndExitCode(long finishTime, int exitCode) {
     this.finishTime.set(finishTime);
     this.exitCode.set(exitCode);
   }
 
+  /**
+   * 如果配置了刷新间隔，则调度下一次刷新定时器任务
+   */
   private synchronized void scheduleTimerTaskIfRequired() {
     if (flushPeriodMs > 0) {
-      // Lazily initialize timer
+      // 懒初始化定时器
       if (timer == null) {
         this.timer = new Timer("Metrics flush checker", true);
       }
@@ -324,6 +401,9 @@ public class ContainerMetrics implements MetricsSource {
     }
   }
 
+  /**
+   * 调度延迟注销指标的定时器任务
+   */
   private void scheduleTimerTaskForUnregistration() {
     TimerTask timerTask = new TimerTask() {
       @Override
@@ -334,6 +414,9 @@ public class ContainerMetrics implements MetricsSource {
     unregisterContainerMetricsTimer.schedule(timerTask, unregisterDelayMs);
   }
 
+  /**
+   * 基于Dropwizard metrics Histogram实现的分位数估算器，用于统计容器资源使用分位数
+   */
   public static class ContainerMetricsQuantiles implements QuantileEstimator {
 
     private final Histogram histogram = new Histogram(new UniformReservoir());
@@ -358,6 +441,7 @@ public class ContainerMetrics implements MetricsSource {
     synchronized public void clear() {
       // don't do anything because we want metrics over the lifetime of the
       // container
+      // 不清除，需要保留容器整个生命周期的统计数据
     }
 
     @Override

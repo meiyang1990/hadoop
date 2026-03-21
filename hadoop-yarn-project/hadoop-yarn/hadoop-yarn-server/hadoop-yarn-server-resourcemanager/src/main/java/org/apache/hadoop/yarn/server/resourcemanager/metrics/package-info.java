@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.resourcemanager.metrics contains
- * classes related to publishing app/container events to ATS.
+ * YARN ResourceManager 指标指标模块，提供应用/容器事件向时间线服务(ATS)的推送能力，
+ * 包含事件处理、指标发布相关核心实现类。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

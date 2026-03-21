@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,45 +29,53 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement.AppPlac
 import org.apache.hadoop.yarn.server.scheduler.SchedulerRequestKey;
 
 /**
- * Factory class to build various application placement policies.
+ * 文件说明：YARN资源调度器应用位置分配器工厂，用于根据配置创建不同策略的应用位置分配器
+ * 工厂类，用于构建各类应用位置分配策略实例
  */
 @Public
 @Unstable
 public class ApplicationPlacementAllocatorFactory {
 
   /**
-   * Get AppPlacementAllocator related to the placement type requested.
+   * 根据请求的位置分配类型，获取对应的应用位置分配器实例
    *
    * @param appPlacementAllocatorName
-   *          allocator class name.
-   * @param appSchedulingInfo app SchedulingInfo.
-   * @param schedulerRequestKey scheduler RequestKey.
-   * @param rmContext RMContext.
-   * @return Specific AppPlacementAllocator instance based on type
+   *          位置分配器实现类全类名
+   * @param appSchedulingInfo 应用调度信息
+   * @param schedulerRequestKey 调度请求唯一标识
+   * @param rmContext ResourceManager上下文对象
+   * @return 对应类型的应用位置分配器实例
    */
   public static AppPlacementAllocator<SchedulerNode> getAppPlacementAllocator(
       String appPlacementAllocatorName, AppSchedulingInfo appSchedulingInfo,
       SchedulerRequestKey schedulerRequestKey, RMContext rmContext) {
     Class<?> policyClass;
     try {
+      // 分配器类名为空，使用默认位置分配器实现
       if (StringUtils.isEmpty(appPlacementAllocatorName)) {
         policyClass = ApplicationSchedulingConfig.DEFAULT_APPLICATION_PLACEMENT_TYPE_CLASS;
       } else {
+        // 加载用户指定的分配器类
         policyClass = Class.forName(appPlacementAllocatorName);
       }
     } catch (ClassNotFoundException e) {
+      // 找不到指定类，回退到默认分配器
       policyClass = ApplicationSchedulingConfig.DEFAULT_APPLICATION_PLACEMENT_TYPE_CLASS;
     }
 
+    // 检查加载的类是否实现了AppPlacementAllocator接口，不满足则使用默认分配器
     if (!AppPlacementAllocator.class.isAssignableFrom(policyClass)) {
       policyClass = ApplicationSchedulingConfig.DEFAULT_APPLICATION_PLACEMENT_TYPE_CLASS;
     }
 
     @SuppressWarnings("unchecked")
+    // 通过反射创建分配器实例
     AppPlacementAllocator<SchedulerNode> placementAllocatorInstance = (AppPlacementAllocator<SchedulerNode>) ReflectionUtils
         .newInstance(policyClass, null);
+    // 初始化分配器，传入所需上下文信息
     placementAllocatorInstance.initialize(appSchedulingInfo,
         schedulerRequestKey, rmContext);
+    // 返回初始化完成的分配器实例
     return placementAllocatorInstance;
   }
 }

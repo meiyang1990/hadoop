@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,6 +35,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.Applicatio
 import java.security.PrivateKey;
 import java.security.cert.X509Certificate;
 
+/**
+ * 空实现的ResourceManager状态存储，不持久化任何状态，用于不需要状态恢复的场景。
+ * 所有存储操作都不执行实际逻辑，加载状态操作抛出不支持异常。
+ */
 @Unstable
 public class NullRMStateStore extends RMStateStore {
 
@@ -57,6 +62,9 @@ public class NullRMStateStore extends RMStateStore {
     return 0L;
   }
 
+  /**
+   * 不支持从空存储加载状态，直接抛出异常
+   */
   @Override
   public RMState loadState() throws Exception {
     throw new UnsupportedOperationException("Cannot load state from null store");
@@ -126,7 +134,7 @@ public class NullRMStateStore extends RMStateStore {
   @Override
   protected void updateApplicationStateInternal(ApplicationId appId,
       ApplicationStateData appStateData) throws Exception {
-    // Do nothing 
+    // Do nothing
   }
 
   @Override

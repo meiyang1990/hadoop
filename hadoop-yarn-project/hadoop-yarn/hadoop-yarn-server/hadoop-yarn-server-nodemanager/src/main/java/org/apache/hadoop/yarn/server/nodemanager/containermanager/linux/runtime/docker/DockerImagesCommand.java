@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -20,16 +21,24 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * Encapsulates the docker images command and its command
- * line arguments.
+ * Docker images命令封装类，封装了docker列出镜像命令及其命令行参数。
+ * 用于YARN NodeManager执行Docker镜像查询操作，对应docker images命令。
  */
 public class DockerImagesCommand extends DockerCommand {
   private static final String IMAGES_COMMAND = "images";
 
+  /**
+   * 构造Docker images命令对象。
+   */
   public DockerImagesCommand() {
     super(IMAGES_COMMAND);
   }
 
+  /**
+   * 添加查询单个镜像状态的参数，仅获取指定镜像的信息。
+   * @param imageName 要查询的镜像名称
+   * @return 当前命令对象，支持链式调用
+   */
   public DockerImagesCommand getSingleImageStatus(String imageName) {
     Preconditions.checkNotNull(imageName, "imageName");
     super.addCommandArguments("image", imageName);

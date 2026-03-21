@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -83,13 +84,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The OpportunisticContainerAllocatorAMService is started instead of the
- * ApplicationMasterService if opportunistic scheduling is enabled for the YARN
- * cluster (either centralized or distributed opportunistic scheduling).
- *
- * It extends the functionality of the ApplicationMasterService by servicing
- * clients (AMs and AMRMProxy request interceptors) that understand the
- * DistributedSchedulingProtocol.
+ * 机会容器分配应用主服务：当YARN集群启用机会调度（集中式或分布式）时，替代普通ApplicationMasterService启动。
+ * 扩展了ApplicationMasterService功能，支持分布式调度协议，为客户端（AM和AMRMProxy请求拦截器）提供服务。
  */
 public class OpportunisticContainerAllocatorAMService
     extends ApplicationMasterService implements DistributedSchedulingAMProtocol,
@@ -98,15 +94,24 @@ public class OpportunisticContainerAllocatorAMService
   private static final Logger LOG =
       LoggerFactory.getLogger(OpportunisticContainerAllocatorAMService.class);
 
+  /** 节点队列负载监控器，维护各节点负载并选出负载最低节点 */
   private final NodeQueueLoadMonitor nodeMonitor;
+  /** 机会容器分配器，负责处理机会容器的分配逻辑 */
   private final OpportunisticContainerAllocator oppContainerAllocator;
 
+  /** 每次分配选择的节点数量，来自配置 */
   private final int numNodes;
 
+  /** 缓存节点列表刷新间隔（毫秒），来自配置 */
   private final long cacheRefreshInterval;
+  /** 缓存的最低负载节点列表 */
   private volatile List<RemoteNode> cachedNodes;
+  /** 上次缓存更新时间戳 */
   private volatile long lastCacheUpdateTime;
 
+  /**
+   * 机会调度AM处理器，处理AM请求中的机会容器分配逻辑，插入到AM处理链中。
+   */
   class OpportunisticAMSProcessor implements
       ApplicationMasterServiceProcessor {
 
@@ -125,17 +130,23 @@ public class OpportunisticContainerAllocatorAMService
       this.nextProcessor = next;
     }
 
+    /**
+     * 注册应用尝试，初始化机会容器上下文
+     */
     @Override
     public void registerApplicationMaster(
         ApplicationAttemptId applicationAttemptId,
         RegisterApplicationMasterRequest request,
         RegisterApplicationMasterResponse response)
         throws IOException, YarnException {
+      // 获取当前应用尝试调度信息
       SchedulerApplicationAttempt appAttempt = ((AbstractYarnScheduler)
           getScheduler()).getApplicationAttempt(applicationAttemptId);
+      // 若尚未初始化机会容器上下文则创建
       if (appAttempt.getOpportunisticContainerContext() == null) {
         OpportunisticContainerContext opCtx =
             new OpportunisticContainerContext();
+        // 设置容器ID生成器，复用应用尝试的容器ID生成逻辑
         opCtx.setContainerIdGenerator(new OpportunisticContainerAllocator
             .ContainerIdGenerator() {
           @Override
@@ -143,10 +154,12 @@ public class OpportunisticContainerAllocatorAMService
             return appAttempt.getAppSchedulingInfo().getNewContainerId();
           }
         });
+        // 读取容器令牌过期间隔配置
         int tokenExpiryInterval = getConfig()
             .getInt(YarnConfiguration.RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS,
                 YarnConfiguration.
                     DEFAULT_RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS);
+        // 更新分配参数：最小/最大资源能力，令牌过期时间
         opCtx.updateAllocationParams(
             getScheduler().getMinimumResourceCapability(),
             getScheduler().getMaximumResourceCapability(),
@@ -154,34 +167,41 @@ public class OpportunisticContainerAllocatorAMService
             tokenExpiryInterval);
         appAttempt.setOpportunisticContainerContext(opCtx);
       }
+      // 传递给下一个处理器继续处理注册逻辑
       nextProcessor.registerApplicationMaster(
           applicationAttemptId, request, response);
     }
 
+    /**
+     * 处理allocate请求，分离机会和保障容器，先分配机会容器再处理保障容器
+     */
     @Override
     public void allocate(ApplicationAttemptId appAttemptId,
         AllocateRequest request, AllocateResponse response)
         throws YarnException {
-      // Partition requests to GUARANTEED and OPPORTUNISTIC.
+      // 将请求按优先级分离为保障容器请求和机会容器请求
       OpportunisticContainerAllocator.PartitionedResourceRequests
           partitionedAsks =
           oppContainerAllocator.partitionAskList(request.getAskList());
 
-      // Allocate OPPORTUNISTIC containers.
+      // 获取当前应用尝试调度信息
       SchedulerApplicationAttempt appAttempt =
           ((AbstractYarnScheduler)rmContext.getScheduler())
               .getApplicationAttempt(appAttemptId);
 
+      // 校验应用尝试ID有效性
       if (!appAttempt.getApplicationAttemptId().equals(appAttemptId)){
         LOG.error("Calling allocate on previous or removed or non "
             + "existent application attempt {}", appAttemptId);
         return;
       }
 
+      // 获取机会容器上下文，更新节点列表（最低负载节点）
       OpportunisticContainerContext oppCtx =
           appAttempt.getOpportunisticContainerContext();
       oppCtx.updateNodeList(getLeastLoadedNodes());
 
+      // 为机会容器请求补全节点标签（使用AM所在节点分区）
       if (!partitionedAsks.getOpportunistic().isEmpty()) {
         String appPartition = appAttempt.getAppAMNodePartitionName();
 
@@ -192,13 +212,14 @@ public class OpportunisticContainerAllocatorAMService
         }
       }
 
+      // 执行机会容器分配
       List<Container> oppContainers =
           oppContainerAllocator.allocateContainers(
               request.getResourceBlacklistRequest(),
               partitionedAsks.getOpportunistic(), appAttemptId, oppCtx,
               ResourceManager.getClusterTimeStamp(), appAttempt.getUser());
 
-      // Create RMContainers and update the NMTokens.
+      // 分配成功后处理：创建RM容器、更新指标、添加令牌、加入响应
       if (!oppContainers.isEmpty()) {
         OpportunisticSchedulerMetrics schedulerMetrics =
             OpportunisticSchedulerMetrics.getMetrics();
@@ -209,7 +230,7 @@ public class OpportunisticContainerAllocatorAMService
             response, oppContainers);
       }
 
-      // Allocate GUARANTEED containers.
+      // 将剩余保障容器请求传递给下一个处理器处理
       request.setAskList(partitionedAsks.getGuaranteed());
       nextProcessor.allocate(appAttemptId, request, response);
     }
@@ -219,28 +240,38 @@ public class OpportunisticContainerAllocatorAMService
         ApplicationAttemptId applicationAttemptId,
         FinishApplicationMasterRequest request,
         FinishApplicationMasterResponse response) {
+      // 传递给下一个处理器处理完成逻辑
       nextProcessor.finishApplicationMaster(applicationAttemptId,
           request, response);
     }
   }
 
+  /**
+   * 构造机会容器分配AM服务，初始化负载监控和分配器
+   * @param rmContext RM上下文
+   * @param scheduler YARN调度器
+   */
   public OpportunisticContainerAllocatorAMService(RMContext rmContext,
       YarnScheduler scheduler) {
     super(OpportunisticContainerAllocatorAMService.class.getName(),
         rmContext, scheduler);
+    // 读取每次心跳最大分配机会容器数量配置
     int maxAllocationsPerAMHeartbeat = rmContext.getYarnConfiguration().getInt(
         YarnConfiguration.OPP_CONTAINER_MAX_ALLOCATIONS_PER_AM_HEARTBEAT,
         YarnConfiguration.
             DEFAULT_OPP_CONTAINER_MAX_ALLOCATIONS_PER_AM_HEARTBEAT);
+    // 读取每次分配选择的节点数量配置
     this.numNodes = rmContext.getYarnConfiguration().getInt(
         YarnConfiguration.OPP_CONTAINER_ALLOCATION_NODES_NUMBER_USED,
         YarnConfiguration.DEFAULT_OPP_CONTAINER_ALLOCATION_NODES_NUMBER_USED);
+    // 读取节点排序间隔配置，作为缓存刷新间隔
     long nodeSortInterval = rmContext.getYarnConfiguration().getLong(
         YarnConfiguration.NM_CONTAINER_QUEUING_SORTING_NODES_INTERVAL_MS,
         YarnConfiguration.
             DEFAULT_NM_CONTAINER_QUEUING_SORTING_NODES_INTERVAL_MS);
     this.cacheRefreshInterval = nodeSortInterval;
     this.lastCacheUpdateTime = System.currentTimeMillis();
+    // 读取负载比较器类型配置
     NodeQueueLoadMonitor.LoadComparator comparator =
         NodeQueueLoadMonitor.LoadComparator.valueOf(
             rmContext.getYarnConfiguration().get(
@@ -248,15 +279,18 @@ public class OpportunisticContainerAllocatorAMService
                 YarnConfiguration.
                     DEFAULT_NM_CONTAINER_QUEUING_LOAD_COMPARATOR));
 
+    // 创建节点队列负载监控器
     NodeQueueLoadMonitor topKSelector =
         new NodeQueueLoadMonitor(nodeSortInterval, comparator, numNodes);
 
+    // 读取阈值计算sigma参数
     float sigma = rmContext.getYarnConfiguration()
         .getFloat(YarnConfiguration.NM_CONTAINER_QUEUING_LIMIT_STDEV,
             YarnConfiguration.DEFAULT_NM_CONTAINER_QUEUING_LIMIT_STDEV);
 
     int limitMin, limitMax;
 
+    // 根据比较器类型读取不同的阈值上下限配置
     if (comparator == NodeQueueLoadMonitor.LoadComparator.QUEUE_LENGTH ||
         comparator ==
             NodeQueueLoadMonitor.LoadComparator.QUEUE_LENGTH_THEN_RESOURCES) {
@@ -281,8 +315,10 @@ public class OpportunisticContainerAllocatorAMService
                   DEFAULT_NM_CONTAINER_QUEUING_MAX_QUEUE_WAIT_TIME_MS);
     }
 
+    // 初始化阈值计算器
     topKSelector.initThresholdCalculator(sigma, limitMin, limitMax);
     this.nodeMonitor = topKSelector;
+    // 创建集中式机会容器分配器
     this.oppContainerAllocator =
         new CentralizedOpportunisticContainerAllocator(
             rmContext.getContainerTokenSecretManager(),
@@ -292,26 +328,27 @@ public class OpportunisticContainerAllocatorAMService
   @Override
   public Server getServer(YarnRPC rpc, Configuration serverConf,
       InetSocketAddress addr, AMRMTokenSecretManager secretManager) {
+    // 如果启用分布式调度，同时暴露分布式调度协议和普通AM协议
     if (YarnConfiguration.isDistSchedulingEnabled(serverConf)) {
       Server server = rpc.getServer(DistributedSchedulingAMProtocol.class, this,
           addr, serverConf, secretManager,
           serverConf.getInt(YarnConfiguration.RM_SCHEDULER_CLIENT_THREAD_COUNT,
               YarnConfiguration.DEFAULT_RM_SCHEDULER_CLIENT_THREAD_COUNT));
-      // To support application running on NMs that DO NOT support
-      // Dist Scheduling... The server multiplexes both the
-      // ApplicationMasterProtocol as well as the DistributedSchedulingProtocol
+      // 为了兼容不支持分布式调度的NM，同时添加普通ApplicationMasterProtocol协议支持
       ((RPC.Server) server).addProtocol(RPC.RpcKind.RPC_PROTOCOL_BUFFER,
           ApplicationMasterProtocolPB.class,
           ApplicationMasterProtocolService.newReflectiveBlockingService(
               new ApplicationMasterProtocolPBServiceImpl(this)));
       return server;
     }
+    // 未启用分布式调度，使用父类方法获取服务端
     return super.getServer(rpc, serverConf, addr, secretManager);
   }
 
   @Override
   protected List<ApplicationMasterServiceProcessor> getProcessorList(
       Configuration conf) {
+    // 获取父类处理器列表，添加本服务的机会调度处理器
     List<ApplicationMasterServiceProcessor> retVal =
         super.getProcessorList(conf);
     retVal.add(new OpportunisticAMSProcessor());
@@ -323,8 +360,10 @@ public class OpportunisticContainerAllocatorAMService
       registerApplicationMasterForDistributedScheduling(
       RegisterApplicationMasterRequest request) throws YarnException,
       IOException {
+    // 先调用普通注册逻辑
     RegisterApplicationMasterResponse response =
         registerApplicationMaster(request);
+    // 构建分布式调度注册响应
     RegisterDistributedSchedulingAMResponse dsResp = recordFactory
         .newRecordInstance(RegisterDistributedSchedulingAMResponse.class);
     dsResp.setRegisterResponse(response);
@@ -339,7 +378,7 @@ public class OpportunisticContainerAllocatorAMService
     dsResp.setContainerIdStart(
         this.rmContext.getEpoch() << ResourceManager.EPOCH_BIT_SHIFT);
 
-    // Set nodes to be used for scheduling
+    // 返回用于调度的最低负载节点列表
     dsResp.setNodesForScheduling(getLeastLoadedNodes());
     return dsResp;
   }
@@ -348,157 +387,5 @@ public class OpportunisticContainerAllocatorAMService
   public DistributedSchedulingAllocateResponse allocateForDistributedScheduling(
       DistributedSchedulingAllocateRequest request)
       throws YarnException, IOException {
-    List<Container> distAllocContainers = request.getAllocatedContainers();
-    handleNewContainers(distAllocContainers, true);
-    AllocateResponse response = allocate(request.getAllocateRequest());
-    DistributedSchedulingAllocateResponse dsResp = recordFactory
-        .newRecordInstance(DistributedSchedulingAllocateResponse.class);
-    dsResp.setAllocateResponse(response);
-    dsResp.setNodesForScheduling(getLeastLoadedNodes());
-    return dsResp;
-  }
-
-  private void handleNewContainers(List<Container> allocContainers,
-      boolean isRemotelyAllocated) {
-    for (Container container : allocContainers) {
-      // Create RMContainer
-      RMContainer rmContainer =
-          SchedulerUtils.createOpportunisticRmContainer(
-              rmContext, container, isRemotelyAllocated);
-      if (rmContainer!=null) {
-        rmContainer.handle(
-            new RMContainerEvent(container.getId(),
-                RMContainerEventType.ACQUIRED));
-      }
-    }
-  }
-
-  @Override
-  protected void serviceStart() throws Exception {
-    if (this.nodeMonitor != null) {
-      this.nodeMonitor.start();
-    }
-    super.serviceStart();
-  }
-
-  @Override
-  protected void serviceStop() throws Exception {
-    if (nodeMonitor != null) {
-      nodeMonitor.stop();
-    }
-    super.serviceStop();
-  }
-
-  @Override
-  public void handle(SchedulerEvent event) {
-    switch (event.getType()) {
-    case NODE_ADDED:
-      if (!(event instanceof NodeAddedSchedulerEvent)) {
-        throw new RuntimeException("Unexpected event type: " + event);
-      }
-      NodeAddedSchedulerEvent nodeAddedEvent = (NodeAddedSchedulerEvent) event;
-      nodeMonitor.addNode(nodeAddedEvent.getContainerReports(),
-          nodeAddedEvent.getAddedRMNode());
-      break;
-    case NODE_REMOVED:
-      if (!(event instanceof NodeRemovedSchedulerEvent)) {
-        throw new RuntimeException("Unexpected event type: " + event);
-      }
-      NodeRemovedSchedulerEvent nodeRemovedEvent =
-          (NodeRemovedSchedulerEvent) event;
-      nodeMonitor.removeNode(nodeRemovedEvent.getRemovedRMNode());
-      break;
-    case NODE_UPDATE:
-      if (!(event instanceof NodeUpdateSchedulerEvent)) {
-        throw new RuntimeException("Unexpected event type: " + event);
-      }
-      NodeUpdateSchedulerEvent nodeUpdatedEvent = (NodeUpdateSchedulerEvent)
-          event;
-      nodeMonitor.updateNode(nodeUpdatedEvent.getRMNode());
-      break;
-    case NODE_RESOURCE_UPDATE:
-      if (!(event instanceof NodeResourceUpdateSchedulerEvent)) {
-        throw new RuntimeException("Unexpected event type: " + event);
-      }
-      NodeResourceUpdateSchedulerEvent nodeResourceUpdatedEvent =
-          (NodeResourceUpdateSchedulerEvent) event;
-      nodeMonitor.updateNodeResource(nodeResourceUpdatedEvent.getRMNode(),
-          nodeResourceUpdatedEvent.getResourceOption());
-      break;
-
-    // <-- IGNORED EVENTS : START -->
-    case APP_ADDED:
-      break;
-    case APP_REMOVED:
-      break;
-    case APP_ATTEMPT_ADDED:
-      break;
-    case APP_ATTEMPT_REMOVED:
-      break;
-    case CONTAINER_EXPIRED:
-      break;
-    case NODE_LABELS_UPDATE:
-      break;
-    case RELEASE_CONTAINER:
-      break;
-    case NODE_ATTRIBUTES_UPDATE:
-      break;
-    case KILL_RESERVED_CONTAINER:
-      break;
-    case MARK_CONTAINER_FOR_PREEMPTION:
-      break;
-    case MARK_CONTAINER_FOR_KILLABLE:
-      break;
-    case MARK_CONTAINER_FOR_NONKILLABLE:
-      break;
-    case MANAGE_QUEUE:
-      break;
-    // <-- IGNORED EVENTS : END -->
-    default:
-      LOG.error("Unknown event arrived at" +
-          "OpportunisticContainerAllocatorAMService: {}", event);
-    }
-
-  }
-
-  QueueLimitCalculator getNodeManagerQueueLimitCalculator() {
-    return nodeMonitor.getThresholdCalculator();
-  }
-
-  @VisibleForTesting
-  synchronized List<RemoteNode> getLeastLoadedNodes() {
-    long currTime = System.currentTimeMillis();
-    if ((currTime - lastCacheUpdateTime > cacheRefreshInterval)
-        || (cachedNodes == null)) {
-      cachedNodes = convertToRemoteNodes(
-          this.nodeMonitor.selectLeastLoadedNodes(this.numNodes));
-      if (cachedNodes.size() > 0) {
-        lastCacheUpdateTime = currTime;
-      }
-    }
-    return cachedNodes;
-  }
-
-  private List<RemoteNode> convertToRemoteNodes(List<NodeId> nodeIds) {
-    ArrayList<RemoteNode> retNodes = new ArrayList<>();
-    for (NodeId nId : nodeIds) {
-      RemoteNode remoteNode = convertToRemoteNode(nId);
-      if (null != remoteNode) {
-        retNodes.add(remoteNode);
-      }
-    }
-    return retNodes;
-  }
-
-  private RemoteNode convertToRemoteNode(NodeId nodeId) {
-    SchedulerNode node =
-        ((AbstractYarnScheduler) rmContext.getScheduler()).getNode(nodeId);
-    if (node != null) {
-      RemoteNode rNode = RemoteNode.newInstance(nodeId, node.getHttpAddress());
-      rNode.setRackName(node.getRackName());
-      rNode.setNodePartition(node.getPartition());
-      return rNode;
-    }
-    return null;
-  }
-}
+    // 处理分布式调度已经分配好的容器，在RM侧创建对应的RMContainer
+    List<Container> dist

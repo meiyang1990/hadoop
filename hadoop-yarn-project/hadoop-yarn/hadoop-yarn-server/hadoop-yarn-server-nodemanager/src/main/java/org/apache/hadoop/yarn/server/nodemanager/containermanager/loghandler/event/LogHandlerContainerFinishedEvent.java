@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -21,12 +22,21 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.ev
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.api.ContainerType;
 
+/**
+ * 容器完成事件，通知日志处理器对已结束容器的日志进行后续处理（聚合、归档等）
+ */
 public class LogHandlerContainerFinishedEvent extends LogHandlerEvent {
 
   private final ContainerId containerId;
   private final ContainerType containerType;
   private final int exitCode;
 
+  /**
+   * 构造容器完成日志处理事件
+   * @param containerId 已完成容器ID
+   * @param containerType 容器类型
+   * @param exitCode 容器退出码
+   */
   public LogHandlerContainerFinishedEvent(ContainerId containerId,
       ContainerType containerType, int exitCode) {
     super(LogHandlerEventType.CONTAINER_FINISHED);

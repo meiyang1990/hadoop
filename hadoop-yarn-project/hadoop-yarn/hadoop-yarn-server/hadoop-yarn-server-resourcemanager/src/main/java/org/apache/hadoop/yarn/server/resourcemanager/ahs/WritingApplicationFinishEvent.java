@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,12 +22,21 @@ package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationFinishData;
 
+/**
+ * 应用程序结束事件写入应用历史的事件类。
+ * 封装应用程序结束相关信息，用于资源管理器异步写入应用历史服务。
+ */
 public class WritingApplicationFinishEvent extends
     WritingApplicationHistoryEvent {
 
   private ApplicationId appId;
   private ApplicationFinishData appFinish;
 
+  /**
+   * 构造应用结束写入历史事件对象。
+   * @param appId 应用程序ID
+   * @param appFinish 应用程序结束信息数据
+   */
   public WritingApplicationFinishEvent(ApplicationId appId,
       ApplicationFinishData appFinish) {
     super(WritingHistoryEventType.APP_FINISH);
@@ -39,10 +49,18 @@ public class WritingApplicationFinishEvent extends
     return appId.hashCode();
   }
 
+  /**
+   * 获取应用程序ID。
+   * @return 应用程序ID
+   */
   public ApplicationId getApplicationId() {
     return appId;
   }
 
+  /**
+   * 获取应用程序结束信息数据。
+   * @return 应用程序结束数据，包含结束时间、最终状态等信息
+   */
   public ApplicationFinishData getApplicationFinishData() {
     return appFinish;
   }

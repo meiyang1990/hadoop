@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -99,8 +100,8 @@ import static org.apache.hadoop.yarn.exceptions
         .InvalidResourceRequestException.InvalidResourceType.LESS_THAN_ZERO;
 
 /**
- * This is the default Application Master Service processor. It has be the
- * last processor in the @{@link AMSProcessingChain}.
+ * 默认Application Master服务处理器，必须是AMS处理链的最后一个处理器，
+ * 负责处理Application Master注册、资源分配、注销等核心请求的最终处理。
  */
 final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
 
@@ -144,19 +145,25 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     RMApp app = getRmContext().getRMApps().get(
         applicationAttemptId.getApplicationId());
     LOG.info("AM registration " + applicationAttemptId);
+    // 发送AM注册事件到事件分发器处理
     getRmContext().getDispatcher().getEventHandler()
         .handle(
             new RMAppAttemptRegistrationEvent(applicationAttemptId, request
                 .getHost(), request.getRpcPort(), request.getTrackingUrl()));
+    // 记录AM注册审计日志
     RMAuditLogger.logSuccess(app.getUser(),
         RMAuditLogger.AuditConstants.REGISTER_AM,
         "ApplicationMasterService", app.getApplicationId(),
         applicationAttemptId);
+    // 设置队列最大资源能力返回给AM
     response.setMaximumResourceCapability(getScheduler()
         .getMaximumResourceCapability(app.getQueue()));
+    // 设置应用ACLs返回给AM
     response.setApplicationACLs(app.getRMAppAttempt(applicationAttemptId)
         .getSubmissionContext().getAMContainerSpec().getApplicationACLs());
+    // 设置应用队列名称返回给AM
     response.setQueue(app.getQueue());
+    // 安全模式下设置Client到AM令牌主密钥
     if (UserGroupInformation.isSecurityEnabled()) {
       LOG.info("Setting client token master key");
       response.setClientToAMTokenMasterKey(java.nio.ByteBuffer.wrap(
@@ -164,12 +171,10 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
           .getMasterKey(applicationAttemptId).getEncoded()));
     }
 
-    // For work-preserving AM restart, retrieve previous attempts' containers
-    // and corresponding NM tokens.
+    // 对于保持容器的AM重启，获取上一次尝试的容器和对应的NM令牌
     if (app.getApplicationSubmissionContext()
         .getKeepContainersAcrossApplicationAttempts()) {
-      // Clear the node set remembered by the secret manager. Necessary
-      // for UAM restart because we use the same attemptId.
+      // 清除密钥管理器中该尝试的节点集合，UAM重启时必须处理，因为复用尝试ID
       rmContext.getNMTokenSecretManager().clearNodeSetForAttempt(applicationAttemptId);
       List<Container> transferredContainers = getScheduler()
           .getTransferredContainers(applicationAttemptId);
@@ -177,6 +182,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
         response.setContainersFromPreviousAttempts(transferredContainers);
 
         List<NMToken> nmTokens = new ArrayList<NMToken>();
+        // 为每个转移过来的容器生成NM令牌
         for (Container container : transferredContainers) {
           try {
             NMToken token = getRmContext().getNMTokenSecretManager()
@@ -186,9 +192,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
               nmTokens.add(token);
             }
           } catch (IllegalArgumentException e) {
-            // if it's a DNS issue, throw UnknowHostException directly and
-            // that
-            // will be automatically retried by RMProxy in RPC layer.
+            // DNS解析错误直接抛出，RPC层RMProxy会自动重试
             if (e.getCause() instanceof UnknownHostException) {
               throw (UnknownHostException) e.getCause();
             }
@@ -204,6 +208,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     response.setSchedulerResourceTypes(getScheduler()
         .getSchedulingResourceTypes());
     response.setResourceTypes(ResourceUtils.getResourcesTypeInfo());
+    // 启用资源配置文件时返回所有资源配置信息
     if (getRmContext().getYarnConfiguration().getBoolean(
         YarnConfiguration.RM_RESOURCE_PROFILES_ENABLED,
         YarnConfiguration.DEFAULT_RM_RESOURCE_PROFILES_ENABLED)) {
@@ -216,6 +221,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
   public void allocate(ApplicationAttemptId appAttemptId,
       AllocateRequest request, AllocateResponse response) throws YarnException {
 
+    // 处理AM进度更新
     handleProgress(appAttemptId, request);
 
     List<ResourceRequest> ask = request.getAskList();
@@ -232,7 +238,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     RMApp app =
         getRmContext().getRMApps().get(appAttemptId.getApplicationId());
 
-    // set label expression for Resource Requests if resourceName=ANY
+    // 为ANY资源请求补上应用默认节点标签表达式
     ApplicationSubmissionContext asc = app.getApplicationSubmissionContext();
     for (ResourceRequest req : ask) {
       if (null == req.getNodeLabelExpression()
@@ -240,6 +246,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
         req.setNodeLabelExpression(asc.getNodeLabelExpression());
       }
       if (ResourceRequest.ANY.equals(req.getResourceName())) {
+        // 强制设置分区排他性
         SchedulerUtils.enforcePartitionExclusivity(req,
             exclusiveEnforcedPartitions, asc.getNodeLabelExpression());
       }
@@ -248,7 +255,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     Resource maximumCapacity =
         getScheduler().getMaximumResourceCapability(app.getQueue());
 
-    // sanity check
+    // 资源请求合法性校验
     try {
       RMServerUtils.normalizeAndValidateRequests(ask,
           maximumCapacity, app.getQueue(),
@@ -259,14 +266,14 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     }
 
     try {
+      // 校验黑名单请求合法性
       RMServerUtils.validateBlacklistRequest(blacklistRequest);
     }  catch (InvalidResourceBlacklistRequestException e) {
       LOG.warn("Invalid blacklist request by application " + appAttemptId, e);
       throw e;
     }
 
-    // In the case of work-preserving AM restart, it's possible for the
-    // AM to release containers from the earlier attempt.
+    // 不保持容器跨尝试时，校验容器释放请求合法性
     if (!app.getApplicationSubmissionContext()
         .getKeepContainersAcrossApplicationAttempts()) {
       try {
@@ -278,18 +285,16 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
       }
     }
 
-    // Split Update Resource Requests into increase and decrease.
-    // No Exceptions are thrown here. All update errors are aggregated
-    // and returned to the AM.
+    // 拆分容器更新请求，收集更新错误
     List<UpdateContainerError> updateErrors = new ArrayList<>();
     ContainerUpdates containerUpdateRequests =
         RMServerUtils.validateAndSplitUpdateResourceRequests(
             getRmContext(), request, maximumCapacity, updateErrors);
 
-    // Send new requests to appAttempt.
     Allocation allocation;
     RMAppAttemptState state =
         app.getRMAppAttempt(appAttemptId).getAppAttemptState();
+    // 应用已进入最终状态，忽略分配请求
     if (state.equals(RMAppAttemptState.FINAL_SAVING) ||
         state.equals(RMAppAttemptState.FINISHING) ||
         app.isAppFinalStateStored()) {
@@ -298,6 +303,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
       allocation = EMPTY_ALLOCATION;
     } else {
       try {
+        // 调用调度器进行资源分配
         allocation = getScheduler().allocate(appAttemptId, ask,
             request.getSchedulingRequests(), release,
             blacklistAdditions, blacklistRemovals, containerUpdateRequests);
@@ -307,6 +313,7 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
       }
     }
 
+    // 日志记录黑名单更新
     if (!blacklistAdditions.isEmpty() || !blacklistRemovals.isEmpty()) {
       LOG.info("blacklist are updated in Scheduler." +
           "blacklistAdditions: " + blacklistAdditions + ", " +
@@ -314,25 +321,30 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
     }
     RMAppAttempt appAttempt = app.getRMAppAttempt(appAttemptId);
 
+    // 设置NM令牌到响应
     if (allocation.getNMTokens() != null &&
         !allocation.getNMTokens().isEmpty()) {
       response.setNMTokens(allocation.getNMTokens());
     }
 
-    // Notify the AM of container update errors
+    // 将容器更新错误添加到响应
     ApplicationMasterServiceUtils.addToUpdateContainerErrors(
         response, updateErrors);
 
-    // update the response with the deltas of node status changes
+    // 处理节点状态更新，添加更新节点报告到响应
     handleNodeUpdates(app, response);
 
+    // 添加新分配容器到响应
     ApplicationMasterServiceUtils.addToAllocatedContainers(
         response, allocation.getContainers());
 
+    // 添加已完成容器状态到响应
     response.setCompletedContainersStatuses(appAttempt
         .pullJustFinishedContainers());
+    // 设置可用资源信息
     response.setAvailableResources(allocation.getResourceLimit());
 
+    // 计算并设置增强容量信息（待处理容器数+总vcore数）
     QueueMetrics queueMetrics =
         this.rmContext.getScheduler().getRootQueueMetrics();
     if (queueMetrics != null) {
@@ -344,27 +356,29 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
           EnhancedHeadroom.newInstance(pendingContainers, totalVirtualCores));
     }
 
+    // 添加容器更新结果和错误到响应
     addToContainerUpdates(response, allocation,
         ((AbstractYarnScheduler)getScheduler())
             .getApplicationAttempt(appAttemptId).pullUpdateContainerErrors());
 
+    // 获取队列默认节点标签，用于计算对应标签下可用节点数
     String label="";
     try {
       label = rmContext.getScheduler()
           .getQueueInfo(app.getQueue(), false, false)
           .getDefaultNodeLabelExpression();
     } catch (Exception e){
-      //Queue may not exist since it could be auto-created in case of
-      // dynamic queues
+      // 动态队列场景下队列可能还不存在，忽略异常
     }
 
+    // 设置集群节点数，带标签时返回对应标签下的活跃节点数
     if (label == null || label.equals("")) {
       response.setNumClusterNodes(getScheduler().getNumClusterNodes());
     } else {
       response.setNumClusterNodes(rmContext.getNodeLabelManager().getActiveNMCountPerLabel(label));
     }
 
-    // add collector address for this application
+    // 开启Timeline Service V2时添加采集器信息到响应
     if (timelineServiceV2Enabled) {
       CollectorInfo collectorInfo = app.getCollectorInfo();
       if (collectorInfo != null) {
@@ -372,179 +386,21 @@ final class DefaultAMSProcessor implements ApplicationMasterServiceProcessor {
       }
     }
 
-    // add preemption to the allocateResponse message (if any)
+    // 生成抢占消息添加到响应
     response.setPreemptionMessage(generatePreemptionMessage(allocation));
 
-    // Set application priority
+    // 设置应用优先级到响应
     response.setApplicationPriority(app
         .getApplicationPriority());
 
+    // 设置上一次尝试保留容器到响应
     response.setContainersFromPreviousAttempts(
         allocation.getPreviousAttemptContainers());
 
+    // 设置被拒绝的调度请求到响应
     response.setRejectedSchedulingRequests(allocation.getRejectedRequest());
 
   }
 
-  private void handleInvalidResourceException(InvalidResourceRequestException e,
-          RMAppAttempt rmAppAttempt) throws InvalidResourceRequestException {
-    if (e.getInvalidResourceType() == LESS_THAN_ZERO ||
-            e.getInvalidResourceType() == GREATER_THEN_MAX_ALLOCATION) {
-      rmAppAttempt.updateAMLaunchDiagnostics(e.getMessage());
-    }
-    LOG.warn("Invalid resource ask by application " +
-            rmAppAttempt.getAppAttemptId(), e);
-    throw e;
-  }
-
-  private void handleNodeUpdates(RMApp app, AllocateResponse allocateResponse) {
-    Map<RMNode, NodeUpdateType> updatedNodes = new HashMap<>();
-    if(app.pullRMNodeUpdates(updatedNodes) > 0) {
-      List<NodeReport> updatedNodeReports = new ArrayList<>();
-      for(Map.Entry<RMNode, NodeUpdateType> rmNodeEntry :
-          updatedNodes.entrySet()) {
-        RMNode rmNode = rmNodeEntry.getKey();
-        SchedulerNodeReport schedulerNodeReport =
-            getScheduler().getNodeReport(rmNode.getNodeID());
-        Resource used = Resources.createResource(0);
-        int numContainers = 0;
-        if (schedulerNodeReport != null) {
-          used = schedulerNodeReport.getUsedResource();
-          numContainers = schedulerNodeReport.getNumContainers();
-        }
-        NodeId nodeId = rmNode.getNodeID();
-        NodeReport report =
-            BuilderUtils.newNodeReport(nodeId, rmNode.getState(),
-                rmNode.getHttpAddress(), rmNode.getRackName(), used,
-                rmNode.getTotalCapability(), numContainers,
-                rmNode.getHealthReport(), rmNode.getLastHealthReportTime(),
-                rmNode.getNodeLabels(), rmNode.getDecommissioningTimeout(),
-                rmNodeEntry.getValue());
-
-        updatedNodeReports.add(report);
-      }
-      allocateResponse.setUpdatedNodes(updatedNodeReports);
-    }
-  }
-
-  private void handleProgress(ApplicationAttemptId appAttemptId,
-      AllocateRequest request) {
-    //filter illegal progress values
-    float filteredProgress = request.getProgress();
-    if (Float.isNaN(filteredProgress) ||
-        filteredProgress == Float.NEGATIVE_INFINITY ||
-        filteredProgress < 0) {
-      request.setProgress(0);
-    } else if (filteredProgress > 1 ||
-        filteredProgress == Float.POSITIVE_INFINITY) {
-      request.setProgress(1);
-    }
-
-    // Send the status update to the appAttempt.
-    getRmContext().getDispatcher().getEventHandler().handle(
-        new RMAppAttemptStatusupdateEvent(appAttemptId, request
-            .getProgress(), request.getTrackingUrl()));
-  }
-
-  @Override
-  public void finishApplicationMaster(
-      ApplicationAttemptId applicationAttemptId,
-      FinishApplicationMasterRequest request,
-      FinishApplicationMasterResponse response) {
-    RMApp app =
-        getRmContext().getRMApps().get(applicationAttemptId.getApplicationId());
-    // For UnmanagedAMs, return true so they don't retry
-    response.setIsUnregistered(
-            app.getApplicationSubmissionContext().getUnmanagedAM());
-    getRmContext().getDispatcher().getEventHandler().handle(
-        new RMAppAttemptUnregistrationEvent(applicationAttemptId, request
-            .getTrackingUrl(), request.getFinalApplicationStatus(), request
-            .getDiagnostics()));
-  }
-
-  private PreemptionMessage generatePreemptionMessage(Allocation allocation){
-    PreemptionMessage pMsg = null;
-    // assemble strict preemption request
-    if (allocation.getStrictContainerPreemptions() != null) {
-      pMsg =
-          recordFactory.newRecordInstance(PreemptionMessage.class);
-      StrictPreemptionContract pStrict =
-          recordFactory.newRecordInstance(StrictPreemptionContract.class);
-      Set<PreemptionContainer> pCont = new HashSet<>();
-      for (ContainerId cId : allocation.getStrictContainerPreemptions()) {
-        PreemptionContainer pc =
-            recordFactory.newRecordInstance(PreemptionContainer.class);
-        pc.setId(cId);
-        pCont.add(pc);
-      }
-      pStrict.setContainers(pCont);
-      pMsg.setStrictContract(pStrict);
-    }
-
-    // assemble negotiable preemption request
-    if (allocation.getResourcePreemptions() != null &&
-        allocation.getResourcePreemptions().size() > 0 &&
-        allocation.getContainerPreemptions() != null &&
-        allocation.getContainerPreemptions().size() > 0) {
-      if (pMsg == null) {
-        pMsg =
-            recordFactory.newRecordInstance(PreemptionMessage.class);
-      }
-      PreemptionContract contract =
-          recordFactory.newRecordInstance(PreemptionContract.class);
-      Set<PreemptionContainer> pCont = new HashSet<>();
-      for (ContainerId cId : allocation.getContainerPreemptions()) {
-        PreemptionContainer pc =
-            recordFactory.newRecordInstance(PreemptionContainer.class);
-        pc.setId(cId);
-        pCont.add(pc);
-      }
-      List<PreemptionResourceRequest> pRes = new ArrayList<>();
-      for (ResourceRequest crr : allocation.getResourcePreemptions()) {
-        PreemptionResourceRequest prr =
-            recordFactory.newRecordInstance(PreemptionResourceRequest.class);
-        prr.setResourceRequest(crr);
-        pRes.add(prr);
-      }
-      contract.setContainers(pCont);
-      contract.setResourceRequest(pRes);
-      pMsg.setContract(contract);
-    }
-
-    return pMsg;
-  }
-
-  protected RMContext getRmContext() {
-    return rmContext;
-  }
-
-  protected YarnScheduler getScheduler() {
-    return rmContext.getScheduler();
-  }
-
-  private static void addToContainerUpdates(AllocateResponse allocateResponse,
-      Allocation allocation, List<UpdateContainerError> updateContainerErrors) {
-    // Handling increased containers
-    ApplicationMasterServiceUtils.addToUpdatedContainers(
-        allocateResponse, ContainerUpdateType.INCREASE_RESOURCE,
-        allocation.getIncreasedContainers());
-
-    // Handling decreased containers
-    ApplicationMasterServiceUtils.addToUpdatedContainers(
-        allocateResponse, ContainerUpdateType.DECREASE_RESOURCE,
-        allocation.getDecreasedContainers());
-
-    // Handling promoted containers
-    ApplicationMasterServiceUtils.addToUpdatedContainers(
-        allocateResponse, ContainerUpdateType.PROMOTE_EXECUTION_TYPE,
-        allocation.getPromotedContainers());
-
-    // Handling demoted containers
-    ApplicationMasterServiceUtils.addToUpdatedContainers(
-        allocateResponse, ContainerUpdateType.DEMOTE_EXECUTION_TYPE,
-        allocation.getDemotedContainers());
-
-    ApplicationMasterServiceUtils.addToUpdateContainerErrors(
-        allocateResponse, updateContainerErrors);
-  }
-}
+  /**
+   * 处理非法

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,9 +23,19 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.server.api.ContainerLogContext;
 import org.apache.hadoop.yarn.server.api.ContainerType;
 
+/**
+ * 仅对ApplicationMaster聚合日志的策略
+ * 仅聚合应用程序主容器（AM）的日志，不聚合普通任务容器的日志
+ */
 @Private
 public class AMOnlyLogAggregationPolicy extends
     AbstractContainerLogAggregationPolicy {
+  
+  /**
+   * 判断是否需要对指定容器进行日志聚合
+   * @param logContext 容器日志上下文，包含容器类型信息
+   * @return 如果容器是ApplicationMaster则返回true，否则返回false
+   */
   public boolean shouldDoLogAggregation(ContainerLogContext logContext) {
    return logContext.getContainerType() == ContainerType.APPLICATION_MASTER;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -30,51 +31,48 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 
 /**
- * This interface is the one implemented by the schedulers. It mainly extends 
- * {@link YarnScheduler}. 
- *
+ * YARN资源调度器核心接口，所有具体调度器实现都需要继承该接口。
+ * 扩展了YarnScheduler基础接口，并增加了恢复、初始化等调度器生命周期相关方法。
  */
 @LimitedPrivate("yarn")
 @Evolving
 public interface ResourceScheduler extends YarnScheduler, Recoverable {
 
   /**
-   * Set RMContext for <code>ResourceScheduler</code>.
-   * This method should be called immediately after instantiating
-   * a scheduler once.
-   * @param rmContext created by ResourceManager
+   * 为资源调度器设置RM上下文对象，
+   * 该方法仅需在调度器实例化后调用一次。
+   * @param rmContext ResourceManager创建的上下文对象
    */
   void setRMContext(RMContext rmContext);
 
   /**
-   * Re-initialize the <code>ResourceScheduler</code>.
-   * @param conf configuration
-   * @param rmContext RMContext.
-   * @throws IOException an I/O exception has occurred.
+   * 重新初始化资源调度器，用于配置更新后重载调度器。
+   * @param conf 新的配置对象
+   * @param rmContext RM上下文对象
+   * @throws IOException 初始化过程中发生I/O异常时抛出
    */
   void reinitialize(Configuration conf, RMContext rmContext) throws IOException;
 
   /**
-   * Get the {@link NodeId} available in the cluster by resource name.
-   * @param resourceName resource name
-   * @return the number of available {@link NodeId} by resource name.
+   * 根据资源名称获取集群中匹配该资源的可用节点ID列表。
+   * @param resourceName 资源名称（通常指节点标签）
+   * @return 匹配该资源名称的可用节点ID列表
    */
   List<NodeId> getNodeIds(String resourceName);
 
   /**
-   * Attempts to allocate a SchedulerRequest on a Node.
-   * NOTE: This ignores the numAllocations in the resource sizing and tries
-   *       to allocate a SINGLE container only.
-   * @param appAttempt ApplicationAttempt.
-   * @param schedulingRequest SchedulingRequest.
-   * @param schedulerNode SchedulerNode.
-   * @return true if proposal was accepted.
+   * 尝试在指定节点上为调度请求分配容器，
+   * 注意：该方法忽略请求中的分配数量，仅尝试分配单个容器。
+   * @param appAttempt 应用尝试上下文
+   * @param schedulingRequest 调度请求
+   * @param schedulerNode 目标节点
+   * @return 分配成功返回true，否则返回false
    */
   boolean attemptAllocationOnNode(SchedulerApplicationAttempt appAttempt,
       SchedulingRequest schedulingRequest, SchedulerNode schedulerNode);
 
   /**
-   * Reset scheduler metrics.
+   * 重置调度器指标统计。
    */
   void resetSchedulerMetrics();
 }

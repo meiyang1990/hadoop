@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,8 +26,13 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resource
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.fpga.FpgaDevice;
 
 /**
- * Interface for an FPGA device discovery strategy.
+ * FPGA设备发现策略接口，定义节点上FPGA设备发现的统一抽象，支持不同厂商/环境的扩展实现
  */
 public interface FPGADiscoveryStrategy {
+  /**
+   * 执行FPGA设备发现，返回当前节点上可用的FPGA设备列表
+   * @return 发现到的可用FPGA设备列表
+   * @throws ResourceHandlerException 发现过程中出现异常时抛出
+   */
   List<FpgaDevice> discover() throws ResourceHandlerException;
 }

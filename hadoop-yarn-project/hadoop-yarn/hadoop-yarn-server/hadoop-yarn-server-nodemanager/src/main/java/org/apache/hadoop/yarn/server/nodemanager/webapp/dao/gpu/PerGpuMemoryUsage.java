@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,6 +26,9 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
+/**
+ * 单个GPU卡的显存使用信息，用于解析nvidia-smi的XML输出，为NM WebUI提供GPU监控数据
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 @XmlRootElement(name = "fb_memory_usage")
@@ -32,6 +36,10 @@ public class PerGpuMemoryUsage {
   private long usedMemoryMiB = -1L;
   private long availMemoryMiB = -1L;
 
+  /**
+   * 获取已使用显存大小（单位MiB）
+   * @return 已使用显存大小
+   */
   @XmlJavaTypeAdapter(PerGpuDeviceInformation.StrToMemAdapter.class)
   @XmlElement(name = "used")
   public Long getUsedMemoryMiB() {
@@ -42,6 +50,10 @@ public class PerGpuMemoryUsage {
     this.usedMemoryMiB = usedMemoryMiB;
   }
 
+  /**
+   * 获取可用显存大小（单位MiB）
+   * @return 可用显存大小
+   */
   @XmlJavaTypeAdapter(PerGpuDeviceInformation.StrToMemAdapter.class)
   @XmlElement(name = "free")
   public Long getAvailMemoryMiB() {
@@ -52,6 +64,10 @@ public class PerGpuMemoryUsage {
     this.availMemoryMiB = availMemoryMiB;
   }
 
+  /**
+   * 计算GPU总显存大小（单位MiB）
+   * @return 总显存大小，若信息未获取到则返回-1
+   */
   public long getTotalMemoryMiB() {
     if (usedMemoryMiB == -1 && availMemoryMiB == -1) {
       return -1;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,6 +44,10 @@ import org.apache.hadoop.yarn.metrics.CustomResourceMetricValue;
 import org.apache.hadoop.yarn.metrics.CustomResourceMetrics;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 
+/**
+ * YARN ResourceManager 集群指标采集类，负责收集和暴露整个YARN集群的运行状态指标，
+ * 包括节点状态、资源使用、调度延迟、事件队列等核心监控数据，供Metrics系统采集展示。
+ */
 @InterfaceAudience.Private
 @Metrics(context="yarn")
 public class ClusterMetrics {
@@ -96,11 +101,16 @@ public class ClusterMetrics {
   private AtomicInteger numContainersAssigned =  new AtomicInteger(0);
   private ScheduledThreadPoolExecutor assignCounterExecutor;
 
+  /**
+   * 构造函数，初始化容器分配计数器定时任务，每秒统计一次分配容器数量。
+   */
   ClusterMetrics() {
+    // 创建守护线程池，负责每秒重置计数器
     assignCounterExecutor  = new ScheduledThreadPoolExecutor(1,
             new ThreadFactoryBuilder().
             setDaemon(true).setNameFormat("ContainerAssignmentCounterThread").
             build());
+    // 启动定时任务，每秒更新每秒容器分配数指标
     assignCounterExecutor.scheduleAtFixedRate(new Runnable() {
       @Override
       public void run() {
@@ -109,6 +119,10 @@ public class ClusterMetrics {
     }, 1, 1, TimeUnit.SECONDS);
   }
 
+  /**
+   * 获取ClusterMetrics单例实例，懒加载实现线程安全的单例模式。
+   * @return 集群指标单例对象
+   */
   public static ClusterMetrics getMetrics() {
     if(!isInitialized.get()){
       synchronized (ClusterMetrics.class) {
@@ -122,14 +136,20 @@ public class ClusterMetrics {
     return INSTANCE;
   }
 
+  /**
+   * 注册集群指标到Hadoop Metrics系统，初始化自定义资源指标。
+   */
   private static void registerMetrics() {
+    // 创建指标注册表，标记所属组件为ResourceManager
     registry = new MetricsRegistry(RECORD_INFO);
     registry.tag(RECORD_INFO, "ResourceManager");
     MetricsSystem ms = DefaultMetricsSystem.instance();
     if (ms != null) {
+      // 将当前指标注册到默认指标系统
       ms.register("ClusterMetrics", "Metrics for the Yarn Cluster", INSTANCE);
     }
 
+    // 如果存在除内存和vcore之外还有自定义资源类型，注册自定义资源指标
     if (ResourceUtils.getNumberOfKnownResourceTypes() > 2) {
       customResourceMetrics =
           new CustomResourceMetrics();
@@ -142,6 +162,9 @@ public class ClusterMetrics {
     }
   }
 
+  /**
+   * 销毁单例实例，关闭定时任务，用于测试场景。
+   */
   @VisibleForTesting
   public synchronized static void destroy() {
     if (INSTANCE != null && INSTANCE.getAssignCounterExecutor() != null) {
@@ -151,6 +174,10 @@ public class ClusterMetrics {
     INSTANCE = null;
   }
   
+  /**
+   * 设置RM事件处理器CPU监控是否启用。
+   * @param value 是否启用
+   */
   // Indicate whether RM Event Thread CPU Monitor is enabled
   public void setRmEventProcMonitorEnable(boolean value) {
     rmEventProcMonitorEnable = value;
@@ -271,10 +298,18 @@ public class ClusterMetrics {
     numActiveNMs.decr();
   }
 
+  /**
+   * 添加一次AM容器启动延迟采样。
+   * @param delay 延迟时间，单位毫秒
+   */
   public void addAMLaunchDelay(long delay) {
     aMLaunchDelay.add(delay);
   }
 
+  /**
+   * 添加一次AM注册延迟采样。
+   * @param delay 延迟时间，单位毫秒
+   */
   public void addAMRegisterDelay(long delay) {
     aMRegisterDelay.add(delay);
   }
@@ -287,14 +322,26 @@ public class ClusterMetrics {
     return capabilityVirtualCores.value();
   }
 
+  /**
+   * 获取所有自定义资源的集群总能力。
+   * @return 自定义资源名称与总容量映射
+   */
   public Map<String, Long> getCustomResourceCapability() {
     return customResourceCapability.getValues();
   }
 
+  /**
+   * 设置自定义资源总容量，从传入资源刷新当前值。
+   * @param res 资源对象，包含所有自定义资源值
+   */
   public void setCustomResourceCapability(Resource res) {
     this.customResourceCapability.set(res);
   }
 
+  /**
+   * 集群新增节点上线时，增加集群总资源容量。
+   * @param res 新增节点的总资源
+   */
   public void incrCapability(Resource res) {
     if (res != null) {
       capabilityMB.incr(res.getMemorySize());
@@ -305,6 +352,10 @@ public class ClusterMetrics {
     }
   }
 
+  /**
+   * 节点下线时，减少集群总资源容量。
+   * @param res 下线节点的总资源
+   */
   public void decrCapability(Resource res) {
     if (res != null) {
       capabilityMB.decr(res.getMemorySize());
@@ -315,6 +366,10 @@ public class ClusterMetrics {
     }
   }
 
+  /**
+   * 添加一次AM容器分配延迟采样。
+   * @param delay 延迟时间，单位毫秒
+   */
   public void addAMContainerAllocationDelay(long delay) {
     aMContainerAllocationDelay.add(delay);
   }
@@ -327,14 +382,26 @@ public class ClusterMetrics {
     return utilizedMB.value();
   }
 
+  /**
+   * 分配容器后增加已使用内存容量。
+   * @param delta 增量值
+   */
   public void incrUtilizedMB(long delta) {
     utilizedMB.incr(delta);
   }
 
+  /**
+   * 释放容器后减少已使用内存容量。
+   * @param delta 减少值
+   */
   public void decrUtilizedMB(long delta) {
     utilizedMB.decr(delta);
   }
 
+  /**
+   * 释放容器后减少已使用vcore容量。
+   * @param delta 减少值
+   */
   public void decrUtilizedVirtualCores(long delta) {
     utilizedVirtualCores.decr(delta);
   }
@@ -343,6 +410,10 @@ public class ClusterMetrics {
     return utilizedVirtualCores.value();
   }
 
+  /**
+   * 分配容器后增加已使用vcore容量。
+   * @param delta 增量值
+   */
   public void incrUtilizedVirtualCores(long delta) {
     utilizedVirtualCores.incr(delta);
   }
@@ -351,6 +422,9 @@ public class ClusterMetrics {
     return containerAssignedPerSecond.value();
   }
 
+  /**
+   * 增加一秒内分配容器计数。
+   */
   public void incrNumContainerAssigned() {
     numContainersAssigned.incrementAndGet();
   }
@@ -363,6 +437,10 @@ public class ClusterMetrics {
     return rmDispatcherEventQueueSize.value();
   }
 
+  /**
+   * 更新RM调度器事件队列当前大小指标。
+   * @param rmEventQueueSize 当前队列大小
+   */
   public void setRmEventQueueSize(int rmEventQueueSize) {
     this.rmDispatcherEventQueueSize.set(rmEventQueueSize);
   }
@@ -371,6 +449,10 @@ public class ClusterMetrics {
     return schedulerDispatcherEventQueueSize.value();
   }
 
+  /**
+   * 更新调度器事件队列当前大小指标。
+   * @param schedulerEventQueueSize 当前队列大小
+   */
   public void setSchedulerEventQueueSize(int schedulerEventQueueSize) {
     this.schedulerDispatcherEventQueueSize.set(schedulerEventQueueSize);
   }

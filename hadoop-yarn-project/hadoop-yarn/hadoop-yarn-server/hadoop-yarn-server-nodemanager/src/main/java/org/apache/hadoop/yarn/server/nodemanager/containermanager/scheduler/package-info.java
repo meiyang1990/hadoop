@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,7 @@
  */
 
 /**
- * Container Scheduler
+ * NodeManager 容器调度模块包，负责在 NodeManager 节点上对已分配的容器进行本地排队与调度执行，
+ * 管理节点资源分配，约束同时运行的容器数量，保障节点资源不会超卖，配合 YARN 全局调度器完成任务执行。
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.scheduler;

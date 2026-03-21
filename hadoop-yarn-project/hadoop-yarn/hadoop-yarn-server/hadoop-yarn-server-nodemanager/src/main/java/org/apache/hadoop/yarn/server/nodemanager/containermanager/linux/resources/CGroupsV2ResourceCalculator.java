@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,79 +34,40 @@ import org.slf4j.LoggerFactory;
 import org.apache.commons.lang3.StringUtils;
 
 /**
- * A Cgroup version 2 file-system based Resource calculator without the process tree features.
+ * 基于cgroup v2文件系统的资源计算器实现，不支持进程树特性
  *
- * Warning: this implementation will not work properly when configured
- * using the mapreduce.job.process-tree.class job property.
- * Theoretically the ResourceCalculatorProcessTree can be configured
- * using the mapreduce.job.process-tree.class job property, however it
- * has a dependency on an instantiated ResourceHandlerModule,
- * which is only initialised in the NodeManager process and not in the containers.
+ * 警告：该实现在配置mapreduce.job.process-tree.class作业属性时无法正常工作。
+ * 理论上ResourceCalculatorProcessTree可通过mapreduce.job.process-tree.class作业属性配置，但它依赖ResourceHandlerModule实例，
+ * 而该模块仅在NodeManager进程中初始化，不会在容器内部初始化。
  *
- * Limitation:
- * The ResourceCalculatorProcessTree class can be configured using the
- * mapreduce.job.process-tree.class property within a MapReduce job.
- * However, it is important to note that instances of ResourceCalculatorProcessTree operate
- * within the context of a MapReduce task. This presents a limitation:
- * these instances do not have access to the ResourceHandlerModule,
- * which is only initialized within the NodeManager process
- * and not within individual containers where MapReduce tasks execute.
- * As a result, the current implementation of ResourceCalculatorProcessTree is incompatible
- * with the mapreduce.job.process-tree.class property. This incompatibility arises
- * because the ResourceHandlerModule is essential for managing and monitoring resource usage,
- * and without it, the ResourceCalculatorProcessTree cannot function as intended
- * within the confines of a MapReduce task. Therefore, any attempts to utilize this class
- * through the mapreduce.job.process-tree.class property
- * will not succeed under the current architecture.
+ * 限制说明：
+ * ResourceCalculatorProcessTree类可通过MapReduce作业中的mapreduce.job.process-tree.class属性配置，
+ * 但需要注意该类实例运行在MapReduce任务上下文内，无法访问仅在NodeManager进程初始化、不会在容器进程中初始化的ResourceHandlerModule，
+ * 因此当前实现与mapreduce.job.process-tree.class属性不兼容。由于ResourceHandlerModule是资源使用监控管理的核心依赖，
+ * 无法在MapReduce任务上下文中正常工作，任何尝试通过mapreduce.job.process-tree.class属性使用该类的操作都会失败。
  */
 public class CGroupsV2ResourceCalculator extends AbstractCGroupsResourceCalculator {
   private static final Logger LOG = LoggerFactory.getLogger(CGroupsV2ResourceCalculator.class);
 
   /**
-   * <a href="https://docs.kernel.org/admin-guide/cgroup-v2.html#cpu-interface-files">DOC</a>
-   *
-   * ...
-   * cpu.stat
-   *  A read-only flat-keyed file. This file exists whether the controller is enabled or not.
-   *  It always reports the following three stats:
-   *  - usage_usec
-   *  - user_usec
-   *  - system_usec
-   *  ...
-   *
+   * CPU使用率统计文件路径，格式为文件名#关键字，从cpu.stat中读取usage_usec获取总CPU使用时间
    */
   private static final String CPU_STAT = "cpu.stat#usage_usec";
 
   /**
-   * <a href="https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files">DOC</a>
-   *
-   * ...
-   * memory.stat
-   *  A read-only flat-keyed file which exists on non-root cgroups.
-   *  This breaks down the cgroup’s memory footprint into different types of memory,
-   *  type-specific details, and other information on the state
-   *  and past events of the memory management system.
-   *  All memory amounts are in bytes.
-   *  ...
-   *  anon
-   *   Amount of memory used in anonymous mappings such as brk(), sbrk(), and mmap(MAP_ANONYMOUS)
-   * ...
-   *
+   * 内存统计文件路径，格式为文件名#关键字，从memory.stat中读取anon获取匿名映射内存使用量
    */
   private static final String MEM_STAT = "memory.stat#anon";
 
   /**
-   * <a href="https://docs.kernel.org/admin-guide/cgroup-v2.html#memory-interface-files">DOC</a>
-   *
-   * ...
-   * memory.swap.current
-   *  A read-only single value file which exists on non-root cgroups.
-   *  The total amount of swap currently being used by the cgroup and its descendants.
-   * ...
-   *
+   * 交换空间使用统计文件路径，直接从memory.swap.current读取当前cgroup总交换空间使用量
    */
   private static final String MEMSW_STAT = "memory.swap.current";
 
+  /**
+   * 构造函数，初始化cgroup v2资源计算器
+   * @param pid 目标进程ID
+   */
   public CGroupsV2ResourceCalculator(String pid) {
     super(
         pid,
@@ -118,6 +80,7 @@ public class CGroupsV2ResourceCalculator extends AbstractCGroupsResourceCalculat
   @Override
   protected List<Path> getCGroupFilesToLoadInStats() {
     List<Path> result = new ArrayList<>();
+    // 遍历cgroup目录下所有文件，批量收集需要读取的统计文件
     try (Stream<Path> cGroupFiles = Files.list(getCGroupPath())){
       cGroupFiles.forEach(result::add);
     } catch (IOException e) {
@@ -127,6 +90,11 @@ public class CGroupsV2ResourceCalculator extends AbstractCGroupsResourceCalculat
     return  result;
   }
 
+  /**
+   * 获取当前进程对应的cgroup v2根路径
+   * @return 当前进程cgroup v2绝对路径
+   * @throws IOException 读取/proc文件获取cgroup路径失败时抛出
+   */
   private Path getCGroupPath() throws IOException {
     return Paths.get(
         getcGroupsHandler().getCGroupV2MountPath(),

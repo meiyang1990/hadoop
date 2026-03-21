@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,17 +21,16 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * Convenience way to filter nodes based on a criteria. To be used in
- * conjunction with {@link ClusterNodeTracker}
+ * YARN资源调度器节点过滤接口，根据指定条件筛选集群节点，配合{@link ClusterNodeTracker}使用完成节点过滤
  */
 @InterfaceAudience.Private
 public interface NodeFilter {
 
   /**
-   * Criteria to accept node in the filtered list.
+   * 判断节点是否符合过滤条件，判断是否将节点加入过滤结果列表
    *
-   * @param node SchedulerNode.
-   * @return true, node accept; false, node not accept.
+   * @param node 调度器节点对象
+   * @return true 保留该节点; false 过滤掉该节点
    */
   boolean accept(SchedulerNode node);
 }

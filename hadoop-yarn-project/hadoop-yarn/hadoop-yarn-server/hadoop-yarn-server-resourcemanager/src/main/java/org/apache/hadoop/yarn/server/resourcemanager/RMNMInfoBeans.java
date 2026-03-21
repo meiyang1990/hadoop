@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,13 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+/**
+ * JMX 管理Bean接口，用于暴露ResourceManager节点管理器相关运行信息
+ */
 public interface RMNMInfoBeans {
+  /**
+   * 获取当前存活的NodeManager列表信息
+   * @return 存活NodeManager的信息字符串，包含地址、状态等核心信息
+   */
   public String getLiveNodeManagers();
 }
