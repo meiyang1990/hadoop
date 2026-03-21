@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,18 +27,31 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * YARN RM Web DAO，封装队列多资源容量向量信息，供Web API序列化返回
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class QueueCapacityVectorInfo {
+  // 容量向量的字符串表示
   private String configuredCapacityVector;
+  // 按资源拆分的容量向量条目列表
   private List<QueueCapacityVectorEntryInfo> capacityVectorEntries;
 
+  /**
+   * 默认无参构造函数，用于JAXB序列化
+   */
   public QueueCapacityVectorInfo() {
   }
 
+  /**
+   * 从调度器端的容量向量对象构造Web DAO对象
+   * @param queueCapacityVector 调度器端原始容量向量对象
+   */
   public QueueCapacityVectorInfo(QueueCapacityVector queueCapacityVector) {
     this.configuredCapacityVector = queueCapacityVector.toString();
     this.capacityVectorEntries = new ArrayList<>();
+    // 遍历原始容量向量条目，转换为Web DAO条目
     for (QueueCapacityVector.QueueCapacityVectorEntry
             queueCapacityVectorEntry : queueCapacityVector) {
       this.capacityVectorEntries.add(

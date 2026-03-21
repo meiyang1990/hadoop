@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,19 +28,34 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.UserInfo;
 
+/**
+ * YARN ResourceManager Web UI 多用户信息数据访问对象，封装所有调度用户信息列表，用于REST API返回序列化。
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class UsersInfo {
+  // 序列化后的XML元素名设为user，存储所有用户信息
   @XmlElement(name="user")
   protected ArrayList<UserInfo> usersList = new ArrayList<UserInfo>();
 
+  /**
+   * 无参构造器，供JAXB序列化使用。
+   */
   public UsersInfo() {
   }
 
+  /**
+   * 构造器，用给定的用户信息列表初始化对象。
+   * @param usersList 容量调度用户信息列表
+   */
   public UsersInfo(ArrayList<UserInfo> usersList) {
     this.usersList = usersList;
   }
 
+  /**
+   * 获取所有用户信息列表。
+   * @return 容量调度用户信息列表
+   */
   public ArrayList<UserInfo> getUsersList() {
     return usersList;
   }

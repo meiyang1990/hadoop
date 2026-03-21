@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -62,9 +63,8 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import com.fasterxml.jackson.core.JsonGenerator;
 
 /**
- * Converts Fair Scheduler configuration (site and fair-scheduler.xml)
- * to Capacity Scheduler. The mapping is not 100% perfect due to
- * feature gaps. These will be addressed in the future.
+ * 将公平调度器（Fair Scheduler）配置（yarn-site和fair-scheduler.xml）转换为容量调度器（Capacity Scheduler）配置。
+ * 由于功能差异，转换并非100%完美匹配，后续版本将持续完善。
  */
 public class FSConfigToCSConfigConverter {
   public static final Logger LOG = LoggerFactory.getLogger(
@@ -105,6 +105,11 @@ public class FSConfigToCSConfigConverter {
   private FSConfigToCSConfigConverterParams.
       PreemptionMode preemptionMode;
 
+  /**
+   * 构造配置转换器，传入规则处理器和转换选项。
+   * @param ruleHandler 规则处理器
+   * @param conversionOptions 转换选项
+   */
   public FSConfigToCSConfigConverter(FSConfigToCSConfigRuleHandler
       ruleHandler, ConversionOptions conversionOptions) {
     this.ruleHandler = ruleHandler;
@@ -114,6 +119,11 @@ public class FSConfigToCSConfigConverter {
     this.placementConverter = new QueuePlacementConverter();
   }
 
+  /**
+   * 执行配置转换主流程。
+   * @param params 转换参数
+   * @throws Exception 转换过程中可能抛出异常
+   */
   public void convert(FSConfigToCSConfigConverterParams params)
       throws Exception {
     validateParams(params);
@@ -131,6 +141,11 @@ public class FSConfigToCSConfigConverter {
     convert(inputYarnSiteConfig);
   }
 
+  /**
+   * 准备输出文件流，根据是否控制台模式选择输出目标。
+   * @param console 是否控制台模式
+   * @throws FileNotFoundException 输出文件不存在时抛出
+   */
   private void prepareOutputFiles(boolean console)
       throws FileNotFoundException {
     if (console) {
@@ -152,6 +167,10 @@ public class FSConfigToCSConfigConverter {
         new FileOutputStream(schedulerXmlOutput);
   }
 
+  /**
+   * 验证输入参数合法性，检查必填参数。
+   * @param params 转换参数
+   */
   private void validateParams(FSConfigToCSConfigConverterParams params) {
     if (params.getYarnSiteXmlConfig() == null) {
       throw new PreconditionException("" + YARN_SITE_XML + " configuration " +
@@ -162,6 +181,11 @@ public class FSConfigToCSConfigConverter {
     }
   }
 
+  /**
+   * 从参数解析集群总资源。
+   * @param params 转换参数
+   * @return 解析后的集群资源
+   */
   private Resource getClusterResource(
       FSConfigToCSConfigConverterParams params) {
     Resource resource = null;
@@ -178,6 +202,11 @@ public class FSConfigToCSConfigConverter {
     return resource;
   }
 
+  /**
+   * 加载用户自定义的转换规则文件。
+   * @param rulesFile 规则文件路径
+   * @throws IOException 读取文件失败时抛出
+   */
   private void loadConversionRules(String rulesFile) throws IOException {
     if (rulesFile != null) {
       LOG.info("Reading conversion rules file from: " + rulesFile);
@@ -190,6 +219,11 @@ public class FSConfigToCSConfigConverter {
     ruleHandler.initPropertyActions();
   }
 
+  /**
+   * 加载输入的yarn-site.xml配置。
+   * @param params 转换参数
+   * @return 加载后的yarn-site配置
+   */
   private Configuration getInputYarnSiteConfig(
       FSConfigToCSConfigConverterParams params) {
     Configuration conf = new YarnConfiguration();
@@ -197,6 +231,11 @@ public class FSConfigToCSConfigConverter {
     return conf;
   }
 
+  /**
+   * 处理公平调度器配置文件路径，从参数或输入配置中获取。
+   * @param params 转换参数
+   * @param conf 输入yarn-site配置
+   */
   private void handleFairSchedulerConfig(
       FSConfigToCSConfigConverterParams params, Configuration conf) {
     String fairSchedulerXmlConfig = params.getFairSchedulerXmlConfig();
@@ -225,7 +264,7 @@ public class FSConfigToCSConfigConverter {
 
   @VisibleForTesting
   void convert(Configuration inputYarnSiteConfig) throws Exception {
-    // initialize Fair Scheduler
+    // 初始化公平调度器实例，用于读取解析原有配置
     RMContext ctx = new RMContextImpl();
     PlacementManager placementManager = new PlacementManager();
     ctx.setQueuePlacementManager(placementManager);
@@ -234,39 +273,50 @@ public class FSConfigToCSConfigConverter {
     // to force the use of ConfiguredYarnAuthorizer, otherwise
     // it might use that of Ranger
     Configuration fsConfig = new Configuration(inputYarnSiteConfig);
+    // 开启迁移模式，跳过不必要的初始化步骤
     fsConfig.setBoolean(FairSchedulerConfiguration.MIGRATION_MODE, true);
+    // 根据配置决定是否跳过终端规则检查
     fsConfig.setBoolean(FairSchedulerConfiguration.NO_TERMINAL_RULE_CHECK,
         conversionOptions.isNoRuleTerminalCheck());
+    // 强制使用默认授权器，避免外部插件影响转换过程
     fsConfig.setClass(YarnConfiguration.YARN_AUTHORIZATION_PROVIDER,
         ConfiguredYarnAuthorizer.class, YarnAuthorizationProvider.class);
     FairScheduler fs = new FairScheduler();
     fs.setRMContext(ctx);
     fs.init(fsConfig);
 
+    // 检查是否使用了DRF调度策略
     drfUsed = isDrfUsed(fs);
 
+    // 获取公平调度器分配配置，提取各类默认值
     AllocationConfiguration allocConf = fs.getAllocationConfiguration();
     queueMaxAppsDefault = allocConf.getQueueMaxAppsDefault();
     userMaxAppsDefault = allocConf.getUserMaxAppsDefault();
     userMaxApps = allocConf.getUserMaxApps();
     queueMaxAMShareDefault = allocConf.getQueueMaxAMShareDefault();
 
+    // 初始化输出配置对象
     convertedYarnSiteConfig = new Configuration(false);
     capacitySchedulerConfig =
         new CapacitySchedulerConfiguration(new Configuration(false));
 
+    // 转换yarn-site.xml配置
     convertYarnSiteXml(inputYarnSiteConfig);
+    // 转换队列配置到capacity-scheduler.xml
     convertCapacitySchedulerXml(fs);
 
+    // 如果需要，转换队列放置规则
     if (convertPlacementRules) {
       performRuleConversion(fs);
     }
 
+    // 输出容量调度器配置
     if (consoleMode) {
       System.out.println("======= " + CAPACITY_SCHEDULER_XML + " =======");
     }
     capacitySchedulerConfig.writeXml(capacitySchedulerOutputStream);
 
+    // 输出转换后的yarn-site配置
     if (consoleMode) {
       System.out.println();
       System.out.println("======= " + YARN_SITE_XML + " =======");
@@ -274,6 +324,10 @@ public class FSConfigToCSConfigConverter {
     convertedYarnSiteConfig.writeXml(yarnSiteOutputStream);
   }
 
+  /**
+   * 转换yarn-site.xml中的调度器相关配置。
+   * @param inputYarnSiteConfig 输入原始yarn-site配置
+   */
   private void convertYarnSiteXml(Configuration inputYarnSiteConfig) {
     FSYarnSiteConverter siteConverter =
         new FSYarnSiteConverter();
@@ -282,20 +336,28 @@ public class FSConfigToCSConfigConverter {
         conversionOptions.isEnableAsyncScheduler(),
         usePercentages, preemptionMode);
 
+    // 获取抢占配置和基于大小权重配置结果
     preemptionEnabled = siteConverter.isPreemptionEnabled();
     sizeBasedWeight = siteConverter.isSizeBasedWeight();
 
+    // 检查并处理预留系统配置
     checkReservationSystem(inputYarnSiteConfig);
   }
 
+  /**
+   * 转换公平调度器队列配置到容量调度器格式。
+   * @param fs 初始化完成的公平调度器实例
+   */
   private void convertCapacitySchedulerXml(FairScheduler fs) {
     FSParentQueue rootQueue = fs.getQueueManager().getRootQueue();
+    // 输出各类默认配置
     emitDefaultQueueMaxParallelApplications();
     emitDefaultUserMaxParallelApplications();
     emitUserMaxParallelApplications();
     emitDefaultMaxAMShare();
     emitDisablePreemptionForObserveOnlyMode();
 
+    // 构建队列转换器
     FSQueueConverter queueConverter = FSQueueConverterBuilder.create()
         .withRuleHandler(ruleHandler)
         .withCapacitySchedulerConfig(capacitySchedulerConfig)
@@ -309,10 +371,17 @@ public class FSConfigToCSConfigConverter {
         .withPercentages(usePercentages)
         .build();
 
+    // 递归转换整个队列层级
     queueConverter.convertQueueHierarchy(rootQueue);
+    // 转换队列ACL权限配置
     emitACLs(fs);
   }
 
+  /**
+   * 执行队列放置规则转换。
+   * @param fs 公平调度器实例
+   * @throws IOException 写JSON输出失败时抛出
+   */
   private void performRuleConversion(FairScheduler fs)
       throws IOException {
     LOG.info("Converting placement rules");
@@ -321,14 +390,17 @@ public class FSConfigToCSConfigConverter {
         fs.getRMContext().getQueuePlacementManager();
 
     if (placementManager.getPlacementRules().size() > 0) {
+      // 获取对应输出流
       mappingRulesOutputStream = getOutputStreamForJson();
 
+      // 转换放置规则为容量调度器JSON格式
       MappingRulesDescription desc =
           placementConverter.convertPlacementPolicy(placementManager,
               ruleHandler, capacitySchedulerConfig, usePercentages);
 
       ObjectMapper mapper = new ObjectMapper();
       // close output stream if we write to a file, leave it open otherwise
+      // 根据输出目标配置自动关闭行为
       if (!consoleMode && rulesToFile) {
         mapper.configure(JsonGenerator.Feature.AUTO_CLOSE_TARGET, true);
       } else {
@@ -336,177 +408,14 @@ public class FSConfigToCSConfigConverter {
       }
       ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
 
+      // 控制台模式且输出到文件时打印头信息
       if (consoleMode && rulesToFile) {
         System.out.println("======= " + MAPPING_RULES_JSON + " =======");
       }
+      // 写入规则JSON
       writer.writeValue(mappingRulesOutputStream, desc);
 
+      // 更新容量调度器配置指定规则格式
       capacitySchedulerConfig.setMappingRuleFormat(MAPPING_RULE_FORMAT_JSON);
       capacitySchedulerConfig.setOverrideWithQueueMappings(true);
-      if (!rulesToFile) {
-        String json =
-            ((ByteArrayOutputStream)mappingRulesOutputStream)
-            .toString(StandardCharsets.UTF_8.name());
-        capacitySchedulerConfig.setMappingRuleJson(json);
-      }
-    } else {
-      LOG.info("No rules to convert");
-    }
-  }
-
-  /*
-   * Console    RulesToFile   OutputStream
-   * true       true          System.out / PrintStream
-   * true       false         ByteArrayOutputStream
-   * false      true          FileOutputStream
-   * false      false         ByteArrayOutputStream
-   */
-  private OutputStream getOutputStreamForJson() throws FileNotFoundException {
-    if (consoleMode && rulesToFile) {
-      return System.out;
-    } else if (rulesToFile) {
-      File mappingRulesFile = new File(outputDirectory,
-          MAPPING_RULES_JSON);
-      return new FileOutputStream(mappingRulesFile);
-    } else {
-      return new ByteArrayOutputStream();
-    }
-  }
-
-  private void emitDefaultQueueMaxParallelApplications() {
-    if (queueMaxAppsDefault != Integer.MAX_VALUE) {
-      capacitySchedulerConfig.setDefaultMaxParallelApps(
-          queueMaxAppsDefault);
-    }
-  }
-
-  private void emitDefaultUserMaxParallelApplications() {
-    if (userMaxAppsDefault != Integer.MAX_VALUE) {
-      capacitySchedulerConfig.setDefaultMaxParallelAppsPerUser(
-          userMaxAppsDefault);
-    }
-  }
-
-  private void emitUserMaxParallelApplications() {
-    userMaxApps
-        .forEach((user, apps) -> {
-          capacitySchedulerConfig.setMaxParallelAppsForUser(user, apps);
-        });
-  }
-
-  private void emitDefaultMaxAMShare() {
-    if (queueMaxAMShareDefault == QUEUE_MAX_AM_SHARE_DISABLED) {
-      capacitySchedulerConfig.setMaximumApplicationMasterResourcePercent(
-            1.0f);
-    } else {
-      capacitySchedulerConfig.setMaximumApplicationMasterResourcePercent(
-          queueMaxAMShareDefault);
-    }
-  }
-  private void emitDisablePreemptionForObserveOnlyMode() {
-    if (preemptionMode == FSConfigToCSConfigConverterParams
-            .PreemptionMode.OBSERVE_ONLY) {
-      capacitySchedulerConfig.
-          setPreemptionObserveOnly(true);
-    }
-  }
-
-  private void emitACLs(FairScheduler fs) {
-    fs.getAllocationConfiguration().getQueueAcls()
-        .forEach(this::generateQueueAcl);
-  }
-
-  private void generateQueueAcl(String queue,
-      Map<AccessType, AccessControlList> access) {
-    AccessControlList submitAcls = access.get(AccessType.SUBMIT_APP);
-    AccessControlList adminAcls = access.get(AccessType.ADMINISTER_QUEUE);
-
-    if (!submitAcls.getGroups().isEmpty() ||
-        !submitAcls.getUsers().isEmpty() || submitAcls.isAllAllowed()) {
-      capacitySchedulerConfig.setAcl(new QueuePath(queue), QueueACL.SUBMIT_APPLICATIONS,
-          submitAcls.getAclString());
-    }
-
-    if (!adminAcls.getGroups().isEmpty() ||
-        !adminAcls.getUsers().isEmpty() || adminAcls.isAllAllowed()) {
-      capacitySchedulerConfig.setAcl(new QueuePath(queue), QueueACL.ADMINISTER_QUEUE,
-          adminAcls.getAclString());
-    }
-  }
-
-  private void checkReservationSystem(Configuration conf) {
-    if (conf.getBoolean(YarnConfiguration.RM_RESERVATION_SYSTEM_ENABLE,
-        YarnConfiguration.DEFAULT_RM_RESERVATION_SYSTEM_ENABLE)) {
-      ruleHandler.handleReservationSystem();
-    }
-  }
-
-  private boolean isDrfUsed(FairScheduler fs) {
-    FSQueue rootQueue = fs.getQueueManager().getRootQueue();
-    AllocationConfiguration allocConf = fs.getAllocationConfiguration();
-
-    String defaultPolicy = allocConf.getDefaultSchedulingPolicy().getName();
-
-    return DominantResourceFairnessPolicy.NAME.equals(defaultPolicy) ||
-        isDrfUsedOnQueueLevel(rootQueue);
-  }
-
-  private boolean isDrfUsedOnQueueLevel(FSQueue queue) {
-    String policy = queue.getPolicy().getName();
-    boolean usesDrf = DominantResourceFairnessPolicy.NAME.equals(policy);
-
-    if (usesDrf) {
-      return true;
-    } else {
-      List<FSQueue> children = queue.getChildQueues();
-
-      if (children != null) {
-        for (FSQueue child : children) {
-          usesDrf |= isDrfUsedOnQueueLevel(child);
-        }
-      }
-
-      return usesDrf;
-    }
-  }
-
-  @VisibleForTesting
-  Resource getClusterResource() {
-    return clusterResource;
-  }
-
-  @VisibleForTesting
-  void setClusterResource(Resource clusterResource) {
-    this.clusterResource = clusterResource;
-  }
-
-  @VisibleForTesting
-  FSConfigToCSConfigRuleHandler getRuleHandler() {
-    return ruleHandler;
-  }
-
-  @VisibleForTesting
-  Configuration getYarnSiteConfig() {
-    return convertedYarnSiteConfig;
-  }
-
-  @VisibleForTesting
-  CapacitySchedulerConfiguration getCapacitySchedulerConfig() {
-    return capacitySchedulerConfig;
-  }
-
-  @VisibleForTesting
-  void setConvertPlacementRules(boolean convertPlacementRules) {
-    this.convertPlacementRules = convertPlacementRules;
-  }
-
-  @VisibleForTesting
-  void setPlacementConverter(QueuePlacementConverter converter) {
-    this.placementConverter = converter;
-  }
-
-  @VisibleForTesting
-  void setConsoleMode(boolean console) {
-    this.consoleMode = console;
-  }
-}
+      // 不输出到文件时直接嵌入

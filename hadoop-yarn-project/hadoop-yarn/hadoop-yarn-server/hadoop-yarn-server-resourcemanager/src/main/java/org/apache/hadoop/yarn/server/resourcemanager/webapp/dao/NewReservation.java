@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -32,6 +33,8 @@ import javax.xml.bind.annotation.XmlRootElement;
  * </p>
  *
  * {@code RMWebServices#createNewReservation(HttpServletRequest)}
+ *
+ * YARN ResourceManager预约创建REST响应数据对象，封装新生成的预约ID
  */
 @XmlRootElement(name="new-reservation")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -40,14 +43,25 @@ public class NewReservation {
   @XmlElement(name="reservation-id")
   private String reservationId;
 
+  /**
+   * 默认无参构造函数，初始化空预约ID
+   */
   public NewReservation() {
     reservationId = "";
   }
 
+  /**
+   * 带参数构造函数，使用指定预约ID创建响应对象
+   * @param resId 新生成的预约ID
+   */
   public NewReservation(String resId) {
     reservationId = resId;
   }
 
+  /**
+   * 获取新生成的预约ID
+   * @return 预约ID字符串
+   */
   public String getReservationId() {
     return reservationId;
   }

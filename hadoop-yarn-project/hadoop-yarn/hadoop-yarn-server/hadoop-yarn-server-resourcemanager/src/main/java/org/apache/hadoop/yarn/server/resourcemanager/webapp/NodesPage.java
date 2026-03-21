@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,8 +49,14 @@ import static org.apache.hadoop.yarn.webapp.view.JQueryUI.DATATABLES_ID;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.initID;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.tableInit;
 
+/**
+ * YARN ResourceManager WebUI 节点列表页面，展示集群所有NodeManager节点信息，支持按节点状态和标签过滤
+ */
 class NodesPage extends RmView {
 
+  /**
+   * 节点列表表格内容渲染块，负责生成节点表格的HTML和数据
+   */
   static class NodesBlock extends HtmlBlock {
     final ResourceManager rm;
     private static final long BYTES_IN_MB = 1024 * 1024;
@@ -60,6 +67,7 @@ class NodesPage extends RmView {
     NodesBlock(ResourceManager rm, ViewContext ctx) {
       super(ctx);
       this.rm = rm;
+      // 从配置读取是否启用机会容器分配
       this.opportunisticContainersEnabled = YarnConfiguration
           .isOpportunisticContainerAllocationEnabled(
               this.rm.getRMContext().getYarnConfiguration());
@@ -67,12 +75,16 @@ class NodesPage extends RmView {
 
     @Override
     protected void render(Block html) {
+      // 渲染指标概览表格
       html.__(MetricsOverviewTable.class);
 
       ResourceScheduler sched = rm.getResourceScheduler();
 
+      // 获取请求参数中的节点状态过滤条件
       String type = $(NODE_STATE);
+      // 获取请求参数中的节点标签过滤条件，默认不过滤
       String labelFilter = $(NODE_LABEL, CommonNodeLabelsManager.ANY).trim();
+      // 构建表格表头，添加基础列
       Hamlet.TR<Hamlet.THEAD<TABLE<Hamlet>>> trbody =
           html.table("#nodes").thead().tr()
               .th(".nodelabels", "Node Labels")
@@ -83,7 +95,9 @@ class NodesPage extends RmView {
               .th(".lastHealthUpdate", "Last health-update")
               .th(".healthReport", "Health-report");
 
+      // 根据是否启用机会容器，渲染不同的表头列
       if (!this.opportunisticContainersEnabled) {
+        // 未启用机会容器，只展示常规资源列
         trbody.th(".containers", "Containers")
             .th(".allocationTags", "Allocation Tags")
             .th(".mem", "Mem Used")
@@ -95,6 +109,7 @@ class NodesPage extends RmView {
             .th(".vcores", "VCores Total")
             .th(".vcores", "Phys VCores Used %");
       } else {
+        // 启用机会容器，额外添加机会容器和排队容器列
         trbody.th(".containers", "Running Containers (G)")
             .th(".allocationTags", "Allocation Tags")
             .th(".mem", "Mem Used (G)")
@@ -111,88 +126,104 @@ class NodesPage extends RmView {
             .th(".containers", "Queued Containers");
       }
 
+      // 为自定义资源类型添加表头列
       for (Map.Entry<String, Integer> integerEntry :
           ResourceUtils.getResourceTypeIndex().entrySet()) {
+        // 内存和vCore已经处理过，跳过
         if (integerEntry.getKey().equals(ResourceInformation.MEMORY_URI)
             || integerEntry.getKey().equals(ResourceInformation.VCORES_URI)) {
           continue;
         }
 
+        // 添加自定义资源已用列
         trbody.th("." + integerEntry.getKey(),
             integerEntry.getKey() + " " + "Used");
 
+        // 添加自定义资源可用列
         trbody.th("." + integerEntry.getKey(),
             integerEntry.getKey() + " " + "Avail");
       }
 
+      // 完成表头构建，开始准备表体
       TBODY<TABLE<Hamlet>> tbody =
           trbody.th(".nodeManagerVersion", "Version").__().__().tbody();
 
       NodeState stateFilter = null;
+      // 解析节点状态过滤条件
       if (type != null && !type.isEmpty()) {
         stateFilter = NodeState.valueOf(StringUtils.toUpperCase(type));
       }
+      // 默认获取所有活跃节点
       Collection<RMNode> rmNodes = this.rm.getRMContext().getRMNodes().values();
       boolean isInactive = false;
+      // 根据过滤条件调整节点集合来源
       if (stateFilter != null) {
         switch (stateFilter) {
         case DECOMMISSIONED:
         case LOST:
         case REBOOTED:
         case SHUTDOWN:
+          // 已下线类节点从非活跃节点集合获取
           rmNodes = this.rm.getRMContext().getInactiveRMNodes().values();
           isInactive = true;
           break;
         case DECOMMISSIONING:
-          // Do nothing
+          // 退役中节点仍然在活跃列表，不需要切换数据源
           break;
         default:
           LOG.debug("Unexpected state filter for inactive RM node");
         }
       }
+      // 构建节点数据JSON数组，供前端DataTable渲染
       StringBuilder nodeTableData = new StringBuilder("[\n");
+      // 遍历所有节点，按条件过滤并添加数据
       for (RMNode ni : rmNodes) {
+        // 按节点状态过滤，不匹配则跳过
         if (stateFilter != null) {
           NodeState state = ni.getState();
           if (!stateFilter.equals(state)) {
             continue;
           }
         } else {
-          // No filter. User is asking for all nodes. Make sure you skip the
-          // unhealthy nodes.
+          // 无状态过滤时，默认不展示不健康节点
           if (ni.getState() == NodeState.UNHEALTHY) {
             continue;
           }
         }
-        // Besides state, we need to filter label as well.
+        // 按节点标签过滤，不匹配则跳过
         if (!labelFilter.equals(RMNodeLabelsManager.ANY)) {
           if (labelFilter.isEmpty()) {
-            // Empty label filter means only shows nodes without label
+            // 空过滤条件只展示无标签节点
             if (!ni.getNodeLabels().isEmpty()) {
               continue;
             }
           } else if (!ni.getNodeLabels().contains(labelFilter)) {
-            // Only nodes have given label can show on web page.
+            // 只展示包含指定标签的节点
             continue;
           }
         }
+        // 封装节点信息为DAO对象
         NodeInfo info = new NodeInfo(ni, sched);
         int usedMemory = (int) info.getUsedMemory();
         int availableMemory = (int) info.getAvailableMemory();
         long totalMemory = info.getTotalResource().getMemorySize();
         int totalVcore = info.getTotalResource().getvCores();
+        // 拼接节点基础信息到JSON数组
         nodeTableData.append("[\"")
             .append(StringUtils.join(",", info.getNodeLabels())).append("\",\"")
             .append(info.getRack()).append("\",\"").append(info.getState())
             .append("\",\"").append(info.getNodeId());
         if (isInactive) {
+          // 非活跃节点无HTTP地址，显示N/A
           nodeTableData.append("\",\"").append("N/A").append("\",\"");
         } else {
+          // 活跃节点生成HTTP地址链接
           String httpAddress = info.getNodeHTTPAddress();
           nodeTableData.append("\",\"<a ").append("href='" + "//" + httpAddress)
               .append("'>").append(httpAddress).append("</a>\",").append("\"");
         }
 
+        // 添加健康检查时间和报告
         nodeTableData.append("<br title='")
             .append(String.valueOf(info.getLastHealthUpdate())).append("'>")
             .append(Times.format(info.getLastHealthUpdate())).append("\",\"")
@@ -218,7 +249,7 @@ class NodesPage extends RmView {
             .append(String.valueOf((int) info.getVcoreUtilization()))
             .append("\",\"");
 
-        // If opportunistic containers are enabled, add extra fields.
+        // 如果启用机会容器，添加机会容器相关数据
         if (this.opportunisticContainersEnabled) {
           nodeTableData
               .append(String.valueOf(info.getNumRunningOpportContainers()))
@@ -233,8 +264,10 @@ class NodesPage extends RmView {
               .append("\",\"");
         }
 
+        // 添加自定义资源数据
         for (Map.Entry<String, Integer> integerEntry :
             ResourceUtils.getResourceTypeIndex().entrySet()) {
+          // 内存和vCore已经处理过，跳过
           if (integerEntry.getKey().equals(ResourceInformation.MEMORY_URI)
               || integerEntry.getKey().equals(ResourceInformation.VCORES_URI)) {
             continue;
@@ -246,6 +279,7 @@ class NodesPage extends RmView {
           String resourceName = integerEntry.getKey();
           Integer index = integerEntry.getValue();
 
+          // 读取自定义资源已用和可用值
           if (index != null && info.getUsedResource() != null
               && info.getAvailableResource() != null) {
             usedCustomResource = info.getUsedResource().getResource()
@@ -261,16 +295,21 @@ class NodesPage extends RmView {
           }
         }
 
+        // 添加NodeManager版本信息，完成当前节点数据拼接
         nodeTableData.append(ni.getNodeManagerVersion())
             .append("\"],\n");
       }
+      // 移除最后一个节点数据末尾多余的逗号
       if (nodeTableData.charAt(nodeTableData.length() - 2) == ',') {
         nodeTableData.delete(nodeTableData.length() - 2,
             nodeTableData.length() - 1);
       }
+      // 完成JSON数组构建
       nodeTableData.append("]");
+      // 将节点数据注入页面JavaScript变量
       html.script().$type("text/javascript")
           .__("var nodeTableData=" + nodeTableData).__();
+      // 完成表体渲染
       tbody.__().__();
     }
   }
@@ -280,10 +319,12 @@ class NodesPage extends RmView {
     commonPreHead(html);
     String type = $(NODE_STATE);
     String title = "Nodes of the cluster";
+    // 按过滤条件设置页面标题
     if (type != null && !type.isEmpty()) {
       title = title + " (" + type + ")";
     }
     setTitle(title);
+    // 配置DataTable插件参数
     set(DATATABLES_ID, "nodes");
     set(initID(DATATABLES, "nodes"), nodesTableInit());
     setTableStyles(html, "nodes", ".healthStatus {width:10em}",
@@ -295,6 +336,10 @@ class NodesPage extends RmView {
     return NodesBlock.class;
   }
 
+  /**
+   * 生成节点表格DataTable初始化配置JSON
+   * @return DataTable初始化配置字符串
+   */
   private String nodesTableInit() {
     StringBuilder b = tableInit().append(", 'aaData': nodeTableData")
         .append(", bDeferRender: true").append(", bProcessing: true")

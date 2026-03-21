@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,6 +49,9 @@ import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet.TR;
 
 import com.google.inject.Inject;
 
+/**
+ * RM Web UI 应用列表页面内容块，负责渲染ResourceManager侧的所有应用列表表格
+ */
 public class RMAppsBlock extends AppsBlock {
 
   private ResourceManager rm;
@@ -88,28 +92,37 @@ public class RMAppsBlock extends AppsBlock {
 
   @Override
   protected void renderData(Block html) {
-
+    // 创建表格表头行
     TR<THEAD<TABLE<Hamlet>>> tr = html.table("#apps").thead().tr();
+    // 遍历所有列定义生成表头单元格
     for (ColumnHeader col : COLUMNS) {
       tr = tr.th(col.getSelector(), col.getCData());
     }
+    // 结束表头，创建表体
     TBODY<TABLE<Hamlet>> tbody = tr.__().__().tbody();
 
+    // 构建前端表格需要的JSON数据
     StringBuilder appsTableData = new StringBuilder("[\n");
+    // 遍历所有符合条件的应用报告
     for (ApplicationReport appReport : appReports) {
       // TODO: remove the following condition. It is still here because
       // the history side implementation of ApplicationBaseProtocol
       // hasn't filtering capability (YARN-1819).
+      // 过滤不符合请求状态的应用
       if (!reqAppStates.isEmpty()
           && !reqAppStates.contains(appReport.getYarnApplicationState())) {
         continue;
       }
 
+      // 包装应用报告为Web层AppInfo对象
       AppInfo app = new AppInfo(appReport);
+      // 解析当前应用尝试ID
       ApplicationAttemptId appAttemptId = ApplicationAttemptId.fromString(
           app.getCurrentAppAttemptId());
+      // 初始化占比数据
       String queuePercent = "N/A";
       String clusterPercent = "N/A";
+      // 如果存在资源使用报告，计算队列和集群占比
       if(appReport.getApplicationResourceUsageReport() != null) {
         queuePercent = String.format("%.1f",
             appReport.getApplicationResourceUsageReport()
@@ -118,10 +131,14 @@ public class RMAppsBlock extends AppsBlock {
             appReport.getApplicationResourceUsageReport().getClusterUsagePercentage());
       }
 
+      // 初始化黑名单节点数量
       String blacklistedNodesCount = "N/A";
+      // 从RM上下文获取应用实例
       RMApp rmApp = rm.getRMContext().getRMApps()
           .get(appAttemptId.getApplicationId());
+      // 标记应用是否已完成
       boolean isAppInCompletedState = false;
+      // 如果应用存在，获取黑名单节点数量
       if (rmApp != null) {
         RMAppAttempt appAttempt = rmApp.getRMAppAttempt(appAttemptId);
         Set<String> nodes =
@@ -131,29 +148,36 @@ public class RMAppsBlock extends AppsBlock {
         }
         isAppInCompletedState = rmApp.isAppInCompletedStates();
       }
+      // 格式化应用进度百分比
       String percent = StringUtils.format("%.1f", app.getProgress());
+      // 拼接应用ID链接
       appsTableData
         .append("[\"<a href='")
         .append(url("app", app.getAppId()))
         .append("'>")
         .append(app.getAppId())
         .append("</a>\",\"")
+        // 转义用户名字符串，避免XSS和JSON解析错误
         .append(
           StringEscapeUtils.escapeEcmaScript(
               StringEscapeUtils.escapeHtml4(app.getUser())))
         .append("\",\"")
+        // 转义应用名
         .append(
           StringEscapeUtils.escapeEcmaScript(
               StringEscapeUtils.escapeHtml4(app.getName())))
         .append("\",\"")
+        // 转义应用类型
         .append(
           StringEscapeUtils.escapeEcmaScript(StringEscapeUtils.escapeHtml4(app
             .getType())))
         .append("\",\"")
+        // 转义应用标签
         .append(
           StringEscapeUtils.escapeEcmaScript(StringEscapeUtils.escapeHtml4(
             app.getApplicationTags() == null ? "" : app.getApplicationTags())))
         .append("\",\"")
+        // 转义队列名
         .append(
           StringEscapeUtils.escapeEcmaScript(StringEscapeUtils.escapeHtml4(app
              .getQueue()))).append("\",\"").append(String
@@ -162,28 +186,36 @@ public class RMAppsBlock extends AppsBlock {
         .append("\",\"").append(app.getLaunchTime())
         .append("\",\"").append(app.getFinishedTime())
         .append("\",\"")
+        // 处理应用状态空值
         .append(app.getAppState() == null ? UNAVAILABLE : app.getAppState())
         .append("\",\"")
         .append(app.getFinalAppStatus())
         .append("\",\"")
+        // 处理运行容器数量空值
         .append(app.getRunningContainers() == -1 ? "N/A" : String
             .valueOf(app.getRunningContainers()))
         .append("\",\"")
+        // 处理已分配CPU空值
         .append(app.getAllocatedCpuVcores() == -1 ? "N/A" : String
             .valueOf(app.getAllocatedCpuVcores()))
         .append("\",\"")
+        // 处理已分配内存空值
         .append(app.getAllocatedMemoryMB() == -1 ? "N/A" :
             String.valueOf(app.getAllocatedMemoryMB()))
         .append("\",\"")
+        // 处理已分配GPU空值，已完成应用无GPU显示不可用
         .append((isAppInCompletedState && app.getAllocatedGpus() <= 0)
             ? UNAVAILABLE : String.valueOf(app.getAllocatedGpus()))
         .append("\",\"")
+        // 处理预留CPU空值
         .append(app.getReservedCpuVcores() == -1 ? "N/A" : String
             .valueOf(app.getReservedCpuVcores()))
         .append("\",\"")
+        // 处理预留内存空值
         .append(app.getReservedMemoryMB() == -1 ? "N/A" :
             String.valueOf(app.getReservedMemoryMB()))
         .append("\",\"")
+        // 处理预留GPU空值，已完成应用无预留GPU显示不可用
         .append((isAppInCompletedState && app.getReservedGpus() <= 0)
             ? UNAVAILABLE : String.valueOf(app.getReservedGpus()))
         .append("\",\"")
@@ -191,42 +223,56 @@ public class RMAppsBlock extends AppsBlock {
         .append("\",\"")
         .append(clusterPercent)
         .append("\",\"")
-        // Progress bar
+        // 生成进度条HTML
           .append("<br title='").append(percent).append("'> <div class='")
         .append(C_PROGRESSBAR).append("' title='").append(join(percent, '%'))
         .append("'> ").append("<div class='").append(C_PROGRESSBAR_VALUE)
         .append("' style='").append(join("width:", percent, '%'))
         .append("'> </div> </div>").append("\",\"<a ");
 
+      // 获取跟踪URL，新建应用无有效URL
       String trackingURL =
           app.getTrackingUrl() == null
               || app.getTrackingUrl().equals(UNAVAILABLE)
               || app.getAppState() == YarnApplicationState.NEW ? null : app
               .getTrackingUrl();
 
+      // 根据应用状态确定跟踪UI类型（历史/ApplicationMaster/未分配）
       String trackingUI =
           app.getTrackingUrl() == null
               || app.getTrackingUrl().equals(UNAVAILABLE)
               || app.getAppState() == YarnApplicationState.NEW ? "Unassigned"
               : Apps.isApplicationFinalState(app.getAppState()) ?
               "History" : "ApplicationMaster";
+      // 拼接跟踪UI链接
       appsTableData.append(trackingURL == null ? "#" : "href='" + trackingURL)
         .append("'>").append(trackingUI).append("</a>\",").append("\"")
         .append(blacklistedNodesCount).append("\"],\n");
 
     }
+    // 移除最后一个元素多余的逗号
     if (appsTableData.charAt(appsTableData.length() - 2) == ',') {
       appsTableData.delete(appsTableData.length() - 2,
         appsTableData.length() - 1);
     }
+    // 闭合JSON数组
     appsTableData.append("]");
+    // 将JSON数据注入页面脚本
     html.script().$type("text/javascript")
       .__("var appsTableData=" + appsTableData).__();
 
+    // 闭合表格标签
     tbody.__().__();
   }
 
   @Override
+  /**
+   * 从ResourceManager客户端服务获取符合条件的应用报告列表
+   * @param request 获取应用请求，包含过滤条件
+   * @return 符合条件的应用报告列表
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
+   */
   protected List<ApplicationReport> getApplicationReport(
       final GetApplicationsRequest request) throws YarnException, IOException {
     return rm.getClientRMService().getApplications(request)

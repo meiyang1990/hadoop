@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,16 +28,32 @@ import org.apache.hadoop.yarn.server.webapp.ContainerBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * ResourceManager Web UI 容器信息页面块，负责渲染容器详情页面
+ * 继承通用ContainerBlock，实现RM侧的容器报告获取逻辑
+ */
 public class RMContainerBlock extends ContainerBlock {
 
   private final ResourceManager rm;
 
+  /**
+   * 构造方法，通过Guice注入ResourceManager实例
+   * @param resourceManager ResourceManager核心实例
+   * @param ctx Web视图上下文
+   */
   @Inject
   public RMContainerBlock(ResourceManager resourceManager, ViewContext ctx) {
     super(null, ctx);
     this.rm = resourceManager;
   }
 
+  /**
+   * 重写获取容器报告的方法，从RM本地客户端服务获取容器信息
+   * @param request 获取容器报告请求
+   * @return 容器详细报告
+   * @throws YarnException Yarn异常
+   * @throws IOException IO异常
+   */
   @Override
   protected ContainerReport getContainerReport(
       final GetContainerReportRequest request)

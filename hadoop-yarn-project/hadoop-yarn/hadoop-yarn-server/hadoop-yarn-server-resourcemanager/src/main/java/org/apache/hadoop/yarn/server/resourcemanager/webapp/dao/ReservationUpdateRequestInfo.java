@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,34 +25,52 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * Simple class to allow users to send information required to update an
- * existing reservation.
+ * 预约更新请求信息数据访问对象，用于封装REST API中预约更新请求的请求体信息
+ * 接收用户提交的现有YARN资源预约更新所需参数
  */
 @XmlRootElement(name = "reservation-update-context")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ReservationUpdateRequestInfo {
 
+  // 待更新的预约ID
   @XmlElement(name = "reservation-id")
   private String reservationId;
 
+  // 更新后的预约定义信息
   @XmlElement(name = "reservation-definition")
   private ReservationDefinitionInfo reservationDefinition;
 
   public ReservationUpdateRequestInfo() {
   }
 
+  /**
+   * 获取待更新的预约ID
+   * @return 预约ID
+   */
   public String getReservationId() {
     return reservationId;
   }
 
+  /**
+   * 设置待更新的预约ID
+   * @param reservationId 预约ID
+   */
   public void setReservationId(String reservationId) {
     this.reservationId = reservationId;
   }
 
+  /**
+   * 获取更新后的预约定义信息
+   * @return 预约定义信息
+   */
   public ReservationDefinitionInfo getReservationDefinition() {
     return reservationDefinition;
   }
 
+  /**
+   * 设置更新后的预约定义信息
+   * @param reservationDefinition 预约定义信息
+   */
   public void setReservationDefinition(
       ReservationDefinitionInfo reservationDefinition) {
     this.reservationDefinition = reservationDefinition;

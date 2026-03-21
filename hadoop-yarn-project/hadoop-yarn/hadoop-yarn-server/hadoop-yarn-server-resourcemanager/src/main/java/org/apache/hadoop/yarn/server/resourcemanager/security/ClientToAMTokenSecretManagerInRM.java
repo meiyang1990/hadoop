@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -27,23 +28,43 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.security.client.BaseClientToAMTokenSecretManager;
 
+/**
+ * ResourceManager端管理Client到ApplicationMaster的令牌密钥管理器
+ * 负责为每个应用尝试生成、存储、维护客户端与AM通信的认证密钥
+ */
 public class ClientToAMTokenSecretManagerInRM extends
     BaseClientToAMTokenSecretManager {
 
-  // Per application master-keys for managing client-tokens
+  // 按应用尝试维度存储各应用的客户端令牌主密钥
   private Map<ApplicationAttemptId, SecretKey> masterKeys =
       new HashMap<ApplicationAttemptId, SecretKey>();
 
+  /**
+   * 为指定应用尝试生成新的主密钥
+   * @param applicationAttemptID 应用尝试ID
+   * @return 生成的密钥
+   */
   public synchronized SecretKey createMasterKey(
       ApplicationAttemptId applicationAttemptID) {
     return generateSecret();
   }
 
+  /**
+   * 注册应用尝试，存储其对应的主密钥
+   * @param applicationAttemptID 应用尝试ID
+   * @param key 应用的主密钥
+   */
   public synchronized void registerApplication(
       ApplicationAttemptId applicationAttemptID, SecretKey key) {
     this.masterKeys.put(applicationAttemptID, key);
   }
 
+  /**
+   * RM恢复场景使用：根据已有密钥数据注册主密钥
+   * @param applicationAttemptID 应用尝试ID
+   * @param keyData 密钥字节数据
+   * @return 恢复生成的密钥
+   */
   // Only for RM recovery
   public synchronized SecretKey registerMasterKey(
       ApplicationAttemptId applicationAttemptID, byte[] keyData) {
@@ -52,6 +73,10 @@ public class ClientToAMTokenSecretManagerInRM extends
     return key;
   }
 
+  /**
+   * 注销应用尝试，移除其对应的主密钥
+   * @param applicationAttemptID 应用尝试ID
+   */
   public synchronized void unRegisterApplication(
       ApplicationAttemptId applicationAttemptID) {
     this.masterKeys.remove(applicationAttemptID);
@@ -63,6 +88,11 @@ public class ClientToAMTokenSecretManagerInRM extends
     return this.masterKeys.get(applicationAttemptID);
   }
 
+  /**
+   * 检查指定应用尝试是否存在主密钥，仅用于测试
+   * @param applicationAttemptID 应用尝试ID
+   * @return 是否存在主密钥
+   */
   @VisibleForTesting
   public synchronized boolean hasMasterKey(
       ApplicationAttemptId applicationAttemptID) {

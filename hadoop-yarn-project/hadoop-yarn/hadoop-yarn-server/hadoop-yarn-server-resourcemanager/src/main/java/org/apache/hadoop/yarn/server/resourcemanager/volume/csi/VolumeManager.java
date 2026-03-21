@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,50 +28,46 @@ import org.apache.hadoop.yarn.server.resourcemanager.volume.csi.provisioner.Volu
 import java.util.concurrent.ScheduledFuture;
 
 /**
- * Main interface for volume manager that manages all volumes.
- * Volume manager talks to a CSI controller plugin to handle the
- * volume operations before it is available to be published on
- * any node manager.
+ * YARN CSI存储卷管理器核心接口，负责管理集群中所有存储卷的全生命周期。
+ * 存储卷会先通过CSI控制器插件完成准备操作，之后才能发布到NodeManager上供容器使用。
  */
 @Private
 @Unstable
 public interface VolumeManager {
 
   /**
-   * @return all known volumes and their states.
+   * 获取所有已知存储卷及其当前状态信息。
+   * @return 所有存储卷及其状态集合
    */
   VolumeStates getVolumeStates();
 
   /**
-   * Start to supervise on a volume.
-   * @param volume volume.
-   * @return the volume being managed by the manager.
+   * 将指定存储卷添加到管理中，并启动状态监控。如果已存在则返回已有实例。
+   * @param volume 待管理的存储卷
+   * @return 被管理器管理的存储卷实例（新增或已有）
    */
   Volume addOrGetVolume(Volume volume);
 
   /**
-   * Execute volume provisioning tasks as backend threads.
-   * @param volumeProvisioningTask  A provisioning task encapsulates
-   * all the logic required by a storage system to provision a volume.
-   * @param delaySecond delay Second.
-   * @return ScheduledFuture.
+   * 异步调度执行存储卷制备任务，在后台线程中完成制备流程。
+   * @param volumeProvisioningTask 封装了特定存储系统制备存储卷所需全部逻辑的任务
+   * @param delaySecond 调度延迟秒数
+   * @return 异步任务的Future对象，可用于获取执行结果
    */
   ScheduledFuture<VolumeProvisioningResults> schedule(
       VolumeProvisioningTask volumeProvisioningTask, int delaySecond);
 
   /**
-   * Register a csi-driver-adaptor to the volume manager.
-   * @param driverName driver name.
-   * @param client csi adaptor protocol client.
+   * 向管理器注册指定CSI驱动对应的适配器客户端。
+   * @param driverName CSI驱动名称
+   * @param client CSI适配器协议客户端实例
    */
   void registerCsiDriverAdaptor(String driverName, CsiAdaptorProtocol client);
 
   /**
-   * Returns the csi-driver-adaptor client from cache by the given driver name.
-   * If the client is not found, null is returned.
-   * @param driverName driver name.
-   * @return a csi-driver-adaptor client working for given driver or null
-   * if the adaptor could not be found.
+   * 根据驱动名称从缓存中获取对应的CSI驱动适配器客户端。
+   * @param driverName CSI驱动名称
+   * @return 对应驱动的适配器客户端，如果未找到则返回null
    */
   CsiAdaptorProtocol getAdaptorByDriverName(String driverName);
 }

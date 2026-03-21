@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,27 +39,22 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * A custom JSON provider that extends {@link org.eclipse.persistence.jaxb.rs.MOXyJsonProvider}
- * to ensure that JSON marshalling and unmarshalling
- * include the root element for configured classes.
+ * YARN ResourceManager REST API自定义JSON序列化提供者，继承EclipseLink MOXyJsonProvider
+ * 核心功能：对指定类开启JSON根元素包裹，统一控制JSON序列化格式。
  * <p>
- * This provider integrates with EclipseLink MOXy and the JAX-RS runtime (annotated with
- * {@link javax.ws.rs.ext.Provider}), and it is configured to both produce and consume
- * {@code application/json} content types. It uses a {@link ClassSerialisationConfig}
- * to determine which classes should include
- * their root elements when serialized or deserialized.
+ * 集成JAX-RS运行时，专门处理application/json类型的请求和响应，通过ClassSerialisationConfig
+ * 决定哪些类在序列化/反序列化时需要包含根元素。
  * </p>
  *
- * During marshalling and unmarshalling, this provider sets the MOXy-specific properties:
+ * 序列化/反序列化时会设置以下MOXy属性：
  * <ul>
- *   <li>{@code MarshallerProperties.JSON_INCLUDE_ROOT = true}</li>
- *   <li>{@code MarshallerProperties.JSON_MARSHAL_EMPTY_COLLECTIONS = false}</li>
+ *   <li>{@code MarshallerProperties.JSON_INCLUDE_ROOT = true} - 开启根元素包裹</li>
+ *   <li>{@code MarshallerProperties.JSON_MARSHAL_EMPTY_COLLECTIONS = false} - 不输出空集合</li>
  * </ul>
- * ensuring consistent JSON structure that includes the root element and omits empty collections.
+ * 保证输出JSON结构一致，同时减少冗余数据。
  *
  * <p>
- * This class also provides detailed trace logging to help debug compatibility and data binding
- * behavior for registered entity types.
+ * 提供Trace级日志，方便调试实体类型的数据绑定行为。
  * </p>
  *
  * @see org.eclipse.persistence.jaxb.rs.MOXyJsonProvider
@@ -75,24 +71,16 @@ public class IncludeRootJSONProvider extends MOXyJsonProvider {
   private final ClassSerialisationConfig classSerialisationConfig;
 
   /**
-   * Default constructor.
+   * 默认构造函数，使用空配置初始化。
    */
   public IncludeRootJSONProvider() {
     this(new Configuration());
   }
 
   /**
-   * Constructs a new {@code IncludeRootJSONProvider} instance and initializes
-   * its {@link ClassSerialisationConfig} based on the provided application configuration.
-   * <p>
-   * This constructor is designed for dependency injection. The {@code Configuration}
-   * object is injected (qualified with {@code @Named("conf")}) and used to
-   * create a {@link ClassSerialisationConfig} instance, which controls how
-   * classes are serialized to JSON (e.g., whether to include root elements).
-   * </p>
+   * 依赖注入构造函数，通过Hadoop配置初始化序列化配置。
    *
-   * @param conf the application {@link Configuration} instance injected by the framework;
-   *             used to initialize serialization settings
+   * @param conf 注入的Hadoop应用配置实例，用于初始化需要根元素包裹的类列表
    */
   @Inject
   public IncludeRootJSONProvider(@javax.inject.Named("conf") Configuration conf) {
@@ -100,7 +88,7 @@ public class IncludeRootJSONProvider extends MOXyJsonProvider {
   }
 
   /**
-   * {@inheritDoc}
+   * 判断当前提供者是否支持对指定类型进行反序列化，仅处理配置中明确指定需要根元素的类。
    */
   @Override
   public boolean isReadable(Class<?> type, Type genericType, Annotation[] annotations,
@@ -111,7 +99,7 @@ public class IncludeRootJSONProvider extends MOXyJsonProvider {
   }
 
   /**
-   * {@inheritDoc}
+   * 判断当前提供者是否支持对指定类型进行序列化，逻辑同反序列化判断。
    */
   @Override
   public boolean isWriteable(Class<?> type, Type genericType, Annotation[] annotations,
@@ -120,25 +108,28 @@ public class IncludeRootJSONProvider extends MOXyJsonProvider {
   }
 
   /**
-   * {@inheritDoc}
+   * 反序列化前预处理，开启根元素解析配置。
    */
   @Override
   protected void preReadFrom(Class<Object> type, Type genericType, Annotation[] annotations,
       MediaType mediaType, MultivaluedMap<String, String> httpHeaders, Unmarshaller unmarshaller)
       throws JAXBException {
     LOG.trace("IncludeRootJSONProvider preReadFrom with {}", type);
+    // 开启根元素包含，正确解析带根节点的JSON
     unmarshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, true);
   }
 
   /**
-   * {@inheritDoc}
+   * 序列化前预处理，配置输出属性。
    */
   @Override
   protected void preWriteTo(Object object, Class<?> type, Type genericType,
       Annotation[] annotations, MediaType mediaType, MultivaluedMap<String, Object> httpHeaders,
       Marshaller marshaller) throws JAXBException {
     LOG.trace("IncludeRootJSONProvider preWriteTo with {}", type);
+    // 不序列化空集合，减少输出冗余
     marshaller.setProperty(MarshallerProperties.JSON_MARSHAL_EMPTY_COLLECTIONS, false);
+    // 开启根元素包含，输出带根节点的JSON结构
     marshaller.setProperty(MarshallerProperties.JSON_INCLUDE_ROOT, true);
   }
 }

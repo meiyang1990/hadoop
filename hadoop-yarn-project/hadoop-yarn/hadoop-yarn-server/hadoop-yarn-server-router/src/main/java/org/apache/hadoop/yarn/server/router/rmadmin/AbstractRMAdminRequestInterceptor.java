@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,9 +24,9 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.server.router.RouterServerUtil;
 
 /**
- * Implements the {@link RMAdminRequestInterceptor} interface and provides
- * common functionality which can can be used and/or extended by other concrete
- * interceptor classes.
+ * YARN Router资源管理器管理请求拦截器抽象基类，实现了RMAdminRequestInterceptor接口，
+ * 提供责任链模式的基础公共能力，可被具体拦截器扩展实现。
+ * 属于YARN Router服务端，处理联邦场景下跨RM的RMAdmin请求拦截。
  *
  */
 public abstract class AbstractRMAdminRequestInterceptor
@@ -37,7 +38,7 @@ public abstract class AbstractRMAdminRequestInterceptor
   protected UserGroupInformation user = null;
 
   /**
-   * Sets the {@link RMAdminRequestInterceptor} in the chain.
+   * 设置责任链中的下一个拦截器。
    */
   @Override
   public void setNextInterceptor(RMAdminRequestInterceptor nextInterceptor) {
@@ -45,7 +46,7 @@ public abstract class AbstractRMAdminRequestInterceptor
   }
 
   /**
-   * Sets the {@link Configuration}.
+   * 设置配置对象，并将配置传递给责任链中下一个拦截器。
    */
 
   @Override
@@ -57,7 +58,7 @@ public abstract class AbstractRMAdminRequestInterceptor
   }
 
   /**
-   * Gets the {@link Configuration}.
+   * 获取当前拦截器的配置对象。
    */
   @Override
   public Configuration getConf() {
@@ -65,7 +66,7 @@ public abstract class AbstractRMAdminRequestInterceptor
   }
 
   /**
-   * Initializes the {@link RMAdminRequestInterceptor}.
+   * 初始化拦截器，根据用户名创建用户凭证，并初始化责任链中下一个拦截器。
    */
   @Override
   public void init(String userName) {
@@ -76,7 +77,7 @@ public abstract class AbstractRMAdminRequestInterceptor
   }
 
   /**
-   * Disposes the {@link RMAdminRequestInterceptor}.
+   * 关闭拦截器，关闭责任链中下一个拦截器，释放资源。
    */
   @Override
   public void shutdown() {
@@ -86,7 +87,7 @@ public abstract class AbstractRMAdminRequestInterceptor
   }
 
   /**
-   * Gets the next {@link RMAdminRequestInterceptor} in the chain.
+   * 获取责任链中的下一个拦截器。
    */
   @Override
   public RMAdminRequestInterceptor getNextInterceptor() {

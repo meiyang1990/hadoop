@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,7 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * This class hosts a set of AppTimeout DAO objects.
+ * YARN RM Web API 应用超时配置信息集合数据访问对象，用于封装多个应用超时配置信息，供Web服务序列化输出。
  */
 @XmlRootElement(name = "timeouts")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -34,13 +35,24 @@ public class AppTimeoutsInfo {
   @XmlElement(name = "timeout")
   private ArrayList<AppTimeoutInfo> timeouts = new ArrayList<AppTimeoutInfo>();
 
+  /**
+   * JAXB反序列化需要的无参构造方法。
+   */
   public AppTimeoutsInfo() {
   } // JAXB needs this
 
+  /**
+   * 添加单个应用超时配置信息到集合中。
+   * @param timeoutInfo 单个应用超时配置信息对象
+   */
   public void add(AppTimeoutInfo timeoutInfo) {
     timeouts.add(timeoutInfo);
   }
 
+  /**
+   * 获取所有应用超时配置信息集合。
+   * @return 所有应用超时配置信息列表
+   */
   public ArrayList<AppTimeoutInfo> getAppTimeouts() {
     return timeouts;
   }

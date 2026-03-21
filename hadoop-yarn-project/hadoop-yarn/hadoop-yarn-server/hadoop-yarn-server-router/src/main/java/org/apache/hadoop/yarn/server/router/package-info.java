@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,5 +17,9 @@
  * limitations under the License.
  */
 
-/** Router Server package. **/
+/**
+ * YARN Router服务器核心包。
+ * 提供YARN联邦场景下的路由服务实现，负责将客户端请求转发到对应ResourceManager，
+ * 屏蔽联邦多RM的底层细节，为用户提供统一的集群访问入口。
+ */
 package org.apache.hadoop.yarn.server.router;

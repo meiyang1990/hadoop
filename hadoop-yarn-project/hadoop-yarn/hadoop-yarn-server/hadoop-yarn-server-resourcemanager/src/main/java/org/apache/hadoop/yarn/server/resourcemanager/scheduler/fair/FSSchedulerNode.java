@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,7 +47,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 /**
- * Fair Scheduler specific node features.
+ * 公平调度器专属的调度节点实现，扩展基础调度节点能力，支持抢占机制。
  */
 @Private
 @Unstable
@@ -54,34 +55,41 @@ public class FSSchedulerNode extends SchedulerNode {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(FSSchedulerNode.class);
+  // 当前节点上已预留资源的应用
   private FSAppAttempt reservedAppSchedulable;
-  // Stores list of containers still to be preempted
+  // 存储待抢占的容器列表
   @VisibleForTesting
   final Set<RMContainer> containersForPreemption =
       new ConcurrentSkipListSet<>();
-  // Stores amount of resources preempted and reserved for each app
+  // 存储每个应用已抢占预留的资源总量
   @VisibleForTesting
   final Map<FSAppAttempt, Resource>
       resourcesPreemptedForApp = new LinkedHashMap<>();
+  // 应用尝试ID到应用调度实例的映射
   private final Map<ApplicationAttemptId, FSAppAttempt> appIdToAppMap =
       new HashMap<>();
-  // Sum of resourcesPreemptedForApp values, total resources that are
-  // slated for preemption
+  // 节点上所有已抢占预留的资源总量，即所有计划被抢占的资源总和
   private Resource totalResourcesPreempted = Resource.newInstance(0, 0);
 
+  /**
+   * 构造公平调度器节点实例。
+   * @param node 底层RM节点对象
+   * @param usePortForNodeName 是否将端口包含进节点名称
+   */
   public FSSchedulerNode(RMNode node, boolean usePortForNodeName) {
     super(node, usePortForNodeName);
   }
 
   /**
-   * Total amount of reserved resources including reservations and preempted
-   * containers.
-   * @return total resources reserved
+   * 获取节点上所有预留资源总和，包含常规预留容器和抢占预留资源。
+   * @return 总预留资源
    */
   Resource getTotalReserved() {
+    // 克隆基础预留容器的资源，如果没有预留容器则初始化为0
     Resource totalReserved = Resources.clone(getReservedContainer() != null
         ? getReservedContainer().getAllocatedResource()
         : Resource.newInstance(0, 0));
+    // 加上抢占预留的总资源
     Resources.addTo(totalReserved, totalResourcesPreempted);
     return totalReserved;
   }
@@ -90,10 +98,10 @@ public class FSSchedulerNode extends SchedulerNode {
   public synchronized void reserveResource(
       SchedulerApplicationAttempt application, SchedulerRequestKey schedulerKey,
       RMContainer container) {
-    // Check if it's already reserved
+    // 检查是否已有预留容器
     RMContainer reservedContainer = getReservedContainer();
     if (reservedContainer != null) {
-      // Sanity check
+      // 完整性检查：确保预留容器的节点ID匹配当前节点
       if (!container.getContainer().getNodeId().equals(getNodeID())) {
         throw new IllegalStateException("Trying to reserve" +
             " container " + container +
@@ -102,7 +110,7 @@ public class FSSchedulerNode extends SchedulerNode {
             " on node " + reservedContainer.getReservedNode());
       }
       
-      // Cannot reserve more than one application on a given node!
+      // 单个节点同一时间只能为一个应用预留资源，检查是否为同一应用
       if (!reservedContainer.getContainer().getId().getApplicationAttemptId()
           .equals(container.getContainer().getId().getApplicationAttemptId())) {
         throw new IllegalStateException("Trying to reserve" +
@@ -121,14 +129,16 @@ public class FSSchedulerNode extends SchedulerNode {
           + " on node " + this + " for application "
           + application.getApplicationId());
     }
+    // 更新预留容器
     setReservedContainer(container);
+    // 保存预留应用的调度实例引用
     this.reservedAppSchedulable = (FSAppAttempt) application;
   }
 
   @Override
   public synchronized void unreserveResource(
       SchedulerApplicationAttempt application) {
-    // Cannot unreserve for wrong application...
+    // 检查取消预留的应用是否匹配当前预留的应用
     ApplicationAttemptId reservedApplication = 
         getReservedContainer().getContainer().getId()
             .getApplicationAttemptId();
@@ -141,18 +151,22 @@ public class FSSchedulerNode extends SchedulerNode {
           " on node " + this);
     }
     
+    // 清空预留容器和应用引用
     setReservedContainer(null);
     this.reservedAppSchedulable = null;
   }
 
+  /**
+   * 获取当前节点预留资源对应的应用调度实例。
+   * @return 预留应用调度实例，无预留则返回null
+   */
   synchronized FSAppAttempt getReservedAppSchedulable() {
     return reservedAppSchedulable;
   }
 
   /**
-   * List reserved resources after preemption and assign them to the
-   * appropriate applications in a FIFO order.
-   * @return if any resources were allocated
+   * 清理后获取抢占预留列表，按FIFO顺序返回每个应用对应的抢占预留资源，用于分配。
+   * @return 应用到抢占预留资源的映射
    */
   @VisibleForTesting
   synchronized LinkedHashMap<FSAppAttempt, Resource> getPreemptionList() {
@@ -161,33 +175,36 @@ public class FSSchedulerNode extends SchedulerNode {
   }
 
   /**
-   * Returns whether a preemption is tracked on the node for the specified app.
-   * @return if preempted containers are reserved for the app
+   * 检查指定应用是否在本节点有抢占预留资源。
+   * @return 是否存在抢占预留资源
    */
   synchronized boolean isPreemptedForApp(FSAppAttempt app){
     return resourcesPreemptedForApp.containsKey(app);
   }
 
   /**
-   * Remove apps that have their preemption requests fulfilled.
+   * 清理抢占列表中不再需要资源的应用，释放已完成抢占预留的资源记录。
    */
   private void cleanupPreemptionList() {
-    // Synchronize separately to avoid potential deadlocks
-    // This may cause delayed deletion of reservations
+    // 单独加锁获取候选列表，避免死锁，该方式可能会导致清理延迟，是可接受的
     LinkedList<FSAppAttempt> candidates;
     synchronized (this) {
       candidates = Lists.newLinkedList(resourcesPreemptedForApp.keySet());
     }
+    // 遍历检查每个应用是否还需要资源
     for (FSAppAttempt app : candidates) {
+      // 应用已停止、不再饥饿，且最小资源和公平资源都已满足，则移除
       if (app.isStopped() || !app.isStarved() ||
           (Resources.isNone(app.getFairshareStarvation()) &&
            Resources.isNone(app.getMinshareStarvation()))) {
-        // App does not need more resources
+        // 应用不再需要更多资源，移除该应用的抢占记录
         synchronized (this) {
           Resource removed = resourcesPreemptedForApp.remove(app);
           if (removed != null) {
+            // 从总抢占资源中扣除
             Resources.subtractFrom(totalResourcesPreempted,
                 removed);
+            // 移除ID映射
             appIdToAppMap.remove(app.getApplicationAttemptId());
           }
         }
@@ -196,29 +213,32 @@ public class FSSchedulerNode extends SchedulerNode {
   }
 
   /**
-   * Mark {@code containers} as being considered for preemption so they are
-   * not considered again. A call to this requires a corresponding call to
-   * {@code releaseContainer} to ensure we do not mark a container for
-   * preemption and never consider it again and avoid memory leaks.
-   *
-   * @param containers container to mark
+   * 将一批容器标记为待抢占，避免重复加入抢占队列，对应释放容器时需要调用releaseContainer清理。
+   * @param containers 待抢占容器集合
+   * @param app 抢占后资源将分配给的目标应用
    */
   void addContainersForPreemption(Collection<RMContainer> containers,
                                   FSAppAttempt app) {
 
+    // 累计当前批次为该应用抢占的资源总量
     Resource appReserved = Resources.createResource(0);
 
     for(RMContainer container : containers) {
       if(containersForPreemption.add(container)) {
+        // 新增成功则累加资源
         Resources.addTo(appReserved, container.getAllocatedResource());
       }
     }
 
     synchronized (this) {
+      // 如果有新增抢占资源，更新统计
       if (!Resources.isNone(appReserved)) {
+        // 累加到总抢占资源
         Resources.addTo(totalResourcesPreempted,
             appReserved);
+        // 维护ID到应用的映射
         appIdToAppMap.putIfAbsent(app.getApplicationAttemptId(), app);
+        // 初始化或累加应用对应的抢占资源
         resourcesPreemptedForApp.
             putIfAbsent(app, Resource.newInstance(0, 0));
         Resources.addTo(resourcesPreemptedForApp.get(app), appReserved);
@@ -227,17 +247,17 @@ public class FSSchedulerNode extends SchedulerNode {
   }
 
   /**
-   * @return set of containers marked for preemption.
+   * 获取所有标记为待抢占的容器集合。
+   * @return 待抢占容器集合
    */
   Set<RMContainer> getContainersForPreemption() {
     return containersForPreemption;
   }
 
   /**
-   * The Scheduler has allocated containers on this node to the given
-   * application.
-   * @param rmContainer Allocated container
-   * @param launchedOnNode True if the container has been launched
+   * 容器分配完成后的处理，更新抢占预留统计，扣除已满足的抢占资源。
+   * @param rmContainer 已分配的容器
+   * @param launchedOnNode 容器是否已在节点启动
    */
   @Override
   protected synchronized void allocateContainer(RMContainer rmContainer,
@@ -254,16 +274,19 @@ public class FSSchedulerNode extends SchedulerNode {
 
     Resource allocated = rmContainer.getAllocatedResource();
     if (!Resources.isNone(allocated)) {
-      // check for satisfied preemption request and update bookkeeping
+      // 检查该分配是否满足某个应用的抢占预留请求
       FSAppAttempt app =
           appIdToAppMap.get(rmContainer.getApplicationAttemptId());
       if (app != null) {
         Resource reserved = resourcesPreemptedForApp.get(app);
+        // 计算本次分配满足了多少抢占预留资源，取最小值避免扣超
         Resource fulfilled = Resources.componentwiseMin(reserved, allocated);
+        // 从应用预留资源中扣除已满足的部分
         Resources.subtractFrom(reserved, fulfilled);
+        // 从总抢占资源中扣除已满足的部分
         Resources.subtractFrom(totalResourcesPreempted, fulfilled);
+        // 如果应用预留资源已全部满足，移除该应用的抢占记录
         if (Resources.isNone(reserved)) {
-          // No more preempted containers
           resourcesPreemptedForApp.remove(app);
           appIdToAppMap.remove(rmContainer.getApplicationAttemptId());
         }
@@ -274,11 +297,9 @@ public class FSSchedulerNode extends SchedulerNode {
   }
 
   /**
-   * Release an allocated container on this node.
-   * It also releases from the reservation list to trigger preemption
-   * allocations.
-   * @param containerId ID of container to be released.
-   * @param releasedByNode whether the release originates from a node update.
+   * 释放容器，同步从待抢占列表中移除，处理内存泄漏。
+   * @param containerId 要释放的容器ID
+   * @param releasedByNode 是否由节点更新发起的释放
    */
   @Override
   public synchronized void releaseContainer(ContainerId containerId,
@@ -286,6 +307,7 @@ public class FSSchedulerNode extends SchedulerNode {
     RMContainer container = getContainer(containerId);
     super.releaseContainer(containerId, releasedByNode);
     if (container != null) {
+      // 从待抢占列表中移除已释放的容器
       containersForPreemption.remove(container);
     }
   }

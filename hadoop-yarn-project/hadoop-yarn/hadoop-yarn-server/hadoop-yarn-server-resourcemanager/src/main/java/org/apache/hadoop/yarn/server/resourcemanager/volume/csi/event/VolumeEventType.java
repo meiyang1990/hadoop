@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,12 +19,18 @@
 package org.apache.hadoop.yarn.server.resourcemanager.volume.csi.event;
 
 /**
- * Volume events.
+ * YARN CSI卷管理事件类型枚举，定义了存储卷生命周期中各类事件的类型。
+ * 用于RM中CSI卷管理模块的事件驱动流程，标识不同的卷操作请求。
  */
 public enum VolumeEventType {
+  /** 卷合法性校验事件 */
   VALIDATE_VOLUME_EVENT,
+  /** 创建存储卷事件 */
   CREATE_VOLUME_EVENT,
+  /** 控制器端发布存储卷事件（将卷挂载到目标节点） */
   CONTROLLER_PUBLISH_VOLUME_EVENT,
+  /** 控制器端取消发布存储卷事件（从目标节点卸载卷） */
   CONTROLLER_UNPUBLISH_VOLUME_EVENT,
+  /** 删除存储卷事件 */
   DELETE_VOLUME
 }

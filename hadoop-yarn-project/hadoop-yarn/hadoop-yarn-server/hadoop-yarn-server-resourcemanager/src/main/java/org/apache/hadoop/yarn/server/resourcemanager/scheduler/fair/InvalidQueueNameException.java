@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,17 +23,26 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * Thrown when Queue Name is malformed.
+ * 公平调度器中当队列名称格式非法时抛出的异常
  */
 @Private
 @Unstable
 public class InvalidQueueNameException extends IllegalArgumentException {
   private static final long serialVersionUID = -7306320927804540011L;
 
+  /**
+   * 构造带有错误消息的非法队列名称异常
+   * @param message 错误描述消息
+   */
   public InvalidQueueNameException(String message) {
     super(message);
   }
 
+  /**
+   * 构造带有错误消息和根异常的非法队列名称异常
+   * @param message 错误描述消息
+   * @param t 根异常
+   */
   public InvalidQueueNameException(String message, Throwable t) {
     super(message, t);
   }

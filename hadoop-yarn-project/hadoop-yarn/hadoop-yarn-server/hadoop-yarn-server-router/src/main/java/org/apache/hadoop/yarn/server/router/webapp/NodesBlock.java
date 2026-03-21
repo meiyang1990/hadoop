@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,7 +46,7 @@ import static org.apache.hadoop.yarn.webapp.YarnWebParams.NODE_LABEL;
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.NODE_STATE;
 
 /**
- * Nodes block for the Router Web UI.
+ * 路由器Web UI的节点信息块，负责在联邦YARN集群页面渲染节点列表。
  */
 public class NodesBlock extends RouterBlock {
 
@@ -59,57 +60,78 @@ public class NodesBlock extends RouterBlock {
 
   @Override
   protected void render(Block html) {
-
+    // 检查YARN联邦功能是否启用
     boolean isEnabled = isYarnFederationEnabled();
 
-    // Get subClusterName
+    // 获取请求参数中的子集群名称
     String subClusterName = $(NODE_SC);
+    // 获取请求参数中的节点状态过滤条件
     String state = $(NODE_STATE);
+    // 获取请求参数中的节点标签过滤条件
     String nodeLabel = $(NODE_LABEL);
 
-    // We will try to get the subClusterName.
-    // If the subClusterName is not empty,
-    // it means that we need to get the Node list of a subCluster.
     NodesInfo nodesInfo;
+    // 如果指定了有效子集群，则查询该子集群的节点列表
     if (subClusterName != null && !subClusterName.isEmpty() &&
         !ROUTER.equalsIgnoreCase(subClusterName)) {
+      // 初始化子集群指标概览表格
       initSubClusterMetricsOverviewTable(html, subClusterName);
+      // 获取指定子集群的节点信息
       nodesInfo = getSubClusterNodesInfo(subClusterName);
     } else {
-      // Metrics Overview Table
+      // 渲染全局指标概览表格
       html.__(MetricsOverviewTable.class);
+      // 获取整个YARN联邦集群的节点信息
       nodesInfo = getYarnFederationNodesInfo(isEnabled);
     }
 
-    // Initialize NodeInfo List
+    // 根据过滤条件渲染节点列表表格
     initYarnFederationNodesOfCluster(nodesInfo, html, state, nodeLabel);
   }
 
+  /**
+   * 获取YARN联邦集群所有节点汇总信息。
+   * @param isEnabled YARN联邦是否启用
+   * @return 节点信息汇总对象
+   */
   private NodesInfo getYarnFederationNodesInfo(boolean isEnabled) {
     Configuration config = this.router.getConfig();
     String webAddress;
     if (isEnabled) {
+      // 联邦启用时从Router获取汇总节点信息
       webAddress = WebAppUtils.getRouterWebAppURLWithScheme(this.router.getConfig());
     } else {
+      // 联邦未启用时从本地RM获取节点信息
       webAddress = WebAppUtils.getRMWebAppURLWithScheme(config);
     }
+    // 通过REST API获取节点信息
     return getSubClusterNodesInfoByWebAddress(webAddress);
   }
 
+  /**
+   * 从指定子集群获取节点信息。
+   * @param subCluster 子集群ID
+   * @return 子集群节点信息汇总，出错返回null
+   */
   private NodesInfo getSubClusterNodesInfo(String subCluster) {
     try {
+      // 构造子集群ID对象
       SubClusterId subClusterId = SubClusterId.newInstance(subCluster);
+      // 获取联邦状态存储门面实例
       FederationStateStoreFacade facade =
           FederationStateStoreFacade.getInstance(this.router.getConfig());
+      // 从状态存储查询子集群信息
       SubClusterInfo subClusterInfo = facade.getSubCluster(subClusterId);
 
       if (subClusterInfo != null) {
-        // Prepare webAddress
+        // 获取子集群RM的Web服务地址
         String webAddress = subClusterInfo.getRMWebServiceAddress();
         String herfWebAppAddress;
         if (webAddress != null && !webAddress.isEmpty()) {
+          // 拼接完整HTTP地址
           herfWebAppAddress =
               WebAppUtils.getHttpSchemePrefix(this.router.getConfig()) + webAddress;
+          // 调用子集群RM接口获取节点信息
           return getSubClusterNodesInfoByWebAddress(herfWebAppAddress);
         }
       }
@@ -119,19 +141,35 @@ public class NodesBlock extends RouterBlock {
     return null;
   }
 
+  /**
+   * 通过指定Web地址调用REST API获取节点信息。
+   * @param webAddress 目标Web服务地址
+   * @return 节点信息汇总对象，请求失败返回null
+   */
   private NodesInfo getSubClusterNodesInfoByWebAddress(String webAddress) {
     Configuration conf = this.router.getConfig();
+    // 创建Jersey客户端实例
     Client client = RouterWebServiceUtil.createJerseyClient(conf);
+    // 转发请求并解析响应
     NodesInfo nodes = RouterWebServiceUtil
         .genericForward(webAddress, null, NodesInfo.class, HTTPMethods.GET,
         RMWSConsts.RM_WEB_SERVICE_PATH + RMWSConsts.NODES, null, null, conf,
         client);
+    // 关闭客户端释放资源
     client.close();
     return nodes;
   }
 
+  /**
+   * 根据过滤条件渲染节点列表表格。
+   * @param nodesInfo 节点信息汇总
+   * @param html HTML块输出对象
+   * @param filterState 节点状态过滤条件
+   * @param filterLabel 节点标签过滤条件
+   */
   private void initYarnFederationNodesOfCluster(NodesInfo nodesInfo, Block html,
       String filterState, String filterLabel) {
+    // 创建节点表格并初始化表头
     TBODY<TABLE<Hamlet>> tbody = html.table("#nodes").thead().tr()
         .th(".nodelabels", "Node Labels")
         .th(".rack", "Rack")
@@ -148,31 +186,39 @@ public class NodesBlock extends RouterBlock {
         .th(".nodeManagerVersion", "Version")
         .__().__().tbody();
 
+    // 遍历所有节点生成表格行
     if (nodesInfo != null && CollectionUtils.isNotEmpty(nodesInfo.getNodes())) {
       for (NodeInfo info : nodesInfo.getNodes()) {
+        // 按节点状态过滤，不匹配则跳过
         if (filterState != null && !filterState.isEmpty() && !filterState.equals(info.getState())) {
           continue;
         }
 
-        // Besides state, we need to filter label as well.
+        // 按节点标签过滤，不匹配则跳过
         if (!filterLabel.equals(RMNodeLabelsManager.ANY)) {
           if (filterLabel.isEmpty()) {
-            // Empty label filter means only shows nodes without label
+            // 空标签过滤仅展示无标签节点
             if (!info.getNodeLabels().isEmpty()) {
               continue;
             }
           } else if (!info.getNodeLabels().contains(filterLabel)) {
-            // Only nodes have given label can show on web page.
+            // 仅展示包含指定标签的节点
             continue;
           }
         }
 
+        // 计算内存使用量
         int usedMemory = (int) info.getUsedMemory();
         int availableMemory = (int) info.getAvailableMemory();
+        // 创建新表格行
         TR<TBODY<TABLE<Hamlet>>> row = tbody.tr();
+        // 输出节点标签
         row.td().__(StringUtils.join(",", info.getNodeLabels())).__();
+        // 输出机架信息
         row.td().__(info.getRack()).__();
+        // 输出节点状态
         row.td().__(info.getState()).__();
+        // 输出节点ID
         row.td().__(info.getNodeId()).__();
         boolean isInactive = false;
         if (isInactive) {
@@ -181,26 +227,37 @@ public class NodesBlock extends RouterBlock {
           String httpAddress = info.getNodeHTTPAddress();
           String herfWebAppAddress = "";
           if (httpAddress != null && !httpAddress.isEmpty()) {
+            // 拼接节点NM的完整HTTP地址
             herfWebAppAddress =
                 WebAppUtils.getHttpSchemePrefix(this.router.getConfig()) + httpAddress;
           }
+          // 输出带链接的节点HTTP地址
           row.td().a(herfWebAppAddress, httpAddress).__();
         }
 
+        // 输出最后健康检查时间
         row.td().br().$title(String.valueOf(info.getLastHealthUpdate())).__()
             .__(new Date(info.getLastHealthUpdate())).__()
+            // 输出健康检查报告
             .td(info.getHealthReport())
+            // 输出容器数量
             .td(String.valueOf(info.getNumContainers())).td().br()
             .$title(String.valueOf(usedMemory)).__()
+            // 输出已用内存容量
             .__(StringUtils.byteDesc(usedMemory * BYTES_IN_MB)).__().td().br()
             .$title(String.valueOf(availableMemory)).__()
+            // 输出可用内存容量
             .__(StringUtils.byteDesc(availableMemory * BYTES_IN_MB)).__()
+            // 输出已用vCore数量
             .td(String.valueOf(info.getUsedVirtualCores()))
+            // 输出可用vCore数量
             .td(String.valueOf(info.getAvailableVirtualCores()))
+            // 输出NodeManager版本
             .td(info.getVersion()).__();
       }
     }
 
+    // 结束表格渲染
     tbody.__().__();
   }
 }

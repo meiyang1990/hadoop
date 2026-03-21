@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,7 +17,8 @@
  * limitations under the License.
  */
 
-/** Router Security Authorization package. **/
+/**
+ * YARN Router 安全授权模块包。
+ * 负责处理YARN联邦路由场景下的客户端访问权限校验，为Router服务提供请求授权能力。
+ */
 package org.apache.hadoop.yarn.server.router.security.authorize;
-
-

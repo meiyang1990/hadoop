@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,6 +20,10 @@ package org.apache.hadoop.yarn.server.router.webapp.dao;
 
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterInfo;
 
+/**
+ * YARN Router联邦子集群查询结果封装类，用于包装对子集群请求的返回结果、子集群信息和异常信息。
+ * @param <R> 泛型，请求响应结果的类型
+ */
 public class SubClusterResult<R> {
   private SubClusterInfo subClusterInfo;
   private R response;
@@ -27,6 +32,12 @@ public class SubClusterResult<R> {
   public SubClusterResult() {
   }
 
+  /**
+   * 构造一个子集群查询结果对象。
+   * @param subCluster 子集群基础信息
+   * @param res 子集群请求响应结果
+   * @param ex 请求过程中发生的异常，无异常则为null
+   */
   public SubClusterResult(SubClusterInfo subCluster, R res, Exception ex) {
     this.subClusterInfo = subCluster;
     this.response = res;

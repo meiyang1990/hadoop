@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -58,6 +59,9 @@ import org.slf4j.LoggerFactory;
 
 import com.google.inject.Injector;
 
+/**
+ * RM Web 应用过滤器，负责处理高可用场景下的重定向以及已完成应用跳转到应用历史服务的逻辑
+ */
 @Singleton
 public class RMWebAppFilter implements Filter {
   private static final Logger LOG =
@@ -69,7 +73,7 @@ public class RMWebAppFilter implements Filter {
    */
   private static final long serialVersionUID = 1L;
 
-  // define a set of URIs which do not need to do redirection
+  // 定义无需重定向的URI集合
   private static final Set<String> NON_REDIRECTED_URIS = Sets.newHashSet(
       "/conf", "/stacks", "/logLevel", "/logs", IsActiveServlet.PATH_SPEC,
       "/jmx", "/prom");
@@ -84,9 +88,15 @@ public class RMWebAppFilter implements Filter {
   public void init(FilterConfig filterConfig) throws ServletException {
   }
 
+  /**
+   * 构造函数，初始化过滤器配置
+   * @param injector Guice注入器
+   * @param conf YARN配置对象
+   */
   @Inject
   public RMWebAppFilter(Injector injector, Configuration conf) {
     this.injector = injector;
+    // 根据HTTPS配置获取对应的RM Web服务地址
     InetSocketAddress sock = YarnConfiguration.useHttps(conf)
         ? conf.getSocketAddr(YarnConfiguration.RM_WEBAPP_HTTPS_ADDRESS,
             YarnConfiguration.DEFAULT_RM_WEBAPP_HTTPS_ADDRESS,
@@ -95,13 +105,16 @@ public class RMWebAppFilter implements Filter {
             YarnConfiguration.DEFAULT_RM_WEBAPP_ADDRESS,
             YarnConfiguration.DEFAULT_RM_WEBAPP_PORT);
 
+    // 拼接完整的RM Web服务基础URL
     path = sock.getHostName() + ":" + sock.getPort();
     path = YarnConfiguration.useHttps(conf)
         ? "https://" + path
         : "http://" + path;
+    // 获取应用历史服务是否启用的配置
     ahsEnabled = conf.getBoolean(
         YarnConfiguration.APPLICATION_HISTORY_ENABLED,
         YarnConfiguration.DEFAULT_APPLICATION_HISTORY_ENABLED);
+    // 构建应用历史服务页面URL前缀
     ahsPageURLPrefix = pjoin(
         WebAppUtils.getHttpSchemePrefix(conf) +
         WebAppUtils.getAHSWebAppURLWithoutScheme(
@@ -115,35 +128,46 @@ public class RMWebAppFilter implements Filter {
     HttpServletRequest request = (HttpServletRequest) servletRequest;
     HttpServletResponse response = (HttpServletResponse) servletResponse;
 
+    // 设置字符编码为UTF-8
     response.setCharacterEncoding("UTF-8");
+    // 对请求URI进行HTML转义，防止XSS攻击
     String htmlEscapedUri = HtmlQuoting.quoteHtmlChars(request.getRequestURI());
 
     if (htmlEscapedUri == null) {
       htmlEscapedUri = "/";
     }
 
+    // 拼接URI和查询参数
     String uriWithQueryString =
         WebAppUtils.appendQueryParams(request, htmlEscapedUri);
+    // 获取转义后的完整URI（含查询参数）
     String htmlEscapedUriWithQueryString =
         WebAppUtils.getHtmlEscapedURIWithQueryString(request);
 
+    // 获取RM Web应用实例
     RMWebApp rmWebApp = injector.getInstance(RMWebApp.class);
+    // 检查当前RM是否为 standby 节点
     rmWebApp.checkIfStandbyRM();
+    // 如果当前是 standby 节点且需要重定向，则执行重定向逻辑
     if (rmWebApp.isStandby()
         && shouldRedirect(rmWebApp, htmlEscapedUri)) {
 
+      // 获取目标重定向地址
       String redirectPath = rmWebApp.getRedirectPath();
 
       if (redirectPath != null && !redirectPath.isEmpty()) {
+        // 拼接请求路径到重定向地址
         redirectPath += uriWithQueryString;
         String redirectMsg = "This is standby RM. The redirect url is: "
             + htmlEscapedUriWithQueryString;
         PrintWriter out = response.getWriter();
         out.println(redirectMsg);
+        // 设置重定向头和状态码
         response.setHeader("Location", redirectPath);
         response.setStatus(HttpServletResponse.SC_TEMPORARY_REDIRECT);
         return;
       } else {
+        // 没有可用活跃RM，准备自动重试
         boolean doRetry = true;
         String retryIntervalStr =
             request.getParameter(YarnWebParams.NEXT_REFRESH_INTERVAL);
@@ -155,14 +179,17 @@ public class RMWebAppFilter implements Filter {
             doRetry = false;
           }
         }
+        // 计算下一次重试的等待时间（指数退避）
         int next = calculateExponentialTime(retryInterval);
 
+        // 构建带重试参数的重定向URL
         String redirectUrl =
             appendOrReplaceParamter(path + uriWithQueryString,
               YarnWebParams.NEXT_REFRESH_INTERVAL + "=" + (retryInterval + 1));
         if (redirectUrl == null || next > MAX_SLEEP_TIME) {
           doRetry = false;
         }
+        // 构建响应提示信息
         String redirectMsg =
             doRetry ? "Can not find any active RM. Will retry in next " + next
                 + " seconds." : "There is no active RM right now.";
@@ -171,23 +198,33 @@ public class RMWebAppFilter implements Filter {
         PrintWriter out = response.getWriter();
         out.println(redirectMsg);
         if (doRetry) {
+          // 设置Refresh头实现自动重试
           response.setHeader("Refresh", next + ";url=" + redirectUrl);
           response.setStatus(HttpServletResponse.SC_TEMPORARY_REDIRECT);
         }
       }
       return;
     } else if (ahsEnabled) {
+      // 如果启用了应用历史服务，检查是否需要跳转到AHS
       String ahsRedirectUrl = ahsRedirectPath(uriWithQueryString, rmWebApp);
       if(ahsRedirectUrl != null) {
+        // 重定向到应用历史服务
         response.setHeader("Location", ahsRedirectUrl);
         response.setStatus(HttpServletResponse.SC_TEMPORARY_REDIRECT);
         return;
       }
     }
 
+    // 放行请求，继续处理
     chain.doFilter(request, response);
   }
 
+  /**
+   * 生成应用历史服务重定向路径，当RM中不存在对应实体时返回重定向地址
+   * @param uri 请求URI
+   * @param rmWebApp RM Web应用实例
+   * @return 重定向地址，如果不需要重定向返回null
+   */
   private String ahsRedirectPath(String uri, RMWebApp rmWebApp) {
     // TODO: Commonize URL parsing code. Will be done in YARN-4642.
     String redirectPath = null;
@@ -202,24 +239,28 @@ public class RMWebAppFilter implements Filter {
         switch(type){
         case "app":
           try {
+            // 解析应用ID
             appId = Apps.toAppID(parts[3]);
           } catch (YarnRuntimeException | NumberFormatException e) {
             LOG.debug("Error parsing {} as an ApplicationId",
                 parts[3], e);
             return redirectPath;
           }
+          // 如果当前RM中不存在该应用，重定向到AHS
           if(!context.getRMApps().containsKey(appId)) {
             redirectPath = pjoin(ahsPageURLPrefix, "app", appId);
           }
           break;
         case "appattempt":
           try{
+            // 解析应用尝试ID
             appAttemptId = ApplicationAttemptId.fromString(parts[3]);
           } catch (IllegalArgumentException e) {
             LOG.debug("Error parsing {} as an ApplicationAttemptId",
                 parts[3], e);
             return redirectPath;
           }
+          // 如果当前RM中不存在该应用，重定向到AHS
           if(!context.getRMApps().containsKey(
               appAttemptId.getApplicationId())) {
             redirectPath = pjoin(ahsPageURLPrefix,
@@ -228,12 +269,14 @@ public class RMWebAppFilter implements Filter {
           break;
         case "container":
           try {
+            // 解析容器ID
             containerId = ContainerId.fromString(parts[3]);
           } catch (IllegalArgumentException e) {
             LOG.debug("Error parsing {} as an ContainerId",
                 parts[3], e);
             return redirectPath;
           }
+          // 如果当前RM中不存在该应用，重定向到AHS
           if(!context.getRMApps().containsKey(
               containerId.getApplicationAttemptId().getApplicationId())) {
             redirectPath = pjoin(ahsPageURLPrefix,
@@ -248,6 +291,12 @@ public class RMWebAppFilter implements Filter {
     return redirectPath;
   }
 
+  /**
+   * 判断当前URI是否需要重定向
+   * @param rmWebApp RM Web应用实例
+   * @param uri 请求URI
+   * @return 是否需要重定向
+   */
   private boolean shouldRedirect(RMWebApp rmWebApp, String uri) {
     return !uri.equals("/" + rmWebApp.wsName() + "/v1/cluster/info")
         && !uri.equals("/ws/v1/cluster/info")
@@ -256,8 +305,15 @@ public class RMWebAppFilter implements Filter {
         && !NON_REDIRECTED_URIS.contains(uri);
   }
 
+  /**
+   * 添加或替换URI中的查询参数
+   * @param uri 原始URI
+   * @param newQuery 新的查询参数项
+   * @return 修改后的URI字符串，出错返回null
+   */
   private String appendOrReplaceParamter(String uri, String newQuery) {
     if (uri.contains(YarnWebParams.NEXT_REFRESH_INTERVAL + "=")) {
+      // 替换已存在的重试间隔参数
       return uri.replaceAll(YarnWebParams.NEXT_REFRESH_INTERVAL + "=[^&]+",
         newQuery);
     }
@@ -270,6 +326,7 @@ public class RMWebAppFilter implements Filter {
         appendQuery += "&" + newQuery;
       }
 
+      // 构建新的URI对象
       URI newUri =
           new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),
             appendQuery, oldUri.getFragment());
@@ -280,6 +337,11 @@ public class RMWebAppFilter implements Filter {
     }
   }
 
+  /**
+   * 使用指数退避算法计算重试等待时间，添加随机因子避免 thundering herd
+   * @param retries 已重试次数
+   * @return 下一次等待时间（秒）
+   */
   private static int calculateExponentialTime(int retries) {
     long baseTime = BASIC_SLEEP_TIME * (1L << retries);
     return (int) (baseTime * (randnum.nextDouble() + 0.5));

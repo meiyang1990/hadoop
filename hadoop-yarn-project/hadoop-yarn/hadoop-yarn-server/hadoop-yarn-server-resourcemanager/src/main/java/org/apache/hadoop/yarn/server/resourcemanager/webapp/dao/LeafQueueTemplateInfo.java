@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,7 @@ import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.C
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration.DOT;
 
 /**
- * This class stores the LeafQueue Template configuration.
+ * 容量调度器自动创建叶子队列模板配置信息DAO，用于REST API返回模板配置数据
  */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -41,13 +42,21 @@ public class LeafQueueTemplateInfo {
   public LeafQueueTemplateInfo() {
   } // JAXB needs this
 
+  /**
+   * 从配置中解析提取指定父队列下的叶子队列模板配置
+   * @param conf 资源管理器配置对象
+   * @param queuePath 父队列路径
+   */
   public LeafQueueTemplateInfo(Configuration conf, QueuePath queuePath) {
+    // 拼接模板配置前缀路径
     String configPrefix = QueuePrefixes.
         getQueuePrefix(queuePath) + AUTO_CREATED_LEAF_QUEUE_TEMPLATE_PREFIX
         + DOT;
+    // 遍历所有配置项，过滤出匹配前缀的模板配置
     conf.forEach(entry -> {
       if (entry.getKey().startsWith(configPrefix)) {
         String name = entry.getKey();
+        // 提取配置项短名称（去掉前缀部分）
         int start = name.lastIndexOf(AUTO_CREATED_LEAF_QUEUE_TEMPLATE_PREFIX
             + DOT);
         add(new ConfItem(name.substring(start), entry.getValue()));
@@ -64,7 +73,7 @@ public class LeafQueueTemplateInfo {
   }
 
   /**
-   * This class stores the Configuration Property.
+   * 单个配置项存储类，保存配置键值对
    */
   @XmlAccessorType(XmlAccessType.FIELD)
   public static class ConfItem {

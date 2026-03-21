@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -75,15 +76,15 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Extends the {@link AbstractRMAdminRequestInterceptor} class and provides an
- * implementation that simply forwards the client requests to the cluster
- * resource manager.
+ * YARN Router联邦场景下默认的RM管理请求拦截器，继承AbstractRMAdminRequestInterceptor，
+ * 将客户端的RM管理请求直接转发到后端ResourceManager处理，作为责任链的最后一环。
  *
  */
 public class DefaultRMAdminRequestInterceptor
     extends AbstractRMAdminRequestInterceptor {
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultRMAdminRequestInterceptor.class);
+  // ResourceManager管理协议代理对象，用于转发请求到后端RM
   private ResourceManagerAdministrationProtocol rmAdminProxy;
 
   @Override
@@ -91,6 +92,7 @@ public class DefaultRMAdminRequestInterceptor
     super.init(userName);
     try {
       final Configuration conf = this.getConf();
+      // 在对应用户权限下创建RM管理协议代理
       rmAdminProxy = user.doAs(
           (PrivilegedExceptionAction<ResourceManagerAdministrationProtocol>) () ->
                ClientRMProxy.createRMProxy(conf, ResourceManagerAdministrationProtocol.class));
@@ -107,6 +109,7 @@ public class DefaultRMAdminRequestInterceptor
 
   @Override
   public void setNextInterceptor(RMAdminRequestInterceptor next) {
+    // Default拦截器是责任链最后一环，不允许设置下一个拦截器
     throw new YarnRuntimeException("setNextInterceptor is being called on "
         + "DefaultRMAdminRequestInterceptor, which should be the last one "
         + "in the chain. Check if the interceptor pipeline configuration "

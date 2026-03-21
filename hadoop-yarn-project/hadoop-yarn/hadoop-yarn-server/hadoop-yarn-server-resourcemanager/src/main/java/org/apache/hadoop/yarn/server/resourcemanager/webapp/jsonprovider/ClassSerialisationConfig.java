@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -89,61 +90,26 @@ import org.apache.hadoop.yarn.webapp.dao.ConfInfo;
 import org.apache.hadoop.yarn.webapp.dao.SchedConfUpdateInfo;
 
 /**
- * Configuration holder for class serialization setup
- * used by the ResourceManager web services layer.
- *
- * <p>This class manages two categories of data transfer objects (DTOs):</p>
+ * ResourceManager Web服务层JSON序列化配置类，管理需要特殊序列化处理的DTO类
+ * 
+ * <p>管理两类数据传输对象（DTO）的序列化行为：</p>
  * <ul>
- *   <li><b>Wrapped classes</b>
- *     – classes whose JSON representation includes a root wrapper element.</li>
- *   <li><b>Unwrapped classes</b>
- *     – classes whose JSON representation omits a root wrapper element.</li>
+ *   <li><b>带根包装类</b>：JSON输出包含根包装元素的类</li>
+ *   <li><b>无跟包装类</b>：JSON输出省略根包装元素的类</li>
  * </ul>
  *
- * <p>The configuration is initialized with a default list of constant classes and may optionally
- * include user-defined classes loaded from configuration properties:</p>
+ * <p>配置初始化包含默认预定义类列表，同时支持从以下配置项加载用户自定义类：</p>
  * <ul>
- *   <li>{@code yarn.http.webapp.custom.dao.classes}</li>
- *   <li>{@code yarn.http.webapp.custom.unwrapped.dao.classes}</li>
+ *   <li>{@code yarn.http.webapp.custom.dao.classes} - 自定义带根包装DTO类</li>
+ *   <li>{@code yarn.http.webapp.custom.unwrapped.dao.classes} - 自定义无跟包装DTO类</li>
  * </ul>
  *
- * <p>This configuration is primarily used to control JSON serialization behavior in MOXy providers
- * when serializing REST API objects.</p>
- *
- * <p><b>Example:</b></p>
- * <p>If we have a class like:</p>
- *
- * <pre>{@code
- * @XmlRootElement(name = "foo-class")
- * class Foo {
- *   String a;
- *   String b;
- * }
- * }</pre>
- *
- * <p>and the class is present in the wrapped classes list, it will be marshalled as:</p>
- *
- * <pre>{@code
- * {
- *   "foo-class": {
- *     "a": "...",
- *     "b": "..."
- *   }
- * }
- * }</pre>
- *
- * <p>or if the class is present in the unwrapped classes list, it will be marshalled as:</p>
- *
- * <pre>{@code
- * {
- *   "a": "...",
- *   "b": "..."
- * }
- * }</pre>
+ * <p>该配置主要用于控制MOXy JSON提供器对REST API返回对象的序列化行为，确保输出格式符合API规范。</p>
  */
 public class ClassSerialisationConfig {
   private static final Logger LOG = LoggerFactory.getLogger(ClassSerialisationConfig.class);
 
+  // 默认自带的带根包装DTO类集合
   private static final Set<Class<?>> CONST_WRAPPED_CLASSES =
       Sets.newHashSet(ActivitiesInfo.class, AppActivitiesInfo.class, AppAttemptInfo.class,
           AppAttemptsInfo.class, AppInfo.class, ApplicationStatisticsInfo.class, AppsInfo.class,
@@ -160,6 +126,7 @@ public class ClassSerialisationConfig {
           SchedulerOverviewInfo.class, SchedulerTypeInfo.class, StatisticsItemInfo.class,
           UserInfo.class, UserMetricsInfo.class, UsersInfo.class);
 
+  // 默认自带的无跟包装DTO类集合
   private static final Set<Class<?>> CONST_UNWRAPPED_CLASSES =
       Sets.newHashSet(ApplicationSubmissionContextInfo.class, AppPriority.class, AppQueue.class,
           AppState.class, ClusterUserInfo.class, ConfInfo.class, ContainersInfo.class ,
@@ -172,40 +139,46 @@ public class ClassSerialisationConfig {
   private final Set<Class<?>> unWrappedClasses;
 
   /**
-   * Default constructor.
+   * 默认构造函数，使用空配置初始化
    */
   public ClassSerialisationConfig() {
     this(new Configuration());
   }
 
   /**
-   * Constructs a new {@code ClassSerialisationConfig} instance and initializes
-   * the sets of wrapped and unwrapped classes used for JSON serialization.
+   * 构造序列化配置实例，从配置加载自定义DTO类完成初始化
    *
-   * @param conf the Hadoop {@link Configuration} instance (typically injected via
-   *             dependency injection) used to load optional custom class definitions
+   * @param conf Hadoop配置对象，依赖注入获取，用于加载自定义DTO类配置
    */
   @Inject
   public ClassSerialisationConfig(@javax.inject.Named("conf") Configuration conf) {
+    // 初始化带根包装类集合，加入默认类
     wrappedClasses = new HashSet<>(CONST_WRAPPED_CLASSES);
     try {
+      // 从配置加载自定义带根包装DTO类并加入集合
       wrappedClasses.addAll(
           Arrays.asList(conf.getClasses(YarnConfiguration.YARN_HTTP_WEBAPP_CUSTOM_DAO_CLASSES)));
     } catch (RuntimeException e) {
+      // 加载失败打警告日志，不影响启动
       LOG.warn("Failed to load YARN_HTTP_WEBAPP_CUSTOM_DAO_CLASSES", e);
     }
 
+    // 初始化无跟包装类集合，加入默认类
     unWrappedClasses = new HashSet<>(CONST_UNWRAPPED_CLASSES);
     try {
+      // 从配置加载自定义无跟包装DTO类并加入集合
       unWrappedClasses.addAll(Arrays.asList(
           conf.getClasses(YarnConfiguration.YARN_HTTP_WEBAPP_CUSTOM_UNWRAPPED_DAO_CLASSES)));
     } catch (RuntimeException e) {
+      // 加载失败打警告日志，不影响启动
       LOG.warn("Failed to load YARN_HTTP_WEBAPP_CUSTOM_DAO_CLASSES", e);
     }
 
+    // 追踪日志输出初始化完成的类集合
     LOG.trace("ClassSerialisationConfig was created, wrappedClasses: {} unWrappedClasses: {}",
         wrappedClasses, unWrappedClasses);
 
+    // 检查是否有类同时出现在两个集合中，存在重复则抛出错误终止启动
     Set<Class<?>> duplicates = new HashSet<>(wrappedClasses);
     duplicates.retainAll(unWrappedClasses);
     if (!duplicates.isEmpty()) {
@@ -214,26 +187,16 @@ public class ClassSerialisationConfig {
   }
 
   /**
-   * Returns the set of classes whose JSON representation should include a root element.
-   * <p>
-   * These classes are used by MOXy JSON providers to determine which data transfer
-   * objects (DTOs) should be wrapped with a root element when serialized.
-   * </p>
-   *
-   * @return an unmodifiable {@link Set} of wrapped classes
+   * 获取所有需要带根包装序列化的类集合
+   * @return 带根包装类集合
    */
   public Set<Class<?>> getWrappedClasses() {
     return wrappedClasses;
   }
 
   /**
-   * Returns the set of classes whose JSON representation should omit the root element.
-   * <p>
-   * These classes are used by MOXy JSON providers to determine which data transfer
-   * objects (DTOs) should be serialized without a root element in the JSON output.
-   * </p>
-   *
-   * @return an unmodifiable {@link Set} of unwrapped classes
+   * 获取所有需要无跟包装序列化的类集合
+   * @return 无跟包装类集合
    */
   public Set<Class<?>> getUnWrappedClasses() {
     return unWrappedClasses;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,6 +23,9 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * RM Web UI 应用队列信息数据访问对象，封装应用所属队列信息，用于REST接口序列化返回。
+ */
 @XmlRootElement(name = "appqueue")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppQueue {
@@ -31,14 +35,26 @@ public class AppQueue {
   public AppQueue() {
   }
 
+  /**
+   * 构造应用队列信息对象。
+   * @param queue 队列名称
+   */
   public AppQueue(String queue) {
     this.queue = queue;
   }
 
+  /**
+   * 设置队列名称。
+   * @param queue 队列名称
+   */
   public void setQueue(String queue) {
     this.queue = queue;
   }
 
+  /**
+   * 获取队列名称。
+   * @return 队列名称
+   */
   public String getQueue() {
     return this.queue;
   }

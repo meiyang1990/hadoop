@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -37,9 +38,8 @@ import com.google.inject.Inject;
 import java.util.Arrays;
 
 /**
- * Provides an table with an overview of many cluster wide metrics and if
- * per user metrics are enabled it will show an overview of what the
- * current user is using on the cluster.
+ * YARN ResourceManager Web UI 指标概览表格渲染块，用于展示集群全局指标，
+ * 开启用户指标时同时展示当前登录用户的资源使用情况。
  */
 public class MetricsOverviewTable extends HtmlBlock {
   private static final long BYTES_IN_MB = 1024 * 1024;
@@ -55,44 +55,55 @@ public class MetricsOverviewTable extends HtmlBlock {
 
   @Override
   protected void render(Block html) {
-    //Yes this is a hack, but there is no other way to insert
-    //CSS in the correct spot
+    // 注入CSS样式，这是 hack 写法，无其他方式将CSS插入正确位置
     html.style(".metrics {margin-bottom:5px}"); 
     
+    // 初始化集群指标信息对象
     ClusterMetricsInfo clusterMetrics = new ClusterMetricsInfo(this.rm);
     
+    // 创建指标容器div
     DIV<Hamlet> div = html.div().$class("metrics");
 
     Resource usedResources;
     Resource totalResources;
     Resource reservedResources;
     int allocatedContainers;
+    // 判断是否支持跨分区聚合指标
     if (clusterMetrics.getCrossPartitionMetricsAvailable()) {
+      // 从跨分区指标获取已分配容器数
       allocatedContainers =
           clusterMetrics.getTotalAllocatedContainersAcrossPartition();
+      // 从跨分区指标获取总已用资源
       usedResources =
           clusterMetrics.getTotalUsedResourcesAcrossPartition().getResource();
+      // 从跨分区指标获取集群总资源
       totalResources =
           clusterMetrics.getTotalClusterResourcesAcrossPartition()
           .getResource();
+      // 从跨分区指标获取总预留资源
       reservedResources =
           clusterMetrics.getTotalReservedResourcesAcrossPartition()
           .getResource();
-      // getTotalUsedResourcesAcrossPartition includes reserved resources.
+      // 跨分区已用资源包含预留资源，这里扣除预留资源得到实际使用资源
       Resources.subtractFrom(usedResources, reservedResources);
     } else {
+      // 不支持跨分区时，使用全局聚合指标
       allocatedContainers = clusterMetrics.getContainersAllocated();
+      // 构造已用资源对象，兼容旧版指标结构
       usedResources = Resource.newInstance(
           clusterMetrics.getAllocatedMB(),
           (int) clusterMetrics.getAllocatedVirtualCores());
+      // 构造总资源对象，兼容旧版指标结构
       totalResources = Resource.newInstance(
           clusterMetrics.getTotalMB(),
           (int) clusterMetrics.getTotalVirtualCores());
+      // 构造预留资源对象，兼容旧版指标结构
       reservedResources = Resource.newInstance(
           clusterMetrics.getReservedMB(),
           (int) clusterMetrics.getReservedVirtualCores());
     }
 
+    // 渲染集群整体指标表格
     div.h3("Cluster Metrics").
     table("#metricsoverview").
     thead().$class("ui-widget-header").
@@ -115,6 +126,7 @@ public class MetricsOverviewTable extends HtmlBlock {
         td(String.valueOf(clusterMetrics.getAppsPending())).
         td(String.valueOf(clusterMetrics.getAppsRunning())).
         td(
+            // 已完成应用总数 = 正常完成 + 失败 +  killed
             String.valueOf(
                 clusterMetrics.getAppsCompleted() + 
                 clusterMetrics.getAppsFailed() + clusterMetrics.getAppsKilled()
@@ -129,6 +141,7 @@ public class MetricsOverviewTable extends HtmlBlock {
         __().
         __().__();
 
+    // 渲染节点状态指标表格
     div.h3("Cluster Nodes Metrics").
     table("#nodemetricsoverview").
     thead().$class("ui-widget-header").
@@ -144,6 +157,7 @@ public class MetricsOverviewTable extends HtmlBlock {
         __().
     tbody().$class("ui-widget-content").
       tr().
+        // 添加链接可跳转对应状态的节点列表页面
         td().a(url("nodes"), String.valueOf(clusterMetrics.getActiveNodes())).__().
         td().a(url("nodes/decommissioning"), String.valueOf(clusterMetrics.getDecommissioningNodes())).__().
         td().a(url("nodes/decommissioned"), String.valueOf(clusterMetrics.getDecommissionedNodes())).__().
@@ -154,10 +168,13 @@ public class MetricsOverviewTable extends HtmlBlock {
         __().
         __().__();
 
+    // 获取当前登录用户
     String user = request().getRemoteUser();
     if (user != null) {
+      // 构造当前用户指标对象
       UserMetricsInfo userMetrics = new UserMetricsInfo(this.rm, user);
       if (userMetrics.metricsAvailable()) {
+        // 指标可用时渲染当前用户指标表格
         div.h3("User Metrics for " + user).
         table("#usermetricsoverview").
         thead().$class("ui-widget-header").
@@ -183,6 +200,7 @@ public class MetricsOverviewTable extends HtmlBlock {
             td(String.valueOf(userMetrics.getAppsPending())).
             td(String.valueOf(userMetrics.getAppsRunning())).
             td(
+                // 用户已完成应用总数 = 正常完成 + 失败 + killed
                 String.valueOf(
                     (userMetrics.getAppsCompleted() + 
                      userMetrics.getAppsFailed() + userMetrics.getAppsKilled())
@@ -191,6 +209,7 @@ public class MetricsOverviewTable extends HtmlBlock {
             td(String.valueOf(userMetrics.getRunningContainers())).
             td(String.valueOf(userMetrics.getPendingContainers())).
             td(String.valueOf(userMetrics.getReservedContainers())).
+            // MB转字节后格式化显示内存大小
             td(StringUtils.byteDesc(userMetrics.getAllocatedMB() * BYTES_IN_MB)).
             td(StringUtils.byteDesc(userMetrics.getPendingMB() * BYTES_IN_MB)).
             td(StringUtils.byteDesc(userMetrics.getReservedMB() * BYTES_IN_MB)).
@@ -203,11 +222,13 @@ public class MetricsOverviewTable extends HtmlBlock {
       }
     }
 
+    // 初始化调度器指标
     SchedulerInfo schedulerInfo = new SchedulerInfo(this.rm);
     int schedBusy = clusterMetrics.getRmSchedulerBusyPercent();
     int rmEventQueueSize = clusterMetrics.getRmEventQueueSize();
     int schedulerEventQueueSize = clusterMetrics.getSchedulerEventQueueSize();
 
+    // 渲染调度器指标表格
     div.h3("Scheduler Metrics").
     table("#schedulermetricsoverview").
     thead().$class("ui-widget-header").
@@ -228,17 +249,20 @@ public class MetricsOverviewTable extends HtmlBlock {
     tbody().$class("ui-widget-content").
       tr().
         td(String.valueOf(schedulerInfo.getSchedulerType())).
+        // 将资源类型列表转为字符串展示
         td(String.valueOf(Arrays.toString(ResourceUtils.getResourcesTypeInfo()
             .toArray(new ResourceTypeInfo[0])))).
         td(schedulerInfo.getMinAllocation().toString()).
         td(schedulerInfo.getMaxAllocation().toString()).
         td(String.valueOf(schedulerInfo.getMaxClusterLevelAppPriority())).
+        // 指标不存在时显示不可用
         td(schedBusy == -1 ? UNAVAILABLE : String.valueOf(schedBusy)).
         td(String.valueOf(rmEventQueueSize)).
         td(String.valueOf(schedulerEventQueueSize)).
         __().
         __().__();
 
+    // 关闭div标签
     div.__();
   }
 }

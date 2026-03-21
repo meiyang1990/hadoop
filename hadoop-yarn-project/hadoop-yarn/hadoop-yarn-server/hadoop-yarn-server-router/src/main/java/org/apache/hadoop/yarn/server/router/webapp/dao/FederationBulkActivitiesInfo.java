@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,24 +26,42 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import java.util.ArrayList;
 
+/**
+ * YARN联邦路由层批量活动信息数据访问对象，聚合多个子集群的批量活动信息。
+ * 用于REST API响应序列化，承载跨子集群的批量操作结果汇总。
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class FederationBulkActivitiesInfo extends BulkActivitiesInfo {
 
+  /** 存储各子集群的批量活动信息列表 */
   @XmlElement(name = "subCluster")
   private ArrayList<BulkActivitiesInfo> list = new ArrayList<>();
 
+  /** JAXB反序列化需要的无参构造函数 */
   public FederationBulkActivitiesInfo() {
   } // JAXB needs this
 
+  /**
+   * 构造函数，通过子集群批量活动信息列表初始化对象
+   * @param list 各子集群批量活动信息列表
+   */
   public FederationBulkActivitiesInfo(ArrayList<BulkActivitiesInfo> list) {
     this.list = list;
   }
 
+  /**
+   * 获取子集群批量活动信息列表
+   * @return 各子集群批量活动信息列表
+   */
   public ArrayList<BulkActivitiesInfo> getList() {
     return list;
   }
 
+  /**
+   * 设置子集群批量活动信息列表
+   * @param list 各子集群批量活动信息列表
+   */
   public void setList(ArrayList<BulkActivitiesInfo> list) {
     this.list = list;
   }

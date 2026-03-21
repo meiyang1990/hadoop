@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,22 +24,41 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * YARN ResourceManager Web API 委托令牌信息数据访问对象，
+ * 用于封装委托令牌信息并序列化为XML/JSON返回给前端。
+ */
 @XmlRootElement(name = "delegation-token")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class DelegationToken {
 
+  // 委托令牌字符串
   String token;
+  // 令牌更新者
   String renewer;
+  // 令牌所有者
   String owner;
+  // 令牌类型
   String kind;
   @XmlElement(name = "expiration-time")
+  // 下次过期时间
   Long nextExpirationTime;
   @XmlElement(name = "max-validity")
+  // 最大有效时长
   Long maxValidity;
 
   public DelegationToken() {
   }
 
+  /**
+   * 构造委托令牌信息对象。
+   * @param token 委托令牌字符串
+   * @param renewer 令牌更新者
+   * @param owner 令牌所有者
+   * @param kind 令牌类型
+   * @param nextExpirationTime 下次过期时间
+   * @param maxValidity 最大有效时长
+   */
   public DelegationToken(String token, String renewer, String owner,
       String kind, Long nextExpirationTime, Long maxValidity) {
     this.token = token;

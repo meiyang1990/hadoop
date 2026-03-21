@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,7 +24,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * DAO object to display node allocation tag.
+ * 节点分配标签信息的数据访问对象，用于RM WebUI展示分配标签统计信息
  */
 @XmlRootElement(name = "allocationTagInfo")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -32,19 +33,35 @@ public class AllocationTagInfo {
   private String allocationTag;
   private long allocationsCount;
 
+  /**
+   * JAXB序列化要求的默认无参构造函数
+   */
   public AllocationTagInfo() {
     // JAXB needs this
   }
 
+  /**
+   * 构造分配标签信息对象
+   * @param tag 分配标签名称
+   * @param count 使用该标签的分配数量
+   */
   public AllocationTagInfo(String tag, long count) {
     this.allocationTag = tag;
     this.allocationsCount = count;
   }
 
+  /**
+   * 获取分配标签名称
+   * @return 分配标签名称
+   */
   public String getAllocationTag() {
     return this.allocationTag;
   }
 
+  /**
+   * 获取使用该标签的分配数量
+   * @return 分配数量
+   */
   public long getAllocationsCount() {
     return this.allocationsCount;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,5 +17,7 @@
  * limitations under the License.
  */
 
-/** Router Cleaner package. **/
+/**
+ * YARN Router 联邦路由清理器包，负责清理YARN联邦场景下的过期数据与无效资源。
+ */
 package org.apache.hadoop.yarn.server.router.cleaner;

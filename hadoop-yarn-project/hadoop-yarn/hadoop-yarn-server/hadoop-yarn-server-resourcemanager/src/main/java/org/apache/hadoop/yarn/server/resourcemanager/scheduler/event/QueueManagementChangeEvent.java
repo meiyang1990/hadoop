@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,13 +25,20 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity
 import java.util.List;
 
 /**
- * Event to update scheduler of any queue management changes
+ * 队列管理变更事件，用于通知调度器队列配置已发生变更
  */
 public class QueueManagementChangeEvent extends SchedulerEvent {
 
+  // 发生变更的父队列
   private AbstractParentQueue parentQueue;
+  // 队列变更操作列表
   private List<QueueManagementChange> queueManagementChanges;
 
+  /**
+   * 构造队列管理变更事件
+   * @param parentQueue 发生变更的父队列
+   * @param queueManagementChanges 队列变更操作列表
+   */
   public QueueManagementChangeEvent(AbstractParentQueue parentQueue,
       List<QueueManagementChange> queueManagementChanges) {
     super(SchedulerEventType.MANAGE_QUEUE);
@@ -38,10 +46,18 @@ public class QueueManagementChangeEvent extends SchedulerEvent {
     this.queueManagementChanges = queueManagementChanges;
   }
 
+  /**
+   * 获取发生变更的父队列
+   * @return 变更所属父队列
+   */
   public AbstractParentQueue getParentQueue() {
     return parentQueue;
   }
 
+  /**
+   * 获取所有队列变更操作列表
+   * @return 队列变更操作集合
+   */
   public List<QueueManagementChange> getQueueManagementChanges() {
     return queueManagementChanges;
   }

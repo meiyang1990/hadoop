@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,111 +31,95 @@ import org.apache.hadoop.yarn.server.webapp.dao.ContainerInfo;
 import org.apache.hadoop.yarn.server.webapp.dao.ContainersInfo;
 
 /**
- * Defines the contract to be implemented by the request interceptor classes,
- * that can be used to intercept and inspect messages sent from the client to
- * the resource manager server.
- *
- * This class includes 4 methods getAppAttempts, getAppAttempt, getContainers
- * and getContainer that belong to {@link WebServices}. They are in this class
- * to make sure that RouterWebServices implements the same REST methods of
- * {@code RMWebServices}.
+ * YARN Router REST请求拦截器接口，定义了拦截器需要实现的契约，用于拦截检查客户端发往资源管理器的REST请求。
+ * 该接口定义了几个与应用尝试、容器信息查询相关的REST方法，确保RouterWebServices实现与RMWebServices一致的接口。
  */
 public interface RESTRequestInterceptor
     extends RMWebServiceProtocol, Configurable {
 
   /**
-   * This method is called for initializing the interceptor. This is guaranteed
-   * to be called only once in the lifetime of this instance.
+   * 初始化拦截器，该方法在拦截器实例生命周期中保证只被调用一次。
    *
-   * @param user the name of the client
+   * @param user 客户端用户名
    */
   void init(String user);
 
   /**
-   * This method is called to release the resources held by the interceptor.
-   * This will be called when the application pipeline is being destroyed. The
-   * concrete implementations should dispose the resources and forward the
-   * request to the next interceptor, if any.
+   * 关闭拦截器，释放拦截器持有的资源，在应用销毁时调用。
+   * 具体实现需要释放资源并将请求转发给下一个拦截器（如果存在）。
    */
   void shutdown();
 
   /**
-   * Sets the next interceptor in the pipeline. The concrete implementation of
-   * this interface should always pass the request to the nextInterceptor after
-   * inspecting the message. The last interceptor in the chain is responsible to
-   * send the messages to the resource manager service and so the last
-   * interceptor will not receive this method call.
+   * 设置拦截器责任链中的下一个拦截器。
+   * 实现类需要在处理完请求后将请求转发给下一个拦截器。
+   * 链中最后一个拦截器负责将请求发送给实际的资源管理器服务，因此最后一个拦截器不会调用此方法。
    *
-   * @param nextInterceptor the RESTRequestInterceptor to set in the pipeline
+   * @param nextInterceptor 责任链中的下一个拦截器
    */
   void setNextInterceptor(RESTRequestInterceptor nextInterceptor);
 
   /**
-   * Returns the next interceptor in the chain.
+   * 获取责任链中的下一个拦截器。
    *
-   * @return the next interceptor in the chain
+   * @return 责任链中的下一个拦截器
    */
   RESTRequestInterceptor getNextInterceptor();
 
   /**
+   * 获取指定应用尝试的信息
    *
    * @see WebServices#getAppAttempt(HttpServletRequest, HttpServletResponse,
    *      String, String)
-   * @param req the servlet request
-   * @param res the servlet response
-   * @param appId the application we want to get the appAttempt. It is a
-   *          PathParam.
-   * @param appAttemptId the AppAttempt we want to get the info. It is a
-   *          PathParam.
-   * @return AppAttemptInfo of the specific AppAttempt
+   * @param req servlet请求对象
+   * @param res servlet响应对象
+   * @param appId 应用ID，URL路径参数
+   * @param appAttemptId 应用尝试ID，URL路径参数
+   * @return 指定应用尝试的信息对象
    */
   AppAttemptInfo getAppAttempt(HttpServletRequest req, HttpServletResponse res,
       String appId, String appAttemptId);
 
   /**
+   * 获取指定应用尝试下的所有容器信息
    *
    * @see WebServices#getContainers(HttpServletRequest, HttpServletResponse,
    *      String, String)
-   * @param req the servlet request
-   * @param res the servlet response
-   * @param appId the application we want to get the containers info. It is a
-   *          PathParam.
-   * @param appAttemptId the AppAttempt we want to get the info. It is a
-   *          PathParam.
-   * @return ContainersInfo of all the containers that belong to the specific
-   *         AppAttempt
+   * @param req servlet请求对象
+   * @param res servlet响应对象
+   * @param appId 应用ID，URL路径参数
+   * @param appAttemptId 应用尝试ID，URL路径参数
+   * @return 指定应用尝试下所有容器的信息对象
    */
   ContainersInfo getContainers(HttpServletRequest req, HttpServletResponse res,
       String appId, String appAttemptId);
 
   /**
+   * 获取指定容器的信息
    *
    * @see WebServices#getContainer(HttpServletRequest, HttpServletResponse,
    *      String, String, String)
-   * @param req the servlet request
-   * @param res the servlet response
-   * @param appId the application we want to get the containers info. It is a
-   *          PathParam.
-   * @param appAttemptId the AppAttempt we want to get the info. It is a
-   *          PathParam.
-   * @param containerId the container we want to get the info. It is a
-   *          PathParam.
-   * @return ContainerInfo of the specific ContainerId
+   * @param req servlet请求对象
+   * @param res servlet响应对象
+   * @param appId 应用ID，URL路径参数
+   * @param appAttemptId 应用尝试ID，URL路径参数
+   * @param containerId 容器ID，URL路径参数
+   * @return 指定容器的信息对象
    */
   ContainerInfo getContainer(HttpServletRequest req, HttpServletResponse res,
       String appId, String appAttemptId, String containerId);
 
   /**
-   * Set RouterClientRMService.
+   * 设置Router客户端RM服务实例
    *
-   * @param routerClientRMService routerClientRMService.
+   * @param routerClientRMService Router客户端RM服务实例
    */
   void setRouterClientRMService(RouterClientRMService routerClientRMService);
 
   /**
-   * Get RouterClientRMService.
+   * 获取Router客户端RM服务实例
    *
-   * @return RouterClientRMService
+   * @return Router客户端RM服务实例
    */
   RouterClientRMService getRouterClientRMService();
 }

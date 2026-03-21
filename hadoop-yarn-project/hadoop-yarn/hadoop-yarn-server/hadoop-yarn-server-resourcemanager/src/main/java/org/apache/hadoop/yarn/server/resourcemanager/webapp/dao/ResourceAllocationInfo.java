@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * Simple class that represent a resource allocation.
+ * 资源分配信息数据访问对象，代表预约系统中一段时间内的资源分配信息，供Web API序列化返回
  */
 @XmlRootElement(name = "resource-allocation")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -34,12 +35,20 @@ public class ResourceAllocationInfo {
   private long startTime;
   private long endTime;
 
+  /**
+   * 默认构造函数，初始化空的资源分配信息
+   */
   public ResourceAllocationInfo() {
     resource = new ResourceInfo();
     startTime = -1;
     endTime = -1;
   }
 
+  /**
+   * 根据预约区间和资源构造资源分配信息对象
+   * @param interval 预约时间区间
+   * @param res 分配的资源
+   */
   public ResourceAllocationInfo(ReservationInterval interval, Resource res) {
     this.resource = new ResourceInfo(res);
     this.startTime = interval.getStartTime();

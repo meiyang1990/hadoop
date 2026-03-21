@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,33 +35,45 @@ import static org.apache.hadoop.yarn.server.router.RouterAuditLogger.AuditConsta
 import static org.apache.hadoop.yarn.server.router.RouterAuditLogger.AuditConstants.UNKNOWN;
 
 /**
- * It prevents DoS attack over the ApplicationClientProtocol. Currently, it
- * checks the size of the ApplicationSubmissionContext. If it exceeds the limit
- * it can cause Zookeeper failures.
+ * YARN Router应用提交上下文拦截器，用于防止DoS攻击。
+ * 核心职责是在应用提交前检查ApplicationSubmissionContext的大小，
+ * 避免过大的上下文导致Zookeeper故障，保障集群稳定性。
  */
 public class ApplicationSubmissionContextInterceptor extends PassThroughClientRequestInterceptor {
 
+  /**
+   * 拦截处理应用提交请求，对提交上下文进行合法性和大小校验。
+   * @param request 应用提交请求
+   * @return 应用提交响应
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
+   */
   @Override
   public SubmitApplicationResponse submitApplication(
       SubmitApplicationRequest request) throws YarnException, IOException {
 
+    // 校验请求基本信息完整性，检查必填字段是否为空
     if (request == null || request.getApplicationSubmissionContext() == null ||
         request.getApplicationSubmissionContext().getApplicationId() == null) {
+      // 统计提交失败的应用
       RouterMetrics.getMetrics().incrAppsFailedSubmitted();
       String errMsg =
           "Missing submitApplication request or applicationSubmissionContext information.";
+      // 记录审计日志
       RouterAuditLogger.logFailure(user.getShortUserName(), SUBMIT_NEW_APP, UNKNOWN,
           TARGET_CLIENT_RM_SERVICE, errMsg);
+      // 记录错误日志并抛出异常
       RouterServerUtil.logAndThrowException(errMsg, null);
     }
 
+    // 获取应用提交上下文，并转换为PB实现类
     ApplicationSubmissionContext appContext = request.getApplicationSubmissionContext();
     ApplicationSubmissionContextPBImpl asc = (ApplicationSubmissionContextPBImpl) appContext;
 
-    // Check for excessively large fields, throw exception if found
+    // 检查提交上下文字段是否过大，超出限制则抛出异常
     RouterServerUtil.checkAppSubmissionContext(asc, getConf());
 
-    // Check succeeded - app submit will be passed on to the next interceptor
+    // 校验通过，将请求传递给下一个拦截器继续处理
     return getNextInterceptor().submitApplication(request);
   }
 }

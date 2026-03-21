@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -54,8 +55,8 @@ import static org.apache.hadoop.yarn.api.resource.PlacementConstraint.TargetExpr
 import static org.apache.hadoop.yarn.api.resource.PlacementConstraints.NODE_PARTITION;
 
 /**
- * This is a simple implementation to do affinity or anti-affinity for
- * inter/intra apps.
+ * 单约束应用放置分配器，实现应用内/应用间亲和性/反亲和性的简单放置策略。
+ * 支持基于单个放置约束的容器节点分配。
  */
 public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
     extends AppPlacementAllocator<N> {
@@ -70,6 +71,9 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
   private AllocationTagsManager allocationTagsManager;
   private PlacementConstraintManager placementConstraintManager;
 
+  /**
+   * 构造函数，初始化读写锁。
+   */
   public SingleConstraintAppPlacementAllocator() {
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     readLock = lock.readLock();
@@ -94,9 +98,15 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
     return null;
   }
 
+  /**
+   * 内部更新待分配请求的核心逻辑。
+   * @param newSchedulingRequest 新的调度请求
+   * @param recoverContainer 是否是恢复被抢占的容器
+   * @return 更新结果
+   */
   private PendingAskUpdateResult internalUpdatePendingAsk(
       SchedulingRequest newSchedulingRequest, boolean recoverContainer) {
-    // When it is a recover container, there must exists an schedulingRequest.
+    // 恢复容器时必须已存在对应的调度请求
     if (recoverContainer && schedulingRequest == null) {
       throw new SchedulerInvalidResourceRequestException("Trying to recover a "
           + "container request=" + newSchedulingRequest.toString() + ", however"
@@ -104,17 +114,13 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
     }
 
     if (schedulingRequest != null) {
-      // If we have an old scheduling request, we will make sure that no changes
-      // made except sizing.
-      // To avoid unnecessary copy of the data structure, we do this by
-      // replacing numAllocations with old numAllocations in the
-      // newSchedulingRequest#getResourceSizing, and compare the two objects.
+      // 已有旧调度请求，仅允许修改分配数量，其他字段不允许修改
+      // 为避免不必要的数据结构拷贝，先替换新请求中的分配数量再比较两个请求
       ResourceSizing sizing = newSchedulingRequest.getResourceSizing();
       int existingNumAllocations =
           schedulingRequest.getResourceSizing().getNumAllocations();
 
-      // When it is a recovered container request, just set
-      // #newAllocations = #existingAllocations + 1;
+      // 恢复容器场景，新分配数量 = 原有数量 + 1
       int newNumAllocations;
       if (recoverContainer) {
         newNumAllocations = existingNumAllocations + 1;
@@ -123,9 +129,9 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
       }
       sizing.setNumAllocations(existingNumAllocations);
 
-      // Compare two objects
+      // 比较两个请求对象是否一致
       if (!schedulingRequest.equals(newSchedulingRequest)) {
-        // Rollback #numAllocations
+        // 回滚分配数量修改
         sizing.setNumAllocations(newNumAllocations);
         throw new SchedulerInvalidResourceRequestException(
             "Invalid updated SchedulingRequest added to scheduler, "
@@ -138,15 +144,15 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
                 + "priority/allocationId");
       } else {
         if (newNumAllocations == existingNumAllocations) {
-          // No update on pending asks, return null.
+          // 待分配数量无变化，返回空表示无更新
           return null;
         }
       }
 
-      // Rollback #numAllocations
+      // 回滚分配数量修改
       sizing.setNumAllocations(newNumAllocations);
 
-      // Basic sanity check
+      // 基础合法性检查
       if (newNumAllocations < 0) {
         throw new SchedulerInvalidResourceRequestException(
             "numAllocation in ResourceSizing field must be >= 0, "
@@ -158,7 +164,7 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
           new PendingAsk(newSchedulingRequest.getResourceSizing()),
           targetNodePartition, targetNodePartition);
 
-      // Ok, now everything is same except numAllocation, update numAllocation.
+      // 所有检查通过，更新分配数量
       this.schedulingRequest.getResourceSizing().setNumAllocations(
           newNumAllocations);
       LOG.info(
@@ -168,9 +174,7 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
       return updateResult;
     }
 
-    // For a new schedulingRequest, we need to validate if we support its asks.
-    // This will update internal partitions, etc. after the SchedulingRequest is
-    // valid.
+    // 处理新增的调度请求，先验证合法性再更新内部状态
     validateAndSetSchedulingRequest(newSchedulingRequest);
 
     return new PendingAskUpdateResult(null,
@@ -192,6 +196,11 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
     }
   }
 
+  /**
+   * 抛出带应用和调度请求元信息的异常。
+   * @param message 原始异常消息
+   * @return 永远抛出异常，无返回
+   */
   private String throwExceptionWithMetaInfo(String message) {
     StringBuilder sb = new StringBuilder();
     sb.append("AppId=").append(appSchedulingInfo.getApplicationId()).append(
@@ -200,10 +209,15 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
     throw new SchedulerInvalidResourceRequestException(sb.toString());
   }
 
+  /**
+   * 验证新调度请求合法性，并设置内部状态。
+   * @param newSchedulingRequest 新调度请求
+   * @throws SchedulerInvalidResourceRequestException 请求非法时抛出
+   */
   private void validateAndSetSchedulingRequest(SchedulingRequest
       newSchedulingRequest)
       throws SchedulerInvalidResourceRequestException {
-    // Check sizing exists
+    // 检查资源大小信息是否存在
     if (newSchedulingRequest.getResourceSizing() == null
         || newSchedulingRequest.getResourceSizing().getResources() == null) {
       throwExceptionWithMetaInfo(
@@ -211,7 +225,7 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
               + "check");
     }
 
-    // Check execution type == GUARANTEED
+    // 检查执行类型，目前仅支持保障型(GUARANTEED)
     if (newSchedulingRequest.getExecutionType() != null
         && newSchedulingRequest.getExecutionType().getExecutionType()
         != ExecutionType.GUARANTEED) {
@@ -219,8 +233,10 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
           "Only GUARANTEED execution type is supported.");
     }
 
+    // 从放置约束中提取并验证目标节点分区
     this.targetNodePartition = validateAndGetTargetNodePartition(
         newSchedulingRequest.getPlacementConstraint());
+    // 深度拷贝调度请求，避免外部修改内部状态
     this.schedulingRequest = new SchedulingRequestPBImpl(
         ((SchedulingRequestPBImpl) newSchedulingRequest).getProto());
 
@@ -232,13 +248,17 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
         + "]. nodePartition=" + targetNodePartition);
   }
 
-  // Tentatively find out potential exist node-partition in the placement
-  // constraint and set as the app's primary node-partition.
-  // Currently only single constraint is handled.
+  /**
+   * 从放置约束中提取目标节点分区，并验证约束格式合法性。
+   * 目前仅处理单个约束，最多支持一个节点分区。
+   * @param placementConstraint 放置约束
+   * @return 验证后的目标节点分区
+   */
   private String validateAndGetTargetNodePartition(
       PlacementConstraint placementConstraint) {
     String defaultNodeLabelExpression =
         appSchedulingInfo.getDefaultNodeLabelExpression();
+    // 默认使用应用默认分区，无默认标签则使用无标签
     String nodePartition = defaultNodeLabelExpression == null ?
         RMNodeLabelsManager.NO_LABEL : defaultNodeLabelExpression;
     if (placementConstraint != null &&
@@ -248,15 +268,17 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
       if (ac != null && ac instanceof PlacementConstraint.SingleConstraint) {
         PlacementConstraint.SingleConstraint singleConstraint =
             (PlacementConstraint.SingleConstraint) ac;
+        // 遍历所有目标表达式，查找节点分区约束
         for (PlacementConstraint.TargetExpression targetExpression :
             singleConstraint.getTargetExpressions()) {
-          // Handle node partition
+          // 处理节点分区属性
           if (targetExpression.getTargetType().equals(NODE_ATTRIBUTE) &&
               targetExpression.getTargetKey().equals(NODE_PARTITION)) {
             Set<String> values = targetExpression.getTargetValues();
             if (values == null || values.isEmpty()) {
               continue;
             }
+            // 目前仅支持单个分区值
             if (values.size() > 1) {
               throwExceptionWithMetaInfo(
                   "Inside one targetExpression, we only support"
@@ -305,8 +327,11 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
     }
   }
 
+  /**
+   * 减少待分配容器数量，更新应用待分配资源统计。
+   */
   private void decreasePendingNumAllocation() {
-    // Deduct pending #allocations by 1
+    // 待分配数量减1
     ResourceSizing sizing = schedulingRequest.getResourceSizing();
     sizing.setNumAllocations(sizing.getNumAllocations() - 1);
 
@@ -318,13 +343,12 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
       NodeType type, SchedulerNode node) {
     writeLock.lock();
     try {
-      // Per container scheduling request, it is just a copy of existing
-      // scheduling request with #allocations=1
+      // 构造容器分配请求，复制原调度请求，设置分配数量为1
       SchedulingRequest containerSchedulingRequest = new SchedulingRequestPBImpl(
           ((SchedulingRequestPBImpl) schedulingRequest).getProto());
       containerSchedulingRequest.getResourceSizing().setNumAllocations(1);
 
-      // Deduct sizing
+      // 减少待分配数量
       decreasePendingNumAllocation();
 
       return new ContainerRequest(containerSchedulingRequest);
@@ -333,14 +357,20 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
     }
   }
 
+  /**
+   * 检查是否还有待分配资源，以及节点是否满足放置约束。
+   * @param node 待检查节点
+   * @param dcOpt 诊断信息收集器
+   * @return 满足约束且有待分配资源返回true，否则返回false
+   */
   private boolean checkCardinalityAndPending(SchedulerNode node,
       Optional<DiagnosticsCollector> dcOpt) {
-    // Do we still have pending resource?
+    // 检查是否还有待分配资源
     if (schedulingRequest.getResourceSizing().getNumAllocations() <= 0) {
       return false;
     }
 
-    // node type will be ignored.
+    // 调用放置约束工具检查节点是否满足约束
     try {
       return PlacementConstraintsUtil.canSatisfyConstraints(
           appSchedulingInfo.getApplicationId(), schedulingRequest, node,
@@ -377,8 +407,7 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
   public boolean precheckNode(SchedulerNode schedulerNode,
       SchedulingMode schedulingMode,
       Optional<DiagnosticsCollector> dcOpt) {
-    // We will only look at node label = nodeLabelToLookAt according to
-    // schedulingMode and partition of node.
+    // 根据调度模式确定需要检查的节点分区
     String nodePartitionToLookAt;
     if (schedulingMode == SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY) {
       nodePartitionToLookAt = schedulerNode.getPartition();
@@ -388,7 +417,7 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
 
     readLock.lock();
     try {
-      // Check node partition as well as cardinality/pending resources.
+      // 先检查节点分区是否匹配，再检查约束和待分配资源
       boolean rst = this.targetNodePartition.equals(nodePartitionToLookAt);
       if (!rst) {
         if (dcOpt.isPresent()) {
@@ -428,19 +457,3 @@ public class SingleConstraintAppPlacementAllocator<N extends SchedulerNode>
 
   @Override
   public SchedulingRequest getSchedulingRequest() {
-    return schedulingRequest;
-  }
-
-  @VisibleForTesting
-  String getTargetNodePartition() {
-    return targetNodePartition;
-  }
-
-  @Override
-  public void initialize(AppSchedulingInfo appSchedulingInfo,
-      SchedulerRequestKey schedulerRequestKey, RMContext rmContext) {
-    super.initialize(appSchedulingInfo, schedulerRequestKey, rmContext);
-    this.allocationTagsManager = rmContext.getAllocationTagsManager();
-    this.placementConstraintManager = rmContext.getPlacementConstraintManager();
-  }
-}

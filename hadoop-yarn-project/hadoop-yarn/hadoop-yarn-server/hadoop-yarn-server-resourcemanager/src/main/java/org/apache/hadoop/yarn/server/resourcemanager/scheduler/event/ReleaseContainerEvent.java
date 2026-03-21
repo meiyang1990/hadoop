@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,15 +22,17 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
 /**
- * Event used to release a container.
+ * 容器释放事件，用于通知调度器释放指定容器的资源
+ * 是YARN调度器事件体系中处理容器资源回收的核心事件类
  */
 public class ReleaseContainerEvent extends SchedulerEvent {
 
+  // 需要被释放的容器对象
   private final RMContainer container;
 
   /**
-   * Create Event.
-   * @param rmContainer RMContainer.
+   * 构造释放容器事件
+   * @param rmContainer 待释放的RMContainer对象
    */
   public ReleaseContainerEvent(RMContainer rmContainer) {
     super(SchedulerEventType.RELEASE_CONTAINER);
@@ -37,8 +40,8 @@ public class ReleaseContainerEvent extends SchedulerEvent {
   }
 
   /**
-   * Get RMContainer.
-   * @return RMContainer.
+   * 获取待释放的RMContainer对象
+   * @return 待释放的RMContainer
    */
   public RMContainer getContainer() {
     return container;

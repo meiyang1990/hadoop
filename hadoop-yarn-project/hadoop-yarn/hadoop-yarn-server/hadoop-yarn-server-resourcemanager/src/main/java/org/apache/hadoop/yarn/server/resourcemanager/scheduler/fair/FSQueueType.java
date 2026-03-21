@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,14 +19,17 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair;
 
+/**
+ * 公平调度器队列类型枚举，定义了公平调度器中两种队列的类型
+ */
 public enum FSQueueType {
   /*
-   * Represents a leaf queue 
+   * 叶子队列，可直接分配应用，不能包含子队列
    */
   LEAF, 
   
   /*
-   * Represents a parent queue
+   * 父队列，仅用于组织子队列，不能直接分配应用
    */
   PARENT
 }

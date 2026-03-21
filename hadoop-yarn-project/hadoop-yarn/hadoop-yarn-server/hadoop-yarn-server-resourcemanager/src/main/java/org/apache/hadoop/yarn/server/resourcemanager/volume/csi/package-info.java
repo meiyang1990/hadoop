@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,7 @@
  */
 
 /**
- * This package contains classes to manage CSI volumes.
+ * YARN ResourceManager CSI 存储卷管理包，提供CSI标准存储卷的生命周期管理能力，支持YARN容器使用外部存储卷。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

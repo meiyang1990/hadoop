@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -55,8 +56,7 @@ import com.google.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 
 /**
- * Shows application information specific to the fair
- * scheduler as part of the fair scheduler page.
+ * 公平调度器页面中展示公平调度器专属应用信息的HTML块
  */
 public class FairSchedulerAppsBlock extends HtmlBlock {
   final ConcurrentMap<ApplicationId, RMApp> apps;
@@ -65,6 +65,12 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
   final ResourceManager rm;
   final boolean filterAppsByUser;
 
+  /**
+   * 构造函数，初始化应用列表并根据权限过滤可见应用
+   * @param rm ResourceManager实例
+   * @param ctx 视图上下文
+   * @param conf Yarn配置
+   */
   @Inject
   public FairSchedulerAppsBlock(ResourceManager rm, ViewContext ctx,
       Configuration conf) {
@@ -72,6 +78,7 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
     this.conf = conf;
     this.rm = rm;
 
+    // 读取是否按登录用户过滤应用的配置
     this.filterAppsByUser  = conf.getBoolean(
         YarnConfiguration.FILTER_ENTITY_LIST_BY_USER,
         YarnConfiguration.DEFAULT_DISPLAY_APPS_FOR_LOGGED_IN_USER);
@@ -79,11 +86,14 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
     FairScheduler scheduler = (FairScheduler) rm.getResourceScheduler();
     fsinfo = new FairSchedulerInfo(scheduler);
     apps = new ConcurrentHashMap<ApplicationId, RMApp>();
+    // 遍历所有RM中应用，筛选符合条件的应用
     for (Map.Entry<ApplicationId, RMApp> entry : rm.getRMContext().getRMApps()
         .entrySet()) {
+      // 只展示已经提交完成的应用，跳过新建/保存中状态
       if (!(RMAppState.NEW.equals(entry.getValue().getState())
           || RMAppState.NEW_SAVING.equals(entry.getValue().getState())
           || RMAppState.SUBMITTED.equals(entry.getValue().getState()))) {
+        // 不需要过滤，或当前用户有权限查看该应用，加入列表
         if (!filterAppsByUser || hasAccess(entry.getValue(),
             ctx.requestContext().getRequest())) {
           apps.put(entry.getKey(), entry.getValue());
@@ -92,6 +102,12 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
     }
   }
 
+  /**
+   * 从HTTP请求中获取调用用户的UGI信息
+   * @param hsr HTTP请求对象
+   * @param usePrincipal 是否使用请求中的Principal获取用户名
+   * @return 调用用户的UserGroupInformation，未获取到用户名则返回null
+   */
   private UserGroupInformation getCallerUserGroupInformation(
       HttpServletRequest hsr, boolean usePrincipal) {
     String remoteUser = hsr.getRemoteUser();
@@ -108,15 +124,23 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
     return callerUGI;
   }
 
+  /**
+   * 检查当前用户是否有权限查看指定应用
+   * @param app 待检查应用
+   * @param hsr HTTP请求对象
+   * @return true表示有权限，false表示无权限
+   */
   protected Boolean hasAccess(RMApp app, HttpServletRequest hsr) {
-    // Check for the authorization.
+    // 获取调用用户UGI
     UserGroupInformation callerUGI = getCallerUserGroupInformation(hsr, true);
     List<String> forwardedAddresses = null;
+    // 解析X-Forwarded-For请求头获取原始客户端IP
     String forwardedFor = hsr.getHeader(RMWSConsts.FORWARDED_FOR);
     if (forwardedFor != null) {
       forwardedAddresses = Arrays.asList(forwardedFor.split(","));
     }
 
+    // 如果用户存在，且既无应用查看权限，也无队列管理权限，则拒绝访问
     if (callerUGI != null
         && !(this.rm.getApplicationACLsManager().checkAccess(callerUGI,
         ApplicationAccessType.VIEW_APP, app.getUser(),
@@ -129,6 +153,11 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
     return true;
   }
 
+  /**
+   * 格式化应用信息数值，-1转换为N/A显示
+   * @param value 待格式化数值
+   * @return 格式化后的字符串
+   */
   private static String printAppInfo(long value) {
     if (value == -1) {
       return "N/A";
@@ -136,7 +165,12 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
     return String.valueOf(value);
   }
 
+  /**
+   * 渲染公平调度器应用列表表格HTML
+   * @param html HTML块输出对象
+   */
   @Override public void render(Block html) {
+    // 创建应用表格表头
     TBODY<TABLE<Hamlet>> tbody = html.
       table("#apps").
         thead().
@@ -160,6 +194,7 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
             th(".progress", "Progress").
             th(".ui", "Tracking UI").__().__().
         tbody();
+    // 解析请求中的应用状态过滤参数
     Collection<YarnApplicationState> reqAppStates = null;
     String reqStateString = $(APP_STATE);
     if (reqStateString != null && !reqStateString.isEmpty()) {
@@ -169,19 +204,27 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
         reqAppStates.add(YarnApplicationState.valueOf(stateString));
       }
     }
+    // 构建前端表格所需的JSON数据
     StringBuilder appsTableData = new StringBuilder("[\n");
+    // 遍历过滤后可见的所有应用
     for (RMApp app : apps.values()) {
+      // 应用状态不匹配过滤条件，跳过
       if (reqAppStates != null && !reqAppStates.contains(app.createApplicationState())) {
         continue;
       }
+      // 构建应用信息对象
       AppInfo appInfo = new AppInfo(rm, app, true, WebAppUtils.getHttpSchemePrefix(conf));
+      // 格式化应用进度百分比
       String percent = StringUtils.format("%.1f", appInfo.getProgress());
+      // 获取当前应用尝试ID
       ApplicationAttemptId attemptId = app.getCurrentAppAttempt().getAppAttemptId();
+      // 从公平调度器信息中获取应用的公平份额
       long fairShare = fsinfo.getAppFairShare(attemptId);
+      // 公平调度器中不存在该应用信息，跳过
       if (fairShare == FairSchedulerInfo.INVALID_FAIR_SHARE) {
-        // FairScheduler#applications don't have the entry. Skip it.
         continue;
       }
+      // 拼接应用信息JSON行
       appsTableData.append("[\"<a href='")
       .append(url("app", appInfo.getAppId())).append("'>")
       .append(appInfo.getAppId()).append("</a>\",\"")
@@ -209,7 +252,7 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
       .append("\",\"")
       .append(printAppInfo(appInfo.getReservedMB()))
       .append("\",\"")
-      // Progress bar
+      // 拼接进度条HTML
       .append("<br title='").append(percent)
       .append("'> <div class='").append(C_PROGRESSBAR).append("' title='")
       .append(join(percent, '%')).append("'> ").append("<div class='")
@@ -217,17 +260,21 @@ public class FairSchedulerAppsBlock extends HtmlBlock {
       .append(join("width:", percent, '%')).append("'> </div> </div>")
       .append("\",\"<a href='");
 
+      // 处理跟踪URL，未就绪则显示#
       String trackingURL =
         !appInfo.isTrackingUrlReady()? "#" : appInfo.getTrackingUrlPretty();
 
+      // 拼接跟踪UI链接
       appsTableData.append(trackingURL).append("'>")
       .append(appInfo.getTrackingUI()).append("</a>\"],\n");
 
     }
+    // 移除最后一行多余的逗号
     if(appsTableData.charAt(appsTableData.length() - 2) == ',') {
       appsTableData.delete(appsTableData.length()-2, appsTableData.length()-1);
     }
     appsTableData.append("]");
+    // 将应用数据输出为JavaScript变量供前端表格使用
     html.script().$type("text/javascript").
         __("var appsTableData=" + appsTableData).__();
 

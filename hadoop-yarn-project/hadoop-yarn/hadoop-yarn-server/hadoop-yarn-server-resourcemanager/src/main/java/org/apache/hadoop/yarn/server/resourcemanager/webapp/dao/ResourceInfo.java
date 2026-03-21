@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,7 +27,9 @@ import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
-
+/**
+ * YARN RM Web UI 资源信息数据访问对象，封装集群/节点/应用的资源信息，用于XML/JSON序列化输出
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.NONE)
 public class ResourceInfo {
@@ -39,11 +42,19 @@ public class ResourceInfo {
   ResourceInformationsInfo resourceInformations =
       new ResourceInformationsInfo();
 
+  // 内部持有原始资源对象
   private Resource resources;
 
+  /**
+   * JAXB反序列化需要的空构造函数
+   */
   public ResourceInfo() {
   }
 
+  /**
+   * 从Resource对象构造ResourceInfo
+   * @param res YARN原始资源对象
+   */
   public ResourceInfo(Resource res) {
     if (res != null) {
       memory = res.getMemorySize();
@@ -53,6 +64,10 @@ public class ResourceInfo {
     }
   }
 
+  /**
+   * 获取内存容量（单位：MB），延迟初始化内部Resource对象
+   * @return 内存大小
+   */
   public long getMemorySize() {
     if (resources == null) {
       resources = Resource.newInstance(memory, vCores);
@@ -60,6 +75,10 @@ public class ResourceInfo {
     return resources.getMemorySize();
   }
 
+  /**
+   * 获取虚拟CPU核心数，延迟初始化内部Resource对象
+   * @return CPU核心数
+   */
   public int getvCores() {
     if (resources == null) {
       resources = Resource.newInstance(memory, vCores);
@@ -72,10 +91,18 @@ public class ResourceInfo {
     return getResource().toString();
   }
 
+  /**
+   * 转换为格式化的资源字符串输出
+   * @return 格式化后的资源信息字符串
+   */
   public String toFormattedString() {
     return getResource().toFormattedString();
   }
 
+  /**
+   * 设置内存容量，延迟初始化内部Resource对象
+   * @param memory 内存大小（单位：MB）
+   */
   public void setMemory(int memory) {
     if (resources == null) {
       resources = Resource.newInstance(memory, vCores);
@@ -84,6 +111,10 @@ public class ResourceInfo {
     resources.setMemorySize(memory);
   }
 
+  /**
+   * 设置虚拟CPU核心数，延迟初始化内部Resource对象
+   * @param vCores CPU核心数
+   */
   public void setvCores(int vCores) {
     if (resources == null) {
       resources = Resource.newInstance(memory, vCores);
@@ -92,6 +123,10 @@ public class ResourceInfo {
     resources.setVirtualCores(vCores);
   }
 
+  /**
+   * 获取原始Resource对象副本，延迟初始化内部Resource对象
+   * @return 新建的Resource对象副本
+   */
   public Resource getResource() {
     if (resources == null) {
       resources = Resource.newInstance(memory, vCores);
@@ -99,6 +134,10 @@ public class ResourceInfo {
     return Resource.newInstance(resources);
   }
 
+  /**
+   * 获取扩展资源信息集合
+   * @return 扩展资源信息对象
+   */
   public ResourceInformationsInfo getResourcesInformations() {
     return resourceInformations;
   }

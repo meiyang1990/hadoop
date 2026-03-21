@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,27 +27,31 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * The YARN UI doesn't have centralized login mechanism. While accessing UI2 from kerberized shell, user who is
- * placed the request to YARN need to be displayed in UI. Given requests from UI2 is routed via Proxy, only RM can provide
- * the user who has placed the request. This DAO object help to provide the requested user and also RM logged in user.
- * the response sent by RM is authenticated user instead of proxy user.
- * It is always good to display authenticated user in browser which eliminates lot of confusion to end use.
+ * 集群用户信息数据访问对象，用于YARN Web UI展示当前认证用户信息。
+ * YARN UI本身没有集中登录机制，请求经过代理转发后，只有ResourceManager能获取真实发起请求的用户。
+ * 该DAO用于返回RM启动用户和当前请求认证用户信息，在前端展示真实认证用户避免混淆。
  */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 @InterfaceStability.Unstable
 public class ClusterUserInfo {
 
-    // User who has started the RM
+    // ResourceManager自身启动登录用户名
     protected String rmLoginUser;
-    // User who has placed the request
+    // 当前请求发起用户的用户名
     protected String requestedUser;
 
+  // 联邦集群环境下子集群ID
   private String subClusterId;
 
     public ClusterUserInfo() {
     }
 
+    /**
+     * 构造集群用户信息对象
+     * @param rm ResourceManager实例
+     * @param ugi 当前请求的用户信息
+     */
     public ClusterUserInfo(ResourceManager rm, UserGroupInformation ugi) {
         this.rmLoginUser = rm.getRMLoginUser();
         if (ugi != null) {

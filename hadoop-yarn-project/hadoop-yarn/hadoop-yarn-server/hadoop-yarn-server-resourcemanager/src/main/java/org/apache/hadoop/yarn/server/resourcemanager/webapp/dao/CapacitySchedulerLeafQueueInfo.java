@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,35 +34,62 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.UserInfo;
 
+/**
+ * 容量调度器叶子队列信息数据访问对象，封装叶子队列的统计信息和配置，供Web UI展示
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
 
+  // 活跃应用数量
   protected int numActiveApplications;
+  // 待运行应用数量
   protected int numPendingApplications;
+  // 已分配容器数量
   protected int numContainers;
+  // 队列最大允许应用数
   protected int maxApplications;
+  // 单用户最大允许应用数
   protected int maxApplicationsPerUser;
+  // 用户资源限制比例
   protected float userLimit;
-  protected UsersInfo users; // To add another level in the XML
+  // 用户信息集合，用于XML层级展示
+  protected UsersInfo users;
+  // 用户资源限制系数
   protected float userLimitFactor;
+  // 配置的AM资源最大占比
   protected float configuredMaxAMResourceLimit;
+  // AM资源限额
   protected ResourceInfo AMResourceLimit;
+  // 已使用AM资源量
   protected ResourceInfo usedAMResource;
+  // 用户AM资源限额
   protected ResourceInfo userAMResourceLimit;
+  // 是否禁用抢占
   protected boolean preemptionDisabled;
+  // 是否禁用队列内抢占
   protected boolean intraQueuePreemptionDisabled;
+  // 默认应用优先级
   protected int defaultPriority;
+  // 是否为自动创建的叶子队列
   protected boolean isAutoCreatedLeafQueue;
+  // 最大应用生命周期
   protected long maxApplicationLifetime;
+  // 默认应用生命周期
   protected long defaultApplicationLifetime;
 
   @XmlTransient
+  // 排序策略显示名称
   protected String orderingPolicyDisplayName;
 
   CapacitySchedulerLeafQueueInfo() {
   }
 
+  /**
+   * 构造方法，从叶子队列对象提取信息构建DAO对象
+   * @param cs 容量调度器实例
+   * @param q 抽象叶子队列对象
+   */
   CapacitySchedulerLeafQueueInfo(CapacityScheduler cs, AbstractLeafQueue q) {
     super(cs, q);
     numActiveApplications = q.getNumActiveApplications();
@@ -81,6 +109,7 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
     orderingPolicyInfo = q.getOrderingPolicy().getConfigName();
     defaultPriority = q.getDefaultApplicationPriority().getPriority();
     ArrayList<UserInfo> usersList = users.getUsersList();
+    // 无用户时使用队列AM限额，否则取第一个用户的AM限额
     if (usersList.isEmpty()) {
       // If no users are present, consider AM Limit for that queue.
       userAMResourceLimit = resources.getPartitionResourceUsageInfo(
@@ -91,6 +120,7 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
           .getAMLimit();
     }
 
+    // 判断是否为自动创建的叶子队列
     if ( q instanceof AutoCreatedLeafQueue) {
       isAutoCreatedLeafQueue = true;
     }
@@ -99,11 +129,19 @@ public class CapacitySchedulerLeafQueueInfo extends CapacitySchedulerQueueInfo {
   }
 
   @Override
+  /**
+   * 填充队列资源使用信息
+   * @param queueResourceUsage 队列资源使用对象
+   */
   protected void populateQueueResourceUsage(ResourceUsage queueResourceUsage) {
     resources = new ResourcesInfo(queueResourceUsage);
   }
 
   @Override
+  /**
+   * 填充队列容量信息
+   * @param queue 队列对象
+   */
   protected void populateQueueCapacities(CSQueue queue) {
     capacities = new QueueCapacitiesInfo(queue, true);
   }

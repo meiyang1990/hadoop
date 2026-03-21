@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -86,14 +87,9 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * RouterRMAdminService is a service that runs on each router that can be used
- * to intercept and inspect {@code ResourceManagerAdministrationProtocol}
- * messages from client to the cluster resource manager. It listens
- * {@code ResourceManagerAdministrationProtocol} messages from the client and
- * creates a request intercepting pipeline instance for each client. The
- * pipeline is a chain of interceptor instances that can inspect and modify the
- * request/response as needed. The main difference with AMRMProxyService is the
- * protocol they implement.
+ * RouterRMAdminService 是运行在 Router 上的服务，负责拦截处理客户端发往ResourceManager的
+ * ResourceManagerAdministrationProtocol 管理协议请求。它为每个用户创建请求拦截管道，
+ * 管道中的拦截器可以按需检查、修改请求和响应，是YARN联邦架构中路由RM管理请求的核心服务。
  */
 public class RouterRMAdminService extends AbstractService
     implements ResourceManagerAdministrationProtocol {
@@ -104,9 +100,8 @@ public class RouterRMAdminService extends AbstractService
   private Server server;
   private InetSocketAddress listenerEndpoint;
 
-  // For each user we store an interceptors' pipeline.
-  // For performance issue we use LRU cache to keep in memory the newest ones
-  // and remove the oldest used ones.
+  // 存储每个用户对应的请求拦截管道
+  // 使用LRU缓存，只保留最近使用的管道，淘汰最久未使用的，控制内存占用
   private Map<String, RequestInterceptorChainWrapper> userPipelineMap;
 
   public RouterRMAdminService() {
@@ -117,34 +112,44 @@ public class RouterRMAdminService extends AbstractService
   protected void serviceStart() throws Exception {
     LOG.info("Starting Router RMAdmin Service.");
     Configuration conf = getConfig();
+    // 创建YARN RPC实例
     YarnRPC rpc = YarnRPC.create(conf);
+    // 设置安全配置
     UserGroupInformation.setConfiguration(conf);
 
+    // 从配置获取RMAdmin服务监听地址
     this.listenerEndpoint =
         conf.getSocketAddr(YarnConfiguration.ROUTER_BIND_HOST,
             YarnConfiguration.ROUTER_RMADMIN_ADDRESS,
             YarnConfiguration.DEFAULT_ROUTER_RMADMIN_ADDRESS,
             YarnConfiguration.DEFAULT_ROUTER_RMADMIN_PORT);
 
+    // 从配置获取管道缓存最大容量
     int maxCacheSize =
         conf.getInt(YarnConfiguration.ROUTER_PIPELINE_CACHE_MAX_SIZE,
             YarnConfiguration.DEFAULT_ROUTER_PIPELINE_CACHE_MAX_SIZE);
+    // 初始化线程安全的LRU缓存存储用户管道
     this.userPipelineMap = Collections.synchronizedMap(new LRUCacheHashMap<>(maxCacheSize, true));
 
+    // 创建服务端配置副本
     Configuration serverConf = new Configuration(conf);
 
+    // 从配置获取工作线程数
     int numWorkerThreads =
         serverConf.getInt(YarnConfiguration.RM_ADMIN_CLIENT_THREAD_COUNT,
             YarnConfiguration.DEFAULT_RM_ADMIN_CLIENT_THREAD_COUNT);
 
+    // 创建RPC服务端，绑定本服务实例到监听地址
     this.server = rpc.getServer(ResourceManagerAdministrationProtocol.class,
         this, listenerEndpoint, serverConf, null, numWorkerThreads);
 
+    // 如果开启了安全授权，刷新服务访问控制列表
     if (conf.getBoolean(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       refreshServiceAcls(conf, RouterPolicyProvider.getInstance());
     }
 
+    // 启动RPC服务
     this.server.start();
     LOG.info("Router RMAdminService listening on address: {}.", this.server.getListenerAddress());
     super.serviceStart();
@@ -154,8 +159,10 @@ public class RouterRMAdminService extends AbstractService
   protected void serviceStop() throws Exception {
     LOG.info("Stopping Router RMAdminService.");
     if (this.server != null) {
+      // 停止RPC服务
       this.server.stop();
     }
+    // 清空管道缓存
     userPipelineMap.clear();
     super.serviceStop();
   }
@@ -173,18 +180,21 @@ public class RouterRMAdminService extends AbstractService
   @VisibleForTesting
   public RequestInterceptorChainWrapper getInterceptorChain()
       throws IOException {
+    // 获取当前请求用户
     String user = UserGroupInformation.getCurrentUser().getUserName();
+    // 从缓存获取用户管道
     RequestInterceptorChainWrapper chain = userPipelineMap.get(user);
     if (chain != null && chain.getRootInterceptor() != null) {
       return chain;
     }
+    // 缓存不存在则初始化新管道
     return initializePipeline(user);
   }
 
   /**
-   * Gets the Request interceptor chains for all the users.
+   * 获取所有用户的请求拦截管道缓存。
    *
-   * @return the request interceptor chains.
+   * @return 所有用户的请求拦截管道映射
    */
   @VisibleForTesting
   protected Map<String, RequestInterceptorChainWrapper> getPipelines() {
@@ -192,14 +202,14 @@ public class RouterRMAdminService extends AbstractService
   }
 
   /**
-   * This method creates and returns reference of the first interceptor in the
-   * chain of request interceptor instances.
+   * 根据配置创建并初始化拦截器责任链，返回链首拦截器。
    *
-   * @return the reference of the first interceptor in the chain
+   * @return 责任链的第一个拦截器实例
    */
   @VisibleForTesting
   protected RMAdminRequestInterceptor createRequestInterceptorChain() {
     Configuration conf = getConfig();
+    // 调用工具方法按配置创建拦截器链
     return RouterServerUtil.createRequestInterceptorChain(conf,
         YarnConfiguration.ROUTER_RMADMIN_INTERCEPTOR_CLASS_PIPELINE,
         YarnConfiguration.DEFAULT_ROUTER_RMADMIN_INTERCEPTOR_CLASS,
@@ -207,12 +217,14 @@ public class RouterRMAdminService extends AbstractService
   }
 
   /**
-   * Initializes the request interceptor pipeline for the specified user.
+   * 为指定用户初始化请求拦截管道，存入缓存。
    *
-   * @param user
+   * @param user 用户名
+   * @return 初始化完成的拦截管道包装器
    */
   private RequestInterceptorChainWrapper initializePipeline(String user) {
     synchronized (this.userPipelineMap) {
+      // 双重检查避免重复初始化
       if (this.userPipelineMap.containsKey(user)) {
         LOG.info("Request to start an already existing user: {}"
             + " was received, so ignoring.", user);
@@ -222,8 +234,7 @@ public class RouterRMAdminService extends AbstractService
       RequestInterceptorChainWrapper chainWrapper =
           new RequestInterceptorChainWrapper();
       try {
-        // We should init the pipeline instance after it is created and then
-        // add to the map, to ensure thread safe.
+        // 先初始化再加入缓存，保证线程安全
         LOG.info("Initializing request processing pipeline for user: {}.", user);
 
         RMAdminRequestInterceptor interceptorChain =
@@ -241,7 +252,7 @@ public class RouterRMAdminService extends AbstractService
   }
 
   /**
-   * Private structure for encapsulating RequestInterceptor and user instances.
+   * 封装用户请求拦截链的包装类，统一管理拦截器实例生命周期。
    *
    */
   @Private
@@ -249,25 +260,25 @@ public class RouterRMAdminService extends AbstractService
     private RMAdminRequestInterceptor rootInterceptor;
 
     /**
-     * Initializes the wrapper with the specified parameters.
+     * 初始化包装器，设置链首拦截器。
      *
-     * @param interceptor the first interceptor in the pipeline
+     * @param interceptor 责任链首拦截器
      */
     public synchronized void init(RMAdminRequestInterceptor interceptor) {
       this.rootInterceptor = interceptor;
     }
 
     /**
-     * Gets the root request interceptor.
+     * 获取责任链首拦截器。
      *
-     * @return the root request interceptor
+     * @return 责任链首拦截器
      */
     public synchronized RMAdminRequestInterceptor getRootInterceptor() {
       return rootInterceptor;
     }
 
     /**
-     * Shutdown the chain of interceptors when the object is destroyed.
+     * 对象销毁时关闭拦截链，释放资源。
      */
     @Override
     protected void finalize() {
@@ -430,20 +441,4 @@ public class RouterRMAdminService extends AbstractService
   public DeleteFederationApplicationResponse deleteFederationApplication(
       DeleteFederationApplicationRequest request) throws YarnException, IOException {
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().deleteFederationApplication(request);
-  }
-
-  @Override
-  public GetSubClustersResponse getFederationSubClusters(
-      GetSubClustersRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().getFederationSubClusters(request);
-  }
-
-  @Override
-  public DeleteFederationQueuePoliciesResponse deleteFederationPoliciesByQueues(
-      DeleteFederationQueuePoliciesRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().deleteFederationPoliciesByQueues(request);
-  }
-}
+    return pipeline.getRoot

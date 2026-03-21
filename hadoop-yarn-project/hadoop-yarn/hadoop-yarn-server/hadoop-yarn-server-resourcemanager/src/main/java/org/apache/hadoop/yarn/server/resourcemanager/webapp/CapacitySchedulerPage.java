@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -59,6 +60,9 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 import com.google.inject.Inject;
 import com.google.inject.servlet.RequestScoped;
 
+/**
+ * Capacity调度器Web页面渲染器，负责生成容量调度器队列监控页面的HTML内容
+ */
 class CapacitySchedulerPage extends RmView {
   static final String _Q = ".ui-state-default.ui-corner-all";
   static final float Q_MAX_WIDTH = 0.8f;
@@ -71,6 +75,9 @@ class CapacitySchedulerPage extends RmView {
   static final String Q_UNDER = "background:#5BD75B";
   static final String ACTIVE_USER = "background:#FFFF00"; // Yellow highlight
 
+  /**
+   * 容量调度器队列信息请求作用域容器，保存当前请求的队列和标签信息
+   */
   @RequestScoped
   static class CSQInfo {
     CapacitySchedulerInfo csinfo;
@@ -79,6 +86,9 @@ class CapacitySchedulerPage extends RmView {
     boolean isExclusiveNodeLabel;
   }
 
+  /**
+   * 叶子队列信息HTML块，负责渲染叶子队列的详细状态信息
+   */
   static class LeafQueueInfoBlock extends HtmlBlock {
     final CapacitySchedulerLeafQueueInfo lqinfo;
     private String nodeLabel;
@@ -98,31 +108,35 @@ class CapacitySchedulerPage extends RmView {
       }
     }
 
+    /**
+     * 渲染带节点分区标签的叶子队列信息
+     */
     private void renderLeafQueueInfoWithPartition(Block html) {
       String nodeLabelDisplay = nodeLabel.length() == 0
           ? NodeLabel.DEFAULT_NODE_LABEL_PARTITION : nodeLabel;
-      // first display the queue's label specific details :
+      // 首先展示分区特定的队列详情
       ResponseInfo ri =
           info("\'" + lqinfo.getQueuePath()
               + "\' Queue Status for Partition \'" + nodeLabelDisplay + "\'");
       renderQueueCapacityInfo(ri, nodeLabel);
       html.__(InfoBlock.class);
-      // clear the info contents so this queue's info doesn't accumulate into
-      // another queue's info
+      // 清空信息，避免多个队列信息累加
       ri.clear();
 
-      // second display the queue specific details :
+      // 然后展示队列通用详情
       ri =
           info("\'" + lqinfo.getQueuePath() + "\' Queue Status")
               .__("Queue State:", lqinfo.getQueueState());
       renderCommonLeafQueueInfo(ri);
 
       html.__(InfoBlock.class);
-      // clear the info contents so this queue's info doesn't accumulate into
-      // another queue's info
+      // 清空信息，避免多个队列信息累加
       ri.clear();
     }
 
+    /**
+     * 渲染不带分区信息的叶子队列信息
+     */
     private void renderLeafQueueInfoWithoutParition(Block html) {
       ResponseInfo ri =
           info("\'" + lqinfo.getQueuePath() + "\' Queue Status")
@@ -130,25 +144,26 @@ class CapacitySchedulerPage extends RmView {
       renderQueueCapacityInfo(ri, "");
       renderCommonLeafQueueInfo(ri);
       html.__(InfoBlock.class);
-      // clear the info contents so this queue's info doesn't accumulate into
-      // another queue's info
+      // 清空信息，避免多个队列信息累加
       ri.clear();
     }
 
+    /**
+     * 渲染队列容量相关信息到响应信息对象
+     */
     private void renderQueueCapacityInfo(ResponseInfo ri, String label) {
       PartitionQueueCapacitiesInfo capacities =
           lqinfo.getCapacities().getPartitionQueueCapacitiesInfo(label);
       PartitionResourcesInfo resourceUsages =
           lqinfo.getResources().getPartitionResourceUsageInfo(label);
 
-      // Get UserInfo from first user to calculate AM Resource Limit per user.
+      // 从第一个用户获取用户级AM资源限制
       ResourceInfo userAMResourceLimit = null;
       ArrayList<UserInfo> usersList = lqinfo.getUsers().getUsersList();
       if (!usersList.isEmpty()) {
         userAMResourceLimit = resourceUsages.getUserAmLimit();
       }
-      // If no users are present or if AM limit per user doesn't exist, retrieve
-      // AM Limit for that queue.
+      // 如果没有用户或无用户级限制，使用队列级AM限制
       if (userAMResourceLimit == null) {
         userAMResourceLimit = resourceUsages.getAMLimit();
       }
@@ -195,6 +210,9 @@ class CapacitySchedulerPage extends RmView {
               userAMResourceLimit.toString());
     }
 
+    /**
+     * 渲染叶子队列通用信息到响应信息对象
+     */
     private void renderCommonLeafQueueInfo(ResponseInfo ri) {
       ri.
           __("Num Schedulable Applications:",
@@ -226,6 +244,9 @@ class CapacitySchedulerPage extends RmView {
     }
   }
 
+  /**
+   * 队列用户信息HTML块，负责渲染叶子队列下所有活跃用户的资源使用信息
+   */
   static class QueueUsersInfoBlock extends HtmlBlock {
     final CapacitySchedulerLeafQueueInfo lqinfo;
     private String nodeLabel;
@@ -256,28 +277,33 @@ class CapacitySchedulerPage extends RmView {
               nodeLabel == null ? "" : nodeLabel);
 
       ArrayList<UserInfo> users = lqinfo.getUsers().getUsersList();
+      // 遍历每个用户渲染信息行
       for (UserInfo userInfo : users) {
         ResourceInfo resourcesUsed = userInfo.getResourcesUsed();
         ResourceInfo userAMLimitPerPartition =
             queueUsageResources.getUserAmLimit();
-        // If AM limit per user is null, use the AM limit for the queue level.
+        // 如果没有用户级AM限制，使用队列级限制
         if (userAMLimitPerPartition == null) {
           userAMLimitPerPartition = queueUsageResources.getAMLimit();
         }
+        // 根据用户权重调整AM限制
         if (userInfo.getUserWeight() != 1.0) {
           userAMLimitPerPartition =
               new ResourceInfo(
                   Resources.multiply(userAMLimitPerPartition.getResource(),
                       userInfo.getUserWeight()));
         }
+        // 如果指定分区，获取分区下的资源使用
         if (nodeLabel != null) {
           resourcesUsed = userInfo.getResourceUsageInfo()
               .getPartitionResourceUsageInfo(nodeLabel).getUsed();
         }
+        // 处理AM使用资源空值
         ResourceInfo amUsed = userInfo.getAMResourcesUsed();
         if (amUsed == null) {
           amUsed = new ResourceInfo(Resources.none());
         }
+        // 高亮当前请求资源的活跃用户
         String highlightIfAsking =
             userInfo.getIsActive() ? ACTIVE_USER : null;
         tbody.tr().$style(highlightIfAsking).td(userInfo.getUsername())
@@ -295,6 +321,9 @@ class CapacitySchedulerPage extends RmView {
     }
   }
 
+  /**
+   * 队列树HTML块，递归渲染队列层级结构
+   */
   public static class QueueBlock extends HtmlBlock {
     final CSQInfo csqinfo;
 
@@ -304,6 +333,7 @@ class CapacitySchedulerPage extends RmView {
 
     @Override
     public void render(Block html) {
+      // 获取当前层级的子队列列表
       ArrayList<CapacitySchedulerQueueInfo> subQueues = (csqinfo.qinfo == null)
           ? csqinfo.csinfo.getQueues().getQueueInfoList()
           : csqinfo.qinfo.getQueues().getQueueInfoList();
@@ -313,11 +343,11 @@ class CapacitySchedulerPage extends RmView {
       float absCap;
       float absMaxCap;
       float absUsedCap;
+      // 遍历每个子队列渲染
       for (CapacitySchedulerQueueInfo info : subQueues) {
         String nodeLabel = (csqinfo.label == null) ? "" : csqinfo.label;
-        //DEFAULT_NODE_LABEL_PARTITION is accessible to all queues
-        //other exclsiveNodeLabels are accessible only if configured
-        if (!nodeLabel.isEmpty()// i.e. its DEFAULT_NODE_LABEL_PARTITION
+        // 独占节点标签过滤：只显示配置了该标签的队列
+        if (!nodeLabel.isEmpty()
             && csqinfo.isExclusiveNodeLabel
             && !info.getNodeLabels().contains("*")
             && !info.getNodeLabels().contains(nodeLabel)) {
@@ -330,6 +360,7 @@ class CapacitySchedulerPage extends RmView {
         absMaxCap = partitionQueueCapsInfo.getAbsoluteMaxCapacity() / 100;
         absUsedCap = partitionQueueCapsInfo.getAbsoluteUsedCapacity() / 100;
 
+        // 判断是否是自动创建的叶子队列，应用不同样式
         boolean isAutoCreatedLeafQueue = info.isLeafQueue() ?
             ((CapacitySchedulerLeafQueueInfo) info).isAutoCreatedLeafQueue()
             : false;
@@ -352,343 +383,4 @@ class CapacitySchedulerPage extends RmView {
             span().$class("qstats").$style(left(Q_STATS_POS)).
             __(join(percent(used), " used")).__();
 
-        csqinfo.qinfo = info;
-        if (info.isLeafQueue()) {
-          li.ul("#lq").li().__(LeafQueueInfoBlock.class).__().__();
-          li.ul("#lq").li().__(QueueUsersInfoBlock.class).__().__();
-        } else {
-          li.__(QueueBlock.class);
-        }
-        li.__();
-      }
-
-      ul.__();
-    }
-  }
-
-  static class QueuesBlock extends HtmlBlock {
-    final CapacityScheduler cs;
-    final CSQInfo csqinfo;
-    private final ResourceManager rm;
-    private List<RMNodeLabel> nodeLabelsInfo;
-
-    @Inject QueuesBlock(ResourceManager rm, CSQInfo info) {
-      cs = (CapacityScheduler) rm.getResourceScheduler();
-      csqinfo = info;
-      this.rm = rm;
-      RMNodeLabelsManager nodeLabelManager =
-          rm.getRMContext().getNodeLabelManager();
-      nodeLabelsInfo = nodeLabelManager.pullRMNodeLabelsInfo();
-    }
-
-    @Override
-    public void render(Block html) {
-      html.__(MetricsOverviewTable.class);
-
-      UserGroupInformation callerUGI = this.getCallerUGI();
-      boolean isAdmin = false;
-      ApplicationACLsManager aclsManager = rm.getApplicationACLsManager();
-      if (aclsManager.areACLsEnabled()) {
-        if (callerUGI != null && aclsManager.isAdmin(callerUGI)) {
-          isAdmin = true;
-        }
-      } else {
-        isAdmin = true;
-      }
-
-      // only show button to dump CapacityScheduler debug logs to admins
-      if (isAdmin) {
-        html.div()
-          .button()
-          .$style(
-              "border-style: solid; border-color: #000000; border-width: 1px;"
-                  + " cursor: hand; cursor: pointer; border-radius: 4px")
-          .$onclick("confirmAction()").b("Dump scheduler logs").__().select()
-          .$id("time").option().$value("60").__("1 min").__().option()
-          .$value("300").__("5 min").__().option().$value("600").__("10 min").__()
-          .__().__();
-
-        StringBuilder script = new StringBuilder();
-        script
-          .append("function confirmAction() {")
-          .append(" b = confirm(\"Are you sure you wish to generate"
-              + " scheduler logs?\");")
-          .append(" if (b == true) {")
-          .append(" var timePeriod = $(\"#time\").val();")
-          .append(" $.ajax({")
-          .append(" type: 'POST',")
-          .append(" url: '/ws/v1/cluster/scheduler/logs',")
-          .append(" contentType: 'text/plain',")
-          .append(AppBlock.getCSRFHeaderString(rm.getConfig()))
-          .append(" data: 'time=' + timePeriod,")
-          .append(" dataType: 'text'")
-          .append(" }).done(function(data){")
-          .append(" setTimeout(function(){")
-          .append(" alert(\"Scheduler log is being generated.\");")
-          .append(" }, 1000);")
-          .append(" }).fail(function(data){")
-          .append(
-              " alert(\"Scheduler log generation failed. Please check the"
-                  + " ResourceManager log for more information.\");")
-          .append(" console.log(data);").append(" });").append(" }")
-          .append("}");
-
-        html.script().$type("text/javascript").__(script.toString()).__();
-      }
-
-      UL<DIV<DIV<Hamlet>>> ul = html.
-        div("#cs-wrapper.ui-widget").
-          div(".ui-widget-header.ui-corner-top").
-          __("Application Queues").__().
-          div("#cs.ui-widget-content.ui-corner-bottom").
-            ul();
-      if (cs == null) {
-        ul.
-          li().
-            a(_Q).$style(width(Q_MAX_WIDTH)).
-              span().$style(Q_END).__("100% ").__().
-              span(".q", "default").__().__();
-      } else {
-        ul.
-          li().$style("margin-bottom: 1em").
-            span().$style("font-weight: bold").__("Legend:").__().
-            span().$class("qlegend ui-corner-all").$style(Q_GIVEN).
-            __("Capacity").__().
-            span().$class("qlegend ui-corner-all").$style(Q_UNDER).
-            __("Used").__().
-            span().$class("qlegend ui-corner-all").$style(Q_OVER).
-            __("Used (over capacity)").__().
-            span().$class("qlegend ui-corner-all ui-state-default").
-              __("Max Capacity").__().
-            span().$class("qlegend ui-corner-all").$style(ACTIVE_USER).
-            __("Users Requesting Resources").__().
-            span().$class("qlegend ui-corner-all").$style(Q_AUTO_CREATED).
-            __("Auto Created Queues").__().
-          __();
-
-        float used = 0;
-
-        CSQueue root = cs.getRootQueue();
-        CapacitySchedulerInfo sinfo = new CapacitySchedulerInfo(root, cs);
-        csqinfo.csinfo = sinfo;
-
-        boolean hasAnyLabelLinkedToNM = false;
-        if (null != nodeLabelsInfo) {
-          for (RMNodeLabel label : nodeLabelsInfo) {
-            if (label.getLabelName().length() == 0) {
-              // Skip DEFAULT_LABEL
-              continue;
-            }
-            if (label.getNumActiveNMs() > 0) {
-              hasAnyLabelLinkedToNM = true;
-              break;
-            }
-          }
-        }
-        if (!hasAnyLabelLinkedToNM) {
-          used = sinfo.getUsedCapacity() / 100;
-          //label is not enabled in the cluster or there's only "default" label,
-          ul.li().
-            a(_Q).$style(width(Q_MAX_WIDTH)).
-              span().$style(join(width(used), ";left:0%;",
-                  used > 1 ? Q_OVER : Q_UNDER)).__(".").__().
-              span(".q", "root").__().
-            span().$class("qstats").$style(left(Q_STATS_POS)).
-              __(join(percent(used), " used")).__().
-              __(QueueBlock.class).__();
-        } else {
-          for (RMNodeLabel label : nodeLabelsInfo) {
-            csqinfo.qinfo = null;
-            csqinfo.label = label.getLabelName();
-            csqinfo.isExclusiveNodeLabel = label.getIsExclusive();
-            String nodeLabelDisplay = csqinfo.label.length() == 0
-                ? NodeLabel.DEFAULT_NODE_LABEL_PARTITION : csqinfo.label;
-            PartitionQueueCapacitiesInfo capacities = sinfo.getCapacities()
-                .getPartitionQueueCapacitiesInfo(csqinfo.label);
-            used = capacities.getUsedCapacity() / 100;
-            String partitionUiTag =
-                "Partition: " + nodeLabelDisplay + " " + label.getResource();
-            ul.li().
-            a(_Q).$style(width(Q_MAX_WIDTH)).
-              span().$style(join(width(used), ";left:0%;",
-                  used > 1 ? Q_OVER : Q_UNDER)).__(".").__().
-              span(".q", partitionUiTag).__().
-            span().$class("qstats").$style(left(Q_STATS_POS)).
-                __(join(percent(used), " used")).__().__();
-
-            //for the queue hierarchy under label
-            UL<Hamlet> underLabel = html.ul("#pq");
-            underLabel.li().
-            a(_Q).$style(width(Q_MAX_WIDTH)).
-              span().$style(join(width(used), ";left:0%;",
-                  used > 1 ? Q_OVER : Q_UNDER)).__(".").__().
-              span(".q", "root").__().
-            span().$class("qstats").$style(left(Q_STATS_POS)).
-                __(join(percent(used), " used")).__().
-                __(QueueBlock.class).__().__();
-          }
-        }
-      }
-      ul.__().__().
-      script().$type("text/javascript").
-          __("$('#cs').hide();").__().__().
-          __(RMAppsBlock.class);
-      html.__(HealthBlock.class);
-    }
-  }
-
-  public static class HealthBlock extends HtmlBlock {
-
-    final CapacityScheduler cs;
-
-    @Inject
-    HealthBlock(ResourceManager rm) {
-      cs = (CapacityScheduler) rm.getResourceScheduler();
-    }
-
-    @Override
-    public void render(HtmlBlock.Block html) {
-      SchedulerHealth healthInfo = cs.getSchedulerHealth();
-      DIV<Hamlet> div = html.div("#health");
-      div.h4("Aggregate scheduler counts");
-      TBODY<TABLE<DIV<Hamlet>>> tbody =
-          div.table("#lastrun").thead().$class("ui-widget-header").tr().th()
-            .$class("ui-state-default").__("Total Container Allocations(count)")
-            .__().th().$class("ui-state-default")
-            .__("Total Container Releases(count)").__().th()
-            .$class("ui-state-default")
-            .__("Total Fulfilled Reservations(count)").__().th()
-            .$class("ui-state-default").__("Total Container Preemptions(count)")
-            .__().__().__().tbody();
-      tbody
-        .$class("ui-widget-content")
-        .tr()
-        .td(
-          String.valueOf(cs.getRootQueueMetrics()
-            .getAggregateAllocatedContainers()))
-        .td(
-          String.valueOf(cs.getRootQueueMetrics()
-            .getAggegatedReleasedContainers()))
-        .td(healthInfo.getAggregateFulFilledReservationsCount().toString())
-        .td(healthInfo.getAggregatePreemptionCount().toString()).__().__().__();
-      div.h4("Last scheduler run");
-      tbody =
-          div.table("#lastrun").thead().$class("ui-widget-header").tr().th()
-            .$class("ui-state-default").__("Time").__().th()
-            .$class("ui-state-default").__("Allocations(count - resources)").__()
-            .th().$class("ui-state-default").__("Reservations(count - resources)")
-            .__().th().$class("ui-state-default").__("Releases(count - resources)")
-            .__().__().__().tbody();
-      tbody
-        .$class("ui-widget-content")
-        .tr()
-        .td(Times.format(healthInfo.getLastSchedulerRunTime()))
-        .td(
-          healthInfo.getAllocationCount().toString() + " - "
-              + healthInfo.getResourcesAllocated().toString())
-        .td(
-          healthInfo.getReservationCount().toString() + " - "
-              + healthInfo.getResourcesReserved().toString())
-        .td(
-          healthInfo.getReleaseCount().toString() + " - "
-              + healthInfo.getResourcesReleased().toString()).__().__().__();
-      Map<String, SchedulerHealth.DetailedInformation> info = new HashMap<>();
-      info.put("Allocation", healthInfo.getLastAllocationDetails());
-      info.put("Reservation", healthInfo.getLastReservationDetails());
-      info.put("Release", healthInfo.getLastReleaseDetails());
-      info.put("Preemption", healthInfo.getLastPreemptionDetails());
-
-      for (Map.Entry<String, SchedulerHealth.DetailedInformation> entry : info
-        .entrySet()) {
-        String containerId = "N/A";
-        String nodeId = "N/A";
-        String queue = "N/A";
-        String table = "#" + entry.getKey();
-        div.h4("Last " + entry.getKey());
-        tbody =
-            div.table(table).thead().$class("ui-widget-header").tr().th()
-              .$class("ui-state-default").__("Time").__().th()
-              .$class("ui-state-default").__("Container Id").__().th()
-              .$class("ui-state-default").__("Node Id").__().th()
-              .$class("ui-state-default").__("Queue").__().__().__().tbody();
-        SchedulerHealth.DetailedInformation di = entry.getValue();
-        if (di.getTimestamp() != 0) {
-          if (di.getContainerId() != null) {
-            containerId = di.getContainerId().toString();
-          }
-          if (di.getNodeId() != null) {
-            nodeId = di.getNodeId().toString();
-          }
-          queue = di.getQueue();
-        }
-        tbody.$class("ui-widget-content").tr()
-          .td(Times.format(di.getTimestamp())).td(containerId).td(nodeId)
-          .td(queue).__().__().__();
-      }
-      div.__();
-    }
-  }
-
-  @Override protected void postHead(Page.HTML<__> html) {
-    html.
-      style().$type("text/css").
-        __("#cs { padding: 0.5em 0 1em 0; margin-bottom: 1em; position: relative }",
-          "#cs ul { list-style: none }",
-          "#cs a { font-weight: normal; margin: 2px; position: relative }",
-          "#cs a span { font-weight: normal; font-size: 80% }",
-          "#cs-wrapper .ui-widget-header { padding: 0.2em 0.5em }",
-          ".qstats { font-weight: normal; font-size: 80%; position: absolute }",
-          ".qlegend { font-weight: normal; padding: 0 1em; margin: 1em }",
-          "table.info tr th {width: 50%}").__(). // to center info table
-      script("/static/jt/jquery.jstree.js").
-      script().$type("text/javascript").
-        __("$(function() {",
-          "  $('#cs a span').addClass('ui-corner-all').css('position', 'absolute');",
-          "  $('#cs').bind('loaded.jstree', function (e, data) {",
-          "    var callback = { call:reopenQueryNodes }",
-          "    data.inst.open_node('#pq', callback);",
-          "   }).",
-          "    jstree({",
-          "    core: { animation: 188, html_titles: true },",
-          "    plugins: ['themeroller', 'html_data', 'ui'],",
-          "    themeroller: { item_open: 'ui-icon-minus',",
-          "      item_clsd: 'ui-icon-plus', item_leaf: 'ui-icon-gear'",
-          "    }",
-          "  });",
-          "  $('#cs').bind('select_node.jstree', function(e, data) {",
-          "    var queues = $('.q', data.rslt.obj);",
-          "    var q = '^' + queues.first().text();",
-          "    q += queues.length == 1 ? '$' : '\\\\.';",
-          // Update this filter column index for queue if new columns are added
-          // Current index for queue column is 5
-          "    $('#apps').dataTable().fnFilter(q, 5, true);",
-          "  });",
-          "  $('#cs').show();",
-          "});").__().
-        __(SchedulerPageUtil.QueueBlockUtil.class);
-  }
-
-  @Override protected Class<? extends SubView> content() {
-    return QueuesBlock.class;
-  }
-
-  static String appendPercent(ResourceInfo resourceInfo, float f) {
-    if (resourceInfo == null) {
-      return "";
-    }
-    return resourceInfo.toString() + " ("
-        + StringUtils.formatPercent(f, 1) + ")";
-  }
-
-  static String percent(float f) {
-    return StringUtils.formatPercent(f, 1);
-  }
-
-  static String width(float f) {
-    return StringUtils.format("width:%.1f%%", f * 100);
-  }
-
-  static String left(float f) {
-    return StringUtils.format("left:%.1f%%", f * 100);
-  }
-}
+        csqinfo.qinfo

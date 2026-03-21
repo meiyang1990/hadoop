@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,19 +23,29 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.ContainerAllocationExpirer;
 
 /**
- * The {@link SchedulerEvent} which notifies that a {@link ContainerId}
- * has expired, sent by {@link ContainerAllocationExpirer} 
+ * 容器过期调度事件，由{@link ContainerAllocationExpirer}发送，通知调度器指定容器已过期
  *
  */
 public class ContainerExpiredSchedulerEvent extends SchedulerEvent {
 
+  /** 过期容器ID */
   private final ContainerId containerId;
+  /** 是否为递增容器分配过期 */
   private final boolean increase;
 
+  /**
+   * 构造非递增容器分配过期事件
+   * @param containerId 过期容器ID
+   */
   public ContainerExpiredSchedulerEvent(ContainerId containerId) {
     this(containerId, false);
   }
 
+  /**
+   * 构造容器过期事件
+   * @param containerId 过期容器ID
+   * @param increase 是否为递增容器分配过期
+   */
   public ContainerExpiredSchedulerEvent(
       ContainerId containerId, boolean increase) {
     super(SchedulerEventType.CONTAINER_EXPIRED);
@@ -42,10 +53,18 @@ public class ContainerExpiredSchedulerEvent extends SchedulerEvent {
     this.increase = increase;
   }
 
+  /**
+   * 获取过期容器ID
+   * @return 过期容器ID
+   */
   public ContainerId getContainerId() {
     return containerId;
   }
 
+  /**
+   * 获取是否为递增容器分配过期
+   * @return true表示是递增容器分配过期，false表示普通容器分配过期
+   */
   public boolean isIncrease() {
     return increase;
   }

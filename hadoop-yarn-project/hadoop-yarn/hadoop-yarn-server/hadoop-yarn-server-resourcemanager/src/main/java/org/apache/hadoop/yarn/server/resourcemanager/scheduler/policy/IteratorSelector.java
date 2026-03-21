@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -5,7 +6,7 @@
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * with the License.  You can obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -19,27 +20,29 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.policy;
 
 /**
- * IteratorSelector contains information needed to tell an
- * {@link OrderingPolicy} what to return in an iterator.
+ * YARN调度器迭代器选择器，用于告诉调度排序策略应该返回哪个分区的迭代器。
+ * 用于支持分区调度场景下，按分区选择待调度实体集合。
  */
 public class IteratorSelector {
 
+  /** 空选择器实例，表示不选择任何分区，返回空迭代器 */
   public static final IteratorSelector EMPTY_ITERATOR_SELECTOR =
       new IteratorSelector();
 
+  /** 目标分区名称 */
   private String partition;
 
   /**
-   * The partition for this iterator selector.
-   * @return partition
+   * 获取当前选择的分区名称。
+   * @return 目标分区名称
    */
   public String getPartition() {
     return this.partition;
   }
 
   /**
-   * Set partition for this iterator selector.
-   * @param p partition
+   * 设置要选择的分区名称。
+   * @param p 目标分区名称
    */
   public void setPartition(String p) {
     this.partition = p;

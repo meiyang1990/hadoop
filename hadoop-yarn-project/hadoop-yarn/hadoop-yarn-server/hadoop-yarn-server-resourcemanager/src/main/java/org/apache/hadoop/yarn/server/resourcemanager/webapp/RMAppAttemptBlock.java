@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -60,10 +61,15 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * ResourceManager端应用尝试信息页面块，继承通用AppAttemptBlock，
+ * 负责渲染应用尝试的资源请求、容器位置统计、调度诊断信息等RM侧特有内容
+ */
 public class RMAppAttemptBlock extends AppAttemptBlock{
 
   private final ResourceManager rm;
   protected Configuration conf;
+  // 前端获取并展示应用分配诊断信息的JavaScript脚本常量
   private final static String DIAGNOSTICS_SCRIPT_BODY = new StringBuilder()
       .append("var refresh = false;")
       .append("var haveGotAppDiagnostic = false;")
@@ -287,6 +293,12 @@ public class RMAppAttemptBlock extends AppAttemptBlock{
       .append("}")
       .append("queryAppDiagnostics();").toString();
 
+  /**
+   * 构造函数，通过Guice注入依赖
+   * @param ctx 页面视图上下文
+   * @param rm ResourceManager实例
+   * @param conf Hadoop配置
+   */
   @Inject
   RMAppAttemptBlock(ViewContext ctx, ResourceManager rm, Configuration conf) {
     super(null, ctx);
@@ -294,301 +306,5 @@ public class RMAppAttemptBlock extends AppAttemptBlock{
     this.conf = conf;
   }
 
-  private void createResourceRequestsTable(Block html) {
-    AppInfo app =
-        new AppInfo(rm, rm.getRMContext().getRMApps()
-          .get(this.appAttemptId.getApplicationId()), true,
-          WebAppUtils.getHttpSchemePrefix(conf));
-
-    List<ResourceRequestInfo> resourceRequests = app.getResourceRequests();
-    if (resourceRequests == null || resourceRequests.isEmpty()) {
-      return;
-    }
-
-    DIV<Hamlet> div = html.div(_INFO_WRAP);
-    // Requests Table
-    TBODY<TABLE<DIV<Hamlet>>> tbody = div
-        .h3("Total Outstanding Resource Requests: "
-            + getTotalResource(resourceRequests))
-        .table("#resourceRequests").thead().tr().th(".priority", "Priority")
-        .th(".allocationRequestId", "AllocationRequestId")
-        .th(".resource", "ResourceName").th(".capacity", "Capability")
-        .th(".containers", "NumContainers")
-        .th(".relaxlocality", "RelaxLocality")
-        .th(".labelexpression", "NodeLabelExpression")
-        .th(".executiontype", "ExecutionType")
-        .th(".allocationTags", "AllocationTags")
-        .th(".placementConstraint", "PlacementConstraint").__().__().tbody();
-
-    StringBuilder resourceRequestTableData = new StringBuilder("[\n");
-    for (ResourceRequestInfo resourceRequest  : resourceRequests) {
-      if (resourceRequest.getNumContainers() == 0) {
-        continue;
-      }
-      resourceRequestTableData.append("[\"")
-          .append(String.valueOf(resourceRequest.getPriority())).append("\",\"")
-          .append(String.valueOf(resourceRequest.getAllocationRequestId()))
-          .append("\",\"")
-          .append(resourceRequest.getResourceName() == null ? "N/A"
-              : resourceRequest.getResourceName())
-          .append("\",\"")
-          .append(StringEscapeUtils.escapeEcmaScript(StringEscapeUtils
-              .escapeHtml4(String.valueOf(resourceRequest.getCapability()))))
-          .append("\",\"")
-          .append(String.valueOf(resourceRequest.getNumContainers()))
-          .append("\",\"")
-          .append(String.valueOf(resourceRequest.getRelaxLocality()))
-          .append("\",\"")
-          .append(resourceRequest.getNodeLabelExpression() == null ? "N/A"
-              : resourceRequest.getNodeLabelExpression())
-          .append("\",\"")
-          .append(resourceRequest.getExecutionTypeRequest() == null ? "N/A"
-              : resourceRequest.getExecutionTypeRequest().getExecutionType())
-          .append("\",\"")
-          .append(resourceRequest.getAllocationTags() == null ? "N/A" :
-              StringUtils.join(resourceRequest.getAllocationTags(), ","))
-          .append("\",\"")
-          .append(resourceRequest.getPlacementConstraint() == null ? "N/A"
-              : resourceRequest.getPlacementConstraint())
-          .append("\"],\n");
-    }
-    if (resourceRequestTableData
-        .charAt(resourceRequestTableData.length() - 2) == ',') {
-      resourceRequestTableData.delete(resourceRequestTableData.length() - 2,
-          resourceRequestTableData.length() - 1);
-    }
-    resourceRequestTableData.append("]");
-    html.script().$type("text/javascript")
-        .__("var resourceRequestsTableData=" + resourceRequestTableData).__();
-    tbody.__().__();
-
-    // create diagnostics table when CS is enabled
-    createDiagnosticsTable(html, div);
-
-    div.__();
-  }
-
-  private Resource getTotalResource(List<ResourceRequestInfo> requests) {
-    Resource totalResource = Resource.newInstance(0, 0);
-    if (requests == null) {
-      return totalResource;
-    }
-    for (ResourceRequestInfo request : requests) {
-      if (request.getNumContainers() == 0) {
-        continue;
-      }
-      if (request.getResourceName() == null || request.getResourceName()
-          .equals(ResourceRequest.ANY)) {
-        Resources.addTo(
-            totalResource,
-            Resources.multiply(request.getCapability().getResource(),
-            request.getNumContainers()));
-      }
-    }
-    return totalResource;
-  }
-
-  private void createContainerLocalityTable(Block html) {
-    RMAppAttemptMetrics attemptMetrics = null;
-    RMAppAttempt attempt = getRMAppAttempt();
-    if (attempt != null) {
-      attemptMetrics = attempt.getRMAppAttemptMetrics();
-    }
-    
-    if (attemptMetrics == null) {
-      return;
-    }
-
-    DIV<Hamlet> div = html.div(_INFO_WRAP);
-    TABLE<DIV<Hamlet>> table =
-        div.h3(
-          "Total Allocated Containers: "
-              + attemptMetrics.getTotalAllocatedContainers()).h3("Each table cell"
-            + " represents the number of NodeLocal/RackLocal/OffSwitch containers"
-            + " satisfied by NodeLocal/RackLocal/OffSwitch resource requests.").table(
-          "#containerLocality");
-    table.
-      tr().
-        th(_TH, "").
-        th(_TH, "Node Local Request").
-        th(_TH, "Rack Local Request").
-        th(_TH, "Off Switch Request").
-        __();
-
-    String[] containersType =
-        { "Num Node Local Containers (satisfied by)", "Num Rack Local Containers (satisfied by)",
-            "Num Off Switch Containers (satisfied by)" };
-    boolean odd = false;
-    for (int i = 0; i < attemptMetrics.getLocalityStatistics().length; i++) {
-      table.tr((odd = !odd) ? _ODD : _EVEN).td(containersType[i])
-        .td(String.valueOf(attemptMetrics.getLocalityStatistics()[i][0]))
-        .td(i == 0 ? "" : String.valueOf(attemptMetrics.getLocalityStatistics()[i][1]))
-        .td(i <= 1 ? "" : String.valueOf(attemptMetrics.getLocalityStatistics()[i][2])).__();
-    }
-    table.__();
-    div.__();
-  }
-
-  private boolean isApplicationInFinalState(YarnApplicationAttemptState state) {
-    return state == YarnApplicationAttemptState.FINISHED
-        || state == YarnApplicationAttemptState.FAILED
-        || state == YarnApplicationAttemptState.KILLED;
-  }
-
-  @Override
-  protected void createAttemptHeadRoomTable(Block html) {
-    RMAppAttempt attempt = getRMAppAttempt();
-    if (attempt != null && !isApplicationInFinalState(createApplicationAttemptState(attempt))) {
-      RMAppAttemptMetrics metrics = attempt.getRMAppAttemptMetrics();
-      DIV<Hamlet> pdiv = html.__(InfoBlock.class).div(_INFO_WRAP);
-      info("Application Attempt Overview").clear();
-      info("Application Attempt Metrics").__(
-          "Application Attempt Headroom : ", metrics == null ? "N/A" :
-          metrics.getApplicationAttemptHeadroom());
-      pdiv.__();
-    }
-  }
-
-  private YarnApplicationAttemptState createApplicationAttemptState(RMAppAttempt attempt) {
-    return RMServerUtils.convertRmAppAttemptStateToYarnApplicationAttemptState(
-        attempt.getState(),
-        attempt.getPreviousState()
-    );
-  }
-
-  private RMAppAttempt getRMAppAttempt() {
-    ApplicationId appId = this.appAttemptId.getApplicationId();
-    RMAppAttempt attempt = null;
-    RMApp rmApp = rm.getRMContext().getRMApps().get(appId);
-    if (rmApp != null) { 
-      attempt = rmApp.getAppAttempts().get(appAttemptId);
-    }
-    return attempt;
-  }
-
-  protected void generateOverview(ApplicationAttemptReport appAttemptReport,
-      Collection<ContainerReport> containers, AppAttemptInfo appAttempt,
-      String node) {
-
-    RMAppAttempt rmAppAttempt = getRMAppAttempt();
-    // nodes which are blacklisted by the application
-    String appBlacklistedNodes =
-        getNodeString(rmAppAttempt.getBlacklistedNodes());
-    // nodes which are blacklisted by the RM for AM launches
-    String rmBlackListedNodes =
-        getNodeString(rmAppAttempt.getAMBlacklistManager()
-          .getBlacklistUpdates().getBlacklistAdditions());
-
-    info("Application Attempt Overview")
-      .__(
-        "Application Attempt State:",
-        appAttempt.getAppAttemptState() == null ? UNAVAILABLE : appAttempt
-          .getAppAttemptState())
-        .__("Started:", Times.format(appAttempt.getStartedTime()))
-        .__("Elapsed:",
-            org.apache.hadoop.util.StringUtils.formatTime(Times.elapsed(
-                appAttempt.getStartedTime(), appAttempt.getFinishedTime())))
-      .__(
-        "AM Container:",
-        appAttempt.getAmContainerId() == null || containers == null
-            || !hasAMContainer(appAttemptReport.getAMContainerId(), containers)
-            ? null : root_url("container", appAttempt.getAmContainerId()),
-        appAttempt.getAmContainerId() == null ? "N/A" :
-          String.valueOf(appAttempt.getAmContainerId()))
-      .__("Node:", node)
-      .__(
-        "Tracking URL:",
-        appAttempt.getTrackingUrl() == null
-            || appAttempt.getTrackingUrl().equals(UNAVAILABLE) ? null
-            : root_url(appAttempt.getTrackingUrl()),
-        appAttempt.getTrackingUrl() == null
-            || appAttempt.getTrackingUrl().equals(UNAVAILABLE)
-            ? "Unassigned"
-            : appAttempt.getAppAttemptState() == YarnApplicationAttemptState.FINISHED
-                || appAttempt.getAppAttemptState() == YarnApplicationAttemptState.FAILED
-                || appAttempt.getAppAttemptState() == YarnApplicationAttemptState.KILLED
-                ? "History" : "ApplicationMaster")
-      .__(
-        "Diagnostics Info:",
-        appAttempt.getDiagnosticsInfo() == null ? "" : appAttempt
-          .getDiagnosticsInfo())
-      .__("Nodes blacklisted by the application:", appBlacklistedNodes)
-      .__("Nodes blacklisted by the system:", rmBlackListedNodes);
-  }
-
-  private String getNodeString(Collection<String> nodes) {
-    String concatinatedString = "-";
-    if (null != nodes && !nodes.isEmpty()) {
-      concatinatedString = StringUtils.join(nodes, ", ");
-    }
-    return concatinatedString;
-  }
-
-  @Override
-  protected void createTablesForAttemptMetrics(Block html) {
-    createContainerLocalityTable(html);
-    createResourceRequestsTable(html);
-  }
-
-  @Override
-  protected List<ContainerReport> getContainers(
-      final GetContainersRequest request) throws YarnException, IOException {
-    return rm.getClientRMService().getContainers(request).getContainerList();
-  }
-
-  @Override
-  protected ApplicationAttemptReport getApplicationAttemptReport(
-      final GetApplicationAttemptReportRequest request)
-      throws YarnException, IOException {
-    return rm.getClientRMService().getApplicationAttemptReport(request)
-        .getApplicationAttemptReport();
-  }
-
-  private void createDiagnosticsTable(Block html, DIV<Hamlet> parentDiv) {
-    if (!(rm.getResourceScheduler() instanceof CapacityScheduler)) {
-      return;
-    }
-    String appActivitiesURL =
-        new StringBuilder().append(RMWSConsts.RM_WEB_SERVICE_PATH).append(
-            RMWSConsts.SCHEDULER_APP_ACTIVITIES.replace("{appid}",
-                this.appAttemptId.getApplicationId().toString())).append("?")
-            .toString();
-    String refreshAppActivitiesURL = appActivitiesURL + "actions=refresh";
-    String getAppActivitiesURL = appActivitiesURL
-        + "actions=get&groupBy=diagnostic&summarize=true";
-    String refreshAndGetAppActivitiesURL = appActivitiesURL
-        + "actions=refresh&actions=get&groupBy=diagnostic&summarize=true";
-    String schedulerActivitiesURL =
-        new StringBuilder().append(RMWSConsts.RM_WEB_SERVICE_PATH)
-            .append(RMWSConsts.SCHEDULER_ACTIVITIES).append("?")
-            .append(RMWSConsts.GROUP_BY).append("=diagnostic").toString();
-
-    DIV<DIV<Hamlet>> div = parentDiv.div();
-    div.p().__("Diagnostics in cache ").__("(For more details refer to ")
-        .a(refreshAndGetAppActivitiesURL, "App Activities").__(" or ")
-        .a(schedulerActivitiesURL, "Scheduler Activities").__(")").__();
-    div.button().$id("refreshDiagnosticsBtn")
-        .$style("border-style: solid; border-color: #000000; border-width: 1px;"
-                + " cursor: hand; cursor: pointer; border-radius: 4px")
-        .$onclick("refreshAppDiagnostics()").b("Refresh").__();
-    div.p().$id("diagnosticsUpdateTime").__();
-    div.p().$id("appDiagnostic").__();
-    div.div("#diagnosticsTableDiv").__();
-
-    div.__();
-
-    StringBuilder script = new StringBuilder();
-    script
-        .append("var refreshAppActivitiesURL = '")
-        .append(refreshAppActivitiesURL).append("';")
-        .append("var getAppActivitiesURL = '")
-        .append(getAppActivitiesURL).append("';")
-        .append("var schedulerActivitiesURL = '")
-        .append(schedulerActivitiesURL).append("';")
-        .append("var ignoreActivityContent = '")
-        .append("does not need more resource';")
-        .append(DIAGNOSTICS_SCRIPT_BODY);
-
-    html.script().$type("text/javascript").__(script.toString()).__();
-  }
-}
+  /**
+   * 创建未完成

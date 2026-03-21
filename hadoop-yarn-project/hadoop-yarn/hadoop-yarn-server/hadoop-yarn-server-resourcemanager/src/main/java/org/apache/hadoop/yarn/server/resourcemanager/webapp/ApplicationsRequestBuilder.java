@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,6 +30,10 @@ import java.util.Set;
 
 import static org.apache.hadoop.yarn.server.webapp.WebServices.parseQueries;
 
+/**
+ * YARN RM Web API 获取应用列表请求构造器，采用Builder模式组装过滤条件，
+ * 验证参数合法性后构造标准的GetApplicationsRequest对象。
+ */
 public class ApplicationsRequestBuilder {
 
   private Set<String> statesQuery = Sets.newHashSet();
@@ -37,7 +42,7 @@ public class ApplicationsRequestBuilder {
   private String limit = null;
   private Long limitNumber;
 
-  // set values suitable in case both of begin/end not specified
+  // 起止时间未指定时设置默认值
   private long startedTimeBegin = 0;
   private long startedTimeEnd = Long.MAX_VALUE;
   private long finishTimeBegin = 0;
@@ -50,18 +55,32 @@ public class ApplicationsRequestBuilder {
   private ApplicationsRequestBuilder() {
   }
 
+  /**
+   * 创建构造器实例，使用静态工厂方法。
+   * @return 新的构造器实例
+   */
   public static ApplicationsRequestBuilder create() {
     return new ApplicationsRequestBuilder();
   }
 
+  /**
+   * 添加应用状态过滤条件，兼容已废弃的单状态参数。
+   * @param stateQuery 应用状态字符串
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withStateQuery(String stateQuery) {
-    // stateQuery is deprecated.
+    // stateQuery 已废弃，保留兼容旧版本请求
     if (stateQuery != null && !stateQuery.isEmpty()) {
       statesQuery.add(stateQuery);
     }
     return this;
   }
 
+  /**
+   * 添加批量应用状态过滤条件。
+   * @param statesQuery 应用状态集合
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withStatesQuery(
       Set<String> statesQuery) {
     if (statesQuery != null) {
@@ -70,6 +89,11 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加提交用户过滤条件。
+   * @param userQuery 用户名
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withUserQuery(String userQuery) {
     if (userQuery != null && !userQuery.isEmpty()) {
       users.add(userQuery);
@@ -77,6 +101,12 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加队列过滤条件，同时保存RM引用用于后续参数校验。
+   * @param rm ResourceManager实例
+   * @param queueQuery 队列名称
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withQueueQuery(ResourceManager rm,
       String queueQuery) {
     this.rm = rm;
@@ -86,6 +116,11 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加返回结果数量限制。
+   * @param limit 限制数量字符串
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withLimit(String limit) {
     if (limit != null && !limit.isEmpty()) {
       this.limit = limit;
@@ -93,6 +128,11 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加应用启动时间起始过滤条件。
+   * @param startedBegin 启动起始时间字符串
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withStartedTimeBegin(
       String startedBegin) {
     if (startedBegin != null && !startedBegin.isEmpty()) {
@@ -101,6 +141,11 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加应用启动时间结束过滤条件。
+   * @param startedEnd 启动结束时间字符串
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withStartedTimeEnd(String startedEnd) {
     if (startedEnd != null && !startedEnd.isEmpty()) {
       startedTimeEnd = parseLongValue(startedEnd, "startedTimeEnd");
@@ -108,6 +153,11 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加应用完成时间起始过滤条件。
+   * @param finishBegin 完成起始时间字符串
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withFinishTimeBegin(String finishBegin) {
     if (finishBegin != null && !finishBegin.isEmpty()) {
       finishTimeBegin = parseLongValue(finishBegin, "finishedTimeBegin");
@@ -115,6 +165,11 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加应用完成时间结束过滤条件。
+   * @param finishEnd 完成结束时间字符串
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withFinishTimeEnd(String finishEnd) {
     if (finishEnd != null && !finishEnd.isEmpty()) {
       finishTimeEnd = parseLongValue(finishEnd, "finishedTimeEnd");
@@ -122,6 +177,11 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加应用类型过滤条件。
+   * @param applicationTypes 应用类型集合
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withApplicationTypes(
       Set<String> applicationTypes) {
     if (applicationTypes !=  null) {
@@ -130,6 +190,11 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加应用标签过滤条件。
+   * @param applicationTags 应用标签集合
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withApplicationTags(
       Set<String> applicationTags) {
     if (applicationTags != null) {
@@ -138,11 +203,19 @@ public class ApplicationsRequestBuilder {
     return this;
   }
 
+  /**
+   * 添加应用名称过滤条件。
+   * @param applicationName 应用名称
+   * @return 当前构造器实例
+   */
   public ApplicationsRequestBuilder withName(String applicationName) {
     name = applicationName;
     return this;
   }
 
+  /**
+   * 对所有请求参数执行统一合法性校验。
+   */
   private void validate() {
     queues.forEach(q -> validateQueueExists(rm, q));
     validateLimit();
@@ -150,11 +223,18 @@ public class ApplicationsRequestBuilder {
     validateFinishTime();
   }
 
+  /**
+   * 验证指定队列在当前RM调度器中是否存在。
+   * @param rm ResourceManager实例
+   * @param queueQuery 待验证队列名称
+   */
   private void validateQueueExists(ResourceManager rm, String queueQuery) {
     ResourceScheduler rs = rm.getResourceScheduler();
+    // 仅对容量调度器执行队列存在性校验
     if (rs instanceof CapacityScheduler) {
       CapacityScheduler cs = (CapacityScheduler) rs;
       try {
+        // 通过获取队列信息判断队列是否存在
         cs.getQueueInfo(queueQuery, false, false);
       } catch (IOException e) {
         throw new BadRequestException(e.getMessage());
@@ -162,6 +242,9 @@ public class ApplicationsRequestBuilder {
     }
   }
 
+  /**
+   * 验证返回结果数量限制参数合法性。
+   */
   private void validateLimit() {
     if (limit != null) {
       limitNumber = parseLongValue(limit, "limit");
@@ -171,6 +254,12 @@ public class ApplicationsRequestBuilder {
     }
   }
 
+  /**
+   * 将字符串参数解析为长整型，非法格式抛出请求错误。
+   * @param strValue 待解析字符串
+   * @param queryName 参数名称，用于错误提示
+   * @return 解析后的长整型值
+   */
   private long parseLongValue(String strValue, String queryName) {
     try {
       return Long.parseLong(strValue);
@@ -179,6 +268,9 @@ public class ApplicationsRequestBuilder {
     }
   }
 
+  /**
+   * 验证启动时间范围参数合法性。
+   */
   private void validateStartTime() {
     if (startedTimeBegin < 0) {
       throw new BadRequestException("startedTimeBegin must be greater than 0");
@@ -192,6 +284,9 @@ public class ApplicationsRequestBuilder {
     }
   }
 
+  /**
+   * 验证完成时间范围参数合法性。
+   */
   private void validateFinishTime() {
     if (finishTimeBegin < 0) {
       throw new BadRequestException("finishTimeBegin must be greater than 0");
@@ -205,6 +300,10 @@ public class ApplicationsRequestBuilder {
     }
   }
 
+  /**
+   * 完成参数校验，构造并返回标准的获取应用列表请求对象。
+   * @return 填充好所有过滤条件的GetApplicationsRequest实例
+   */
   public GetApplicationsRequest build() {
     validate();
     GetApplicationsRequest request = GetApplicationsRequest.newInstance();

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,6 +48,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 
+/**
+ * YARN Router Web UI 基础区块抽象基类，提供联邦集群下多个子集群的页面构建基础能力
+ * 为Router的各个Web页面区块提供通用工具方法和数据获取能力
+ */
 public abstract class RouterBlock extends HtmlBlock {
 
   private final Router router;
@@ -56,6 +61,11 @@ public abstract class RouterBlock extends HtmlBlock {
 
   public static final String ROUTER = "router";
 
+  /**
+   * 构造RouterBlock，初始化依赖组件
+   * @param router Router服务实例
+   * @param ctx 视图上下文
+   */
   public RouterBlock(Router router, ViewContext ctx) {
     super(ctx);
     this.ctx = ctx;
@@ -65,9 +75,8 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Get RouterClusterMetrics Info.
-   *
-   * @return Router ClusterMetricsInfo.
+   * 获取Router聚合后的集群指标信息
+   * @return 聚合后的集群指标信息
    */
   protected ClusterMetricsInfo getRouterClusterMetricsInfo() {
     boolean isEnabled = isYarnFederationEnabled();
@@ -81,18 +90,17 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Get RouterClusterMetrics Info.
-   *
-   * @param webAppAddress webAppAddress.
-   * @return ClusterMetricsInfo.
+   * 根据指定地址获取集群指标信息
+   * @param webAppAddress 目标Web服务地址
+   * @return 集群指标信息
    */
   protected ClusterMetricsInfo getClusterMetricsInfo(String webAppAddress) {
-    // If webAppAddress is empty, we will return NULL.
+    // 如果地址为空直接返回null
     if (StringUtils.isBlank(webAppAddress)) {
       return null;
     }
 
-    // We will get ClusterMetricsInfo By webAppAddress.
+    // 创建REST客户端调用指标接口
     Client client = RouterWebServiceUtil.createJerseyClient(conf);
     ClusterMetricsInfo metrics = RouterWebServiceUtil
         .genericForward(webAppAddress, null, ClusterMetricsInfo.class, HTTPMethods.GET,
@@ -103,20 +111,18 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Get a list of subclusters.
-   *
-   * @return subcluster List.
+   * 获取所有子集群信息列表，按子集群ID排序
+   * @return 所有子集群信息列表
    */
   protected List<SubClusterInfo> getSubClusterInfoList() {
     List<SubClusterInfo> subClusters = new ArrayList<>();
     try {
       Map<SubClusterId, SubClusterInfo> subClustersInfo = facade.getSubClusters(true);
-      // Sort the SubClusters.
+      // 将所有子集群加入列表并按ID排序
       subClusters.addAll(subClustersInfo.values());
       Comparator<? super SubClusterInfo> cmp = Comparator.comparing(o -> o.getSubClusterId());
       Collections.sort(subClusters, cmp);
 
-      // Return results
       return subClusters;
     } catch (YarnException e) {
       LOG.error("getSubClusterInfoList error.", e);
@@ -125,9 +131,8 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Whether Yarn Federation is enabled.
-   *
-   * @return true, enable yarn federation; false, not enable yarn federation;
+   * 检查YARN联邦模式是否启用
+   * @return true表示已启用联邦，false表示未启用
    */
   protected boolean isYarnFederationEnabled() {
     boolean isEnabled = conf.getBoolean(
@@ -137,9 +142,8 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Get a list of SubClusterIds for ActiveSubClusters.
-   *
-   * @return list of SubClusterIds.
+   * 获取所有活跃子集群的ID列表
+   * @return 活跃子集群ID列表
    */
   protected List<String> getActiveSubClusterIds() {
     List<String> result = new ArrayList<>();
@@ -155,10 +159,9 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * init SubCluster MetricsOverviewTable.
-   *
-   * @param html HTML Object.
-   * @param subclusterId subClusterId
+   * 初始化指定子集群的指标概览表格
+   * @param html HTML块对象
+   * @param subclusterId 目标子集群ID
    */
   protected void initSubClusterMetricsOverviewTable(Block html, String subclusterId) {
     MetricsOverviewTable metricsOverviewTable = new MetricsOverviewTable(this.router, this.ctx);
@@ -166,10 +169,9 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Get ClusterMetricsInfo By SubClusterId.
-   *
-   * @param subclusterId subClusterId
-   * @return SubCluster RM ClusterMetricsInfo
+   * 根据子集群ID获取对应子集群RM的指标信息
+   * @param subclusterId 目标子集群ID
+   * @return 子集群指标信息，获取失败返回null
    */
   protected ClusterMetricsInfo getClusterMetricsInfoBySubClusterId(String subclusterId) {
     try {
@@ -177,7 +179,7 @@ public abstract class RouterBlock extends HtmlBlock {
       SubClusterInfo subClusterInfo = facade.getSubCluster(subClusterId);
       if (subClusterInfo != null) {
         Client client = RouterWebServiceUtil.createJerseyClient(this.conf);
-        // Call the RM interface to obtain schedule information
+        // 调用子集群RM接口获取指标信息
         String webAppAddress =  WebAppUtils.getHttpSchemePrefix(this.conf) +
             subClusterInfo.getRMWebServiceAddress();
         ClusterMetricsInfo metrics = RouterWebServiceUtil
@@ -194,10 +196,9 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Get SubClusterInfo based on subclusterId.
-   *
-   * @param subclusterId subCluster Id
-   * @return SubClusterInfo Collection
+   * 根据子集群ID获取对应子集群信息
+   * @param subclusterId 目标子集群ID
+   * @return 仅包含目标子集群的单元素集合，获取失败返回null
    */
   protected Collection<SubClusterInfo> getSubClusterInfoList(String subclusterId) {
     try {
@@ -210,15 +211,18 @@ public abstract class RouterBlock extends HtmlBlock {
     return null;
   }
 
+  /**
+   * 获取联邦状态存储门面实例
+   * @return 联邦状态存储门面实例
+   */
   public FederationStateStoreFacade getFacade() {
     return facade;
   }
 
   /**
-   * Initialize the Nodes menu.
-   *
-   * @param mainList HTML Object.
-   * @param subClusterIds subCluster List.
+   * 初始化导航栏中的Nodes菜单，联邦模式下按子集群分组展示
+   * @param mainList 父级UL列表对象
+   * @param subClusterIds 活跃子集群ID列表
    */
   protected void initNodesMenu(Hamlet.UL<Hamlet.DIV<Hamlet>> mainList,
       List<String> subClusterIds) {
@@ -227,7 +231,7 @@ public abstract class RouterBlock extends HtmlBlock {
           mainList.li().a(url("nodes"), "Nodes").ul().
           $style("padding:0.3em 1em 0.1em 2em");
 
-      // ### nodes info
+      // 添加每个子集群的Nodes入口链接
       nodesList.li().__();
       for (String subClusterId : subClusterIds) {
         nodesList.li().a(url("nodes", subClusterId), subClusterId).__();
@@ -239,10 +243,9 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Initialize the Applications menu.
-   *
-   * @param mainList HTML Object.
-   * @param subClusterIds subCluster List.
+   * 初始化导航栏中的Applications菜单，联邦模式下按子集群+应用状态分组展示
+   * @param mainList 父级UL列表对象
+   * @param subClusterIds 活跃子集群ID列表
    */
   protected void initApplicationsMenu(Hamlet.UL<Hamlet.DIV<Hamlet>> mainList,
       List<String> subClusterIds) {
@@ -256,6 +259,7 @@ public abstract class RouterBlock extends HtmlBlock {
         Hamlet.UL<Hamlet.LI<Hamlet.UL<Hamlet.LI<Hamlet.UL<Hamlet.DIV<Hamlet>>>>>> subAppStates =
             subClusterList.ul().$style("padding:0.3em 1em 0.1em 2em");
         subAppStates.li().__();
+        // 为每个应用状态添加筛选链接
         for (YarnApplicationState state : YarnApplicationState.values()) {
           subAppStates.
               li().a(url("apps", subClusterId, state.toString()), state.toString()).__();
@@ -270,10 +274,9 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Initialize the NodeLabels menu.
-   *
-   * @param mainList HTML Object.
-   * @param subClusterIds subCluster List.
+   * 初始化导航栏中的Node Labels菜单，联邦模式下按子集群分组展示
+   * @param mainList 父级UL列表对象
+   * @param subClusterIds 活跃子集群ID列表
    */
   protected void initNodeLabelsMenu(Hamlet.UL<Hamlet.DIV<Hamlet>> mainList,
       List<String> subClusterIds) {
@@ -283,7 +286,7 @@ public abstract class RouterBlock extends HtmlBlock {
           mainList.li().a(url("nodelabels"), "Node Labels").ul().
           $style("padding:0.3em 1em 0.1em 2em");
 
-      // ### nodelabels info
+      // 添加每个子集群的Node Labels入口链接
       nodesList.li().__();
       for (String subClusterId : subClusterIds) {
         nodesList.li().a(url("nodelabels", subClusterId), subClusterId).__();
@@ -295,17 +298,16 @@ public abstract class RouterBlock extends HtmlBlock {
   }
 
   /**
-   * Generate SubClusterInfo based on local cluster information.
-   *
-   * @param config Configuration.
-   * @return SubClusterInfo.
+   * 根据本地集群信息生成SubClusterInfo对象，用于非联邦模式兼容
+   * @param config 配置对象
+   * @return 本地集群对应的SubClusterInfo，获取失败返回null
    */
   protected SubClusterInfo getSubClusterInfoByLocalCluster(Configuration config) {
 
     Client client = null;
     try {
 
-      // Step1. Retrieve the name of the local cluster and ClusterMetricsInfo.
+      // 第一步：获取本地集群名称和指标信息
       String localClusterName = config.get(YarnConfiguration.RM_CLUSTER_ID, UNAVAILABLE);
       String webAppAddress = WebAppUtils.getRMWebAppURLWithScheme(config);
       String rmWebAppURLWithoutScheme = WebAppUtils.getRMWebAppURLWithoutScheme(config);
@@ -319,7 +321,7 @@ public abstract class RouterBlock extends HtmlBlock {
         return null;
       }
 
-      // Step2. Retrieve cluster information for the local cluster to obtain its startup time.
+      // 第二步：获取本地集群基本信息，获取启动时间
       ClusterInfo clusterInfo = RouterWebServiceUtil.genericForward(webAppAddress, null,
           ClusterInfo.class, HTTPMethods.GET, RMWSConsts.RM_WEB_SERVICE_PATH + RMWSConsts.INFO,
           null, null, config, client);
@@ -328,14 +330,14 @@ public abstract class RouterBlock extends HtmlBlock {
         return null;
       }
 
-      // Step3. Get Local-Cluster Capability
+      // 第三步：将集群指标序列化为JSON字符串作为子集群能力描述
       JettisonJaxbContext jc = new JettisonJaxbContext(ClusterMetricsInfo.class);
       JettisonMarshaller marshaller = jc.createJsonMarshaller();
       StringWriter writer = new StringWriter();
       marshaller.marshallToJSON(clusterMetricsInfos, writer);
       String capability = writer.toString();
 
-      // Step4. Generate SubClusterInfo.
+      // 第四步：构造SubClusterInfo对象返回
       SubClusterId subClusterId = SubClusterId.newInstance(localClusterName);
       SubClusterInfo subClusterInfo = SubClusterInfo.newInstance(subClusterId,
           rmWebAppURLWithoutScheme, SubClusterState.SC_RUNNING, clusterInfo.getStartedOn(),

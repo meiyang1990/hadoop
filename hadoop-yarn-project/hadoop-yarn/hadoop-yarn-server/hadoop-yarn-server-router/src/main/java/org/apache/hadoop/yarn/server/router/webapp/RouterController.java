@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -23,7 +24,7 @@ import org.apache.hadoop.yarn.webapp.Controller;
 import com.google.inject.Inject;
 
 /**
- * Controller for the Router Web UI.
+ * YARN Router Web UI 控制器，处理Router前端页面的请求分发与渲染
  */
 public class RouterController extends Controller {
 
@@ -38,25 +39,40 @@ public class RouterController extends Controller {
     render(AboutPage.class);
   }
 
+  /**
+   * 处理集群信息页面请求，渲染关于页面
+   */
   public void about() {
     setTitle("About the Cluster");
     render(AboutPage.class);
   }
 
+  /**
+   * 处理联邦信息页面请求，渲染联邦页面
+   */
   public void federation() {
     render(FederationPage.class);
   }
 
+  /**
+   * 处理应用列表页面请求，渲染应用列表页面
+   */
   public void apps() {
     setTitle("Applications");
     render(AppsPage.class);
   }
 
+  /**
+   * 处理节点列表页面请求，渲染节点列表页面
+   */
   public void nodes() {
     setTitle("Nodes");
     render(NodesPage.class);
   }
 
+  /**
+   * 处理节点标签页面请求，渲染节点标签页面
+   */
   public void nodeLabels() {
     setTitle("Node Labels");
     render(NodeLabelsPage.class);

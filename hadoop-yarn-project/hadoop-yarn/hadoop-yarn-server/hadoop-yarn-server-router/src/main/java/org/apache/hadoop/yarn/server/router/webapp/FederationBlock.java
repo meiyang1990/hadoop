@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,6 +43,9 @@ import com.google.inject.Inject;
 import org.glassfish.jersey.jettison.JettisonJaxbContext;
 import org.glassfish.jersey.jettison.JettisonUnmarshaller;
 
+/**
+ * YARN联邦Router WebUI的子集群信息展示块，负责渲染所有子集群的概览信息表格
+ */
 class FederationBlock extends RouterBlock {
 
   private final Router router;
@@ -54,18 +58,18 @@ class FederationBlock extends RouterBlock {
 
   @Override
   public void render(Block html) {
-
+    // 检查YARN联邦是否启用
     boolean isEnabled = isYarnFederationEnabled();
 
-    // init Html Page Federation
+    // 初始化联邦页面HTML
     initHtmlPageFederation(html, isEnabled);
   }
 
   /**
-   * Parse the capability and obtain the metric information of the cluster.
+   * 从RM返回的指标JSON中解析出集群指标信息.
    *
-   * @param capability metric json obtained from RM.
-   * @return ClusterMetricsInfo Object
+   * @param capability 从RM获取的指标JSON字符串
+   * @return 解析后的集群指标对象
    */
   protected ClusterMetricsInfo getClusterMetricsInfo(String capability) {
     try {
@@ -83,35 +87,34 @@ class FederationBlock extends RouterBlock {
   }
 
   /**
-   * Initialize the subCluster details JavaScript of the Federation page.
+   * 初始化联邦页面子集群详情展示所需的JavaScript.
+   * 该JS脚本负责处理用户点击子集群ID时，展示/隐藏子集群详情信息的逻辑
+   * 会将所有子集群的详细指标数据传递给前端JS用于展示
    *
-   * This part of the js script will control to display or hide the detailed information
-   * of the subCluster when the user clicks on the subClusterId.
-   *
-   * We will obtain the specific information of a SubCluster,
-   * including the information of Applications, Resources, and Nodes.
-   *
-   * @param html html object
-   * @param subClusterDetailMap subCluster Detail Map
+   * @param html html对象
+   * @param subClusterDetailMap 子集群详情数据列表
    */
   private void initFederationSubClusterDetailTableJs(Block html,
       List<Map<String, String>> subClusterDetailMap) {
     Gson gson = new Gson();
+    // 将子集群详情数据转为JSON注入页面供前端使用
     html.script().$type("text/javascript").
         __(" var scTableData = " + gson.toJson(subClusterDetailMap) + "; ")
         .__();
+    // 加载联邦页面前端处理脚本
     html.script(root_url("static/federation/federation.js"));
   }
 
   /**
-   * Initialize the Html page.
+   * 初始化联邦页面HTML结构.
    *
-   * @param html html object
+   * @param html html对象
+   * @param isEnabled YARN联邦是否启用
    */
   private void initHtmlPageFederation(Block html, boolean isEnabled) {
     List<Map<String, String>> lists = new ArrayList<>();
 
-    // Table header
+    // 创建表格表头
     TBODY<TABLE<Hamlet>> tbody =
         html.table("#rms").$class("cell-border").$style("width:100%").thead().tr()
         .th(".id", "SubCluster")
@@ -124,27 +127,29 @@ class FederationBlock extends RouterBlock {
 
     try {
       if (isEnabled) {
+        // 联邦启用，加载所有子集群信息
         initSubClusterPage(tbody, lists);
       } else {
+        // 联邦未启用，仅展示本集群信息
         initLocalClusterPage(tbody, lists);
       }
     } catch (Exception e) {
       LOG.error("Cannot render Router Federation.", e);
     }
 
-    // Init FederationBlockTableJs
+    // 初始化前端交互JS
     initFederationSubClusterDetailTableJs(html, lists);
 
-    // Tips
+    // 添加提示信息
     tbody.__().__().div().p().$style("color:red")
         .__("*The application counts are local per subcluster").__().__();
   }
 
   /**
-   * Initialize the Federation page of the local-cluster.
+   * 初始化本集群的页面展示（联邦未启用场景）.
    *
-   * @param tbody HTML tbody.
-   * @param lists subCluster page data list.
+   * @param tbody HTML表格body
+   * @param lists 子集群页面数据列表
    */
   private void initLocalClusterPage(TBODY<TABLE<Hamlet>> tbody, List<Map<String, String>> lists) {
     Configuration config = this.router.getConfig();
@@ -159,17 +164,16 @@ class FederationBlock extends RouterBlock {
   }
 
   /**
-   * Initialize the Federation page of the sub-cluster.
+   * 初始化所有子集群的页面展示（联邦启用场景）.
    *
-   * @param tbody HTML tbody.
-   * @param lists subCluster page data list.
+   * @param tbody HTML表格body
+   * @param lists 子集群页面数据列表
    */
   private void initSubClusterPage(TBODY<TABLE<Hamlet>> tbody, List<Map<String, String>> lists) {
-    // Sort the SubClusters
+    // 获取排序后的子集群列表
     List<SubClusterInfo> subClusters = getSubClusterInfoList();
 
-    // Iterate through the sub-clusters and display data for each sub-cluster.
-    // If a sub-cluster cannot display data, skip it.
+    // 遍历所有子集群，逐个渲染数据，遇到异常跳过该子集群
     for (SubClusterInfo subCluster : subClusters) {
       try {
         initSubClusterPageItem(tbody, subCluster, lists);
@@ -180,22 +184,22 @@ class FederationBlock extends RouterBlock {
   }
 
   /**
-   * We will initialize the specific SubCluster's data within this method.
+   * 初始化单个子集群的页面数据行.
    *
-   * @param tbody HTML TBody.
-   * @param subClusterInfo Sub-cluster information.
-   * @param lists Used to record data that needs to be displayed in JS.
+   * @param tbody HTML表格body
+   * @param subClusterInfo 子集群信息
+   * @param lists 用于记录需要传递给前端JS展示的数据
    */
   private void initSubClusterPageItem(TBODY<TABLE<Hamlet>> tbody,
       SubClusterInfo subClusterInfo, List<Map<String, String>> lists) {
 
     Map<String, String> subClusterMap = new HashMap<>();
 
-    // Prepare subCluster
+    // 获取子集群ID
     SubClusterId subClusterId = subClusterInfo.getSubClusterId();
     String subClusterIdText = subClusterId.getId();
 
-    // Prepare WebAppAddress
+    // 构建子集群RM Web服务链接
     String webAppAddress = subClusterInfo.getRMWebServiceAddress();
     String herfWebAppAddress = "";
     if (webAppAddress != null && !webAppAddress.isEmpty()) {
@@ -203,7 +207,7 @@ class FederationBlock extends RouterBlock {
           WebAppUtils.getHttpSchemePrefix(this.router.getConfig()) + webAppAddress;
     }
 
-    // Prepare Capability
+    // 解析子集群指标信息
     String capability = subClusterInfo.getCapability();
     ClusterMetricsInfo subClusterMetricsInfo = getClusterMetricsInfo(capability);
 
@@ -211,28 +215,29 @@ class FederationBlock extends RouterBlock {
       return;
     }
 
-    // Prepare LastStartTime & LastHeartBeat
+    // 格式化启动时间和最后心跳时间
     Date lastStartTime = new Date(subClusterInfo.getLastStartTime());
     Date lastHeartBeat = new Date(subClusterInfo.getLastHeartBeat());
 
-    // Prepare Resource
+    // 格式化总资源信息
     long totalMB = subClusterMetricsInfo.getTotalMB();
     String totalMBDesc = StringUtils.byteDesc(totalMB * BYTES_IN_MB);
     long totalVirtualCores = subClusterMetricsInfo.getTotalVirtualCores();
     String resources = String.format("<memory:%s, vCores:%s>", totalMBDesc, totalVirtualCores);
 
-    // Prepare Node
+    // 格式化节点信息
     long totalNodes = subClusterMetricsInfo.getTotalNodes();
     long activeNodes = subClusterMetricsInfo.getActiveNodes();
     String nodes = String.format("<totalNodes:%s, activeNodes:%s>", totalNodes, activeNodes);
 
-    // Prepare HTML Table
+    // 根据子集群状态设置不同字体颜色（运行中绿色，异常红色）
     String stateStyle = "color:#dc3545;font-weight:bolder";
     SubClusterState state = subClusterInfo.getState();
     if (SubClusterState.SC_RUNNING == state) {
       stateStyle = "color:#28a745;font-weight:bolder";
     }
 
+    // 添加表格行
     tbody.tr().$id(subClusterIdText)
         .td().$class("details-control").a(herfWebAppAddress, subClusterIdText).__()
         .td().$style(stateStyle).__(state.name()).__()
@@ -242,7 +247,7 @@ class FederationBlock extends RouterBlock {
         .td(nodes)
         .__();
 
-    // Formatted memory information
+    // 格式化各类内存指标
     long allocatedMB = subClusterMetricsInfo.getAllocatedMB();
     String allocatedMBDesc = StringUtils.byteDesc(allocatedMB * BYTES_IN_MB);
     long availableMB = subClusterMetricsInfo.getAvailableMB();
@@ -252,6 +257,7 @@ class FederationBlock extends RouterBlock {
     long reservedMB = subClusterMetricsInfo.getReservedMB();
     String reservedMBDesc = StringUtils.byteDesc(reservedMB * BYTES_IN_MB);
 
+    // 将详细信息存入Map供前端JS展开详情使用
     subClusterMap.put("totalmemory", totalMBDesc);
     subClusterMap.put("allocatedmemory", allocatedMBDesc);
     subClusterMap.put("availablememory", availableMBDesc);

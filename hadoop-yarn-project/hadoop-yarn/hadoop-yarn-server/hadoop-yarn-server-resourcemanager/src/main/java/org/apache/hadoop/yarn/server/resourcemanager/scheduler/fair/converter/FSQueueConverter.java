@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,29 +36,47 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.policies.Fif
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
- * Converts a Fair Schedule queue hierarchy to Capacity Scheduler
- * configuration.
+ * 将Fair Scheduler队列层次结构转换为Capacity Scheduler配置。
+ * 用于从公平调度器迁移到容量调度器时自动完成配置转换。
  *
  */
 public class FSQueueConverter {
+  /** AM资源占比禁用标记值 */
   public static final float QUEUE_MAX_AM_SHARE_DISABLED = -1.0f;
+  /** 最大运行应用数未设置标记 */
   private static final int MAX_RUNNING_APPS_UNSET = Integer.MAX_VALUE;
+  /** 公平策略名称常量 */
   private static final String FAIR_POLICY = "fair";
+  /** FIFO策略名称常量 */
   private static final String FIFO_POLICY = "fifo";
 
+  /** 规则处理处理器，用于处理不兼容配置并输出警告/错误 */
   private final FSConfigToCSConfigRuleHandler ruleHandler;
+  /** 容量调度器配置对象，用于写入转换后的配置 */
   private CapacitySchedulerConfiguration capacitySchedulerConfig;
+  /** 全局抢占是否启用 */
   private final boolean preemptionEnabled;
+  /** 是否启用基于大小的权重计算 */
   private final boolean sizeBasedWeight;
+  /** 集群总资源 */
   @SuppressWarnings("unused")
   private final Resource clusterResource;
+  /** 队列AM资源占比默认值 */
   private final float queueMaxAMShareDefault;
+  /** 队列最大运行应用数默认值 */
   private final int queueMaxAppsDefault;
+  /** 是否使用DRF策略 */
   private final boolean drfUsed;
+  /** 是否使用百分比方式转换容量 */
   private final boolean usePercentages;
 
+  /** 转换选项，包含错误处理等配置 */
   private ConversionOptions conversionOptions;
 
+  /**
+   * 通过Builder构造FSQueueConverter实例。
+   * @param builder 构建器对象
+   */
   public FSQueueConverter(FSQueueConverterBuilder builder) {
     this.ruleHandler = builder.ruleHandler;
     this.capacitySchedulerConfig = builder.capacitySchedulerConfig;
@@ -71,6 +90,10 @@ public class FSQueueConverter {
     this.usePercentages = builder.usePercentages;
   }
 
+  /**
+   * 递归转换整个队列层次结构。
+   * @param queue 当前处理队列
+   */
   public void convertQueueHierarchy(FSQueue queue) {
     List<FSQueue> children = queue.getChildQueues();
     final String queueName = queue.getName();
@@ -94,9 +117,9 @@ public class FSQueueConverter {
   }
 
   /**
-   * Generates yarn.scheduler.capacity.&lt;queue-name&gt;.queues.
-   * @param queueName
-   * @param children
+   * 生成子队列列表配置：yarn.scheduler.capacity.&lt;queue-name&gt;.queues.
+   * @param queueName 当前队列名称
+   * @param children 子队列列表
    */
   private void emitChildQueues(String queueName, List<FSQueue> children) {
     ruleHandler.handleChildQueueCount(queueName, children.size());
@@ -111,10 +134,10 @@ public class FSQueueConverter {
   }
 
   /**
-   * &lt;maxAMShare&gt; 
-   * ==> yarn.scheduler.capacity.&lt;queue-name&gt;.maximum-am-resource-percent.
-   * @param queueName
-   * @param queue
+   * 转换maxAMShare配置到maximum-am-resource-percent。
+   * &lt;maxAMShare&gt; ==> yarn.scheduler.capacity.&lt;queue-name&gt;.maximum-am-resource-percent.
+   * @param queueName 队列名称
+   * @param queue 队列对象
    */
   private void emitMaxAMShare(String queueName, FSQueue queue) {
     float queueMaxAmShare = queue.getMaxAMShare();
@@ -135,10 +158,10 @@ public class FSQueueConverter {
   }
 
   /**
-   * &lt;maxRunningApps&gt;
-   * ==> yarn.scheduler.capacity.&lt;queue-name&gt;.max-parallel-apps.
-   * @param queueName
-   * @param queue
+   * 转换maxRunningApps到max-parallel-apps配置。
+   * &lt;maxRunningApps&gt; ==> yarn.scheduler.capacity.&lt;queue-name&gt;.max-parallel-apps.
+   * @param queueName 队列名称
+   * @param queue 队列对象
    */
   private void emitMaxParallelApps(String queueName, FSQueue queue) {
     if (queue.getMaxRunningApps() != MAX_RUNNING_APPS_UNSET
@@ -149,10 +172,10 @@ public class FSQueueConverter {
   }
 
   /**
-   * &lt;maxResources&gt;
-   * ==> yarn.scheduler.capacity.&lt;queue-name&gt;.maximum-capacity.
-   * @param queueName
-   * @param queue
+   * 转换maxResources到maximum-capacity配置。
+   * &lt;maxResources&gt; ==> yarn.scheduler.capacity.&lt;queue-name&gt;.maximum-capacity.
+   * @param queueName 队列名称
+   * @param queue 队列对象
    */
   private void emitMaximumCapacity(String queueName, FSQueue queue) {
     ConfigurableResource rawMaxShare = queue.getRawMaxShare();
@@ -168,11 +191,10 @@ public class FSQueueConverter {
   }
 
   /**
-   * &lt;maxContainerAllocation&gt;
-   * ==> yarn.scheduler.capacity.&lt;queue-name&gt;.maximum-allocation-mb
-   * / vcores.
-   * @param queueName
-   * @param queue
+   * 转换maxContainerAllocation到队列最大容器分配配置。
+   * &lt;maxContainerAllocation&gt; ==> yarn.scheduler.capacity.&lt;queue-name&gt;.maximum-allocation-mb / vcores.
+   * @param queueName 队列名称
+   * @param queue 队列对象
    */
   private void emitMaxAllocations(String queueName, FSQueue queue) {
     Resource maxAllocation = queue.getMaximumContainerAllocation();
@@ -193,7 +215,7 @@ public class FSQueueConverter {
       int maxVcores = maxAllocation.getVirtualCores();
       long maxMemory = maxAllocation.getMemorySize();
 
-      // only emit max allocation if it differs from the parent's setting
+      // 仅当和父配置不同时才生成配置
       if (maxVcores != parentMaxVcores || maxMemory != parentMaxMemory) {
         capacitySchedulerConfig.setQueueMaximumAllocationMb(
             new QueuePath(queueName), (int) maxMemory);
@@ -205,10 +227,10 @@ public class FSQueueConverter {
   }
 
   /**
-   * &lt;allowPreemptionFrom&gt;
-   * ==> yarn.scheduler.capacity.&lt;queue-name&gt;.disable_preemption.
-   * @param queueName
-   * @param queue
+   * 转换allowPreemptionFrom到disable_preemption配置。
+   * &lt;allowPreemptionFrom&gt; ==> yarn.scheduler.capacity.&lt;queue-name&gt;.disable_preemption.
+   * @param queueName 队列名称
+   * @param queue 队列对象
    */
   private void emitPreemptionDisabled(String queueName, FSQueue queue) {
     if (preemptionEnabled && !queue.isPreemptable()) {
@@ -216,6 +238,11 @@ public class FSQueueConverter {
     }
   }
 
+  /**
+   * 为叶子队列设置默认userLimitFactor为-1（关闭用户限制）。
+   * @param queueName 队列名称
+   * @param children 子队列列表
+   */
   public void emitDefaultUserLimitFactor(String queueName, List<FSQueue> children) {
     if (children.isEmpty() &&
             !capacitySchedulerConfig.isAutoQueueCreationV2Enabled(new QueuePath(queueName))) {
@@ -224,10 +251,9 @@ public class FSQueueConverter {
   }
 
   /**
-   * yarn.scheduler.fair.sizebasedweight ==>
-   * yarn.scheduler.capacity.&lt;queue-path&gt;
-   * .ordering-policy.fair.enable-size-based-weight.
-   * @param queueName
+   * 转换基于大小的权重配置到容量调度器对应配置。
+   * yarn.scheduler.fair.sizebasedweight ==> yarn.scheduler.capacity.&lt;queue-path&gt;.ordering-policy.fair.enable-size-based-weight.
+   * @param queueName 队列名称
    */
   private void emitSizeBasedWeight(String queueName) {
     if (sizeBasedWeight) {
@@ -237,10 +263,10 @@ public class FSQueueConverter {
   }
 
   /**
-   * &lt;schedulingPolicy&gt;
-   * ==> yarn.scheduler.capacity.&lt;queue-path&gt;.ordering-policy.
-   * @param queueName
-   * @param queue
+   * 转换调度策略到容量调度器排序策略配置。
+   * &lt;schedulingPolicy&gt; ==> yarn.scheduler.capacity.&lt;queue-path&gt;.ordering-policy.
+   * @param queueName 队列名称
+   * @param queue 队列对象
    */
   private void emitOrderingPolicy(String queueName, FSQueue queue) {
     if (queue instanceof FSLeafQueue) {
@@ -268,9 +294,9 @@ public class FSQueueConverter {
   }
 
   /**
-   * weight + minResources
-   * ==> yarn.scheduler.capacity.&lt;queue-name&gt;.capacity.
-   * @param queue
+   * 将权重和最小资源转换为容量调度器容量配置。
+   * weight + minResources ==> yarn.scheduler.capacity.&lt;queue-name&gt;.capacity.
+   * @param queue 当前队列
    */
   private void emitChildCapacity(FSQueue queue) {
     CapacityConverter converter =
@@ -285,9 +311,9 @@ public class FSQueueConverter {
   }
 
   /**
-   * Missing feature, "leaf-queue-template.capacity" only accepts a single
-   * pct value.
-   * @param queue
+   * 检查子队列最大资源配置，该配置不被容量调度器支持，输出警告。
+   * 容量调度器leaf-queue-template.capacity仅接受单个百分比值，不支持maxChildQueueResource。
+   * @param queue 当前队列
    */
   private void checkMaxChildCapacitySetting(FSQueue queue) {
     if (queue.getMaxChildQueueResource() != null) {
@@ -295,17 +321,27 @@ public class FSQueueConverter {
 
       if ((resource != null && isNotUnboundedResource(resource))
           || queue.getMaxChildQueueResource().getPercentages() != null) {
-        // Maximum child resource is defined
+        // 定义了最大子资源，容量调度器不支持该特性，通知处理器
         ruleHandler.handleMaxChildCapacity();
       }
     }
   }
 
+  /**
+   * 从全路径队列名提取短名称（最后一个点后的部分）。
+   * @param queueName 全路径队列名
+   * @return 队列短名称
+   */
   private String getQueueShortName(String queueName) {
     int lastDot = queueName.lastIndexOf(".");
     return queueName.substring(lastDot + 1);
   }
 
+  /**
+   * 判断资源是否不是无限资源。
+   * @param res 待判断资源对象
+   * @return true表示不是无限资源，false表示是无限资源
+   */
   private boolean isNotUnboundedResource(Resource res) {
     return Resources.unbounded().compareTo(res) != 0;
   }

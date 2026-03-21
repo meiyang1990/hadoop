@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -66,134 +67,114 @@ import org.apache.hadoop.yarn.webapp.dao.SchedConfUpdateInfo;
 
 /**
  * <p>
- * The protocol between clients and the <code>ResourceManager</code> to
- * submit/abort jobs and to get information on applications, cluster metrics,
- * nodes, queues, ACLs and reservations via REST calls.
+ * ResourceManager REST Web服务接口协议，定义了客户端通过REST调用与RM交互的所有API端点，
+ * 包括应用提交管理、集群信息查询、节点标签管理、队列管理、资源预留等功能。
  * </p>
  *
- * The WebService is reachable by using {@link RMWSConsts#RM_WEB_SERVICE_PATH}
+ * 该Web服务可通过{@link RMWSConsts#RM_WEB_SERVICE_PATH}访问
  */
 @Private
 @Evolving
 public interface RMWebServiceProtocol {
 
   /**
-   * This method retrieves the cluster information, and it is reachable by using
-   * {@link RMWSConsts#INFO}.
+   * 获取集群基本信息，可通过{@link RMWSConsts#INFO}访问
    *
-   * @return the cluster information
+   * @return 集群基本信息对象
    */
   ClusterInfo get();
 
   /**
-   * This method retrieves the cluster information, and it is reachable by using
-   * {@link RMWSConsts#INFO}.
+   * 获取集群基本信息，可通过{@link RMWSConsts#INFO}访问
    *
-   * @return the cluster information
+   * @return 集群基本信息对象
    */
   ClusterInfo getClusterInfo();
 
 
   /**
-   * This method retrieves the cluster user information, and it is reachable by using
-   * {@link RMWSConsts#CLUSTER_USER_INFO}.
+   * 获取当前请求用户的集群用户信息，可通过{@link RMWSConsts#CLUSTER_USER_INFO}访问
    *
-   * @param hsr the servlet request
-   * @return the cluster user information
+   * @param hsr HTTP Servlet请求对象
+   * @return 当前用户的集群信息对象
    */
   ClusterUserInfo getClusterUserInfo(HttpServletRequest hsr);
 
   /**
-   * This method retrieves the cluster metrics information, and it is reachable
-   * by using {@link RMWSConsts#METRICS}.
+   * 获取集群 metrics 指标信息，可通过{@link RMWSConsts#METRICS}访问
    *
    * @see ApplicationClientProtocol#getClusterMetrics
-   * @return the cluster metrics information
+   * @return 集群 metrics 指标对象
    */
   ClusterMetricsInfo getClusterMetricsInfo();
 
   /**
-   * This method retrieves the current scheduler status, and it is reachable by
-   * using {@link RMWSConsts#SCHEDULER}.
+   * 获取当前调度器类型信息，可通过{@link RMWSConsts#SCHEDULER}访问
    *
-   * @return the current scheduler status
+   * @return 当前调度器类型信息对象
    */
   SchedulerTypeInfo getSchedulerInfo();
 
   /**
-   * This method dumps the scheduler logs for the time got in input, and it is
-   * reachable by using {@link RMWSConsts#SCHEDULER_LOGS}.
+   * 导出指定时间段内的调度器日志，可通过{@link RMWSConsts#SCHEDULER_LOGS}访问
    *
-   * @param time the period of time. It is a FormParam.
-   * @param hsr the servlet request
-   * @return the result of the operation
-   * @throws IOException when it cannot create dump log file
+   * @param time 导出日志的时间范围（FormParam参数）
+   * @param hsr HTTP Servlet请求对象
+   * @return 操作结果字符串
+   * @throws IOException 无法创建日志转储文件时抛出
    */
   String dumpSchedulerLogs(String time, HttpServletRequest hsr)
       throws IOException;
 
   /**
-   * This method retrieves all the nodes information in the cluster, and it is
-   * reachable by using {@link RMWSConsts#NODES}.
+   * 获取集群所有节点信息，可按节点状态过滤，可通过{@link RMWSConsts#NODES}访问
    *
    * @see ApplicationClientProtocol#getClusterNodes
-   * @param states the states we want to filter. It is a QueryParam.
-   * @return all nodes in the cluster. If the states param is given, returns all
-   *         nodes that are in the comma-separated list of states
+   * @param states 过滤节点状态，逗号分隔的状态列表（QueryParam参数）
+   * @return 节点信息集合，若传入states参数则只返回对应状态的节点
    */
   NodesInfo getNodes(String states);
 
   /**
-   * This method retrieves a specific node information, and it is reachable by
-   * using {@link RMWSConsts#NODES_NODEID}.
+   * 获取指定节点的详细信息，可通过{@link RMWSConsts#NODES_NODEID}访问
    *
-   * @param nodeId the node we want to retrieve the information. It is a
-   *          PathParam.
-   * @return the information about the node in input
+   * @param nodeId 目标节点ID（PathParam参数）
+   * @return 指定节点的详细信息对象
    */
   NodeInfo getNode(String nodeId);
 
   /**
-   * This method changes the resources of a specific node, and it is reachable
-   * by using {@link RMWSConsts#NODE_RESOURCE}.
+   * 更新指定节点可分配资源量，可通过{@link RMWSConsts#NODE_RESOURCE}访问
    *
-   * @param hsr The servlet request.
-   * @param nodeId The node we want to retrieve the information for.
-   *               It is a PathParam.
-   * @param resourceOption The resource change.
-   * @throws AuthorizationException If the user is not authorized.
-   * @return the resources of a specific node.
+   * @param hsr HTTP Servlet请求对象
+   * @param nodeId 目标节点ID（PathParam参数）
+   * @param resourceOption 资源变更信息
+   * @return 更新后的节点资源信息
+   * @throws AuthorizationException 用户未授权时抛出
    */
   ResourceInfo updateNodeResource(HttpServletRequest hsr, String nodeId,
       ResourceOptionInfo resourceOption) throws AuthorizationException;
 
   /**
-   * This method retrieves all the app reports in the cluster, and it is
-   * reachable by using {@link RMWSConsts#APPS}.
+   * 获取集群中符合条件的应用列表，支持多维度过滤，可通过{@link RMWSConsts#APPS}访问
    *
    * @see ApplicationClientProtocol#getApplications
-   * @param hsr the servlet request
-   * @param stateQuery right now the stateQuery is deprecated. It is a
-   *          QueryParam.
-   * @param statesQuery filter the result by states. It is a QueryParam.
-   * @param finalStatusQuery filter the result by final states. It is a
-   *          QueryParam.
-   * @param userQuery filter the result by user. It is a QueryParam.
-   * @param queueQuery filter the result by queue. It is a QueryParam.
-   * @param count set a limit of the result. It is a QueryParam.
-   * @param startedBegin filter the result by started begin time. It is a
-   *          QueryParam.
-   * @param startedEnd filter the result by started end time. It is a
-   *          QueryParam.
-   * @param finishBegin filter the result by finish begin time. It is a
-   *          QueryParam.
-   * @param finishEnd filter the result by finish end time. It is a QueryParam.
-   * @param applicationTypes filter the result by types. It is a QueryParam.
-   * @param applicationTags filter the result by tags. It is a QueryParam.
-   * @param name filter the name of the application. It is a QueryParam.
-   * @param unselectedFields De-selected params to avoid from report. It is a
-   *          QueryParam.
-   * @return all apps in the cluster
+   * @param hsr HTTP Servlet请求对象
+   * @param stateQuery 已废弃的状态过滤参数（QueryParam参数）
+   * @param statesQuery 按应用状态过滤（QueryParam参数）
+   * @param finalStatusQuery 按应用最终状态过滤（QueryParam参数）
+   * @param userQuery 按提交用户过滤（QueryParam参数）
+   * @param queueQuery 按队列过滤（QueryParam参数）
+   * @param count 限制返回结果最大数量（QueryParam参数）
+   * @param startedBegin 按开始时间过滤，起始时间（QueryParam参数）
+   * @param startedEnd 按开始时间过滤，结束时间（QueryParam参数）
+   * @param finishBegin 按结束时间过滤，起始时间（QueryParam参数）
+   * @param finishEnd 按结束时间过滤，结束时间（QueryParam参数）
+   * @param applicationTypes 按应用类型过滤（QueryParam参数）
+   * @param applicationTags 按应用标签过滤（QueryParam参数）
+   * @param name 按应用名称过滤（QueryParam参数）
+   * @param unselectedFields 需要排除返回结果的字段（QueryParam参数）
+   * @return 符合过滤条件的应用列表
    */
   @SuppressWarnings("checkstyle:parameternumber")
   AppsInfo getApps(HttpServletRequest hsr, String stateQuery,
@@ -203,54 +184,41 @@ public interface RMWebServiceProtocol {
       Set<String> applicationTags, String name, Set<String> unselectedFields);
 
   /**
-   * This method retrieve all the activities in a specific node, and it is
-   * reachable by using {@link RMWSConsts#SCHEDULER_ACTIVITIES}.
+   * 获取指定节点上的调度活动列表，可通过{@link RMWSConsts#SCHEDULER_ACTIVITIES}访问
    *
-   * @param hsr the servlet request
-   * @param nodeId the node we want to retrieve the activities. It is a
-   *          QueryParam.
-   * @param groupBy the groupBy type by which the activities should be
-   *          aggregated. It is a QueryParam.
-   * @return all the activities in the specific node
+   * @param hsr HTTP Servlet请求对象
+   * @param nodeId 目标节点ID（QueryParam参数）
+   * @param groupBy 活动聚合分组方式（QueryParam参数）
+   * @return 指定节点的调度活动信息
    */
   ActivitiesInfo getActivities(HttpServletRequest hsr, String nodeId,
       String groupBy);
 
   /**
-   * This method retrieve the last n activities inside scheduler, and it is
-   * reachable by using {@link RMWSConsts#SCHEDULER_BULK_ACTIVITIES}.
+   * 获取最近N条调度器全局活动，可通过{@link RMWSConsts#SCHEDULER_BULK_ACTIVITIES}访问
    *
-   * @param hsr the servlet request
-   * @param groupBy the groupBy type by which the activities should be
-   *        aggregated. It is a QueryParam.
-   * @param activitiesCount number of activities
-   * @return last n activities
-   * @throws InterruptedException if interrupted.
+   * @param hsr HTTP Servlet请求对象
+   * @param groupBy 活动聚合分组方式（QueryParam参数）
+   * @param activitiesCount 需要返回的活动数量
+   * @return 最近N条调度活动信息
+   * @throws InterruptedException 线程被中断时抛出
    */
   BulkActivitiesInfo getBulkActivities(HttpServletRequest hsr,
       String groupBy, int activitiesCount) throws InterruptedException;
 
   /**
-   * This method retrieves all the activities for a specific app for a specific
-   * period of time, and it is reachable by using
-   * {@link RMWSConsts#SCHEDULER_APP_ACTIVITIES}.
+   * 获取指定应用在指定时间段内的所有调度活动，可通过{@link RMWSConsts#SCHEDULER_APP_ACTIVITIES}访问
    *
-   * @param hsr the servlet request
-   * @param appId the applicationId we want to retrieve the activities. It is a
-   *          QueryParam.
-   * @param time for how long we want to retrieve the activities. It is a
-   *          QueryParam.
-   * @param requestPriorities the request priorities we want to retrieve the
-   *          activities. It is a QueryParam.
-   * @param allocationRequestIds the allocation request ids we want to retrieve
-   *          the activities. It is a QueryParam.
-   * @param groupBy the groupBy type by which the activities should be
-   *          aggregated. It is a QueryParam.
-   * @param limit set a limit of the result. It is a QueryParam.
-   * @param actions the required actions of app activities. It is a QueryParam.
-   * @param summarize whether app activities in multiple scheduling processes
-   *          need to be summarized. It is a QueryParam.
-   * @return all the activities about a specific app for a specific time
+   * @param hsr HTTP Servlet请求对象
+   * @param appId 目标应用ID（QueryParam参数）
+   * @param time 查询的时间范围（QueryParam参数）
+   * @param requestPriorities 按请求优先级过滤（QueryParam参数）
+   * @param allocationRequestIds 按分配请求ID过滤（QueryParam参数）
+   * @param groupBy 活动聚合分组方式（QueryParam参数）
+   * @param limit 限制返回结果数量（QueryParam参数）
+   * @param actions 按活动动作过滤（QueryParam参数）
+   * @param summarize 是否聚合多个调度周期的活动（QueryParam参数）
+   * @return 指定应用指定时间范围的调度活动信息
    */
   AppActivitiesInfo getAppActivities(HttpServletRequest hsr, String appId,
       String time, Set<String> requestPriorities,
@@ -258,524 +226,143 @@ public interface RMWebServiceProtocol {
       Set<String> actions, boolean summarize);
 
   /**
-   * This method retrieves all the statistics for a specific app, and it is
-   * reachable by using {@link RMWSConsts#APP_STATISTICS}.
+   * 获取应用统计信息，可按状态和类型过滤，可通过{@link RMWSConsts#APP_STATISTICS}访问
    *
-   * @param hsr the servlet request
-   * @param stateQueries filter the result by states. It is a QueryParam.
-   * @param typeQueries filter the result by type names. It is a QueryParam.
-   * @return the application's statistics for specific states and types
+   * @param hsr HTTP Servlet请求对象
+   * @param stateQueries 按应用状态过滤（QueryParam参数）
+   * @param typeQueries 按应用类型过滤（QueryParam参数）
+   * @return 指定条件的应用统计信息
    */
   ApplicationStatisticsInfo getAppStatistics(HttpServletRequest hsr,
       Set<String> stateQueries, Set<String> typeQueries);
 
   /**
-   * This method retrieves the report for a specific app, and it is reachable by
-   * using {@link RMWSConsts#APPS_APPID}.
+   * 获取指定应用的详细报告信息，可通过{@link RMWSConsts#APPS_APPID}访问
    *
    * @see ApplicationClientProtocol#getApplicationReport
-   * @param hsr the servlet request
-   * @param appId the Id of the application we want the report. It is a
-   *          PathParam.
-   * @param unselectedFields De-selected param list to avoid from report. It is
-   *          a QueryParam.
-   * @return the app report for a specific application
+   * @param hsr HTTP Servlet请求对象
+   * @param appId 目标应用ID（PathParam参数）
+   * @param unselectedFields 需要排除返回结果的字段（QueryParam参数）
+   * @return 指定应用详细报告信息
    */
   AppInfo getApp(HttpServletRequest hsr, String appId,
       Set<String> unselectedFields);
 
   /**
-   * This method retrieves the state for a specific app, and it is reachable by
-   * using {@link RMWSConsts#APPS_APPID_STATE}.
+   * 获取指定应用当前状态，可通过{@link RMWSConsts#APPS_APPID_STATE}访问
    *
-   * @param hsr the servlet request
-   * @param appId the Id of the application we want the state. It is a
-   *          PathParam.
-   * @return the state for a specific application
-   * @throws AuthorizationException if the user is not authorized
+   * @param hsr HTTP Servlet请求对象
+   * @param appId 目标应用ID（PathParam参数）
+   * @return 指定应用当前状态
+   * @throws AuthorizationException 用户未授权时抛出
    */
   AppState getAppState(HttpServletRequest hsr, String appId)
       throws AuthorizationException;
 
   /**
-   * This method updates the state of the app in input, and it is reachable by
-   * using {@link RMWSConsts#APPS_APPID_STATE}.
+   * 更新指定应用状态（如终止运行的应用），可通过{@link RMWSConsts#APPS_APPID_STATE}访问
    *
-   * @param targetState the target state for the app. It is a content param.
-   * @param hsr the servlet request
-   * @param appId the Id of the application we want to update the state. It is a
-   *          PathParam.
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *           method
-   * @throws YarnException if app does not exist
-   * @throws InterruptedException if interrupted
-   * @throws IOException if doAs action throws an IOException
+   * @param targetState 目标状态（请求体参数）
+   * @param hsr HTTP Servlet请求对象
+   * @param appId 目标应用ID（PathParam参数）
+   * @return HTTP响应对象，包含状态码
+   * @throws AuthorizationException 用户未授权调用时抛出
+   * @throws YarnException 应用不存在时抛出
+   * @throws InterruptedException 线程被中断时抛出
+   * @throws IOException doAs操作抛出IO异常时抛出
    */
   Response updateAppState(AppState targetState, HttpServletRequest hsr,
       String appId) throws AuthorizationException, YarnException,
       InterruptedException, IOException;
 
   /**
-   * This method retrieves all the node labels with the respective nodes in the
-   * cluster, and it is reachable by using
-   * {@link RMWSConsts#GET_NODE_TO_LABELS}.
+   * 获取集群节点标签与节点映射关系，可通过{@link RMWSConsts#GET_NODE_TO_LABELS}访问
    *
    * @see ApplicationClientProtocol#getNodeToLabels
-   * @param hsr the servlet request
-   * @return all the nodes within a node label
-   * @throws IOException if an IOException happened
+   * @param hsr HTTP Servlet请求对象
+   * @return 节点到标签的映射信息
+   * @throws IOException IO异常时抛出
    */
   NodeToLabelsInfo getNodeToLabels(HttpServletRequest hsr) throws IOException;
 
+  /**
+   * 获取RM注册的所有节点标签信息
+   *
+   * @param hsr HTTP Servlet请求对象
+   * @return 节点标签信息列表
+   * @throws IOException IO异常时抛出
+   */
   NodeLabelsInfo getRMNodeLabels(HttpServletRequest hsr) throws IOException;
 
   /**
-   * This method retrieves all the node within multiple node labels in the
-   * cluster, and it is reachable by using {@link RMWSConsts#LABEL_MAPPINGS}.
+   * 获取标签到节点的映射关系，可按标签过滤，可通过{@link RMWSConsts#LABEL_MAPPINGS}访问
    *
    * @see ApplicationClientProtocol#getLabelsToNodes
-   * @param labels filter the result by node labels. It is a QueryParam.
-   * @return all the nodes within multiple node labels
-   * @throws IOException if an IOException happened
+   * @param labels 按标签过滤（QueryParam参数）
+   * @return 标签到节点的映射信息
+   * @throws IOException IO异常时抛出
    */
   LabelsToNodesInfo getLabelsToNodes(Set<String> labels) throws IOException;
 
   /**
-   * This method replaces all the node labels for specific nodes, and it is
-   * reachable by using {@link RMWSConsts#REPLACE_NODE_TO_LABELS}.
+   * 批量替换多个节点的标签，可通过{@link RMWSConsts#REPLACE_NODE_TO_LABELS}访问
    *
    * @see ResourceManagerAdministrationProtocol#replaceLabelsOnNode
-   * @param newNodeToLabels the list of new labels. It is a content param.
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws Exception if an exception happened
+   * @param newNodeToLabels 新节点标签映射列表（请求体参数）
+   * @param hsr HTTP Servlet请求对象
+   * @return HTTP响应对象，包含状态码
+   * @throws Exception 处理过程发生异常时抛出
    */
   Response replaceLabelsOnNodes(NodeToLabelsEntryList newNodeToLabels,
       HttpServletRequest hsr) throws Exception;
 
   /**
-   * This method replaces all the node labels for specific node, and it is
-   * reachable by using {@link RMWSConsts#NODES_NODEID_REPLACE_LABELS}.
+   * 替换指定节点的标签，可通过{@link RMWSConsts#NODES_NODEID_REPLACE_LABELS}访问
    *
    * @see ResourceManagerAdministrationProtocol#replaceLabelsOnNode
-   * @param newNodeLabelsName the list of new labels. It is a QueryParam.
-   * @param hsr the servlet request
-   * @param nodeId the node we want to replace the node labels. It is a
-   *          PathParam.
-   * @return Response containing the status code
-   * @throws Exception if an exception happened
+   * @param newNodeLabelsName 新标签列表（QueryParam参数）
+   * @param hsr HTTP Servlet请求对象
+   * @param nodeId 目标节点ID（PathParam参数）
+   * @return HTTP响应对象，包含状态码
+   * @throws Exception 处理过程发生异常时抛出
    */
   Response replaceLabelsOnNode(Set<String> newNodeLabelsName,
       HttpServletRequest hsr, String nodeId) throws Exception;
 
   /**
-   * This method retrieves all the node labels in the cluster, and it is
-   * reachable by using {@link RMWSConsts#GET_NODE_LABELS}.
+   * 获取集群中所有节点标签，可通过{@link RMWSConsts#GET_NODE_LABELS}访问
    *
    * @see ApplicationClientProtocol#getClusterNodeLabels
-   * @param hsr the servlet request
-   * @return all the node labels in the cluster
-   * @throws IOException if an IOException happened
+   * @param hsr HTTP Servlet请求对象
+   * @return 集群所有节点标签信息
+   * @throws IOException IO异常时抛出
    */
   NodeLabelsInfo getClusterNodeLabels(HttpServletRequest hsr)
       throws IOException;
 
   /**
-   * This method adds specific node labels for specific nodes, and it is
-   * reachable by using {@link RMWSConsts#ADD_NODE_LABELS}.
+   * 向集群添加新节点标签，可通过{@link RMWSConsts#ADD_NODE_LABELS}访问
    *
    * @see ResourceManagerAdministrationProtocol#addToClusterNodeLabels
-   * @param newNodeLabels the node labels to add. It is a content param.
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws Exception in case of bad request
+   * @param newNodeLabels 要添加的节点标签（请求体参数）
+   * @param hsr HTTP Servlet请求对象
+   * @return HTTP响应对象，包含状态码
+   * @throws Exception 请求非法时抛出
    */
   Response addToClusterNodeLabels(NodeLabelsInfo newNodeLabels,
       HttpServletRequest hsr) throws Exception;
 
   /**
-   * This method removes all the node labels for specific nodes, and it is
-   * reachable by using {@link RMWSConsts#REMOVE_NODE_LABELS}.
+   * 从集群删除节点标签，可通过{@link RMWSConsts#REMOVE_NODE_LABELS}访问
    *
    * @see ResourceManagerAdministrationProtocol#removeFromClusterNodeLabels
-   * @param oldNodeLabels the node labels to remove. It is a QueryParam.
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws Exception in case of bad request
+   * @param oldNodeLabels 要删除的标签列表（QueryParam参数）
+   * @param hsr HTTP Servlet请求对象
+   * @return HTTP响应对象，包含状态码
+   * @throws Exception 请求非法时抛出
    */
   Response removeFromClusterNodeLabels(Set<String> oldNodeLabels,
       HttpServletRequest hsr) throws Exception;
 
   /**
-   * This method retrieves all the node labels for specific node, and it is
-   * reachable by using {@link RMWSConsts#NODES_NODEID_GETLABELS}.
-   *
-   * @param hsr the servlet request
-   * @param nodeId the node we want to get all the node labels. It is a
-   *          PathParam.
-   * @return all the labels for a specific node.
-   * @throws IOException if an IOException happened
-   */
-  NodeLabelsInfo getLabelsOnNode(HttpServletRequest hsr, String nodeId)
-      throws IOException;
-
-  /**
-   * This method retrieves the priority for a specific app, and it is reachable
-   * by using {@link RMWSConsts#APPS_APPID_PRIORITY}.
-   *
-   * @param hsr the servlet request
-   * @param appId the app we want to get the priority. It is a PathParam.
-   * @return the priority for a specific application
-   * @throws AuthorizationException in case of the user is not authorized
-   */
-  AppPriority getAppPriority(HttpServletRequest hsr, String appId)
-      throws AuthorizationException;
-
-  /**
-   * This method updates the priority for a specific application, and it is
-   * reachable by using {@link RMWSConsts#APPS_APPID_PRIORITY}.
-   *
-   * @param targetPriority the priority we want to set for the app. It is a
-   *          content param.
-   * @param hsr the servlet request
-   * @param appId the application we want to update its priority. It is a
-   *          PathParam.
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authenticated
-   * @throws YarnException if the target is null
-   * @throws IOException if the update fails.
-   * @throws InterruptedException if interrupted.
-   */
-  Response updateApplicationPriority(AppPriority targetPriority,
-      HttpServletRequest hsr, String appId) throws AuthorizationException,
-      YarnException, InterruptedException, IOException;
-
-  /**
-   * This method retrieves the queue for a specific app, and it is reachable by
-   * using {@link RMWSConsts#APPS_APPID_QUEUE}.
-   *
-   * @param hsr the servlet request
-   * @param appId the application we want to retrieve its queue. It is a
-   *          PathParam.
-   * @return the Queue for a specific application.
-   * @throws AuthorizationException if the user is not authenticated
-   */
-  AppQueue getAppQueue(HttpServletRequest hsr, String appId)
-      throws AuthorizationException;
-
-  /**
-   * This method updates the queue for a specific application, and it is
-   * reachable by using {@link RMWSConsts#APPS_APPID_QUEUE}.
-   *
-   * @param targetQueue the queue we want to set. It is a content param.
-   * @param hsr the servlet request
-   * @param appId the application we want to change its queue. It is a
-   *          PathParam.
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authenticated
-   * @throws YarnException if the app is not found
-   * @throws IOException if the update fails.
-   * @throws InterruptedException if interrupted.
-   */
-  Response updateAppQueue(AppQueue targetQueue, HttpServletRequest hsr,
-      String appId) throws AuthorizationException, YarnException,
-      InterruptedException, IOException;
-
-  /**
-   * Generates a new ApplicationId which is then sent to the client. This method
-   * is reachable by using {@link RMWSConsts#APPS_NEW_APPLICATION}.
-   *
-   * @see ApplicationClientProtocol#getNewApplication
-   *
-   * @param hsr the servlet request
-   * @return Response containing the app id and the maximum resource
-   *         capabilities
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *           method
-   * @throws IOException if the creation fails
-   * @throws InterruptedException if interrupted
-   */
-  Response createNewApplication(HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException;
-
-  /**
-   * Function to submit an app to the RM. This method is reachable by using
-   * {@link RMWSConsts#APPS}.
-   *
-   * @see ApplicationClientProtocol#submitApplication
-   *
-   * @param newApp structure containing information to construct the
-   *          ApplicationSubmissionContext. It is a content param.
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *           method
-   * @throws IOException if the submission failed
-   * @throws InterruptedException if interrupted
-   */
-  Response submitApplication(ApplicationSubmissionContextInfo newApp,
-      HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException;
-
-  /**
-   * This method posts a delegation token from the client, and it is reachable
-   * by using {@link RMWSConsts#DELEGATION_TOKEN}.
-   *
-   * @see ApplicationBaseProtocol#getDelegationToken
-   * @param tokenData the token to delegate. It is a content param.
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws AuthorizationException if Kerberos auth failed
-   * @throws IOException if the delegation failed
-   * @throws InterruptedException if interrupted
-   * @throws Exception in case of bad request
-   */
-  Response postDelegationToken(DelegationToken tokenData,
-      HttpServletRequest hsr) throws AuthorizationException, IOException,
-      InterruptedException, Exception;
-
-  /**
-   * This method updates the expiration for a delegation token from the client,
-   * and it is reachable by using
-   * {@link RMWSConsts#DELEGATION_TOKEN_EXPIRATION}.
-   *
-   * @see ApplicationBaseProtocol#renewDelegationToken
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws AuthorizationException if Kerberos auth failed
-   * @throws IOException if the delegation failed
-   * @throws Exception in case of bad request
-   */
-  Response postDelegationTokenExpiration(HttpServletRequest hsr)
-      throws AuthorizationException, IOException, Exception;
-
-  /**
-   * This method cancel the delegation token from the client, and it is
-   * reachable by using {@link RMWSConsts#DELEGATION_TOKEN}.
-   *
-   * @see ApplicationBaseProtocol#cancelDelegationToken
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws AuthorizationException if Kerberos auth failed
-   * @throws IOException if the delegation failed
-   * @throws InterruptedException if interrupted
-   * @throws Exception in case of bad request
-   */
-  Response cancelDelegationToken(HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException,
-      Exception;
-
-  /**
-   * Generates a new ReservationId which is then sent to the client. This method
-   * is reachable by using {@link RMWSConsts#RESERVATION_NEW}.
-   *
-   * @see ApplicationClientProtocol#getNewReservation
-   *
-   * @param hsr the servlet request
-   * @return Response containing the app id and the maximum resource
-   *         capabilities
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *           method.
-   * @throws IOException if creation failed
-   * @throws InterruptedException if interrupted
-   */
-  Response createNewReservation(HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException;
-
-  /**
-   * Function to submit a Reservation to the RM.This method is reachable by
-   * using {@link RMWSConsts#RESERVATION_SUBMIT}.
-   *
-   * @see ApplicationClientProtocol#submitReservation
-   *
-   * @param resContext provides information to construct the
-   *          ReservationSubmissionRequest. It is a content param.
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *           method
-   * @throws IOException if creation failed
-   * @throws InterruptedException if interrupted
-   */
-  Response submitReservation(ReservationSubmissionRequestInfo resContext,
-      HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException;
-
-  /**
-   * Function to update a Reservation to the RM. This method is reachable by
-   * using {@link RMWSConsts#RESERVATION_UPDATE}.
-   *
-   * @see ApplicationClientProtocol#updateReservation
-   *
-   * @param resContext provides information to construct the
-   *          ReservationUpdateRequest. It is a content param.
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *           method
-   * @throws IOException if the operation failed
-   * @throws InterruptedException if interrupted
-   */
-  Response updateReservation(ReservationUpdateRequestInfo resContext,
-      HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException;
-
-  /**
-   * Function to delete a Reservation to the RM. This method is reachable by
-   * using {@link RMWSConsts#RESERVATION_DELETE}.
-   *
-   * @see ApplicationClientProtocol#deleteReservation
-   *
-   * @param resContext provides information to construct the
-   *          ReservationDeleteRequest. It is a content param.
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws AuthorizationException when the user group information cannot be
-   *           retrieved.
-   * @throws IOException when a {@link ReservationDeleteRequest} cannot be
-   *           created from the {@link ReservationDeleteRequestInfo}. This
-   *           exception is also thrown on
-   *           {@code ClientRMService.deleteReservation} invocation failure.
-   * @throws InterruptedException if doAs action throws an InterruptedException.
-   */
-  Response deleteReservation(ReservationDeleteRequestInfo resContext,
-      HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException;
-
-  /**
-   * Function to retrieve a list of all the reservations. This method is
-   * reachable by using {@link RMWSConsts#RESERVATION_LIST}.
-   *
-   * @see ApplicationClientProtocol#listReservations
-   * @param queue filter the result by queue. It is a QueryParam.
-   * @param reservationId filter the result by reservationId. It is a
-   *          QueryParam.
-   * @param startTime filter the result by start time. It is a QueryParam.
-   * @param endTime filter the result by end time. It is a QueryParam.
-   * @param includeResourceAllocations true if the resource allocation should be
-   *          in the result, false otherwise. It is a QueryParam.
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws Exception in case of bad request
-   */
-  Response listReservation(String queue, String reservationId, long startTime,
-      long endTime, boolean includeResourceAllocations, HttpServletRequest hsr)
-      throws Exception;
-
-  /**
-   * This method retrieves the timeout information for a specific app with a
-   * specific type, and it is reachable by using
-   * {@link RMWSConsts#APPS_TIMEOUTS_TYPE}.
-   *
-   * @param hsr the servlet request
-   * @param appId the application we want to get the timeout. It is a PathParam.
-   * @param type the type of the timeouts. It is a PathParam.
-   * @return the timeout for a specific application with a specific type.
-   * @throws AuthorizationException if the user is not authorized
-   */
-  AppTimeoutInfo getAppTimeout(HttpServletRequest hsr, String appId,
-      String type) throws AuthorizationException;
-
-  /**
-   * This method retrieves the timeout information for a specific app, and it is
-   * reachable by using {@link RMWSConsts#APPS_TIMEOUTS}.
-   *
-   * @param hsr the servlet request
-   * @param appId the application we want to get the timeouts. It is a
-   *          PathParam.
-   * @return the timeouts for a specific application
-   * @throws AuthorizationException if the user is not authorized
-   */
-  AppTimeoutsInfo getAppTimeouts(HttpServletRequest hsr, String appId)
-      throws AuthorizationException;
-
-  /**
-   * This method updates the timeout information for a specific app, and it is
-   * reachable by using {@link RMWSConsts#APPS_TIMEOUT}.
-   *
-   * @see ApplicationClientProtocol#updateApplicationTimeouts
-   * @param appTimeout the appTimeoutInfo. It is a content param.
-   * @param hsr the servlet request
-   * @param appId the application we want to update. It is a PathParam.
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *           method
-   * @throws YarnException in case of bad request
-   * @throws IOException if the operation failed
-   * @throws InterruptedException if interrupted
-   */
-  Response updateApplicationTimeout(AppTimeoutInfo appTimeout,
-      HttpServletRequest hsr, String appId) throws AuthorizationException,
-      YarnException, InterruptedException, IOException;
-
-  /**
-   * This method retrieves all the attempts information for a specific app, and
-   * it is reachable by using {@link RMWSConsts#APPS_APPID_APPATTEMPTS}.
-   *
-   * @see ApplicationBaseProtocol#getApplicationAttempts
-   * @param hsr the servlet request
-   * @param appId the application we want to get the attempts. It is a
-   *          PathParam.
-   * @return all the attempts info for a specific application
-   */
-  AppAttemptsInfo getAppAttempts(HttpServletRequest hsr, String appId);
-
-  /**
-   * This method verifies if a user has access to a specified queue.
-   *
-   * @return Response containing the status code.
-   *
-   * @param queue queue
-   * @param username user
-   * @param queueAclType acl type of queue, it could be
-   *                     SUBMIT_APPLICATIONS/ADMINISTER_QUEUE
-   * @param hsr request
-   *
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *                                method.
-   */
-  RMQueueAclInfo checkUserAccessToQueue(String queue, String username,
-      String queueAclType, HttpServletRequest hsr)
-      throws AuthorizationException;
-
-  /**
-   * This method sends a signal to container.
-   * @param containerId containerId
-   * @param command signal command, it could be OUTPUT_THREAD_DUMP/
-   *                GRACEFUL_SHUTDOWN/FORCEFUL_SHUTDOWN
-   * @param req request
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *                                method.
-   */
-  Response signalToContainer(String containerId, String command,
-      HttpServletRequest req) throws AuthorizationException;
-
-  /**
-   * This method updates the Scheduler configuration, and it is reachable by
-   * using {@link RMWSConsts#SCHEDULER_CONF}.
-   *
-   * @param mutationInfo th information for making scheduler configuration
-   *        changes (supports adding, removing, or updating a queue, as well
-   *        as global scheduler conf changes)
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *         method
-   * @throws InterruptedException if interrupted
-   */
-  Response updateSchedulerConfiguration(SchedConfUpdateInfo mutationInfo,
-      HttpServletRequest hsr) throws AuthorizationException, InterruptedException;
-
-  /**
-   * This method retrieves all the Scheduler configuration, and it is reachable
-   * by using {@link RMWSConsts#SCHEDULER_CONF}.
-   *
-   * @param hsr the servlet request
-   * @return Response containing the status code
-   * @throws AuthorizationException if the user is not authorized to invoke this
-   *         method.
-   */
-  Response getSchedulerConfiguration(HttpServletRequest hsr) throws AuthorizationException;
-}
+   * 获取指定节点上的所有标签，可通过{@link RMWSConsts#

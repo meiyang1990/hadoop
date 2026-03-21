@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,110 +25,97 @@ import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.api.records.Resource;
 
 /**
- * A Schedulable represents an entity that can be scheduled such as an
- * application or a queue. It provides a common interface so that algorithms
- * such as fair sharing can be applied both within a queue and across queues.
- *
- * A Schedulable is responsible for three roles:
- * 1) Assign resources through {@link #assignContainer}.
- * 2) It provides information about the app/queue to the scheduler, including:
- *    - Demand (maximum number of tasks required)
- *    - Minimum share (for queues)
- *    - Job/queue weight (for fair sharing)
- *    - Start time and priority (for FIFO)
- * 3) It can be assigned a fair share, for use with fair scheduling.
- *
- * Schedulable also contains two methods for performing scheduling computations:
- * - updateDemand() is called periodically to compute the demand of the various
- *   jobs and queues, which may be expensive (e.g. jobs must iterate through all
- *   their tasks to count failed tasks, tasks that can be speculated, etc).
+ * YARN公平调度器可调度实体抽象接口，代表应用或队列等可被调度的实体
+ * 提供统一接口让公平共享算法可以统一应用于队列内和跨队列调度
+ * 
+ * 核心职责包含三部分：
+ * 1) 通过{@link #assignContainer}分配资源
+ * 2) 向调度器提供应用/队列的相关信息，包括资源需求、最小份额、权重、优先级、启动时间等
+ * 3) 存储公平调度分配给该实体的公平份额
+ * 
+ * 还提供updateDemand方法供调度器定期更新实体资源需求，处理失败任务、推测执行任务等统计
  */
 @Private
 @Unstable
 public interface Schedulable {
   /**
-   * Name of job/queue, used for debugging as well as for breaking ties in
-   * scheduling order deterministically.
-   * @return Name of job/queue.
+   * 获取作业/队列名称，用于调试和调度顺序确定性破局
+   * @return 作业/队列名称
    */
   String getName();
 
   /**
-   * Maximum number of resources required by this Schedulable. This is defined as
-   * number of currently utilized resources + number of unlaunched resources (that
-   * are either not yet launched or need to be speculated).
-   * @return resources required by this Schedulable.
+   * 获取当前可调度实体所需的最大资源总量，等于已使用资源 + 待启动资源（包含未启动和需要推测执行的任务资源）
+   * @return 该可调度实体所需资源
    */
   Resource getDemand();
 
   /**
-   * Get the aggregate amount of resources consumed by the schedulable.
-   * @return aggregate amount of resources.
+   * 获取该可调度实体已消耗的总资源量
+   * @return 已消耗总资源量
    */
   Resource getResourceUsage();
 
   /**
-   * Minimum Resource share assigned to the schedulable.
-   * @return Minimum Resource share.
+   * 获取分配给该可调度实体的最小资源份额
+   * @return 最小资源份额
    */
   Resource getMinShare();
 
   /**
-   * Maximum Resource share assigned to the schedulable.
-   * @return Maximum Resource share.
+   * 获取分配给该可调度实体的最大资源份额
+   * @return 最大资源份额
    */
   Resource getMaxShare();
 
   /**
-   * Job/queue weight in fair sharing. Weights are only meaningful when
-   * compared. A weight of 2.0f has twice the weight of a weight of 1.0f,
-   * which has twice the weight of a weight of 0.5f. A weight of 1.0f is
-   * considered unweighted or a neutral weight. A weight of 0 is no weight.
+   * 获取公平共享中作业/队列的权重
+   * 权重是相对值，2.0的权重分配的公平份额是1.0的两倍，1.0为中性权重，0代表无权重
    *
-   * @return the weight
+   * @return 权重值
    */
   float getWeight();
 
   /**
-   * Start time for jobs in FIFO queues; meaningless for QueueSchedulables.
-   * @return Start time for jobs.
+   * 获取FIFO队列中作业的启动时间，对队列实体无意义
+   * @return 作业启动时间
    */
   long getStartTime();
 
- /**
-  * Job priority for jobs in FIFO queues; meaningless for QueueSchedulables.
-  * @return Job priority.
-  */
+  /**
+   * 获取FIFO队列中作业的优先级，对队列实体无意义
+   * @return 作业优先级
+   */
   Priority getPriority();
 
-  /** Refresh the Schedulable's demand and those of its children if any. */
+  /**
+   * 刷新当前可调度实体及其子实体（如果有）的资源需求
+   */
   void updateDemand();
 
   /**
-   * Assign a container on this node if possible, and return the amount of
-   * resources assigned.
+   * 在指定节点尝试分配容器，返回实际分配的资源量
    *
-   * @param node FSSchedulerNode.
-   * @return the amount of resources assigned.
+   * @param node 目标节点封装对象
+   * @return 实际分配的资源量
    */
   Resource assignContainer(FSSchedulerNode node);
 
   /**
-   * Get the fair share assigned to this Schedulable.
-   * @return the fair share assigned to this Schedulable.
+   * 获取分配给该可调度实体的公平份额
+   * @return 分配的公平份额
    */
   Resource getFairShare();
 
   /**
-   * Assign a fair share to this Schedulable.
-   * @param fairShare a fair share to this Schedulable.
+   * 为该可调度实体设置公平份额
+   * @param fairShare 要设置的公平份额
    */
   void setFairShare(Resource fairShare);
 
   /**
-   * Check whether the schedulable is preemptable.
-   * @return <code>true</code> if the schedulable is preemptable;
-   *         <code>false</code> otherwise
+   * 检查该可调度实体是否允许被抢占
+   * @return <code>true</code> 允许抢占; <code>false</code> 不允许抢占
    */
   boolean isPreemptable();
 }

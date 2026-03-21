@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,7 +28,8 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * A simple CandidateNodeSet which keeps an unordered map
+ * 候选节点集合的简单实现，基于无序Map存储候选节点
+ * 用于YARN应用分配容器时，存储待选择的候选节点列表
  */
 public class SimpleCandidateNodeSet<N extends SchedulerNode>
     implements CandidateNodeSet<N> {
@@ -35,6 +37,10 @@ public class SimpleCandidateNodeSet<N extends SchedulerNode>
   private Map<NodeId, N> map;
   private String partition;
 
+  /**
+   * 构造单节点候选集合
+   * @param node 单个候选节点
+   */
   public SimpleCandidateNodeSet(N node) {
     if (null != node) {
       // Only one node in the initial CandidateNodeSet
@@ -46,6 +52,11 @@ public class SimpleCandidateNodeSet<N extends SchedulerNode>
     }
   }
 
+  /**
+   * 构造多节点候选集合
+   * @param map 候选节点Map（key为节点ID，value为调度节点对象）
+   * @param partition 节点分区（标签分区）
+   */
   public SimpleCandidateNodeSet(Map<NodeId, N> map, String partition) {
     this.map = map;
     this.partition = partition;

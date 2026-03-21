@@ -1,10 +1,11 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
 * distributed with this work for additional information
 * regarding copyright ownership.  The ASF licenses this file
 * to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
+* "License"); you may not use this use this file except in compliance
 * with the License.  You may obtain a copy of the License at
 *
 *     http://www.apache.org/licenses/LICENSE-2.0
@@ -24,7 +25,7 @@ import com.google.inject.Inject;
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.ERROR_MESSAGE;
 
 /**
- * This class is used to display an error message to the user in the UI.
+ * 该类用于在YARN ResourceManager WebUI中向用户展示错误信息
  */
 public class ErrorBlock extends HtmlBlock {
   @Inject
@@ -32,8 +33,13 @@ public class ErrorBlock extends HtmlBlock {
     super(ctx);
   }
 
+  /**
+   * 渲染错误信息HTML块
+   * @param html HTML块构建对象
+   */
   @Override
   protected void render(Block html) {
+    // 将错误信息渲染为HTML段落
     html.p().__($(ERROR_MESSAGE)).__();
   }
 }

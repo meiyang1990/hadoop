@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,10 +21,15 @@ package org.apache.hadoop.yarn.server.resourcemanager.volume.csi.event;
 import org.apache.hadoop.yarn.server.resourcemanager.volume.csi.lifecycle.Volume;
 
 /**
- * Validate volume capability with the CSI driver.
+ * CSI存储卷验证事件，用于触发与CSI驱动交互验证存储卷能力。
+ * 属于YARN CSI存储卷生命周期管理的事件体系，用于请求验证存储卷是否满足应用需求。
  */
 public class ValidateVolumeEvent extends VolumeEvent {
 
+  /**
+   * 构造存储卷验证事件。
+   * @param volume 待验证的CSI存储卷对象
+   */
   public ValidateVolumeEvent(Volume volume) {
     super(volume, VolumeEventType.VALIDATE_VOLUME_EVENT);
   }

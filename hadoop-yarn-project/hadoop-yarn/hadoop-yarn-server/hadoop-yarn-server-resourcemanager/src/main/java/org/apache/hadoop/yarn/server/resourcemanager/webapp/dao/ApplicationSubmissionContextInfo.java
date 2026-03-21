@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,8 +31,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.yarn.api.records.Priority;
 
 /**
- * Simple class to allow users to send information required to create an
- * ApplicationSubmissionContext which can then be used to submit an app
+ * 应用提交上下文信息DAO，用于接收REST API提交应用时的参数，构建ApplicationSubmissionContext用于应用提交
  * 
  */
 @XmlRootElement(name = "application-submission-context")
@@ -87,6 +87,9 @@ public class ApplicationSubmissionContextInfo {
   @XmlElement(name = "reservation-id")
   String reservationId;
 
+  /**
+   * 无参构造函数，初始化所有字段为默认值
+   */
   public ApplicationSubmissionContextInfo() {
     applicationId = "";
     applicationName = "";

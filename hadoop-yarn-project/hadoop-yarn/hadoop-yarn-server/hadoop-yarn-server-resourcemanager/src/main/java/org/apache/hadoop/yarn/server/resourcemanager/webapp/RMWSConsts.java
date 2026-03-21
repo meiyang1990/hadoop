@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,7 +20,8 @@
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
 /**
- * Constants for {@code RMWebServiceProtocol}.
+ * YARN ResourceManager REST WebService 通用常量定义类，
+ * 包含所有Web服务的请求路径、查询参数和枚举类型定义。
  */
 public final class RMWSConsts {
 
@@ -265,22 +267,21 @@ public final class RMWSConsts {
   public static final String ACTIVITIES_COUNT = "activitiesCount";
 
   private RMWSConsts() {
-    // not called
+    // 工具类禁止实例化
   }
 
   /**
-   * Defines the groupBy types of activities, currently only support
-   * DIAGNOSTIC with which user can query aggregated activities
-   * grouped by allocation state and diagnostic.
+   * 定义调度活动统计的分组维度，当前仅支持按诊断信息分组。
+   * 使用DIAGNOSTIC分组时，会按分配状态和诊断信息聚合活动统计。
    */
   public enum ActivitiesGroupBy {
     DIAGNOSTIC
   }
 
   /**
-   * Defines the required action of app activities:
-   * REFRESH means to turn on activities recording for the required app,
-   * GET means the required app activities should be involved in response.
+   * 定义应用活动查询的所需操作类型：
+   * REFRESH - 开启指定应用的活动记录
+   * GET - 在响应中返回指定应用的活动信息
    */
   public enum AppActivitiesRequiredAction {
     REFRESH, GET

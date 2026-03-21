@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,9 +28,15 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 容量调度器健康信息数据访问对象，为Web UI提供调度器运行状态数据
+ */
 @XmlAccessorType(XmlAccessType.FIELD)
 public class CapacitySchedulerHealthInfo {
 
+  /**
+   * 单条调度操作详细信息，用于Web UI展示最近一次操作详情
+   */
   @XmlAccessorType(XmlAccessType.FIELD)
   public static class OperationInformation {
     String operation;
@@ -40,6 +47,11 @@ public class CapacitySchedulerHealthInfo {
     OperationInformation() {
     }
 
+    /**
+     * 根据调度器详细信息构造操作信息对象
+     * @param operation 操作类型名称
+     * @param di 调度器提供的详细信息
+     */
     OperationInformation(String operation,
         SchedulerHealth.DetailedInformation di) {
       this.operation = operation;
@@ -66,6 +78,9 @@ public class CapacitySchedulerHealthInfo {
     }
   }
 
+  /**
+   * 上次调度运行统计详情，记录各类操作的统计数据与资源使用情况
+   */
   @XmlAccessorType(XmlAccessType.FIELD)
   public static class LastRunDetails {
     String operation;
@@ -75,6 +90,12 @@ public class CapacitySchedulerHealthInfo {
     LastRunDetails() {
     }
 
+    /**
+     * 构造上次运行统计详情对象
+     * @param operation 操作类型名称
+     * @param count 操作次数
+     * @param resource 操作涉及的资源总量
+     */
     LastRunDetails(String operation, long count, Resource resource) {
       this.operation = operation;
       this.count = count;
@@ -94,8 +115,11 @@ public class CapacitySchedulerHealthInfo {
     }
   }
 
+  // 上次调度运行时间戳
   long lastrun;
+  // 各类操作的详细信息列表
   List<OperationInformation> operationsInfo;
+  // 各类操作的统计详情列表
   List<LastRunDetails> lastRunDetails;
 
   CapacitySchedulerHealthInfo() {
@@ -109,24 +133,39 @@ public class CapacitySchedulerHealthInfo {
     return operationsInfo;
   }
 
+  /**
+   * 从容量调度器提取健康信息构造DAO对象
+   * @param cs 容量调度器实例
+   */
   CapacitySchedulerHealthInfo(CapacityScheduler cs) {
+    // 获取调度器健康信息对象
     SchedulerHealth ht = cs.getSchedulerHealth();
+    // 提取上次调度运行时间
     lastrun = ht.getLastSchedulerRunTime();
+    // 初始化操作详情列表
     operationsInfo = new ArrayList<>();
+    // 添加上次资源分配操作详情
     operationsInfo.add(new OperationInformation("last-allocation",
         ht.getLastAllocationDetails()));
+    // 添加上次资源释放操作详情
     operationsInfo.add(
         new OperationInformation("last-release", ht.getLastReleaseDetails()));
+    // 添加上次抢占操作详情
     operationsInfo.add(new OperationInformation("last-preemption",
         ht.getLastPreemptionDetails()));
+    // 添加上次资源预留操作详情
     operationsInfo.add(new OperationInformation("last-reservation",
         ht.getLastReservationDetails()));
 
+    // 初始化统计详情列表
     lastRunDetails = new ArrayList<>();
+    // 添加资源释放统计
     lastRunDetails.add(new LastRunDetails("releases", ht.getReleaseCount(), ht
       .getResourcesReleased()));
+    // 添加资源分配统计
     lastRunDetails.add(new LastRunDetails("allocations", ht
       .getAllocationCount(), ht.getResourcesAllocated()));
+    // 添加资源预留统计
     lastRunDetails.add(new LastRunDetails("reservations", ht
       .getReservationCount(), ht.getResourcesReserved()));
 

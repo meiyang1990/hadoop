@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,23 +27,43 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * YARN Router联邦场景下，聚合多个子集群调度器类型信息的DAO类.
+ * 用于REST API返回序列化，继承RM原生SchedulerTypeInfo扩展支持多子集群场景
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class FederationSchedulerTypeInfo extends SchedulerTypeInfo {
+  // 存储所有子集群的调度器类型信息列表
   @XmlElement(name = "subCluster")
   private List<SchedulerTypeInfo> list = new ArrayList<>();
 
+  /**
+   * JAXB序列化需要的无参构造方法.
+   */
   public FederationSchedulerTypeInfo() {
   } // JAXB needs this
 
+  /**
+   * 用传入的子集群调度器信息列表构造对象.
+   * @param list 所有子集群调度器类型信息列表
+   */
   public FederationSchedulerTypeInfo(ArrayList<SchedulerTypeInfo> list) {
     this.list = list;
   }
 
+  /**
+   * 获取所有子集群的调度器类型信息列表.
+   * @return 子集群调度器信息列表
+   */
   public List<SchedulerTypeInfo> getList() {
     return list;
   }
 
+  /**
+   * 设置子集群调度器类型信息列表.
+   * @param list 子集群调度器信息列表
+   */
   public void setList(List<SchedulerTypeInfo> list) {
     this.list = list;
   }

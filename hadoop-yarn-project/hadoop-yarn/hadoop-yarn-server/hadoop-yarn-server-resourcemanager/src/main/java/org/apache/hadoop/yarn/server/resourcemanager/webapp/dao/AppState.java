@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,6 +23,9 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * YARN RM Web API 应用状态信息数据访问对象，用于序列化返回应用状态和诊断信息。
+ */
 @XmlRootElement(name = "appstate")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppState {
@@ -29,9 +33,16 @@ public class AppState {
   String state;
   private String diagnostics;
 
+  /**
+   * JAXB要求的无参构造函数，用于反序列化XML/JSON对象。
+   */
   public AppState() {
   }
 
+  /**
+   * 构造仅包含应用状态的AppState对象。
+   * @param state 应用当前状态
+   */
   public AppState(String state) {
     this.state = state;
   }

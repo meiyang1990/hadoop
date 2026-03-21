@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,7 +16,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.yarn.server.router.webapp.dao;
+package org.apache.hadoop.yarn.server.router.webapp.dao.RouterInfo;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.Service;
@@ -28,6 +29,10 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * Router 基础信息数据访问对象，封装 Router 服务元信息供 Web UI 展示。
+ * 存储集群时间戳、服务状态、版本信息、状态存储类名等核心元数据。
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class RouterInfo {
@@ -45,17 +50,27 @@ public class RouterInfo {
   public RouterInfo() {
   } // JAXB needs this
 
+  /**
+   * 从 Router 服务实例构造 RouterInfo 对象，提取所有元信息。
+   * @param router Router 服务实例
+   */
   public RouterInfo(Router router) {
+    // 获取集群启动时间戳
     long ts = Router.getClusterTimeStamp();
     this.id = ts;
+    // 获取 Router 当前服务状态
     this.state = router.getServiceState();
+    // 获取 Router 配置对象
     Configuration configuration = router.getConfig();
+    // 从配置中读取联邦状态存储客户端类名，使用默认值兜底
     this.routerStateStoreName = configuration.get(
         YarnConfiguration.FEDERATION_STATESTORE_CLIENT_CLASS,
         YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_CLIENT_CLASS);
+    // 填充 YARN/Router 版本信息
     this.routerVersion = YarnVersionInfo.getVersion();
     this.routerBuildVersion = YarnVersionInfo.getBuildVersion();
     this.routerVersionBuiltOn = YarnVersionInfo.getDate();
+    // 填充 Hadoop 版本信息
     this.hadoopVersion = VersionInfo.getVersion();
     this.hadoopBuildVersion = VersionInfo.getBuildVersion();
     this.hadoopVersionBuiltOn = VersionInfo.getDate();

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,28 +20,33 @@
 package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
 /**
- * Header for a Web UI column. This used with TH.
+ * YARN ResourceManager Web UI 列表表格列头模型，用于渲染HTML表格表头(TH标签)
  */
 public class ColumnHeader {
   private String selector;
   private String cdata;
 
+  /**
+   * 构造列头对象
+   * @param pselector CSS选择器名称，用于前端样式和选择
+   * @param pcdata 列头显示文本内容
+   */
   public ColumnHeader(String pselector, String pcdata) {
     this.selector = pselector;
     this.cdata = pcdata;
   }
 
   /**
-   * Get the selector field for the TH.
-   * @return Selector.
+   * 获取TH标签对应的CSS选择器
+   * @return 选择器名称
    */
   public String getSelector() {
     return this.selector;
   }
 
   /**
-   * Get the cdata field for the TH.
-   * @return CData.
+   * 获取列头显示文本内容
+   * @return 列头显示文本
    */
   public String getCData() {
     return this.cdata;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -102,15 +103,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Extends the {@code AbstractRequestInterceptorClient} class and provides an
- * implementation that simply forwards the client requests to the cluster
- * resource manager.
+ * 继承AbstractRequestInterceptorClient，实现客户端请求拦截器，将客户端请求
+ * 直接转发到集群ResourceManager，是责任链模式的最终节点
  *
  */
 public class DefaultClientRequestInterceptor
     extends AbstractClientRequestInterceptor {
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultClientRequestInterceptor.class);
+  // ResourceManager客户端代理实例
   private ApplicationClientProtocol clientRMProxy;
 
   @Override
@@ -118,6 +119,7 @@ public class DefaultClientRequestInterceptor
     super.init(userName);
     try {
       final Configuration conf = this.getConf();
+      // 以当前用户身份创建ResourceManager RPC代理
       clientRMProxy = user.doAs(
           (PrivilegedExceptionAction<ApplicationClientProtocol>) () ->
                ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class));
@@ -134,6 +136,7 @@ public class DefaultClientRequestInterceptor
 
   @Override
   public void setNextInterceptor(ClientRequestInterceptor next) {
+    // 默认拦截器是责任链最后一个节点，不允许设置下一个拦截器，直接抛出异常提示配置错误
     throw new YarnRuntimeException(
         "setNextInterceptor is being called on DefaultRequestInterceptor,"
             + "which should be the last one in the chain "
@@ -355,6 +358,10 @@ public class DefaultClientRequestInterceptor
     return clientRMProxy.getNodesToAttributes(request);
   }
 
+  /**
+   * 仅用于测试，设置RM客户端代理实例
+   * @param clientRM RM客户端代理实例
+   */
   @VisibleForTesting
   public void setRMClient(ApplicationClientProtocol clientRM) {
     this.clientRMProxy = clientRM;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -28,7 +29,7 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 import com.google.inject.Inject;
 
 /**
- * About block for the Router Web UI.
+ * YARN Router Web UI 关于页面信息块，展示Router的基础信息和联邦状态。
  */
 public class AboutBlock extends RouterBlock {
 
@@ -42,32 +43,36 @@ public class AboutBlock extends RouterBlock {
 
   @Override
   protected void render(Block html) {
-
+    // 获取YARN联邦是否启用状态
     boolean isEnabled = isYarnFederationEnabled();
 
-    // If Yarn Federation is not enabled, the user needs to be prompted.
+    // 初始化用户帮助提示区域，未启用联邦时提示用户
     initUserHelpInformationDiv(html, isEnabled);
 
-    // Metrics Overview Table
+    // 渲染指标概览表格
     html.__(MetricsOverviewTable.class);
 
-    // Init Yarn Router Basic Information
+    // 初始化YARN Router基础信息面板
     initYarnRouterBasicInformation(isEnabled);
 
-    // InfoBlock
+    // 渲染通用信息块
     html.__(InfoBlock.class);
   }
 
   /**
-   * Init Yarn Router Basic Infomation.
-   * @param isEnabled true, federation is enabled; false, federation is not enabled.
+   * 初始化YARN Router基础信息，添加到信息面板展示。
+   * @param isEnabled true=联邦已启用，false=联邦未启用
    */
   private void initYarnRouterBasicInformation(boolean isEnabled) {
+    // 获取联邦状态存储门面实例
     FederationStateStoreFacade facade = FederationStateStoreFacade.getInstance(router.getConfig());
+    // 构建Router基础信息DAO
     RouterInfo routerInfo = new RouterInfo(router);
+    // 格式化Router启动时间
     String lastStartTime =
         DateFormatUtils.format(routerInfo.getStartedOn(), DATE_PATTERN);
     try {
+      // 创建Overview信息块，添加各项Router信息
       info("Yarn Router Overview").
           __("Federation Enabled:", String.valueOf(isEnabled)).
           __("Router ID:", routerInfo.getClusterId()).
@@ -80,6 +85,7 @@ public class AboutBlock extends RouterBlock {
           __("Hadoop version:", routerInfo.getHadoopBuildVersion() +
              " on " + routerInfo.getHadoopVersionBuiltOn());
     } catch (YarnException e) {
+      // 初始化失败记录日志
       LOG.error("initYarnRouterBasicInformation error.", e);
     }
   }

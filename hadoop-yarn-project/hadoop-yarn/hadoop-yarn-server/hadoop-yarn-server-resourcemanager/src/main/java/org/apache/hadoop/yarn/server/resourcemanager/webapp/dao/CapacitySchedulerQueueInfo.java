@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,6 +46,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueuePat
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueuePrefixes;
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.dao.helper.CapacitySchedulerInfoHelper;
 
+/**
+ * 容量调度器队列信息数据访问对象，为Web UI提供队列结构化数据
+ * 封装队列容量、资源使用、ACL、标签等核心队列信息
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlSeeAlso({CapacitySchedulerLeafQueueInfo.class})
@@ -99,6 +104,11 @@ public class CapacitySchedulerQueueInfo {
   CapacitySchedulerQueueInfo() {
   }
 
+  /**
+   * 从容量调度器和队列对象构造队列信息DAO
+   * @param cs 容量调度器实例
+   * @param q 队列对象
+   */
   CapacitySchedulerQueueInfo(CapacityScheduler cs, CSQueue q) {
 
     queuePath = q.getQueuePath();
@@ -107,6 +117,7 @@ public class CapacitySchedulerQueueInfo {
     usedCapacity = q.getUsedCapacity() * 100;
 
     maxCapacity = q.getMaximumCapacity();
+    // 校正最大容量值，确保落在合法区间[0, 1]
     if (maxCapacity < EPSILON || maxCapacity > 1f)
       maxCapacity = 1f;
     maxCapacity *= 100;
@@ -128,11 +139,12 @@ public class CapacitySchedulerQueueInfo {
     state = q.getState();
     defaultNodeLabelExpression = q.getDefaultNodeLabelExpression();
     resourcesUsed = new ResourceInfo(q.getUsedResources());
+    // 判断是否需要隐藏预留队列，不展示在UI中
     if (q instanceof PlanQueue && !((PlanQueue) q).showReservationsAsQueues()) {
       hideReservationQueues = true;
     }
 
-    // add labels
+    // 添加可访问节点标签
     Set<String> labelSet = q.getAccessibleNodeLabels();
     if (labelSet != null) {
       nodeLabels.addAll(labelSet);
@@ -160,6 +172,7 @@ public class CapacitySchedulerQueueInfo {
     queueAcls.addAll(getSortedQueueAclInfoList(q, queuePathObject, conf));
 
     queuePriority = q.getPriority().getPriority();
+    // 父队列额外提取排序策略和自动队列模板信息
     if (q instanceof AbstractParentQueue) {
       AbstractParentQueue queue = (AbstractParentQueue) q;
       orderingPolicyInfo = queue.getQueueOrderingPolicy()
@@ -175,6 +188,7 @@ public class CapacitySchedulerQueueInfo {
               .getLeafOnlyProperties());
     }
 
+    // 标记容量配置类型是否为绝对资源模式
     isAbsoluteResource = q.getCapacityConfigType() ==
         AbstractCSQueue.CapacityConfigType.ABSOLUTE_RESOURCE;
 
@@ -183,9 +197,17 @@ public class CapacitySchedulerQueueInfo {
     leafQueueTemplate = new LeafQueueTemplateInfo(conf, queuePathObject);
   }
 
+  /**
+   * 获取排序后的队列ACL信息列表
+   * @param queue 队列对象
+   * @param queuePath 队列路径
+   * @param conf 容量调度器配置
+   * @return 排序后的ACL信息列表
+   */
   public static ArrayList<QueueAclInfo> getSortedQueueAclInfoList(
       CSQueue queue, QueuePath queuePath, CapacitySchedulerConfiguration conf) {
     ArrayList<QueueAclInfo> queueAclsInfo = new ArrayList<>();
+    // 遍历队列已有的ACL，添加到列表
     for (Map.Entry<AccessType, AccessControlList> e :
         ((AbstractCSQueue) queue).getACLs().entrySet()) {
       QueueAclInfo queueAcl = new QueueAclInfo(e.getKey().toString(),
@@ -193,6 +215,7 @@ public class CapacitySchedulerQueueInfo {
       queueAclsInfo.add(queueAcl);
     }
 
+    // 单独处理应用最大优先级ACL，该ACL存储在配置中
     String aclApplicationMaxPriority = "acl_" +
         StringUtils.toLowerCase(AccessType.APPLICATION_MAX_PRIORITY.toString());
     String priorityAcls = conf.get(QueuePrefixes
@@ -202,6 +225,7 @@ public class CapacitySchedulerQueueInfo {
     QueueAclInfo queueAcl = new QueueAclInfo(
         AccessType.APPLICATION_MAX_PRIORITY.toString(), priorityAcls);
     queueAclsInfo.add(queueAcl);
+    // 按访问类型排序ACL列表
     queueAclsInfo.sort(Comparator.comparing(QueueAclInfo::getAccessType));
     return queueAclsInfo;
   }
@@ -282,11 +306,11 @@ public class CapacitySchedulerQueueInfo {
   }
 
   /**
-   * Limit a value to a specified range.
-   * @param val the value to be capped
-   * @param low the lower bound of the range (inclusive)
-   * @param hi the upper bound of the range (inclusive)
-   * @return the capped value
+   * 将值限制在指定区间范围内
+   * @param val 待限制的值
+   * @param low 区间下限（包含）
+   * @param hi 区间上限（包含）
+   * @return 限制后的取值
    */
   static float cap(float val, float low, float hi) {
     return Math.min(Math.max(val, low), hi);

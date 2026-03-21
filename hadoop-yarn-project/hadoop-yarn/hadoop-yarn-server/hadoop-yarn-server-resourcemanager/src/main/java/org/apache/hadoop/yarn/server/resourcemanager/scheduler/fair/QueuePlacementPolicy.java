@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,10 +45,8 @@ import org.w3c.dom.NodeList;
 import static org.apache.hadoop.yarn.server.resourcemanager.placement.PlacementFactory.getPlacementRule;
 
 /**
- * The FairScheduler rules based policy for placing an application in a queue.
- * It parses the configuration and updates the {@link
- * org.apache.hadoop.yarn.server.resourcemanager.placement.PlacementManager}
- * with a list of {@link PlacementRule}s to execute in order.
+ * 公平调度器基于规则的应用队列放置策略实现。
+ * 它解析配置并生成有序的{@link PlacementRule}规则列表，更新PlacementManager用于应用队列分配。
  */
 @Private
 @Unstable
@@ -55,7 +54,7 @@ final class QueuePlacementPolicy {
   private static final Logger LOG =
       LoggerFactory.getLogger(QueuePlacementPolicy.class);
 
-  // Simple private class to make the rule mapping simpler.
+  // 用于简化规则名称到实现类和终止状态映射的内部辅助类
   private static final class RuleMap {
     private final Class<? extends PlacementRule> ruleClass;
     private final String terminal;
@@ -66,11 +65,8 @@ final class QueuePlacementPolicy {
     }
   }
 
-  // The list of known rules:
-  // key to the map is the name in the configuration.
-  // for each name the mapping contains the class name of the implementation
-  // and a flag (true, false or create) which describes the terminal state
-  // see the method getTerminal() for more comments.
+  // 已知规则映射表：key是配置中使用的规则名称，
+  // value包含规则实现类和终止状态配置标识
   private static final Map<String, RuleMap> RULES;
   static {
     Map<String, RuleMap> map = new HashMap<>();
@@ -90,11 +86,11 @@ final class QueuePlacementPolicy {
   }
 
   /**
-   * Update the rules in the manager based on this placement policy.
-   * @param newRules The new list of rules to set in the manager.
-   * @param newTerminalState The list of terminal states for this set of rules.
-   * @param fs the reference to the scheduler needed in the rule on init.
-   * @throws AllocationConfigurationException for any errors
+   * 验证并更新调度器PlacementManager中的规则集合。
+   * @param newRules 要设置的新规则列表
+   * @param newTerminalState 对应规则的终止状态列表
+   * @param fs 公平调度器引用，用于规则初始化
+   * @throws AllocationConfigurationException 配置错误时抛出
    */
   private static void updateRuleSet(List<PlacementRule> newRules,
                                     List<Boolean> newTerminalState,
@@ -105,6 +101,7 @@ final class QueuePlacementPolicy {
       return;
     }
     LOG.debug("Placement rule order check");
+    // 遍历检查所有规则，确保终止规则后没有不可达规则
     for (int i = 0; i < newTerminalState.size()-1; i++) {
       if (newTerminalState.get(i)) {
         String errorMsg = "Rules after rule "
@@ -116,11 +113,12 @@ final class QueuePlacementPolicy {
         }
       }
     }
+    // 必须保证最后一条规则是终止规则，避免分配结束后没有队列
     if (!newTerminalState.get(newTerminalState.size()-1)) {
       throw new AllocationConfigurationException(
           "Could get past last queue placement rule without assigning");
     }
-    // Set the scheduler in the rule to get queues etc
+    // 初始化所有规则，注入调度器引用
     LOG.debug("Initialising new rule set");
     try {
       for (PlacementRule rule: newRules){
@@ -132,18 +130,17 @@ final class QueuePlacementPolicy {
       throw new AllocationConfigurationException(
           "Rule initialisation failed with exception", ioe);
     }
-    // Update the placement manager with the new rule list.
+    // 所有规则验证通过，更新PlacementManager中的规则列表
     // We only get here when all rules are OK.
     fs.getRMContext().getQueuePlacementManager().updateRules(newRules);
     LOG.debug("PlacementManager active with new rule set");
   }
 
   /**
-   * Builds a QueuePlacementPolicy from a xml element.
-   * @param confElement the placement policy xml snippet from the
-   *                    {@link FairSchedulerConfiguration}
-   * @param fs the reference to the scheduler needed in the rule on init.
-   * @throws AllocationConfigurationException for any errors
+   * 从XML配置元素解析并构建队列放置策略。
+   * @param confElement 公平调度器分配配置中的放置策略XML片段
+   * @param fs 公平调度器引用，用于规则初始化
+   * @throws AllocationConfigurationException 配置错误时抛出
    */
   static void fromXml(Element confElement, FairScheduler fs)
       throws AllocationConfigurationException {
@@ -155,15 +152,17 @@ final class QueuePlacementPolicy {
     List<PlacementRule> newRules = new ArrayList<>();
     List<Boolean> newTerminalState = new ArrayList<>();
     NodeList elements = confElement.getChildNodes();
+    // 遍历所有子节点，处理每个rule配置
     for (int i = 0; i < elements.getLength(); i++) {
       Node node = elements.item(i);
       if (node instanceof Element &&
           node.getNodeName().equalsIgnoreCase("rule")) {
         String name = ((Element) node).getAttribute("name");
         LOG.debug("Creating new rule: {}", name);
+        // 根据XML节点创建规则实例
         PlacementRule rule = createRule((Element)node);
 
-        // The only child node that we currently know is a parent rule
+        // 获取嵌套的父规则定义（仅用于嵌套用户队列场景）
         PlacementRule parentRule = null;
         String parentName = null;
         Element child = getParentRuleElement(node);
@@ -171,13 +170,13 @@ final class QueuePlacementPolicy {
           parentName = child.getAttribute("name");
           parentRule = getParentRule(child, fs);
         }
-        // Need to make sure that the nestedUserQueue has a parent for
-        // backwards compatibility
+        // 向后兼容性检查：nestedUserQueue必须配置父规则
         if (name.equalsIgnoreCase("nestedUserQueue") && parentRule == null) {
           throw new AllocationConfigurationException("Rule '" + name
               + "' must have a parent rule set");
         }
         newRules.add(rule);
+        // 计算规则终止状态
         if (parentRule == null) {
           newTerminalState.add(
               getTerminal(RULES.get(name).terminal, rule));
@@ -193,21 +192,22 @@ final class QueuePlacementPolicy {
   }
 
   /**
-   * Find the element that defines the parent rule.
-   * @param node the xml node to check for a parent rule
-   * @return {@link Element} that describes the parent rule or
-   * <code>null</code> if none is found
+   * 从当前规则节点中查找嵌套定义的父规则节点。
+   * @param node 当前规则XML节点
+   * @return 父规则元素，没有则返回null
+   * @throws AllocationConfigurationException 配置错误时抛出
    */
   private static Element getParentRuleElement(Node node)
       throws AllocationConfigurationException {
     Element parent = null;
-    // walk over the node list
+    // 遍历查找子节点中的rule节点
     if (node.hasChildNodes()) {
       NodeList childList = node.getChildNodes();
       for (int j = 0; j < childList.getLength(); j++) {
         Node child = childList.item(j);
         if (child instanceof Element &&
             child.getNodeName().equalsIgnoreCase("rule")) {
+          // 允许多个配置但只使用最后一个，输出警告
           if (parent != null) {
             LOG.warn("Rule '{}' has multiple parent rules defined, only the " +
                 "last parent rule will be used",
@@ -217,7 +217,7 @@ final class QueuePlacementPolicy {
         }
       }
     }
-    // sanity check the rule that is configured
+    // 验证父规则合法性：reject和nestedUserQueue不能作为父规则
     if (parent != null) {
       String parentName = parent.getAttribute("name");
       if (parentName.equals("reject") ||
@@ -231,19 +231,18 @@ final class QueuePlacementPolicy {
   }
 
   /**
-   * Retrieve the configured parent rule from the xml config.
-   * @param parent the xml element that contains the name of the rule to add.
-   * @param fs the reference to the scheduler needed in the rule on init.
-   * @return {@link PlacementRule} to set as a parent
-   * @throws AllocationConfigurationException for any error
+   * 根据XML配置创建并初始化父规则实例。
+   * @param parent 父规则XML元素
+   * @param fs 公平调度器引用，用于规则初始化
+   * @return 初始化完成的父规则实例
+   * @throws AllocationConfigurationException 配置错误时抛出
    */
   private static PlacementRule getParentRule(Element parent,
                                              FairScheduler fs)
       throws AllocationConfigurationException {
     LOG.debug("Creating new parent rule: {}", parent.getAttribute("name"));
     PlacementRule parentRule = createRule(parent);
-    // Init the rule, we do not want to add it to the list of the
-    // placement manager
+    // 直接初始化父规则，不加入顶层规则列表
     try {
       parentRule.initialize(fs);
     } catch (IOException ioe) {
@@ -256,29 +255,28 @@ final class QueuePlacementPolicy {
   }
 
   /**
-   * Returns the terminal status of the rule based on the definition and the
-   * create flag set in the rule.
-   * @param terminal The definition of the terminal flag
-   * @param rule The rule to check
-   * @return <code>true</code> if the rule is terminal <code>false</code> in
-   * all other cases.
+   * 根据规则配置和创建标志计算规则是否为终止规则。
+   * 终止规则表示匹配后不会继续执行后续规则。
+   * @param terminal 终止状态配置值（true/false/create）
+   * @param rule 规则实例
+   * @return true表示是终止规则，否则false
    */
   private static Boolean getTerminal(String terminal, PlacementRule rule) {
     switch (terminal) {
-    case "true":    // rule is always terminal
+    case "true":    // 始终是终止规则
       return true;
-    case "false":   // rule is never terminal
+    case "false":   // 始终不是终止规则
       return false;
-    default:        // rule is terminal based on the create flag
+    default:        // 根据规则的创建标志决定：允许创建队列则为终止
       return ((FSPlacementRule)rule).getCreateFlag();
     }
   }
 
   /**
-   * Create a rule from a given a xml node.
-   * @param element the xml element to create the rule from
-   * @return PlacementRule
-   * @throws AllocationConfigurationException for any error
+   * 根据XML元素创建规则实例。
+   * @param element 规则XML元素
+   * @return 创建完成的规则实例
+   * @throws AllocationConfigurationException 配置错误时抛出
    */
   @SuppressWarnings("unchecked")
   private static PlacementRule createRule(Element element)
@@ -302,10 +300,9 @@ final class QueuePlacementPolicy {
   }
     
   /**
-   * Build a simple queue placement policy from the configuration options
-   * {@link FairSchedulerConfiguration#ALLOW_UNDECLARED_POOLS} and
-   * {@link FairSchedulerConfiguration#USER_AS_DEFAULT_QUEUE}.
-   * @param fs the reference to the scheduler needed in the rule on init.
+   * 根据传统FairScheduler配置选项构建默认队列放置策略。
+   * 兼容不使用规则配置的旧版本配置格式。
+   * @param fs 公平调度器引用，用于规则初始化
    */
   static void fromConfiguration(FairScheduler fs) {
     LOG.debug("Creating base placement policy from config");

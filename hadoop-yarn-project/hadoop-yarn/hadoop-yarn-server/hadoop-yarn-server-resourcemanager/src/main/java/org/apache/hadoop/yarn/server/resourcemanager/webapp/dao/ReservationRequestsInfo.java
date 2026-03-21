@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,27 +30,40 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * Simple class representing a list of ReservationRequest and the
- * interpreter which capture the semantic of this list (all/any/order).
+ * 文件级注释：YARN ResourceManager Web REST API 数据访问对象，用于封装预约资源请求列表及其解释规则信息
+ * 
+ * 表示一组预约资源请求，同时包含解释规则（满足所有/任意/按顺序满足）语义信息，
+ * 用于在Web API中序列化和传输预约定义信息。
  */
 @XmlRootElement(name = "reservation-definition")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ReservationRequestsInfo {
 
+  // 预约请求解释规则的枚举序号，对应all/any/order三种语义
   @XmlElement(name = "reservation-request-interpreter")
   private int reservationRequestsInterpreter;
+  // 转换后的单个预约请求信息列表
   @XmlElement(name = "reservation-request")
   private ArrayList<ReservationRequestInfo> reservationRequest;
 
+  /**
+   * JAXB反序列化默认构造函数
+   */
   public ReservationRequestsInfo() {
 
   }
 
+  /**
+   * 基于原生ReservationRequests对象构造Web DAO对象
+   * @param requests 原生预约请求对象，来自YARN API层
+   */
   public ReservationRequestsInfo(ReservationRequests requests) {
     reservationRequest = new ArrayList<>();
+    // 遍历所有资源请求，逐个转换为Web DAO格式
     for (ReservationRequest request : requests.getReservationResources()) {
       reservationRequest.add(new ReservationRequestInfo(request));
     }
+    // 获取解释规则枚举的序号存储
     reservationRequestsInterpreter = requests.getInterpreter().ordinal();
   }
 

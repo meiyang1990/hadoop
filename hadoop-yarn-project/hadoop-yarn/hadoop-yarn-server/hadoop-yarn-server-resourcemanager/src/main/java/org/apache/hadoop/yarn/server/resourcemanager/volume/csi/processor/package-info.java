@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,7 @@
  */
 
 /**
- * This package contains AMS processor class for volume handling.
+ * CSI存储卷相关的AMS事件处理器包，提供YARN集群中CSI存储卷生命周期管理的核心处理逻辑
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

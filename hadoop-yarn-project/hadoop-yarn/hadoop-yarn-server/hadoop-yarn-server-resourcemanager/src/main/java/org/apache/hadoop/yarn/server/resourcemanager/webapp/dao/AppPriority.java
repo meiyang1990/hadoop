@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +22,9 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * YARN ResourceManager Web REST API 数据访问对象，封装应用优先级信息，用于XML/JSON序列化返回给前端
+ */
 @XmlRootElement(name = "applicationpriority")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppPriority {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -39,7 +40,7 @@ import javax.ws.rs.client.Client;
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.NODE_SC;
 
 /**
- * Navigation block for the Router Web UI.
+ *  Router Web UI 节点标签页面区块，负责渲染联邦集群下的节点标签列表
  */
 public class NodeLabelsBlock extends RouterBlock {
 
@@ -53,39 +54,46 @@ public class NodeLabelsBlock extends RouterBlock {
 
   @Override
   protected void render(Block html) {
+    // 检查YARN联邦模式是否启用
     boolean isEnabled = isYarnFederationEnabled();
 
-    // Get subClusterName
+    // 获取请求参数中的子集群名称
     String subClusterName = $(NODE_SC);
 
     NodeLabelsInfo nodeLabelsInfo = null;
     if (StringUtils.isNotEmpty(subClusterName)) {
+      // 获取指定子集群的节点标签信息
       nodeLabelsInfo = getSubClusterNodeLabelsInfo(subClusterName);
     } else {
+      // 根据联邦状态获取对应集群的节点标签信息
       nodeLabelsInfo = getYarnFederationNodeLabelsInfo(isEnabled);
     }
 
+    // 渲染节点标签表格到页面
     initYarnFederationNodeLabelsOfCluster(nodeLabelsInfo, html);
   }
 
   /**
-   * Get NodeLabels Info based on SubCluster.
-   * @return NodeLabelsInfo.
+   * 根据指定子集群获取节点标签信息.
+   * @param subCluster 子集群ID
+   * @return 节点标签信息
    */
   private NodeLabelsInfo getSubClusterNodeLabelsInfo(String subCluster) {
     try {
       SubClusterId subClusterId = SubClusterId.newInstance(subCluster);
       FederationStateStoreFacade facade =
           FederationStateStoreFacade.getInstance(router.getConfig());
+      // 从联邦状态存储获取子集群信息
       SubClusterInfo subClusterInfo = facade.getSubCluster(subClusterId);
 
       if (subClusterInfo != null) {
-        // Prepare webAddress
+        // 构造子集群RM Web服务地址
         String webAddress = subClusterInfo.getRMWebServiceAddress();
         String herfWebAppAddress = "";
         if (webAddress != null && !webAddress.isEmpty()) {
           herfWebAppAddress =
               WebAppUtils.getHttpSchemePrefix(this.router.getConfig()) + webAddress;
+          // 远程调用子集群RM获取节点标签
           return getSubClusterNodeLabelsByWebAddress(herfWebAppAddress);
         }
       }
@@ -96,52 +104,54 @@ public class NodeLabelsBlock extends RouterBlock {
   }
 
   /**
-   * We will obtain the NodeLabel information of multiple sub-clusters.
+   * 获取节点标签信息，联邦模式开启则聚合多个子集群，否则获取本地集群节点标签.
    *
-   * If Federation mode is enabled, get the NodeLabels of multiple sub-clusters,
-   * otherwise get the NodeLabels of the local cluster.
+   * @param isEnabled 是否开启联邦模式，true为开启，false为关闭
    *
-   * @param isEnabled Whether to enable Federation mode,
-   * true, Federation mode; false, Non-Federation mode.
-   *
-   * @return NodeLabelsInfo.
+   * @return 节点标签信息
    */
   private NodeLabelsInfo getYarnFederationNodeLabelsInfo(boolean isEnabled) {
     Configuration config = this.router.getConfig();
     String webAddress;
     if (isEnabled) {
+      // 联邦模式下获取Router自身的Web服务地址
       webAddress = WebAppUtils.getRouterWebAppURLWithScheme(config);
     } else {
+      // 非联邦模式下获取本地RM的Web服务地址
       webAddress = WebAppUtils.getRMWebAppURLWithScheme(config);
     }
+    // 从对应地址获取节点标签
     return getSubClusterNodeLabelsByWebAddress(webAddress);
   }
 
   /**
-   * Get NodeLabels based on WebAddress.
+   * 根据指定Web地址远程获取节点标签信息.
    *
-   * @param webAddress RM WebAddress.
-   * @return NodeLabelsInfo.
+   * @param webAddress RM Web服务地址
+   * @return 节点标签信息
    */
   private NodeLabelsInfo getSubClusterNodeLabelsByWebAddress(String webAddress) {
     Configuration conf = this.router.getConfig();
+    // 创建Jersey REST客户端
     Client client = RouterWebServiceUtil.createJerseyClient(conf);
+    // 转发请求到目标RM获取节点标签信息
     NodeLabelsInfo nodes = RouterWebServiceUtil
         .genericForward(webAddress, null, NodeLabelsInfo.class, HTTPMethods.GET,
         RMWSConsts.RM_WEB_SERVICE_PATH + RMWSConsts.GET_RM_NODE_LABELS, null, null, conf,
         client);
+    // 关闭客户端释放资源
     client.close();
     return nodes;
   }
 
   /**
-   * Initialize the Router page based on NodeLabels.
+   * 初始化渲染页面节点标签表格.
    *
-   * @param nodeLabelsInfo NodeLabelsInfo.
-   * @param html html Block.
+   * @param nodeLabelsInfo 节点标签信息
+   * @param html 页面区块对象
    */
   private void initYarnFederationNodeLabelsOfCluster(NodeLabelsInfo nodeLabelsInfo, Block html) {
-
+    // 创建表格并初始化表头
     Hamlet.TBODY<Hamlet.TABLE<Hamlet>> tbody = html.table("#nodelabels").
         thead().
         tr().
@@ -153,14 +163,17 @@ public class NodeLabelsBlock extends RouterBlock {
         tbody();
 
     if (nodeLabelsInfo != null) {
+      // 遍历所有节点标签生成表格行
       for (NodeLabelInfo info : nodeLabelsInfo.getNodeLabelsInfo()) {
         Hamlet.TR<Hamlet.TBODY<Hamlet.TABLE<Hamlet>>> row =
             tbody.tr().td(info.getName().isEmpty() ?
             NodeLabel.DEFAULT_NODE_LABEL_PARTITION : info.getName());
+        // 输出标签独占类型
         String type = (info.getExclusivity()) ? "Exclusive Partition" : "Non Exclusive Partition";
         row = row.td(type);
         int nActiveNMs = info.getActiveNMs();
         if (nActiveNMs > 0) {
+          // 活跃节点数大于0时添加跳转到节点列表的链接
           row = row.td().a(url("nodes",
               "?" + YarnWebParams.NODE_LABEL + "=" + info.getName()), String.valueOf(nActiveNMs))
               .__();
@@ -168,12 +181,14 @@ public class NodeLabelsBlock extends RouterBlock {
           row = row.td(String.valueOf(nActiveNMs));
         }
 
+        // 输出分区可用资源信息
         PartitionInfo partitionInfo = info.getPartitionInfo();
         ResourceInfo available = partitionInfo.getResourceAvailable();
         row.td(available.toFormattedString()).__();
       }
     }
 
+    // 结束表格渲染
     tbody.__().__();
   }
 }

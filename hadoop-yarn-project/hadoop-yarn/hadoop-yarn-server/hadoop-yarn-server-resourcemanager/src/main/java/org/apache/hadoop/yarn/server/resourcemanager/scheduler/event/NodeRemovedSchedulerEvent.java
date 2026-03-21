@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,15 +21,27 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
+/**
+ * 节点下线调度事件，通知调度器集群中移除了一个节点，需要清理该节点上的资源和调度信息。
+ */
 public class NodeRemovedSchedulerEvent extends SchedulerEvent {
 
+  /** 已被移除的RM节点对象 */
   private final RMNode rmNode;
 
+  /**
+   * 构造节点移除调度事件
+   * @param rmNode 被移除的RM节点
+   */
   public NodeRemovedSchedulerEvent(RMNode rmNode) {
     super(SchedulerEventType.NODE_REMOVED);
     this.rmNode = rmNode;
   }
 
+  /**
+   * 获取被移除的RM节点对象
+   * @return 已移除的RM节点实例
+   */
   public RMNode getRemovedRMNode() {
     return rmNode;
   }

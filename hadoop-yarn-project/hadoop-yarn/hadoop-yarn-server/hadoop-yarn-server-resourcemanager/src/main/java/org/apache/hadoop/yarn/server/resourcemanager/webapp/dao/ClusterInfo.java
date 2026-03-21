@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,6 +29,10 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.resourcemanager.ResourceManager;
 import org.apache.hadoop.yarn.util.YarnVersionInfo;
 
+/**
+ * YARN ResourceManager 集群信息数据访问对象，封装集群基本信息用于Web UI展示。
+ * 存储集群标识、启动时间、服务状态、高可用状态、版本信息等核心元数据。
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ClusterInfo {
@@ -48,10 +53,18 @@ public class ClusterInfo {
   private String subClusterId;
   private boolean schedulerUiEnabled;
 
+  /**
+   * 空构造方法，供JAXB序列化反序列化使用。
+   */
   public ClusterInfo() {
   } // JAXB needs this
 
+  /**
+   * 从ResourceManager实例构造集群信息对象。
+   * @param rm ResourceManager服务实例
+   */
   public ClusterInfo(ResourceManager rm) {
+    // 获取集群创建时间戳
     long ts = ResourceManager.getClusterTimeStamp();
 
     this.id = ts;

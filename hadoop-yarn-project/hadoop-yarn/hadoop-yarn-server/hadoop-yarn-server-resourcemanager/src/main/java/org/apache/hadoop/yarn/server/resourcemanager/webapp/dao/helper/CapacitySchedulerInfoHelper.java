@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,26 +36,8 @@ import static org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager.NO_LABEL
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCapacityVector.ResourceUnitCapacityType.PERCENTAGE;
 
 /**
- * Helper class to describe a queue's type, its creation method and its
- * eligibility of having auto created children.
- *
- * queueType: a queue can be a parent or a leaf.
- *
- * creationMethod: the creation method of the queue. Can be: static,
- * dynamicLegacy or dynamicFlexible. When the legacy way of queue auto-creation
- * (before YARN-10506) is used, a parent can only be static (ManagedParent)
- * and a leaf queue can only be dynamicLegacy (no static child queues are
- * allowed under ManagedParents). When the flexible auto queue creation is used
- * both a parent and a leaf can be either static or dynamicFlexible.
- *
- * autoCreationEligibility: describes whether a queue can have dynamically
- * created children. Can be: off, legacy or flexible. Every leaf will have this
- * field with the value off, as they can't have children. When the legacy way
- * of queue auto-creation (before YARN-10506) is used a ManagedParent will have
- * the legacy value. When the flexible auto queue creation is used a static
- * parent can have the value flexible if it is configured to allow auto queue
- * creation, or off if it is not. A dynamic parent implicitly will have the
- * value flexible, as a dynamically created parent cannot have static children.
+ * 容量调度器Web UI信息辅助工具类，为容量调度器队列查询页面提供队列元信息处理能力，
+ * 包括队列容量配置模式、队列类型、创建方式、自动创建子队列 eligibility等信息的提取转换。
  */
 public class CapacitySchedulerInfoHelper {
   private static final String PARENT_QUEUE = "parent";
@@ -67,26 +50,37 @@ public class CapacitySchedulerInfoHelper {
   private static final String AUTO_CREATION_LEGACY = "legacy";
   private static final String AUTO_CREATION_FLEXIBLE = "flexible";
 
+  /** 工具类禁止实例化 */
   private CapacitySchedulerInfoHelper() {}
 
+  /**
+   * 获取队列容量配置模式（百分比、绝对资源、权重、混合模式）
+   * @param queue 待查询队列对象
+   * @return 容量配置模式名称
+   */
   public static String getMode(CSQueue queue) {
+    // 旧版队列模式处理
     if (((AbstractCSQueue) queue).getQueueContext().getConfiguration().isLegacyQueueMode()) {
+      // 绝对资源配置模式
       if (queue.getCapacityConfigType() ==
               AbstractCSQueue.CapacityConfigType.ABSOLUTE_RESOURCE) {
         return "absolute";
       } else if (queue.getCapacityConfigType() ==
               AbstractCSQueue.CapacityConfigType.PERCENTAGE) {
+        // 百分比配置模式，需要判断是否使用权重
         float weight = queue.getQueueCapacities().getWeight();
         if (weight == -1) {
-          //-1 indicates we are not in weight mode
+          // -1表示未启用权重模式，返回百分比
           return "percentage";
         } else {
           return "weight";
         }
       }
     } else {
+      // 新版队列模式，获取已定义的容量类型集合
       final Set<QueueCapacityVector.ResourceUnitCapacityType> definedCapacityTypes =
               queue.getConfiguredCapacityVector(NO_LABEL).getDefinedCapacityTypes();
+      // 单容量类型模式
       if (definedCapacityTypes.size() == 1) {
         QueueCapacityVector.ResourceUnitCapacityType next = definedCapacityTypes.iterator().next();
         if (Objects.requireNonNull(next) == PERCENTAGE) {
@@ -97,6 +91,7 @@ public class CapacitySchedulerInfoHelper {
           return "weight";
         }
       } else if (definedCapacityTypes.size() > 1) {
+        // 多种容量类型混合模式
         return "mixed";
       }
     }
@@ -104,6 +99,11 @@ public class CapacitySchedulerInfoHelper {
     return "unknown";
   }
 
+  /**
+   * 获取队列类型（父队列/叶子队列）
+   * @param queue 待查询队列对象
+   * @return 队列类型字符串
+   */
   public static String getQueueType(CSQueue queue) {
     if (queue instanceof AbstractLeafQueue) {
       return LEAF_QUEUE;
@@ -113,6 +113,11 @@ public class CapacitySchedulerInfoHelper {
     return UNKNOWN_QUEUE;
   }
 
+  /**
+   * 获取队列创建方式（静态/旧版动态/新版灵活动态）
+   * @param queue 待查询队列对象
+   * @return 创建方式字符串
+   */
   public static String getCreationMethod(CSQueue queue) {
     if (queue instanceof AutoCreatedLeafQueue) {
       return LEGACY_DYNAMIC_QUEUE;
@@ -123,6 +128,11 @@ public class CapacitySchedulerInfoHelper {
     }
   }
 
+  /**
+   * 获取队列自动创建子队列的资格模式（关闭/旧版/灵活版）
+   * @param queue 待查询队列对象
+   * @return 自动创建资格模式字符串
+   */
   public static String getAutoCreationEligibility(CSQueue queue) {
     if (queue instanceof ManagedParentQueue) {
       return AUTO_CREATION_LEGACY;
@@ -134,6 +144,11 @@ public class CapacitySchedulerInfoHelper {
     }
   }
 
+  /**
+   * 将自动队列模板属性转换为Web DAO对象
+   * @param templateProperties 模板属性键值对
+   * @return 封装后的自动队列模板属性DAO对象
+   */
   public static AutoQueueTemplatePropertiesInfo getAutoCreatedTemplate(
       Map<String, String> templateProperties) {
     AutoQueueTemplatePropertiesInfo propertiesInfo =

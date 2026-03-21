@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,6 +46,9 @@ import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * YARN ResourceManager Web UI 应用日志聚合状态展示块，负责渲染应用级日志聚合状态页面
+ */
 public class RMAppLogAggregationStatusBlock extends HtmlBlock {
 
   private static final Logger LOG = LoggerFactory
@@ -61,7 +65,12 @@ public class RMAppLogAggregationStatusBlock extends HtmlBlock {
   }
 
   @Override
+  /**
+   * 渲染日志聚合状态HTML页面
+   * @param html HTML块输出对象
+   */
   protected void render(Block html) {
+    // 从请求获取应用ID
     String aid = $(APPLICATION_ID);
     if (aid.isEmpty()) {
       puts("Bad request: requires Application ID");
@@ -70,6 +79,7 @@ public class RMAppLogAggregationStatusBlock extends HtmlBlock {
 
     ApplicationId appId;
     try {
+      // 将字符串转换为应用ID对象
       appId = Apps.toAppID(aid);
     } catch (Exception e) {
       puts("Invalid Application ID: " + aid);
@@ -78,8 +88,7 @@ public class RMAppLogAggregationStatusBlock extends HtmlBlock {
 
     setTitle(join("Application ", aid));
 
-    // Add LogAggregationStatus description table
-    // to explain the meaning of different LogAggregationStatus
+    // 添加日志聚合状态说明表，解释不同状态含义
     DIV<Hamlet> div_description = html.div(_INFO_WRAP);
     TABLE<DIV<Hamlet>> table_description =
         div_description.table("#LogAggregationStatusDecription");
@@ -110,8 +119,9 @@ public class RMAppLogAggregationStatusBlock extends HtmlBlock {
     table_description.__();
     div_description.__();
 
+    // 获取对应应用对象
     RMApp rmApp = rm.getRMContext().getRMApps().get(appId);
-    // Application Log aggregation status Table
+    // 创建应用日志聚合状态详情表
     DIV<Hamlet> div = html.div(_INFO_WRAP);
     TABLE<DIV<Hamlet>> table =
         div.h3(
@@ -121,6 +131,7 @@ public class RMAppLogAggregationStatusBlock extends HtmlBlock {
                 .getLogAggregationStatusForAppReport().name())).table(
           "#LogAggregationStatus");
 
+    // 从配置获取内存中保留的最大日志聚合诊断信息条数
     int maxLogAggregationDiagnosticsInMemory = conf.getInt(
       YarnConfiguration.RM_MAX_LOG_AGGREGATION_DIAGNOSTICS_IN_MEMORY,
       YarnConfiguration.DEFAULT_RM_MAX_LOG_AGGREGATION_DIAGNOSTICS_IN_MEMORY);
@@ -133,21 +144,26 @@ public class RMAppLogAggregationStatusBlock extends HtmlBlock {
       .th(_TH, "Last "
           + maxLogAggregationDiagnosticsInMemory + " Failure Messages").__();
 
+    // 如果应用存在，遍历各节点日志聚合报告
     if (rmApp != null) {
       Map<NodeId, LogAggregationReport> logAggregationReports =
           rmApp.getLogAggregationReportsForApp();
       if (logAggregationReports != null && !logAggregationReports.isEmpty()) {
         for (Entry<NodeId, LogAggregationReport> report :
             logAggregationReports.entrySet()) {
+          // 获取当前节点日志聚合状态
           LogAggregationStatus status =
               report.getValue() == null ? null : report.getValue()
                 .getLogAggregationStatus();
+          // 获取诊断信息
           String message =
               report.getValue() == null ? null : report.getValue()
                 .getDiagnosticMessage();
+          // 获取失败信息
           String failureMessage =
               report.getValue() == null ? null : ((RMAppImpl)rmApp)
                   .getLogAggregationFailureMessagesForNM(report.getKey());
+          // 添加表格行输出当前节点日志聚合信息
           table.tr()
             .td(report.getKey().toString())
             .td(status == null ? "N/A" : status.toString())

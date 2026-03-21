@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,13 +24,16 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * Simple class that represent the response to a reservation update
- * request.
+ * YARN ResourceManager Web REST API 中，资源预留更新请求的响应数据对象。
+ * 用于封装预约更新操作的返回结果，供Web UI序列化返回给客户端。
  */
 @XmlRootElement(name = "reservation-update-response")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ReservationUpdateResponseInfo {
 
+  /**
+   * JAXB反序列化需要的无参构造函数。
+   */
   public ReservationUpdateResponseInfo() {
 
   }
