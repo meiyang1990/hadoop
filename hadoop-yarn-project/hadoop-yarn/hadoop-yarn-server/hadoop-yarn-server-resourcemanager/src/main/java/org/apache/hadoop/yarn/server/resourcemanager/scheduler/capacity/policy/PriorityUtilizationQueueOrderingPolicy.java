@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,20 +37,14 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * For two queues with the same priority:
- * - The queue with less relative used-capacity goes first - today’s behavior.
- * - The default priority for all queues is 0 and equal. So, we get today’s
- *   behaviour at every level - the queue with the lowest used-capacity
- *   percentage gets the resources
- *
- * For two queues with different priorities:
- * - Both the queues are under their guaranteed capacities: The queue with
- *   the higher priority gets resources
- * - Both the queues are over or meeting their guaranteed capacities:
- *   The queue with the higher priority gets resources
- * - One of the queues is over or meeting their guaranteed capacities and the
- *   other is under: The queue that is under its capacity guarantee gets the
- *   resources.
+ * 容量调度器队列排序策略：基于优先级和资源利用率对队列进行排序
+ * 
+ * 相同优先级队列排序规则：相对已用资源利用率更低的队列优先分配资源，默认所有队列优先级为0，保持原有行为
+ * 
+ * 不同优先级队列排序规则：
+ * - 两个队列都低于保证容量：高优先级队列优先获取资源
+ * - 两个队列都达到或超过保证容量：高优先级队列优先获取资源
+ * - 一个达到/超过保证容量、另一个低于保证容量：低于保证容量的队列优先获取资源
  */
 public class PriorityUtilizationQueueOrderingPolicy
     implements QueueOrderingPolicy {
@@ -57,39 +52,34 @@ public class PriorityUtilizationQueueOrderingPolicy
   private final boolean respectPriority;
 
   /**
-   * Compare two queues with possibly different priority and assigned capacity,
-   * Will be used by preemption policy as well.
+   * 基于相对利用率和优先级比较两个队列的排序顺序，也会被抢占策略使用
    *
-   * @param relativeAssigned1 relativeAssigned1
-   * @param relativeAssigned2 relativeAssigned2
-   * @param priority1 p1
-   * @param priority2 p2
-   * @return compared result
+   * @param relativeAssigned1 队列1相对已用利用率
+   * @param relativeAssigned2 队列2相对已用利用率
+   * @param priority1 队列1优先级
+   * @param priority2 队列2优先级
+   * @return 比较结果，负数表示第一个队列优先，正数表示第二个队列优先
    */
   public static int compare(double relativeAssigned1, double relativeAssigned2,
       int priority1, int priority2) {
     if (priority1 == priority2) {
-      // The queue with less relative used-capacity goes first
+      // 相对已用利用率更低的队列优先
       return Double.compare(relativeAssigned1, relativeAssigned2);
     } else{
-      // When priority is different:
+      // 优先级不同时的比较逻辑
       if ((relativeAssigned1 < 1.0f && relativeAssigned2 < 1.0f) || (
           relativeAssigned1 >= 1.0f && relativeAssigned2 >= 1.0f)) {
-        // When both the queues are under their guaranteed capacities,
-        // Or both the queues are over or meeting their guaranteed capacities
-        // queue with higher used-capacity goes first
+        // 两个队列都低于保证容量，或都达到/超过保证容量，高优先级队列优先
         return Integer.compare(priority2, priority1);
       } else{
-        // Otherwise, when one of the queues is over or meeting their
-        // guaranteed capacities and the other is under: The queue that is
-        // under its capacity guarantee gets the resources.
+        // 一个达到/超过保证容量，另一个低于，低于保证容量的队列优先
         return Double.compare(relativeAssigned1, relativeAssigned2);
       }
     }
   }
 
   /**
-   * Comparator that both looks at priority and utilization
+   * 同时考虑优先级和资源利用率的队列比较器
    */
   final public class PriorityQueueComparator
       implements Comparator<PriorityQueueResourcesForSorting> {
@@ -103,6 +93,7 @@ public class PriorityUtilizationQueueOrderingPolicy
     @Override
     public int compare(PriorityQueueResourcesForSorting q1Sort,
         PriorityQueueResourcesForSorting q2Sort) {
+      // 先比较队列对当前节点标签分区的访问权限
       int rc = compareQueueAccessToPartition(
           q1Sort.nodeLabelAccessible,
           q2Sort.nodeLabelAccessible);
@@ -113,18 +104,17 @@ public class PriorityUtilizationQueueOrderingPolicy
       float q1AbsCapacity = q1Sort.absoluteCapacity;
       float q2AbsCapacity = q2Sort.absoluteCapacity;
 
-      //If q1's abs capacity > 0 and q2 is 0, then prioritize q1
+      // q1绝对容量大于0，q2等于0，优先分配q1
       if (Float.compare(q1AbsCapacity, 0f) > 0 && Float.compare(q2AbsCapacity,
           0f) == 0) {
         return -1;
-        //If q2's abs capacity > 0 and q1 is 0, then prioritize q2
+      // q2绝对容量大于0，q1等于0，优先分配q2
       } else if (Float.compare(q2AbsCapacity, 0f) > 0 && Float.compare(
           q1AbsCapacity, 0f) == 0) {
         return 1;
       } else if (Float.compare(q1AbsCapacity, 0f) == 0 && Float.compare(
           q2AbsCapacity, 0f) == 0) {
-        // both q1 has 0 and q2 has 0 capacity, then fall back to using
-        // priority, abs used capacity to prioritize
+        // 两个队列绝对容量都为0，使用优先级和绝对已用容量排序
         float used1 = q1Sort.absoluteUsedCapacity;
         float used2 = q2Sort.absoluteUsedCapacity;
 
@@ -132,8 +122,7 @@ public class PriorityUtilizationQueueOrderingPolicy
             q1Sort.priority.
                 getPriority(), q2Sort.priority.getPriority());
       } else{
-        // both q1 has positive abs capacity and q2 has positive abs
-        // capacity
+        // 两个队列绝对容量都大于0，使用相对利用率和优先级排序
         float used1 = q1Sort.usedCapacity;
         float used2 = q2Sort.usedCapacity;
 
@@ -149,6 +138,7 @@ public class PriorityUtilizationQueueOrderingPolicy
 
       int p1 = 0;
       int p2 = 0;
+      // 如果开启优先级尊重，使用队列实际优先级，否则都按0处理
       if (respectPriority) {
         p1 = q1Prior;
         p2 = q2Prior;
@@ -157,8 +147,7 @@ public class PriorityUtilizationQueueOrderingPolicy
       int rc = PriorityUtilizationQueueOrderingPolicy.compare(q1Used, q2Used,
           p1, p2);
 
-      // For queue with same used ratio / priority, queue with higher configured
-      // capacity goes first
+      // 利用率和优先级相同，配置最小资源更大的队列优先
       if (0 == rc) {
         Resource minEffRes1 =
             q1Sort.configuredMinResource;
@@ -169,6 +158,7 @@ public class PriorityUtilizationQueueOrderingPolicy
           return minEffRes2.compareTo(minEffRes1);
         }
 
+        // 最小资源也相同，绝对容量更大的队列优先
         float abs1 = q1Sort.absoluteCapacity;
         float abs2 = q2Sort.absoluteCapacity;
         return Float.compare(abs2, abs1);
@@ -178,14 +168,13 @@ public class PriorityUtilizationQueueOrderingPolicy
     }
 
     private int compareQueueAccessToPartition(boolean q1Accessible, boolean q2Accessible) {
-      // Everybody has access to default partition
+      // 默认分区所有队列都有权限，直接返回相等
       if (StringUtils.equals(partition, RMNodeLabelsManager.NO_LABEL)) {
         return 0;
       }
 
       /*
-       * Check accessible to given partition, if one queue accessible and
-       * the other not, accessible queue goes first.
+       * 检查对指定分区的访问权限，有权限的队列优先于无权限的
        */
       if (q1Accessible && !q2Accessible) {
         return -1;
@@ -193,12 +182,13 @@ public class PriorityUtilizationQueueOrderingPolicy
         return 1;
       }
 
+      // 都有权限或都无权限，返回相等
       return 0;
     }
   }
 
   /**
-   * A simple storage class to represent a snapshot of a queue.
+   * 存储队列排序前的快照信息，避免排序过程中队列状态变化
    */
   public static class PriorityQueueResourcesForSorting {
     private final float absoluteUsedCapacity;
@@ -224,6 +214,7 @@ public class PriorityUtilizationQueueOrderingPolicy
           queue.getQueueResourceQuotas().
               getConfiguredMinResource(partition);
       this.priority = queue.getPriority();
+      // 判断队列是否可以访问当前节点标签分区
       this.nodeLabelAccessible = queue.getAccessibleNodeLabels() != null &&
           queue.getAccessibleNodeLabels().contains(partition) ||
           queue.getAccessibleNodeLabels().contains(RMNodeLabelsManager.ANY);
@@ -238,6 +229,10 @@ public class PriorityUtilizationQueueOrderingPolicy
     }
   }
 
+  /**
+   * 构造函数，指定是否尊重队列优先级
+   * @param respectPriority 是否尊重队列优先级
+   */
   public PriorityUtilizationQueueOrderingPolicy(boolean respectPriority) {
     this.respectPriority = respectPriority;
   }
@@ -249,8 +244,7 @@ public class PriorityUtilizationQueueOrderingPolicy
 
   @Override
   public Iterator<CSQueue> getAssignmentIterator(String partition) {
-    // Copy (for thread safety) and sort the snapshot of the queues in order to avoid breaking
-    // the prerequisites of TimSort. See YARN-10178 for details.
+    // 拷贝队列列表保证线程安全，对队列快照排序，避免破坏TimSort前置条件，详见YARN-10178
     return new ArrayList<>(queues).stream()
         .map(queue -> PriorityQueueResourcesForSorting.create(queue, partition))
         .sorted(new PriorityQueueComparator(partition))

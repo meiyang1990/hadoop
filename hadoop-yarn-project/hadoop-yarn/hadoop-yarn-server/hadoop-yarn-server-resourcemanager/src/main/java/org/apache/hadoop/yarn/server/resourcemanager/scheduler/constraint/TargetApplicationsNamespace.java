@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,26 +37,32 @@ import static org.apache.hadoop.yarn.api.records.AllocationTagNamespaceType.APP_
 import static org.apache.hadoop.yarn.api.records.AllocationTagNamespaceType.ALL;
 
 /**
- * Class to describe the namespace of allocation tags, used by
- * {@link AllocationTags}. Each namespace can be evaluated against
- * a target set applications, represented by {@link TargetApplications}.
- * After evaluation, the namespace is interpreted to be a set of
- * applications based on the namespace type.
+ * 分配标签命名空间描述类，用于AllocationTags分配标签约束调度，
+ * 根据命名空间类型解析得到目标应用集合。
  */
 public abstract class TargetApplicationsNamespace implements
     Evaluable<TargetApplications> {
 
+  /** 命名路径分隔符 */
   public final static String NAMESPACE_DELIMITER = "/";
 
   private AllocationTagNamespaceType nsType;
-  // Namespace scope value will be delay binding by eval method.
+  // 命名空间作用域采用延迟绑定，由eval方法初始化
   private Set<ApplicationId> nsScope;
 
+  /**
+   * 构造方法，指定命名空间类型。
+   * @param allocationTagNamespaceType 命名空间类型
+   */
   public TargetApplicationsNamespace(AllocationTagNamespaceType
       allocationTagNamespaceType) {
     this.nsType = allocationTagNamespaceType;
   }
 
+  /**
+   * 如果应用ID集合不为空，则设置命名空间作用域。
+   * @param appIds 应用ID集合
+   */
   protected void setScopeIfNotNull(Set<ApplicationId> appIds) {
     if (appIds != null) {
       this.nsScope = appIds;
@@ -63,17 +70,16 @@ public abstract class TargetApplicationsNamespace implements
   }
 
   /**
-   * Get the type of the namespace.
-   * @return namespace type.
+   * 获取命名空间类型。
+   * @return 命名空间类型
    */
   public AllocationTagNamespaceType getNamespaceType() {
     return nsType;
   }
 
   /**
-   * Get the scope of the namespace, in form of a set of applications.
-   *
-   * @return a set of applications.
+   * 获取命名空间作用域，即符合条件的应用ID集合。
+   * @return 符合条件的应用ID集合
    */
   public Set<ApplicationId> getNamespaceScope() {
     if (this.nsScope == null) {
@@ -85,14 +91,11 @@ public abstract class TargetApplicationsNamespace implements
   }
 
   /**
-   * Evaluate the namespace against given target applications
-   * if it is necessary. Only self/not-self/app-label namespace types
-   * require this evaluation step, because they are not binding to a
-   * specific scope during initiating. So we do lazy binding for them
-   * in this method.
+   * 根据输入的目标应用上下文，延迟绑定命名空间作用域。
+   * 仅self/not-self等需要动态计算范围的命名空间类型需要执行该步骤。
    *
-   * @param target a generic type target that impacts this evaluation.
-   * @throws InvalidAllocationTagsQueryException if given string is not in valid format.
+   * @param target 目标应用上下文，包含当前应用ID等信息
+   * @throws InvalidAllocationTagsQueryException 如果命名空间格式非法则抛出异常
    */
   @Override
   public void evaluate(TargetApplications target)
@@ -106,7 +109,7 @@ public abstract class TargetApplicationsNamespace implements
   }
 
   /**
-   * Namespace within application itself.
+   * 仅包含当前应用自身的命名空间。
    */
   public static class Self extends TargetApplicationsNamespace {
 
@@ -127,7 +130,7 @@ public abstract class TargetApplicationsNamespace implements
   }
 
   /**
-   * Namespace to all applications except itself.
+   * 包含除当前应用外所有其他应用的命名空间。
    */
   public static class NotSelf extends TargetApplicationsNamespace {
 
@@ -138,10 +141,8 @@ public abstract class TargetApplicationsNamespace implements
     }
 
     /**
-     * The scope of self namespace is to an application itself,
-     * the application ID can be delay binding to the namespace.
-     *
-     * @param appId application ID.
+     * 设置当前应用ID，用于后续排除计算。
+     * @param appId 当前应用ID
      */
     public void setApplicationId(ApplicationId appId) {
       this.applicationId = appId;
@@ -159,7 +160,7 @@ public abstract class TargetApplicationsNamespace implements
   }
 
   /**
-   * Namespace to all applications in the cluster.
+   * 包含集群所有应用的命名空间。
    */
   public static class All extends TargetApplicationsNamespace {
 
@@ -169,7 +170,7 @@ public abstract class TargetApplicationsNamespace implements
   }
 
   /**
-   * Namespace to applications that attached with a certain application tag.
+   * 包含带有指定应用标签所有应用的命名空间。
    */
   public static class AppTag extends TargetApplicationsNamespace {
 
@@ -192,12 +193,12 @@ public abstract class TargetApplicationsNamespace implements
   }
 
   /**
-   * Namespace defined by a certain application ID.
+   * 仅包含指定应用ID单个应用的命名空间。
    */
   public static class AppID extends TargetApplicationsNamespace {
 
     private ApplicationId targetAppId;
-    // app-id namespace requires an extra value of an application id.
+    // app-id命名空间需要额外指定一个应用ID作为参数
     public AppID(ApplicationId applicationId) {
       super(APP_ID);
       this.targetAppId = applicationId;
@@ -211,24 +212,22 @@ public abstract class TargetApplicationsNamespace implements
   }
 
   /**
-   * Parse namespace from a string. The string must be in legal format
-   * defined by each {@link AllocationTagNamespaceType}.
+   * 从字符串解析命名空间实例。
    *
-   * @param namespaceStr namespace string.
-   * @return an instance of {@link TargetApplicationsNamespace}.
-   * @throws InvalidAllocationTagsQueryException
-   * if given string is not in valid format
+   * @param namespaceStr 命名空间字符串
+   * @return 解析得到的命名空间实例
+   * @throws InvalidAllocationTagsQueryException 如果字符串格式非法则抛出异常
    */
   public static TargetApplicationsNamespace parse(String namespaceStr)
       throws InvalidAllocationTagsQueryException {
-    // Return the default namespace if no valid string is given.
+    // 空输入默认返回Self命名空间
     if (Strings.isNullOrEmpty(namespaceStr)) {
       return new Self();
     }
 
-    // Normalize the input, escape additional chars.
+    // 归一化输入，处理多余分隔符
     List<String> nsValues = normalize(namespaceStr);
-    // The first string should be the prefix.
+    // 第一个片段是命名空间前缀
     String nsPrefix = nsValues.get(0);
     AllocationTagNamespaceType allocationTagNamespaceType =
         fromString(nsPrefix);
@@ -260,6 +259,12 @@ public abstract class TargetApplicationsNamespace implements
     }
   }
 
+  /**
+   * 从前缀字符串匹配命名空间类型。
+   * @param prefix 前缀字符串
+   * @return 匹配到的命名空间类型
+   * @throws InvalidAllocationTagsQueryException 如果前缀不匹配任何类型则抛出异常
+   */
   private static AllocationTagNamespaceType fromString(String prefix) throws
       InvalidAllocationTagsQueryException {
     for (AllocationTagNamespaceType type :
@@ -277,6 +282,12 @@ public abstract class TargetApplicationsNamespace implements
             + ", valid values are: " + String.join(",", values));
   }
 
+  /**
+   * 解析应用ID字符串生成AppID命名空间。
+   * @param appIDStr 应用ID字符串
+   * @return 解析得到的AppID命名空间
+   * @throws InvalidAllocationTagsQueryException 如果应用ID格式非法则抛出异常
+   */
   private static TargetApplicationsNamespace parseAppID(String appIDStr)
       throws InvalidAllocationTagsQueryException {
     try {
@@ -290,15 +301,11 @@ public abstract class TargetApplicationsNamespace implements
   }
 
   /**
-   * Valid given namespace string and parse it to a list of sub-strings
-   * that can be consumed by the parser according to the type of the
-   * namespace. Currently the size of return list should be either 1 or 2.
-   * Extra slash is escaped during the normalization.
+   * 归一化命名空间字符串，切割并过滤空片段，校验格式合法性。
    *
-   * @param namespaceStr namespace string.
-   * @return a list of parsed strings.
-   * @throws InvalidAllocationTagsQueryException
-   * if namespace format is unexpected.
+   * @param namespaceStr 输入的命名空间字符串
+   * @return 归一化后的片段列表
+   * @throws InvalidAllocationTagsQueryException 如果格式不合法则抛出异常
    */
   private static List<String> normalize(String namespaceStr)
       throws InvalidAllocationTagsQueryException {
@@ -314,7 +321,7 @@ public abstract class TargetApplicationsNamespace implements
       }
     }
 
-    // Currently we only allow 1 or 2 values for a namespace string
+    // 当前仅允许1段或2段格式：<前缀> 或 <前缀>/<值>
     if (result.size() == 0 || result.size() > 2) {
       throw new InvalidAllocationTagsQueryException("Invalid namespace string: "
           + namespaceStr + ", the syntax is <namespace_prefix> or"

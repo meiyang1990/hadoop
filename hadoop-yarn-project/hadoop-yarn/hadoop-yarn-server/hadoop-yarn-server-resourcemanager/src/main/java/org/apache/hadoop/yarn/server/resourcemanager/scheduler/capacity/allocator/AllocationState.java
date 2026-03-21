@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,11 +19,20 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.allocator;
 
+/**
+ * 容器分配结果状态枚举，定义容量调度器资源分配过程中的各种结果状态
+ */
 public enum AllocationState {
+  /** 当前应用未分配到容器，跳过该应用 */
   APP_SKIPPED,
+  /** 当前优先级无可用资源，跳过该优先级 */
   PRIORITY_SKIPPED,
+  /** 未满足位置性要求，跳过本次分配 */
   LOCALITY_SKIPPED,
+  /** 队列资源不足，跳过该队列 */
   QUEUE_SKIPPED,
+  /** 成功分配容器 */
   ALLOCATED,
+  /** 容器已预留，等待后续分配 */
   RESERVED
 }

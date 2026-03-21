@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,18 +29,21 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Represents a simple resource floating point value grouped by resource names.
+ * 文件: 容量调度器资源向量，用于按资源名称存储资源的浮点值
+ * 功能: 支持多资源的浮点型数值存储与运算，为容量调度器的资源计算提供基础数据结构
+ * 表示按资源名称分组的浮点型资源值集合，用于YARN容量调度器的资源计算
  */
 public class ResourceVector implements Iterable<Map.Entry<String, Double>> {
+  // 按资源名称存储对应浮点值的映射
   private final Map<String, Double> resourcesByName = new HashMap<>();
 
   /**
-   * Creates a new {@code ResourceVector} with all pre-defined resources set to
-   * zero.
-   * @return zero resource vector
+   * 创建一个所有预定义资源值都初始化为0的空资源向量
+   * @return 全零初始化的资源向量
    */
   public static ResourceVector newInstance() {
     ResourceVector zeroResourceVector = new ResourceVector();
+    // 遍历所有已知资源类型，初始化为0
     for (ResourceInformation resource : ResourceUtils.getResourceTypesArray()) {
       zeroResourceVector.setValue(resource.getName(), 0);
     }
@@ -48,13 +52,13 @@ public class ResourceVector implements Iterable<Map.Entry<String, Double>> {
   }
 
   /**
-   * Creates a new {@code ResourceVector} with all pre-defined resources set to
-   * the same value.
-   * @param value the value to set all resources to
-   * @return uniform resource vector
+   * 创建一个所有预定义资源都设置为相同值的资源向量
+   * @param value 所有资源要设置的值
+   * @return 所有资源值统一的资源向量
    */
   public static ResourceVector of(double value) {
     ResourceVector emptyResourceVector = new ResourceVector();
+    // 遍历所有已知资源类型，设置为统一值
     for (ResourceInformation resource : ResourceUtils.getResourceTypesArray()) {
       emptyResourceVector.setValue(resource.getName(), value);
     }
@@ -63,24 +67,24 @@ public class ResourceVector implements Iterable<Map.Entry<String, Double>> {
   }
 
   /**
-   * Creates a new {@code ResourceVector} with the values set in a
-   * {@code Resource} object.
-   * @param resource resource object the resource vector will be based on
-   * @return uniform resource vector
+   * 基于已有的Resource对象创建对应的资源向量
+   * @param resource 用来初始化资源向量的YARN Resource对象
+   * @return 包含对应资源值的资源向量
    */
   public static ResourceVector of(Resource resource) {
     ResourceVector resourceVector = new ResourceVector();
+    // 遍历Resource对象中所有资源，存入向量
     for (ResourceInformation resourceInformation : resource.getResources()) {
       resourceVector.setValue(resourceInformation.getName(),
-          resourceInformation.getValue());
+          (double)resourceInformation.getValue());
     }
 
     return resourceVector;
   }
 
   /**
-   * Decrements values for each resource defined in the given resource vector.
-   * @param otherResourceVector rhs resource vector of the subtraction
+   * 减去另一个资源向量中所有资源对应的值
+   * @param otherResourceVector 要减去的资源向量
    */
   public void decrement(ResourceVector otherResourceVector) {
     for (Map.Entry<String, Double> resource : otherResourceVector) {
@@ -89,18 +93,18 @@ public class ResourceVector implements Iterable<Map.Entry<String, Double>> {
   }
 
   /**
-   * Decrements the given resource by the specified value.
-   * @param resourceName name of the resource
-   * @param value value to be subtracted from the resource's current value
+   * 指定资源减去指定数值
+   * @param resourceName 资源名称
+   * @param value 要减去的数值
    */
   public void decrement(String resourceName, double value) {
     setValue(resourceName, getValue(resourceName) - value);
   }
 
   /**
-   * Increments the given resource by the specified value.
-   * @param resourceName name of the resource
-   * @param value value to be added to the resource's current value
+   * 指定资源加上指定数值
+   * @param resourceName 资源名称
+   * @param value 要加上的数值
    */
   public void increment(String resourceName, double value) {
     setValue(resourceName, getValue(resourceName) + value);

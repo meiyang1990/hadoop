@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,18 +22,18 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
- * A class implements Evaluable interface represents the internal state
- * of the class can be changed against a given target.
- * @param <T> a target to evaluate against
+ * YARN资源调度约束求值接口，实现该接口的类表示可根据给定目标更新内部状态并完成求值。
+ * 用于YARN调度过程中对 placement 分配约束进行评估计算。
+ * @param <T> 求值所依赖的目标对象类型
  */
 public interface Evaluable<T> {
 
   /**
-   * Evaluate against a given target, this process changes the internal state
-   * of current class.
+   * 基于给定目标执行求值，该过程会修改当前对象的内部状态。
+   * 在YARN调度约束流程中，用于根据目标节点/节点分区更新约束满足状态。
    *
-   * @param target a generic type target that impacts this evaluation.
-   * @throws YarnException if evaluate error.
+   * @param target 影响求值结果的目标对象，通常为待评估的节点或节点分区
+   * @throws YarnException 求值过程中发生错误时抛出
    */
   void evaluate(T target) throws YarnException;
 }

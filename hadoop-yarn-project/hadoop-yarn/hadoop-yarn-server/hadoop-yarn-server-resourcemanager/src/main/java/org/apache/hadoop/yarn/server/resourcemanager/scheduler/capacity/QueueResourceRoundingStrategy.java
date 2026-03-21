@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,16 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCapacityVector.QueueCapacityVectorEntry;
 
 /**
- * Represents an approach on how to convert a calculated resource from floating point to a whole
- * number.
+ * YARN容量调度器队列资源舍入策略接口，定义将计算得到的浮点资源值转换为整数资源值的统一抽象。
+ * 用于在按比例分配集群资源时，处理小数资源的舍入逻辑，保证总资源分配结果正确。
  */
 public interface QueueResourceRoundingStrategy {
 
   /**
-   * Returns a whole number converted from the calculated resource value.
-   * @param resourceValue calculated resource value
-   * @param capacityVectorEntry configured capacity entry
-   * @return rounded resource value
+   * 对计算得到的浮点资源值进行舍入，返回最终可分配的资源值。
+   * @param resourceValue 计算得到的原始浮点资源值
+   * @param capacityVectorEntry 队列配置的容量条目，提供队列元信息
+   * @return 舍入后的最终资源值
    */
   double getRoundedResource(double resourceValue, QueueCapacityVectorEntry capacityVectorEntry);
 }

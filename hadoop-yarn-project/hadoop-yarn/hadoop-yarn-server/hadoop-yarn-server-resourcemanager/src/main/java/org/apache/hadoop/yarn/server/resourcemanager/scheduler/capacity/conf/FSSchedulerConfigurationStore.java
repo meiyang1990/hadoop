@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,8 +44,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 
 
 /**
- * A filesystem implementation of {@link YarnConfigurationStore}. Offer
- * configuration storage in FileSystem
+ * 基于Hadoop文件系统实现的容量调度器配置存储，将调度器配置持久化存储在文件系统中
  */
 public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
   public static final Logger LOG = LoggerFactory.getLogger(
@@ -68,6 +68,7 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
   @Override
   public void initialize(Configuration fsConf, Configuration vSchedConf,
       RMContext rmContext) throws Exception {
+    // 创建配置文件路径过滤器，筛选合法配置文件
     this.configFilePathFilter = new PathFilter() {
       @Override
       public boolean accept(Path path) {
@@ -75,12 +76,14 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
           return false;
         }
         String pathName = path.getName();
+        // 匹配配置文件前缀，过滤掉临时文件
         return pathName.startsWith(YarnConfiguration.CS_CONFIGURATION_FILE)
             && !pathName.endsWith(TMP);
       }
     };
 
     Configuration conf = new Configuration(fsConf);
+    // 从配置中读取存储目录路径
     String schedulerConfPathStr = conf.get(
         YarnConfiguration.SCHEDULER_CONFIGURATION_FS_PATH);
     if (schedulerConfPathStr == null || schedulerConfPathStr.isEmpty()) {
@@ -94,49 +97,57 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
       scheme = FileSystem.getDefaultUri(conf).getScheme();
     }
     if (scheme != null) {
+      // 禁用文件系统缓存，确保获取最新文件系统实例
       String disableCacheName = String.format("fs.%s.impl.disable.cache",
           scheme);
       conf.setBoolean(disableCacheName, true);
     }
+    // 获取文件系统实例
     this.fileSystem = this.schedulerConfDir.getFileSystem(conf);
+    // 读取允许保留的最大配置文件版本数
     this.maxVersion = conf.getInt(
         YarnConfiguration.SCHEDULER_CONFIGURATION_FS_MAX_VERSION,
         YarnConfiguration.DEFAULT_SCHEDULER_CONFIGURATION_FS_MAX_VERSION);
     LOG.info("schedulerConfDir=" + schedulerConfPathStr);
     LOG.info("capacity scheduler file max version = " + maxVersion);
 
+    // 存储目录不存在则创建
     if (!fileSystem.exists(schedulerConfDir)) {
       if (!fileSystem.mkdirs(schedulerConfDir)) {
         throw new IOException("mkdir " + schedulerConfPathStr + " failed");
       }
     }
 
+    // 初始化配置版本文件
     this.configVersionFile = new Path(schedulerConfPathStr, "ConfigVersion");
     if (!fileSystem.exists(configVersionFile)) {
       fileSystem.createNewFile(configVersionFile);
       writeConfigVersion(0L);
     }
 
-    // create capacity-schedule.xml.ts file if not existing
+    // 如果没有已存在的配置文件，写入初始配置
     if (this.getConfigFileInputStream() == null) {
       writeConfigurationToFileSystem(vSchedConf);
       long configVersion = getConfigVersion() + 1L;
       writeConfigVersion(configVersion);
     }
 
+    // 从文件系统加载最新配置到内存
     this.schedConf = this.getConfigurationFromFileSystem();
   }
 
   /**
-   * Update and persist latest configuration in temp file.
-   * @param logMutation configuration change to be persisted in write ahead log
-   * @throws IOException throw IOE when write temp configuration file fail
+   * 记录配置变更，写入临时配置文件预提交
+   * @param logMutation 需要持久化的配置变更
+   * @throws IOException 写入临时配置文件失败时抛出
    */
   @Override
   public void logMutation(LogMutation logMutation) throws IOException {
-    LOG.info(new GsonBuilder().serializeNulls().create().toJson(logMutation));
+    LOG.info(new GsonBuilder().serializeNulls().create().toJson(logMutation);
+    // 保存变更前的配置用于回滚
     oldConf = new Configuration(schedConf);
     Map<String, String> mutations = logMutation.getUpdates();
+    // 遍历应用所有配置变更
     for (Map.Entry<String, String> kv : mutations.entrySet()) {
       if (kv.getValue() == null) {
         this.schedConf.unset(kv.getKey());
@@ -144,14 +155,15 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
         this.schedConf.set(kv.getKey(), kv.getValue());
       }
     }
+    // 将变更后的配置写入临时文件
     tempConfigPath = writeTmpConfig(schedConf);
   }
 
   /**
-   * @param pendingMutation the log mutation to apply
-   * @param isValid if true, finalize temp configuration file
-   *                if false, remove temp configuration file and rollback
-   * @throws Exception throw IOE when write temp configuration file fail
+   * 确认配置变更，提交或回滚预写入的临时配置
+   * @param pendingMutation 待确认的配置变更
+   * @param isValid 变更是否有效，true则正式提交，false则回滚
+   * @throws Exception 处理过程IO失败时抛出
    */
   @Override
   public void confirmMutation(LogMutation pendingMutation,
@@ -161,10 +173,13 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
       return;
     }
     if (isValid) {
+      // 变更有效，将临时文件转为正式配置文件
       finalizeFileSystemFile();
+      // 递增并保存配置版本号
       long configVersion = getConfigVersion() + 1L;
       writeConfigVersion(configVersion);
     } else {
+      // 变更无效，回滚到变更前配置，删除临时文件
       schedConf = oldConf;
       removeTmpConfigFile();
     }
@@ -172,8 +187,9 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
   }
 
   private void finalizeFileSystemFile() throws IOException {
-    // call confirmMutation() make sure tempConfigPath is not null
+    // 由confirmMutation保证tempConfigPath非空
     Path finalConfigPath = getFinalConfigPath(tempConfigPath);
+    // 重命名临时文件为正式配置文件
     fileSystem.rename(tempConfigPath, finalConfigPath);
     LOG.info("finalize temp configuration file successfully, finalConfigPath="
         + finalConfigPath);
@@ -181,11 +197,13 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
 
   @Override
   public void format() throws Exception {
+    // 列出所有正式配置文件
     FileStatus[] fileStatuses = fileSystem.listStatus(this.schedulerConfDir,
         this.configFilePathFilter);
     if (fileStatuses == null) {
       return;
     }
+    // 删除所有配置文件，格式化存储
     for (int i = 0; i < fileStatuses.length; i++) {
       fileSystem.delete(fileStatuses[i].getPath(), false);
       LOG.info("delete config file " + fileStatuses[i].getPath());
@@ -199,13 +217,14 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
           + TMP + "' return null");
       return null;
     }
+    // 去除临时文件后缀，得到正式文件名
     String finalConfigPathStr = tempConfigPathStr.substring(0,
         (tempConfigPathStr.length() - TMP.length()));
     return new Path(tempPath.getParent(), finalConfigPathStr);
   }
 
   private void removeTmpConfigFile() throws IOException {
-    // call confirmMutation() make sure tempConfigPath is not null
+    // 由confirmMutation保证tempConfigPath非空
     fileSystem.delete(tempConfigPath, true);
     LOG.info("delete temp configuration file: " + tempConfigPath);
   }
@@ -214,13 +233,16 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
     long start = Time.monotonicNow();
 
     Configuration conf = new Configuration(false);
+    // 获取最新配置文件输入流
     InputStream configInputStream = getConfigFileInputStream();
     if (configInputStream == null) {
       throw new IOException(
           "no capacity scheduler file in " + this.schedulerConfDir);
     }
 
+    // 加载配置
     conf.addResource(configInputStream);
+    // 复制配置项到新配置对象
     Configuration result = new Configuration(false);
     for (Map.Entry<String, String> entry : conf) {
       result.set(entry.getKey(), entry.getValue());
@@ -228,32 +250,37 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
     LOG.info("upload conf from fileSystem took "
             + (Time.monotonicNow() - start) + " ms");
 
-    //for ha transition, local schedConf may be old one.
+    // 更新内存中的配置，用于HA切换后刷新
     this.schedConf = result;
     return result;
   }
 
   private InputStream getConfigFileInputStream() throws IOException {
+    // 获取最新版本配置文件路径
     Path lastestConfigPath = getLatestConfigPath();
     if (lastestConfigPath == null) {
       return null;
     }
+    // 打开并返回输入流
     return fileSystem.open(lastestConfigPath);
   }
 
   private Path getLatestConfigPath() throws IOException {
+    // 列出所有正式配置文件
     FileStatus[] fileStatuses = fileSystem.listStatus(this.schedulerConfDir,
         this.configFilePathFilter);
 
     if (fileStatuses == null || fileStatuses.length == 0) {
       return null;
     }
+    // 按路径排序，最后一个就是最新版本
     Arrays.sort(fileStatuses);
 
     return fileStatuses[fileStatuses.length - 1].getPath();
   }
 
   private void writeConfigVersion(long configVersion) throws IOException {
+    // 覆盖写入配置版本号到版本文件
     try (FSDataOutputStream out = fileSystem.create(configVersionFile, true)) {
       out.writeLong(configVersion);
     } catch (IOException e) {
@@ -264,6 +291,7 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
 
   @Override
   public long getConfigVersion() throws Exception {
+    // 从版本文件读取当前配置版本号
     try (FSDataInputStream in = fileSystem.open(configVersionFile)) {
       return in.readLong();
     } catch (IOException e) {
@@ -277,6 +305,7 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
   @VisibleForTesting
   private Path writeTmpConfig(Configuration vSchedConf) throws IOException {
     long start = Time.monotonicNow();
+    // 生成带时间戳的临时文件名，保证唯一
     String tempSchedulerConfigFile = YarnConfiguration.CS_CONFIGURATION_FILE
         + "." + System.currentTimeMillis() + TMP;
 
@@ -285,9 +314,10 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
 
     try (FSDataOutputStream outputStream = fileSystem.create(
         tempSchedulerConfigPath)) {
-      //clean configuration file when num exceed maxVersion
+      // 超过最大版本数时清理旧配置文件
       cleanConfigurationFile();
 
+      // 将配置写入XML格式输出流
       vSchedConf.writeXml(outputStream);
       LOG.info(
           "write temp capacity configuration successfully, schedulerConfigFile="
@@ -305,17 +335,21 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
   @VisibleForTesting
   void writeConfigurationToFileSystem(Configuration vSchedConf)
       throws IOException {
+    // 先写入临时文件，再确认提交为正式文件
     tempConfigPath = writeTmpConfig(vSchedConf);
     finalizeFileSystemFile();
   }
 
   private void cleanConfigurationFile() throws IOException {
+    // 列出所有正式配置文件
     FileStatus[] fileStatuses = fileSystem.listStatus(this.schedulerConfDir,
         this.configFilePathFilter);
 
+    // 不超过最大保留版本数则无需清理
     if (fileStatuses == null || fileStatuses.length <= this.maxVersion) {
       return;
     }
+    // 按版本排序，删除最旧的多余配置文件
     Arrays.sort(fileStatuses);
     int configFileNum = fileStatuses.length;
     if (fileStatuses.length > this.maxVersion) {
@@ -328,18 +362,19 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
 
   @Override
   public Configuration retrieve() throws IOException {
+    // 从文件系统加载并返回最新配置
     return getConfigurationFromFileSystem();
   }
 
   @Override
   public List<LogMutation> getConfirmedConfHistory(long fromId) {
-    // Unimplemented.
+    // 本实现不支持该功能
     return null;
   }
 
   @Override
   protected LinkedList<LogMutation> getLogs() {
-    // Unimplemented.
+    // 本实现不支持该功能
     return null;
   }
 
@@ -360,6 +395,7 @@ public class FSSchedulerConfigurationStore extends YarnConfigurationStore {
 
   @Override
   public void close() throws IOException {
+    // 关闭文件系统实例
     if (fileSystem != null) {
       fileSystem.close();
     }

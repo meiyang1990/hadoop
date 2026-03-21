@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,29 +24,47 @@ import org.apache.hadoop.yarn.api.records.ResourceSizing;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
- * {@link PendingAsk} is the class to include minimal information of how much
- * resource to ask under constraints (e.g. on one host / rack / node-attributes)
- * , etc.
+ * 待分配资源请求，保存特定约束条件（如特定主机/机架/节点属性）下的资源请求最小信息，用于YARN调度器处理等待分配的资源请求
  */
 public class PendingAsk {
+  // 单次分配所需的资源量
   private final Resource perAllocationResource;
+  // 需要分配的次数
   private final int count;
+  // 空资源请求常量，代表无资源请求
   public final static PendingAsk ZERO = new PendingAsk(Resources.none(), 0);
 
+  /**
+   * 通过资源规格构造待分配资源请求
+   * @param sizing 资源规格，包含单次资源量和分配次数
+   */
   public PendingAsk(ResourceSizing sizing) {
     this.perAllocationResource = sizing.getResources();
     this.count = sizing.getNumAllocations();
   }
 
+  /**
+   * 通过指定资源量和分配次数构造待分配资源请求
+   * @param res 单次分配所需资源量
+   * @param num 需要分配的次数
+   */
   public PendingAsk(Resource res, int num) {
     this.perAllocationResource = res;
     this.count = num;
   }
 
+  /**
+   * 获取单次分配所需资源量
+   * @return 单次分配资源量
+   */
   public Resource getPerAllocationResource() {
     return perAllocationResource;
   }
 
+  /**
+   * 获取需要分配的次数
+   * @return 分配次数
+   */
   public int getCount() {
     return count;
   }

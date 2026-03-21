@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,8 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 /**
- * Factory class for creating instances of {@link YarnConfigurationStore}.
+ * YARN容量调度器配置存储工厂类，用于创建不同实现的YarnConfigurationStore实例。
+ * 支持多种配置存储后端，通过配置选择具体实现。
  */
 public final class YarnConfigurationStoreFactory {
 
@@ -33,13 +35,20 @@ public final class YarnConfigurationStoreFactory {
       YarnConfigurationStoreFactory.class);
 
   private YarnConfigurationStoreFactory() {
-    // Unused.
+    // 工具类不允许实例化
   }
 
+  /**
+   * 根据配置创建并返回对应的配置存储实例。
+   * @param conf YARN配置对象
+   * @return 配置存储实例
+   */
   public static YarnConfigurationStore getStore(Configuration conf) {
+    // 从配置中读取存储实现类名称，默认使用内存存储
     String store = conf.get(
         YarnConfiguration.SCHEDULER_CONFIGURATION_STORE_CLASS,
         YarnConfiguration.MEMORY_CONFIGURATION_STORE);
+    // 根据存储类型创建对应实例
     switch (store) {
       case YarnConfiguration.MEMORY_CONFIGURATION_STORE:
         return new InMemoryConfigurationStore();
@@ -50,6 +59,7 @@ public final class YarnConfigurationStoreFactory {
       case YarnConfiguration.FS_CONFIGURATION_STORE:
         return new FSSchedulerConfigurationStore();
       default:
+        // 自定义实现：通过反射加载用户指定的配置存储类
         Class<? extends YarnConfigurationStore> storeClass =
             conf.getClass(YarnConfiguration.SCHEDULER_CONFIGURATION_STORE_CLASS,
             InMemoryConfigurationStore.class, YarnConfigurationStore.class);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,7 @@
  */
 
 /**
- * Contains classes that are related to the newer
- * version of CS placement engine.
+ * 容量调度器应用队列放置模块包，包含新一代容量调度器（CS）应用队列放置引擎的所有相关实现类。
+ * 核心功能是根据配置规则将用户提交的应用自动放置到对应队列，支持多种匹配策略。
  */
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.placement;

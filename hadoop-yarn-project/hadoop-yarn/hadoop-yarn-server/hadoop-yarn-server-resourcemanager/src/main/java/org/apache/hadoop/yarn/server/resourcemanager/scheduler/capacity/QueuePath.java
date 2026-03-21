@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,25 +31,25 @@ import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.C
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration.ROOT;
 
 /**
- * This is a helper class which represents a queue path, and has easy access
- * methods to get the path's parent or leaf part, or as a whole.
+ * 容量调度器队列路径工具类，封装队列路径并提供便捷方法获取父路径、叶子节点等信息
  */
 public class QueuePath implements Iterable<String> {
+  // 队列路径分隔符正则表达式（点分隔）
   private static final String QUEUE_REGEX_DELIMITER = "\\.";
   /**
-   * The parent part of the queue path.
+   * 队列路径的父路径部分
    */
   private String parent;
 
   /**
-   * The leaf part of the parent path.
+   * 队列路径的叶子节点名称
    */
   private String leaf;
 
   /**
-   * Constructor to create mapping queue path from parent path and leaf name.
-   * @param parent Parent path of the queue
-   * @param leaf Name of the leaf queue
+   * 通过父路径和叶子节点名称构造QueuePath
+   * @param parent 队列父路径
+   * @param leaf 叶子队列名称
    */
   public QueuePath(String parent, String leaf) {
     this.parent = parent;
@@ -56,27 +57,25 @@ public class QueuePath implements Iterable<String> {
   }
 
   /**
-   * Constructor creates a MappingQueuePath object using the queue's full path.
-   * @param fullPath Full path of the queue
+   * 通过完整路径字符串构造QueuePath
+   * @param fullPath 队列完整路径
    */
   public QueuePath(String fullPath) {
     setFromFullPath(fullPath);
   }
 
   /**
-   * Constructor to create Queue path from queue names.
-   * The provided queue names will be concatenated by dots, giving a full queue path.
-   * @param parts Parts of queue path
-   * @return QueuePath object
+   * 通过队列名称分段列表拼接构造QueuePath
+   * @param parts 队列路径分段数组
+   * @return 构造完成的QueuePath对象
    */
   public static QueuePath createFromQueues(String... parts) {
     return new QueuePath(String.join(DOT, parts));
   }
 
   /**
-   * This method is responsible for splitting up a full queue path into parent
-   * path and leaf name.
-   * @param fullPath Full path of the queue to be processed
+   * 将完整队列路径拆分为父路径和叶子节点名称
+   * @param fullPath 需要处理的队列完整路径
    */
   private void setFromFullPath(String fullPath) {
     parent = null;
@@ -95,11 +94,11 @@ public class QueuePath implements Iterable<String> {
   }
 
   /**
-   * Simple helper method to determine if the path contains any empty parts.
-   * @return true if there is at least one empty part of the path
+   * 检查路径是否包含空分段
+   * @return true 如果路径中至少有一个空分段
    */
   public boolean hasEmptyPart() {
-    // iterator will not contain an empty leaf queue, so check directly
+    // 迭代器不会包含空叶子队列，直接检查
     if (leaf.isEmpty()) {
       return true;
     }
@@ -114,75 +113,73 @@ public class QueuePath implements Iterable<String> {
   }
 
   /**
-   * Simple helper method to determine if the queue path is invalid or not.
-   * @return true if the queue path is invalid.
+   * 检查队列路径是否非法
+   * @return true 如果队列路径非法
    */
   public boolean isInvalid() {
     return getPathComponents().length <= 1 && !isRoot();
   }
 
   /**
-   * Getter for the parent part of the path.
-   * @return Parent path of the queue, null if there is no parent.
+   * 获取路径的父路径部分
+   * @return 队列父路径，无父路径时返回null
    */
   public String getParent() {
     return parent;
   }
 
   /**
-   * Getter for the parent object of the path.
-   * @return Parent QueuePath object of the queue, null if there is no parent.
+   * 获取父路径对应的QueuePath对象
+   * @return 父路径QueuePath对象，无父路径时返回null
    */
   public QueuePath getParentObject() {
     return hasParent() ? new QueuePath(parent) : null;
   }
 
   /**
-   * Getter for the leaf part of the path.
-   * @return The leaf queue name
+   * 获取路径的叶子节点名称
+   * @return 叶子队列名称
    */
   public String getLeafName() {
     return leaf;
   }
 
   /**
-   * Getter for the full path of the queue.
-   * @return Full path of the queue
+   * 获取队列完整路径
+   * @return 队列完整路径字符串
    */
   public String getFullPath() {
     return hasParent() ? (parent + DOT + leaf) : leaf;
   }
 
   /**
-   * Convenience getter to check if the queue has a parent path defined.
-   * @return True if there is a parent path provided
+   * 检查队列是否存在父路径
+   * @return true 如果定义了父路径
    */
   public boolean hasParent() {
     return parent != null;
   }
 
   /**
-   * Convenience getter to check if the queue is the root queue.
-   * @return True if the path is root
+   * 检查当前队列是否为根队列
+   * @return true 如果当前路径是根队列
    */
   public boolean isRoot() {
     return !hasParent() && leaf.equals(ROOT);
   }
 
   /**
-   * Creates a new {@code QueuePath} from the current full path as parent, and
-   * the appended child queue path as leaf.
-   * @param childQueue path of leaf queue
-   * @return new queue path made of current full path and appended leaf path
+   * 基于当前路径作为父路径，追加子队列创建新QueuePath
+   * @param childQueue 子队列叶子路径
+   * @return 拼接后新的队列路径
    */
   public QueuePath createNewLeaf(String childQueue) {
     return new QueuePath(getFullPath(), childQueue);
   }
 
   /**
-   * Returns an iterator of queue path parts, starting from the highest level
-   * (generally root).
-   * @return queue part iterator
+   * 获取队列分段迭代器，从最高层级（通常是root）开始遍历
+   * @return 队列分段迭代器
    */
   @Override
   public Iterator<String> iterator() {
@@ -190,9 +187,8 @@ public class QueuePath implements Iterable<String> {
   }
 
   /**
-   * Returns an iterator that provides a way to traverse the queue path from
-   * current queue through its parents.
-   * @return queue path iterator
+   * 获取反向迭代器，从当前队列向上遍历到根节点
+   * @return 反向队列路径迭代器
    */
   public Iterator<String> reverseIterator() {
 
@@ -224,23 +220,20 @@ public class QueuePath implements Iterable<String> {
   }
 
   /**
-   * Returns the list of wildcarded queue paths based on the autoCreatedQueueDepth config value.
-   * An example template precedence hierarchy for root.a ParentQueue from highest to lowest:
-   * yarn.scheduler.capacity.root.a.auto-queue-creation-v2.template.capacity
-   * yarn.scheduler.capacity.root.*.auto-queue-creation-v2.template.capacity
-   * @param maxAutoCreatedQueueDepth the maximum depth of auto-created queues stored in the
-   *                                 configuration
-   * @return list of wildcarded QueuePath objects
+   * 根据自动创建队列深度配置，生成所有通配符形式的队列路径（用于模板配置查找）
+   * 例如root.a的模板优先级从高到低为：root.a.*、root.*
+   * @param maxAutoCreatedQueueDepth 配置中允许的自动创建队列最大深度
+   * @return 通配符QueuePath列表
    */
   public List<QueuePath> getWildcardedQueuePaths(int maxAutoCreatedQueueDepth) {
     List<QueuePath> wildcardedPaths = new ArrayList<>();
-    // Start with the most explicit format (without wildcard)
+    // 首先添加最明确的原路径（不带通配符）
     wildcardedPaths.add(this);
 
     String[] pathComponents = getPathComponents();
     int supportedWildcardLevel = getSupportedWildcardLevel(maxAutoCreatedQueueDepth);
 
-    // Collect all template entries
+    // 收集所有通配符模板路径
     for (int wildcardLevel = 1; wildcardLevel <= supportedWildcardLevel; wildcardLevel++) {
       int wildcardedComponentIndex = pathComponents.length - wildcardLevel;
       pathComponents[wildcardedComponentIndex] = WILDCARD_QUEUE;
@@ -252,20 +245,19 @@ public class QueuePath implements Iterable<String> {
   }
 
   /**
-   * Returns the supported wildcard level for this queue path.
-   * @param maxAutoCreatedQueueDepth the maximum depth of auto-created queues stored in the
-   *                                 configuration
-   * @return int value of the supported wildcard level
+   * 计算当前队列路径支持的通配符层级数
+   * @param maxAutoCreatedQueueDepth 配置中允许的自动创建队列最大深度
+   * @return 支持的通配符层级数值
    */
   private int getSupportedWildcardLevel(int maxAutoCreatedQueueDepth) {
     int queuePathMaxIndex = getPathComponents().length - 1;
-    // Allow root to have template properties
+    // 根队列允许使用模板配置
     return isRoot() ? 0 : Math.min(queuePathMaxIndex, maxAutoCreatedQueueDepth);
   }
 
   /**
-   * Returns queue path components.
-   * @return String array containing the queue names.
+   * 拆分获取队列路径所有分段
+   * @return 包含各级队列名称的字符串数组
    */
   public String[] getPathComponents() {
     return getFullPath().split(QUEUE_REGEX_DELIMITER);

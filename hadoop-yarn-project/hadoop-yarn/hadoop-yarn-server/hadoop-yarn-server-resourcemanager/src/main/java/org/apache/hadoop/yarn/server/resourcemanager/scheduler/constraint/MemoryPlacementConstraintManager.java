@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -33,14 +34,16 @@ import java.util.stream.Stream;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
+管理员
+org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.resource.PlacementConstraint;
 import org.apache.hadoop.yarn.api.resource.PlacementConstraints;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * In memory implementation of the {@link PlacementConstraintManagerService}.
+ * YARN调度 placement约束管理器的内存实现，基于内存存储全局和应用级的放置约束规则。
+ * 继承自PlacementConstraintManagerService抽象服务，提供线程安全的约束增删查改能力。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -54,17 +57,17 @@ public class MemoryPlacementConstraintManager
   private ReentrantReadWriteLock.WriteLock writeLock;
 
   /**
-   * Stores the global constraints that will be manipulated by the cluster
-   * admin. The key of each entry is the tag that will enable the corresponding
-   * constraint.
+   * 存储集群管理员配置的全局放置约束，key为触发约束的标签，value为对应约束规则。
    */
   private Map<String, PlacementConstraint> globalConstraints;
   /**
-   * Stores the constraints for each application, along with the allocation tags
-   * that will enable each of the constraints for a given application.
+   * 存储每个应用的放置约束，外层key为应用ID，内层map结构同全局约束：key为触发约束的标签，value为约束规则。
    */
   private Map<ApplicationId, Map<String, PlacementConstraint>> appConstraints;
 
+  /**
+   * 构造内存版约束管理器，初始化存储结构和读写锁。
+   */
   public MemoryPlacementConstraintManager() {
     this.globalConstraints = new HashMap<>();
     this.appConstraints = new HashMap<>();
@@ -75,22 +78,28 @@ public class MemoryPlacementConstraintManager
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 调用父类服务初始化逻辑
     super.serviceInit(conf);
   }
 
   @Override
+  /**
+   * 注册应用，将应用的所有初始约束存入管理器。
+   * @param appId 应用ID
+   * @param constraintMap 应用初始约束映射表，key为触发约束的标签集合，value为约束规则
+   */
   public void registerApplication(ApplicationId appId,
       Map<Set<String>, PlacementConstraint> constraintMap) {
     // Check if app already exists. If not, prepare its constraint map.
     Map<String, PlacementConstraint> constraintsForApp = new HashMap<>();
     readLock.lock();
     try {
+      // 检查应用是否已注册
       if (appConstraints.get(appId) != null) {
         LOG.warn("Application {} has already been registered.", appId);
         return;
       }
-      // Go over each sourceTag-constraint pair, validate it, and add it to the
-      // constraint map for this app.
+      // 遍历所有约束对，验证后加入应用约束映射表
       for (Map.Entry<Set<String>, PlacementConstraint> entry : constraintMap
           .entrySet()) {
         Set<String> sourceTags = entry.getKey();
@@ -108,7 +117,7 @@ public class MemoryPlacementConstraintManager
       LOG.info("Application {} was registered, but no constraints were added.",
           appId);
     }
-    // Update appConstraints.
+    // 更新全局应用约束表，加写锁保证线程安全
     writeLock.lock();
     try {
       appConstraints.put(appId, constraintsForApp);
@@ -118,12 +127,20 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 为已注册应用添加新的放置约束。
+   * @param appId 目标应用ID
+   * @param sourceTags 触发该约束的标签集合
+   * @param placementConstraint 待添加的约束规则
+   * @param replace 是否覆盖已存在的同名约束
+   */
   public void addConstraint(ApplicationId appId, Set<String> sourceTags,
       PlacementConstraint placementConstraint, boolean replace) {
     writeLock.lock();
     try {
       Map<String, PlacementConstraint> constraintsForApp =
           appConstraints.get(appId);
+      // 应用未注册时无法添加约束
       if (constraintsForApp == null) {
         LOG.info("Cannot add constraint to application {}, as it has not "
             + "been registered yet.", appId);
@@ -138,6 +155,12 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 添加全局放置约束，对所有应用生效。
+   * @param sourceTags 触发该约束的标签集合
+   * @param placementConstraint 待添加的全局约束规则
+   * @param replace 是否覆盖已存在的同名约束
+   */
   public void addGlobalConstraint(Set<String> sourceTags,
       PlacementConstraint placementConstraint, boolean replace) {
     writeLock.lock();
@@ -150,14 +173,13 @@ public class MemoryPlacementConstraintManager
   }
 
   /**
-   * Helper method that adds a constraint to a map for a given source tag.
-   * Assumes there is already a lock on the constraint map.
+   * 辅助方法：将约束添加到指定约束映射表，处理验证、覆盖逻辑。
+   * 调用方需要保证已获取对应写锁。
    *
-   * @param constraintMap constraint map to which the constraint will be added
-   * @param sourceTags the source tags that will enable this constraint
-   * @param placementConstraint the new constraint to be added
-   * @param replace if true, an existing constraint for these sourceTags will be
-   *          replaced with the new one
+   * @param constraintMap 目标约束映射表
+   * @param sourceTags 触发约束的标签集合
+   * @param placementConstraint 待添加的约束
+   * @param replace 是否覆盖已有约束
    */
   private void addConstraintToMap(
       Map<String, PlacementConstraint> constraintMap, Set<String> sourceTags,
@@ -179,6 +201,11 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 获取指定应用的所有放置约束，返回不可修改映射表保证线程安全。
+   * @param appId 目标应用ID
+   * @return 应用所有约束的不可修改映射表，应用未注册返回null
+   */
   public Map<Set<String>, PlacementConstraint> getConstraints(
       ApplicationId appId) {
     readLock.lock();
@@ -189,8 +216,7 @@ public class MemoryPlacementConstraintManager
         return null;
       }
 
-      // Copy to a new map and return an unmodifiable version of it.
-      // Each key of the map is a set with a single source tag.
+      // 转换格式为key为Set<String>的映射表，返回不可修改版本
       Map<Set<String>, PlacementConstraint> constraintMap =
           appConstraints.get(appId).entrySet().stream()
               .collect(Collectors.toMap(
@@ -204,6 +230,12 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 获取指定应用指定标签对应的放置约束。
+   * @param appId 目标应用ID
+   * @param sourceTags 触发约束的标签集合
+   * @return 匹配的约束规则，不存在或验证失败返回null
+   */
   public PlacementConstraint getConstraint(ApplicationId appId,
       Set<String> sourceTags) {
     if (!validateSourceTags(sourceTags)) {
@@ -226,6 +258,11 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 获取指定标签对应的全局放置约束。
+   * @param sourceTags 触发约束的标签集合
+   * @return 匹配的全局约束规则，不存在或验证失败返回null
+   */
   public PlacementConstraint getGlobalConstraint(Set<String> sourceTags) {
     if (!validateSourceTags(sourceTags)) {
       return null;
@@ -240,24 +277,32 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 合并请求级、应用级、全局三级约束为一个AND组合约束，要求所有约束都必须满足。
+   * 合并顺序为 CC = AND(全局约束, 应用级约束, 请求级约束)，保证所有层级约束都生效。
+   * @param appId 目标应用ID
+   * @param sourceTags 触发约束的标签集合
+   * @param schedulingRequestConstraint 请求级约束
+   * @return 合并后的AND组合约束
+   */
   public PlacementConstraint getMultilevelConstraint(ApplicationId appId,
       Set<String> sourceTags, PlacementConstraint schedulingRequestConstraint) {
     List<PlacementConstraint> constraints = new ArrayList<>();
-    // Add scheduling request-level constraint.
+    // 添加请求级约束
     if (schedulingRequestConstraint != null) {
       constraints.add(schedulingRequestConstraint);
     }
-    // Add app-level constraint if appId is given.
+    // 添加应用级约束（应用存在且标签非空时）
     if (appId != null && sourceTags != null
         && !sourceTags.isEmpty()) {
       constraints.add(getConstraint(appId, sourceTags));
     }
-    // Add global constraint.
+    // 添加全局约束（标签非空时）
     if (sourceTags != null && !sourceTags.isEmpty()) {
       constraints.add(getGlobalConstraint(sourceTags));
     }
 
-    // Remove all null or duplicate constraints.
+    // 过滤空值和重复约束，提取约束表达式去重
     List<PlacementConstraint.AbstractConstraint> allConstraints =
         constraints.stream()
             .filter(placementConstraint -> placementConstraint != null
@@ -266,12 +311,7 @@ public class MemoryPlacementConstraintManager
             .distinct()
             .collect(Collectors.toList());
 
-    // Compose an AND constraint
-    // When merge request(RC), app(AC) and global constraint(GC),
-    // we do a merge on them with CC=AND(GC, AC, RC) and returns a
-    // composite AND constraint. Subsequently we check if CC could
-    // be satisfied. This ensures that every level of constraint
-    // is satisfied.
+    // 构造AND组合约束并返回
     PlacementConstraint.And andConstraint = PlacementConstraints.and(
         allConstraints.toArray(new PlacementConstraint
             .AbstractConstraint[allConstraints.size()]));
@@ -279,6 +319,10 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 注销应用，从管理器中移除该应用的所有约束。
+   * @param appId 待注销的应用ID
+   */
   public void unregisterApplication(ApplicationId appId) {
     writeLock.lock();
     try {
@@ -289,6 +333,10 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 移除指定标签对应的全局约束。
+   * @param sourceTags 目标标签集合
+   */
   public void removeGlobalConstraint(Set<String> sourceTags) {
     if (!validateSourceTags(sourceTags)) {
       return;
@@ -303,6 +351,10 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 获取当前已注册应用数量。
+   * @return 已注册应用总数
+   */
   public int getNumRegisteredApplications() {
     readLock.lock();
     try {
@@ -313,6 +365,10 @@ public class MemoryPlacementConstraintManager
   }
 
   @Override
+  /**
+   * 获取当前全局约束数量。
+   * @return 全局约束总数
+   */
   public int getNumGlobalConstraints() {
     readLock.lock();
     try {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,7 +29,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ConfigurationMuta
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.MutableConfScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
 import org.apache.hadoop.yarn.webapp.dao.QueueConfigInfo;
-import org.apache.hadoop.yarn.webapp.dao.SchedConfUpdateInfo;
+ org.apache.hadoop.yarn.webapp.dao.SchedConfUpdateInfo;
 
 import java.io.IOException;
 import java.util.HashSet;
@@ -36,8 +37,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A configuration mutation ACL policy which checks that user has admin
- * privileges on all queues they are changing.
+ * 文件所属模块: YARN 资源调度器容量调度器
+ * 核心职责: 实现队列配置修改访问控制策略，验证用户对所有待修改队列是否具备管理员权限
  */
 public class QueueAdminConfigurationMutationACLPolicy implements
     ConfigurationMutationACLPolicy {
@@ -50,13 +51,14 @@ public class QueueAdminConfigurationMutationACLPolicy implements
   public void init(Configuration config, RMContext context) {
     this.conf = config;
     this.rmContext = context;
+    // 初始化YARN权限验证器实例
     this.authorizer = YarnAuthorizationProvider.getInstance(conf);
   }
 
   @Override
   public boolean isMutationAllowed(UserGroupInformation user,
       SchedConfUpdateInfo confUpdate) {
-    // If there are global config changes, check if user is admin.
+    // 如果包含全局配置修改，先检查用户是否是集群管理员
     Map<String, String> globalParams = confUpdate.getGlobalParams();
     if (globalParams != null && globalParams.size() != 0) {
       if (!authorizer.isAdmin(user)) {
@@ -64,7 +66,7 @@ public class QueueAdminConfigurationMutationACLPolicy implements
       }
     }
 
-    // Check if user is admin of all modified queues.
+    // 收集所有待修改的队列（新增、删除、更新）
     Set<String> queues = new HashSet<>();
     for (QueueConfigInfo addQueueInfo : confUpdate.getAddQueueInfo()) {
       queues.add(addQueueInfo.getQueue());
@@ -76,32 +78,31 @@ public class QueueAdminConfigurationMutationACLPolicy implements
       queues.add(updateQueueInfo.getQueue());
     }
 
-    // Loop through all the queues.
+    // 遍历检查所有待修改队列的权限
     for (String queuePath : queues) {
       QueueInfo queueInfo = null;
       String parentPath = queuePath;
 
-      // For this queue, check if queue information exists for its children
-      // starting at the end of the queue.
-      // Keep this check going by moving up in the queue hierarchy until
-      // queue information has been found for one of its children.
+      // 从最深层节点开始向上遍历队列层次，直到找到存在的队列
       String queueName;
       while (queueInfo == null) {
+        // 确定当前检查的队列名称：如果存在子节点则检查最后一个子节点
         queueName = queueHasAChild(parentPath) ?
             getLastChildForQueue(parentPath) : parentPath;
         try {
+          // 从RM调度器获取队列信息
           queueInfo = rmContext.getScheduler()
               .getQueueInfo(queueName, false, false);
         } catch (IOException e) {
-          // Queue is not found, do nothing.
+          // 队列不存在，继续向上查找
         }
 
-        // Keep going up in the queue hierarchy.
+        // 向上移动一层，继续查找存在的队列
         parentPath = queueHasAChild(parentPath) ?
             getQueueBeforeLastChild(parentPath) : parentPath;
       }
 
-      // check if user has Admin access to this queue.
+      // 获取队列对象，检查用户是否具备该队列的管理权限
       Queue queue = ((MutableConfScheduler) rmContext.getScheduler())
           .getQueue(queueInfo.getQueueName());
       if (queue != null && !queue.hasAccess(QueueACL.ADMINISTER_QUEUE, user)) {
@@ -113,27 +114,27 @@ public class QueueAdminConfigurationMutationACLPolicy implements
   }
 
   /**
-   * Does the queue have a child?
-   * @param queue The queue that needs to be checked for a child.
-   * @return True if a "." exists in the queue name, signalling hierarchy.
+   * 检查队列路径是否包含子队列（包含'.'说明存在层级）
+   * @param queue 待检查的队列路径
+   * @return True如果存在子队列，否则False
    */
   private boolean queueHasAChild(String queue) {
     return queue.lastIndexOf('.') != -1;
   }
 
   /**
-   * Get the last child name from a queue name.
-   * @param queue The queue that is checked for the last child.
-   * @return The last child of the queue.
+   * 从队列路径中提取最后一级子队列名称
+   * @param queue 完整队列路径
+   * @return 最后一级子队列名称
    */
   private String getLastChildForQueue(String queue) {
     return queue.substring(queue.lastIndexOf('.') + 1);
   }
 
   /**
-   * Get a queue name minus the last child.
-   * @param queue The queue that needs to be trimmed of its last child.
-   * @return Remaining queue name after its last child has been taken out.
+   * 从队列路径中移除最后一级子队列，得到父队列路径
+   * @param queue 完整队列路径
+   * @return 移除最后一级后的父队列路径
    */
   private String getQueueBeforeLastChild(String queue) {
     return queue.substring(0, queue.lastIndexOf('.'));

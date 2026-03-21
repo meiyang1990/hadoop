@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,45 +26,58 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.util.List;
 
+/**
+ * 容量调度器容器分配结果封装类，用于表示一次容器分配尝试的结果状态与相关信息
+ */
 public class ContainerAllocation {
   /**
-   * Skip the locality (e.g. node-local, rack-local, any), and look at other
-   * localities of the same priority
+   * 跳过当前位置性查找，继续查找同优先级其他位置性请求
    */
   public static final ContainerAllocation LOCALITY_SKIPPED =
       new ContainerAllocation(null, null, AllocationState.LOCALITY_SKIPPED);
 
   /**
-   * Skip the priority, and look at other priorities of the same application
+   * 跳过当前优先级，继续查找同一应用的其他优先级请求
    */
   public static final ContainerAllocation PRIORITY_SKIPPED =
       new ContainerAllocation(null, null, AllocationState.PRIORITY_SKIPPED);
 
   /**
-   * Skip the application, and look at other applications of the same queue
+   * 跳过当前应用，继续查找同一队列的其他应用请求
    */
   public static final ContainerAllocation APP_SKIPPED =
       new ContainerAllocation(null, null, AllocationState.APP_SKIPPED);
 
   /**
-   * Skip the leaf-queue, and look at other queues of the same parent queue
+   * 跳过当前叶子队列，继续查找同一父队列下的其他队列请求
    */
   public static final ContainerAllocation QUEUE_SKIPPED =
       new ContainerAllocation(null, null, AllocationState.QUEUE_SKIPPED);
 
+  // 需要取消预留的容器
   RMContainer containerToBeUnreserved;
+  // 本次待分配的资源量
   private Resource resourceToBeAllocated = Resources.none();
+  // 分配状态
   private AllocationState state;
+  // 容器所在节点类型
   NodeType containerNodeType = NodeType.NODE_LOCAL;
+  // 请求要求的位置性类型
   NodeType requestLocalityType = null;
 
   /**
-   * When some (new) container allocated/reserved or some increase container
-   * request allocated/reserved, updatedContainer will be set.
+   * 当分配/预留新容器或扩容容器时，存储更新后的容器对象
    */
   RMContainer updatedContainer;
+  // 需要杀死的容器列表（用于抢占等场景）
   private List<RMContainer> toKillContainers;
 
+  /**
+   * 构造容器分配结果对象
+   * @param containerToBeUnreserved 需要取消预留的容器
+   * @param resourceToBeAllocated 本次待分配的资源
+   * @param state 分配状态
+   */
   public ContainerAllocation(RMContainer containerToBeUnreserved,
       Resource resourceToBeAllocated, AllocationState state) {
     this.containerToBeUnreserved = containerToBeUnreserved;
@@ -71,10 +85,16 @@ public class ContainerAllocation {
     this.state = state;
   }
 
+  /** 获取需要取消预留的容器
+   * @return 需要取消预留的容器
+   */
   public RMContainer getContainerToBeUnreserved() {
     return containerToBeUnreserved;
   }
 
+  /** 获取本次待分配的资源量
+   * @return 待分配资源量
+   */
   public Resource getResourceToBeAllocated() {
     if (resourceToBeAllocated == null) {
       return Resources.none();
@@ -82,22 +102,37 @@ public class ContainerAllocation {
     return resourceToBeAllocated;
   }
 
+  /** 获取本次分配的状态
+   * @return 分配状态
+   */
   public AllocationState getAllocationState() {
     return state;
   }
 
+  /** 获取容器所在节点类型
+   * @return 节点类型
+   */
   public NodeType getContainerNodeType() {
     return containerNodeType;
   }
 
+  /** 获取更新后的容器对象
+   * @return 更新后的容器对象
+   */
   public RMContainer getUpdatedContainer() {
     return updatedContainer;
   }
 
+  /** 设置需要杀死的容器列表
+   * @param toKillContainers 需要杀死的容器列表
+   */
   public void setToKillContainers(List<RMContainer> toKillContainers) {
     this.toKillContainers = toKillContainers;
   }
 
+  /** 获取需要杀死的容器列表
+   * @return 需要杀死的容器列表
+   */
   public List<RMContainer> getToKillContainers() {
     return toKillContainers;
   }

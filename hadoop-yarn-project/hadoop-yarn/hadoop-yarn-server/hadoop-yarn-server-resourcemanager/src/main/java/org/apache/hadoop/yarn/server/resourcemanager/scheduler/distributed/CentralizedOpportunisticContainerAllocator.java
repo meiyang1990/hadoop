@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,13 +46,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * <p>
- * The CentralizedOpportunisticContainerAllocator allocates opportunistic
- * containers by considering all the nodes present in the cluster, after
- * modifying the container sizes to respect the limits set by the
- * ResourceManager. It tries to distribute the containers as evenly as
- * possible.
- * </p>
+ * 集中式机会容器分配器，基于集群所有节点分配机会容器，遵循ResourceManager限制
+ * 调整容器大小，尽可能均匀地将容器分布到不同节点。
+ * 属于YARN分布式机会调度的核心服务端组件，负责从ResourceManager集中完成容器分配。
  */
 public class CentralizedOpportunisticContainerAllocator extends
     OpportunisticContainerAllocator {
@@ -59,13 +56,15 @@ public class CentralizedOpportunisticContainerAllocator extends
   private static final Logger LOG =
       LoggerFactory.getLogger(CentralizedOpportunisticContainerAllocator.class);
 
+  // 节点队列负载监视器，用于根据负载选择合适的分配节点
   private NodeQueueLoadMonitor nodeQueueLoadMonitor;
+  // 机会调度指标收集器
   private OpportunisticSchedulerMetrics metrics =
       OpportunisticSchedulerMetrics.getMetrics();
 
   /**
-   * Create a new Centralized Opportunistic Container Allocator.
-   * @param tokenSecretManager TokenSecretManager
+   * 构造集中式机会容器分配器，使用默认参数。
+   * @param tokenSecretManager 容器令牌密钥管理器，用于生成容器令牌
    */
   public CentralizedOpportunisticContainerAllocator(
       BaseContainerTokenSecretManager tokenSecretManager) {
@@ -73,11 +72,10 @@ public class CentralizedOpportunisticContainerAllocator extends
   }
 
   /**
-   * Create a new Centralized Opportunistic Container Allocator.
-   * @param tokenSecretManager TokenSecretManager
-   * @param maxAllocationsPerAMHeartbeat max number of containers to be
-   *                                     allocated in one AM heartbeat
-   * @param nodeQueueLoadMonitor NodeQueueLoadMonitor.
+   * 构造集中式机会容器分配器，指定全量参数。
+   * @param tokenSecretManager 容器令牌密钥管理器，用于生成容器令牌
+   * @param maxAllocationsPerAMHeartbeat 单次AM心跳最多分配容器数量
+   * @param nodeQueueLoadMonitor 节点队列负载监视器
    */
   public CentralizedOpportunisticContainerAllocator(
       BaseContainerTokenSecretManager tokenSecretManager,
@@ -99,28 +97,30 @@ public class CentralizedOpportunisticContainerAllocator extends
       OpportunisticContainerContext opportContext, long rmIdentifier,
       String appSubmitter) throws YarnException {
 
+    // 更新节点黑名单
     updateBlacklist(blackList, opportContext);
 
-    // Add OPPORTUNISTIC requests to the outstanding ones.
+    // 将新的机会容器请求加入待分配队列
     opportContext.addToOutstandingReqs(oppResourceReqs);
 
+    // 获取当前黑名单集合
     Set<String> nodeBlackList = new HashSet<>(opportContext.getBlacklist());
+    // 存储已分配容器结果
     List<Container> allocatedContainers = new ArrayList<>();
+    // 获取单次AM心跳最大分配数量限制
     int maxAllocationsPerAMHeartbeat = getMaxAllocationsPerAMHeartbeat();
+    // 存储按调度键分类的分配结果
     List<Map<Resource, List<Allocation>>> allocations = new ArrayList<>();
 
+    // 按优先级降序遍历待分配请求
     for (SchedulerRequestKey schedulerKey :
         opportContext.getOutstandingOpReqs().descendingKeySet()) {
-      // Allocated containers :
-      //  Key = Requested Capability,
-      //  Value = List of Containers of given cap (the actual container size
-      //          might be different than what is requested, which is why
-      //          we need the requested capability (key) to match against
-      //          the outstanding reqs)
+      // 计算本次心跳剩余可分配容器数量
       int remAllocs = -1;
       if (maxAllocationsPerAMHeartbeat > 0) {
         remAllocs =
             maxAllocationsPerAMHeartbeat - getTotalAllocations(allocations);
+        // 已达到最大分配数量，停止分配
         if (remAllocs <= 0) {
           LOG.info("Not allocating more containers as we have reached max "
                   + "allocations per AM heartbeat {}",
@@ -128,6 +128,7 @@ public class CentralizedOpportunisticContainerAllocator extends
           break;
         }
       }
+      // 为当前优先级分配容器
       Map<Resource, List<Allocation>> allocation = allocatePerSchedulerKey(
           rmIdentifier, opportContext, schedulerKey, applicationAttemptId,
           appSubmitter, nodeBlackList, remAllocs);
@@ -135,10 +136,12 @@ public class CentralizedOpportunisticContainerAllocator extends
         allocations.add(allocation);
       }
     }
+    // 将分配结果匹配到待分配请求，更新待分配队列并返回结果
     matchAllocation(allocations, allocatedContainers, opportContext);
     return allocatedContainers;
   }
 
+  // 按调度键（优先级）分配容器
   private Map<Resource, List<Allocation>> allocatePerSchedulerKey(
       long rmIdentifier, OpportunisticContainerContext appContext,
       SchedulerRequestKey schedKey, ApplicationAttemptId appAttId,
@@ -146,11 +149,14 @@ public class CentralizedOpportunisticContainerAllocator extends
       throws YarnException {
     Map<Resource, List<Allocation>> allocations = new HashMap<>();
     int totalAllocated = 0;
+    // 遍历当前优先级下所有待分配资源请求
     for (EnrichedResourceRequest enrichedAsk :
         appContext.getOutstandingOpReqs().get(schedKey).values()) {
+      // 计算当前请求剩余可分配数量
       int remainingAllocs = -1;
       if (maxAllocations > 0) {
         remainingAllocs = maxAllocations - totalAllocated;
+        // 已达到心跳分配上限，停止分配
         if (remainingAllocs <= 0) {
           LOG.info("Not allocating more containers as max allocations per AM "
               + "heartbeat {} has reached", getMaxAllocationsPerAMHeartbeat());
@@ -158,12 +164,14 @@ public class CentralizedOpportunisticContainerAllocator extends
         }
       }
 
+      // 为当前资源请求分配容器，累计已分配数量
       totalAllocated += allocateContainersPerRequest(rmIdentifier,
           appContext.getAppParams(),
           appContext.getContainerIdGenerator(), blackList,
           appAttId, userName, allocations, enrichedAsk,
           remainingAllocs);
       ResourceRequest anyAsk = enrichedAsk.getRequest();
+      // 打印分配日志
       if (!allocations.isEmpty()) {
         LOG.info("Opportunistic allocation requested for [priority={}, "
                 + "allocationRequestId={}, num_containers={}, capability={}] "
@@ -176,6 +184,7 @@ public class CentralizedOpportunisticContainerAllocator extends
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
+  // 为单个资源请求分配容器，按照节点本地 -> 机架本地 -> 任意节点的顺序分配
   private int allocateContainersPerRequest(long rmIdentifier,
       AllocationParams appParams, ContainerIdGenerator idCounter,
       Set<String> blacklist,
@@ -185,53 +194,61 @@ public class CentralizedOpportunisticContainerAllocator extends
       throws YarnException {
     ResourceRequest anyAsk = enrichedAsk.getRequest();
     int totalAllocated = 0;
+    // 计算本次需要分配的容器总数
     int maxToAllocate = anyAsk.getNumContainers()
         - (allocations.isEmpty() ? 0 :
         allocations.get(anyAsk.getCapability()).size());
+    // 受限于心跳最大分配数，取较小值
     if (maxAllocations >= 0) {
       maxToAllocate = Math.min(maxAllocations, maxToAllocate);
     }
 
-    // allocate node local
+    // 优先分配节点本地容器
     if (maxToAllocate > 0) {
       Map<String, AtomicInteger> nodeLocations = enrichedAsk.getNodeMap();
+      // 遍历请求的所有节点位置
       for (Map.Entry<String, AtomicInteger> nodeLocation :
           nodeLocations.entrySet()) {
         int numContainers = nodeLocation.getValue().get();
         numContainers = Math.min(numContainers, maxToAllocate);
+        // 在指定节点分配容器
         List<Container> allocatedContainers =
             allocateNodeLocal(enrichedAsk, nodeLocation.getKey(),
                 numContainers, rmIdentifier, appParams, idCounter, blacklist,
                 id, userName, allocations);
+        // 更新计数
         totalAllocated += allocatedContainers.size();
         maxToAllocate -= allocatedContainers.size();
-        // no more containers to allocate
+        // 已分配完需要的数量，退出
         if (maxToAllocate <= 0) {
           break;
         }
       }
     }
 
-    // if still left, allocate rack local
+    // 节点本地分配后仍有剩余，尝试分配机架本地容器
     if (maxToAllocate > 0) {
       Map<String, AtomicInteger> rackLocations = enrichedAsk.getRackMap();
+      // 遍历请求的所有机架位置
       for (Map.Entry<String, AtomicInteger> rack : rackLocations.entrySet()) {
         int numContainers = rack.getValue().get();
         numContainers = Math.min(numContainers, maxToAllocate);
+        // 在指定机架分配容器
         List<Container> allocatedContainers =
             allocateRackLocal(enrichedAsk, rack.getKey(), numContainers,
                 rmIdentifier, appParams, idCounter, blacklist, id,
                 userName, allocations);
+        // 更新计数
         totalAllocated += allocatedContainers.size();
         maxToAllocate -= allocatedContainers.size();
-        // no more containers to allocate
+        // 已分配完需要的数量，退出
         if (maxToAllocate <= 0) {
           break;
         }
       }
     }
 
-    // if still left, try on ANY
+    // 机架本地分配后仍有剩余，在任意节点分配容器
     if (maxToAllocate > 0) {
       List<Container> allocatedContainers = allocateAny(enrichedAsk,
           maxToAllocate, rmIdentifier, appParams, idCounter, blacklist,
@@ -242,6 +259,7 @@ public class CentralizedOpportunisticContainerAllocator extends
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
+  // 分配节点本机会容器，在指定节点分配指定数量机会容器
   private List<Container> allocateNodeLocal(
       EnrichedResourceRequest enrichedAsk,
       String nodeLocation,
@@ -253,20 +271,24 @@ public class CentralizedOpportunisticContainerAllocator extends
       throws YarnException {
     List<Container> allocatedContainers = new ArrayList<>();
     final ResourceRequest resourceRequest = enrichedAsk.getRequest();
+    // 循环分配直到达到需要数量或没有可用节点
     while (toAllocate > 0) {
+      // 从负载监视器选择指定节点，满足资源要求且不在黑名单
       RMNode node = nodeQueueLoadMonitor.selectLocalNode(nodeLocation,
           blacklist, resourceRequest.getCapability());
       if (node != null) {
         toAllocate--;
+        // 创建容器实例并加入分配结果
         Container container = createContainer(rmIdentifier, appParams,
             idCounter, id, userName, allocations, nodeLocation,
             resourceRequest, convertToRemoteNode(node));
         allocatedContainers.add(container);
         LOG.info("Allocated [{}] as opportunistic at location [{}]",
             container.getId(), nodeLocation);
+        // 增加节点本地机会容器分配指标计数
         metrics.incrNodeLocalOppContainers();
       } else {
-        // we couldn't allocate any - break the loop.
+        // 没有可用节点，退出循环
         break;
       }
     }
@@ -274,6 +296,7 @@ public class CentralizedOpportunisticContainerAllocator extends
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
+  // 分配机架本地机会容器，在指定机架内选择合适节点分配容器
   private List<Container> allocateRackLocal(EnrichedResourceRequest enrichedAsk,
       String rackLocation, int toAllocate, long rmIdentifier,
       AllocationParams appParams, ContainerIdGenerator idCounter,
@@ -283,20 +306,24 @@ public class CentralizedOpportunisticContainerAllocator extends
       throws YarnException {
     List<Container> allocatedContainers = new ArrayList<>();
     final ResourceRequest resourceRequest = enrichedAsk.getRequest();
+    // 循环分配直到达到需要数量或没有可用节点
     while (toAllocate > 0) {
+      // 从负载监视器选择指定机架内负载最低的可用节点
       RMNode node = nodeQueueLoadMonitor.selectRackLocalNode(rackLocation,
           blacklist, resourceRequest.getCapability());
       if (node != null) {
         toAllocate--;
+        // 创建容器实例并加入分配结果
         Container container = createContainer(rmIdentifier, appParams,
             idCounter, id, userName, allocations, rackLocation,
             resourceRequest, convertToRemoteNode(node));
         allocatedContainers.add(container);
+        // 增加机架本地机会容器分配指标计数
         metrics.incrRackLocalOppContainers();
         LOG.info("Allocated [{}] as opportunistic at location [{}]",
             container.getId(), rackLocation);
       } else {
-        // we couldn't allocate any - break the loop.
+        // 没有可用节点，退出循环
         break;
       }
     }
@@ -304,6 +331,7 @@ public class CentralizedOpportunisticContainerAllocator extends
   }
 
   @SuppressWarnings("checkstyle:parameternumber")
+  // 在集群任意节点分配机会容器，选择全局负载最低的可用节点
   private List<Container> allocateAny(EnrichedResourceRequest enrichedAsk,
       int toAllocate, long rmIdentifier,
       AllocationParams appParams, ContainerIdGenerator idCounter,
@@ -313,26 +341,31 @@ public class CentralizedOpportunisticContainerAllocator extends
       throws YarnException {
     List<Container> allocatedContainers = new ArrayList<>();
     final ResourceRequest resourceRequest = enrichedAsk.getRequest();
+    // 循环分配直到达到需要数量或没有可用节点
     while (toAllocate > 0) {
+      // 从负载监视器选择全局负载最低的可用节点
       RMNode node = nodeQueueLoadMonitor.selectAnyNode(
           blacklist, resourceRequest.getCapability());
       if (node != null) {
         toAllocate--;
+        // 创建容器实例并加入分配结果
         Container container = createContainer(rmIdentifier, appParams,
             idCounter, id, userName, allocations, ResourceRequest.ANY,
             resourceRequest, convertToRemoteNode(node));
         allocatedContainers.add(container);
+        // 增加跨交换机机会容器分配指标计数
         metrics.incrOffSwitchOppContainers();
         LOG.info("Allocated [{}] as opportunistic at location [{}]",
             container.getId(), ResourceRequest.ANY);
       } else {
-        // we couldn't allocate any - break the loop.
+        // 没有可用节点，退出循环
         break;
       }
     }
     return allocatedContainers;
   }
 
+  // 将RMNode转换为RemoteNode，用于返回给AM的分配结果
   private RemoteNode convertToRemoteNode(RMNode rmNode) {
     if (rmNode != null) {
       RemoteNode rNode = RemoteNode.newInstance(rmNode.getNodeID(),

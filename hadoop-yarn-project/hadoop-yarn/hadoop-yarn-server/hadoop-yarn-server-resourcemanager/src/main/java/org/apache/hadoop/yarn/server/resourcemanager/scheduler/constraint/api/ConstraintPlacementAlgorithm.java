@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,23 +21,21 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint.api;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 
 /**
- * Marker interface for a Constraint Placement. The only contract is that it
- * should be initialized with the RMContext.
+ * 约束放置算法的标记接口，YARN调度器中用于容器节点放置约束的算法扩展点。
+ * 唯一约定是需要使用RMContext进行初始化，便于算法获取调度器上下文信息。
  */
 public interface ConstraintPlacementAlgorithm {
 
   /**
-   * Initialize the Algorithm.
-   * @param rmContext RMContext.
+   * 初始化约束放置算法，传入资源管理器上下文供算法使用。
+   * @param rmContext 资源管理器上下文对象，包含集群全局信息
    */
   void init(RMContext rmContext);
 
   /**
-   * The Algorithm is expected to compute the placement of the provided
-   * ConstraintPlacementAlgorithmInput and use the collector to aggregate
-   * any output.
-   * @param algorithmInput Input to the Algorithm.
-   * @param collector Collector for output of algorithm.
+   * 根据输入约束计算容器的放置位置，并将结果输出到收集器中。
+   * @param algorithmInput 算法输入，包含待放置容器和当前约束条件
+   * @param collector 算法输出收集器，用于汇总放置结果
    */
   void place(ConstraintPlacementAlgorithmInput algorithmInput,
       ConstraintPlacementAlgorithmOutputCollector collector);

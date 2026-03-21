@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,30 +35,39 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A grouping of Scheduling Requests which are sent to the PlacementAlgorithm
- * to place as a batch. The placement algorithm tends to give more optimal
- * placements if more requests are batched together.
+ * 批量调度请求容器，将多个调度请求分组后批量提交给放置算法处理。
+ * 批量处理可以让放置算法得到更优化的整体放置结果。
  */
 public class BatchedRequests
     implements ConstraintPlacementAlgorithmInput, Iterable<SchedulingRequest> {
 
-  // PlacementAlgorithmOutput attempt - the number of times the requests in this
-  // batch has been placed but was rejected by the scheduler.
+  // 当前批次已被调度器拒绝的放置尝试次数
   private final int placementAttempt;
 
   private final ApplicationId applicationId;
   private final Collection<SchedulingRequest> requests;
+  // 按标签分组的黑名单节点，放置算法不会将容器分配到这些节点
   private final Map<String, Set<NodeId>> blacklist = new HashMap<>();
+  // 请求遍历迭代器类型，决定批量请求的遍历顺序
   private IteratorType iteratorType;
 
   /**
-   * Iterator Type.
+   * 迭代器类型枚举，定义不同的批量请求遍历策略。
    */
   public enum IteratorType {
+    /** 串行顺序遍历 */
     SERIAL,
+    /** 按标签热度优先遍历 */
     POPULAR_TAGS
   }
 
+  /**
+   * 构造批量请求容器。
+   * @param type 迭代器类型，指定遍历策略
+   * @param applicationId 所属应用ID
+   * @param requests 批量调度请求集合
+   * @param attempt 当前放置尝试次数
+   */
   public BatchedRequests(IteratorType type, ApplicationId applicationId,
       Collection<SchedulingRequest> requests, int attempt) {
     this.iteratorType = type;
@@ -67,9 +77,8 @@ public class BatchedRequests
   }
 
   /**
-   * Exposes SchedulingRequest Iterator interface which can be used
-   * to traverse requests using different heuristics i.e. Tag Popularity
-   * @return SchedulingRequest Iterator.
+   * 根据配置的迭代器类型，返回对应策略的调度请求迭代器。
+   * @return 对应策略的调度请求迭代器
    */
   @Override
   public Iterator<SchedulingRequest> iterator() {
@@ -84,16 +93,16 @@ public class BatchedRequests
   }
 
   /**
-   * Get Application Id.
-   * @return Application Id.
+   * 获取所属应用ID。
+   * @return 应用ID
    */
   public ApplicationId getApplicationId() {
     return applicationId;
   }
 
   /**
-   * Get Collection of SchedulingRequests in this batch.
-   * @return Collection of Scheduling Requests.
+   * 获取当前批次包含的所有调度请求。
+   * @return 调度请求集合
    */
   @Override
   public Collection<SchedulingRequest> getSchedulingRequests() {
@@ -101,42 +110,47 @@ public class BatchedRequests
   }
 
   /**
-   * Add a Scheduling request to the batch.
-   * @param req Scheduling Request.
+   * 添加单个调度请求到当前批次。
+   * @param req 待添加的调度请求
    */
   public void addToBatch(SchedulingRequest req) {
     requests.add(req);
   }
 
+  /**
+   * 将节点添加到对应标签的黑名单中，禁止该标签的请求分配到该节点。
+   * 当前仅支持每个调度请求单个分配标签。
+   * @param tags 关联标签集合
+   * @param node 待拉黑节点
+   */
   public void addToBlacklist(Set<String> tags, SchedulerNode node) {
     if (tags != null && !tags.isEmpty() && node != null) {
-      // We are currently assuming a single allocation tag
-      // per scheduler request currently.
+      // 目前假设每个调度请求只有一个分配标签
       blacklist.computeIfAbsent(tags.iterator().next(),
           k -> new HashSet<>()).add(node.getNodeID());
     }
   }
 
   /**
-   * Get placement attempt.
-   * @return PlacementAlgorithmOutput placement Attempt.
+   * 获取当前批次的放置尝试次数。
+   * @return 放置尝试次数
    */
   public int getPlacementAttempt() {
     return placementAttempt;
   }
 
   /**
-   * Get any blacklisted nodes associated with tag.
-   * @param tag Tag.
-   * @return Set of blacklisted Nodes.
+   * 获取指定标签对应的所有黑名单节点。
+   * @param tag 目标标签
+   * @return 该标签的黑名单节点集合，无则返回空集合
    */
   public Set<NodeId> getBlacklist(String tag) {
     return blacklist.getOrDefault(tag, Collections.emptySet());
   }
 
   /**
-   * Get Iterator type.
-   * @return Iterator type.
+   * 获取当前配置的迭代器类型。
+   * @return 迭代器类型
    */
   public IteratorType getIteratorType() {
     return iteratorType;

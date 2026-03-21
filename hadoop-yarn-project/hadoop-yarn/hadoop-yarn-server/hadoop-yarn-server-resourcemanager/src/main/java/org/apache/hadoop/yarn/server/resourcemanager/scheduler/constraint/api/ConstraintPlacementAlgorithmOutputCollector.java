@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,15 +19,14 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint.api;
 
 /**
- * The ConstraintPlacementAlgorithm uses the
- * ConstraintPlacementAlgorithmOutputCollector to collect any output it
- * spits out.
+ * YARN 约束放置算法输出收集器接口，用于收集约束放置算法执行产生的输出结果。
+ * 是约束 placements 算法框架中，算法与结果处理模块之间的抽象接口。
  */
 public interface ConstraintPlacementAlgorithmOutputCollector {
 
   /**
-   * Collect an ConstraintPlacementAlgorithm output.
-   * @param algorithmOutput ConstraintPlacementAlgorithm Output.
+   * 收集约束放置算法的输出结果。
+   * @param algorithmOutput 约束放置算法产生的输出结果对象
    */
   void collect(ConstraintPlacementAlgorithmOutput algorithmOutput);
 }

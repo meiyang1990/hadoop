@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,13 +23,28 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCap
 
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCapacityVector.ResourceUnitCapacityType.PERCENTAGE;
 
+/**
+ * 根队列容量计算器，为YARN容量调度器的根队列提供容量计算实现。
+ * 根队列占用集群全部资源，所有子队列的容量都是基于根队列总资源比例计算。
+ */
 public class RootQueueCapacityCalculator extends AbstractQueueCapacityCalculator {
 
+  /**
+   * 计算根队列资源前置条件，初始化归一化资源比例。
+   * @param resourceCalculationDriver 资源计算驱动上下文
+   */
   @Override
   public void calculateResourcePrerequisites(ResourceCalculationDriver resourceCalculationDriver) {
     AbsoluteResourceCapacityCalculator.setNormalizedResourceRatio(resourceCalculationDriver);
   }
 
+  /**
+   * 计算根队列最小资源量，根队列最小资源等于集群全部可用资源。
+   * @param resourceCalculationDriver 资源计算驱动上下文
+   * @param context 计算上下文
+   * @param label 节点标签
+   * @return 根队列最小资源值
+   */
   @Override
   public double calculateMinimumResource(ResourceCalculationDriver resourceCalculationDriver,
                                          CalculationContext context, String label) {
@@ -36,6 +52,13 @@ public class RootQueueCapacityCalculator extends AbstractQueueCapacityCalculator
         .getResourceValue(context.getResourceName());
   }
 
+  /**
+   * 计算根队列最大资源量，根队列最大资源等于集群全部可用资源。
+   * @param resourceCalculationDriver 资源计算驱动上下文
+   * @param context 计算上下文
+   * @param label 节点标签
+   * @return 根队列最大资源值
+   */
   @Override
   public double calculateMaximumResource(ResourceCalculationDriver resourceCalculationDriver,
                                          CalculationContext context, String label) {
@@ -43,6 +66,12 @@ public class RootQueueCapacityCalculator extends AbstractQueueCapacityCalculator
         .getResourceValue(context.getResourceName());
   }
 
+  /**
+   * 计算完成后更新根队列容量信息，设置根队列绝对容量为100%。
+   * @param resourceCalculationDriver 资源计算驱动上下文
+   * @param queue 目标根队列对象
+   * @param label 节点标签
+   */
   @Override
   public void updateCapacitiesAfterCalculation(
       ResourceCalculationDriver resourceCalculationDriver, CSQueue queue, String label) {
@@ -52,6 +81,10 @@ public class RootQueueCapacityCalculator extends AbstractQueueCapacityCalculator
     }
   }
 
+  /**
+   * 获取容量计算类型，根队列使用百分比类型容量表示。
+   * @return 百分比容量类型
+   */
   @Override
   public ResourceUnitCapacityType getCapacityType() {
     return PERCENTAGE;

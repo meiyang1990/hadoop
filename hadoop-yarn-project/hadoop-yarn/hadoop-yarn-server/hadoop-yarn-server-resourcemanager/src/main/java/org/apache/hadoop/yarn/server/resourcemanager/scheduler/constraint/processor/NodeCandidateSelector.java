@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,15 +24,15 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import java.util.List;
 
 /**
- * A read only implementation of the ClusterNodeTracker which exposes a method
- * to simply return a filtered list of nodes.
+ * YARN容量调度器约束处理模块的节点候选选择器接口，基于ClusterNodeTracker的只读实现，
+ * 核心职责是根据过滤条件返回符合要求的节点列表，用于调度时节点筛选。
  */
 public interface NodeCandidateSelector {
 
   /**
-   * Select a list of nodes given a filter.
-   * @param filter a NodeFilter.
-   * @return List of SchedulerNodes.
+   * 根据指定过滤条件筛选符合要求的候选节点列表
+   * @param filter 节点过滤器，定义筛选规则
+   * @return 筛选后符合条件的调度节点列表
    */
   List<SchedulerNode> selectNodes(NodeFilter filter);
 

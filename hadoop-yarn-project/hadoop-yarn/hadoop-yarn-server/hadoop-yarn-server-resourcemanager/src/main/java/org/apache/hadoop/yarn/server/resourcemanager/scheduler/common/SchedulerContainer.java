@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNode;
 import org.apache.hadoop.yarn.server.scheduler.SchedulerRequestKey;
 
 /**
- * Contexts for a container inside scheduler
+ * YARN资源调度器中容器的上下文信息包装类，封装调度过程中需要的容器关联信息
+ * @param <A> 调度应用尝试类型，继承自SchedulerApplicationAttempt
+ * @param <N> 调度节点类型，继承自SchedulerNode
  */
 public class SchedulerContainer<A extends SchedulerApplicationAttempt,
     N extends SchedulerNode> {
@@ -33,8 +36,16 @@ public class SchedulerContainer<A extends SchedulerApplicationAttempt,
   private String nodePartition;
   private A schedulerApplicationAttempt;
   private N schedulerNode;
-  private boolean allocated; // Allocated (True) or reserved (False)
+  private boolean allocated; // 标记容器状态：已分配为True，已预留为False
 
+  /**
+   * 构造调度容器上下文对象
+   * @param app 所属的调度应用尝试
+   * @param node 容器所在的调度节点
+   * @param rmContainer 关联的RM容器对象
+   * @param nodePartition 节点分区名称
+   * @param allocated 是否已分配标记
+   */
   public SchedulerContainer(A app, N node, RMContainer rmContainer,
       String nodePartition, boolean allocated) {
     this.schedulerApplicationAttempt = app;
@@ -64,6 +75,10 @@ public class SchedulerContainer<A extends SchedulerApplicationAttempt,
     return allocated;
   }
 
+  /**
+   * 根据容器状态获取对应的调度请求键
+   * @return 预留状态返回预留调度键，已分配状态返回已分配调度键
+   */
   public SchedulerRequestKey getSchedulerRequestKey() {
     if (rmContainer.getState() == RMContainerState.RESERVED) {
       return rmContainer.getReservedSchedulerKey();
