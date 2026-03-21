@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,7 +29,7 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.KeyConverter
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.Separator;
 
 /**
- * Represents a rowkey for the flow activity table.
+ * 表示流活动HBase表的RowKey结构
  */
 public class FlowActivityRowKey {
 
@@ -40,10 +41,11 @@ public class FlowActivityRowKey {
       flowActivityRowKeyConverter = new FlowActivityRowKeyConverter();
 
   /**
-   * @param clusterId identifying the cluster
-   * @param dayTs to be converted to the top of the day timestamp
-   * @param userId identifying user
-   * @param flowName identifying the flow
+   * 构造流活动RowKey对象，自动将时间戳转换为当日零点时间
+   * @param clusterId 集群标识
+   * @param dayTs 原始时间戳
+   * @param userId 用户标识
+   * @param flowName 流名称
    */
   public FlowActivityRowKey(String clusterId, Long dayTs, String userId,
       String flowName) {
@@ -51,18 +53,18 @@ public class FlowActivityRowKey {
   }
 
   /**
-   * @param clusterId identifying the cluster
-   * @param timestamp when the flow activity happened. May be converted to the
-   *          top of the day depending on the convertDayTsToTopOfDay argument.
-   * @param userId identifying user
-   * @param flowName identifying the flow
-   * @param convertDayTsToTopOfDay if true and timestamp isn't null, then
-   *          timestamp will be converted to the top-of-the day timestamp
+   * 构造流活动RowKey对象，可选择是否将时间戳转换为当日零点
+   * @param clusterId 集群标识
+   * @param timestamp 流活动发生时间戳
+   * @param userId 用户标识
+   * @param flowName 流名称
+   * @param convertDayTsToTopOfDay 是否将时间戳转换为当日零点时间
    */
   protected FlowActivityRowKey(String clusterId, Long timestamp, String userId,
       String flowName, boolean convertDayTsToTopOfDay) {
     this.clusterId = clusterId;
     if (convertDayTsToTopOfDay && (timestamp != null)) {
+      // 将时间戳转换为当日零点，方便按天维度聚合查询
       this.dayTs = HBaseTimelineSchemaUtils.getTopOfTheDayTimestamp(timestamp);
     } else {
       this.dayTs = timestamp;
@@ -88,47 +90,44 @@ public class FlowActivityRowKey {
   }
 
   /**
-   * Constructs a row key for the flow activity table as follows:
-   * {@code clusterId!dayTimestamp!user!flowName}.
+   * 构造流活动表的HBase RowKey字节数组，格式为: clusterId!dayTimestamp!user!flowName
    *
-   * @return byte array for the row key
+   * @return 流活动RowKey字节数组
    */
   public byte[] getRowKey() {
     return flowActivityRowKeyConverter.encode(this);
   }
 
   /**
-   * Given the raw row key as bytes, returns the row key as an object.
+   * 从字节数组解析出流活动RowKey对象
    *
-   * @param rowKey Byte representation of row key.
-   * @return A <cite>FlowActivityRowKey</cite> object.
+   * @param rowKey RowKey字节数组
+   * @return 解析后的FlowActivityRowKey对象
    */
   public static FlowActivityRowKey parseRowKey(byte[] rowKey) {
     return new FlowActivityRowKeyConverter().decode(rowKey);
   }
 
   /**
-   * Constructs a row key for the flow activity table as follows:
-   * {@code clusterId!dayTimestamp!user!flowName}.
-   * @return String representation of row key
+   * 构造流活动RowKey的字符串表示，格式为: clusterId!dayTimestamp!user!flowName
+   * @return 流活动RowKey字符串
    */
   public String getRowKeyAsString() {
     return flowActivityRowKeyConverter.encodeAsString(this);
   }
 
   /**
-   * Given the raw row key as string, returns the row key as an object.
-   * @param encodedRowKey String representation of row key.
-   * @return A <cite>FlowActivityRowKey</cite> object.
+   * 从字符串解析出流活动RowKey对象
+   * @param encodedRowKey RowKey字符串
+   * @return 解析后的FlowActivityRowKey对象
    */
   public static FlowActivityRowKey parseRowKeyFromString(String encodedRowKey) {
     return new FlowActivityRowKeyConverter().decodeFromString(encodedRowKey);
   }
 
   /**
-   * Encodes and decodes row key for flow activity table. The row key is of the
-   * form : clusterId!dayTimestamp!user!flowName. dayTimestamp(top of the day
-   * timestamp) is a long and rest are strings.
+   * 流活动RowKey的编解码器，负责在对象和HBase字节数组/字符串之间转换
+   * RowKey格式为: clusterId!dayTimestamp!user!flowName，其中dayTimestamp是长整型，其余为字符串
    * <p>
    */
   final private static class FlowActivityRowKeyConverter
@@ -139,13 +138,8 @@ public class FlowActivityRowKey {
     }
 
     /**
-     * The flow activity row key is of the form
-     * clusterId!dayTimestamp!user!flowName with each segment separated by !.
-     * The sizes below indicate sizes of each one of these segements in
-     * sequence. clusterId, user and flowName are strings. Top of the day
-     * timestamp is a long hence 8 bytes in size. Strings are variable in size
-     * (i.e. they end whenever separator is encountered). This is used while
-     * decoding and helps in determining where to split.
+     * 定义每个分段的大小，用于解码时分段切割：
+     * clusterId: 变长，dayTimestamp: 固定8字节(long)，userId:变长，flowName:变长
      */
     private static final int[] SEGMENT_SIZES = {Separator.VARIABLE_SIZE,
         Bytes.SIZEOF_LONG, Separator.VARIABLE_SIZE, Separator.VARIABLE_SIZE };
@@ -153,16 +147,9 @@ public class FlowActivityRowKey {
     /*
      * (non-Javadoc)
      *
-     * Encodes FlowActivityRowKey object into a byte array with each
-     * component/field in FlowActivityRowKey separated by Separator#QUALIFIERS.
-     * This leads to an flow activity table row key of the form
-     * clusterId!dayTimestamp!user!flowName. If dayTimestamp in passed
-     * FlowActivityRowKey object is null and clusterId is not null, then this
-     * returns a row key prefix as clusterId! and if userId in
-     * FlowActivityRowKey is null (and the fields preceding it i.e. clusterId
-     * and dayTimestamp are not null), this returns a row key prefix as
-     * clusterId!dayTimeStamp! dayTimestamp is inverted while encoding as it
-     * helps maintain a descending order for row keys in flow activity table.
+     * 将FlowActivityRowKey对象编码为HBase RowKey字节数组，各部分使用!分隔。
+     * 时间戳会被反转，使得行键在HBase中按时间降序排列，最新数据优先查询。
+     * 根据字段是否为null生成不同长度的前缀，支持范围查询场景。
      *
      * @see org.apache.hadoop.yarn.server.timelineservice.storage.common
      * .KeyConverter#encode(java.lang.Object)
@@ -170,16 +157,19 @@ public class FlowActivityRowKey {
     @Override
     public byte[] encode(FlowActivityRowKey rowKey) {
       if (rowKey.getDayTimestamp() == null) {
+        // 仅返回clusterId前缀，用于查询该集群下所有流活动
         return Separator.QUALIFIERS.join(Separator.encode(
             rowKey.getClusterId(), Separator.SPACE, Separator.TAB,
             Separator.QUALIFIERS), Separator.EMPTY_BYTES);
       }
       if (rowKey.getUserId() == null) {
+        // 返回clusterId!dayTimestamp前缀，用于查询该集群某一天下所有流活动
         return Separator.QUALIFIERS.join(Separator.encode(
             rowKey.getClusterId(), Separator.SPACE, Separator.TAB,
             Separator.QUALIFIERS), Bytes.toBytes(LongConverter
             .invertLong(rowKey.getDayTimestamp())), Separator.EMPTY_BYTES);
       }
+      // 编码完整RowKey: clusterId!反转后的dayTimestamp!userId!flowName
       return Separator.QUALIFIERS.join(Separator.encode(rowKey.getClusterId(),
           Separator.SPACE, Separator.TAB, Separator.QUALIFIERS), Bytes
           .toBytes(LongConverter.invertLong(rowKey.getDayTimestamp())),
@@ -197,15 +187,18 @@ public class FlowActivityRowKey {
      */
     @Override
     public FlowActivityRowKey decode(byte[] rowKey) {
+      // 按分隔符和分段大小切割RowKey
       byte[][] rowKeyComponents =
           Separator.QUALIFIERS.split(rowKey, SEGMENT_SIZES);
       if (rowKeyComponents.length != 4) {
         throw new IllegalArgumentException("the row key is not valid for "
             + "a flow activity");
       }
+      // 解码各分段，还原转义字符
       String clusterId =
           Separator.decode(Bytes.toString(rowKeyComponents[0]),
               Separator.QUALIFIERS, Separator.TAB, Separator.SPACE);
+      // 反转时间戳还原原始值
       Long dayTs = LongConverter.invertLong(Bytes.toLong(rowKeyComponents[1]));
       String userId =
           Separator.decode(Bytes.toString(rowKeyComponents[2]),
@@ -219,21 +212,26 @@ public class FlowActivityRowKey {
     @Override
     public String encodeAsString(FlowActivityRowKey key) {
       if (key.getDayTimestamp() == null) {
+        // 仅编码clusterId
         return TimelineReaderUtils
             .joinAndEscapeStrings(new String[] {key.clusterId});
       } else if (key.getUserId() == null) {
+        // 编码clusterId + 时间戳
         return TimelineReaderUtils.joinAndEscapeStrings(
             new String[] {key.clusterId, key.dayTs.toString()});
       } else if (key.getFlowName() == null) {
+        // 编码clusterId + 时间戳 + userId
         return TimelineReaderUtils.joinAndEscapeStrings(
             new String[] {key.clusterId, key.dayTs.toString(), key.userId});
       }
+      // 编码完整四个字段
       return TimelineReaderUtils.joinAndEscapeStrings(new String[] {
           key.clusterId, key.dayTs.toString(), key.userId, key.flowName});
     }
 
     @Override
     public FlowActivityRowKey decodeFromString(String encodedRowKey) {
+      // 切割并反转义字符串
       List<String> split = TimelineReaderUtils.split(encodedRowKey);
       if (split == null || split.size() != 4) {
         throw new IllegalArgumentException(

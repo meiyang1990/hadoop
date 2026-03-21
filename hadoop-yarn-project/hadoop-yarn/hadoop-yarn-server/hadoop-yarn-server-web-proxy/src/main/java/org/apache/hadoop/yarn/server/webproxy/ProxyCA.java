@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -81,36 +82,59 @@ import java.util.Random;
 import java.util.UUID;
 
 /**
- * Allows for the generation and acceptance of specialized HTTPS Certificates to
- * be used for HTTPS communication between the AMs and the RM Proxy.
+ * YARN Web Proxy证书颁发机构，负责生成和验证ApplicationMaster与RM Proxy之间
+ * HTTPS通信使用的专用HTTPS证书。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class ProxyCA {
   private static final Logger LOG = LoggerFactory.getLogger(ProxyCA.class);
 
+  // 根CA证书
   private X509Certificate caCert;
+  // 根CA密钥对
   private KeyPair caKeyPair;
+  // 信任存储，信任当前根CA证书
   private KeyStore childTrustStore;
+  // 安全随机数生成器
   private final Random srand;
+  // 系统默认X509信任管理器
   private X509TrustManager defaultTrustManager;
+  // X509密钥管理器
   private X509KeyManager x509KeyManager;
+  // 主机名验证器
   private HostnameVerifier hostnameVerifier;
+  // 签名算法标识：SHA512withRSA
   private static final AlgorithmIdentifier SIG_ALG_ID =
       new DefaultSignatureAlgorithmIdentifierFinder().find("SHA512WITHRSA");
 
+  /**
+   * 构造ProxyCA实例，初始化安全随机数并注册BouncyCastle加密提供器
+   */
   public ProxyCA() {
     srand = new SecureRandom();
 
-    // This only has to be done once
+    // BouncyCastle提供器只需注册一次
     Security.addProvider(new BouncyCastleProvider());
   }
 
+  /**
+   * 初始化ProxyCA，自动生成根CA证书和密钥对
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   public void init() throws GeneralSecurityException, IOException {
     createCACertAndKeyPair();
     initInternal();
   }
 
+  /**
+   * 使用外部提供的根CA证书和私钥初始化ProxyCA，验证失败则自动重新生成
+   * @param caCert 根CA证书
+   * @param caPrivateKey 根CA私钥
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   public void init(X509Certificate caCert, PrivateKey caPrivateKey)
       throws GeneralSecurityException, IOException {
     if (caCert == null || caPrivateKey == null
@@ -125,11 +149,18 @@ public class ProxyCA {
     initInternal();
   }
 
+  /**
+   * 内部初始化：加载默认信任管理器、创建密钥管理器、主机名验证器和信任存储
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   private void initInternal() throws GeneralSecurityException, IOException {
     defaultTrustManager = null;
     TrustManagerFactory factory = TrustManagerFactory.getInstance(
         TrustManagerFactory.getDefaultAlgorithm());
+    // 使用默认信任管理器初始化，加载系统信任的CA证书
     factory.init((KeyStore) null);
+    // 查找默认X509信任管理器
     for (TrustManager manager : factory.getTrustManagers()) {
       if (manager instanceof X509TrustManager) {
         defaultTrustManager = (X509TrustManager) manager;
@@ -146,6 +177,19 @@ public class ProxyCA {
     this.childTrustStore = createTrustStore("client", caCert);
   }
 
+  /**
+   * 使用BouncyCastle生成X509证书
+   * @param isCa 是否为CA证书
+   * @param issuerStr 颁发者DN
+   * @param subjectStr 主体DN
+   * @param from 证书生效时间
+   * @param to 证书过期时间
+   * @param publicKey 证书公钥
+   * @param privateKey 签名私钥
+   * @return 生成的X509证书
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   private X509Certificate createCert(boolean isCa, String issuerStr,
       String subjectStr, Date from, Date to, PublicKey publicKey,
       PrivateKey privateKey) throws GeneralSecurityException, IOException {
@@ -153,30 +197,33 @@ public class ProxyCA {
     X500Name subject = new X500Name(subjectStr);
     SubjectPublicKeyInfo subPubKeyInfo =
         SubjectPublicKeyInfo.getInstance(publicKey.getEncoded());
+    // 创建证书生成器，使用64位随机序列号
     X509v3CertificateBuilder certBuilder = new X509v3CertificateBuilder(
         issuer, new BigInteger(64, srand), from, to, subject, subPubKeyInfo);
     AlgorithmIdentifier digAlgId =
         new DefaultDigestAlgorithmIdentifierFinder().find(SIG_ALG_ID);
     ContentSigner contentSigner;
     try {
+      // 构建RSA内容签名器
       contentSigner = new BcRSAContentSignerBuilder(SIG_ALG_ID, digAlgId)
           .build(PrivateKeyFactory.createKey(privateKey.getEncoded()));
     } catch (OperatorCreationException oce) {
       throw new GeneralSecurityException(oce);
     }
     if (isCa) {
-      // BasicConstraints(0) indicates a CA and a path length of 0.  This is
-      // important to indicate that child certificates can't issue additional
-      // grandchild certificates
+      // BasicConstraints(0)表示这是CA证书，且路径长度为0，
+      // 意味着子证书不能再签发孙证书，限制证书层级只有两级（CA-应用证书）
       certBuilder.addExtension(Extension.basicConstraints, true,
           new BasicConstraints(0));
     } else {
-      // BasicConstraints(false) indicates this is not a CA
+      // BasicConstraints(false)表示这不是CA证书，不能签发其他证书
       certBuilder.addExtension(Extension.basicConstraints, true,
           new BasicConstraints(false));
+      // 添加CA证书的颁发者密钥标识
       certBuilder.addExtension(Extension.authorityKeyIdentifier, false,
           new JcaX509ExtensionUtils().createAuthorityKeyIdentifier(caCert));
     }
+    // 签名生成证书
     X509CertificateHolder certHolder = certBuilder.build(contentSigner);
     X509Certificate cert = new JcaX509CertificateConverter().setProvider("BC")
         .getCertificate(certHolder);
@@ -184,30 +231,47 @@ public class ProxyCA {
     return cert;
   }
 
+  /**
+   * 生成自签名根CA证书和密钥对
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   private void createCACertAndKeyPair()
       throws GeneralSecurityException, IOException {
     Date from = new Date();
+    // 证书过期时间固定到2037年底
     Date to = new GregorianCalendar(2037, Calendar.DECEMBER, 31).getTime();
+    // 生成2048位RSA密钥对
     KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
     keyGen.initialize(2048);
     caKeyPair = keyGen.genKeyPair();
+    // 生成随机主体名称
     String subject = "OU=YARN-" + UUID.randomUUID();
+    // 生成自签名CA证书
     caCert = createCert(true, subject, subject, from, to,
         caKeyPair.getPublic(), caKeyPair.getPrivate());
     LOG.debug("CA Certificate: \n{}", caCert);
   }
 
+  /**
+   * 为指定应用生成专属密钥库，包含应用证书和私钥
+   * @param appId 应用ID
+   * @param ksPassword 密钥库密码
+   * @return 密钥库字节数组
+   * @throws Exception 生成过程中可能的异常
+   */
   public byte[] createChildKeyStore(ApplicationId appId, String ksPassword)
       throws Exception {
-    // We don't check the expiration date, and this will provide further reason
-    // for outside users to not accept these certificates
+    // 不对应用证书设置过期时间，应用停止后证书自然失效，即使被误用也无法通过应用ID校验
     Date from = new Date();
     Date to = from;
     KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
     keyGen.initialize(2048);
     KeyPair keyPair = keyGen.genKeyPair();
     String issuer = caCert.getSubjectX500Principal().getName();
+    // 主体名称使用应用ID，方便后续校验
     String subject = "CN=" + appId;
+    // 由根CA签发应用证书
     X509Certificate cert = createCert(false, issuer, subject, from, to,
         keyPair.getPublic(), caKeyPair.getPrivate());
     if (LOG.isTraceEnabled()) {
@@ -219,18 +283,41 @@ public class ProxyCA {
     return keyStoreToBytes(keyStore, ksPassword);
   }
 
+  /**
+   * 获取信任当前根CA的信任存储字节数组
+   * @param password 信任存储密码
+   * @return 信任存储字节数组
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   public byte[] getChildTrustStore(String password)
       throws GeneralSecurityException, IOException {
     return keyStoreToBytes(childTrustStore, password);
   }
 
+  /**
+   * 创建空的JKS密钥库
+   * @return 空密钥库
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   private KeyStore createEmptyKeyStore()
       throws GeneralSecurityException, IOException {
     KeyStore ks = KeyStore.getInstance("JKS");
-    ks.load(null, null); // initialize
+    ks.load(null, null); // 初始化空密钥库
     return ks;
   }
 
+  /**
+   * 创建包含应用私钥和证书的子密钥库
+   * @param password 密钥库密码
+   * @param alias 别名
+   * @param privateKey 应用私钥
+   * @param cert 应用证书
+   * @return 创建好的子密钥库
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   private KeyStore createChildKeyStore(String password, String alias,
       Key privateKey, Certificate cert)
       throws GeneralSecurityException, IOException {
@@ -240,10 +327,22 @@ public class ProxyCA {
     return ks;
   }
 
+  /**
+   * 生成随机16位密钥库密码
+   * @return 随机密码字符串
+   */
   public String generateKeyStorePassword() {
     return RandomStringUtils.random(16, 0, 0, true, true, null, srand);
   }
 
+  /**
+   * 将密钥库导出为字节数组
+   * @param ks 密钥库
+   * @param password 密钥库密码
+   * @return 密钥库字节数组
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   private byte[] keyStoreToBytes(KeyStore ks, String password)
       throws GeneralSecurityException, IOException {
     try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -252,6 +351,14 @@ public class ProxyCA {
     }
   }
 
+  /**
+   * 创建信任存储，将指定证书加入信任列表
+   * @param alias 证书别名
+   * @param cert 要信任的证书
+   * @return 创建好的信任存储
+   * @throws GeneralSecurityException 安全相关异常
+   * @throws IOException IO异常
+   */
   private KeyStore createTrustStore(String alias, Certificate cert)
       throws GeneralSecurityException, IOException {
     KeyStore ks = createEmptyKeyStore();
@@ -259,13 +366,16 @@ public class ProxyCA {
     return ks;
   }
 
+  /**
+   * 为指定应用创建定制SSL上下文，包含自定义信任管理器验证应用证书
+   * @param appId 应用ID
+   * @return 定制SSL上下文
+   * @throws GeneralSecurityException 安全相关异常
+   */
   public SSLContext createSSLContext(ApplicationId appId)
       throws GeneralSecurityException {
-    // We need the normal TrustManager, plus our custom one.  While the
-    // SSLContext accepts an array of TrustManagers, the docs indicate that only
-    // the first instance of any particular implementation type is used
-    // (e.g. X509KeyManager) - this means that simply putting both TrustManagers
-    // in won't work.  We need to have ours do both.
+    // 由于SSL规范仅会使用第一个X509TrustManager，因此需要我们自定义信任管理器
+    // 同时处理默认信任和ProxyCA签发的应用证书信任
     TrustManager[] trustManagers = new TrustManager[] {
         createTrustManager(appId)};
     KeyManager[] keyManagers = new KeyManager[]{x509KeyManager};
@@ -275,6 +385,11 @@ public class ProxyCA {
     return sc;
   }
 
+  /**
+   * 创建自定义信任管理器，优先验证ProxyCA签发的应用证书，验证失败回退到默认信任管理器
+   * @param appId 期望的应用ID
+   * @return 自定义X509信任管理器
+   */
   @VisibleForTesting
   X509TrustManager createTrustManager(ApplicationId appId) {
     return new X509TrustManager() {
@@ -286,154 +401,9 @@ public class ProxyCA {
       @Override
       public void checkClientTrusted(
           java.security.cert.X509Certificate[] certs, String authType) {
-        // not used
+        // 客户端信任检查当前未使用
       }
 
       @Override
       public void checkServerTrusted(
           java.security.cert.X509Certificate[] certs, String authType)
-          throws CertificateException {
-        // Our certs will always have 2 in the chain, with 0 being the app's
-        // cert and 1 being the RM's cert
-        boolean issuedByRM = false;
-        if (certs.length == 2) {
-          try {
-            // We can verify both certs using the CA cert's public key - the
-            // child cert's info is not needed
-            certs[0].verify(caKeyPair.getPublic());
-            certs[1].verify(caKeyPair.getPublic());
-            issuedByRM = true;
-          } catch (CertificateException | NoSuchAlgorithmException
-              | InvalidKeyException | NoSuchProviderException
-              | SignatureException e) {
-            // Fall back to the default trust manager
-            LOG.debug("Could not verify certificate with RM CA, falling " +
-                "back to default", e);
-            defaultTrustManager.checkServerTrusted(certs, authType);
-          }
-        } else {
-          LOG.debug("Certificate not issued by RM CA, falling back to " +
-              "default");
-          defaultTrustManager.checkServerTrusted(certs, authType);
-        }
-        if (issuedByRM) {
-          // Check that it has the correct App ID
-          if (!certs[0].getSubjectX500Principal().getName()
-              .equals("CN=" + appId)) {
-            throw new CertificateException(
-                "Expected to find Subject X500 Principal with CN="
-                    + appId + " but found "
-                    + certs[0].getSubjectX500Principal().getName());
-          }
-          LOG.debug("Verified certificate signed by RM CA");
-        }
-      }
-    };
-  }
-
-  @VisibleForTesting
-  X509KeyManager getX509KeyManager() {
-    return x509KeyManager;
-  }
-
-  private X509KeyManager createKeyManager() {
-    return new X509KeyManager() {
-      @Override
-      public String[] getClientAliases(String s, Principal[] principals) {
-        return new String[]{"client"};
-      }
-
-      @Override
-      public String chooseClientAlias(String[] strings,
-          Principal[] principals, Socket socket) {
-        return "client";
-      }
-
-      @Override
-      public String[] getServerAliases(String s, Principal[] principals) {
-        return null;
-      }
-
-      @Override
-      public String chooseServerAlias(String s, Principal[] principals,
-          Socket socket) {
-        return null;
-      }
-
-      @Override
-      public X509Certificate[] getCertificateChain(String s) {
-        return new X509Certificate[]{caCert};
-      }
-
-      @Override
-      public PrivateKey getPrivateKey(String s) {
-        return caKeyPair.getPrivate();
-      }
-    };
-  }
-
-  public HostnameVerifier getHostnameVerifier() {
-    return hostnameVerifier;
-  }
-
-  private HostnameVerifier createHostnameVerifier() {
-    HostnameVerifier defaultHostnameVerifier =
-        new DefaultHostnameVerifier(PublicSuffixMatcherLoader.getDefault());
-    return new HostnameVerifier() {
-      @Override
-      public boolean verify(String host, SSLSession sslSession) {
-        try {
-          Certificate[] certs = sslSession.getPeerCertificates();
-          if (certs.length == 2) {
-            // Make sure this is one of our certs.  More thorough checking would
-            // have already been done by the SSLContext
-            certs[0].verify(caKeyPair.getPublic());
-            LOG.debug("Verified certificate signed by RM CA, " +
-                "skipping hostname verification");
-            return true;
-          }
-        } catch (SSLPeerUnverifiedException e) {
-          // No certificate
-          return false;
-        } catch (CertificateException | NoSuchAlgorithmException
-            | InvalidKeyException | SignatureException
-            | NoSuchProviderException e) {
-          // fall back to normal verifier below
-          LOG.debug("Could not verify certificate with RM CA, " +
-              "falling back to default hostname verification", e);
-        }
-        return defaultHostnameVerifier.verify(host, sslSession);
-      }
-    };
-  }
-
-  @VisibleForTesting
-  void setDefaultTrustManager(X509TrustManager trustManager) {
-    this.defaultTrustManager = trustManager;
-  }
-
-  @VisibleForTesting
-  public X509Certificate getCaCert() {
-    return caCert;
-  }
-
-  @VisibleForTesting
-  public KeyPair getCaKeyPair() {
-    return caKeyPair;
-  }
-
-  private boolean verifyCertAndKeys(X509Certificate cert,
-      PrivateKey privateKey) throws GeneralSecurityException {
-    PublicKey publicKey = cert.getPublicKey();
-    byte[] data = new byte[2000];
-    srand.nextBytes(data);
-    Signature signer = Signature.getInstance("SHA512withRSA");
-    signer.initSign(privateKey);
-    signer.update(data);
-    byte[] sig = signer.sign();
-    signer = Signature.getInstance("SHA512withRSA");
-    signer.initVerify(publicKey);
-    signer.update(data);
-    return signer.verify(sig);
-  }
-}

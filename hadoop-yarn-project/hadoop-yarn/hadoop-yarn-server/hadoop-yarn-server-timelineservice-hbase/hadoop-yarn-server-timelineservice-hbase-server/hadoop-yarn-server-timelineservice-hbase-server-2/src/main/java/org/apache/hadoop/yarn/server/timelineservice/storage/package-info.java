@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,10 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.storage contains
- * classes which define and implement reading and writing to backend storage.
+ * YARN时间线服务后端存储层根包，包含所有定义和实现后端存储读写能力的核心类，
+ * 为时间线应用指标数据提供持久化存储和访问能力，当前主流实现基于HBase存储。
+ * <p>
+ * 本包是私有API，不对外公开使用，且接口稳定性未稳定，随时可能变更。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

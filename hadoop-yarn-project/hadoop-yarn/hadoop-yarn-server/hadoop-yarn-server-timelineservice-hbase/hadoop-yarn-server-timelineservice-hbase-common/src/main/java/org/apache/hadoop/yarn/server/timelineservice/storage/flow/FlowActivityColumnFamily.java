@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,32 +23,35 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ColumnFamily
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.Separator;
 
 /**
- * Represents the flow run table column families.
+ * 定义HBase中流活动表(FlowActivityTable)使用的列族
+ * 为YARN时间线服务存储流活动元数据提供列族定义
  */
 public enum FlowActivityColumnFamily
     implements ColumnFamily<FlowActivityTable> {
 
   /**
-   * Info column family houses known columns, specifically ones included in
-   * columnfamily filters.
+   * 信息列族，存储已知的固定列，可用于列族过滤。
    */
   INFO("i");
 
   /**
-   * Byte representation of this column family.
+   * 列族名称的字节数组表示，用于HBase读写。
    */
   private final byte[] bytes;
 
   /**
-   * @param value
-   *          create a column family with this name. Must be lower case and
-   *          without spaces.
+   * 构造函数，根据字符串名称创建列族定义。
+   * @param value 列族名称缩写，要求小写且不含空格
    */
   private FlowActivityColumnFamily(String value) {
-    // column families should be lower case and not contain any spaces.
+    // 对列族名称编码并转换为字节数组
     this.bytes = Bytes.toBytes(Separator.SPACE.encode(value));
   }
 
+  /**
+   * 获取列族名称的字节数组副本。
+   * @return 列族名称字节数组
+   */
   public byte[] getBytes() {
     return Bytes.copy(bytes);
   }

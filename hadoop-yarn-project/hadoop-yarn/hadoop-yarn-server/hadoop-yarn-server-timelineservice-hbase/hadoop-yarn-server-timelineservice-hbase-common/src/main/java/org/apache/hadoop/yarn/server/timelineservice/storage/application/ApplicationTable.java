@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,18 +22,16 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.application;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
 
 /**
- * The application table as column families info, config and metrics. Info
- * stores information about a YARN application entity, config stores
- * configuration data of a YARN application, metrics stores the metrics of a
- * YARN application. This table is entirely analogous to the entity table but
- * created for better performance.
+ * YARN时间线服务存储应用信息的HBase表定义类，定义了应用表的结构。
+ * 应用表包含三个列族：info存储应用基本信息、config存储应用配置数据、metrics存储应用指标数据。
+ * 独立创建该表是为了提升查询性能，结构与实体表类似但专门用于应用数据存储。
  *
- * Example application table record:
+ * 示例应用表记录结构:
  *
  * <pre>
  * |-------------------------------------------------------------------------|
  * |  Row       | Column Family                | Column Family| Column Family|
- * |  key       | info                         | metrics      | config       |
+ * |  Rowkey    | info                         | metrics      | config       |
  * |-------------------------------------------------------------------------|
  * | clusterId! | id:appId                     | metricId1:   | configKey1:  |
  * | userName!  |                              | metricValue1 | configValue1 |
@@ -55,6 +54,9 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
  * |            | versionValue                 |              |              |
  * |-------------------------------------------------------------------------|
  * </pre>
+ */
+/**
+ * 应用信息HBase表实现类，继承自通用表基类，专门用于存储YARN应用时间线数据。
  */
 public final class ApplicationTable extends BaseTable<ApplicationTable> {
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,9 +21,17 @@ package org.apache.hadoop.yarn.server.webproxy.amfilter;
 
 import java.security.Principal;
 
+/**
+ * YARN Web Proxy应用Master地址过滤使用的安全主体，
+ * 表示经过认证的用户身份，用于保存请求用户名信息。
+ */
 public class AmIpPrincipal implements Principal {
   private final String name;
   
+  /**
+   * 构造包含指定用户名的安全主体对象。
+   * @param name 用户名
+   */
   public AmIpPrincipal(String name) {
     this.name = name;
   }

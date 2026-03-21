@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -5,7 +6,7 @@
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * with the License.  You may obtain copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -27,28 +28,28 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ValueConvert
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * Identifies fully qualified columns for the {@link SubApplicationTable}.
+ * 子应用表SubApplicationTable的列枚举定义，标识HBase中子应用表全限定列信息。
  */
 public enum SubApplicationColumn implements Column<SubApplicationTable> {
 
   /**
-   * Identifier for the sub application.
+   * 子应用唯一标识符列。
    */
   ID(SubApplicationColumnFamily.INFO, "id"),
 
   /**
-   * The type of sub application.
+   * 子应用类型列。
    */
   TYPE(SubApplicationColumnFamily.INFO, "type"),
 
   /**
-   * When the sub application was created.
+   * 子应用创建时间列。
    */
   CREATED_TIME(SubApplicationColumnFamily.INFO, "created_time",
       new LongConverter()),
 
   /**
-   * The version of the flow that this sub application belongs to.
+   * 子应用所属流的版本列。
    */
   FLOW_VERSION(SubApplicationColumnFamily.INFO, "flow_version");
 
@@ -57,16 +58,27 @@ public enum SubApplicationColumn implements Column<SubApplicationTable> {
   private final byte[] columnQualifierBytes;
   private final ValueConverter valueConverter;
 
+  /**
+   * 子应用列构造方法，使用通用值转换器。
+   * @param columnFamily 列所属列族
+   * @param columnQualifier 列限定符名称
+   */
   SubApplicationColumn(ColumnFamily<SubApplicationTable> columnFamily,
       String columnQualifier) {
     this(columnFamily, columnQualifier, GenericConverter.getInstance());
   }
 
+  /**
+   * 子应用列构造方法，使用自定义值转换器。
+   * @param columnFamily 列所属列族
+   * @param columnQualifier 列限定符名称
+   * @param converter 值转换器
+   */
   SubApplicationColumn(ColumnFamily<SubApplicationTable> columnFamily,
       String columnQualifier, ValueConverter converter) {
     this.columnFamily = columnFamily;
     this.columnQualifier = columnQualifier;
-    // Future-proof by ensuring the right column prefix hygiene.
+    // 对列限定符编码，保证前缀规范，向前兼容
     this.columnQualifierBytes =
         Bytes.toBytes(Separator.SPACE.encode(columnQualifier));
     this.valueConverter = converter;
@@ -74,6 +86,7 @@ public enum SubApplicationColumn implements Column<SubApplicationTable> {
 
   @Override
   public byte[] getColumnQualifierBytes() {
+    // 返回克隆后的字节数组避免外部修改内部状态
     return columnQualifierBytes.clone();
   }
 

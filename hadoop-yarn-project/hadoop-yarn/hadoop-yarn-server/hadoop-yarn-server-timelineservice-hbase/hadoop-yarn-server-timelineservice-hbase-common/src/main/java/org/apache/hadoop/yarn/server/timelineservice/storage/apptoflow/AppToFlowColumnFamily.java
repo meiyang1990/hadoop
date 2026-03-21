@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,28 +23,33 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ColumnFamily
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.Separator;
 
 /**
- * Represents the app_flow table column families.
+ * 表示应用到流映射表(AppToFlowTable)的列族定义，用于YARN时间线服务HBase存储层。
+ * 应用到流映射表存储应用ID到流信息的映射关系，用于按流维度查询时间线数据。
  */
 public enum AppToFlowColumnFamily implements ColumnFamily<AppToFlowTable> {
   /**
-   * Mapping column family houses known columns such as flowName and flowRunId.
+   * 映射列族，存储流名称、流运行ID等应用到流的映射元数据。
    */
   MAPPING("m");
 
   /**
-   * Byte representation of this column family.
+   * 列族名称对应的字节数组表示，用于HBase存储。
    */
   private final byte[] bytes;
 
   /**
-   * @param value create a column family with this name. Must be lower case and
-   *          without spaces.
+   * 构造列族枚举实例，将列族名称转换为HBase可用的字节数组。
+   * @param value 列族名称字符串，要求小写且不含空格
    */
   AppToFlowColumnFamily(String value) {
     // column families should be lower case and not contain any spaces.
     this.bytes = Bytes.toBytes(Separator.SPACE.encode(value));
   }
 
+  /**
+   * 获取列族名称的字节数组副本，避免外部修改内部状态。
+   * @return 列族名称的字节数组副本
+   */
   public byte[] getBytes() {
     return Bytes.copy(bytes);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,52 +21,54 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * Used to represent a partially qualified column, where the actual column name
- * will be composed of a prefix and the remainder of the column qualifier. The
- * prefix can be null, in which case the column qualifier will be completely
- * determined when the values are stored.
+ * 表示HBase中部分限定列名的抽象接口，完整列名由前缀和后缀拼接而成。
+ * 当前缀为null时，完整列名将在数据存储时动态确定。
+ * 用于YARN时间线服务HBase存储，统一管理不同列前缀的列操作。
  */
 public interface ColumnPrefix<T extends BaseTable<T>> {
 
   /**
-   * @param qualifierPrefix Column qualifier or prefix of qualifier.
-   * @return a byte array encoding column prefix and qualifier/prefix passed.
+   * 拼接并获取编码后的完整列前缀字节数组，传入字符串类型的后缀。
+   * @param qualifierPrefix 列限定符后缀
+   * @return 拼接后的完整列前缀字节数组
    */
   byte[] getColumnPrefixBytes(String qualifierPrefix);
 
   /**
-   * @param qualifierPrefix Column qualifier or prefix of qualifier.
-   * @return a byte array encoding column prefix and qualifier/prefix passed.
+   * 拼接并获取编码后的完整列前缀字节数组，传入字节数组类型的后缀。
+   * @param qualifierPrefix 列限定符后缀
+   * @return 拼接后的完整列前缀字节数组
    */
   byte[] getColumnPrefixBytes(byte[] qualifierPrefix);
 
   /**
-   * Get the column prefix in bytes.
-   * @return column prefix in bytes
+   * 获取基础列前缀的字节数组。
+   * @return 基础列前缀字节数组
    */
   byte[] getColumnPrefixInBytes();
 
   /**
-   * Returns column family name(as bytes) associated with this column prefix.
-   * @return a byte array encoding column family for this prefix.
+   * 获取该列前缀所属列族的字节数组。
+   * @return 列族对应的字节数组
    */
   byte[] getColumnFamilyBytes();
 
   /**
-   * Returns value converter implementation associated with this column prefix.
-   * @return a {@link ValueConverter} implementation.
+   * 获取该列前缀关联的值转换器。
+   * @return 值转换器实例
    */
   ValueConverter getValueConverter();
 
   /**
-   * Return attributed combined with aggregations, if any.
-   * @return an array of Attributes
+   * 获取合并聚合信息后的属性数组。
+   * @param attributes 原始属性数组
+   * @return 合并聚合属性后的属性数组
    */
   Attribute[] getCombinedAttrsWithAggr(Attribute... attributes);
 
   /**
-   * Return true if the cell timestamp needs to be supplemented.
-   * @return true if the cell timestamp needs to be supplemented
+   * 判断是否需要补充单元格时间戳。
+   * @return true表示需要补充单元格时间戳
    */
   boolean supplementCellTimeStamp();
 }

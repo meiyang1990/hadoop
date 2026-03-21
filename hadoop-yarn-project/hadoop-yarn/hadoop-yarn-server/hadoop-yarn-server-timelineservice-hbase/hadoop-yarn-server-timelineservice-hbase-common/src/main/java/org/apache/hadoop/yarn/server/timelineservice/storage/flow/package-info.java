@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,7 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.storage.flow
- * contains classes related to implementation for flow related tables, viz. flow
- * run table and flow activity table.
+ * YARN Timeline Service HBase存储层的流信息相关表处理包，包含流运行表和流活动表相关实现类。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

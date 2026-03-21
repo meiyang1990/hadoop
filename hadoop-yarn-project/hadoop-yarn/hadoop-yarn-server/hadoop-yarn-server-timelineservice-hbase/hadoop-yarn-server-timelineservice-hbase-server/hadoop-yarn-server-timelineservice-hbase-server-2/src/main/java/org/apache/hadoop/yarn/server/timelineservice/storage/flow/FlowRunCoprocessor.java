@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,7 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Coprocessor for flow run table.
+ * 流运行表的HBase协处理器，负责处理时间线服务流数据的读写、刷写、合并等操作。
  */
 public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
 
@@ -65,7 +66,7 @@ public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
 
   private Region region;
   /**
-   * generate a timestamp that is unique per row in a region this is per region.
+   * 为Region内每行生成唯一时间戳，每个Region维护一个实例。
    */
   private final TimestampGenerator timestampGenerator =
       new TimestampGenerator();
@@ -102,7 +103,7 @@ public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
   public void prePut(ObserverContext<RegionCoprocessorEnvironment> e, Put put,
                      WALEdit edit, Durability durability) throws IOException {
     Map<String, byte[]> attributes = put.getAttributesMap();
-    // Assumption is that all the cells in a put are the same operation.
+    // 假设同一个Put中的所有单元格操作类型相同
     List<Tag> tags = new ArrayList<>();
     if ((attributes != null) && (attributes.size() > 0)) {
       for (Map.Entry<String, byte[]> attribute : attributes.entrySet()) {
@@ -115,15 +116,12 @@ public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
           HBaseTimelineServerUtils.convertTagListToByteArray(tags);
       NavigableMap<byte[], List<Cell>> newFamilyMap = new TreeMap<>(
           Bytes.BYTES_COMPARATOR);
+      // 遍历Put中每个列族的所有单元格
       for (Map.Entry<byte[], List<Cell>> entry : put.getFamilyCellMap()
           .entrySet()) {
         List<Cell> newCells = new ArrayList<>(entry.getValue().size());
         for (Cell cell : entry.getValue()) {
-          // for each cell in the put add the tags
-          // Assumption is that all the cells in
-          // one put are the same operation
-          // also, get a unique cell timestamp for non-metric cells
-          // this way we don't inadvertently overwrite cell versions
+          // 为每个单元格添加标签，并为非指标单元格生成唯一时间戳，避免误覆盖不同版本
           long cellTimestamp = getCellTimestamp(cell.getTimestamp(), tags);
           newCells.add(CellUtil.createCell(CellUtil.cloneRow(cell),
               CellUtil.cloneFamily(cell), CellUtil.cloneQualifier(cell),
@@ -132,25 +130,20 @@ public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
         }
         newFamilyMap.put(entry.getKey(), newCells);
       } // for each entry
-      // Update the family map for the Put
+      // 更新Put中的列族单元格映射
       put.setFamilyCellMap(newFamilyMap);
     }
   }
 
   /**
-   * Determines if the current cell's timestamp is to be used or a new unique
-   * cell timestamp is to be used. The reason this is done is to inadvertently
-   * overwrite cells when writes come in very fast. But for metric cells, the
-   * cell timestamp signifies the metric timestamp. Hence we don't want to
-   * overwrite it.
+   * 确定单元格使用的时间戳：对未指定时间戳的单元格生成唯一时间戳，避免快速写入时误覆盖；指标单元格保留原有时间戳，因为它代表指标采集时间。
    *
-   * @param timestamp
-   * @param tags
-   * @return cell timestamp
+   * @param timestamp 原始时间戳
+   * @param tags 单元格标签列表
+   * @return 最终使用的单元格时间戳
    */
   private long getCellTimestamp(long timestamp, List<Tag> tags) {
-    // if ts not set (hbase sets to HConstants.LATEST_TIMESTAMP by default)
-    // then use the generator
+    // 如果时间戳未设置（HBase默认设置为LATEST_TIMESTAMP），则使用生成器生成唯一时间戳
     if (timestamp == HConstants.LATEST_TIMESTAMP) {
       return timestampGenerator.getUniqueTimestamp();
     } else {
@@ -172,13 +165,16 @@ public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
   @Override
   public void preGetOp(ObserverContext<RegionCoprocessorEnvironment> e,
                        Get get, List<Cell> results) throws IOException {
+    // 将Get请求转换为Scan，便于流量聚合处理
     Scan scan = new Scan(get);
     scan.setMaxVersions();
     RegionScanner scanner = null;
     try {
+      // 使用自定义FlowScanner处理读取操作
       scanner = new FlowScanner(e.getEnvironment(), scan,
           region.getScanner(scan), FlowScannerOperation.READ);
       scanner.next(results);
+      // 跳过后续默认处理流程
       e.bypass();
     } finally {
       if (scanner != null) {
@@ -202,8 +198,7 @@ public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
   public void preScannerOpen(
       ObserverContext<RegionCoprocessorEnvironment> e, Scan scan)
       throws IOException {
-    // set max versions for scan to see all
-    // versions to aggregate for metrics
+    // 设置最大版本数为所有版本，确保能够看到全部版本用于指标聚合计算
     scan.setMaxVersions();
   }
 
@@ -223,6 +218,7 @@ public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
   public RegionScanner postScannerOpen(
       ObserverContext<RegionCoprocessorEnvironment> e, Scan scan,
       RegionScanner scanner) throws IOException {
+    // 包装原始扫描器为自定义FlowScanner，用于读取场景的流量聚合处理
     return new FlowScanner(e.getEnvironment(), scan,
         scanner, FlowScannerOperation.READ);
   }
@@ -244,6 +240,7 @@ public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
             + " storeFilesCount=" + store.getStorefilesCount());
       }
     }
+    // 包装原始扫描器为自定义FlowScanner，用于刷写场景的数据聚合处理
     return new FlowScanner(c.getEnvironment(), scanner,
         FlowScannerOperation.FLUSH);
   }
@@ -274,12 +271,14 @@ public class FlowRunCoprocessor implements RegionCoprocessor, RegionObserver {
 
     FlowScannerOperation requestOp = FlowScannerOperation.MINOR_COMPACTION;
     if (request != null) {
+      // 根据压缩请求类型判断是 major 还是 minor 压缩
       requestOp = (request.isMajor() ? FlowScannerOperation.MAJOR_COMPACTION
           : FlowScannerOperation.MINOR_COMPACTION);
       LOG.info("Compactionrequest= " + request.toString() + " "
           + requestOp.toString() + " RegionName=" + e.getEnvironment()
           .getRegion().getRegionInfo().getRegionNameAsString());
     }
+    // 包装原始扫描器为自定义FlowScanner，用于压缩场景的数据聚合处理
     return new FlowScanner(e.getEnvironment(), scanner, requestOp);
   }
 }

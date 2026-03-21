@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,37 +28,37 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ValueConvert
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * Identifies fully qualified columns for the {@link DomainTable}.
+ * 域名表DomainTable的列定义枚举，标识域名表中所有全限定列。
  */
 public enum DomainColumn implements Column<DomainTable> {
 
   /**
-   * The created time.
+   * 域创建时间列。
    */
   CREATED_TIME(DomainColumnFamily.INFO, "created_time"),
 
   /**
-   * The description of the domain.
+   * 域描述列。
    */
   DESCRIPTION(DomainColumnFamily.INFO, "description"),
 
   /**
-   * The modification time.
+   * 域修改时间列。
    */
   MODIFICATION_TIME(DomainColumnFamily.INFO, "modification_time"),
 
   /**
-   * The owner.
+   * 域所有者列。
    */
   OWNER(DomainColumnFamily.INFO, "owner"),
 
   /**
-   * The readers.
+   * 域可读用户列表列。
    */
   READERS(DomainColumnFamily.INFO, "readers"),
 
   /**
-   * The Writers.
+   * 域可写用户列表列。
    */
   WRITERS(DomainColumnFamily.INFO, "writers");
 
@@ -67,18 +68,23 @@ public enum DomainColumn implements Column<DomainTable> {
   private final byte[] columnQualifierBytes;
   private final ValueConverter valueConverter;
 
+  /**
+   * 域名列构造方法。
+   * @param columnFamily 列所属列族
+   * @param columnQualifier 列限定符名称
+   */
   DomainColumn(ColumnFamily<DomainTable> columnFamily,
                String columnQualifier) {
     this.columnFamily = columnFamily;
     this.columnQualifier = columnQualifier;
-    // Future-proof by ensuring the right column prefix hygiene.
+    // 对列限定符进行编码，保证格式一致性
     this.columnQualifierBytes =
         Bytes.toBytes(Separator.SPACE.encode(columnQualifier));
     this.valueConverter = GenericConverter.getInstance();
   }
 
   /**
-   * @return the column name value
+   * @return 列限定符名称
    */
   private String getColumnQualifier() {
     return columnQualifier;

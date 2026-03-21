@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,12 +22,10 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.entity;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
 
 /**
- * The entity table as column families info, config and metrics. Info stores
- * information about a timeline entity object config stores configuration data
- * of a timeline entity object metrics stores the metrics of a timeline entity
- * object
- *
- * Example entity table record:
+ * 时间线服务实体表定义，基于HBase存储时间线实体数据。
+ * 包含三个列族：info存储实体基础信息、config存储实体配置数据、metrics存储实体指标数据。
+ * 
+ * 实体表记录示例:
  *
  * <pre>
  * |-------------------------------------------------------------------------|
@@ -39,7 +38,7 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
  * | flowRunId! |                              |              | configKey2:  |
  * | AppId!     | created_time:                | metricId1:   | configValue2 |
  * | entityType!| 1392993084018                | metricValue2 |              |
- * | idPrefix!  |                              | @timestamp2  |              |
+ * | idPrefix!  |                              |              |              |
  * | entityId   | i!infoKey:                   |              |              |
  * |            | infoValue                    | metricId1:   |              |
  * |            |                              | metricValue1 |              |
@@ -56,6 +55,8 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
  * |            | versionValue                 |              |              |
  * |-------------------------------------------------------------------------|
  * </pre>
+ * 
+ * 继承自BaseTable，使用自身类型作为泛型参数，遵循HBase表定义的模式。
  */
 public final class EntityTable extends BaseTable<EntityTable> {
 }

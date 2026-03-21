@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -17,26 +18,29 @@
 
 package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 
-import org.apache.hadoop.hbase.util.Bytes;
-
 /**
- * Encodes and decodes event column names for application and entity tables.
- * The event column name is of the form : eventId=timestamp=infokey.
- * If info is not associated with the event, event column name is of the form :
- * eventId=timestamp=
- * Event timestamp is long and rest are strings.
- * Column prefixes are not part of the eventcolumn name passed for encoding. It
- * is added later, if required in the associated ColumnPrefix implementations.
+ * YARN Timeline服务HBase存储层：应用和实体表事件列名编解码工具，
+ * 将{@link EventColumnName}对象编码为HBase存储用字节数组，
+ * 并将HBase中存储的字节数组解码还原为{@link EventColumnName}对象。
+ * <p>
+ * 事件列名格式：{@code eventId=timestamp=infokey}，若事件无关联信息则格式为{@code eventId=timestamp=}
+ * 其中事件时间戳为long类型，其余部分为字符串类型。
+ * 列前缀不包含在本次编码的列名中，会在后续ColumnPrefix实现中按需添加。
  */
 public final class EventColumnNameConverter
     implements KeyConverter<EventColumnName> {
 
+  /**
+   * 无参构造函数，创建编解码转换器实例。
+   */
   public EventColumnNameConverter() {
   }
 
-  // eventId=timestamp=infokey are of types String, Long String
-  // Strings are variable in size (i.e. end whenever separator is encountered).
-  // This is used while decoding and helps in determining where to split.
+  /**
+   * 分段长度定义，用于拆分解码时确定各字段边界：
+   * eventId为变长、时间戳固定占8字节(long)、infoKey为变长。
+   * 变长字段遇到分隔符即结束，帮助解码时正确分割不同组件。
+   */
   private static final int[] SEGMENT_SIZES = {
       Separator.VARIABLE_SIZE, Bytes.SIZEOF_LONG, Separator.VARIABLE_SIZE };
 
@@ -57,16 +61,21 @@ public final class EventColumnNameConverter
    */
   @Override
   public byte[] encode(EventColumnName key) {
+    // 编码事件ID，转义特殊分隔符
     byte[] first = Separator.encode(key.getId(), Separator.SPACE, Separator.TAB,
         Separator.VALUES);
+    // 若时间戳为空，仅返回事件ID加分隔符前缀
     if (key.getTimestamp() == null) {
       return Separator.VALUES.join(first, Separator.EMPTY_BYTES);
     }
+    // 反转时间戳实现降序排列，转换为字节数组
     byte[] second = Bytes.toBytes(
         LongConverter.invertLong(key.getTimestamp()));
+    // 若信息键为空，返回事件ID+时间戳加分隔符前缀
     if (key.getInfoKey() == null) {
       return Separator.VALUES.join(first, second, Separator.EMPTY_BYTES);
     }
+    // 编码信息键，拼接完整事件列名
     return Separator.VALUES.join(first, second, Separator.encode(
         key.getInfoKey(), Separator.SPACE, Separator.TAB, Separator.VALUES));
   }
@@ -84,16 +93,22 @@ public final class EventColumnNameConverter
    */
   @Override
   public EventColumnName decode(byte[] bytes) {
+    // 按分隔符和分段长度拆分字节数组为三个组件
     byte[][] components = Separator.VALUES.split(bytes, SEGMENT_SIZES);
+    // 组件数量不对，列名格式非法
     if (components.length != 3) {
       throw new IllegalArgumentException("the column name is not valid");
     }
+    // 解码事件ID，还原转义的分隔符
     String id = Separator.decode(Bytes.toString(components[0]),
         Separator.VALUES, Separator.TAB, Separator.SPACE);
+    // 反转时间戳还原原始值
     Long ts = LongConverter.invertLong(Bytes.toLong(components[1]));
+    // 若infoKey长度为0则设为null，否则解码还原
     String infoKey = components[2].length == 0 ? null :
         Separator.decode(Bytes.toString(components[2]),
             Separator.VALUES, Separator.TAB, Separator.SPACE);
+    // 构建并返回EventColumnName对象
     return new EventColumnName(id, ts, infoKey);
   }
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,20 +28,20 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.Separator;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.ValueConverter;
 
 /**
- * Identifies partially qualified columns for the {@link FlowRunTable}.
+ * 定义FlowRunTable表中列名前缀，用于HBase列名的模块化构造
+ * 实现了ColumnPrefix接口，提供统一的列前缀字节转换方法
  */
 public enum FlowRunColumnPrefix implements ColumnPrefix<FlowRunTable> {
 
   /**
-   * To store flow run info values.
+   * 用于存储流运行指标数据的列前缀
    */
   METRIC(FlowRunColumnFamily.INFO, "m", null, new LongConverter());
 
   private final ColumnFamily<FlowRunTable> columnFamily;
 
   /**
-   * Can be null for those cases where the provided column qualifier is the
-   * entire column name.
+   * 列前缀字符串，若列前缀为空则表示当前列限定符即为完整列名
    */
   private final String columnPrefix;
   private final byte[] columnPrefixBytes;
@@ -49,10 +50,12 @@ public enum FlowRunColumnPrefix implements ColumnPrefix<FlowRunTable> {
   private final AggregationOperation aggOp;
 
   /**
-   * Private constructor, meant to be used by the enum definition.
+   * 枚举构造方法，用于定义FlowRunTable的列前缀。
    *
-   * @param columnFamily that this column is stored in.
-   * @param columnPrefix for this column.
+   * @param columnFamily 该列前缀所属的列族
+   * @param columnPrefix 列前缀字符串
+   * @param fra 聚合操作类型
+   * @param converter 列值转换器
    */
   private FlowRunColumnPrefix(ColumnFamily<FlowRunTable> columnFamily,
       String columnPrefix, AggregationOperation fra, ValueConverter converter) {
@@ -68,7 +71,7 @@ public enum FlowRunColumnPrefix implements ColumnPrefix<FlowRunTable> {
     if (columnPrefix == null) {
       this.columnPrefixBytes = null;
     } else {
-      // Future-proof by ensuring the right column prefix hygiene.
+      // 对列前缀进行编码确保格式一致性
       this.columnPrefixBytes =
           Bytes.toBytes(Separator.SPACE.encode(columnPrefix));
     }
@@ -76,7 +79,8 @@ public enum FlowRunColumnPrefix implements ColumnPrefix<FlowRunTable> {
   }
 
   /**
-   * @return the column name value
+   * 获取列前缀字符串。
+   * @return 列前缀字符串
    */
   public String getColumnPrefix() {
     return columnPrefix;
@@ -88,42 +92,50 @@ public enum FlowRunColumnPrefix implements ColumnPrefix<FlowRunTable> {
 
   @Override
   public byte[] getColumnPrefixBytes(byte[] qualifierPrefix) {
+    // 合并当前列前缀和传入的限定符前缀，生成完整列限定符
     return ColumnHelper.getColumnQualifier(this.columnPrefixBytes,
         qualifierPrefix);
   }
 
   @Override
   public byte[] getColumnPrefixBytes(String qualifierPrefix) {
+    // 合并当前列前缀和传入的字符串限定符前缀，生成完整列限定符
     return ColumnHelper.getColumnQualifier(this.columnPrefixBytes,
         qualifierPrefix);
   }
 
   @Override
   public byte[] getColumnFamilyBytes() {
+    // 获取所属列族的字节数组表示
     return columnFamily.getBytes();
   }
 
   @Override
   public byte[] getColumnPrefixInBytes() {
+    // 获取列前缀的字节数组表示，为空则返回null
     return columnPrefixBytes != null ? columnPrefixBytes.clone() : null;
   }
 
   @Override
   public Attribute[] getCombinedAttrsWithAggr(Attribute... attributes) {
+    // 合并聚合操作属性到现有属性数组
     return HBaseTimelineSchemaUtils.combineAttributes(attributes, aggOp);
   }
 
   @Override
   public boolean supplementCellTimeStamp() {
+    // 需要补充单元格时间戳
     return true;
   }
 
   public AggregationOperation getAttribute() {
+    // 获取聚合操作对象
     return aggOp;
   }
 
   @Override
   public ValueConverter getValueConverter() {
+    // 获取列值转换器
     return valueConverter;
   }
 }

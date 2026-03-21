@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,10 +19,12 @@
 
 package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 
-
 /**
- * The base type of tables.
- * @param <T> table type
+ * HBase时序数据存储抽象基类，为所有具体时序存储表提供统一类型定义。
+ * 本类属于YARN Timeline Service基于HBase存储的公共基础抽象，
+ * 子类会实现不同类型的时序数据表（如应用表、流表等）具体逻辑。
+ * 
+ * @param <T> 具体表类型
  */
 public abstract class BaseTable<T> {
 }

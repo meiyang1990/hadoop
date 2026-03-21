@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,40 +21,38 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.flow;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /**
- * Identifies the attributes to be set for puts into the {@link FlowRunTable}.
- * The numbers used for tagType are prime numbers.
+ * 定义写入FlowRunTable时需要聚合计算的操作类型，为HBase流运行表存储提供聚合标记。
+ * 枚举tagType使用质数作为取值，用于唯一区分不同聚合操作。
  */
 public enum AggregationOperation {
 
   /**
-   * When the flow was started.
+   * 流启动时间聚合，取全局最小值。
    */
   GLOBAL_MIN((byte) 71),
 
   /**
-   * When it ended.
+   * 流结束时间聚合，取全局最大值。
    */
   GLOBAL_MAX((byte) 73),
 
   /**
-   * The metrics of the flow.
+   * 流指标值聚合，累加求和。
    */
   SUM((byte) 79),
 
   /**
-   * application running.
+   * 已结束应用指标值聚合，累加求和。
    */
   SUM_FINAL((byte) 83),
 
   /**
-   * Min value as per the latest timestamp
-   * seen for a given app.
+   * 根据最新时间戳，取应用当前最小值。
    */
   LATEST_MIN((byte) 89),
 
   /**
-   * Max value as per the latest timestamp
-   * seen for a given app.
+   * 根据最新时间戳，取应用当前最大值。
    */
   LATEST_MAX((byte) 97);
 
@@ -65,6 +64,10 @@ public enum AggregationOperation {
     this.inBytes = Bytes.toBytes(this.name());
   }
 
+  /**
+   * 获取当前聚合操作对应的属性对象。
+   * @return 包含操作名称和字节数组形式名称的属性对象
+   */
   public Attribute getAttribute() {
     return new Attribute(this.name(), this.inBytes);
   }
@@ -73,14 +76,18 @@ public enum AggregationOperation {
     return tagType;
   }
 
+  /**
+   * 获取聚合操作名称的字节数组表示，用于HBase存储。
+   * @return 名称字节数组的副本
+   */
   public byte[] getInBytes() {
     return this.inBytes.clone();
   }
 
   /**
-   * returns the AggregationOperation enum that represents that string.
-   * @param aggOpStr Aggregation operation.
-   * @return the AggregationOperation enum that represents that string
+   * 根据字符串名称匹配对应的聚合操作枚举。
+   * @param aggOpStr 聚合操作名称字符串
+   * @return 匹配到的聚合操作枚举，无匹配则返回null
    */
   public static AggregationOperation getAggregationOperation(String aggOpStr) {
     for (AggregationOperation aggOp : AggregationOperation.values()) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,12 +20,14 @@
 package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 
 /**
- * Encodes and decodes column names / row keys which are merely strings.
- * Column prefixes are not part of the column name passed for encoding. It is
- * added later, if required in the associated ColumnPrefix implementations.
+ * 字符串类型键的编解码器，用于HBase中列名/行键的编码解码。
+ * 编码时不会包含列前缀，列前缀会在关联的ColumnPrefix实现中按需添加。
  */
 public final class StringKeyConverter implements KeyConverter<String> {
 
+  /**
+   * 构造字符串键编解码器实例。
+   */
   public StringKeyConverter() {
   }
 
@@ -37,6 +40,7 @@ public final class StringKeyConverter implements KeyConverter<String> {
    */
   @Override
   public byte[] encode(String key) {
+    // 对字符串键进行转义，处理空格和tab特殊字符
     return Separator.encode(key, Separator.SPACE, Separator.TAB);
   }
 
@@ -49,6 +53,7 @@ public final class StringKeyConverter implements KeyConverter<String> {
    */
   @Override
   public String decode(byte[] bytes) {
+    // 对字节数组进行解码，还原转义的空格和tab特殊字符
     return Separator.decode(bytes, Separator.TAB, Separator.SPACE);
   }
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,34 +21,22 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.subapplication;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.RowKeyPrefix;
 
 /**
- * Represents a partial rowkey without the entityId or without entityType and
- * entityId for the sub application table.
- *
+ * 子应用表HBase行键前缀，代表不包含完整entityId（或同时不包含entityType和entityId）的不完整行键
+ * 用于子应用表的范围扫描查询
  */
 public class SubApplicationRowKeyPrefix extends SubApplicationRowKey
     implements RowKeyPrefix<SubApplicationRowKey> {
 
   /**
-   * Creates a prefix which generates the following rowKeyPrefixes for the sub
-   * application table:
-   * {@code subAppUserId!clusterId!entityType!entityPrefix!userId}.
+   * 构造子应用表行键前缀，生成的行键前缀格式为：
+   * {@code subAppUserId!clusterId!entityType!entityPrefix!userId}
    *
-   * @param subAppUserId
-   *          identifying the subApp User
-   * @param clusterId
-   *          identifying the cluster
-   * @param entityType
-   *          which entity type
-   * @param entityIdPrefix
-   *          for entityId
-   * @param entityId
-   *          for an entity
-   * @param userId
-   *          for the user who runs the AM
-   *
-   * subAppUserId is usually the doAsUser.
-   * userId is the yarn user that the AM runs as.
-   *
+   * @param subAppUserId 子应用用户标识，通常为doAsUser代理用户
+   * @param clusterId 集群标识
+   * @param entityType 实体类型
+   * @param entityIdPrefix 实体ID前缀
+   * @param entityId 实体ID
+   * @param userId 运行AM的YARN实际用户
    */
   public SubApplicationRowKeyPrefix(String subAppUserId, String clusterId,
       String entityType, Long entityIdPrefix, String entityId,
@@ -56,11 +45,9 @@ public class SubApplicationRowKeyPrefix extends SubApplicationRowKey
         userId);
   }
 
-  /*
-   * (non-Javadoc)
-   *
-   * @see org.apache.hadoop.yarn.server.timelineservice.storage.subapplication.
-   * RowKeyPrefix#getRowKeyPrefix()
+  /**
+   * 获取行键前缀字节数组
+   * @return 行键前缀的二进制表示
    */
   public byte[] getRowKeyPrefix() {
     return super.getRowKey();

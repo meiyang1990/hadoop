@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,30 +29,40 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ValueConvert
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * Identifies partially qualified columns for the app-to-flow table.
+ * App-to-flow表(HBase存储应用流关联关系的表)的半限定列前缀枚举，
+ * 用于定义该表中不同列类型的前缀规范，支持HBase列的动态构造。
  */
 public enum AppToFlowColumnPrefix implements ColumnPrefix<AppToFlowTable> {
 
   /**
-   * The flow name.
+   * 流名称列前缀。
    */
   FLOW_NAME(AppToFlowColumnFamily.MAPPING, "flow_name"),
 
   /**
-   * The flow run ID.
+   * 流运行ID列前缀。
    */
   FLOW_RUN_ID(AppToFlowColumnFamily.MAPPING, "flow_run_id"),
 
   /**
-   * The user.
+   * 用户ID列前缀。
    */
   USER_ID(AppToFlowColumnFamily.MAPPING, "user_id");
 
+  // 当前列前缀所属的列族
   private final ColumnFamily<AppToFlowTable> columnFamily;
+  // 字符串形式的列前缀
   private final String columnPrefix;
+  // 字节数组形式的列前缀(用于HBase存储)
   private final byte[] columnPrefixBytes;
+  // 列值转换器，用于编解码列值
   private final ValueConverter valueConverter;
 
+  /**
+   * 构造AppToFlow列前缀实例，完成字符串前缀到字节数组的转换。
+   * @param columnFamily 所属列族
+   * @param columnPrefix 字符串形式的列前缀
+   */
   AppToFlowColumnPrefix(ColumnFamily<AppToFlowTable> columnFamily,
       String columnPrefix) {
     this.columnFamily = columnFamily;
@@ -59,7 +70,7 @@ public enum AppToFlowColumnPrefix implements ColumnPrefix<AppToFlowTable> {
     if (columnPrefix == null) {
       this.columnPrefixBytes = null;
     } else {
-      // Future-proof by ensuring the right column prefix hygiene.
+      // 对列前缀进行编码处理，确保格式符合规范
       this.columnPrefixBytes =
           Bytes.toBytes(Separator.SPACE.encode(columnPrefix));
     }
@@ -68,38 +79,45 @@ public enum AppToFlowColumnPrefix implements ColumnPrefix<AppToFlowTable> {
 
   @Override
   public byte[] getColumnPrefixBytes(String qualifierPrefix) {
+    // 合并固定前缀和动态限定符前缀，生成完整列限定符
     return ColumnHelper.getColumnQualifier(
         columnPrefixBytes, qualifierPrefix);
   }
 
   @Override
   public byte[] getColumnPrefixBytes(byte[] qualifierPrefix) {
+    // 合并固定前缀和字节形式动态限定符前缀，生成完整列限定符
     return ColumnHelper.getColumnQualifier(
         columnPrefixBytes, qualifierPrefix);
   }
 
   @Override
   public byte[] getColumnPrefixInBytes() {
+    // 返回列前缀字节数组的克隆，避免外部修改内部状态
     return columnPrefixBytes != null ? columnPrefixBytes.clone() : null;
   }
 
   @Override
   public byte[] getColumnFamilyBytes() {
+    // 获取所属列族的字节数组形式
     return columnFamily.getBytes();
   }
 
   @Override
   public ValueConverter getValueConverter() {
+    // 获取当前列前缀对应的列值转换器
     return valueConverter;
   }
 
   @Override
   public Attribute[] getCombinedAttrsWithAggr(Attribute... attributes) {
+    // 直接返回传入属性，当前列前缀无需聚合额外属性
     return attributes;
   }
 
   @Override
   public boolean supplementCellTimeStamp() {
+    // 当前列前缀不需要补充单元格时间戳
     return false;
   }
 }
