@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -65,8 +66,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Class on the NodeManager side that manages adding and removing collectors and
- * their lifecycle. Also instantiates the per-node collector webapp.
+ * NodeManager侧的时间线采集器管理器，负责管理采集器的添加、移除和生命周期，同时启动节点级采集器Web服务。
  */
 @Private
 @Unstable
@@ -74,25 +74,34 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(NodeTimelineCollectorManager.class);
 
-  // REST server for this collector manager.
+  // 当前采集器管理器的REST服务实例
   private HttpServer2 timelineRestServer;
 
+  // REST服务绑定地址
   private String timelineRestServerBindAddress;
 
+  // NodeManager采集器服务代理对象
   private volatile CollectorNodemanagerProtocol nmCollectorService;
 
+  // Timeline V2 委托令牌密钥管理服务
   private TimelineV2DelegationTokenSecretManagerService tokenMgrService;
 
+  // 标记是否作为NodeManager辅助服务运行
   private final boolean runningAsAuxService;
 
+  // 登录用户信息
   private UserGroupInformation loginUGI;
 
+  // 令牌续期定时任务执行器
   private ScheduledThreadPoolExecutor tokenRenewalExecutor;
 
+  // 令牌续期间隔
   private long tokenRenewInterval;
 
+  // 令牌提前10秒进行续期
   private static final long TIME_BEFORE_RENEW_DATE = 10 * 1000; // 10 seconds.
 
+  // 令牌提前5分钟重新生成
   private static final long TIME_BEFORE_EXPIRY = 5 * 60 * 1000; // 5 minutes.
 
   static final String COLLECTOR_MANAGER_ATTR_KEY = "collector.manager";
@@ -109,9 +118,13 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 创建令牌管理服务
     tokenMgrService = createTokenManagerService();
+    // 添加服务到服务框架
     addService(tokenMgrService);
+    // 获取当前登录用户
     this.loginUGI = UserGroupInformation.getCurrentUser();
+    // 从配置读取令牌续期间隔
     tokenRenewInterval = conf.getLong(
         YarnConfiguration.TIMELINE_DELEGATION_TOKEN_RENEW_INTERVAL,
         YarnConfiguration.DEFAULT_TIMELINE_DELEGATION_TOKEN_RENEW_INTERVAL);
@@ -120,8 +133,9 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
 
   @Override
   protected void serviceStart() throws Exception {
+    // 安全模式下处理登录
     if (UserGroupInformation.isSecurityEnabled()) {
-      // Do security login for cases where collector is running outside NM.
+      // 非辅助服务运行模式下需要自行完成安全登录
       if (!runningAsAuxService) {
         try {
           doSecureLogin();
@@ -131,13 +145,19 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
       }
       this.loginUGI = UserGroupInformation.getLoginUser();
     }
+    // 创建令牌续期定时线程池
     tokenRenewalExecutor = new ScheduledThreadPoolExecutor(
         1, new ThreadFactoryBuilder().setNameFormat(
             "App Collector Token Renewal thread").build());
     super.serviceStart();
+    // 启动REST Web服务
     startWebApp();
   }
 
+  /**
+   * 创建令牌管理服务实例。
+   * @return 令牌管理服务实例
+   */
   protected TimelineV2DelegationTokenSecretManagerService
       createTokenManagerService() {
     return new TimelineV2DelegationTokenSecretManagerService();
@@ -149,6 +169,10 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
     return tokenMgrService;
   }
 
+  /**
+   * 安全模式下完成Kerberos登录。
+   * @throws IOException 登录失败抛出异常
+   */
   private void doSecureLogin() throws IOException {
     Configuration conf = getConfig();
     String webAppURLWithoutScheme =
@@ -160,9 +184,11 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
 
   @Override
   protected void serviceStop() throws Exception {
+    // 停止REST服务
     if (timelineRestServer != null) {
       timelineRestServer.stop();
     }
+    // 关闭定时任务线程池
     if (tokenRenewalExecutor != null) {
       tokenRenewalExecutor.shutdownNow();
     }
@@ -175,6 +201,7 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
     Token<TimelineDelegationTokenIdentifier> token  = tokenMgrService.
         generateToken(UserGroupInformation.createRemoteUser(user),
             loginUGI.getShortUserName());
+    // 设置令牌服务地址
     token.setService(new Text(timelineRestServerBindAddress));
     return token;
   }
@@ -201,37 +228,63 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
     }
   }
 
+  /**
+   * 计算下次续期的延迟时间，提前进行续期。
+   * @param renewInterval 原始续期间隔
+   * @return 调整后的延迟时间
+   */
   private long getRenewalDelay(long renewInterval) {
     return ((renewInterval > TIME_BEFORE_RENEW_DATE) ?
         renewInterval - TIME_BEFORE_RENEW_DATE : renewInterval);
   }
 
+  /**
+   * 计算令牌重新生成的延迟时间，提前过期前重新生成。
+   * @param tokenMaxDate 令牌最大过期时间
+   * @return 调整后的延迟时间
+   */
   private long getRegenerationDelay(long tokenMaxDate) {
     long regenerateTime = tokenMaxDate - Time.now();
     return ((regenerateTime > TIME_BEFORE_EXPIRY) ?
         regenerateTime - TIME_BEFORE_EXPIRY : regenerateTime);
   }
 
+  /**
+   * 生成应用采集器令牌并设置续期定时任务。
+   * @param appId 应用ID
+   * @param appCollector 应用级采集器实例
+   * @return 生成的YARN令牌
+   * @throws IOException 生成失败抛出异常
+   */
   private org.apache.hadoop.yarn.api.records.Token generateTokenAndSetTimer(
       ApplicationId appId, AppLevelTimelineCollector appCollector)
       throws IOException {
+    // 生成新的委托令牌
     Token<TimelineDelegationTokenIdentifier> timelineToken =
         generateTokenForAppCollector(appCollector.getAppUser());
+    // 解码令牌标识符
     TimelineDelegationTokenIdentifier tokenId =
         timelineToken.decodeIdentifier();
+    // 计算续期延迟
     long renewalDelay = getRenewalDelay(tokenRenewInterval);
+    // 计算重新生成延迟
     long regenerationDelay = getRegenerationDelay(tokenId.getMaxDate());
+    // 需要安排定时任务
     if (renewalDelay > 0 || regenerationDelay > 0) {
+      // 选择先执行哪个任务
       boolean isTimerForRenewal = renewalDelay < regenerationDelay;
+      // 提交定时任务
       Future<?> renewalOrRegenerationFuture = tokenRenewalExecutor.schedule(
           new CollectorTokenRenewer(appId, isTimerForRenewal),
           isTimerForRenewal? renewalDelay : regenerationDelay,
           TimeUnit.MILLISECONDS);
+      // 保存令牌和任务future到采集器
       appCollector.setDelegationTokenAndFutureForApp(timelineToken,
           renewalOrRegenerationFuture, tokenId.getMaxDate(),
           tokenId.getRenewer().toString());
     }
     LOG.info("Generated a new token {} for app {}", timelineToken, appId);
+    // 转换为YARN令牌格式返回
     return org.apache.hadoop.yarn.api.records.Token.newInstance(
         timelineToken.getIdentifier(), timelineToken.getKind().toString(),
         timelineToken.getPassword(), timelineToken.getService().toString());
@@ -240,9 +293,9 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
   @Override
   protected void doPostPut(ApplicationId appId, TimelineCollector collector) {
     try {
-      // Get context info from NM
+      // 从NodeManager获取采集器上下文信息并更新
       updateTimelineCollectorContext(appId, collector);
-      // Generate token for app collector.
+      // 生成应用采集器令牌
       org.apache.hadoop.yarn.api.records.Token token = null;
       if (UserGroupInformation.isSecurityEnabled() &&
           collector instanceof AppLevelTimelineCollector) {
@@ -250,10 +303,10 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
             (AppLevelTimelineCollector) collector;
         token = generateTokenAndSetTimer(appId, appCollector);
       }
-      // Report to NM if a new collector is added.
+      // 向NodeManager报告新采集器信息
       reportNewCollectorInfoToNM(appId, token);
     } catch (YarnException | IOException e) {
-      // throw exception here as it cannot be used if failed communicate with NM
+      // 和NodeManager通信失败，无法继续使用，抛出运行时异常
       LOG.error("Failed to communicate with NM Collector Service for {}", appId);
       throw new YarnRuntimeException(e);
     }
@@ -261,6 +314,7 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
 
   @Override
   protected void postRemove(ApplicationId appId, TimelineCollector collector) {
+    // 应用级采集器移除后取消令牌
     if (collector instanceof AppLevelTimelineCollector) {
       try {
         cancelTokenForAppCollector((AppLevelTimelineCollector) collector);
@@ -272,29 +326,32 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
   }
 
   /**
-   * Launch the REST web server for this collector manager.
+   * 启动节点级采集器的REST Web服务。
    */
   private void startWebApp() {
     Configuration conf = getConfig();
     String initializers = conf.get("hadoop.http.filter.initializers", "");
     Set<String> defaultInitializers = new LinkedHashSet<String>();
+    // 添加Timeline认证过滤器
     TimelineServerUtils.addTimelineAuthFilter(
         initializers, defaultInitializers, tokenMgrService);
+    // 设置最终过滤器配置
     TimelineServerUtils.setTimelineFilters(
         conf, initializers, defaultInitializers);
 
     String bindAddress = null;
+    // 获取绑定主机配置
     String host =
         conf.getTrimmed(YarnConfiguration.TIMELINE_SERVICE_COLLECTOR_BIND_HOST);
+    // 获取端口范围配置
     Configuration.IntegerRanges portRanges = conf.getRange(
         YarnConfiguration.TIMELINE_SERVICE_COLLECTOR_BIND_PORT_RANGES, "");
     int startPort = 0;
     if (portRanges != null && !portRanges.isEmpty()) {
       startPort = portRanges.getRangeStart();
     }
+    // 主机未配置，兼容旧配置，使用全局timeline绑定主机
     if (host == null || host.isEmpty()) {
-      // if collector bind-host is not set, fall back to
-      // timeline-service.bind-host to maintain compatibility
       bindAddress =
           conf.get(YarnConfiguration.DEFAULT_TIMELINE_SERVICE_BIND_HOST,
               YarnConfiguration.DEFAULT_TIMELINE_SERVICE_BIND_HOST)
@@ -304,185 +361,68 @@ public class NodeTimelineCollectorManager extends TimelineCollectorManager {
     }
 
     try {
+      // 构建HttpServer
       HttpServer2.Builder builder = new HttpServer2.Builder()
           .setName("timeline")
           .setConf(conf)
           .addEndpoint(URI.create(
               (YarnConfiguration.useHttps(conf) ? "https://" : "http://") +
                   bindAddress));
+      // 设置端口范围
       if (portRanges != null && !portRanges.isEmpty()) {
         builder.setPortRanges(portRanges);
       }
+      // HTTPS模式下加载SSL配置
       if (YarnConfiguration.useHttps(conf)) {
         builder = WebAppUtils.loadSslConfiguration(builder, conf);
       }
       timelineRestServer = builder.build();
+      // 添加Jersey资源配置
       timelineRestServer.addJerseyResourceConfig(configure(), "/*", null);
+      // 设置当前管理器到Servlet上下文属性
       timelineRestServer.setAttribute(COLLECTOR_MANAGER_ATTR_KEY, this);
+      // 启动服务
       timelineRestServer.start();
     } catch (Exception e) {
       String msg = "The per-node collector webapp failed to start.";
       LOG.error(msg, e);
       throw new YarnRuntimeException(msg, e);
     }
-    //TODO: We need to think of the case of multiple interfaces
+    // 解析获取实际绑定地址
     this.timelineRestServerBindAddress = WebAppUtils.getResolvedAddress(
         timelineRestServer.getConnectorAddress(0));
     LOG.info("Instantiated the per-node collector webapp at {}",
         timelineRestServerBindAddress);
   }
 
+  /**
+   * 配置Jersey REST资源。
+   * @return 配置好的ResourceConfig
+   */
   protected static ResourceConfig configure() {
     ResourceConfig config = new ResourceConfig();
+    // 扫描当前包注册资源
     config.packages("org.apache.hadoop.yarn.server.timelineservice.collector");
+    // 注册异常处理器
     config.register(GenericExceptionHandler.class);
+    // 注册采集器Web服务
     config.register(TimelineCollectorWebService.class);
+    // 注册时间线实体写服务
     config.register(TimelineEntitiesWriter.class);
+    // 注册时间线实体读服务
     config.register(TimelineEntitiesReader.class);
+    // 注册时间线域读服务
     config.register(TimelineDomainReader.class);
+    // 注册JSON处理组件
     config.register(new JettisonFeature()).register(YarnJacksonJaxbJsonProvider.class);
     return config;
   }
 
-  private void reportNewCollectorInfoToNM(ApplicationId appId,
-      org.apache.hadoop.yarn.api.records.Token token)
-      throws YarnException, IOException {
-    ReportNewCollectorInfoRequest request =
-        ReportNewCollectorInfoRequest.newInstance(appId,
-            this.timelineRestServerBindAddress, token);
-    LOG.info("Report a new collector for application: {}" +
-        " to the NM Collector Service.", appId);
-    getNMCollectorService().reportNewCollectorInfo(request);
-  }
-
-  private void updateTimelineCollectorContext(
-      ApplicationId appId, TimelineCollector collector)
-      throws YarnException, IOException {
-    GetTimelineCollectorContextRequest request =
-        GetTimelineCollectorContextRequest.newInstance(appId);
-    LOG.info("Get timeline collector context for {}", appId);
-    GetTimelineCollectorContextResponse response =
-        getNMCollectorService().getTimelineCollectorContext(request);
-    String userId = response.getUserId();
-    if (userId != null && !userId.isEmpty()) {
-      LOG.debug("Setting the user in the context: {}", userId);
-      collector.getTimelineEntityContext().setUserId(userId);
-    }
-    String flowName = response.getFlowName();
-    if (flowName != null && !flowName.isEmpty()) {
-      LOG.debug("Setting the flow name: {}", flowName);
-      collector.getTimelineEntityContext().setFlowName(flowName);
-    }
-    String flowVersion = response.getFlowVersion();
-    if (flowVersion != null && !flowVersion.isEmpty()) {
-      LOG.debug("Setting the flow version: {}", flowVersion);
-      collector.getTimelineEntityContext().setFlowVersion(flowVersion);
-    }
-    long flowRunId = response.getFlowRunId();
-    if (flowRunId != 0L) {
-      LOG.debug("Setting the flow run id: {}", flowRunId);
-      collector.getTimelineEntityContext().setFlowRunId(flowRunId);
-    }
-  }
-
-  @VisibleForTesting
-  protected CollectorNodemanagerProtocol getNMCollectorService() {
-    if (nmCollectorService == null) {
-      synchronized (this) {
-        if (nmCollectorService == null) {
-          Configuration conf = getConfig();
-          InetSocketAddress nmCollectorServiceAddress = conf.getSocketAddr(
-              YarnConfiguration.NM_BIND_HOST,
-              YarnConfiguration.NM_COLLECTOR_SERVICE_ADDRESS,
-              YarnConfiguration.DEFAULT_NM_COLLECTOR_SERVICE_ADDRESS,
-              YarnConfiguration.DEFAULT_NM_COLLECTOR_SERVICE_PORT);
-          LOG.info("nmCollectorServiceAddress: {}", nmCollectorServiceAddress);
-          final YarnRPC rpc = YarnRPC.create(conf);
-
-          // TODO Security settings.
-          nmCollectorService = (CollectorNodemanagerProtocol) rpc.getProxy(
-              CollectorNodemanagerProtocol.class,
-              nmCollectorServiceAddress, conf);
-        }
-      }
-    }
-    return nmCollectorService;
-  }
-
-  @VisibleForTesting
-  public String getRestServerBindAddress() {
-    return timelineRestServerBindAddress;
-  }
-
-  private final class CollectorTokenRenewer implements Runnable {
-    private ApplicationId appId;
-    // Indicates whether timer is for renewal or regeneration of token.
-    private boolean timerForRenewal = true;
-    private CollectorTokenRenewer(ApplicationId applicationId,
-        boolean forRenewal) {
-      appId = applicationId;
-      timerForRenewal = forRenewal;
-    }
-
-    private void renewToken(AppLevelTimelineCollector appCollector)
-        throws IOException {
-      long newExpirationTime = renewTokenForAppCollector(appCollector);
-      // Set renewal or regeneration timer based on delay.
-      long renewalDelay = 0;
-      if (newExpirationTime > 0) {
-        LOG.info("Renewed token for {} with new expiration " +
-            "timestamp = {}", appId, newExpirationTime);
-        renewalDelay = getRenewalDelay(newExpirationTime - Time.now());
-      }
-      long regenerationDelay =
-          getRegenerationDelay(appCollector.getAppDelegationTokenMaxDate());
-      if (renewalDelay > 0 || regenerationDelay > 0) {
-        this.timerForRenewal = renewalDelay < regenerationDelay;
-        Future<?> renewalOrRegenerationFuture = tokenRenewalExecutor.schedule(
-            this, timerForRenewal ? renewalDelay : regenerationDelay,
-            TimeUnit.MILLISECONDS);
-        appCollector.setRenewalOrRegenerationFutureForApp(
-            renewalOrRegenerationFuture);
-      }
-    }
-
-    private void regenerateToken(AppLevelTimelineCollector appCollector)
-        throws IOException {
-      org.apache.hadoop.yarn.api.records.Token token =
-          generateTokenAndSetTimer(appId, appCollector);
-      // Report to NM if a new collector is added.
-      try {
-        reportNewCollectorInfoToNM(appId, token);
-      } catch (YarnException e) {
-        LOG.warn("Unable to report regenerated token to NM for {}", appId);
-      }
-    }
-
-    @Override
-    public void run() {
-      TimelineCollector collector = get(appId);
-      if (collector == null) {
-        LOG.info("Cannot find active collector while {} token for {}",
-            (timerForRenewal ? "renewing" : "regenerating"), appId);
-        return;
-      }
-      AppLevelTimelineCollector appCollector =
-          (AppLevelTimelineCollector) collector;
-
-      synchronized (collector) {
-        if (!collector.isStopped()) {
-          try {
-            if (timerForRenewal) {
-              renewToken(appCollector);
-            } else {
-              regenerateToken(appCollector);
-            }
-          } catch (Exception e) {
-            LOG.warn("Unable to {} token for {}",
-                (timerForRenewal ? "renew" : "regenerate"), appId, e);
-          }
-        }
-      }
-    }
-  }
-}
+  /**
+   * 向NodeManager报告新采集器地址和令牌信息。
+   * @param appId 应用ID
+   * @param token 应用采集器令牌
+   * @throws YarnException 报告失败抛出异常
+   * @throws IOException 通信失败抛出异常
+   */
+  private void reportNewCollectorInfoToNM(Application

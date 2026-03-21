@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -38,7 +39,7 @@ import org.apache.hadoop.yarn.server.timelineservice.reader.filter.TimelineKeyVa
 import org.apache.hadoop.yarn.server.timelineservice.reader.filter.TimelineKeyValuesFilter;
 
 /**
- * A bunch of utility functions used across TimelineReader and TimelineWriter.
+ * 时间线服务存储模块通用工具类，提供时间线实体各类过滤器匹配工具函数，被时间线读取器和写入器共享使用。
  */
 @Public
 @Unstable
@@ -47,53 +48,55 @@ public final class TimelineStorageUtils {
   }
 
   /**
-   * Matches key-values filter. Used for relatesTo/isRelatedTo filters.
+   * 多值键过滤器匹配，用于relatesTo/isRelatedTo实体关系过滤。
    *
-   * @param entity entity which holds relatesTo/isRelatedTo relations which we
-   *     will match against.
-   * @param keyValuesFilter key-values filter.
-   * @param entityFiltersType type of filters we are trying to match.
-   * @return true, if filter matches, false otherwise.
+   * @param entity 待匹配的时间线实体，持有关系数据
+   * @param keyValuesFilter 多值键过滤器
+   * @param entityFiltersType 过滤器类型（关系类型）
+   * @return true匹配成功，false匹配失败
    */
   private static boolean matchKeyValuesFilter(TimelineEntity entity,
       TimelineKeyValuesFilter keyValuesFilter,
       TimelineEntityFiltersType entityFiltersType) {
     Map<String, Set<String>> relations = null;
+    // 根据关系类型获取对应关系集合
     if (entityFiltersType == TimelineEntityFiltersType.IS_RELATED_TO) {
       relations = entity.getIsRelatedToEntities();
     } else if (entityFiltersType == TimelineEntityFiltersType.RELATES_TO) {
       relations = entity.getRelatesToEntities();
     }
+    // 实体没有该类型关系，匹配失败
     if (relations == null) {
       return false;
     }
+    // 获取对应键关联的实体ID集合
     Set<String> ids = relations.get(keyValuesFilter.getKey());
+    // 该键没有关联实体，匹配失败
     if (ids == null) {
       return false;
     }
     boolean matched = false;
+    // 遍历所有过滤值依次匹配
     for (Object id : keyValuesFilter.getValues()) {
-      // Matches if id is found amongst the relationships for an entity and
-      // filter's compare op is EQUAL.
-      // If compare op is NOT_EQUAL, for a match to occur, id should not be
-      // found amongst relationships for an entity.
+      // 根据比较运算符判断匹配结果：EQUAL要求id存在，NOT_EQUAL要求id不存在
       matched = !(ids.contains(id) ^
           keyValuesFilter.getCompareOp() == TimelineCompareOp.EQUAL);
+      // 任意一个值不匹配，直接返回失败
       if (!matched) {
         return false;
       }
     }
+    // 所有值都匹配成功
     return true;
   }
 
   /**
-   * Matches relatesto.
+   * 匹配实体的relatesTo关系过滤条件。
    *
-   * @param entity entity which holds relatesto relations.
-   * @param relatesTo the relations for filtering.
-   * @return true, if filter matches, false otherwise.
-   * @throws IOException if an unsupported filter for matching relations is
-   *     being matched.
+   * @param entity 待匹配的时间线实体
+   * @param relatesTo 关系过滤条件列表
+   * @return true匹配成功，false匹配失败
+   * @throws IOException 遇到不支持的过滤器类型时抛出
    */
   public static boolean matchRelatesTo(TimelineEntity entity,
       TimelineFilterList relatesTo) throws IOException {
@@ -102,13 +105,12 @@ public final class TimelineStorageUtils {
   }
 
   /**
-   * Matches isrelatedto.
+   * 匹配实体的isRelatedTo关系过滤条件。
    *
-   * @param entity entity which holds isRelatedTo relations.
-   * @param isRelatedTo the relations for filtering.
-   * @return true, if filter matches, false otherwise.
-   * @throws IOException if an unsupported filter for matching relations is
-   *     being matched.
+   * @param entity 待匹配的时间线实体
+   * @param isRelatedTo 关系过滤条件列表
+   * @return true匹配成功，false匹配失败
+   * @throws IOException 遇到不支持的过滤器类型时抛出
    */
   public static boolean matchIsRelatedTo(TimelineEntity entity,
       TimelineFilterList isRelatedTo) throws IOException {
@@ -117,47 +119,45 @@ public final class TimelineStorageUtils {
   }
 
   /**
-   * Matches key-value filter. Used for config and info filters.
+   * 单键值对过滤器匹配，用于配置和信息字段过滤。
    *
-   * @param entity entity which holds the config/info which we will match
-   *     against.
-   * @param kvFilter a key-value filter.
-   * @param entityFiltersType type of filters we are trying to match.
-   * @return true, if filter matches, false otherwise.
+   * @param entity 待匹配的时间线实体，持有配置/信息数据
+   * @param kvFilter 单键值过滤器
+   * @param entityFiltersType 过滤器类型（配置/信息）
+   * @return true匹配成功，false匹配失败
    */
   private static boolean matchKeyValueFilter(TimelineEntity entity,
       TimelineKeyValueFilter kvFilter,
       TimelineEntityFiltersType entityFiltersType) {
     Map<String, ? extends Object> map = null;
-    // Supported only for config and info filters.
+    // 根据过滤器类型获取对应键值对集合
     if (entityFiltersType == TimelineEntityFiltersType.CONFIG) {
       map = entity.getConfigs();
     } else if (entityFiltersType == TimelineEntityFiltersType.INFO) {
       map = entity.getInfo();
     }
+    // 实体没有该类型数据，匹配失败
     if (map == null) {
       return false;
     }
+    // 获取对应键的值
     Object value = map.get(kvFilter.getKey());
+    // 键不存在，匹配失败
     if (value == null) {
       return false;
     }
-    // Matches if filter's value is equal to the value of the key and filter's
-    // compare op is EQUAL.
-    // If compare op is NOT_EQUAL, for a match to occur, value should not be
-    // equal to the value of the key.
+    // 根据比较运算符判断匹配结果：EQUAL要求值相等，NOT_EQUAL要求值不等
     return !(value.equals(kvFilter.getValue()) ^
         kvFilter.getCompareOp() == TimelineCompareOp.EQUAL);
   }
 
   /**
-   * Matches config filters.
+   * 匹配实体的配置字段过滤条件。
    *
-   * @param entity entity which holds a map of config key-value pairs.
-   * @param configFilters list of info filters.
-   * @return a boolean flag to indicate if both match.
-   * @throws IOException if an unsupported filter for matching config filters is
-   *     being matched.
+   * @param entity 待匹配的时间线实体
+   * @param configFilters 配置过滤条件列表
+   * @return true匹配成功，false匹配失败
+   * @throws IOException 遇到不支持的过滤器类型时抛出
    */
   public static boolean matchConfigFilters(TimelineEntity entity,
       TimelineFilterList configFilters) throws IOException {
@@ -166,13 +166,12 @@ public final class TimelineStorageUtils {
   }
 
   /**
-   * Matches info filters.
+   * 匹配实体的信息字段过滤条件。
    *
-   * @param entity entity which holds a map of info key-value pairs.
-   * @param infoFilters list of info filters.
-   * @return a boolean flag to indicate if both match.
-   * @throws IOException if an unsupported filter for matching info filters is
-   *     being matched.
+   * @param entity 待匹配的时间线实体
+   * @param infoFilters 信息过滤条件列表
+   * @return true匹配成功，false匹配失败
+   * @throws IOException 遇到不支持的过滤器类型时抛出
    */
   public static boolean matchInfoFilters(TimelineEntity entity,
       TimelineFilterList infoFilters) throws IOException {
@@ -180,40 +179,37 @@ public final class TimelineStorageUtils {
   }
 
   /**
-   * Matches exists filter. Used for event filters.
+   * 存在性过滤器匹配，用于事件过滤。
    *
-   * @param entity entity which holds the events which we will match against.
-   * @param existsFilter exists filter.
-   * @param entityFiltersType type of filters we are trying to match.
-   * @return true, if filter matches, false otherwise.
+   * @param entity 待匹配的时间线实体，持有事件数据
+   * @param existsFilter 存在性过滤器
+   * @param entityFiltersType 过滤器类型
+   * @return true匹配成功，false匹配失败
    */
   private static boolean matchExistsFilter(TimelineEntity entity,
       TimelineExistsFilter existsFilter,
       TimelineEntityFiltersType entityFiltersType) {
-    // Currently exists filter is only supported for event filters.
+    // 存在性过滤器仅支持事件类型过滤
     if (entityFiltersType != TimelineEntityFiltersType.EVENT) {
       return false;
     }
+    // 收集实体所有事件ID
     Set<String> eventIds = new HashSet<String>();
     for (TimelineEvent event : entity.getEvents()) {
       eventIds.add(event.getId());
     }
-    // Matches if filter's value is contained in the list of events filter's
-    // compare op is EQUAL.
-    // If compare op is NOT_EQUAL, for a match to occur, value should not be
-    // contained in the list of events.
+    // 根据比较运算符判断匹配结果：EQUAL要求事件存在，NOT_EQUAL要求事件不存在
     return !(eventIds.contains(existsFilter.getValue()) ^
         existsFilter.getCompareOp() == TimelineCompareOp.EQUAL);
   }
 
   /**
-   * Matches event filters.
+   * 匹配实体的事件过滤条件。
    *
-   * @param entity entity which holds a set of event objects.
-   * @param eventFilters the set of event Ids for filtering.
-   * @return a boolean flag to indicate if both match.
-   * @throws IOException if an unsupported filter for matching event filters is
-   *     being matched.
+   * @param entity 待匹配的时间线实体
+   * @param eventFilters 事件过滤条件列表
+   * @return true匹配成功，false匹配失败
+   * @throws IOException 遇到不支持的过滤器类型时抛出
    */
   public static boolean matchEventFilters(TimelineEntity entity,
       TimelineFilterList eventFilters) throws IOException {
@@ -221,12 +217,12 @@ public final class TimelineStorageUtils {
   }
 
   /**
-   * Compare two values based on comparison operator.
+   * 根据比较运算符比较两个长整型值。
    *
-   * @param compareOp comparison operator.
-   * @param val1 value 1.
-   * @param val2 value 2.
-   * @return true, if relation matches, false otherwise
+   * @param compareOp 比较运算符
+   * @param val1 待比较值1
+   * @param val2 待比较值2
+   * @return true比较关系成立，false不成立
    */
   private static boolean compareValues(TimelineCompareOp compareOp,
       long val1, long val2) {
@@ -250,48 +246,50 @@ public final class TimelineStorageUtils {
   }
 
   /**
-   * Matches compare filter. Used for metric filters.
+   * 比较过滤器匹配，用于指标过滤。
    *
-   * @param entity entity which holds the metrics which we will match against.
-   * @param compareFilter compare filter.
-   * @param entityFiltersType type of filters we are trying to match.
-   * @return true, if filter matches, false otherwise.
-   * @throws IOException if metric filters holds non integral values.
+   * @param entity 待匹配的时间线实体，持有指标数据
+   * @param compareFilter 比较过滤器
+   * @param entityFiltersType 过滤器类型
+   * @return true匹配成功，false匹配失败
+   * @throws IOException 过滤器包含非整型值时抛出
    */
   private static boolean matchCompareFilter(TimelineEntity entity,
       TimelineCompareFilter compareFilter,
       TimelineEntityFiltersType entityFiltersType) throws IOException {
-    // Currently exists filter is only supported for metric filters.
+    // 比较过滤器仅支持指标类型过滤
     if (entityFiltersType != TimelineEntityFiltersType.METRIC) {
       return false;
     }
-    // We expect only integral values(short/int/long) for metric filters.
+    // 指标过滤器要求过滤值必须是整型
     if (!isIntegralValue(compareFilter.getValue())) {
       throw new IOException("Metric filters has non integral values");
     }
+    // 构建指标ID到指标对象的映射
     Map<String, TimelineMetric> metricMap =
         new HashMap<String, TimelineMetric>();
     for (TimelineMetric metric : entity.getMetrics()) {
       metricMap.put(metric.getId(), metric);
     }
+    // 根据键获取对应指标
     TimelineMetric metric = metricMap.get(compareFilter.getKey());
+    // 指标不存在，匹配失败
     if (metric == null) {
       return false;
     }
-    // We will be using the latest value of metric to compare.
+    // 使用指标最新值和过滤值比较，返回匹配结果
     return compareValues(compareFilter.getCompareOp(),
         metric.getValuesJAXB().firstEntry().getValue().longValue(),
         ((Number)compareFilter.getValue()).longValue());
   }
 
   /**
-   * Matches metric filters.
+   * 匹配实体的指标过滤条件。
    *
-   * @param entity entity which holds a set of metric objects.
-   * @param metricFilters list of metric filters.
-   * @return a boolean flag to indicate if both match.
-   * @throws IOException if an unsupported filter for matching metric filters is
-   *     being matched.
+   * @param entity 待匹配的时间线实体
+   * @param metricFilters 指标过滤条件列表
+   * @return true匹配成功，false匹配失败
+   * @throws IOException 遇到不支持的过滤器类型时抛出
    */
   public static boolean matchMetricFilters(TimelineEntity entity,
       TimelineFilterList metricFilters) throws IOException {
@@ -300,72 +298,84 @@ public final class TimelineStorageUtils {
   }
 
   /**
-   * Common routine to match different filters. Iterates over a filter list and
-   * calls routines based on filter type.
+   * 过滤器匹配通用核心逻辑，遍历过滤器列表根据过滤器类型分发匹配。
    *
-   * @param entity Timeline entity.
-   * @param filters filter list.
-   * @param entityFiltersType type of filters which are being matched.
-   * @return a boolean flag to indicate if filter matches.
-   * @throws IOException if an unsupported filter for matching this specific
-   *     filter is being matched.
+   * @param entity 待匹配的时间线实体
+   * @param filters 过滤器列表
+   * @param entityFiltersType 当前匹配的过滤器大类
+   * @return true匹配成功，false匹配失败
+   * @throws IOException 遇到不支持的过滤器类型时抛出
    */
   private static boolean matchFilters(TimelineEntity entity,
       TimelineFilterList filters, TimelineEntityFiltersType entityFiltersType)
       throws IOException {
+    // 过滤器列表为空，匹配失败
     if (filters == null || filters.getFilterList().isEmpty()) {
       return false;
     }
+    // 获取当前过滤器列表的组合运算符（AND/OR）
     TimelineFilterList.Operator operator = filters.getOperator();
+    // 遍历所有过滤器依次匹配
     for (TimelineFilter filter : filters.getFilterList()) {
       TimelineFilterType filterType = filter.getFilterType();
+      // 检查当前过滤器类型是否被当前大类支持
       if (!entityFiltersType.isValidFilter(filterType)) {
         throw new IOException("Unsupported filter " + filterType);
       }
       boolean matched = false;
+      // 根据过滤器类型调用对应匹配逻辑
       switch (filterType) {
       case LIST:
+        // 嵌套过滤器列表，递归匹配
         matched = matchFilters(entity, (TimelineFilterList)filter,
             entityFiltersType);
         break;
       case COMPARE:
+        // 比较过滤器匹配（指标）
         matched = matchCompareFilter(entity, (TimelineCompareFilter)filter,
             entityFiltersType);
         break;
       case EXISTS:
+        // 存在性过滤器匹配（事件）
         matched = matchExistsFilter(entity, (TimelineExistsFilter)filter,
             entityFiltersType);
         break;
       case KEY_VALUE:
+        // 单键值过滤器匹配（配置/信息）
         matched = matchKeyValueFilter(entity, (TimelineKeyValueFilter)filter,
             entityFiltersType);
         break;
       case KEY_VALUES:
+        // 多值键过滤器匹配（关系）
         matched = matchKeyValuesFilter(entity, (TimelineKeyValuesFilter)filter,
             entityFiltersType);
         break;
       default:
         throw new IOException("Unsupported filter " + filterType);
       }
+      // 当前过滤器匹配失败处理
       if (!matched) {
+        // AND运算符：任意失败直接返回失败
         if(operator == TimelineFilterList.Operator.AND) {
           return false;
         }
       } else {
+        // 当前过滤器匹配成功处理
+        // OR运算符：任意成功直接返回成功
         if(operator == TimelineFilterList.Operator.OR) {
           return true;
         }
       }
     }
+    // 遍历完所有过滤器：AND运算符说明全部匹配成功返回true；OR运算符说明全部失败返回false
     return operator == TimelineFilterList.Operator.AND;
   }
 
   /**
-   * Checks if passed object is of integral type(Short/Integer/Long).
+   * 检查对象是否为整型类型（Short/Integer/Long）。
    *
-   * @param obj Object to be checked.
-   * @return true if object passed is of type Short or Integer or Long, false
-   * otherwise.
+   * @param obj 待检查对象
+   * @return true是整型类型，false不是
    */
   public static boolean isIntegralValue(Object obj) {
     return (obj instanceof Short) || (obj instanceof Integer) ||

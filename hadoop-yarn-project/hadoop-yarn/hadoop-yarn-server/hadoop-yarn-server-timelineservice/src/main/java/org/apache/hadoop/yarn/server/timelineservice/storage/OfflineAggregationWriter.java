@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,37 +30,29 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.OfflineAggre
 import java.io.IOException;
 
 /**
- * YARN timeline service v2 offline aggregation storage interface.
+ * 文件说明：YARN Timeline Service v2 离线聚合数据存储抽象接口，定义离线聚合后时间线数据的写入规范
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public abstract class OfflineAggregationWriter extends AbstractService {
 
   /**
-   * Construct the offline writer.
+   * 构造离线聚合写入器服务
    *
-   * @param name service name
+   * @param name 服务名称
    */
   public OfflineAggregationWriter(String name) {
     super(name);
   }
 
   /**
-   * Persist aggregated timeline entities to the offline store based on which
-   * track this entity is to be rolled up to. The tracks along which
-   * aggregations are to be done are given by {@link OfflineAggregationInfo}.
+   * 将聚合后的时间线实体持久化存储到离线存储中，聚合路径由聚合信息对象指定
    *
-   * @param context a {@link TimelineCollectorContext} object that describes the
-   *                context information of the aggregated data. Depends on the
-   *                type of the aggregation, some fields of this context maybe
-   *                empty or null.
-   * @param entities {@link TimelineEntities} to be persisted.
-   * @param info an {@link OfflineAggregationInfo} object that describes the
-   *             detail of the aggregation. Current supported option is
-   *             {@link OfflineAggregationInfo#FLOW_AGGREGATION}.
-   * @return a {@link TimelineWriteResponse} object.
-   * @throws IOException if any problem occurs while writing aggregated
-   *     entities.
+   * @param context 时间线收集器上下文，描述聚合数据的上下文信息，根据聚合类型不同，部分字段可能为空
+   * @param entities 需要持久化的聚合后时间线实体集合
+   * @param info 离线聚合信息对象，描述聚合的具体信息，当前支持流聚合(FLOW_AGGREGATION)
+   * @return 时间线写入响应对象，包含写入结果信息
+   * @throws IOException 写入聚合实体过程中发生I/O异常时抛出
    */
   abstract TimelineWriteResponse writeAggregatedEntity(
       TimelineCollectorContext context, TimelineEntities entities,

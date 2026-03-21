@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,29 +33,27 @@ import org.apache.hadoop.hbase.client.Table;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 /**
- * Implements behavior common to tables used in the timeline service storage. It
- * is thread-safe, and can be used by multiple threads concurrently.
+ * 时间线服务HBase存储层所有表读写操作的抽象基类，提供通用表操作能力，线程安全可并发使用。
  *
- * @param <T> reference to the table instance class itself for type safety.
+ * @param <T> 表实例类型，用于类型安全约束。
  */
 public abstract class BaseTableRW<T extends BaseTable<T>> {
 
   /**
-   * Name of config variable that is used to point to this table.
+   * 配置项名称，用于指定本HBase表的名称。
    */
   private final String tableNameConfName;
 
   /**
-   * Unless the configuration overrides, this will be the default name for the
-   * table when it is created.
+   * 默认表名，若配置未指定则使用该默认值。
    */
   private final String defaultTableName;
 
   /**
-   * @param tableNameConfName name of config variable that is used to point to
-   *          this table.
-   * @param defaultTableName Default table name if table from config is not
-   *          found.
+   * 构造函数，初始化表名称配置项和默认表名。
+   *
+   * @param tableNameConfName 表名称配置项名称。
+   * @param defaultTableName 未配置时使用的默认表名。
    */
   protected BaseTableRW(String tableNameConfName, String defaultTableName) {
     this.tableNameConfName = tableNameConfName;
@@ -62,25 +61,23 @@ public abstract class BaseTableRW<T extends BaseTable<T>> {
   }
 
   /**
-   * Used to create a type-safe mutator for this table.
+   * 获取当前表的类型安全批量写入器。
    *
-   * @param hbaseConf used to read table name.
-   * @param conn used to create a table from.
-   * @return a type safe {@link BufferedMutator} for the entity table.
-   * @throws IOException if any exception occurs while creating mutator for the
-   *     table.
+   * @param hbaseConf HBase配置，用于读取表名称。
+   * @param conn HBase连接，用于创建写入器。
+   * @return 当前表的类型安全BufferedMutator。
+   * @throws IOException 创建写入器过程中发生异常时抛出。
    */
   public TypedBufferedMutator<T> getTableMutator(Configuration hbaseConf,
       Connection conn) throws IOException {
 
+    // 获取本HBase表的TableName对象
     TableName tableName = this.getTableName(hbaseConf);
 
-    // Plain buffered mutator
+    // 创建基础BufferedMutator
     BufferedMutator bufferedMutator = conn.getBufferedMutator(tableName);
 
-    // Now make this thing type safe.
-    // This is how service initialization should hang on to this variable, with
-    // the proper type
+    // 包装为类型安全的BufferedMutator
     TypedBufferedMutator<T> table =
         new TypedBufferedMutator<T>(bufferedMutator);
 
@@ -88,11 +85,13 @@ public abstract class BaseTableRW<T extends BaseTable<T>> {
   }
 
   /**
-   * @param hbaseConf used to read settings that override defaults
-   * @param conn used to create table from
-   * @param scan that specifies what you want to read from this table.
-   * @return scanner for the table.
-   * @throws IOException if any exception occurs while getting the scanner.
+   * 根据扫描条件获取当前表的结果扫描器。
+   *
+   * @param hbaseConf HBase配置，用于读取表名称。
+   * @param conn HBase连接，用于获取表对象。
+   * @param scan 扫描条件，指定需要读取的数据范围。
+   * @return 扫描结果扫描器。
+   * @throws IOException 获取扫描器过程中发生异常时抛出。
    */
   public ResultScanner getResultScanner(Configuration hbaseConf,
       Connection conn, Scan scan) throws IOException {
@@ -101,12 +100,13 @@ public abstract class BaseTableRW<T extends BaseTable<T>> {
   }
 
   /**
+   * 根据Get查询获取单行结果。
    *
-   * @param hbaseConf used to read settings that override defaults
-   * @param conn used to create table from
-   * @param get that specifies what single row you want to get from this table
-   * @return result of get operation
-   * @throws IOException if any exception occurs while getting the result.
+   * @param hbaseConf HBase配置，用于读取表名称。
+   * @param conn HBase连接，用于获取表对象。
+   * @param get Get查询条件，指定需要获取的单行数据。
+   * @return Get查询返回的结果。
+   * @throws IOException 获取结果过程中发生异常时抛出。
    */
   public Result getResult(Configuration hbaseConf, Connection conn, Get get)
       throws IOException {
@@ -115,11 +115,11 @@ public abstract class BaseTableRW<T extends BaseTable<T>> {
   }
 
   /**
-   * Get the table name for the input table.
+   * 拼接Schema前缀后，构造TableName对象。
    *
-   * @param conf HBase configuration from which table name will be fetched.
-   * @param tableName name of the table to be fetched
-   * @return A {@link TableName} object.
+   * @param conf HBase配置，用于读取Schema前缀配置。
+   * @param tableName 表名称。
+   * @return 拼接Schema前缀后的完整TableName对象。
    */
   public static TableName getTableName(Configuration conf, String tableName) {
     String tableSchemaPrefix =  conf.get(
@@ -129,10 +129,10 @@ public abstract class BaseTableRW<T extends BaseTable<T>> {
   }
 
   /**
-   * Get the table name for this table.
+   * 获取当前表的TableName对象，从配置读取表名，不存在则使用默认值。
    *
-   * @param conf HBase configuration from which table name will be fetched.
-   * @return A {@link TableName} object.
+   * @param conf HBase配置，用于读取表名称。
+   * @return 当前表的TableName对象。
    */
   public TableName getTableName(Configuration conf) {
     String tableName = conf.get(tableNameConfName, defaultTableName);
@@ -140,12 +140,12 @@ public abstract class BaseTableRW<T extends BaseTable<T>> {
   }
 
   /**
-   * Get the table name based on the input config parameters.
+   * 从配置读取表名，不存在则使用默认值，拼接Schema前缀后构造TableName对象。
    *
-   * @param conf HBase configuration from which table name will be fetched.
-   * @param tableNameInConf the table name parameter in conf.
-   * @param defaultTableName the default table name.
-   * @return A {@link TableName} object.
+   * @param conf HBase配置，用于读取表名称和Schema前缀。
+   * @param tableNameInConf 配置中的表名配置项。
+   * @param defaultTableName 默认表名。
+   * @return 拼接Schema前缀后的完整TableName对象。
    */
   public static TableName getTableName(Configuration conf,
       String tableNameInConf, String defaultTableName) {
@@ -154,12 +154,11 @@ public abstract class BaseTableRW<T extends BaseTable<T>> {
   }
 
   /**
-   * Used to create the table in HBase. Should be called only once (per HBase
-   * instance).
+   * 在HBase中创建当前表，每个HBase实例只需要调用一次。
    *
-   * @param admin Used for doing HBase table operations.
-   * @param hbaseConf Hbase configuration.
-   * @throws IOException if any exception occurs while creating the table.
+   * @param admin HBase管理员客户端，用于执行表创建操作。
+   * @param hbaseConf HBase配置。
+   * @throws IOException 创建表过程中发生异常时抛出。
    */
   public abstract void createTable(Admin admin, Configuration hbaseConf)
       throws IOException;

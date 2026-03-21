@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,14 +31,16 @@ import org.apache.hadoop.yarn.server.timelineservice.reader.TimelineDataToRetrie
 import org.apache.hadoop.yarn.server.timelineservice.reader.TimelineEntityFilters;
 import org.apache.hadoop.yarn.server.timelineservice.reader.TimelineReaderContext;
 
-/** ATSv2 reader interface. */
+/**
+ * 文件说明：ATSv2（时间线服务V2）存储层读取接口，定义了从后端存储读取时间线实体数据的核心方法契约。
+ * 核心职责：为上层查询服务提供统一的存储读取抽象，支持不同后端存储的实现接入。
+ */
 @Private
 @Unstable
 public interface TimelineReader extends Service {
 
   /**
-   * Possible fields to retrieve for {@link #getEntities} and
-   * {@link #getEntity}.
+   * 可指定需要获取的时间线实体字段枚举，用于控制查询返回数据范围，减少不必要的数据传输。
    */
   public enum Field {
     ALL,
@@ -50,131 +53,22 @@ public interface TimelineReader extends Service {
   }
 
   /**
-   * <p>The API to fetch the single entity given the identifier(depending on
-   * the entity type) in the scope of the given context.</p>
-   * @param context Context which defines the scope in which query has to be
-   *    made. Use getters of {@link TimelineReaderContext} to fetch context
-   *    fields. Context contains the following :<br>
-   *    <ul>
-   *    <li><b>entityType</b> - Entity type(mandatory).</li>
-   *    <li><b>clusterId</b> - Identifies the cluster(mandatory).</li>
-   *    <li><b>userId</b> - Identifies the user.</li>
-   *    <li><b>flowName</b> - Context flow name.</li>
-   *    <li><b>flowRunId</b> - Context flow run id.</li>
-   *    <li><b>appId</b> - Context app id.</li>
-   *    <li><b>entityId</b> - Entity id.</li>
-   *    </ul>
-   *    Fields in context which are mandatory depends on entity type. Entity
-   *    type is always mandatory. In addition to entity type, below is the list
-   *    of context fields which are mandatory, based on entity type.<br>
-   *    <ul>
-   *    <li>If entity type is YARN_FLOW_RUN (i.e. query to fetch a specific flow
-   *    run), clusterId, userId, flowName and flowRunId are mandatory.</li>
-   *    <li>If entity type is YARN_APPLICATION (i.e. query to fetch a specific
-   *    app), query is within the scope of clusterId, userId, flowName,
-   *    flowRunId and appId. But out of this, only clusterId and appId are
-   *    mandatory. If only clusterId and appId are supplied, backend storage
-   *    must fetch the flow context information i.e. userId, flowName and
-   *    flowRunId first and based on that, fetch the app. If flow context
-   *    information is also given, app can be directly fetched.
-   *    </li>
-   *    <li>For other entity types (i.e. query to fetch generic entity), query
-   *    is within the scope of clusterId, userId, flowName, flowRunId, appId,
-   *    entityType and entityId. But out of this, only clusterId, appId,
-   *    entityType and entityId are mandatory. If flow context information is
-   *    not supplied, backend storage must fetch the flow context information
-   *    i.e. userId, flowName and flowRunId first and based on that, fetch the
-   *    entity. If flow context information is also given, entity can be
-   *    directly queried.
-   *    </li>
-   *    </ul>
-   * @param dataToRetrieve Specifies which data to retrieve for the entity. Use
-   *    getters of TimelineDataToRetrieve class to fetch dataToRetrieve
-   *    fields. All the dataToRetrieve fields are optional. Refer to
-   *    {@link TimelineDataToRetrieve} for details.
-   * @return A <cite>TimelineEntity</cite> instance or null. The entity will
-   *    contain the metadata plus the given fields to retrieve.<br>
-   *    If entityType is YARN_FLOW_RUN, entity returned is of type
-   *    <cite>FlowRunEntity</cite>.<br>
-   *    For all other entity types, entity returned is of type
-   *    <cite>TimelineEntity</cite>.
-   * @throws IOException if there is an exception encountered while fetching
-   *    entity from backend storage.
+   * 根据实体标识符和上下文查询单个时间线实体。
+   * @param context 查询上下文，定义查询范围，包含集群ID、用户ID、流信息、应用ID、实体ID等层级信息
+   * @param dataToRetrieve 指定需要获取的实体数据字段，控制返回内容大小
+   * @return 查询到的时间线实体，未找到则返回null，实体类型根据查询实体类型变化
+   * @throws IOException 从后端存储读取数据发生异常时抛出
    */
   TimelineEntity getEntity(TimelineReaderContext context,
       TimelineDataToRetrieve dataToRetrieve) throws IOException;
 
   /**
-   * <p>The API to search for a set of entities of the given entity type in
-   * the scope of the given context which matches the given predicates. The
-   * predicates include the created time window, limit to number of entities to
-   * be returned, and the entities can be filtered by checking whether they
-   * contain the given info/configs entries in the form of key/value pairs,
-   * given metrics in the form of metricsIds and its relation with metric
-   * values, given events in the form of the Ids, and whether they relate to/are
-   * related to other entities. For those parameters which have multiple
-   * entries, the qualified entity needs to meet all or them.</p>
-   *
-   * @param context Context which defines the scope in which query has to be
-   *    made. Use getters of {@link TimelineReaderContext} to fetch context
-   *    fields. Context contains the following :<br>
-   *    <ul>
-   *    <li><b>entityType</b> - Entity type(mandatory).</li>
-   *    <li><b>clusterId</b> - Identifies the cluster(mandatory).</li>
-   *    <li><b>userId</b> - Identifies the user.</li>
-   *    <li><b>flowName</b> - Context flow name.</li>
-   *    <li><b>flowRunId</b> - Context flow run id.</li>
-   *    <li><b>appId</b> - Context app id.</li>
-   *    </ul>
-   *    Although entityIdPrefix and entityId are also part of context,
-   *    it has no meaning for getEntities.<br>
-   *    Fields in context which are mandatory depends on entity type. Entity
-   *    type is always mandatory. In addition to entity type, below is the list
-   *    of context fields which are mandatory, based on entity type.<br>
-   *    <ul>
-   *    <li>If entity type is YARN_FLOW_ACTIVITY (i.e. query to fetch flows),
-   *    only clusterId is mandatory.
-   *    </li>
-   *    <li>If entity type is YARN_FLOW_RUN (i.e. query to fetch flow runs),
-   *    clusterId, userId and flowName are mandatory.</li>
-   *    <li>If entity type is YARN_APPLICATION (i.e. query to fetch apps), we
-   *    can either get all apps within the context of flow name or within the
-   *    context of flow run. If apps are queried within the scope of flow name,
-   *    clusterId, userId and flowName are supplied. If they are queried within
-   *    the scope of flow run, clusterId, userId, flowName and flowRunId are
-   *    supplied.</li>
-   *    <li>For other entity types (i.e. query to fetch generic entities), query
-   *    is within the scope of clusterId, userId, flowName, flowRunId, appId and
-   *    entityType. But out of this, only clusterId, appId and entityType are
-   *    mandatory. If flow context information is not supplied, backend storage
-   *    must fetch the flow context information i.e. userId, flowName and
-   *    flowRunId first and based on that, fetch the entities. If flow context
-   *    information is also given, entities can be directly queried.
-   *    </li>
-   *    </ul>
-   * @param filters Specifies filters which restrict the number of entities
-   *    to return. Use getters of TimelineEntityFilters class to fetch
-   *    various filters. All the filters are optional. Refer to
-   *    {@link TimelineEntityFilters} for details.
-   * @param dataToRetrieve Specifies which data to retrieve for each entity. Use
-   *    getters of TimelineDataToRetrieve class to fetch dataToRetrieve
-   *    fields. All the dataToRetrieve fields are optional. Refer to
-   *    {@link TimelineDataToRetrieve} for details.
-   * @return A set of <cite>TimelineEntity</cite> instances of the given entity
-   *    type in the given context scope which matches the given predicates
-   *    ordered by enitityIdPrefix(for generic entities only).
-   *    Each entity will only contain
-   *    the metadata(id, type , idPrefix and created time) plus the given
-   *    fields to retrieve.
-   *    <br>
-   *    If entityType is YARN_FLOW_ACTIVITY, entities returned are of type
-   *    <cite>FlowActivityEntity</cite>.<br>
-   *    If entityType is YARN_FLOW_RUN, entities returned are of type
-   *    <cite>FlowRunEntity</cite>.<br>
-   *    For all other entity types, entities returned are of type
-   *    <cite>TimelineEntity</cite>.
-   * @throws IOException if there is an exception encountered while fetching
-   *    entity from backend storage.
+   * 根据过滤条件在指定上下文范围内批量查询符合条件的时间线实体集合。
+   * @param context 查询上下文，定义查询范围
+   * @param filters 过滤条件，包括创建时间窗口、返回数量限制、键值对过滤、指标过滤、事件过滤、关系过滤等
+   * @param dataToRetrieve 指定每个实体需要获取的字段，控制返回内容大小
+   * @return 符合条件的时间线实体集合，按实体ID前缀排序
+   * @throws IOException 从后端存储读取数据发生异常时抛出
    */
   Set<TimelineEntity> getEntities(
       TimelineReaderContext context,
@@ -182,22 +76,16 @@ public interface TimelineReader extends Service {
       TimelineDataToRetrieve dataToRetrieve) throws IOException;
 
   /**
-   * The API to list all available entity types of the given context.
-   *
-   * @param context A context defines the scope of this query. The incoming
-   * context should contain at least the cluster id and application id.
-   *
-   * @return A set of entity types available in the given context.
-   *
-   * @throws IOException if an exception occurred while listing from backend
-   * storage.
+   * 列出指定上下文范围内所有可用的实体类型。
+   * @param context 查询上下文，至少需要包含集群ID和应用ID
+   * @return 指定上下文中存在的所有实体类型集合
+   * @throws IOException 从后端存储读取数据发生异常时抛出
    */
   Set<String> getEntityTypes(TimelineReaderContext context) throws IOException;
 
   /**
-   * Check if reader connection is working properly.
-   *
-   * @return True if reader connection works as expected, false otherwise.
+   * 检查时间线读取器与后端存储的连接健康状态。
+   * @return 读取器健康状态信息，包含连接是否正常等状态
    */
   TimelineHealth getHealthStatus();
 }

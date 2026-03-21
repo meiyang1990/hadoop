@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+/**
+ * YARN时间线服务核心服务包，提供应用指标与历史数据存储相关核心抽象与基础实现
+ * 为不同存储后端的插件化实现提供通用基础设施支持
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,7 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.api.CollectorNodemanagerProtocolPB;
 
 /**
- * SecurityInfo implementation for CollectorNodemanager protocol.
+ * CollectorNodemanager 协议的安全信息实现类，为时间线采集器和NodeManager之间的RPC通信提供Kerberos认证配置。
  */
 @Public
 @Evolving
@@ -38,10 +39,12 @@ public class CollectorNodemanagerSecurityInfo extends SecurityInfo {
 
   @Override
   public KerberosInfo getKerberosInfo(Class<?> protocol, Configuration conf) {
+    // 仅针对CollectorNodemanagerProtocolPB协议返回安全信息，其他协议返回空
     if (!protocol
         .equals(CollectorNodemanagerProtocolPB.class)) {
       return null;
     }
+    // 匿名内部类实现KerberosInfo，提供服务端principal配置
     return new KerberosInfo() {
 
       @Override
@@ -51,6 +54,7 @@ public class CollectorNodemanagerSecurityInfo extends SecurityInfo {
 
       @Override
       public String serverPrincipal() {
+        // 返回NodeManager的Kerberos principal配置项键
         return YarnConfiguration.NM_PRINCIPAL;
       }
 
@@ -63,7 +67,7 @@ public class CollectorNodemanagerSecurityInfo extends SecurityInfo {
 
   @Override
   public TokenInfo getTokenInfo(Class<?> protocol, Configuration conf) {
+    // 不使用delegation token认证，返回null
     return null;
   }
 }
-

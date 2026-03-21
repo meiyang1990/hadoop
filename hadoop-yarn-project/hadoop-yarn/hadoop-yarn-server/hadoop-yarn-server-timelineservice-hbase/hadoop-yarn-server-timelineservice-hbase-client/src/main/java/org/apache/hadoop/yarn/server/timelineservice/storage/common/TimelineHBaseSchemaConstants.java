@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,9 +23,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /**
- * contains the constants used in the context of schema accesses for
- * {@link org.apache.hadoop.yarn.api.records.timelineservice.TimelineEntity}
- * information.
+ * 时间线服务HBase存储schema相关常量定义，用于存储时间线实体信息。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -33,10 +32,8 @@ public final class TimelineHBaseSchemaConstants {
   }
 
   /**
-   * Used to create a pre-split for tables starting with a username in the
-   * prefix. TODO: this may have to become a config variable (string with
-   * separators) so that different installations can presplit based on their own
-   * commonly occurring names.
+   * 用户名前缀开头的HBase表预拆分点，用于优化表分区分布。
+   * TODO: 这个预拆分点未来需要改为可配置项，允许不同部署根据自身常用用户名前缀调整。
    */
   private final static byte[][] USERNAME_SPLITS = {
       Bytes.toBytes("a"), Bytes.toBytes("ad"), Bytes.toBytes("an"),
@@ -52,16 +49,18 @@ public final class TimelineHBaseSchemaConstants {
   };
 
   /**
-   * The length at which keys auto-split.
+   * 用户名前缀拆分时，用于自动拆分的前缀长度，默认值为4。
    */
   public static final String USERNAME_SPLIT_KEY_PREFIX_LENGTH = "4";
 
   /**
-   * @return splits for splits where a user is a prefix.
+   * 获取用户名前缀表的预拆分点（返回深拷贝保证内部数据不被修改）。
+   * @return 用户名前缀预拆分点数组
    */
   public static byte[][] getUsernameSplits() {
+    // 克隆外层数组
     byte[][] kloon = USERNAME_SPLITS.clone();
-    // Deep copy.
+    // 深拷贝每个拆分点字节数组
     for (int row = 0; row < USERNAME_SPLITS.length; row++) {
       kloon[row] = Bytes.copy(USERNAME_SPLITS[row]);
     }

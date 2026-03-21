@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,10 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.
- * documentstore.lib contains factory class for instantiating
- * different DocumentStore reader writer client based on the DocumentVendor
- * configured.
+ * 时间线服务文档存储库工具包，提供根据配置的文档存储厂商，实例化不同文档存储读写客户端的工厂类。
+ * 该包是YARN时间线服务文档存储模块的内部底层支持包，负责创建适配不同底层文档数据库的客户端实例。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

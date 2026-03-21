@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,21 +23,28 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * Filter class which represents filter to be applied based on existence of a
- * value.
+ * 存在性过滤类，用于基于某个值是否存在对时间线数据进行过滤
  */
 @Private
 @Unstable
 public class TimelineExistsFilter extends TimelineFilter {
 
+  /** 比较操作符 */
   private TimelineCompareOp compareOp;
+  /** 待检查存在性的值 */
   private String value;
 
   public TimelineExistsFilter() {
   }
 
+  /**
+   * 构造存在性过滤器
+   * @param op 比较操作符，仅支持EQUAL或NOT_EQUAL
+   * @param value 待检查存在性的值
+   */
   public TimelineExistsFilter(TimelineCompareOp op, String value) {
     this.value = value;
+    // 验证操作符合法性，仅允许EQUAL或NOT_EQUAL
     if (op != TimelineCompareOp.EQUAL && op != TimelineCompareOp.NOT_EQUAL) {
       throw new IllegalArgumentException("CompareOp for exists filter should " +
           "be EQUAL or NOT_EQUAL");
@@ -80,6 +88,7 @@ public class TimelineExistsFilter extends TimelineFilter {
 
   @Override
   public TimelineFilterType getFilterType() {
+    // 返回过滤器类型：存在性过滤
     return TimelineFilterType.EXISTS;
   }
 

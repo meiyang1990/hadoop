@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,9 +43,8 @@ import java.io.IOException;
 import java.util.Set;
 
 /**
- * This is a generic document store timeline writer for storing the timeline
- * entity information. Based on the {@link DocumentStoreVendor} that is
- * configured, the documents are written to that backend.
+ * 文档存储类型时间线写入器实现，用于存储时间线实体信息。
+ * 根据配置选择不同的文档存储后端（如MongoDB等）写入数据，支持按类型分集合存储。
  */
 public class DocumentStoreTimelineWriterImpl extends AbstractService
     implements TimelineWriter {
@@ -67,16 +67,21 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
 
   @Override
   public void serviceInit(Configuration conf) throws Exception {
+    // 从配置中获取文档存储厂商类型
     storeType = DocumentStoreUtils.getStoreVendor(conf);
     LOG.info("Initializing Document Store Writer for : " + storeType);
     super.serviceInit(conf);
 
+    // 初始化应用集合写入器
     this.appCollWriter = new TimelineCollectionWriter<>(
         CollectionType.APPLICATION, conf);
+    // 初始化普通实体集合写入器
     this.entityCollWriter = new TimelineCollectionWriter<>(
         CollectionType.ENTITY, conf);
+    // 初始化流活动集合写入器
     this.flowActivityCollWriter = new TimelineCollectionWriter<>(
         CollectionType.FLOW_ACTIVITY, conf);
+    // 初始化流运行集合写入器
     this.flowRunCollWriter = new TimelineCollectionWriter<>(
         CollectionType.FLOW_RUN, conf);
   }
@@ -89,6 +94,7 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
   @Override
   protected void serviceStop() throws Exception {
     super.serviceStop();
+    // 关闭各集合写入器释放资源
     appCollWriter.close();
     entityCollWriter.close();
     flowActivityCollWriter.close();
@@ -100,9 +106,10 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
       context, TimelineEntities data, UserGroupInformation callerUgi) {
     LOG.debug("Writing Timeline Entity for appID : {}", context.getAppId());
     TimelineWriteResponse putStatus = new TimelineWriteResponse();
+    // 获取提交用户的短用户名
     String subApplicationUser = callerUgi.getShortUserName();
 
-    //Avoiding NPE for document id
+    // 空值检查，避免生成文档ID时出现NPE
     if (DocumentStoreUtils.isNullOrEmpty(context.getFlowName(),
         context.getAppId(), context.getClusterId(), context.getUserId())) {
       LOG.warn("Found NULL for one of: flowName={} appId={} " +
@@ -111,35 +118,42 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
       return putStatus;
     }
 
+    // 遍历所有待写入实体
     for (TimelineEntity timelineEntity : data.getEntities()) {
-      // a set can have at most 1 null
+      // 跳过空实体
       if(timelineEntity == null) {
         continue;
       }
 
       TimelineEntityDocument entityDocument;
-      //If the entity is application, it will be stored in Application
-      // Collection
+      // 应用实体单独存储到应用集合
       if (ApplicationEntity.isApplicationEntity(timelineEntity)) {
+        // 创建应用实体文档对象
         entityDocument = createTimelineEntityDoc(context, subApplicationUser,
             timelineEntity, true);
-        // if it's an application entity, store metrics for aggregation
+        // 创建流运行文档，用于聚合指标
         FlowRunDocument flowRunDoc = createFlowRunDoc(context,
             timelineEntity.getMetrics());
-        // fetch flow activity if App is created or finished
+        // 根据应用创建/完成事件生成流活动文档
         FlowActivityDocument flowActivityDoc = getFlowActivityDoc(context,
             timelineEntity, flowRunDoc, entityDocument);
+        // 写入应用文档到对应集合
         writeApplicationDoc(entityDocument);
+        // 写入流运行文档到对应集合
         writeFlowRunDoc(flowRunDoc);
+        // 如果生成了流活动文档则写入
         if(flowActivityDoc != null) {
           storeFlowActivityDoc(flowActivityDoc);
         }
       } else {
+        // 非应用实体创建文档对象
         entityDocument = createTimelineEntityDoc(context, subApplicationUser,
             timelineEntity, false);
+        // 如果提交用户和上下文用户不同，追加用户信息到上下文
         appendSubAppUserIfExists(context, subApplicationUser);
-        // The entity will be stored in Entity Collection
+        // 设置实体创建时间
         entityDocument.setCreatedTime(fetchEntityCreationTime(timelineEntity));
+        // 写入普通实体文档到实体集合
         writeEntityDoc(entityDocument);
       }
     }
@@ -154,9 +168,13 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
 
   @Override
   public TimelineHealth getHealthStatus() {
+    // 默认返回运行中健康状态
     return new TimelineHealth(TimelineHealth.TimelineHealthStatus.RUNNING, "");
   }
 
+  /**
+   * 如果提交用户与上下文用户不同，将提交用户追加到上下文用户ID中。
+   */
   private void appendSubAppUserIfExists(TimelineCollectorContext context,
       String subApplicationUser) {
     String userId = context.getUserId();
@@ -167,6 +185,9 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
     }
   }
 
+  /**
+   * 创建时间线实体文档对象，根据是否为应用实体生成对应文档ID。
+   */
   private TimelineEntityDocument createTimelineEntityDoc(
       TimelineCollectorContext context, String subApplicationUser,
       TimelineEntity timelineEntity, boolean isAppEntity) {
@@ -185,6 +206,9 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
     return entityDocument;
   }
 
+  /**
+   * 创建流运行文档对象，生成对应文档ID。
+   */
   private FlowRunDocument createFlowRunDoc(TimelineCollectorContext context,
       Set<TimelineMetric> metrics) {
     FlowRunDocument flowRunDoc = new FlowRunDocument(context, metrics);
@@ -193,10 +217,15 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
     return flowRunDoc;
   }
 
+  /**
+   * 根据实体类型从对应事件中提取实体创建时间。
+   */
   private long fetchEntityCreationTime(TimelineEntity timelineEntity) {
     TimelineEvent event;
+    // 根据实体类型选择对应的创建事件类型
     switch (TimelineEntityType.valueOf(timelineEntity.getType())) {
     case YARN_CONTAINER:
+      // 容器从CREATED事件获取创建时间
       event = DocumentStoreUtils.fetchEvent(
           timelineEntity, ContainerMetricsConstants.CREATED_EVENT_TYPE);
       if (event != null) {
@@ -204,6 +233,7 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
       }
       break;
     case YARN_APPLICATION_ATTEMPT:
+      // 应用尝试从REGISTERED事件获取创建时间
       event = DocumentStoreUtils.fetchEvent(
           timelineEntity, AppAttemptMetricsConstants.REGISTERED_EVENT_TYPE);
       if (event != null) {
@@ -211,37 +241,44 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
       }
       break;
     default:
-      //NO Op
+      // 其他类型不处理
     }
+    // 没有找到对应事件则返回实体本身携带的创建时间
     if (timelineEntity.getCreatedTime() == null) {
       return 0;
     }
     return timelineEntity.getCreatedTime();
   }
 
+  /**
+   * 从应用实体的创建/完成事件中生成流活动文档。
+   */
   private FlowActivityDocument getFlowActivityDoc(
       TimelineCollectorContext context,
       TimelineEntity timelineEntity, FlowRunDocument flowRunDoc,
       TimelineEntityDocument entityDocument) {
     FlowActivityDocument flowActivityDoc = null;
-    // check if the application is created
+    // 检查是否有应用创建事件
     TimelineEvent event = DocumentStoreUtils.fetchEvent(
         timelineEntity, ApplicationMetricsConstants.CREATED_EVENT_TYPE);
     if (event != null) {
+      // 设置应用创建时间
       entityDocument.setCreatedTime(event.getTimestamp());
+      // 设置流运行最小开始时间
       flowRunDoc.setMinStartTime(event.getTimestamp());
+      // 创建流活动文档
       flowActivityDoc = createFlowActivityDoc(context, context.getFlowName(),
           context.getFlowVersion(), context.getFlowRunId(), event);
     }
 
-    // if application has finished, store it's finish time
+    // 检查是否有应用完成事件
     event = DocumentStoreUtils.fetchEvent(timelineEntity,
         ApplicationMetricsConstants.FINISHED_EVENT_TYPE);
     if (event != null) {
+      // 设置流运行最大结束时间
       flowRunDoc.setMaxEndTime(event.getTimestamp());
 
-      // this check is to handle in case both create and finish event exist
-      // under the single list of events for an TimelineEntity
+      // 如果同时存在创建和完成事件且之前未创建流活动文档，则创建
       if (flowActivityDoc == null) {
         flowActivityDoc = createFlowActivityDoc(context, context.getFlowName(),
             context.getFlowVersion(), context.getFlowRunId(), event);
@@ -250,11 +287,15 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
     return flowActivityDoc;
   }
 
+  /**
+   * 创建流活动文档对象，生成文档ID并设置时间戳按天分区。
+   */
   private FlowActivityDocument createFlowActivityDoc(
       TimelineCollectorContext context, String flowName, String flowVersion,
       long flowRunId, TimelineEvent event) {
     FlowActivityDocument flowActivityDoc = new FlowActivityDocument(flowName,
         flowVersion, flowRunId);
+    // 获取当日零点时间戳用于按天分区存储
     flowActivityDoc.setDayTimestamp(DocumentStoreUtils.getTopOfTheDayTimestamp(
         event.getTimestamp()));
     flowActivityDoc.setFlowName(flowName);
@@ -264,18 +305,30 @@ public class DocumentStoreTimelineWriterImpl extends AbstractService
     return flowActivityDoc;
   }
 
+  /**
+   * 将流运行文档写入对应集合。
+   */
   private void writeFlowRunDoc(FlowRunDocument flowRunDoc) {
     flowRunCollWriter.writeDocument(flowRunDoc);
   }
 
+  /**
+   * 将流活动文档写入对应集合。
+   */
   private void storeFlowActivityDoc(FlowActivityDocument flowActivityDoc) {
     flowActivityCollWriter.writeDocument(flowActivityDoc);
   }
 
+  /**
+   * 将普通实体文档写入对应集合。
+   */
   private void writeEntityDoc(TimelineEntityDocument entityDocument) {
     entityCollWriter.writeDocument(entityDocument);
   }
 
+  /**
+   * 将应用实体文档写入对应集合。
+   */
   private void writeApplicationDoc(TimelineEntityDocument entityDocument) {
     appCollWriter.writeDocument(entityDocument);
   }

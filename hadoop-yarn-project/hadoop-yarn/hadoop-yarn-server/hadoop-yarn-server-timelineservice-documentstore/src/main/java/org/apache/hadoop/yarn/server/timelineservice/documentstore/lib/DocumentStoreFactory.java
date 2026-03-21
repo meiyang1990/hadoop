@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,34 +31,30 @@ import org.apache.hadoop.yarn.server.timelineservice.documentstore.writer.Docume
 import static org.apache.hadoop.yarn.server.timelineservice.documentstore.DocumentStoreUtils.getStoreVendor;
 
 /**
- * Factory methods for instantiating a timeline Document Store reader or
- * writer. Based on the {@link DocumentStoreVendor} that is configured,
- * appropriate reader or writer would be instantiated.
+ * 时间线文档存储读写器工厂类，根据配置的文档存储供应商类型创建对应的读/写实例。
  */
 public final class DocumentStoreFactory {
 
-  // making factory class not instantiable
+  // 禁止实例化工厂类
   private DocumentStoreFactory(){
   }
 
   /**
-   * Creates a DocumentStoreWriter for a {@link DocumentStoreVendor}.
-   * @param conf
-   *              for creating client connection
-   * @param <Document> type of Document for which the writer has to be created,
-   *                  i.e TimelineEntityDocument, FlowActivityDocument etc
-   * @return document store writer
-   * @throws DocumentStoreNotSupportedException if there is no implementation
-   *         for a configured {@link DocumentStoreVendor} or unknown
-   *         {@link DocumentStoreVendor} is configured.
-   * @throws YarnException if the required configs for DocumentStore is missing.
+   * 根据配置创建对应供应商的文档存储写入器实例。
+   * @param conf Hadoop配置对象，用于创建客户端连接
+   * @param <Document> 写入文档类型，如TimelineEntityDocument、FlowActivityDocument等
+   * @return 文档存储写入器实例
+   * @throws DocumentStoreNotSupportedException 配置的供应商不存在或不支持时抛出
+   * @throws YarnException 缺少必要配置项时抛出
    */
   public static <Document extends TimelineDocument>
       DocumentStoreWriter <Document> createDocumentStoreWriter(
           Configuration conf) throws YarnException {
+    // 从配置中获取文档存储供应商类型
     final DocumentStoreVendor storeType = getStoreVendor(conf);
     switch (storeType) {
     case COSMOS_DB:
+      // 验证Azure Cosmos DB配置合法性
       DocumentStoreUtils.validateCosmosDBConf(conf);
       return new CosmosDBDocumentStoreWriter<>(conf);
     default:
@@ -68,23 +65,21 @@ public final class DocumentStoreFactory {
   }
 
   /**
- * Creates a DocumentStoreReader for a {@link DocumentStoreVendor}.
- * @param conf
- *            for creating client connection
- * @param <Document> type of Document for which the writer has to be created,
- *                  i.e TimelineEntityDocument, FlowActivityDocument etc
- * @return document store reader
- * @throws DocumentStoreNotSupportedException if there is no implementation
- *         for a configured {@link DocumentStoreVendor} or unknown
- *         {@link DocumentStoreVendor} is configured.
- * @throws YarnException if the required configs for DocumentStore is missing.
+ * 根据配置创建对应供应商的文档存储读取器实例。
+ * @param conf Hadoop配置对象，用于创建客户端连接
+ * @param <Document> 读取文档类型，如TimelineEntityDocument、FlowActivityDocument等
+ * @return 文档存储读取器实例
+ * @throws DocumentStoreNotSupportedException 配置的供应商不存在或不支持时抛出
+ * @throws YarnException 缺少必要配置项时抛出
  * */
   public static <Document extends TimelineDocument>
       DocumentStoreReader<Document> createDocumentStoreReader(
           Configuration conf) throws YarnException {
+    // 从配置中获取文档存储供应商类型
     final DocumentStoreVendor storeType = getStoreVendor(conf);
     switch (storeType) {
     case COSMOS_DB:
+      // 验证Azure Cosmos DB配置合法性
       DocumentStoreUtils.validateCosmosDBConf(conf);
       return new CosmosDBDocumentStoreReader<>(conf);
     default:

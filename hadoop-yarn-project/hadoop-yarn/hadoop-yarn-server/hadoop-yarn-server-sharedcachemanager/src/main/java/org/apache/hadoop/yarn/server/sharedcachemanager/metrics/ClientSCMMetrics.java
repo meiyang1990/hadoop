@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,8 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class is for maintaining  client requests metrics
- * and publishing them through the metrics interfaces.
+ * 维护共享缓存管理器(SCM)客户端请求指标，并通过Hadoop指标系统对外发布
  */
 @Private
 @Unstable
@@ -47,10 +47,18 @@ public class ClientSCMMetrics {
     LOG.debug("Initialized {}", registry);
   }
   
+  /**
+   * 获取ClientSCMMetrics单例实例
+   * @return ClientSCMMetrics单例对象
+   */
   public static ClientSCMMetrics getInstance() {
     return INSTANCE;
   }
 
+  /**
+   * 创建ClientSCMMetrics实例并注册到默认指标系统
+   * @return 初始化完成的ClientSCMMetrics实例
+   */
   static ClientSCMMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
 
@@ -64,21 +72,21 @@ public class ClientSCMMetrics {
   @Metric("Number of cache releases") MutableCounterLong cacheReleases;
 
   /**
-   * One cache hit event
+   * 缓存命中计数加1
    */
   public void incCacheHitCount() {
     cacheHits.incr();
   }
 
   /**
-   * One cache miss event
+   * 缓存未命中计数加1
    */
   public void incCacheMissCount() {
     cacheMisses.incr();
   }
 
   /**
-   * One cache release event
+   * 缓存释放计数加1
    */
   public void incCacheRelease() {
     cacheReleases.incr();

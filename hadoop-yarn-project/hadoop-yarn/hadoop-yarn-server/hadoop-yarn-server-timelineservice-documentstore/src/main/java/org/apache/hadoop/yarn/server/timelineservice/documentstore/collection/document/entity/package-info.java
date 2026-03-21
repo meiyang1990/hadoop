@@ -1,10 +1,11 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
+ * "License"); you may not use this except in compliance
  * with the License.  You may obtain a copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
@@ -17,10 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.
- * documentstore.collection.document.entity contains
- * TimelineEntityDocument that will be common to different TimelineEntity i.e
- * Application, App Attempt, Container etc.
+ * 时间线服务文档存储的实体文档包，提供通用的时间线实体文档基础结构，
+ * 可被应用、应用尝试、容器等不同时间线实体复用。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

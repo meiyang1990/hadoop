@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,17 +27,17 @@ import org.apache.hadoop.hbase.client.BufferedMutator;
 import org.apache.hadoop.hbase.client.Mutation;
 
 /**
- * To be used to wrap an actual {@link BufferedMutator} in a type safe manner.
+ * YARN时间线服务HBase存储层，泛型类型安全的BufferedMutator包装类，将底层HBase的写入器与具体表类型绑定，保证类型安全。
  *
- * @param <T> The class referring to the table to be written to.
+ * @param <T> 指代要写入的HBase表的类型，必须继承自BaseTable
  */
 public class TypedBufferedMutator<T extends BaseTable<T>> {
 
   private final BufferedMutator bufferedMutator;
 
   /**
-   * @param bufferedMutator the mutator to be wrapped for delegation. Shall not
-   *          be null.
+   * 构造方法，包装底层HBase的BufferedMutator实现。
+   * @param bufferedMutator 用于委托操作的底层BufferedMutator实例，不可为null
    */
   public TypedBufferedMutator(BufferedMutator bufferedMutator) {
     this.bufferedMutator = bufferedMutator;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,33 +32,48 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * This is a generic class which contains all the meta information of some
- * conceptual entity and its related events. The timeline entity can be an
- * application, an attempt, a container or whatever the user-defined object.
+ * 文档存储时间线服务中，表示时间线实体的文档模型，包含一个概念实体及其关联事件的全部元信息。
+ * 时间线实体可以是应用、尝试、容器或用户自定义对象。
  */
 public class TimelineEntityDocument implements
     TimelineDocument<TimelineEntityDocument> {
 
+  // 原始时间线实体对象
   private final TimelineEntity timelineEntity;
+  // 时间线上下文，包含流、用户等层级标识信息
   private TimelineContext context;
+  // 工作流版本
   private String flowVersion;
+  // 子应用用户名
   private String subApplicationUser;
+  // 按指标ID分组存储的指标子文档集合
   private final Map<String, Set<TimelineMetricSubDoc>>
       metrics = new HashMap<>();
+  // 按事件ID分组存储的事件子文档集合
   private final Map<String, Set<TimelineEventSubDoc>>
       events = new HashMap<>();
 
+  /**
+   * 构造空时间线实体文档。
+   */
   public TimelineEntityDocument() {
     timelineEntity = new TimelineEntity();
   }
 
+  /**
+   * 基于原始时间线实体构造文档对象，自动转换指标和事件为文档子结构。
+   * @param timelineEntity 原始时间线实体
+   */
   public TimelineEntityDocument(TimelineEntity timelineEntity) {
     this.timelineEntity = timelineEntity;
     transformEvents(timelineEntity.getEvents());
     timelineMetrics(timelineEntity.getMetrics());
   }
 
-  // transforms TimelineMetric to TimelineMetricSubDoc
+  /**
+   * 将原始指标集合转换为文档存储用的指标子文档结构，按指标ID分组存储。
+   * @param timelineMetrics 原始指标集合
+   */
   private void timelineMetrics(Set<TimelineMetric> timelineMetrics) {
     for (TimelineMetric timelineMetric : timelineMetrics) {
       if (this.metrics.containsKey(timelineMetric.getId())) {
@@ -71,7 +87,10 @@ public class TimelineEntityDocument implements
     }
   }
 
-  // transforms TimelineEvent to TimelineEventSubDoc
+  /**
+   * 将原始事件集合转换为文档存储用的事件子文档结构，按事件ID分组存储。
+   * @param timelineEvents 原始事件集合
+   */
   private void transformEvents(Set<TimelineEvent> timelineEvents) {
     for (TimelineEvent timelineEvent : timelineEvents) {
       if (this.events.containsKey(timelineEvent.getId())) {
@@ -86,11 +105,9 @@ public class TimelineEntityDocument implements
   }
 
   /**
-   * Merge the TimelineEntityDocument that is passed with the current
-   * document for upsert.
+   * 将传入的文档合并到当前文档，用于upsert操作，合并所有字段信息。
    *
-   * @param newTimelineDocument
-   *          that has to be merged
+   * @param newTimelineDocument 需要合并的新文档
    */
   @Override
   public void merge(TimelineEntityDocument newTimelineDocument) {
@@ -125,6 +142,7 @@ public class TimelineEntityDocument implements
   }
 
   public Map<String, Object> getInfo() {
+    // 添加实体ID到信息中供查询使用
     timelineEntity.getInfo().put(TimelineReaderUtils.FROMID_KEY, getId());
     return timelineEntity.getInfo();
   }
@@ -137,6 +155,10 @@ public class TimelineEntityDocument implements
     return metrics;
   }
 
+  /**
+   * 合并传入的指标集合到当前文档，同时更新原始时间线实体。
+   * @param metrics 需要合并的指标集合
+   */
   public void setMetrics(Map<String, Set<TimelineMetricSubDoc>> metrics) {
     for (Map.Entry<String, Set<TimelineMetricSubDoc>> metricEntry :
         metrics.entrySet()) {
@@ -158,6 +180,10 @@ public class TimelineEntityDocument implements
     return events;
   }
 
+  /**
+   * 合并传入的事件集合到当前文档，同时更新原始时间线实体。
+   * @param events 需要合并的事件集合
+   */
   public void setEvents(Map<String, Set<TimelineEventSubDoc>> events) {
     for (Map.Entry<String, Set<TimelineEventSubDoc>> eventEntry :
         events.entrySet()) {
@@ -244,6 +270,10 @@ public class TimelineEntityDocument implements
     this.context = context;
   }
 
+  /**
+   * 获取封装的原始时间线实体对象。
+   * @return 原始时间线实体
+   */
   public TimelineEntity fetchTimelineEntity() {
     return timelineEntity;
   }

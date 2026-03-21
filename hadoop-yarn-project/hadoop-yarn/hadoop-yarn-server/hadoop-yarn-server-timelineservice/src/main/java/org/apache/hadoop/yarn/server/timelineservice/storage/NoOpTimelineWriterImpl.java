@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,9 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * Stub based implementation for TimelineWriter. This implementation will
- * not provide a complete implementation of all the necessary features. This
- * implementation is provided solely for basic testing purposes.
+ * 空操作时间线写入器实现，是TimelineWriter接口的桩实现，不实现真实存储功能，仅用于基础测试场景。
  */
 
 public class NoOpTimelineWriterImpl extends AbstractService implements
@@ -41,6 +40,9 @@ public class NoOpTimelineWriterImpl extends AbstractService implements
   private static final Logger LOG =
           LoggerFactory.getLogger(NoOpTimelineWriterImpl.class);
 
+  /**
+   * 构造空操作时间线写入器，打印配置提示日志。
+   */
   public NoOpTimelineWriterImpl() {
     super(NoOpTimelineWriterImpl.class.getName());
     LOG.info("NoOpTimelineWriter is configured. All the writes to the backend" +

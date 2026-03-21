@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,32 +26,29 @@ import java.util.Set;
 import java.util.SortedSet;
 
 /**
- * Plugin to map a requested query ( or an Entity/set of Entities ) to a CacheID.
- * The Cache ID is an identifier to the data set that needs to be queried to
- * serve the response for the query.
+ * 时间线实体分组插件抽象基类，将用户查询请求映射到对应的缓存分组ID，
+ * 缓存分组ID标识需要扫描查询的目标数据集，用于服务时间线数据查询请求。
  */
 public abstract class TimelineEntityGroupPlugin {
 
   /**
-   * Get the {@link TimelineEntityGroupId}s for the data sets that need to be
-   * scanned to serve the query.
+   * 根据过滤条件获取需要扫描的时间线实体分组ID集合，用于条件查询场景。
    *
-   * @param entityType Entity Type being queried
-   * @param primaryFilter Primary filter being applied
-   * @param secondaryFilters Secondary filters being applied in the query
-   * @return {@link org.apache.hadoop.yarn.api.records.timeline.TimelineEntityGroupId}
+   * @param entityType 待查询的实体类型
+   * @param primaryFilter 应用的主过滤条件
+   * @param secondaryFilters 应用的二级过滤条件集合
+   * @return 需要扫描的时间线实体分组ID集合
    */
   public abstract Set<TimelineEntityGroupId> getTimelineEntityGroupId(
       String entityType, NameValuePair primaryFilter,
       Collection<NameValuePair> secondaryFilters);
 
   /**
-   * Get the {@link TimelineEntityGroupId}s for the data sets that need to be
-   * scanned to serve the query.
+   * 根据单个实体获取需要扫描的时间线实体分组ID集合，用于单实体查询场景。
    *
-   * @param entityType Entity Type being queried
-   * @param entityId Entity Id being requested
-   * @return {@link org.apache.hadoop.yarn.api.records.timeline.TimelineEntityGroupId}
+   * @param entityId 待查询的实体ID
+   * @param entityType 待查询的实体类型
+   * @return 需要扫描的时间线实体分组ID集合
    */
   public abstract Set<TimelineEntityGroupId> getTimelineEntityGroupId(
       String entityId,
@@ -58,13 +56,12 @@ public abstract class TimelineEntityGroupPlugin {
 
 
   /**
-   * Get the {@link TimelineEntityGroupId}s for the data sets that need to be
-   * scanned to serve the query.
+   * 根据多个实体ID和事件类型获取需要扫描的时间线实体分组ID集合，用于多实体批量查询场景。
    *
-   * @param entityType Entity Type being queried
-   * @param entityIds Entity Ids being requested
-   * @param eventTypes Event Types being requested
-   * @return {@link org.apache.hadoop.yarn.api.records.timeline.TimelineEntityGroupId}
+   * @param entityType 待查询的实体类型
+   * @param entityIds 待查询的实体ID有序集合
+   * @param eventTypes 待查询的事件类型集合
+   * @return 需要扫描的时间线实体分组ID集合
    */
   public abstract Set<TimelineEntityGroupId> getTimelineEntityGroupId(
       String entityType, SortedSet<String> entityIds,

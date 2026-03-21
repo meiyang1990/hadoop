@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.documentstore.writer
- * contains the implementation of different DocumentStore writer clients
- * for DocumentVendor.
+ * 时间线服务文档存储写入器包，提供针对不同文档数据库厂商的文档存储写入客户端实现。
+ * 负责将时间线服务产生的应用指标、流数据写入到文档型存储中持久化。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,15 +33,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The service wrapper of {@link TimelineV2DelegationTokenSecretManager}.
+ * Timeline V2 时间线服务的委托令牌密钥管理器服务包装类，为 ATSv2 提供委托令牌管理的服务封装。
  */
 public class TimelineV2DelegationTokenSecretManagerService extends
     TimelineDelgationTokenSecretManagerService {
 
+  /**
+   * 构造 Timeline V2 委托令牌密钥管理器服务实例。
+   */
   public TimelineV2DelegationTokenSecretManagerService() {
     super(TimelineV2DelegationTokenSecretManagerService.class.getName());
   }
 
+  /**
+   * 创建 Timeline V2 版本的委托令牌密钥管理器实例。
+   * @param secretKeyInterval 密钥滚动更新间隔（毫秒）
+   * @param tokenMaxLifetime 委托令牌最大生命周期（毫秒）
+   * @param tokenRenewInterval 委托令牌必须更新的间隔（毫秒）
+   * @param tokenRemovalScanInterval 扫描过期令牌的间隔（毫秒）
+   * @return 初始化完成的 Timeline V2 委托令牌密钥管理器
+   */
   @Override
   protected AbstractDelegationTokenSecretManager
       <TimelineDelegationTokenIdentifier>
@@ -51,24 +63,43 @@ public class TimelineV2DelegationTokenSecretManagerService extends
         tokenMaxLifetime, tokenRenewInterval, tokenRemovalScanInterval);
   }
 
+  /**
+   * 为指定用户生成新的 Timeline V2 委托令牌。
+   * @param ugi 用户信息对象
+   * @param renewer 允许更新此令牌的用户
+   * @return 生成完成的委托令牌
+   */
   public Token<TimelineDelegationTokenIdentifier> generateToken(
       UserGroupInformation ugi, String renewer) {
     return ((TimelineV2DelegationTokenSecretManager)
         getTimelineDelegationTokenSecretManager()).generateToken(ugi, renewer);
   }
 
+  /**
+   * 更新指定 Timeline 委托令牌，延长其有效期。
+   * @param token 待更新的委托令牌
+   * @param renewer 请求更新的用户名
+   * @return 更新后令牌的过期时间戳
+   * @throws IOException 更新过程中发生 I/O 错误
+   */
   public long renewToken(Token<TimelineDelegationTokenIdentifier> token,
       String renewer) throws IOException {
     return getTimelineDelegationTokenSecretManager().renewToken(token, renewer);
   }
 
+  /**
+   * 取消指定 Timeline 委托令牌，使其立即失效。
+   * @param token 待取消的委托令牌
+   * @param canceller 请求取消的用户名
+   * @throws IOException 取消过程中发生 I/O 错误
+   */
   public void cancelToken(Token<TimelineDelegationTokenIdentifier> token,
       String canceller) throws IOException {
     getTimelineDelegationTokenSecretManager().cancelToken(token, canceller);
   }
 
   /**
-   * Delegation token secret manager for ATSv2.
+   * Timeline V2 时间线服务专用的委托令牌密钥管理器，负责 ATSv2 委托令牌的生成、更新、过期管理。
    */
   @Private
   @Unstable
@@ -79,15 +110,11 @@ public class TimelineV2DelegationTokenSecretManagerService extends
         LoggerFactory.getLogger(TimelineV2DelegationTokenSecretManager.class);
 
     /**
-     * Create a timeline v2 secret manager.
-     * @param delegationKeyUpdateInterval the number of milliseconds for rolling
-     *        new secret keys.
-     * @param delegationTokenMaxLifetime the maximum lifetime of the delegation
-     *        tokens in milliseconds
-     * @param delegationTokenRenewInterval how often the tokens must be renewed
-     *        in milliseconds
-     * @param delegationTokenRemoverScanInterval how often the tokens are
-     *        scanned for expired tokens in milliseconds
+     * 创建 Timeline V2 委托令牌密钥管理器实例。
+     * @param delegationKeyUpdateInterval 密钥滚动更新间隔（毫秒）
+     * @param delegationTokenMaxLifetime 委托令牌最大生命周期（毫秒）
+     * @param delegationTokenRenewInterval 委托令牌必须更新的间隔（毫秒）
+     * @param delegationTokenRemoverScanInterval 扫描过期令牌的间隔（毫秒）
      */
     public TimelineV2DelegationTokenSecretManager(
         long delegationKeyUpdateInterval, long delegationTokenMaxLifetime,
@@ -97,16 +124,25 @@ public class TimelineV2DelegationTokenSecretManagerService extends
           delegationTokenRenewInterval, delegationTokenRemoverScanInterval);
     }
 
+    /**
+     * 为指定用户生成 Timeline V2 委托令牌。
+     * @param ugi 用户信息对象，包含当前用户以及代理真实用户信息
+     * @param renewer 允许更新此令牌的用户
+     * @return 生成完成的委托令牌实例
+     */
     public Token<TimelineDelegationTokenIdentifier> generateToken(
         UserGroupInformation ugi, String renewer) {
+      // 保存代理的真实用户信息（如果存在）
       Text realUser = null;
       if (ugi.getRealUser() != null) {
         realUser = new Text(ugi.getRealUser().getUserName());
       }
+      // 创建令牌标识符并填充权限信息
       TimelineDelegationTokenIdentifier identifier = createIdentifier();
       identifier.setOwner(new Text(ugi.getUserName()));
       identifier.setRenewer(new Text(renewer));
       identifier.setRealUser(realUser);
+      // 根据标识符生成密钥密码，组装为完整令牌返回
       byte[] password = createPassword(identifier);
       return new Token<TimelineDelegationTokenIdentifier>(identifier.getBytes(),
           password, identifier.getKind(), null);
@@ -117,6 +153,11 @@ public class TimelineV2DelegationTokenSecretManagerService extends
       return new TimelineDelegationTokenIdentifier();
     }
 
+    /**
+     * 令牌过期时的日志记录，打印过期令牌信息。
+     * @param ident 过期的令牌标识符
+     * @throws IOException 记录过程中发生 I/O 错误
+     */
     @Override
     protected void logExpireToken(TimelineDelegationTokenIdentifier ident)
         throws IOException {

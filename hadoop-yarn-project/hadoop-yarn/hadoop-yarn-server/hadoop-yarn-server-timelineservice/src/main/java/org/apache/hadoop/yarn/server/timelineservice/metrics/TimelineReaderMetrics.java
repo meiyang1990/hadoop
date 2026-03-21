@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,33 +31,45 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
 /**
- * Metrics class for TimelineReader.
+ * 时间线读取器的指标统计类，用于收集时间线服务读取操作的性能指标。
  */
 @Metrics(about = "Metrics for timeline reader", context = "timelineservice")
 final public class TimelineReaderMetrics {
 
+  // 时间线读取器指标元信息定义
   private final static MetricsInfo METRICS_INFO = info("TimelineReaderMetrics",
       "Metrics for TimelineReader");
+  // 标记单例是否已初始化，保证线程安全
   private static AtomicBoolean isInitialized = new AtomicBoolean(false);
+  // 单例实例
   private static TimelineReaderMetrics instance = null;
 
+  /** 查询实体失败延迟分位数统计 */
   @Metric(about = "GET entities failure latency", valueName = "latency")
   private MutableQuantiles getEntitiesFailureLatency;
+  /** 查询实体成功延迟分位数统计 */
   @Metric(about = "GET entities success latency", valueName = "latency")
   private MutableQuantiles getEntitiesSuccessLatency;
 
+  /** 查询实体类型失败延迟分位数统计 */
   @Metric(about = "GET entity types failure latency", valueName = "latency")
   private MutableQuantiles getEntityTypesFailureLatency;
+  /** 查询实体类型成功延迟分位数统计 */
   @Metric(about = "GET entity types success latency", valueName = "latency")
   private MutableQuantiles getEntityTypesSuccessLatency;
 
   private TimelineReaderMetrics() {
   }
 
+  /**
+   * 获取TimelineReaderMetrics单例实例，懒加载初始化。
+   * @return 单例实例
+   */
   public static TimelineReaderMetrics getInstance() {
     if (!isInitialized.get()) {
       synchronized (TimelineReaderMetrics.class) {
         if (instance == null) {
+          // 向默认指标系统注册当前指标实例
           instance =
               DefaultMetricsSystem.initialize("TimelineService").register(
                   METRICS_INFO.name(), METRICS_INFO.description(),
@@ -68,6 +81,9 @@ final public class TimelineReaderMetrics {
     return instance;
   }
 
+  /**
+   * 销毁单例实例，重置初始化状态。
+   */
   public synchronized static void destroy() {
     isInitialized.set(false);
     instance = null;
@@ -93,6 +109,11 @@ final public class TimelineReaderMetrics {
     return getEntityTypesFailureLatency;
   }
 
+  /**
+   * 添加查询实体操作的延迟记录，按成功/失败分类统计。
+   * @param durationMs 操作耗时，单位毫秒
+   * @param succeeded 操作是否成功
+   */
   public void addGetEntitiesLatency(
       long durationMs, boolean succeeded) {
     if (succeeded) {
@@ -102,6 +123,11 @@ final public class TimelineReaderMetrics {
     }
   }
 
+  /**
+   * 添加查询实体类型操作的延迟记录，按成功/失败分类统计。
+   * @param durationMs 操作耗时，单位毫秒
+   * @param succeeded 操作是否成功
+   */
   public void addGetEntityTypesLatency(
       long durationMs, boolean succeeded) {
     if (succeeded) {

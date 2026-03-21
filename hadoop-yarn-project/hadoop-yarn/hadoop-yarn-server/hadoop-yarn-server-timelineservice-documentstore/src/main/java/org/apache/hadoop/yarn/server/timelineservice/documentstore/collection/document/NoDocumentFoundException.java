@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,15 +24,13 @@ import org.apache.hadoop.yarn.server.timelineservice.documentstore.lib.DocumentS
 import java.io.IOException;
 
 /**
- * Indicates that the document that was requested is not found from the
- * Document Store. This is a generic exception that will be thrown for all
- * the {@link DocumentStoreVendor} if there is no document while reading.
+ * 文档存储服务中未找到请求文档时抛出的异常，对所有类型的文档存储提供商通用，读取文档不存在时触发。
  */
 public class NoDocumentFoundException extends IOException {
 
   /**
-   * Constructs exception with the specified detail message.
-   * @param message detailed message.
+   * 用指定的详细信息构造异常实例。
+   * @param message 异常详细信息
    */
   public NoDocumentFoundException(String message) {
     super(message);

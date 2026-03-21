@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,11 +17,8 @@
  * limitations under the License.
  */
 
-
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.
- * documentstore.collection contains different collection types
- * for storing documents.
+ * 时间线服务文档存储集合包，提供不同类型的文档集合实现，用于存储各类时间线文档数据。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

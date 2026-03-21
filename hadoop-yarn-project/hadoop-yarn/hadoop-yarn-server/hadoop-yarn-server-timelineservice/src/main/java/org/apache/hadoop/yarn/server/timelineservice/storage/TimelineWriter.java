@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,78 +32,58 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineWriteResponse;
 import org.apache.hadoop.yarn.server.timelineservice.collector.TimelineCollectorContext;
 
 /**
- * This interface is for storing application timeline information.
+ * 时间线服务写入存储层接口，定义了时间线数据持久化的统一操作规范。
+ * 负责处理应用时间线信息的写入、聚合、刷新和健康检查操作，不同存储后端实现该接口提供存储能力。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface TimelineWriter extends Service {
 
   /**
-   * Stores the entire information in {@link TimelineEntities} to the timeline
-   * store. Any errors occurring for individual write request objects will be
-   * reported in the response.
+   * 将一组时间线实体数据写入底层存储，单条写入错误会返回在响应中不影响整体操作。
    *
-   * @param context a {@link TimelineCollectorContext}
-   * @param data a {@link TimelineEntities} object.
-   * @param callerUgi {@link UserGroupInformation}.
-   * @return a {@link TimelineWriteResponse} object.
-   * @throws IOException if there is any exception encountered while storing or
-   *           writing entities to the back end storage.
+   * @param context 时间线收集器上下文，包含流、应用等上下文信息
+   * @param data 待写入的时间线实体集合
+   * @param callerUgi 调用者用户信息，用于权限检查
+   * @return 写入响应，包含写入结果和错误信息
+   * @throws IOException 写入底层存储时遇到IO异常
    */
   TimelineWriteResponse write(TimelineCollectorContext context,
       TimelineEntities data, UserGroupInformation callerUgi) throws IOException;
 
   /**
-   * Stores {@link TimelineDomain} object to the timeline
-   * store. Any errors occurring for individual write request objects will be
-   * reported in the response.
+   * 将单个时间线域信息写入底层存储，写入错误会返回在响应中。
    *
-   * @param context a {@link TimelineCollectorContext}
-   * @param domain a {@link TimelineDomain} object.
-   * @return a {@link TimelineWriteResponse} object.
-   * @throws IOException if there is any exception encountered while storing or
-   *           writing entities to the back end storage.
+   * @param context 时间线收集器上下文，包含流、应用等上下文信息
+   * @param domain 待写入的时间线域对象
+   * @return 写入响应，包含写入结果和错误信息
+   * @throws IOException 写入底层存储时遇到IO异常
    */
   TimelineWriteResponse write(TimelineCollectorContext context,
       TimelineDomain domain) throws IOException;
 
   /**
-   * Aggregates the entity information to the timeline store based on which
-   * track this entity is to be rolled up to The tracks along which aggregations
-   * are to be done are given by {@link TimelineAggregationTrack}
+   * 按指定聚合维度对时间线实体信息进行聚合写入，当前未实际使用，所有实现均返回null。
    *
-   * Any errors occurring for individual write request objects will be reported
-   * in the response.
-   *<p>
-   * This is not invoked anywhere, tested and all implementations return null.
-   *
-   * @param data
-   *          a {@link TimelineEntity} object
-   *          a {@link TimelineAggregationTrack} enum
-   *          value.
-   * @param track Specifies the track or dimension along which aggregation would
-   *     occur. Includes USER, FLOW, QUEUE, etc.
-   * @return a {@link TimelineWriteResponse} object. All implementations return null.
-   * @throws IOException if there is any exception encountered while aggregating
-   *     entities to the backend storage.
+   * @param data 待聚合的时间线实体对象
+   * @param track 聚合维度轨道，指定按哪个维度聚合（如用户、流、队列等）
+   * @return 聚合写入响应，所有实现均返回null
+   * @throws IOException 聚合写入底层存储时遇到IO异常
    */
   TimelineWriteResponse aggregate(TimelineEntity data,
       TimelineAggregationTrack track) throws IOException;
 
   /**
-   * Flushes the data to the backend storage. Whatever may be buffered will be
-   * written to the storage when the method returns. This may be a potentially
-   * time-consuming operation, and should be used judiciously.
+   * 将缓冲区中的所有数据刷新写入到底层存储，可能会耗时较长需谨慎调用。
    *
-   * @throws IOException if there is any exception encountered while flushing
-   *     entities to the backend storage.
+   * @throws IOException 刷新数据到后端存储时遇到IO异常
    */
   void flush() throws IOException;
 
   /**
-   * Check if writer connection is working properly.
+   * 检查写入器与底层存储的连接健康状态。
    *
-   * @return True if writer connection works as expected, false otherwise.
+   * @return 时间线健康状态，包含连接是否正常的信息
    */
   TimelineHealth getHealthStatus();
 

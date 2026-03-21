@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,52 +31,53 @@ import org.apache.hadoop.yarn.server.timelineservice.reader.filter.TimelineFilte
 import org.apache.hadoop.yarn.server.timelineservice.reader.filter.TimelineFilterList.Operator;
 
 /**
- * Abstract class for parsing compare expressions.
- * Compare expressions are of the form :
- * (&lt;key&gt; &lt;compareop&gt; &lt;value&gt;) &lt;op&gt; (&lt;key
- * &gt; &lt;compareop&gt; &lt;value&gt;)
- * compareop is used to compare value of a the specified key in the backend
- * storage. compareop can be :
- * 1. eq - Equals
- * 2. ne - Not equals (matches if key does not exist)
- * 3. ene - Exists and not equals (key must exist for match to occur)
- * 4. lt - Less than
- * 5. gt - Greater than
- * 6. le - Less than or equals
- * 7. ge - Greater than or equals
- * compareop's supported would depend on implementation. For instance, all
- * the above compareops' will be supported for metric filters but only eq,ne and
- * ene would be supported for KV filters like config/info filters.
- *
- * op is a logical operator and can be either AND or OR.
- *
- * The way values will be interpreted would also depend on implementation
- *
- * A typical compare expression would look as under:
- * ((key1 eq val1 OR key2 ne val2) AND (key5 gt val45))
+ * 时间线比较表达式解析抽象基类，负责将用户输入的比较表达式字符串解析为 TimelineFilter 过滤器树
+ * 比较表达式格式：(key 比较符 value) 逻辑运算符 (key 比较符 value)
+ * 比较符支持：等于(eq)、不等于(ne，键不存在也匹配)、存在且不等于(ene)、小于(lt)、大于(gt)、小于等于(le)、大于等于(ge)
+ * 逻辑运算符支持：AND、OR
  */
 @Private
 @Unstable
 abstract class TimelineParserForCompareExpr implements TimelineParser {
+  /**
+   * 解析状态枚举，标记当前解析到表达式的哪个部分
+   */
   private enum ParseState {
+    /** 正在解析键 */
     PARSING_KEY,
+    /** 正在解析值 */
     PARSING_VALUE,
+    /** 正在解析逻辑运算符 */
     PARSING_OP,
+    /** 正在解析比较运算符 */
     PARSING_COMPAREOP
   }
-  // Main expression.
+  // 原始表达式字符串
   private final String expr;
-  // Expression in lower case.
+  // 转换为小写的表达式字符串，用于不区分大小写的比较符/运算符匹配
   private final String exprInLowerCase;
+  // 表达式名称，用于错误日志标识
   private final String exprName;
+  // 当前解析偏移量
   private int offset = 0;
+  // 当前键/值段开始偏移量
   private int kvStartOffset = 0;
+  // 表达式总长度
   private final int exprLength;
+  // 当前解析状态
   private ParseState currentParseState = ParseState.PARSING_KEY;
-  // Linked list implemented as a stack.
+  // 过滤器列表栈，用于处理嵌套括号，保存外层逻辑运算符列表
   private Deque<TimelineFilterList> filterListStack = new LinkedList<>();
+  // 当前正在构建的比较过滤器
   private TimelineFilter currentFilter = null;
+  // 当前正在构建的过滤器列表（逻辑分组）
   private TimelineFilterList filterList = null;
+
+  /**
+   * 构造比较表达式解析器
+   * @param expression 待解析的表达式字符串
+   * @param name 表达式名称，用于错误标识
+   */
   public TimelineParserForCompareExpr(String expression, String name) {
     if (expression != null) {
       expr = expression.trim();
@@ -97,17 +99,41 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
     return filterList;
   }
 
+  /**
+   * 创建具体类型的过滤器，由子类实现
+   * @return 新建的过滤器实例
+   */
   protected abstract TimelineFilter createFilter();
 
+  /**
+   * 解析字符串形式的值为具体类型，由子类实现
+   * @param strValue 字符串值
+   * @return 解析后的对象
+   * @throws TimelineParseException 解析失败抛出异常
+   */
   protected abstract Object parseValue(String strValue)
       throws TimelineParseException;
 
+  /**
+   * 将比较运算符设置到当前过滤器，由子类实现
+   * @param compareOp 比较运算符
+   * @param keyMustExistFlag 键是否必须存在才能匹配
+   * @throws TimelineParseException 设置失败抛出异常
+   */
   protected abstract void setCompareOpToCurrentFilter(
       TimelineCompareOp compareOp, boolean keyMustExistFlag)
       throws TimelineParseException;
 
+  /**
+   * 将解析后的值设置到当前过滤器，由子类实现
+   * @param value 解析后的值
+   */
   protected abstract void setValueToCurrentFilter(Object value);
 
+  /**
+   * 处理空格字符，根据当前解析状态提取键或值
+   * @throws TimelineParseException 解析错误抛出异常
+   */
   private void handleSpaceChar() throws TimelineParseException {
     if (currentParseState == ParseState.PARSING_KEY ||
         currentParseState == ParseState.PARSING_VALUE) {
@@ -133,6 +159,10 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
     offset++;
   }
 
+  /**
+   * 处理左括号，保存当前过滤器列表到栈，开始新的嵌套分组
+   * @throws TimelineParseException 位置错误抛出异常
+   */
   private void handleOpeningBracketChar() throws TimelineParseException {
     if (currentParseState != ParseState.PARSING_KEY) {
       throw new TimelineParseException("Encountered unexpected opening " +
@@ -144,6 +174,10 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
     filterList = null;
   }
 
+  /**
+   * 处理右括号，结束当前嵌套分组，将当前分组合并到外层过滤器列表
+   * @throws TimelineParseException 括号不匹配或位置错误抛出异常
+   */
   private void handleClosingBracketChar() throws TimelineParseException {
     if (currentParseState != ParseState.PARSING_VALUE &&
         currentParseState != ParseState.PARSING_OP) {
@@ -159,8 +193,7 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
       if (currentFilter != null) {
         filterList.addFilter(currentFilter);
       }
-      // As bracket is closing, pop the filter list from top of the stack and
-      // combine it with current filter list.
+      // 弹出栈中保存的外层过滤器列表，将当前分组添加到外层
       TimelineFilterList fList = filterListStack.pop();
       if (fList != null) {
         fList.addFilter(filterList);
@@ -175,6 +208,10 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
     }
   }
 
+  /**
+   * 解析比较运算符，识别不同的比较操作符并设置到当前过滤器
+   * @throws TimelineParseException 无法识别运算符抛出异常
+   */
   private void parseCompareOp() throws TimelineParseException {
     if (offset + 2 >= exprLength) {
       throw new TimelineParseException("Compare op cannot be parsed for " +
@@ -199,7 +236,7 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
       }
       offset = offset + 3;
     } else if (exprInLowerCase.startsWith("ene ", offset)) {
-      // Not equal but key should be present.
+      // 不等比较，但要求键必须存在
       compareOp = TimelineCompareOp.NOT_EQUAL;
       offset = offset + 4;
     }
@@ -212,6 +249,11 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
     currentParseState = ParseState.PARSING_VALUE;
   }
 
+  /**
+   * 解析逻辑运算符（AND/OR），处理过滤器分组
+   * @param closingBracket 是否刚处理完右括号
+   * @throws TimelineParseException 无法识别运算符抛出异常
+   */
   private void parseOp(boolean closingBracket) throws TimelineParseException {
     Operator operator = null;
     if (exprInLowerCase.startsWith("or ", offset)) {
@@ -239,6 +281,11 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
     currentParseState = ParseState.PARSING_KEY;
   }
 
+  /**
+   * 执行表达式解析，生成过滤器树
+   * @return 解析完成的根过滤器列表
+   * @throws TimelineParseException 解析错误抛出异常
+   */
   @Override
   public TimelineFilterList parse() throws TimelineParseException {
     if (expr == null || exprLength == 0) {
@@ -258,15 +305,15 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
         handleClosingBracketChar();
         closingBracket = true;
         break;
-      default: // other characters.
-        // Parse based on state.
+      default: // 其他字符
+        // 根据当前状态处理
         if (currentParseState == ParseState.PARSING_COMPAREOP) {
           parseCompareOp();
         } else if (currentParseState == ParseState.PARSING_OP) {
           parseOp(closingBracket);
           closingBracket = false;
         } else {
-          // Might be a key or value. Move ahead.
+          // 键或值的一部分，继续偏移
           offset++;
         }
         break;
@@ -294,6 +341,9 @@ abstract class TimelineParserForCompareExpr implements TimelineParser {
     return filterList;
   }
 
+  /**
+   * 清理解析过程中的临时数据，释放资源
+   */
   @Override
   public void close() {
     if (filterListStack != null) {

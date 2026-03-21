@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,7 +20,7 @@
 package org.apache.hadoop.yarn.server.timelineservice.reader;
 
 /**
- * Set of constants used while parsing filter expressions.
+ * 时间线服务过滤器表达式解析过程中使用的常量定义类
  */
 final class TimelineParseConstants {
   private TimelineParseConstants() {

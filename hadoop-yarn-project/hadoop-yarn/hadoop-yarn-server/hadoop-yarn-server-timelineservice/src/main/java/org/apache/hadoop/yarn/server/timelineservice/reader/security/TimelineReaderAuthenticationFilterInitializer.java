@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -5,7 +6,7 @@
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * with the License.  You may obtain copy of the License at
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -24,29 +25,24 @@ import org.apache.hadoop.security.authentication.server.AuthenticationFilter;
 import org.apache.hadoop.yarn.server.timeline.security.TimelineAuthenticationFilterInitializer;
 
 /**
- * Filter initializer to initialize {@link AuthenticationFilter}
- * for ATSv2 timeline reader server with timeline service specific
- * configurations.
+ * 文件说明：时间线服务v2读取器Web服务的认证过滤器初始化器
+ * 核心功能：为时间线读取器HTTP服务初始化Hadoop认证过滤器，加载时间线服务专属配置
  */
 public class TimelineReaderAuthenticationFilterInitializer extends
     TimelineAuthenticationFilterInitializer{
 
   /**
-   * Initializes {@link AuthenticationFilter}
-   * <p>
-   * Propagates to {@link AuthenticationFilter} configuration all
-   * YARN configuration properties prefixed with
-   * {@value
-   *   org.apache.hadoop.yarn.conf.YarnConfiguration#TIMELINE_HTTP_AUTH_PREFIX}.
-   *
-   * @param container
-   *          The filter container
-   * @param conf
-   *          Configuration for run-time parameters
+   * 初始化时间线读取器HTTP认证过滤器
+   * 把YARN配置中前缀为TIMELINE_HTTP_AUTH_PREFIX的配置传递给认证过滤器，并注册到全局过滤器容器
+   * 
+   * @param container 过滤器容器，用于注册全局过滤器
+   * @param conf YARN运行时配置
    */
   @Override
   public void initFilter(FilterContainer container, Configuration conf) {
+    // 加载并构建认证过滤器配置
     setAuthFilterConfig(conf);
+    // 将认证过滤器注册到容器，用于时间线读取器HTTP请求认证
     container.addGlobalFilter("Timeline Reader Authentication Filter",
         AuthenticationFilter.class.getName(),
         getFilterConfig());

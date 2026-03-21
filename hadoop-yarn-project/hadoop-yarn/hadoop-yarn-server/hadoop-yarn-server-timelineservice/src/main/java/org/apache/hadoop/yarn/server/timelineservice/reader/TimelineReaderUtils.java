@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,40 +28,39 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Set of utility methods to be used across timeline reader.
+ * 时间线读取器通用工具类，提供字符串分割、转义和拼接等通用工具方法，供时间线读取模块各处使用
  */
 public final class TimelineReaderUtils {
   private TimelineReaderUtils() {
   }
 
   /**
-   * Default delimiter for joining strings.
+   * 字符串拼接默认分隔符
    */
   @VisibleForTesting
   public static final char DEFAULT_DELIMITER_CHAR = '!';
 
   /**
-   * Default escape character used for joining strings.
+   * 字符串转义默认转义字符
    */
   @VisibleForTesting
   public static final char DEFAULT_ESCAPE_CHAR = '*';
 
+  /**
+   * 分页起始ID查询参数键名
+   */
   public static final String FROMID_KEY = "FROM_ID";
 
   @VisibleForTesting
   public static final String UID_KEY = "UID";
 
   /**
-   * Split the passed string along the passed delimiter character while looking
-   * for escape char to interpret the splitted parts correctly. For delimiter or
-   * escape character to be interpreted as part of the string, they have to be
-   * escaped by putting an escape character in front.
-   * @param str string to be split.
-   * @param delimiterChar delimiter used for splitting.
-   * @param escapeChar delimiter and escape character will be escaped using this
-   *     character.
-   * @return a list of strings after split.
-   * @throws IllegalArgumentException if string is not properly escaped.
+   * 处理转义字符，按指定分隔符分割字符串。分隔符和转义字符本身若要作为普通字符使用，需要在前面添加转义字符转义。
+   * @param str 待分割字符串
+   * @param delimiterChar 分隔符
+   * @param escapeChar 转义字符，用于转义分隔符和转义字符本身
+   * @return 分割后的字符串列表
+   * @throws IllegalArgumentException 如果字符串转义格式不正确，则抛出异常
    */
   static List<String> split(final String str, final char delimiterChar,
       final char escapeChar) throws IllegalArgumentException {
@@ -72,60 +72,63 @@ public final class TimelineReaderUtils {
       return Collections.emptyList();
     }
     List<String> list = new ArrayList<String>();
-    // Keeps track of offset of the passed string.
+    // 当前遍历偏移量
     int offset = 0;
-    // Indicates start offset from which characters will be copied from original
-    // string to destination string. Resets when an escape or delimiter char is
-    // encountered.
+    // 当前分段起始偏移量，遇到转义符或分隔符后重置
     int startOffset = 0;
     StringBuilder builder = new StringBuilder(len);
-    // Iterate over the string till we reach the end.
+    // 遍历整个字符串
     while (offset < len) {
       if (str.charAt(offset) == escapeChar) {
-        // An escape character must be followed by a delimiter or escape char
-        // but we have reached the end and have no further character to look at.
+        // 转义符不能是字符串最后一个字符，必须跟待转义字符
         if (offset + 1 >= len) {
           throw new IllegalArgumentException(
               "Escape char not properly escaped.");
         }
         char nextChar = str.charAt(offset + 1);
-        // Next character must be a delimiter or an escape char.
+        // 只有转义符和分隔符允许被转义，其他位置不允许出现单独转义符
         if (nextChar != escapeChar && nextChar != delimiterChar) {
           throw new IllegalArgumentException(
               "Escape char or delimiter char not properly escaped.");
         }
-        // Copy contents from the offset where last escape or delimiter char was
-        // encountered.
+        // 复制上一次分段起始到当前转义符之间的字符
         if (startOffset < offset) {
           builder.append(str.substring(startOffset, offset));
         }
+        // 添加被转义的原字符
         builder.append(nextChar);
         offset += 2;
-        // Reset the start offset as an escape char has been encountered.
+        // 重置分段起始偏移量
         startOffset = offset;
         continue;
       } else if (str.charAt(offset) == delimiterChar) {
-        // A delimiter has been encountered without an escape character.
-        // String needs to be split here. Copy remaining chars and add the
-        // string to list.
+        // 遇到未转义的分隔符，在此处分割
         builder.append(str.substring(startOffset, offset));
+        // 分割结果添加当前分段，去除首尾空格
         list.add(builder.toString().trim());
-        // Reset the start offset as a delimiter has been encountered.
+        // 重置偏移量和缓冲，准备下一分段
         startOffset = ++offset;
         builder = new StringBuilder(len - offset);
         continue;
       }
       offset++;
     }
-    // Copy rest of the characters.
+    // 拼接最后一个分段剩余字符
     if (!str.isEmpty()) {
       builder.append(str.substring(startOffset));
     }
-    // Add the last part of delimited string to list.
+    // 添加最后一个分段到结果
     list.add(builder.toString().trim());
     return list;
   }
 
+  /**
+   * 对字符串中存在的分隔符和转义字符进行转义处理
+   * @param str 待转义原始字符串
+   * @param delimiterChar 需要转义的分隔符
+   * @param escapeChar 用于转义的转义字符
+   * @return 转义完成后的字符串
+   */
   private static String escapeString(final String str, final char delimiterChar,
       final char escapeChar) {
     if (str == null) {
@@ -136,63 +139,67 @@ public final class TimelineReaderUtils {
       return "";
     }
     StringBuilder builder = new StringBuilder();
-    // Keeps track of offset of the passed string.
+    // 当前遍历偏移量
     int offset = 0;
-    // Indicates start offset from which characters will be copied from original
-    // string to destination string. Resets when an escape or delimiter char is
-    // encountered.
+    // 当前分段起始偏移量
     int startOffset = 0;
-    // Iterate over the string till we reach the end.
+    // 遍历整个字符串
     while (offset < len) {
       char charAtOffset = str.charAt(offset);
       if (charAtOffset == escapeChar || charAtOffset == delimiterChar) {
-        // If an escape or delimiter character is encountered, copy characters
-        // from the offset where escape or delimiter was last encountered.
+        // 遇到需要转义的字符，复制上一次分段起始到当前位置之间的字符
         if (startOffset < offset) {
           builder.append(str.substring(startOffset, offset));
         }
-        // Append escape char before delimiter/escape char.
+        // 先添加转义符，再添加原字符，完成转义
         builder.append(escapeChar).append(charAtOffset);
-        // Reset start offset for copying characters when next escape/delimiter
-        // char is encountered.
+        // 重置分段起始偏移量
         startOffset = offset + 1;
       }
       offset++;
     }
-    // Copy remaining characters.
+    // 拼接剩余字符
     builder.append(str.substring(startOffset));
     return builder.toString();
   }
 
   /**
-   * Join different strings in the passed string array delimited by passed
-   * delimiter with delimiter and escape character escaped using passed escape
-   * char.
-   * @param strs strings to be joined.
-   * @param delimiterChar delimiter used to join strings.
-   * @param escapeChar escape character used to escape delimiter and escape
-   *     char.
-   * @return a single string joined using delimiter and properly escaped.
+   * 先对每个字符串做转义处理，再使用指定分隔符拼接为一个字符串
+   * @param strs 待拼接的字符串数组
+   * @param delimiterChar 拼接分隔符
+   * @param escapeChar 转义字符
+   * @return 转义拼接完成后的字符串
    */
   static String joinAndEscapeStrings(final String[] strs,
       final char delimiterChar, final char escapeChar) {
     int len = strs.length;
-    // Escape each string in string array.
+    // 逐个对字符串进行转义处理
     for (int index = 0; index < len; index++) {
       if (strs[index] == null) {
         return null;
       }
       strs[index] = escapeString(strs[index], delimiterChar, escapeChar);
     }
-    // Join the strings after they have been escaped.
+    // 使用分隔符拼接转义后的字符串
     return StringUtils.join(strs, delimiterChar);
   }
 
+  /**
+   * 使用默认分隔符和转义符分割字符串
+   * @param str 待分割字符串
+   * @return 分割后的字符串列表
+   * @throws IllegalArgumentException 如果字符串转义格式不正确，则抛出异常
+   */
   public static List<String> split(final String str)
       throws IllegalArgumentException {
     return split(str, DEFAULT_DELIMITER_CHAR, DEFAULT_ESCAPE_CHAR);
   }
 
+  /**
+   * 使用默认分隔符和转义符转义拼接字符串数组
+   * @param strs 待拼接字符串数组
+   * @return 转义拼接完成后的字符串
+   */
   public static String joinAndEscapeStrings(final String[] strs) {
     return joinAndEscapeStrings(strs, DEFAULT_DELIMITER_CHAR,
         DEFAULT_ESCAPE_CHAR);

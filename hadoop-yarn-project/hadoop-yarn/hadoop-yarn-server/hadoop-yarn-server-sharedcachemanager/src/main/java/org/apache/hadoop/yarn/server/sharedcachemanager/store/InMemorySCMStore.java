@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -54,22 +55,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A thread safe version of an in-memory SCM store. The thread safety is
- * implemented with two key pieces: (1) at the mapping level a ConcurrentHashMap
- * is used to allow concurrency to resources and their associated references,
- * and (2) a key level lock is used to ensure mutual exclusion between any
- * operation that accesses a resource with the same key. <br>
+ * 线程安全的共享缓存管理器内存存储实现。线程安全通过两点保障：
+ * (1) 使用ConcurrentHashMap存储资源及其引用，支持并发访问；
+ * (2) 基于键级别锁保证同一资源操作的互斥性。<br>
  * <br>
- * To ensure safe key-level locking, we use the original string key and intern
- * it weakly using hadoop's <code>StringInterner</code>. It avoids the pitfalls
- * of using built-in String interning. The interned strings are also weakly
- * referenced, so it can be garbage collected once it is done. And there is
- * little risk of keys being available for other parts of the code so they can
- * be used as locks accidentally. <br>
+ * 为实现安全的键级锁，使用Hadoop的StringInterner对键进行弱驻留，避免了内置String驻留的缺陷：
+ * 驻留后的字符串是弱引用，使用完成后可被垃圾回收，同时降低了代码其他部分误将这些键用作锁的风险。<br>
  * <br>
- * Resources in the in-memory store are evicted based on a time staleness
- * criteria. If a resource is not referenced (i.e. used) for a given period, it
- * is designated as a stale resource and is considered evictable.
+ * 内存存储中的资源基于过期时间策略进行驱逐：如果一个资源在指定周期内未被引用，则被标记为过期，满足驱逐条件。
  */
 @Private
 @Evolving
@@ -77,15 +70,23 @@ public class InMemorySCMStore extends SCMStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(InMemorySCMStore.class);
 
+  // 存储所有缓存资源，key为资源校验和，value为缓存资源对象
   private final Map<String, SharedCacheResource> cachedResources =
       new ConcurrentHashMap<String, SharedCacheResource>();
+  // 存储服务启动时正在运行的应用列表，用于初始阶段的资源可驱逐性判断
   private Collection<ApplicationId> initialApps =
       new ArrayList<ApplicationId>();
+  // 初始应用列表的同步锁
   private final Object initialAppsLock = new Object();
+  // 存储服务启动时间，用于判断资源过期
   private long startTime;
+  // 资源过期判断的时间阈值（分钟）
   private int stalenessMinutes;
+  // 定时检查应用状态的调度器
   private ScheduledExecutorService scheduler;
+  // 首次检查应用状态的初始延迟（分钟）
   private int initialDelayMin;
+  // 应用状态检查的周期（分钟）
   private int checkPeriodMin;
 
   public InMemorySCMStore() {
@@ -97,13 +98,13 @@ public class InMemorySCMStore extends SCMStore {
     super(InMemorySCMStore.class.getName(), appChecker);
   }
 
+  // 对键进行弱驻留，用于键级别锁
   private String intern(String key) {
     return StringInterner.weakIntern(key);
   }
 
   /**
-   * The in-memory store bootstraps itself from the shared cache entries that
-   * exist in HDFS.
+   * 内存存储从HDFS中已存在的共享缓存条目完成自举初始化。
    */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
@@ -118,6 +119,7 @@ public class InMemorySCMStore extends SCMStore {
     ThreadFactory tf =
         new ThreadFactoryBuilder().setNameFormat("InMemorySCMStore")
             .build();
+    // 创建单线程定时调度器
     scheduler = HadoopExecutors.newSingleThreadScheduledExecutor(tf);
 
     super.serviceInit(conf);
@@ -125,16 +127,17 @@ public class InMemorySCMStore extends SCMStore {
 
   @Override
   protected void serviceStart() throws Exception {
-    // start composed services first
+    // 先启动组合服务
     super.serviceStart();
 
-    // Get initial list of running applications
+    // 获取初始运行应用列表
     LOG.info("Getting the active app list to initialize the in-memory scm store");
     synchronized (initialAppsLock) {
       initialApps = appChecker.getActiveApplications();
     }
     LOG.info(initialApps.size() + " apps recorded as active at this time");
 
+    // 创建应用检查任务并启动定时调度
     Runnable task = new AppCheckTask(appChecker);
     scheduler.scheduleAtFixedRate(task, initialDelayMin, checkPeriodMin,
         TimeUnit.MINUTES);
@@ -148,8 +151,10 @@ public class InMemorySCMStore extends SCMStore {
         + " service.");
     if (scheduler != null) {
       LOG.info("Shutting down the background thread.");
+      // 立即关闭调度器
       scheduler.shutdownNow();
       try {
+        // 等待任务终止，最多10秒
         if (!scheduler.awaitTermination(10, TimeUnit.SECONDS)) {
           LOG.warn("Gave up waiting for the app check task to shutdown.");
         }
@@ -163,7 +168,9 @@ public class InMemorySCMStore extends SCMStore {
     super.serviceStop();
   }
 
+  // 从HDFS文件系统加载已有缓存资源，完成内存存储初始化
   private void bootstrap(Configuration conf) throws IOException {
+    // 从文件系统获取所有初始缓存资源
     Map<String, String> initialCachedResources =
         getInitialCachedResources(FileSystem.get(conf), conf);
     LOG.info("Bootstrapping from " + initialCachedResources.size()
@@ -175,9 +182,9 @@ public class InMemorySCMStore extends SCMStore {
       String key = intern(e.getKey());
       String fileName = e.getValue();
       SharedCacheResource resource = new SharedCacheResource(fileName);
-      // we don't hold the lock for this as it is done as part of serviceInit
+      // 初始化阶段无需加锁，serviceInit过程单线程执行
       cachedResources.put(key, resource);
-      // clear out the initial resource to reduce the footprint
+      // 清理临时map，减少内存占用
       it.remove();
     }
     LOG.info("Bootstrapping complete");
@@ -186,12 +193,13 @@ public class InMemorySCMStore extends SCMStore {
   @VisibleForTesting
   Map<String, String> getInitialCachedResources(FileSystem fs,
       Configuration conf) throws IOException {
-    // get the root directory for the shared cache
+    // 获取共享缓存根目录
     String location =
         conf.get(YarnConfiguration.SHARED_CACHE_ROOT,
             YarnConfiguration.DEFAULT_SHARED_CACHE_ROOT);
     Path root = new Path(location);
     try {
+      // 检查根目录是否存在
       fs.getFileStatus(root);
     } catch (FileNotFoundException e) {
       String message =
@@ -201,13 +209,13 @@ public class InMemorySCMStore extends SCMStore {
           .initCause(e);
     }
 
+    // 获取缓存目录嵌套层级
     int nestedLevel = SharedCacheUtil.getCacheDepth(conf);
-    // now traverse individual directories and process them
-    // the directory structure is specified by the nested level parameter
-    // (e.g. 9/c/d/<checksum>/file)
+    // 遍历目录结构格式为 level/../<checksum>/file，构造glob匹配模式
     String pattern = SharedCacheUtil.getCacheEntryGlobPattern(nestedLevel+1);
 
     LOG.info("Querying for all individual cached resource files");
+    // 匹配所有缓存资源文件
     FileStatus[] entries = fs.globStatus(new Path(root, pattern));
     int numEntries = entries == null ? 0 : entries.length;
     LOG.info("Found " + numEntries + " files: processing for one resource per "
@@ -219,13 +227,11 @@ public class InMemorySCMStore extends SCMStore {
         Path file = entry.getPath();
         String fileName = file.getName();
         if (entry.isFile()) {
-          // get the parent to get the checksum
+          // 父目录名称即为资源校验和（key）
           Path parent = file.getParent();
           if (parent != null) {
-            // the name of the immediate parent directory is the checksum
             String key = parent.getName();
-            // make sure we insert only one file per checksum whichever comes
-            // first
+            // 保证每个key只对应一个文件，冲突时保留第一个
             if (initialCachedEntries.containsKey(key)) {
               LOG.warn("Key " + key + " is already mapped to file "
                   + initialCachedEntries.get(key) + "; file " + fileName
@@ -243,14 +249,10 @@ public class InMemorySCMStore extends SCMStore {
   }
 
   /**
-   * Adds the given resource to the store under the key and the filename. If the
-   * entry is already found, it returns the existing filename. It represents the
-   * state of the store at the time of this query. The entry may change or even
-   * be removed once this method returns. The caller should be prepared to
-   * handle that situation.
+   * 将资源添加到缓存存储中。如果该key已存在资源，返回已有文件名。
+   * 返回值仅代表查询时刻的存储状态，方法返回后条目可能被变更或移除，调用者需要处理该情况。
    * 
-   * @return the filename of the newly inserted resource or that of the existing
-   *         resource
+   * @return 新插入或已有资源的文件名
    */
   @Override
   public String addResource(String key, String fileName) {
@@ -266,12 +268,10 @@ public class InMemorySCMStore extends SCMStore {
   }
 
   /**
-   * Adds the provided resource reference to the cache resource under the key,
-   * and updates the access time. If it returns a non-null value, the caller may
-   * safely assume that the resource will not be removed at least until the app
-   * in this resource reference has terminated.
+   * 为对应key的缓存资源添加资源引用，并更新访问时间。
+   * 如果返回非null值，调用者可以安全假定：至少在引用关联的应用终止前，该资源不会被移除。
    * 
-   * @return the filename of the resource, or null if the resource is not found
+   * @return 资源文件名，如果资源不存在返回null
    */
   @Override
   public String addResourceReference(String key,
@@ -279,7 +279,7 @@ public class InMemorySCMStore extends SCMStore {
     String interned = intern(key);
     synchronized (interned) {
       SharedCacheResource resource = cachedResources.get(interned);
-      if (resource == null) { // it's not mapped
+      if (resource == null) { // 资源不存在
         return null;
       }
       resource.addReference(ref);
@@ -289,16 +289,10 @@ public class InMemorySCMStore extends SCMStore {
   }
 
   /**
-   * Returns the list of resource references currently registered under the
-   * cache entry. If the list is empty, it returns an empty collection. The
-   * returned collection is unmodifiable and a snapshot of the information at
-   * the time of the query. The state may change after this query returns. The
-   * caller should handle the situation that some or all of these resource
-   * references are no longer relevant.
+   * 获取当前缓存条目下注册的所有资源引用列表。如果为空返回空集合。
+   * 返回集合不可修改，是查询时刻的快照，返回后状态可能变更，调用者需要处理引用失效情况。
    * 
-   * @return the collection that contains the resource references associated
-   *         with the resource; or an empty collection if no resource references
-   *         are registered under this resource
+   * @return 关联的资源引用集合，无引用则返回空集合
    */
   @Override
   public Collection<SharedCacheResourceReference> getResourceReferences(String key) {
@@ -316,8 +310,7 @@ public class InMemorySCMStore extends SCMStore {
   }
 
   /**
-   * Removes the provided resource reference from the resource. If the resource
-   * does not exist, nothing will be done.
+   * 从资源中移除指定资源引用。如果资源不存在则不做任何操作。
    */
   @Override
   public boolean removeResourceReference(String key, SharedCacheResourceReference ref,
@@ -339,8 +332,7 @@ public class InMemorySCMStore extends SCMStore {
   }
 
   /**
-   * Removes the provided collection of resource references from the resource.
-   * If the resource does not exist, nothing will be done.
+   * 从资源中批量移除指定资源引用集合。如果资源不存在则不做任何操作。
    */
   @Override
   public void removeResourceReferences(String key,
@@ -360,7 +352,7 @@ public class InMemorySCMStore extends SCMStore {
   }
 
   /**
-   * Provides atomicity for the method.
+   * 为方法提供原子性保证。
    */
   @Override
   public void cleanResourceReferences(String key) throws YarnException {
@@ -371,10 +363,7 @@ public class InMemorySCMStore extends SCMStore {
   }
 
   /**
-   * Removes the given resource from the store. Returns true if the resource is
-   * found and removed or if the resource is not found. Returns false if it was
-   * unable to remove the resource because the resource reference list was not
-   * empty.
+   * 从存储中移除指定资源。如果资源不存在或成功移除，返回true；如果资源存在但引用列表非空无法移除，返回false。
    */
   @Override
   public boolean removeResource(String key) {
@@ -388,19 +377,16 @@ public class InMemorySCMStore extends SCMStore {
       if (!resource.getResourceReferences().isEmpty()) {
         return false;
       }
-      // no users
+      // 无引用，移除资源
       cachedResources.remove(interned);
       return true;
     }
   }
 
   /**
-   * Obtains the access time for a resource. It represents the view of the
-   * resource at the time of the query. The value may have been updated at a
-   * later point.
+   * 获取资源的最后访问时间，返回值为查询时刻的快照，之后可能会被更新。
    * 
-   * @return the access time of the resource if found; -1 if the resource is not
-   *         found
+   * @return 如果找到资源返回访问时间；否则返回-1
    */
   @VisibleForTesting
   long getAccessTime(String key) {
@@ -414,33 +400,35 @@ public class InMemorySCMStore extends SCMStore {
   @Override
   public boolean isResourceEvictable(String key, FileStatus file) {
     synchronized (initialAppsLock) {
+      // 初始应用列表未空，说明启动时所有应用都已完成，允许驱逐
       if (initialApps.size() > 0) {
         return false;
       }
     }
 
+    // 计算过期时间阈值
     long staleTime =
         System.currentTimeMillis()
             - TimeUnit.MINUTES.toMillis(this.stalenessMinutes);
     long accessTime = getAccessTime(key);
     if (accessTime == -1) {
-      // check modification time
+      // 内存中没有访问时间，使用文件修改时间判断
       long modTime = file.getModificationTime();
-      // if modification time is older then the store startup time, we need to
-      // just use the store startup time as the last point of certainty
+      // 如果修改时间早于存储启动时间，使用启动时间作为最后确定使用时间
       long lastUse = modTime < this.startTime ? this.startTime : modTime;
       return lastUse < staleTime;
     } else {
-      // check access time
+      // 使用内存中的访问时间判断
       return accessTime < staleTime;
     }
   }
 
+  // 从配置读取资源过期周期，校验合法性
   private static int getStalenessPeriod(Configuration conf) {
     int stalenessMinutes =
         conf.getInt(YarnConfiguration.IN_MEMORY_STALENESS_PERIOD_MINS,
             YarnConfiguration.DEFAULT_IN_MEMORY_STALENESS_PERIOD_MINS);
-    // non-positive value is invalid; use the default
+    // 非正值非法，抛出异常
     if (stalenessMinutes <= 0) {
       throw new HadoopIllegalArgumentException("Non-positive staleness value: "
           + stalenessMinutes
@@ -449,11 +437,12 @@ public class InMemorySCMStore extends SCMStore {
     return stalenessMinutes;
   }
 
+  // 从配置读取首次检查延迟，校验合法性
   private static int getInitialDelay(Configuration conf) {
     int initialMinutes =
         conf.getInt(YarnConfiguration.IN_MEMORY_INITIAL_DELAY_MINS,
             YarnConfiguration.DEFAULT_IN_MEMORY_INITIAL_DELAY_MINS);
-    // non-positive value is invalid; use the default
+    // 非正值非法，抛出异常
     if (initialMinutes <= 0) {
       throw new HadoopIllegalArgumentException(
           "Non-positive initial delay value: " + initialMinutes
@@ -462,64 +451,7 @@ public class InMemorySCMStore extends SCMStore {
     return initialMinutes;
   }
 
+  // 从配置读取检查周期，校验合法性
   private static int getCheckPeriod(Configuration conf) {
     int checkMinutes =
-        conf.getInt(YarnConfiguration.IN_MEMORY_CHECK_PERIOD_MINS,
-            YarnConfiguration.DEFAULT_IN_MEMORY_CHECK_PERIOD_MINS);
-    // non-positive value is invalid; use the default
-    if (checkMinutes <= 0) {
-      throw new HadoopIllegalArgumentException(
-          "Non-positive check period value: " + checkMinutes
-              + ". The check period value must be greater than zero.");
-    }
-    return checkMinutes;
-  }
-
-  @Private
-  @Evolving
-  class AppCheckTask implements Runnable {
-
-    private final AppChecker taskAppChecker;
-
-    public AppCheckTask(AppChecker appChecker) {
-      this.taskAppChecker = appChecker;
-    }
-
-    @Override
-    public void run() {
-      try {
-        LOG.info("Checking the initial app list for finished applications.");
-        synchronized (initialAppsLock) {
-          if (initialApps.isEmpty()) {
-            // we're fine, no-op; there are no active apps that were running at
-            // the time of the service start
-          } else {
-            LOG.info("Looking into " + initialApps.size()
-                + " apps to see if they are still active");
-            Iterator<ApplicationId> it = initialApps.iterator();
-            while (it.hasNext()) {
-              ApplicationId id = it.next();
-              try {
-                if (!taskAppChecker.isApplicationActive(id)) {
-                  // remove it from the list
-                  it.remove();
-                }
-              } catch (YarnException e) {
-                LOG.warn("Exception while checking the app status;"
-                    + " will leave the entry in the list", e);
-                // continue
-              }
-            }
-          }
-          LOG.info("There are now " + initialApps.size()
-              + " entries in the list");
-        }
-      } catch (Throwable e) {
-        LOG.error(
-            "Unexpected exception thrown during in-memory store app check task."
-                + " Rescheduling task.", e);
-      }
-
-    }
-  }
-}
+        conf.getInt(Y

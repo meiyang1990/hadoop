@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,26 +26,23 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 /**
- * Class to carry the offline aggregation information for storage level
- * implementations. There are currently two predefined aggregation info
- * instances that represent flow and user level offline aggregations. Depend on
- * its implementation, a storage class may use an OfflineAggregationInfo object
- * to decide behaviors dynamically.
+ * 承载离线聚合信息的数据类，供存储层实现使用。
+ * 当前预定义了流级别和用户级别两种离线聚合实例，存储层实现可根据该对象动态决定处理行为。
  */
 public final class OfflineAggregationInfo {
   /**
-   * Default flow level aggregation table name.
+   * 默认流级别聚合表名。
    */
   @VisibleForTesting
   public static final String FLOW_AGGREGATION_TABLE_NAME
       = "yarn_timeline_flow_aggregation";
   /**
-   * Default user level aggregation table name.
+   * 默认用户级别聚合表名。
    */
   public static final String USER_AGGREGATION_TABLE_NAME
       = "yarn_timeline_user_aggregation";
 
-  // These lists are not taking effects in table creations.
+  // 主键列表不会影响表创建逻辑
   private static final String[] FLOW_AGGREGATION_PK_LIST = {
       "user", "cluster", "flow_name"
   };
@@ -63,25 +61,57 @@ public final class OfflineAggregationInfo {
     primaryKeyStringSetter = formatter;
   }
 
+  /**
+   * 主键值设置到预编译SQL语句的函数接口。
+   */
   private interface PrimaryKeyStringSetter {
+    /**
+     * 将主键值设置到预编译语句中。
+     * @param ps 预编译SQL语句
+     * @param context 时间线收集器上下文，含聚合维度信息
+     * @param extraInfo 额外信息数组
+     * @param startPos 开始设置参数的起始位置
+     * @return 下一个可用参数位置
+     * @throws SQLException SQL异常
+     */
     int setValues(PreparedStatement ps, TimelineCollectorContext context,
         String[] extraInfo, int startPos) throws SQLException;
   }
 
+  /**
+   * 获取聚合表名。
+   * @return 聚合表名
+   */
   public String getTableName() {
     return tableName;
   }
 
+  /**
+   * 获取主键列名列表拷贝。
+   * @return 主键列名数组拷贝
+   */
   public String[] getPrimaryKeyList() {
     return primaryKeyList.clone();
   }
 
+  /**
+   * 将主键值设置到预编译SQL语句中。
+   * @param ps 预编译SQL语句
+   * @param context 时间线收集器上下文
+   * @param extraInfo 额外信息
+   * @param startPos 起始参数位置
+   * @return 下一个可用参数位置
+   * @throws SQLException SQL异常
+   */
   public int setStringsForPrimaryKey(PreparedStatement ps,
       TimelineCollectorContext context, String[] extraInfo, int startPos)
       throws SQLException {
     return primaryKeyStringSetter.setValues(ps, context, extraInfo, startPos);
   }
 
+  /**
+   * 流级别离线聚合实例，按用户、集群、流名称聚合。
+   */
   public static final OfflineAggregationInfo FLOW_AGGREGATION =
       new OfflineAggregationInfo(FLOW_AGGREGATION_TABLE_NAME,
           FLOW_AGGREGATION_PK_LIST,
@@ -91,13 +121,19 @@ public final class OfflineAggregationInfo {
               TimelineCollectorContext context, String[] extraInfo,
               int startPos) throws SQLException {
             int idx = startPos;
+            // 设置用户ID
             ps.setString(idx++, context.getUserId());
+            // 设置集群ID
             ps.setString(idx++, context.getClusterId());
+            // 设置流名称
             ps.setString(idx++, context.getFlowName());
             return idx;
           }
         });
 
+  /**
+   * 用户级别离线聚合实例，按用户、集群聚合。
+   */
   public static final OfflineAggregationInfo USER_AGGREGATION =
       new OfflineAggregationInfo(USER_AGGREGATION_TABLE_NAME,
           USER_AGGREGATION_PK_LIST,
@@ -107,7 +143,9 @@ public final class OfflineAggregationInfo {
               TimelineCollectorContext context, String[] extraInfo,
               int startPos) throws SQLException {
             int idx = startPos;
+            // 设置用户ID
             ps.setString(idx++, context.getUserId());
+            // 设置集群ID
             ps.setString(idx++, context.getClusterId());
             return idx;
           }

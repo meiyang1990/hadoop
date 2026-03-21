@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,11 +38,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Service that handles aggregations for applications
- * and makes use of {@link AppLevelTimelineCollector} class for
- * writes to Timeline Service.
- *
- * App-related lifecycle management is handled by this service.
+ * 应用级时间线数据聚合服务，基于{@link AppLevelTimelineCollector}实现，
+ * 负责将聚合后的时间线数据写入时间线服务，并管理应用相关的生命周期。
  */
 @Private
 @Unstable
@@ -50,18 +48,32 @@ public class AppLevelTimelineCollectorWithAgg
   private static final Logger LOG =
       LoggerFactory.getLogger(TimelineCollector.class);
 
+  // 聚合线程池固定线程数
   private final static int AGGREGATION_EXECUTOR_NUM_THREADS = 1;
+  // 聚合执行间隔（秒）
   private int aggregationExecutorIntervalSecs;
+  // 需要跳过聚合的实体类型集合
   private static Set<String> entityTypesSkipAggregation
       = initializeSkipSet();
 
+  // 应用级聚合定时线程池
   private ScheduledThreadPoolExecutor appAggregationExecutor;
+  // 应用级聚合任务实例
   private AppLevelAggregator appAggregator;
 
+  /**
+   * 构造函数，创建带聚合能力的应用级时间线收集器。
+   * @param appId 应用ID
+   * @param user 应用对应用户
+   */
   public AppLevelTimelineCollectorWithAgg(ApplicationId appId, String user) {
     super(appId, user);
   }
 
+  /**
+   * 初始化需要跳过聚合的实体类型集合。
+   * @return 跳过聚合的实体类型集合
+   */
   private static Set<String> initializeSkipSet() {
     Set<String> result = new HashSet<>();
     result.add(TimelineEntityType.YARN_APPLICATION.toString());
@@ -72,6 +84,7 @@ public class AppLevelTimelineCollectorWithAgg
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 从配置读取聚合间隔，使用默认值兜底
     aggregationExecutorIntervalSecs = conf.getInt(
         YarnConfiguration.TIMELINE_SERVICE_AGGREGATION_INTERVAL_SECS,
         YarnConfiguration.
@@ -82,13 +95,14 @@ public class AppLevelTimelineCollectorWithAgg
 
   @Override
   protected void serviceStart() throws Exception {
-    // Launch the aggregation thread
+    // 启动聚合定时线程
     appAggregationExecutor = new ScheduledThreadPoolExecutor(
         AppLevelTimelineCollectorWithAgg.AGGREGATION_EXECUTOR_NUM_THREADS,
         new ThreadFactoryBuilder()
             .setNameFormat("TimelineCollector Aggregation thread #%d")
             .build());
     appAggregator = new AppLevelAggregator();
+    // 按固定间隔调度聚合任务
     appAggregationExecutor.scheduleAtFixedRate(appAggregator,
         aggregationExecutorIntervalSecs,
         aggregationExecutorIntervalSecs,
@@ -98,12 +112,14 @@ public class AppLevelTimelineCollectorWithAgg
 
   @Override
   protected void serviceStop() throws Exception {
+    // 关闭聚合线程池
     appAggregationExecutor.shutdown();
+    // 等待优雅关闭超时后强制关闭
     if (!appAggregationExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
       LOG.info("App-level aggregator shutdown timed out, shutdown now. ");
       appAggregationExecutor.shutdownNow();
     }
-    // Perform one round of aggregation after the aggregation executor is done.
+    // 线程池关闭后执行最后一轮聚合
     appAggregator.aggregate();
     super.serviceStop();
   }
@@ -113,8 +129,14 @@ public class AppLevelTimelineCollectorWithAgg
     return entityTypesSkipAggregation;
   }
 
+  /**
+   * 应用级时间线聚合任务，按固定间隔执行聚合。
+   */
   private class AppLevelAggregator implements Runnable {
 
+    /**
+     * 执行应用级时间线指标聚合。
+     */
     private void aggregate() {
       LOG.debug("App-level real-time aggregating");
       if (!isReadyToAggregate()) {
@@ -122,17 +144,22 @@ public class AppLevelTimelineCollectorWithAgg
         return;
       }
       try {
+        // 获取当前时间线实体上下文
         TimelineCollectorContext currContext = getTimelineEntityContext();
+        // 获取所有聚合分组
         Map<String, AggregationStatusTable> aggregationGroups
             = getAggregationGroups();
+        // 无聚合数据直接跳过
         if (aggregationGroups == null
             || aggregationGroups.isEmpty()) {
           LOG.debug("App-level collector is empty, skip aggregation. ");
           return;
         }
+        // 执行无分组应用级聚合，生成聚合后的应用实体
         TimelineEntity resultEntity = TimelineCollector.aggregateWithoutGroupId(
             aggregationGroups, currContext.getAppId(),
             TimelineEntityType.YARN_APPLICATION.toString());
+        // 异步写入聚合结果到时间线服务
         TimelineEntities entities = new TimelineEntities();
         entities.addEntity(resultEntity);
         putEntitiesAsync(entities, getCurrentUser());

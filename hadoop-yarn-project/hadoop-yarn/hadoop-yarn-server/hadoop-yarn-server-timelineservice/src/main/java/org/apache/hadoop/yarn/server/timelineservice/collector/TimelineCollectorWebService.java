@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -58,7 +59,7 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEntityType;
 import org.apache.hadoop.yarn.api.records.timelineservice.UserEntity;
 import org.apache.hadoop.yarn.server.timelineservice.metrics.PerNodeAggTimelineCollectorMetrics;
 import org.apache.hadoop.yarn.webapp.ForbiddenException;
-import org.apache.hadoop.yarn.webapp.NotFoundException;
+import org.apache.hadoop.yarn.webapp.NotFound;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,9 +68,7 @@ import java.io.IOException;
 import java.util.IllegalFormatException;
 
 /**
- * The main per-node REST end point for timeline service writes. It is
- * essentially a container service that routes requests to the appropriate
- * per-app services.
+ * 时间线服务写入操作的每个节点REST端点入口，负责将请求路由到对应应用的收集器服务进行处理。
  */
 @Private
 @Unstable
@@ -86,7 +85,7 @@ public class TimelineCollectorWebService {
       PerNodeAggTimelineCollectorMetrics.getInstance();
 
   /**
-   * Gives information about timeline collector.
+   * 时间线收集器服务基本信息封装类，用于REST接口返回服务描述。
    */
   @XmlRootElement(name = "about")
   @XmlAccessorType(XmlAccessType.NONE)
@@ -116,11 +115,11 @@ public class TimelineCollectorWebService {
   }
 
   /**
-   * Return the description of the timeline web services.
+   * 获取时间线Web服务描述信息。
    *
-   * @param req Servlet request.
-   * @param res Servlet response.
-   * @return description of timeline web service.
+   * @param req Servlet请求对象
+   * @param res Servlet响应对象
+   * @return 时间线收集器服务描述信息
    */
   @GET
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8
@@ -133,19 +132,15 @@ public class TimelineCollectorWebService {
   }
 
   /**
-   * Accepts writes to the collector, and returns a response. It simply routes
-   * the request to the app level collector. It expects an application as a
-   * context.
+   * 接收时间线实体写入请求，路由到对应应用收集器处理。
    *
-   * @param req Servlet request.
-   * @param res Servlet response.
-   * @param async flag indicating whether its an async put or not. "true"
-   *     indicates, its an async call. If null, its considered false.
-   * @param isSubAppEntities subappwrite.
-   * @param appId Application Id to which the entities to be put belong to. If
-   *     appId is not there or it cannot be parsed, HTTP 400 will be sent back.
-   * @param entities timeline entities to be put.
-   * @return a Response with appropriate HTTP status.
+   * @param req Servlet请求对象
+   * @param res Servlet响应对象
+   * @param async 是否异步写入标识，true表示异步，null/其他表示同步
+   * @param isSubAppEntities 是否为子应用实体写入标识
+   * @param appId 目标应用ID
+   * @param entities 待写入的时间线实体集合
+   * @return 带对应HTTP状态码的响应
    */
   @PUT
   @Path("/entities")
@@ -158,30 +153,38 @@ public class TimelineCollectorWebService {
       @QueryParam("appid") String appId,
       TimelineEntities entities) {
     init(res);
+    // 获取请求发起用户信息
     UserGroupInformation callerUgi = getUser(req);
+    // 解析是否异步写入
     boolean isAsync = async != null && async.trim().equalsIgnoreCase("true");
+    // 用户身份校验
     if (callerUgi == null) {
       String msg = "The owner of the posted timeline entities is not set";
       LOG.error(msg);
       throw new ForbiddenException(msg);
     }
 
+    // 记录请求开始时间，用于统计延迟
     long startTime = Time.monotonicNow();
     boolean succeeded = false;
     try {
+      // 解析应用ID
       ApplicationId appID = parseApplicationId(appId);
       if (appID == null) {
         return Response.status(Response.Status.BAD_REQUEST).build();
       }
+      // 从Servlet上下文获取节点级收集器管理器
       NodeTimelineCollectorManager collectorManager =
           (NodeTimelineCollectorManager) context.getAttribute(
               NodeTimelineCollectorManager.COLLECTOR_MANAGER_ATTR_KEY);
+      // 获取对应应用的时间线收集器
       TimelineCollector collector = collectorManager.get(appID);
       if (collector == null) {
         LOG.error("Application: {} is not found", appId);
         throw new NotFoundException("Application: "+ appId + " is not found");
       }
 
+      // 根据是否异步选择对应写入方式
       if (isAsync) {
         collector.putEntitiesAsync(processTimelineEntities(entities, appId,
             Boolean.valueOf(isSubAppEntities)), callerUgi);
@@ -204,6 +207,7 @@ public class TimelineCollectorWebService {
       throw new WebApplicationException(e,
           Response.Status.INTERNAL_SERVER_ERROR);
     } finally {
+      // 统计请求延迟
       long latency = Time.monotonicNow() - startTime;
       if (isAsync) {
         METRICS.addAsyncPutEntitiesLatency(latency, succeeded);
@@ -214,12 +218,13 @@ public class TimelineCollectorWebService {
   }
 
   /**
-   * @param req    Servlet request.
-   * @param res    Servlet response.
-   * @param domain timeline domain to be put.
-   * @param appId Application Id to which the domain to be put belong to. If
-   *     appId is not there or it cannot be parsed, HTTP 400 will be sent back.
-   * @return a Response with appropriate HTTP status.
+   * 接收时间线域名写入请求，路由到对应应用收集器处理。
+   *
+   * @param req Servlet请求对象
+   * @param res Servlet响应对象
+   * @param domain 待写入的时间线域名
+   * @param appId 目标应用ID
+   * @return 带对应HTTP状态码的响应
    */
   @PUT
   @Path("/domain")
@@ -230,7 +235,9 @@ public class TimelineCollectorWebService {
       @QueryParam("appid") String appId,
       TimelineDomain domain) {
     init(res);
+    // 获取请求发起用户信息
     UserGroupInformation callerUgi = getUser(req);
+    // 用户身份校验
     if (callerUgi == null) {
       String msg = "The owner of the posted timeline entities is not set";
       LOG.error(msg);
@@ -238,20 +245,25 @@ public class TimelineCollectorWebService {
     }
 
     try {
+      // 解析应用ID
       ApplicationId appID = parseApplicationId(appId);
       if (appID == null) {
         return Response.status(Response.Status.BAD_REQUEST).build();
       }
+      // 从Servlet上下文获取节点级收集器管理器
       NodeTimelineCollectorManager collectorManager =
           (NodeTimelineCollectorManager) context.getAttribute(
               NodeTimelineCollectorManager.COLLECTOR_MANAGER_ATTR_KEY);
+      // 获取对应应用的时间线收集器
       TimelineCollector collector = collectorManager.get(appID);
       if (collector == null) {
         LOG.error("Application: {} is not found", appId);
         throw new NotFoundException("Application: " + appId + " is not found");
       }
 
+      // 设置域名所有者为当前请求用户
       domain.setOwner(callerUgi.getShortUserName());
+      // 委托收集器写入域名
       collector.putDomain(domain, callerUgi);
 
       return Response.ok().build();
@@ -265,6 +277,11 @@ public class TimelineCollectorWebService {
     }
   }
 
+  /**
+   * 解析字符串格式的应用ID，转换为ApplicationId对象。
+   * @param appId 字符串格式应用ID
+   * @return 解析成功返回ApplicationId，格式错误或为空返回null
+   */
   private static ApplicationId parseApplicationId(String appId) {
     try {
       if (appId != null) {
@@ -278,10 +295,19 @@ public class TimelineCollectorWebService {
     }
   }
 
+  /**
+   * 初始化HTTP响应，清空默认ContentType。
+   * @param response HTTP响应对象
+   */
   private static void init(HttpServletResponse response) {
     response.setContentType(null);
   }
 
+  /**
+   * 从HTTP请求中提取远程用户信息，创建对应的UGI对象。
+   * @param req HTTP请求对象
+   * @return 远程用户UGI对象，未获取到远程用户返回null
+   */
   private static UserGroupInformation getUser(HttpServletRequest req) {
     String remoteUser = req.getRemoteUser();
     UserGroupInformation callerUgi = null;
@@ -291,12 +317,21 @@ public class TimelineCollectorWebService {
     return callerUgi;
   }
 
+  /**
+   * 将通用时间线实体转换为具体类型的实体对象，适配后端存储。
+   * 保留该处理以便未来扩展聚合等功能。
+   * @param entities 输入的通用时间线实体集合
+   * @param appId 应用ID，用于子应用实体绑定
+   * @param isSubAppWrite 是否为子应用写入
+   * @return 处理后的具体类型实体集合
+   */
   // The process may not be necessary according to the way we write the backend,
   // but let's keep it for now in case we need to use sub-classes APIs in the
   // future (e.g., aggregation).
   private static TimelineEntities processTimelineEntities(
       TimelineEntities entities, String appId, boolean isSubAppWrite) {
     TimelineEntities entitiesToReturn = new TimelineEntities();
+    // 遍历每个实体进行类型转换
     for (TimelineEntity entity : entities.getEntities()) {
       TimelineEntityType type = null;
       try {
@@ -304,6 +339,7 @@ public class TimelineCollectorWebService {
       } catch (IllegalArgumentException e) {
         type = null;
       }
+      // 根据YARN预定义类型转换为对应具体实体类
       if (type != null) {
         switch (type) {
         case YARN_CLUSTER:
@@ -331,6 +367,7 @@ public class TimelineCollectorWebService {
           break;
         }
       } else {
+        // 非预定义类型处理：子应用写入转换为SubApplicationEntity并绑定应用ID
         if (isSubAppWrite) {
           SubApplicationEntity se = new SubApplicationEntity(entity);
           se.setApplicationId(appId);

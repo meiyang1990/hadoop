@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,20 +19,40 @@
 
 package org.apache.hadoop.yarn.server.timelineservice.documentstore.collection.document;
 
-
 /**
- * This is an interface for all the Timeline Documents. Any new document that
- * has to be persisted in the document store should implement this.
+ * 时间线文档通用接口，所有需要持久化到文档存储的时间线文档都必须实现该接口。
+ * 定义了时间线文档需要具备的基础能力和公共属性。
  */
 public interface TimelineDocument<Document> {
 
+  /**
+   * 获取文档唯一标识ID。
+   * @return 文档ID字符串
+   */
   String getId();
 
+  /**
+   * 获取文档类型。
+   * @return 文档类型字符串
+   */
   String getType();
 
+  /**
+   * 获取文档创建时间戳。
+   * @return 创建时间（毫秒级时间戳）
+   */
   long getCreatedTime();
 
+  /**
+   * 设置文档创建时间戳。
+   * @param time 创建时间（毫秒级时间戳）
+   */
   void setCreatedTime(long time);
 
+  /**
+   * 将传入文档合并到当前文档。
+   * 用于处理同一文档的更新合并场景。
+   * @param timelineDocument 需要合并的源文档
+   */
   void merge(Document timelineDocument);
 }

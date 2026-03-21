@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,10 +17,11 @@
  * limitations under the License.
  */
 
-/**Package org.apache.hadoop.yarn.server.timelineservice.
- * documentstore.collection.document.flowrun contains
- * FlowRunDocument that stores the flow level information for
- * each Application and also aggregates the metrics.
+/**
+ * 文件级包说明：YARN时间线服务文档存储层的工作流运行文档实体包
+ * <p>
+ * 该包提供了工作流运行级别的时间线数据存储实体定义，负责存储每个应用的工作流级别信息
+ * 并完成工作流运行级别指标聚合，用于时间线服务中工作流维度的数据统计与查询。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

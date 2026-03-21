@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,7 +34,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * This doc represents the flow run information for every job.
+ * 流运行文档，存储YARN中每个作业流运行的元信息和指标数据，用于时序服务文档存储。
  */
 public class FlowRunDocument implements TimelineDocument<FlowRunDocument> {
 
@@ -55,6 +56,11 @@ public class FlowRunDocument implements TimelineDocument<FlowRunDocument> {
   public FlowRunDocument() {
   }
 
+  /**
+   * 基于时间线收集器上下文和指标集合构造流运行文档。
+   * @param collectorContext 时间线收集器上下文，包含流运行基本信息
+   * @param metrics 流运行指标集合
+   */
   public FlowRunDocument(TimelineCollectorContext collectorContext,
       Set<TimelineMetric> metrics) {
     this.clusterId = collectorContext.getClusterId();
@@ -64,6 +70,10 @@ public class FlowRunDocument implements TimelineDocument<FlowRunDocument> {
     transformMetrics(metrics);
   }
 
+  /**
+   * 将输入指标转换为子文档格式存入当前文档。
+   * @param timelineMetrics 输入时间线指标集合
+   */
   private void transformMetrics(Set<TimelineMetric> timelineMetrics) {
     for (TimelineMetric metric : timelineMetrics) {
       TimelineMetricSubDoc metricSubDoc = new TimelineMetricSubDoc(metric);
@@ -72,11 +82,9 @@ public class FlowRunDocument implements TimelineDocument<FlowRunDocument> {
   }
 
   /**
-   * Merge the {@link FlowRunDocument} that is passed with the current
-   * document for upsert.
+   * 将传入的流运行文档合并到当前文档，用于upsert操作。
    *
-   * @param flowRunDoc
-   *          that has to be merged
+   * @param flowRunDoc 需要合并的流运行文档
    */
   @Override
   public void merge(FlowRunDocument flowRunDoc) {
@@ -95,6 +103,10 @@ public class FlowRunDocument implements TimelineDocument<FlowRunDocument> {
     aggregateMetrics(flowRunDoc.getMetrics());
   }
 
+  /**
+   * 聚合传入的指标到当前文档已有指标，按聚合规则处理冲突。
+   * @param metricSubDocMap 待聚合的指标子文档映射
+   */
   private void aggregateMetrics(
       Map<String, TimelineMetricSubDoc> metricSubDocMap) {
     for(Map.Entry<String, TimelineMetricSubDoc> metricEntry :
@@ -108,6 +120,7 @@ public class FlowRunDocument implements TimelineDocument<FlowRunDocument> {
         TimelineMetric baseMetric =
             this.metrics.get(metricId).fetchTimelineMetric();
         if (incomingMetric.getValues().size() > 0) {
+          // 执行聚合操作后更新子文档
           baseMetric = aggregate(incomingMetric, baseMetric);
           this.metrics.put(metricId, new TimelineMetricSubDoc(baseMetric));
         } else {
@@ -115,30 +128,42 @@ public class FlowRunDocument implements TimelineDocument<FlowRunDocument> {
               baseMetric.getId());
         }
       } else {
+        // 不存在则直接添加新指标
         this.metrics.put(metricId, metricValue);
       }
     }
   }
 
+  /**
+   * 根据聚合操作类型对两个指标进行聚合计算。
+   * @param incomingMetric 新输入指标
+   * @param baseMetric 当前已有基础指标
+   * @return 聚合后的指标
+   */
   private TimelineMetric aggregate(TimelineMetric incomingMetric,
       TimelineMetric baseMetric) {
     switch (baseMetric.getRealtimeAggregationOp()) {
     case SUM:
+      // 累加聚合
       baseMetric = TimelineMetricOperation.SUM
           .aggregate(incomingMetric, baseMetric, null);
       break;
     case AVG:
+      // 平均值聚合
       baseMetric = TimelineMetricOperation.AVG
           .aggregate(incomingMetric, baseMetric, null);
       break;
     case MAX:
+      // 最大值聚合
       baseMetric = TimelineMetricOperation.MAX
           .aggregate(incomingMetric, baseMetric, null);
       break;
     case REPLACE:
+      // 替换聚合
       baseMetric = TimelineMetricOperation.REPLACE
           .aggregate(incomingMetric, baseMetric, null);
     default:
+      // 未知聚合类型打印警告日志
       LOG.warn("Unknown TimelineMetricOperation: {}",
           baseMetric.getRealtimeAggregationOp());
     }
@@ -193,6 +218,10 @@ public class FlowRunDocument implements TimelineDocument<FlowRunDocument> {
     this.metrics.putAll(metrics);
   }
 
+  /**
+   * 从子文档中提取所有原始时间线指标。
+   * @return 原始时间线指标集合
+   */
   public Set<TimelineMetric> fetchTimelineMetrics() {
     Set<TimelineMetric> metricSet = new HashSet<>();
     for(TimelineMetricSubDoc metricSubDoc : metrics.values()) {
@@ -229,6 +258,7 @@ public class FlowRunDocument implements TimelineDocument<FlowRunDocument> {
 
   @Override
   public void setCreatedTime(long createdTime) {
+    // 仅当未设置开始时间时才赋值
     if(minStartTime == 0) {
       minStartTime = createdTime;
     }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,28 +23,38 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * Filter class which represents filter to be applied based on key-value pair
- * and the relation between them represented by different relational operators.
+ * 时间线服务比较过滤器，基于键值对和比较运算符对实体进行过滤。
+ * 根据指定的比较关系（等于、不等于、大于等）筛选符合条件的时间线实体。
  */
 @Private
 @Unstable
 public class TimelineCompareFilter extends TimelineFilter {
 
+  /** 比较操作符 */
   private TimelineCompareOp compareOp;
+  /** 待比较的键名称 */
   private String key;
+  /** 待比较的目标值 */
   private Object value;
-  // If comparison operator is NOT_EQUAL, this flag decides if we should return
-  // the entity if key does not exist.
+  /** 当比较操作是不等于时，该标记决定键不存在时是否过滤掉实体。true表示键必须存在才会被保留，false表示键不存在也会被保留 */
   private boolean keyMustExist = true;
 
   public TimelineCompareFilter() {
   }
 
+  /**
+   * 构造带完整参数的比较过滤器。
+   * @param op 比较操作符
+   * @param key 待比较的键
+   * @param val 待比较的目标值
+   * @param keyMustExistFlag 不等于比较时，键是否必须存在
+   */
   public TimelineCompareFilter(TimelineCompareOp op, String key, Object val,
        boolean keyMustExistFlag) {
     this.compareOp = op;
     this.key = key;
     this.value = val;
+    // 仅当不等于操作时才使用传入的标记，其他操作强制要求键必须存在
     if (op == TimelineCompareOp.NOT_EQUAL) {
       this.keyMustExist = keyMustExistFlag;
     } else {
@@ -51,6 +62,12 @@ public class TimelineCompareFilter extends TimelineFilter {
     }
   }
 
+  /**
+   * 构造比较过滤器，默认不等于比较时要求键必须存在。
+   * @param op 比较操作符
+   * @param key 待比较的键
+   * @param val 待比较的目标值
+   */
   public TimelineCompareFilter(TimelineCompareOp op, String key, Object val) {
     this(op, key, val, true);
   }
@@ -76,9 +93,15 @@ public class TimelineCompareFilter extends TimelineFilter {
     return value;
   }
 
+  /**
+   * 设置比较操作符和键存在标记。
+   * @param timelineCompareOp 比较操作符
+   * @param keyExistFlag 不等于比较时键是否必须存在
+   */
   public void setCompareOp(TimelineCompareOp timelineCompareOp,
       boolean keyExistFlag) {
     this.compareOp = timelineCompareOp;
+    // 仅当操作符为不等于时更新键存在标记
     if (timelineCompareOp == TimelineCompareOp.NOT_EQUAL) {
       this.keyMustExist = keyExistFlag;
     }

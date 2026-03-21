@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,13 +20,16 @@
 package org.apache.hadoop.yarn.server.timelineservice.documentstore.collection;
 
 /**
- * Specifies the different collections that are currently used for storing
- * documents.
+ * 文档存储集合类型枚举，定义时间线服务文档存储中使用的不同集合类型
  */
 public enum CollectionType {
+  /** 实体集合，存储时间线实体数据 */
   ENTITY("EntityCollection"),
+  /** 应用集合，存储YARN应用数据 */
   APPLICATION("AppCollection"),
+  /** 流运行集合，存储工作流运行数据 */
   FLOW_RUN("FlowRunCollection"),
+  /** 流活动集合，存储工作流活动数据 */
   FLOW_ACTIVITY("FlowActivityCollection");
 
   private final String collectionName;
@@ -34,10 +38,19 @@ public enum CollectionType {
     this.collectionName = collectionName;
   }
 
+  /**
+   * 判断当前集合类型名称与给定名称是否相等
+   * @param otherCollectionName 待比较的集合名称
+   * @return 比较结果
+   */
   public boolean equals(String otherCollectionName) {
     return this.collectionName.equals(otherCollectionName);
   }
 
+  /**
+   * 获取集合的实际名称
+   * @return 集合名称字符串
+   */
   public String getCollectionName() {
     return collectionName;
   }

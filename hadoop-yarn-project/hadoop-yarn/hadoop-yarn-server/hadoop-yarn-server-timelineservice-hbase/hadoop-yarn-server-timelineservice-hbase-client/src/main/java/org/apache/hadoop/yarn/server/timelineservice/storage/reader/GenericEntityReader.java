@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -64,30 +65,41 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.entity.EntityTableR
 import org.apache.hadoop.yarn.webapp.BadRequestException;
 
 /**
- * Timeline entity reader for generic entities that are stored in the entity
- * table.
+ * 存储在实体表中的通用时间线实体读取器，负责从HBase实体表读取时间线实体数据。
  */
 class GenericEntityReader extends TimelineEntityReader {
+  // 实体表读写对象单例
   private static final EntityTableRW ENTITY_TABLE = new EntityTableRW();
 
   /**
-   * Used to convert strings key components to and from storage format.
+   * 字符串键转换器，用于字符串键在存储格式和Java格式之间转换。
    */
   private final KeyConverter<String> stringKeyConverter =
       new StringKeyConverter();
 
+  /**
+   * 构造函数，用于多实体读取场景。
+   * @param ctxt 读取器上下文
+   * @param entityFilters 实体过滤条件
+   * @param toRetrieve 需要获取的数据描述
+   */
   GenericEntityReader(TimelineReaderContext ctxt,
       TimelineEntityFilters entityFilters, TimelineDataToRetrieve toRetrieve) {
     super(ctxt, entityFilters, toRetrieve);
   }
 
+  /**
+   * 构造函数，用于单实体读取场景。
+   * @param ctxt 读取器上下文
+   * @param toRetrieve 需要获取的数据描述
+   */
   GenericEntityReader(TimelineReaderContext ctxt,
       TimelineDataToRetrieve toRetrieve) {
     super(ctxt, toRetrieve);
   }
 
   /**
-   * Uses the {@link EntityTableRW}.
+   * 获取实体表读写对象。
    */
   protected BaseTableRW<?> getTable() {
     return ENTITY_TABLE;
@@ -95,12 +107,10 @@ class GenericEntityReader extends TimelineEntityReader {
 
   @Override
   protected FilterList constructFilterListBasedOnFilters() throws IOException {
-    // Filters here cannot be null for multiple entity reads as they are set in
-    // augmentParams if null.
+    // 多实体读取场景下过滤条件不可能为空，会在augmentParams中补空
     FilterList listBasedOnFilters = new FilterList();
     TimelineEntityFilters filters = getFilters();
-    // Create filter list based on created time range and add it to
-    // listBasedOnFilters.
+    // 根据创建时间范围创建过滤条件并添加到过滤列表
     long createdTimeBegin = filters.getCreatedTimeBegin();
     long createdTimeEnd = filters.getCreatedTimeEnd();
     if (createdTimeBegin != 0 || createdTimeEnd != Long.MAX_VALUE) {
@@ -108,21 +118,19 @@ class GenericEntityReader extends TimelineEntityReader {
           .createSingleColValueFiltersByRange(EntityColumn.CREATED_TIME,
               createdTimeBegin, createdTimeEnd));
     }
-    // Create filter list based on metric filters and add it to
-    // listBasedOnFilters.
+    // 根据指标过滤条件创建过滤列表并添加到过滤列表
     TimelineFilterList metricFilters = filters.getMetricFilters();
     if (metricFilters != null && !metricFilters.getFilterList().isEmpty()) {
       listBasedOnFilters.addFilter(TimelineFilterUtils.createHBaseFilterList(
           EntityColumnPrefix.METRIC, metricFilters));
     }
-    // Create filter list based on config filters and add it to
-    // listBasedOnFilters.
+    // 根据配置过滤条件创建过滤列表并添加到过滤列表
     TimelineFilterList configFilters = filters.getConfigFilters();
     if (configFilters != null && !configFilters.getFilterList().isEmpty()) {
       listBasedOnFilters.addFilter(TimelineFilterUtils.createHBaseFilterList(
           EntityColumnPrefix.CONFIG, configFilters));
     }
-    // Create filter list based on info filters and add it to listBasedOnFilters
+    // 根据信息过滤条件创建过滤列表并添加到过滤列表
     TimelineFilterList infoFilters = filters.getInfoFilters();
     if (infoFilters != null && !infoFilters.getFilterList().isEmpty()) {
       listBasedOnFilters.addFilter(TimelineFilterUtils.createHBaseFilterList(
@@ -132,9 +140,10 @@ class GenericEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Check if we need to fetch only some of the event columns.
-   *
-   * @return true if we need to fetch some of the columns, false otherwise.
+   * 检查是否只需要获取部分事件列。
+   * @param eventFilters 事件过滤条件
+   * @param fieldsToRetrieve 需要获取的字段集合
+   * @return 是否只需要获取部分事件列
    */
   protected boolean fetchPartialEventCols(TimelineFilterList eventFilters,
       EnumSet<Field> fieldsToRetrieve) {
@@ -143,9 +152,10 @@ class GenericEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Check if we need to fetch only some of the relates_to columns.
-   *
-   * @return true if we need to fetch some of the columns, false otherwise.
+   * 检查是否只需要获取部分relates_to关联列。
+   * @param relatesTo relates_to过滤条件
+   * @param fieldsToRetrieve 需要获取的字段集合
+   * @return 是否只需要获取部分relates_to关联列
    */
   protected boolean fetchPartialRelatesToCols(TimelineFilterList relatesTo,
       EnumSet<Field> fieldsToRetrieve) {
@@ -154,9 +164,10 @@ class GenericEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Check if we need to fetch only some of the is_related_to columns.
-   *
-   * @return true if we need to fetch some of the columns, false otherwise.
+   * 检查是否只需要获取部分is_related_to关联列。
+   * @param isRelatedTo is_related_to过滤条件
+   * @param fieldsToRetrieve 需要获取的字段集合
+   * @return 是否只需要获取部分is_related_to关联列
    */
   private boolean fetchPartialIsRelatedToCols(TimelineFilterList isRelatedTo,
       EnumSet<Field> fieldsToRetrieve) {
@@ -165,11 +176,8 @@ class GenericEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Check if we need to fetch only some of the columns based on event filters,
-   * relatesto and isrelatedto from info family.
-   *
-   * @return true, if we need to fetch only some of the columns, false if we
-   *         need to fetch all the columns under info column family.
+   * 检查info列族是否只需要获取部分列。
+   * @return 是否只需要获取info列族的部分列
    */
   protected boolean fetchPartialColsFromInfoFamily() {
     EnumSet<Field> fieldsToRetrieve = getDataToRetrieve().getFieldsToRetrieve();
@@ -181,29 +189,19 @@ class GenericEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Check if we need to create filter list based on fields. We need to create a
-   * filter list iff all fields need not be retrieved or we have some specific
-   * fields or metrics to retrieve. We also need to create a filter list if we
-   * have relationships(relatesTo/isRelatedTo) and event filters specified for
-   * the query.
-   *
-   * @return true if we need to create the filter list, false otherwise.
+   * 检查是否需要基于字段创建过滤列表。
+   * @return 是否需要基于字段创建过滤列表
    */
   protected boolean needCreateFilterListBasedOnFields() {
     TimelineDataToRetrieve dataToRetrieve = getDataToRetrieve();
-    // Check if all fields are to be retrieved or not. If all fields have to
-    // be retrieved, also check if we have some metrics or configs to
-    // retrieve specified for the query because then a filter list will have
-    // to be created.
+    // 检查是否不是获取所有字段，或者指定了特定配置/指标需要获取
     boolean flag =
         !dataToRetrieve.getFieldsToRetrieve().contains(Field.ALL)
             || (dataToRetrieve.getConfsToRetrieve() != null && !dataToRetrieve
                 .getConfsToRetrieve().getFilterList().isEmpty())
             || (dataToRetrieve.getMetricsToRetrieve() != null && !dataToRetrieve
                 .getMetricsToRetrieve().getFilterList().isEmpty());
-    // Filters need to be checked only if we are reading multiple entities. If
-    // condition above is false, we check if there are relationships(relatesTo/
-    // isRelatedTo) and event filters specified for the query.
+    // 如果上述条件不满足，多实体读取场景下检查是否有关联过滤或事件过滤
     if (!flag && !isSingleEntityRead()) {
       TimelineEntityFilters filters = getFilters();
       flag =
@@ -218,10 +216,8 @@ class GenericEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Add {@link QualifierFilter} filters to filter list for each column of
-   * entity table.
-   *
-   * @param list filter list to which qualifier filters have to be added.
+   * 将实体表固定列的限定符过滤添加到过滤列表。
+   * @param list 目标过滤列表
    */
   protected void updateFixedColumns(FilterList list) {
     for (EntityColumn column : EntityColumn.values()) {
@@ -231,21 +227,16 @@ class GenericEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Creates a filter list which indicates that only some of the column
-   * qualifiers in the info column family will be returned in result.
-   *
-   * @param isApplication If true, it means operations are to be performed for
-   *          application table, otherwise for entity table.
-   * @return filter list.
-   * @throws IOException if any problem occurs while creating filter list.
+   * 创建info列族的列过滤列表，只返回符合条件的限定符。
+   * @return info列族过滤列表
+   * @throws IOException 创建过滤列表时发生IO异常
    */
   private FilterList createFilterListForColsOfInfoFamily() throws IOException {
     FilterList infoFamilyColsFilter = new FilterList(Operator.MUST_PASS_ONE);
-    // Add filters for each column in entity table.
+    // 添加固定列的过滤
     updateFixedColumns(infoFamilyColsFilter);
     EnumSet<Field> fieldsToRetrieve = getDataToRetrieve().getFieldsToRetrieve();
-    // If INFO field has to be retrieved, add a filter for fetching columns
-    // with INFO column prefix.
+    // 如果需要获取INFO字段，添加INFO前缀列的过滤
     if (hasField(fieldsToRetrieve, Field.INFO)) {
       infoFamilyColsFilter
           .addFilter(TimelineFilterUtils.createHBaseQualifierFilter(
@@ -253,16 +244,12 @@ class GenericEntityReader extends TimelineEntityReader {
     }
     TimelineFilterList relatesTo = getFilters().getRelatesTo();
     if (hasField(fieldsToRetrieve, Field.RELATES_TO)) {
-      // If RELATES_TO field has to be retrieved, add a filter for fetching
-      // columns with RELATES_TO column prefix.
+      // 如果需要获取RELATES_TO字段，添加RELATES_TO前缀列的过滤
       infoFamilyColsFilter.addFilter(TimelineFilterUtils
           .createHBaseQualifierFilter(CompareOp.EQUAL,
               EntityColumnPrefix.RELATES_TO));
     } else if (relatesTo != null && !relatesTo.getFilterList().isEmpty()) {
-      // Even if fields to retrieve does not contain RELATES_TO, we still
-      // need to have a filter to fetch some of the column qualifiers if
-      // relatesTo filters are specified. relatesTo filters will then be
-      // matched after fetching rows from HBase.
+      // 即使不需要整个RELATES_TO字段，仍然需要获取过滤条件指定的列用于后端过滤
       Set<String> relatesToCols =
           TimelineFilterUtils.fetchColumnsFromFilterList(relatesTo);
       infoFamilyColsFilter.addFilter(createFiltersFromColumnQualifiers(
@@ -270,16 +257,12 @@ class GenericEntityReader extends TimelineEntityReader {
     }
     TimelineFilterList isRelatedTo = getFilters().getIsRelatedTo();
     if (hasField(fieldsToRetrieve, Field.IS_RELATED_TO)) {
-      // If IS_RELATED_TO field has to be retrieved, add a filter for fetching
-      // columns with IS_RELATED_TO column prefix.
+      // 如果需要获取IS_RELATED_TO字段，添加IS_RELATED_TO前缀列的过滤
       infoFamilyColsFilter.addFilter(TimelineFilterUtils
           .createHBaseQualifierFilter(CompareOp.EQUAL,
               EntityColumnPrefix.IS_RELATED_TO));
     } else if (isRelatedTo != null && !isRelatedTo.getFilterList().isEmpty()) {
-      // Even if fields to retrieve does not contain IS_RELATED_TO, we still
-      // need to have a filter to fetch some of the column qualifiers if
-      // isRelatedTo filters are specified. isRelatedTo filters will then be
-      // matched after fetching rows from HBase.
+      // 即使不需要整个IS_RELATED_TO字段，仍然需要获取过滤条件指定的列用于后端过滤
       Set<String> isRelatedToCols =
           TimelineFilterUtils.fetchColumnsFromFilterList(isRelatedTo);
       infoFamilyColsFilter.addFilter(createFiltersFromColumnQualifiers(
@@ -287,17 +270,13 @@ class GenericEntityReader extends TimelineEntityReader {
     }
     TimelineFilterList eventFilters = getFilters().getEventFilters();
     if (hasField(fieldsToRetrieve, Field.EVENTS)) {
-      // If EVENTS field has to be retrieved, add a filter for fetching columns
-      // with EVENT column prefix.
+      // 如果需要获取EVENTS字段，添加EVENT前缀列的过滤
       infoFamilyColsFilter
           .addFilter(TimelineFilterUtils.createHBaseQualifierFilter(
               CompareOp.EQUAL, EntityColumnPrefix.EVENT));
     } else if (eventFilters != null &&
         !eventFilters.getFilterList().isEmpty()) {
-      // Even if fields to retrieve does not contain EVENTS, we still need to
-      // have a filter to fetch some of the column qualifiers on the basis of
-      // event filters specified. Event filters will then be matched after
-      // fetching rows from HBase.
+      // 即使不需要整个EVENTS字段，仍然需要获取过滤条件指定的列用于后端过滤
       Set<String> eventCols =
           TimelineFilterUtils.fetchColumnsFromFilterList(eventFilters);
       infoFamilyColsFilter.addFilter(createFiltersFromColumnQualifiers(
@@ -307,33 +286,30 @@ class GenericEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Exclude column prefixes via filters which are not required(based on fields
-   * to retrieve) from info column family. These filters are added to filter
-   * list which contains a filter for getting info column family.
-   *
-   * @param infoColFamilyList filter list for info column family.
+   * 根据需要获取的字段，排除info列族中不需要的列前缀。
+   * @param infoColFamilyList info列族过滤列表
    */
   private void excludeFieldsFromInfoColFamily(FilterList infoColFamilyList) {
     EnumSet<Field> fieldsToRetrieve = getDataToRetrieve().getFieldsToRetrieve();
-    // Events not required.
+    // 排除不需要的事件列
     if (!hasField(fieldsToRetrieve, Field.EVENTS)) {
       infoColFamilyList.addFilter(TimelineFilterUtils
           .createHBaseQualifierFilter(CompareOp.NOT_EQUAL,
               EntityColumnPrefix.EVENT));
     }
-    // info not required.
+    // 排除不需要的info列
     if (!hasField(fieldsToRetrieve, Field.INFO)) {
       infoColFamilyList.addFilter(TimelineFilterUtils
           .createHBaseQualifierFilter(CompareOp.NOT_EQUAL,
               EntityColumnPrefix.INFO));
     }
-    // is related to not required.
+    // 排除不需要的is_related_to列
     if (!hasField(fieldsToRetrieve, Field.IS_RELATED_TO)) {
       infoColFamilyList.addFilter(TimelineFilterUtils
           .createHBaseQualifierFilter(CompareOp.NOT_EQUAL,
               EntityColumnPrefix.IS_RELATED_TO));
     }
-    // relates to not required.
+    // 排除不需要的relates_to列
     if (!hasField(fieldsToRetrieve, Field.RELATES_TO)) {
       infoColFamilyList.addFilter(TimelineFilterUtils
           .createHBaseQualifierFilter(CompareOp.NOT_EQUAL,
@@ -342,19 +318,18 @@ class GenericEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Updates filter list based on fields for confs and metrics to retrieve.
-   *
-   * @param listBasedOnFields filter list based on fields.
-   * @throws IOException if any problem occurs while updating filter list.
+   * 根据需要获取的配置和指标更新过滤列表。
+   * @param listBasedOnFields 基于字段的过滤列表
+   * @param cfsInFields 需要获取的列族集合
+   * @throws IOException 更新过滤列表时发生IO异常
    */
   private void updateFilterForConfsAndMetricsToRetrieve(
       FilterList listBasedOnFields, Set<String> cfsInFields)
       throws IOException {
     TimelineDataToRetrieve dataToRetrieve = getDataToRetrieve();
-    // Please note that if confsToRetrieve is specified, we would have added
-    // CONFS to fields to retrieve in augmentParams() even if not specified.
+    // 如果指定了配置需要获取，已经在augmentParams中将CONFIGS加入字段列表
     if (dataToRetrieve.getFieldsToRetrieve().contains(Field.CONFIGS)) {
-      // Create a filter list for configs.
+      // 创建配置获取过滤列表
       listBasedOnFields.addFilter(TimelineFilterUtils
           .createFilterForConfsOrMetricsToRetrieve(
               dataToRetrieve.getConfsToRetrieve(), EntityColumnFamily.CONFIGS,
@@ -362,10 +337,9 @@ class GenericEntityReader extends TimelineEntityReader {
       cfsInFields.add(Bytes.toString(EntityColumnFamily.CONFIGS.getBytes()));
     }
 
-    // Please note that if metricsToRetrieve is specified, we would have added
-    // METRICS to fields to retrieve in augmentParams() even if not specified.
+    // 如果指定了指标需要获取，已经在augmentParams中将METRICS加入字段列表
     if (dataToRetrieve.getFieldsToRetrieve().contains(Field.METRICS)) {
-      // Create a filter list for metrics.
+      // 创建指标获取过滤列表
       listBasedOnFields.addFilter(TimelineFilterUtils
           .createFilterForConfsOrMetricsToRetrieve(
               dataToRetrieve.getMetricsToRetrieve(),
@@ -376,291 +350,4 @@ class GenericEntityReader extends TimelineEntityReader {
 
   @Override
   protected FilterList constructFilterListBasedOnFields(Set<String> cfsInFields)
-      throws IOException {
-    if (!needCreateFilterListBasedOnFields()) {
-      // Fetch all the columns. No need of a filter.
-      return null;
-    }
-    FilterList listBasedOnFields = new FilterList(Operator.MUST_PASS_ONE);
-    FilterList infoColFamilyList = new FilterList();
-    // By default fetch everything in INFO column family.
-    FamilyFilter infoColumnFamily =
-        new FamilyFilter(CompareOp.EQUAL, new BinaryComparator(
-            EntityColumnFamily.INFO.getBytes()));
-    infoColFamilyList.addFilter(infoColumnFamily);
-    if (!isSingleEntityRead() && fetchPartialColsFromInfoFamily()) {
-      // We can fetch only some of the columns from info family.
-      infoColFamilyList.addFilter(createFilterListForColsOfInfoFamily());
-    } else {
-      // Exclude column prefixes in info column family which are not required
-      // based on fields to retrieve.
-      excludeFieldsFromInfoColFamily(infoColFamilyList);
-    }
-    listBasedOnFields.addFilter(infoColFamilyList);
-    cfsInFields.add(Bytes.toString(EntityColumnFamily.INFO.getBytes()));
-    updateFilterForConfsAndMetricsToRetrieve(listBasedOnFields, cfsInFields);
-    return listBasedOnFields;
-  }
-
-  @Override
-  protected void validateParams() {
-    if (getContext() == null) {
-      throw new NullPointerException("context shouldn't be null");
-    }
-    if (getDataToRetrieve() == null) {
-      throw new NullPointerException("data to retrieve shouldn't be null");
-    }
-    if (getContext().getClusterId() == null) {
-      throw new NullPointerException("clusterId shouldn't be null");
-    }
-    if (getContext().getAppId() == null) {
-      throw new NullPointerException("appId shouldn't be null");
-    }
-    if (getContext().getEntityType() == null) {
-      throw new NullPointerException("entityType shouldn't be null");
-    }
-    if (isSingleEntityRead()) {
-      if (getContext().getEntityId() == null) {
-        throw new NullPointerException("entityId shouldn't be null");
-      }
-    }
-  }
-
-  @Override
-  protected void augmentParams(Configuration hbaseConf, Connection conn)
-      throws IOException {
-    defaultAugmentParams(hbaseConf, conn);
-    // Add configs/metrics to fields to retrieve if confsToRetrieve and/or
-    // metricsToRetrieve are specified.
-    getDataToRetrieve().addFieldsBasedOnConfsAndMetricsToRetrieve();
-    if (!isSingleEntityRead()) {
-      createFiltersIfNull();
-    }
-  }
-
-  @Override
-  protected Result getResult(Configuration hbaseConf, Connection conn,
-      FilterList filterList) throws IOException {
-    TimelineReaderContext context = getContext();
-    Result result = null;
-    if (context.getEntityIdPrefix() != null) {
-      byte[] rowKey = new EntityRowKey(context.getClusterId(),
-          context.getUserId(), context.getFlowName(), context.getFlowRunId(),
-          context.getAppId(), context.getEntityType(),
-          context.getEntityIdPrefix(), context.getEntityId()).getRowKey();
-      Get get = new Get(rowKey);
-      setMetricsTimeRange(get);
-      get.setMaxVersions(getDataToRetrieve().getMetricsLimit());
-      if (filterList != null && !filterList.getFilters().isEmpty()) {
-        get.setFilter(filterList);
-      }
-      result = getTable().getResult(hbaseConf, conn, get);
-
-    } else {
-      // Prepare for range scan
-      // create single SingleColumnValueFilter and add to existing filters.
-      FilterList filter = new FilterList(Operator.MUST_PASS_ALL);
-      if (filterList != null && !filterList.getFilters().isEmpty()) {
-        filter.addFilter(filterList);
-      }
-      FilterList newFilter = new FilterList();
-      newFilter.addFilter(TimelineFilterUtils.createHBaseSingleColValueFilter(
-          EntityColumn.ID, context.getEntityId(), CompareOp.EQUAL));
-      newFilter.addFilter(new PageFilter(1));
-      filter.addFilter(newFilter);
-
-      ResultScanner results = getResults(hbaseConf, conn, filter);
-      try {
-        Iterator<Result> iterator = results.iterator();
-        if (iterator.hasNext()) {
-          result = iterator.next();
-        }
-      } finally {
-        results.close();
-      }
-    }
-    return result;
-  }
-
-  private void setMetricsTimeRange(Query query) {
-    // Set time range for metric values.
-    HBaseTimelineStorageUtils.setMetricsTimeRange(
-        query, EntityColumnFamily.METRICS.getBytes(),
-        getDataToRetrieve().getMetricsTimeBegin(),
-        getDataToRetrieve().getMetricsTimeEnd());
-  }
-
-  @Override
-  protected ResultScanner getResults(Configuration hbaseConf, Connection conn,
-      FilterList filterList) throws IOException {
-    // Scan through part of the table to find the entities belong to one app
-    // and one type
-    Scan scan = new Scan();
-    TimelineReaderContext context = getContext();
-    RowKeyPrefix<EntityRowKey> entityRowKeyPrefix = null;
-    // default mode, will always scans from beginning of entity type.
-    if (getFilters() == null || getFilters().getFromId() == null) {
-      entityRowKeyPrefix = new EntityRowKeyPrefix(context.getClusterId(),
-          context.getUserId(), context.getFlowName(), context.getFlowRunId(),
-          context.getAppId(), context.getEntityType(), null, null);
-      scan.setRowPrefixFilter(entityRowKeyPrefix.getRowKeyPrefix());
-    } else { // pagination mode, will scan from given entityIdPrefix!enitityId
-
-      EntityRowKey entityRowKey = null;
-      try {
-        entityRowKey =
-            EntityRowKey.parseRowKeyFromString(getFilters().getFromId());
-      } catch (IllegalArgumentException e) {
-        throw new BadRequestException("Invalid filter fromid is provided.");
-      }
-      if (!context.getClusterId().equals(entityRowKey.getClusterId())) {
-        throw new BadRequestException(
-            "fromid doesn't belong to clusterId=" + context.getClusterId());
-      }
-
-      // set start row
-      scan.withStartRow(entityRowKey.getRowKey());
-
-      // get the bytes for stop row
-      entityRowKeyPrefix = new EntityRowKeyPrefix(context.getClusterId(),
-          context.getUserId(), context.getFlowName(), context.getFlowRunId(),
-          context.getAppId(), context.getEntityType(), null, null);
-
-      // set stop row
-      scan.withStopRow(
-          HBaseTimelineStorageUtils.calculateTheClosestNextRowKeyForPrefix(
-              entityRowKeyPrefix.getRowKeyPrefix()));
-
-      // set page filter to limit. This filter has to set only in pagination
-      // mode.
-      filterList.addFilter(new PageFilter(getFilters().getLimit()));
-    }
-    setMetricsTimeRange(scan);
-    scan.setMaxVersions(getDataToRetrieve().getMetricsLimit());
-    if (filterList != null && !filterList.getFilters().isEmpty()) {
-      scan.setFilter(filterList);
-    }
-    return getTable().getResultScanner(hbaseConf, conn, scan);
-  }
-
-  @Override
-  protected TimelineEntity parseEntity(Result result) throws IOException {
-    if (result == null || result.isEmpty()) {
-      return null;
-    }
-    TimelineEntity entity = new TimelineEntity();
-    EntityRowKey parseRowKey = EntityRowKey.parseRowKey(result.getRow());
-    entity.setType(parseRowKey.getEntityType());
-    entity.setId(parseRowKey.getEntityId());
-    entity.setIdPrefix(parseRowKey.getEntityIdPrefix().longValue());
-
-    TimelineEntityFilters filters = getFilters();
-    // fetch created time
-    Long createdTime = (Long) ColumnRWHelper.readResult(result,
-        EntityColumn.CREATED_TIME);
-    entity.setCreatedTime(createdTime);
-
-    EnumSet<Field> fieldsToRetrieve = getDataToRetrieve().getFieldsToRetrieve();
-    // fetch is related to entities and match isRelatedTo filter. If isRelatedTo
-    // filters do not match, entity would be dropped. We have to match filters
-    // locally as relevant HBase filters to filter out rows on the basis of
-    // isRelatedTo are not set in HBase scan.
-    boolean checkIsRelatedTo =
-        !isSingleEntityRead() && filters.getIsRelatedTo() != null
-            && filters.getIsRelatedTo().getFilterList().size() > 0;
-    if (hasField(fieldsToRetrieve, Field.IS_RELATED_TO) || checkIsRelatedTo) {
-      readRelationship(entity, result, EntityColumnPrefix.IS_RELATED_TO, true);
-      if (checkIsRelatedTo
-          && !TimelineStorageUtils.matchIsRelatedTo(entity,
-              filters.getIsRelatedTo())) {
-        return null;
-      }
-      if (!hasField(fieldsToRetrieve, Field.IS_RELATED_TO)) {
-        entity.getIsRelatedToEntities().clear();
-      }
-    }
-
-    // fetch relates to entities and match relatesTo filter. If relatesTo
-    // filters do not match, entity would be dropped. We have to match filters
-    // locally as relevant HBase filters to filter out rows on the basis of
-    // relatesTo are not set in HBase scan.
-    boolean checkRelatesTo =
-        !isSingleEntityRead() && filters.getRelatesTo() != null
-            && filters.getRelatesTo().getFilterList().size() > 0;
-    if (hasField(fieldsToRetrieve, Field.RELATES_TO)
-        || checkRelatesTo) {
-      readRelationship(entity, result, EntityColumnPrefix.RELATES_TO, false);
-      if (checkRelatesTo
-          && !TimelineStorageUtils.matchRelatesTo(entity,
-              filters.getRelatesTo())) {
-        return null;
-      }
-      if (!hasField(fieldsToRetrieve, Field.RELATES_TO)) {
-        entity.getRelatesToEntities().clear();
-      }
-    }
-
-    // fetch info if fieldsToRetrieve contains INFO or ALL.
-    if (hasField(fieldsToRetrieve, Field.INFO)) {
-      readKeyValuePairs(entity, result, EntityColumnPrefix.INFO, false);
-    }
-
-    // fetch configs if fieldsToRetrieve contains CONFIGS or ALL.
-    if (hasField(fieldsToRetrieve, Field.CONFIGS)) {
-      readKeyValuePairs(entity, result, EntityColumnPrefix.CONFIG, true);
-    }
-
-    // fetch events and match event filters if they exist. If event filters do
-    // not match, entity would be dropped. We have to match filters locally
-    // as relevant HBase filters to filter out rows on the basis of events
-    // are not set in HBase scan.
-    boolean checkEvents =
-        !isSingleEntityRead() && filters.getEventFilters() != null
-            && filters.getEventFilters().getFilterList().size() > 0;
-    if (hasField(fieldsToRetrieve, Field.EVENTS) || checkEvents) {
-      readEvents(entity, result, EntityColumnPrefix.EVENT);
-      if (checkEvents
-          && !TimelineStorageUtils.matchEventFilters(entity,
-              filters.getEventFilters())) {
-        return null;
-      }
-      if (!hasField(fieldsToRetrieve, Field.EVENTS)) {
-        entity.getEvents().clear();
-      }
-    }
-
-    // fetch metrics if fieldsToRetrieve contains METRICS or ALL.
-    if (hasField(fieldsToRetrieve, Field.METRICS)) {
-      readMetrics(entity, result, EntityColumnPrefix.METRIC);
-    }
-
-    entity.getInfo().put(TimelineReaderUtils.FROMID_KEY,
-        parseRowKey.getRowKeyAsString());
-    return entity;
-  }
-
-  /**
-   * Helper method for reading key-value pairs for either info or config.
-   *
-   * @param <T> Describes the type of column prefix.
-   * @param entity entity to fill.
-   * @param result result from HBase.
-   * @param prefix column prefix.
-   * @param isConfig if true, means we are reading configs, otherwise info.
-   * @throws IOException if any problem is encountered while reading result.
-   */
-  protected <T extends BaseTable<T>> void readKeyValuePairs(
-      TimelineEntity entity, Result result,
-      ColumnPrefix<T> prefix, boolean isConfig) throws IOException {
-    // info and configuration are of type Map<String, Object or String>
-    Map<String, Object> columns =
-        ColumnRWHelper.readResults(result, prefix, stringKeyConverter);
-    if (isConfig) {
-      for (Map.Entry<String, Object> column : columns.entrySet()) {
-        entity.addConfig(column.getKey(), column.getValue().toString());
-      }
-    } else {
-      entity.addInfo(columns);
-    }
-  }
-}
+      throws

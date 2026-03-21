@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,45 +25,58 @@ import org.apache.hadoop.yarn.util.TimelineServiceHelper;
 import java.util.Map;
 
 /**
- * This class represents a Sub Document for {@link TimelineEvent}
- * when creating a new {@link TimelineEntityDocument}.
+ * 文档存储时间线服务中，用于表示{@link TimelineEntityDocument}中事件信息的子文档。
+ * 封装时间线事件，适配文档存储的文档结构模型。
  */
 public class TimelineEventSubDoc {
 
+  /** 持有的实际时间线事件对象 */
   private final TimelineEvent timelineEvent;
 
+  /** 无参构造方法，初始化空的时间线事件 */
   public TimelineEventSubDoc() {
     timelineEvent = new TimelineEvent();
   }
 
+  /**
+   * 构造方法，基于已有时间线事件创建子文档
+   * @param timelineEvent 原始时间线事件对象
+   */
   public TimelineEventSubDoc(TimelineEvent timelineEvent) {
     this.timelineEvent = timelineEvent;
   }
 
+  /** 获取事件ID */
   public String getId() {
     return timelineEvent.getId();
   }
 
+  /** 设置事件ID */
   public void setId(String eventId) {
     timelineEvent.setId(eventId);
   }
 
+  /** 检查当前事件是否合法 */
   public boolean isValid() {
     return timelineEvent.isValid();
   }
   
+  /** 获取事件时间戳 */
   public long getTimestamp() {
     return timelineEvent.getTimestamp();
   }
 
+  /** 设置事件时间戳 */
   public void setTimestamp(long ts) {
     timelineEvent.setTimestamp(ts);
   }
 
+  /** 获取事件扩展信息键值对 */
   public Map<String, Object> getInfo() {
     return timelineEvent.getInfo();
   }
 
+  /** 设置事件扩展信息，将输入Map转换为HashMap适配存储 */
   public void setInfo(Map<String, Object> info) {
     timelineEvent.setInfo(TimelineServiceHelper.mapCastToHashMap(info));
   }
@@ -85,6 +99,7 @@ public class TimelineEventSubDoc {
     return this.timelineEvent.getId().equals(otherTimelineEvent.getId());
   }
 
+  /** 获取封装的原始时间线事件对象 */
   public TimelineEvent fetchTimelineEvent() {
     return timelineEvent;
   }

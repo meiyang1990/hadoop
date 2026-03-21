@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -33,7 +34,7 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * A bunch of utility functions used in HBase TimelineService backend.
+ * HBase时间线服务后端存储的通用工具类集合，提供配置加载、行键计算、时间范围设置等通用功能。
  */
 public final class HBaseTimelineStorageUtils {
   private static final Logger LOG =
@@ -43,14 +44,12 @@ public final class HBaseTimelineStorageUtils {
   }
 
   /**
-   * @param conf YARN configuration. Used to see if there is an explicit config
-   *          pointing to the HBase config file to read. It should not be null
-   *          or a NullPointerException will be thrown.
-   * @return a configuration with the HBase configuration from the classpath,
-   *         optionally overwritten by the timeline service configuration URL if
-   *         specified.
-   * @throws IOException if a timeline service HBase configuration URL
-   *           is specified but unable to read it.
+   * 加载时间线服务HBase存储的配置，优先使用配置文件中指定的HBase配置文件路径，
+   * 若未指定则使用类路径下的默认HBase配置。
+   * 
+   * @param conf YARN配置对象，不能为null，用于读取HBase配置文件路径
+   * @return 合并后的HBase配置对象
+   * @throws IOException 当配置文件路径指定但无法读取时抛出IO异常
    */
   public static Configuration getTimelineServiceHBaseConf(Configuration conf)
       throws IOException {
@@ -59,6 +58,7 @@ public final class HBaseTimelineStorageUtils {
     }
 
     Configuration hbaseConf;
+    // 从YARN配置中获取HBase配置文件路径
     String timelineServiceHBaseConfFilePath =
         conf.get(YarnConfiguration.TIMELINE_SERVICE_HBASE_CONFIGURATION_FILE);
 
@@ -66,35 +66,37 @@ public final class HBaseTimelineStorageUtils {
           && timelineServiceHBaseConfFilePath.length() > 0) {
       LOG.info("Using hbase configuration at " +
           timelineServiceHBaseConfFilePath);
-      // create a clone so that we don't mess with out input one
+      // 克隆输入配置，避免修改原配置对象
       hbaseConf = new Configuration(conf);
       Configuration plainHBaseConf = new Configuration(false);
       Path hbaseConfigPath = new Path(timelineServiceHBaseConfFilePath);
+      // 自动关闭流资源
       try (FileSystem fs =
           FileSystem.newInstance(hbaseConfigPath.toUri(), conf);
           FSDataInputStream in = fs.open(hbaseConfigPath)) {
+        // 加载从HDFS读取的HBase配置
         plainHBaseConf.addResource(in);
+        // 将加载的HBase配置合并到基础配置
         HBaseConfiguration.merge(hbaseConf, plainHBaseConf);
       }
     } else {
-      // default to what is on the classpath
+      // 未指定自定义配置，使用类路径下默认的HBase配置
       hbaseConf = HBaseConfiguration.create(conf);
     }
     return hbaseConf;
   }
 
   /**
-   * Given a row key prefix stored in a byte array, return a byte array for its
-   * immediate next row key.
+   * 根据给定行键前缀计算出范围扫描用的截止行键，用于HBase前缀扫描，
+   * 可以将扫描范围限定为所有以该前缀开头的行。
    *
-   * @param rowKeyPrefix The provided row key prefix, represented in an array.
-   * @return the closest next row key of the provided row key.
+   * @param rowKeyPrefix 输入的行键前缀字节数组
+   * @return 最接近的下一个行键，用于作为HBase扫描的stopRow
    */
   public static byte[] calculateTheClosestNextRowKeyForPrefix(
       byte[] rowKeyPrefix) {
-    // Essentially we are treating it like an 'unsigned very very long' and
-    // doing +1 manually.
-    // Search for the place where the trailing 0xFFs start
+    // 把行键看作无符号大整数，对其执行+1操作
+    // 从末尾向前查找第一个不是0xFF的字节位置
     int offset = rowKeyPrefix.length;
     while (offset > 0) {
       if (rowKeyPrefix[offset - 1] != (byte) 0xFF) {
@@ -104,22 +106,28 @@ public final class HBaseTimelineStorageUtils {
     }
 
     if (offset == 0) {
-      // We got an 0xFFFF... (only FFs) stopRow value which is
-      // the last possible prefix before the end of the table.
-      // So set it to stop at the 'end of the table'
+      // 所有字节都是0xFF，已经是最大可能前缀，直接返回表结束标记
       return HConstants.EMPTY_END_ROW;
     }
 
-    // Copy the right length of the original
+    // 复制前缀到offset位置，只保留第一个非0xFF之前的部分
     byte[] newStopRow = Arrays.copyOfRange(rowKeyPrefix, 0, offset);
-    // And increment the last one
+    // 对最后一个字节执行+1，得到下一个行键
     newStopRow[newStopRow.length - 1]++;
     return newStopRow;
   }
 
+  /**
+   * 为查询设置指标列族的时间范围过滤，仅查询指定时间范围内的指标数据。
+   * @param query HBase查询对象
+   * @param metricsCf 指标列族字节数组
+   * @param tsBegin 开始时间戳
+   * @param tsEnd 结束时间戳
+   */
   public static void setMetricsTimeRange(Query query, byte[] metricsCf,
       long tsBegin, long tsEnd) {
     if (tsBegin != 0 || tsEnd != Long.MAX_VALUE) {
+      // HBase时间范围是左闭右开，结束点需要+1
       query.setColumnFamilyTimeRange(metricsCf,
           tsBegin, ((tsEnd == Long.MAX_VALUE) ? Long.MAX_VALUE : (tsEnd + 1)));
     }

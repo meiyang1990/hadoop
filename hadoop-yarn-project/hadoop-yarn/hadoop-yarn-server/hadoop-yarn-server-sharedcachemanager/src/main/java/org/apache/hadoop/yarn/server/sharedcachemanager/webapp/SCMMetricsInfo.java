@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,25 +30,39 @@ import org.apache.hadoop.yarn.server.sharedcachemanager.metrics.ClientSCMMetrics
 import org.apache.hadoop.yarn.server.sharedcachemanager.metrics.SharedCacheUploaderMetrics;
 
 /**
- * This class is used to summarize useful shared cache manager metrics for the
- * webUI display.
+ * 共享缓存管理器(SCM)指标信息封装类，用于聚合各类指标供Web UI展示
+ * 
+ * 聚合了清理器、客户端、上传器三类核心指标，通过JAXB支持XML序列化返回给Web前端
  */
 @XmlRootElement(name = "SCMMetrics")
 @XmlAccessorType(XmlAccessType.FIELD)
 @Private
 @Unstable
 public class SCMMetricsInfo {
+  // 累计删除文件数
   protected long totalDeletedFiles;
+  // 累计处理文件数
   protected long totalProcessedFiles;
+  // 缓存命中次数
   protected long cacheHits;
+  // 缓存未命中次数
   protected long cacheMisses;
+  // 缓存释放次数
   protected long cacheReleases;
+  // 接受的上传数
   protected long acceptedUploads;
+  // 拒绝的上传数
   protected long rejectedUploads;
 
   public SCMMetricsInfo() {
   }
   
+  /**
+   * 从各组件指标构造聚合后的SCM指标信息
+   * @param cleanerMetrics 清理器指标实例
+   * @param clientSCMMetrics 客户端指标实例
+   * @param scmUploaderMetrics 上传器指标实例
+   */
   public SCMMetricsInfo(CleanerMetrics cleanerMetrics,
       ClientSCMMetrics clientSCMMetrics,
       SharedCacheUploaderMetrics scmUploaderMetrics) {

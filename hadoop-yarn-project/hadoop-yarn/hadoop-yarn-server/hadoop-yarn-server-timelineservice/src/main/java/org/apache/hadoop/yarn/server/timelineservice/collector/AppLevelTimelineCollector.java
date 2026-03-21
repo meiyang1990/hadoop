@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,10 +36,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Service that handles writes to the timeline service and writes them to the
- * backing storage for a given YARN application.
- *
- * App-related lifecycle management is handled by this service.
+ * 应用级别时间线收集器服务，负责处理单个YARN应用的时间线数据写入，并将数据持久化到后端存储。
+ * 负责管理该应用相关的生命周期流程，包括委托令牌的更新和服务启停。
  */
 @Private
 @Unstable
@@ -46,19 +45,36 @@ public class AppLevelTimelineCollector extends TimelineCollector {
   private static final Logger LOG =
       LoggerFactory.getLogger(TimelineCollector.class);
 
+  // 当前收集器对应YARN应用ID
   private final ApplicationId appId;
+  // 应用提交用户名
   private final String appUser;
+  // 时间线实体上下文，存储当前应用的上下文信息
   private final TimelineCollectorContext context;
+  // 当前操作的用户信息
   private UserGroupInformation currentUser;
+  // 当前应用的时间线委托令牌
   private Token<TimelineDelegationTokenIdentifier> delegationTokenForApp;
+  // 委托令牌最大有效期时间戳
   private long tokenMaxDate = 0;
+  // 委托令牌更新者
   private String tokenRenewer;
+  // 委托令牌更新/重新生成的异步任务Future
   private Future<?> renewalOrRegenerationFuture;
 
+  /**
+   * 构造应用级别时间线收集器，不指定提交用户。
+   * @param appId YARN应用ID
+   */
   public AppLevelTimelineCollector(ApplicationId appId) {
     this(appId, null);
   }
 
+  /**
+   * 构造应用级别时间线收集器，指定应用ID和提交用户。
+   * @param appId YARN应用ID
+   * @param user 应用提交用户名
+   */
   public AppLevelTimelineCollector(ApplicationId appId, String user) {
     super(AppLevelTimelineCollector.class.getName() + " - " + appId.toString());
     Preconditions.checkNotNull(appId, "AppId shouldn't be null");
@@ -75,6 +91,13 @@ public class AppLevelTimelineCollector extends TimelineCollector {
     return appUser;
   }
 
+  /**
+   * 设置应用的委托令牌及相关更新任务信息。
+   * @param token 委托令牌
+   * @param appRenewalOrRegenerationFuture 更新/重新生成异步任务
+   * @param tknMaxDate 令牌最大有效期
+   * @param renewer 令牌更新者
+   */
   void setDelegationTokenAndFutureForApp(
       Token<TimelineDelegationTokenIdentifier> token,
       Future<?> appRenewalOrRegenerationFuture, long tknMaxDate,
@@ -85,11 +108,18 @@ public class AppLevelTimelineCollector extends TimelineCollector {
     this.renewalOrRegenerationFuture = appRenewalOrRegenerationFuture;
   }
 
+  /**
+   * 更新应用的委托令牌更新/重新生成异步任务。
+   * @param appRenewalOrRegenerationFuture 新的异步任务Future
+   */
   void setRenewalOrRegenerationFutureForApp(
       Future<?> appRenewalOrRegenerationFuture) {
     this.renewalOrRegenerationFuture = appRenewalOrRegenerationFuture;
   }
 
+  /**
+   * 取消应用的委托令牌更新/重新生成异步任务。
+   */
   void cancelRenewalOrRegenerationFutureForApp() {
     if (renewalOrRegenerationFuture != null &&
         !renewalOrRegenerationFuture.isDone()) {
@@ -112,11 +142,11 @@ public class AppLevelTimelineCollector extends TimelineCollector {
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 从配置中读取集群ID，设置到上下文中
     context.setClusterId(conf.get(YarnConfiguration.RM_CLUSTER_ID,
         YarnConfiguration.DEFAULT_RM_CLUSTER_ID));
-    // Set the default values, which will be updated with an RPC call to get the
-    // context info from NM.
-    // Current user usually is not the app user, but keep this field non-null
+    // 先设置默认值，后续会通过RPC调用从NodeManager获取最新上下文信息进行更新
+    // 当前用户通常不是应用提交用户，但需要保证该字段非空
     currentUser = UserGroupInformation.getCurrentUser();
     context.setUserId(currentUser.getShortUserName());
     context.setAppId(appId.toString());
@@ -130,6 +160,7 @@ public class AppLevelTimelineCollector extends TimelineCollector {
 
   @Override
   protected void serviceStop() throws Exception {
+    // 停止时取消未完成的令牌更新任务
     cancelRenewalOrRegenerationFutureForApp();
     super.serviceStop();
   }

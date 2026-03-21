@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,22 +39,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This service maintains the shared cache meta data. It handles claiming and
- * releasing of resources, all rpc calls from the client to the shared cache
- * manager, and administrative commands. It also persists the shared cache meta
- * data to a backend store, and cleans up stale entries on a regular basis.
+ * YARN共享缓存管理器服务，负责维护共享缓存元数据，处理资源申请释放、客户端RPC调用、管理命令，
+ * 将元数据持久化到后端存储，并定期清理过期缓存条目。
  */
 @Private
 @Unstable
 public class SharedCacheManager extends CompositeService {
   /**
-   * Priority of the SharedCacheManager shutdown hook.
+   * 共享缓存管理器关闭钩子的优先级
    */
   public static final int SHUTDOWN_HOOK_PRIORITY = 30;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SharedCacheManager.class);
 
+  // 共享缓存元数据存储对象
   private SCMStore store;
 
   public SharedCacheManager() {
@@ -63,26 +63,32 @@ public class SharedCacheManager extends CompositeService {
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
 
+    // 创建并添加元数据存储服务
     this.store = createSCMStoreService(conf);
     addService(store);
 
+    // 创建并添加过期缓存清理服务
     CleanerService cs = createCleanerService(store);
     addService(cs);
 
+    // 创建并添加NodeManager缓存上传协议服务
     SharedCacheUploaderService nms =
         createNMCacheUploaderSCMProtocolService(store);
     addService(nms);
 
+    // 创建并添加客户端协议服务
     ClientProtocolService cps = createClientProtocolService(store);
     addService(cps);
 
+    // 创建并添加管理员协议服务
     SCMAdminProtocolService saps = createSCMAdminProtocolService(cs);
     addService(saps);
 
+    // 创建并添加Web UI服务
     SCMWebServer webUI = createSCMWebServer(this);
     addService(webUI);
 
-    // init metrics
+    // 初始化metrics系统
     DefaultMetricsSystem.initialize("SharedCacheManager");
     JvmMetrics.initSingleton("SharedCacheManager", null);
 
@@ -90,9 +96,11 @@ public class SharedCacheManager extends CompositeService {
   }
 
   @SuppressWarnings("unchecked")
+  // 根据配置创建SCM存储服务实例
   private static SCMStore createSCMStoreService(Configuration conf) {
     Class<? extends SCMStore> defaultStoreClass;
     try {
+      // 加载默认存储实现类
       defaultStoreClass =
           (Class<? extends SCMStore>) Class
               .forName(YarnConfiguration.DEFAULT_SCM_STORE_CLASS);
@@ -101,6 +109,7 @@ public class SharedCacheManager extends CompositeService {
           + YarnConfiguration.DEFAULT_SCM_STORE_CLASS, e);
     }
 
+    // 根据配置创建存储实例，使用默认类作为后备
     SCMStore store =
         ReflectionUtils.newInstance(conf.getClass(
             YarnConfiguration.SCM_STORE_CLASS,
@@ -108,52 +117,66 @@ public class SharedCacheManager extends CompositeService {
     return store;
   }
 
+  // 创建过期缓存清理服务
   private CleanerService createCleanerService(SCMStore store) {
     return new CleanerService(store);
   }
 
+  // 创建NodeManager缓存上传协议服务
   private SharedCacheUploaderService
       createNMCacheUploaderSCMProtocolService(SCMStore store) {
     return new SharedCacheUploaderService(store);
   }
 
+  // 创建客户端协议服务
   private ClientProtocolService createClientProtocolService(SCMStore store) {
     return new ClientProtocolService(store);
   }
 
+  // 创建管理员协议服务
   private SCMAdminProtocolService createSCMAdminProtocolService(
       CleanerService cleanerService) {
     return new SCMAdminProtocolService(cleanerService);
   }
 
+  // 创建Web UI服务
   private SCMWebServer createSCMWebServer(SharedCacheManager scm) {
     return new SCMWebServer(scm);
   }
 
   @Override
   protected void serviceStop() throws Exception {
-
+    // 关闭metrics系统
     DefaultMetricsSystem.shutdown();
     super.serviceStop();
   }
 
   /**
-   * For testing purposes only.
+   * 仅用于测试，获取元数据存储对象
    */
   @VisibleForTesting
   SCMStore getSCMStore() {
     return this.store;
   }
 
+  /**
+   * 共享缓存管理器启动入口
+   */
   public static void main(String[] args) {
+    // 设置默认未捕获异常处理器
     Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
+    // 打印启动日志信息
     StringUtils.startupShutdownMessage(SharedCacheManager.class, args, LOG);
     try {
+      // 加载YARN配置
       Configuration conf = new YarnConfiguration();
+      // 创建共享缓存管理器实例
       SharedCacheManager sharedCacheManager = new SharedCacheManager();
+      // 注册关闭钩子，确保服务正常退出
       ShutdownHookManager.get().addShutdownHook(
           new CompositeServiceShutdownHook(sharedCacheManager),
           SHUTDOWN_HOOK_PRIORITY);
+      // 初始化并启动服务
       sharedCacheManager.init(conf);
       sharedCacheManager.start();
     } catch (Throwable t) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,8 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class is for maintaining shared cache uploader requests metrics
- * and publishing them through the metrics interfaces.
+ * 维护YARN共享缓存上传器的请求指标，通过Hadoop metrics2接口对外发布
  */
 @Private
 @Evolving
@@ -47,10 +47,12 @@ public class SharedCacheUploaderMetrics {
     LOG.debug("Initialized {}", registry);
   }
 
+  /** 获取单例指标实例 */
   public static SharedCacheUploaderMetrics getInstance() {
     return INSTANCE;
   }
 
+  /** 创建并注册指标实例到默认指标系统 */
   static SharedCacheUploaderMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
 
@@ -63,20 +65,18 @@ public class SharedCacheUploaderMetrics {
   @Metric("Number of accepted uploads") MutableCounterLong acceptedUploads;
   @Metric("Number of rejected uploads") MutableCounterLong rejectedUploads;
 
-  /**
-   * One accepted upload event
-   */
+  /** 增加一个已接受上传的计数 */
   public void incAcceptedUploads() {
     acceptedUploads.incr();
   }
 
-  /**
-   * One rejected upload event
-   */
+  /** 增加一个已拒绝上传的计数 */
   public void incRejectedUploads() {
     rejectedUploads.incr();
   }
 
+  /** 获取已接受上传总数量 */
   public long getAcceptedUploads() { return acceptedUploads.value(); }
+  /** 获取已拒绝上传总数量 */
   public long getRejectUploads() { return rejectedUploads.value(); }
 }

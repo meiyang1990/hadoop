@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.documentstore.reader
- * contains the implementation of different DocumentStore reader clients
- * for DocumentVendor.
+ * 时间线服务文档存储读取器包，提供针对不同文档存储厂商的读取客户端实现
+ * 负责从文档数据库中读取时间线服务的指标数据
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

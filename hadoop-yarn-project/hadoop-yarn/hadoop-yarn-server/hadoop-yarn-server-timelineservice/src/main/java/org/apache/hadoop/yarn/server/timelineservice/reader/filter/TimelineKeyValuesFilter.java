@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,9 +25,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * Filter class which represents filter to be applied based on multiple values
- * for a key and these values being equal or not equal to values in back-end
- * store.
+ * 时间线服务多值键过滤器，用于根据单个键的多个值进行过滤，支持相等或不等匹配，过滤后端存储中的实体数据。
  */
 @Private
 @Unstable
@@ -38,6 +37,12 @@ public class TimelineKeyValuesFilter extends TimelineFilter {
   public TimelineKeyValuesFilter() {
   }
 
+  /**
+   * 构造多值键过滤器，校验比较操作类型必须为EQUAL或NOT_EQUAL。
+   * @param op 比较操作符
+   * @param key 过滤键名
+   * @param values 过滤值集合
+   */
   public TimelineKeyValuesFilter(TimelineCompareOp op, String key,
       Set<Object> values) {
     if (op != TimelineCompareOp.EQUAL && op != TimelineCompareOp.NOT_EQUAL) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.server.timelineservice.reader.filter stores
- * timeline filter implementations.
+ * 时间线服务读取过滤器包，提供时间线数据查询过滤的各种实现类。
+ * 用于在HBase存储的时间线服务数据中按条件筛选实体、事件数据。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
