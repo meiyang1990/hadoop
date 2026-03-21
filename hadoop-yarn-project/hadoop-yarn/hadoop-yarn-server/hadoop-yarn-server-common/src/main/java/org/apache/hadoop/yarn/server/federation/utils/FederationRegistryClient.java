@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,24 +45,33 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Helper class that handles reads and writes to Yarn Registry to support UAM HA
- * and second attempt.
+ * YARN联邦环境下，对接Yarn Registry的工具类，负责读写UAM（Unified Application Master）高可用相关信息，
+ * 支持UAM重试和故障恢复场景。
  */
 public class FederationRegistryClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(FederationRegistryClient.class);
 
+  // Yarn Registry操作实例
   private RegistryOperations registry;
 
+  // 当前操作Registry使用的用户身份
   private UserGroupInformation user;
 
-  // AppId -> SubClusterId -> UAM token
+  // 本地缓存：应用ID -> 子集群ID -> UAM AMRM令牌
   private Map<ApplicationId, Map<String, Token<AMRMTokenIdentifier>>>
       appSubClusterTokenMap;
 
-  // Structure in registry: <registryBaseDir>/<AppId>/<SubClusterId> -> UAMToken
+  // Yarn Registry中存储联邦信息的根目录路径
   private String registryBaseDir;
 
+  /**
+   * 构造联邦Registry客户端，初始化缓存和根路径配置。
+   *
+   * @param conf YARN配置对象
+   * @param registry Registry操作实例
+   * @param user 操作Registry的用户身份
+   */
   public FederationRegistryClient(Configuration conf,
       RegistryOperations registry, UserGroupInformation user) {
     this.registry = registry;
@@ -75,9 +85,9 @@ public class FederationRegistryClient {
   }
 
   /**
-   * Get the list of known applications in the registry.
+   * 获取Registry中所有已知应用ID列表。
    *
-   * @return the list of known applications
+   * @return 所有应用ID的列表，不存在时返回空列表
    */
   public synchronized List<String> getAllApplications() {
     // Suppress the exception here because it is valid that the entry does not
@@ -97,7 +107,7 @@ public class FederationRegistryClient {
   }
 
   /**
-   * For testing, delete all application records in registry.
+   * 清空Registry中所有应用记录，仅用于测试。
    */
   @VisibleForTesting
   public synchronized void cleanAllApplications() {
@@ -110,12 +120,12 @@ public class FederationRegistryClient {
   }
 
   /**
-   * Write/update the UAM token for an application and a sub-cluster.
+   * 写入或更新指定应用子集群的UAM AMRM令牌到Registry。
    *
-   * @param appId ApplicationId.
-   * @param subClusterId sub-cluster id of the token
-   * @param token the UAM of the application
-   * @return whether the amrmToken is added or updated to a new value
+   * @param appId 应用ID
+   * @param subClusterId 子集群ID
+   * @param token UAM的AMRM令牌
+   * @return 是否新增或更新了令牌（令牌未变化返回false）
    */
   public synchronized boolean writeAMRMTokenForUAM(ApplicationId appId,
       String subClusterId, Token<AMRMTokenIdentifier> token) {
@@ -136,11 +146,11 @@ public class FederationRegistryClient {
     LOG.info("Writing/Updating amrmToken for {} to registry for {}",
         subClusterId, appId);
     try {
-      // First, write the token entry
+      // 先写入令牌到Registry
       writeRegistry(this.registry, this.user,
           getRegistryKey(appId, subClusterId), token.encodeToUrlString(), true);
 
-      // Then update the subClusterTokenMap
+      // 更新本地缓存
       subClusterTokenMap.put(subClusterId, token);
     } catch (YarnException | IOException e) {
       LOG.error("Failed writing AMRMToken to registry for subcluster {}.", subClusterId, e);
@@ -149,10 +159,10 @@ public class FederationRegistryClient {
   }
 
   /**
-   * Load the information of one application from registry.
+   * 从Registry加载指定应用的所有UAM AMRM令牌信息。
    *
-   * @param appId application id
-   * @return the sub-cluster to UAM token mapping
+   * @param appId 应用ID
+   * @return 子集群ID到AMRM令牌的映射表
    */
   public synchronized Map<String, Token<AMRMTokenIdentifier>>
       loadStateFromRegistry(ApplicationId appId) {
@@ -172,7 +182,7 @@ public class FederationRegistryClient {
       return retMap;
     }
 
-    // Read the amrmToken for each sub-cluster with an existing UAM
+    // 遍历子集群逐个读取AMRM令牌
     for (String scId : subclusters) {
       LOG.info("Reading amrmToken for subcluster {} for {}", scId, appId);
       String key = getRegistryKey(appId, scId);
@@ -183,7 +193,7 @@ public class FederationRegistryClient {
         }
         Token<AMRMTokenIdentifier> amrmToken = new Token<>();
         amrmToken.decodeFromUrlString(tokenString);
-        // Clear the service field, as if RM just issued the token
+        // 清空服务字段，模拟RM新签发令牌的状态
         amrmToken.setService(new Text());
 
         retMap.put(scId, amrmToken);
@@ -192,26 +202,25 @@ public class FederationRegistryClient {
       }
     }
 
-    // Override existing map if there
+    // 更新本地缓存覆盖旧数据
     this.appSubClusterTokenMap.put(appId, new ConcurrentHashMap<>(retMap));
     return retMap;
   }
 
   /**
-   * Remove an application from registry.
+   * 从Registry中删除指定应用的所有记录。
    *
-   * @param appId application id.
+   * @param appId 应用ID
    */
   public synchronized void removeAppFromRegistry(ApplicationId appId) {
     removeAppFromRegistry(appId, false);
   }
 
   /**
-   * Remove an application from registry.
+   * 从Registry中删除指定应用的所有记录，可选择忽略本地缓存状态。
    *
-   * @param appId application id
-   * @param ignoreMemoryState whether to ignore the memory data in terms of
-   *      known application
+   * @param appId 应用ID
+   * @param ignoreMemoryState 是否忽略本地缓存中存储的应用状态
    */
   public synchronized void removeAppFromRegistry(ApplicationId appId,
       boolean ignoreMemoryState) {
@@ -224,7 +233,7 @@ public class FederationRegistryClient {
     }
     LOG.info("Removing all registry entries for {}.", appId);
 
-    // Lastly remove the application directory
+    // 删除应用在Registry中的目录
     String key = getRegistryKey(appId, null);
     try {
       removeKeyRegistry(this.registry, this.user, key, true, true);
@@ -236,6 +245,13 @@ public class FederationRegistryClient {
     }
   }
 
+  /**
+   * 构造Registry中对应条目的完整路径键。
+   *
+   * @param appId 应用ID，传null返回根目录
+   * @param fileName 文件名（子集群ID），传null返回应用目录
+   * @return 完整Registry路径键
+   */
   private String getRegistryKey(ApplicationId appId, String fileName) {
     if (appId == null) {
       return this.registryBaseDir;
@@ -246,10 +262,20 @@ public class FederationRegistryClient {
     return this.registryBaseDir + appId.toString() + "/" + fileName;
   }
 
+  /**
+   * 在指定用户身份下读取Registry条目内容。
+   *
+   * @param registryImpl Registry操作实例
+   * @param ugi 操作用户身份
+   * @param key Registry路径键
+   * @param throwIfFails 读取失败是否抛出异常
+   * @return 读取到的条目描述内容
+   * @throws YarnException 读取失败且throwIfFails为true时抛出
+   */
   private String readRegistry(final RegistryOperations registryImpl,
       UserGroupInformation ugi, final String key, final boolean throwIfFails)
       throws YarnException {
-    // Use the ugi loaded with app credentials to access registry
+    // 使用带应用凭证的UGI访问Registry
     String result = ugi.doAs(new PrivilegedAction<String>() {
       @Override
       public String run() {
@@ -272,10 +298,20 @@ public class FederationRegistryClient {
     return result;
   }
 
+  /**
+   * 在指定用户身份下删除Registry条目。
+   *
+   * @param registryImpl Registry操作实例
+   * @param ugi 操作用户身份
+   * @param key Registry路径键
+   * @param recursive 是否递归删除子条目
+   * @param throwIfFails 删除失败是否抛出异常
+   * @throws YarnException 删除失败且throwIfFails为true时抛出
+   */
   private void removeKeyRegistry(final RegistryOperations registryImpl,
       UserGroupInformation ugi, final String key, final boolean recursive,
       final boolean throwIfFails) throws YarnException {
-    // Use the ugi loaded with app credentials to access registry
+    // 使用带应用凭证的UGI访问Registry
     boolean success = ugi.doAs(new PrivilegedAction<Boolean>() {
       @Override
       public Boolean run() {
@@ -296,7 +332,14 @@ public class FederationRegistryClient {
   }
 
   /**
-   * Write registry entry, override if exists.
+   * 在指定用户身份下写入Registry条目，存在则覆盖。
+   *
+   * @param registryImpl Registry操作实例
+   * @param ugi 操作用户身份
+   * @param key Registry路径键
+   * @param value 要写入的内容
+   * @param throwIfFails 写入失败是否抛出异常
+   * @throws YarnException 写入失败且throwIfFails为true时抛出
    */
   private void writeRegistry(final RegistryOperations registryImpl,
       UserGroupInformation ugi, final String key, final String value,
@@ -304,7 +347,7 @@ public class FederationRegistryClient {
 
     final ServiceRecord recordValue = new ServiceRecord();
     recordValue.description = value;
-    // Use the ugi loaded with app credentials to access registry
+    // 使用带应用凭证的UGI访问Registry
     boolean success = ugi.doAs(new PrivilegedAction<Boolean>() {
       @Override
       public Boolean run() {
@@ -325,7 +368,14 @@ public class FederationRegistryClient {
   }
 
   /**
-   * List the sub directories in the given directory.
+   * 在指定用户身份下列出指定目录的所有子条目。
+   *
+   * @param registryImpl Registry操作实例
+   * @param ugi 操作用户身份
+   * @param key Registry路径键
+   * @param throwIfFails 列出失败是否抛出异常
+   * @return 子条目名称列表
+   * @throws YarnException 列出失败且throwIfFails为true时抛出
    */
   private List<String> listDirRegistry(final RegistryOperations registryImpl,
       UserGroupInformation ugi, final String key, final boolean throwIfFails)

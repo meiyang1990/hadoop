@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -13,5 +14,9 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
+ */
+/**
+ * YARN联邦应用位置解析模块，提供将应用提交/路由到对应子集群的解析能力。
+ * 包含不同路由策略的实现，负责根据应用信息、集群负载等条件解析目标子集群。
  */
 package org.apache.hadoop.yarn.server.federation.resolver;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -21,11 +22,20 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.application;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 
+/**
+ * 应用容器完成事件，用于通知应用程序所属容器已执行完毕。
+ * 携带容器结束状态和启动时间等信息，供应用状态机处理后续逻辑。
+ */
 public class ApplicationContainerFinishedEvent extends ApplicationEvent {
   private ContainerStatus containerStatus;
-  // Required by NMTimelinePublisher.
+  // 时间线发布器需要该字段，保留容器启动时间
   private long containerStartTime;
 
+  /**
+   * 构造容器完成事件实例。
+   * @param containerStatus 容器完成后的状态信息
+   * @param containerStartTs 容器启动时间戳
+   */
   public ApplicationContainerFinishedEvent(ContainerStatus containerStatus,
       long containerStartTs) {
     super(containerStatus.getContainerId().getApplicationAttemptId().
@@ -35,14 +45,26 @@ public class ApplicationContainerFinishedEvent extends ApplicationEvent {
     this.containerStartTime = containerStartTs;
   }
 
+  /**
+   * 获取已完成容器的ID。
+   * @return 容器ID
+   */
   public ContainerId getContainerID() {
     return containerStatus.getContainerId();
   }
 
+  /**
+   * 获取已完成容器的最终状态。
+   * @return 容器状态对象
+   */
   public ContainerStatus getContainerStatus() {
     return containerStatus;
   }
 
+  /**
+   * 获取容器启动时间戳。
+   * @return 容器启动时间戳，单位毫秒
+   */
   public long getContainerStartTime() {
     return containerStartTime;
   }

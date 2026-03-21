@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,10 +32,9 @@ import org.apache.hadoop.yarn.server.federation.utils.FederationStateStoreFacade
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
- * The default ApplicationCleaner that cleans up old applications from table
- * applicationsHomeSubCluster in FederationStateStore.
+ * 文件级注释：默认应用清理器实现，负责清理联邦状态存储中已经完成的旧应用元数据
+ * 清理FederationStateStore中applicationsHomeSubCluster表的旧应用条目默认实现。
  */
 public class DefaultApplicationCleaner extends ApplicationCleaner {
   private static final Logger LOG =
@@ -42,12 +42,14 @@ public class DefaultApplicationCleaner extends ApplicationCleaner {
 
   @Override
   public void run() {
+    // 记录当前清理执行时间
     Date now = new Date();
     LOG.info("Application cleaner run at time {}", now);
 
+    // 获取联邦状态存储门面实例
     FederationStateStoreFacade facade = getGPGContext().getStateStoreFacade();
     try {
-      // Get the candidate list from StateStore before calling router
+      // 从状态存储获取所有应用，存入集合
       Set<ApplicationId> allStateStoreApps = new HashSet<>();
       List<ApplicationHomeSubCluster> response =
           facade.getApplicationsHomeSubCluster();
@@ -56,15 +58,15 @@ public class DefaultApplicationCleaner extends ApplicationCleaner {
       }
       LOG.info("{} app entries in FederationStateStore", allStateStoreApps.size());
 
-      // Get the candidate list from Registry before calling router
+      // 从联邦注册中心获取所有应用列表
       List<String> allRegistryApps = getRegistryClient().getAllApplications();
       LOG.info("{} app entries in FederationRegistry", allStateStoreApps.size());
 
-      // Get the list of known apps from Router
+      // 从Router获取当前活跃的已知应用集合
       Set<ApplicationId> routerApps = getRouterKnownApplications();
       LOG.info("{} known applications from Router", routerApps.size());
 
-      // Clean up StateStore entries
+      // 计算需要删除的应用：状态存储中有但Router未知的已完成应用
       Set<ApplicationId> toDelete =
           Sets.difference(allStateStoreApps, routerApps);
 
@@ -72,6 +74,7 @@ public class DefaultApplicationCleaner extends ApplicationCleaner {
       LOG.debug("Apps to delete: {}.",
           toDelete.stream().map(Object::toString).collect(Collectors.joining(",")));
 
+      // 遍历待删除应用，逐个从状态存储删除
       for (ApplicationId appId : toDelete) {
         try {
           LOG.debug("Deleting {} from statestore ", appId);
@@ -81,7 +84,7 @@ public class DefaultApplicationCleaner extends ApplicationCleaner {
         }
       }
 
-      // Clean up Registry entries
+      // 清理注册中心中的过期应用条目
       for (String app : allRegistryApps) {
         ApplicationId appId = ApplicationId.fromString(app);
         if (!routerApps.contains(appId)) {

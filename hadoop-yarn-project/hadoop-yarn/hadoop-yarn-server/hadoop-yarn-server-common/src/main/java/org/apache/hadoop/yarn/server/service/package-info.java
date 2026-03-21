@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -16,8 +17,7 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.service contains service related
- * classes.
+ * YARN服务端通用服务工具包，提供YARN服务端各类基础服务相关的公共类。
  */
 @Private
 @Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+/**
+ * YARN联邦路由策略管理器包
+ * 该包提供了YARN联邦环境中不同路由策略管理器的实现，
+ * 负责加载、维护和管理应用提交到子集群的路由策略，
+ * 支持联邦集群中作业路由的可扩展策略管理。
  */
 /** Various implementation of FederationPolicyManager. **/
 package org.apache.hadoop.yarn.server.federation.policies.manager;

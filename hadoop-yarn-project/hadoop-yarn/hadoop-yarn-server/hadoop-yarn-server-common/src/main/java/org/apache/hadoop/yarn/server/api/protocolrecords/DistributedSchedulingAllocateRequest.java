@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,44 +27,43 @@ import org.apache.hadoop.yarn.api.records.Container;
 import java.util.List;
 
 /**
- * Object used by the Application Master when distributed scheduling is enabled,
- * in order to forward the {@link AllocateRequest} for GUARANTEED containers to
- * the Resource Manager, and to notify the Resource Manager about the allocation
- * of OPPORTUNISTIC containers through the Distributed Scheduler.
+ * 分布式调度模式下ApplicationMaster向ResourceManager发送的分配请求类
+ * <p>
+ * 用于将保障容器的分配请求转发给ResourceManager，同时通知ResourceManager节点
+ * 分布式调度器已分配的机会容器信息。
+ * </p>
  */
 @Public
 @Evolving
 public abstract class DistributedSchedulingAllocateRequest {
 
   /**
-   * Get the underlying <code>AllocateRequest</code> object.
-   * @return Allocate request
+   * 获取基础的AllocateRequest对象。
+   * @return 容器分配请求
    */
   @Public
   @Evolving
   public abstract AllocateRequest getAllocateRequest();
 
   /**
-   * Set the underlying <code>AllocateRequest</code> object.
-   * @param allocateRequest  Allocate request
+   * 设置基础的AllocateRequest对象。
+   * @param allocateRequest 容器分配请求
    */
   @Public
   @Evolving
   public abstract void  setAllocateRequest(AllocateRequest allocateRequest);
 
   /**
-   * Get the list of <em>newly allocated</em> <code>Container</code> by the
-   * Distributed Scheduling component on the NodeManager.
-   * @return list of <em>newly allocated</em> <code>Container</code>
+   * 获取NodeManager上分布式调度组件新分配的容器列表。
+   * @return 新分配的容器列表
    */
   @Public
   @Evolving
   public abstract List<Container> getAllocatedContainers();
 
   /**
-   * Set the list of <em>newly allocated</em> <code>Container</code> by the
-   * Distributed Scheduling component on the NodeManager.
-   * @param containers list of <em>newly allocated</em> <code>Container</code>
+   * 设置NodeManager上分布式调度组件新分配的容器列表。
+   * @param containers 新分配的容器列表
    */
   @Public
   @Evolving

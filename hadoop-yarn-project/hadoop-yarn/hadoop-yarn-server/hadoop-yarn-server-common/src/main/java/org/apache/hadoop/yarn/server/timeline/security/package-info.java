@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.server.timeline.security contains classes related
- * to timeline authentication filters and abstract delegation token service for
- * ATSv1 and ATSv2.
+ * YARN 时间线服务安全模块包，提供了适用于ATSv1和ATSv2版本的时间线服务认证过滤器
+ * 以及抽象委托令牌服务相关实现，负责时间线服务REST接口访问的身份认证与令牌管理。
  */
 @Private
 package org.apache.hadoop.yarn.server.timeline.security;

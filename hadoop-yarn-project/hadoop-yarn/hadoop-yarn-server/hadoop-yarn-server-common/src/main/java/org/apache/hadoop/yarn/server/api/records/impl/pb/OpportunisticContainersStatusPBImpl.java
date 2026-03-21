@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,35 +23,50 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonProtos;
 import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
 
 /**
- * Protocol Buffer implementation of OpportunisticContainersStatus.
+ *  opportunistic容器状态信息基于Protocol Buffer的实现类，用于YARN节点状态上报
  */
 public class OpportunisticContainersStatusPBImpl
     extends OpportunisticContainersStatus {
 
+  /** 存储序列化后的proto对象，默认初始化为默认实例 */
   private YarnServerCommonProtos.OpportunisticContainersStatusProto proto =
       YarnServerCommonProtos.OpportunisticContainersStatusProto
           .getDefaultInstance();
+  /** proto构建器，修改状态时使用 */
   private YarnServerCommonProtos.OpportunisticContainersStatusProto.Builder
       builder = null;
+  /** 标识当前数据是否已经序列化存储在proto中 */
   private boolean viaProto = false;
 
+  /**
+   * 空构造函数，初始化proto构建器
+   */
   public OpportunisticContainersStatusPBImpl() {
     builder =
         YarnServerCommonProtos.OpportunisticContainersStatusProto.newBuilder();
   }
 
+  /**
+   * 基于已有proto对象的构造函数，直接复用已有proto
+   */
   public OpportunisticContainersStatusPBImpl(YarnServerCommonProtos
       .OpportunisticContainersStatusProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前状态对应的proto对象，按需完成构建
+   */
   public YarnServerCommonProtos.OpportunisticContainersStatusProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
   }
 
+  /**
+   * 确保构建器已初始化，修改数据前调用
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = YarnServerCommonProtos.OpportunisticContainersStatusProto

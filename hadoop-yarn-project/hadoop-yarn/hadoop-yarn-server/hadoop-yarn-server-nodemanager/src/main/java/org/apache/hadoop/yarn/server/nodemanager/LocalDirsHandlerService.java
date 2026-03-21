@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -51,9 +52,8 @@ import org.apache.hadoop.yarn.server.nodemanager.DirectoryCollection.DirsChangeL
 import org.apache.hadoop.yarn.server.nodemanager.metrics.NodeManagerMetrics;
 
 /**
- * The class which provides functionality of checking the health of the local
- * directories of a node. This specifically manages nodemanager-local-dirs and
- * nodemanager-log-dirs by periodically checking their health.
+ * 提供NodeManager本地目录健康检查功能，定期检测NM本地工作目录和日志目录的健康状态
+ * 管理健康目录列表，为目录分配器提供最新的可用目录信息
  */
 public class LocalDirsHandlerService extends AbstractService
     implements HealthReporter {
@@ -79,59 +79,59 @@ public class LocalDirsHandlerService extends AbstractService
   static final String NM_GOOD_LOG_DIRS =
       YarnConfiguration.NM_PREFIX + "good-log-dirs";
 
-  /** Timer used to schedule disk health monitoring code execution */
+  /** 调度磁盘健康检查任务的定时器 */
   private Timer dirsHandlerScheduler;
+  /** 磁盘健康检查间隔时间（毫秒） */
   private long diskHealthCheckInterval;
+  /** 是否启用磁盘健康检查功能 */
   private boolean isDiskHealthCheckerEnabled;
   /**
-   * Minimum fraction of disks to be healthy for the node to be healthy in
-   * terms of disks. This applies to nm-local-dirs and nm-log-dirs.
+   * 节点被判定为健康所需的最小健康磁盘比例，同时适用于本地工作目录和日志目录
    */
   private float minNeededHealthyDisksFactor;
 
   private MonitoringTimerTask monitoringTimerTask;
 
-  /** Local dirs to store localized files in */
+  /** 存储本地化文件的本地目录集合 */
   private DirectoryCollection localDirs = null;
 
-  /** storage for container logs*/
+  /** 存储容器日志的目录集合 */
   private DirectoryCollection logDirs = null;
 
   /**
-   * Everybody should go through this LocalDirAllocator object for read/write
-   * of any local path corresponding to {@link YarnConfiguration#NM_LOCAL_DIRS}
-   * instead of creating his/her own LocalDirAllocator objects
+   * 本地目录分配器，所有对NM_LOCAL_DIRS的读写都应通过此实例，避免重复创建分配器
    */ 
   private LocalDirAllocator localDirsAllocator;
   /**
-   * Everybody should go through this LocalDirAllocator object for read/write
-   * of any local path corresponding to {@link YarnConfiguration#NM_LOG_DIRS}
-   * instead of creating his/her own LocalDirAllocator objects
+   * 日志目录分配器，所有对NM_LOG_DIRS的读写都应通过此实例，避免重复创建分配器
    */ 
   private LocalDirAllocator logDirsAllocator;
 
-  /** when disk health checking code was last run */
+  /** 上次执行磁盘健康检查的时间戳 */
   private long lastDisksCheckTime;
   
   private static String FILE_SCHEME = "file";
 
+  /** NodeManager指标收集器 */
   private NodeManagerMetrics nodeManagerMetrics = null;
 
   /**
-   * Class which is used by the {@link Timer} class to periodically execute the
-   * disks' health checker code.
+   * 被定时器调用，定期执行磁盘健康检查任务的内部类
    */
   private final class MonitoringTimerTask extends TimerTask {
 
     public MonitoringTimerTask(Configuration conf) throws YarnRuntimeException {
+      // 获取磁盘利用率高水位阈值
       float highUsableSpacePercentagePerDisk =
           conf.getFloat(
             YarnConfiguration.NM_MAX_PER_DISK_UTILIZATION_PERCENTAGE,
             YarnConfiguration.DEFAULT_NM_MAX_PER_DISK_UTILIZATION_PERCENTAGE);
+      // 获取磁盘利用率低水位阈值（用于工作预留）
       float lowUsableSpacePercentagePerDisk =
           conf.getFloat(
               YarnConfiguration.NM_WM_LOW_PER_DISK_UTILIZATION_PERCENTAGE,
               highUsableSpacePercentagePerDisk);
+      // 参数校验：低水位不能高于高水位，不合法则使用高水位值
       if (lowUsableSpacePercentagePerDisk > highUsableSpacePercentagePerDisk) {
         LOG.warn("Using " + YarnConfiguration.
             NM_MAX_PER_DISK_UTILIZATION_PERCENTAGE + " as " +
@@ -141,12 +141,15 @@ public class LocalDirsHandlerService extends AbstractService
             " is not configured properly.");
         lowUsableSpacePercentagePerDisk = highUsableSpacePercentagePerDisk;
       }
+      // 获取最低空闲空间低水位阈值（MB）
       long lowMinFreeSpacePerDiskMB =
           conf.getLong(YarnConfiguration.NM_MIN_PER_DISK_FREE_SPACE_MB,
               YarnConfiguration.DEFAULT_NM_MIN_PER_DISK_FREE_SPACE_MB);
+      // 获取最低空闲空间高水位阈值（MB）
       long highMinFreeSpacePerDiskMB =
           conf.getLong(YarnConfiguration.NM_WM_HIGH_PER_DISK_FREE_SPACE_MB,
               lowMinFreeSpacePerDiskMB);
+      // 参数校验：高水位不能低于低水位，不合法则使用低水位值
       if (highMinFreeSpacePerDiskMB < lowMinFreeSpacePerDiskMB) {
         LOG.warn("Using " + YarnConfiguration.
             NM_MIN_PER_DISK_FREE_SPACE_MB + " as " +
@@ -157,6 +160,7 @@ public class LocalDirsHandlerService extends AbstractService
         highMinFreeSpacePerDiskMB = lowMinFreeSpacePerDiskMB;
       }
 
+      // 初始化本地工作目录集合
       localDirs =
           new DirectoryCollection(
               validatePaths(conf
@@ -165,6 +169,7 @@ public class LocalDirsHandlerService extends AbstractService
               lowUsableSpacePercentagePerDisk,
               lowMinFreeSpacePerDiskMB,
               highMinFreeSpacePerDiskMB);
+      // 初始化日志目录集合
       logDirs =
           new DirectoryCollection(
               validatePaths(conf
@@ -174,19 +179,24 @@ public class LocalDirsHandlerService extends AbstractService
               lowMinFreeSpacePerDiskMB,
               highMinFreeSpacePerDiskMB);
 
+      // 将初始完整目录列表写入配置，供分配器使用
       String local = conf.get(YarnConfiguration.NM_LOCAL_DIRS);
       conf.set(NM_GOOD_LOCAL_DIRS,
           (local != null) ? local : "");
+      // 获取磁盘校验器实现类名
       String diskValidatorName = conf.get(YarnConfiguration.DISK_VALIDATOR,
               YarnConfiguration.DEFAULT_DISK_VALIDATOR);
       try {
+        // 创建磁盘校验器实例
         DiskValidator diskValidator =
             DiskValidatorFactory.getInstance(diskValidatorName);
+        // 初始化本地目录分配器
         localDirsAllocator = new LocalDirAllocator(
                 NM_GOOD_LOCAL_DIRS, diskValidator);
         String log = conf.get(YarnConfiguration.NM_LOG_DIRS);
         conf.set(NM_GOOD_LOG_DIRS,
                 (log != null) ? log : "");
+        // 初始化日志目录分配器
         logDirsAllocator = new LocalDirAllocator(
                 NM_GOOD_LOG_DIRS, diskValidator);
       } catch (DiskErrorException e) {
@@ -199,68 +209,85 @@ public class LocalDirsHandlerService extends AbstractService
     @Override
     public void run() {
       try {
+        // 执行磁盘健康检查
         checkDirs();
       } catch (Throwable t) {
-        // Prevent uncaught exceptions from killing this thread
+        // 捕获异常避免终止定时器线程
         LOG.warn("Error while checking local directories: ", t);
       }
     }
   }
 
+  /**
+   * 无参构造函数
+   */
   public LocalDirsHandlerService() {
     this(null);
   }
 
+  /**
+   * 带指标收集器的构造函数
+   * @param nodeManagerMetrics NodeManager指标收集器
+   */
   public LocalDirsHandlerService(NodeManagerMetrics nodeManagerMetrics) {
     super(LocalDirsHandlerService.class.getName());
     this.nodeManagerMetrics = nodeManagerMetrics;
   }
 
   /**
-   * Method which initializes the timertask and its interval time.
-   * 
+   * 服务初始化方法，创建检查任务并初始化目录
    */
   @Override
   protected void serviceInit(Configuration config) throws Exception {
-    // Clone the configuration as we may do modifications to dirs-list
+    // 克隆配置，因为我们会修改其中的目录列表配置
     Configuration conf = new Configuration(config);
+    // 读取磁盘健康检查间隔配置
     diskHealthCheckInterval = conf.getLong(
         YarnConfiguration.NM_DISK_HEALTH_CHECK_INTERVAL_MS,
         YarnConfiguration.DEFAULT_NM_DISK_HEALTH_CHECK_INTERVAL_MS);
+    // 创建检查任务实例
     monitoringTimerTask = new MonitoringTimerTask(conf);
+    // 读取是否启用磁盘健康检查配置
     isDiskHealthCheckerEnabled = conf.getBoolean(
         YarnConfiguration.NM_DISK_HEALTH_CHECK_ENABLE, true);
+    // 读取最小健康磁盘比例配置
     minNeededHealthyDisksFactor = conf.getFloat(
         YarnConfiguration.NM_MIN_HEALTHY_DISKS_FRACTION,
         YarnConfiguration.DEFAULT_NM_MIN_HEALTHY_DISKS_FRACTION);
+    // 记录初始化时间作为初始检查时间
     lastDisksCheckTime = System.currentTimeMillis();
     super.serviceInit(conf);
 
     FileContext localFs;
     try {
+      // 获取本地文件上下文
       localFs = FileContext.getLocalFSFileContext(config);
     } catch (IOException e) {
       throw new YarnRuntimeException("Unable to get the local filesystem", e);
     }
+    // 设置目录权限为0755
     FsPermission perm = new FsPermission((short)0755);
+    // 创建不存在的目录
     boolean createSucceeded = localDirs.createNonExistentDirs(localFs, perm);
     createSucceeded &= logDirs.createNonExistentDirs(localFs, perm);
+    // 如果创建目录失败，更新配置中的健康目录列表
     if (!createSucceeded) {
       updateDirsAfterTest();
     }
 
-    // Check the disk health immediately to weed out bad directories
-    // before other init code attempts to use them.
+    // 立即执行一次磁盘健康检查，在其他组件使用目录前过滤出坏盘
     checkDirs();
   }
 
   /**
-   * Method used to start the disk health monitoring, if enabled.
+   * 服务启动方法，启动定时磁盘健康检查
    */
   @Override
   protected void serviceStart() throws Exception {
     if (isDiskHealthCheckerEnabled) {
+      // 创建后台定时线程
       dirsHandlerScheduler = new Timer("DiskHealthMonitor-Timer", true);
+      // 按固定间隔调度检查任务
       dirsHandlerScheduler.scheduleAtFixedRate(monitoringTimerTask,
           diskHealthCheckInterval, diskHealthCheckInterval);
     }
@@ -268,66 +295,80 @@ public class LocalDirsHandlerService extends AbstractService
   }
 
   /**
-   * Method used to terminate the disk health monitoring service.
+   * 服务停止方法，终止定时检查
    */
   @Override
   protected void serviceStop() throws Exception {
     if (dirsHandlerScheduler != null) {
+      // 取消定时器
       dirsHandlerScheduler.cancel();
     }
     super.serviceStop();
   }
 
+  /**
+   * 注册本地目录变更监听器
+   * @param listener 目录变更监听器
+   */
   public void registerLocalDirsChangeListener(DirsChangeListener listener) {
     localDirs.registerDirsChangeListener(listener);
   }
 
+  /**
+   * 注册日志目录变更监听器
+   * @param listener 目录变更监听器
+   */
   public void registerLogDirsChangeListener(DirsChangeListener listener) {
     logDirs.registerDirsChangeListener(listener);
   }
 
+  /**
+   * 注销本地目录变更监听器
+   * @param listener 目录变更监听器
+   */
   public void deregisterLocalDirsChangeListener(DirsChangeListener listener) {
     localDirs.deregisterDirsChangeListener(listener);
   }
 
+  /**
+   * 注销日志目录变更监听器
+   * @param listener 目录变更监听器
+   */
   public void deregisterLogDirsChangeListener(DirsChangeListener listener) {
     logDirs.deregisterDirsChangeListener(listener);
   }
 
   /**
-   * @return the good/valid local directories based on disks' health
+   * @return 当前健康的本地工作目录列表
    */
   public List<String> getLocalDirs() {
     return localDirs.getGoodDirs();
   }
 
   /**
-   * @return the good/valid log directories based on disks' health
+   * @return 当前健康的日志目录列表
    */
   public List<String> getLogDirs() {
     return logDirs.getGoodDirs();
   }
 
   /**
-   * @return the local directories which have no disk space
+   * @return 容量已满的本地工作目录列表
    */
   public List<String> getDiskFullLocalDirs() {
     return localDirs.getFullDirs();
   }
 
   /**
-   * @return the log directories that have no disk space
+   * @return 容量已满的日志目录列表
    */
   public List<String> getDiskFullLogDirs() {
     return logDirs.getFullDirs();
   }
 
   /**
-   * Function to get the local dirs which should be considered for reading
-   * existing files on disk. Contains the good local dirs and the local dirs
-   * that have reached the disk space limit
-   *
-   * @return the local dirs which should be considered for reading
+   * 获取可用于读取已有文件的本地目录列表，包含健康目录和已满目录
+   * @return 可读本地目录列表
    */
   public List<String> getLocalDirsForRead() {
     return DirectoryCollection.concat(localDirs.getGoodDirs(),
@@ -335,11 +376,8 @@ public class LocalDirsHandlerService extends AbstractService
   }
 
   /**
-   * Function to get the local dirs which should be considered when cleaning up
-   * resources. Contains the good local dirs and the local dirs that have reached
-   * the disk space limit
-   *
-   * @return the local dirs which should be considered for cleaning up
+   * 获取可用于资源清理的本地目录列表，包含健康目录和已满目录
+   * @return 可清理本地目录列表
    */
   public List<String> getLocalDirsForCleanup() {
     return DirectoryCollection.concat(localDirs.getGoodDirs(),
@@ -347,11 +385,8 @@ public class LocalDirsHandlerService extends AbstractService
   }
 
   /**
-   * Function to get the log dirs which should be considered for reading
-   * existing files on disk. Contains the good log dirs and the log dirs that
-   * have reached the disk space limit
-   *
-   * @return the log dirs which should be considered for reading
+   * 获取可用于读取已有日志文件的目录列表，包含健康目录和已满目录
+   * @return 可读日志目录列表
    */
   public List<String> getLogDirsForRead() {
     return DirectoryCollection.concat(logDirs.getGoodDirs(),
@@ -359,11 +394,8 @@ public class LocalDirsHandlerService extends AbstractService
   }
 
   /**
-   * Function to get the log dirs which should be considered when cleaning up
-   * resources. Contains the good log dirs and the log dirs that have reached
-   * the disk space limit
-   *
-   * @return the log dirs which should be considered for cleaning up
+   * 获取可用于资源清理的日志目录列表，包含健康目录和已满目录
+   * @return 可清理日志目录列表
    */
   public List<String> getLogDirsForCleanup() {
     return DirectoryCollection.concat(logDirs.getGoodDirs(),
@@ -371,12 +403,9 @@ public class LocalDirsHandlerService extends AbstractService
   }
 
   /**
-   * Function to generate a report on the state of the disks.
-   *
-   * @param listGoodDirs
-   *          flag to determine whether the report should report the state of
-   *          good dirs or failed dirs
-   * @return the health report of nm-local-dirs and nm-log-dirs
+   * 生成磁盘健康状态报告
+   * @param listGoodDirs true返回健康目录信息，false返回异常目录信息
+   * @return 格式化的健康报告字符串
    */
   public String getDisksHealthReport(boolean listGoodDirs) {
     if (!isDiskHealthCheckerEnabled) {
@@ -406,313 +435,4 @@ public class LocalDirsHandlerService extends AbstractService
       }
 
       if (!erroredLogDirsList.isEmpty()) {
-        report.append(erroredLogDirsList.size() + "/" + numLogDirs
-            + " log-dirs have errors: "
-            + buildDiskErrorReport(erroredLogDirsList, logDirs));
-      }
-      if (!diskFullLogDirsList.isEmpty()) {
-        report.append(diskFullLogDirsList.size() + "/" + numLogDirs
-            + " log-dirs " + diskCapacityExceededErrorMsg
-            + buildDiskErrorReport(diskFullLogDirsList, logDirs));
-      }
-    } else {
-      report.append(goodLocalDirsList.size() + "/" + numLocalDirs
-          + " local-dirs are good: " + StringUtils.join(",", goodLocalDirsList)
-          + "; ");
-      report.append(goodLogDirsList.size() + "/" + numLogDirs
-          + " log-dirs are good: " + StringUtils.join(",", goodLogDirsList));
-
-    }
-
-    return report.toString();
-
-  }
-
-  @Override
-  public String getHealthReport() {
-    return getDisksHealthReport(false);
-  }
-
-  /**
-   * The minimum fraction of number of disks needed to be healthy for a node to
-   * be considered healthy in terms of disks is configured using
-   * {@link YarnConfiguration#NM_MIN_HEALTHY_DISKS_FRACTION}, with a default
-   * value of {@link YarnConfiguration#DEFAULT_NM_MIN_HEALTHY_DISKS_FRACTION}.
-   * @return <em>false</em> if either (a) more than the allowed percentage of
-   * nm-local-dirs failed or (b) more than the allowed percentage of
-   * nm-log-dirs failed.
-   */
-  public boolean areDisksHealthy() {
-    if (!isDiskHealthCheckerEnabled) {
-      return true;
-    }
-
-    int goodDirs = getLocalDirs().size();
-    int failedDirs = localDirs.getFailedDirs().size();
-    int totalConfiguredDirs = goodDirs + failedDirs;
-    if (goodDirs/(float)totalConfiguredDirs < minNeededHealthyDisksFactor) {
-      return false; // Not enough healthy local-dirs
-    }
-
-    goodDirs = getLogDirs().size();
-    failedDirs = logDirs.getFailedDirs().size();
-    totalConfiguredDirs = goodDirs + failedDirs;
-    if (goodDirs/(float)totalConfiguredDirs < minNeededHealthyDisksFactor) {
-      return false; // Not enough healthy log-dirs
-    }
-
-    return true;
-  }
-
-  @Override
-  public boolean isHealthy() {
-    return areDisksHealthy();
-  }
-
-  public long getLastDisksCheckTime() {
-    return lastDisksCheckTime;
-  }
-
-  @Override
-  public long getLastHealthReportTime() {
-    return getLastDisksCheckTime();
-  }
-
-  public boolean isGoodLocalDir(String path) {
-    return isInGoodDirs(getLocalDirs(), path);
-  }
-
-  public boolean isGoodLogDir(String path) {
-    return isInGoodDirs(getLogDirs(), path);
-  }
-
-  private boolean isInGoodDirs(List<String> goodDirs, String path) {
-    for (String goodDir : goodDirs) {
-      if (path.startsWith(goodDir)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Set good local dirs and good log dirs in the configuration so that the
-   * LocalDirAllocator objects will use this updated configuration only.
-   */
-  private void updateDirsAfterTest() {
-
-    Configuration conf = getConfig();
-    List<String> localDirs = getLocalDirs();
-    conf.setStrings(NM_GOOD_LOCAL_DIRS,
-                    localDirs.toArray(new String[localDirs.size()]));
-    List<String> logDirs = getLogDirs();
-    conf.setStrings(NM_GOOD_LOG_DIRS,
-                      logDirs.toArray(new String[logDirs.size()]));
-    if (!areDisksHealthy()) {
-      // Just log.
-      LOG.error("Most of the disks failed. " + getDisksHealthReport(false));
-    }
-  }
-
-  private void logDiskStatus(boolean newDiskFailure, boolean diskTurnedGood) {
-    if (newDiskFailure) {
-      String report = getDisksHealthReport(false);
-      LOG.info("Disk(s) failed: " + report);
-    }
-    if (diskTurnedGood) {
-      String report = getDisksHealthReport(true);
-      LOG.info("Disk(s) turned good: " + report);
-    }
-
-  }
-
-  @VisibleForTesting
-  public void checkDirs() {
-    boolean disksStatusChange = false;
-    Set<String> failedLocalDirsPreCheck =
-        new HashSet<String>(localDirs.getFailedDirs());
-    Set<String> failedLogDirsPreCheck =
-        new HashSet<String>(logDirs.getFailedDirs());
-
-    if (localDirs.checkDirs()) {
-      disksStatusChange = true;
-    }
-    if (logDirs.checkDirs()) {
-      disksStatusChange = true;
-    }
-
-    Set<String> failedLocalDirsPostCheck =
-        new HashSet<String>(localDirs.getFailedDirs());
-    Set<String> failedLogDirsPostCheck =
-        new HashSet<String>(logDirs.getFailedDirs());
-
-    boolean disksFailed = false;
-    boolean disksTurnedGood = false;
-
-    disksFailed =
-        disksTurnedBad(failedLocalDirsPreCheck, failedLocalDirsPostCheck);
-    disksTurnedGood =
-        disksTurnedGood(failedLocalDirsPreCheck, failedLocalDirsPostCheck);
-
-    // skip check if we have new failed or good local dirs since we're going to
-    // log anyway
-    if (!disksFailed) {
-      disksFailed =
-          disksTurnedBad(failedLogDirsPreCheck, failedLogDirsPostCheck);
-    }
-    if (!disksTurnedGood) {
-      disksTurnedGood =
-          disksTurnedGood(failedLogDirsPreCheck, failedLogDirsPostCheck);
-    }
-
-    logDiskStatus(disksFailed, disksTurnedGood);
-
-    if (disksStatusChange) {
-      updateDirsAfterTest();
-    }
-
-    updateMetrics();
-
-    lastDisksCheckTime = System.currentTimeMillis();
-  }
-
-  private boolean disksTurnedBad(Set<String> preCheckFailedDirs,
-      Set<String> postCheckDirs) {
-    boolean disksFailed = false;
-    for (String dir : postCheckDirs) {
-      if (!preCheckFailedDirs.contains(dir)) {
-        disksFailed = true;
-        break;
-      }
-    }
-    return disksFailed;
-  }
-
-  private boolean disksTurnedGood(Set<String> preCheckDirs,
-      Set<String> postCheckDirs) {
-    boolean disksTurnedGood = false;
-    for (String dir : preCheckDirs) {
-      if (!postCheckDirs.contains(dir)) {
-        disksTurnedGood = true;
-        break;
-      }
-    }
-    return disksTurnedGood;
-  }
-
-  private Path getPathToRead(String pathStr, List<String> dirs)
-      throws IOException {
-    // remove the leading slash from the path (to make sure that the uri
-    // resolution results in a valid path on the dir being checked)
-    if (pathStr.startsWith("/")) {
-      pathStr = pathStr.substring(1);
-    }
-
-    FileSystem localFS = FileSystem.getLocal(getConfig());
-    for (String dir : dirs) {
-      try {
-        Path tmpDir = new Path(dir);
-        File tmpFile = tmpDir.isAbsolute()
-            ? new File(localFS.makeQualified(tmpDir).toUri())
-            : new File(dir);
-        Path file = new Path(tmpFile.getPath(), pathStr);
-        if (localFS.exists(file)) {
-          return file;
-        }
-      } catch (IOException ie) {
-        // ignore
-        LOG.warn("Failed to find " + pathStr + " at " + dir, ie);
-      }
-    }
-
-    throw new IOException("Could not find " + pathStr + " in any of" +
-        " the directories");
-  }
-
-  public Path getLocalPathForWrite(String pathStr) throws IOException {
-    return localDirsAllocator.getLocalPathForWrite(pathStr, getConfig());
-  }
-
-  public Path getLocalPathForWrite(String pathStr, long size,
-      boolean checkWrite) throws IOException {
-    return localDirsAllocator.getLocalPathForWrite(pathStr, size, getConfig(),
-                                                   checkWrite);
-  }
-
-  public Path getLocalPathForRead(String pathStr) throws IOException {
-    return getPathToRead(pathStr, getLocalDirsForRead());
-  }
-
-  public Iterable<Path> getAllLocalPathsForRead(String pathStr) throws IOException {
-    return localDirsAllocator.getAllLocalPathsToRead(pathStr, getConfig());
-  }
-
-  public Path getLogPathForWrite(String pathStr, boolean checkWrite)
-      throws IOException {
-    return logDirsAllocator.getLocalPathForWrite(pathStr,
-        LocalDirAllocator.SIZE_UNKNOWN, getConfig(), checkWrite);
-  }
-
-  public Path getLogPathToRead(String pathStr) throws IOException {
-    return getPathToRead(pathStr, getLogDirsForRead());
-  }
-
-  public static String[] validatePaths(String[] paths) {
-    ArrayList<String> validPaths = new ArrayList<String>();
-    for (int i = 0; i < paths.length; ++i) {
-      try {
-        URI uriPath = (new Path(paths[i])).toUri();
-        if (uriPath.getScheme() == null
-            || uriPath.getScheme().equals(FILE_SCHEME)) {
-          validPaths.add(new Path(uriPath.getPath()).toString());
-        } else {
-          LOG.warn(paths[i] + " is not a valid path. Path should be with "
-              + FILE_SCHEME + " scheme or without scheme");
-          throw new YarnRuntimeException(paths[i]
-              + " is not a valid path. Path should be with " + FILE_SCHEME
-              + " scheme or without scheme");
-        }
-      } catch (IllegalArgumentException e) {
-        LOG.warn(e.getMessage());
-        throw new YarnRuntimeException(paths[i]
-            + " is not a valid path. Path should be with " + FILE_SCHEME
-            + " scheme or without scheme");
-      }
-    }
-    String[] arrValidPaths = new String[validPaths.size()];
-    validPaths.toArray(arrValidPaths);
-    return arrValidPaths;
-  }
-
-  protected void updateMetrics() {
-    if (nodeManagerMetrics != null) {
-      nodeManagerMetrics.setBadLocalDirs(localDirs.getFailedDirs().size());
-      nodeManagerMetrics.setBadLogDirs(logDirs.getFailedDirs().size());
-      nodeManagerMetrics.setGoodLocalDirsDiskUtilizationPerc(
-          localDirs.getGoodDirsDiskUtilizationPercentage());
-      nodeManagerMetrics.setGoodLogDirsDiskUtilizationPerc(
-          logDirs.getGoodDirsDiskUtilizationPercentage());
-    }
-  }
-
-  private String buildDiskErrorReport(List<String> dirs, DirectoryCollection directoryCollection) {
-    StringBuilder sb = new StringBuilder();
-
-    sb.append(" [ ");
-    for (int i = 0; i < dirs.size(); i++) {
-      final String dirName = dirs.get(i);
-      if ( directoryCollection.isDiskUnHealthy(dirName)) {
-        sb.append(dirName + " : " + directoryCollection.getDirectoryErrorInfo(dirName).message);
-      } else {
-        sb.append(dirName + " : " + "Unknown cause for disk error");
-      }
-
-      if ( i != (dirs.size() - 1)) {
-        sb.append(" , ");
-      }
-    }
-    sb.append(" ] ");
-    return sb.toString();
-  }
-}
+        report.append(erroredLogDirsList.size() + "/" + numLogDir

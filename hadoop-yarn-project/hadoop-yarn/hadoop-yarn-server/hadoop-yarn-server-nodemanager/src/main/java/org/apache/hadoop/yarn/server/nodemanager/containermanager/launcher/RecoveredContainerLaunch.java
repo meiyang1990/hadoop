@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -41,14 +42,16 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerReacquisitionContext;
 
 /**
- * This is a ContainerLaunch which has been recovered after an NM restart (for
- * rolling upgrades).
+ * NodeManager重启（用于滚动升级）后恢复已有容器的启动处理类，负责接管已运行的容器
  */
 public class RecoveredContainerLaunch extends ContainerLaunch {
 
   private static final Logger LOG =
        LoggerFactory.getLogger(RecoveredContainerLaunch.class);
 
+  /**
+   * 构造恢复容器启动处理对象，标记容器已启动
+   */
   public RecoveredContainerLaunch(Context context, Configuration configuration,
       Dispatcher dispatcher, ContainerExecutor exec, Application app,
       Container container, LocalDirsHandlerService dirsHandler,
@@ -60,27 +63,33 @@ public class RecoveredContainerLaunch extends ContainerLaunch {
   }
 
   /**
-   * Wait on the process specified in pid file and return its exit code
+   * 等待已恢复容器进程退出并获取退出码，处理后续完成逻辑
+   * @return 容器退出码
    */
   @SuppressWarnings("unchecked")
   @Override
   public Integer call() {
+    // 默认退出码设为进程丢失
     int retCode = ExitCode.LOST.getExitCode();
     ContainerId containerId = container.getContainerId();
     String appIdStr =
         containerId.getApplicationAttemptId().getApplicationId().toString();
     String containerIdStr = containerId.toString();
 
+    // 发送容器已启动事件
     dispatcher.getEventHandler().handle(new ContainerEvent(containerId,
         ContainerEventType.CONTAINER_LAUNCHED));
 
     boolean interrupted = false;
     try {
+      // 查找容器PID文件
       File pidFile = locatePidFile(appIdStr, containerIdStr);
       if (pidFile != null) {
         String pidPathStr = pidFile.getPath();
         pidFilePath = new Path(pidPathStr);
+        // 激活容器，关联PID文件
         exec.activateContainer(containerId, pidFilePath);
+        // 重新获取已运行容器，等待其退出并获取退出码
         retCode = exec.reacquireContainer(
             new ContainerReacquisitionContext.Builder()
                 .setContainer(container)
@@ -97,9 +106,12 @@ public class RecoveredContainerLaunch extends ContainerLaunch {
       LOG.error("Unable to recover container " + containerIdStr, e);
     } finally {
       if (!interrupted) {
+        // 标记容器已完成
         this.completed.set(true);
+        // 取消容器激活状态
         exec.deactivateContainer(containerId);
         try {
+          // 持久化存储容器退出状态
           getContext().getNMStateStore().storeContainerCompleted(containerId,
               retCode);
         } catch (IOException e) {
@@ -108,6 +120,7 @@ public class RecoveredContainerLaunch extends ContainerLaunch {
       }
     }
 
+    // 非零退出码处理，发送容器失败退出事件
     if (retCode != 0) {
       LOG.warn("Recovered container exited with a non-zero exit code "
           + retCode);
@@ -118,6 +131,7 @@ public class RecoveredContainerLaunch extends ContainerLaunch {
       return retCode;
     }
 
+    // 零退出码处理，发送容器成功退出事件
     LOG.info("Recovered container " + containerId + " succeeded");
     dispatcher.getEventHandler().handle(
         new ContainerEvent(containerId,
@@ -125,8 +139,15 @@ public class RecoveredContainerLaunch extends ContainerLaunch {
     return 0;
   }
 
+  /**
+   * 在所有本地目录中查找容器的PID文件
+   * @param appIdStr 应用ID字符串
+   * @param containerIdStr 容器ID字符串
+   * @return 找到的PID文件，找不到返回null
+   */
   private File locatePidFile(String appIdStr, String containerIdStr) {
     String pidSubpath= getPidFileSubpath(appIdStr, containerIdStr);
+    // 遍历所有可读本地目录查找PID文件
     for (String dir : getContext().getLocalDirsHandler().
         getLocalDirsForRead()) {
       File pidFile = new File(dir, pidSubpath);

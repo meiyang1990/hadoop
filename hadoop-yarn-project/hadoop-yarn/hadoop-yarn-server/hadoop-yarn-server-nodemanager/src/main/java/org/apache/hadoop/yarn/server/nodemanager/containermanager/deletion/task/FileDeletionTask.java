@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -27,7 +28,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * {@link DeletionTask} handling the removal of files (and directories).
+ * 文件删除任务，负责处理容器退出后本地文件/目录的清理工作，继承自DeletionTask基类。
  */
 public class FileDeletionTask extends DeletionTask implements Runnable {
 
@@ -35,6 +36,10 @@ public class FileDeletionTask extends DeletionTask implements Runnable {
   private final List<Path> baseDirs;
   private static final FileContext lfs = getLfs();
 
+  /**
+   * 静态初始化获取本地文件系统上下文实例。
+   * @return 本地文件系统上下文
+   */
   private static FileContext getLfs() {
     try {
       return FileContext.getLocalFSFileContext();
@@ -44,12 +49,12 @@ public class FileDeletionTask extends DeletionTask implements Runnable {
   }
 
   /**
-   * Construct a FileDeletionTask with the default INVALID_TASK_ID.
+   * 构造文件删除任务，使用默认无效任务ID。
    *
-   * @param deletionService     the {@link DeletionService}.
-   * @param user                the user deleting the file.
-   * @param subDir              the subdirectory to delete.
-   * @param baseDirs            the base directories containing the subdir.
+   * @param deletionService     删除服务实例
+   * @param user                执行删除操作对应用户
+   * @param subDir              需要删除的子目录
+   * @param baseDirs            包含子目录的基目录列表
    */
   public FileDeletionTask(DeletionService deletionService, String user,
       Path subDir, List<Path> baseDirs) {
@@ -57,13 +62,13 @@ public class FileDeletionTask extends DeletionTask implements Runnable {
   }
 
   /**
-   * Construct a FileDeletionTask with the default INVALID_TASK_ID.
+   * 构造文件删除任务，指定任务ID用于恢复场景。
    *
-   * @param taskId              the ID of the task, if previously set.
-   * @param deletionService     the {@link DeletionService}.
-   * @param user                the user deleting the file.
-   * @param subDir              the subdirectory to delete.
-   * @param baseDirs            the base directories containing the subdir.
+   * @param taskId              任务ID，NM重启恢复时使用
+   * @param deletionService     删除服务实例
+   * @param user                执行删除操作对应用户
+   * @param subDir              需要删除的子目录
+   * @param baseDirs            包含子目录的基目录列表
    */
   public FileDeletionTask(int taskId, DeletionService deletionService,
       String user, Path subDir, List<Path> baseDirs) {
@@ -73,31 +78,33 @@ public class FileDeletionTask extends DeletionTask implements Runnable {
   }
 
   /**
-   * Get the subdirectory to delete.
+   * 获取需要删除的子目录。
    *
-   * @return the subDir for the FileDeletionTask.
+   * @return 待删除子目录
    */
   public Path getSubDir() {
     return this.subDir;
   }
 
   /**
-   * Get the base directories containing the subdirectory.
+   * 获取包含待删除子目录的基目录列表。
    *
-   * @return the base directories for the FileDeletionTask.
+   * @return 基目录列表
    */
   public List<Path> getBaseDirs() {
     return this.baseDirs;
   }
 
   /**
-   * Delete the specified file/directory as the specified user.
+   * 执行文件删除任务，区分NM本身删除和容器对应用户权限删除。
    */
   @Override
   public void run() {
     LOG.debug("Running DeletionTask : {}", this);
     boolean error = false;
+    // 无指定用户，NM进程直接删除
     if (null == getUser()) {
+      // 无基目录，直接删除绝对路径
       if (baseDirs == null || baseDirs.size() == 0) {
         LOG.debug("NM deleting absolute path : {}", subDir);
         try {
@@ -107,6 +114,7 @@ public class FileDeletionTask extends DeletionTask implements Runnable {
           LOG.warn("Failed to delete " + subDir);
         }
       } else {
+        // 遍历每个基目录，拼接完整路径后删除
         for (Path baseDir : baseDirs) {
           Path del = subDir == null? baseDir : new Path(baseDir, subDir);
           LOG.debug("NM deleting path : {}", del);
@@ -119,6 +127,7 @@ public class FileDeletionTask extends DeletionTask implements Runnable {
         }
       }
     } else {
+      // 有指定用户，委托容器执行器以对应用户身份删除
       try {
         LOG.debug("Deleting path: [{}] as user [{}]", subDir, getUser());
         if (baseDirs == null || baseDirs.size() == 0) {
@@ -143,13 +152,14 @@ public class FileDeletionTask extends DeletionTask implements Runnable {
     if (error) {
       setSuccess(!error);
     }
+    // 通知删除服务任务完成
     deletionTaskFinished();
   }
 
   /**
-   * Convert the FileDeletionTask to a String representation.
+   * 转换为字符串方便日志调试。
    *
-   * @return String representation of the FileDeletionTask.
+   * @return 当前任务的字符串描述
    */
   @Override
   public String toString() {
@@ -170,10 +180,9 @@ public class FileDeletionTask extends DeletionTask implements Runnable {
   }
 
   /**
-   * Convert the FileDeletionTask to the Protobuf representation for storing
-   * in the state store and recovery.
+   * 将当前删除任务转换为Protobuf格式，用于NM状态存储和重启恢复。
    *
-   * @return the protobuf representation of the FileDeletionTask.
+   * @return 任务的Protobuf表示
    */
   public DeletionServiceDeleteTaskProto convertDeletionTaskToProto() {
     DeletionServiceDeleteTaskProto.Builder builder =

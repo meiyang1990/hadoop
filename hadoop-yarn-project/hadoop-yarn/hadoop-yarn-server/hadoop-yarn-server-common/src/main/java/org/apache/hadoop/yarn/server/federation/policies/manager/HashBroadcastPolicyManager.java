@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,13 +24,15 @@ import org.apache.hadoop.yarn.server.federation.policies.dao.WeightedPolicyInfo;
 import org.apache.hadoop.yarn.server.federation.policies.router.HashBasedRouterPolicy;
 
 /**
- * Policy that routes applications via hashing of their queuename, and broadcast
- * resource requests. This picks a {@link HashBasedRouterPolicy} for the router
- * and a {@link BroadcastAMRMProxyPolicy} for the amrmproxy as they are designed
- * to work together.
+ * YARN联邦环境下，基于队列名哈希路由+广播请求的策略管理器，
+ * 为路由层和AMRM代理层预先绑定兼容的策略实现。
+ * 该策略通过队列名哈希选择目标子集群，同时向所有子集群广播AMRM资源请求。
  */
 public class HashBroadcastPolicyManager extends AbstractPolicyManager {
 
+  /**
+   * 构造函数，硬编码绑定路由层和AMRM代理层的匹配策略。
+   */
   public HashBroadcastPolicyManager() {
     // this structurally hard-codes two compatible policies for Router and
     // AMRMProxy.

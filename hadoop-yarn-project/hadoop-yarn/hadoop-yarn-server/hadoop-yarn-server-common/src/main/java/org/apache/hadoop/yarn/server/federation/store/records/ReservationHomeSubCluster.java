@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -26,15 +27,13 @@ import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>
- * ReservationHomeSubCluster is a report of the runtime information of the
- * reservation that is running in the federated cluster.
+ * 预约与归属子集群的映射关系实体，存储联邦集群中预约归属哪个子集群的信息。
  *
  * <p>
- * It includes information such as:
+ * 包含信息如下：
  * <ul>
- * <li>{@link ReservationId}</li>
- * <li>{@link SubClusterId}</li>
+ * <li>{@link ReservationId} 预约唯一标识</li>
+ * <li>{@link SubClusterId} 归属子集群唯一标识</li>
  * </ul>
  *
  */
@@ -42,6 +41,12 @@ import org.apache.hadoop.yarn.util.Records;
 @Unstable
 public abstract class ReservationHomeSubCluster {
 
+  /**
+   * 创建一个新的预约-子集群映射实例。
+   * @param resId 预约唯一标识
+   * @param homeSubCluster 归属子集群标识
+   * @return 初始化完成的映射实例
+   */
   @Private
   @Unstable
   public static ReservationHomeSubCluster newInstance(ReservationId resId,
@@ -53,40 +58,36 @@ public abstract class ReservationHomeSubCluster {
   }
 
   /**
-   * Get the {@link ReservationId} representing the unique identifier of the
-   * Reservation.
+   * 获取预约的唯一标识。
    *
-   * @return the reservation identifier
+   * @return 预约标识
    */
   @Public
   @Unstable
   public abstract ReservationId getReservationId();
 
   /**
-   * Set the {@link ReservationId} representing the unique identifier of the
-   * Reservation.
+   * 设置预约的唯一标识。
    *
-   * @param resId the reservation identifier
+   * @param resId 预约标识
    */
   @Private
   @Unstable
   public abstract void setReservationId(ReservationId resId);
 
   /**
-   * Get the {@link SubClusterId} representing the unique identifier of the home
-   * subcluster in which the reservation is mapped to.
+   * 获取预约归属子集群的唯一标识。
    *
-   * @return the home subcluster identifier
+   * @return 归属子集群标识
    */
   @Public
   @Unstable
   public abstract SubClusterId getHomeSubCluster();
 
   /**
-   * Set the {@link SubClusterId} representing the unique identifier of the home
-   * subcluster in which the ReservationMaster of the reservation is running.
+   * 设置预约归属子集群的唯一标识。
    *
-   * @param subClusterId the home subcluster identifier
+   * @param subClusterId 归属子集群标识
    */
   @Private
   @Unstable

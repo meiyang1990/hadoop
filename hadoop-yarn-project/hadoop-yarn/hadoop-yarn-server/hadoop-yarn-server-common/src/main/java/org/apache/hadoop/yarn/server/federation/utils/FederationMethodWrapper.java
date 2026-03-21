@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,7 +25,10 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
-
+/**
+ * YARN联邦环境中方法调用的抽象包装基类，用于统一管理跨子集群方法调用的参数信息，
+ * 支持并发调用多个子集群方法并收集结果。
+ */
 public abstract class FederationMethodWrapper {
 
   /**
@@ -42,6 +46,12 @@ public abstract class FederationMethodWrapper {
    */
   private String methodName;
 
+  /**
+   * 构造方法包装器，校验参数和参数类型长度匹配。
+   * @param pTypes 参数类型数组
+   * @param pParams 参数值数组
+   * @throws IOException 参数长度不匹配时抛出异常
+   */
   public FederationMethodWrapper(Class<?>[] pTypes, Object... pParams)
       throws IOException {
     if (pParams.length != pTypes.length) {
@@ -72,5 +82,12 @@ public abstract class FederationMethodWrapper {
     return Arrays.copyOf(this.types, this.types.length);
   }
 
+  /**
+   * 抽象方法，并发调用多个子集群上的目标方法并收集返回结果。
+   * @param clazz 返回结果类型Class对象
+   * @param <R> 返回结果泛型
+   * @return 所有子集群调用返回结果集合
+   * @throws YarnException 调用过程中发生Yarn异常抛出
+   */
   protected abstract <R> Collection<R> invokeConcurrent(Class<R> clazz) throws YarnException;
 }

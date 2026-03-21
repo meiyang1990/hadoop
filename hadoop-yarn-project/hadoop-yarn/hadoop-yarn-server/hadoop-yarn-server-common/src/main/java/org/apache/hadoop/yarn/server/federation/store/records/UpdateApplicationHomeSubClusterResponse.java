@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,16 +23,17 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * UpdateApplicationHomeSubClusterResponse contains the answer from the
- * {@code FederationApplicationHomeSubClusterStore} to a request to register the
- * home subcluster of a submitted application. Currently response is empty if
- * the operation was successful, if not an exception reporting reason for a
- * failure.
+ * 更新应用归属子集群响应类，封装联邦存储层更新应用主归属子集群请求的返回结果。
+ * 操作成功时响应为空，失败时通过异常抛出具体错误原因。
  */
 @Private
 @Unstable
 public abstract class UpdateApplicationHomeSubClusterResponse {
 
+  /**
+   * 创建新的更新应用归属子集群响应实例。
+   * @return 新建的响应实例
+   */
   @Private
   @Unstable
   public static UpdateApplicationHomeSubClusterResponse newInstance() {

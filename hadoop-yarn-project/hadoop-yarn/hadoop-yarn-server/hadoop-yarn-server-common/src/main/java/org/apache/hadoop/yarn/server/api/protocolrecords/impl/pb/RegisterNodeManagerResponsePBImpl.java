@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,30 +34,49 @@ import org.apache.hadoop.yarn.server.api.records.NodeAction;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 
 /**
- * PBImpl class for RegisterNodeManagerResponse.
+ * 基于Protobuf实现的NodeManager注册ResourceManager响应PB实现类
+ * 负责Protocol Buffers格式与高层API对象之间的互转
  */
 public class RegisterNodeManagerResponsePBImpl
     extends RegisterNodeManagerResponse {
+  // 存储Protobuf消息对象
   private RegisterNodeManagerResponseProto proto =
       RegisterNodeManagerResponseProto.getDefaultInstance();
+  // 用于构建Protobuf消息的Builder
   private RegisterNodeManagerResponseProto.Builder builder = null;
+  // 标记当前是否通过现有Protobuf对象构造
   private boolean viaProto = false;
+  // 缓存节点总资源对象
   private Resource resource = null;
 
+  // 缓存容器令牌主密钥对象
   private MasterKey containerTokenMasterKey = null;
+  // 缓存NodeManager令牌主密钥对象
   private MasterKey nmTokenMasterKey = null;
 
+  // 标记是否需要重新构建Protobuf对象
   private boolean rebuild = false;
 
+  /**
+   * 默认构造方法，初始化Builder
+   */
   public RegisterNodeManagerResponsePBImpl() {
     builder = RegisterNodeManagerResponseProto.newBuilder();
   }
 
+  /**
+   * 通过已有的Protobuf对象构造响应实例
+   * @param proto 已构建好的RegisterNodeManagerResponseProto对象
+   */
   public RegisterNodeManagerResponsePBImpl(RegisterNodeManagerResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前响应对应的Protobuf对象
+   * @return 构建完成的RegisterNodeManagerResponseProto
+   */
   public RegisterNodeManagerResponseProto getProto() {
     if (rebuild)
       mergeLocalToProto();
@@ -65,6 +85,9 @@ public class RegisterNodeManagerResponsePBImpl
     return proto;
   }
 
+  /**
+   * 将本地缓存的对象合并到Builder中
+   */
   private void mergeLocalToBuilder() {
     if (this.containerTokenMasterKey != null) {
       builder.setContainerTokenMasterKey(
@@ -79,6 +102,9 @@ public class RegisterNodeManagerResponsePBImpl
     }
   }
 
+  /**
+   * 将本地修改合并到Protobuf对象中
+   */
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -88,6 +114,9 @@ public class RegisterNodeManagerResponsePBImpl
     viaProto = true;
   }
 
+  /**
+   * 延迟初始化Builder，基于现有proto创建Builder
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = RegisterNodeManagerResponseProto.newBuilder(proto);
@@ -233,26 +262,32 @@ public class RegisterNodeManagerResponsePBImpl
     builder.setRmIdentifier(rmIdentifier);
   }
 
+  /** Protobuf格式转NodeAction枚举 */
   private NodeAction convertFromProtoFormat(NodeActionProto p) {
     return  NodeAction.valueOf(p.name());
   }
 
+  /** NodeAction枚举转Protobuf格式 */
   private NodeActionProto convertToProtoFormat(NodeAction t) {
     return NodeActionProto.valueOf(t.name());
   }
 
+  /** Protobuf格式转MasterKey对象 */
   private MasterKeyPBImpl convertFromProtoFormat(MasterKeyProto p) {
     return new MasterKeyPBImpl(p);
   }
 
+  /** MasterKey对象转Protobuf格式 */
   private MasterKeyProto convertToProtoFormat(MasterKey t) {
     return ((MasterKeyPBImpl)t).getProto();
   }
 
+  /** Protobuf格式转Resource对象 */
   private ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
     return new ResourcePBImpl(p);
   }
 
+  /** Resource对象转Protobuf格式 */
   private ResourceProto convertToProtoFormat(Resource t) {
     return ProtoUtils.convertToProtoFormat(t);
   }
@@ -284,4 +319,4 @@ public class RegisterNodeManagerResponsePBImpl
     this.builder
         .setAreNodeAttributesAcceptedByRM(areNodeAttributesAcceptedByRM);
   }
-}  
+}

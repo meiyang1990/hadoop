@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -36,11 +37,21 @@ import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.impl.pb.Loc
 
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+/**
+ * 本地化协议Protobuf RPC客户端实现，为资源本地化器提供与NodeManager通信的客户端能力
+ */
 public class LocalizationProtocolPBClientImpl implements LocalizationProtocol,
     Closeable {
 
   private LocalizationProtocolPB proxy;
-  
+
+  /**
+   * 构造本地化协议Protobuf RPC客户端，建立与NodeManager的RPC连接
+   * @param clientVersion 客户端版本号
+   * @param addr NodeManager本地化服务地址
+   * @param conf Hadoop配置对象
+   * @throws IOException 连接建立失败时抛出IO异常
+   */
   public LocalizationProtocolPBClientImpl(long clientVersion, InetSocketAddress addr, Configuration conf) throws IOException {
     RPC.setProtocolEngine(conf, LocalizationProtocolPB.class,
         ProtobufRpcEngine2.class);
@@ -55,14 +66,24 @@ public class LocalizationProtocolPBClientImpl implements LocalizationProtocol,
     }
   }
 
+  /**
+   * 向NodeManager发送本地化器心跳，上报本地化状态并获取响应指令
+   * @param status 本地化器当前状态
+   * @return NodeManager返回的心跳响应
+   * @throws YarnException Yarn服务异常
+   * @throws IOException RPC通信IO异常
+   */
   @Override
   public LocalizerHeartbeatResponse heartbeat(LocalizerStatus status)
     throws YarnException, IOException {
+    // 从包装对象获取Protobuf格式的状态对象
     LocalizerStatusProto statusProto = ((LocalizerStatusPBImpl)status).getProto();
     try {
+      // 发起RPC调用，将返回的Protobuf响应包装为业务对象返回
       return new LocalizerHeartbeatResponsePBImpl(
           proxy.heartbeat(null, statusProto));
     } catch (ServiceException e) {
+      // 解包并重新抛出服务异常
       RPCUtil.unwrapAndThrowException(e);
       return null;
     }

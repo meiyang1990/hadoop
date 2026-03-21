@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -5,7 +6,7 @@
 * regarding copyright ownership.  The ASF licenses this file
 * to you under the Apache License, Version 2.0 (the
 * "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
+* with the License.  You may obtain copy of the License at
 *
 *     http://www.apache.org/licenses/LICENSE-2.0
 *
@@ -28,6 +29,10 @@ import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 import static org.apache.hadoop.util.GenericsUtil.isLog4jLogger;
 
+/**
+ * 应用历史服务Web界面导航栏渲染块
+ * 负责生成页面顶部导航菜单，包括应用历史主入口和按状态筛选的应用列表链接
+ */
 public class NavBlock extends HtmlBlock {
 
   private Configuration conf;
@@ -37,16 +42,25 @@ public class NavBlock extends HtmlBlock {
     this.conf = conf;
   }
 
+  /**
+   * 渲染导航栏HTML内容
+   * @param html HTML块输出对象
+   */
   @Override
   public void render(Block html) {
+    // 标记是否需要添加错误警告日志链接
     boolean addErrorsAndWarningsLink = false;
+    // 检查当前类使用的是Log4j日志
     if (isLog4jLogger(NavBlock.class)) {
+      // 查找错误警告日志统计appender
       Log4jWarningErrorMetricsAppender appender =
           Log4jWarningErrorMetricsAppender.findAppender();
+      // 如果appender存在，显示错误警告链接
       if (appender != null) {
         addErrorsAndWarningsLink = true;
       }
     }
+    // 构建导航栏主结构，添加应用历史主标题
     Hamlet.DIV<Hamlet> nav = html.
         div("#nav").
             h3("Application History").
@@ -55,14 +69,17 @@ public class NavBlock extends HtmlBlock {
         __().
                     li().a(url("apps"), "Applications").
                         ul().
+                            // 添加已完成状态应用筛选链接
                             li().a(url("apps",
                                 YarnApplicationState.FINISHED.toString()),
                                 YarnApplicationState.FINISHED.toString()).
         __().
+                            // 添加失败状态应用筛选链接
                             li().a(url("apps",
                                 YarnApplicationState.FAILED.toString()),
                                 YarnApplicationState.FAILED.toString()).
         __().
+                            // 添加 killed 状态应用筛选链接
                             li().a(url("apps",
                                 YarnApplicationState.KILLED.toString()),
                                 YarnApplicationState.KILLED.toString()).
@@ -71,15 +88,19 @@ public class NavBlock extends HtmlBlock {
         __().
         __();
 
+    // 添加工具区域到导航栏
     Hamlet.UL<Hamlet.DIV<Hamlet>> tools = WebPageUtils.appendToolSection(nav, conf);
 
+    // 如果工具区域创建失败，提前结束渲染
     if (tools == null) {
       return;
     }
 
+    // 需要显示错误警告链接时，添加到工具区域
     if (addErrorsAndWarningsLink) {
       tools.li().a(url("errors-and-warnings"), "Errors/Warnings").__();
     }
+    // 闭合工具区域和导航栏HTML标签
     tools.__().__();
   }
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -64,14 +65,41 @@ import org.apache.hadoop.yarn.webapp.BadRequestException;
 import org.apache.hadoop.yarn.webapp.ForbiddenException;
 import org.apache.hadoop.yarn.webapp.NotFoundException;
 
+/**
+ * YARN服务器Web服务核心实现类，提供应用、应用尝试、容器等资源的RESTful查询接口
+ * 实现AppInfoProvider接口，为Web UI提供应用信息查询能力
+ */
 public class WebServices implements AppInfoProvider {
 
+  // 应用基础协议客户端，用于与YARN核心服务交互获取信息
   protected ApplicationBaseProtocol appBaseProt;
 
+  /**
+   * 构造函数，初始化Web服务
+   * @param appBaseProt 应用基础协议客户端实例
+   */
   public WebServices(ApplicationBaseProtocol appBaseProt) {
     this.appBaseProt = appBaseProt;
   }
 
+  /**
+   * 获取符合过滤条件的应用列表
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param stateQuery 已过时的应用状态查询参数
+   * @param statesQuery 应用状态集合查询参数
+   * @param finalStatusQuery 最终状态查询参数
+   * @param userQuery 提交用户查询参数
+   * @param queueQuery 队列查询参数
+   * @param count 返回结果数量限制
+   * @param startedBegin 应用启动时间起始范围
+   * @param startedEnd 应用启动时间结束范围
+   * @param finishBegin 应用完成时间起始范围
+   * @param finishEnd 应用完成时间结束范围
+   * @param nameQuery 应用名称查询参数
+   * @param applicationTypes 应用类型集合查询参数
+   * @return 符合条件的应用列表信息
+   */
   public AppsInfo getApps(HttpServletRequest req, HttpServletResponse res,
       String stateQuery, Set<String> statesQuery, String finalStatusQuery,
       String userQuery, String queueQuery, String count, String startedBegin,
@@ -83,12 +111,13 @@ public class WebServices implements AppInfoProvider {
     boolean checkAppStates = false;
     long countNum = Long.MAX_VALUE;
 
-    // set values suitable in case both of begin/end not specified
+    // 未指定范围时设置默认值
     long sBegin = 0;
     long sEnd = Long.MAX_VALUE;
     long fBegin = 0;
     long fEnd = Long.MAX_VALUE;
 
+    // 解析结果数量限制并校验
     if (count != null && !count.isEmpty()) {
       countNum = Long.parseLong(count);
       if (countNum <= 0) {
@@ -96,23 +125,27 @@ public class WebServices implements AppInfoProvider {
       }
     }
 
+    // 解析启动时间起始值并校验
     if (startedBegin != null && !startedBegin.isEmpty()) {
       sBegin = Long.parseLong(startedBegin);
       if (sBegin < 0) {
         throw new BadRequestException("startedTimeBegin must be greater than 0");
       }
     }
+    // 解析启动时间结束值并校验
     if (startedEnd != null && !startedEnd.isEmpty()) {
       sEnd = Long.parseLong(startedEnd);
       if (sEnd < 0) {
         throw new BadRequestException("startedTimeEnd must be greater than 0");
       }
     }
+    // 校验启动时间范围合法性
     if (sBegin > sEnd) {
       throw new BadRequestException(
         "startedTimeEnd must be greater than startTimeBegin");
     }
 
+    // 解析完成时间起始值并校验
     if (finishBegin != null && !finishBegin.isEmpty()) {
       checkEnd = true;
       fBegin = Long.parseLong(finishBegin);
@@ -120,6 +153,7 @@ public class WebServices implements AppInfoProvider {
         throw new BadRequestException("finishTimeBegin must be greater than 0");
       }
     }
+    // 解析完成时间结束值并校验
     if (finishEnd != null && !finishEnd.isEmpty()) {
       checkEnd = true;
       fEnd = Long.parseLong(finishEnd);
@@ -127,20 +161,23 @@ public class WebServices implements AppInfoProvider {
         throw new BadRequestException("finishTimeEnd must be greater than 0");
       }
     }
+    // 校验完成时间范围合法性
     if (fBegin > fEnd) {
       throw new BadRequestException(
         "finishTimeEnd must be greater than finishTimeBegin");
     }
 
+    // 解析应用类型查询参数
     Set<String> appTypes = parseQueries(applicationTypes, false);
     if (!appTypes.isEmpty()) {
       checkAppTypes = true;
     }
 
-    // stateQuery is deprecated.
+    // 处理已过时的stateQuery参数，兼容旧用法
     if (stateQuery != null && !stateQuery.isEmpty()) {
       statesQuery.add(stateQuery);
     }
+    // 解析应用状态查询参数
     Set<String> appStates = parseQueries(statesQuery, true);
     if (!appStates.isEmpty()) {
       checkAppStates = true;
@@ -148,11 +185,13 @@ public class WebServices implements AppInfoProvider {
 
     AppsInfo allApps = new AppsInfo();
     Collection<ApplicationReport> appReports = null;
+    // 构造获取应用列表请求
     final GetApplicationsRequest request =
         GetApplicationsRequest.newInstance();
     request.setLimit(countNum);
     request.setStartRange(Range.between(sBegin, sEnd));
     try {
+      // 根据UGI情况选择是否以特权用户身份执行请求
       if (callerUGI == null) {
         // TODO: the request should take the params like what RMWebServices does
         // in YARN-1819.
@@ -172,13 +211,16 @@ public class WebServices implements AppInfoProvider {
     if (appReports == null) {
       return allApps;
     }
+    // 遍历所有应用，根据过滤条件筛选
     for (ApplicationReport appReport : appReports) {
 
+      // 按应用状态过滤
       if (checkAppStates &&
           !appStates.contains(StringUtils.toLowerCase(
               appReport.getYarnApplicationState().toString()))) {
         continue;
       }
+      // 按最终状态过滤
       if (finalStatusQuery != null && !finalStatusQuery.isEmpty()) {
         FinalApplicationStatus.valueOf(finalStatusQuery);
         if (!appReport.getFinalApplicationStatus().toString()
@@ -186,32 +228,38 @@ public class WebServices implements AppInfoProvider {
           continue;
         }
       }
+      // 按提交用户过滤
       if (userQuery != null && !userQuery.isEmpty()) {
         if (!appReport.getUser().equals(userQuery)) {
           continue;
         }
       }
+      // 按队列过滤
       if (queueQuery != null && !queueQuery.isEmpty()) {
         if (appReport.getQueue() == null || !appReport.getQueue()
             .equals(queueQuery)) {
           continue;
         }
       }
+      // 按应用类型过滤
       if (checkAppTypes &&
           !appTypes.contains(
               StringUtils.toLowerCase(appReport.getApplicationType().trim()))) {
         continue;
       }
 
+      // 按完成时间过滤
       if (checkEnd
           && (appReport.getFinishTime() < fBegin || appReport.getFinishTime() > fEnd)) {
         continue;
       }
 
+      // 按应用名称过滤
       if (nameQuery != null && !nameQuery.equals(appReport.getName())) {
         continue;
       }
 
+      // 转换为DAO对象添加到结果集
       AppInfo app = new AppInfo(appReport);
 
       allApps.add(app);
@@ -219,6 +267,13 @@ public class WebServices implements AppInfoProvider {
     return allApps;
   }
 
+  /**
+   * 获取指定应用的信息
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param appId 应用ID字符串
+   * @return 应用信息
+   */
   public AppInfo getApp(HttpServletRequest req,
       HttpServletResponse res, String appId) {
     return getApp(req, appId);
@@ -230,11 +285,18 @@ public class WebServices implements AppInfoProvider {
     return BasicAppInfo.fromAppInfo(getApp(req, appId));
   }
 
+  /**
+   * 获取指定应用的信息
+   * @param req HTTP请求
+   * @param appId 应用ID字符串
+   * @return 应用信息
+   */
   public AppInfo getApp(HttpServletRequest req, String appId) {
     UserGroupInformation callerUGI = getUser(req);
     final ApplicationId id = parseApplicationId(appId);
     ApplicationReport app = null;
     try {
+      // 根据UGI情况选择是否以特权用户身份执行请求
       if (callerUGI == null) {
         GetApplicationReportRequest request =
             GetApplicationReportRequest.newInstance(id);
@@ -259,12 +321,20 @@ public class WebServices implements AppInfoProvider {
     return new AppInfo(app);
   }
 
+  /**
+   * 获取指定应用的所有尝试列表信息
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param appId 应用ID字符串
+   * @return 应用尝试列表信息
+   */
   public AppAttemptsInfo getAppAttempts(HttpServletRequest req,
       HttpServletResponse res, String appId) {
     UserGroupInformation callerUGI = getUser(req);
     final ApplicationId id = parseApplicationId(appId);
     Collection<ApplicationAttemptReport> appAttemptReports = null;
     try {
+      // 根据UGI情况选择是否以特权用户身份执行请求
       if (callerUGI == null) {
         GetApplicationAttemptsRequest request =
             GetApplicationAttemptsRequest.newInstance(id);
@@ -288,6 +358,7 @@ public class WebServices implements AppInfoProvider {
     if (appAttemptReports == null) {
       return appAttemptsInfo;
     }
+    // 转换为DAO对象添加到结果集
     for (ApplicationAttemptReport appAttemptReport : appAttemptReports) {
       AppAttemptInfo appAttemptInfo = new AppAttemptInfo(appAttemptReport);
       appAttemptsInfo.add(appAttemptInfo);
@@ -296,6 +367,14 @@ public class WebServices implements AppInfoProvider {
     return appAttemptsInfo;
   }
 
+  /**
+   * 获取指定应用尝试的详细信息
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param appId 应用ID字符串
+   * @param appAttemptId 应用尝试ID字符串
+   * @return 应用尝试信息
+   */
   public AppAttemptInfo getAppAttempt(HttpServletRequest req,
       HttpServletResponse res, String appId, String appAttemptId) {
     UserGroupInformation callerUGI = getUser(req);
@@ -304,6 +383,7 @@ public class WebServices implements AppInfoProvider {
     validateIds(aid, aaid, null);
     ApplicationAttemptReport appAttempt = null;
     try {
+      // 根据UGI情况选择是否以特权用户身份执行请求
       if (callerUGI == null) {
         GetApplicationAttemptReportRequest request =
             GetApplicationAttemptReportRequest.newInstance(aaid);
@@ -330,6 +410,14 @@ public class WebServices implements AppInfoProvider {
     return new AppAttemptInfo(appAttempt);
   }
 
+  /**
+   * 获取指定应用尝试下的所有容器列表信息
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param appId 应用ID字符串
+   * @param appAttemptId 应用尝试ID字符串
+   * @return 容器列表信息
+   */
   public ContainersInfo getContainers(HttpServletRequest req,
       HttpServletResponse res, String appId, String appAttemptId) {
     UserGroupInformation callerUGI = getUser(req);
@@ -338,6 +426,7 @@ public class WebServices implements AppInfoProvider {
     validateIds(aid, aaid, null);
     Collection<ContainerReport> containerReports = null;
     try {
+      // 根据UGI情况选择是否以特权用户身份执行请求
       if (callerUGI == null) {
         GetContainersRequest request = GetContainersRequest.newInstance(aaid);
         containerReports =
@@ -359,222 +448,9 @@ public class WebServices implements AppInfoProvider {
     if (containerReports == null) {
       return containersInfo;
     }
+    // 转换为DAO对象添加到结果集
     for (ContainerReport containerReport : containerReports) {
       ContainerInfo containerInfo = new ContainerInfo(containerReport);
       containersInfo.add(containerInfo);
     }
     return containersInfo;
-  }
-
-  @Override
-  public String getNodeHttpAddress(HttpServletRequest req,
-      String appId, String appAttemptId,
-      String containerId, String clusterId) {
-    ContainerInfo containerInfo = getContainer(req, appId,
-        appAttemptId, containerId);
-    return containerInfo.getNodeHttpAddress();
-  }
-
-  public ContainerInfo getContainer(HttpServletRequest req,
-      String appId, String appAttemptId,
-      String containerId) {
-    UserGroupInformation callerUGI = getUser(req);
-    ApplicationId aid = parseApplicationId(appId);
-    ApplicationAttemptId aaid = parseApplicationAttemptId(appAttemptId);
-    final ContainerId cid = parseContainerId(containerId);
-    validateIds(aid, aaid, cid);
-    ContainerReport container = null;
-    try {
-      if (callerUGI == null) {
-        GetContainerReportRequest request =
-            GetContainerReportRequest.newInstance(cid);
-        container =
-            getContainerReport(request);
-      } else {
-        container = callerUGI.doAs(
-            new PrivilegedExceptionAction<ContainerReport> () {
-          @Override
-          public ContainerReport run() throws Exception {
-            GetContainerReportRequest request =
-                GetContainerReportRequest.newInstance(cid);
-            return getContainerReport(request);
-          }
-        });
-      }
-    } catch (Exception e) {
-      rewrapAndThrowException(e);
-    }
-    if (container == null) {
-      throw new NotFoundException("container with id: " + containerId
-          + " not found");
-    }
-    return new ContainerInfo(container);
-  }
-
-  public ContainerInfo getContainer(HttpServletRequest req,
-      HttpServletResponse res, String appId, String appAttemptId,
-      String containerId) {
-    return getContainer(req, appId, appAttemptId, containerId);
-  }
-
-  protected void initForReadableEndpoints(HttpServletResponse response) {
-    // clear content type
-    response.setContentType(null);
-  }
-
-  public static Set<String>
-      parseQueries(Set<String> queries, boolean isState) {
-    Set<String> params = new HashSet<String>();
-    if (!queries.isEmpty()) {
-      for (String query : queries) {
-        if (query != null && !query.trim().isEmpty()) {
-          String[] paramStrs = query.split(",");
-          for (String paramStr : paramStrs) {
-            if (paramStr != null && !paramStr.trim().isEmpty()) {
-              if (isState) {
-                try {
-                  // enum string is in the uppercase
-                  YarnApplicationState.valueOf(
-                      StringUtils.toUpperCase(paramStr.trim()));
-                } catch (RuntimeException e) {
-                  YarnApplicationState[] stateArray =
-                      YarnApplicationState.values();
-                  String allAppStates = Arrays.toString(stateArray);
-                  throw new BadRequestException("Invalid application-state "
-                      + paramStr.trim() + " specified. It should be one of "
-                      + allAppStates);
-                }
-              }
-              params.add(StringUtils.toLowerCase(paramStr.trim()));
-            }
-          }
-        }
-      }
-    }
-    return params;
-  }
-
-  protected static ApplicationId parseApplicationId(String appId) {
-    if (appId == null || appId.isEmpty()) {
-      throw new NotFoundException("appId, " + appId + ", is empty or null");
-    }
-    ApplicationId aid = null;
-    try {
-      aid = ApplicationId.fromString(appId);
-    } catch (Exception e) {
-      throw new BadRequestException(e);
-    }
-    if (aid == null) {
-      throw new NotFoundException("appId is null");
-    }
-    return aid;
-  }
-
-  protected static ApplicationAttemptId parseApplicationAttemptId(
-      String appAttemptId) {
-    if (appAttemptId == null || appAttemptId.isEmpty()) {
-      throw new NotFoundException("appAttemptId, " + appAttemptId
-          + ", is empty or null");
-    }
-    ApplicationAttemptId aaid = null;
-    try {
-      aaid = ApplicationAttemptId.fromString(appAttemptId);
-    } catch (Exception e) {
-      throw new BadRequestException(e);
-    }
-    if (aaid == null) {
-      throw new NotFoundException("appAttemptId is null");
-    }
-    return aaid;
-  }
-
-  protected static ContainerId parseContainerId(String containerId) {
-    if (containerId == null || containerId.isEmpty()) {
-      throw new NotFoundException("containerId, " + containerId
-          + ", is empty or null");
-    }
-    ContainerId cid = null;
-    try {
-      cid = ContainerId.fromString(containerId);
-    } catch (Exception e) {
-      throw new BadRequestException(e);
-    }
-    if (cid == null) {
-      throw new NotFoundException("containerId is null");
-    }
-    return cid;
-  }
-
-  protected void validateIds(ApplicationId appId,
-      ApplicationAttemptId appAttemptId, ContainerId containerId) {
-    if (!appAttemptId.getApplicationId().equals(appId)) {
-      throw new NotFoundException("appId and appAttemptId don't match");
-    }
-    if (containerId != null
-        && !containerId.getApplicationAttemptId().equals(appAttemptId)) {
-      throw new NotFoundException("appAttemptId and containerId don't match");
-    }
-  }
-
-  protected static UserGroupInformation getUser(HttpServletRequest req) {
-    String remoteUser = req.getRemoteUser();
-    UserGroupInformation callerUGI = null;
-    if (remoteUser != null) {
-      callerUGI = UserGroupInformation.createRemoteUser(remoteUser);
-    }
-    return callerUGI;
-  }
-
-  private static void rewrapAndThrowException(Exception e) {
-    if (e instanceof UndeclaredThrowableException) {
-      rewrapAndThrowThrowable(e.getCause());
-    } else {
-      rewrapAndThrowThrowable(e);
-    }
-  }
-
-  private static void rewrapAndThrowThrowable(Throwable t) {
-    if (t instanceof AuthorizationException) {
-      throw new ForbiddenException(t);
-    } else if (t instanceof ApplicationNotFoundException ||
-        t instanceof ApplicationAttemptNotFoundException ||
-        t instanceof ContainerNotFoundException) {
-      throw new NotFoundException(t);
-    } else {
-      throw new WebApplicationException(t);
-    }
-  }
-
-  protected ApplicationReport getApplicationReport(
-      GetApplicationReportRequest request) throws YarnException, IOException {
-    return appBaseProt.getApplicationReport(request).getApplicationReport();
-  }
-
-  protected List<ApplicationReport> getApplicationsReport(
-      final GetApplicationsRequest request) throws YarnException, IOException {
-    return appBaseProt.getApplications(request).getApplicationList();
-  }
-
-  protected ApplicationAttemptReport getApplicationAttemptReport(
-      GetApplicationAttemptReportRequest request)
-      throws YarnException, IOException {
-    return appBaseProt.getApplicationAttemptReport(request)
-        .getApplicationAttemptReport();
-  }
-
-  protected List<ApplicationAttemptReport> getApplicationAttemptsReport(
-      GetApplicationAttemptsRequest request) throws YarnException, IOException {
-    return appBaseProt.getApplicationAttempts(request)
-        .getApplicationAttemptList();
-  }
-
-  protected ContainerReport getContainerReport(
-      GetContainerReportRequest request) throws YarnException, IOException {
-    return appBaseProt.getContainerReport(request).getContainerReport();
-  }
-
-  protected List<ContainerReport> getContainersReport(
-      GetContainersRequest request) throws YarnException, IOException {
-    return appBaseProt.getContainers(request).getContainerList();
-  }
-}

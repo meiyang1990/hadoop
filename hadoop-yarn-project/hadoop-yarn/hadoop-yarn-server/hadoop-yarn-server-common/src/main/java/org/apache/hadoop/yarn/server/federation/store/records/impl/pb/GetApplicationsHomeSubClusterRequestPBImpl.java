@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -28,29 +29,43 @@ import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 
 /**
- * Protocol buffer based implementation of
- * {@link GetApplicationsHomeSubClusterRequest}.
+ * GetApplicationsHomeSubClusterRequest 的 Protocol Buffer 实现，
+ * 用于 federation 状态存储中查询指定子集群应用归属请求的序列化/反序列化。
  */
 @Private
 @Unstable
 public class GetApplicationsHomeSubClusterRequestPBImpl
     extends GetApplicationsHomeSubClusterRequest {
 
+  // PB 协议对象实例
   private GetApplicationsHomeSubClusterRequestProto proto =
       GetApplicationsHomeSubClusterRequestProto.getDefaultInstance();
+  // PB 构建器实例
   private GetApplicationsHomeSubClusterRequestProto.Builder builder = null;
+  // 是否直接使用 proto 模式，false 表示正在使用构建器修改
   private boolean viaProto = false;
 
+  /**
+   * 构造函数，初始化 PB 构建器。
+   */
   public GetApplicationsHomeSubClusterRequestPBImpl() {
     builder = GetApplicationsHomeSubClusterRequestProto.newBuilder();
   }
 
+  /**
+   * 基于已有 PB 对象构造封装。
+   * @param proto PB 协议对象
+   */
   public GetApplicationsHomeSubClusterRequestPBImpl(
       GetApplicationsHomeSubClusterRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求的 PB 协议对象。
+   * @return 构建完成的 PB 对象
+   */
   public GetApplicationsHomeSubClusterRequestProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;
@@ -78,6 +93,7 @@ public class GetApplicationsHomeSubClusterRequestPBImpl
     return TextFormat.shortDebugString(getProto());
   }
 
+  // 初始化构建器，若当前使用只读 proto，则基于 proto 新建可写构建器
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = GetApplicationsHomeSubClusterRequestProto.newBuilder(proto);
@@ -91,6 +107,7 @@ public class GetApplicationsHomeSubClusterRequestPBImpl
     if (!p.hasSubClusterId()) {
       return null;
     }
+    // 将 PB 格式子集群ID转换为 API 对象
     return convertFromProtoFormat(p.getSubClusterId());
   }
 
@@ -101,13 +118,16 @@ public class GetApplicationsHomeSubClusterRequestPBImpl
       builder.clearSubClusterId();
       return;
     }
+    // 将 API 对象转换为 PB 格式存入构建器
     builder.setSubClusterId(convertToProtoFormat(subClusterId));
   }
 
+  // 将 PB 格式子集群ID转换为 API 实现对象
   private SubClusterId convertFromProtoFormat(YarnServerFederationProtos.SubClusterIdProto sc) {
     return new SubClusterIdPBImpl(sc);
   }
 
+  // 将 API 对象转换为 PB 格式子集群ID
   private YarnServerFederationProtos.SubClusterIdProto convertToProtoFormat(SubClusterId sc) {
     return ((SubClusterIdPBImpl) sc).getProto();
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,18 +26,19 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
+ * 子集群唯一标识符，用于YARN联邦集群中标识参与联邦的子集群。
  * <p>
- * SubClusterId represents the <em>globally unique</em> identifier for a
- * subcluster that is participating in federation.
- *
- * <p>
- * The globally unique nature of the identifier is obtained from the
- * <code>FederationMembershipStateStore</code> on initialization.
+ * 全局唯一性由联邦初始化时的<code>FederationMembershipStateStore</code>保证。
  */
 @Private
 @Unstable
 public abstract class SubClusterId implements Comparable<SubClusterId> {
 
+  /**
+   * 根据字符串ID创建新的子集群标识符实例。
+   * @param subClusterId 子集群唯一标识字符串
+   * @return 子集群标识符实例
+   */
   @Private
   @Unstable
   public static SubClusterId newInstance(String subClusterId) {
@@ -45,6 +47,11 @@ public abstract class SubClusterId implements Comparable<SubClusterId> {
     return id;
   }
 
+  /**
+   * 根据整数ID创建新的子集群标识符实例。
+   * @param subClusterId 子集群唯一标识整数
+   * @return 子集群标识符实例
+   */
   @Private
   @Unstable
   public static SubClusterId newInstance(Integer subClusterId) {
@@ -54,22 +61,18 @@ public abstract class SubClusterId implements Comparable<SubClusterId> {
   }
 
   /**
-   * Get the string identifier of the <em>subcluster</em> which is unique across
-   * the federated cluster. The identifier is static, i.e. preserved across
-   * restarts and failover.
+   * 获取子集群唯一标识字符串，该标识在整个联邦集群中唯一，并且会在重启和故障转移后保持不变。
    *
-   * @return unique identifier of the subcluster
+   * @return 子集群唯一标识符
    */
   @Public
   @Unstable
   public abstract String getId();
 
   /**
-   * Set the string identifier of the <em>subcluster</em> which is unique across
-   * the federated cluster. The identifier is static, i.e. preserved across
-   * restarts and failover.
+   * 设置子集群唯一标识字符串，该标识在整个联邦集群中唯一，并且会在重启和故障转移后保持不变。
    *
-   * @param subClusterId unique identifier of the subcluster
+   * @param subClusterId 子集群唯一标识符
    */
   @Private
   @Unstable
@@ -77,14 +80,17 @@ public abstract class SubClusterId implements Comparable<SubClusterId> {
 
   @Override
   public boolean equals(Object obj) {
+    // 同一对象直接返回相等
     if (this == obj) {
       return true;
     }
 
+    // 空对象直接返回不相等
     if (obj == null) {
       return false;
     }
 
+    // 类型匹配则比较ID值
     if (obj instanceof SubClusterId) {
       SubClusterId other = (SubClusterId) obj;
       return new EqualsBuilder()
@@ -92,6 +98,7 @@ public abstract class SubClusterId implements Comparable<SubClusterId> {
           .isEquals();
     }
 
+    // 类型不匹配返回不相等
     return false;
   }
 
@@ -104,6 +111,7 @@ public abstract class SubClusterId implements Comparable<SubClusterId> {
 
   @Override
   public int compareTo(SubClusterId other) {
+    // 按ID字符串字典序比较
     return getId().compareTo(other.getId());
   }
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,20 +37,31 @@ import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * NodeManager令牌密钥管理器基类，负责NM令牌的生成、密码计算和验证逻辑
+ * 为AM访问NodeManager提供身份认证的密钥管理能力
+ */
 public class BaseNMTokenSecretManager extends
     SecretManager<NMTokenIdentifier> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseNMTokenSecretManager.class);
 
+  // 主密钥序列号，用于生成新主密钥的ID
   protected int serialNo = new SecureRandom().nextInt();
 
+  // 读写锁，保护主密钥的并发访问，支持多线程读、单线程写
   protected final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
   protected final Lock readLock = readWriteLock.readLock();
   protected final Lock writeLock = readWriteLock.writeLock();
 
+  // 当前生效的主密钥数据
   protected MasterKeyData currentMasterKey;
   
+  /**
+   * 创建新的主密钥，更新序列号
+   * @return 新生成的主密钥数据
+   */
   protected MasterKeyData createNewMasterKey() {
     this.writeLock.lock();
     try {
@@ -59,6 +71,10 @@ public class BaseNMTokenSecretManager extends
     }
   }
 
+  /**
+   * 获取当前生效的主密钥
+   * @return 当前主密钥对象
+   */
   @Private
   public MasterKey getCurrentKey() {
     this.readLock.lock();
@@ -76,6 +92,7 @@ public class BaseNMTokenSecretManager extends
         identifier.getApplicationSubmitter(), identifier.getNodeId());
     readLock.lock();
     try {
+      // 使用当前主密钥为令牌标识符生成密码
       return createPassword(identifier.getBytes(),
           currentMasterKey.getSecretKey());
     } finally {
@@ -88,6 +105,7 @@ public class BaseNMTokenSecretManager extends
       throws org.apache.hadoop.security.token.SecretManager.InvalidToken {
     readLock.lock();
     try {
+      // 调用内部方法验证令牌密码
       return retrivePasswordInternal(identifier, currentMasterKey);
     } finally {
       readLock.unlock();
@@ -99,8 +117,10 @@ public class BaseNMTokenSecretManager extends
     LOG.debug("retriving password for {} for user {} to run on NM {}",
         identifier.getApplicationAttemptId(),
         identifier.getApplicationSubmitter(), identifier.getNodeId());
+    // 重新计算密码，和传入令牌中的密码比对完成验证
     return createPassword(identifier.getBytes(), masterKey.getSecretKey());
   }
+
   /**
    * It is required for RPC
    */
@@ -124,21 +144,30 @@ public class BaseNMTokenSecretManager extends
     
     this.readLock.lock();
     try {
+      // 使用当前主密钥ID构造令牌标识符
       identifier =
           new NMTokenIdentifier(applicationAttemptId, nodeId,
               applicationSubmitter, this.currentMasterKey.getMasterKey()
                   .getKeyId());
+      // 为标识符生成对应密码
       password = this.createPassword(identifier);
     } finally {
       this.readLock.unlock();
     }
+    // 实例化并返回最终NM令牌对象
     return newInstance(password, identifier);
   }
   
+  /**
+   * 实例化NM令牌对象，设置正确的服务标识
+   * @param password 令牌密码
+   * @param identifier NM令牌标识符
+   * @return 构造完成的NM令牌
+   */
   public static Token newInstance(byte[] password,
       NMTokenIdentifier identifier) {
     NodeId nodeId = identifier.getNodeId();
-    // RPC layer client expects ip:port as service for tokens
+    // RPC层要求令牌服务地址格式为ip:port
     InetSocketAddress addr =
         NetUtils.createSocketAddrForHost(nodeId.getHost(), nodeId.getPort());
     Token nmToken =

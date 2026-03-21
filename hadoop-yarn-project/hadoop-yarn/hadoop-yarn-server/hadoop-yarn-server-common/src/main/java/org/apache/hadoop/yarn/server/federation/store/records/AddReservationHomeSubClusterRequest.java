@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -24,20 +25,24 @@ import org.apache.hadoop.yarn.util.Records;
 
 /**
  * <p>
- * The request sent by the <code>Router</code> to <code>Federation state
- * store</code> to map the home subcluster of a newly submitted Reservation.
+ * 路由器向联邦状态存储发送的请求，用于为新提交的预留建立家子集群映射关系。
  *
  * <p>
- * The request includes the mapping details, i.e.:
+ * 请求包含的映射信息:
  * <ul>
- * <li>{@code ReservationId}</li>
- * <li>{@code SubClusterId}</li>
+ * <li>{@code 预留ID}</li>
+ * <li>{@code 子集群ID}</li>
  * </ul>
  */
 @Private
 @Unstable
 public abstract class AddReservationHomeSubClusterRequest {
 
+  /**
+   * 创建新增预留家子集群映射请求实例。
+   * @param reservationHomeSubCluster 预留与家子集群的映射信息
+   * @return 新增预留家子集群映射请求实例
+   */
   @Private
   @Unstable
   public static AddReservationHomeSubClusterRequest newInstance(
@@ -49,21 +54,18 @@ public abstract class AddReservationHomeSubClusterRequest {
   }
 
   /**
-   * Get the {@link ReservationHomeSubCluster} representing the mapping of the
-   * Reservation to it's home sub-cluster.
+   * 获取预留与家子集群的映射信息。
    *
-   * @return the mapping of the Reservation to it's home sub-cluster.
+   * @return 预留与家子集群的映射信息
    */
   @Public
   @Unstable
   public abstract ReservationHomeSubCluster getReservationHomeSubCluster();
 
   /**
-   * Set the {@link ReservationHomeSubCluster} representing the mapping of the
-   * Reservation to it's home sub-cluster.
+   * 设置预留与家子集群的映射信息。
    *
-   * @param reservationHomeSubCluster the mapping of the Reservation to it's
-   *          home sub-cluster.
+   * @param reservationHomeSubCluster 预留与家子集群的映射信息
    */
   @Private
   @Unstable

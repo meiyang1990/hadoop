@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -28,38 +29,33 @@ import org.apache.hadoop.yarn.server.federation.policies.ConfigurableFederationP
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 
 /**
- * Implementors of this interface provide logic to split the list of
- * {@link ResourceRequest}s received by the AM among various RMs.
+ * YARN联邦AMRMProxy路由策略接口，定义了将ApplicationMaster发出的资源请求分发到多个子集群ResourceManager的策略契约。
+ * 实现该接口的类负责将AM收到的资源请求列表拆分路由到不同子集群RM。
  */
 public interface FederationAMRMProxyPolicy
     extends ConfigurableFederationPolicy {
 
   /**
-   * Splits the {@link ResourceRequest}s from the client across one or more
-   * sub-clusters based on the policy semantics (e.g., broadcast, load-based).
+   * 根据当前策略规则，将AM发来的资源请求拆分路由到一个或多个子集群。
+   * 常见策略实现包括广播到所有子集群、按负载选择子集群等。
    *
-   * @param resourceRequests the list of {@link ResourceRequest}s from the AM to
-   *          be split
-   * @param timedOutSubClusters the set of sub-clusters that haven't had a
-   *          successful heart-beat response for a while.
-   * @return map of sub-cluster as identified by {@link SubClusterId} to the
-   *         list of {@link ResourceRequest}s that should be forwarded to it
-   * @throws YarnException in case the request is malformed or no viable
-   *           sub-clusters can be found.
+   * @param resourceRequests AM发送的资源请求列表，待拆分路由
+   * @param timedOutSubClusters 超时未心跳响应的子集群集合，策略需排除这些不可用子集群
+   * @return 子集群ID -> 待转发给该子集群的资源请求列表 映射结果
+   * @throws YarnException 请求格式错误或找不到可用子集群时抛出异常
    */
   Map<SubClusterId, List<ResourceRequest>> splitResourceRequests(
       List<ResourceRequest> resourceRequests,
       Set<SubClusterId> timedOutSubClusters) throws YarnException;
 
   /**
-   * This method should be invoked to notify the policy about responses being
-   * received. This is useful for stateful policies that make decisions based on
-   * previous responses being received.
+   * 通知策略从子集群收到Allocate响应，供有状态策略基于历史响应做路由决策。
+   * 例如基于负载的策略可通过该方法更新各子集群剩余资源统计。
    *
-   * @param subClusterId the id of the subcluster sending the notification
-   * @param response the response received from one of the RMs
+   * @param subClusterId 发送响应的子集群ID
+   * @param response 从子集群RM收到的Allocate响应
    *
-   * @throws YarnException in case the response is not valid
+   * @throws YarnException 响应格式非法时抛出异常
    */
   void notifyOfResponse(SubClusterId subClusterId, AllocateResponse response)
       throws YarnException;

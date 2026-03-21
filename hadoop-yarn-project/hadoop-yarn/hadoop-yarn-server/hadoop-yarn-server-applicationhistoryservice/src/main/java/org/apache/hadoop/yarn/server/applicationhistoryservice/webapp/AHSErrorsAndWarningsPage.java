@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,27 +25,44 @@ import org.apache.hadoop.yarn.webapp.SubView;
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.*;
 
 /**
- * Class to display the Errors and Warnings page for the AHS.
+ * 应用历史服务器(AHS)错误和警告页面，用于展示应用运行过程中产生的错误与警告信息
  */
 public class AHSErrorsAndWarningsPage extends AHSView {
 
+  /**
+   * 获取页面内容区块类
+   * @return 错误警告信息区块类
+   */
   @Override
   protected Class<? extends SubView> content() {
     return ErrorsAndWarningsBlock.class;
   }
 
+  /**
+   * 在HTML head渲染前执行初始化配置
+   * @param html HTML页面构建器
+   */
   @Override
   protected void preHead(Page.HTML<__> html) {
+    // 调用通用初始化逻辑
     commonPreHead(html);
+    // 设置页面标题
     String title = "Errors and Warnings in the Application History Server";
     setTitle(title);
+    // 设置表格ID
     String tableId = "messages";
     set(DATATABLES_ID, tableId);
+    // 初始化表格
     set(initID(DATATABLES, tableId), tablesInit());
+    // 设置表格列样式
     setTableStyles(html, tableId, ".message {width:50em}",
         ".count {width:8em}", ".lasttime {width:16em}");
   }
 
+  /**
+   * 生成DataTables表格初始化配置JSON
+   * @return 表格初始化参数字符串
+   */
   private String tablesInit() {
     StringBuilder b = tableInit().append(", aoColumnDefs: [");
     b.append("{'sType': 'string', 'aTargets': [ 0 ]}")

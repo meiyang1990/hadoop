@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -42,8 +43,8 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * This class provides a facade to the policy subsystem, and handles the
- * lifecycle of policies (e.g., refresh from remote, default behaviors etc.).
+ * RouterPolicyFacade是YARN联邦路由策略子系统的外观类，负责管理所有路由策略的生命周期，
+ * 包括从远程状态存储加载配置、处理策略刷新、提供默认降级策略等功能，对外统一暴露路由查询接口。
  */
 public class RouterPolicyFacade {
 
@@ -57,6 +58,16 @@ public class RouterPolicyFacade {
   @VisibleForTesting
   Map<String, FederationRouterPolicy> globalPolicyMap;
 
+  /**
+   * 构造RouterPolicyFacade实例，初始化默认降级路由策略。
+   * 优先从联邦状态存储加载默认策略，加载失败则从本地XML配置创建默认策略，最后将默认策略缓存。
+   * 
+   * @param conf Hadoop配置对象
+   * @param facade 联邦状态存储外观对象，用于查询策略配置
+   * @param resolver 子集群解析器
+   * @param homeSubcluster 当前Router所在的 home 子集群ID
+   * @throws FederationPolicyInitializationException 当默认策略初始化失败时抛出
+   */
   public RouterPolicyFacade(Configuration conf,
       FederationStateStoreFacade facade, SubClusterResolver resolver,
       SubClusterId homeSubcluster)
@@ -67,7 +78,7 @@ public class RouterPolicyFacade {
     this.globalConfMap = new ConcurrentHashMap<>();
     this.globalPolicyMap = new ConcurrentHashMap<>();
 
-    // load default behavior from store if possible
+    // 尝试从联邦状态存储加载默认策略配置
     String defaultKey = YarnConfiguration.DEFAULT_FEDERATION_POLICY_KEY;
     SubClusterPolicyConfiguration configuration = null;
     try {
@@ -77,7 +88,7 @@ public class RouterPolicyFacade {
           + "configuration fallback behavior.");
     }
 
-    // or from XML conf otherwise.
+    // 状态存储无默认配置，从本地XML配置读取并构造默认策略配置
     if (configuration == null) {
       String defaultFederationPolicyManager =
           conf.get(YarnConfiguration.FEDERATION_POLICY_MANAGER,
@@ -92,7 +103,7 @@ public class RouterPolicyFacade {
           defaultFederationPolicyManager, defaultPolicyParam);
     }
 
-    // construct the required policy manager
+    // 实例化策略管理器并初始化
     FederationPolicyInitializationContext fallbackContext =
         new FederationPolicyInitializationContext(configuration,
             subClusterResolver, federationFacade, homeSubcluster);
@@ -100,7 +111,7 @@ public class RouterPolicyFacade {
         FederationPolicyUtils.instantiatePolicyManager(configuration.getType());
     fallbackPolicyManager.setQueue(defaultKey);
 
-    // add to the cache the fallback behavior
+    // 将默认策略加入缓存，作为全局降级策略
     globalConfMap.put(defaultKey,
         fallbackContext.getSubClusterPolicyConfiguration());
     globalPolicyMap.put(defaultKey,
@@ -109,29 +120,19 @@ public class RouterPolicyFacade {
   }
 
   /**
-   * This method provides a wrapper of all policy functionalities for routing .
-   * Internally it manages configuration changes, and policy init/reinit.
+   * 根据应用提交上下文和黑名单，为应用选择目标执行子集群。
+   * 内部会自动处理配置变更，按需重新初始化策略。
    *
-   * @param appSubmissionContext the {@link ApplicationSubmissionContext} that
-   *          has to be routed to an appropriate subCluster for execution.
-   *
-   * @param blackListSubClusters the list of subClusters as identified by
-   *          {@link SubClusterId} to blackList from the selection of the home
-   *          subCluster.
-   *
-   * @return the {@link SubClusterId} that will be the "home" for this
-   *         application.
-   *
-   * @throws YarnException if there are issues initializing policies, or no
-   *           valid sub-cluster id could be found for this app.
+   * @param appSubmissionContext 应用提交上下文，包含队列等信息
+   * @param blackListSubClusters 需要排除的黑名单子集群列表
+   * @return 选出来作为应用"home"的目标子集群ID
+   * @throws YarnException 策略初始化失败或找不到有效子集群时抛出
    */
   public SubClusterId getHomeSubcluster(
       ApplicationSubmissionContext appSubmissionContext,
       List<SubClusterId> blackListSubClusters) throws YarnException {
 
-    // the maps are concurrent, but we need to protect from reset()
-    // reinitialization mid-execution by creating a new reference local to this
-    // method.
+    // 局部引用缓存，避免reset()重分配全局map导致的并发问题
     Map<String, SubClusterPolicyConfiguration> cachedConfs = globalConfMap;
     Map<String, FederationRouterPolicy> policyMap = globalPolicyMap;
 
@@ -142,16 +143,14 @@ public class RouterPolicyFacade {
 
     String queue = appSubmissionContext.getQueue();
 
-    // respecting YARN behavior we assume default queue if the queue is not
-    // specified. This also ensures that "null" can be used as a key to get the
-    // default behavior.
+    // 队列未指定时使用默认队列，保证null也能命中默认策略
     if (queue == null) {
       queue = YarnConfiguration.DEFAULT_QUEUE_NAME;
     }
 
     FederationRouterPolicy policy = getFederationRouterPolicy(cachedConfs, policyMap, queue);
     if (policy == null) {
-      // this should never happen, as the to maps are updated together
+      // 正常不会发生，缓存的默认策略总会存在
       throw new FederationPolicyException("No FederationRouterPolicy found "
           + "for queue: " + appSubmissionContext.getQueue() + " (for "
           + "application: " + appSubmissionContext.getApplicationId() + ") "
@@ -162,12 +161,13 @@ public class RouterPolicyFacade {
   }
 
   /**
-   * This method reinitializes a policy and loads it in the policyMap.
+   * 重新初始化指定队列的路由策略，加载最新配置并更新到缓存。
    *
-   * @param queue the queue to initialize a policy for.
-   * @param conf the configuration to use for initialization.
-   *
-   * @throws FederationPolicyInitializationException if initialization fails.
+   * @param policyMap 路由策略缓存map
+   * @param cachedConfs 策略配置缓存map
+   * @param queue 目标队列名称
+   * @param conf 最新的策略配置
+   * @throws FederationPolicyInitializationException 策略初始化失败时抛出
    */
   private void singlePolicyReinit(Map<String, FederationRouterPolicy> policyMap,
       Map<String, SubClusterPolicyConfiguration> cachedConfs, String queue,
@@ -180,16 +180,14 @@ public class RouterPolicyFacade {
     String newType = context.getSubClusterPolicyConfiguration().getType();
     FederationRouterPolicy routerPolicy = policyMap.get(queue);
 
+    // 实例化策略管理器，获取最新路由策略实例
     FederationPolicyManager federationPolicyManager =
         FederationPolicyUtils.instantiatePolicyManager(newType);
-    // set queue, reinit policy if required (implementation lazily check
-    // content of conf), and cache it
     federationPolicyManager.setQueue(queue);
     routerPolicy =
         federationPolicyManager.getRouterPolicy(context, routerPolicy);
 
-    // we need the two put to be atomic (across multiple threads invoking
-    // this and reset operations)
+    // 保证配置和策略的更新原子性
     synchronized (this) {
       policyMap.put(queue, routerPolicy);
       cachedConfs.put(queue, conf);
@@ -197,22 +195,23 @@ public class RouterPolicyFacade {
   }
 
   /**
-   * This method flushes all cached configurations and policies. This should be
-   * invoked if the facade remains activity after very large churn of queues in
-   * the system.
+   * 清空所有缓存的策略和配置，只保留默认降级策略。
+   * 当系统出现大量队列 churn 时调用，清理过期无用缓存。
+   * 该方法是线程安全的，会同步更新全局缓存。
    */
   public synchronized void reset() {
 
-    // remember the fallBack
+    // 保留默认降级策略
     SubClusterPolicyConfiguration conf =
         globalConfMap.get(YarnConfiguration.DEFAULT_FEDERATION_POLICY_KEY);
     FederationRouterPolicy policy =
         globalPolicyMap.get(YarnConfiguration.DEFAULT_FEDERATION_POLICY_KEY);
 
+    // 创建新的空缓存
     globalConfMap = new ConcurrentHashMap<>();
     globalPolicyMap = new ConcurrentHashMap<>();
 
-    // add to the cache a fallback with keyword null
+    // 重新添加默认降级策略到新缓存
     globalConfMap.put(YarnConfiguration.DEFAULT_FEDERATION_POLICY_KEY, conf);
     globalPolicyMap.put(YarnConfiguration.DEFAULT_FEDERATION_POLICY_KEY,
         policy);
@@ -220,24 +219,17 @@ public class RouterPolicyFacade {
   }
 
   /**
-   * This method provides a wrapper of all policy functionalities for routing a
-   * reservation. Internally it manages configuration changes, and policy
-   * init/reinit.
+   * 为资源预留请求选择目标执行子集群。
+   * 内部自动处理配置变更，按需重新初始化策略。
    *
-   * @param request the reservation to route.
-   *
-   * @return the id of the subcluster that will be the "home" for this
-   *         reservation.
-   *
-   * @throws YarnException if there are issues initializing policies, or no
-   *           valid sub-cluster id could be found for this reservation.
+   * @param request 资源预留提交请求，包含队列信息
+   * @return 选出来作为预留"home"的目标子集群ID
+   * @throws YarnException 策略初始化失败或找不到有效子集群时抛出
    */
   public SubClusterId getReservationHomeSubCluster(
       ReservationSubmissionRequest request) throws YarnException {
 
-    // the maps are concurrent, but we need to protect from reset()
-    // reinitialization mid-execution by creating a new reference local to this
-    // method.
+    // 局部引用缓存，避免reset()重分配全局map导致的并发问题
     Map<String, SubClusterPolicyConfiguration> cachedConfs = globalConfMap;
     Map<String, FederationRouterPolicy> policyMap = globalPolicyMap;
 
@@ -250,7 +242,7 @@ public class RouterPolicyFacade {
     FederationRouterPolicy policy = getFederationRouterPolicy(cachedConfs, policyMap, queue);
 
     if (policy == null) {
-      // this should never happen, as the to maps are updated together
+      // 正常不会发生，缓存的默认策略总会存在
       throw new FederationPolicyException("No FederationRouterPolicy found "
           + "for queue: " + request.getQueue() + " (while routing "
           + "reservation: " + request.getReservationId() + ") "
@@ -260,15 +252,26 @@ public class RouterPolicyFacade {
     return policy.getReservationHomeSubcluster(request);
   }
 
+  /**
+   * 获取指定队列对应的路由策略实例，自动处理配置加载、降级和重新初始化。
+   * 流程：先尝试从状态存储加载队列配置 -> 加载失败回退到默认策略 ->
+   * 配置发生变化则重新初始化策略 -> 返回最终策略实例。
+   *
+   * @param cachedConfiguration 缓存的策略配置map
+   * @param policyMap 缓存的路由策略map
+   * @param queue 目标队列名称
+   * @return 对应队列的路由策略实例
+   * @throws FederationPolicyInitializationException 策略重新初始化失败时抛出
+   */
   private FederationRouterPolicy getFederationRouterPolicy(
       Map<String, SubClusterPolicyConfiguration> cachedConfiguration,
       Map<String, FederationRouterPolicy> policyMap, String queue)
       throws FederationPolicyInitializationException {
 
-    // the facade might cache this request, based on its parameterization
     SubClusterPolicyConfiguration configuration = null;
     String copyQueue = queue;
 
+    // 尝试从联邦状态存储查询当前队列的策略配置
     try {
       configuration = federationFacade.getPolicyConfiguration(copyQueue);
     } catch (YarnException e) {
@@ -276,8 +279,7 @@ public class RouterPolicyFacade {
           copyQueue, e);
     }
 
-    // If there is no policy configured for this queue, fallback to the baseline
-    // policy that is configured either in the store or via XML config (and cached)
+    // 当前队列无配置，回退到全局默认策略
     if (configuration == null) {
       final String policyKey = YarnConfiguration.DEFAULT_FEDERATION_POLICY_KEY;
       LOG.warn("There is no policies configured for queue: {} " +
@@ -291,14 +293,12 @@ public class RouterPolicyFacade {
       }
     }
 
-    // the fallback is not configure via store, but via XML, using
-    // previously loaded configuration.
+    // 默认策略在状态存储也不存在，使用本地缓存的XML默认配置
     if (configuration == null) {
       configuration = cachedConfiguration.get(YarnConfiguration.DEFAULT_FEDERATION_POLICY_KEY);
     }
 
-    // if the configuration has changed since last loaded, reinit the policy
-    // based on current configuration
+    // 对比缓存配置，如果配置变化则重新初始化策略
     SubClusterPolicyConfiguration policyConfiguration =
         cachedConfiguration.getOrDefault(copyQueue, null);
     if (policyConfiguration == null || !policyConfiguration.equals(configuration)) {

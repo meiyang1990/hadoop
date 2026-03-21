@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -31,7 +32,7 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 import com.google.inject.Inject;
 
 /**
- * Overview block for the GPG Web UI.
+ * GPG Web UI概览信息块，负责渲染全局策略生成器的核心概览信息。
  */
 public class GPGOverviewBlock extends HtmlBlock {
 
@@ -45,35 +46,47 @@ public class GPGOverviewBlock extends HtmlBlock {
 
   @Override
   protected void render(Block html) {
+    // 获取GPG配置对象
     Configuration config = this.globalPolicyGenerator.getConfig();
 
+    // 初始化应用清理器状态为禁用
     String appCleaner = "disable";
+    // 从配置读取应用清理器执行间隔
     long appCleanerIntervalMs = config.getTimeDuration(YarnConfiguration.GPG_APPCLEANER_INTERVAL_MS,
         YarnConfiguration.DEFAULT_GPG_APPCLEANER_INTERVAL_MS, TimeUnit.MILLISECONDS);
+    // 如果间隔大于0，说明启用，拼接间隔信息
     if (appCleanerIntervalMs > 0) {
       appCleaner = "enable, interval : " + appCleanerIntervalMs + " ms";
     }
 
+    // 初始化子集群清理器状态为禁用
     String scCleaner = "disable";
+    // 从配置读取子集群清理器执行间隔
     long scCleanerIntervalMs = config.getTimeDuration(
         YarnConfiguration.GPG_SUBCLUSTER_CLEANER_INTERVAL_MS,
         YarnConfiguration.DEFAULT_GPG_SUBCLUSTER_CLEANER_INTERVAL_MS, TimeUnit.MILLISECONDS);
+    // 如果间隔大于0，说明启用，拼接间隔信息
     if (scCleanerIntervalMs > 0) {
       scCleaner = "enable, interval : " + scCleanerIntervalMs + " ms";
     }
 
+    // 初始化策略生成器状态为禁用
     String pgGenerator = "disable";
+    // 从配置读取策略生成器执行间隔
     long policyGeneratorIntervalMillis = config.getTimeDuration(
         YarnConfiguration.GPG_POLICY_GENERATOR_INTERVAL,
         YarnConfiguration.DEFAULT_GPG_POLICY_GENERATOR_INTERVAL, TimeUnit.MILLISECONDS);
 
+    // 如果间隔大于0，说明启用，拼接间隔信息
     if (policyGeneratorIntervalMillis > 0) {
       pgGenerator = "enable, interval : " + policyGeneratorIntervalMillis + " ms";
     }
 
+    // 获取全局策略实现类名，使用默认值兜底
     String policy = config.get(YarnConfiguration.GPG_GLOBAL_POLICY_CLASS,
         YarnConfiguration.DEFAULT_GPG_GLOBAL_POLICY_CLASS);
 
+    // 构建概览信息表格，填充各项GPG配置与状态信息
     info("GPG Details")
         .__("GPG started on", new Date(GlobalPolicyGenerator.getGPGStartupTime()))
         .__("GPG application cleaner", appCleaner)
@@ -83,6 +96,7 @@ public class GPGOverviewBlock extends HtmlBlock {
         .__("GPG Version", YarnVersionInfo.getVersion())
         .__("Hadoop Version", VersionInfo.getVersion());
 
+    // 将信息块渲染到页面
     html.__(InfoBlock.class);
   }
 }

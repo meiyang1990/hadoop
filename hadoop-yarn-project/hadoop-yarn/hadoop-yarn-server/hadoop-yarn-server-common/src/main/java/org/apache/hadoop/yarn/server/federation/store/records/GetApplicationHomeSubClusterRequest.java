@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -24,13 +25,17 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Request class to obtain the home sub-cluster for the specified
- * {@link ApplicationId}.
+ * YARN联邦状态存储查询应用所属主子集群的请求类，用于根据指定ApplicationId获取对应主子集群信息。
  */
 @Private
 @Unstable
 public abstract class GetApplicationHomeSubClusterRequest {
 
+  /**
+   * 创建不包含应用提交上下文的查询请求实例。
+   * @param appId 待查询的应用ID
+   * @return 查询请求实例
+   */
   @Private
   @Unstable
   public static GetApplicationHomeSubClusterRequest newInstance(
@@ -41,6 +46,12 @@ public abstract class GetApplicationHomeSubClusterRequest {
     return appMapping;
   }
 
+  /**
+   * 创建可指定是否包含应用提交上下文的查询请求实例。
+   * @param appId 待查询的应用ID
+   * @param containsAppSubmissionContext 是否需要返回应用提交上下文
+   * @return 查询请求实例
+   */
   @Private
   @Unstable
   public static GetApplicationHomeSubClusterRequest newInstance(
@@ -53,20 +64,18 @@ public abstract class GetApplicationHomeSubClusterRequest {
   }
 
   /**
-   * Get the {@link ApplicationId} representing the unique identifier of the
-   * application.
+   * 获取待查询的应用唯一标识。
    *
-   * @return the application identifier
+   * @return 应用ID
    */
   @Public
   @Unstable
   public abstract ApplicationId getApplicationId();
 
   /**
-   * Set the {@link ApplicationId} representing the unique identifier of the
-   * application.
+   * 设置待查询的应用唯一标识。
    *
-   * @param applicationId the application identifier
+   * @param applicationId 应用ID
    */
   @Private
   @Unstable
@@ -74,22 +83,19 @@ public abstract class GetApplicationHomeSubClusterRequest {
 
 
   /**
-   * Get the flag that indicates whether appSubmissionContext should be
-   * returned.
-   * The reason for adding this variable is due to the consideration that
-   * appSubmissionContext is not commonly used and its data size can be large.
+   * 获取是否需要返回应用提交上下文的标志。
+   * 添加该标志是因为应用提交上下文不常用且数据体积较大，可按需获取减少传输量。
    *
-   * @return whether to return appSubmissionContext.
+   * @return 是否需要返回应用提交上下文
    */
   @Public
   @Unstable
   public abstract boolean getContainsAppSubmissionContext();
 
   /**
-   * Set the flag that indicates whether appSubmissionContext should be
-   * returned.
+   * 设置是否需要返回应用提交上下文的标志。
    *
-   * @param containsAppSubmissionContext whether to return appSubmissionContext.
+   * @param containsAppSubmissionContext 是否需要返回应用提交上下文
    */
   @Public
   @Unstable

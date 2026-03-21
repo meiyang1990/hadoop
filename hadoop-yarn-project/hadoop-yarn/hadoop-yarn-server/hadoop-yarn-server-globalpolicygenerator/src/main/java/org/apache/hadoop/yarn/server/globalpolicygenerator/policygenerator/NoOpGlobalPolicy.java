@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,10 +24,17 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 import java.util.Map;
 
 /**
- * Default policy that does not update any policy configurations.
+ * 空操作全局策略实现，不更新任何策略配置，用作默认实现。
  */
 public class NoOpGlobalPolicy extends GlobalPolicy{
 
+  /**
+   * 空实现的策略更新方法，不执行任何实际更新操作。
+   * @param queueName 队列名称
+   * @param clusterInfo 子集群信息映射表
+   * @param manager 原联邦策略管理器实例
+   * @return 始终返回null，表示不修改原有策略
+   */
   @Override
   public FederationPolicyManager updatePolicy(String queueName,
       Map<SubClusterId, Map<Class, Object>> clusterInfo,

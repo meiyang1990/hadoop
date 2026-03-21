@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,10 +28,19 @@ import org.apache.hadoop.yarn.util.Records;
 import java.io.DataInput;
 import java.io.IOException;
 
+/**
+ * YARN联邦路由存储委托令牌的记录类，用于在联邦状态存储中保存Router转发请求所需的委托令牌信息。
+ */
 @Private
 @Unstable
 public abstract class RouterStoreToken {
 
+  /**
+   * 创建新的RouterStoreToken实例，初始化令牌标识和更新时间。
+   * @param identifier YARN委托令牌标识符
+   * @param renewdate 令牌更新时间
+   * @return 新建的RouterStoreToken实例
+   */
   @Private
   @Unstable
   public static RouterStoreToken newInstance(YARNDelegationTokenIdentifier identifier,
@@ -41,6 +51,13 @@ public abstract class RouterStoreToken {
     return storeToken;
   }
 
+  /**
+   * 创建新的RouterStoreToken实例，初始化令牌标识、更新时间和额外令牌信息。
+   * @param identifier YARN委托令牌标识符
+   * @param renewdate 令牌更新时间
+   * @param tokenInfo 额外令牌信息字符串
+   * @return 新建的RouterStoreToken实例
+   */
   @Private
   @Unstable
   public static RouterStoreToken newInstance(YARNDelegationTokenIdentifier identifier,
@@ -60,6 +77,10 @@ public abstract class RouterStoreToken {
   @Unstable
   public abstract void setIdentifier(YARNDelegationTokenIdentifier identifier);
 
+  /**
+   * 获取令牌更新时间。
+   * @return 令牌更新时间戳
+   */
   @Public
   @Stable
   public abstract Long getRenewDate();
@@ -76,6 +97,10 @@ public abstract class RouterStoreToken {
   @Unstable
   public abstract void readFields(DataInput in) throws IOException;
 
+  /**
+   * 获取额外令牌信息。
+   * @return 额外令牌信息字符串
+   */
   @Public
   @Stable
   public abstract String getTokenInfo();

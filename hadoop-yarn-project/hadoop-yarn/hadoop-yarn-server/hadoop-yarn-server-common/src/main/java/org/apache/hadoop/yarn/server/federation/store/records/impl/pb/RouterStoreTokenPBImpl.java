@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,31 +34,49 @@ import java.io.DataInputStream;
 import java.io.IOException;
 
 /**
- * Protocol buffer based implementation of {@link RouterStoreToken}.
+ * 文件说明：YARN联邦存储中Router存储令牌的Protobuf实现类，基于ProtocolBuffer序列化存储令牌信息
+ * 实现{@link RouterStoreToken}接口，封装联邦环境下 delegation token 的存储与序列化
  */
 @Private
 @Unstable
 public class RouterStoreTokenPBImpl extends RouterStoreToken {
 
+  // Protobuf消息对象，缓存序列化后的实例
   private RouterStoreTokenProto proto = RouterStoreTokenProto.getDefaultInstance();
 
+  // Protobuf构建器，用于构造消息
   private RouterStoreTokenProto.Builder builder = null;
 
+  // 标识当前数据是否已通过Protobuf对象存储
   private boolean viaProto = false;
 
+  // 缓存RM委派令牌标识对象
   private YARNDelegationTokenIdentifier rMDelegationTokenIdentifier = null;
+  // 令牌更新日期
   private Long renewDate;
+  // 令牌额外信息字符串
   private String tokenInfo;
 
+  /**
+   * 空构造函数，初始化Protobuf构建器
+   */
   public RouterStoreTokenPBImpl() {
     builder = RouterStoreTokenProto.newBuilder();
   }
 
+  /**
+   * 基于已有的Protobuf对象构造实例
+   * @param storeTokenProto 预构建的RouterStoreTokenProto对象
+   */
   public RouterStoreTokenPBImpl(RouterStoreTokenProto storeTokenProto) {
     this.proto = storeTokenProto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的Protobuf实例，合并本地字段到Proto后返回
+   * @return 序列化后的RouterStoreTokenProto对象
+   */
   public RouterStoreTokenProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -65,6 +84,7 @@ public class RouterStoreTokenPBImpl extends RouterStoreToken {
     return proto;
   }
 
+  // 将本地缓存字段合并到Protobuf对象
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -74,6 +94,7 @@ public class RouterStoreTokenPBImpl extends RouterStoreToken {
     viaProto = true;
   }
 
+  // 将本地缓存的所有字段写入Protobuf构建器
   private void mergeLocalToBuilder() {
     if (this.rMDelegationTokenIdentifier != null) {
       YARNDelegationTokenIdentifierProto idProto = this.rMDelegationTokenIdentifier.getProto();
@@ -91,6 +112,7 @@ public class RouterStoreTokenPBImpl extends RouterStoreToken {
     }
   }
 
+  // 初始化Protobuf构建器，如果当前通过proto存储则从proto构造builder
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = RouterStoreTokenProto.newBuilder(proto);
@@ -98,6 +120,7 @@ public class RouterStoreTokenPBImpl extends RouterStoreToken {
     viaProto = false;
   }
 
+  @Override
   public int hashCode() {
     return getProto().hashCode();
   }
@@ -120,17 +143,22 @@ public class RouterStoreTokenPBImpl extends RouterStoreToken {
 
   @Override
   public YARNDelegationTokenIdentifier getTokenIdentifier() throws IOException {
+    // 根据存储模式选择proto或builder
     RouterStoreTokenProtoOrBuilder p = viaProto ? proto : builder;
+    // 已缓存直接返回缓存对象
     if (rMDelegationTokenIdentifier != null) {
       return rMDelegationTokenIdentifier;
     }
+    // proto中没有该字段返回空
     if(!p.hasTokenIdentifier()){
       return null;
     }
+    // 从proto反序列化出令牌标识对象
     YARNDelegationTokenIdentifierProto identifierProto = p.getTokenIdentifier();
     ByteArrayInputStream in = new ByteArrayInputStream(identifierProto.toByteArray());
     RMDelegationTokenIdentifier identifier = new RMDelegationTokenIdentifier();
     identifier.readFields(new DataInputStream(in));
+    // 缓存到本地
     this.rMDelegationTokenIdentifier = identifier;
     return identifier;
   }
@@ -169,6 +197,7 @@ public class RouterStoreTokenPBImpl extends RouterStoreToken {
     this.renewDate = renewDate;
     this.builder.setRenewDate(renewDate);
   }
+
   @Override
   public String getTokenInfo() {
     RouterStoreTokenProtoOrBuilder p = viaProto ? proto : builder;
@@ -193,15 +222,26 @@ public class RouterStoreTokenPBImpl extends RouterStoreToken {
     this.builder.setTokenInfo(tokenInfo);
   }
 
+  // 将YARN令牌标识转换为Protobuf格式
   private YARNDelegationTokenIdentifierProto convertToProtoFormat(
       YARNDelegationTokenIdentifier delegationTokenIdentifier) {
     return delegationTokenIdentifier.getProto();
   }
 
+  /**
+   * 将当前对象序列化为字节数组
+   * @return 序列化后的字节数组
+   * @throws IOException 序列化异常
+   */
   public byte[] toByteArray() throws IOException {
     return builder.build().toByteArray();
   }
 
+  /**
+   * 从输入流反序列化读取对象
+   * @param in 输入流
+   * @throws IOException 反序列化异常
+   */
   public void readFields(DataInput in) throws IOException {
     builder.mergeFrom((DataInputStream) in);
   }

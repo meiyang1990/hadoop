@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,10 +23,18 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * YARN联邦状态存储查询路由主密钥的响应类，封装查询到的路由主密钥信息。
+ */
 @Private
 @Unstable
 public abstract class RouterMasterKeyResponse {
 
+  /**
+   * 创建新的RouterMasterKeyResponse实例，初始化设置路由主密钥。
+   * @param masterKey 路由主密钥对象
+   * @return 初始化完成的响应实例
+   */
   @Private
   @Unstable
   public static RouterMasterKeyResponse newInstance(RouterMasterKey masterKey) {
@@ -34,10 +43,18 @@ public abstract class RouterMasterKeyResponse {
     return request;
   }
 
+  /**
+   * 获取查询到的路由主密钥。
+   * @return 路由主密钥对象
+   */
   @Public
   @Unstable
   public abstract RouterMasterKey getRouterMasterKey();
 
+  /**
+   * 设置路由主密钥。
+   * @param masterKey 路由主密钥对象
+   */
   @Private
   @Unstable
   public abstract void setRouterMasterKey(RouterMasterKey masterKey);

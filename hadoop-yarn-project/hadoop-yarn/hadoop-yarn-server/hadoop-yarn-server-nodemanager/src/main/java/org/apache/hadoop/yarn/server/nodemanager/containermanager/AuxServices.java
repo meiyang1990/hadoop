@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -82,46 +83,81 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.deletion.task.
 import org.apache.hadoop.yarn.util.FSDownload;
 import org.apache.hadoop.util.Preconditions;
 
+/**
+ * NodeManager辅助服务管理类，负责管理YARN节点上的自定义辅助服务，支持静态配置加载和动态清单加载、热重载。
+ * 辅助服务允许NodeManager扩展额外功能，如shuffle服务、分布式缓存等。
+ */
 public class AuxServices extends AbstractService
     implements ServiceStateChangeListener, EventHandler<AuxServicesEvent> {
 
+  /** NM本地辅助服务存储目录名称 */
   public static final String NM_AUX_SERVICE_DIR = "nmAuxService";
+  /** NM辅助服务目录权限 */
   public static final FsPermission NM_AUX_SERVICE_DIR_PERM =
       new FsPermission((short) 0700);
 
+  /** 配置中服务类名的key */
   public static final String CLASS_NAME = "class.name";
+  /** 配置中系统类列表的key */
   public static final String SYSTEM_CLASSES = "system.classes";
 
+  /** 恢复状态存储根目录名称 */
   static final String STATE_STORE_ROOT_NAME = "nm-aux-services";
 
   private static final Logger LOG =
        LoggerFactory.getLogger(AuxServices.class);
+  /** 待删除旧版本目录后缀 */
   private static final String DEL_SUFFIX = "_DEL_";
 
+  /** 已注册的辅助服务映射，key为服务名称 */
   private final Map<String, AuxiliaryService> serviceMap;
+  /** 已注册的辅助服务信息记录映射，key为服务名称 */
   private final Map<String, AuxServiceRecord> serviceRecordMap;
+  /** 已启动服务的元数据映射，key为服务名称 */
   private final Map<String, ByteBuffer> serviceMetaData;
+  /** 本地路径处理器，用于处理辅助服务的本地路径 */
   private final AuxiliaryLocalPathHandler auxiliaryLocalPathHandler;
+  /** NM本地目录处理器，用于获取本地可写路径 */
   private final LocalDirsHandlerService dirsHandler;
+  /** 删除服务，用于异步清理旧文件 */
   private final DeletionService delService;
+  /** 当前NodeManager运行用户信息，用于权限校验 */
   private final UserGroupInformation userUGI;
 
+  /** 状态存储目录权限 */
   private final FsPermission storeDirPerms = new FsPermission((short)0700);
+  /** 状态存储根路径，恢复功能启用时使用 */
   private Path stateStoreRoot = null;
+  /** 状态存储文件系统，本地文件系统 */
   private FileSystem stateStoreFs = null;
 
+  /** 是否启用动态清单加载功能 */
   private volatile boolean manifestEnabled = false;
+  /** 动态清单文件路径 */
   private volatile Path manifest;
+  /** 动态清单文件所在文件系统 */
   private volatile FileSystem manifestFS;
+  /** 清单自动重载定时器 */
   private Timer manifestReloadTimer;
+  /** 清单自动重载任务 */
   private TimerTask manifestReloadTask;
+  /** 清单自动重载间隔（毫秒） */
   private long manifestReloadInterval;
+  /** 上次读取清单时的修改时间戳 */
   private long manifestModifyTS = -1;
 
+  /** JSON解析器，用于解析动态清单文件 */
   private final ObjectMapper mapper;
 
+  /** 服务名称正则校验表达式，只允许字母开头，字母数字下划线 */
   private final Pattern p = Pattern.compile("^[A-Za-z_]+[A-Za-z0-9_]*$");
 
+  /**
+   * 构造辅助服务管理器实例
+   * @param auxiliaryLocalPathHandler 本地路径处理器
+   * @param nmContext NodeManager上下文
+   * @param deletionService 删除服务
+   */
   AuxServices(AuxiliaryLocalPathHandler auxiliaryLocalPathHandler,
       Context nmContext, DeletionService deletionService) {
     super(AuxServices.class.getName());
@@ -141,14 +177,14 @@ public class AuxServices extends AbstractService
   }
 
   /**
-   * Returns whether aux services manifest / dynamic loading is enabled.
+   * 返回是否启用辅助服务动态清单/动态加载功能
    */
   public boolean isManifestEnabled() {
     return manifestEnabled;
   }
 
   /**
-   * Adds a service to the service map.
+   * 添加服务到服务映射表，同步方法保证线程安全
    *
    * @param name aux service name
    * @param service aux service
@@ -162,6 +198,9 @@ public class AuxServices extends AbstractService
     serviceRecordMap.put(name, serviceRecord);
   }
 
+  /**
+   * 获取所有已注册的辅助服务集合
+   */
   Collection<AuxiliaryService> getServices() {
     return Collections.unmodifiableCollection(serviceMap.values());
   }
@@ -176,9 +215,8 @@ public class AuxServices extends AbstractService
   }
 
   /**
-   * @return the meta data for all registered services, that have been started.
-   * If a service has not been started no metadata will be available. The key
-   * is the name of the service as defined in the configuration.
+   * 获取所有已启动辅助服务的元数据，拷贝返回避免并发修改
+   * @return 元数据映射，key为服务名称，value为服务元数据字节缓存
    */
   public Map<String, ByteBuffer> getMetaData() {
     Map<String, ByteBuffer> metaClone = new HashMap<>(serviceMetaData.size());
@@ -191,8 +229,7 @@ public class AuxServices extends AbstractService
   }
 
   /**
-   * Creates an auxiliary service from a specification using the Configuration
-   * classloader.
+   * 使用配置类加载器创建辅助服务实例
    *
    * @param service aux service record
    * @return auxiliary service
@@ -212,8 +249,7 @@ public class AuxServices extends AbstractService
   }
 
   /**
-   * Creates an auxiliary service from a specification using a custom local
-   * classpath.
+   * 使用自定义本地类路径创建辅助服务实例
    *
    * @param service aux service record
    * @param appLocalClassPath local class path
@@ -244,7 +280,7 @@ public class AuxServices extends AbstractService
   }
 
   /**
-   * Creates an auxiliary service from a specification.
+   * 根据服务规范创建辅助服务实例，根据是否配置远程资源选择加载方式
    *
    * @param service aux service record
    * @param conf configuration
@@ -299,9 +335,8 @@ public class AuxServices extends AbstractService
   }
 
   /**
-   * Copies the specified remote file to local NM aux service directory. If the
-   * same file already exists (as determined by modification time), the file
-   * will not be copied again.
+   * 下载远程辅助服务依赖文件到NM本地，版本变化时自动更新并删除旧版本
+   * 如果文件已存在且版本未变化，直接返回本地路径
    *
    * @param sName service name
    * @param className service class name
@@ -315,9 +350,10 @@ public class AuxServices extends AbstractService
   protected Path maybeDownloadJars(String sName, String className, String
       remoteFile, AuxServiceFile.TypeEnum type, Configuration conf)
       throws IOException {
-    // load AuxiliaryService from remote classpath
+    // 获取本地文件上下文
     FileContext localLFS = getLocalFileContext(conf);
     // create NM aux-service dir in NM localdir if it does not exist.
+    // 在NM本地目录创建辅助服务存储目录
     Path nmAuxDir = dirsHandler.getLocalPathForWrite("."
         + Path.SEPARATOR + NM_AUX_SERVICE_DIR);
     if (!localLFS.util().exists(nmAuxDir)) {
@@ -328,660 +364,43 @@ public class AuxServices extends AbstractService
             + nmAuxDir.toString(), ex);
       }
     }
+    // 获取远程文件路径和文件上下文
     Path src = new Path(remoteFile);
     FileContext remoteLFS = getRemoteFileContext(src.toUri(), conf);
     FileStatus scFileStatus = remoteLFS.getFileStatus(src);
+    // 校验远程文件所有者必须是NM运行用户
     if (!scFileStatus.getOwner().equals(
         this.userUGI.getShortUserName())) {
       throw new YarnRuntimeException("The remote jarfile owner:"
           + scFileStatus.getOwner() + " is not the same as the NM user:"
           + this.userUGI.getShortUserName() + ".");
     }
+    // 校验远程文件不能允许组或其他用户写入，防止篡改
     if ((scFileStatus.getPermission().toShort() & 0022) != 0) {
       throw new YarnRuntimeException("The remote jarfile should not "
           + "be writable by group or others. "
           + "The current Permission is "
           + scFileStatus.getPermission().toShort());
     }
+    // 根据类名和修改时间生成下载目标路径，实现版本区分
     Path downloadDest = new Path(nmAuxDir,
         className + "_" + scFileStatus.getModificationTime());
     // check whether we need to re-download the jar
     // from remote directory
     Path targetDirPath = new Path(downloadDest,
         scFileStatus.getPath().getName());
+    // 遍历现有目录，检查是否已下载，同时标记旧版本为删除
     FileStatus[] allSubDirs = localLFS.util().listStatus(nmAuxDir);
     for (FileStatus sub : allSubDirs) {
       if (sub.getPath().getName().equals(downloadDest.getName())) {
+        // 当前版本已存在，直接返回
         return targetDirPath;
       } else {
+        // 标记同名旧版本为待删除，提交删除任务
         if (sub.getPath().getName().contains(className) &&
             !sub.getPath().getName().endsWith(DEL_SUFFIX)) {
           Path delPath = new Path(sub.getPath().getParent(),
               sub.getPath().getName() + DEL_SUFFIX);
           localLFS.rename(sub.getPath(), delPath);
           LOG.info("delete old aux service jar dir:"
-              + delPath.toString());
-          FileDeletionTask deletionTask = new FileDeletionTask(
-              this.delService, null, delPath, null);
-          this.delService.delete(deletionTask);
-        }
-      }
-    }
-    LocalResourceType srcType;
-    if (type == AuxServiceFile.TypeEnum.STATIC) {
-      srcType = LocalResourceType.FILE;
-    } else if (type == AuxServiceFile.TypeEnum.ARCHIVE) {
-      srcType = LocalResourceType.ARCHIVE;
-    } else {
-      throw new YarnRuntimeException(
-          "Cannot unpack file of type " + type + " from remote-file-path:" +
-              src + "for aux-service:" + ".\n");
-    }
-    LocalResource scRsrc = LocalResource.newInstance(
-        URL.fromURI(src.toUri()),
-        srcType, LocalResourceVisibility.PRIVATE,
-        scFileStatus.getLen(), scFileStatus.getModificationTime());
-    FSDownload download = new FSDownload(localLFS, null, conf,
-        downloadDest, scRsrc, null);
-    try {
-      // don't need to convert downloaded path into a dir
-      // since it's already a jar path.
-      return download.call();
-    } catch (Exception ex) {
-      throw new YarnRuntimeException(
-          "Exception happend while downloading files "
-              + "for aux-service:" + sName + " and remote-file-path:"
-              + src + ".\n" + ex.getMessage());
-    }
-  }
-
-  /**
-   * If recovery is enabled, creates a recovery directory for the named
-   * service and sets it on the service.
-   *
-   * @param sName name of the service
-   * @param s auxiliary service
-   * @throws IOException
-   */
-  private void setStateStoreDir(String sName, AuxiliaryService s) throws
-      IOException {
-    if (stateStoreRoot != null) {
-      Path storePath = new Path(stateStoreRoot, sName);
-      stateStoreFs.mkdirs(storePath, storeDirPerms);
-      s.setRecoveryPath(storePath);
-    }
-  }
-
-  /**
-   * Removes a service from the service map and stops it, if it exists.
-   *
-   * @param sName name of the service
-   */
-  private synchronized void maybeRemoveAuxService(String sName) {
-    AuxiliaryService s;
-    s = serviceMap.remove(sName);
-    serviceRecordMap.remove(sName);
-    serviceMetaData.remove(sName);
-    if (s != null) {
-      LOG.info("Removing aux service " + sName);
-      stopAuxService(s);
-    }
-  }
-
-  /**
-   * Constructs an AuxiliaryService then configures and initializes it based
-   * on a service specification.
-   *
-   * @param service aux service record
-   * @param conf configuration
-   * @param fromConfiguration true if from configuration, false if from manifest
-   * @return aux service
-   * @throws IOException
-   */
-  private AuxiliaryService initAuxService(AuxServiceRecord service,
-      Configuration conf, boolean fromConfiguration) throws IOException {
-    final String sName = service.getName();
-    AuxiliaryService s;
-    try {
-      Preconditions
-          .checkArgument(
-              validateAuxServiceName(sName),
-              "The auxiliary service name: " + sName + " is invalid. " +
-                  "The valid service name should only contain a-zA-Z0-9_ " +
-                  "and cannot start with numbers.");
-      s = createAuxService(service, conf, fromConfiguration);
-      if (s == null) {
-        throw new YarnRuntimeException("No auxiliary service class loaded for" +
-            " " + sName);
-      }
-      // TODO better use s.getName()?
-      if (!sName.equals(s.getName())) {
-        LOG.warn("The Auxiliary Service named '" + sName + "' in the "
-            + "configuration is for " + s.getClass() + " which has "
-            + "a name of '" + s.getName() + "'. Because these are "
-            + "not the same tools trying to send ServiceData and read "
-            + "Service Meta Data may have issues unless the refer to "
-            + "the name in the config.");
-      }
-      s.setAuxiliaryLocalPathHandler(auxiliaryLocalPathHandler);
-      setStateStoreDir(sName, s);
-      Configuration customConf = new Configuration(conf);
-      if (service.getConfiguration() != null) {
-        for (Entry<String, String> entry : service.getConfiguration()
-            .getProperties().entrySet()) {
-          customConf.set(entry.getKey(), entry.getValue());
-        }
-      }
-      s.init(customConf);
-
-      LOG.info("Initialized auxiliary service " + sName);
-    } catch (RuntimeException e) {
-      LOG.error("Failed to initialize " + sName, e);
-      throw e;
-    } catch (ClassNotFoundException e) {
-      throw new YarnRuntimeException(e);
-    }
-    return s;
-  }
-
-  /**
-   * Reloads auxiliary services manifest. Must be called after service init.
-   *
-   * @throws IOException if manifest can't be loaded
-   */
-  @VisibleForTesting
-  protected void reloadManifest() throws IOException {
-    loadManifest(getConfig(), true);
-  }
-
-  /**
-   * Reloads auxiliary services. Must be called after service init.
-   *
-   * @param services a list of auxiliary services
-   * @throws IOException if aux services have not been started yet or dynamic
-   * reloading is not enabled
-   */
-  public synchronized void reload(AuxServiceRecords services) throws
-      IOException {
-    if (!manifestEnabled) {
-      throw new IOException("Dynamic reloading is not enabled via " +
-          YarnConfiguration.NM_AUX_SERVICES_MANIFEST_ENABLED);
-    }
-    if (getServiceState() != Service.STATE.STARTED) {
-      throw new IOException("Auxiliary services have not been started yet, " +
-          "please retry later");
-    }
-    LOG.info("Received list of auxiliary services: " + mapper
-        .writeValueAsString(services));
-    loadServices(services, getConfig(), true);
-  }
-
-  @VisibleForTesting
-  boolean checkManifestPermissions(FileStatus status) throws
-      IOException {
-    if ((status.getPermission().toShort() & 0022) != 0) {
-      LOG.error("Manifest file and parents must not be writable by group or " +
-          "others. The current Permission of " + status.getPath() + " is " +
-          status.getPermission());
-      return false;
-    }
-    Path parent = status.getPath().getParent();
-    if (parent == null) {
-      return true;
-    }
-    return checkManifestPermissions(getManifestFS().getFileStatus(parent));
-  }
-
-  private boolean checkManifestOwnerAndPermissions(FileStatus status) throws
-      IOException {
-    AccessControlList yarnAdminAcl = new AccessControlList(getConfig().get(
-        YarnConfiguration.YARN_ADMIN_ACL,
-        YarnConfiguration.DEFAULT_YARN_ADMIN_ACL));
-    if (!yarnAdminAcl.isUserAllowed(
-        UserGroupInformation.createRemoteUser(status.getOwner()))) {
-      LOG.error("Manifest must be owned by YARN admin: " + manifest);
-      return false;
-    }
-
-    return checkManifestPermissions(status);
-  }
-
-  /**
-   * Reads the manifest file if it is configured, exists, and has not been
-   * modified since the last read.
-   *
-   * @return aux service records
-   * @throws IOException
-   */
-  private synchronized AuxServiceRecords maybeReadManifestFile() throws
-      IOException {
-    if (manifest == null) {
-      return null;
-    }
-    if (!manifestFS.exists(manifest)) {
-      LOG.warn("Manifest file " + manifest + " doesn't exist");
-      return null;
-    }
-    FileStatus status;
-    try {
-      status = manifestFS.getFileStatus(manifest);
-    } catch (FileNotFoundException e) {
-      LOG.warn("Manifest file " + manifest + " doesn't exist");
-      return null;
-    }
-    if (!status.isFile()) {
-      LOG.warn("Manifest file " + manifest + " is not a file");
-    }
-    if (!checkManifestOwnerAndPermissions(status)) {
-      return null;
-    }
-    if (status.getModificationTime() == manifestModifyTS) {
-      return null;
-    }
-    manifestModifyTS = status.getModificationTime();
-    LOG.info("Reading auxiliary services manifest " + manifest);
-    try (FSDataInputStream in = manifestFS.open(manifest)) {
-      return mapper.readValue((InputStream) in, AuxServiceRecords.class);
-    }
-  }
-
-  /**
-   * Updates current aux services based on changes found in the manifest.
-   *
-   * @param conf configuration
-   * @param startServices if true starts services, otherwise only inits services
-   * @throws IOException
-   */
-  @VisibleForTesting
-  protected synchronized void loadManifest(Configuration conf, boolean
-      startServices) throws IOException {
-    if (!manifestEnabled) {
-      throw new IOException("Dynamic reloading is not enabled via " +
-          YarnConfiguration.NM_AUX_SERVICES_MANIFEST_ENABLED);
-    }
-    if (manifest == null) {
-      return;
-    }
-    if (!manifestFS.exists(manifest)) {
-      if (serviceMap.isEmpty()) {
-        return;
-      }
-      LOG.info("Manifest file " + manifest + " doesn't exist, stopping " +
-          "auxiliary services");
-      Set<String> servicesToRemove = new HashSet<>(serviceMap.keySet());
-      for (String sName : servicesToRemove) {
-        maybeRemoveAuxService(sName);
-      }
-      return;
-    }
-    AuxServiceRecords services = maybeReadManifestFile();
-    loadServices(services, conf, startServices);
-  }
-
-  /**
-   * Updates current aux services based on changes found in the service list.
-   *
-   * @param services list of auxiliary services
-   * @param conf configuration
-   * @param startServices if true starts services, otherwise only inits services
-   * @throws IOException
-   */
-  private synchronized void loadServices(AuxServiceRecords services,
-      Configuration conf, boolean startServices) throws IOException {
-    if (services == null) {
-      // read did not occur or no changes detected
-      return;
-    }
-    Set<String> loadedAuxServices = new HashSet<>();
-    boolean foundChanges = false;
-    if (services.getServices() != null) {
-      for (AuxServiceRecord service : services.getServices()) {
-        AuxServiceRecord existingService = serviceRecordMap.get(service
-            .getName());
-        loadedAuxServices.add(service.getName());
-        if (existingService != null && existingService.equals(service)) {
-          LOG.debug("Auxiliary service already loaded: {}", service.getName());
-          continue;
-        }
-        foundChanges = true;
-        try {
-          // stop aux service
-          maybeRemoveAuxService(service.getName());
-          // init aux service
-          AuxiliaryService s = initAuxService(service, conf, false);
-          if (startServices) {
-            // start aux service
-            startAuxService(service.getName(), s, service);
-          }
-          // add aux service to serviceMap
-          addService(service.getName(), s, service);
-        } catch (IOException e) {
-          LOG.error("Failed to load auxiliary service " + service.getName());
-        }
-      }
-    }
-
-    // remove aux services that do not appear in the new list
-    Set<String> servicesToRemove = new HashSet<>(serviceMap.keySet());
-    servicesToRemove.removeAll(loadedAuxServices);
-    for (String sName : servicesToRemove) {
-      foundChanges = true;
-      maybeRemoveAuxService(sName);
-    }
-
-    if (!foundChanges) {
-      LOG.info("No auxiliary services changes detected");
-    }
-  }
-
-  private static String getClassName(AuxServiceRecord service) {
-    AuxServiceConfiguration serviceConf = service.getConfiguration();
-    if (serviceConf == null) {
-      return null;
-    }
-    return serviceConf.getProperty(CLASS_NAME);
-  }
-
-  private static String[] getSystemClasses(AuxServiceRecord service) {
-    AuxServiceConfiguration serviceConf = service.getConfiguration();
-    if (serviceConf == null || serviceConf.getProperty(SYSTEM_CLASSES) == null) {
-      return new String[]{};
-    }
-    return StringUtils.split(serviceConf.getProperty(SYSTEM_CLASSES));
-  }
-
-  /**
-   * Translates an aux service specified in the Configuration to an aux
-   * service record.
-   *
-   * @param sName aux service name
-   * @param conf configuration
-   * @return
-   */
-  private static AuxServiceRecord createServiceRecordFromConfiguration(String
-      sName, Configuration conf) {
-    String className = conf.get(String.format(
-        YarnConfiguration.NM_AUX_SERVICE_FMT, sName));
-    String remoteClassPath = conf.get(String.format(
-        YarnConfiguration.NM_AUX_SERVICE_REMOTE_CLASSPATH, sName));
-    String[] systemClasses = conf.getTrimmedStrings(String.format(
-        YarnConfiguration.NM_AUX_SERVICES_SYSTEM_CLASSES, sName));
-
-    AuxServiceConfiguration serviceConf = new AuxServiceConfiguration();
-    if (className != null) {
-      serviceConf.setProperty(CLASS_NAME, className);
-    }
-    if (systemClasses != null) {
-      serviceConf.setProperty(SYSTEM_CLASSES, StringUtils.join(",",
-          systemClasses));
-    }
-    if (remoteClassPath != null) {
-      AuxServiceFile.TypeEnum type;
-      String lcClassPath = StringUtils.toLowerCase(remoteClassPath);
-      if (lcClassPath.endsWith(".jar")) {
-        type = AuxServiceFile.TypeEnum.STATIC;
-      } else if (lcClassPath.endsWith(".zip") ||
-          lcClassPath.endsWith(".tar.gz") || lcClassPath.endsWith(".tgz") ||
-          lcClassPath.endsWith(".tar")) {
-        type = AuxServiceFile.TypeEnum.ARCHIVE;
-      } else {
-        throw new YarnRuntimeException("Cannot unpack file from " +
-            "remote-file-path:" + remoteClassPath + "for aux-service:" +
-            sName + ".\n");
-      }
-      AuxServiceFile file = new AuxServiceFile().srcFile(remoteClassPath)
-          .type(type);
-      serviceConf.getFiles().add(file);
-    }
-    return new AuxServiceRecord().name(sName).configuration(serviceConf);
-  }
-
-  @Override
-  public synchronized void serviceInit(Configuration conf) throws Exception {
-    boolean recoveryEnabled = conf.getBoolean(
-        YarnConfiguration.NM_RECOVERY_ENABLED,
-        YarnConfiguration.DEFAULT_NM_RECOVERY_ENABLED);
-    if (recoveryEnabled) {
-      stateStoreRoot = new Path(conf.get(YarnConfiguration.NM_RECOVERY_DIR),
-          STATE_STORE_ROOT_NAME);
-      stateStoreFs = FileSystem.getLocal(conf);
-    }
-    manifestEnabled = conf.getBoolean(
-        YarnConfiguration.NM_AUX_SERVICES_MANIFEST_ENABLED,
-        YarnConfiguration.DEFAULT_NM_AUX_SERVICES_MANIFEST_ENABLED);
-    if (!manifestEnabled) {
-      Collection<String> auxNames = conf.getStringCollection(
-          YarnConfiguration.NM_AUX_SERVICES);
-      for (final String sName : auxNames) {
-        AuxServiceRecord service = createServiceRecordFromConfiguration(sName,
-            conf);
-        maybeRemoveAuxService(sName);
-        AuxiliaryService s = initAuxService(service, conf, true);
-        addService(sName, s, service);
-      }
-    } else {
-      String manifestStr = conf.get(YarnConfiguration.NM_AUX_SERVICES_MANIFEST);
-      if (manifestStr != null) {
-        manifest = new Path(manifestStr);
-        manifestFS = FileSystem.get(new URI(manifestStr), conf);
-        loadManifest(conf, false);
-        manifestReloadInterval = conf.getLong(
-            YarnConfiguration.NM_AUX_SERVICES_MANIFEST_RELOAD_MS,
-            YarnConfiguration.DEFAULT_NM_AUX_SERVICES_MANIFEST_RELOAD_MS);
-        manifestReloadTask = new ManifestReloadTask();
-      } else {
-        LOG.info("Auxiliary services manifest is enabled, but no manifest " +
-            "file is specified in the configuration.");
-      }
-    }
-
-    super.serviceInit(conf);
-  }
-
-  private void startAuxService(String name, AuxiliaryService service,
-      AuxServiceRecord serviceRecord) {
-    service.start();
-    service.registerServiceListener(this);
-    ByteBuffer meta = service.getMetaData();
-    if (meta != null) {
-      serviceMetaData.put(name, meta);
-    }
-    serviceRecord.setLaunchTime(new Date());
-  }
-
-  private void stopAuxService(Service service) {
-    if (service.getServiceState() == Service.STATE.STARTED) {
-      service.unregisterServiceListener(this);
-      service.stop();
-    }
-  }
-
-  @Override
-  public synchronized void serviceStart() throws Exception {
-    // TODO fork(?) services running as configured user
-    //      monitor for health, shutdown/restart(?) if any should die
-    for (Map.Entry<String, AuxiliaryService> entry : serviceMap.entrySet()) {
-      AuxiliaryService service = entry.getValue();
-      String name = entry.getKey();
-      startAuxService(name, service, serviceRecordMap.get(name));
-    }
-    if (manifestEnabled && manifest != null && manifestReloadInterval > 0) {
-      LOG.info("Scheduling reloading auxiliary services manifest file at " +
-          "interval " + manifestReloadInterval + " ms");
-      manifestReloadTimer = new Timer("AuxServicesManifestReload-Timer",
-          true);
-      manifestReloadTimer.schedule(manifestReloadTask,
-          manifestReloadInterval, manifestReloadInterval);
-    }
-    super.serviceStart();
-  }
-
-  @Override
-  public synchronized void serviceStop() throws Exception {
-    try {
-      for (Service service : serviceMap.values()) {
-        stopAuxService(service);
-      }
-      serviceMap.clear();
-      serviceRecordMap.clear();
-      serviceMetaData.clear();
-      if (manifestFS != null) {
-        manifestFS.close();
-      }
-      if (manifestReloadTimer != null) {
-        manifestReloadTimer.cancel();
-      }
-    } finally {
-      super.serviceStop();
-    }
-  }
-
-  @Override
-  public void stateChanged(Service service) {
-    // services changing state is expected on reload
-    LOG.info("Service " + service.getName() + " changed state: " +
-        service.getServiceState());
-  }
-
-  @Override
-  public void handle(AuxServicesEvent event) {
-    LOG.info("Got event " + event.getType() + " for appId "
-        + event.getApplicationID());
-    switch (event.getType()) {
-      case APPLICATION_INIT:
-        LOG.info("Got APPLICATION_INIT for service " + event.getServiceID());
-        AuxiliaryService service = null;
-        try {
-          service = serviceMap.get(event.getServiceID());
-          service
-              .initializeApplication(new ApplicationInitializationContext(event
-                  .getUser(), event.getApplicationID(), event.getServiceData()));
-        } catch (Throwable th) {
-          logWarningWhenAuxServiceThrowExceptions(service,
-              AuxServicesEventType.APPLICATION_INIT, th);
-        }
-        break;
-      case APPLICATION_STOP:
-        for (AuxiliaryService serv : serviceMap.values()) {
-          try {
-            serv.stopApplication(new ApplicationTerminationContext(event
-                .getApplicationID()));
-          } catch (Throwable th) {
-            logWarningWhenAuxServiceThrowExceptions(serv,
-                AuxServicesEventType.APPLICATION_STOP, th);
-          }
-        }
-        break;
-      case CONTAINER_INIT:
-        for (AuxiliaryService serv : serviceMap.values()) {
-          try {
-            serv.initializeContainer(new ContainerInitializationContext(
-                event.getContainer().getUser(),
-                event.getContainer().getContainerId(),
-                event.getContainer().getResource(), event.getContainer()
-                .getContainerTokenIdentifier().getContainerType()));
-          } catch (Throwable th) {
-            logWarningWhenAuxServiceThrowExceptions(serv,
-                AuxServicesEventType.CONTAINER_INIT, th);
-          }
-        }
-        break;
-      case CONTAINER_STOP:
-        for (AuxiliaryService serv : serviceMap.values()) {
-          try {
-            serv.stopContainer(new ContainerTerminationContext(
-                event.getUser(), event.getContainer().getContainerId(),
-                event.getContainer().getResource(), event.getContainer()
-                .getContainerTokenIdentifier().getContainerType()));
-          } catch (Throwable th) {
-            logWarningWhenAuxServiceThrowExceptions(serv,
-                AuxServicesEventType.CONTAINER_STOP, th);
-          }
-        }
-        break;
-      default:
-        throw new RuntimeException("Unknown type: " + event.getType());
-    }
-  }
-
-  private boolean validateAuxServiceName(String name) {
-    if (name == null || name.trim().isEmpty()) {
-      return false;
-    }
-    return p.matcher(name).matches();
-  }
-
-  private void logWarningWhenAuxServiceThrowExceptions(AuxiliaryService service,
-      AuxServicesEventType eventType, Throwable th) {
-    LOG.warn((null == service ? "The auxService is null"
-        : "The auxService name is " + service.getName())
-        + " and it got an error at event: " + eventType, th);
-  }
-
-  FileContext getLocalFileContext(Configuration conf) {
-    try {
-      return FileContext.getLocalFSFileContext(conf);
-    } catch (IOException e) {
-      throw new YarnRuntimeException("Failed to access local fs");
-    }
-  }
-
-  FileContext getRemoteFileContext(final URI path, Configuration conf) {
-    try {
-      return FileContext.getFileContext(path, conf);
-    } catch (IOException e) {
-      throw new YarnRuntimeException("Failed to access remote fs");
-    }
-  }
-
-  private UserGroupInformation getRemoteUgi() {
-    UserGroupInformation remoteUgi;
-    try {
-      remoteUgi = UserGroupInformation.getCurrentUser();
-    } catch (IOException e) {
-      String msg = "Cannot obtain the user-name. Got exception: "
-          + StringUtils.stringifyException(e);
-      LOG.warn(msg);
-      throw new YarnRuntimeException(msg);
-    }
-    return remoteUgi;
-  }
-
-  protected static AuxServiceRecord newAuxService(String name, String
-      className) {
-    AuxServiceConfiguration serviceConf = new AuxServiceConfiguration();
-    serviceConf.setProperty(CLASS_NAME, className);
-    return new AuxServiceRecord().name(name).configuration(serviceConf);
-  }
-
-  protected static void setClasspath(AuxServiceRecord service, String
-      classpath) {
-    service.getConfiguration().getFiles().add(new AuxServiceFile()
-        .srcFile(classpath).type(AuxServiceFile.TypeEnum.STATIC));
-  }
-
-  protected static void setSystemClasses(AuxServiceRecord service, String
-      systemClasses) {
-    service.getConfiguration().setProperty(SYSTEM_CLASSES, systemClasses);
-  }
-
-  protected FileSystem getManifestFS() {
-    return manifestFS;
-  }
-
-  /**
-   * Class which is used by the {@link Timer} class to periodically execute the
-   * manifest reload.
-   */
-  private final class ManifestReloadTask extends TimerTask {
-    @Override
-    public void run() {
-      try {
-        reloadManifest();
-      } catch (Throwable t) {
-        // Prevent uncaught exceptions from killing this thread
-        LOG.warn("Error while reloading manifest: ", t);
-      }
-    }
-  }
-}
+              +

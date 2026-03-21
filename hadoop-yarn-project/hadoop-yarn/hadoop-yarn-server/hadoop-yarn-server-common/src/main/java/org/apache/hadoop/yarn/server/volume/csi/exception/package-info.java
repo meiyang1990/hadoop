@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,7 @@
  */
 
 /**
- * This package contains volume related exception classes.
+ * CSI卷相关异常类包，存放YARN CSI存储模块中所有卷操作相关的自定义异常类型
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

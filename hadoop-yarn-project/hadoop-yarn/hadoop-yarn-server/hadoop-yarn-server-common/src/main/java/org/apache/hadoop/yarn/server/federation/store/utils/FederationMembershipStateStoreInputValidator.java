@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,9 +33,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility class to validate the inputs to
- * {@code FederationMembershipStateStore}, allows a fail fast mechanism for
- * invalid user inputs.
+ * 联邦成员状态存储输入参数验证工具类，实现快速失败机制，提前拦截非法用户输入。
+ * 为 FederationMembershipStateStore 提供各类请求的参数合法性检查。
  *
  */
 public final class FederationMembershipStateStoreInputValidator {
@@ -46,17 +46,15 @@ public final class FederationMembershipStateStoreInputValidator {
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link SubClusterRegisterRequest} for
-   * registration a new subcluster is valid or not.
+   * 验证子集群注册请求参数的合法性，提前拦截明显错误参数实现快速失败。
    *
-   * @param request the {@link SubClusterRegisterRequest} to validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 待验证的子集群注册请求
+   * @throws FederationStateStoreInvalidInputException 如果请求参数非法抛出异常
    */
   public static void validate(SubClusterRegisterRequest request)
       throws FederationStateStoreInvalidInputException {
 
-    // check if the request is present
+    // 检查请求对象非空
     if (request == null) {
       String message = "Missing SubClusterRegister Request."
           + " Please try again by specifying a"
@@ -66,22 +64,20 @@ public final class FederationMembershipStateStoreInputValidator {
 
     }
 
-    // validate subcluster info
+    // 验证子集群信息完整性
     checkSubClusterInfo(request.getSubClusterInfo());
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link SubClusterDeregisterRequest} for
-   * deregistration a subcluster is valid or not.
+   * 验证子集群注销请求参数的合法性，提前拦截明显错误参数实现快速失败。
    *
-   * @param request the {@link SubClusterDeregisterRequest} to validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 待验证的子集群注销请求
+   * @throws FederationStateStoreInvalidInputException 如果请求参数非法抛出异常
    */
   public static void validate(SubClusterDeregisterRequest request)
       throws FederationStateStoreInvalidInputException {
 
-    // check if the request is present
+    // 检查请求对象非空
     if (request == null) {
       String message = "Missing SubClusterDeregister Request."
           + " Please try again by specifying a"
@@ -90,10 +86,11 @@ public final class FederationMembershipStateStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate subcluster id
+    // 验证子集群ID合法性
     checkSubClusterId(request.getSubClusterId());
-    // validate subcluster state
+    // 验证子集群状态合法性
     checkSubClusterState(request.getState());
+    // 注销操作要求状态必须是最终状态
     if (!request.getState().isFinal()) {
       String message = "Invalid non-final state: " + request.getState();
       LOG.warn(message);
@@ -102,17 +99,15 @@ public final class FederationMembershipStateStoreInputValidator {
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link SubClusterHeartbeatRequest} for
-   * heartbeating a subcluster is valid or not.
+   * 验证子集群心跳请求参数的合法性，提前拦截明显错误参数实现快速失败。
    *
-   * @param request the {@link SubClusterHeartbeatRequest} to validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 待验证的子集群心跳请求
+   * @throws FederationStateStoreInvalidInputException 如果请求参数非法抛出异常
    */
   public static void validate(SubClusterHeartbeatRequest request)
       throws FederationStateStoreInvalidInputException {
 
-    // check if the request is present
+    // 检查请求对象非空
     if (request == null) {
       String message = "Missing SubClusterHeartbeat Request."
           + " Please try again by specifying a"
@@ -121,29 +116,27 @@ public final class FederationMembershipStateStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate subcluster id
+    // 验证子集群ID合法性
     checkSubClusterId(request.getSubClusterId());
-    // validate last heartbeat timestamp
+    // 验证最后心跳时间戳合法性
     checkTimestamp(request.getLastHeartBeat());
-    // validate subcluster capability
+    // 验证子集群能力描述合法性
     checkCapability(request.getCapability());
-    // validate subcluster state
+    // 验证子集群状态合法性
     checkSubClusterState(request.getState());
 
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link GetSubClusterInfoRequest} for querying
-   * subcluster's information is valid or not.
+   * 验证查询子集群信息请求参数的合法性，提前拦截明显错误参数实现快速失败。
    *
-   * @param request the {@link GetSubClusterInfoRequest} to validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 待验证的子集群信息查询请求
+   * @throws FederationStateStoreInvalidInputException 如果请求参数非法抛出异常
    */
   public static void validate(GetSubClusterInfoRequest request)
       throws FederationStateStoreInvalidInputException {
 
-    // check if the request is present
+    // 检查请求对象非空
     if (request == null) {
       String message = "Missing GetSubClusterInfo Request."
           + " Please try again by specifying a Get SubCluster information.";
@@ -151,19 +144,16 @@ public final class FederationMembershipStateStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate subcluster id
+    // 验证子集群ID合法性
     checkSubClusterId(request.getSubClusterId());
   }
 
   /**
-   * Validate if all the required fields on {@link SubClusterInfo} are present
-   * or not. {@code Capability} will be empty as the corresponding
-   * {@code ResourceManager} is in the process of initialization during
-   * registration.
+   * 验证子集群信息所有必填字段完整性。
+   * 注册过程中RM未完成初始化时，Capability允许为空。
    *
-   * @param subClusterInfo the information of the subcluster to be verified
-   * @throws FederationStateStoreInvalidInputException if the SubCluster Info
-   *           are invalid
+   * @param subClusterInfo 待验证的子集群信息
+   * @throws FederationStateStoreInvalidInputException 如果子集群信息非法抛出异常
    */
   public static void checkSubClusterInfo(SubClusterInfo subClusterInfo)
       throws FederationStateStoreInvalidInputException {
@@ -174,34 +164,33 @@ public final class FederationMembershipStateStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate subcluster id
+    // 验证子集群ID合法性
     checkSubClusterId(subClusterInfo.getSubClusterId());
 
-    // validate AMRM Service address
+    // 验证AMRM服务地址合法性
     checkAddress(subClusterInfo.getAMRMServiceAddress());
-    // validate ClientRM Service address
+    // 验证ClientRM服务地址合法性
     checkAddress(subClusterInfo.getClientRMServiceAddress());
-    // validate RMClient Service address
+    // 验证RMAdmin服务地址合法性
     checkAddress(subClusterInfo.getRMAdminServiceAddress());
-    // validate RMWeb Service address
+    // 验证RMWeb服务地址合法性
     checkAddress(subClusterInfo.getRMWebServiceAddress());
 
-    // validate last heartbeat timestamp
+    // 验证最后心跳时间戳合法性
     checkTimestamp(subClusterInfo.getLastHeartBeat());
-    // validate last start timestamp
+    // 验证最后启动时间戳合法性
     checkTimestamp(subClusterInfo.getLastStartTime());
 
-    // validate subcluster state
+    // 验证子集群状态合法性
     checkSubClusterState(subClusterInfo.getState());
 
   }
 
   /**
-   * Validate if the timestamp is positive or not.
+   * 验证时间戳为非负值。
    *
-   * @param timestamp the timestamp to be verified
-   * @throws FederationStateStoreInvalidInputException if the timestamp is
-   *           invalid
+   * @param timestamp 待验证的时间戳
+   * @throws FederationStateStoreInvalidInputException 如果时间戳为负抛出异常
    */
   private static void checkTimestamp(long timestamp)
       throws FederationStateStoreInvalidInputException {
@@ -214,11 +203,10 @@ public final class FederationMembershipStateStoreInputValidator {
   }
 
   /**
-   * Validate if the Capability is present or not.
+   * 验证子集群能力描述非空。
    *
-   * @param capability the capability of the subcluster to be verified
-   * @throws FederationStateStoreInvalidInputException if the capability is
-   *           invalid
+   * @param capability 待验证的子集群能力描述
+   * @throws FederationStateStoreInvalidInputException 如果能力描述为空抛出异常
    */
   private static void checkCapability(String capability)
       throws FederationStateStoreInvalidInputException {
@@ -231,22 +219,21 @@ public final class FederationMembershipStateStoreInputValidator {
   }
 
   /**
-   * Validate if the SubCluster Id is present or not.
+   * 验证子集群ID非空且合法。
    *
-   * @param subClusterId the identifier of the subcluster to be verified
-   * @throws FederationStateStoreInvalidInputException if the SubCluster Id is
-   *           invalid
+   * @param subClusterId 待验证的子集群ID
+   * @throws FederationStateStoreInvalidInputException 如果子集群ID非法抛出异常
    */
   protected static void checkSubClusterId(SubClusterId subClusterId)
       throws FederationStateStoreInvalidInputException {
-    // check if cluster id is present
+    // 检查子集群ID非空
     if (subClusterId == null) {
       String message = "Missing SubCluster Id information."
           + " Please try again by specifying Subcluster Id information.";
       LOG.warn(message);
       throw new FederationStateStoreInvalidInputException(message);
     }
-    // check if cluster id is valid
+    // 检查子集群ID字符串非空
     if (subClusterId.getId().isEmpty()) {
       String message = "Invalid SubCluster Id information."
           + " Please try again by specifying valid Subcluster Id.";
@@ -256,24 +243,25 @@ public final class FederationMembershipStateStoreInputValidator {
   }
 
   /**
-   * Validate if the SubCluster Address is a valid URL or not.
+   * 验证子集群端点地址为合法的host:port格式URI。
    *
-   * @param address the endpoint of the subcluster to be verified
-   * @throws FederationStateStoreInvalidInputException if the address is invalid
+   * @param address 待验证的子集群端点地址
+   * @throws FederationStateStoreInvalidInputException 如果地址格式非法抛出异常
    */
   private static void checkAddress(String address)
       throws FederationStateStoreInvalidInputException {
-    // Ensure url is not null
+    // 确保地址非空
     if (address == null || address.isEmpty()) {
       String message = "Missing SubCluster Endpoint information."
           + " Please try again by specifying SubCluster Endpoint information.";
       LOG.warn(message);
       throw new FederationStateStoreInvalidInputException(message);
     }
-    // Validate url is well formed
+    // 验证URI格式合法性
     boolean hasScheme = address.contains("://");
     URI uri = null;
     try {
+      // 无scheme时添加虚拟scheme方便URI解析
       uri = hasScheme ? URI.create(address)
           : URI.create("dummyscheme://" + address);
     } catch (IllegalArgumentException e) {
@@ -285,6 +273,7 @@ public final class FederationMembershipStateStoreInputValidator {
     String host = uri.getHost();
     int port = uri.getPort();
     String path = uri.getPath();
+    // 检查必须包含合法host和port，无scheme时不能包含路径
     if ((host == null) || (port < 0)
         || (!hasScheme && path != null && !path.isEmpty())) {
       String message = "The provided SubCluster Endpoint does not contain a"
@@ -295,15 +284,14 @@ public final class FederationMembershipStateStoreInputValidator {
   }
 
   /**
-   * Validate if the SubCluster State is present or not.
+   * 验证子集群状态非空。
    *
-   * @param state the state of the subcluster to be verified
-   * @throws FederationStateStoreInvalidInputException if the SubCluster State
-   *           is invalid
+   * @param state 待验证的子集群状态
+   * @throws FederationStateStoreInvalidInputException 如果状态为空抛出异常
    */
   private static void checkSubClusterState(SubClusterState state)
       throws FederationStateStoreInvalidInputException {
-    // check sub-cluster state is not empty
+    // 检查子集群状态非空
     if (state == null) {
       String message = "Missing SubCluster State information."
           + " Please try again by specifying SubCluster State information.";

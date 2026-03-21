@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,13 +28,21 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The class contains the fields that can be determined when
- * <code>RMContainer</code> starts, and that need to be stored persistently.
+ * 容器启动数据记录，保存RM容器启动时确定的、需要持久化存储的核心信息，用于应用历史服务存储查询
  */
 @Public
 @Unstable
 public abstract class ContainerStartData {
 
+  /**
+   * 创建新的容器启动数据实例，初始化所有必填字段
+   * @param containerId 容器ID
+   * @param allocatedResource 分配给容器的资源
+   * @param assignedNode 容器分配到的节点ID
+   * @param priority 容器调度优先级
+   * @param startTime 容器启动时间戳
+   * @return 初始化完成的容器启动数据实例
+   */
   @Public
   @Unstable
   public static ContainerStartData newInstance(ContainerId containerId,

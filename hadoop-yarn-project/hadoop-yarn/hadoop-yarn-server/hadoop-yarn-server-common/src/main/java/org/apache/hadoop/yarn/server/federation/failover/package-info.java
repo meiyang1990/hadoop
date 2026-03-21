@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -13,5 +14,9 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
+ */
+/**
+ * YARN联邦架构下的ResourceManager故障转移相关实现包
+ * 提供联邦环境中主备ResourceManager切换、故障恢复的核心能力
  */
 package org.apache.hadoop.yarn.server.federation.failover;

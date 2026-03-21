@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,5 +16,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/** Server records PB implementations. */
+/**
+ * YARN服务端API协议记录的Protobuf实现包
+ * 存放所有基于Protobuf序列化的服务端API记录类型实现类
+ */
 package org.apache.hadoop.yarn.server.api.records.impl.pb;

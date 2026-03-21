@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,11 +21,21 @@ package org.apache.hadoop.yarn.server.utils;
 import java.lang.annotation.Documented;
 
 /**
+ * 文件级注释：YARN服务器端锁顺序标记注解，用于标识代码需要遵循的锁获取顺序，避免死锁
+ *
  * Annotation to document locking order.
+ * 用于文档化记录锁的获取顺序，帮助开发者遵守锁顺序避免死锁
  */
 @Documented public @interface Lock {
+  /**
+   * 定义锁的期望获取顺序，数组中按顺序存放需要获取的锁对应的类
+   * @return 按获取顺序排列的锁关联类数组
+   */
   @SuppressWarnings({ "rawtypes" })
   Class[] value();
   
+  /**
+   * 表示无锁的标记类，用于标注不需要加锁的场景
+   */
   public class NoLock{}
 }

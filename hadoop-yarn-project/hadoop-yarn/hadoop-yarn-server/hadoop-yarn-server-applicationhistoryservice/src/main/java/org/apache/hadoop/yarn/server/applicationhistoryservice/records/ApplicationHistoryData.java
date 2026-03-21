@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,8 +26,8 @@ import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 
 /**
- * The class contains all the fields that are stored persistently for
- * <code>RMApp</code>.
+ * 应用历史数据实体，存储RM应用的所有持久化历史信息，供应用历史服务使用。
+ * 包含应用从提交到完成全生命周期的核心元数据。
  */
 @Public
 @Unstable
@@ -54,6 +55,21 @@ public class ApplicationHistoryData {
 
   private YarnApplicationState yarnApplicationState;
 
+  /**
+   * 创建新的应用历史数据实例，初始化所有必填字段。
+   * @param applicationId 应用ID
+   * @param applicationName 应用名称
+   * @param applicationType 应用类型
+   * @param queue 应用提交队列
+   * @param user 提交应用的用户
+   * @param submitTime 应用提交时间戳
+   * @param startTime 应用启动时间戳
+   * @param finishTime 应用完成时间戳
+   * @param diagnosticsInfo 应用诊断信息（用于失败场景）
+   * @param finalApplicationStatus 应用最终状态
+   * @param yarnApplicationState 应用最终Yarn状态
+   * @return 初始化完成的应用历史数据实例
+   */
   @Public
   @Unstable
   public static ApplicationHistoryData newInstance(ApplicationId applicationId,

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -18,15 +19,22 @@
 package org.apache.hadoop.yarn.server.federation.policies.exceptions;
 
 /**
- * This exception is thrown when the initialization of a federation policy is
- * not successful.
+ * YARN联邦路由策略初始化失败时抛出的异常。
  */
 public class FederationPolicyInitializationException
     extends FederationPolicyException {
+  /**
+   * 带错误信息的构造方法。
+   * @param message 错误描述信息
+   */
   public FederationPolicyInitializationException(String message) {
     super(message);
   }
 
+  /**
+   * 包装底层异常的构造方法。
+   * @param j 原始异常
+   */
   public FederationPolicyInitializationException(Throwable j) {
     super(j);
   }

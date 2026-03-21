@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,64 +25,50 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.yarn.server.api.DistributedSchedulingAMProtocol;
 
 /**
- * Defines the contract to be implemented by the request interceptor classes,
- * that can be used to intercept and inspect messages sent from the application
- * master to the resource manager.
+ * 定义了AMRMProxy请求拦截器需要实现的契约，拦截器用于拦截检查从Application Master发送到Resource Manager的消息
  */
 public interface RequestInterceptor extends DistributedSchedulingAMProtocol,
     Configurable {
   /**
-   * This method is called for initializing the interceptor. This is guaranteed
-   * to be called only once in the lifetime of this instance.
+   * 初始化拦截器，该方法在实例生命周期中保证只调用一次
    *
-   * @param ctx AMRMProxy application context
+   * @param ctx AMRMProxy应用上下文
    */
   void init(AMRMProxyApplicationContext ctx);
 
   /**
-   * Recover interceptor state when NM recovery is enabled. AMRMProxy will
-   * recover the data map into
-   * AMRMProxyApplicationContext.getRecoveredDataMap(). All interceptors should
-   * recover state from it.
+   * 当NM恢复启用时，恢复拦截器状态。AMRMProxy会将恢复数据存入AMRMProxyApplicationContext的恢复数据字典，
+   * 所有拦截器需要从中恢复自身状态。
+   * 例如：注册请求需要被链尾拦截器（实际连接RM的拦截器）保存，以便在RM故障转移时重新注册
    *
-   * For example, registerRequest has to be saved by the last interceptor (i.e.
-   * the one that actually connects to RM), in order to re-register when RM
-   * fails over.
-   *
-   * @param recoveredDataMap states for all interceptors recovered from NMSS
+   * @param recoveredDataMap 从NM状态存储中恢复的所有拦截器状态数据
    */
   void recover(Map<String, byte[]> recoveredDataMap);
 
   /**
-   * This method is called to release the resources held by the interceptor.
-   * This will be called when the application pipeline is being destroyed. The
-   * concrete implementations should dispose the resources and forward the
-   * request to the next interceptor, if any.
+   * 释放拦截器持有的资源，在应用销毁管道时调用。具体实现需要释放资源，并将请求转发给下一个拦截器（如果存在）
    */
   void shutdown();
 
   /**
-   * Sets the next interceptor in the pipeline. The concrete implementation of
-   * this interface should always pass the request to the nextInterceptor after
-   * inspecting the message. The last interceptor in the chain is responsible to
-   * send the messages to the resource manager service and so the last
-   * interceptor will not receive this method call.
+   * 设置管道中的下一个拦截器。该接口的具体实现需要在检查消息后将请求传递给下一个拦截器。
+   * 链中最后一个拦截器负责发送消息到Resource Manager服务，因此最后一个拦截器不会收到该调用
    *
-   * @param nextInterceptor the next interceptor to set
+   * @param nextInterceptor 要设置的下一个拦截器
    */
   void setNextInterceptor(RequestInterceptor nextInterceptor);
 
   /**
-   * Returns the next interceptor in the chain.
+   * 获取责任链中的下一个拦截器
    * 
-   * @return the next interceptor in the chain
+   * @return 责任链中的下一个拦截器
    */
   RequestInterceptor getNextInterceptor();
 
   /**
-   * Returns the context.
+   * 获取当前拦截器对应的应用上下文
    * 
-   * @return the context
+   * @return 应用上下文
    */
   AMRMProxyApplicationContext getApplicationContext();
 }

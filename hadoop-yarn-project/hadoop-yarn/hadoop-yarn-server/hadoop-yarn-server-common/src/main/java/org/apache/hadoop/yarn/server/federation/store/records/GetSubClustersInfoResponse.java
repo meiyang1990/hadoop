@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,13 +28,17 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Response to a query with list of {@link SubClusterInfo} about all
- * sub-clusters that are currently participating in Federation.
+ * YARN联邦存储层查询子集群信息的响应封装，包含所有当前加入联邦的子集群信息列表。
  */
 @Private
 @Unstable
 public abstract class GetSubClustersInfoResponse {
 
+  /**
+   * 创建新的GetSubClustersInfoResponse实例，设置子集群信息列表。
+   * @param subClusters 子集群信息集合
+   * @return 初始化完成的响应对象
+   */
   @Public
   @Unstable
   public static GetSubClustersInfoResponse newInstance(
@@ -45,20 +50,18 @@ public abstract class GetSubClustersInfoResponse {
   }
 
   /**
-   * Get the list of {@link SubClusterInfo} representing the information about
-   * all sub-clusters that are currently participating in Federation.
+   * 获取所有当前加入联邦的子集群信息列表。
    *
-   * @return the list of {@link SubClusterInfo}
+   * @return 子集群信息列表
    */
   @Public
   @Unstable
   public abstract List<SubClusterInfo> getSubClusters();
 
   /**
-   * Set the list of {@link SubClusterInfo} representing the information about
-   * all sub-clusters that are currently participating in Federation.
+   * 设置所有当前加入联邦的子集群信息列表。
    *
-   * @param subClusters the list of {@link SubClusterInfo}
+   * @param subClusters 子集群信息集合
    */
   @Private
   @Unstable

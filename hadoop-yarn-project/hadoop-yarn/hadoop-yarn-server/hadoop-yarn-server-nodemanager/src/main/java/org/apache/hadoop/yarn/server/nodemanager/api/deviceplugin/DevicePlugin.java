@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,48 +22,44 @@ package org.apache.hadoop.yarn.server.nodemanager.api.deviceplugin;
 import java.util.Set;
 
 /**
- * A must interface for vendor plugin to implement.
+ * YARN NodeManager 设备插件SPI接口，第三方硬件厂商必须实现该接口来对接自定义设备。
+ * 用于扩展YARN对GPU、FPGA等特殊计算设备的支持，实现设备的发现、分配和生命周期管理。
  * */
 public interface DevicePlugin {
   /**
-   * Called first when device plugin framework wants to register.
-   * @return DeviceRegisterRequest {@link DeviceRegisterRequest}
-   * @throws Exception
+   * 设备插件向NodeManager注册时调用，是注册流程的第一个方法。
+   * @return 设备注册请求信息，包含设备类型等基本信息
+   * @throws Exception 注册过程中发生异常
    * */
   DeviceRegisterRequest getRegisterRequestInfo()
       throws Exception;
 
   /**
-   * Called when update node resource.
-   * @return a set of {@link Device}, {@link java.util.TreeSet} recommended
-   * @throws Exception
+   * NodeManager更新节点可用资源时调用，获取当前节点上该类型设备的全部信息。
+   * @return 当前节点上所有设备的集合，推荐使用TreeSet保证有序性
+   * @throws Exception 获取设备信息过程中发生异常
    * */
   Set<Device> getDevices() throws Exception;
 
   /**
-   * Asking how these devices should be prepared/used
-   * before/when container launch. A plugin can do some tasks in its own or
-   * define it in DeviceRuntimeSpec to let the framework do it.
-   * For instance, define {@code VolumeSpec} to let the
-   * framework to create volume before running container.
+   * 容器启动前，当设备已分配给容器后调用，用于准备设备运行环境。
+   * 插件可以自行完成准备工作，也可以通过DeviceRuntimeSpec定义，交由YARN框架完成。
+   * 例如可以定义数据卷规格，让框架在容器启动前自动创建设备数据卷。
    *
-   * @param allocatedDevices A set of allocated {@link Device}.
-   * @param yarnRuntime Indicate which runtime YARN will use
-   *        Could be {@code RUNTIME_DEFAULT} or {@code RUNTIME_DOCKER}
-   *        in {@link DeviceRuntimeSpec} constants. The default means YARN's
-   *        non-docker container runtime is used. The docker means YARN's
-   *        docker container runtime is used.
-   * @return a {@link DeviceRuntimeSpec} description about environment,
-   * {@link         VolumeSpec}, {@link MountVolumeSpec}. etc
-   * @throws Exception
+   * @param allocatedDevices 已分配给容器的设备集合
+   * @param yarnRuntime YARN将使用的容器运行时类型，
+   *        可选值为{@link DeviceRuntimeSpec}中定义的RUNTIME_DEFAULT（原生容器）
+   *        或RUNTIME_DOCKER（Docker容器）
+   * @return 设备运行时规格描述，包含环境变量、数据卷、挂载点等配置
+   * @throws Exception 设备分配处理过程中发生异常
    * */
   DeviceRuntimeSpec onDevicesAllocated(Set<Device> allocatedDevices,
       YarnRuntimeType yarnRuntime) throws Exception;
 
   /**
-   * Called after device released.
-   * @param releasedDevices A set of released devices
-   * @throws Exception
+   * 容器运行结束，设备释放完成后调用，用于插件执行清理工作。
+   * @param releasedDevices 已释放的设备集合
+   * @throws Exception 设备释放处理过程中发生异常
    * */
   void onDevicesReleased(Set<Device> releasedDevices)
       throws Exception;

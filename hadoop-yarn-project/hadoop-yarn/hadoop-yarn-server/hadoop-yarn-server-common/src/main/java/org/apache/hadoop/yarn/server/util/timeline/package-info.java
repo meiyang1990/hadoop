@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -9,7 +10,7 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
+ * Unless required by applicable law or agreed to writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
@@ -17,8 +18,7 @@
  */
 
 /**
- * Package org.apache.hadoop.server.util.timeline contains utility classes used
- * by ATSv1 and ATSv2 on the server side.
+ * 该包包含YARN时间线服务（ATS v1和ATS v2）服务端使用的通用工具类
  */
 @Private
 package org.apache.hadoop.yarn.server.util.timeline;

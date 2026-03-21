@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,12 @@
  */
 package org.apache.hadoop.yarn.server.nodemanager;
 
+/**
+ * NodeManager事件类型枚举，定义了NodeManager生命周期中需要处理的核心事件类型
+ */
 public enum NodeManagerEventType {
-  SHUTDOWN, RESYNC
+  /** 关闭NodeManager服务事件 */
+  SHUTDOWN,
+  /** 与ResourceManager重新同步状态事件 */
+  RESYNC
 }

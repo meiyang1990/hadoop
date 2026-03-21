@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -27,29 +28,45 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Protocol buffer based implementation of {@link DeleteSubClusterPoliciesConfigurationsRequest}.
+ * 基于 Protocol Buffer 实现的 {@link DeleteSubClusterPoliciesConfigurationsRequest}，
+ * 用于YARN联邦状态存储中删除子集群策略配置的请求序列化/反序列化
  */
 @Private
 @Unstable
 public class DeleteSubClusterPoliciesConfigurationsRequestPBImpl extends
     DeleteSubClusterPoliciesConfigurationsRequest {
 
+  // PB 协议对象实例，通过 proto 方式存储数据时使用
   private DeleteSubClusterPoliciesConfigurationsRequestProto proto =
       DeleteSubClusterPoliciesConfigurationsRequestProto.getDefaultInstance();
+  // PB 构建器，通过构建器方式修改数据时使用
   private DeleteSubClusterPoliciesConfigurationsRequestProto.Builder builder = null;
+  // 标记当前数据是否已经通过 proto 存储
   private boolean viaProto = false;
+  // 待删除策略对应的队列列表缓存
   private List<String> queues = null;
 
+  /**
+   * 空构造方法，初始化 PB 构建器
+   */
   public DeleteSubClusterPoliciesConfigurationsRequestPBImpl() {
     builder = DeleteSubClusterPoliciesConfigurationsRequestProto.newBuilder();
   }
 
+  /**
+   * 基于已有 PB 对象构造包装实例
+   * @param proto 已序列化的 PB 请求对象
+   */
   public DeleteSubClusterPoliciesConfigurationsRequestPBImpl(
       DeleteSubClusterPoliciesConfigurationsRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求对应的 PB 协议对象，会合并本地缓存数据到 proto
+   * @return 序列化完成的 PB 请求对象
+   */
   public DeleteSubClusterPoliciesConfigurationsRequestProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -57,6 +74,9 @@ public class DeleteSubClusterPoliciesConfigurationsRequestPBImpl extends
     return proto;
   }
 
+  /**
+   * 将本地修改合并到 PB proto 对象
+   */
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -66,12 +86,18 @@ public class DeleteSubClusterPoliciesConfigurationsRequestPBImpl extends
     viaProto = true;
   }
 
+  /**
+   * 将本地缓存的修改合并到 PB 构建器
+   */
   private void mergeLocalToBuilder() {
     if (this.queues != null) {
       addQueuesToProto();
     }
   }
 
+  /**
+   * 将本地缓存的队列列表写入 PB 构建器
+   */
   private void addQueuesToProto() {
     maybeInitBuilder();
     builder.clearQueues();
@@ -81,6 +107,9 @@ public class DeleteSubClusterPoliciesConfigurationsRequestPBImpl extends
     builder.addAllQueues(this.queues);
   }
 
+  /**
+   * 从 PB 对象初始化队列列表本地缓存
+   */
   private void initQueues() {
     if (this.queues != null) {
       return;
@@ -132,6 +161,9 @@ public class DeleteSubClusterPoliciesConfigurationsRequestPBImpl extends
     this.queues.addAll(pQueues);
   }
 
+  /**
+   * 延迟初始化 PB 构建器，确保线程安全
+   */
   private synchronized void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = DeleteSubClusterPoliciesConfigurationsRequestProto.newBuilder(proto);

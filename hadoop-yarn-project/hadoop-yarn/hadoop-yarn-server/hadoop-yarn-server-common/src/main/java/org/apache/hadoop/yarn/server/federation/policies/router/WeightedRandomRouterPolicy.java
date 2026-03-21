@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,34 +30,37 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterIdInfo;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterInfo;
 
 /**
- * This policy implements a weighted random sample among currently active
- * sub-clusters.
+ * YARN联邦路由策略实现，基于加权随机算法从当前活跃子集群中选择目标子集群。
  */
 public class WeightedRandomRouterPolicy extends AbstractRouterPolicy {
   @Override
   protected SubClusterId chooseSubCluster(
       String queue, Map<SubClusterId, SubClusterInfo> preSelectSubclusters) throws YarnException {
 
-    // note: we cannot pre-compute the weights, as the set of activeSubCluster
-    // changes dynamically (and this would unfairly spread the load to
-    // sub-clusters adjacent to an inactive one), hence we need to count/scan
-    // the list and based on weight pick the next sub-cluster.
+    // 权重无法预计算，因为活跃子集群集合动态变化，需要每次重新计算选择
     Map<SubClusterIdInfo, Float> weights = getPolicyInfo().getRouterPolicyWeights();
 
+    // 保存符合条件的子集群权重列表
     ArrayList<Float> weightList = new ArrayList<>();
+    // 保存符合条件的子集群ID列表
     ArrayList<SubClusterId> scIdList = new ArrayList<>();
+    // 遍历所有配置的权重，筛选出当前活跃的子集群
     for (Map.Entry<SubClusterIdInfo, Float> entry : weights.entrySet()) {
       SubClusterIdInfo key = entry.getKey();
+      // 仅保留子集群不为空且当前处于活跃状态的权重
       if (key != null && preSelectSubclusters.containsKey(key.toId())) {
         weightList.add(entry.getValue());
         scIdList.add(key.toId());
       }
     }
 
+    // 根据权重随机选择一个子集群的索引
     int pickedIndex = FederationPolicyUtils.getWeightedRandom(weightList);
+    // 没有有效正权重时抛出异常
     if (pickedIndex == -1) {
       throw new FederationPolicyException("No positive weight found on active subclusters");
     }
+    // 返回选中的子集群ID
     return scIdList.get(pickedIndex);
   }
 }

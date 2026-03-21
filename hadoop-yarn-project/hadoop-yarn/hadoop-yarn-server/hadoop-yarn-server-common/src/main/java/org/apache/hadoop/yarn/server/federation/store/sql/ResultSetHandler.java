@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,10 +22,16 @@ package org.apache.hadoop.yarn.server.federation.store.sql;
 import java.sql.SQLException;
 
 /**
- * Result Set Handler.
+ * YARN联邦元数据SQL查询结果处理器接口，定义将JDBC查询结果转换为目标对象的统一规范。
  *
- * @param <T> Generic T.
+ * @param <T> 转换后目标对象的类型
  */
 public interface ResultSetHandler<T> {
+  /**
+   * 处理SQL查询结果，将其转换为指定类型的业务对象。
+   * @param params 查询参数与结果集对象
+   * @return 转换完成的业务对象
+   * @throws SQLException 处理结果集过程中发生SQL异常时抛出
+   */
   T handle(Object... params) throws SQLException;
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,31 +28,31 @@ import org.apache.hadoop.yarn.api.records.timeline.TimelineDomain;
 import org.apache.hadoop.yarn.api.records.timeline.TimelinePutResponse;
 
 /**
- * This interface is for storing timeline information.
+ * 时间线数据写入接口，定义时间线服务存储实体和域数据的规范
+ * 该接口为YARN应用时间线服务提供统一的数据写入抽象，不同存储后端可实现该接口
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface TimelineWriter {
 
   /**
-   * Stores entity information to the timeline store. Any errors occurring for
-   * individual put request objects will be reported in the response.
+   * 将时间线实体数据写入存储
+   * 单个写入请求的错误会记录在返回响应中，不会直接抛出异常中断整个写入
    * 
    * @param data
-   *          a {@link TimelineEntities} object.
-   * @return a {@link TimelinePutResponse} object.
-   * @throws IOException
+   *          待写入的时间线实体集合
+   * @return 写入响应，包含每个实体的写入结果（成功/错误信息）
+   * @throws IOException 存储层面的IO异常
    */
   TimelinePutResponse put(TimelineEntities data) throws IOException;
 
   /**
-   * Store domain information to the timeline store. If A domain of the
-   * same ID already exists in the timeline store, it will be COMPLETELY updated
-   * with the given domain.
+   * 将时间线域信息写入存储
+   * 如果同ID的域已存在，会完全覆盖原有域信息
    * 
    * @param domain
-   *          a {@link TimelineDomain} object
-   * @throws IOException
+   *          待写入的时间线域对象
+   * @throws IOException 存储层面的IO异常
    */
    void put(TimelineDomain domain) throws IOException;
 

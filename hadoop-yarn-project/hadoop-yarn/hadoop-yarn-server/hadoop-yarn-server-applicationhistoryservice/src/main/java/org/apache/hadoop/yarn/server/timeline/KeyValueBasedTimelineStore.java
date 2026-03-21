@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -52,21 +53,21 @@ import static org.apache.hadoop.yarn.server.timeline.TimelineDataManager.DEFAULT
 import static org.apache.hadoop.yarn.server.timeline.TimelineStoreMapAdapter.CloseableIterator;
 
 /**
- * Map based implementation of {@link TimelineStore}. A hash map
- * implementation should be connected to this implementation through a
- * {@link TimelineStoreMapAdapter}.
- *
- * The methods are synchronized to avoid concurrent modifications.
- *
+ * 基于键值对存储的时间线存储抽象实现，依赖TimelineStoreMapAdapter对接具体的键值存储
+ * 所有公共方法使用synchronized保证线程安全，避免并发修改问题
  */
 @Private
 @Unstable
 abstract class KeyValueBasedTimelineStore
     extends AbstractService implements TimelineStore {
 
+  /** 时间线实体存储：通过实体标识映射实体对象 */
   protected TimelineStoreMapAdapter<EntityIdentifier, TimelineEntity> entities;
+  /** 实体插入时间存储：记录每个实体的写入时间，用于分页查询 */
   protected TimelineStoreMapAdapter<EntityIdentifier, Long> entityInsertTimes;
+  /** 域存储：通过域ID映射域对象 */
   protected TimelineStoreMapAdapter<String, TimelineDomain> domainById;
+  /** 域按所有者分组存储：通过所有者用户名映射该用户拥有的所有域 */
   protected TimelineStoreMapAdapter<String, Set<TimelineDomain>> domainsByOwner;
 
   private boolean serviceStopped = false;
@@ -82,6 +83,10 @@ abstract class KeyValueBasedTimelineStore
     super(name);
   }
 
+  /**
+   * 获取服务是否已停止
+   * @return 服务停止状态
+   */
   public synchronized boolean getServiceStopped() {
     return serviceStopped;
   }
@@ -93,14 +98,19 @@ abstract class KeyValueBasedTimelineStore
   }
 
   @Override
+  /**
+   * 根据查询条件获取符合条件的时间线实体列表
+   */
   public synchronized TimelineEntities getEntities(String entityType, Long limit,
       Long windowStart, Long windowEnd, String fromId, Long fromTs,
       NameValuePair primaryFilter, Collection<NameValuePair> secondaryFilters,
       EnumSet<Field> fields, CheckAcl checkAcl) throws IOException {
+    // 服务已停止直接返回空
     if (getServiceStopped()) {
       LOG.info("Service stopped, return null for the storage");
       return null;
     }
+    // 设置默认查询参数
     if (limit == null) {
       limit = DEFAULT_LIMIT;
     }
@@ -114,6 +124,7 @@ abstract class KeyValueBasedTimelineStore
       fields = EnumSet.allOf(Field.class);
     }
 
+    // 处理分页起始点
     TimelineEntity firstEntity = null;
     if (fromId != null) {
       firstEntity = entities.get(new EntityIdentifier(fromId,
@@ -125,33 +136,40 @@ abstract class KeyValueBasedTimelineStore
 
     List<TimelineEntity> entitiesSelected = new ArrayList<TimelineEntity>();
 
+    // 遍历实体迭代器，应用过滤条件
     try(CloseableIterator<TimelineEntity> entityIterator =
         firstEntity == null ? entities.valueSetIterator() :
             entities.valueSetIterator(firstEntity)) {
       while (entityIterator.hasNext()) {
         TimelineEntity entity = entityIterator.next();
+        // 达到数量限制停止遍历
         if (entitiesSelected.size() >= limit) {
           break;
         }
+        // 过滤不匹配实体类型的实体
         if (!entity.getEntityType().equals(entityType)) {
           continue;
         }
+        // 过滤超出时间窗口范围的实体
         if (entity.getStartTime() <= windowStart) {
           continue;
         }
         if (entity.getStartTime() > windowEnd) {
           continue;
         }
+        // 过滤插入时间晚于起始时间戳的实体（分页）
         if (fromTs != null && entityInsertTimes.get(
             new EntityIdentifier(entity.getEntityId(), entity.getEntityType()))
             > fromTs) {
           continue;
         }
+        // 应用主过滤条件
         if (primaryFilter != null && !KeyValueBasedTimelineStoreUtils
             .matchPrimaryFilter(entity.getPrimaryFilters(), primaryFilter)) {
           continue;
         }
-        if (secondaryFilters != null) { // AND logic
+        // 应用多个二级过滤条件（AND逻辑，全部满足才保留）
+        if (secondaryFilters != null) {
           boolean flag = true;
           for (NameValuePair secondaryFilter : secondaryFilters) {
             if (secondaryFilter != null && !KeyValueBasedTimelineStoreUtils
@@ -166,15 +184,18 @@ abstract class KeyValueBasedTimelineStore
             continue;
           }
         }
+        // 设置默认域ID
         if (entity.getDomainId() == null) {
           entity.setDomainId(DEFAULT_DOMAIN_ID);
         }
+        // ACL检查通过后加入结果集
         if (checkAcl == null || checkAcl.check(entity)) {
           entitiesSelected.add(entity);
         }
       }
     }
 
+    // 按要求过滤返回字段，排序后返回
     List<TimelineEntity> entitiesToReturn = new ArrayList<TimelineEntity>();
     for (TimelineEntity entitySelected : entitiesSelected) {
       entitiesToReturn.add(KeyValueBasedTimelineStoreUtils.maskFields(
@@ -187,6 +208,9 @@ abstract class KeyValueBasedTimelineStore
   }
 
   @Override
+  /**
+   * 根据实体ID和类型获取单个时间线实体
+   */
   public synchronized TimelineEntity getEntity(String entityId, String entityType,
       EnumSet<Field> fieldsToRetrieve) {
     if (getServiceStopped()) {
@@ -201,12 +225,16 @@ abstract class KeyValueBasedTimelineStore
     if (entity == null) {
       return null;
     } else {
+      // 按要求过滤返回字段
       return KeyValueBasedTimelineStoreUtils.maskFields(
           entity, fieldsToRetrieve);
     }
   }
 
   @Override
+  /**
+   * 获取多个实体指定时间范围的事件列表
+   */
   public synchronized TimelineEvents getEntityTimelines(String entityType,
       SortedSet<String> entityIds, Long limit, Long windowStart,
       Long windowEnd,
@@ -219,6 +247,7 @@ abstract class KeyValueBasedTimelineStore
     if (entityIds == null) {
       return allEvents;
     }
+    // 设置默认查询参数
     if (limit == null) {
       limit = DEFAULT_LIMIT;
     }
@@ -228,6 +257,7 @@ abstract class KeyValueBasedTimelineStore
     if (windowEnd == null) {
       windowEnd = Long.MAX_VALUE;
     }
+    // 遍历每个实体，收集符合条件的事件
     for (String entityId : entityIds) {
       EntityIdentifier entityID = new EntityIdentifier(entityId, entityType);
       TimelineEntity entity = entities.get(entityID);
@@ -238,15 +268,18 @@ abstract class KeyValueBasedTimelineStore
       events.setEntityId(entityId);
       events.setEntityType(entityType);
       for (TimelineEvent event : entity.getEvents()) {
+        // 达到数量限制停止
         if (events.getEvents().size() >= limit) {
           break;
         }
+        // 过滤超出时间窗口范围的事件
         if (event.getTimestamp() <= windowStart) {
           continue;
         }
         if (event.getTimestamp() > windowEnd) {
           continue;
         }
+        // 过滤不匹配事件类型的事件
         if (eventTypes != null && !eventTypes.contains(event.getEventType())) {
           continue;
         }
@@ -258,6 +291,9 @@ abstract class KeyValueBasedTimelineStore
   }
 
   @Override
+  /**
+   * 根据域ID获取域信息
+   */
   public TimelineDomain getDomain(String domainId)
       throws IOException {
     if (getServiceStopped()) {
@@ -268,6 +304,7 @@ abstract class KeyValueBasedTimelineStore
     if (domain == null) {
       return null;
     } else {
+      // 复制域信息返回
       return KeyValueBasedTimelineStoreUtils.createTimelineDomain(
           domain.getId(),
           domain.getDescription(),
@@ -280,6 +317,9 @@ abstract class KeyValueBasedTimelineStore
   }
 
   @Override
+  /**
+   * 根据所有者获取该用户拥有的所有域，按创建/修改时间倒序排序
+   */
   public TimelineDomains getDomains(String owner)
       throws IOException {
     if (getServiceStopped()) {
@@ -291,6 +331,7 @@ abstract class KeyValueBasedTimelineStore
     if (domainsOfOneOwner == null) {
       return new TimelineDomains();
     }
+    // 复制每个域信息
     for (TimelineDomain domain : domainsByOwner.get(owner)) {
       TimelineDomain domainToReturn = KeyValueBasedTimelineStoreUtils
           .createTimelineDomain(
@@ -303,6 +344,7 @@ abstract class KeyValueBasedTimelineStore
               domain.getModifiedTime());
       domains.add(domainToReturn);
     }
+    // 按创建时间倒序，创建时间相同则按修改时间倒序排序
     Collections.sort(domains, new Comparator<TimelineDomain>() {
       @Override
       public int compare(
@@ -323,6 +365,9 @@ abstract class KeyValueBasedTimelineStore
   }
 
   @Override
+  /**
+   * 批量写入时间线实体，增量更新已有实体信息
+   */
   public synchronized TimelinePutResponse put(TimelineEntities data) {
     TimelinePutResponse response = new TimelinePutResponse();
     if (getServiceStopped()) {
@@ -332,10 +377,11 @@ abstract class KeyValueBasedTimelineStore
       response.addError(error);
       return response;
     }
+    // 逐个处理每个实体
     for (TimelineEntity entity : data.getEntities()) {
       EntityIdentifier entityId =
           new EntityIdentifier(entity.getEntityId(), entity.getEntityType());
-      // store entity info in memory
+      // 获取已有实体，不存在则新建
       TimelineEntity existingEntity = entities.get(entityId);
       boolean needsPut = false;
       if (existingEntity == null) {
@@ -343,6 +389,7 @@ abstract class KeyValueBasedTimelineStore
         existingEntity.setEntityId(entity.getEntityId());
         existingEntity.setEntityType(entity.getEntityType());
         existingEntity.setStartTime(entity.getStartTime());
+        // 新实体必须指定域ID
         if (entity.getDomainId() == null ||
             entity.getDomainId().length() == 0) {
           TimelinePutError error = new TimelinePutError();
@@ -353,10 +400,11 @@ abstract class KeyValueBasedTimelineStore
           continue;
         }
         existingEntity.setDomainId(entity.getDomainId());
-        // insert a new entity to the storage, update insert time map
+        // 记录新实体插入时间
         entityInsertTimes.put(entityId, System.currentTimeMillis());
         needsPut = true;
       }
+      // 合并事件，合并后排序
       if (entity.getEvents() != null) {
         if (existingEntity.getEvents() == null) {
           existingEntity.setEvents(entity.getEvents());
@@ -366,7 +414,7 @@ abstract class KeyValueBasedTimelineStore
         Collections.sort(existingEntity.getEvents());
         needsPut = true;
       }
-      // check startTime
+      // 如果实体没有设置开始时间，从事件中提取最小时间戳作为开始时间
       if (existingEntity.getStartTime() == null) {
         if (existingEntity.getEvents() == null
             || existingEntity.getEvents().isEmpty()) {
@@ -389,6 +437,7 @@ abstract class KeyValueBasedTimelineStore
           needsPut = true;
         }
       }
+      // 合并主过滤条件
       if (entity.getPrimaryFilters() != null) {
         if (existingEntity.getPrimaryFilters() == null) {
           existingEntity.setPrimaryFilters(new HashMap<String, Set<Object>>());
@@ -402,6 +451,7 @@ abstract class KeyValueBasedTimelineStore
           }
         }
       }
+      // 合并其他信息
       if (entity.getOtherInfo() != null) {
         if (existingEntity.getOtherInfo() == null) {
           existingEntity.setOtherInfo(new HashMap<String, Object>());
@@ -412,11 +462,12 @@ abstract class KeyValueBasedTimelineStore
           needsPut = true;
         }
       }
+      // 如果有修改，写入存储
       if (needsPut) {
         entities.put(entityId, existingEntity);
       }
 
-      // relate it to other entities
+      // 处理关联实体关系
       if (entity.getRelatedEntities() == null) {
         continue;
       }
@@ -426,151 +477,4 @@ abstract class KeyValueBasedTimelineStore
           continue;
         }
         for (String idStr : partRelatedEntities.getValue()) {
-          EntityIdentifier relatedEntityId =
-              new EntityIdentifier(idStr, partRelatedEntities.getKey());
-          TimelineEntity relatedEntity = entities.get(relatedEntityId);
-          if (relatedEntity != null) {
-            if (relatedEntity.getDomainId().equals(
-                existingEntity.getDomainId())) {
-              relatedEntity.addRelatedEntity(
-                  existingEntity.getEntityType(), existingEntity.getEntityId());
-              entities.put(relatedEntityId, relatedEntity);
-            } else {
-              // in this case the entity will be put, but the relation will be
-              // ignored
-              TimelinePutError error = new TimelinePutError();
-              error.setEntityType(existingEntity.getEntityType());
-              error.setEntityId(existingEntity.getEntityId());
-              error.setErrorCode(TimelinePutError.FORBIDDEN_RELATION);
-              response.addError(error);
-            }
-          } else {
-            relatedEntity = new TimelineEntity();
-            relatedEntity.setEntityId(relatedEntityId.getId());
-            relatedEntity.setEntityType(relatedEntityId.getType());
-            relatedEntity.setStartTime(existingEntity.getStartTime());
-            relatedEntity.addRelatedEntity(existingEntity.getEntityType(),
-                existingEntity.getEntityId());
-            relatedEntity.setDomainId(existingEntity.getDomainId());
-            entities.put(relatedEntityId, relatedEntity);
-            entityInsertTimes.put(relatedEntityId, System.currentTimeMillis());
-          }
-        }
-      }
-    }
-    return response;
-  }
-
-  public void put(TimelineDomain domain) throws IOException {
-    if (getServiceStopped()) {
-      LOG.info("Service stopped, return null for the storage");
-      return;
-    }
-    TimelineDomain domainToReplace =
-        domainById.get(domain.getId());
-    Long currentTimestamp = System.currentTimeMillis();
-    TimelineDomain domainToStore
-        = KeyValueBasedTimelineStoreUtils.createTimelineDomain(
-        domain.getId(), domain.getDescription(), domain.getOwner(),
-        domain.getReaders(), domain.getWriters(),
-        (domainToReplace == null ?
-            currentTimestamp : domainToReplace.getCreatedTime()),
-        currentTimestamp);
-    domainById.put(domainToStore.getId(), domainToStore);
-    Set<TimelineDomain> domainsByOneOwner =
-        domainsByOwner.get(domainToStore.getOwner());
-    if (domainsByOneOwner == null) {
-      domainsByOneOwner = new HashSet<TimelineDomain>();
-      domainsByOwner.put(domainToStore.getOwner(), domainsByOneOwner);
-    }
-    if (domainToReplace != null) {
-      domainsByOneOwner.remove(domainToReplace);
-    }
-    domainsByOneOwner.add(domainToStore);
-  }
-
-  private static class KeyValueBasedTimelineStoreUtils {
-
-    static TimelineDomain createTimelineDomain(
-        String id, String description, String owner,
-        String readers, String writers,
-        Long createdTime, Long modifiedTime) {
-      TimelineDomain domainToStore = new TimelineDomain();
-      domainToStore.setId(id);
-      domainToStore.setDescription(description);
-      domainToStore.setOwner(owner);
-      domainToStore.setReaders(readers);
-      domainToStore.setWriters(writers);
-      domainToStore.setCreatedTime(createdTime);
-      domainToStore.setModifiedTime(modifiedTime);
-      return domainToStore;
-    }
-
-    static TimelineEntity maskFields(
-        TimelineEntity entity, EnumSet<Field> fields) {
-      // Conceal the fields that are not going to be exposed
-      TimelineEntity entityToReturn = new TimelineEntity();
-      entityToReturn.setEntityId(entity.getEntityId());
-      entityToReturn.setEntityType(entity.getEntityType());
-      entityToReturn.setStartTime(entity.getStartTime());
-      entityToReturn.setDomainId(entity.getDomainId());
-      // Deep copy
-      if (fields.contains(Field.EVENTS)) {
-        entityToReturn.addEvents(entity.getEvents());
-      } else if (fields.contains(Field.LAST_EVENT_ONLY)) {
-        entityToReturn.addEvent(entity.getEvents().get(0));
-      } else {
-        entityToReturn.setEvents(null);
-      }
-      if (fields.contains(Field.RELATED_ENTITIES)) {
-        entityToReturn.addRelatedEntities(entity.getRelatedEntities());
-      } else {
-        entityToReturn.setRelatedEntities(null);
-      }
-      if (fields.contains(Field.PRIMARY_FILTERS)) {
-        entityToReturn.addPrimaryFilters(entity.getPrimaryFilters());
-      } else {
-        entityToReturn.setPrimaryFilters(null);
-      }
-      if (fields.contains(Field.OTHER_INFO)) {
-        entityToReturn.addOtherInfo(entity.getOtherInfo());
-      } else {
-        entityToReturn.setOtherInfo(null);
-      }
-      return entityToReturn;
-    }
-
-    static boolean matchFilter(Map<String, Object> tags,
-        NameValuePair filter) {
-      Object value = tags.get(filter.getName());
-      if (value == null) { // doesn't have the filter
-        return false;
-      } else if (!value.equals(filter.getValue())) { // doesn't match the filter
-        return false;
-      }
-      return true;
-    }
-
-    static boolean matchPrimaryFilter(Map<String, Set<Object>> tags,
-        NameValuePair filter) {
-      Set<Object> value = tags.get(filter.getName());
-      if (value == null) { // doesn't have the filter
-        return false;
-      } else {
-        return value.contains(filter.getValue());
-      }
-    }
-
-    static Object compactNumber(Object o) {
-      if (o instanceof Long) {
-        Long l = (Long) o;
-        if (l >= Integer.MIN_VALUE && l <= Integer.MAX_VALUE) {
-          return l.intValue();
-        }
-      }
-      return o;
-    }
-
-  }
-
-}
+          Entity

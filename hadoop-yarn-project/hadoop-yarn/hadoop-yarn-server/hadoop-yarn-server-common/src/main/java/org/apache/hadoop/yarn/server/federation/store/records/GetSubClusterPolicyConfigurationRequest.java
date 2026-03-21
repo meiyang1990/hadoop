@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,14 +24,17 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * GetSubClusterPolicyConfigurationRequest is a request to the
- * {@code FederationPolicyStore} to get the configuration of a policy for a
- * given queue.
+ * YARN联邦环境中，向FederationPolicyStore查询指定队列路由策略配置的请求类
  */
 @Private
 @Unstable
 public abstract class GetSubClusterPolicyConfigurationRequest {
 
+  /**
+   * 创建指定队列的策略配置查询请求实例
+   * @param queueName 要查询策略配置的队列名称
+   * @return 新建的查询请求实例
+   */
   @Private
   @Unstable
   public static GetSubClusterPolicyConfigurationRequest newInstance(
@@ -42,20 +46,18 @@ public abstract class GetSubClusterPolicyConfigurationRequest {
   }
 
   /**
-   * Get the name of the queue for which we are requesting a policy
-   * configuration.
+   * 获取本次请求要查询策略配置的队列名称
    *
-   * @return the name of the queue
+   * @return 队列名称
    */
   @Public
   @Unstable
   public abstract String getQueue();
 
   /**
-   * Sets the name of the queue for which we are requesting a policy
-   * configuration.
+   * 设置本次请求要查询策略配置的队列名称
    *
-   * @param queueName the name of the queue
+   * @param queueName 队列名称
    */
   @Private
   @Unstable

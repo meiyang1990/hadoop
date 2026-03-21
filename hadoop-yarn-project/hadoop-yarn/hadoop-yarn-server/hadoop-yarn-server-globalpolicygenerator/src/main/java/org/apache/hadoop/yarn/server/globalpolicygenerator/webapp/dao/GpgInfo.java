@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,10 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * 全局策略生成器(GPG)信息数据对象，用于Web REST API返回版本和启动信息。
+ * 封装GPG自身和Hadoop的版本信息，以及GPG服务启动时间。
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class GpgInfo {
@@ -38,9 +43,16 @@ public class GpgInfo {
   private String hadoopVersionBuiltOn;
   private long gpgStartupTime;
 
+  /**
+   * JAXB要求的无参构造方法，用于序列化/反序列化。
+   */
   public GpgInfo() {
   } // JAXB needs this
 
+  /**
+   * 构造GPG信息对象，从上下文获取并填充版本和启动时间信息。
+   * @param context GPG上下文对象
+   */
   public GpgInfo(final GPGContext context) {
     this.gpgVersion = YarnVersionInfo.getVersion();
     this.gpgBuildVersion = YarnVersionInfo.getBuildVersion();

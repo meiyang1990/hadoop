@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,5 +16,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/** Router policies. **/
+/**
+ * YARN联邦路由策略包，提供将应用提交/请求路由到联邦集群中对应子集群的各类路由策略实现。
+ * 核心职责是根据不同的路由规则，将用户请求转发到最合适的子集群，实现联邦集群的负载均衡和资源利用。
+ */
 package org.apache.hadoop.yarn.server.federation.policies.router;

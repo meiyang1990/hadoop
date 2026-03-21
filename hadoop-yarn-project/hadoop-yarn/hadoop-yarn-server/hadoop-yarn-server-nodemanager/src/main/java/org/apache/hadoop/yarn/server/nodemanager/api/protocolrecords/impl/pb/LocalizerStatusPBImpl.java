@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -28,25 +29,41 @@ import org.apache.hadoop.yarn.proto.YarnServerNodemanagerServiceProtos.Localizer
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalResourceStatus;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerStatus;
 
+/**
+ * LocalizerStatus的Protobuf实现，用于NodeManager与Localizer之间
+ * 通信时序列化本地化状态信息
+ */
 public class LocalizerStatusPBImpl
     extends ProtoBase<LocalizerStatusProto> implements LocalizerStatus {
 
+  // Protobuf默认实例
   LocalizerStatusProto proto =
     LocalizerStatusProto.getDefaultInstance();
+  // Protobuf构建器
   LocalizerStatusProto.Builder builder = null;
+  // 当前是否通过Proto模式持有数据
   boolean viaProto = false;
 
+  // 缓存本地资源状态列表
   private List<LocalResourceStatus> resources = null;
 
+  /**
+   * 无参构造函数，初始化Builder
+   */
   public LocalizerStatusPBImpl() {
     builder = LocalizerStatusProto.newBuilder();
   }
 
+  /**
+   * 基于已有Proto实例构造，复用现有Proto数据
+   * @param proto 已有的LocalizerStatusProto实例
+   */
   public LocalizerStatusPBImpl(LocalizerStatusProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  @Override
   public LocalizerStatusProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -54,12 +71,14 @@ public class LocalizerStatusPBImpl
     return proto;
   }
 
+  // 将本地缓存数据合并到Builder中
   private void mergeLocalToBuilder() {
     if (this.resources != null) {
       addResourcesToProto();
     }
   }
 
+  // 将本地缓存数据合并到最终Proto实例
   private void mergeLocalToProto() {
     if (viaProto)
       maybeInitBuilder();
@@ -68,6 +87,7 @@ public class LocalizerStatusPBImpl
     viaProto = true;
   }
 
+  // 延迟初始化Builder，基于现有Proto构建
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = LocalizerStatusProto.newBuilder(proto);
@@ -100,6 +120,7 @@ public class LocalizerStatusPBImpl
     builder.setLocalizerId(localizerId);
   }
 
+  // 延迟初始化资源列表，从Proto转换为Java对象
   private void initResources() {
     if (this.resources != null) {
       return;
@@ -113,6 +134,7 @@ public class LocalizerStatusPBImpl
     }
   }
 
+  // 将Java对象格式的资源列表转换回Proto格式写入Builder
   private void addResourcesToProto() {
     maybeInitBuilder();
     builder.clearResources();
@@ -180,11 +202,21 @@ public class LocalizerStatusPBImpl
     this.resources.clear();
   }
 
+  /**
+   * 将Proto格式转换为LocalResourceStatus业务对象
+   * @param p Proto格式资源状态
+   * @return 业务对象实例
+   */
   private LocalResourceStatus
       convertFromProtoFormat(LocalResourceStatusProto p) {
     return new LocalResourceStatusPBImpl(p);
   }
 
+  /**
+   * 将LocalResourceStatus业务对象转换为Proto格式
+   * @param s 业务对象实例
+   * @return Proto格式资源状态
+   */
   private LocalResourceStatusProto convertToProtoFormat(LocalResourceStatus s) {
     return ((LocalResourceStatusPBImpl)s).getProto();
   }

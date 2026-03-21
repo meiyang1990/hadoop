@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -24,13 +25,17 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The request to <code>Federation state store</code> to delete the mapping of
- * home subcluster of a submitted application.
+ * 向联邦状态存储请求删除已提交应用的归属子集群映射记录
  */
 @Private
 @Unstable
 public abstract class DeleteApplicationHomeSubClusterRequest {
 
+  /**
+   * 创建删除应用归属子集群映射的请求实例
+   * @param applicationId 待删除映射的应用ID
+   * @return 删除请求实例
+   */
   @Private
   @Unstable
   public static DeleteApplicationHomeSubClusterRequest newInstance(
@@ -42,22 +47,18 @@ public abstract class DeleteApplicationHomeSubClusterRequest {
   }
 
   /**
-   * Get the identifier of the {@link ApplicationId} to be removed from
-   * <code>Federation state store</code> .
+   * 获取待从联邦状态存储中删除映射的应用ID
    *
-   * @return the identifier of the application to be removed from Federation
-   *         State Store.
+   * @return 待删除映射的应用ID
    */
   @Public
   @Unstable
   public abstract ApplicationId getApplicationId();
 
   /**
-   * Set the identifier of the {@link ApplicationId} to be removed from
-   * <code>Federation state store</code> .
+   * 设置待从联邦状态存储中删除映射的应用ID
    *
-   * @param applicationId the identifier of the application to be removed from
-   *          Federation State Store.
+   * @param applicationId 待删除映射的应用ID
    */
   @Private
   @Unstable

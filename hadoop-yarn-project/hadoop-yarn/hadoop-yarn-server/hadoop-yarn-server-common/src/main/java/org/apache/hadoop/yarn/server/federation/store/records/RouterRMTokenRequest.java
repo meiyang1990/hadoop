@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,10 +23,19 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * YARN联邦状态存储获取Router RMToken的请求实体类，
+ * 用于封装从联邦状态存储查询Router RM令牌所需的请求参数。
+ */
 @Private
 @Unstable
 public abstract class RouterRMTokenRequest {
 
+  /**
+   * 创建一个新的RouterRMTokenRequest实例，封装传入的存储令牌信息。
+   * @param routerStoreToken Router存储令牌信息
+   * @return 初始化完成的请求实例
+   */
   @Private
   @Unstable
   public static RouterRMTokenRequest newInstance(RouterStoreToken routerStoreToken) {
@@ -34,10 +44,18 @@ public abstract class RouterRMTokenRequest {
     return request;
   }
 
+  /**
+   * 获取请求中携带的Router存储令牌信息。
+   * @return Router存储令牌
+   */
   @Public
   @Unstable
   public abstract RouterStoreToken getRouterStoreToken();
 
+  /**
+   * 设置请求中的Router存储令牌信息。
+   * @param routerStoreToken Router存储令牌
+   */
   @Private
   @Unstable
   public abstract void setRouterStoreToken(RouterStoreToken routerStoreToken);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,10 +21,21 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.container;
 
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
+/**
+ * 容器退出事件，封装容器退出时的相关信息
+ * 用于容器状态机处理容器退出流程，携带退出码和诊断信息
+ */
 public class ContainerExitEvent extends ContainerEvent {
   private int exitCode;
   private final String diagnosticInfo;
 
+  /**
+   * 构造容器退出事件
+   * @param cID 容器ID
+   * @param eventType 容器事件类型
+   * @param exitCode 容器退出码
+   * @param diagnosticInfo 容器退出诊断信息
+   */
   public ContainerExitEvent(ContainerId cID, ContainerEventType eventType,
       int exitCode, String diagnosticInfo) {
     super(cID, eventType);
@@ -31,10 +43,18 @@ public class ContainerExitEvent extends ContainerEvent {
     this.diagnosticInfo = diagnosticInfo;
   }
 
+  /**
+   * 获取容器退出码
+   * @return 容器退出码
+   */
   public int getExitCode() {
     return this.exitCode;
   }
 
+  /**
+   * 获取容器退出诊断信息
+   * @return 诊断信息字符串
+   */
   public String getDiagnosticInfo() {
     return diagnosticInfo;
   }

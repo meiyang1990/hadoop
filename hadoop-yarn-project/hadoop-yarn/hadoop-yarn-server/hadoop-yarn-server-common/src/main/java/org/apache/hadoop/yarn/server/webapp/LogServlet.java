@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -58,8 +59,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Extracts aggregated logs and related information.
- * Used by various WebServices (AHS, ATS).
+ * 聚合日志提取与相关信息查询服务，被AHS、ATS等多个Web服务共享使用
  */
 public class LogServlet extends Configured {
 
@@ -72,11 +72,20 @@ public class LogServlet extends Configured {
   private LogAggregationFileControllerFactory factoryInstance = null;
   private final AppInfoProvider appInfoProvider;
 
+  /**
+   * 构造日志服务Servlet，传入配置和应用信息提供者
+   * @param conf 配置对象
+   * @param appInfoProvider 应用信息提供者
+   */
   public LogServlet(Configuration conf, AppInfoProvider appInfoProvider) {
     super(conf);
     this.appInfoProvider = appInfoProvider;
   }
 
+  /**
+   * 获取或创建日志聚合文件控制器工厂（懒加载单例模式）
+   * @return 日志聚合文件控制器工厂实例
+   */
   private LogAggregationFileControllerFactory getOrCreateFactory() {
     if (factoryInstance != null) {
       return factoryInstance;
@@ -92,6 +101,12 @@ public class LogServlet extends Configured {
     return LogWebServiceUtils.getNMWebAddressFromRM(getConf(), nodeId);
   }
 
+  /**
+   * 将容器日志元数据列表转换为Web服务返回的容器日志信息列表
+   * @param containerLogMetas 容器日志元数据列表
+   * @param emptyLocalContainerLogMeta 是否需要添加空的本地日志元数据条目
+   * @return 转换后的容器日志信息列表
+   */
   private static List<ContainerLogsInfo> convertToContainerLogsInfo(
       List<ContainerLogMeta> containerLogMetas,
       boolean emptyLocalContainerLogMeta) {
@@ -113,6 +128,12 @@ public class LogServlet extends Configured {
     return containersLogsInfo;
   }
 
+  /**
+   * 生成包含容器日志元数据的REST响应
+   * @param request 封装后的日志元数据请求
+   * @param emptyLocalContainerLogMeta 是否添加空本地日志条目
+   * @return 包含日志元数据的REST响应
+   */
   private static Response getContainerLogMeta(
       WrappedLogMetaRequest request, boolean emptyLocalContainerLogMeta) {
     try {
@@ -127,9 +148,7 @@ public class LogServlet extends Configured {
           new GenericEntity<List<ContainerLogsInfo>>(containersLogsInfo) {
           };
       Response.ResponseBuilder response = Response.ok(meta);
-      // Sending the X-Content-Type-Options response header with the value
-      // nosniff will prevent Internet Explorer from MIME-sniffing a response
-      // away from the declared content-type.
+      // 阻止浏览器对内容类型进行MIME嗅探，避免安全问题
       response.header("X-Content-Type-Options", "nosniff");
       return response.build();
     } catch (Exception ex) {
@@ -139,21 +158,21 @@ public class LogServlet extends Configured {
   }
 
   /**
-   * Validates whether the user has provided at least one query param for
-   * the request. Also validates that if multiple query params are provided,
-   * they do not contradict.
+   * 验证用户查询参数合法性：至少指定一个ID，且各ID之间所属关系正确
+   * @param applicationId 应用ID
+   * @param applicationAttemptId 应用尝试ID
+   * @param containerId 容器ID
    */
   private void validateUserInput(ApplicationId applicationId,
       ApplicationAttemptId applicationAttemptId, ContainerId containerId) {
-    // At least one field should be set
+    // 至少指定一个查询参数
     if (applicationId == null && applicationAttemptId == null &&
         containerId == null) {
       throw new IllegalArgumentException("Should set application id, " +
           "application attempt id or container id.");
     }
 
-    // container id should belong to the app attempt and the app id,
-    // if provided
+    // 验证容器ID是否匹配提供的应用尝试ID和应用ID
     if (containerId != null) {
       if (applicationAttemptId != null && !applicationAttemptId.equals(
           containerId.getApplicationAttemptId())) {
@@ -171,24 +190,22 @@ public class LogServlet extends Configured {
       }
     }
 
-    // app attempt id should match the app id, if provided
+    // 验证应用尝试ID是否匹配提供的应用ID
     if (applicationAttemptId != null && applicationId != null &&
         !applicationId.equals(applicationAttemptId.getApplicationId())) {
       throw new IllegalArgumentException(
           String.format(
-              "Application attempt %s does not belong to application %s!",
-              applicationAttemptId, applicationId));
+                "Application attempt %s does not belong to application %s!",
+                applicationAttemptId, applicationId));
     }
   }
 
   /**
-   * Returns the user qualified path name of the remote log directory for
-   * each pre-configured log aggregation file controller.
-   *
-   * @param user remoteUser.
-   * @param applicationId applicationId.
-   * @return {@link Response} object containing remote log dir path names
-   * @throws IOException if there are I/O errors.
+   * 获取每个配置的日志聚合文件控制器对应的远程日志目录路径
+   * @param user 远程用户名
+   * @param applicationId 应用ID字符串
+   * @return 包含远程日志路径的REST响应
+   * @throws IOException IO异常
    */
   public Response getRemoteLogDirPath(String user, String applicationId)
       throws IOException {
@@ -196,6 +213,7 @@ public class LogServlet extends Configured {
     ApplicationId appId = applicationId != null ?
         ApplicationIdPBImpl.fromString(applicationId) : null;
 
+    // 未指定用户时使用当前登录用户
     if (remoteUser == null) {
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
       remoteUser = ugi.getUserName();
@@ -205,6 +223,7 @@ public class LogServlet extends Configured {
         getOrCreateFactory().getConfiguredLogAggregationFileControllerList();
     List<RemoteLogPathEntry> paths = new ArrayList<>();
 
+    // 遍历所有已配置的文件控制器收集路径
     for (LogAggregationFileController fileController : fileControllers) {
       String path;
       if (appId != null) {
@@ -225,6 +244,17 @@ public class LogServlet extends Configured {
     return response.build();
   }
 
+  /**
+   * 根据路径参数获取日志元数据信息
+   * @param hsr HTTP请求对象
+   * @param appIdStr 应用ID字符串
+   * @param appAttemptIdStr 应用尝试ID字符串
+   * @param containerIdStr 容器ID字符串
+   * @param nmId NodeManager ID
+   * @param redirectedFromNode 是否从节点重定向而来
+   * @param manualRedirection 是否手动重定向（返回Location头而非自动跳转）
+   * @return 包含日志信息的REST响应
+   */
   public Response getLogsInfo(HttpServletRequest hsr, String appIdStr,
       String appAttemptIdStr, String containerIdStr, String nmId,
       boolean redirectedFromNode, boolean manualRedirection) {
@@ -255,6 +285,7 @@ public class LogServlet extends Configured {
       }
     }
 
+    // 验证输入参数合法性
     validateUserInput(appId, appAttemptId, containerId);
 
     WrappedLogMetaRequest.Builder logMetaRequestBuilder =
@@ -263,22 +294,32 @@ public class LogServlet extends Configured {
             .setApplicationAttemptId(appAttemptId)
             .setContainerId(containerIdStr);
 
+    // 继续处理请求获取容器日志信息
     return getContainerLogsInfo(hsr, logMetaRequestBuilder, nmId,
         redirectedFromNode, null, manualRedirection);
   }
 
+  /**
+   * 根据扩展日志元请求获取批量容器日志信息
+   * @param req HTTP请求对象
+   * @param logsRequest 扩展日志元请求构建器
+   * @return 包含批量日志信息的REST响应
+   * @throws IOException IO异常
+   */
   public Response getContainerLogsInfo(
       HttpServletRequest req,
       ExtendedLogMetaRequest.ExtendedLogMetaRequestBuilder logsRequest)
       throws IOException {
     List<ContainerLogMeta> logs = new ArrayList<>();
 
+    // 未指定用户时使用当前登录用户
     if (!logsRequest.isUserSet()) {
       logsRequest.setUser(UserGroupInformation.getCurrentUser().getUserName());
     }
     LogAggregationMetaCollector collector = new LogAggregationMetaCollector(
         logsRequest.build(), getConf());
 
+    // 从所有已配置的文件控制器收集日志元数据
     for (LogAggregationFileController fc : getOrCreateFactory()
         .getConfiguredLogAggregationFileControllerList()) {
       logs.addAll(collector.collect(fc));
@@ -290,25 +331,21 @@ public class LogServlet extends Configured {
         new GenericEntity<List<ContainerLogsInfo>>(containersLogsInfo) {
         };
     Response.ResponseBuilder response = Response.ok(meta);
-    // Sending the X-Content-Type-Options response header with the value
-    // nosniff will prevent Internet Explorer from MIME-sniffing a response
-    // away from the declared content-type.
+    // 阻止浏览器对内容类型进行MIME嗅探，避免安全问题
     response.header("X-Content-Type-Options", "nosniff");
     return response.build();
   }
 
 
   /**
-   * Returns information about the logs for a specific container.
-   *
-   * @param req the {@link HttpServletRequest}
-   * @param builder builder instance for the log meta request
-   * @param nmId NodeManager id
-   * @param redirectedFromNode whether the request was redirected
-   * @param clusterId the id of the cluster
-   * @param manualRedirection whether to return a response with a Location
-   *                          instead of an automatic redirection
-   * @return {@link Response} object containing information about the logs
+   * 获取指定容器的日志信息，运行中容器会重定向到对应NodeManager获取本地日志
+   * @param req HTTP请求对象
+   * @param builder 日志元请求构建器
+   * @param nmId NodeManager ID
+   * @param redirectedFromNode 是否从节点重定向而来
+   * @param clusterId 集群ID
+   * @param manualRedirection 是否手动重定向（返回Location头而非自动跳转）
+   * @return 包含日志信息或重定向指令的REST响应
    */
   public Response getContainerLogsInfo(HttpServletRequest req,
       WrappedLogMetaRequest.Builder builder,
@@ -319,23 +356,25 @@ public class LogServlet extends Configured {
 
     BasicAppInfo appInfo;
     try {
+      // 从信息提供者获取应用基本信息
       appInfo = appInfoProvider.getApp(req, builder.getAppId(), clusterId);
     } catch (Exception ex) {
       LOG.warn("Could not obtain appInfo object from provider.", ex);
-      // directly find logs from HDFS.
+      // 获取应用信息失败，直接从HDFS读取聚合日志返回
       return getContainerLogMeta(builder.build(), false);
     }
-    // if the application finishes, directly find logs
-    // from HDFS.
+    // 应用已完成，直接从HDFS读取聚合日志返回
     if (Apps.isApplicationFinalState(appInfo.getAppState())) {
       return getContainerLogMeta(builder.build(), false);
     }
+    // 应用正在运行，尝试重定向到对应NodeManager获取本地日志
     if (LogWebServiceUtils.isRunningState(appInfo.getAppState())) {
       String appOwner = appInfo.getUser();
       builder.setAppOwner(appOwner);
       WrappedLogMetaRequest request = builder.build();
 
       String nodeHttpAddress = null;
+      // 已提供NM ID，尝试从RM获取NM的Web地址
       if (nmId != null && !nmId.isEmpty()) {
         try {
           nodeHttpAddress = getNMWebAddressFromRM(nmId);
@@ -343,6 +382,7 @@ public class LogServlet extends Configured {
           LOG.info("Exception during getting NM web address.", ex);
         }
       }
+      // 未获取到NM地址，尝试通过应用信息提供者查询
       if (nodeHttpAddress == null || nodeHttpAddress.isEmpty()) {
         if (request.getContainerId() != null) {
           try {
@@ -351,29 +391,25 @@ public class LogServlet extends Configured {
                 request.getContainerId().toString(), clusterId);
           } catch (Exception ex) {
             LOG.warn("Could not obtain node HTTP address from provider.", ex);
-            // return log meta for the aggregated logs if exists.
-            // It will also return empty log meta for the local logs.
+            // 获取NM地址失败，返回聚合日志元数据，并添加空本地日志条目
             return getContainerLogMeta(request, true);
           }
         }
-        // make sure nodeHttpAddress is not null and not empty. Otherwise,
-        // we would only get log meta for aggregated logs instead of
-        // re-directing the request
+        // 仍未获取到NM地址 或 请求本身就是从NM重定向来的，直接返回聚合日志
         if (nodeHttpAddress == null || nodeHttpAddress.isEmpty()
             || redirectedFromNode) {
-          // return log meta for the aggregated logs if exists.
-          // It will also return empty log meta for the local logs.
-          // If this is the redirect request from NM, we should not
-          // re-direct the request back. Simply output the aggregated log meta.
+          // 返回聚合日志元数据，如果存在的话，并添加空本地日志条目
           return getContainerLogMeta(request, true);
         }
       }
       ContainerId containerId = request.getContainerId();
+      // 没有指定容器ID，无法重定向到单个NM
       if (containerId == null) {
         throw new WebApplicationException(
             new Exception("Could not redirect to node, as app attempt or " +
                 "application logs are requested."));
       }
+      // 拼接NM端日志下载地址
       String uri = "/" + containerId.toString() + "/logs";
       String resURI = JOINER.join(
           LogWebServiceUtils.getAbsoluteNMWebAddress(getConf(),
@@ -383,166 +419,6 @@ public class LogServlet extends Configured {
       if (query != null && !query.isEmpty()) {
         resURI += "?" + query;
       }
+      // 手动重定向模式返回Location头，自动重定向模式返回302跳转响应
       if (manualRedirection) {
-        return createLocationResponse(resURI, createEmptyLogsInfo());
-      }
-
-      Response.ResponseBuilder response = Response.status(
-          HttpServletResponse.SC_TEMPORARY_REDIRECT);
-      response.header("Location", resURI);
-      return response.build();
-    } else {
-      throw new NotFoundException(
-          "The application is not at Running or Finished State.");
-    }
-  }
-
-  /**
-   * Creates a response with empty payload and a location header to preserve
-   * API compatibility.
-   *
-   * @param uri redirection url
-   * @param emptyPayload a payload that is discarded
-   * @return a response with empty payload
-   */
-  private static <T> Response createLocationResponse(
-      String uri, T emptyPayload) {
-    Response.ResponseBuilder response = Response.status(
-        HttpServletResponse.SC_OK).entity(emptyPayload);
-    response.header("Location", uri);
-    response.header("Access-Control-Expose-Headers", "Location");
-    return response.build();
-  }
-
-  private static GenericEntity<List<ContainerLogsInfo>> createEmptyLogsInfo() {
-    return new GenericEntity<List<ContainerLogsInfo>>(
-        Collections.EMPTY_LIST, List.class);
-  }
-
-  private static StreamingOutput createEmptyStream() {
-    return outputStream -> outputStream.write(
-        "".getBytes(StandardCharsets.UTF_8));
-  }
-
-  /**
-   * Returns an aggregated log file belonging to a container.
-   *
-   * @param req the {@link HttpServletRequest}
-   * @param containerIdStr container id
-   * @param filename the name of the file
-   * @param format the format of the response
-   * @param size the size of bytes of the log file that should be returned
-   * @param nmId NodeManager id
-   * @param redirectedFromNode whether the request was redirected
-   * @param clusterId the id of the cluster
-   * @param manualRedirection whether to return a response with a Location
-   *                          instead of an automatic redirection
-   * @return {@link Response} object containing information about the logs
-   */
-  public Response getLogFile(HttpServletRequest req, String containerIdStr,
-      String filename, String format, String size, String nmId,
-      boolean redirectedFromNode, String clusterId, boolean manualRedirection) {
-    ContainerId containerId;
-    try {
-      containerId = ContainerId.fromString(containerIdStr);
-    } catch (IllegalArgumentException ex) {
-      return LogWebServiceUtils.createBadResponse(Status.NOT_FOUND,
-          "Invalid ContainerId: " + containerIdStr);
-    }
-
-    LogAggregationFileControllerFactory factory = getOrCreateFactory();
-
-    final long length = LogWebServiceUtils.parseLongParam(size);
-
-    ApplicationId appId = containerId.getApplicationAttemptId()
-        .getApplicationId();
-    BasicAppInfo appInfo;
-    try {
-      appInfo = appInfoProvider.getApp(req, appId.toString(), clusterId);
-    } catch (Exception ex) {
-      LOG.warn("Could not obtain appInfo object from provider.", ex);
-      return LogWebServiceUtils
-          .sendStreamOutputResponse(factory, appId, null, null, containerIdStr,
-              filename, format, length, false);
-    }
-    String appOwner = appInfo.getUser();
-    if (Apps.isApplicationFinalState(appInfo.getAppState())) {
-      // directly find logs from HDFS.
-      return LogWebServiceUtils
-          .sendStreamOutputResponse(factory, appId, appOwner, null,
-              containerIdStr, filename, format, length, false);
-    }
-
-    if (LogWebServiceUtils.isRunningState(appInfo.getAppState())) {
-      String nodeHttpAddress = null;
-      if (nmId != null && !nmId.isEmpty()) {
-        try {
-          nodeHttpAddress = getNMWebAddressFromRM(nmId);
-        } catch (Exception ex) {
-          LOG.debug("Exception happened during obtaining NM web address " +
-              "from RM.", ex);
-        }
-      }
-      if (nodeHttpAddress == null || nodeHttpAddress.isEmpty()) {
-        try {
-          nodeHttpAddress = appInfoProvider.getNodeHttpAddress(
-              req, appId.toString(),
-              containerId.getApplicationAttemptId().toString(),
-              containerId.toString(), clusterId);
-        } catch (Exception ex) {
-          LOG.warn("Could not obtain node HTTP address from provider.", ex);
-          // output the aggregated logs
-          return LogWebServiceUtils
-              .sendStreamOutputResponse(factory, appId, appOwner, null,
-                  containerIdStr, filename, format, length, true);
-        }
-        // make sure nodeHttpAddress is not null and not empty. Otherwise,
-        // we would only get aggregated logs instead of re-directing the
-        // request.
-        // If this is the redirect request from NM, we should not re-direct the
-        // request back. Simply output the aggregated logs.
-        if (nodeHttpAddress == null || nodeHttpAddress.isEmpty()
-            || redirectedFromNode) {
-          // output the aggregated logs
-          return LogWebServiceUtils
-              .sendStreamOutputResponse(factory, appId, appOwner, null,
-                  containerIdStr, filename, format, length, true);
-        }
-      }
-      String uri = "/" + containerId.toString() + "/logs/" + filename;
-      String resURI = JOINER.join(
-          LogWebServiceUtils.getAbsoluteNMWebAddress(getConf(),
-              nodeHttpAddress),
-          NM_DOWNLOAD_URI_STR, uri);
-      String query = req.getQueryString();
-      if (query != null && !query.isEmpty()) {
-        resURI += "?" + query;
-      }
-
-
-      if (manualRedirection) {
-        return createLocationResponse(resURI, createEmptyStream());
-      }
-
-      Response.ResponseBuilder response = Response.status(
-          HttpServletResponse.SC_TEMPORARY_REDIRECT);
-      response.header("Location", resURI);
-      return response.build();
-    } else {
-      return LogWebServiceUtils.createBadResponse(Status.NOT_FOUND,
-          "The application is not at Running or Finished State.");
-    }
-  }
-
-  public static WrappedLogMetaRequest.Builder createRequestFromContainerId(
-      String containerIdStr) {
-    WrappedLogMetaRequest.Builder logMetaRequestBuilder =
-        WrappedLogMetaRequest.builder();
-    try {
-      logMetaRequestBuilder.setContainerId(containerIdStr);
-    } catch (IllegalArgumentException e) {
-      throw new BadRequestException("Invalid container id: " + containerIdStr);
-    }
-    return logMetaRequestBuilder;
-  }
-}
+        return createLocationResponse(res

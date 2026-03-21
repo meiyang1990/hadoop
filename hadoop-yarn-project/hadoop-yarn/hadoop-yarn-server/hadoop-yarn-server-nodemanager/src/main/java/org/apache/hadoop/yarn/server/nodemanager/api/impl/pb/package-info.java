@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -15,7 +16,7 @@
  * limitations under the License.
  */
 /**
- * Package containing classes for working with Protobuf.
+ * NodeManager API 的 Protobuf 序列化实现包，提供基于 Protobuf 的 RPC 消息编解码能力。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

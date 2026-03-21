@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -20,13 +21,21 @@ package org.apache.hadoop.yarn.server.federation.policies.exceptions;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
- * Generic policy exception.
+ * YARN联邦路由策略异常基类，用于表示联邦策略执行过程中出现的各类错误。
  */
 public class FederationPolicyException extends YarnException {
+  /**
+   * 构造带有错误信息的联邦策略异常。
+   * @param s 错误描述信息
+   */
   public FederationPolicyException(String s) {
     super(s);
   }
 
+  /**
+   * 构造包装底层异常的联邦策略异常。
+   * @param t 原始异常
+   */
   public FederationPolicyException(Throwable t) {
     super(t);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,12 +23,13 @@ import org.apache.hadoop.service.Service;
 import org.apache.hadoop.yarn.api.records.ResourceUtilization;
 
 /**
- * Interface for monitoring the resources of a node.
+ * NodeManager节点资源监控接口，定义获取节点当前资源使用情况的抽象能力。
+ * 各实现类可通过不同监控方式采集节点实际资源利用率，支撑YARN节点健康检查和资源调度。
  */
 public interface NodeResourceMonitor extends Service {
   /**
-   * Get the <em>resource utilization</em> of the node.
-   * @return <em>resource utilization</em> of the node.
+   * 获取当前节点整体资源利用率信息，包含CPU、内存等资源的使用情况。
+   * @return 当前节点的资源利用率信息
    */
   public ResourceUtilization getUtilization();
 }

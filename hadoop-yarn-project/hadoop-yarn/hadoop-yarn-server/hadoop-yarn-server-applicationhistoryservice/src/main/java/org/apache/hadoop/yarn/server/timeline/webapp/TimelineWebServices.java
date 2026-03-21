@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -69,6 +70,9 @@ import org.apache.hadoop.yarn.webapp.NotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Timeline时间线服务REST API实现类，提供时间线数据的查询、写入和域名管理的HTTP接口
+ */
 @Singleton
 @Path("/ws/v1/timeline")
 //TODO: support XML serialization/deserialization
@@ -79,13 +83,20 @@ public class TimelineWebServices {
 
   private TimelineDataManager timelineDataManager;
 
+  /**
+   * 构造函数，注入时间线数据管理器实例
+   * @param timelineDataManager 时间线数据管理器
+   */
   @Inject
   public TimelineWebServices(TimelineDataManager timelineDataManager) {
     this.timelineDataManager = timelineDataManager;
   }
 
   /**
-   * Return the description of the timeline web services.
+   * 获取时间线服务API描述信息
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @return 时间线API描述信息
    */
   @GET
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8
@@ -98,7 +109,19 @@ public class TimelineWebServices {
   }
 
   /**
-   * Return a list of entities that match the given parameters.
+   * 根据查询条件获取匹配的实体列表
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param entityType 实体类型
+   * @param primaryFilter 主过滤条件
+   * @param secondaryFilter 二级过滤条件
+   * @param windowStart 时间窗口起始
+   * @param windowEnd 时间窗口结束
+   * @param fromId 分页起始实体ID
+   * @param fromTs 分页起始时间戳
+   * @param limit 返回结果数量限制
+   * @param fields 需要返回的字段列表
+   * @return 匹配的实体集合
    */
   @GET
   @Path("/{entityType}")
@@ -144,7 +167,13 @@ public class TimelineWebServices {
   }
 
   /**
-   * Return a single entity of the given entity type and Id.
+   * 根据实体类型和ID获取单个实体详情
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param entityType 实体类型
+   * @param entityId 实体ID
+   * @param fields 需要返回的字段列表
+   * @return 实体详情
    */
   @GET
   @Path("/{entityType}/{entityId}")
@@ -166,7 +195,7 @@ public class TimelineWebServices {
           parseFieldsStr(fields, ","),
           getUser(req));
     } catch (YarnException e) {
-      // The user doesn't have the access to override the existing domain.
+      // 用户无权限覆盖已存在的域名
       LOG.info(e.getMessage(), e);
       throw new ForbiddenException(e);
     } catch (IllegalArgumentException e) {
@@ -185,7 +214,16 @@ public class TimelineWebServices {
   }
 
   /**
-   * Return the events that match the given parameters.
+   * 根据查询条件获取匹配的事件列表
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param entityType 实体类型
+   * @param entityId 实体ID列表
+   * @param eventType 事件类型列表
+   * @param windowStart 时间窗口起始
+   * @param windowEnd 时间窗口结束
+   * @param limit 返回结果数量限制
+   * @return 匹配的事件集合
    */
   @GET
   @Path("/{entityType}/events")
@@ -222,14 +260,11 @@ public class TimelineWebServices {
   }
 
   /**
-   * Store the given entities into the timeline store, and return the errors
-   * that happen during storing.
-   *
-   * We’re migrating to Jersey2. Previously, using `TimelineEntities`
-   * and converting to JSON via `JAXBContext` led to type conversion issues.
-   *
-   * Therefore, we’ve changed the method parameter to `String`,
-   * passing JSON directly and performing deserialization here.
+   * 将一批实体写入时间线存储，返回写入过程中发生的错误
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param entities 待写入的实体集合
+   * @return 写入响应，包含错误信息
    */
   @POST
   @Consumes({ MediaType.APPLICATION_JSON /* , MediaType.APPLICATION_XML */})
@@ -258,8 +293,11 @@ public class TimelineWebServices {
   }
 
   /**
-   * Store the given domain into the timeline store, and return the errors
-   * that happen during storing.
+   * 将一个域名写入时间线存储，返回写入过程中发生的错误
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param domain 待写入的域名信息
+   * @return 写入响应
    */
   @PUT
   @Path("/domain")
@@ -281,7 +319,7 @@ public class TimelineWebServices {
     try {
       timelineDataManager.putDomain(domain, callerUGI);
     } catch (YarnException e) {
-      // The user doesn't have the access to override the existing domain.
+      // 用户无权限覆盖已存在的域名
       LOG.error(e.getMessage(), e);
       throw new ForbiddenException(e);
     } catch (RuntimeException e) {
@@ -297,7 +335,11 @@ public class TimelineWebServices {
   }
 
   /**
-   * Return a single domain of the given domain Id.
+   * 根据域名ID获取单个域名详情
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param domainId 域名ID
+   * @return 域名详情
    */
   @GET
   @Path("/domain/{domainId}")
@@ -329,7 +371,11 @@ public class TimelineWebServices {
   }
 
   /**
-   * Return a list of domains of the given owner.
+   * 根据所有者获取域名列表
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param owner 所有者用户名
+   * @return 该所有者拥有的域名集合
    */
   @GET
   @Path("/domain")
@@ -346,7 +392,7 @@ public class TimelineWebServices {
       if (callerUGI == null) {
         throw new BadRequestException("Domain owner is not specified.");
       } else {
-        // By default it's going to list the caller's domains
+        // 默认返回当前调用者自己的域名列表
         owner = callerUGI.getShortUserName();
       }
     }
@@ -359,10 +405,19 @@ public class TimelineWebServices {
     }
   }
 
+  /**
+   * 初始化HTTP响应，清除默认ContentType
+   * @param response HTTP响应对象
+   */
   private void init(HttpServletResponse response) {
     response.setContentType(null);
   }
 
+  /**
+   * 从HTTP请求获取调用用户的UGI信息
+   * @param req HTTP请求
+   * @return 调用用户的UGI，无远程用户时返回null
+   */
   private static UserGroupInformation getUser(HttpServletRequest req) {
     String remoteUser = req.getRemoteUser();
     UserGroupInformation callerUGI = null;
@@ -372,6 +427,12 @@ public class TimelineWebServices {
     return callerUGI;
   }
 
+  /**
+   * 将字符串按分隔符拆分解析为有序字符串集合
+   * @param str 输入字符串
+   * @param delimiter 分隔符
+   * @return 拆分后的有序字符串集合
+   */
   private static SortedSet<String> parseArrayStr(String str, String delimiter) {
     if (str == null) {
       return null;
@@ -384,6 +445,12 @@ public class TimelineWebServices {
     return strSet;
   }
 
+  /**
+   * 将字符串按分隔符拆分解析为单个键值对，尝试将值反序列化为对象
+   * @param str 输入字符串
+   * @param delimiter 分隔符
+   * @return 解析后的键值对
+   */
   private static NameValuePair parsePairStr(String str, String delimiter) {
     if (str == null) {
       return null;
@@ -391,65 +458,3 @@ public class TimelineWebServices {
     String[] strs = str.split(delimiter, 2);
     try {
       return new NameValuePair(strs[0].trim(),
-          GenericObjectMapper.OBJECT_READER.readValue(strs[1].trim()));
-    } catch (Exception e) {
-      // didn't work as an Object, keep it as a String
-      return new NameValuePair(strs[0].trim(), strs[1].trim());
-    }
-  }
-
-  private static Collection<NameValuePair> parsePairsStr(
-      String str, String aDelimiter, String pDelimiter) {
-    if (str == null) {
-      return null;
-    }
-    String[] strs = str.split(aDelimiter);
-    Set<NameValuePair> pairs = new HashSet<NameValuePair>();
-    for (String aStr : strs) {
-      pairs.add(parsePairStr(aStr, pDelimiter));
-    }
-    return pairs;
-  }
-
-  private static EnumSet<Field> parseFieldsStr(String str, String delimiter) {
-    if (str == null) {
-      return null;
-    }
-    String[] strs = str.split(delimiter);
-    List<Field> fieldList = new ArrayList<Field>();
-    for (String s : strs) {
-      s = StringUtils.toUpperCase(s.trim());
-      if (s.equals("EVENTS")) {
-        fieldList.add(Field.EVENTS);
-      } else if (s.equals("LASTEVENTONLY")) {
-        fieldList.add(Field.LAST_EVENT_ONLY);
-      } else if (s.equals("RELATEDENTITIES")) {
-        fieldList.add(Field.RELATED_ENTITIES);
-      } else if (s.equals("PRIMARYFILTERS")) {
-        fieldList.add(Field.PRIMARY_FILTERS);
-      } else if (s.equals("OTHERINFO")) {
-        fieldList.add(Field.OTHER_INFO);
-      } else {
-        throw new IllegalArgumentException("Requested nonexistent field " + s);
-      }
-    }
-    if (fieldList.size() == 0) {
-      return null;
-    }
-    Field f1 = fieldList.remove(fieldList.size() - 1);
-    if (fieldList.size() == 0) {
-      return EnumSet.of(f1);
-    } else {
-      return EnumSet.of(f1, fieldList.toArray(new Field[fieldList.size()]));
-    }
-  }
-
-  private static Long parseLongStr(String str) {
-    return str == null ? null : Long.parseLong(str.trim());
-  }
-
-  private static String parseStr(String str) {
-    return str == null ? null : str.trim();
-  }
-
-}

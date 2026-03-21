@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,6 +21,10 @@ package org.apache.hadoop.yarn.server.nodemanager.api;
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.yarn.proto.LocalizationProtocol.LocalizationProtocolService;
 
+/**
+ * 容器本地化协议PB实现接口，定义节点管理器本地化服务的RPC协议
+ * 基于Protobuf生成的阻塞接口扩展，提供资源本地化RPC服务定义
+ */
 @ProtocolInfo(protocolName = "org.apache.hadoop.yarn.server.nodemanager.api.LocalizationProtocolPB",
     protocolVersion = 1)
 public interface LocalizationProtocolPB extends LocalizationProtocolService.BlockingInterface {

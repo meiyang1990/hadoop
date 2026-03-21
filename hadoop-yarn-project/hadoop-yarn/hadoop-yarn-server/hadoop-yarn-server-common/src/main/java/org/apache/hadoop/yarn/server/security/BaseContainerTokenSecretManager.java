@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -33,8 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * SecretManager for ContainerTokens. Extended by both RM and NM and hence is
- * present in yarn-server-common package.
+ * 容器令牌密钥管理器基类，提供容器令牌生成与验证的核心逻辑。
+ * ResourceManager和NodeManager都继承此类，因此放置在yarn-server-common公共模块中。
  * 
  */
 public class BaseContainerTokenSecretManager extends
@@ -43,28 +44,34 @@ public class BaseContainerTokenSecretManager extends
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseContainerTokenSecretManager.class);
 
+  // 主密钥序列号，使用安全随机数初始化
   protected int serialNo = new SecureRandom().nextInt();
 
+  // 读写锁，保护主密钥并发访问
   protected final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
   protected final Lock readLock = readWriteLock.readLock();
   protected final Lock writeLock = readWriteLock.writeLock();
 
   /**
-   * THE masterKey. ResourceManager should persist this and recover it on
-   * restart instead of generating a new key. The NodeManagers get it from the
-   * ResourceManager and use it for validating container-tokens.
+   * 当前生效的主密钥。ResourceManager重启时需要持久化恢复此密钥，
+   * NodeManager从ResourceManager获取此密钥，用于验证容器令牌。
    */
   protected MasterKeyData currentMasterKey;
 
+  // 容器令牌过期时间间隔
   protected final long containerTokenExpiryInterval;
 
+  /**
+   * 构造函数，从配置中读取容器令牌过期时间。
+   * @param conf YARN配置对象
+   */
   public BaseContainerTokenSecretManager(Configuration conf) {
     this.containerTokenExpiryInterval =
         conf.getInt(YarnConfiguration.RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS,
           YarnConfiguration.DEFAULT_RM_CONTAINER_ALLOC_EXPIRY_INTERVAL_MS);
   }
 
-  // Need lock as we increment serialNo etc.
+  // 需要写锁保护序列号递增等操作
   protected MasterKeyData createNewMasterKey() {
     this.writeLock.lock();
     try {

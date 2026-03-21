@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,16 @@ package org.apache.hadoop.yarn.server.api.protocolrecords;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * 上报新采集器信息响应，YARN服务端内部协议的响应记录类
+ * 用于接收Timeline服务采集器上线注册的响应结果
+ */
 public abstract class ReportNewCollectorInfoResponse {
 
+  /**
+   * 创建ReportNewCollectorInfoResponse新实例
+   * @return 新的响应对象实例
+   */
   @Private
   public static ReportNewCollectorInfoResponse newInstance() {
     ReportNewCollectorInfoResponse response =

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,7 @@
  */
 
 /**
- * This package contains classes related to NM container launch.
+ * NodeManager 容器启动模块包，包含容器启动执行相关的核心实现类，
+ * 负责处理YARN节点上用户容器的生命周期启动流程。
  */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher;

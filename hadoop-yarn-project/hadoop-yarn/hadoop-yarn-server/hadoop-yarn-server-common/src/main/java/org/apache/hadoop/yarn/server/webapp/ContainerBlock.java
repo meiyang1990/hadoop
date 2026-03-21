@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,12 +42,20 @@ import java.util.Map;
 import static org.apache.hadoop.yarn.util.StringHelper.join;
 import static org.apache.hadoop.yarn.webapp.YarnWebParams.CONTAINER_ID;
 
+/**
+ * YARN Web UI 容器详情页面块，负责渲染容器基本信息页面
+ */
 public class ContainerBlock extends HtmlBlock {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBlock.class);
   protected ApplicationBaseProtocol appBaseProt;
 
+  /**
+   * 构造方法，注入应用基础协议和视图上下文
+   * @param appBaseProt 应用基础协议客户端，用于获取容器信息
+   * @param ctx 视图上下文
+   */
   @Inject
   public ContainerBlock(ApplicationBaseProtocol appBaseProt, ViewContext ctx) {
     super(ctx);
@@ -55,6 +64,7 @@ public class ContainerBlock extends HtmlBlock {
 
   @Override
   protected void render(Block html) {
+    // 从请求参数获取容器ID
     String containerid = $(CONTAINER_ID);
     if (containerid.isEmpty()) {
       puts("Bad request: requires container ID");
@@ -63,20 +73,24 @@ public class ContainerBlock extends HtmlBlock {
 
     ContainerId containerId = null;
     try {
+      // 解析容器ID字符串
       containerId = ContainerId.fromString(containerid);
     } catch (IllegalArgumentException e) {
       puts("Invalid container ID: " + containerid);
       return;
     }
 
+    // 获取当前请求用户信息
     UserGroupInformation callerUGI = getCallerUGI();
     ContainerReport containerReport = null;
     try {
+      // 创建获取容器报告请求
       final GetContainerReportRequest request =
           GetContainerReportRequest.newInstance(containerId);
       if (callerUGI == null) {
         containerReport = getContainerReport(request);
       } else {
+        // 以请求用户身份获取容器报告
         containerReport = callerUGI.doAs(
             new PrivilegedExceptionAction<ContainerReport> () {
           @Override
@@ -97,9 +111,12 @@ public class ContainerBlock extends HtmlBlock {
       return;
     }
 
+    // 包装容器报告为DAO对象
     ContainerInfo container = new ContainerInfo(containerReport);
+    // 设置页面标题
     setTitle(join("Container ", containerid));
 
+    // 构建容器概览信息块
     info("Container Overview")
       .__(
         "Container State:",
@@ -125,26 +142,31 @@ public class ContainerBlock extends HtmlBlock {
       .__("Diagnostics:", container.getDiagnosticsInfo() == null ?
           "" : container.getDiagnosticsInfo());
 
+    // 渲染信息块到页面
     html.__(InfoBlock.class);
   }
 
   /**
-   * Creates a string representation of allocated resources to a container.
-   * Memory, followed with VCores are always the first two resources of
-   * the resulted string, followed with any custom resources, if any is present.
+   * 格式化容器分配资源为字符串，内存和vCore始终排在最前，自定义资源在后
+   * @param container 容器信息对象
+   * @return 格式化后的资源字符串
    */
   @VisibleForTesting
   String getResources(ContainerInfo container) {
     Map<String, Long> allocatedResources = container.getAllocatedResources();
 
     StringBuilder sb = new StringBuilder();
+    // 先添加内存资源
     sb.append(getResourceAsString(ResourceInformation.MEMORY_URI,
         allocatedResources.get(ResourceInformation.MEMORY_URI))).append(", ");
+    // 再添加CPU核心资源
     sb.append(getResourceAsString(ResourceInformation.VCORES_URI,
         allocatedResources.get(ResourceInformation.VCORES_URI)));
 
+    // 添加自定义资源
     if (container.hasCustomResources()) {
       container.getAllocatedResources().forEach((key, value) -> {
+        // 跳过已添加的内存和vCore
         if (!key.equals(ResourceInformation.MEMORY_URI) &&
             !key.equals(ResourceInformation.VCORES_URI)) {
           sb.append(", ");
@@ -156,6 +178,12 @@ public class ContainerBlock extends HtmlBlock {
     return sb.toString();
   }
 
+  /**
+   * 格式化单个资源为字符串，转换内置资源的显示名称
+   * @param resourceName 资源标识符
+   * @param value 资源值
+   * @return 格式化后的资源字符串
+   */
   private String getResourceAsString(String resourceName, long value) {
     final String translatedResourceName;
     switch (resourceName) {
@@ -172,6 +200,13 @@ public class ContainerBlock extends HtmlBlock {
     return String.valueOf(value) + " " + translatedResourceName;
   }
 
+  /**
+   * 调用API获取容器报告
+   * @param request 获取容器报告请求
+   * @return 容器报告
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
+   */
   protected ContainerReport getContainerReport(
       final GetContainerReportRequest request)
       throws YarnException, IOException {

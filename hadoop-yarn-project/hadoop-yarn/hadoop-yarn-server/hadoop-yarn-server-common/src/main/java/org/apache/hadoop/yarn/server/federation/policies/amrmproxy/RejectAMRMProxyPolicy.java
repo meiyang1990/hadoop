@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,21 +32,33 @@ import org.apache.hadoop.yarn.server.federation.policies.exceptions.FederationPo
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 
 /**
- * An implementation of the {@link FederationAMRMProxyPolicy} that simply
- * rejects all requests. Useful to prevent apps from accessing any sub-cluster.
+ * 文件说明：YARN联邦环境下AMRMProxy策略实现类，实现了拒绝所有资源请求的路由策略
+ * 
+ * 核心功能：该策略会拒绝所有传入的资源请求，用于禁止应用访问任何联邦子集群，满足队列级别的权限隔离需求
  */
 public class RejectAMRMProxyPolicy extends AbstractAMRMProxyPolicy {
 
+  /**
+   * 重新初始化策略，跳过权重校验逻辑
+   * @param policyContext 联邦策略初始化上下文
+   * @throws FederationPolicyInitializationException 初始化失败时抛出异常
+   */
   @Override
   public void reinitialize(FederationPolicyInitializationContext policyContext)
       throws FederationPolicyInitializationException {
-    // overrides initialize to avoid weight checks that do not apply for
-    // this policy.
+    // 重载初始化方法，跳过不适用于本策略的权重校验
     FederationPolicyInitializationContextValidator.validate(policyContext,
         this.getClass().getCanonicalName());
     setPolicyContext(policyContext);
   }
 
+  /**
+   * 拆分资源请求到各个子集群，本策略直接拒绝所有请求
+   * @param resourceRequests 待分发的资源请求列表
+   * @param timedOutSubClusters 已超时的子集群集合
+   * @return 拆分后的<子集群, 资源请求列表>映射（本方法不会正常返回）
+   * @throws YarnException 直接抛出策略异常拒绝请求
+   */
   @Override
   public Map<SubClusterId, List<ResourceRequest>> splitResourceRequests(
       List<ResourceRequest> resourceRequests,

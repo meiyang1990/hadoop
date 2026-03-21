@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -73,56 +74,67 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * UnmanagedApplicationManager is used to register unmanaged application and
- * negotiate for resources from resource managers. An unmanagedAM is an AM that
- * is not launched and managed by the RM. Allocate calls are handled
- * asynchronously using {@link AsyncCallback}.
+ * 非托管ApplicationMaster，用于向ResourceManager注册非托管应用并申请资源。
+ * 非托管AM指不由RM启动和管理的AM，allocate调用通过{@link AsyncCallback}异步处理。
  */
 @Public
 @Unstable
 public class UnmanagedApplicationManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(UnmanagedApplicationManager.class);
+  // AM状态等待超时时间，单位毫秒
   private static final long AM_STATE_WAIT_TIMEOUT_MS = 10000;
   public static final String APP_NAME = "UnmanagedAM";
+  // 默认队列配置项名称
   private static final String DEFAULT_QUEUE_CONFIG = "uam.default.queue.name";
 
+  // AM心跳请求处理器
   private AMHeartbeatRequestHandler heartbeatHandler;
+  // AM-RM客户端代理中继器
   private AMRMClientRelayer rmProxyRelayer;
+  // 当前UAM所属应用ID
   private ApplicationId applicationId;
+  // 应用提交者用户名
   private String submitter;
+  // 应用名称后缀
   private String appNameSuffix;
+  // YARN配置对象
   private Configuration conf;
+  // 应用提交队列名称
   private String queueName;
+  // 当前UAM运行用户UGI
   private UserGroupInformation userUgi;
+  // AM注册请求，用于后续重注册
   private RegisterApplicationMasterRequest registerRequest;
+  // RM客户端协议代理
   private ApplicationClientProtocol rmClient;
+  // 异步API轮询间隔，单位毫秒
   private long asyncApiPollIntervalMillis;
+  // YARN记录工厂，用于创建记录对象
   private RecordFactory recordFactory;
+  // 跨应用尝试保留容器标记，用于UAM恢复
   private boolean keepContainersAcrossApplicationAttempts;
+  // 原始应用提交上下文，用于复制自定义配置
   private ApplicationSubmissionContext applicationSubmissionContext;
 
   /*
-   * This flag is used as an indication that this method launchUAM/reAttachUAM
-   * is called (and perhaps blocked in initializeUnmanagedAM below due to RM
-   * connection/failover issue and not finished yet). Set the flag before
-   * calling the blocking call to RM.
+   * 该标记用于表示launchUAM/reAttachUAM已经被调用，可能在initializeUnmanagedAM中因为RM连接/故障切换问题阻塞尚未完成。
+   * 在调用RM阻塞方法前设置该标记。
    */
+  // 连接初始化已发起标记
   private boolean connectionInitiated;
 
   /**
-   * Constructor.
+   * 构造非托管ApplicationManager实例。
    *
-   * @param conf configuration
-   * @param appId application Id to use for this UAM
-   * @param queueName the queue of the UAM
-   * @param submitter user name of the app
-   * @param appNameSuffix the app name suffix to use
-   * @param rmName name of the YarnRM
-   * @param originalApplicationSubmissionContext ApplicationSubmissionContext
-   * @param keepContainersAcrossApplicationAttempts keep container flag for UAM
-   *          recovery. See {@link ApplicationSubmissionContext
-   *          #setKeepContainersAcrossApplicationAttempts(boolean)}
+   * @param conf YARN配置
+   * @param appId 当前UAM对应的应用ID
+   * @param queueName UAM提交队列
+   * @param submitter 应用提交用户名
+   * @param appNameSuffix 应用名称后缀
+   * @param keepContainersAcrossApplicationAttempts 跨应用尝试保留容器标记，用于UAM恢复
+   * @param rmName YARN ResourceManager名称
+   * @param originalApplicationSubmissionContext 原始应用提交上下文
    */
   public UnmanagedApplicationManager(Configuration conf, ApplicationId appId,
       String queueName, String submitter, String appNameSuffix,
@@ -138,7 +150,7 @@ public class UnmanagedApplicationManager {
     this.submitter = submitter;
     this.appNameSuffix = appNameSuffix;
     this.userUgi = null;
-    // Relayer's rmClient will be set after the RM connection is created
+    // 中继器的RM客户端会在创建RM连接后设置
     this.rmProxyRelayer =
         new AMRMClientRelayer(null, this.applicationId, rmName, this.conf);
     this.heartbeatHandler = createAMHeartbeatRequestHandler(this.conf,
@@ -163,74 +175,80 @@ public class UnmanagedApplicationManager {
   }
 
   /**
-   * Launch a new UAM in the resource manager.
+   * 在ResourceManager中启动一个新的UAM。
    *
-   * @return identifier uam identifier
-   * @throws YarnException if fails
-   * @throws IOException if fails
+   * @return UAM的AM-RM身份令牌
+   * @throws YarnException 操作失败抛出异常
+   * @throws IOEException IO操作失败抛出异常
    */
   public Token<AMRMTokenIdentifier> launchUAM()
       throws YarnException, IOException {
     this.connectionInitiated = true;
 
-    // Blocking call to RM
+    // 阻塞调用RM初始化UAM
     Token<AMRMTokenIdentifier> amrmToken = initializeUnmanagedAM(this.applicationId);
 
-    // Creates the UAM connection
+    // 创建UAM到RM的连接代理
     createUAMProxy(amrmToken);
     return amrmToken;
   }
 
   /**
-   * Re-attach to an existing UAM in the resource manager.
+   * 重新附加到ResourceManager中已存在的UAM。
    *
-   * @param amrmToken the UAM token
-   * @throws IOException if re-attach fails
-   * @throws YarnException if re-attach fails
+   * @param amrmToken 已有UAM的AM-RM身份令牌
+   * @throws IOException 重新附加失败抛出异常
+   * @throws YarnException 重新附加失败抛出异常
    */
   public void reAttachUAM(Token<AMRMTokenIdentifier> amrmToken)
       throws IOException, YarnException {
     this.connectionInitiated = true;
 
-    // Creates the UAM connection
+    // 创建UAM到RM的连接代理
     createUAMProxy(amrmToken);
   }
 
   protected void createUAMProxy(Token<AMRMTokenIdentifier> amrmToken)
       throws IOException {
+    // 创建代理用户UGI，以应用身份访问RM
     this.userUgi = UserGroupInformation.createProxyUser(
         this.applicationId.toString(), UserGroupInformation.getCurrentUser());
+    // 设置RM协议代理
     this.rmProxyRelayer.setRMClient(createRMProxy(
         ApplicationMasterProtocol.class, this.conf, this.userUgi, amrmToken));
+    // 设置心跳处理器的UGI
     this.heartbeatHandler.setUGI(this.userUgi);
   }
 
   /**
-   * Registers this {@link UnmanagedApplicationManager} with the resource
-   * manager.
+   * 向ResourceManager注册当前UnmanagedApplicationManager。
    *
-   * @param request RegisterApplicationMasterRequest
-   * @return register response
-   * @throws YarnException if register fails
-   * @throws IOException if register fails
+   * @param request AM注册请求
+   * @return 注册响应
+   * @throws YarnException 注册失败抛出异常
+   * @throws IOException 注册失败抛出异常
    */
   public RegisterApplicationMasterResponse registerApplicationMaster(
       RegisterApplicationMasterRequest request) throws YarnException, IOException {
 
-    // Save the register request for re-register later
+    // 保存注册请求供后续重注册使用
     this.registerRequest = request;
 
     LOG.info("Registering the Unmanaged application master {}",
         this.applicationId);
+    // 通过中继器向RM发起注册
     RegisterApplicationMasterResponse response =
         this.rmProxyRelayer.registerApplicationMaster(this.registerRequest);
+    // 重置心跳处理器的最后响应ID
     this.heartbeatHandler.resetLastResponseId();
 
     if (LOG.isDebugEnabled()) {
+      // 打印前一次尝试保留下来的容器
       for (Container container : response.getContainersFromPreviousAttempts()) {
         LOG.debug("RegisterUAM returned existing running container {}", container.getId());
       }
 
+      // 打印前一次尝试保留下来的NM令牌
       for (NMToken nmToken : response.getNMTokensFromPreviousAttempts()) {
         LOG.debug("RegisterUAM returned existing NM token for node {}", nmToken.getNodeId());
       }
@@ -240,7 +258,7 @@ public class UnmanagedApplicationManager {
         response.getContainersFromPreviousAttempts().size(),
         response.getNMTokensFromPreviousAttempts().size());
 
-    // Only when register succeed that we start the heartbeat thread
+    // 注册成功后才启动心跳线程
     this.heartbeatHandler.setDaemon(true);
     this.heartbeatHandler.start();
 
@@ -248,20 +266,19 @@ public class UnmanagedApplicationManager {
   }
 
   /**
-   * Unregisters from the resource manager and stops the request handler thread.
+   * 向ResourceManager注销，停止请求处理线程。
    *
-   * @param request the finishApplicationMaster request
-   * @return the response
-   * @throws YarnException if finishAM call fails
-   * @throws IOException if finishAM call fails
+   * @param request 结束AM请求
+   * @return 结束AM响应
+   * @throws YarnException 结束AM调用失败抛出异常
+   * @throws IOException 结束AM调用失败抛出异常
    */
   public FinishApplicationMasterResponse finishApplicationMaster(
       FinishApplicationMasterRequest request) throws YarnException, IOException {
 
     if (this.userUgi == null) {
       if (this.connectionInitiated) {
-        // This is possible if the async launchUAM is still
-        // blocked and retrying. Return a dummy response in this case.
+        // 这种情况可能是异步launchUAM仍在阻塞重试，直接返回虚拟响应并停止心跳线程
         LOG.warn("Unmanaged AM still not successfully launched/registered yet."
             + " Stopping the UAM heartbeat thread anyways.");
         return FinishApplicationMasterResponse.newInstance(false);
@@ -279,19 +296,21 @@ public class UnmanagedApplicationManager {
   }
 
   /**
-   * Force kill the UAM.
+   * 强制杀死当前UAM应用。
    *
-   * @return kill response
-   * @throws IOException if fails to create rmProxy
-   * @throws YarnException if force kill fails
+   * @return 杀死应用响应
+   * @throws IOException 创建RM代理失败抛出异常
+   * @throws YarnException 强制杀死失败抛出异常
    */
   public KillApplicationResponse forceKillApplication()
       throws IOException, YarnException {
+    // 关闭本地连接
     shutDownConnections();
 
     KillApplicationRequest request =
         KillApplicationRequest.newInstance(this.applicationId);
     if (this.rmClient == null) {
+      // 创建应用客户端RM代理，使用提交者身份
       this.rmClient = createRMProxy(ApplicationClientProtocol.class, this.conf,
           UserGroupInformation.createRemoteUser(this.submitter), null);
     }
@@ -299,23 +318,20 @@ public class UnmanagedApplicationManager {
   }
 
   /**
-   * Sends the specified heart beat request to the resource manager and invokes
-   * the callback asynchronously with the response.
+   * 发送分配请求给ResourceManager，异步通过回调返回结果。
    *
-   * @param request the allocate request
-   * @param callback the callback method for the request
-   * @throws YarnException if registerAM is not called yet
+   * @param request 分配请求
+   * @param callback 结果回调
+   * @throws YarnException AM未注册时抛出异常
    */
   public void allocateAsync(AllocateRequest request,
       AsyncCallback<AllocateResponse> callback) throws YarnException {
     this.heartbeatHandler.allocateAsync(request, callback);
 
-    // Two possible cases why the UAM is not successfully registered yet:
-    // 1. launchUAM is not called at all. Should throw here.
-    // 2. launchUAM is called but hasn't successfully returned.
-    //
-    // In case 2, we have already save the allocate request above, so if the
-    // registration succeed later, no request is lost.
+    // 两种情况UAM还未注册成功：
+    // 1. launchUAM根本没调用，这里直接抛出异常
+    // 2. launchUAM已调用但还未成功返回
+    // 第二种情况下请求已经保存在队列中，注册成功后会自动发送，不会丢失请求
     if (this.userUgi == null) {
       if (this.connectionInitiated) {
         LOG.info("Unmanaged AM still not successfully launched/registered yet."
@@ -327,7 +343,7 @@ public class UnmanagedApplicationManager {
   }
 
   /**
-   * Shutdown this UAM client, without killing the UAM in the YarnRM side.
+   * 关闭本地UAM客户端连接，不会杀死RM端的UAM应用。
    */
   public void shutDownConnections() {
     this.heartbeatHandler.shutdown();
@@ -335,34 +351,33 @@ public class UnmanagedApplicationManager {
   }
 
   /**
-   * Returns the application id of the UAM.
+   * 获取当前UAM对应的应用ID。
    *
-   * @return application id of the UAM
+   * @return 当前UAM应用ID
    */
   public ApplicationId getAppId() {
     return this.applicationId;
   }
 
   /**
-   * Returns the rmProxy relayer of this UAM.
+   * 获取当前UAM的RM代理中继器。
    *
-   * @return rmProxy relayer of the UAM
+   * @return 当前UAM的AMRMClientRelayer
    */
   public AMRMClientRelayer getAMRMClientRelayer() {
     return this.rmProxyRelayer;
   }
 
   /**
-   * Returns RM proxy for the specified protocol type. Unit test cases can
-   * override this method and return mock proxy instances.
+   * 创建指定协议类型的RM代理。单元测试可以覆盖该方法返回Mock代理。
    *
-   * @param protocol protocol of the proxy
-   * @param config configuration
-   * @param user ugi for the proxy connection
-   * @param token token for the connection
-   * @param <T> type of the proxy
-   * @return the proxy instance
-   * @throws IOException if fails to create the proxy
+   * @param protocol 代理协议类型
+   * @param config YARN配置
+   * @param user 连接使用的用户UGI
+   * @param token 连接身份令牌
+   * @param <T> 代理类型泛型
+   * @return RM代理实例
+   * @throws IOException 创建代理失败抛出异常
    */
   protected <T> T createRMProxy(Class<T> protocol, Configuration config,
       UserGroupInformation user, Token<AMRMTokenIdentifier> token)
@@ -371,201 +386,34 @@ public class UnmanagedApplicationManager {
   }
 
   /**
-   * Launch and initialize an unmanaged AM. First, it creates a new application
-   * on the RM and negotiates a new attempt id. Then it waits for the RM
-   * application attempt state to reach YarnApplicationAttemptState.LAUNCHED
-   * after which it returns the AM-RM token.
+   * 启动并初始化非托管AM。首先在RM上创建新应用，协商得到尝试ID，然后等待RM应用尝试状态变为LAUNCHED，
+   * 之后返回AM-RM身份令牌。
    *
-   * @param appId application id
-   * @return the UAM token
-   * @throws IOException if initialize fails
-   * @throws YarnException if initialize fails
+   * @param appId 应用ID
+   * @return UAM身份令牌
+   * @throws IOException 初始化失败抛出异常
+   * @throws YarnException 初始化失败抛出异常
    */
   protected Token<AMRMTokenIdentifier> initializeUnmanagedAM(
       ApplicationId appId) throws IOException, YarnException {
     try {
       UserGroupInformation appSubmitter;
+      // 根据安全状态创建提交者代理用户
       if (UserGroupInformation.isSecurityEnabled()) {
         appSubmitter = UserGroupInformation.createProxyUser(this.submitter,
             UserGroupInformation.getLoginUser());
       } else {
         appSubmitter = UserGroupInformation.createRemoteUser(this.submitter);
       }
+      // 创建应用客户端协议RM代理
       this.rmClient = createRMProxy(ApplicationClientProtocol.class, this.conf,
           appSubmitter, null);
 
-      // Submit the application
+      // 提交非托管应用到RM
       submitUnmanagedApp(appId);
 
-      // Monitor the application attempt to wait for launch state
+      // 监控应用尝试状态直到达到LAUNCHED
       monitorCurrentAppAttempt(appId,
           EnumSet.of(YarnApplicationState.ACCEPTED,
               YarnApplicationState.RUNNING, YarnApplicationState.KILLED,
-              YarnApplicationState.FAILED, YarnApplicationState.FINISHED),
-          YarnApplicationAttemptState.LAUNCHED);
-      return getUAMToken();
-    } finally {
-      this.rmClient = null;
-    }
-  }
-
-  private void submitUnmanagedApp(ApplicationId appId) throws YarnException, IOException {
-
-    SubmitApplicationRequest submitRequest =
-        this.recordFactory.newRecordInstance(SubmitApplicationRequest.class);
-
-    ApplicationSubmissionContext context = this.recordFactory
-        .newRecordInstance(ApplicationSubmissionContext.class);
-
-    context.setApplicationId(appId);
-    context.setApplicationName(APP_NAME + "-" + appNameSuffix);
-    if (StringUtils.isBlank(this.queueName)) {
-      context.setQueue(this.conf.get(DEFAULT_QUEUE_CONFIG, YarnConfiguration.DEFAULT_QUEUE_NAME));
-    } else {
-      context.setQueue(this.queueName);
-    }
-
-    ContainerLaunchContext amContainer =
-        this.recordFactory.newRecordInstance(ContainerLaunchContext.class);
-    Resource resource = Resources.createResource(1024);
-    context.setResource(resource);
-    context.setAMContainerSpec(amContainer);
-    if (applicationSubmissionContext != null) {
-      context.setApplicationType(applicationSubmissionContext.getApplicationType());
-      context.setKeepContainersAcrossApplicationAttempts(
-          applicationSubmissionContext.getKeepContainersAcrossApplicationAttempts());
-      context.setApplicationTags(applicationSubmissionContext.getApplicationTags());
-      context.setApplicationTimeouts(applicationSubmissionContext.getApplicationTimeouts());
-      context.setLogAggregationContext(applicationSubmissionContext.getLogAggregationContext());
-      context.setNodeLabelExpression(applicationSubmissionContext.getNodeLabelExpression());
-      context.setApplicationSchedulingPropertiesMap(
-          applicationSubmissionContext.getApplicationSchedulingPropertiesMap());
-      context.setPriority(applicationSubmissionContext.getPriority());
-    }
-    submitRequest.setApplicationSubmissionContext(context);
-
-    context.setUnmanagedAM(true);
-    context.setKeepContainersAcrossApplicationAttempts(
-        this.keepContainersAcrossApplicationAttempts);
-
-    LOG.info("Submitting unmanaged application {}", appId);
-    this.rmClient.submitApplication(submitRequest);
-  }
-
-  /**
-   * Monitor the submitted application and attempt until it reaches certain
-   * states.
-   *
-   * @param appId Application Id of application to be monitored
-   * @param appStates acceptable application state
-   * @param attemptState acceptable application attempt state
-   * @return the application report
-   * @throws YarnException if getApplicationReport fails
-   * @throws IOException if getApplicationReport fails
-   */
-  private ApplicationAttemptReport monitorCurrentAppAttempt(ApplicationId appId,
-      Set<YarnApplicationState> appStates, YarnApplicationAttemptState attemptState)
-      throws YarnException, IOException {
-
-    long startTime = System.currentTimeMillis();
-    ApplicationAttemptId appAttemptId = null;
-    while (true) {
-      if (appAttemptId == null) {
-        // Get application report for the appId we are interested in
-        ApplicationReport report = getApplicationReport(appId);
-        YarnApplicationState state = report.getYarnApplicationState();
-        if (appStates.contains(state)) {
-          if (state != YarnApplicationState.ACCEPTED) {
-            throw new YarnRuntimeException(
-                "Received non-accepted application state: " + state + " for "
-                    + appId + ". This is likely because this is not the first "
-                    + "app attempt in home sub-cluster, and AMRMProxy HA "
-                    + "(yarn.nodemanager.amrmproxy.ha.enable) is not enabled.");
-          }
-          appAttemptId =
-              getApplicationReport(appId).getCurrentApplicationAttemptId();
-        } else {
-          LOG.info("Current application state of {} is {}, will retry later.",
-              appId, state);
-        }
-      }
-
-      if (appAttemptId != null) {
-        GetApplicationAttemptReportRequest req =
-             this.recordFactory.newRecordInstance(GetApplicationAttemptReportRequest.class);
-        req.setApplicationAttemptId(appAttemptId);
-        GetApplicationAttemptReportResponse appAttemptReport =
-            this.rmClient.getApplicationAttemptReport(req);
-        ApplicationAttemptReport attemptReport = appAttemptReport.getApplicationAttemptReport();
-        YarnApplicationAttemptState appAttemptState =
-            attemptReport.getYarnApplicationAttemptState();
-        if (attemptState.equals(appAttemptState)) {
-          return attemptReport;
-        }
-        LOG.info("Current attempt state of {} is {}, waiting for current attempt to reach {}.",
-            appAttemptId, appAttemptState, attemptState);
-      }
-
-      try {
-        Thread.sleep(this.asyncApiPollIntervalMillis);
-      } catch (InterruptedException e) {
-        LOG.warn("Interrupted while waiting for current attempt of {} to reach {}.",
-            appId, attemptState);
-      }
-
-      if (System.currentTimeMillis() - startTime > AM_STATE_WAIT_TIMEOUT_MS) {
-        throw new RuntimeException("Timeout for waiting current attempt of "
-            + appId + " to reach " + attemptState);
-      }
-    }
-  }
-
-  /**
-   * Gets the amrmToken of the unmanaged AM.
-   *
-   * @return the amrmToken of the unmanaged AM.
-   * @throws IOException if getApplicationReport fails
-   * @throws YarnException if getApplicationReport fails
-   */
-  protected Token<AMRMTokenIdentifier> getUAMToken()
-      throws IOException, YarnException {
-    Token<AMRMTokenIdentifier> token = null;
-    org.apache.hadoop.yarn.api.records.Token amrmToken =
-        getApplicationReport(this.applicationId).getAMRMToken();
-    if (amrmToken != null) {
-      token = ConverterUtils.convertFromYarn(amrmToken, (Text) null);
-    } else {
-      LOG.warn("AMRMToken not found in the application report for application: {}",
-          this.applicationId);
-    }
-    return token;
-  }
-
-  private ApplicationReport getApplicationReport(ApplicationId appId)
-      throws YarnException, IOException {
-    GetApplicationReportRequest request =
-        this.recordFactory.newRecordInstance(GetApplicationReportRequest.class);
-    request.setApplicationId(appId);
-    return this.rmClient.getApplicationReport(request).getApplicationReport();
-  }
-
-  @VisibleForTesting
-  public int getRequestQueueSize() {
-    return this.heartbeatHandler.getRequestQueueSize();
-  }
-
-  @VisibleForTesting
-  protected void drainHeartbeatThread() {
-    this.heartbeatHandler.drainHeartbeatThread();
-  }
-
-  @VisibleForTesting
-  protected boolean isHeartbeatThreadAlive() {
-    return this.heartbeatHandler.isAlive();
-  }
-
-  @VisibleForTesting
-  public ApplicationSubmissionContext getApplicationSubmissionContext() {
-    return applicationSubmissionContext;
-  }
-}
+              YarnApplicationState.FAILED, Y

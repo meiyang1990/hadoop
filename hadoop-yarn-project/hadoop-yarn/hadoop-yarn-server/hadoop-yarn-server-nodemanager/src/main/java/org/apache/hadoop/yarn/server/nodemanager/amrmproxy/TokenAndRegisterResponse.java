@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,22 +24,35 @@ import org.apache.hadoop.yarn.api.protocolrecords.RegisterApplicationMasterRespo
 import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 
 /**
- * This class contains information about the AMRM token and the RegisterApplicationMasterResponse.
+ * 封装AMRM令牌和ApplicationMaster注册响应的数据容器，用于AMRM代理中转注册结果
  */
 public class TokenAndRegisterResponse {
   private Token<AMRMTokenIdentifier> token;
   private RegisterApplicationMasterResponse response;
 
+  /**
+   * 构造令牌与注册响应的容器对象
+   * @param pToken AMRM身份认证令牌
+   * @param pResponse ApplicationMaster注册响应
+   */
   public TokenAndRegisterResponse(Token<AMRMTokenIdentifier> pToken,
       RegisterApplicationMasterResponse pResponse) {
     this.token = pToken;
     this.response = pResponse;
   }
 
+  /**
+   * 获取AMRM身份认证令牌
+   * @return AMRM令牌对象
+   */
   public Token<AMRMTokenIdentifier> getToken() {
     return token;
   }
 
+  /**
+   * 获取ApplicationMaster注册响应
+   * @return 注册响应对象
+   */
   public RegisterApplicationMasterResponse getResponse() {
     return response;
   }

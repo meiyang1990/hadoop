@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,7 +22,7 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 
 /**
- * Update Event consumed by the Container.
+ * 节点管理器容器处理的容器令牌更新事件，用于容器令牌过期后的更新及相关属性变更通知。
  */
 public class UpdateContainerTokenEvent extends ContainerEvent {
   private final ContainerTokenIdentifier updatedToken;
@@ -30,13 +31,13 @@ public class UpdateContainerTokenEvent extends ContainerEvent {
   private final boolean isIncrease;
 
   /**
-   * Create Update event.
+   * 构造容器令牌更新事件。
    *
-   * @param cID Container Id.
-   * @param updatedToken Updated Container Token.
-   * @param isResourceChange Is Resource change.
-   * @param isExecTypeUpdate Is ExecutionType Update.
-   * @param isIncrease Is container increase.
+   * @param cID 容器ID
+   * @param updatedToken 更新后的容器令牌
+   * @param isResourceChange 是否伴随资源变更
+   * @param isExecTypeUpdate 是否伴随执行类型变更
+   * @param isIncrease 是否为容器资源扩容
    */
   public UpdateContainerTokenEvent(ContainerId cID,
       ContainerTokenIdentifier updatedToken, boolean isResourceChange,
@@ -49,36 +50,36 @@ public class UpdateContainerTokenEvent extends ContainerEvent {
   }
 
   /**
-   * Update Container Token.
+   * 获取更新后的容器令牌。
    *
-   * @return Container Token.
+   * @return 更新后的容器令牌标识
    */
   public ContainerTokenIdentifier getUpdatedToken() {
     return updatedToken;
   }
 
   /**
-   * Is this update a ResourceChange.
+   * 判断本次更新是否包含资源变更。
    *
-   * @return isResourceChange.
+   * @return true表示包含资源变更，false表示不包含
    */
   public boolean isResourceChange() {
     return isResourceChange;
   }
 
   /**
-   * Is this update an ExecType Update.
+   * 判断本次更新是否包含执行类型变更。
    *
-   * @return isExecTypeUpdate.
+   * @return true表示包含执行类型变更，false表示不包含
    */
   public boolean isExecTypeUpdate() {
     return isExecTypeUpdate;
   }
 
   /**
-   * Is this a container Increase.
+   * 判断本次更新是否为容器资源扩容。
    *
-   * @return isIncrease.
+   * @return true表示是资源扩容，false表示不是
    */
   public boolean isIncrease() {
     return isIncrease;

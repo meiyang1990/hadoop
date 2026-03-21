@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  *  Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,4 +17,8 @@
  * limitations under the License.
  */
 
+/**
+ * YARN全局策略生成器包，用于为联邦YARN集群生成统一的全局调度策略，
+ * 支持跨集群资源调度时的全局策略决策，是YARN联邦架构的核心组件之一。
+ */
 package org.apache.hadoop.yarn.server.globalpolicygenerator;

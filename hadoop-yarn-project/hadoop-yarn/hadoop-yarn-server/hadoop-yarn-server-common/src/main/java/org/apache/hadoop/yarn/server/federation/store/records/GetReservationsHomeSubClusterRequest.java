@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,13 +23,16 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Request class to obtain the home sub-cluster mapping of all active
- * reservations.
+ * 获取所有活跃预约对应的归属子集群映射关系的请求类，用于YARN联邦存储层查询。
  */
 @Private
 @Unstable
 public abstract class GetReservationsHomeSubClusterRequest {
 
+  /**
+   * 创建一个新的GetReservationsHomeSubClusterRequest实例。
+   * @return 创建好的请求实例
+   */
   @Private
   @Unstable
   public static GetReservationsHomeSubClusterRequest newInstance() {

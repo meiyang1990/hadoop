@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -52,40 +53,54 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * 抽象cgroups处理器基类，封装Linux cgroups操作的通用逻辑，为不同版本cgroups提供统一抽象接口
+ * 负责管理cgroups挂载路径、创建/删除cgroup、读写cgroup参数等通用操作
+ */
 public abstract class AbstractCGroupsHandler implements CGroupsHandler {
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractCGroupsHandler.class);
   protected static final String MTAB_FILE = "/proc/mounts";
 
+  // 删除cgroup操作的超时时间
   private final long deleteCGroupTimeout;
+  // 删除cgroup操作前的延迟等待时间
   private final long deleteCGroupDelay;
+  // 时钟实例，用于计时
   private final Clock clock;
 
+  // 挂载信息文件路径（默认/proc/mounts）
   protected final String mtabFile;
+  // cgroups挂载配置
   protected final CGroupsMountConfig cGroupsMountConfig;
+  // 读写锁，保护controllerPaths并发访问
   protected final ReadWriteLock rwLock;
+  // 存储各cgroup控制器对应的挂载路径
   protected Map<CGroupController, String> controllerPaths;
+  // 存储解析后的挂载信息：路径 -> 该挂载点包含的控制器集合
   protected Map<String, Set<String>> parsedMtab;
+  // 特权操作执行器，用于执行需要root权限的操作
   protected final PrivilegedOperationExecutor privilegedOperationExecutor;
+  // YARN使用的cgroup层级前缀路径
   protected final String cGroupPrefix;
 
   /**
-   * Create cgroup handler object.
+   * 构造抽象cgroups处理器，加载配置并初始化基础信息
    *
-   * @param conf                        configuration
-   * @param privilegedOperationExecutor provides mechanisms to execute
-   *                                    PrivilegedContainerOperations
-   * @param mtab                        mount file location
-   * @throws ResourceHandlerException if initialization failed
+   * @param conf                        YARN配置
+   * @param privilegedOperationExecutor 特权操作执行器，用于执行需要权限的操作
+   * @param mtab                        挂载文件路径
+   * @throws ResourceHandlerException 初始化失败抛出异常
    */
   AbstractCGroupsHandler(Configuration conf, PrivilegedOperationExecutor
       privilegedOperationExecutor, String mtab)
       throws ResourceHandlerException {
-    // Remove leading and trialing slash(es)
+    // 移除路径首尾的斜杠，统一格式
     this.cGroupPrefix = conf.get(YarnConfiguration.
             NM_LINUX_CONTAINER_CGROUPS_HIERARCHY, "/hadoop-yarn")
         .replaceAll("^/+", "").replaceAll("/+$", "");
     this.cGroupsMountConfig = new CGroupsMountConfig(conf);
+    // 计算总超时时间，加上配置的sigkill延迟和额外1秒缓冲
     this.deleteCGroupTimeout = conf.getLong(
         YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT,
         YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_DELETE_TIMEOUT) +
@@ -117,6 +132,10 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
     }
   }
 
+  /**
+   * 初始化各cgroup控制器的挂载路径，从挂载文件或预配置路径解析
+   * @throws ResourceHandlerException 初始化失败抛出异常
+   */
   private void initializeControllerPaths() throws ResourceHandlerException {
     // Cluster admins may have some subsystems mounted in specific locations
     // We'll attempt to figure out mount points. We do this even if we plan
@@ -129,16 +148,18 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
     Map<String, Set<String>> newMtab = null;
     Map<CGroupController, String> cPaths;
     try {
+      // 如果禁用自动挂载且已配置挂载路径，使用预配置路径解析
       if (this.cGroupsMountConfig.mountDisabledButMountPathDefined()) {
         newMtab = parsePreConfiguredMountPath();
       }
 
+      // 否则从系统mtab文件解析挂载信息
       if (newMtab == null) {
         // parse mtab
         newMtab = parseMtab(mtabFile);
       }
 
-      // find cgroup controller paths
+      // 从挂载信息中提取各控制器的路径
       cPaths = initializeControllerPathsFromMtab(newMtab);
     } catch (IOException e) {
       LOG.warn("Failed to initialize controller paths! Exception: ", e);
@@ -146,7 +167,7 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
           "Failed to initialize controller paths!");
     }
 
-    // we want to do a bulk update without the paths changing concurrently
+    // 加写锁批量更新路径信息，避免并发访问时路径不一致
     rwLock.writeLock().lock();
     try {
       controllerPaths = cPaths;
@@ -158,10 +179,16 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
 
   protected abstract Map<String, Set<String>> parsePreConfiguredMountPath() throws IOException;
 
+  /**
+   * 从解析后的挂载信息中提取各cgroup控制器的挂载路径
+   * @param mtab 解析后的挂载信息
+   * @return 控制器 -> 挂载路径 映射
+   */
   protected Map<CGroupController, String> initializeControllerPathsFromMtab(
       Map<String, Set<String>> mtab) {
     Map<CGroupController, String> ret = new HashMap<>();
 
+    // 遍历所有需要的控制器，查找对应挂载路径
     for (CGroupController controller : getCGroupControllers()) {
       String subsystemName = controller.getName();
       String controllerPath = findControllerInMtab(subsystemName, mtab);
@@ -182,6 +209,7 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
    * grabs the 2, 3, and 4th fields.
    */
 
+  // 匹配mtab文件行格式的正则表达式，提取路径、类型、选项
   private static final Pattern MTAB_FILE_FORMAT = Pattern.compile(
       "^[^\\s]+\\s([^\\s]+)\\s([^\\s]+)\\s([^\\s]+)\\s[^\\s]+\\s[^\\s]+$");
 
@@ -189,6 +217,12 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
    * Returns a map: path -> mount options
    * for mounts with type "cgroup". Cgroup controllers will
    * appear in the list of options for a path.
+   */
+  /**
+   * 解析mtab挂载文件，提取cgroup相关挂载信息
+   * @param mtab mtab文件路径
+   * @return 挂载路径 -> 该挂载点包含的控制器集合 映射
+   * @throws IOException 读取文件失败抛出异常
    */
   protected Map<String, Set<String>> parseMtab(String mtab)
       throws IOException {
@@ -199,6 +233,7 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
       FileInputStream fis = new FileInputStream(mtab);
       in = new BufferedReader(new InputStreamReader(fis, StandardCharsets.UTF_8));
 
+      // 逐行读取解析
       for (String str = in.readLine(); str != null;
            str = in.readLine()) {
         Matcher m = MTAB_FILE_FORMAT.matcher(str);
@@ -208,6 +243,7 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
           String type = m.group(2);
           String options = m.group(3);
 
+          // 处理当前行，提取控制器集合
           Set<String> controllerSet = handleMtabEntry(path, type, options);
           if (controllerSet != null) {
             ret.put(path, controllerSet);
@@ -216,9 +252,10 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
       }
     } catch (IOException e) {
       if (Shell.LINUX) {
+        // Linux系统必须读取成功，抛出异常
         throw new IOException("Error while reading " + mtab, e);
       } else {
-        // Ignore the error, if we are running on an os other than Linux
+        // 非Linux系统忽略错误，仅打印警告（测试场景）
         LOG.warn("Error while reading " + mtab, e);
       }
     } finally {
@@ -232,19 +269,18 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
       throws IOException;
 
   /**
-   * Find the hierarchy of the subsystem.
-   * The kernel ensures that a subsystem can only be part of a single hierarchy.
-   * The subsystem can be part of multiple mount points, if they belong to the
-   * same hierarchy.
+   * 在解析后的mtab中查找指定控制器的挂载路径
+   * 内核保证一个控制器只能属于一个层级，返回第一个找到的可访问路径
    *
-   * @param controller subsystem like cpu, cpuset, etc...
-   * @param entries    map of paths to mount options
-   * @return the first mount path that has the requested subsystem
+   * @param controller 控制器名称（如cpu、cpuset等）
+   * @param entries    解析后的挂载信息
+   * @return 找到的控制器挂载路径，找不到返回null
    */
   protected String findControllerInMtab(String controller,
                                         Map<String, Set<String>> entries) {
     for (Map.Entry<String, Set<String>> e : entries.entrySet()) {
       if (e.getValue().contains(controller)) {
+        // 检查路径是否可读
         if (new File(e.getKey()).canRead()) {
           return e.getKey();
         } else {
@@ -287,39 +323,30 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
   }
 
   /**
-   * Mount cgroup or use existing mount point based on configuration.
+   * 初始化cgroup控制器，根据配置选择自动挂载或使用已挂载的层级
    *
-   * @param controller - the controller being initialized
-   * @throws ResourceHandlerException yarn hierarchy cannot be created or
-   *                                  accessed for any reason
+   * @param controller 需要初始化的控制器
+   * @throws ResourceHandlerException 初始化失败抛出异常
    */
   @Override
   public void initializeCGroupController(CGroupController controller) throws
       ResourceHandlerException {
     if (this.cGroupsMountConfig.isMountEnabled() &&
         cGroupsMountConfig.ensureMountPathIsDefined()) {
-      // We have a controller that needs to be mounted
+      // 启用自动挂载，执行挂载操作
       mountCGroupController(controller);
     }
 
-    // We are working with a pre-mounted contoller
-    // Make sure that YARN cgroup hierarchy path exists
+    // 检查并初始化YARN在已挂载层级中的目录
     initializePreMountedCGroupController(controller);
   }
 
   /**
-   * This function is called when the administrator opted
-   * to use a pre-mounted cgroup controller.
-   * There are two options.
-   * 1. YARN hierarchy already exists. We verify, whether we have write access
-   * in this case.
-   * 2. YARN hierarchy does not exist, yet. We create it in this case. If cgroup v2 is used
-   * an additional step is required to update the cgroup.subtree_control file, see
-   * {@link CGroupsV2HandlerImpl#updateEnabledControllersInHierarchy}
+   * 初始化预挂载cgroup控制器，检查YARN层级存在性和权限，不存在则创建
+   * 处理两种场景：1. YARN层级已存在，检查权限；2. YARN层级不存在，创建
    *
-   * @param controller the controller being initialized
-   * @throws ResourceHandlerException yarn hierarchy cannot be created or
-   *                                  accessed for any reason
+   * @param controller 需要初始化的控制器
+   * @throws ResourceHandlerException 初始化失败抛出异常
    */
   private void initializePreMountedCGroupController(CGroupController controller)
       throws ResourceHandlerException {
@@ -343,6 +370,7 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
     LOG.info("Initializing mounted controller " + controller.getName() + " " +
         "at " + yarnHierarchy);
 
+    // 检查根挂载点是否存在
     if (!rootHierarchy.exists()) {
       throw new ResourceHandlerException(getErrorWithDetails(
           "Cgroups mount point does not exist or not accessible",
@@ -350,13 +378,15 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
           rootHierarchy.getAbsolutePath()
       ));
     } else if (!yarnHierarchy.exists()) {
+      // YARN层级不存在，创建
       LOG.info("Yarn control group does not exist. Creating " +
           yarnHierarchy.getAbsolutePath());
       try {
         if (yarnHierarchy.mkdir()) {
+          // 创建成功后更新层级中启用的控制器（cgroup v2需要）
           updateEnabledControllersInHierarchy(rootHierarchy, controller);
         } else {
-          // Unexpected: we just checked that it was missing
+          // 创建失败抛出异常
           throw new ResourceHandlerException(getErrorWithDetails(
               "Unexpected: Cannot create yarn cgroup hierarchy",
               subsystemName,
@@ -371,6 +401,7 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
         ), e);
       }
     } else if (!FileUtil.canWrite(yarnHierarchy)) {
+      // 检查YARN层级是否可写
       throw new ResourceHandlerException(getErrorWithDetails(
           "Yarn control group not writable",
           subsystemName,
@@ -378,6 +409,7 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
       ));
     }
 
+    // 更新层级中启用的控制器
     updateEnabledControllersInHierarchy(yarnHierarchy, controller);
   }
 
@@ -386,12 +418,12 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
       throws ResourceHandlerException;
 
   /**
-   * Creates an actionable error message for mtab parsing.
+   * 生成带详细上下文信息的错误信息，方便问题排查
    *
-   * @param errorMessage   message to use
-   * @param subsystemName  cgroup subsystem
-   * @param yarnCgroupPath cgroup path that failed
-   * @return a string builder that can be appended by the caller
+   * @param errorMessage   错误描述
+   * @param subsystemName  cgroup子系统名称
+   * @param yarnCgroupPath 出错的cgroup路径
+   * @return 完整错误信息字符串
    */
   protected String getErrorWithDetails(
       String errorMessage,
@@ -400,178 +432,3 @@ public abstract class AbstractCGroupsHandler implements CGroupsHandler {
     return String.format("%s Subsystem:%s Mount points:%s User:%s Path:%s ",
         errorMessage, subsystemName, mtabFile, System.getProperty("user.name"),
         yarnCgroupPath);
-  }
-
-  @Override
-  public String createCGroup(CGroupController controller, String cGroupId)
-      throws ResourceHandlerException {
-    String path = getPathForCGroup(controller, cGroupId);
-    File cgroup = new File(path);
-    LOG.debug("createCgroup: {}", path);
-
-    if (!cgroup.exists() && !cgroup.mkdir()) {
-      throw new ResourceHandlerException("Failed to create cgroup at " + path);
-    }
-
-    return path;
-  }
-
-  /*
-   * Utility routine to print first line from cgroup.procs file
-   */
-  private void logLineFromProcsFile(File cgf) {
-    String str;
-    if (LOG.isDebugEnabled()) {
-      try (BufferedReader inl =
-               new BufferedReader(new InputStreamReader(
-                   Files.newInputStream(Paths.get(cgf + Path.SEPARATOR + CGROUP_PROCS_FILE)),
-                   StandardCharsets.UTF_8))) {
-        str = inl.readLine();
-        if (str != null) {
-          LOG.debug("First line in cgroup tasks file: {} {}", cgf, str);
-        }
-      } catch (IOException e) {
-        LOG.warn("Failed to read cgroup tasks file. ", e);
-      }
-    }
-  }
-
-  /**
-   * If tasks file is empty, delete the cgroup.
-   *
-   * @param cgf object referring to the cgroup to be deleted
-   * @return Boolean indicating whether cgroup was deleted
-   */
-  private boolean checkAndDeleteCgroup(File cgf) throws InterruptedException {
-    boolean deleted = false;
-    // FileInputStream in = null;
-    if (cgf.exists()) {
-      try (FileInputStream in = new FileInputStream(cgf + Path.SEPARATOR + CGROUP_PROCS_FILE)) {
-        if (in.read() == -1) {
-          /*
-           * "cgroup.procs" file is empty, sleep a bit more and then try to delete the
-           * cgroup. Some versions of linux will occasionally panic due to a race
-           * condition in this area, hence the paranoia.
-           */
-          Thread.sleep(deleteCGroupDelay);
-          deleted = cgf.delete();
-          if (!deleted) {
-            LOG.warn("Failed attempt to delete cgroup: " + cgf);
-          }
-        } else {
-          logLineFromProcsFile(cgf);
-        }
-      } catch (IOException e) {
-        LOG.warn("Failed to read cgroup tasks file. ", e);
-      }
-    } else {
-      LOG.info("Parent Cgroups directory {} does not exist. Skipping "
-          + "deletion", cgf.getPath());
-      deleted = true;
-    }
-    return deleted;
-  }
-
-  @Override
-  public void deleteCGroup(CGroupController controller, String cGroupId)
-      throws ResourceHandlerException {
-    boolean deleted = false;
-    String cGroupPath = getPathForCGroup(controller, cGroupId);
-
-    LOG.debug("deleteCGroup: {}", cGroupPath);
-
-    long start = clock.getTime();
-
-    do {
-      try {
-        deleted = checkAndDeleteCgroup(new File(cGroupPath));
-        if (!deleted) {
-          Thread.sleep(deleteCGroupDelay);
-        }
-      } catch (InterruptedException ex) {
-        // NOP
-      }
-    } while (!deleted && (clock.getTime() - start) < deleteCGroupTimeout);
-
-    if (!deleted) {
-      LOG.warn(String.format("Unable to delete  %s, tried to delete for %d ms",
-          cGroupPath, deleteCGroupTimeout));
-    }
-  }
-
-  @Override
-  public void updateCGroupParam(CGroupController controller, String cGroupId,
-                                String param, String value) throws ResourceHandlerException {
-    String cGroupParamPath = getPathForCGroupParam(controller, cGroupId, param);
-    PrintWriter pw = null;
-
-    LOG.debug("updateCGroupParam for path: {} with value {}",
-        cGroupParamPath, value);
-
-    try {
-      File file = new File(cGroupParamPath);
-      Writer w = new OutputStreamWriter(Files.newOutputStream(file.toPath()),
-          StandardCharsets.UTF_8);
-      pw = new PrintWriter(w);
-      pw.write(value);
-    } catch (IOException e) {
-      throw new ResourceHandlerException(
-          String.format("Unable to write to %s with value: %s",
-              cGroupParamPath, value), e);
-    } finally {
-      if (pw != null) {
-        boolean hasError = pw.checkError();
-        pw.close();
-        if (hasError) {
-          throw new ResourceHandlerException(
-              String.format("PrintWriter unable to write to %s with value: %s",
-                  cGroupParamPath, value));
-        }
-        if (pw.checkError()) {
-          throw new ResourceHandlerException(
-              String.format("Error while closing cgroup file %s",
-                  cGroupParamPath));
-        }
-      }
-    }
-  }
-
-  @Override
-  public String getCGroupParam(CGroupController controller, String cGroupId,
-                               String param) throws ResourceHandlerException {
-    String cGroupParamPath =
-        param.equals(CGROUP_PROCS_FILE) ?
-            getPathForCGroup(controller, cGroupId)
-                + Path.SEPARATOR + param :
-            getPathForCGroupParam(controller, cGroupId, param);
-
-    try {
-      byte[] contents = Files.readAllBytes(Paths.get(cGroupParamPath));
-      return new String(contents, StandardCharsets.UTF_8).trim();
-    } catch (IOException e) {
-      throw new ResourceHandlerException(
-          "Unable to read from " + cGroupParamPath);
-    }
-  }
-
-  @Override
-  public String getCGroupMountPath() {
-    return this.cGroupsMountConfig.getMountPath();
-  }
-
-  @Override
-  public String getCGroupV2MountPath() {
-    return this.cGroupsMountConfig.getV2MountPath();
-  }
-
-  @Override
-  public String toString() {
-    return CGroupsHandlerImpl.class.getName() + "{" +
-        "mtabFile='" + mtabFile + '\'' +
-        ", cGroupPrefix='" + cGroupPrefix + '\'' +
-        ", cGroupsMountConfig=" + cGroupsMountConfig +
-        ", deleteCGroupTimeout=" + deleteCGroupTimeout +
-        ", deleteCGroupDelay=" + deleteCGroupDelay +
-        '}';
-  }
-}

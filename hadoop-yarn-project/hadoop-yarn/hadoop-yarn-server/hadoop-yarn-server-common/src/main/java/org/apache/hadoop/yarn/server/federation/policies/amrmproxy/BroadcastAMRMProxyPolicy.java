@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,8 +33,7 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterInfo;
 
 /**
- * An implementation of the {@link FederationAMRMProxyPolicy} that simply
- * broadcasts each {@link ResourceRequest} to all the available sub-clusters.
+ * YARN联邦AMRMProxy策略实现，将所有资源请求广播到所有可用子集群。
  */
 public class BroadcastAMRMProxyPolicy extends AbstractAMRMProxyPolicy {
 
@@ -41,8 +41,7 @@ public class BroadcastAMRMProxyPolicy extends AbstractAMRMProxyPolicy {
   public void reinitialize(
       FederationPolicyInitializationContext policyContext)
       throws FederationPolicyInitializationException {
-    // overrides initialize to avoid weight checks that do not apply for
-    // this policy.
+    // 重写初始化方法，跳过不适用本策略的权重校验
     FederationPolicyInitializationContextValidator
         .validate(policyContext, this.getClass().getCanonicalName());
     setPolicyContext(policyContext);
@@ -53,12 +52,13 @@ public class BroadcastAMRMProxyPolicy extends AbstractAMRMProxyPolicy {
       List<ResourceRequest> resourceRequests,
       Set<SubClusterId> timedOutSubClusters) throws YarnException {
 
+    // 获取当前所有活跃子集群信息
     Map<SubClusterId, SubClusterInfo> activeSubclusters =
         getActiveSubclusters();
 
     Map<SubClusterId, List<ResourceRequest>> answer = new HashMap<>();
 
-    // simply broadcast the resource request to all sub-clusters
+    // 将资源请求广播到所有活跃子集群
     for (SubClusterId subClusterId : activeSubclusters.keySet()) {
       answer.put(subClusterId, resourceRequests);
     }

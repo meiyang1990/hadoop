@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,15 +28,23 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.ReportNewColle
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.ReportNewCollectorInfoRequestProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.protocolrecords.ReportNewCollectorInfoRequest;
 
+/**
+ * ReportNewCollectorInfoRequest的Protobuf实现类，
+ * 用于序列化/反序列化上报新Collector信息的请求，基于Protobuf协议实现RPC传输
+ */
 public class ReportNewCollectorInfoRequestPBImpl extends
     ReportNewCollectorInfoRequest {
 
+  // Protobuf消息对象，只读模式下使用
   private ReportNewCollectorInfoRequestProto proto =
       ReportNewCollectorInfoRequestProto.getDefaultInstance();
 
+  // Protobuf消息构造器，可写模式下使用
   private ReportNewCollectorInfoRequestProto.Builder builder = null;
+  // 标识当前是否通过只读proto存储数据
   private boolean viaProto = false;
 
+  // 本地缓存的Collector信息列表
   private List<AppCollectorData> collectorsList = null;
 
   public ReportNewCollectorInfoRequestPBImpl() {
@@ -48,6 +57,10 @@ public class ReportNewCollectorInfoRequestPBImpl extends
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求的Protobuf消息对象，合并本地修改并构建最终消息
+   * @return 构建完成的ReportNewCollectorInfoRequestProto对象
+   */
   public ReportNewCollectorInfoRequestProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -71,6 +84,9 @@ public class ReportNewCollectorInfoRequestPBImpl extends
     return false;
   }
 
+  /**
+   * 将本地修改合并到proto对象中
+   */
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -80,12 +96,18 @@ public class ReportNewCollectorInfoRequestPBImpl extends
     viaProto = true;
   }
 
+  /**
+   * 将本地字段合并到Protobuf构造器中
+   */
   private void mergeLocalToBuilder() {
     if (collectorsList != null) {
       addLocalCollectorsToProto();
     }
   }
 
+  /**
+   * 如果当前是只读proto模式，初始化可写构造器
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = ReportNewCollectorInfoRequestProto.newBuilder(proto);
@@ -93,6 +115,9 @@ public class ReportNewCollectorInfoRequestPBImpl extends
     viaProto = false;
   }
 
+  /**
+   * 将本地缓存的Collector列表转换为Protobuf格式添加到构造器
+   */
   private void addLocalCollectorsToProto() {
     maybeInitBuilder();
     builder.clearAppCollectors();
@@ -104,6 +129,9 @@ public class ReportNewCollectorInfoRequestPBImpl extends
     builder.addAllAppCollectors(protoList);
   }
 
+  /**
+   * 从Protobuf解析Collector列表到本地缓存
+   */
   private void initLocalCollectorsList() {
     ReportNewCollectorInfoRequestProtoOrBuilder p = viaProto ? proto : builder;
     List<AppCollectorDataProto> list =
@@ -131,11 +159,21 @@ public class ReportNewCollectorInfoRequestPBImpl extends
     this.collectorsList = appCollectorsList;
   }
 
+  /**
+   * 将Protobuf格式转换为内部API格式
+   * @param p Protobuf格式的Collector数据
+   * @return 内部API格式的Collector数据
+   */
   private AppCollectorDataPBImpl convertFromProtoFormat(
       AppCollectorDataProto p) {
     return new AppCollectorDataPBImpl(p);
   }
 
+  /**
+   * 将内部API格式转换为Protobuf格式
+   * @param m 内部API格式的Collector数据
+   * @return Protobuf格式的Collector数据
+   */
   private AppCollectorDataProto convertToProtoFormat(
       AppCollectorData m) {
     return ((AppCollectorDataPBImpl) m).getProto();

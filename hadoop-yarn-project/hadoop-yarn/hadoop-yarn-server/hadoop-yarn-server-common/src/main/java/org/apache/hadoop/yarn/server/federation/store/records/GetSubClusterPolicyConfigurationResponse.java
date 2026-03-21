@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,14 +25,18 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * GetSubClusterPolicyConfigurationResponse contains the answer from the {@code
- * FederationPolicyStore} to a request to get the information about how a policy
- * should be configured via a {@link SubClusterPolicyConfiguration}.
+ * 获取子集群策略配置响应类，封装联邦策略存储返回的子集群路由策略配置信息。
+ * 响应包含指定队列对应的策略配置对象，用于YARN联邦环境中路由决策。
  */
 @Private
 @Unstable
 public abstract class GetSubClusterPolicyConfigurationResponse {
 
+  /**
+   * 创建新的获取子集群策略配置响应实例，设置返回的策略配置。
+   * @param policy 要返回的子集群策略配置
+   * @return 初始化完成的响应实例
+   */
   @Private
   @Unstable
   public static GetSubClusterPolicyConfigurationResponse newInstance(
@@ -43,19 +48,18 @@ public abstract class GetSubClusterPolicyConfigurationResponse {
   }
 
   /**
-   * Get the policy configuration.
+   * 获取指定队列对应的子集群策略配置。
    *
-   * @return the policy configuration for the specified queue
+   * @return 指定队列的策略配置对象
    */
   @Public
   @Unstable
   public abstract SubClusterPolicyConfiguration getPolicyConfiguration();
 
   /**
-   * Sets the policyConfiguration configuration.
+   * 设置指定队列对应的子集群策略配置。
    *
-   * @param policyConfiguration the policyConfiguration configuration for the
-   *          specified queue
+   * @param policyConfiguration 指定队列的策略配置对象
    */
   @Private
   @Unstable

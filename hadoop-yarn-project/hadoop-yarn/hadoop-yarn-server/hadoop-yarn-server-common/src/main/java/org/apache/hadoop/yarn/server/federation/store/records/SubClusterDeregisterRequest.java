@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -24,20 +25,26 @@ import org.apache.hadoop.yarn.util.Records;
 
 /**
  * <p>
- * The request sent to set the state of a subcluster to either
- * SC_DECOMMISSIONED, SC_LOST, or SC_DEREGISTERED.
+ * YARN联邦状态存储中下线子集群的请求封装，用于将子集群状态设置为
+ * SC_DECOMMISSIONED（下线中）、SC_LOST（失联）或SC_DEREGISTERED（已注销）。
  *
  * <p>
- * The update includes details such as:
+ * 请求包含以下信息：
  * <ul>
- * <li>{@link SubClusterId}</li>
- * <li>{@link SubClusterState}</li>
+ * <li>{@link SubClusterId} 子集群唯一标识</li>
+ * <li>{@link SubClusterState} 目标子集群状态</li>
  * </ul>
  */
 @Private
 @Unstable
 public abstract class SubClusterDeregisterRequest {
 
+  /**
+   * 创建新的子集群注销/状态变更请求实例。
+   * @param subClusterId 子集群唯一标识
+   * @param subClusterState 目标子集群状态
+   * @return 初始化完成的请求实例
+   */
   @Private
   @Unstable
   public static SubClusterDeregisterRequest newInstance(
@@ -50,38 +57,36 @@ public abstract class SubClusterDeregisterRequest {
   }
 
   /**
-   * Get the {@link SubClusterId} representing the unique identifier of the
-   * subcluster.
+   * 获取需要变更状态的子集群唯一标识。
    *
-   * @return the subcluster identifier
+   * @return 子集群唯一标识符
    */
   @Public
   @Unstable
   public abstract SubClusterId getSubClusterId();
 
   /**
-   * Set the {@link SubClusterId} representing the unique identifier of the
-   * subcluster.
+   * 设置需要变更状态的子集群唯一标识。
    *
-   * @param subClusterId the subcluster identifier
+   * @param subClusterId 子集群唯一标识符
    */
   @Private
   @Unstable
   public abstract void setSubClusterId(SubClusterId subClusterId);
 
   /**
-   * Get the {@link SubClusterState} of the subcluster.
+   * 获取子集群要设置的目标状态。
    *
-   * @return the state of the subcluster
+   * @return 目标子集群状态
    */
   @Public
   @Unstable
   public abstract SubClusterState getState();
 
   /**
-   * Set the {@link SubClusterState} of the subcluster.
+   * 设置子集群要变更的目标状态。
    *
-   * @param state the state of the subCluster
+   * @param state 目标子集群状态
    */
   @Private
   @Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,10 +27,11 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * This interface defines the plug-able policy that the PolicyGenerator uses
- * to update policies into the state store.
+ * 文件：联邦全局策略抽象基类
+ * 所属模块：YARN全局策略生成器
+ * 核心职责：定义可插拔的全局策略生成接口，供策略生成器扩展实现不同的联邦路由策略生成逻辑
+ * 作用：为全局策略生成器提供统一的扩展点，允许自定义根据集群状态生成联邦路由策略的逻辑
  */
-
 public abstract class GlobalPolicy implements Configurable {
 
   private Configuration conf;
@@ -45,31 +47,23 @@ public abstract class GlobalPolicy implements Configurable {
   }
 
   /**
-   * Return a map of the object type and RM path to request it from - the
-   * framework will query these paths and provide the objects to the policy.
-   * Delegating this responsibility to the PolicyGenerator enables us to avoid
-   * duplicate calls to the same * endpoints as the GlobalPolicy is invoked
-   * once per queue.
-   *
-   * @return a map of the object type and RM path.
+   * 注册需要从各子集群RM端点获取的信息类型与对应路径
+   * 框架统一查询后提供给策略，避免每个队列重复查询相同端点优化性能
+   * @return 映射表：key为需要获取的对象类型，value为RM端点路径
    */
   protected Map<Class<?>, String> registerPaths() {
-    // Default register nothing
+    // 默认不注册任何端点
     return Collections.emptyMap();
   }
 
   /**
-   * Given a queue, cluster metrics, and policy manager, update the policy
-   * to account for the cluster status. This method defines the policy generator
-   * behavior.
+   * 根据当前集群状态更新或创建队列的联邦路由策略
+   * 该方法定义了具体策略生成器的核心行为，由子类实现
    *
-   * @param queueName   name of the queue
-   * @param clusterInfo subClusterId map to cluster information about the
-   *                    SubCluster used to make policy decisions
-   * @param manager     the FederationPolicyManager for the queue's existing
-   *                    policy the manager may be null, in which case the policy
-   *                    will need to be created
-   * @return policy manager that handles the updated (or created) policy
+   * @param queueName   当前处理的队列名称
+   * @param clusterInfo 子集群信息映射表：key为子集群ID，value为该子集群对应的各类度量信息对象映射
+   * @param manager     队列已有的联邦策略管理器，若为null则需要新建策略管理器
+   * @return 更新或新建后的联邦策略管理器，将被保存到联邦状态存储
    */
   protected abstract FederationPolicyManager updatePolicy(String queueName,
       Map<SubClusterId, Map<Class, Object>> clusterInfo,

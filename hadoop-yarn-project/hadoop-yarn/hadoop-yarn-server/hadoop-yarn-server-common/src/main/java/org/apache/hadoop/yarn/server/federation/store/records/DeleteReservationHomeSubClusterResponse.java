@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,16 +23,18 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * DeleteReservationHomeSubClusterResponse contains the answer from the {@code
- * FederationReservationHomeSubClusterStore} to a request to delete the mapping
- * of home subcluster of a submitted reservation. Currently, response is empty if
- * the operation was successful, if not an exception reporting reason for a
- * failure.
+ * 删除预约归属子集群映射操作的响应类，用于联邦存储层返回删除预约归属子集群映射请求的处理结果。
+ * 操作成功时响应为空，失败则通过异常抛出具体失败原因。
+ * 对应请求为{@link DeleteReservationHomeSubClusterRequest}，存储操作由{@code FederationReservationHomeSubClusterStore}执行。
  */
 @Private
 @Unstable
 public abstract class DeleteReservationHomeSubClusterResponse {
 
+  /**
+   * 创建一个新的删除预约归属子集群响应实例。
+   * @return 新建的空响应实例
+   */
   @Private
   @Unstable
   public static DeleteReservationHomeSubClusterResponse newInstance() {

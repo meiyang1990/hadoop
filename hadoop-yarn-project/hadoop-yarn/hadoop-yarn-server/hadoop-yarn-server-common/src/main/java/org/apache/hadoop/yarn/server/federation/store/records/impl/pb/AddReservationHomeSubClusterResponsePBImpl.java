@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -28,29 +29,42 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of
- * {@link AddReservationHomeSubClusterResponse}.
+ * 文件说明：添加预约归属子集群响应的Protobuf实现，基于Protocol Buffer序列化格式
+ * 实现了{@link AddReservationHomeSubClusterResponse}接口，用于YARN联邦元数据存储的RPC通信
  */
 @Private
 @Unstable
 public class AddReservationHomeSubClusterResponsePBImpl
     extends AddReservationHomeSubClusterResponse {
 
+  // Protobuf对象实例，只读模式下使用
   private AddReservationHomeSubClusterResponseProto proto =
       AddReservationHomeSubClusterResponseProto.getDefaultInstance();
+  // Protobuf构建器，可写模式下使用
   private AddReservationHomeSubClusterResponseProto.Builder builder = null;
+  // 当前是否通过proto实例持有数据
   private boolean viaProto = false;
 
+  /**
+   * 无参构造函数，初始化Builder用于构建响应对象
+   */
   public AddReservationHomeSubClusterResponsePBImpl() {
     builder = AddReservationHomeSubClusterResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造响应对象
+   * @param proto 已序列化的Protobuf响应对象
+   */
   public AddReservationHomeSubClusterResponsePBImpl(
       AddReservationHomeSubClusterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 初始化Builder，确保修改数据前处于可写状态
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = AddReservationHomeSubClusterResponseProto.newBuilder(proto);
@@ -58,6 +72,10 @@ public class AddReservationHomeSubClusterResponsePBImpl
     viaProto = false;
   }
 
+  /**
+   * 获取当前响应对应的Protobuf对象，序列化前构建最终对象
+   * @return 构建完成的Protobuf响应对象
+   */
   public AddReservationHomeSubClusterResponseProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;
@@ -66,21 +84,27 @@ public class AddReservationHomeSubClusterResponsePBImpl
 
   @Override
   public void setHomeSubCluster(SubClusterId homeSubCluster) {
+    // 确保Builder已初始化
     maybeInitBuilder();
+    // 处理空值，清空已有字段
     if (homeSubCluster == null) {
       builder.clearHomeSubCluster();
       return;
     }
+    // 转换Domain对象为Protobuf格式后设置
     builder.setHomeSubCluster(convertToProtoFormat(homeSubCluster));
   }
 
   @Override
   public SubClusterId getHomeSubCluster() {
+    // 根据当前模式选择proto或builder
     AddReservationHomeSubClusterResponseProtoOrBuilder p = viaProto ? proto : builder;
 
+    // 如果字段不存在返回null
     if (!p.hasHomeSubCluster()) {
       return null;
     }
+    // 转换Protobuf格式为Domain对象后返回
     return convertFromProtoFormat(p.getHomeSubCluster());
   }
 
@@ -105,10 +129,20 @@ public class AddReservationHomeSubClusterResponsePBImpl
     return TextFormat.shortDebugString(getProto());
   }
 
+  /**
+   * 将Protobuf格式的子集群ID转换为领域对象
+   * @param sc Protobuf格式子集群ID
+   * @return 领域对象子集群ID
+   */
   private SubClusterId convertFromProtoFormat(SubClusterIdProto sc) {
     return new SubClusterIdPBImpl(sc);
   }
 
+  /**
+   * 将领域对象格式的子集群ID转换为Protobuf格式
+   * @param sc 领域对象子集群ID
+   * @return Protobuf格式子集群ID
+   */
   private SubClusterIdProto convertToProtoFormat(SubClusterId sc) {
     return ((SubClusterIdPBImpl) sc).getProto();
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -45,22 +46,21 @@ import org.apache.hadoop.yarn.server.nodemanager.timelineservice.NMTimelinePubli
 import org.apache.hadoop.yarn.server.security.ApplicationACLsManager;
 
 /**
- * Context interface for sharing information across components in the
- * NodeManager.
+ * NodeManager内部上下文接口，用于在NodeManager各组件之间共享运行时状态信息。
  */
 public interface Context {
 
   /**
-   * Return the nodeId. Usable only when the ContainerManager is started.
+   * 获取当前Node节点的ID，仅在ContainerManager启动后可用。
    * 
-   * @return the NodeId
+   * @return 当前Node的NodeId
    */
   NodeId getNodeId();
 
   /**
-   * Return the node http-address. Usable only after the Webserver is started.
+   * 获取当前Node的HTTP服务端口，仅在Web服务器启动后可用。
    * 
-   * @return the http-port
+   * @return HTTP端口号
    */
   int getHttpPort();
 
@@ -69,16 +69,14 @@ public interface Context {
   Map<ApplicationId, Credentials> getSystemCredentialsForApps();
 
   /**
-   * Get the list of collectors that are registering with the RM from this node.
-   * @return registering collectors, or null if the timeline service v.2 is not
-   * enabled
+   * 获取当前节点正在向ResourceManager注册的应用收集器列表。
+   * @return 正在注册的收集器映射，如果未开启timeline service v2则返回null
    */
   ConcurrentMap<ApplicationId, AppCollectorData> getRegisteringCollectors();
 
   /**
-   * Get the list of collectors registered with the RM and known by this node.
-   * @return known collectors, or null if the timeline service v.2 is not
-   * enabled.
+   * 获取当前节点已知的、已在ResourceManager注册完成的应用收集器列表。
+   * @return 已知收集器映射，如果未开启timeline service v2则返回null
    */
   ConcurrentMap<ApplicationId, AppCollectorData> getKnownCollectors();
 
@@ -133,9 +131,9 @@ public interface Context {
   NodeManagerMetrics getNodeManagerMetrics();
 
   /**
-   * Get the {@code DeletionService} associated with the NM.
+   * 获取关联到当前NodeManager的删除服务实例。
    *
-   * @return the NM {@code DeletionService}.
+   * @return 当前NM的DeletionService实例
    */
   DeletionService getDeletionService();
 

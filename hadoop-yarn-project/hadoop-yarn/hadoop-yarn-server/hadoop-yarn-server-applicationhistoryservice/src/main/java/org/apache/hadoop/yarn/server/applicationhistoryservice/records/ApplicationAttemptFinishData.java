@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,13 +27,21 @@ import org.apache.hadoop.yarn.api.records.YarnApplicationAttemptState;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The class contains the fields that can be determined when
- * <code>RMAppAttempt</code> finishes, and that need to be stored persistently.
+ * 应用尝试完成数据，保存RM应用尝试结束时确定的、需要持久化存储的所有字段，用于应用历史服务存储
  */
 @Public
 @Unstable
 public abstract class ApplicationAttemptFinishData {
 
+  /**
+   * 创建新的应用尝试完成数据实例
+   * @param appAttemptId 应用尝试ID
+   * @param diagnosticsInfo 诊断信息
+   * @param trackingURL 追踪URL
+   * @param finalApplicationStatus 应用最终状态
+   * @param yarnApplicationAttemptState YARN应用尝试状态
+   * @return 初始化完成的应用尝试完成数据实例
+   */
   @Public
   @Unstable
   public static ApplicationAttemptFinishData newInstance(

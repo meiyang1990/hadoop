@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,20 +23,20 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * AddReservationHomeSubClusterResponse contains the answer from the
- * {@code FederationReservationHomeSubClusterStore} to a request to insert a
- * newly generated ReservationId and its owner.
- *
- * The response contains reservation's home sub-cluster as it is stored in the
- * {@code FederationReservationHomeSubClusterStore}. If a mapping for the
- * reservation already existed, the {@code SubClusterId} in this response will
- * return the existing mapping which might be different from that in the
- * {@code AddReservationHomeSubClusterRequest}.
+ * 添加预约归属子集群响应类，封装联邦集群预约存储层对添加预约归属子集群请求的返回结果。
+ * YARN联邦集群中，每个预约需要存储其归属的子集群信息，该类封装存储操作的返回结果。
+ * 如果预约已存在，返回存储中已有的归属子集群信息，可能与请求中的信息不同。
  */
 @Private
 @Unstable
 public abstract class AddReservationHomeSubClusterResponse {
 
+  /**
+   * 创建添加预约归属子集群响应的新实例。
+   *
+   * @param homeSubCluster 预约归属的子集群ID
+   * @return 构造完成的响应实例
+   */
   @Private
   @Unstable
   public static AddReservationHomeSubClusterResponse newInstance(
@@ -47,19 +48,17 @@ public abstract class AddReservationHomeSubClusterResponse {
   }
 
   /**
-   * Set the home sub-cluster that this Reservation has been assigned to.
+   * 设置预约分配到的归属子集群ID。
    *
-   * @param homeSubCluster the {@link SubClusterId} of this reservation's home
-   *          sub-cluster
+   * @param homeSubCluster 预约所属子集群的ID
    */
   public abstract void setHomeSubCluster(SubClusterId homeSubCluster);
 
   /**
-   * Get the home sub-cluster that this Reservation has been assigned to. This
-   * may not match the {@link SubClusterId} in the corresponding response, if
-   * the mapping for the request's reservation already existed.
+   * 获取预约分配到的归属子集群ID。
+   * 如果请求添加的预约已存在，返回存储中已有的映射，可能与请求中的不同。
    *
-   * @return the {@link SubClusterId} of this reservation's home sub-cluster
+   * @return 预约所属子集群的ID
    */
   public abstract SubClusterId getHomeSubCluster();
 }

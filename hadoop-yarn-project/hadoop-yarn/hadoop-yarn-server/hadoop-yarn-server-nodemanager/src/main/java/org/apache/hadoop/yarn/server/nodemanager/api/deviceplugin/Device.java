@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,7 +25,8 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 
 /**
- * Represent one "device" resource.
+ * YARN NodeManager 设备插件框架中，对单个硬件设备资源的抽象表示。
+ * 用于描述节点上可分配给容器的GPU、FPGA等外设资源信息。
  * */
 @XmlAccessorType(XmlAccessType.FIELD)
 public final class Device implements Serializable, Comparable {
@@ -32,51 +34,44 @@ public final class Device implements Serializable, Comparable {
   private static final long serialVersionUID = -7270474563684671656L;
 
   /**
-   * An plugin specified index number.
-   * Must set. Recommend starting from 0
+   * 设备插件指定的设备索引，必须设置，推荐从0开始编号。
    * */
   private int id;
 
   /**
-   * The device node like "/dev/devname".
-   * Optional
+   * 设备在宿主机上的设备文件路径，例如"/dev/nvidia0"，可选字段。
    * */
   private String devPath;
 
   /**
-   * The major device number.
-   * Optional
+   * Linux设备主设备号，可选字段。
    * */
   private int majorNumber;
 
   /**
-   * The minor device number.
-   * Optional
+   * Linux设备次设备号，可选字段。
    * */
   private int minorNumber;
 
   /**
-   * PCI Bus ID in format.
-   * [[[[&lt;domain&gt;]:]&lt;bus&gt;]:][&lt;slot&gt;][.[&lt;func&gt;]].
-   * Optional. Can get from "lspci -D" in Linux
+   * PCI总线地址，格式为[[[<domain>]:]<bus>]:][<slot>][.[<func>]]，
+   * 可通过Linux命令lspci -D获取，可选字段。
    * */
   private String busID;
 
   /**
-   * Is healthy or not.
-   * false by default
+   * 设备健康状态标记，false表示不健康，默认值为false。
    * */
   private boolean isHealthy;
 
   /**
-   * Plugin customized status info.
-   * Optional
+   * 设备插件自定义的状态描述信息，可选字段。
    * */
   private String status;
 
   /**
-   * Private constructor.
-   * @param builder
+   * 私有构造函数，通过Builder构造Device实例，必填校验设备ID。
+   * @param builder 设备构造器对象
    */
   private Device(Builder builder) {
     if (builder.id == -1) {
@@ -151,26 +146,31 @@ public final class Device implements Serializable, Comparable {
 
     Device other = (Device) o;
 
+    // 优先按设备ID比较
     int result = Integer.compare(id, other.getId());
     if (0 != result) {
       return result;
     }
 
+    // 其次按主设备号比较
     result = Integer.compare(majorNumber, other.getMajorNumber());
     if (0 != result) {
       return result;
     }
 
+    // 再按次设备号比较
     result = Integer.compare(minorNumber, other.getMinorNumber());
     if (0 != result) {
       return result;
     }
 
+    // 再按设备路径比较
     result = devPath.compareTo(other.getDevPath());
     if (0 != result) {
       return result;
     }
 
+    // 最后按PCI总线ID比较
     return busID.compareTo(other.getBusID());
   }
 
@@ -181,10 +181,10 @@ public final class Device implements Serializable, Comparable {
   }
 
   /**
-   * Builder for Device.
+   * Device对象的Builder构造器，用于链式构造Device实例。
    * */
   public final static class Builder {
-    // default -1 representing the value is not set
+    // 默认-1表示该字段未设置
     private int id = -1;
     private String devPath = "";
     private int majorNumber = -1;

@@ -1,10 +1,11 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
 * distributed with this work for additional information
 * regarding copyright ownership.  The ASF licenses this file
 * to you under the Apache License, Version 2.0 (the
-* "License"); you may not use this file except in compliance
+* "License"); you may not use this use this file except in compliance
 * with the License.  You may obtain a copy of the License at
 *
 *     http://www.apache.org/licenses/LICENSE-2.0
@@ -23,54 +24,57 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.nodemanager.nodelabels.NodeAttributesProvider;
 import org.apache.hadoop.yarn.server.nodemanager.nodelabels.NodeLabelsProvider;
 
+/**
+ * NodeManager节点状态更新器接口，定义了NodeManager向ResourceManager汇报节点状态
+ * 和处理本地容器状态的核心方法，是节点状态同步流程的核心抽象接口。
+ */
 public interface NodeStatusUpdater extends Service {
 
   /**
-   * Schedule a heartbeat to the ResourceManager outside of the normal,
-   * periodic heartbeating process. This is typically called when the state
-   * of containers on the node has changed to notify the RM sooner.
+   * 发起一次带外心跳，在常规周期性心跳之外向ResourceManager发送状态更新。
+   * 通常在节点上容器状态发生变化时调用，用于更快通知RM状态变更。
    */
   void sendOutofBandHeartBeat();
 
   /**
-   * Get the ResourceManager identifier received during registration
-   * @return the ResourceManager ID
+   * 获取节点注册时从ResourceManager得到的RM标识符。
+   * @return ResourceManager ID
    */
   long getRMIdentifier();
   
   /**
-   * Query if a container has recently completed
-   * @param containerId the container ID
-   * @return true if the container has recently completed
+   * 查询指定容器是否最近刚停止。
+   * @param containerId 容器ID
+   * @return true 如果容器最近已完成停止
    */
   public boolean isContainerRecentlyStopped(ContainerId containerId);
   
   /**
-   * Add a container to the list of containers that have recently completed
-   * @param containerId the ID of the completed container
+   * 将已完成的容器添加到最近完成容器列表中。
+   * @param containerId 已完成容器的ID
    */
   public void addCompletedContainer(ContainerId containerId);
 
   /**
-   * Clear the list of recently completed containers
+   * 清空缓存中最近完成容器的列表。
    */
   public void clearFinishedContainersFromCache();
 
   /**
-   * Report an unrecoverable exception.
-   * @param ex exception that makes the node unhealthy
+   * 上报不可恢复的异常，标记节点为不健康状态。
+   * @param ex 导致节点不健康的异常
    */
   void reportException(Exception ex);
 
   /**
-   * Sets a node attributes provider to node manager.
-   * @param provider
+   * 设置节点属性提供者，用于汇报节点属性给ResourceManager。
+   * @param provider 节点属性提供者实例
    */
   void setNodeAttributesProvider(NodeAttributesProvider provider);
 
   /**
-   * Sets a node labels provider to the node manager.
-   * @param provider
+   * 设置节点标签提供者，用于汇报节点标签给ResourceManager。
+   * @param provider 节点标签提供者实例
    */
   void setNodeLabelsProvider(NodeLabelsProvider provider);
 }

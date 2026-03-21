@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -31,6 +32,11 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
+/**
+ * ZK联邦状态存储操作耗时指标收集类，用于统计所有ZKFederationStateStore操作的执行耗时分布，
+ * 为性能监控和问题排查提供指标数据。
+ * 采用单例模式，向Hadoop指标系统注册本来源源。
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 @Metrics(context="ZKFederationStateStore-op-durations")
@@ -111,14 +117,20 @@ public final class ZKFederationStateStoreOpDurations implements MetricsSource {
   @Metric("Duration for a get token by router store token call")
   private MutableRate getTokenByRouterStoreToken;
 
+  // 指标记录信息，定义指标名称和描述
   protected static final MetricsInfo RECORD_INFO =
       info("ZKFederationStateStoreOpDurations", "Durations of ZKFederationStateStore calls");
 
   private final MetricsRegistry registry;
 
+  // 单例实例
   private static final ZKFederationStateStoreOpDurations INSTANCE =
       new ZKFederationStateStoreOpDurations();
 
+  /**
+   * 获取单例实例。
+   * @return 单例对象
+   */
   public static ZKFederationStateStoreOpDurations getInstance() {
     return INSTANCE;
   }
@@ -127,117 +139,249 @@ public final class ZKFederationStateStoreOpDurations implements MetricsSource {
     registry = new MetricsRegistry(RECORD_INFO);
     registry.tag(RECORD_INFO, "ZKFederationStateStoreOpDurations");
 
+    // 获取默认指标系统实例
     MetricsSystem ms = DefaultMetricsSystem.instance();
     if (ms != null) {
+      // 向指标系统注册当前指标来源
       ms.register(RECORD_INFO.name(), RECORD_INFO.description(), this);
     }
   }
 
   @Override
   public synchronized void getMetrics(MetricsCollector collector, boolean all) {
+    // 生成指标快照，输出给收集器
     registry.snapshot(collector.addRecord(registry.info()), all);
   }
 
+  /**
+   * 添加添加应用归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addAppHomeSubClusterDuration(long startTime, long endTime) {
     addAppHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加更新应用归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addUpdateAppHomeSubClusterDuration(long startTime, long endTime) {
     updateAppHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加获取应用归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addGetAppHomeSubClusterDuration(long startTime, long endTime) {
     getAppHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加批量获取应用归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addGetAppsHomeSubClusterDuration(long startTime, long endTime) {
     getAppsHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加删除应用归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addDeleteAppHomeSubClusterDuration(long startTime, long endTime) {
     deleteAppHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加注册子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addRegisterSubClusterDuration(long startTime, long endTime) {
     registerSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加注销子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addDeregisterSubClusterDuration(long startTime, long endTime) {
     deregisterSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加子集群心跳操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addSubClusterHeartbeatDuration(long startTime, long endTime) {
     subClusterHeartbeat.add(endTime - startTime);
   }
 
+  /**
+   * 添加获取单个子集群信息操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addGetSubClusterDuration(long startTime, long endTime) {
     getSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加获取所有子集群信息操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addGetSubClustersDuration(long startTime, long endTime) {
     getSubClusters.add(endTime - startTime);
   }
 
+  /**
+   * 添加获取路由策略配置操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addGetPolicyConfigurationDuration(long startTime, long endTime) {
     getPolicyConfiguration.add(endTime - startTime);
   }
 
+  /**
+   * 添加设置路由策略配置操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addSetPolicyConfigurationDuration(long startTime, long endTime) {
     setPolicyConfiguration.add(endTime - startTime);
   }
 
+  /**
+   * 添加批量获取路由策略配置操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addGetPoliciesConfigurationsDuration(long startTime, long endTime) {
     getPoliciesConfigurations.add(endTime - startTime);
   }
 
+  /**
+   * 添加添加预留资源归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addReservationHomeSubClusterDuration(long startTime, long endTime) {
     addReservationHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加获取预留资源归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addGetReservationHomeSubClusterDuration(long startTime, long endTime) {
     getReservationHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加批量获取预留资源归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addGetReservationsHomeSubClusterDuration(long startTime, long endTime) {
     getReservationsHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加删除预留资源归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addDeleteReservationHomeSubClusterDuration(long startTime, long endTime) {
     deleteReservationHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加更新预留资源归属子集群操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addUpdateReservationHomeSubClusterDuration(long startTime, long endTime) {
     updateReservationHomeSubCluster.add(endTime - startTime);
   }
 
+  /**
+   * 添加存储新主密钥操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void addStoreNewMasterKeyDuration(long startTime, long endTime) {
     storeNewMasterKey.add(endTime - startTime);
   }
 
+  /**
+   * 添加删除存储的主密钥操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void removeStoredMasterKeyDuration(long startTime, long endTime) {
     removeStoredMasterKey.add(endTime - startTime);
   }
 
+  /**
+   * 添加根据委托密钥获取主密钥操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void getMasterKeyByDelegationKeyDuration(long startTime, long endTime) {
     getMasterKeyByDelegationKey.add(endTime - startTime);
   }
 
+  /**
+   * 添加存储新令牌操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void getStoreNewTokenDuration(long startTime, long endTime) {
     storeNewToken.add(endTime - startTime);
   }
 
+  /**
+   * 添加更新存储的令牌操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void updateStoredTokenDuration(long startTime, long endTime) {
     updateStoredToken.add(endTime - startTime);
   }
 
+  /**
+   * 添加删除存储的令牌操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void removeStoredTokenDuration(long startTime, long endTime) {
     removeStoredToken.add(endTime - startTime);
   }
 
+  /**
+   * 添加根据路由存储查询令牌操作耗时。
+   * @param startTime 操作开始时间
+   * @param endTime 操作结束时间
+   */
   public void getTokenByRouterStoreTokenDuration(long startTime, long endTime) {
     getTokenByRouterStoreToken.add(endTime - startTime);
   }
 
+  /**
+   * 重置所有操作耗时指标，仅用于单元测试。
+   * @return 新的指标实例
+   */
   @VisibleForTesting
   protected ZKFederationStateStoreOpDurations resetOpDurations() {
     return new ZKFederationStateStoreOpDurations();

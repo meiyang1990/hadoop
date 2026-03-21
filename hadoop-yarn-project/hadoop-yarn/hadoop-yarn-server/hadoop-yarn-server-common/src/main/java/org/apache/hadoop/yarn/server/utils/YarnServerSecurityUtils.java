@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,7 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility class that contains commonly used server methods.
+ * YARN服务端安全相关工具类，提供AMRMToken处理、请求认证、凭证解析等常用安全能力。
  *
  */
 @Private
@@ -52,22 +53,23 @@ public final class YarnServerSecurityUtils {
   }
 
   /**
-   * Authorizes the current request and returns the AMRMTokenIdentifier for the
-   * current application.
+   * 对当前ApplicationMaster请求进行认证，提取并返回当前应用的AMRMTokenIdentifier。
    *
-   * @return the AMRMTokenIdentifier instance for the current user
-   * @throws YarnException exceptions from yarn servers.
+   * @return 当前对应用户的AMRMTokenIdentifier实例
+   * @throws YarnException 认证失败时抛出YARN异常
    */
   public static AMRMTokenIdentifier authorizeRequest() throws YarnException {
 
     UserGroupInformation remoteUgi;
     try {
+      // 获取当前请求对应用户UGI
       remoteUgi = UserGroupInformation.getCurrentUser();
     } catch (IOException e) {
       String msg =
           "Cannot obtain the user-name for authorizing ApplicationMaster. "
               + "Got exception: " + StringUtils.stringifyException(e);
       LOG.warn(msg);
+      // 封装IO异常为远程RPC异常返回
       throw RPCUtil.getRemoteException(msg);
     }
 
@@ -75,6 +77,7 @@ public final class YarnServerSecurityUtils {
     String message = "";
     AMRMTokenIdentifier appTokenIdentifier = null;
     try {
+      // 从UGI中查找AMRMTokenIdentifier
       appTokenIdentifier = selectAMRMTokenIdentifier(remoteUgi);
       if (appTokenIdentifier == null) {
         tokenFound = false;
@@ -90,19 +93,24 @@ public final class YarnServerSecurityUtils {
 
     if (!tokenFound) {
       LOG.warn(message);
+      // 未找到合法令牌，抛出认证失败异常
       throw RPCUtil.getRemoteException(message);
     }
 
     return appTokenIdentifier;
   }
 
-  // Obtain the needed AMRMTokenIdentifier from the remote-UGI. RPC layer
-  // currently sets only the required id, but iterate through anyways just to be
-  // sure.
+  /**
+   * 从远程用户UGI中查找并提取AMRMTokenIdentifier
+   * @param remoteUgi 远程请求用户UGI
+   * @return 找到的AMRMTokenIdentifier，未找到返回null
+   * @throws IOException IO异常
+   */
   private static AMRMTokenIdentifier selectAMRMTokenIdentifier(
       UserGroupInformation remoteUgi) throws IOException {
     AMRMTokenIdentifier result = null;
     Set<TokenIdentifier> tokenIds = remoteUgi.getTokenIdentifiers();
+    // 遍历所有令牌标识符，找到AMRMToken类型的标识符
     for (TokenIdentifier tokenId : tokenIds) {
       if (tokenId instanceof AMRMTokenIdentifier) {
         result = (AMRMTokenIdentifier) tokenId;
@@ -114,32 +122,34 @@ public final class YarnServerSecurityUtils {
   }
 
   /**
-   * Update the new AMRMToken into the ugi used for RM proxy.
+   * 将RM下发的新AMRMToken更新到RM代理使用的UGI中，替换旧令牌。
    *
-   * @param token the new AMRMToken sent by RM
-   * @param user ugi used for RM proxy
-   * @param conf configuration
+   * @param token RM下发的新AMRMToken
+   * @param user  RM代理使用的用户UGI
+   * @param conf  配置对象
    */
   public static void updateAMRMToken(
       org.apache.hadoop.yarn.api.records.Token token, UserGroupInformation user,
       Configuration conf) {
+    // 将YARN API的Token转换为Hadoop安全Token类型
     Token<AMRMTokenIdentifier> amrmToken = new Token<AMRMTokenIdentifier>(
         token.getIdentifier().array(), token.getPassword().array(),
         new Text(token.getKind()), new Text(token.getService()));
     // Preserve the token service sent by the RM when adding the token
     // to ensure we replace the previous token setup by the RM.
     // Afterwards we can update the service address for the RPC layer.
+    // 添加新令牌到UGI，会自动替换同服务的旧令牌
     user.addToken(amrmToken);
+    // 更新令牌服务地址为本地RM地址，适配RPC层调用
     amrmToken.setService(ClientRMProxy.getAMRMTokenService(conf));
   }
 
   /**
-   * Parses the container launch context and returns a Credential instance that
-   * contains all the tokens from the launch context.
+   * 从容器启动上下文中解析出凭证信息，提取所有安全令牌。
    *
-   * @param launchContext ContainerLaunchContext.
-   * @return the credential instance
-   * @throws IOException if there are I/O errors.
+   * @param launchContext 容器启动上下文
+   * @return 包含所有令牌的Credentials实例
+   * @throws IOException 解析过程IO错误
    */
   public static Credentials parseCredentials(
       ContainerLaunchContext launchContext) throws IOException {
@@ -147,10 +157,14 @@ public final class YarnServerSecurityUtils {
     ByteBuffer tokens = launchContext.getTokens();
 
     if (tokens != null) {
+      // 准备输入流读取凭证数据
       DataInputByteBuffer buf = new DataInputByteBuffer();
+      // 重置缓冲区位置到起始点
       tokens.rewind();
       buf.reset(tokens);
+      // 从流中读取凭证存储
       credentials.readTokenStorageStream(buf);
+      // 调试模式下日志打印所有令牌信息
       if (LOG.isDebugEnabled()) {
         for (Token<? extends TokenIdentifier> tk : credentials.getAllTokens()) {
           LOG.debug("{}={}", tk.getService(), tk);

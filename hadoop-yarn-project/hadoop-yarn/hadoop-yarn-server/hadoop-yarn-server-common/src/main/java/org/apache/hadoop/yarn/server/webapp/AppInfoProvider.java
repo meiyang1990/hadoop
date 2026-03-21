@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,34 +24,33 @@ import org.apache.hadoop.classification.InterfaceStability;
 import javax.servlet.http.HttpServletRequest;
 
 /**
- * Classes implementing this interface are used in the {@link LogServlet}
- * for providing various application related information.
+ * YARN WebUI 应用信息提供者接口，被{@link LogServlet}用于获取应用相关信息。
+ * 实现类负责从不同数据源（RM/NM）查询应用、容器相关信息，为日志等Web请求提供数据支撑。
  */
 @InterfaceAudience.LimitedPrivate({"YARN"})
 @InterfaceStability.Unstable
 public interface AppInfoProvider {
 
   /**
-   * Returns the node HTTP address.
+   * 根据请求信息获取容器所在节点的HTTP访问地址
    *
-   * @param req {@link HttpServletRequest} associated with the request
-   * @param appId the id of the application
-   * @param appAttemptId the id of the application attempt
-   * @param containerId the container id
-   * @param clusterId the id of the cluster
-   * @return the node HTTP address
+   * @param req HTTP请求对象
+   * @param appId 应用ID
+   * @param appAttemptId 应用尝试ID
+   * @param containerId 容器ID
+   * @param clusterId 集群ID
+   * @return 节点HTTP地址
    */
   String getNodeHttpAddress(HttpServletRequest req,
       String appId, String appAttemptId, String containerId, String clusterId);
 
   /**
-   * Returns {@link BasicAppInfo} object that wraps the collected information
-   * about the application.
+   * 根据应用ID获取应用基本信息
    *
-   * @param req {@link HttpServletRequest} associated with the request
-   * @param appId the id of the application
-   * @param clusterId the id of the cluster
-   * @return {@link BasicAppInfo} object
+   * @param req HTTP请求对象
+   * @param appId 应用ID
+   * @param clusterId 集群ID
+   * @return 封装好的应用基本信息对象
    */
   BasicAppInfo getApp(HttpServletRequest req, String appId, String clusterId);
 }

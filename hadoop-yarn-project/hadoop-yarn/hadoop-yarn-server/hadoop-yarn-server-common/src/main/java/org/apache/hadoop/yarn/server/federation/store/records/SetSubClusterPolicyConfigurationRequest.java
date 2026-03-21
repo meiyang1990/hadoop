@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,13 +24,17 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * SetSubClusterPolicyConfigurationRequest is a request to the
- * {@code FederationPolicyStore} to set the policy configuration corresponding
- * to a queue.
+ * 设置子集群策略配置请求类，用于向 FederationPolicyStore 请求更新指定队列的策略配置。
+ * 是YARN联邦存储层RPC请求的封装，用于持久化保存队列路由策略配置。
  */
 @Private
 @Unstable
 public abstract class SetSubClusterPolicyConfigurationRequest {
+  /**
+   * 创建设置子集群策略配置请求实例。
+   * @param policy 待设置的策略配置
+   * @return 新建的请求实例
+   */
   @Private
   @Unstable
   public static SetSubClusterPolicyConfigurationRequest newInstance(
@@ -41,18 +46,18 @@ public abstract class SetSubClusterPolicyConfigurationRequest {
   }
 
   /**
-   * Get the policy configuration assigned to the queue.
+   * 获取请求中待设置的队列策略配置。
    *
-   * @return the policy for the specified queue
+   * @return 指定队列的路由策略配置
    */
   @Public
   @Unstable
   public abstract SubClusterPolicyConfiguration getPolicyConfiguration();
 
   /**
-   * Set the policyConfiguration configuration for the queue.
+   * 设置请求中的队列策略配置。
    *
-   * @param policyConfiguration the policyConfiguration for the specified queue
+   * @param policyConfiguration 指定队列的路由策略配置
    */
   @Private
   @Unstable

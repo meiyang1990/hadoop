@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -29,6 +30,7 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterPolicyCo
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
+ * 文件说明：子集群路由策略配置基于Protobuf的实现类，存储YARN联邦环境中队列级别的路由策略配置
  * Protobuf based implementation of {@link SubClusterPolicyConfiguration}.
  *
  */
@@ -37,27 +39,44 @@ import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 public class SubClusterPolicyConfigurationPBImpl
     extends SubClusterPolicyConfiguration {
 
+  // Protobuf消息对象，存储序列化后的配置数据
   private SubClusterPolicyConfigurationProto proto =
       SubClusterPolicyConfigurationProto.getDefaultInstance();
+  // Protobuf构建器，用于构建修改配置
   private SubClusterPolicyConfigurationProto.Builder builder = null;
+  // 标记当前是否直接使用proto对象，false表示正在通过builder修改
   private boolean viaProto = false;
 
+  /**
+   * 构造函数，初始化空的构建器
+   */
   public SubClusterPolicyConfigurationPBImpl() {
     builder = SubClusterPolicyConfigurationProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造配置实例
+   * @param proto 已有的Protobuf配置对象
+   */
   public SubClusterPolicyConfigurationPBImpl(
       SubClusterPolicyConfigurationProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前配置对应的Protobuf对象，构建并缓存最终结果
+   * @return 序列化后的Protobuf配置对象
+   */
   public SubClusterPolicyConfigurationProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
   }
 
+  /**
+   * 初始化构建器，确保可以修改配置，从现有proto拷贝数据到builder
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = SubClusterPolicyConfigurationProto.newBuilder(proto);

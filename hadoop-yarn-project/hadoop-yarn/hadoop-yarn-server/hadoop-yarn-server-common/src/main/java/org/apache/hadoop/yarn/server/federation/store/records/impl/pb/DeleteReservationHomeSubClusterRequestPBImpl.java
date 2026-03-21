@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -29,29 +30,43 @@ import org.apache.hadoop.yarn.server.federation.store.records.DeleteReservationH
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of
- * {@link DeleteReservationHomeSubClusterRequest}.
+ * 文件说明：删除预约归属子集群请求的Protocol Buffer实现类
+ * 基于Protocol Buffer实现{@link DeleteReservationHomeSubClusterRequest}接口
  */
 @Private
 @Unstable
 public class DeleteReservationHomeSubClusterRequestPBImpl
     extends DeleteReservationHomeSubClusterRequest {
 
+  // Protocol Buffer proto对象，存储序列化后的数据
   private DeleteReservationHomeSubClusterRequestProto proto =
       DeleteReservationHomeSubClusterRequestProto.getDefaultInstance();
+  // Protocol Buffer构建器，用于构造对象
   private DeleteReservationHomeSubClusterRequestProto.Builder builder = null;
+  // 标记当前是否通过proto方式存储数据，false表示使用builder构建
   private boolean viaProto = false;
 
+  /**
+   * 构造方法，初始化builder用于构建请求对象
+   */
   public DeleteReservationHomeSubClusterRequestPBImpl() {
     builder = DeleteReservationHomeSubClusterRequestProto.newBuilder();
   }
 
+  /**
+   * 构造方法，基于已有proto对象封装请求
+   * @param proto 已序列化的proto对象
+   */
   public DeleteReservationHomeSubClusterRequestPBImpl(
       DeleteReservationHomeSubClusterRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求的proto对象，处理本地数据合并
+   * @return 序列化后的proto对象
+   */
   public DeleteReservationHomeSubClusterRequestProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -59,6 +74,9 @@ public class DeleteReservationHomeSubClusterRequestPBImpl
     return proto;
   }
 
+  /**
+   * 将本地builder数据合并到proto对象
+   */
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -68,6 +86,9 @@ public class DeleteReservationHomeSubClusterRequestPBImpl
     viaProto = true;
   }
 
+  /**
+   * 如果当前是proto存储模式，初始化builder以便修改
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = DeleteReservationHomeSubClusterRequestProto.newBuilder(proto);
@@ -75,6 +96,9 @@ public class DeleteReservationHomeSubClusterRequestPBImpl
     viaProto = false;
   }
 
+  /**
+   * 将本地字段合并到builder，本类无额外本地字段，因此为空实现
+   */
   private void mergeLocalToBuilder() {
   }
 
@@ -101,28 +125,44 @@ public class DeleteReservationHomeSubClusterRequestPBImpl
 
   @Override
   public ReservationId getReservationId() {
+    // 根据存储模式获取proto或builder
     DeleteReservationHomeSubClusterRequestProtoOrBuilder p =
         viaProto ? proto : builder;
+    // 如果没有预约ID，返回空
     if (!p.hasReservationId()) {
       return null;
     }
+    // 将proto格式转换为ReservationId对象返回
     return convertFromProtoFormat(p.getReservationId());
   }
 
   @Override
   public void setReservationId(ReservationId reservationId) {
+    // 初始化builder以便修改
     maybeInitBuilder();
+    // 如果传入为空，清空字段
     if (reservationId == null) {
       builder.clearReservationId();
       return;
     }
+    // 将ReservationId转换为proto格式并设置
     builder.setReservationId(convertToProtoFormat(reservationId));
   }
 
+  /**
+   * 将ReservationIdProto转换为ReservationId业务对象
+   * @param appId proto格式预约ID
+   * @return 业务层ReservationId对象
+   */
   private ReservationId convertFromProtoFormat(ReservationIdProto appId) {
     return new ReservationIdPBImpl(appId);
   }
 
+  /**
+   * 将ReservationId业务对象转换为proto格式
+   * @param appId 业务层ReservationId对象
+   * @return proto格式预约ID
+   */
   private ReservationIdProto convertToProtoFormat(ReservationId appId) {
     return ((ReservationIdPBImpl) appId).getProto();
   }

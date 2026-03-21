@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -26,39 +27,28 @@ import org.apache.hadoop.yarn.server.federation.policies.ConfigurableFederationP
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 
 /**
- * Implements the logic for determining the routing of an application submission
- * based on a policy.
+ * YARN联邦路由器策略接口，定义根据指定策略决定应用提交路由到哪个子集群的核心逻辑。
  */
 public interface FederationRouterPolicy extends ConfigurableFederationPolicy {
 
   /**
-   * Determines the sub-cluster that the user application submission should be
-   * routed to.
+   * 根据策略确定用户应用提交应该路由到的目标子集群。
    *
-   * @param appSubmissionContext the {@link ApplicationSubmissionContext} that
-   *          has to be routed to an appropriate subCluster for execution.
-   *
-   * @param blackListSubClusters the list of subClusters as identified by
-   *          {@link SubClusterId} to blackList from the selection of the home
-   *          subCluster.
-   *
-   * @return the {@link SubClusterId} that will be the "home" for this
-   *         application.
-   *
-   * @throws YarnException if the policy cannot determine a viable subcluster.
+   * @param appSubmissionContext 应用提交上下文，包含需要路由的应用信息
+   * @param blackListSubClusters 需要排除的黑名单子集群列表，这些子集群不会被选中
+   * @return 本次应用执行的目标子集群ID
+   * @throws YarnException 当策略无法找到可用子集群时抛出异常
    */
   SubClusterId getHomeSubcluster(
       ApplicationSubmissionContext appSubmissionContext,
       List<SubClusterId> blackListSubClusters) throws YarnException;
 
   /**
-   * Determines the sub-cluster where a ReservationSubmissionRequest should be
-   * sent to.
+   * 根据策略确定资源配额提交请求应该路由到的目标子集群。
    *
-   * @param request the original request
-   * @return a mapping of sub-clusters and the requests
-   *
-   * @throws YarnException if the policy fails to choose a sub-cluster
+   * @param request 原始资源配额提交请求
+   * @return 本次配额提交的目标子集群ID
+   * @throws YarnException 当策略无法选择目标子集群时抛出异常
    */
   SubClusterId getReservationHomeSubcluster(
       ReservationSubmissionRequest request) throws YarnException;

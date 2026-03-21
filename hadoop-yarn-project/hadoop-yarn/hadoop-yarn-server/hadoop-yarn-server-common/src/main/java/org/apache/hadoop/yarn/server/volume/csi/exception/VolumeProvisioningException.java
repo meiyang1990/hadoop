@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,14 +19,24 @@
 package org.apache.hadoop.yarn.server.volume.csi.exception;
 
 /**
- * Exception throws when volume provisioning is failed.
+ * CSI卷供应失败时抛出的异常，属于YARN CSI存储卷集成模块的自定义异常类。
+ * 当动态创建、供应存储卷过程中发生错误时抛出该异常。
  */
 public class VolumeProvisioningException extends VolumeException {
 
+  /**
+   * 构造带错误消息的卷供应异常。
+   * @param message 错误描述信息
+   */
   public VolumeProvisioningException(String message) {
     super(message);
   }
 
+  /**
+   * 构造带错误消息和原始异常的卷供应异常。
+   * @param message 错误描述信息
+   * @param e 原始异常
+   */
   public VolumeProvisioningException(String message, Exception e) {
     super(message, e);
   }

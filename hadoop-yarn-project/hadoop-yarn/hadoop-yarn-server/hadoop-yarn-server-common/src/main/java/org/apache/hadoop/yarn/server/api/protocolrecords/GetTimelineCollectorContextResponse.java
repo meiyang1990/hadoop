@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,19 @@ package org.apache.hadoop.yarn.server.api.protocolrecords;
 
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * 获取时间线收集器上下文响应协议记录，封装时间线服务流上下文信息
+ */
 public abstract class GetTimelineCollectorContextResponse {
 
+  /**
+   * 创建获取时间线收集器上下文响应的新实例
+   * @param userId 用户ID
+   * @param flowName 流名称
+   * @param flowVersion 流版本
+   * @param flowRunId 流运行ID
+   * @return 响应对象实例
+   */
   public static GetTimelineCollectorContextResponse newInstance(
       String userId, String flowName, String flowVersion, long flowRunId) {
     GetTimelineCollectorContextResponse response =

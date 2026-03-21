@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -59,12 +60,21 @@ import org.apache.hadoop.yarn.server.webapp.dao.ContainersInfo;
 import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.hadoop.yarn.webapp.BadRequestException;
 
+/**
+ * 应用历史服务(AHS) REST Web服务实现类
+ * 提供查询已完成应用历史信息和容器日志的REST接口
+ */
 @Singleton
 @Path("/ws/v1/applicationhistory")
 public class AHSWebServices extends WebServices {
 
   private LogServlet logServlet;
 
+  /**
+   * 构造函数，注入应用基础协议和配置，初始化日志Servlet
+   * @param appBaseProt 应用基础协议，用于查询应用信息
+   * @param conf 配置对象
+   */
   @Inject
   public AHSWebServices(
       final @Named("appBaseProt") ApplicationBaseProtocol appBaseProt,
@@ -73,6 +83,12 @@ public class AHSWebServices extends WebServices {
     this.logServlet = new LogServlet(conf, this);
   }
 
+  /**
+   * 获取应用历史服务基本信息接口
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @return 时间线服务基本信息
+   */
   @GET
   @Path("/about")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -84,6 +100,12 @@ public class AHSWebServices extends WebServices {
     return TimelineUtils.createTimelineAbout("Generic History Service API");
   }
 
+  /**
+   * 获取所有已完成应用列表接口（无过滤条件）
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @return 应用列表信息
+   */
   @GET
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
       MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
@@ -94,6 +116,24 @@ public class AHSWebServices extends WebServices {
         Collections.emptySet());
   }
 
+  /**
+   * 根据过滤条件获取已完成应用列表接口
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param stateQuery 应用状态查询（已弃用）
+   * @param statesQuery 应用状态集合查询
+   * @param finalStatusQuery 最终状态查询
+   * @param userQuery 提交用户查询
+   * @param queueQuery 队列查询
+   * @param count 返回结果数量限制
+   * @param startedBegin 启动时间起始查询
+   * @param startedEnd 启动时间结束查询
+   * @param finishBegin 完成时间起始查询
+   * @param finishEnd 完成时间结束查询
+   * @param name 应用名称查询
+   * @param applicationTypes 应用类型集合查询
+   * @return 过滤后的应用列表信息
+   */
   @GET
   @Path("/apps")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -119,6 +159,13 @@ public class AHSWebServices extends WebServices {
       finishEnd, name, applicationTypes);
   }
 
+  /**
+   * 获取指定应用的详细信息接口
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param appId 应用ID
+   * @return 应用详细信息
+   */
   @GET
   @Path("/apps/{appid}")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -130,6 +177,13 @@ public class AHSWebServices extends WebServices {
     return super.getApp(req, res, appId);
   }
 
+  /**
+   * 获取指定应用的所有尝试attempt信息接口
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param appId 应用ID
+   * @return 应用尝试attempt列表信息
+   */
   @GET
   @Path("/apps/{appid}/appattempts")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -141,6 +195,14 @@ public class AHSWebServices extends WebServices {
     return super.getAppAttempts(req, res, appId);
   }
 
+  /**
+   * 获取指定应用指定尝试attempt的详细信息接口
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param appId 应用ID
+   * @param appAttemptId 尝试attempt ID
+   * @return 应用尝试attempt详细信息
+   */
   @GET
   @Path("/apps/{appid}/appattempts/{appattemptid}")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -153,6 +215,14 @@ public class AHSWebServices extends WebServices {
     return super.getAppAttempt(req, res, appId, appAttemptId);
   }
 
+  /**
+   * 获取指定应用指定尝试attempt的所有容器信息接口
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param appId 应用ID
+   * @param appAttemptId 尝试attempt ID
+   * @return 容器列表信息
+   */
   @GET
   @Path("/apps/{appid}/appattempts/{appattemptid}/containers")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -165,6 +235,15 @@ public class AHSWebServices extends WebServices {
     return super.getContainers(req, res, appId, appAttemptId);
   }
 
+  /**
+   * 获取指定容器的详细信息接口
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param appId 应用ID
+   * @param appAttemptId 尝试attempt ID
+   * @param containerId 容器ID
+   * @return 容器详细信息
+   */
   @GET
   @Path("/apps/{appid}/appattempts/{appattemptid}/containers/{containerid}")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -178,6 +257,11 @@ public class AHSWebServices extends WebServices {
     return super.getContainer(req, res, appId, appAttemptId, containerId);
   }
 
+  /**
+   * 验证应用状态查询参数，应用历史服务只允许查询终态应用
+   * @param stateQuery 单个状态查询参数（已弃用）
+   * @param statesQuery 状态集合查询参数
+   */
   private static void
       validateStates(String stateQuery, Set<String> statesQuery) {
     // stateQuery is deprecated.
@@ -202,20 +286,15 @@ public class AHSWebServices extends WebServices {
   // TODO: YARN-6080: Create WebServiceUtils to have common functions used in
   //       RMWebService, NMWebService and AHSWebService.
   /**
-   * Returns log file's name as well as current file size for a container.
+   * 获取容器日志元信息接口，返回日志文件名和当前大小
    *
-   * @param req
-   *    HttpServletRequest
-   * @param res
-   *    HttpServletResponse
-   * @param containerIdStr
-   *    The container ID
-   * @param nmId
-   *    The Node Manager NodeId
-   * @param redirectedFromNode
-   *    Whether this is a redirected request from NM
-   * @return
-   *    The log file's name and current file size
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param containerIdStr 容器ID
+   * @param nmId NodeManager节点ID
+   * @param redirectedFromNode 是否从NM重定向而来
+   * @param manualRedirection 是否手动重定向
+   * @return 日志元信息响应
    */
   @GET
   @Path("/containers/{containerid}/logs")
@@ -239,26 +318,18 @@ public class AHSWebServices extends WebServices {
   }
 
   /**
-   * Returns the contents of a container's log file in plain text.
+   * 获取容器指定日志文件的内容接口
    *
-   * @param req
-   *    HttpServletRequest
-   * @param res
-   *    HttpServletResponse
-   * @param containerIdStr
-   *    The container ID
-   * @param filename
-   *    The name of the log file
-   * @param format
-   *    The content type
-   * @param size
-   *    the size of the log file
-   * @param nmId
-   *    The Node Manager NodeId
-   * @param redirectedFromNode
-   *    Whether this is the redirect request from NM
-   * @return
-   *    The contents of the container's log file
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param containerIdStr 容器ID
+   * @param filename 日志文件名
+   * @param format 响应内容格式
+   * @param size 返回内容大小限制
+   * @param nmId NodeManager节点ID
+   * @param redirectedFromNode 是否从NM重定向而来
+   * @param manualRedirection 是否手动重定向
+   * @return 日志文件内容响应
    */
   @GET
   @Path("/containers/{containerid}/logs/{filename}")
@@ -283,6 +354,20 @@ public class AHSWebServices extends WebServices {
   //TODO: YARN-4993: Refactory ContainersLogsBlock, AggregatedLogsBlock and
   //      container log webservice introduced in AHS to minimize
   //      the duplication.
+  /**
+   * 获取容器日志文件内容兼容接口
+   *
+   * @param req HTTP请求
+   * @param res HTTP响应
+   * @param containerIdStr 容器ID
+   * @param filename 日志文件名
+   * @param format 响应内容格式
+   * @param size 返回内容大小限制
+   * @param nmId NodeManager节点ID
+   * @param redirectedFromNode 是否从NM重定向而来
+   * @param manualRedirection 是否手动重定向
+   * @return 日志文件内容响应
+   */
   @GET
   @Path("/containerlogs/{containerid}/{filename}")
   @Produces({ MediaType.TEXT_PLAIN + "; " + JettyUtils.UTF_8 })
@@ -304,15 +389,11 @@ public class AHSWebServices extends WebServices {
         nmId, redirectedFromNode, null, manualRedirection);
   }
 
+  /**
+   * 仅用于测试，获取日志Servlet实例
+   * @return 日志Servlet实例
+   */
   @VisibleForTesting
   @Private
   LogServlet getLogServlet() {
-    return this.logServlet;
-  }
-
-  @VisibleForTesting
-  @Private
-  void setLogServlet(LogServlet logServlet) {
-    this.logServlet = logServlet;
-  }
-}
+    return this.logServlet

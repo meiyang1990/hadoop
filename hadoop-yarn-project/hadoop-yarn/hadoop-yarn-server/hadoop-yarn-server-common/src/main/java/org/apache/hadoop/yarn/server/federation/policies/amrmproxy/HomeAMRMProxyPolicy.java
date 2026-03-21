@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,23 +35,25 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterInfo;
 
 /**
- * An implementation of the {@link FederationAMRMProxyPolicy} that simply
- * sends the {@link ResourceRequest} to the home subcluster.
+ * {@link FederationAMRMProxyPolicy}的实现类，将所有{@link ResourceRequest}
+ * 全部路由到应用所属的本地home子集群，是联邦场景下AM-RM代理的简单路由策略。
  */
 public class HomeAMRMProxyPolicy extends AbstractAMRMProxyPolicy {
 
-  /** Identifier of the local subcluster. */
+  /** Home子集群的标识符。 */
   private SubClusterId homeSubcluster;
 
   @Override
   public void reinitialize(
       FederationPolicyInitializationContext policyContext)
       throws FederationPolicyInitializationException {
-
+    // 验证策略初始化上下文合法性
     FederationPolicyInitializationContextValidator
         .validate(policyContext, this.getClass().getCanonicalName());
+    // 保存策略上下文到父类
     setPolicyContext(policyContext);
 
+    // 从上下文中获取当前应用所属的home子集群ID
     this.homeSubcluster = policyContext.getHomeSubcluster();
   }
 
@@ -58,18 +61,23 @@ public class HomeAMRMProxyPolicy extends AbstractAMRMProxyPolicy {
   public Map<SubClusterId, List<ResourceRequest>> splitResourceRequests(
       List<ResourceRequest> resourceRequests,
       Set<SubClusterId> timedOutSubClusters) throws YarnException {
+    // home子集群未初始化，抛出异常
     if (homeSubcluster == null) {
       throw new FederationPolicyException("No home subcluster available");
     }
 
+    // 获取当前所有活跃子集群信息
     Map<SubClusterId, SubClusterInfo> active = getActiveSubclusters();
+    // home子集群不在活跃列表中，抛出异常
     if (!active.containsKey(homeSubcluster)) {
       throw new FederationPolicyException(
           "The local subcluster " + homeSubcluster + " is not active");
     }
 
+    // 复制全部资源请求
     List<ResourceRequest> resourceRequestsCopy =
         new ArrayList<>(resourceRequests);
+    // 将所有请求全部打包返回给home子集群
     return Collections.singletonMap(homeSubcluster, resourceRequestsCopy);
   }
 }

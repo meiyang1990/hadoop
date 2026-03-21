@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,24 +27,43 @@ import org.apache.hadoop.yarn.federation.proto.YarnServerFederationProtos.Router
 import org.apache.hadoop.yarn.federation.proto.YarnServerFederationProtos.RouterMasterKeyRequestProtoOrBuilder;
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
+/**
+ * YARN联邦Router主密钥请求的Protobuf实现类，基于PB序列化协议实现数据存储与转换。
+ * 负责在联邦状态存储中传递获取/更新Router主密钥的请求信息。
+ */
 @Private
 @Unstable
 public class RouterMasterKeyRequestPBImpl extends RouterMasterKeyRequest {
 
+  // Protobuf消息实例，当通过已有proto构建时使用
   private RouterMasterKeyRequestProto proto = RouterMasterKeyRequestProto.getDefaultInstance();
+  // Protobuf消息构建器，当构建新消息时使用
   private RouterMasterKeyRequestProto.Builder builder = null;
+  // 当前是否直接使用proto实例标识，false表示正在通过builder构建
   private boolean viaProto = false;
+  // 缓存的Router主密钥对象
   private RouterMasterKey routerMasterKey = null;
 
+  /**
+   * 无参构造函数，初始化Protobuf构建器。
+   */
   public RouterMasterKeyRequestPBImpl() {
     builder = RouterMasterKeyRequestProto.newBuilder();
   }
 
+  /**
+   * 通过已有Protobuf消息构造请求对象。
+   * @param proto 已有的RouterMasterKeyRequestProto实例
+   */
   public RouterMasterKeyRequestPBImpl(RouterMasterKeyRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求对应的Protobuf消息，合并本地缓存后生成最终proto。
+   * @return 序列化后的Protobuf消息实例
+   */
   public RouterMasterKeyRequestProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -51,6 +71,7 @@ public class RouterMasterKeyRequestPBImpl extends RouterMasterKeyRequest {
     return proto;
   }
 
+  // 将本地缓存数据合并到Protobuf消息
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -60,6 +81,7 @@ public class RouterMasterKeyRequestPBImpl extends RouterMasterKeyRequest {
     viaProto = true;
   }
 
+  // 初始化Protobuf构建器，如果当前使用proto实例则基于它创建builder
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = RouterMasterKeyRequestProto.newBuilder(proto);
@@ -67,6 +89,7 @@ public class RouterMasterKeyRequestPBImpl extends RouterMasterKeyRequest {
     viaProto = false;
   }
 
+  // 将本地缓存的主密钥对象合并到Protobuf构建器
   private void mergeLocalToBuilder() {
     RouterMasterKeyPBImpl masterKeyRequest = (RouterMasterKeyPBImpl) this.routerMasterKey;
     RouterMasterKeyProto routerMasterKeyProto = builder.getRouterMasterKey();
@@ -120,10 +143,20 @@ public class RouterMasterKeyRequestPBImpl extends RouterMasterKeyRequest {
     return TextFormat.shortDebugString(getProto());
   }
 
+  /**
+   * 将Protobuf格式的主密钥转换为业务对象。
+   * @param masterKeyProto Protobuf格式主密钥
+   * @return 业务层RouterMasterKey对象
+   */
   private RouterMasterKey convertFromProtoFormat(RouterMasterKeyProto masterKeyProto) {
     return new RouterMasterKeyPBImpl(masterKeyProto);
   }
 
+  /**
+   * 将业务层主密钥对象转换为Protobuf格式。
+   * @param masterKey 业务层RouterMasterKey对象
+   * @return Protobuf格式主密钥
+   */
   private RouterMasterKeyProto convertToProtoFormat(RouterMasterKey masterKey) {
     return ((RouterMasterKeyPBImpl) masterKey).getProto();
   }

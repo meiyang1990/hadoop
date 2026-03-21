@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -37,28 +38,36 @@ import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.util.concurrent.SubjectInheritingThread;
 
 /**
- * Extends Thread and provides an implementation that is used for processing the
- * AM heart beat request asynchronously and sending back the response using the
- * callback method registered with the system.
+ * 应用 Masters 心跳请求异步处理线程，用于异步处理 AM 心跳请求，通过回调返回处理结果。
  */
 public class AMHeartbeatRequestHandler extends SubjectInheritingThread {
   public static final Logger LOG =
       LoggerFactory.getLogger(AMHeartbeatRequestHandler.class);
 
-  // Indication flag for the thread to keep running
+  // 线程运行状态标记，控制线程是否继续工作
   private volatile boolean keepRunning;
 
-  // For unit test draining
+  // 线程等待状态标记，供单元测试排空队列使用
   private volatile boolean isThreadWaiting;
 
   private Configuration conf;
   private ApplicationId applicationId;
 
+  // 异步心跳请求队列，缓存待处理的分配请求
   private BlockingQueue<AsyncAllocateRequestInfo> requestQueue;
+  // ResourceManager 客户端代理，负责转发心跳请求到RM
   private AMRMClientRelayer rmProxyRelayer;
+  // 发起请求的用户凭据信息
   private UserGroupInformation userUgi;
+  // 记录上一次心跳响应的ID，用于请求序号同步
   private int lastResponseId;
 
+  /**
+   * 构造AM心跳请求处理器，初始化线程和请求队列。
+   * @param conf Hadoop配置对象
+   * @param applicationId 所属应用ID
+   * @param rmProxyRelayer RM客户端代理
+   */
   public AMHeartbeatRequestHandler(Configuration conf,
       ApplicationId applicationId, AMRMClientRelayer rmProxyRelayer) {
     super("AMHeartbeatRequestHandler Heartbeat Handler Thread");
@@ -76,7 +85,7 @@ public class AMHeartbeatRequestHandler extends SubjectInheritingThread {
   }
 
   /**
-   * Shutdown the thread.
+   * 关闭该处理线程，终止心跳处理循环。
    */
   public void shutdown() {
     this.keepRunning = false;
@@ -88,8 +97,11 @@ public class AMHeartbeatRequestHandler extends SubjectInheritingThread {
     while (keepRunning) {
       AsyncAllocateRequestInfo requestInfo;
       try {
+        // 标记线程进入等待状态
         this.isThreadWaiting = true;
+        // 从队列阻塞取出待处理请求
         requestInfo = this.requestQueue.take();
+        // 标记线程退出等待状态
         this.isThreadWaiting = false;
 
         if (requestInfo == null) {
@@ -100,8 +112,7 @@ public class AMHeartbeatRequestHandler extends SubjectInheritingThread {
           break;
         }
 
-        // change the response id before forwarding the allocate request as we
-        // could have different values for each UAM
+        // 在转发请求前设置响应ID，不同UAM可能需要独立序号
         AllocateRequest request = requestInfo.getRequest();
         if (request == null) {
           throw new YarnException("Null allocateRequest from requestInfo");
@@ -110,14 +121,17 @@ public class AMHeartbeatRequestHandler extends SubjectInheritingThread {
             ((request.getAskList() == null) ? " empty" :
             request.getAskList().size()));
 
+        // 设置当前请求的响应ID
         request.setResponseId(lastResponseId);
+        // 通过代理向RM发送分配请求（心跳）
         AllocateResponse response = rmProxyRelayer.allocate(request);
         if (response == null) {
           throw new YarnException("Null allocateResponse from allocate");
         }
 
+        // 更新本地记录的最新响应ID
         lastResponseId = response.getResponseId();
-        // update token if RM has reissued/renewed
+        // 如果RM重新颁发了AMRM令牌，更新本地令牌
         if (response.getAMRMToken() != null) {
           LOG.debug("Received new AMRMToken");
           YarnServerSecurityUtils.updateAMRMToken(response.getAMRMToken(),
@@ -131,6 +145,7 @@ public class AMHeartbeatRequestHandler extends SubjectInheritingThread {
         if (requestInfo.getCallback() == null) {
           throw new YarnException("Null callback from requestInfo");
         }
+        // 回调通知调用方处理结果
         requestInfo.getCallback().callback(response);
       } catch (InterruptedException ex) {
         LOG.debug("Interrupted while waiting for queue", ex);
@@ -146,38 +161,40 @@ public class AMHeartbeatRequestHandler extends SubjectInheritingThread {
   }
 
   /**
-   * Reset the lastResponseId to zero.
+   * 重置响应ID为初始值0。
    */
   public void resetLastResponseId() {
     this.lastResponseId = 0;
   }
 
   /**
-   * Set the UGI for RM connection.
-   * @param ugi UserGroupInformation.
+   * 设置连接RM使用的用户凭据UGI。
+   * @param ugi 用户组信息对象
    */
   public void setUGI(UserGroupInformation ugi) {
     this.userUgi = ugi;
   }
 
   /**
-   * Sends the specified heart beat request to the resource manager and invokes
-   * the callback asynchronously with the response.
+   * 异步提交心跳分配请求，处理完成后通过回调返回结果。
    *
-   * @param request the allocate request
-   * @param callback the callback method for the request
-   * @throws YarnException if registerAM is not called yet
+   * @param request 资源分配请求
+   * @param callback 结果回调方法
+   * @throws YarnException 如果请求入队失败
    */
   public void allocateAsync(AllocateRequest request,
       AsyncCallback<AllocateResponse> callback) throws YarnException {
     try {
       this.requestQueue.put(new AsyncAllocateRequestInfo(request, callback));
     } catch (InterruptedException ex) {
-      // Should not happen as we have MAX_INT queue length
+      // 队列长度无上限，理论上不会阻塞被中断
       LOG.debug("Interrupted while waiting to put on response queue", ex);
     }
   }
 
+  /**
+   * 排空请求队列，等待所有请求处理完成，仅用于单元测试。
+   */
   @VisibleForTesting
   public void drainHeartbeatThread() {
     while (!this.isThreadWaiting || this.requestQueue.size() > 0) {
@@ -188,14 +205,16 @@ public class AMHeartbeatRequestHandler extends SubjectInheritingThread {
     }
   }
 
+  /**
+   * 获取当前请求队列长度，仅用于单元测试。
+   */
   @VisibleForTesting
   public int getRequestQueueSize() {
     return this.requestQueue.size();
   }
 
   /**
-   * Data structure that encapsulates AllocateRequest and AsyncCallback
-   * instance.
+   * 封装异步分配请求的结构体，保存请求对象和结果回调。
    */
   public static class AsyncAllocateRequestInfo {
     private AllocateRequest request;
@@ -221,7 +240,7 @@ public class AMHeartbeatRequestHandler extends SubjectInheritingThread {
   }
 
   /**
-   * Uncaught exception handler for the background heartbeat thread.
+   * 后台心跳线程的未捕获异常处理器，处理线程运行中未捕获的异常。
    */
   public class HeartBeatThreadUncaughtExceptionHandler
       implements UncaughtExceptionHandler {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -28,16 +29,17 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterPolicyCo
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Policy that allows operator to configure "weights" for routing. This picks a
- * {@link LocalityRouterPolicy} for the router and a {@link
- * LocalityMulticastAMRMProxyPolicy} for the amrmproxy as they are designed to
- * work together.
+ * YARN联邦加权位置感知路由策略管理器，支持管理员为不同子集群配置权重进行调度。
+ * 固定绑定位置感知路由策略和位置感知AMRM代理策略，二者专为加权位置感知场景设计协同工作。
  */
 public class WeightedLocalityPolicyManager
     extends AbstractPolicyManager {
 
   private WeightedPolicyInfo weightedPolicyInfo;
 
+  /**
+   * 构造函数，硬编码绑定路由层和代理层兼容的位置感知策略实现。
+   */
   public WeightedLocalityPolicyManager() {
     //this structurally hard-codes two compatible policies for Router and
     // AMRMProxy.
@@ -49,7 +51,9 @@ public class WeightedLocalityPolicyManager
   @Override
   public SubClusterPolicyConfiguration serializeConf()
       throws FederationPolicyInitializationException {
+    // 将权重策略信息序列化为ByteBuffer
     ByteBuffer buf = weightedPolicyInfo.toByteBuffer();
+    // 构造并返回序列化后的子集群策略配置
     return SubClusterPolicyConfiguration
         .newInstance(getQueue(), this.getClass().getCanonicalName(), buf);
   }

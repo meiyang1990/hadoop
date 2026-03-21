@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,17 +22,25 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.util.StringUtils;
 
 /**
- * Unique ID for a volume. This may or may not come from a storage system,
- * YARN depends on this ID to recognized volumes and manage their states.
+ * CSI存储卷的唯一标识类。ID可能来自底层存储系统，也可由YARN生成，
+ * YARN依赖该ID识别存储卷并管理其生命周期状态。
  */
 public class VolumeId {
 
   private final String volumeId;
 
+  /**
+   * 构造方法，基于指定ID字符串创建存储卷标识。
+   * @param volumeId 存储卷唯一ID字符串
+   */
   public VolumeId(String volumeId) {
     this.volumeId = volumeId;
   }
 
+  /**
+   * 获取存储卷ID字符串。
+   * @return 存储卷唯一ID
+   */
   public String getId() {
     return this.volumeId;
   }
@@ -46,6 +55,7 @@ public class VolumeId {
     if (!(obj instanceof VolumeId)) {
       return false;
     }
+    // 不区分大小写比较ID字符串
     return StringUtils.equalsIgnoreCase(volumeId,
         ((VolumeId) obj).getId());
   }

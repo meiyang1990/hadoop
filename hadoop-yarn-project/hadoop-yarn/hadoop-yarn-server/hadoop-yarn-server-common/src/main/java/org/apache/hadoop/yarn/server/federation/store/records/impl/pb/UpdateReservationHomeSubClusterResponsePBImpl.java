@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,29 +26,43 @@ import org.apache.hadoop.yarn.server.federation.store.records.UpdateReservationH
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of
- * {@link UpdateReservationHomeSubClusterResponse}.
+ * 文件说明：YARN联邦存储更新预留主集群响应的Protocol Buffer实现类
+ * 基于Protocol Buffer序列化实现{@link UpdateReservationHomeSubClusterResponse}接口。
  */
 @Private
 @Unstable
 public class UpdateReservationHomeSubClusterResponsePBImpl
     extends UpdateReservationHomeSubClusterResponse {
 
+  // 存储Protocol Buffer消息实例
   private UpdateReservationHomeSubClusterResponseProto proto =
       UpdateReservationHomeSubClusterResponseProto.getDefaultInstance();
+  // Protocol Buffer构建器，用于构建消息
   private UpdateReservationHomeSubClusterResponseProto.Builder builder = null;
+  // 标识当前是否直接使用proto实例，而非通过builder构建
   private boolean viaProto = false;
 
+  /**
+   * 构造函数，初始化构建器准备创建响应对象。
+   */
   public UpdateReservationHomeSubClusterResponsePBImpl() {
     builder = UpdateReservationHomeSubClusterResponseProto.newBuilder();
   }
 
+  /**
+   * 构造函数，基于已有proto实例包装响应对象。
+   * @param proto 已有的Protocol Buffer响应实例
+   */
   public UpdateReservationHomeSubClusterResponsePBImpl(
       UpdateReservationHomeSubClusterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的Protocol Buffer proto实例。
+   * @return 序列化后的proto实例
+   */
   public UpdateReservationHomeSubClusterResponseProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;

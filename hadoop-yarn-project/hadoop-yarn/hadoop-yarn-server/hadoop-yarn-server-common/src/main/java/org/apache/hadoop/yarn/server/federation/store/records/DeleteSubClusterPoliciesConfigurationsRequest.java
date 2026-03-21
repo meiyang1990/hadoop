@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,12 +26,18 @@ import org.apache.hadoop.yarn.util.Records;
 import java.util.List;
 
 /**
- * This class is used to respond to queue deletion requests and contains a list of queues.
+ * 删除子集群路由策略配置请求类，封装待删除策略关联的队列列表，用于YARN联邦状态存储层处理策略删除操作。
  */
 @Private
 @Unstable
 public abstract class DeleteSubClusterPoliciesConfigurationsRequest {
 
+  /**
+   * 创建删除子集群策略配置请求实例，传入待删除策略关联的队列列表。
+   *
+   * @param queues 待删除策略关联的队列名称列表
+   * @return 初始化完成的删除请求对象
+   */
   @Private
   @Unstable
   public static DeleteSubClusterPoliciesConfigurationsRequest newInstance(
@@ -42,18 +49,18 @@ public abstract class DeleteSubClusterPoliciesConfigurationsRequest {
   }
 
   /**
-   * To obtain the list of queues to be deleted.
+   * 获取待删除策略关联的队列名称列表。
    *
-   * @return list of queue names.
+   * @return 队列名称列表
    */
   @Public
   @Unstable
   public abstract List<String> getQueues();
 
   /**
-   * Set the list of queues to be deleted.
+   * 设置待删除策略关联的队列名称列表。
    *
-   * @param queues list of queue names.
+   * @param queues 队列名称列表
    */
   @Private
   @Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,7 +39,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
 /**
- * Metrics for FederationInterceptor Internals.
+ * AMRMClientRelayer 性能和使用指标采集类，用于YARN联邦场景下链路转发的监控统计。
  */
 @InterfaceAudience.Private
 @Metrics(about = "Performance and usage metrics for YARN AMRMClientRelayer",
@@ -46,7 +47,7 @@ import static org.apache.hadoop.metrics2.lib.Interns.info;
 public final class AMRMClientRelayerMetrics implements MetricsSource{
 
   /**
-   * Easier classification of request types for logging metrics.
+   * 按请求类型分类指标，便于统计不同类型请求的监控数据。
    */
   public enum RequestType {
     Guaranteed, Opportunistic, Promote, Demote;
@@ -77,38 +78,42 @@ public final class AMRMClientRelayerMetrics implements MetricsSource{
   private static volatile AMRMClientRelayerMetrics instance = null;
   private static MetricsRegistry registry;
 
-  // The metrics are set up as a map from string (typically sub cluster id) to
-  // request type (Guaranteed, Opp, Promote, Demote) to the counter.
-  // The counters are constructed lazily when the first metric entry
-  // comes in.
-  // For some metrics, request type is not applicable.
+  // 指标结构：子集群ID -> 请求类型 -> 指标对象，懒加载构造指标
+  // 按子集群维度区分统计，不适用请求类型的指标使用单独存储
+  /** RM客户端待处理请求队列长度，按子集群+请求类型分组 */
   private final Map<String, Map<RequestType, MutableGaugeLong>>
       rmClientPending = new ConcurrentHashMap<>();
 
+  /** 请求满足延迟分位数统计，按子集群+请求类型分组 */
   private final Map<String, Map<RequestType, MutableQuantiles>> fulfillLatency =
       new ConcurrentHashMap<>();
 
+  /** 请求QPS统计，按子集群+请求类型分组 */
   private final Map<String, Map<RequestType, MutableGaugeLong>>
       requestedQps = new ConcurrentHashMap<>();
 
+  /** 已满足请求QPS统计，按子集群+请求类型分组 */
   private final Map<String, Map<RequestType, MutableGaugeLong>>
       fulfilledQps = new ConcurrentHashMap<>();
 
+  /** RM主备切换次数统计，按子集群分组 */
   private final Map<String, MutableGaugeLong> rmMasterSlaveSwitch =
       new ConcurrentHashMap<>();
 
+  /** 心跳失败次数统计，按子集群分组 */
   private final Map<String, MutableGaugeLong> heartbeatFailure =
       new ConcurrentHashMap<>();
 
+  /** 心跳成功次数统计，按子集群分组 */
   private final Map<String, MutableGaugeLong> heartbeatSuccess =
       new ConcurrentHashMap<>();
+  /** 心跳延迟分位数统计，按子集群分组 */
   private final Map<String, MutableQuantiles> heartbeatLatency =
       new ConcurrentHashMap<>();
 
   /**
-   * Initialize the singleton instance.
-   *
-   * @return the singleton
+   * 获取单例实例，线程安全的懒加载初始化。
+   * @return 单例对象
    */
   public static AMRMClientRelayerMetrics getInstance() {
     if (!isInitialized.get()) {
@@ -129,6 +134,11 @@ public final class AMRMClientRelayerMetrics implements MetricsSource{
     registry.tag(RECORD_INFO, "AMRMClientRelayer");
   }
 
+  /**
+   * 根据执行类型转换为指标请求分类。
+   * @param execType 执行类型
+   * @return 指标请求分类
+   */
   public static RequestType getRequestType(ExecutionType execType) {
     if (execType == null || execType.equals(ExecutionType.GUARANTEED)) {
       return RequestType.Guaranteed;
@@ -190,6 +200,12 @@ public final class AMRMClientRelayerMetrics implements MetricsSource{
     getFulfillLatencyMetric(instanceId, type).add(latency);
   }
 
+  /**
+   * 添加容器更新类型请求的满足延迟。
+   * @param instanceId 子集群ID
+   * @param type 容器更新类型
+   * @param latency 延迟值
+   */
   public void addFulfillLatency(String instanceId, ContainerUpdateType type,
       long latency) {
     switch(type) {
@@ -252,20 +268,32 @@ public final class AMRMClientRelayerMetrics implements MetricsSource{
     getFulfilledQPSMetric(instanceId, type).incr(numEntries);
   }
 
+  /**
+   * 添加容器更新类型请求的已完成QPS统计。
+   * @param instanceId 子集群ID
+   * @param type 容器更新类型
+   * @param numEntries 增量数量
+   */
   public void addFulfilledQPS(String instanceId, ContainerUpdateType type,
-      long latency) {
+      long numEntries) {
     switch(type) {
     case DEMOTE_EXECUTION_TYPE:
-      addFulfilledQPS(instanceId, RequestType.Demote, latency);
+      addFulfilledQPS(instanceId, RequestType.Demote, numEntries);
       break;
     case PROMOTE_EXECUTION_TYPE:
-      addFulfilledQPS(instanceId, RequestType.Promote, latency);
+      addFulfilledQPS(instanceId, RequestType.Promote, numEntries);
       break;
     default:
       break;
     }
   }
 
+  /**
+   * 增加容器更新类型请求的待处理队列长度。
+   * @param scId 子集群ID
+   * @param type 容器更新类型
+   * @param diff 增量数量
+   */
   public void incrClientPending(String scId, ContainerUpdateType type,
       int diff) {
     switch(type) {
@@ -280,6 +308,12 @@ public final class AMRMClientRelayerMetrics implements MetricsSource{
     }
   }
 
+  /**
+   * 减少容器更新类型请求的待处理队列长度。
+   * @param scId 子集群ID
+   * @param type 容器更新类型
+   * @param diff 减量数量
+   */
   public void decrClientPending(String scId, ContainerUpdateType type,
       int diff) {
     switch(type) {
@@ -336,6 +370,11 @@ public final class AMRMClientRelayerMetrics implements MetricsSource{
     return heartbeatFailure.get(instanceId);
   }
 
+  /**
+   * 记录一次心跳失败，并添加心跳延迟统计。
+   * @param instanceId 子集群ID
+   * @param latency 心跳延迟
+   */
   public void addHeartbeatFailure(String instanceId, long latency) {
     getHeartbeatFailureMetric(instanceId).incr();
 
@@ -355,6 +394,11 @@ public final class AMRMClientRelayerMetrics implements MetricsSource{
     return heartbeatSuccess.get(instanceId);
   }
 
+  /**
+   * 记录一次心跳成功，并添加心跳延迟统计。
+   * @param instanceId 子集群ID
+   * @param latency 心跳延迟
+   */
   public void addHeartbeatSuccess(String instanceId, long latency) {
     getHeartbeatSuccessMetric(instanceId).incr();
 

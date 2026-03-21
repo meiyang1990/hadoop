@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,18 +29,20 @@ import java.util.Map;
 import java.util.TreeSet;
 
 /**
- * In-memory implementation of {@link TimelineStore}. This
- * implementation is for test purpose only. If users improperly instantiate it,
- * they may encounter reading and writing history data in different memory
- * store.
- * 
- * The methods are synchronized to avoid concurrent modification on the memory.
- * 
+ * 基于内存的时间线存储服务实现，仅用于测试目的。
+ * 所有方法都做了同步处理，避免内存数据并发修改问题。
+ * 错误实例化可能导致读写操作访问不同内存存储实例，因此不建议在生产环境使用。
  */
 @Private
 @Unstable
 public class MemoryTimelineStore extends KeyValueBasedTimelineStore {
 
+  /**
+   * 基于HashMap的时间线存储适配器，实现TimelineStoreMapAdapter接口
+   * 封装HashMap基础操作，提供按值范围迭代能力
+   * @param <K> 键类型
+   * @param <V> 值类型
+   */
   static class HashMapStoreAdapter<K, V>
       implements TimelineStoreMapAdapter<K, V> {
     Map<K, V> internalMap = new HashMap<>();
@@ -62,6 +65,7 @@ public class MemoryTimelineStore extends KeyValueBasedTimelineStore {
     @Override
     public CloseableIterator<V>
     valueSetIterator() {
+      // 将所有值排序后返回迭代器
       return wrapClosableIterator(new TreeSet<>(internalMap.values())
           .iterator());
     }
@@ -69,6 +73,7 @@ public class MemoryTimelineStore extends KeyValueBasedTimelineStore {
     @Override
     @SuppressWarnings("unchecked")
     public CloseableIterator<V> valueSetIterator(V minV) {
+      // 如果值支持比较，只返回大于等于最小值的结果
       if (minV instanceof Comparable) {
         TreeSet<V> tempTreeSet = new TreeSet<>();
         for (V value : internalMap.values()) {
@@ -78,10 +83,16 @@ public class MemoryTimelineStore extends KeyValueBasedTimelineStore {
         }
         return wrapClosableIterator(tempTreeSet.iterator());
       } else {
+        // 不支持比较则返回所有值
         return valueSetIterator();
       }
     }
 
+    /**
+     * 将原生迭代器包装为可关闭迭代器
+     * @param iterator 原生迭代器
+     * @return 可关闭迭代器实例
+     */
     private CloseableIterator<V> wrapClosableIterator(
         final Iterator<V> iterator) {
       return new CloseableIterator<V>() {
@@ -110,10 +121,17 @@ public class MemoryTimelineStore extends KeyValueBasedTimelineStore {
     }
   }
 
+  /**
+   * 默认构造函数，使用类名作为存储名称
+   */
   public MemoryTimelineStore() {
     this(MemoryTimelineStore.class.getName());
   }
 
+  /**
+   * 带名称的构造函数，初始化各类存储容器
+   * @param name 存储名称
+   */
   public MemoryTimelineStore(String name) {
     super(name);
     entities = new HashMapStoreAdapter<>();

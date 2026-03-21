@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,16 +23,17 @@ import org.apache.hadoop.yarn.api.records.Container;
 import java.util.List;
 
 /**
- * Event used by the NodeStatusUpdater to notify the ContainerManager of
- * container update commands it received from the RM.
+ * YARN NodeManager中，用于NodeStatusUpdater向ContainerManager
+ * 通知从ResourceManager收到的容器更新命令的事件
  */
 public class CMgrUpdateContainersEvent extends ContainerManagerEvent {
 
+  // 待更新的容器列表
   private final List<Container> containersToUpdate;
 
   /**
-   * Create event.
-   * @param containersToUpdate Container to update.
+   * 构造容器更新事件
+   * @param containersToUpdate 待更新的容器列表
    */
   public CMgrUpdateContainersEvent(List<Container> containersToUpdate) {
     super(ContainerManagerEventType.UPDATE_CONTAINERS);
@@ -39,8 +41,8 @@ public class CMgrUpdateContainersEvent extends ContainerManagerEvent {
   }
 
   /**
-   * Get containers to update.
-   * @return List of containers to update.
+   * 获取待更新的容器列表
+   * @return 待更新的容器列表
    */
   public List<Container> getContainersToUpdate() {
     return this.containersToUpdate;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,29 +24,43 @@ import org.apache.hadoop.yarn.federation.proto.YarnServerFederationProtos.Delete
 import org.apache.hadoop.yarn.server.federation.store.records.DeleteSubClusterPoliciesConfigurationsResponse;
 
 /**
- * Protocol buffer based implementation of
- * {@link DeleteSubClusterPoliciesConfigurationsResponse}.
+ * 基于ProtocolBuffer实现的删除子集群策略配置响应类，用于YARN联邦元数据存储响应的序列化
+ * 实现 {@link DeleteSubClusterPoliciesConfigurationsResponse} 接口
  */
 @Private
 @Unstable
 public class DeleteSubClusterPoliciesConfigurationsResponsePBImpl
     extends DeleteSubClusterPoliciesConfigurationsResponse {
 
+  // 存储已构建完成的ProtocolBuffer原型对象
   private DeleteSubClusterPoliciesConfigurationsResponseProto proto =
       DeleteSubClusterPoliciesConfigurationsResponseProto.getDefaultInstance();
+  // ProtocolBuffer构建器，用于构建新对象
   private DeleteSubClusterPoliciesConfigurationsResponseProto.Builder builder = null;
+  // 标记当前是否通过已有的原型对象使用该实例
   private boolean viaProto = false;
 
+  /**
+   * 构造函数，初始化构建器用于创建新响应对象
+   */
   public DeleteSubClusterPoliciesConfigurationsResponsePBImpl() {
     builder = DeleteSubClusterPoliciesConfigurationsResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有原型对象构造响应实例
+   * @param proto 已有的ProtocolBuffer原型对象
+   */
   public DeleteSubClusterPoliciesConfigurationsResponsePBImpl(
       DeleteSubClusterPoliciesConfigurationsResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前响应对应的ProtocolBuffer原型对象
+   * @return 构建完成的ProtocolBuffer原型对象
+   */
   public DeleteSubClusterPoliciesConfigurationsResponseProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;

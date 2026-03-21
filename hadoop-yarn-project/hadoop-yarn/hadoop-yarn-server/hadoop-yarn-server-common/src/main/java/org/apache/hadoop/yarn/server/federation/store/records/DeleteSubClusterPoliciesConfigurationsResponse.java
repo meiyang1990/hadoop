@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,13 +23,16 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * DeleteSubClusterPoliciesConfigurationsResponse contains the answer from the
- * {@code FederationPolicyStore} to a request to delete policy configurations
- * for given queues.
+ * 删除子集群策略配置响应类，封装联邦策略存储层处理删除队列策略配置请求后的返回结果。
+ * 用于YARN联邦架构中，反馈删除指定队列子集群路由策略配置操作的结果。
  */
 @Private
 @Unstable
 public abstract class DeleteSubClusterPoliciesConfigurationsResponse {
+  /**
+   * 创建一个新的删除策略配置响应实例。
+   * @return 新建的删除策略配置响应对象
+   */
   public static DeleteSubClusterPoliciesConfigurationsResponse newInstance() {
     return Records.newRecord(DeleteSubClusterPoliciesConfigurationsResponse.class);
   }

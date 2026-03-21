@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /** * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -30,6 +31,9 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
+/**
+ * 全局策略生成器(GPG) REST Web服务端点，提供GPG运行状态信息查询接口。
+ */
 @Singleton
 @Path("/ws/v1/gpg")
 public class GPGWebServices {
@@ -38,11 +42,19 @@ public class GPGWebServices {
 
   private GlobalPolicyGenerator gpgGenerator;
 
+  /**
+   * 构造函数，通过依赖注入获取全局策略生成器实例。
+   * @param gpg 全局策略生成器实例
+   */
   @Inject
   public GPGWebServices(final @Named("gpg") GlobalPolicyGenerator gpg) {
     this.gpgGenerator = gpg;
   }
 
+  /**
+   * 获取GPG基本信息，根端点响应。
+   * @return 封装GPG上下文信息的GpgInfo对象
+   */
   @GET
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
       MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
@@ -50,6 +62,10 @@ public class GPGWebServices {
     return new GpgInfo(this.gpgGenerator.getGPGContext());
   }
 
+  /**
+   * 获取GPG详细信息，/info端点响应。
+   * @return 封装GPG上下文信息的GpgInfo对象
+   */
   @GET
   @Path("/info")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -18,10 +19,13 @@
 package org.apache.hadoop.yarn.server.federation.policies.exceptions;
 
 /**
- * This exception is thrown whenever a policy is given a {@code SubClusterId}
- * that is unknown.
+ * YARN联邦路由策略异常：当策略接收到不存在的子集群ID时抛出此异常。
  */
 public class UnknownSubclusterException extends FederationPolicyException {
+  /**
+   * 构造方法，传入异常描述信息。
+   * @param s 异常描述信息
+   */
   public UnknownSubclusterException(String s) {
     super(s);
   }

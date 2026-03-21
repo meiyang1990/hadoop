@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,8 +22,16 @@ package org.apache.hadoop.yarn.server.api.protocolrecords;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * 获取时间线收集器上下文请求，用于从YARN服务获取指定应用的时间线收集器配置上下文信息。
+ */
 public abstract class GetTimelineCollectorContextRequest {
 
+  /**
+   * 创建获取时间线收集器上下文请求实例。
+   * @param appId 目标应用ID
+   * @return 构建完成的请求对象
+   */
   public static GetTimelineCollectorContextRequest newInstance(
       ApplicationId appId) {
     GetTimelineCollectorContextRequest request =
@@ -31,7 +40,15 @@ public abstract class GetTimelineCollectorContextRequest {
     return request;
   }
 
+  /**
+   * 获取请求目标应用ID。
+   * @return 目标应用ID
+   */
   public abstract ApplicationId getApplicationId();
 
+  /**
+   * 设置请求目标应用ID。
+   * @param appId 目标应用ID
+   */
   public abstract void setApplicationId(ApplicationId appId);
 }

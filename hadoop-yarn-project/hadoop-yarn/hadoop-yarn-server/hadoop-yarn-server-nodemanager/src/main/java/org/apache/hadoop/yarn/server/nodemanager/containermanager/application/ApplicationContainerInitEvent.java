@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,25 +23,29 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ContainerInitEvent;
 
 /**
- * Event sent from {@link ContainerManagerImpl} to {@link ApplicationImpl} to
- * request the initialization of a container. This is funneled through
- * the Application so that the application life-cycle can be checked, and container
- * launches can be delayed until the application is fully initialized.
- * 
- * Once the application is initialized,
- * {@link ApplicationImpl.InitContainerTransition} simply passes this event on as a
- * {@link ContainerInitEvent}.
- *  
+ * 容器初始化事件，由ContainerManagerImpl发送给ApplicationImpl
+ * 用于请求初始化应用所属容器，通过应用层中转可以检查应用生命周期，
+ * 容器启动会被延迟到应用完成初始化之后。
+ * 应用初始化完成后，InitContainerTransition会将本事件转换为ContainerInitEvent转发给容器。
  */
 public class ApplicationContainerInitEvent extends ApplicationEvent {
+  // 待初始化的容器实例
   final Container container;
   
+  /**
+   * 构造应用容器初始化事件
+   * @param container 待初始化的容器
+   */
   public ApplicationContainerInitEvent(Container container) {
     super(container.getContainerId().getApplicationAttemptId()
         .getApplicationId(), ApplicationEventType.INIT_CONTAINER);
     this.container = container;
   }
 
+  /**
+   * 获取待初始化的容器实例
+   * @return 待初始化容器
+   */
   Container getContainer() {
     return container;
   }

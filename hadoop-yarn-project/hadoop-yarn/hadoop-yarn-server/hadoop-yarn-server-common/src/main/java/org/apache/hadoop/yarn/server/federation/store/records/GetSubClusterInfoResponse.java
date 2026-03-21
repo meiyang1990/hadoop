@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,12 +24,17 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Response to a query with {@link SubClusterInfo} about a sub-cluster.
+ * YARN联邦存储层获取子集群信息查询的响应封装，携带查询到的子集群信息。
  */
 @Private
 @Unstable
 public abstract class GetSubClusterInfoResponse {
 
+  /**
+   * 创建新的获取子集群信息响应实例。
+   * @param subClusterInfo 子集群信息
+   * @return 响应实例
+   */
   @Private
   @Unstable
   public static GetSubClusterInfoResponse newInstance(
@@ -40,20 +46,18 @@ public abstract class GetSubClusterInfoResponse {
   }
 
   /**
-   * Get the {@link SubClusterInfo} encapsulating the information about the
-   * sub-cluster.
+   * 获取查询到的子集群详细信息。
    *
-   * @return the information pertaining to the sub-cluster
+   * @return 子集群完整信息
    */
   @Public
   @Unstable
   public abstract SubClusterInfo getSubClusterInfo();
 
   /**
-   * Set the {@link SubClusterInfo} encapsulating the information about the
-   * sub-cluster.
+   * 设置查询结果的子集群信息。
    *
-   * @param subClusterInfo the information pertaining to the sub-cluster
+   * @param subClusterInfo 子集群完整信息
    */
   @Private
   @Unstable

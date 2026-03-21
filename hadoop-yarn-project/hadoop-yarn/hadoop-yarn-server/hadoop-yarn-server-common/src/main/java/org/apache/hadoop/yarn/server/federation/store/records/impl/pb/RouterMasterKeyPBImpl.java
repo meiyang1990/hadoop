@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,27 +27,48 @@ import org.apache.hadoop.yarn.server.federation.store.records.RouterMasterKey;
 
 import java.nio.ByteBuffer;
 
+/**
+ * RouterMasterKey的Protobuf实现类，用于YARN联邦状态存储中存储路由器主密钥信息，
+ * 基于Protobuf实现序列化，支持在联邦状态存储中持久化读写。
+ */
 public class RouterMasterKeyPBImpl extends RouterMasterKey {
 
+  // 持有的Protobuf对象实例
   private RouterMasterKeyProto proto = RouterMasterKeyProto.getDefaultInstance();
+  // Protobuf构建器，用于构建修改对象
   private RouterMasterKeyProto.Builder builder = null;
+  // 当前是否直接使用proto对象标识状态
   private boolean viaProto = false;
 
+  /**
+   * 构造函数，初始化空Builder用于构建新对象。
+   */
   public RouterMasterKeyPBImpl() {
     builder = RouterMasterKeyProto.newBuilder();
   }
 
+  /**
+   * 基于已有的Protobuf对象构造包装实例。
+   * @param masterKeyProto 已构造好的RouterMasterKeyProto对象
+   */
   public RouterMasterKeyPBImpl(RouterMasterKeyProto masterKeyProto) {
     this.proto = masterKeyProto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的Protobuf实例，用于序列化。
+   * @return 构造完成的RouterMasterKeyProto
+   */
   public RouterMasterKeyProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
   }
 
+  /**
+   * 初始化Builder，确保可以修改对象，从现有proto拷贝构建Builder。
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = RouterMasterKeyProto.newBuilder(proto);
@@ -123,10 +145,20 @@ public class RouterMasterKeyPBImpl extends RouterMasterKey {
     builder.setExpiryDate(expiryDate);
   }
 
+  /**
+   * 将Protobuf的ByteString转换为Java NIO ByteBuffer。
+   * @param byteString Protobuf格式字节串
+   * @return Java ByteBuffer
+   */
   protected final ByteBuffer convertFromProtoFormat(ByteString byteString) {
     return ProtoUtils.convertFromProtoFormat(byteString);
   }
 
+  /**
+   * 将Java NIO ByteBuffer转换为Protobuf的ByteString。
+   * @param byteBuffer Java ByteBuffer
+   * @return Protobuf格式字节串
+   */
   protected final ByteString convertToProtoFormat(ByteBuffer byteBuffer) {
     return ProtoUtils.convertToProtoFormat(byteBuffer);
   }

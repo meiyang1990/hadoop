@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -26,21 +27,24 @@ import org.apache.hadoop.yarn.util.Records;
 
 /**
  * <p>
- * The response sent by <code>Federation state
- * store</code> to a query for the home subcluster of all submitted
- * reservations.
+ * YARN联邦状态存储响应类，用于响应查询所有已提交预留资源归属子集群的请求。
  *
  * <p>
- * The response includes the mapping details, i.e.:
+ * 响应包含预留资源与归属子集群的映射信息，具体包括：
  * <ul>
- * <li>{@code ReservationId}</li>
- * <li>{@code SubClusterId}</li>
+ * <li>{@code ReservationId} 预留资源ID</li>
+ * <li>{@code SubClusterId} 归属子集群ID</li>
  * </ul>
  */
 @Private
 @Unstable
 public abstract class GetReservationsHomeSubClusterResponse {
 
+  /**
+   * 创建包含所有预留归属子集群映射的响应实例。
+   * @param appsHomeSubClusters 预留资源-归属子集群映射列表
+   * @return 新建的响应对象
+   */
   @Private
   @Unstable
   public static GetReservationsHomeSubClusterResponse newInstance(
@@ -52,21 +56,18 @@ public abstract class GetReservationsHomeSubClusterResponse {
   }
 
   /**
-   * Get the {@link ReservationHomeSubCluster} list representing the mapping of
-   * all submitted reservations to it's home sub-cluster.
+   * 获取所有已提交预留资源与其归属子集群的映射列表。
    *
-   * @return the mapping of all submitted reservation to it's home sub-cluster.
+   * @return 预留资源-归属子集群映射列表
    */
   @Public
   @Unstable
   public abstract List<ReservationHomeSubCluster> getAppsHomeSubClusters();
 
   /**
-   * Set the {@link ReservationHomeSubCluster} list representing the mapping of
-   * all submitted reservations to it's home sub-cluster.
+   * 设置所有已提交预留资源与其归属子集群的映射列表。
    *
-   * @param reservationsHomeSubClusters the mapping of all submitted reservation
-   *          to it's home sub-cluster.
+   * @param reservationsHomeSubClusters 预留资源-归属子集群映射列表
    */
   @Private
   @Unstable

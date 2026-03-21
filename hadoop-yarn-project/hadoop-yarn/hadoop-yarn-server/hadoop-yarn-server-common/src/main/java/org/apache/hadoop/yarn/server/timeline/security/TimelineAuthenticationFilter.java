@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,25 +29,34 @@ import org.apache.hadoop.security.token.delegation.web.DelegationTokenAuthentica
 import org.apache.hadoop.yarn.security.client.TimelineDelegationTokenIdentifier;
 
 /**
- * Timeline authentication filter provides delegation token support for ATSv1
- * and ATSv2.
+ * 时间线服务认证过滤器，为ATSv1和ATSv2提供代理令牌认证支持
+ * 用于对时间线服务的REST API请求进行身份认证验证
  */
 @Private
 @Unstable
 public class TimelineAuthenticationFilter
     extends DelegationTokenAuthenticationFilter {
 
+  // 时间线服务代理令牌密钥管理器实例
   private static AbstractDelegationTokenSecretManager
       <TimelineDelegationTokenIdentifier> secretManager;
 
+  /**
+   * 初始化过滤器，注入时间线服务的代理令牌密钥管理器
+   */
   @Override
   public void init(FilterConfig filterConfig) throws ServletException {
+    // 将密钥管理器存入Servlet上下文供父过滤器使用
     filterConfig.getServletContext().setAttribute(
         DelegationTokenAuthenticationFilter.
             DELEGATION_TOKEN_SECRET_MANAGER_ATTR, secretManager);
     super.init(filterConfig);
   }
 
+  /**
+   * 设置时间线服务代理令牌密钥管理器
+   * @param secretMgr 时间线代理令牌密钥管理器实例
+   */
   public static void setTimelineDelegationTokenSecretManager(
       AbstractDelegationTokenSecretManager
           <TimelineDelegationTokenIdentifier> secretMgr) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,41 +26,25 @@ import org.apache.hadoop.yarn.server.federation.policies.router.FederationRouter
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterPolicyConfiguration;
 
 /**
- *
- * Implementors need to provide the ability to serialize a policy and its
- * configuration as a {@link SubClusterPolicyConfiguration}, as well as provide
- * (re)initialization mechanics for the underlying
- * {@link FederationAMRMProxyPolicy} and {@link FederationRouterPolicy}.
- *
- * The serialization aspects are used by admin APIs or a policy engine to store
- * a serialized configuration in the {@code FederationStateStore}, while the
- * getters methods are used to obtain a properly initialized policy in the
- * {@code Router} and {@code AMRMProxy} respectively.
- *
- * This interface by design binds together {@link FederationAMRMProxyPolicy} and
- * {@link FederationRouterPolicy} and provide lifecycle support for
- * serialization and deserialization, to reduce configuration mistakes
- * (combining incompatible policies).
- *
+ * YARN联邦路由策略管理器接口，统一管理AMRMProxy策略和Router策略的生命周期与序列化。
+ * 
+ * 实现类需要支持将策略及其配置序列化为{@link SubClusterPolicyConfiguration}存储到联邦状态存储，
+ * 同时提供对{@link FederationAMRMProxyPolicy}和{@link FederationRouterPolicy}的重新初始化能力。
+ * 
+ * 将AMRMProxy策略和Router策略绑定在一起统一管理，减少配置错误（避免组合不兼容的策略），
+ * 序列化配置用于持久化存储到联邦状态存储，getter方法用于在Router和AMRMProxy服务获取初始化完成的策略实例。
  */
 public interface FederationPolicyManager {
 
   /**
-   * If the current instance is compatible, this method returns the same
-   * instance of {@link FederationAMRMProxyPolicy} reinitialized with the
-   * current context, otherwise a new instance initialized with the current
-   * context is provided. If the instance is compatible with the current class
-   * the implementors should attempt to reinitialize (retaining state). To affect
-   * a complete policy reset oldInstance should be null.
+   * 获取并初始化AMRMProxy路由策略实例。
+   * 若旧实例兼容则复用并重新初始化，否则创建新实例；旧实例为null则强制重置创建新实例。
+   * 初始化失败时旧实例仍然保持可用。
    *
-   * @param policyContext the current context
-   * @param oldInstance the existing (possibly null) instance.
-   *
-   * @return an updated {@link FederationAMRMProxyPolicy }.
-   *
-   * @throws FederationPolicyInitializationException if the initialization
-   *           cannot be completed properly. The oldInstance should be still
-   *           valid in case of failed initialization.
+   * @param policyContext 当前策略初始化上下文
+   * @param oldInstance 现有策略实例，可为null表示需要新建
+   * @return 初始化完成的AMRMProxy策略实例
+   * @throws FederationPolicyInitializationException 初始化失败时抛出
    */
   FederationAMRMProxyPolicy getAMRMPolicy(
       FederationPolicyInitializationContext policyContext,
@@ -67,21 +52,14 @@ public interface FederationPolicyManager {
       throws FederationPolicyInitializationException;
 
   /**
-   * If the current instance is compatible, this method returns the same
-   * instance of {@link FederationRouterPolicy} reinitialized with the current
-   * context, otherwise a new instance initialized with the current context is
-   * provided. If the instance is compatible with the current class the
-   * implementors should attempt to reinitialize (retaining state). To affect a
-   * complete policy reset oldInstance should be set to null.
+   * 获取并初始化Router路由策略实例。
+   * 若旧实例兼容则复用并重新初始化，否则创建新实例；旧实例为null则强制重置创建新实例。
+   * 初始化失败时旧实例仍然保持可用。
    *
-   * @param policyContext the current context
-   * @param oldInstance the existing (possibly null) instance.
-   *
-   * @return an updated {@link FederationRouterPolicy}.
-   *
-   * @throws FederationPolicyInitializationException if the initialization cannot
-   *           be completed properly. The oldInstance should be still valid in
-   *           case of failed initialization.
+   * @param policyContext 当前策略初始化上下文
+   * @param oldInstance 现有策略实例，可为null表示需要新建
+   * @return 初始化完成的Router策略实例
+   * @throws FederationPolicyInitializationException 初始化失败时抛出
    */
   FederationRouterPolicy getRouterPolicy(
       FederationPolicyInitializationContext policyContext,
@@ -89,54 +67,46 @@ public interface FederationPolicyManager {
       throws FederationPolicyInitializationException;
 
   /**
-   * This method is invoked to derive a {@link SubClusterPolicyConfiguration}.
-   * This is to be used when writing a policy object in the federation policy
-   * store.
+   * 将当前策略配置序列化为可持久化的配置对象，用于存储到联邦状态存储。
    *
-   * @return a valid policy configuration representing this object
-   *         parametrization.
-   *
-   * @throws FederationPolicyInitializationException if the current state cannot
-   *           be serialized properly
+   * @return 序列化完成的策略配置
+   * @throws FederationPolicyInitializationException 当前状态无法正确序列化时抛出
    */
   SubClusterPolicyConfiguration serializeConf()
       throws FederationPolicyInitializationException;
 
   /**
-   * This method returns the queue this policy is configured for.
+   * 获取当前策略绑定的队列名称。
    *
-   * @return the name of the queue.
+   * @return 队列名称
    */
   String getQueue();
 
   /**
-   * This methods provides a setter for the queue this policy is specified for.
+   * 设置当前策略绑定的队列名称。
    *
-   * @param queue the name of the queue.
+   * @param queue 队列名称
    */
   void setQueue(String queue);
 
   /**
-   * This method returns the queue WeightedPolicyInfo
-   * this policy is configured for.
+   * 获取当前策略配置的加权策略信息。
    *
-   * @return the name of the queue.
+   * @return 加权策略信息
    */
   WeightedPolicyInfo getWeightedPolicyInfo();
 
   /**
-   * This methods provides a setter for the queue WeightedPolicyInfo
-   * this policy is specified for.
+   * 设置当前策略的加权策略信息。
    *
-   * @param weightedPolicyInfo weightedPolicyInfo of the subCluster.
+   * @param weightedPolicyInfo 子集群加权策略信息
    */
   void setWeightedPolicyInfo(WeightedPolicyInfo weightedPolicyInfo);
 
   /**
-   * PolicyManager Whether to support WeightedPolicyInfo.
-   * Some of PolicyManagers do not support WeightedPolicyInfo.
-   * @return true, supports WeightedPolicyInfo;
-   * false, WeightedPolicyInfo is not supported
+   * 检查当前策略管理器是否支持加权策略信息，部分策略管理器不支持加权配置。
+   *
+   * @return true表示支持加权策略信息，false表示不支持
    */
   boolean isSupportWeightedPolicyInfo();
 }

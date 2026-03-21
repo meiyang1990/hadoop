@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -29,8 +30,22 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * NodeManager向ResourceManager注册时的请求记录
+ * 包含节点基本信息、当前运行状态、容器信息等注册所需的全部内容
+ */
 public abstract class RegisterNodeManagerRequest {
 
+  /**
+   * 创建RegisterNodeManagerRequest实例（最简参数）
+   * @param nodeId 节点ID
+   * @param httpPort HTTP服务端口
+   * @param resource 节点可分配资源
+   * @param nodeManagerVersionId NodeManager版本号
+   * @param containerStatuses 容器状态列表
+   * @param runningApplications 运行中应用ID列表
+   * @return 注册请求实例
+   */
   public static RegisterNodeManagerRequest newInstance(NodeId nodeId,
       int httpPort, Resource resource, String nodeManagerVersionId,
       List<NMContainerStatus> containerStatuses,
@@ -39,6 +54,17 @@ public abstract class RegisterNodeManagerRequest {
         containerStatuses, runningApplications, null);
   }
 
+  /**
+   * 创建RegisterNodeManagerRequest实例（添加节点标签）
+   * @param nodeId 节点ID
+   * @param httpPort HTTP服务端口
+   * @param resource 节点可分配资源
+   * @param nodeManagerVersionId NodeManager版本号
+   * @param containerStatuses 容器状态列表
+   * @param runningApplications 运行中应用ID列表
+   * @param nodeLabels 节点标签集合
+   * @return 注册请求实例
+   */
   public static RegisterNodeManagerRequest newInstance(NodeId nodeId,
       int httpPort, Resource resource, String nodeManagerVersionId,
       List<NMContainerStatus> containerStatuses,
@@ -47,6 +73,18 @@ public abstract class RegisterNodeManagerRequest {
         containerStatuses, runningApplications, nodeLabels, null);
   }
 
+  /**
+   * 创建RegisterNodeManagerRequest实例（添加物理资源信息）
+   * @param nodeId 节点ID
+   * @param httpPort HTTP服务端口
+   * @param resource 节点可分配资源
+   * @param nodeManagerVersionId NodeManager版本号
+   * @param containerStatuses 容器状态列表
+   * @param runningApplications 运行中应用ID列表
+   * @param nodeLabels 节点标签集合
+   * @param physicalResource 节点物理总资源
+   * @return 注册请求实例
+   */
   public static RegisterNodeManagerRequest newInstance(NodeId nodeId,
       int httpPort, Resource resource, String nodeManagerVersionId,
       List<NMContainerStatus> containerStatuses,
@@ -57,12 +95,27 @@ public abstract class RegisterNodeManagerRequest {
         null, null);
   }
 
+  /**
+   * 创建RegisterNodeManagerRequest实例（全参数）
+   * @param nodeId 节点ID
+   * @param httpPort HTTP服务端口
+   * @param resource 节点可分配资源
+   * @param nodeManagerVersionId NodeManager版本号
+   * @param containerStatuses 容器状态列表
+   * @param runningApplications 运行中应用ID列表
+   * @param nodeLabels 节点标签集合
+   * @param physicalResource 节点物理总资源
+   * @param nodeAttributes 节点属性集合
+   * @param nodeStatus 节点状态
+   * @return 注册请求实例
+   */
   public static RegisterNodeManagerRequest newInstance(NodeId nodeId,
       int httpPort, Resource resource, String nodeManagerVersionId,
       List<NMContainerStatus> containerStatuses,
       List<ApplicationId> runningApplications, Set<NodeLabel> nodeLabels,
       Resource physicalResource, Set<NodeAttribute> nodeAttributes,
       NodeStatus nodeStatus) {
+    // 通过Records工具创建实例
     RegisterNodeManagerRequest request =
         Records.newRecord(RegisterNodeManagerRequest.class);
     request.setHttpPort(httpPort);
@@ -128,13 +181,29 @@ public abstract class RegisterNodeManagerRequest {
    */
   public abstract void setPhysicalResource(Resource physicalResource);
 
+  /**
+   * 获取应用日志聚合报告列表
+   * @return 应用日志聚合报告列表
+   */
   public abstract List<LogAggregationReport> getLogAggregationReportsForApps();
 
+  /**
+   * 设置应用日志聚合报告列表
+   * @param logAggregationReportsForApps 应用日志聚合报告列表
+   */
   public abstract void setLogAggregationReportsForApps(
       List<LogAggregationReport> logAggregationReportsForApps);
 
+  /**
+   * 获取节点属性集合
+   * @return 节点属性集合
+   */
   public abstract Set<NodeAttribute> getNodeAttributes();
 
+  /**
+   * 设置节点属性集合
+   * @param nodeAttributes 节点属性集合
+   */
   public abstract void setNodeAttributes(Set<NodeAttribute> nodeAttributes);
 
   /**

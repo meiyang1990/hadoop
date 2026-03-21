@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -18,9 +19,13 @@
 package org.apache.hadoop.yarn.server.federation.policies.exceptions;
 
 /**
- * This exception is thrown when policies cannot locate any active cluster.
+ * YARN联邦路由策略找不到任何可用活跃子集群时抛出的异常。
  */
 public class NoActiveSubclustersException extends FederationPolicyException {
+  /**
+   * 构造带错误消息的异常实例。
+   * @param s 错误描述信息
+   */
   public NoActiveSubclustersException(String s) {
     super(s);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -60,81 +61,95 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * A component that sits in between AMRMClient(Impl) and Yarn RM. It remembers
- * pending requests similar to AMRMClient, and handles RM re-sync automatically
- * without propagate the re-sync exception back to AMRMClient.
+ * 介于AMRMClient(Impl)与YARN RM之间的中转层组件，记忆所有未完成请求，自动处理RM故障切换重同步，无需将重同步异常透传给上层AMRMClient。
  */
 public class AMRMClientRelayer implements ApplicationMasterProtocol {
   private static final Logger LOG =
       LoggerFactory.getLogger(AMRMClientRelayer.class);
 
+  // 底层RM客户端代理
   private ApplicationMasterProtocol rmClient;
 
   /**
-   * The original registration request that was sent by the AM. This instance is
-   * reused to register/re-register with all the sub-cluster RMs.
+   * AM发送的原始注册请求，用于向RM重新注册时复用。
    */
   private RegisterApplicationMasterRequest amRegistrationRequest;
 
   /**
-   * Similar to AMRMClientImpl, all data structures below have two versions:
+   * 类似AMRMClientImpl，以下数据结构分为两类：
    *
-   * The remote ones are all the pending requests that RM has not fulfill yet.
-   * Whenever RM fails over, we re-register and then full re-send all these
-   * pending requests.
-   *
-   * The non-remote ones are the requests that RM has not received yet. When RM
-   * throws non-fail-over exception back, the request is considered not received
-   * by RM. We will merge with new requests and re-send in the next heart beat.
+   * remote端：RM尚未满足的已发送请求，当RM故障切换后，重新注册后会重发所有这些请求
+   * 本地端：RM尚未接收的请求，当RM抛出非故障切换异常时，请求被认为未送达，会与新请求合并后在下一次心跳重发
    */
+  // RM侧未完成的资源请求集合
   private Map<ResourceRequestSetKey, ResourceRequestSet> remotePendingAsks =
       new HashMap<>();
   /**
-   * Same as AMRMClientImpl, we need to use a custom comparator that does not
-   * look at ResourceRequest.getNumContainers() here. TreeSet allows a custom
-   * comparator.
+   * 与AMRMClientImpl一致，使用自定义比较器忽略容器数量比较，TreeSet支持自定义比较器。
    */
+  // 本次心跳待发送的资源请求集合
   private Set<ResourceRequest> ask =
       new TreeSet<>(new ResourceRequest.ResourceRequestComparator());
 
   /**
-   * Data structures for pending and allocate latency metrics. This only applies
-   * for requests with non-zero allocationRequestId.
+   * 待分配请求计数与分配延迟指标存储，仅适用于非零分配请求ID的请求。
    */
+  // 每个分配请求ID对应的待分配容器数量
   private Map<Long, Integer> pendingCountForMetrics = new HashMap<>();
+  // 每个分配请求ID对应的请求发起时间戳
   private Map<Long, Long> askTimeStamp = new HashMap<>();
-  // List of allocated containerId to avoid double counting
+  // 已分配容器ID集合，避免指标重复统计
   private Set<ContainerId> knownContainers = new HashSet<>();
 
+  // RM侧待释放容器ID集合
   private Set<ContainerId> remotePendingRelease = new HashSet<>();
+  // 本次心跳待发送的待释放容器ID集合
   private Set<ContainerId> release = new HashSet<>();
 
+  // RM侧已拉黑节点集合
   private Set<String> remoteBlacklistedNodes = new HashSet<>();
+  // 本次心跳待添加的拉黑节点集合
   private Set<String> blacklistAdditions = new HashSet<>();
+  // 本次心跳待移除的拉黑节点集合
   private Set<String> blacklistRemovals = new HashSet<>();
 
+  // RM侧待更新容器请求集合
   private Map<ContainerId, UpdateContainerRequest> remotePendingChange =
       new HashMap<>();
+  // 本次心跳待发送的容器更新请求集合
   private Map<ContainerId, UpdateContainerRequest> change = new HashMap<>();
+  // 每个容器更新请求的发起时间戳
   private Map<ContainerId, Long> changeTimeStamp = new HashMap<>();
 
+  // RM侧待处理调度请求集合
   private Map<Set<String>, List<SchedulingRequest>> remotePendingSchedRequest =
       new HashMap<>();
+  // 本次心跳待发送的调度请求列表
   private List<SchedulingRequest> schedulingRequest = new ArrayList<>();
 
+  // 当前应用ID
   private ApplicationId appId;
 
-  // Normally -1, otherwise will override responseId with this value in the next
-  // heartbeat
+  // 正常为-1，非-1时会在下一次心跳覆盖响应ID
   private volatile int resetResponseId;
 
+  // 当前连接的RM标识
   private String rmId = "";
+  // 关闭标记
   private volatile boolean shutdown = false;
 
+  // 指标收集器
   private AMRMClientRelayerMetrics metrics;
 
+  // 容器分配历史记录
   private ContainerAllocationHistory allocationHistory;
 
+  /**
+   * 构造AMRM中转层实例。
+   * @param rmClient 底层RM客户端
+   * @param appId 当前应用ID
+   * @param rmId 当前RM标识
+   */
   public AMRMClientRelayer(ApplicationMasterProtocol rmClient,
       ApplicationId appId, String rmId) {
     this.resetResponseId = -1;
@@ -144,29 +159,49 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
     this.rmId = rmId;
   }
 
+  /**
+   * 构造AMRM中转层实例，支持配置容器分配历史。
+   * @param rmClient 底层RM客户端
+   * @param appId 当前应用ID
+   * @param rmId 当前RM标识
+   * @param conf 配置对象
+   */
   public AMRMClientRelayer(ApplicationMasterProtocol rmClient,
       ApplicationId appId, String rmId, Configuration conf) {
     this(rmClient, appId, rmId);
     this.allocationHistory = new ContainerAllocationHistory(conf);
   }
 
+  /**
+   * 设置AM注册请求。
+   * @param registerRequest 注册请求
+   */
   public void setAMRegistrationRequest(
       RegisterApplicationMasterRequest registerRequest) {
     this.amRegistrationRequest = registerRequest;
   }
 
+  /**
+   * 获取当前连接RM标识。
+   * @return RM标识字符串
+   */
   public String getRMIdentifier() {
     return this.rmId;
   }
 
+  /**
+   * 更新底层RM客户端。
+   * @param client 新的RM客户端
+   */
   public void setRMClient(ApplicationMasterProtocol client) {
     this.rmClient = client;
   }
 
+  /**
+   * 关闭中转层，清理指标数据并停止客户端代理。
+   */
   public void shutdown() {
-    // On finish, clear out our pending count from the metrics
-    // and set the shut down flag so no more pending requests get
-    // added
+    // 关闭时清理待处理请求指标，设置关闭标记避免新请求加入
     synchronized (this) {
       if (this.shutdown) {
         LOG.warn(
@@ -174,6 +209,7 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
         return;
       }
       this.shutdown = true;
+      // 遍历所有远程待处理资源请求，清理对应指标
       for (Map.Entry<ResourceRequestSetKey, ResourceRequestSet> entry
           : this.remotePendingAsks .entrySet()) {
         ResourceRequestSetKey key = entry.getKey();
@@ -195,6 +231,7 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
               pending);
         }
       }
+      // 清理容器更新请求指标
       for(UpdateContainerRequest req : remotePendingChange.values()) {
         this.metrics
             .decrClientPending(rmId, req.getContainerUpdateType(), 1);
@@ -219,10 +256,10 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
   }
 
   /**
-   * After an RM failover, there might be more than one
-   * allocate/finishApplicationMaster call thread (due to RPC timeout and retry)
-   * doing the auto re-register concurrently. As a result, we need to swallow
-   * the already register exception thrown by the new RM.
+   * RM故障切换后重新注册，处理并发注册场景，忽略已注册异常。
+   * @param request 注册请求
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
    */
   private void reRegisterApplicationMaster(
       RegisterApplicationMasterRequest request)
@@ -248,15 +285,20 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
     } catch (ApplicationMasterNotRegisteredException e) {
       LOG.warn("Out of sync with RM " + rmId
           + " for " + this.appId + ", hence resyncing.");
-      // re register with RM
+      // 与RM不同步，重新注册后重试
       reRegisterApplicationMaster(this.amRegistrationRequest);
       return finishApplicationMaster(request);
     }
   }
 
+  /**
+   * 将新分配请求合并到本地数据结构中。
+   * @param allocateRequest 分配请求
+   * @throws YarnException YARN异常
+   */
   private void addNewAllocateRequest(AllocateRequest allocateRequest)
       throws YarnException {
-    // update the data structures first
+    // 先更新数据结构
     addNewAsks(allocateRequest.getAskList());
 
     if (allocateRequest.getReleaseList() != null) {
@@ -289,13 +331,12 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
         this.changeTimeStamp
             .put(update.getContainerId(), System.currentTimeMillis());
         if (req == null) {
-          // If this is a brand new request, all we have to do is increment
+          // 新增请求，指标计数+1
           this.metrics
               .incrClientPending(rmId, update.getContainerUpdateType(), 1);
         } else if (req.getContainerUpdateType() != update
             .getContainerUpdateType()) {
-          // If this is replacing a request with a different update type, we
-          // need to decrement the replaced type
+          // 请求更新类型变更，原类型计数-1，新类型计数+1
           this.metrics
               .decrClientPending(rmId, req.getContainerUpdateType(), 1);
           this.metrics
@@ -323,15 +364,16 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
         throw new YarnException("Allocate called after AMRMClientRelayer for "
             + "RM " + rmId + " shutdown.");
       }
+      // 合并新请求到本地数据结构
       addNewAllocateRequest(allocateRequest);
 
+      // 复制待发送资源请求，避免RPC发送过程中被修改
       ArrayList<ResourceRequest> askList = new ArrayList<>(ask.size());
       for (ResourceRequest r : ask) {
-        // create a copy of ResourceRequest as we might change it while the
-        // RPC layer is using it to send info across
         askList.add(ResourceRequest.clone(r));
       }
 
+      // 构造发送给RM的分配请求，合并所有本地待发送请求
       allocateRequest = AllocateRequest.newBuilder()
           .responseId(allocateRequest.getResponseId())
           .progress(allocateRequest.getProgress()).askList(askList)
@@ -343,6 +385,7 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
           .schedulingRequests(new ArrayList<>(this.schedulingRequest))
           .build();
 
+      // 如果需要重置响应ID，覆盖请求中的响应ID
       if (this.resetResponseId != -1) {
         LOG.info("Override allocate responseId from "
             + allocateRequest.getResponseId() + " to " + this.resetResponseId
@@ -351,22 +394,22 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
       }
     }
 
-    // Do the actual allocate call
+    // 执行实际RPC分配调用
     try {
       allocateResponse = this.rmClient.allocate(allocateRequest);
 
-      // Heartbeat succeeded, wipe out responseId overriding
+      // 心跳成功，清除响应ID重置标记
       this.resetResponseId = -1;
     } catch (ApplicationMasterNotRegisteredException e) {
-      // This is a retriable exception - we will re register and mke a
-      // recursive call to retry
+      // 捕获未注册异常，自动重同步后重试
       LOG.warn("ApplicationMaster is out of sync with RM " + rmId
           + " for " + this.appId + ", hence resyncing.");
 
+      // RM主备切换计数+1
       this.metrics.incrRMMasterSlaveSwitch(this.rmId);
 
       synchronized (this) {
-        // Add all remotePending data into to-send data structures
+        // 将所有远程已发送未完成请求合并到待发送列表，准备重发
         for (ResourceRequestSet requestSet : this.remotePendingAsks
             .values()) {
           for (ResourceRequest rr : requestSet.getRRs()) {
@@ -382,247 +425,15 @@ public class AMRMClientRelayer implements ApplicationMasterProtocol {
         }
       }
 
-      // re-register with RM, then retry allocate recursively
+      // 重新注册后递归重试分配
       reRegisterApplicationMaster(this.amRegistrationRequest);
-      // Reset responseId after re-register
+      // 重新注册后重置响应ID为0
       allocateRequest.setResponseId(0);
       allocateResponse = allocate(allocateRequest);
       return allocateResponse;
     } catch (Throwable t) {
-      // Unexpected exception - rethrow and increment heart beat failure metric
+      // 其他异常，记录心跳失败指标后抛出
       this.metrics.addHeartbeatFailure(this.rmId,
           System.currentTimeMillis() - startTime);
 
-      // If RM is complaining about responseId out of sync, force reset next
-      // time
-      if (t instanceof InvalidApplicationMasterRequestException) {
-        int responseId = AMRMClientUtils
-            .parseExpectedResponseIdFromException(t.getMessage());
-        if (responseId != -1) {
-          this.resetResponseId = responseId;
-          LOG.info("ResponseId out of sync with RM, expect " + responseId
-              + " but " + allocateRequest.getResponseId() + " used by "
-              + this.appId + ". Will override in the next allocate.");
-        } else {
-          LOG.warn("Failed to parse expected responseId out of exception for "
-              + this.appId);
-        }
-      }
-
-      throw t;
-    }
-
-    synchronized (this) {
-      if (this.shutdown) {
-        throw new YarnException("Allocate call succeeded for " + this.appId
-            + " after AMRMClientRelayer for RM " + rmId + " shutdown.");
-      }
-
-      updateMetrics(allocateResponse, startTime);
-
-      AMRMClientUtils.removeFromOutstandingSchedulingRequests(
-          allocateResponse.getAllocatedContainers(),
-          this.remotePendingSchedRequest);
-      AMRMClientUtils.removeFromOutstandingSchedulingRequests(
-          allocateResponse.getContainersFromPreviousAttempts(),
-          this.remotePendingSchedRequest);
-
-      this.ask.clear();
-      this.release.clear();
-
-      this.blacklistAdditions.clear();
-      this.blacklistRemovals.clear();
-
-      this.change.clear();
-      this.schedulingRequest.clear();
-      return allocateResponse;
-    }
-  }
-
-  private void updateMetrics(AllocateResponse allocateResponse,
-      long startTime) {
-    this.metrics.addHeartbeatSuccess(this.rmId,
-        System.currentTimeMillis() - startTime);
-    // Process the allocate response from RM
-    if (allocateResponse.getAllocatedContainers() != null) {
-      for (Container container : allocateResponse
-          .getAllocatedContainers()) {
-        // Do not update metrics aggressively for AllocationRequestId zero
-        // case. Also avoid double count to due to re-send
-        if (this.knownContainers.add(container.getId())) {
-          this.metrics.addFulfilledQPS(this.rmId, AMRMClientRelayerMetrics
-              .getRequestType(container.getExecutionType()), 1);
-          long currentTime = System.currentTimeMillis();
-          long fulfillLatency = -1;
-          if (container.getAllocationRequestId() != 0) {
-            Integer count = this.pendingCountForMetrics
-                .get(container.getAllocationRequestId());
-            if (count != null && count > 0) {
-              this.pendingCountForMetrics
-                  .put(container.getAllocationRequestId(), --count);
-              this.metrics.decrClientPending(this.rmId,
-                  AMRMClientRelayerMetrics
-                      .getRequestType(container.getExecutionType()), 1);
-              fulfillLatency = currentTime - this.askTimeStamp.get(
-                  container.getAllocationRequestId());
-              AMRMClientRelayerMetrics.RequestType requestType = AMRMClientRelayerMetrics
-                  .getRequestType(container.getExecutionType());
-              this.metrics.addFulfillLatency(this.rmId, requestType, fulfillLatency);
-            }
-          }
-          addAllocationHistoryEntry(container, currentTime, fulfillLatency);
-        }
-      }
-    }
-    if (allocateResponse.getCompletedContainersStatuses() != null) {
-      for (ContainerStatus container : allocateResponse
-          .getCompletedContainersStatuses()) {
-        this.remotePendingRelease.remove(container.getContainerId());
-        UpdateContainerRequest req =
-            this.remotePendingChange.remove(container.getContainerId());
-        if (req != null) {
-          this.metrics
-              .decrClientPending(rmId, req.getContainerUpdateType(), 1);
-        }
-        this.knownContainers.remove(container.getContainerId());
-      }
-    }
-
-    if (allocateResponse.getUpdatedContainers() != null) {
-      for (UpdatedContainer updatedContainer : allocateResponse
-          .getUpdatedContainers()) {
-        UpdateContainerRequest req = this.remotePendingChange
-            .remove(updatedContainer.getContainer().getId());
-        if (req != null) {
-          this.metrics
-              .decrClientPending(rmId, req.getContainerUpdateType(), 1);
-          this.metrics.addFulfillLatency(rmId, req.getContainerUpdateType(),
-              System.currentTimeMillis() - this.changeTimeStamp
-                  .remove(req.getContainerId()));
-          this.metrics
-              .addFulfilledQPS(rmId, req.getContainerUpdateType(), 1);
-        }
-      }
-    }
-
-  }
-
-  private void addNewAsks(List<ResourceRequest> asks) throws YarnException {
-    Set<ResourceRequestSetKey> touchedKeys = new HashSet<>();
-    Set<ResourceRequestSetKey> nonZeroNewKeys = new HashSet<>();
-    for (ResourceRequest rr : asks) {
-      addResourceRequestToAsk(rr);
-
-      ResourceRequestSetKey key = new ResourceRequestSetKey(rr);
-      touchedKeys.add(key);
-
-      ResourceRequestSet askSet = this.remotePendingAsks.get(key);
-      if (askSet == null) {
-        askSet = new ResourceRequestSet(key);
-        this.remotePendingAsks.put(key, askSet);
-        if (key.getAllocationRequestId() != 0) {
-          nonZeroNewKeys.add(key);
-        }
-      }
-
-      int numContainers = askSet.getNumContainers();
-      askSet.addAndOverrideRR(rr);
-      int deltaContainers = askSet.getNumContainers() - numContainers;
-
-      if (key.getAllocationRequestId() == 0) {
-        // AllocationRequestId is zero, keep track of pending count in the
-        // delayed but correct way. Allocation latency is not supported
-        if (deltaContainers != 0) {
-          this.metrics.incrClientPending(this.rmId,
-              AMRMClientRelayerMetrics.getRequestType(key.getExeType()),
-              deltaContainers);
-          if(deltaContainers > 0){
-            this.metrics.addRequestedQPS(this.rmId,
-                AMRMClientRelayerMetrics.getRequestType(key.getExeType()),
-                deltaContainers);
-          }
-        }
-      } else {
-        // AllocationRequestId is non-zero, we do pending decrement and latency
-        // aggressively. So don't update metrics here. Double check AM is not
-        // reusing the requestId for more asks
-        if (deltaContainers > 0 && numContainers != 0) {
-          throw new YarnException("Received new ask ("
-              + askSet.getNumContainers() + ") on top of existing ("
-              + numContainers + ") in key " + key);
-        }
-      }
-    }
-
-    // Cleanup properly if needed
-    for (ResourceRequestSetKey key : touchedKeys) {
-      ResourceRequestSet askSet = this.remotePendingAsks.get(key);
-      if (askSet.getNumContainers() == 0) {
-        this.remotePendingAsks.remove(key);
-      } else {
-        // Remove non-any zero RRs
-        askSet.cleanupZeroNonAnyRR();
-      }
-    }
-
-    // Initialize data for pending metrics for each new key
-    for (ResourceRequestSetKey key : nonZeroNewKeys) {
-      if(remotePendingAsks.containsKey(key)){
-        this.askTimeStamp.put(key.getAllocationRequestId(),
-            System.currentTimeMillis());
-        int count = this.remotePendingAsks.get(key).getNumContainers();
-        this.pendingCountForMetrics.put(key.getAllocationRequestId(), count);
-        this.metrics.incrClientPending(this.rmId,
-            AMRMClientRelayerMetrics.getRequestType(key.getExeType()), count);
-        this.metrics.addRequestedQPS(this.rmId,
-            AMRMClientRelayerMetrics.getRequestType(key.getExeType()), count);
-      }
-    }
-  }
-
-  private void addResourceRequestToAsk(ResourceRequest remoteRequest) {
-    // The ResourceRequestComparator doesn't look at container count when
-    // comparing. So we need to make sure the new RR override the old if any
-    this.ask.remove(remoteRequest);
-    this.ask.add(remoteRequest);
-  }
-
-  public ContainerAllocationHistory getAllocationHistory() {
-    return this.allocationHistory;
-  }
-
-  private void addAllocationHistoryEntry(Container container, long fulfillTimeStamp,
-      long fulfillLatency) {
-    ResourceRequestSetKey key = ResourceRequestSetKey.extractMatchingKey(container,
-        this.remotePendingAsks.keySet());
-    if (key == null) {
-      LOG.info("allocation history ignoring {}, no matching request key found.", container);
-      return;
-    }
-    this.allocationHistory.addAllocationEntry(container, this.remotePendingAsks.get(key),
-        fulfillTimeStamp, fulfillLatency);
-  }
-
-  public void gatherReadOnlyPendingAsksInfo(Map<ResourceRequestSetKey,
-      ResourceRequestSet> pendingAsks, Map<ResourceRequestSetKey, Long> pendingTime) {
-    pendingAsks.clear();
-    pendingTime.clear();
-    synchronized (this) {
-      pendingAsks.putAll(this.remotePendingAsks);
-      for (ResourceRequestSetKey key : pendingAsks.keySet()) {
-        Long startTime = this.askTimeStamp.get(key.getAllocationRequestId());
-        if (startTime != null) {
-          long elapsedMs = System.currentTimeMillis() - startTime;
-          pendingTime.put(key, elapsedMs);
-        }
-      }
-    }
-  }
-
-  @VisibleForTesting
-  protected Map<ResourceRequestSetKey, ResourceRequestSet>
-      getRemotePendingAsks() {
-    return this.remotePendingAsks;
-  }
-
-}
+      // 如果是

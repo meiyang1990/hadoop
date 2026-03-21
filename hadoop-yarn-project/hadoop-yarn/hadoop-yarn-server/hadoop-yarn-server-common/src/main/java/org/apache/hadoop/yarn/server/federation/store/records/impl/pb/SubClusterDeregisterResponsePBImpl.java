@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,6 +26,7 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterDeregist
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
+ * 文件级注释：YARN联邦子集群注销响应的Protocol Buffer实现类，基于PB序列化存储
  * Protocol buffer based implementation of {@link SubClusterDeregisterResponse}.
  */
 @Private
@@ -32,21 +34,35 @@ import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 public class SubClusterDeregisterResponsePBImpl
     extends SubClusterDeregisterResponse {
 
+  // 缓存的PB协议对象实例
   private SubClusterDeregisterResponseProto proto =
       SubClusterDeregisterResponseProto.getDefaultInstance();
+  // PB对象构建器，构建阶段非空
   private SubClusterDeregisterResponseProto.Builder builder = null;
+  // 当前是否通过proto方式存储数据
   private boolean viaProto = false;
 
+  /**
+   * 构造函数，初始化空的PB构建器
+   */
   public SubClusterDeregisterResponsePBImpl() {
     builder = SubClusterDeregisterResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有PB对象构造响应实例
+   * @param proto 已有的子集群注销响应PB对象
+   */
   public SubClusterDeregisterResponsePBImpl(
       SubClusterDeregisterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前响应对应的PB协议对象
+   * @return 序列化后的PB对象
+   */
   public SubClusterDeregisterResponseProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -31,8 +32,8 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 
 /**
- * This class provides basic implementation for common methods that multiple
- * policies will need to implement.
+ * 文件说明: YARN联邦策略管理器抽象基类，提供多个策略实现共用的基础方法，减少重复代码
+ * 核心职责: 统一管理路由策略和AMRM代理策略的初始化、重新实例化逻辑，子类只需实现权重信息相关抽象方法
  */
 public abstract class AbstractPolicyManager implements
     FederationPolicyManager {
@@ -45,27 +46,20 @@ public abstract class AbstractPolicyManager implements
 
   public static final Logger LOG =
       LoggerFactory.getLogger(AbstractPolicyManager.class);
+
   /**
-   * This default implementation validates the
-   * {@link FederationPolicyInitializationContext},
-   * then checks whether it needs to reinstantiate the class (null or
-   * mismatching type), and reinitialize the policy.
-   *
-   * @param federationPolicyContext the current context
-   * @param oldInstance             the existing (possibly null) instance.
-   *
-   * @return a valid and fully reinitialized {@link FederationAMRMProxyPolicy}
-   * instance
-   *
-   * @throws FederationPolicyInitializationException if the reinitialization is
-   *                                                 not valid, and ensure
-   *                                                 previous state is preserved
+   * 获取并初始化AMRM代理策略，默认实现已完成通用初始化校验和实例复用逻辑
+   * @param federationPolicyContext 当前联邦策略初始化上下文
+   * @param oldInstance 已存在的策略实例，可为null
+   * @return 初始化完成的有效AMRM代理策略实例
+   * @throws FederationPolicyInitializationException 初始化失败时抛出，保证原状态不变
    */
   public FederationAMRMProxyPolicy getAMRMPolicy(
       FederationPolicyInitializationContext federationPolicyContext,
       FederationAMRMProxyPolicy oldInstance)
       throws FederationPolicyInitializationException {
 
+    // 检查子类是否已在构造函数中初始化策略类型
     if (amrmProxyFederationPolicy == null) {
       throw new FederationPolicyInitializationException("The parameter "
           + "amrmProxyFederationPolicy should be initialized in "
@@ -82,20 +76,11 @@ public abstract class AbstractPolicyManager implements
   }
 
   /**
-   * This default implementation validates the
-   * {@link FederationPolicyInitializationContext},
-   * then checks whether it needs to reinstantiate the class (null or
-   * mismatching type), and reinitialize the policy.
-   *
-   * @param federationPolicyContext the current context
-   * @param oldInstance             the existing (possibly null) instance.
-   *
-   * @return a valid and fully reinitialized {@link FederationRouterPolicy}
-   * instance
-   *
-   * @throws FederationPolicyInitializationException if the reinitialization is
-   *                                                 not valid, and ensure
-   *                                                 previous state is preserved
+   * 获取并初始化路由策略，默认实现已完成通用初始化校验和实例复用逻辑
+   * @param federationPolicyContext 当前联邦策略初始化上下文
+   * @param oldInstance 已存在的策略实例，可为null
+   * @return 初始化完成的有效路由策略实例
+   * @throws FederationPolicyInitializationException 初始化失败时抛出，保证原状态不变
    */
 
   public FederationRouterPolicy getRouterPolicy(
@@ -103,7 +88,7 @@ public abstract class AbstractPolicyManager implements
       FederationRouterPolicy oldInstance)
       throws FederationPolicyInitializationException {
 
-    //checks that sub-types properly initialize the types of policies
+    // 检查子类是否已在构造函数中初始化策略类型
     if (routerFederationPolicy == null) {
       throw new FederationPolicyInitializationException("The policy "
           + "type should be initialized in " + this.getClass().getSimpleName()
@@ -121,8 +106,7 @@ public abstract class AbstractPolicyManager implements
   @Override
   public SubClusterPolicyConfiguration serializeConf()
       throws FederationPolicyInitializationException {
-    // default implementation works only for sub-classes which do not require
-    // any parameters
+    // 默认实现仅适用于不需要额外参数的子类，配置为空字节缓冲
     ByteBuffer buf = ByteBuffer.allocate(0);
     return SubClusterPolicyConfiguration
         .newInstance(getQueue(), this.getClass().getCanonicalName(), buf);
@@ -139,17 +123,23 @@ public abstract class AbstractPolicyManager implements
   }
 
   /**
-   * Common functionality to instantiate a reinitialize a {@link
-   * ConfigurableFederationPolicy}.
+   * 通用内部方法：负责策略实例的创建、复用和重新初始化
+   * @param federationPolicyContext 当前联邦策略初始化上下文
+   * @param oldInstance 已存在的策略实例，可为null
+   * @param policy 目标策略类对象
+   * @return 初始化完成的可配置策略实例
+   * @throws FederationPolicyInitializationException 初始化或实例化失败时抛出
    */
   private ConfigurableFederationPolicy internalPolicyGetter(
       final FederationPolicyInitializationContext federationPolicyContext,
       ConfigurableFederationPolicy oldInstance, Class policy)
       throws FederationPolicyInitializationException {
 
+    // 验证初始化上下文合法性
     FederationPolicyInitializationContextValidator
         .validate(federationPolicyContext, this.getClass().getCanonicalName());
 
+    // 实例不存在或类型不匹配，需要重新创建实例
     if (oldInstance == null || !oldInstance.getClass().equals(policy)) {
       try {
         oldInstance = (ConfigurableFederationPolicy) policy.newInstance();
@@ -160,26 +150,30 @@ public abstract class AbstractPolicyManager implements
       }
     }
 
-    //copying the context to avoid side-effects
+    // 拷贝上下文避免修改原对象产生副作用
     FederationPolicyInitializationContext modifiedContext =
         updateContext(federationPolicyContext,
             oldInstance.getClass().getCanonicalName());
 
+    // 重新初始化策略实例
     oldInstance.reinitialize(modifiedContext);
     return oldInstance;
   }
 
   /**
-   * This method is used to copy-on-write the context, that will be passed
-   * downstream to the router/amrmproxy policies.
+   * 拷贝原上下文生成新上下文，修改策略类型后返回，实现写时复制避免副作用
+   * @param federationPolicyContext 原始初始化上下文
+   * @param type 目标策略类型名称
+   * @return 修改后的新上下文对象
    */
   private FederationPolicyInitializationContext updateContext(
       FederationPolicyInitializationContext federationPolicyContext,
       String type) {
-    // copying configuration and context to avoid modification of original
+    // 深拷贝原配置避免修改原对象
     SubClusterPolicyConfiguration newConf = SubClusterPolicyConfiguration
         .newInstance(federationPolicyContext
             .getSubClusterPolicyConfiguration());
+    // 设置当前策略的类型
     newConf.setType(type);
 
     return new FederationPolicyInitializationContext(newConf,
@@ -189,16 +183,14 @@ public abstract class AbstractPolicyManager implements
   }
 
   /**
-   * We get the WeightedPolicyInfo of the subCluster.
-   *
-   * @return WeightedPolicyInfo.
+   * 获取子集群权重策略配置信息，抽象方法由子类具体实现
+   * @return 权重策略信息对象
    */
   public abstract WeightedPolicyInfo getWeightedPolicyInfo();
 
   /**
-   * We set the WeightedPolicyInfo of the subCluster.
-   *
-   * @param weightedPolicyInfo weightedPolicyInfo of the subCluster.
+   * 设置子集群权重策略配置信息，抽象方法由子类具体实现
+   * @param weightedPolicyInfo 权重策略信息对象
    */
   public abstract void setWeightedPolicyInfo(WeightedPolicyInfo weightedPolicyInfo);
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,16 +28,19 @@ import org.apache.hadoop.yarn.util.Records;
 import java.util.List;
 
 /**
- * This is the response to registering an Application Master when distributed
- * scheduling is enabled. Apart from the
- * {@link RegisterApplicationMasterResponse}, it includes various parameters
- * to be used during distributed scheduling, such as the min and max resources
- * that can be requested by containers.
+ * 分布式调度模式下注册ApplicationMaster的响应类。
+ * 在标准ApplicationMaster注册响应基础上，额外携带分布式调度所需的各类参数，
+ * 包括容器资源范围、容器令牌过期时间、容器ID起始值、调度可用节点列表等。
  */
 @Public
 @Unstable
 public abstract class RegisterDistributedSchedulingAMResponse {
 
+  /**
+   * 创建分布式调度AM注册响应实例。
+   * @param regAMResp 标准ApplicationMaster注册响应
+   * @return 分布式调度AM注册响应新实例
+   */
   @Public
   @Unstable
   public static RegisterDistributedSchedulingAMResponse newInstance

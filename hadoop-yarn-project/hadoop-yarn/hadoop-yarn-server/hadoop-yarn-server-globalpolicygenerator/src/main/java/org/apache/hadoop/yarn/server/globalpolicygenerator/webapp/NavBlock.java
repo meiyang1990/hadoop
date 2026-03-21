@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,12 +21,13 @@ package org.apache.hadoop.yarn.server.globalpolicygenerator.webapp;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 /**
- * Navigation block for the GPG Web UI.
+ * 全局策略生成器GPG Web UI的导航栏区块，负责生成页面左侧导航菜单HTML
  */
 public class NavBlock extends HtmlBlock {
 
   @Override
   public void render(Block html) {
+    // 构建导航栏HTML结构
     html.
       div("#nav").
         h3("GPG").

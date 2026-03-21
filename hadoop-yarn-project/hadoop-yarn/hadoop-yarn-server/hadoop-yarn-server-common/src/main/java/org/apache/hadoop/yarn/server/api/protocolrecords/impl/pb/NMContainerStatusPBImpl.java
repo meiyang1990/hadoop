@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -40,27 +41,49 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * NMContainerStatus的Protobuf序列化实现，用于NodeManager向ResourceManager汇报容器状态
+ * 基于PB实现协议缓存，支持本地对象和PB proto两种存储格式的懒加载转换
+ */
 public class NMContainerStatusPBImpl extends NMContainerStatus {
 
+  // PB proto对象，当viaProto为true时使用原始proto存储
   NMContainerStatusProto proto = NMContainerStatusProto
     .getDefaultInstance();
+  // PB构建器，当通过本地对象构建时使用builder缓存修改
   NMContainerStatusProto.Builder builder = null;
+  // 当前是否通过原始proto对象构造，标志存储格式
   boolean viaProto = false;
 
+  // 本地缓存的容器ID对象，懒加载从proto转换
   private ContainerId containerId = null;
+  // 本地缓存的容器分配资源对象，懒加载从proto转换
   private Resource resource = null;
+  // 本地缓存的容器优先级对象，懒加载从proto转换
   private Priority priority = null;
+  // 本地缓存的容器分配标签集合，懒加载从proto转换
   private Set<String> allocationTags = null;
 
+  /**
+   * 空构造函数，用于新建对象
+   */
   public NMContainerStatusPBImpl() {
     builder = NMContainerStatusProto.newBuilder();
   }
 
+  /**
+   * 基于已有proto对象构造，使用proto存储格式
+   * @param proto 已有的NMContainerStatusProto对象
+   */
   public NMContainerStatusPBImpl(NMContainerStatusProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的proto对象，自动合并本地修改生成最终proto
+   * @return 合并修改后的NMContainerStatusProto
+   */
   public NMContainerStatusProto getProto() {
 
     mergeLocalToProto();
@@ -290,6 +313,9 @@ public class NMContainerStatusPBImpl extends NMContainerStatus {
     builder.setAllocationRequestId(allocationRequestId);
   }
 
+  /**
+   * 懒加载从proto转换分配标签集合到本地缓存
+   */
   private void initAllocationTags() {
     if (this.allocationTags != null) {
       return;
@@ -312,6 +338,9 @@ public class NMContainerStatusPBImpl extends NMContainerStatus {
     this.allocationTags = allocationTags;
   }
 
+  /**
+   * 将本地缓存的对象修改合并到PB构建器中
+   */
   private void mergeLocalToBuilder() {
     if (this.containerId != null
         && !((ContainerIdPBImpl) containerId).getProto().equals(
@@ -332,6 +361,9 @@ public class NMContainerStatusPBImpl extends NMContainerStatus {
     }
   }
 
+  /**
+   * 将本地修改合并到最终proto对象
+   */
   private void mergeLocalToProto() {
     if (viaProto)
       maybeInitBuilder();
@@ -340,6 +372,9 @@ public class NMContainerStatusPBImpl extends NMContainerStatus {
     viaProto = true;
   }
 
+  /**
+   * 初始化构建器，当从proto修改时，基于现有proto创建构建器
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = NMContainerStatusProto.newBuilder(proto);

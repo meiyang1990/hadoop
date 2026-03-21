@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -13,5 +14,11 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
+ */
+
+/**
+ * YARN联邦状态存储记录的Protobuf序列化实现包，
+ * 提供基于Protobuf的联邦元数据记录序列化/反序列化能力，
+ * 用于在联邦注册中心存储和交换集群路由信息。
  */
 package org.apache.hadoop.yarn.server.federation.store.records.impl.pb;

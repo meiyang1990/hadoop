@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,17 +23,17 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * SubClusterRegisterResponse contains the response from the {@code
- * FederationMembershipStateStore} to a registration request from a
- * <code>ResourceManager</code> to participate in federation.
- *
- * Currently response is empty if the operation was successful, if not an
- * exception reporting reason for a failure.
+ * 子集群注册响应类，封装联邦集群成员状态存储对ResourceManager注册请求的返回结果。
+ * 操作成功时响应为空，失败会通过异常返回具体失败原因。
  */
 @Private
 @Unstable
 public abstract class SubClusterRegisterResponse {
 
+  /**
+   * 创建一个新的子集群注册响应实例。
+   * @return 新建的空响应实例
+   */
   @Private
   @Unstable
   public static SubClusterRegisterResponse newInstance() {

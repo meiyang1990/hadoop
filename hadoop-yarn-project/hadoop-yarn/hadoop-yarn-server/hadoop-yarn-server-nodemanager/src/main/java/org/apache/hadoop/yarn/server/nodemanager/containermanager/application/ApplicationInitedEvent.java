@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,8 +20,16 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.application;
 
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
+/**
+ * 应用初始化完成事件，由NodeManager容器管理器分发，
+ * 用于触发应用初始化完成后的后续处理流程。
+ */
 public class ApplicationInitedEvent extends ApplicationEvent {
 
+  /**
+   * 创建应用初始化完成事件实例。
+   * @param appID 已完成初始化的应用ID
+   */
   public ApplicationInitedEvent(ApplicationId appID) {
     super(appID, ApplicationEventType.APPLICATION_INITED);
   }

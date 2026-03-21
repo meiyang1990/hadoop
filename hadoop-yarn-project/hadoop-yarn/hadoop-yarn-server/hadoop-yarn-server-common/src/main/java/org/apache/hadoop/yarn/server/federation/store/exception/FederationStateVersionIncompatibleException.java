@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,6 +20,9 @@ package org.apache.hadoop.yarn.server.federation.store.exception;
 
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
+/**
+ * YARN联邦状态存储版本不兼容异常，当联邦状态存储的数据版本与当前服务版本不匹配时抛出。
+ */
 public class FederationStateVersionIncompatibleException extends YarnException {
 
   private static final long serialVersionUID = 1L;

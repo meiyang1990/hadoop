@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,15 +22,16 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.application;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 /**
- * Finish/abort event
+ * 应用完成/终止事件，用于通知NodeManager上的应用实例需要结束清理
  */
 public class ApplicationFinishEvent extends ApplicationEvent {
+  // 应用终止的诊断信息，用于日志和问题排查
   private final String diagnostic;
 
   /**
-   * Application event to abort all containers associated with the app
-   * @param appId to abort containers
-   * @param diagnostic reason for the abort
+   * 构造应用终止事件，用于触发应用所有容器的中止清理
+   * @param appId 要终止的应用ID
+   * @param diagnostic 应用终止的原因信息
    */
   public ApplicationFinishEvent(ApplicationId appId, String diagnostic) {
     super(appId, ApplicationEventType.FINISH_APPLICATION);
@@ -37,8 +39,8 @@ public class ApplicationFinishEvent extends ApplicationEvent {
   }
 
   /**
-   * Why the app was aborted
-   * @return diagnostic message
+   * 获取应用终止的诊断原因信息
+   * @return 诊断信息字符串
    */
   public String getDiagnostic() {
     return diagnostic;

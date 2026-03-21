@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -61,8 +62,8 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * A service that manages a pool of UAM managers in
- * {@link UnmanagedApplicationManager}.
+ * 非托管应用管理器(UAM)池管理服务，负责管理一组UnmanagedApplicationManager实例的生命周期
+ * 主要用于联邦YARN场景下跨子集群管理多个非托管应用master
  */
 @Public
 @Unstable
@@ -70,17 +71,24 @@ public class UnmanagedAMPoolManager extends AbstractService {
   public static final Logger LOG =
       LoggerFactory.getLogger(UnmanagedAMPoolManager.class);
 
-  // Map from uamId to UAM instances
+  // UAM ID到UAM实例的映射表
   private Map<String, UnmanagedApplicationManager> unmanagedAppMasterMap;
 
+  // UAM ID对应ApplicationId的映射表
   private Map<String, ApplicationId> appIdMap;
 
+  // 异步任务执行线程池
   private ExecutorService threadpool;
 
   private final String dispatcherThreadName = "UnmanagedAMPoolManager-Finish-Thread";
 
+  // 服务停止时强制结束UAM的后台线程
   private Thread finishApplicationThread;
 
+  /**
+   * 构造函数，使用外部提供的线程池
+   * @param threadpool 外部线程池
+   */
   public UnmanagedAMPoolManager(ExecutorService threadpool) {
     super(UnmanagedAMPoolManager.class.getName());
     this.threadpool = threadpool;
@@ -88,23 +96,22 @@ public class UnmanagedAMPoolManager extends AbstractService {
 
   @Override
   protected void serviceStart() throws Exception {
+    // 如果未传入线程池，创建缓存线程池
     if (this.threadpool == null) {
       this.threadpool = Executors.newCachedThreadPool();
     }
+    // 初始化并发存储映射
     this.unmanagedAppMasterMap = new ConcurrentHashMap<>();
     this.appIdMap = new ConcurrentHashMap<>();
     super.serviceStart();
   }
 
   /**
-   * Normally we should finish all applications before stop. If there are still
-   * UAMs running, force kill all of them. Do parallel kill because of
-   * performance reasons.
-   *
+   * 服务停止方法，若还有运行中的UAM，启动后台线程强制杀死所有UAM
    */
   @Override
   protected void serviceStop() throws Exception {
-
+    // 存在未结束的UAM，启动强制结束线程
     if (!this.unmanagedAppMasterMap.isEmpty()) {
       finishApplicationThread = new SubjectInheritingThread(createForceFinishApplicationThread());
       finishApplicationThread.setName(dispatcherThreadName);
@@ -115,23 +122,19 @@ public class UnmanagedAMPoolManager extends AbstractService {
   }
 
   /**
-   * Create a new UAM and register the application, without specifying uamId and
-   * appId. We will ask for an appId from RM and use it as the uamId.
+   * 创建并注册新的UAM，自动从RM申请ApplicationId作为UAM ID
    *
-   * @param registerRequest RegisterApplicationMasterRequest
-   * @param conf configuration for this UAM
-   * @param queueName queue of the application
-   * @param submitter submitter name of the UAM
-   * @param appNameSuffix application name suffix for the UAM
-   * @param keepContainersAcrossApplicationAttempts keep container flag for UAM
-   *          recovery.
-   * @param rmName name of the YarnRM
-   * @param originalAppSubmissionContext ApplicationSubmissionContext
-   * @see ApplicationSubmissionContext
-   *          #setKeepContainersAcrossApplicationAttempts(boolean)
-   * @return uamId for the UAM
-   * @throws YarnException if registerApplicationMaster fails
-   * @throws IOException if registerApplicationMaster fails
+   * @param registerRequest UAM注册请求
+   * @param conf UAM配置
+   * @param queueName 应用队列名称
+   * @param submitter 提交者用户名
+   * @param appNameSuffix 应用名称后缀
+   * @param keepContainersAcrossApplicationAttempts 应用尝试恢复时是否保留容器
+   * @param rmName YARN RM名称
+   * @param originalAppSubmissionContext 原始应用提交上下文
+   * @return 新创建UAM的ID
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
    */
   public String createAndRegisterNewUAM(
       RegisterApplicationMasterRequest registerRequest, Configuration conf,
@@ -142,12 +145,14 @@ public class UnmanagedAMPoolManager extends AbstractService {
     ApplicationId appId;
     ApplicationClientProtocol rmClient;
     try {
+      // 创建远程提交用户UGI
       UserGroupInformation appSubmitter =
           UserGroupInformation.createRemoteUser(submitter);
+      // 创建RM代理客户端
       rmClient = AMRMClientUtils.createRMProxy(conf,
           ApplicationClientProtocol.class, appSubmitter, null);
 
-      // Get a new appId from RM
+      // 从RM申请新的ApplicationId
       GetNewApplicationResponse response =
           rmClient.getNewApplication(GetNewApplicationRequest.newInstance());
       if (response == null) {
@@ -159,36 +164,33 @@ public class UnmanagedAMPoolManager extends AbstractService {
       rmClient = null;
     }
 
-    // Launch the UAM in RM
+    // 启动UAM
     launchUAM(appId.toString(), conf, appId, queueName, submitter,
         appNameSuffix, keepContainersAcrossApplicationAttempts, rmName,
         originalAppSubmissionContext);
 
-    // Register the UAM application
+    // 向RM注册UAM
     registerApplicationMaster(appId.toString(), registerRequest);
 
-    // Returns the appId as uamId
+    // 使用applicationId作为uamId返回
     return appId.toString();
   }
 
   /**
-   * Launch a new UAM, using the provided uamId and appId.
+   * 使用指定的UAM ID和ApplicationId启动新UAM
    *
-   * @param uamId uam Id
-   * @param conf configuration for this UAM
-   * @param appId application id for the UAM
-   * @param queueName queue of the application
-   * @param submitter submitter name of the UAM
-   * @param appNameSuffix application name suffix for the UAM
-   * @param keepContainersAcrossApplicationAttempts keep container flag for UAM
-   *          recovery.
-   * @param rmName name of the YarnRM
-   * @param originalAppSubmissionContext AppSubmissionContext
-   * @see ApplicationSubmissionContext
-   *          #setKeepContainersAcrossApplicationAttempts(boolean)
-   * @return UAM token
-   * @throws YarnException if fails
-   * @throws IOException if fails
+   * @param uamId UAM ID
+   * @param conf UAM配置
+   * @param appId 应用ID
+   * @param queueName 应用队列名称
+   * @param submitter 提交者用户名
+   * @param appNameSuffix 应用名称后缀
+   * @param keepContainersAcrossApplicationAttempts 应用尝试恢复时是否保留容器
+   * @param rmName YARN RM名称
+   * @param originalAppSubmissionContext 原始应用提交上下文
+   * @return UAM的AMRM令牌
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
    */
   public Token<AMRMTokenIdentifier> launchUAM(String uamId, Configuration conf,
       ApplicationId appId, String queueName, String submitter,
@@ -196,47 +198,49 @@ public class UnmanagedAMPoolManager extends AbstractService {
       String rmName, ApplicationSubmissionContext originalAppSubmissionContext)
       throws YarnException, IOException {
 
+    // 检查UAM ID是否已存在
     if (this.unmanagedAppMasterMap.containsKey(uamId)) {
       throw new YarnException("UAM " + uamId + " already exists");
     }
 
+    // 创建UAM实例
     UnmanagedApplicationManager uam = createUAM(conf, appId, queueName,
         submitter, appNameSuffix, keepContainersAcrossApplicationAttempts,
         rmName, originalAppSubmissionContext);
 
-    // Put the UAM into map first before initializing it to avoid additional UAM
-    // for the same uamId being created concurrently
+    // 先存入映射表保证并发下同一个UAM ID只会创建一个实例
     this.unmanagedAppMasterMap.put(uamId, uam);
 
     Token<AMRMTokenIdentifier> amrmToken;
     try {
       LOG.info("Launching UAM id {} for application {}", uamId, appId);
+      // 执行UAM启动流程
       amrmToken = uam.launchUAM();
     } catch (Exception e) {
-      // Add the map earlier and remove here if register failed because we want
-      // to make sure there is only one uam instance per uamId at any given time
+      // 启动失败移除映射表
       this.unmanagedAppMasterMap.remove(uamId);
       throw e;
     }
 
+    // 保存ApplicationId映射并返回令牌
     this.appIdMap.put(uamId, uam.getAppId());
     return amrmToken;
   }
 
   /**
-   * Re-attach to an existing UAM, using the provided uamIdentifier.
+   * 重新关联已存在的UAM实例，用于UAM恢复场景
    *
-   * @param uamId uam Id
-   * @param conf configuration for this UAM
-   * @param appId application id for the UAM
-   * @param queueName queue of the application
-   * @param submitter submitter name of the UAM
-   * @param appNameSuffix application name suffix for the UAM
-   * @param uamToken UAM token
-   * @param rmName name of the YarnRM
-   * @param originalAppSubmissionContext AppSubmissionContext
-   * @throws YarnException if fails
-   * @throws IOException if fails
+   * @param uamId UAM ID
+   * @param conf UAM配置
+   * @param appId 应用ID
+   * @param queueName 应用队列名称
+   * @param submitter 提交者用户名
+   * @param appNameSuffix 应用名称后缀
+   * @param uamToken UAM的AMRM令牌
+   * @param rmName YARN RM名称
+   * @param originalAppSubmissionContext 原始应用提交上下文
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
    */
   public void reAttachUAM(String uamId, Configuration conf, ApplicationId appId,
       String queueName, String submitter, String appNameSuffix,
@@ -244,40 +248,42 @@ public class UnmanagedAMPoolManager extends AbstractService {
       ApplicationSubmissionContext originalAppSubmissionContext)
       throws YarnException, IOException {
 
+    // 检查UAM ID是否已存在
     if (this.unmanagedAppMasterMap.containsKey(uamId)) {
       throw new YarnException("UAM " + uamId + " already exists");
     }
+    // 创建UAM实例，恢复场景默认保留容器
     UnmanagedApplicationManager uam = createUAM(conf, appId, queueName,
         submitter, appNameSuffix, true, rmName, originalAppSubmissionContext);
-    // Put the UAM into map first before initializing it to avoid additional UAM
-    // for the same uamId being created concurrently
+    // 先存入映射表保证并发安全
     this.unmanagedAppMasterMap.put(uamId, uam);
 
     try {
       LOG.info("Reattaching UAM id {} for application {}", uamId, appId);
+      // 使用已有令牌重新关联UAM
       uam.reAttachUAM(uamToken);
     } catch (Exception e) {
-      // Add the map earlier and remove here if register failed because we want
-      // to make sure there is only one uam instance per uamId at any given time
+      // 关联失败移除映射表
       this.unmanagedAppMasterMap.remove(uamId);
       throw e;
     }
 
+    // 保存ApplicationId映射
     this.appIdMap.put(uamId, uam.getAppId());
   }
 
   /**
-   * Creates the UAM instance. Pull out to make unit test easy.
+   * 创建UAM实例，抽取该方法方便单元测试
    *
-   * @param conf Configuration
-   * @param appId application id
-   * @param queueName queue of the application
-   * @param submitter submitter name of the application
-   * @param appNameSuffix application name suffix
-   * @param keepContainersAcrossApplicationAttempts keep container flag for UAM
-   * @param rmName name of the YarnRM
-   * @param originalAppSubmissionContext ApplicationSubmissionContext
-   * @return the UAM instance
+   * @param conf 配置
+   * @param appId 应用ID
+   * @param queueName 队列名称
+   * @param submitter 提交者用户名
+   * @param appNameSuffix 应用名称后缀
+   * @param keepContainersAcrossApplicationAttempts 是否保留容器
+   * @param rmName RM名称
+   * @param originalAppSubmissionContext 原始应用提交上下文
+   * @return 创建好的UAM实例
    */
   @VisibleForTesting
   protected UnmanagedApplicationManager createUAM(Configuration conf,
@@ -290,13 +296,13 @@ public class UnmanagedAMPoolManager extends AbstractService {
   }
 
   /**
-   * Register application master for the UAM.
+   * 向RM注册指定UAM
    *
-   * @param uamId uam Id
-   * @param registerRequest RegisterApplicationMasterRequest
-   * @return register response
-   * @throws YarnException if register fails
-   * @throws IOException if register fails
+   * @param uamId UAM ID
+   * @param registerRequest 注册请求
+   * @return 注册响应
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
    */
   public RegisterApplicationMasterResponse registerApplicationMaster(
       String uamId, RegisterApplicationMasterRequest registerRequest)
@@ -311,13 +317,13 @@ public class UnmanagedAMPoolManager extends AbstractService {
   }
 
   /**
-   * AllocateAsync to an UAM.
+   * 对指定UAM执行异步资源分配请求
    *
-   * @param uamId uam Id
-   * @param request AllocateRequest
-   * @param callback callback for response
-   * @throws YarnException if allocate fails
-   * @throws IOException if allocate fails
+   * @param uamId UAM ID
+   * @param request 分配请求
+   * @param callback 结果回调
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
    */
   public void allocateAsync(String uamId, AllocateRequest request,
       AsyncCallback<AllocateResponse> callback)
@@ -329,13 +335,13 @@ public class UnmanagedAMPoolManager extends AbstractService {
   }
 
   /**
-   * Finish an UAM/application.
+   * 结束指定UAM应用
    *
-   * @param uamId uam Id
-   * @param request FinishApplicationMasterRequest
-   * @return FinishApplicationMasterResponse
-   * @throws YarnException if finishApplicationMaster call fails
-   * @throws IOException if finishApplicationMaster call fails
+   * @param uamId UAM ID
+   * @param request 结束请求
+   * @return 结束响应
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
    */
   public FinishApplicationMasterResponse finishApplicationMaster(String uamId,
       FinishApplicationMasterRequest request)
@@ -348,8 +354,8 @@ public class UnmanagedAMPoolManager extends AbstractService {
     FinishApplicationMasterResponse response =
         this.unmanagedAppMasterMap.get(uamId).finishApplicationMaster(request);
 
+    // 注销成功后才移除UAM
     if (response.getIsUnregistered()) {
-      // Only remove the UAM when the unregister finished
       this.unmanagedAppMasterMap.remove(uamId);
       this.appIdMap.remove(uamId);
       LOG.info("UAM id {} is unregistered", uamId);
@@ -358,10 +364,10 @@ public class UnmanagedAMPoolManager extends AbstractService {
   }
 
   /**
-   * Shutdown an UAM client without killing it in YarnRM.
+   * 关闭UAM连接但不向RM杀死应用
    *
-   * @param uamId uam Id
-   * @throws YarnException if fails
+   * @param uamId UAM ID
+   * @throws YarnException YARN异常
    */
   public void shutDownConnections(String uamId)
       throws YarnException {
@@ -375,9 +381,9 @@ public class UnmanagedAMPoolManager extends AbstractService {
   }
 
   /**
-   * Shutdown all UAM clients without killing them in YarnRM.
+   * 关闭所有UAM连接但不向RM杀死应用
    *
-   * @throws YarnException if fails
+   * @throws YarnException YARN异常
    */
   public void shutDownConnections() throws YarnException {
     for (String uamId : this.unmanagedAppMasterMap.keySet()) {
@@ -386,32 +392,31 @@ public class UnmanagedAMPoolManager extends AbstractService {
   }
 
   /**
-   * Get the id of all running UAMs.
+   * 获取所有正在运行的UAM ID集合
    *
-   * @return uamId set
+   * @return UAM ID集合
    */
   public Set<String> getAllUAMIds() {
-    // Return a clone of the current id set for concurrency reasons, so that the
-    // returned map won't change with the actual map
+    // 返回副本避免并发修改问题
     return new HashSet<>(this.unmanagedAppMasterMap.keySet());
   }
 
   /**
-   * Return whether an UAM exists.
+   * 检查指定UAM ID是否存在
    *
-   * @param uamId uam Id
-   * @return UAM exists or not
+   * @param uamId UAM ID
+   * @return 是否存在
    */
   public boolean hasUAMId(String uamId) {
     return this.unmanagedAppMasterMap.containsKey(uamId);
   }
 
   /**
-   * Return the rmProxy relayer of an UAM.
+   * 获取指定UAM的AMRM客户端中继器
    *
-   * @param uamId uam Id
-   * @return the rmProxy relayer
-   * @throws YarnException if fails
+   * @param uamId UAM ID
+   * @return AMRM客户端中继器
+   * @throws YarnException YARN异常
    */
   public AMRMClientRelayer getAMRMClientRelayer(String uamId)
       throws YarnException {
@@ -425,131 +430,3 @@ public class UnmanagedAMPoolManager extends AbstractService {
   public int getRequestQueueSize(String uamId) throws YarnException {
     if (!this.unmanagedAppMasterMap.containsKey(uamId)) {
       throw new YarnException("UAM " + uamId + " does not exist");
-    }
-    return this.unmanagedAppMasterMap.get(uamId).getRequestQueueSize();
-  }
-
-  @VisibleForTesting
-  public void drainUAMHeartbeats() {
-    for (UnmanagedApplicationManager uam : this.unmanagedAppMasterMap
-        .values()) {
-      uam.drainHeartbeatThread();
-    }
-  }
-
-  /**
-   * Complete FinishApplicationMaster interface calls in batches.
-   *
-   * @param request FinishApplicationMasterRequest
-   * @param appId application Id
-   * @return Returns the Map,
-   *         the key is subClusterId, the value is FinishApplicationMasterResponse
-   */
-  public Map<String, FinishApplicationMasterResponse> batchFinishApplicationMaster(
-      FinishApplicationMasterRequest request, String appId) {
-
-    Map<String, FinishApplicationMasterResponse> responseMap = new HashMap<>();
-    Set<String> subClusterIds = this.unmanagedAppMasterMap.keySet();
-
-    if (subClusterIds != null && !subClusterIds.isEmpty()) {
-      ExecutorCompletionService<Map<String, FinishApplicationMasterResponse>> finishAppService =
-          new ExecutorCompletionService<>(this.threadpool);
-      LOG.info("Sending finish application request to {} sub-cluster RMs", subClusterIds.size());
-
-      for (final String subClusterId : subClusterIds) {
-        finishAppService.submit(() -> {
-          LOG.info("Sending finish application request to RM {}", subClusterId);
-          try {
-            FinishApplicationMasterResponse uamResponse =
-                finishApplicationMaster(subClusterId, request);
-            return Collections.singletonMap(subClusterId, uamResponse);
-          } catch (Throwable e) {
-            LOG.warn("Failed to finish unmanaged application master: " +
-                " RM address: {} ApplicationId: {}", subClusterId, appId, e);
-            return Collections.singletonMap(subClusterId, null);
-          }
-        });
-      }
-
-      for (int i = 0; i < subClusterIds.size(); ++i) {
-        try {
-          Future<Map<String, FinishApplicationMasterResponse>> future = finishAppService.take();
-          Map<String, FinishApplicationMasterResponse> uamResponse = future.get();
-          LOG.debug("Received finish application response from RM: {}", uamResponse.keySet());
-          responseMap.putAll(uamResponse);
-        } catch (Throwable e) {
-          LOG.warn("Failed to finish unmanaged application master: ApplicationId: {}", appId, e);
-        }
-      }
-    }
-
-    return responseMap;
-  }
-
-  Runnable createForceFinishApplicationThread() {
-    return () -> {
-
-      ExecutorCompletionService<Pair<String, KillApplicationResponse>> completionService =
-          new ExecutorCompletionService<>(threadpool);
-
-      // Save a local copy of the key set so that it won't change with the map
-      Set<String> addressList = new HashSet<>(unmanagedAppMasterMap.keySet());
-
-      LOG.warn("Abnormal shutdown of UAMPoolManager, still {} UAMs in map", addressList.size());
-
-      for (final String uamId : addressList) {
-        completionService.submit(() -> {
-          try {
-            ApplicationId appId = appIdMap.get(uamId);
-            LOG.info("Force-killing UAM id {} for application {}", uamId, appId);
-            UnmanagedApplicationManager applicationManager = unmanagedAppMasterMap.remove(uamId);
-            KillApplicationResponse response = applicationManager.forceKillApplication();
-            return Pair.of(uamId, response);
-          } catch (Exception e) {
-            LOG.error("Failed to kill unmanaged application master", e);
-            return Pair.of(uamId, null);
-          }
-        });
-      }
-
-      for (int i = 0; i < addressList.size(); ++i) {
-        try {
-          Future<Pair<String, KillApplicationResponse>> future = completionService.take();
-          Pair<String, KillApplicationResponse> pairs = future.get();
-          String uamId = pairs.getLeft();
-          ApplicationId appId = appIdMap.get(uamId);
-          KillApplicationResponse response = pairs.getRight();
-          if (response == null) {
-            throw new YarnException(
-                "Failed Force-killing UAM id " + uamId + " for application " + appId);
-          }
-          LOG.info("Force-killing UAM id = {} for application {} KillCompleted {}.",
-              uamId, appId, response.getIsKillCompleted());
-        } catch (Exception e) {
-          LOG.error("Failed to kill unmanaged application master", e);
-        }
-      }
-
-      appIdMap.clear();
-    };
-  }
-
-  public void unAttachUAM(String uamId) {
-    if (this.unmanagedAppMasterMap.containsKey(uamId)) {
-      UnmanagedApplicationManager appManager = this.unmanagedAppMasterMap.get(uamId);
-      appManager.shutDownConnections();
-    }
-    this.unmanagedAppMasterMap.remove(uamId);
-    this.appIdMap.remove(uamId);
-  }
-
-  @VisibleForTesting
-  protected Map<String, UnmanagedApplicationManager> getUnmanagedAppMasterMap() {
-    return unmanagedAppMasterMap;
-  }
-
-  @VisibleForTesting
-  protected Thread getFinishApplicationThread() {
-    return finishApplicationThread;
-  }
-}

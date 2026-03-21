@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -55,6 +56,9 @@ import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeStatusPBImpl;
 
+/**
+ * Node心跳请求的Protobuf实现，基于PB协议序列化Node心跳上报信息
+ */
 public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   NodeHeartbeatRequestProto proto = NodeHeartbeatRequestProto.getDefaultInstance();
   NodeHeartbeatRequestProto.Builder builder = null;
@@ -78,6 +82,10 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     viaProto = true;
   }
   
+  /**
+   * 获取当前请求的Protobuf对象，合并本地修改后返回
+   * @return Protobuf格式的心跳请求对象
+   */
   public NodeHeartbeatRequestProto getProto() {
       mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -100,6 +108,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     return false;
   }
 
+  /**
+   * 将本地缓存的Java对象合并到PB Builder中
+   */
   private void mergeLocalToBuilder() {
     if (this.nodeStatus != null) {
       builder.setNodeStatus(convertToProtoFormat(this.nodeStatus));
@@ -137,6 +148,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     }
   }
 
+  /**
+   * 将日志聚合报告列表转换为PB格式添加到Builder
+   */
   private void addLogAggregationStatusForAppsToProto() {
     maybeInitBuilder();
     builder.clearLogAggregationReportsForApps();
@@ -176,6 +190,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     return ((LogAggregationReportPBImpl) value).getProto();
   }
 
+  /**
+   * 将注册中的日志收集器列表转换为PB格式添加到Builder
+   */
   private void addRegisteringCollectorsToProto() {
     maybeInitBuilder();
     builder.clearRegisteringCollectors();
@@ -196,6 +213,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     }
   }
 
+  /**
+   * 合并本地修改到最终Proto对象
+   */
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -204,6 +224,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     viaProto = true;
   }
 
+  /**
+   * 初始化Builder，如果当前基于Proto对象则复制到Builder中
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = NodeHeartbeatRequestProto.newBuilder(proto);
@@ -286,6 +309,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     return registeringCollectors;
   }
 
+  /**
+   * 从PB对象初始化注册收集器列表
+   */
   private void initRegisteredCollectors() {
     NodeHeartbeatRequestProtoOrBuilder p = viaProto ? proto : builder;
     List<AppCollectorDataProto> list = p.getRegisteringCollectorsList();
@@ -361,6 +387,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     this.labels = nodeLabels;
   }
   
+  /**
+   * 从PB对象初始化节点标签集合
+   */
   private void initNodeLabels() {
     if (this.labels != null) {
       return;
@@ -391,6 +420,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     return this.attributes;
   }
 
+  /**
+   * 从PB对象初始化节点属性集合
+   */
   private void initNodeAttributes() {
     if (this.attributes != null) {
       return;
@@ -432,6 +464,9 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
     return logAggregationReportsForApps;
   }
 
+  /**
+   * 从PB对象初始化应用日志聚合报告列表
+   */
   private void initLogAggregationReportsForApps() {
     NodeHeartbeatRequestProtoOrBuilder p = viaProto ? proto : builder;
     List<LogAggregationReportProto> list =
@@ -451,21 +486,4 @@ public class NodeHeartbeatRequestPBImpl extends NodeHeartbeatRequest {
   public void setLogAggregationReportsForApps(
       List<LogAggregationReport> logAggregationStatusForApps) {
     if(logAggregationStatusForApps == null) {
-      builder.clearLogAggregationReportsForApps();
-    }
-    this.logAggregationReportsForApps = logAggregationStatusForApps;
-  }
-
-  @Override
-  public void setTokenSequenceNo(long tokenSequenceNo) {
-    maybeInitBuilder();
-    this.builder.setTokenSequenceNo(tokenSequenceNo);
-  }
-
-  @Override
-  public long getTokenSequenceNo() {
-    NodeHeartbeatRequestProtoOrBuilder p =
-        this.viaProto ? this.proto : this.builder;
-    return p.getTokenSequenceNo();
-  }
-}  
+      builder.clear

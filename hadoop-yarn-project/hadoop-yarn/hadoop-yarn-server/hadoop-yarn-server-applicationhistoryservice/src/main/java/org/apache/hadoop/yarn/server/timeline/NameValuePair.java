@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,8 +22,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * A class holding a name and value pair, used for specifying filters in
- * {@link TimelineReader}.
+ * 存储名称-值对的简单数据类，用于为TimelineReader指定查询过滤条件
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -30,14 +30,19 @@ public class NameValuePair {
   String name;
   Object value;
 
+  /**
+   * 构造名称值对对象
+   * @param name 过滤条件名称
+   * @param value 过滤条件值
+   */
   public NameValuePair(String name, Object value) {
     this.name = name;
     this.value = value;
   }
 
   /**
-   * Get the name.
-   * @return The name.
+   * 获取名称
+   * @return 名称
    */
   public String getName() {
 
@@ -45,8 +50,8 @@ public class NameValuePair {
   }
 
   /**
-   * Get the value.
-   * @return The value.
+   * 获取值
+   * @return 值
    */
   public Object getValue() {
     return value;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -20,21 +21,17 @@ package org.apache.hadoop.yarn.server.federation.policies;
 import org.apache.hadoop.yarn.server.federation.policies.exceptions.FederationPolicyInitializationException;
 
 /**
- * This interface provides a general method to reinitialize a policy. The
- * semantics are try-n-swap, so in case of an exception is thrown the
- * implementation must ensure the previous state and configuration is preserved.
+ * YARN联邦环境下可配置策略的基础接口，定义了策略热更新的通用规范。
+ * 采用尝试-交换(try-n-swap)语义，初始化失败时必须保证原有配置和状态不受影响。
  */
 public interface ConfigurableFederationPolicy {
 
   /**
-   * This method is invoked to initialize of update the configuration of
-   * policies. The implementor should provide try-n-swap semantics, and retain
-   * state if possible.
+   * 初始化或更新策略配置，采用尝试-交换语义，初始化失败时需保留原有状态。
    *
-   * @param policyContext the new context to provide to implementor.
+   * @param policyContext 新的策略初始化上下文，包含更新后的配置和环境信息
    *
-   * @throws FederationPolicyInitializationException in case the initialization
-   *           fails.
+   * @throws FederationPolicyInitializationException 初始化或更新失败时抛出
    */
   void reinitialize(FederationPolicyInitializationContext policyContext)
       throws FederationPolicyInitializationException;

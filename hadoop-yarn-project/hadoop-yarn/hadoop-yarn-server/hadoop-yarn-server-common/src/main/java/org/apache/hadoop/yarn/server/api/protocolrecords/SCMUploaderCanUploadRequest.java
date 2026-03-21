@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,8 +24,7 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
  * <p>
- * The request from the NodeManager to the <code>SharedCacheManager</code> that
- * requests whether it can upload a resource in the shared cache.
+ * NodeManager向共享缓存管理器SCM发起的请求，询问是否可以将指定资源上传到共享缓存
  * </p>
  */
 @Private
@@ -32,18 +32,14 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 public abstract class SCMUploaderCanUploadRequest {
 
   /**
-   * Get the <code>key</code> of the resource that would be uploaded to the
-   * shared cache.
-   *
-   * @return <code>key</code>
+   * 获取待上传到共享缓存的资源的唯一标识key
+   * @return 资源唯一标识key
    */
   public abstract String getResourceKey();
 
   /**
-   * Set the <code>key</code> of the resource that would be uploaded to the
-   * shared cache.
-   *
-   * @param key unique identifier for the resource
+   * 设置待上传到共享缓存的资源的唯一标识key
+   * @param key 资源的唯一标识符
    */
   public abstract void setResourceKey(String key);
 }

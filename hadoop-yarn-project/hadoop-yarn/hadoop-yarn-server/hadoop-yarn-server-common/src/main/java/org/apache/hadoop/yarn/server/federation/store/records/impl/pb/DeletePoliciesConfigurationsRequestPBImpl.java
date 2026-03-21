@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,28 +23,46 @@ import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 import org.apache.hadoop.yarn.federation.proto.YarnServerFederationProtos.DeletePoliciesConfigurationsRequestProto;
 import org.apache.hadoop.yarn.server.federation.store.records.DeletePoliciesConfigurationsRequest;
 
+/**
+ * 删除路由策略配置请求的Protobuf序列化实现类，
+ * 用于YARN联邦元数据存储层的请求数据序列化。
+ */
 @Private
 @Unstable
 public class DeletePoliciesConfigurationsRequestPBImpl
     extends DeletePoliciesConfigurationsRequest {
 
+  // Protobuf消息对象，构建完成后不可变
   private DeletePoliciesConfigurationsRequestProto proto =
       DeletePoliciesConfigurationsRequestProto.getDefaultInstance();
 
+  // Protobuf构建器，用于构造消息对象
   private DeletePoliciesConfigurationsRequestProto.Builder builder = null;
 
+  // 当前是否通过只读proto对象提供数据
   private boolean viaProto = false;
 
+  /**
+   * 构造空的删除请求对象，初始化Protobuf构建器。
+   */
   public DeletePoliciesConfigurationsRequestPBImpl() {
     builder = DeletePoliciesConfigurationsRequestProto.newBuilder();
   }
 
+  /**
+   * 基于已有的Protobuf对象构造删除请求对象。
+   * @param proto 已构造完成的Protobuf请求对象
+   */
   public DeletePoliciesConfigurationsRequestPBImpl(
       DeletePoliciesConfigurationsRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求对应的不可变Protobuf对象，自动完成构建。
+   * @return 不可变Protobuf请求对象
+   */
   public DeletePoliciesConfigurationsRequestProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;

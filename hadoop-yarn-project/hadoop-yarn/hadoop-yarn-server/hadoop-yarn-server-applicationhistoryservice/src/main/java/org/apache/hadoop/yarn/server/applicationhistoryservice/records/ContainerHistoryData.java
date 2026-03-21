@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,8 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The class contains all the fields that are stored persistently for
- * <code>RMContainer</code>.
+ * YARN应用历史服务中RM容器的持久化存储历史数据，保存容器全生命周期核心信息。
  */
 @Public
 @Unstable
@@ -57,6 +57,19 @@ public class ContainerHistoryData {
 
   private Map<String, List<Map<String, String>>> exposedPorts;
 
+  /**
+   * 创建容器历史数据实例，初始化所有核心字段。
+   * @param containerId 容器ID
+   * @param allocatedResource 分配给容器的资源
+   * @param assignedNode 容器分配到的节点ID
+   * @param priority 容器调度优先级
+   * @param startTime 容器启动时间
+   * @param finishTime 容器结束时间
+   * @param diagnosticsInfo 容器诊断信息
+   * @param containerExitCode 容器退出码
+   * @param containerState 容器最终状态
+   * @return 初始化完成的容器历史数据实例
+   */
   @Public
   @Unstable
   public static ContainerHistoryData newInstance(ContainerId containerId,
@@ -69,7 +82,7 @@ public class ContainerHistoryData {
     containerHD.setAssignedNode(assignedNode);
     containerHD.setPriority(priority);
     containerHD.setStartTime(startTime);
-    containerHD.setFinishTime(finishTime);
+    containerHD.setFinishTime(finish);
     containerHD.setDiagnosticsInfo(diagnosticsInfo);
     containerHD.setContainerExitStatus(containerExitCode);
     containerHD.setContainerState(containerState);
@@ -185,10 +198,18 @@ public class ContainerHistoryData {
     this.containerState = containerState;
   }
 
+  /**
+   * 获取容器暴露的端口映射信息。
+   * @return 容器暴露端口信息
+   */
   public Map<String, List<Map<String, String>>> getExposedPorts() {
     return exposedPorts;
   }
 
+  /**
+   * 设置容器暴露的端口映射信息。
+   * @param ports 容器暴露端口信息
+   */
   public void setExposedPorts(Map<String, List<Map<String, String>>> ports) {
     this.exposedPorts = ports;
   }

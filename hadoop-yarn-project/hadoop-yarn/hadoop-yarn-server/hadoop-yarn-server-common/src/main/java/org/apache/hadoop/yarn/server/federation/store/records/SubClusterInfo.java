@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,24 +26,34 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>
- * SubClusterInfo is a report of the runtime information of the subcluster that
- * is participating in federation.
+ * 子集群信息实体，存储YARN联邦中参与联邦的子集群运行时信息
  *
  * <p>
- * It includes information such as:
+ * 包含以下核心信息：
  * <ul>
- * <li>{@link SubClusterId}</li>
- * <li>The URL of the subcluster</li>
- * <li>The timestamp representing the last start time of the subCluster</li>
- * <li>{@code FederationsubClusterState}</li>
- * <li>The current capacity and utilization of the subCluster</li>
+ * <li>{@link SubClusterId} 子集群唯一标识</li>
+ * <li>子集群各类服务地址</li>
+ * <li>子集群最近启动时间戳</li>
+ * <li>{@link SubClusterState} 子集群当前状态</li>
+ * <li>子集群当前容量与利用率信息</li>
  * </ul>
  */
 @Private
 @Unstable
 public abstract class SubClusterInfo {
 
+  /**
+   * 创建SubClusterInfo实例，兼容缺少心跳时间的旧版本构造
+   * @param subClusterId 子集群唯一标识
+   * @param amRMServiceAddress AM-RM服务地址
+   * @param clientRMServiceAddress 客户端-RM服务地址
+   * @param rmAdminServiceAddress RM管理服务地址
+   * @param rmWebServiceAddress RM Web服务地址
+   * @param state 子集群状态
+   * @param lastStartTime 子集群最近启动时间戳
+   * @param capability 子集群容量信息序列化字符串
+   * @return 构造完成的SubClusterInfo实例
+   */
   @Private
   @Unstable
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -55,6 +66,19 @@ public abstract class SubClusterInfo {
         capability);
   }
 
+  /**
+   * 创建完整参数的SubClusterInfo实例
+   * @param subClusterId 子集群唯一标识
+   * @param amRMServiceAddress AM-RM服务地址
+   * @param clientRMServiceAddress 客户端-RM服务地址
+   * @param rmAdminServiceAddress RM管理服务地址
+   * @param rmWebServiceAddress RM Web服务地址
+   * @param lastHeartBeat 最近一次心跳时间戳
+   * @param state 子集群状态
+   * @param lastStartTime 子集群最近启动时间戳
+   * @param capability 子集群容量信息序列化字符串
+   * @return 构造完成的SubClusterInfo实例
+   */
   @Private
   @Unstable
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -63,6 +87,7 @@ public abstract class SubClusterInfo {
       String rmAdminServiceAddress, String rmWebServiceAddress,
       long lastHeartBeat, SubClusterState state, long lastStartTime,
       String capability) {
+    // 使用Hadoop Records框架创建实例
     SubClusterInfo subClusterInfo = Records.newRecord(SubClusterInfo.class);
     subClusterInfo.setSubClusterId(subClusterId);
     subClusterInfo.setAMRMServiceAddress(amRMServiceAddress);
@@ -76,6 +101,16 @@ public abstract class SubClusterInfo {
     return subClusterInfo;
   }
 
+  /**
+   * 仅提供核心必要参数创建SubClusterInfo实例
+   * @param subClusterId 子集群唯一标识
+   * @param rmWebServiceAddress RM Web服务地址
+   * @param state 子集群状态
+   * @param lastStartTime 子集群最近启动时间戳
+   * @param lastHeartBeat 最近一次心跳时间戳
+   * @param capability 子集群容量信息序列化字符串
+   * @return 构造完成的SubClusterInfo实例
+   */
   public static SubClusterInfo newInstance(SubClusterId subClusterId,
       String rmWebServiceAddress, SubClusterState state, long lastStartTime, long lastHeartBeat,
       String capability) {
@@ -279,21 +314,24 @@ public abstract class SubClusterInfo {
 
   @Override
   public boolean equals(Object obj) {
-
+    // 同一对象直接返回相等
     if (this == obj) {
       return true;
     }
 
+    // null对象直接返回不相等
     if (obj == null) {
       return false;
     }
 
+    // 类型不同直接返回不相等
     if (getClass() != obj.getClass()) {
       return false;
     }
 
     if (obj instanceof SubClusterInfo) {
       SubClusterInfo other = (SubClusterInfo) obj;
+      // 仅比较静态标识信息，不包含动态变化的容量和心跳信息
       return new EqualsBuilder()
           .append(this.getSubClusterId(), other.getSubClusterId())
           .append(this.getAMRMServiceAddress(), other.getAMRMServiceAddress())
@@ -313,7 +351,7 @@ public abstract class SubClusterInfo {
 
   @Override
   public int hashCode() {
-
+    // 仅对静态标识信息计算哈希，不包含动态变化的容量和心跳信息
     return new HashCodeBuilder()
         .append(this.getSubClusterId())
         .append(this.getAMRMServiceAddress())

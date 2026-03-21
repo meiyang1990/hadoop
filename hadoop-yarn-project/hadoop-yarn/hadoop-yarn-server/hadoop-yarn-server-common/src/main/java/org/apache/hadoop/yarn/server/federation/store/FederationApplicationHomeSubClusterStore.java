@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -32,16 +33,8 @@ import org.apache.hadoop.yarn.server.federation.store.records.UpdateApplicationH
 import org.apache.hadoop.yarn.server.federation.store.records.UpdateApplicationHomeSubClusterResponse;
 
 /**
- * FederationApplicationHomeSubClusterStore maintains the state of all
- * <em>Applications</em> that have been submitted to the federated cluster.
- *
- * *
- * <p>
- * The mapping details contains:
- * <ul>
- * <li>{@code ApplicationId}</li>
- * <li>{@code SubClusterId}</li>
- * </ul>
+ * YARN联邦环境下应用归属子集群存储接口，维护所有提交到联邦集群的应用与运行子集群的映射关系。
+ * 存储的核心信息为每个应用ID对应的归属子集群ID，用于联邦路由时快速定位应用所在子集群。
  *
  */
 @Private
@@ -49,71 +42,54 @@ import org.apache.hadoop.yarn.server.federation.store.records.UpdateApplicationH
 public interface FederationApplicationHomeSubClusterStore {
 
   /**
-   * Register the home {@code SubClusterId} of the newly submitted
-   * {@code ApplicationId}. Currently response is empty if the operation was
-   * successful, if not an exception reporting reason for a failure. If a
-   * mapping for the application already existed, the {@code SubClusterId} in
-   * this response will return the existing mapping which might be different
-   * from that in the {@code AddApplicationHomeSubClusterRequest}.
+   * 为新提交的应用注册归属子集群映射。
+   * 若应用已存在映射关系，将返回原有映射而非覆盖。操作成功响应为空，失败抛出异常。
    *
-   * @param request the request to register a new application with its home
-   *          sub-cluster
-   * @return upon successful registration of the application in the StateStore,
-   *         {@code AddApplicationHomeSubClusterRequest} containing the home
-   *         sub-cluster of the application. Otherwise, an exception reporting
-   *         reason for a failure
-   * @throws YarnException if the request is invalid/fails
+   * @param request 新增应用映射请求，包含应用ID和待注册的归属子集群ID
+   * @return 操作成功返回包含应用最终归属子集群的响应，若已有旧映射则返回旧映射
+   * @throws YarnException 请求无效或操作失败时抛出异常
    */
   AddApplicationHomeSubClusterResponse addApplicationHomeSubCluster(
       AddApplicationHomeSubClusterRequest request) throws YarnException;
 
   /**
-   * Update the home {@code SubClusterId} of a previously submitted
-   * {@code ApplicationId}. Currently response is empty if the operation was
-   * successful, if not an exception reporting reason for a failure.
+   * 更新已有应用的归属子集群映射。
+   * 操作成功响应为空，失败抛出异常。
    *
-   * @param request the request to update the home sub-cluster of an
-   *          application.
-   * @return empty on successful update of the application in the StateStore, if
-   *         not an exception reporting reason for a failure
-   * @throws YarnException if the request is invalid/fails
+   * @param request 更新应用归属请求，包含应用ID和新的归属子集群ID
+   * @return 操作成功返回空响应
+   * @throws YarnException 请求无效或操作失败时抛出异常
    */
   UpdateApplicationHomeSubClusterResponse updateApplicationHomeSubCluster(
       UpdateApplicationHomeSubClusterRequest request) throws YarnException;
 
   /**
-   * Get information about the application identified by the input
-   * {@code ApplicationId}.
+   * 根据应用ID查询单个应用的归属子集群信息。
    *
-   * @param request contains the application queried
-   * @return {@code ApplicationHomeSubCluster} containing the application's home
-   *         subcluster
-   * @throws YarnException if the request is invalid/fails
+   * @param request 查询请求，包含待查询的应用ID
+   * @return 返回包含应用归属子集群信息的响应
+   * @throws YarnException 请求无效或查询失败时抛出异常
    */
   GetApplicationHomeSubClusterResponse getApplicationHomeSubCluster(
       GetApplicationHomeSubClusterRequest request) throws YarnException;
 
   /**
-   * Get the {@code ApplicationHomeSubCluster} list representing the mapping of
-   * all submitted applications to it's home sub-cluster.
+   * 查询存储中所有应用的归属子集群映射关系。
    *
-   * @param request empty representing all applications
-   * @return the mapping of all submitted application to it's home sub-cluster
-   * @throws YarnException if the request is invalid/fails
+   * @param request 空请求，表示查询所有应用
+   * @return 返回所有应用到归属子集群的完整映射列表
+   * @throws YarnException 请求无效或查询失败时抛出异常
    */
   GetApplicationsHomeSubClusterResponse getApplicationsHomeSubCluster(
       GetApplicationsHomeSubClusterRequest request) throws YarnException;
 
   /**
-   * Delete the mapping of home {@code SubClusterId} of a previously submitted
-   * {@code ApplicationId}. Currently response is empty if the operation was
-   * successful, if not an exception reporting reason for a failure.
+   * 删除指定应用的归属子集群映射关系。
+   * 操作成功响应为空，失败抛出异常。
    *
-   * @param request the request to delete the home sub-cluster of an
-   *          application.
-   * @return empty on successful update of the application in the StateStore, if
-   *         not an exception reporting reason for a failure
-   * @throws YarnException if the request is invalid/fails
+   * @param request 删除请求，包含待删除的应用ID
+   * @return 操作成功返回空响应
+   * @throws YarnException 请求无效或操作失败时抛出异常
    */
   DeleteApplicationHomeSubClusterResponse deleteApplicationHomeSubCluster(
       DeleteApplicationHomeSubClusterRequest request) throws YarnException;

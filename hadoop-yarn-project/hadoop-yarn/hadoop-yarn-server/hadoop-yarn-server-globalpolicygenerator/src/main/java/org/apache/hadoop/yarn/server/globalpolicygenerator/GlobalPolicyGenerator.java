@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -60,32 +61,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Global Policy Generator (GPG) is a Yarn Federation component. By tuning the
- * Federation policies in Federation State Store, GPG overlooks the entire
- * federated cluster and ensures that the system is tuned and balanced all the
- * time.
- *
- * The GPG operates continuously but out-of-band from all cluster operations,
- * that allows to enforce global invariants, affect load balancing, trigger
- * draining of sub-clusters that will undergo maintenance, etc.
+ * 全局策略生成器(GPG)是YARN联邦的核心组件，通过调整联邦状态存储中的路由策略，
+ * 监控整个联邦集群状态，持续保障集群负载均衡和全局状态一致。
+ * 
+ * GPG以后台异步方式持续运行，独立于常规集群操作，可实现全局策略统一规划、
+ * 负载均衡调整、待维护子集群任务 draining 等功能。
  */
 public class GlobalPolicyGenerator extends CompositeService {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(GlobalPolicyGenerator.class);
 
-  // YARN Variables
+  // YARN 全局变量
   private static CompositeServiceShutdownHook gpgShutdownHook;
   public static final int SHUTDOWN_HOOK_PRIORITY = 30;
   private AtomicBoolean isStopping = new AtomicBoolean(false);
   private static final String METRICS_NAME = "Global Policy Generator";
   private static long gpgStartupTime = System.currentTimeMillis();
 
-  // Federation Variables
+  // 联邦相关变量
   private GPGContext gpgContext;
   private RegistryOperations registry;
 
-  // Scheduler service that runs tasks periodically
+  // 周期性任务调度执行器
   private ScheduledThreadPoolExecutor scheduledExecutorService;
   private SubClusterCleaner subClusterCleaner;
   private ApplicationCleaner applicationCleaner;
@@ -99,14 +97,23 @@ public class GlobalPolicyGenerator extends CompositeService {
     this.gpgContext = new GPGContextImpl();
   }
 
+  /**
+   * 安全登录Kerberos获取凭证。
+   * @throws IOException 登录失败抛出异常
+   */
   protected void doSecureLogin() throws IOException {
     Configuration config = getConfig();
     SecurityUtil.login(config, YarnConfiguration.GPG_KEYTAB,
         YarnConfiguration.GPG_PRINCIPAL, getHostName(config));
   }
 
+  /**
+   * 初始化并启动GPG服务，注册关闭钩子。
+   * @param conf 配置对象
+   * @param hasToReboot 是否重启，重启需要移除旧钩子
+   */
   protected void initAndStart(Configuration conf, boolean hasToReboot) {
-    // Remove the old hook if we are rebooting.
+    // 重启时移除旧的关闭钩子
     if (hasToReboot && null != gpgShutdownHook) {
       ShutdownHookManager.get().removeShutdownHook(gpgShutdownHook);
     }
@@ -120,43 +127,52 @@ public class GlobalPolicyGenerator extends CompositeService {
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     UserGroupInformation.setConfiguration(conf);
-    // Set up the context
+    // 初始化GPG上下文
     this.gpgContext.setStateStoreFacade(FederationStateStoreFacade.getInstance(conf));
     GPGPolicyFacade gpgPolicyFacade =
         new GPGPolicyFacade(this.gpgContext.getStateStoreFacade(), conf);
     this.gpgContext.setPolicyFacade(gpgPolicyFacade);
 
+    // 创建并初始化服务注册中心
     this.registry = FederationStateStoreFacade.createInstance(conf,
         YarnConfiguration.YARN_REGISTRY_CLASS,
         YarnConfiguration.DEFAULT_YARN_REGISTRY_CLASS,
         RegistryOperations.class);
     this.registry.init(conf);
 
+    // 初始化联邦注册客户端
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     FederationRegistryClient registryClient =
         new FederationRegistryClient(conf, this.registry, user);
     this.gpgContext.setRegistryClient(registryClient);
 
+    // 创建周期性任务线程池
     this.scheduledExecutorService = new ScheduledThreadPoolExecutor(
         conf.getInt(YarnConfiguration.GPG_SCHEDULED_EXECUTOR_THREADS,
             YarnConfiguration.DEFAULT_GPG_SCHEDULED_EXECUTOR_THREADS));
+    // 初始化子集群清理器
     this.subClusterCleaner = new SubClusterCleaner(conf, this.gpgContext);
 
+    // 创建并初始化应用清理器
     this.applicationCleaner = FederationStateStoreFacade.createInstance(conf,
         YarnConfiguration.GPG_APPCLEANER_CLASS,
         YarnConfiguration.DEFAULT_GPG_APPCLEANER_CLASS, ApplicationCleaner.class);
     this.applicationCleaner.init(conf, this.gpgContext);
 
+    // 初始化策略生成器
     this.policyGenerator = new PolicyGenerator(conf, this.gpgContext);
 
+    // 获取Web服务地址
     this.webAppAddress = WebAppUtils.getGPGWebAppURLWithoutScheme(conf);
+    // 初始化 metrics 系统
     DefaultMetricsSystem.initialize(METRICS_NAME);
     JvmMetrics jm = JvmMetrics.initSingleton("GPG", null);
+    // 初始化JVM暂停监控
     pauseMonitor = new JvmPauseMonitor();
     addService(pauseMonitor);
     jm.setPauseMonitor(pauseMonitor);
 
-    // super.serviceInit after all services are added
+    // 所有服务添加完成后调用父类初始化
     super.serviceInit(conf);
     WebServiceClient.initialize(conf);
   }
@@ -171,13 +187,15 @@ public class GlobalPolicyGenerator extends CompositeService {
 
     super.serviceStart();
 
+    // 启动注册中心服务
     this.registry.start();
 
-    // Schedule SubClusterCleaner service
+    // 调度子集群清理任务
     Configuration config = getConfig();
     long scCleanerIntervalMs = config.getTimeDuration(
         YarnConfiguration.GPG_SUBCLUSTER_CLEANER_INTERVAL_MS,
         YarnConfiguration.DEFAULT_GPG_SUBCLUSTER_CLEANER_INTERVAL_MS, TimeUnit.MILLISECONDS);
+    // 间隔大于0才启动周期性任务
     if (scCleanerIntervalMs > 0) {
       this.scheduledExecutorService.scheduleAtFixedRate(this.subClusterCleaner,
           0, scCleanerIntervalMs, TimeUnit.MILLISECONDS);
@@ -185,7 +203,7 @@ public class GlobalPolicyGenerator extends CompositeService {
           DurationFormatUtils.formatDurationISO(scCleanerIntervalMs));
     }
 
-    // Schedule ApplicationCleaner service
+    // 调度应用清理任务
     long appCleanerIntervalMs = config.getTimeDuration(
         YarnConfiguration.GPG_APPCLEANER_INTERVAL_MS,
         YarnConfiguration.DEFAULT_GPG_APPCLEANER_INTERVAL_MS, TimeUnit.MILLISECONDS);
@@ -197,12 +215,10 @@ public class GlobalPolicyGenerator extends CompositeService {
           DurationFormatUtils.formatDurationISO(appCleanerIntervalMs));
     }
 
-    // Schedule PolicyGenerator
-    // We recommend using yarn.federation.gpg.policy.generator.interval
-    // instead of yarn.federation.gpg.policy.generator.interval-ms
+    // 调度策略生成任务，兼容新旧配置项
+    // 推荐使用yarn.federation.gpg.policy.generator.interval，替代旧的毫秒配置
 
-    // To ensure compatibility,
-    // let's first obtain the value of "yarn.federation.gpg.policy.generator.interval-ms."
+    // 先读取旧配置项的值兼容旧版本
     long policyGeneratorIntervalMillis = 0L;
     String generatorIntervalMS = config.get(YarnConfiguration.GPG_POLICY_GENERATOR_INTERVAL_MS);
     if (generatorIntervalMS != null) {
@@ -211,8 +227,7 @@ public class GlobalPolicyGenerator extends CompositeService {
       policyGeneratorIntervalMillis = Long.parseLong(generatorIntervalMS);
     }
 
-    // If it is not available, let's retrieve
-    // the value of "yarn.federation.gpg.policy.generator.interval" instead.
+    // 旧配置不存在时，读取新配置项
     if (policyGeneratorIntervalMillis == 0) {
       policyGeneratorIntervalMillis = config.getTimeDuration(
           YarnConfiguration.GPG_POLICY_GENERATOR_INTERVAL,
@@ -225,6 +240,7 @@ public class GlobalPolicyGenerator extends CompositeService {
       LOG.info("Scheduled policy-generator with interval: {}",
           DurationFormatUtils.formatDurationISO(policyGeneratorIntervalMillis));
     }
+    // 启动Web服务
     startWepApp();
   }
 
@@ -246,6 +262,7 @@ public class GlobalPolicyGenerator extends CompositeService {
       throw e;
     }
 
+    // 避免重复停止
     if (this.isStopping.getAndSet(true)) {
       return;
     }
@@ -269,6 +286,7 @@ public class GlobalPolicyGenerator extends CompositeService {
   public void startWepApp() {
     Configuration configuration = getConfig();
 
+    // 处理跨域配置
     boolean enableCors = configuration.getBoolean(YarnConfiguration.GPG_WEBAPP_ENABLE_CORS_FILTER,
         YarnConfiguration.DEFAULT_GPG_WEBAPP_ENABLE_CORS_FILTER);
 
@@ -277,8 +295,7 @@ public class GlobalPolicyGenerator extends CompositeService {
           + HttpCrossOriginFilterInitializer.ENABLED_SUFFIX, true);
     }
 
-    // Always load pseudo authentication filter to parse "user.name" in an URL
-    // to identify a HTTP request's user.
+    // 确保认证过滤器被加载，用于解析URL中的user.name识别请求用户
     boolean hasHadoopAuthFilterInitializer = false;
     String filterInitializerConfKey = "hadoop.http.filter.initializers";
     Class<?>[] initializersClasses = configuration.getClasses(filterInitializerConfKey);
@@ -293,21 +310,29 @@ public class GlobalPolicyGenerator extends CompositeService {
         targets.add(initializer.getName());
       }
     }
+    // 如果未配置认证过滤器，添加进去
     if (!hasHadoopAuthFilterInitializer) {
       targets.add(AuthenticationFilterInitializer.class.getName());
       configuration.set(filterInitializerConfKey, StringUtils.join(",", targets));
     }
     LOG.info("Instantiating GPGWebApp at {}.", webAppAddress);
     GPGWebApp gpgWebApp = new GPGWebApp(this);
+    // 启动Web应用
     webApp = WebApps.$for("gpg", GPGContext.class, this.gpgContext,
         "gpg-ws").at(webAppAddress).
          withResourceConfig(gpgWebApp.resourceConfig()).start(gpgWebApp);
   }
 
+  /**
+   * 启动GPG服务入口方法。
+   * @param argv 启动参数
+   * @param conf 配置对象
+   */
   @SuppressWarnings("resource")
   public static void startGPG(String[] argv, Configuration conf) {
     boolean federationEnabled = conf.getBoolean(YarnConfiguration.FEDERATION_ENABLED,
         YarnConfiguration.DEFAULT_FEDERATION_ENABLED);
+    // 联邦未开启不启动GPG
     if (federationEnabled) {
       Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
       StringUtils.startupShutdownMessage(GlobalPolicyGenerator.class, argv, LOG);
@@ -319,12 +344,10 @@ public class GlobalPolicyGenerator extends CompositeService {
   }
 
   /**
-   * Returns the hostname for this Router. If the hostname is not
-   * explicitly configured in the given config, then it is determined.
-   *
-   * @param config configuration
-   * @return the hostname (NB: may not be a FQDN)
-   * @throws UnknownHostException if the hostname cannot be determined
+   * 获取GPG服务主机名，未配置则自动获取本机主机名。
+   * @param config 配置对象
+   * @return 主机名
+   * @throws UnknownHostException 无法获取主机名抛出异常
    */
   private String getHostName(Configuration config)
       throws UnknownHostException {
@@ -340,13 +363,16 @@ public class GlobalPolicyGenerator extends CompositeService {
       YarnConfiguration conf = new YarnConfiguration();
       GenericOptionsParser hParser = new GenericOptionsParser(conf, argv);
       argv = hParser.getRemainingArgs();
+      // 处理命令行参数
       if (argv.length > 1) {
         if (argv[0].equals("-format-policy-store")) {
+          // 格式化清空策略存储
           handFormatPolicyStateStore(conf);
         } else {
           printUsage(System.err);
         }
       } else {
+        // 正常启动GPG服务
         startGPG(argv, conf);
       }
     } catch (Throwable t) {
@@ -364,10 +390,18 @@ public class GlobalPolicyGenerator extends CompositeService {
     return webApp;
   }
 
+  /**
+   * 打印命令行帮助信息。
+   * @param out 输出流
+   */
   private static void printUsage(PrintStream out) {
     out.println("Usage: yarn gpg [-format-policy-store]");
   }
 
+  /**
+   * 格式化清空联邦策略状态存储。
+   * @param conf 配置对象
+   */
   private static void handFormatPolicyStateStore(Configuration conf) {
     try {
       System.out.println("Deleting Federation policy state store.");

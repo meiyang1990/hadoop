@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.nodemanager.collectormanager contains
- * classes for handling timeline collector information.
+ * NodeManager 时间线收集器管理包，提供时间线收集器信息管理相关核心实现
+ * 负责在NodeManager节点上管理应用指标收集器的生命周期与路由信息
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

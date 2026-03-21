@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -18,9 +19,16 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager;
 
+/**
+ * 辅助服务事件类型枚举，定义NodeManager辅助服务支持的各类事件类型
+ */
 public enum AuxServicesEventType {
+  /** 应用初始化事件 */
   APPLICATION_INIT,
+  /** 应用停止事件 */
   APPLICATION_STOP,
+  /** 容器初始化事件 */
   CONTAINER_INIT,
+  /** 容器停止事件 */
   CONTAINER_STOP
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -28,29 +29,43 @@ import org.apache.hadoop.yarn.server.federation.store.records.ReservationHomeSub
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of
- * {@link AddReservationHomeSubClusterRequest}.
+ * 添加预约归属子集群请求的Protocol Buffer实现类。
+ * 基于Protobuf序列化协议实现{@link AddReservationHomeSubClusterRequest}接口。
  */
 @Private
 @Unstable
 public class AddReservationHomeSubClusterRequestPBImpl
     extends AddReservationHomeSubClusterRequest {
 
+  // 存储Protobuf消息对象
   private AddReservationHomeSubClusterRequestProto proto =
       AddReservationHomeSubClusterRequestProto.getDefaultInstance();
+  // Protobuf消息构造器
   private AddReservationHomeSubClusterRequestProto.Builder builder = null;
+  // 当前是否通过proto对象访问数据的标记
   private boolean viaProto = false;
 
+  /**
+   * 构造空请求对象，初始化Builder。
+   */
   public AddReservationHomeSubClusterRequestPBImpl() {
     builder = AddReservationHomeSubClusterRequestProto.newBuilder();
   }
 
+  /**
+   * 通过已有的Protobuf对象构造请求。
+   * @param proto 已构造完成的Protobuf请求对象
+   */
   public AddReservationHomeSubClusterRequestPBImpl(
       AddReservationHomeSubClusterRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求对应的Protobuf对象，合并本地修改。
+   * @return 序列化完成的Protobuf请求对象
+   */
   public AddReservationHomeSubClusterRequestProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -58,6 +73,7 @@ public class AddReservationHomeSubClusterRequestPBImpl
     return proto;
   }
 
+  // 合并本地修改到proto对象
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -67,6 +83,7 @@ public class AddReservationHomeSubClusterRequestPBImpl
     viaProto = true;
   }
 
+  // 延迟初始化Builder，从现有proto对象拷贝数据
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = AddReservationHomeSubClusterRequestProto.newBuilder(proto);
@@ -74,6 +91,7 @@ public class AddReservationHomeSubClusterRequestPBImpl
     viaProto = false;
   }
 
+  // 合并本地修改到Builder，当前无本地字段需要合并
   private void mergeLocalToBuilder() {
   }
 
@@ -118,11 +136,13 @@ public class AddReservationHomeSubClusterRequestPBImpl
     builder.setAppSubclusterMap(convertToProtoFormat(reservationInfo));
   }
 
+  // 将Protobuf格式预约信息转换为业务对象
   private ReservationHomeSubCluster convertFromProtoFormat(
       ReservationHomeSubClusterProto sc) {
     return new ReservationHomeSubClusterPBImpl(sc);
   }
 
+  // 将业务对象预约信息转换为Protobuf格式
   private ReservationHomeSubClusterProto convertToProtoFormat(
       ReservationHomeSubCluster sc) {
     return ((ReservationHomeSubClusterPBImpl) sc).getProto();

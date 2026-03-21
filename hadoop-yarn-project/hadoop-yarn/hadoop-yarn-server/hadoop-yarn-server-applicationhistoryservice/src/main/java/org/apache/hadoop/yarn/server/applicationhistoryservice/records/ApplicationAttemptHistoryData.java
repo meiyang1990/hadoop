@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,8 @@ import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.YarnApplicationAttemptState;
 
 /**
- * The class contains all the fields that are stored persistently for
- * <code>RMAppAttempt</code>.
+ * 应用尝试运行历史数据实体，存储RMAppAttempt需要持久化保存的所有字段数据
+ * 供应用历史服务持久化存储、查询应用尝试运行历史信息使用
  */
 @Public
 @Unstable
@@ -49,6 +50,18 @@ public class ApplicationAttemptHistoryData {
 
   private YarnApplicationAttemptState yarnApplicationAttemptState;
 
+  /**
+   * 创建应用尝试运行历史数据实例，使用所有必填字段初始化
+   * @param appAttemptId 应用尝试运行ID
+   * @param host AM所在节点主机名
+   * @param rpcPort AM RPC服务端口
+   * @param masterContainerId AM主容器ID
+   * @param diagnosticsInfo 诊断信息
+   * @param trackingURL 追踪页面URL
+   * @param finalApplicationStatus 应用最终状态
+   * @param yarnApplicationAttemptState YARN应用尝试运行状态
+   * @return 初始化完成的应用尝试运行历史数据实例
+   */
   @Public
   @Unstable
   public static ApplicationAttemptHistoryData newInstance(

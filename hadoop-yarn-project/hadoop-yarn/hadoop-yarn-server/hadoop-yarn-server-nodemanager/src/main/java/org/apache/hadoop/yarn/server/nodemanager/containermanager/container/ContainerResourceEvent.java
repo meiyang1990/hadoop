@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,16 +21,30 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalResourceRequest;
 
+/**
+ * 容器资源相关事件，用于通知容器资源请求/释放等资源操作
+ */
 public class ContainerResourceEvent extends ContainerEvent {
 
+  // 关联的本地资源请求
   private final LocalResourceRequest rsrc;
 
+  /**
+   * 构造容器资源事件
+   * @param container 容器ID
+   * @param type 容器事件类型
+   * @param rsrc 本地资源请求
+   */
   public ContainerResourceEvent(ContainerId container,
       ContainerEventType type, LocalResourceRequest rsrc) {
     super(container, type);
     this.rsrc = rsrc;
   }
 
+  /**
+   * 获取事件关联的资源请求
+   * @return 本地资源请求
+   */
   public LocalResourceRequest getResource() {
     return rsrc;
   }

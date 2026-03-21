@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -32,31 +33,46 @@ import org.apache.hadoop.yarn.server.federation.store.records.GetReservationsHom
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of
- * {@link GetReservationsHomeSubClusterResponse}.
+ * 文件说明：基于Protocol Buffer实现的{@link GetReservationsHomeSubClusterResponse}，用于YARN联邦存储查询预约归属子集群响应的PB序列化实现
+ * GetReservationsHomeSubClusterResponse基于Protocol Buffer的实现类，处理YARN联邦预约查询响应的序列化。
  */
 @Private
 @Unstable
 public class GetReservationsHomeSubClusterResponsePBImpl
     extends GetReservationsHomeSubClusterResponse {
 
+  // PB协议对象，存储序列化后的响应数据
   private GetReservationsHomeSubClusterResponseProto proto =
       GetReservationsHomeSubClusterResponseProto.getDefaultInstance();
+  // PB构建器，用于构建响应对象
   private GetReservationsHomeSubClusterResponseProto.Builder builder = null;
+  // 标记当前是否通过proto对象存储数据
   private boolean viaProto = false;
 
+  // 本地缓存的预约归属子集群列表
   private List<ReservationHomeSubCluster> appsHomeSubCluster;
 
+  /**
+   * 构造函数，初始化空的PB构建器。
+   */
   public GetReservationsHomeSubClusterResponsePBImpl() {
     builder = GetReservationsHomeSubClusterResponseProto.newBuilder();
   }
 
+  /**
+   * 构造函数，基于已有proto对象构建响应实例。
+   * @param proto 已有的proto响应对象
+   */
   public GetReservationsHomeSubClusterResponsePBImpl(
       GetReservationsHomeSubClusterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前响应的proto对象，合并本地缓存数据到proto后返回。
+   * @return 序列化后的proto对象
+   */
   public GetReservationsHomeSubClusterResponseProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -64,6 +80,7 @@ public class GetReservationsHomeSubClusterResponsePBImpl
     return proto;
   }
 
+  // 合并本地缓存数据到proto对象
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -73,6 +90,7 @@ public class GetReservationsHomeSubClusterResponsePBImpl
     viaProto = true;
   }
 
+  // 延迟初始化PB构建器，若当前基于proto存储则复制现有数据到构建器
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = GetReservationsHomeSubClusterResponseProto.newBuilder(proto);
@@ -80,6 +98,7 @@ public class GetReservationsHomeSubClusterResponsePBImpl
     viaProto = false;
   }
 
+  // 合并本地缓存数据到PB构建器
   private void mergeLocalToBuilder() {
     if (this.appsHomeSubCluster != null) {
       addSubClustersInfoToProto();
@@ -125,6 +144,7 @@ public class GetReservationsHomeSubClusterResponsePBImpl
     addSubClustersInfoToProto();
   }
 
+  // 从PB对象初始化本地预约归属子集群列表缓存
   private void initSubClustersInfoList() {
     if (this.appsHomeSubCluster != null) {
       return;
@@ -138,6 +158,7 @@ public class GetReservationsHomeSubClusterResponsePBImpl
     }
   }
 
+  // 将本地缓存的预约归属子集群列表转换写入PB构建器
   private void addSubClustersInfoToProto() {
     maybeInitBuilder();
     builder.clearAppSubclusterMap();
@@ -172,10 +193,12 @@ public class GetReservationsHomeSubClusterResponsePBImpl
     builder.addAllAppSubclusterMap(iterable);
   }
 
+  // 将PB格式预约归属对象转换为业务对象
   private ReservationHomeSubCluster convertFromProtoFormat(ReservationHomeSubClusterProto sc) {
     return new ReservationHomeSubClusterPBImpl(sc);
   }
 
+  // 将业务格式预约归属对象转换为PB对象
   private ReservationHomeSubClusterProto convertToProtoFormat(ReservationHomeSubCluster sc) {
     return ((ReservationHomeSubClusterPBImpl) sc).getProto();
   }

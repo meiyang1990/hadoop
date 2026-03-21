@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,13 +24,15 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * SetSubClusterPolicyConfigurationResponse contains the answer from the
- * {@code FederationPolicyStore} to a request to set for a policy configuration
- * for a given queue.
+ * YARN联邦环境中，设置队列子集群路由策略配置请求的响应类，封装联邦策略存储返回的操作结果。
  */
 @Private
 @Unstable
 public abstract class SetSubClusterPolicyConfigurationResponse {
+  /**
+   * 创建一个新的设置子集群策略配置响应实例。
+   * @return 新建的响应对象
+   */
   public static SetSubClusterPolicyConfigurationResponse newInstance() {
     return Records.newRecord(SetSubClusterPolicyConfigurationResponse.class);
   }

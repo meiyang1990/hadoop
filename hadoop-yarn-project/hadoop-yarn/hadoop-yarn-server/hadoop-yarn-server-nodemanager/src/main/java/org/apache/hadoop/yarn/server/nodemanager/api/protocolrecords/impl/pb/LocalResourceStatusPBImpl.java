@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -33,27 +34,45 @@ import org.apache.hadoop.yarn.proto.YarnServerNodemanagerServiceProtos.ResourceS
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalResourceStatus;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.ResourceStatusType;
 
+/**
+ * LocalResourceStatus的Protobuf序列化实现类，用于NodeManager与客户端/ResourceManager之间通信
+ * 基于ProtoBase实现，封装了Protobuf的构建与转换逻辑
+ */
 public class LocalResourceStatusPBImpl
   extends ProtoBase<LocalResourceStatusProto> implements LocalResourceStatus {
 
+  // Protobuf对象实例，通过已有proto构造时使用
   LocalResourceStatusProto proto =
     LocalResourceStatusProto.getDefaultInstance();
+  // Protobuf构建器，新建对象时使用
   LocalResourceStatusProto.Builder builder = null;
+  // 标记是否通过已有proto构造，控制对象构建流程
   boolean viaProto = false;
 
+  // 本地资源缓存对象
   private LocalResource resource;
+  // 本地路径缓存对象
   private URL localPath;
+  // 异常信息缓存对象
   private SerializedException exception;
 
+  /**
+   * 构造空的LocalResourceStatusPBImpl，用于新建对象
+   */
   public LocalResourceStatusPBImpl() {
     builder = LocalResourceStatusProto.newBuilder();
   }
 
+  /**
+   * 通过已有Protobuf对象构造LocalResourceStatusPBImpl
+   * @param proto 已有的LocalResourceStatusProto实例
+   */
   public LocalResourceStatusPBImpl(LocalResourceStatusProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  @Override
   public LocalResourceStatusProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -61,6 +80,9 @@ public class LocalResourceStatusPBImpl
     return proto;
   }
 
+  /**
+   * 将本地缓存的对象字段合并到Protobuf构建器中
+   */
   private void mergeLocalToBuilder() {
     if (this.resource != null &&
         !((LocalResourcePBImpl)this.resource).getProto()
@@ -79,6 +101,9 @@ public class LocalResourceStatusPBImpl
     }
   }
 
+  /**
+   * 将本地缓存的字段合并到最终Protobuf对象
+   */
   private void mergeLocalToProto() {
     if (viaProto)
       maybeInitBuilder();
@@ -87,6 +112,9 @@ public class LocalResourceStatusPBImpl
     viaProto = true;
   }
 
+  /**
+   * 初始化Protobuf构建器，在从现有proto修改时使用
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = LocalResourceStatusProto.newBuilder(proto);
@@ -189,34 +217,42 @@ public class LocalResourceStatusPBImpl
     this.exception = exception;
   }
 
+  /** 转换LocalResource为Protobuf格式 */
   private LocalResourceProto convertToProtoFormat(LocalResource rsrc) {
     return ((LocalResourcePBImpl)rsrc).getProto();
   }
 
+  /** 从Protobuf格式转换为LocalResource */
   private LocalResourcePBImpl convertFromProtoFormat(LocalResourceProto rsrc) {
     return new LocalResourcePBImpl(rsrc);
   }
 
+  /** 从Protobuf格式转换为URL */
   private URLPBImpl convertFromProtoFormat(URLProto p) {
     return new URLPBImpl(p);
   }
 
+  /** 转换URL为Protobuf格式 */
   private URLProto convertToProtoFormat(URL t) {
     return ((URLPBImpl)t).getProto();
   }
 
+  /** 转换ResourceStatusType为Protobuf格式 */
   private ResourceStatusTypeProto convertToProtoFormat(ResourceStatusType e) {
     return ResourceStatusTypeProto.valueOf(e.name());
   }
 
+  /** 从Protobuf格式转换为ResourceStatusType */
   private ResourceStatusType convertFromProtoFormat(ResourceStatusTypeProto e) {
     return ResourceStatusType.valueOf(e.name());
   }
 
+  /** 从Protobuf格式转换为SerializedException */
   private SerializedExceptionPBImpl convertFromProtoFormat(SerializedExceptionProto p) {
     return new SerializedExceptionPBImpl(p);
   }
 
+  /** 转换SerializedException为Protobuf格式 */
   private SerializedExceptionProto convertToProtoFormat(SerializedException t) {
     return ((SerializedExceptionPBImpl)t).getProto();
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -32,24 +33,44 @@ import org.apache.hadoop.yarn.server.nodemanager.api.LocalizationProtocol;
 import org.apache.hadoop.yarn.server.nodemanager.api.LocalizationProtocolPB;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerHeartbeatResponse;
 
+/**
+ * 本地化协议Protobuf服务实现类，负责处理本地化器心跳RPC请求，完成PB格式转换与实际业务逻辑转发
+ */
 public class LocalizationProtocolPBServiceImpl implements LocalizationProtocolPB {
 
+  // 持有实际业务逻辑处理对象
   private LocalizationProtocol real;
   
+  /**
+   * 构造函数，注入实际业务处理接口
+   * @param impl 实际本地化协议业务逻辑实现
+   */
   public LocalizationProtocolPBServiceImpl(LocalizationProtocol impl) {
     this.real = impl;
   }
   
+  /**
+   * 处理本地化器心跳请求，完成PB格式转换并转发给实际业务逻辑
+   * @param controller RPC控制器
+   * @param proto Protobuf格式的本地化器状态请求
+   * @return Protobuf格式的心跳响应
+   * @throws ServiceException 服务异常包装
+   */
   @Override
   public LocalizerHeartbeatResponseProto heartbeat(RpcController controller,
       LocalizerStatusProto proto) throws ServiceException {
+    // 将Protobuf请求转换为内部业务对象
     LocalizerStatusPBImpl request = new LocalizerStatusPBImpl(proto);
     try {
+      // 转发请求给实际业务处理
       LocalizerHeartbeatResponse response = real.heartbeat(request);
+      // 将内部响应对象转换为Protobuf格式返回
       return ((LocalizerHeartbeatResponsePBImpl)response).getProto();
     } catch (YarnException e) {
+      // 包装Yarn异常为RPC服务异常
       throw new ServiceException(e);
     } catch (IOException e) {
+      // 包装IO异常为RPC服务异常
       throw new ServiceException(e);
     }
   }

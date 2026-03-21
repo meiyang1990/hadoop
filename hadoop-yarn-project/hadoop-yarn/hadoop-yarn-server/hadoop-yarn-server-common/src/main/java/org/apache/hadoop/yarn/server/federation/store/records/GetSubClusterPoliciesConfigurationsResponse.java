@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,14 +27,19 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * GetSubClusterPolicyConfigurationResponse contains the answer from the {@code
- * FederationPolicyStore} to a request to get all the policies configured in the
- * system via a {@link SubClusterPolicyConfiguration}.
+ * YARN联邦策略存储获取所有子集群路由策略配置响应类，
+ * 封装从FederationPolicyStore查询所有已配置路由策略的返回结果。
  */
 @Private
 @Unstable
 public abstract class GetSubClusterPoliciesConfigurationsResponse {
 
+  /**
+   * 创建获取所有子集群策略配置响应实例，设置返回的策略列表。
+   *
+   * @param policyConfigurations 所有已配置的子集群策略列表
+   * @return 新建的响应对象实例
+   */
   @Private
   @Unstable
   public static GetSubClusterPoliciesConfigurationsResponse newInstance(
@@ -45,18 +51,18 @@ public abstract class GetSubClusterPoliciesConfigurationsResponse {
   }
 
   /**
-   * Get all the policies configured in the system.
+   * 获取系统中所有已配置的子集群路由策略。
    *
-   * @return all the policies configured in the system
+   * @return 所有已配置的子集群路由策略列表
    */
   @Public
   @Unstable
   public abstract List<SubClusterPolicyConfiguration> getPoliciesConfigs();
 
   /**
-   * Sets all the policies configured in the system.
+   * 设置系统中所有已配置的子集群路由策略。
    *
-   * @param policyConfigurations all the policies configured in the system
+   * @param policyConfigurations 所有已配置的子集群路由策略列表
    */
   @Private
   @Unstable

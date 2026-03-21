@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,22 +23,19 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * An optional interface to implement if custom device scheduling is needed.
- * If this is not implemented, the device framework will do scheduling.
+ * 设备插件自定义调度器接口，当需要自定义设备分配逻辑时可实现该接口
+ * 若未实现该接口，则默认由YARN设备框架完成设备调度分配
  * */
 public interface DevicePluginScheduler {
   /**
-   * Called when allocating devices. The framework will do all device book
-   * keeping and fail recovery. So this hook could be stateless and only do
-   * scheduling based on available devices passed in. It could be
-   * invoked multiple times by the framework. The hint in environment variables
-   * passed in could be potentially used in making better scheduling decision.
-   * For instance, GPU scheduling might support different kind of policy. The
-   * container can set it through environment variables.
-   * @param availableDevices Devices allowed to be chosen from.
-   * @param count Number of device to be allocated.
-   * @param env Environment variables of the container.
-   * @return A set of {@link Device} allocated
+   * 设备分配调度钩子，在YARN设备框架分配设备时调用
+   * 框架已负责设备台账管理和故障恢复，因此该接口无需维护状态，仅需根据传入的可用设备完成调度决策
+   * 框架可能多次调用该方法，可通过容器环境变量传入的调度参数做出更贴合业务的分配决策
+   * 例如GPU调度可通过环境变量指定不同调度策略
+   * @param availableDevices 可用于分配的候选设备集合
+   * @param count 需要分配的设备数量
+   * @param env 待分配容器的环境变量，可携带自定义调度参数
+   * @return 完成分配的设备集合
    * */
   Set<Device> allocateDevices(Set<Device> availableDevices, int count,
       Map<String, String> env);
