@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,48 +27,46 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
- * Objects that are read from/written to a database should implement
- * <code>DBWritable</code>. DBWritable, is similar to {@link Writable} 
- * except that the {@link #write(PreparedStatement)} method takes a 
- * {@link PreparedStatement}, and {@link #readFields(ResultSet)} 
- * takes a {@link ResultSet}. 
- * <p>
- * Implementations are responsible for writing the fields of the object 
- * to PreparedStatement, and reading the fields of the object from the 
- * ResultSet. 
+ * MapReduce数据库读写功能接口，定义对象与关系型数据库交互的序列化协议。
+ * 该接口类似{@link Writable}，区别在于它专门用于JDBC交互：
+ * 将当前对象的字段写入JDBC PreparedStatement，或从JDBC ResultSet读取字段填充对象。
+ * 实现类需要自行处理对象字段和数据库表列之间的映射关系，用于MapReduce从数据库读取输入、
+ * 将计算结果写入数据库的场景。
  * 
- * <p>Example:</p>
- * If we have the following table in the database :
+ * <p>使用示例:</p>
+ * 如果数据库中有如下表:
  * <pre>
  * CREATE TABLE MyTable (
  *   counter        INTEGER NOT NULL,
  *   timestamp      BIGINT  NOT NULL,
  * );
  * </pre>
- * then we can read/write the tuples from/to the table with :
+ * 可以实现该接口来读写表中记录:
  * <p><pre>
  * public class MyWritable implements Writable, DBWritable {
- *   // Some data     
+ *   // 业务数据
  *   private int counter;
  *   private long timestamp;
  *       
- *   //Writable#write() implementation
+ *   //Writable#write()实现
  *   public void write(DataOutput out) throws IOException {
  *     out.writeInt(counter);
  *     out.writeLong(timestamp);
  *   }
  *       
- *   //Writable#readFields() implementation
+ *   //Writable#readFields()实现
  *   public void readFields(DataInput in) throws IOException {
  *     counter = in.readInt();
  *     timestamp = in.readLong();
  *   }
  *       
+ *   // 将对象字段写入JDBC预编译语句
  *   public void write(PreparedStatement statement) throws SQLException {
  *     statement.setInt(1, counter);
  *     statement.setLong(2, timestamp);
  *   }
  *       
+ *   // 从JDBC结果集读取数据填充对象
  *   public void readFields(ResultSet resultSet) throws SQLException {
  *     counter = resultSet.getInt(1);
  *     timestamp = resultSet.getLong(2);
@@ -80,16 +79,16 @@ import org.apache.hadoop.io.Writable;
 public interface DBWritable {
 
   /**
-   * Sets the fields of the object in the {@link PreparedStatement}.
-   * @param statement the statement that the fields are put into.
-   * @throws SQLException
+   * 将当前对象的所有字段写入到JDBC PreparedStatement中，用于SQL执行
+   * @param statement 预编译SQL语句对象，对象字段将按顺序绑定到该语句的参数
+   * @throws SQLException 如果数据库操作发生异常则抛出
    */
 	public void write(PreparedStatement statement) throws SQLException;
 	
 	/**
-	 * Reads the fields of the object from the {@link ResultSet}. 
-	 * @param resultSet the {@link ResultSet} to get the fields from.
-	 * @throws SQLException
+	 * 从JDBC ResultSet当前行读取数据，填充当前对象的所有字段
+	 * @param resultSet 查询结果集，从当前行读取字段值填充对象
+	 * @throws SQLException 如果数据库操作发生异常则抛出
 	 */
 	public void readFields(ResultSet resultSet) throws SQLException ; 
 }

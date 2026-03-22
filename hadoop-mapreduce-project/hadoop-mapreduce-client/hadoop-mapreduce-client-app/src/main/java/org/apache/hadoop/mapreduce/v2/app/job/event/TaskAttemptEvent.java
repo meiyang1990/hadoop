@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +23,8 @@ import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
 /**
- * This class encapsulates task attempt related events.
+ * MapReduce任务尝试相关事件的基类，封装任务尝试ID和事件类型，
+ * 用于MapReduce ApplicationMaster内部的任务尝试状态变更事件驱动处理。
  *
  */
 public class TaskAttemptEvent extends AbstractEvent<TaskAttemptEventType> {
@@ -30,15 +32,19 @@ public class TaskAttemptEvent extends AbstractEvent<TaskAttemptEventType> {
   private TaskAttemptId attemptID;
   
   /**
-   * Create a new TaskAttemptEvent.
-   * @param id the id of the task attempt
-   * @param type the type of event that happened.
+   * 构造任务尝试事件实例
+   * @param id 发生事件的任务尝试ID
+   * @param type 事件类型
    */
   public TaskAttemptEvent(TaskAttemptId id, TaskAttemptEventType type) {
     super(type);
     this.attemptID = id;
   }
 
+  /**
+   * 获取发生该事件的任务尝试ID
+   * @return 任务尝试ID
+   */
   public TaskAttemptId getTaskAttemptID() {
     return attemptID;
   }

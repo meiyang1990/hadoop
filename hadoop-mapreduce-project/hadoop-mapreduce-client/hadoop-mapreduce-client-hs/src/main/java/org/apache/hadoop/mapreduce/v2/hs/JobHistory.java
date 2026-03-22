@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -58,7 +59,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Loads and manages the Job history cache.
+ * 文件: JobHistory.java
+ * 归属模块: hadoop-mapreduce-client-hs
+ * 核心职责: 负责作业历史文件的加载、缓存管理和定期清理，为MapReduce作业历史服务器提供已完成作业的查询能力
+ */
+
+/**
+ * 加载和管理作业历史缓存，实现HistoryContext接口，提供作业历史查询能力
  */
 public class JobHistory extends AbstractService implements HistoryContext {
   private static final Logger LOG = LoggerFactory.getLogger(JobHistory.class);
@@ -67,7 +74,7 @@ public class JobHistory extends AbstractService implements HistoryContext {
       + JobID.JOBID_REGEX + ")_conf.xml(?:\\.[0-9]+\\.old)?");
   public static final String OLD_SUFFIX = ".old";
 
-  // Time interval for the move thread.
+  // 移动中间历史文件线程的执行间隔
   private long moveThreadInterval;
 
   private Configuration conf;
@@ -78,7 +85,7 @@ public class JobHistory extends AbstractService implements HistoryContext {
   private HistoryFileManager hsManager = null;
   ScheduledFuture<?> futureHistoryCleaner = null;
   
-  //History job cleaner interval
+  // 历史作业清理线程执行间隔
   private long cleanerInterval;
   
   @Override
@@ -88,21 +95,22 @@ public class JobHistory extends AbstractService implements HistoryContext {
     this.appID = ApplicationId.newInstance(0, 0);
     this.appAttemptID = RecordFactoryProvider.getRecordFactory(conf)
         .newRecordInstance(ApplicationAttemptId.class);
-
+    // 从配置读取移动中间文件线程间隔
     moveThreadInterval = conf.getLong(
         JHAdminConfig.MR_HISTORY_MOVE_INTERVAL_MS,
         JHAdminConfig.DEFAULT_MR_HISTORY_MOVE_INTERVAL_MS);
-
+    // 创建并初始化历史文件管理器
     hsManager = createHistoryFileManager();
     hsManager.init(conf);
     try {
+      // 初始化已存在的历史目录
       hsManager.initExisting();
     } catch (IOException e) {
       throw new YarnRuntimeException("Failed to initialize existing directories", e);
     }
-
+    // 创建历史存储实例
     storage = createHistoryStorage();
-    
+    // 如果存储是服务则初始化
     if (storage instanceof Service) {
       ((Service) storage).init(conf);
     }
@@ -111,35 +119,47 @@ public class JobHistory extends AbstractService implements HistoryContext {
     super.serviceInit(conf);
   }
 
+  /**
+   * 通过反射创建配置指定的历史存储实现实例
+   * @return 历史存储实例
+   */
   protected HistoryStorage createHistoryStorage() {
     return ReflectionUtils.newInstance(conf.getClass(
         JHAdminConfig.MR_HISTORY_STORAGE, CachedHistoryStorage.class,
         HistoryStorage.class), conf);
   }
   
+  /**
+   * 创建历史文件管理器实例，子类可覆盖
+   * @return 历史文件管理器实例
+   */
   protected HistoryFileManager createHistoryFileManager() {
     return new HistoryFileManager();
   }
 
   @Override
   protected void serviceStart() throws Exception {
+    // 启动历史文件管理器
     hsManager.start();
     if (storage instanceof Service) {
       ((Service) storage).start();
     }
-
+    // 创建定时线程池，用于日志扫描和清理任务
     scheduledExecutor = new HadoopScheduledThreadPoolExecutor(2,
         new ThreadFactoryBuilder().setNameFormat("Log Scanner/Cleaner #%d")
             .build());
-
+    // 启动定时任务，定期将中间历史文件移动到完成目录
     scheduledExecutor.scheduleAtFixedRate(new MoveIntermediateToDoneRunnable(),
         moveThreadInterval, moveThreadInterval, TimeUnit.MILLISECONDS);
-
-    // Start historyCleaner
+    // 启动历史清理定时任务
     scheduleHistoryCleaner();
     super.serviceStart();
   }
 
+  /**
+   * 获取历史清理任务初始延迟秒数
+   * @return 初始延迟秒数
+   */
   protected int getInitDelaySecs() {
     return 30;
   }
@@ -152,6 +172,7 @@ public class JobHistory extends AbstractService implements HistoryContext {
       scheduledExecutor.shutdown();
       int retryCnt = 50;
       try {
+        // 等待线程池优雅终止，超时则强制关闭
         while (!scheduledExecutor.awaitTermination(20,
             TimeUnit.MILLISECONDS)) {
           if (--retryCnt == 0) {
@@ -168,16 +189,20 @@ public class JobHistory extends AbstractService implements HistoryContext {
       }
       scheduledExecutor = null;
     }
-    // Stop the other services.
+    // 停止存储服务
     if (storage != null && storage instanceof Service) {
       ((Service) storage).stop();
     }
+    // 停止历史文件管理器
     if (hsManager != null) {
       hsManager.stop();
     }
     super.serviceStop();
   }
 
+  /**
+   * 构造JobHistory实例
+   */
   public JobHistory() {
     super(JobHistory.class.getName());
   }
@@ -187,11 +212,15 @@ public class JobHistory extends AbstractService implements HistoryContext {
     return "Job History Server";
   }
 
+  /**
+   * 定时将中间完成的作业历史文件移动到最终Done目录的任务
+   */
   private class MoveIntermediateToDoneRunnable implements Runnable {
     @Override
     public void run() {
       try {
         LOG.info("Starting scan to move intermediate done files");
+        // 扫描中间目录移动文件
         hsManager.scanIntermediateDirectory();
       } catch (IOException e) {
         LOG.error("Error while scanning intermediate done dir ", e);
@@ -199,10 +228,14 @@ public class JobHistory extends AbstractService implements HistoryContext {
     }
   }
   
+  /**
+   * 定时清理过期历史作业文件的任务
+   */
   private class HistoryCleaner implements Runnable {
     public void run() {
       LOG.info("History Cleaner started");
       try {
+        // 执行过期文件清理
         hsManager.clean();
       } catch (IOException e) {
         LOG.warn("Error trying to clean up ", e);
@@ -212,8 +245,12 @@ public class JobHistory extends AbstractService implements HistoryContext {
   }
 
   /**
-   * Helper method for test cases.
+   * 测试用辅助方法：获取指定作业的历史文件信息
+   * @param jobId 作业ID
+   * @return 历史文件信息
+   * @throws IOException IO异常
    */
+  @VisibleForTesting
   HistoryFileInfo getJobFileInfo(JobId jobId) throws IOException {
     return hsManager.getFileInfo(jobId);
   }
@@ -241,6 +278,9 @@ public class JobHistory extends AbstractService implements HistoryContext {
     return storage.getAllPartialJobs();
   }
 
+  /**
+   * 刷新已加载的作业缓存，触发缓存重新加载
+   */
   public void refreshLoadedJobCache() {
     if (getServiceState() == STATE.STARTED) {
       if (storage instanceof CachedHistoryStorage) {
@@ -260,29 +300,6 @@ public class JobHistory extends AbstractService implements HistoryContext {
     return storage;
   }
   
-  /**
-   * Look for a set of partial jobs.
-   * 
-   * @param offset
-   *          the offset into the list of jobs.
-   * @param count
-   *          the maximum number of jobs to return.
-   * @param user
-   *          only return jobs for the given user.
-   * @param queue
-   *          only return jobs for in the given queue.
-   * @param sBegin
-   *          only return Jobs that started on or after the given time.
-   * @param sEnd
-   *          only return Jobs that started on or before the given time.
-   * @param fBegin
-   *          only return Jobs that ended on or after the given time.
-   * @param fEnd
-   *          only return Jobs that ended on or before the given time.
-   * @param jobState
-   *          only return jobs that are in the give job state.
-   * @return The list of filtered jobs.
-   */
   @Override
   public JobsInfo getPartialJobs(Long offset, Long count, String user,
       String queue, Long sBegin, Long sEnd, Long fBegin, Long fEnd,
@@ -291,12 +308,17 @@ public class JobHistory extends AbstractService implements HistoryContext {
         fBegin, fEnd, jobState);
   }
 
+  /**
+   * 刷新作业历史保留设置，重新读取配置更新清理参数
+   */
   public void refreshJobRetentionSettings() {
     if (getServiceState() == STATE.STARTED) {
       conf = createConf();
+      // 重新读取最大历史保留时间
       long maxHistoryAge = conf.getLong(JHAdminConfig.MR_HISTORY_MAX_AGE_MS,
           JHAdminConfig.DEFAULT_MR_HISTORY_MAX_AGE);
       hsManager.setMaxHistoryAge(maxHistoryAge);
+      // 取消原有清理任务，重新调度
       if (futureHistoryCleaner != null) {
         futureHistoryCleaner.cancel(false);
       }
@@ -307,20 +329,29 @@ public class JobHistory extends AbstractService implements HistoryContext {
     }
   }
 
+  /**
+   * 调度历史清理定时任务
+   */
   private void scheduleHistoryCleaner() {
+    // 从配置读取清理开关
     boolean startCleanerService = conf.getBoolean(
         JHAdminConfig.MR_HISTORY_CLEANER_ENABLE, true);
     if (startCleanerService) {
+      // 读取清理间隔
       cleanerInterval = conf.getLong(
           JHAdminConfig.MR_HISTORY_CLEANER_INTERVAL_MS,
           JHAdminConfig.DEFAULT_MR_HISTORY_CLEANER_INTERVAL_MS);
-
+      // 启动定时清理任务
       futureHistoryCleaner = scheduledExecutor.scheduleAtFixedRate(
           new HistoryCleaner(), getInitDelaySecs() * 1000l, cleanerInterval,
           TimeUnit.MILLISECONDS);
     }
   }
 
+  /**
+   * 创建新的配置实例，用于刷新配置
+   * @return 新配置实例
+   */
   protected Configuration createConf() {
     return new Configuration();
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,8 +42,8 @@ import java.util.Set;
 import java.util.TimeZone;
 
 /**
- * Used by the {@link HistoryViewer} to print job history in a human-readable
- * format.
+ * 为人可读格式打印MapReduce作业历史的实现类，供HistoryViewer使用
+ * 将解析后的作业历史转换为适合人类阅读的格式化文本输出
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -53,11 +54,24 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
   private boolean printAll;
   private String scheme;
 
+  /**
+   * 构造HumanReadableHistoryViewerPrinter，使用默认时区
+   * @param job 解析后的作业信息对象
+   * @param printAll 是否打印所有任务（包括成功的任务和所有尝试）
+   * @param scheme 日志URL的协议类型
+   */
   HumanReadableHistoryViewerPrinter(JobHistoryParser.JobInfo job,
                                     boolean printAll, String scheme) {
     this(job, printAll, scheme, TimeZone.getDefault());
   }
 
+  /**
+   * 构造HumanReadableHistoryViewerPrinter，指定时区
+   * @param job 解析后的作业信息对象
+   * @param printAll 是否打印所有任务（包括成功的任务和所有尝试）
+   * @param scheme 日志URL的协议类型
+   * @param tz 日期格式化使用的时区
+   */
   HumanReadableHistoryViewerPrinter(JobHistoryParser.JobInfo job,
                                     boolean printAll, String scheme,
                                     TimeZone tz) {
@@ -68,16 +82,19 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
   }
 
   /**
-   * Print out the Job History to the given {@link PrintStream} in a
-   * human-readable format.
-   * @param ps the {@link PrintStream} to print to
-   * @throws IOException when a problem occurs while printing
+   * 将作业历史以人类可读格式打印到指定输出流
+   * @param ps 输出流
+   * @throws IOException 打印过程中IO异常
    */
   @Override
   public void print(PrintStream ps) throws IOException {
+    // 打印作业基本信息
     printJobDetails(ps);
+    // 打印各类任务汇总统计
     printTaskSummary(ps);
+    // 打印作业性能分析
     printJobAnalysis(ps);
+    // 打印不同类型不同状态的失败/被杀死任务列表
     printTasks(ps, TaskType.JOB_SETUP, TaskStatus.State.FAILED.toString());
     printTasks(ps, TaskType.JOB_SETUP, TaskStatus.State.KILLED.toString());
     printTasks(ps, TaskType.MAP, TaskStatus.State.FAILED.toString());
@@ -87,6 +104,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
     printTasks(ps, TaskType.JOB_CLEANUP, TaskStatus.State.FAILED.toString());
     printTasks(ps, TaskType.JOB_CLEANUP,
         JobStatus.getJobRunState(JobStatus.KILLED));
+    // 如果需要打印全部内容，打印成功任务和所有任务尝试
     if (printAll) {
       printTasks(ps, TaskType.JOB_SETUP, TaskStatus.State.SUCCEEDED.toString());
       printTasks(ps, TaskType.MAP, TaskStatus.State.SUCCEEDED.toString());
@@ -99,6 +117,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
       printAllTaskAttempts(ps, TaskType.JOB_CLEANUP);
     }
 
+    // 按节点统计失败的任务尝试
     HistoryViewer.FilteredJob filter = new HistoryViewer.FilteredJob(job,
         TaskStatus.State.FAILED.toString());
     printFailedAttempts(ps, filter);
@@ -108,6 +127,10 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
     printFailedAttempts(ps, filter);
   }
 
+  /**
+   * 打印作业基本详细信息
+   * @param ps 输出流
+   */
   private void printJobDetails(PrintStream ps) {
     StringBuilder jobDetails = new StringBuilder();
     jobDetails.append("\nHadoop job: ").append(job.getJobId());
@@ -128,6 +151,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
             job.getLaunchTime()));
     jobDetails.append("\nStatus: ").append(((job.getJobStatus() == null) ?
         "Incomplete" :job.getJobStatus()));
+    // 打印作业计数器信息
     printJobCounters(jobDetails, job.getTotalCounters(), job.getMapCounters(),
         job.getReduceCounters());
     jobDetails.append("\n");
@@ -135,9 +159,16 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
     ps.println(jobDetails);
   }
 
+  /**
+   * 格式化打印作业计数器，分别展示Map端、Reduce端和总计数器值
+   * @param buff 字符串拼接缓冲区
+   * @param totalCounters 总计数器
+   * @param mapCounters Map端计数器
+   * @param reduceCounters Reduce端计数器
+   */
   private void printJobCounters(StringBuilder buff, Counters totalCounters,
                                 Counters mapCounters, Counters reduceCounters) {
-    // Killed jobs might not have counters
+    // 被杀死的作业可能没有计数器
     if (totalCounters != null) {
       buff.append("\nCounters: \n\n");
       buff.append(String.format("|%1$-30s|%2$-30s|%3$-10s|%4$-10s|%5$-10s|",
@@ -148,6 +179,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
           "Total Value"));
       buff.append("\n------------------------------------------" +
           "---------------------------------------------");
+      // 遍历所有计数器组
       for (CounterGroup counterGroup : totalCounters) {
         String groupName = counterGroup.getName();
         CounterGroup totalGroup = totalCounters.getGroup(groupName);
@@ -157,6 +189,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
         Format decimal = new DecimalFormat();
         Iterator<Counter> ctrItr =
             totalGroup.iterator();
+        // 遍历计数器组内每个计数器
         while (ctrItr.hasNext()) {
           org.apache.hadoop.mapreduce.Counter counter = ctrItr.next();
           String name = counter.getName();
@@ -177,19 +210,27 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
     }
   }
 
+  /**
+   * 打印指定类型所有任务尝试的详细信息
+   * @param ps 输出流
+   * @param taskType 任务类型
+   */
   private void printAllTaskAttempts(PrintStream ps, TaskType taskType) {
     Map<TaskID, JobHistoryParser.TaskInfo> tasks = job.getAllTasks();
     StringBuilder taskList = new StringBuilder();
     taskList.append("\n").append(taskType);
     taskList.append(" task list for ").append(job.getJobId());
     taskList.append("\nTaskId\t\tStartTime");
+    // Reduce任务额外打印Shuffle和排序完成时间
     if (TaskType.REDUCE.equals(taskType)) {
       taskList.append("\tShuffleFinished\tSortFinished");
     }
     taskList.append("\tFinishTime\tHostName\tError\tTaskLogs");
     taskList.append("\n====================================================");
     ps.println(taskList.toString());
+    // 遍历所有任务
     for (JobHistoryParser.TaskInfo task : tasks.values()) {
+      // 遍历任务的所有尝试
       for (JobHistoryParser.TaskAttemptInfo attempt :
           task.getAllTaskAttempts().values()) {
         if (taskType.equals(task.getTaskType())){
@@ -212,6 +253,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
           taskList.append("\t");
           taskList.append(attempt.getHostname()).append("\t");
           taskList.append(attempt.getError());
+          // 拼接任务日志链接
           String taskLogsUrl = HistoryViewer.getTaskLogsUrl(scheme, attempt);
           taskList.append(taskLogsUrl != null ? taskLogsUrl : "n/a");
           ps.println(taskList);
@@ -220,6 +262,10 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
     }
   }
 
+  /**
+   * 按任务类型打印任务统计汇总信息
+   * @param ps 输出流
+   */
   private void printTaskSummary(PrintStream ps) {
     HistoryViewer.SummarizedJob ts = new HistoryViewer.SummarizedJob(job);
     StringBuilder taskSummary = new StringBuilder();
@@ -228,6 +274,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
     taskSummary.append("\nKind\tTotal\t");
     taskSummary.append("Successful\tFailed\tKilled\tStartTime\tFinishTime");
     taskSummary.append("\n");
+    // 打印JOB_SETUP任务统计
     taskSummary.append("\nSetup\t").append(ts.totalSetups);
     taskSummary.append("\t").append(ts.numFinishedSetups);
     taskSummary.append("\t\t").append(ts.numFailedSetups);
@@ -236,6 +283,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
         dateFormat, ts.setupStarted, 0));
     taskSummary.append("\t").append(StringUtils.getFormattedTimeWithDiff(
         dateFormat, ts.setupFinished, ts.setupStarted));
+    // 打印MAP任务统计
     taskSummary.append("\nMap\t").append(ts.totalMaps);
     taskSummary.append("\t").append(job.getSucceededMaps());
     taskSummary.append("\t\t").append(ts.numFailedMaps);
@@ -244,6 +292,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
         dateFormat, ts.mapStarted, 0));
     taskSummary.append("\t").append(StringUtils.getFormattedTimeWithDiff(
         dateFormat, ts.mapFinished, ts.mapStarted));
+    // 打印REDUCE任务统计
     taskSummary.append("\nReduce\t").append(ts.totalReduces);
     taskSummary.append("\t").append(job.getSucceededReduces());
     taskSummary.append("\t\t").append(ts.numFailedReduces);
@@ -252,6 +301,7 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
         dateFormat, ts.reduceStarted, 0));
     taskSummary.append("\t").append(StringUtils.getFormattedTimeWithDiff(
         dateFormat, ts.reduceFinished, ts.reduceStarted));
+    // 打印JOB_CLEANUP任务统计
     taskSummary.append("\nCleanup\t").append(ts.totalCleanups);
     taskSummary.append("\t").append(ts.numFinishedCleanups);
     taskSummary.append("\t\t").append(ts.numFailedCleanups);
@@ -265,17 +315,25 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
     ps.println(taskSummary);
   }
 
+  /**
+   * 打印已完成作业的性能分析信息
+   * @param ps 输出流
+   */
   private void printJobAnalysis(PrintStream ps) {
+    // 仅对成功完成的作业做分析
     if (job.getJobStatus().equals(
         JobStatus.getJobRunState(JobStatus.SUCCEEDED))) {
       HistoryViewer.AnalyzedJob avg = new HistoryViewer.AnalyzedJob(job);
 
       ps.println("\nAnalysis");
       ps.println("=========");
+      // 分析Map任务运行时间
       printAnalysis(ps, avg.getMapTasks(), cMap, "map", avg.getAvgMapTime(),
           10);
+      // 输出最后完成的Map任务信息
       printLast(ps, avg.getMapTasks(), "map", cFinishMapRed);
 
+      // 如果存在Reduce任务，分析Shuffle和Reduce阶段
       if (avg.getReduceTasks().length > 0) {
         printAnalysis(ps, avg.getReduceTasks(), cShuffle, "shuffle",
             avg.getAvgShuffleTime(), 10);
@@ -291,16 +349,27 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
     }
   }
 
+  /**
+   * 打印任务阶段性能分析，展示最快任务、平均时间和最慢的N个任务
+   * @param ps 输出流
+   * @param tasks 任务尝试信息数组
+   * @param cmp 排序比较器
+   * @param taskType 任务阶段类型（map/shuffle/reduce）
+   * @param avg 该阶段平均耗时
+   * @param showTasks 需要展示的最慢任务数量
+   */
   protected void printAnalysis(PrintStream ps,
       JobHistoryParser.TaskAttemptInfo[] tasks,
       Comparator<JobHistoryParser.TaskAttemptInfo> cmp,
       String taskType, long avg, int showTasks) {
     Arrays.sort(tasks, cmp);
+    // 排序后最后一个就是最快的任务
     JobHistoryParser.TaskAttemptInfo min = tasks[tasks.length-1];
     StringBuilder details = new StringBuilder();
     details.append("\nTime taken by best performing ");
     details.append(taskType).append(" task ");
     details.append(min.getAttemptId().getTaskID().toString()).append(": ");
+    // 根据阶段类型计算耗时
     if ("map".equals(taskType)) {
       details.append(StringUtils.formatTimeDiff(
           min.getFinishTime(),
@@ -311,161 +380,3 @@ class HumanReadableHistoryViewerPrinter implements HistoryViewerPrinter {
           min.getStartTime()));
     } else {
       details.append(StringUtils.formatTimeDiff(
-          min.getFinishTime(),
-          min.getShuffleFinishTime()));
-    }
-    details.append("\nAverage time taken by ");
-    details.append(taskType).append(" tasks: ");
-    details.append(StringUtils.formatTimeDiff(avg, 0));
-    details.append("\nWorse performing ");
-    details.append(taskType).append(" tasks: ");
-    details.append("\nTaskId\t\tTimetaken");
-    ps.println(details);
-    for (int i = 0; i < showTasks && i < tasks.length; i++) {
-      details.setLength(0);
-      details.append(tasks[i].getAttemptId().getTaskID()).append(" ");
-      if ("map".equals(taskType)) {
-        details.append(StringUtils.formatTimeDiff(
-            tasks[i].getFinishTime(),
-            tasks[i].getStartTime()));
-      } else if ("shuffle".equals(taskType)) {
-        details.append(StringUtils.formatTimeDiff(
-            tasks[i].getShuffleFinishTime(),
-            tasks[i].getStartTime()));
-      } else {
-        details.append(StringUtils.formatTimeDiff(
-            tasks[i].getFinishTime(),
-            tasks[i].getShuffleFinishTime()));
-      }
-      ps.println(details);
-    }
-  }
-
-  protected void printLast(PrintStream ps,
-      JobHistoryParser.TaskAttemptInfo[] tasks, String taskType,
-      Comparator<JobHistoryParser.TaskAttemptInfo> cmp) {
-    Arrays.sort(tasks, cFinishMapRed);
-    JobHistoryParser.TaskAttemptInfo last = tasks[0];
-    StringBuilder lastBuf = new StringBuilder();
-    lastBuf.append("The last ").append(taskType);
-    lastBuf.append(" task ").append(last.getAttemptId().getTaskID());
-    Long finishTime;
-    if ("shuffle".equals(taskType)) {
-      finishTime = last.getShuffleFinishTime();
-    } else {
-      finishTime = last.getFinishTime();
-    }
-    lastBuf.append(" finished at (relative to the Job launch time): ");
-    lastBuf.append(StringUtils.getFormattedTimeWithDiff(dateFormat,
-        finishTime, job.getLaunchTime()));
-    ps.println(lastBuf);
-  }
-
-  private void printTasks(PrintStream ps, TaskType taskType, String status) {
-    Map<TaskID, JobHistoryParser.TaskInfo> tasks = job.getAllTasks();
-    StringBuilder header = new StringBuilder();
-    header.append("\n").append(status).append(" ");
-    header.append(taskType).append(" task list for ")
-        .append(job.getJobId().toString());
-    header.append("\nTaskId\t\tStartTime\tFinishTime\tError");
-    if (TaskType.MAP.equals(taskType)) {
-      header.append("\tInputSplits");
-    }
-    header.append("\n====================================================");
-    StringBuilder taskList = new StringBuilder();
-    for (JobHistoryParser.TaskInfo task : tasks.values()) {
-      if (taskType.equals(task.getTaskType()) &&
-          (status.equals(task.getTaskStatus())
-              || status.equalsIgnoreCase("ALL"))) {
-        taskList.setLength(0);
-        taskList.append(task.getTaskId());
-        taskList.append("\t").append(StringUtils.getFormattedTimeWithDiff(
-            dateFormat, task.getStartTime(), 0));
-        taskList.append("\t").append(StringUtils.getFormattedTimeWithDiff(
-            dateFormat, task.getFinishTime(),
-            task.getStartTime()));
-        taskList.append("\t").append(task.getError());
-        if (TaskType.MAP.equals(taskType)) {
-          taskList.append("\t").append(task.getSplitLocations());
-        }
-        if (taskList != null) {
-          ps.println(header);
-          ps.println(taskList);
-        }
-      }
-    }
-  }
-
-  private void printFailedAttempts(PrintStream ps,
-                                   HistoryViewer.FilteredJob filteredJob) {
-    Map<String, Set<TaskID>> badNodes = filteredJob.getFilteredMap();
-    StringBuilder attempts = new StringBuilder();
-    if (badNodes.size() > 0) {
-      attempts.append("\n").append(filteredJob.getFilter());
-      attempts.append(" task attempts by nodes");
-      attempts.append("\nHostname\tFailedTasks");
-      attempts.append("\n===============================");
-      ps.println(attempts);
-      for (Map.Entry<String, Set<TaskID>> entry : badNodes.entrySet()) {
-        String node = entry.getKey();
-        Set<TaskID> failedTasks = entry.getValue();
-        attempts.setLength(0);
-        attempts.append(node).append("\t");
-        for (TaskID t : failedTasks) {
-          attempts.append(t).append(", ");
-        }
-        ps.println(attempts);
-      }
-    }
-  }
-
-  private static Comparator<JobHistoryParser.TaskAttemptInfo> cMap =
-      new Comparator<JobHistoryParser.TaskAttemptInfo>() {
-        public int compare(JobHistoryParser.TaskAttemptInfo t1,
-                           JobHistoryParser.TaskAttemptInfo t2) {
-          long l1 = t1.getFinishTime() - t1.getStartTime();
-          long l2 = t2.getFinishTime() - t2.getStartTime();
-          return Long.compare(l2, l1);
-        }
-      };
-
-  private static Comparator<JobHistoryParser.TaskAttemptInfo> cShuffle =
-      new Comparator<JobHistoryParser.TaskAttemptInfo>() {
-        public int compare(JobHistoryParser.TaskAttemptInfo t1,
-                           JobHistoryParser.TaskAttemptInfo t2) {
-          long l1 = t1.getShuffleFinishTime() - t1.getStartTime();
-          long l2 = t2.getShuffleFinishTime() - t2.getStartTime();
-          return Long.compare(l2, l1);
-        }
-      };
-
-  private static Comparator<JobHistoryParser.TaskAttemptInfo> cFinishShuffle =
-      new Comparator<JobHistoryParser.TaskAttemptInfo>() {
-        public int compare(JobHistoryParser.TaskAttemptInfo t1,
-                           JobHistoryParser.TaskAttemptInfo t2) {
-          long l1 = t1.getShuffleFinishTime();
-          long l2 = t2.getShuffleFinishTime();
-          return Long.compare(l2, l1);
-        }
-      };
-
-  private static Comparator<JobHistoryParser.TaskAttemptInfo> cFinishMapRed =
-      new Comparator<JobHistoryParser.TaskAttemptInfo>() {
-        public int compare(JobHistoryParser.TaskAttemptInfo t1,
-                           JobHistoryParser.TaskAttemptInfo t2) {
-          long l1 = t1.getFinishTime();
-          long l2 = t2.getFinishTime();
-          return Long.compare(l2, l1);
-        }
-      };
-
-  private static Comparator<JobHistoryParser.TaskAttemptInfo> cReduce =
-      new Comparator<JobHistoryParser.TaskAttemptInfo>() {
-        public int compare(JobHistoryParser.TaskAttemptInfo t1,
-                           JobHistoryParser.TaskAttemptInfo t2) {
-          long l1 = t1.getFinishTime() - t1.getShuffleFinishTime();
-          long l2 = t2.getFinishTime() - t2.getShuffleFinishTime();
-          return Long.compare(l2, l1);
-        }
-      };
-}

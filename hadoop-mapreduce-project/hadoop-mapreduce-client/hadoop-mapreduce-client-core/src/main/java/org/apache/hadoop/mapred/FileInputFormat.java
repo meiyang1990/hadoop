@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -52,18 +53,13 @@ import org.apache.hadoop.thirdparty.com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** 
- * A base class for file-based {@link InputFormat}.
+/**
+ * 文件型InputFormat的抽象基类，为所有基于文件的输入格式提供通用能力
  * 
- * <p><code>FileInputFormat</code> is the base class for all file-based 
- * <code>InputFormat</code>s. This provides a generic implementation of
- * {@link #getSplits(JobConf, int)}.
- *
- * Implementations of <code>FileInputFormat</code> can also override the
- * {@link #isSplitable(FileSystem, Path)} method to prevent input files
- * from being split-up in certain situations. Implementations that may
- * deal with non-splittable files <i>must</i> override this method, since
- * the default implementation assumes splitting is always possible.
+ * <p>提供了输入路径解析、文件过滤、输入分片生成的通用实现，子类只需要实现
+ * {@link #getRecordReader(InputSplit, JobConf, Reporter)} 方法即可。
+ * 子类可以重写 {@link #isSplitable(FileSystem, Path)} 方法控制文件是否可分割，
+ * 默认实现认为所有文件都可以分割。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -87,9 +83,10 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     org.apache.hadoop.mapreduce.lib.input.FileInputFormat.INPUT_DIR_NONRECURSIVE_IGNORE_SUBDIRS;
 
 
-  private static final double SPLIT_SLOP = 1.1;   // 10% slop
+  private static final double SPLIT_SLOP = 1.1;   // 10% slop，分片大小容差，剩余大小超过该比例才生成新分片
 
   private long minSplitSize = 1;
+  // 过滤隐藏文件：过滤文件名以_或.开头的文件
   private static final PathFilter hiddenFileFilter = new PathFilter(){
       public boolean accept(Path p){
         String name = p.getName(); 
@@ -101,9 +98,8 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
   }
 
   /**
-   * Proxy PathFilter that accepts a path only if all filters given in the
-   * constructor do. Used by the listPaths() to apply the built-in
-   * hiddenFileFilter together with a user provided one (if any).
+   * 多过滤器组合PathFilter，只有所有过滤器都接受的路径才会被接受
+   * 用于同时应用内置的隐藏文件过滤器和用户自定义过滤器
    */
   private static class MultiPathFilter implements PathFilter {
     private List<PathFilter> filters;
@@ -123,20 +119,13 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
   }
 
   /**
-   * Is the given filename splittable? Usually, true, but if the file is
-   * stream compressed, it will not be.
-   *
-   * The default implementation in <code>FileInputFormat</code> always returns
-   * true. Implementations that may deal with non-splittable files <i>must</i>
-   * override this method.
-   *
-   * <code>FileInputFormat</code> implementations can override this and return
-   * <code>false</code> to ensure that individual input files are never split-up
-   * so that {@link Mapper}s process entire files.
+   * 判断给定文件是否可分割，默认实现总是返回true
+   * 需要处理不可分割文件（如流式压缩文件）的子类必须重写此方法
+   * 返回false可以保证整个文件作为一个分片，由单个Mapper处理
    * 
-   * @param fs the file system that the file is on
-   * @param filename the file name to check
-   * @return is this file splitable?
+   * @param fs 文件所在文件系统
+   * @param filename 待检查的文件路径
+   * @return 文件是否可分割
    */
   protected boolean isSplitable(FileSystem fs, Path filename) {
     return true;
@@ -148,9 +137,9 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     throws IOException;
 
   /**
-   * Set a PathFilter to be applied to the input paths for the map-reduce job.
+   * 设置MapReduce作业输入路径的过滤器类，用于过滤不需要处理的输入路径
    *
-   * @param filter the PathFilter class use for filtering the input paths.
+   * @param filter 用于过滤输入路径的PathFilter类
    */
   public static void setInputPathFilter(JobConf conf,
                                         Class<? extends PathFilter> filter) {
@@ -159,9 +148,9 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
   }
 
   /**
-   * Get a PathFilter instance of the filter set for the input paths.
+   * 获取作业配置中设置的输入路径过滤器实例
    *
-   * @return the PathFilter instance set for the job, NULL if none has been set.
+   * @return 配置好的输入路径过滤器实例，如果没有设置则返回null
    */
   public static PathFilter getInputPathFilter(JobConf conf) {
     Class<? extends PathFilter> filterClass = conf.getClass(
@@ -172,16 +161,12 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
   }
 
   /**
-   * Add files in the input path recursively into the results.
-   * @param result
-   *          The List to store all files.
-   * @param fs
-   *          The FileSystem.
-   * @param path
-   *          The input path.
-   * @param inputFilter
-   *          The input filter that can be used to filter files/dirs. 
-   * @throws IOException
+   * 递归遍历输入路径，将所有符合过滤条件的文件添加到结果列表
+   * @param result 存储所有符合条件文件的列表
+   * @param fs 文件系统对象
+   * @param path 当前遍历的输入路径
+   * @param inputFilter 输入路径过滤器
+   * @throws IOException IO异常
    */
   protected void addInputPathRecursively(List<FileStatus> result,
       FileSystem fs, Path path, PathFilter inputFilter) 
@@ -201,16 +186,11 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
   }
   
   /**
-   * List input directories.
-   * Subclasses may override to, e.g., select only files matching a regular
-   * expression. 
-   * 
-   * If security is enabled, this method collects
-   * delegation tokens from the input paths and adds them to the job's
-   * credentials.
-   * @param job the job to list input paths for and attach tokens to.
-   * @return array of FileStatus objects
-   * @throws IOException if zero items.
+   * 枚举所有输入路径下的输入文件，处理通配符匹配和安全凭证获取
+   * 开启安全认证时，会自动获取所有输入文件系统的委托令牌添加到作业凭证中
+   * @param job 当前作业配置
+   * @return 所有符合条件的输入文件状态数组
+   * @throws IOException 当没有输入路径或匹配不到文件时抛出IO异常
    */
   protected FileStatus[] listStatus(JobConf job) throws IOException {
     Path[] dirs = getInputPaths(job);
@@ -218,14 +198,13 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
       throw new IOException("No input paths specified in job");
     }
 
-    // get tokens for all the required FileSystems..
+    // 为所有输入文件系统获取访问令牌
     TokenCache.obtainTokensForNamenodes(job.getCredentials(), dirs, job);
     
-    // Whether we need to recursive look into the directory structure
+    // 是否递归遍历子目录
     boolean recursive = job.getBoolean(INPUT_DIR_RECURSIVE, false);
 
-    // creates a MultiPathFilter with the hiddenFileFilter and the
-    // user provided one (if any).
+    // 组合内置隐藏文件过滤器和用户自定义过滤器
     List<PathFilter> filters = new ArrayList<PathFilter>();
     filters.add(hiddenFileFilter);
     PathFilter jobFilter = getInputPathFilter(job);
@@ -235,6 +214,7 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     PathFilter inputFilter = new MultiPathFilter(filters);
 
     FileStatus[] result;
+    // 获取文件状态枚举的并发线程数配置
     int numThreads = job
         .getInt(
             org.apache.hadoop.mapreduce.lib.input.FileInputFormat.LIST_STATUS_NUM_THREADS,
@@ -242,12 +222,13 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     
     StopWatch sw = new StopWatch().start();
     if (numThreads == 1) {
+      // 单线程枚举输入文件
       List<FileStatus> locatedFiles = singleThreadedListStatus(job, dirs, inputFilter, recursive); 
       result = locatedFiles.toArray(new FileStatus[locatedFiles.size()]);
     } else {
+      // 多线程并发枚举输入文件
       Iterable<FileStatus> locatedFiles = null;
       try {
-        
         LocatedFileStatusFetcher locatedFileStatusFetcher = new LocatedFileStatusFetcher(
             job, dirs, recursive, inputFilter, false);
         locatedFiles = locatedFileStatusFetcher.getFileStatuses();
@@ -268,6 +249,9 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     return result;
   }
   
+  /**
+   * 单线程枚举输入路径下所有符合条件的文件
+   */
   private List<FileStatus> singleThreadedListStatus(JobConf job, Path[] dirs,
       PathFilter inputFilter, boolean recursive) throws IOException {
     List<FileStatus> result = new ArrayList<FileStatus>();
@@ -309,8 +293,7 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
   }
 
   /**
-   * A factory that makes the split for this class. It can be overridden
-   * by sub-classes to make sub-types
+   * 生成FileSplit分片的工厂方法，子类可以重写该方法生成自定义分片类型
    */
   protected FileSplit makeSplit(Path file, long start, long length, 
                                 String[] hosts) {
@@ -318,29 +301,37 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
   }
   
   /**
-   * A factory that makes the split for this class. It can be overridden
-   * by sub-classes to make sub-types
+   * 生成带缓存主机信息的FileSplit分片工厂方法，子类可以重写该方法生成自定义分片类型
    */
   protected FileSplit makeSplit(Path file, long start, long length, 
                                 String[] hosts, String[] inMemoryHosts) {
     return new FileSplit(file, start, length, hosts, inMemoryHosts);
   }
 
-  /** Splits files returned by {@link #listStatus(JobConf)} when
-   * they're too big.*/ 
+  /**
+   * 将输入文件切分成分片，每个分片由一个Map任务处理
+   * 会根据文件块位置信息，尽量保证数据本地性，减少网络传输
+   * @param job 当前作业配置
+   * @param numSplits 期望生成的分片数量
+   * @return 切分完成的输入分片数组
+   * @throws IOException IO异常
+   */
   public InputSplit[] getSplits(JobConf job, int numSplits)
     throws IOException {
     StopWatch sw = new StopWatch().start();
+    // 获取所有输入文件状态
     FileStatus[] stats = listStatus(job);
 
-    // Save the number of input files for metrics/loadgen
+    // 保存输入文件数量到作业配置，用于指标统计
     job.setLong(NUM_INPUT_FILES, stats.length);
-    long totalSize = 0;                           // compute total size
+    long totalSize = 0;
+    // 非递归模式下是否忽略子目录
     boolean ignoreDirs = !job.getBoolean(INPUT_DIR_RECURSIVE, false)
       && job.getBoolean(INPUT_DIR_NONRECURSIVE_IGNORE_SUBDIRS, false);
 
     List<FileStatus> files = new ArrayList<>(stats.length);
-    for (FileStatus file: stats) {                // check we have valid files
+    // 过滤掉目录，只保留有效文件
+    for (FileStatus file: stats) {
       if (file.isDirectory()) {
         if (!ignoreDirs) {
           throw new IOException("Not a file: "+ file.getPath());
@@ -351,11 +342,13 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
       }
     }
 
+    // 计算每个分片目标大小：总大小除以期望分片数
     long goalSize = totalSize / (numSplits == 0 ? 1 : numSplits);
+    // 计算分片最小大小，取作业配置和当前类设置的最大值
     long minSize = Math.max(job.getLong(org.apache.hadoop.mapreduce.lib.input.
       FileInputFormat.SPLIT_MINSIZE, 1), minSplitSize);
 
-    // generate splits
+    // 生成分片列表
     ArrayList<FileSplit> splits = new ArrayList<FileSplit>(numSplits);
     NetworkTopology clusterMap = new NetworkTopology();
     for (FileStatus file: files) {
@@ -365,16 +358,22 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
         FileSystem fs = path.getFileSystem(job);
         BlockLocation[] blkLocations;
         if (file instanceof LocatedFileStatus) {
+          // 从LocatedFileStatus直接获取块位置信息
           blkLocations = ((LocatedFileStatus) file).getBlockLocations();
         } else {
+          // 从文件系统查询块位置信息
           blkLocations = fs.getFileBlockLocations(file, 0, length);
         }
+        // 判断文件是否可分割
         if (isSplitable(fs, path)) {
           long blockSize = file.getBlockSize();
+          // 计算最终分片大小：在minSize和goalSize之间，尽量不超过blockSize
           long splitSize = computeSplitSize(goalSize, minSize, blockSize);
 
           long bytesRemaining = length;
+          // 剩余大小超过容差比例，继续生成分片
           while (((double) bytesRemaining)/splitSize > SPLIT_SLOP) {
+            // 获取分片存储位置的主机和缓存主机列表
             String[][] splitHosts = getSplitHostsAndCachedHosts(blkLocations,
                 length-bytesRemaining, splitSize, clusterMap);
             splits.add(makeSplit(path, length-bytesRemaining, splitSize,
@@ -382,6 +381,7 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
             bytesRemaining -= splitSize;
           }
 
+          // 处理剩余字节
           if (bytesRemaining != 0) {
             String[][] splitHosts = getSplitHostsAndCachedHosts(blkLocations, length
                 - bytesRemaining, bytesRemaining, clusterMap);
@@ -389,8 +389,9 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
                 splitHosts[0], splitHosts[1]));
           }
         } else {
+          // 文件不可分割，整个文件作为一个分片
           if (LOG.isDebugEnabled()) {
-            // Log only if the file is big enough to be splitted
+            // 只有文件足够大时才打印日志
             if (length > Math.min(file.getBlockSize(), minSize)) {
               LOG.debug("File is not splittable so no parallelization "
                   + "is possible: " + file.getPath());
@@ -400,7 +401,7 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
           splits.add(makeSplit(path, 0, length, splitHosts[0], splitHosts[1]));
         }
       } else { 
-        //Create empty hosts array for zero length files
+        // 空文件创建空分片
         splits.add(makeSplit(path, 0, length, new String[0]));
       }
     }
@@ -412,383 +413,10 @@ public abstract class FileInputFormat<K, V> implements InputFormat<K, V> {
     return splits.toArray(new FileSplit[splits.size()]);
   }
 
+  /**
+   * 计算最终分片大小，取minSize、goalSize、blockSize三者的中间值
+   * 保证分片大小不小于最小分片，不大于块大小，尽量接近目标分片大小
+   */
   protected long computeSplitSize(long goalSize, long minSize,
                                        long blockSize) {
     return Math.max(minSize, Math.min(goalSize, blockSize));
-  }
-
-  protected int getBlockIndex(BlockLocation[] blkLocations, 
-                              long offset) {
-    for (int i = 0 ; i < blkLocations.length; i++) {
-      // is the offset inside this block?
-      if ((blkLocations[i].getOffset() <= offset) &&
-          (offset < blkLocations[i].getOffset() + blkLocations[i].getLength())){
-        return i;
-      }
-    }
-    BlockLocation last = blkLocations[blkLocations.length -1];
-    long fileLength = last.getOffset() + last.getLength() -1;
-    throw new IllegalArgumentException("Offset " + offset + 
-                                       " is outside of file (0.." +
-                                       fileLength + ")");
-  }
-
-  /**
-   * Sets the given comma separated paths as the list of inputs 
-   * for the map-reduce job.
-   * 
-   * @param conf Configuration of the job
-   * @param commaSeparatedPaths Comma separated paths to be set as 
-   *        the list of inputs for the map-reduce job.
-   */
-  public static void setInputPaths(JobConf conf, String commaSeparatedPaths) {
-    setInputPaths(conf, StringUtils.stringToPath(
-                        getPathStrings(commaSeparatedPaths)));
-  }
-
-  /**
-   * Add the given comma separated paths to the list of inputs for
-   *  the map-reduce job.
-   * 
-   * @param conf The configuration of the job 
-   * @param commaSeparatedPaths Comma separated paths to be added to
-   *        the list of inputs for the map-reduce job.
-   */
-  public static void addInputPaths(JobConf conf, String commaSeparatedPaths) {
-    for (String str : getPathStrings(commaSeparatedPaths)) {
-      addInputPath(conf, new Path(str));
-    }
-  }
-
-  /**
-   * Set the array of {@link Path}s as the list of inputs
-   * for the map-reduce job.
-   * 
-   * @param conf Configuration of the job. 
-   * @param inputPaths the {@link Path}s of the input directories/files 
-   * for the map-reduce job.
-   */ 
-  public static void setInputPaths(JobConf conf, Path... inputPaths) {
-    Path path = new Path(conf.getWorkingDirectory(), inputPaths[0]);
-    StringBuilder str = new StringBuilder(StringUtils.escapeString(path.toString()));
-    for(int i = 1; i < inputPaths.length;i++) {
-      str.append(StringUtils.COMMA_STR);
-      path = new Path(conf.getWorkingDirectory(), inputPaths[i]);
-      str.append(StringUtils.escapeString(path.toString()));
-    }
-    conf.set(org.apache.hadoop.mapreduce.lib.input.
-      FileInputFormat.INPUT_DIR, str.toString());
-  }
-
-  /**
-   * Add a {@link Path} to the list of inputs for the map-reduce job.
-   * 
-   * @param conf The configuration of the job 
-   * @param path {@link Path} to be added to the list of inputs for 
-   *            the map-reduce job.
-   */
-  public static void addInputPath(JobConf conf, Path path ) {
-    path = new Path(conf.getWorkingDirectory(), path);
-    String dirStr = StringUtils.escapeString(path.toString());
-    String dirs = conf.get(org.apache.hadoop.mapreduce.lib.input.
-      FileInputFormat.INPUT_DIR);
-    conf.set(org.apache.hadoop.mapreduce.lib.input.
-      FileInputFormat.INPUT_DIR, dirs == null ? dirStr :
-      dirs + StringUtils.COMMA_STR + dirStr);
-  }
-         
-  // This method escapes commas in the glob pattern of the given paths.
-  private static String[] getPathStrings(String commaSeparatedPaths) {
-    int length = commaSeparatedPaths.length();
-    int curlyOpen = 0;
-    int pathStart = 0;
-    boolean globPattern = false;
-    List<String> pathStrings = new ArrayList<String>();
-    
-    for (int i=0; i<length; i++) {
-      char ch = commaSeparatedPaths.charAt(i);
-      switch(ch) {
-        case '{' : {
-          curlyOpen++;
-          if (!globPattern) {
-            globPattern = true;
-          }
-          break;
-        }
-        case '}' : {
-          curlyOpen--;
-          if (curlyOpen == 0 && globPattern) {
-            globPattern = false;
-          }
-          break;
-        }
-        case ',' : {
-          if (!globPattern) {
-            pathStrings.add(commaSeparatedPaths.substring(pathStart, i));
-            pathStart = i + 1 ;
-          }
-          break;
-        }
-        default:
-          continue; // nothing special to do for this character
-      }
-    }
-    pathStrings.add(commaSeparatedPaths.substring(pathStart, length));
-    
-    return pathStrings.toArray(new String[0]);
-  }
-  
-  /**
-   * Get the list of input {@link Path}s for the map-reduce job.
-   * 
-   * @param conf The configuration of the job 
-   * @return the list of input {@link Path}s for the map-reduce job.
-   */
-  public static Path[] getInputPaths(JobConf conf) {
-    String dirs = conf.get(org.apache.hadoop.mapreduce.lib.input.
-      FileInputFormat.INPUT_DIR, "");
-    String [] list = StringUtils.split(dirs);
-    Path[] result = new Path[list.length];
-    for (int i = 0; i < list.length; i++) {
-      result[i] = new Path(StringUtils.unEscapeString(list[i]));
-    }
-    return result;
-  }
-  
-
-  private void sortInDescendingOrder(List<NodeInfo> mylist) {
-    Collections.sort(mylist, new Comparator<NodeInfo> () {
-      public int compare(NodeInfo obj1, NodeInfo obj2) {
-
-        if (obj1 == null || obj2 == null)
-          return -1;
-
-        if (obj1.getValue() == obj2.getValue()) {
-          return 0;
-        }
-        else {
-          return ((obj1.getValue() < obj2.getValue()) ? 1 : -1);
-        }
-      }
-    }
-    );
-  }
-
-  /** 
-   * This function identifies and returns the hosts that contribute 
-   * most for a given split. For calculating the contribution, rack
-   * locality is treated on par with host locality, so hosts from racks
-   * that contribute the most are preferred over hosts on racks that 
-   * contribute less
-   * @param blkLocations The list of block locations
-   * @param offset 
-   * @param splitSize 
-   * @return an array of hosts that contribute most to this split
-   * @throws IOException
-   */
-  protected String[] getSplitHosts(BlockLocation[] blkLocations, 
-      long offset, long splitSize, NetworkTopology clusterMap) throws IOException {
-    return getSplitHostsAndCachedHosts(blkLocations, offset, splitSize,
-        clusterMap)[0];
-  }
-  
-  /** 
-   * This function identifies and returns the hosts that contribute 
-   * most for a given split. For calculating the contribution, rack
-   * locality is treated on par with host locality, so hosts from racks
-   * that contribute the most are preferred over hosts on racks that 
-   * contribute less
-   * @param blkLocations The list of block locations
-   * @param offset 
-   * @param splitSize 
-   * @return two arrays - one of hosts that contribute most to this split, and
-   *    one of hosts that contribute most to this split that have the data
-   *    cached on them
-   * @throws IOException
-   */
-  private String[][] getSplitHostsAndCachedHosts(BlockLocation[] blkLocations, 
-      long offset, long splitSize, NetworkTopology clusterMap)
-  throws IOException {
-
-    int startIndex = getBlockIndex(blkLocations, offset);
-
-    long bytesInThisBlock = blkLocations[startIndex].getOffset() + 
-                          blkLocations[startIndex].getLength() - offset;
-
-    //If this is the only block, just return
-    if (bytesInThisBlock >= splitSize) {
-      return new String[][] { blkLocations[startIndex].getHosts(),
-          blkLocations[startIndex].getCachedHosts() };
-    }
-
-    long bytesInFirstBlock = bytesInThisBlock;
-    int index = startIndex + 1;
-    splitSize -= bytesInThisBlock;
-
-    while (splitSize > 0) {
-      bytesInThisBlock =
-        Math.min(splitSize, blkLocations[index++].getLength());
-      splitSize -= bytesInThisBlock;
-    }
-
-    long bytesInLastBlock = bytesInThisBlock;
-    int endIndex = index - 1;
-    
-    Map <Node,NodeInfo> hostsMap = new IdentityHashMap<Node,NodeInfo>();
-    Map <Node,NodeInfo> racksMap = new IdentityHashMap<Node,NodeInfo>();
-    String [] allTopos = new String[0];
-
-    // Build the hierarchy and aggregate the contribution of 
-    // bytes at each level. See TestGetSplitHosts.java 
-
-    for (index = startIndex; index <= endIndex; index++) {
-
-      // Establish the bytes in this block
-      if (index == startIndex) {
-        bytesInThisBlock = bytesInFirstBlock;
-      }
-      else if (index == endIndex) {
-        bytesInThisBlock = bytesInLastBlock;
-      }
-      else {
-        bytesInThisBlock = blkLocations[index].getLength();
-      }
-      
-      allTopos = blkLocations[index].getTopologyPaths();
-
-      // If no topology information is available, just
-      // prefix a fakeRack
-      if (allTopos.length == 0) {
-        allTopos = fakeRacks(blkLocations, index);
-      }
-
-      // NOTE: This code currently works only for one level of
-      // hierarchy (rack/host). However, it is relatively easy
-      // to extend this to support aggregation at different
-      // levels 
-      
-      for (String topo: allTopos) {
-
-        Node node, parentNode;
-        NodeInfo nodeInfo, parentNodeInfo;
-
-        node = clusterMap.getNode(topo);
-
-        if (node == null) {
-          node = new NodeBase(topo);
-          clusterMap.add(node);
-        }
-        
-        nodeInfo = hostsMap.get(node);
-        
-        if (nodeInfo == null) {
-          nodeInfo = new NodeInfo(node);
-          hostsMap.put(node,nodeInfo);
-          parentNode = node.getParent();
-          parentNodeInfo = racksMap.get(parentNode);
-          if (parentNodeInfo == null) {
-            parentNodeInfo = new NodeInfo(parentNode);
-            racksMap.put(parentNode,parentNodeInfo);
-          }
-          parentNodeInfo.addLeaf(nodeInfo);
-        }
-        else {
-          nodeInfo = hostsMap.get(node);
-          parentNode = node.getParent();
-          parentNodeInfo = racksMap.get(parentNode);
-        }
-
-        nodeInfo.addValue(index, bytesInThisBlock);
-        parentNodeInfo.addValue(index, bytesInThisBlock);
-
-      } // for all topos
-    
-    } // for all indices
-
-    // We don't yet support cached hosts when bytesInThisBlock > splitSize
-    return new String[][] { identifyHosts(allTopos.length, racksMap),
-        new String[0]};
-  }
-  
-  private String[] identifyHosts(int replicationFactor, 
-                                 Map<Node,NodeInfo> racksMap) {
-    
-    String [] retVal = new String[replicationFactor];
-   
-    List <NodeInfo> rackList = new LinkedList<NodeInfo>(); 
-
-    rackList.addAll(racksMap.values());
-    
-    // Sort the racks based on their contribution to this split
-    sortInDescendingOrder(rackList);
-    
-    boolean done = false;
-    int index = 0;
-    
-    // Get the host list for all our aggregated items, sort
-    // them and return the top entries
-    for (NodeInfo ni: rackList) {
-
-      Set<NodeInfo> hostSet = ni.getLeaves();
-
-      List<NodeInfo>hostList = new LinkedList<NodeInfo>();
-      hostList.addAll(hostSet);
-    
-      // Sort the hosts in this rack based on their contribution
-      sortInDescendingOrder(hostList);
-
-      for (NodeInfo host: hostList) {
-        // Strip out the port number from the host name
-        retVal[index++] = host.node.getName().split(":")[0];
-        if (index == replicationFactor) {
-          done = true;
-          break;
-        }
-      }
-      
-      if (done == true) {
-        break;
-      }
-    }
-    return retVal;
-  }
-  
-  private String[] fakeRacks(BlockLocation[] blkLocations, int index) 
-  throws IOException {
-    String[] allHosts = blkLocations[index].getHosts();
-    String[] allTopos = new String[allHosts.length];
-    for (int i = 0; i < allHosts.length; i++) {
-      allTopos[i] = NetworkTopology.DEFAULT_RACK + "/" + allHosts[i];
-    }
-    return allTopos;
-  }
-
-
-  private static class NodeInfo {
-    final Node node;
-    final Set<Integer> blockIds;
-    final Set<NodeInfo> leaves;
-
-    private long value;
-    
-    NodeInfo(Node node) {
-      this.node = node;
-      blockIds = new HashSet<Integer>();
-      leaves = new HashSet<NodeInfo>();
-    }
-
-    long getValue() {return value;}
-
-    void addValue(int blockIndex, long value) {
-      if (blockIds.add(blockIndex) == true) {
-        this.value += value;
-      }
-    }
-
-    Set<NodeInfo> getLeaves() { return leaves;}
-
-    void addLeaf(NodeInfo nodeInfo) {
-      leaves.add(nodeInfo);
-    }
-  }
-}

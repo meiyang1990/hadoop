@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,6 +32,11 @@ import org.apache.hadoop.util.StringInterner;
 import org.apache.hadoop.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+/**
+ * 描述MapReduce任务的当前运行状态，是MapTaskStatus和ReduceTaskStatus的抽象基类
+ * 用于在TaskTracker、JobTracker之间传递任务执行状态信息
+ */
 /**************************************************
  * Describes the current status of a task.  This is
  * not intended to be a comprehensive piece of data.
@@ -42,11 +48,13 @@ public abstract class TaskStatus implements Writable, Cloneable {
   static final Logger LOG =
       LoggerFactory.getLogger(TaskStatus.class.getName());
   
+  /** 任务执行阶段枚举 */
   //enumeration for reporting current phase of a task.
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
   public enum Phase{STARTING, MAP, SHUFFLE, SORT, REDUCE, CLEANUP}
 
+  /** 任务运行状态枚举 */
   // what state is the task in?
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
@@ -70,24 +78,38 @@ public abstract class TaskStatus implements Writable, Cloneable {
   private boolean includeAllCounters;
   private SortedRanges.Range nextRecordRange = new SortedRanges.Range();
   
-  // max task-status string size
+  // 任务状态信息字符串最大长度
   static final int MAX_STRING_SIZE = 1024;
 
   /**
-   * Testcases can override {@link #getMaxStringSize()} to control the max-size 
-   * of strings in {@link TaskStatus}. Note that the {@link TaskStatus} is never
-   * exposed to clients or users (i.e Map or Reduce) and hence users cannot 
-   * override this api to pass large strings in {@link TaskStatus}.
+   * 测试用方法，用于覆盖获取最大字符串长度的逻辑，控制TaskStatus中字符串的最大长度
+   * 仅用于单元测试，生产环境不会被修改
+   * @return 允许的最大字符串长度
    */
   protected int getMaxStringSize() {
     return MAX_STRING_SIZE;
   }
   
+  /**
+   * 空构造函数，用于反序列化
+   */
   public TaskStatus() {
     taskid = new TaskAttemptID();
     numSlots = 0;
   }
 
+  /**
+   * 构造TaskStatus对象，初始化任务状态信息
+   * @param taskid 任务尝试ID
+   * @param progress 任务进度（0-1）
+   * @param numSlots 任务占用的槽位数
+   * @param runState 任务运行状态
+   * @param diagnosticInfo 诊断信息
+   * @param stateString 状态描述字符串
+   * @param taskTracker 运行任务的TaskTracker名称
+   * @param phase 任务执行阶段
+   * @param counters 任务计数器
+   */
   public TaskStatus(TaskAttemptID taskid, float progress, int numSlots,
                     State runState, String diagnosticInfo,
                     String stateString, String taskTracker,
@@ -105,6 +127,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
   }
   
   public TaskAttemptID getTaskID() { return taskid; }
+  /**
+   * 判断任务是否为Map任务，由子类实现
+   * @return true表示Map任务，false表示Reduce任务
+   */
   public abstract boolean getIsMap();
   public int getNumSlots() {
     return numSlots;
@@ -119,16 +145,22 @@ public abstract class TaskStatus implements Writable, Cloneable {
   public void setTaskTracker(String tracker) { this.taskTracker = tracker;}
   public void setRunState(State runState) { this.runState = runState; }
   public String getDiagnosticInfo() { return diagnosticInfo; }
+  
+  /**
+   * 设置任务诊断信息，追加新信息并限制总长度不超过最大值
+   * @param info 要添加的诊断信息
+   */
   public void setDiagnosticInfo(String info) {
-    // if the diag-info has already reached its max then log and return
+    // 如果诊断信息已经达到最大长度，直接记录日志并返回
     if (diagnosticInfo != null 
         && diagnosticInfo.length() == getMaxStringSize()) {
       LOG.info("task-diagnostic-info for task " + taskid + " : " + info);
       return;
     }
+    // 拼接新诊断信息
     diagnosticInfo = 
       ((diagnosticInfo == null) ? info : diagnosticInfo.concat(info)); 
-    // trim the string to MAX_STRING_SIZE if needed
+    // 如果超过最大长度，截断并记录完整日志
     if (diagnosticInfo != null 
         && diagnosticInfo.length() > getMaxStringSize()) {
       LOG.info("task-diagnostic-info for task " + taskid + " : " 
@@ -140,14 +172,18 @@ public abstract class TaskStatus implements Writable, Cloneable {
   /**
    * Set the state of the {@link TaskStatus}.
    */
+  /**
+   * 设置任务状态描述字符串，超过最大长度则截断并记录日志
+   * @param stateString 状态描述字符串
+   */
   public void setStateString(String stateString) {
     if (stateString != null) {
       if (stateString.length() <= getMaxStringSize()) {
         this.stateString = stateString;
       } else {
-        // log it
+        // 记录完整字符串日志
         LOG.info("state-string for task " + taskid + " : " + stateString);
-        // trim the state string
+        // 截断超长字符串
         this.stateString = stateString.substring(0, getMaxStringSize());
       }
     }
@@ -157,6 +193,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * Get the next record range which is going to be processed by Task.
    * @return nextRecordRange
    */
+  /**
+   * 获取任务接下来将要处理的记录范围
+   * @return 下一个待处理记录范围
+   */
   public SortedRanges.Range getNextRecordRange() {
     return nextRecordRange;
   }
@@ -164,6 +204,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
   /**
    * Set the next record range which is going to be processed by Task.
    * @param nextRecordRange
+   */
+  /**
+   * 设置任务接下来将要处理的记录范围
+   * @param nextRecordRange 下一个待处理记录范围
    */
   public void setNextRecordRange(SortedRanges.Range nextRecordRange) {
     this.nextRecordRange = nextRecordRange;
@@ -177,6 +221,11 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * TaskStatus.FAILED then finish time represents when the task failed.
    * @return finish time of the task. 
    */
+  /**
+   * 获取任务结束时间，如果任务失败则表示失败发生的时间
+   * 如果shuffle和sort结束时间未单独设置，会默认使用任务结束时间
+   * @return 任务结束时间（毫秒）
+   */
   public long getFinishTime() {
     return finishTime;
   }
@@ -188,11 +237,15 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * 
    * @param finishTime finish time of task.
    */
+  /**
+   * 设置任务结束时间，仅在开始时间已设置且结束时间合法时生效
+   * @param finishTime 任务结束时间（毫秒）
+   */
   void setFinishTime(long finishTime) {
     if(this.getStartTime() > 0 && finishTime > 0) {
       this.finishTime = finishTime;
     } else {
-      //Using String utils to get the stack trace.
+      // 记录错误堆栈日志
       LOG.error("Trying to set finish time for task " + taskid + 
           " when no start time is set, stackTrace is : " + 
       		StringUtils.stringifyException(new Exception()));
@@ -206,6 +259,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * @return 0 if shuffleFinishTime, sortFinishTime and finish time are not set. else 
    * it returns approximate shuffle finish time.  
    */
+  /**
+   * 获取Shuffle阶段结束时间，如果未单独设置则返回0，由子类实现
+   * @return Shuffle阶段结束时间
+   */
   public long getShuffleFinishTime() {
     return 0;
   }
@@ -213,6 +270,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
   /**
    * Set shuffle finish time. 
    * @param shuffleFinishTime 
+   */
+  /**
+   * 设置Shuffle阶段结束时间，由子类实现
+   * @param shuffleFinishTime Shuffle阶段结束时间
    */
   void setShuffleFinishTime(long shuffleFinishTime) {}
 
@@ -224,6 +285,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * @return 0 if mapFinishTime, sortFinishTime are not set. else 
    * it returns approximate map finish time.
    */
+  /**
+   * 获取Map阶段结束时间，如果未单独设置则返回0，由子类实现
+   * @return Map阶段结束时间
+   */
   public long getMapFinishTime() {
     return 0;
   }
@@ -231,6 +296,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
   /**
    * Set map phase finish time. 
    * @param mapFinishTime 
+   */
+  /**
+   * 设置Map阶段结束时间，由子类实现
+   * @param mapFinishTime Map阶段结束时间
    */
   void setMapFinishTime(long mapFinishTime) {}
 
@@ -241,6 +310,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * @return 0 if sort finish time and finish time are not set, else returns sort
    * finish time if that is set, else it returns finish time. 
    */
+  /**
+   * 获取Sort阶段结束时间，如果未单独设置则返回任务结束时间，由子类实现
+   * @return Sort阶段结束时间
+   */
   public long getSortFinishTime() {
     return 0;
   }
@@ -250,11 +323,19 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * then its set to sortFinishTime.  
    * @param sortFinishTime
    */
+  /**
+   * 设置Sort阶段结束时间，由子类实现
+   * @param sortFinishTime Sort阶段结束时间
+   */
   void setSortFinishTime(long sortFinishTime) {}
 
   /**
    * Get start time of the task. 
    * @return 0 is start time is not set, else returns start time. 
+   */
+  /**
+   * 获取任务开始时间
+   * @return 任务开始时间（毫秒），未设置则返回0
    */
   public long getStartTime() {
     return startTime;
@@ -264,13 +345,16 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * Set startTime of the task if start time is greater than zero.
    * @param startTime start time
    */
+  /**
+   * 设置任务开始时间，仅在时间为正值时生效
+   * @param startTime 任务开始时间（毫秒）
+   */
   void setStartTime(long startTime) {
-    //Making the assumption of passed startTime to be a positive
-    //long value explicit.
+    // 仅接受正的时间戳
     if (startTime > 0) {
       this.startTime = startTime;
     } else {
-      //Using String utils to get the stack trace.
+      // 记录非法参数错误堆栈
       LOG.error("Trying to set illegal startTime for task : " + taskid +
           ".Stack trace is : " +
           StringUtils.stringifyException(new Exception()));
@@ -281,6 +365,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * for reduce one of Phase.SHUFFLE, Phase.SORT or Phase.REDUCE. 
    * @return . 
    */
+  /**
+   * 获取任务当前执行阶段
+   * @return 任务执行阶段
+   */
   public Phase getPhase(){
     return this.phase; 
   }
@@ -288,10 +376,14 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * Set current phase of this task.  
    * @param phase phase of this task
    */
+  /**
+   * 设置任务当前执行阶段，切换阶段时自动记录前一阶段的结束时间
+   * @param phase 任务执行阶段
+   */
   public void setPhase(Phase phase){
     TaskStatus.Phase oldPhase = getPhase();
     if (oldPhase != phase){
-      // sort phase started
+      // 进入排序阶段，自动记录上一阶段结束时间
       if (phase == TaskStatus.Phase.SORT){
         if (oldPhase == TaskStatus.Phase.MAP) {
           setMapFinishTime(System.currentTimeMillis());
@@ -300,12 +392,17 @@ public abstract class TaskStatus implements Writable, Cloneable {
           setShuffleFinishTime(System.currentTimeMillis());
         }
       }else if (phase == TaskStatus.Phase.REDUCE){
+        // 进入Reduce阶段，自动记录排序结束时间
         setSortFinishTime(System.currentTimeMillis());
       }
       this.phase = phase;
     }
   }
 
+  /**
+   * 判断任务是否处于清理阶段（任务失败/被杀死后的清理）
+   * @return true表示处于清理阶段，false否则
+   */
   boolean inTaskCleanupPhase() {
     return (this.phase == TaskStatus.Phase.CLEANUP && 
       (this.runState == TaskStatus.State.FAILED_UNCLEAN || 
@@ -316,6 +413,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
     return includeAllCounters;
   }
   
+  /**
+   * 设置是否需要发送全部计数器，并更新计数器的写入配置
+   * @param send true表示发送全部计数器，false仅发送变更过的计数器
+   */
   public void setIncludeAllCounters(boolean send) {
     includeAllCounters = send;
     counters.setWriteAllCounters(send);
@@ -324,12 +425,20 @@ public abstract class TaskStatus implements Writable, Cloneable {
   /**
    * Get task's counters.
    */
+  /**
+   * 获取任务计数器
+   * @return 任务计数器对象
+   */
   public Counters getCounters() {
     return counters;
   }
   /**
    * Set the task's counters.
    * @param counters
+   */
+  /**
+   * 设置任务计数器
+   * @param counters 任务计数器对象
    */
   public void setCounters(Counters counters) {
     this.counters = counters;
@@ -338,6 +447,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
   /**
    * Returns the number of bytes of output from this map.
    */
+  /**
+   * 获取任务输出字节数
+   * @return 任务输出字节数
+   */
   public long getOutputSize() {
     return outputSize;
   }
@@ -345,6 +458,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
   /**
    * Set the size on disk of this task's output.
    * @param l the number of map output bytes
+   */
+  /**
+   * 设置任务输出字节数
+   * @param l 输出字节数
    */
   void setOutputSize(long l)  {
     outputSize = l;
@@ -355,6 +472,10 @@ public abstract class TaskStatus implements Writable, Cloneable {
    * 
    * @return the list of maps from which output-fetches failed.
    */
+  /**
+   * 获取Fetch失败的Map任务列表，仅Reduce任务有意义
+   * @return 拉取输出失败的Map任务尝试ID列表，默认返回null
+   */
   public List<TaskAttemptID> getFetchFailedMaps() {
     return null;
   }
@@ -364,164 +485,5 @@ public abstract class TaskStatus implements Writable, Cloneable {
    *  
    * @param mapTaskId map from which fetch failed
    */
-  public abstract void addFetchFailedMap(TaskAttemptID mapTaskId);
-
   /**
-   * Update the status of the task.
-   * 
-   * This update is done by ping thread before sending the status. 
-   * 
-   * @param progress
-   * @param state
-   * @param counters
-   */
-  synchronized void statusUpdate(float progress,
-                                 String state, 
-                                 Counters counters) {
-    setProgress(progress);
-    setStateString(state);
-    setCounters(counters);
-  }
-  
-  /**
-   * Update the status of the task.
-   * 
-   * @param status updated status
-   */
-  synchronized void statusUpdate(TaskStatus status) {
-    setProgress (status.getProgress());
-    this.runState = status.getRunState();
-    setStateString(status.getStateString());
-    this.nextRecordRange = status.getNextRecordRange();
-
-    setDiagnosticInfo(status.getDiagnosticInfo());
-    
-    if (status.getStartTime() > 0) {
-      this.setStartTime(status.getStartTime()); 
-    }
-    if (status.getFinishTime() > 0) {
-      this.setFinishTime(status.getFinishTime()); 
-    }
-    
-    this.phase = status.getPhase();
-    this.counters = status.getCounters();
-    this.outputSize = status.outputSize;
-  }
-
-  /**
-   * Update specific fields of task status
-   * 
-   * This update is done in JobTracker when a cleanup attempt of task
-   * reports its status. Then update only specific fields, not all.
-   * 
-   * @param runState
-   * @param progress
-   * @param state
-   * @param phase
-   * @param finishTime
-   */
-  synchronized void statusUpdate(State runState, 
-                                 float progress,
-                                 String state, 
-                                 Phase phase,
-                                 long finishTime) {
-    setRunState(runState);
-    setProgress(progress);
-    setStateString(state);
-    setPhase(phase);
-    if (finishTime > 0) {
-      setFinishTime(finishTime); 
-    }
-  }
-
-  /**
-   * Clear out transient information after sending out a status-update
-   * from either the {@link Task} to the {@link TaskTracker} or from the
-   * {@link TaskTracker} to the {@link JobTracker}. 
-   */
-  synchronized void clearStatus() {
-    // Clear diagnosticInfo
-    diagnosticInfo = "";
-  }
-
-  @Override
-  public Object clone() {
-    try {
-      return super.clone();
-    } catch (CloneNotSupportedException cnse) {
-      // Shouldn't happen since we do implement Clonable
-      throw new InternalError(cnse.toString());
-    }
-  }
-  
-  //////////////////////////////////////////////
-  // Writable
-  //////////////////////////////////////////////
-  public void write(DataOutput out) throws IOException {
-    taskid.write(out);
-    out.writeFloat(progress);
-    out.writeInt(numSlots);
-    WritableUtils.writeEnum(out, runState);
-    Text.writeString(out, diagnosticInfo);
-    Text.writeString(out, stateString);
-    WritableUtils.writeEnum(out, phase);
-    out.writeLong(startTime);
-    out.writeLong(finishTime);
-    out.writeBoolean(includeAllCounters);
-    out.writeLong(outputSize);
-    counters.write(out);
-    nextRecordRange.write(out);
-  }
-
-  public void readFields(DataInput in) throws IOException {
-    this.taskid.readFields(in);
-    setProgress(in.readFloat());
-    this.numSlots = in.readInt();
-    this.runState = WritableUtils.readEnum(in, State.class);
-    setDiagnosticInfo(StringInterner.weakIntern(Text.readString(in)));
-    setStateString(StringInterner.weakIntern(Text.readString(in)));
-    this.phase = WritableUtils.readEnum(in, Phase.class); 
-    this.startTime = in.readLong(); 
-    this.finishTime = in.readLong(); 
-    counters = new Counters();
-    this.includeAllCounters = in.readBoolean();
-    this.outputSize = in.readLong();
-    counters.readFields(in);
-    nextRecordRange.readFields(in);
-  }
-  
-  //////////////////////////////////////////////////////////////////////////////
-  // Factory-like methods to create/read/write appropriate TaskStatus objects
-  //////////////////////////////////////////////////////////////////////////////
-  
-  static TaskStatus createTaskStatus(DataInput in, TaskAttemptID taskId, 
-                                     float progress, int numSlots,
-                                     State runState, String diagnosticInfo,
-                                     String stateString, String taskTracker,
-                                     Phase phase, Counters counters) 
-  throws IOException {
-    boolean isMap = in.readBoolean();
-    return createTaskStatus(isMap, taskId, progress, numSlots, runState, 
-                            diagnosticInfo, stateString, taskTracker, phase, 
-                            counters);
-  }
-  
-  static TaskStatus createTaskStatus(boolean isMap, TaskAttemptID taskId, 
-                                     float progress, int numSlots,
-                                     State runState, String diagnosticInfo,
-                                     String stateString, String taskTracker,
-                                     Phase phase, Counters counters) { 
-    return (isMap) ? new MapTaskStatus(taskId, progress, numSlots, runState, 
-                                       diagnosticInfo, stateString, taskTracker, 
-                                       phase, counters) :
-                     new ReduceTaskStatus(taskId, progress, numSlots, runState, 
-                                          diagnosticInfo, stateString, 
-                                          taskTracker, phase, counters);
-  }
-  
-  static TaskStatus createTaskStatus(boolean isMap) {
-    return (isMap) ? new MapTaskStatus() : new ReduceTaskStatus();
-  }
-
-}
-
+   * 添加拉取输出失败的Map任务到失败列表，

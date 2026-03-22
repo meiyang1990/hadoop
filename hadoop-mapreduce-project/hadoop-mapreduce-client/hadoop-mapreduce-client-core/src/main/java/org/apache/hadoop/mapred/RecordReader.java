@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,6 +26,10 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
+ * 文件名称: RecordReader.java
+ * 所属模块: MapReduce 客户端核心模块
+ * 核心职责: 定义了从输入分片InputSplit中读取键值对记录的统一接口，为Map任务提供面向记录的输入视图
+ * 
  * <code>RecordReader</code> reads &lt;key, value&gt; pairs from an 
  * {@link InputSplit}.
  *   
@@ -41,50 +46,49 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Stable
 public interface RecordReader<K, V> extends Closeable{
   /** 
-   * Reads the next key/value pair from the input for processing.
+   * 从输入分片读取下一个键值对，用于Map任务处理
    *
-   * @param key the key to read data into
-   * @param value the value to read data into
-   * @return true iff a key/value was read, false if at EOF
+   * @param key 存储读取结果的键对象
+   * @param value 存储读取结果的值对象
+   * @return 成功读取到键值对返回true，读取到输入末尾返回false
    */      
   boolean next(K key, V value) throws IOException;
   
   /**
-   * Create an object of the appropriate type to be used as a key.
+   * 创建合适类型的键对象实例
    * 
-   * @return a new key object.
+   * @return 新建的键对象
    */
   K createKey();
   
   /**
-   * Create an object of the appropriate type to be used as a value.
+   * 创建合适类型的值对象实例
    * 
-   * @return a new value object.
+   * @return 新建的值对象
    */
   V createValue();
 
   /** 
-   * Returns the current position in the input.
+   * 获取当前读取位置在输入分片中的字节偏移量
    * 
-   * @return the current position in the input.
-   * @throws IOException
+   * @return 当前位置的字节偏移量
+   * @throws IOException IO异常
    */
   long getPos() throws IOException;
 
   /** 
-   * Close this {@link InputSplit} to future operations.
+   * 关闭当前RecordReader，释放资源
    * 
-   * @throws IOException
+   * @throws IOException IO异常
    */
   @Override
   public void close() throws IOException;
 
   /**
-   * How much of the input has the {@link RecordReader} consumed i.e.
-   * has been processed by?
+   * 获取当前输入分片的处理进度
    * 
-   * @return progress from <code>0.0</code> to <code>1.0</code>.
-   * @throws IOException
+   * @return 处理进度，范围从 0.0（未开始）到 1.0（处理完成）
+   * @throws IOException IO异常
    */
   float getProgress() throws IOException;
 }

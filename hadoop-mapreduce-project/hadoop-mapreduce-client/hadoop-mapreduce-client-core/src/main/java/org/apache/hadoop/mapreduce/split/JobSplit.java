@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,6 +31,10 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
+ * 文件级说明：MapReduce作业分片信息的基础容器类，将分片信息分为元信息和原始分片数据两部分，
+ * 分别服务于作业初始化阶段的资源调度和Map任务运行阶段的数据读取。
+ * 元信息写入单独元文件供JobTracker加载，原始分片数据存储在独立文件中，由Map任务运行时读取。
+ *
  * This class groups the fundamental classes associated with
  * reading/writing splits. The split information is divided into
  * two parts based on the consumer of the information. The two
@@ -45,18 +50,21 @@ import org.apache.hadoop.classification.InterfaceStability;
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
+/**
+ * JobSplit 容器类，聚合了所有和作业分片相关的内部类，定义了分片信息的存储结构
+ */
 public class JobSplit {
+  // 元分片文件版本号
   static final int META_SPLIT_VERSION = 1;
+  // 元分片文件文件头标识
   static final byte[] META_SPLIT_FILE_HEADER = "META-SPL".getBytes(StandardCharsets.UTF_8);
+  // 空任务分片元信息实例，作为默认值使用
   public static final TaskSplitMetaInfo EMPTY_TASK_SPLIT =
     new TaskSplitMetaInfo();
   
   /**
-   * This represents the meta information about the task split.
-   * The main fields are 
-   *     - start offset in actual split
-   *     - data length that will be processed in this split
-   *     - hosts on which this split is local
+   * 分片元信息类，存储单个分片的核心调度信息：偏移量、数据长度、数据所在节点位置
+   * 供JobTracker构建任务数据局部性调度结构使用，实现Writable支持序列化
    */
   public static class SplitMetaInfo implements Writable {
     private long startOffset;
@@ -65,6 +73,12 @@ public class JobSplit {
 
     public SplitMetaInfo() {}
     
+    /**
+     * 构造方法，通过分片位置、偏移量、数据长度构造分片元信息
+     * @param locations 该分片数据所在的节点主机列表
+     * @param startOffset 原始分片文件中的起始偏移量
+     * @param inputDataLength 该分片的数据总长度
+     */
     public SplitMetaInfo(String[] locations, long startOffset, 
         long inputDataLength) {
       this.locations = locations;
@@ -72,6 +86,12 @@ public class JobSplit {
       this.inputDataLength = inputDataLength;
     }
     
+    /**
+     * 构造方法，从InputSplit对象和起始偏移量构造分片元信息
+     * @param split 原始InputSplit对象
+     * @param startOffset 原始分片文件中的起始偏移量
+     * @throws IOException 中断异常封装为IOException抛出
+     */
     public SplitMetaInfo(InputSplit split, long startOffset) throws IOException {
       try {
         this.locations = split.getLocations();
@@ -102,6 +122,11 @@ public class JobSplit {
       this.inputDataLength = length;
     }
     
+    /**
+     * 从输入流反序列化读取分片元信息
+     * @param in 数据输入流
+     * @throws IOException 读取异常
+     */
     public void readFields(DataInput in) throws IOException {
       int len = WritableUtils.readVInt(in);
       locations = new String[len];
@@ -112,6 +137,11 @@ public class JobSplit {
       inputDataLength = WritableUtils.readVLong(in);
     }
   
+    /**
+     * 将分片元信息序列化写入输出流
+     * @param out 数据输出流
+     * @throws IOException 写入异常
+     */
     public void write(DataOutput out) throws IOException {
       WritableUtils.writeVInt(out, locations.length);
       for (int i = 0; i < locations.length; i++) {
@@ -133,9 +163,9 @@ public class JobSplit {
       return buf.toString();
     }
   }
+
   /**
-   * This represents the meta information about the task split that the 
-   * JobTracker creates
+   * 任务分片元信息，JobTracker创建任务时使用，包含分片索引、数据长度、位置信息
    */
   public static class TaskSplitMetaInfo {
     private TaskSplitIndex splitIndex;
@@ -145,18 +175,39 @@ public class JobSplit {
       this.splitIndex = new TaskSplitIndex();
       this.locations = new String[0];
     }
+
+    /**
+     * 构造方法，通过分片索引、位置列表、数据长度构造任务分片元信息
+     * @param splitIndex 分片索引，指向原始分片数据位置
+     * @param locations 数据所在节点主机列表
+     * @param inputDataLength 分片数据长度
+     */
     public TaskSplitMetaInfo(TaskSplitIndex splitIndex, String[] locations, 
         long inputDataLength) {
       this.splitIndex = splitIndex;
       this.locations = locations;
       this.inputDataLength = inputDataLength;
     }
+
+    /**
+     * 构造方法，从InputSplit和起始偏移量构造任务分片元信息
+     * @param split 原始InputSplit对象
+     * @param startOffset 原始分片文件中的起始偏移量
+     * @throws InterruptedException 获取位置信息时的中断异常
+     * @throws IOException IO异常
+     */
     public TaskSplitMetaInfo(InputSplit split, long startOffset) 
     throws InterruptedException, IOException {
       this(new TaskSplitIndex("", startOffset), split.getLocations(), 
           split.getLength());
     }
     
+    /**
+     * 构造方法，通过位置列表、起始偏移量、数据长度构造任务分片元信息
+     * @param locations 数据所在节点主机列表
+     * @param startOffset 原始分片文件中的起始偏移量
+     * @param inputDataLength 分片数据长度
+     */
     public TaskSplitMetaInfo(String[] locations, long startOffset, 
         long inputDataLength) {
       this(new TaskSplitIndex("",startOffset), locations, inputDataLength);
@@ -181,8 +232,7 @@ public class JobSplit {
   }
   
   /**
-   * This represents the meta information about the task split that the 
-   * task gets
+   * 分片索引，任务获取分片时使用，存储原始分片数据的文件路径和偏移量
    */
   public static class TaskSplitIndex {
     private String splitLocation;
@@ -190,6 +240,12 @@ public class JobSplit {
     public TaskSplitIndex(){
       this("", 0);
     }
+
+    /**
+     * 构造方法，通过分片文件路径和起始偏移量构造分片索引
+     * @param splitLocation 原始分片文件路径
+     * @param startOffset 原始分片文件中的起始偏移量
+     */
     public TaskSplitIndex(String splitLocation, long startOffset) {
       this.splitLocation = splitLocation;
       this.startOffset = startOffset;
@@ -200,10 +256,22 @@ public class JobSplit {
     public String getSplitLocation() {
       return splitLocation;
     }
+
+    /**
+     * 从输入流反序列化读取分片索引
+     * @param in 数据输入流
+     * @throws IOException 读取异常
+     */
     public void readFields(DataInput in) throws IOException {
       splitLocation = Text.readString(in);
       startOffset = WritableUtils.readVLong(in);
     }
+
+    /**
+     * 将分片索引序列化写入输出流
+     * @param out 数据输出流
+     * @throws IOException 写入异常
+     */
     public void write(DataOutput out) throws IOException {
       Text.writeString(out, splitLocation);
       WritableUtils.writeVLong(out, startOffset);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,9 @@
 
 package org.apache.hadoop.mapreduce.v2.api.records;
 
+/**
+ * Task尝试任务的运行状态枚举，定义了MapReduce任务尝试从创建到结束的所有可能状态
+ */
 public enum TaskAttemptState {
   NEW, 
   STARTING, 

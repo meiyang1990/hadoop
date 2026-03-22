@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,16 +21,28 @@ package org.apache.hadoop.mapreduce.v2.app.job.event;
 
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 
-
+/**
+ * 作业诊断信息更新事件，用于承载MapReduce作业运行过程中新增的诊断日志信息
+ * 在作业运行异常或需要输出运行状态时触发，将诊断信息传递给事件处理系统
+ */
 public class JobDiagnosticsUpdateEvent extends JobEvent {
 
   private String diagnosticUpdate;
 
+  /**
+   * 构造作业诊断信息更新事件
+   * @param jobID 目标作业ID
+   * @param diagnostic 新增的诊断信息文本
+   */
   public JobDiagnosticsUpdateEvent(JobId jobID, String diagnostic) {
     super(jobID, JobEventType.JOB_DIAGNOSTIC_UPDATE);
     this.diagnosticUpdate = diagnostic;
   }
 
+  /**
+   * 获取本次更新的新增诊断信息
+   * @return 诊断信息文本
+   */
   public String getDiagnosticUpdate() {
     return this.diagnosticUpdate;
   }

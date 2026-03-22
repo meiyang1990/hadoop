@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,10 +22,9 @@ package org.apache.hadoop.mapred.lib.aggregate;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-
 /**
- * This class implements a value aggregator that maintain the maximum of 
- * a sequence of long values.
+ * 长整型最大值聚合器，为旧版MapReduce API提供兼容实现
+ * 维护一系列长整型值的最大值，用于聚合计算场景
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable

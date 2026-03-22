@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,13 @@ package org.apache.hadoop.mapred.nativetask.buffer;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 本地任务缓冲区类型枚举，定义了MapReduce本地任务可用的内存缓冲区类型
+ */
 @InterfaceAudience.Private
 public enum BufferType {
+  /** 直接内存缓冲区，使用堆外内存分配 */
   DIRECT_BUFFER,
+  /** 堆缓冲区，使用JVM堆内存分配 */
   HEAP_BUFFER
 };

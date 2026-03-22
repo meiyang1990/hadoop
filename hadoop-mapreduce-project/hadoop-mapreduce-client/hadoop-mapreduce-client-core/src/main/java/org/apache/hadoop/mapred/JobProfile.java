@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,16 +31,17 @@ import org.apache.hadoop.io.WritableFactories;
 import org.apache.hadoop.io.WritableFactory;
 import org.apache.hadoop.util.StringInterner;
 
-/**************************************************
- * A JobProfile is a MapReduce primitive.  Tracks a job,
- * whether living or dead.
- *
- **************************************************/
+/**
+ * JobProfile类用于存储MapReduce作业的核心元数据信息，跟踪作业的基本属性，
+ * 无论作业处于运行中还是已完成状态，都可以通过该类获取作业基本信息。
+ * 是旧版MapReduce API中用于描述作业概况的核心数据结构。
+ */
 @InterfaceAudience.LimitedPrivate({"MapReduce"})
 @InterfaceStability.Unstable
 public class JobProfile implements Writable {
 
-  static {                                      // register a ctor
+  // 静态注册构造工厂，供Writable序列化框架反射创建实例
+  static {
     WritableFactories.setFactory
       (JobProfile.class,
        new WritableFactory() {
@@ -47,29 +49,34 @@ public class JobProfile implements Writable {
        });
   }
 
+  // 提交作业的用户名
   String user;
+  // 作业唯一ID
   final JobID jobid;
+  // 作业配置文件路径
   String jobFile;
+  // 作业Web UI访问地址
   String url;
+  // 作业名称
   String name;
+  // 作业所属队列名称
   String queueName;
   
   /**
-   * Construct an empty {@link JobProfile}.
+   * 构造空的JobProfile对象，供反序列化使用。
    */
   public JobProfile() {
     jobid = new JobID();
   }
 
   /**
-   * Construct a {@link JobProfile} the userid, jobid, 
-   * job config-file, job-details url and job name. 
+   * 构造完整的JobProfile对象，包含作业核心元信息，默认使用默认队列。
    * 
-   * @param user userid of the person who submitted the job.
-   * @param jobid id of the job.
-   * @param jobFile job configuration file. 
-   * @param url link to the web-ui for details of the job.
-   * @param name user-specified job name.
+   * @param user 提交作业的用户名
+   * @param jobid 作业唯一ID
+   * @param jobFile 作业配置文件路径
+   * @param url 作业Web UI详情链接
+   * @param name 用户指定的作业名称
    */
   public JobProfile(String user, org.apache.hadoop.mapreduce.JobID jobid, 
                     String jobFile, String url,
@@ -78,15 +85,14 @@ public class JobProfile implements Writable {
   }
 
   /**
-   * Construct a {@link JobProfile} the userid, jobid, 
-   * job config-file, job-details url and job name. 
+   * 构造完整的JobProfile对象，包含作业核心元信息和队列信息。
    * 
-   * @param user userid of the person who submitted the job.
-   * @param jobid id of the job.
-   * @param jobFile job configuration file. 
-   * @param url link to the web-ui for details of the job.
-   * @param name user-specified job name.
-   * @param queueName name of the queue to which the job is submitted
+   * @param user 提交作业的用户名
+   * @param jobid 作业唯一ID
+   * @param jobFile 作业配置文件路径
+   * @param url 作业Web UI详情链接
+   * @param name 用户指定的作业名称
+   * @param queueName 作业提交到的队列名称
    */
   public JobProfile(String user, org.apache.hadoop.mapreduce.JobID jobid, 
                     String jobFile, String url,
@@ -100,7 +106,8 @@ public class JobProfile implements Writable {
   }
   
   /**
-   * @deprecated use JobProfile(String, JobID, String, String, String) instead
+   * 构造JobProfile对象，使用字符串格式作业ID。
+   * @deprecated 已废弃，请使用JobProfile(String, JobID, String, String, String)替代
    */
   @Deprecated
   public JobProfile(String user, String jobid, String jobFile, String url,
@@ -109,21 +116,25 @@ public class JobProfile implements Writable {
   }
   
   /**
-   * Get the user id.
+   * 获取提交作业的用户名。
+   * @return 提交作业用户名
    */
   public String getUser() {
     return user;
   }
     
   /**
-   * Get the job id.
+   * 获取作业唯一ID。
+   * @return 作业ID对象
    */
   public JobID getJobID() {
     return jobid;
   }
 
   /**
-   * @deprecated use getJobID() instead
+   * 获取字符串格式的作业ID。
+   * @deprecated 已废弃，请使用getJobID()替代
+   * @return 字符串格式作业ID
    */
   @Deprecated
   public String getJobId() {
@@ -131,14 +142,16 @@ public class JobProfile implements Writable {
   }
   
   /**
-   * Get the configuration file for the job.
+   * 获取作业配置文件路径。
+   * @return 作业配置文件路径
    */
   public String getJobFile() {
     return jobFile;
   }
 
   /**
-   * Get the link to the web-ui for details of the job.
+   * 获取作业Web UI详情页URL。
+   * @return 作业Web UI的URL对象，解析失败返回null
    */
   public URL getURL() {
     try {
@@ -149,23 +162,30 @@ public class JobProfile implements Writable {
   }
 
   /**
-   * Get the user-specified job name.
+   * 获取用户指定的作业名称。
+   * @return 作业名称
    */
   public String getJobName() {
     return name;
   }
   
   /**
-   * Get the name of the queue to which the job is submitted.
-   * @return name of the queue.
+   * 获取作业所属队列名称。
+   * @return 队列名称
    */
   public String getQueueName() {
     return queueName;
   }
   
   ///////////////////////////////////////
-  // Writable
+  // Writable序列化接口实现
   ///////////////////////////////////////
+
+  /**
+   * 将JobProfile对象序列化输出到DataOutput流。
+   * @param out 输出流
+   * @throws IOException 输出过程IO异常
+   */
   public void write(DataOutput out) throws IOException {
     jobid.write(out);
     Text.writeString(out, jobFile);
@@ -175,6 +195,12 @@ public class JobProfile implements Writable {
     Text.writeString(out, queueName);
   }
 
+  /**
+   * 从DataInput流反序列化读取JobProfile对象数据。
+   * 使用弱字符串驻留减少重复字符串内存占用。
+   * @param in 输入流
+   * @throws IOException 读取过程IO异常
+   */
   public void readFields(DataInput in) throws IOException {
     jobid.readFields(in);
     this.jobFile = StringInterner.weakIntern(Text.readString(in));
@@ -184,5 +210,3 @@ public class JobProfile implements Writable {
     this.queueName = StringInterner.weakIntern(Text.readString(in));
   }
 }
-
-

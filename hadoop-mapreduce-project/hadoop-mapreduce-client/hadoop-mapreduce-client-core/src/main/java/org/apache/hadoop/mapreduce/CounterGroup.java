@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,11 +24,13 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.counters.CounterGroupBase;
 
 /**
- * A group of {@link Counter}s that logically belong together. Typically,
- * it is an {@link Enum} subclass and the counters are the values.
+ * 文件概述：MapReduce作业计数器分组接口，定义了一组逻辑相关计数器的集合抽象
+ * 
+ * 计数器分组接口，将一组逻辑相关的计数器聚合在一起。通常，一个分组对应一个
+ * {@link Enum}枚举子类，分组中的计数器对应枚举的各个取值。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface CounterGroup extends CounterGroupBase<Counter> {
-  // essentially a typedef so user doesn't have to use generic syntax
+  // 本质上是类型别名，简化用户使用，避免编写泛型语法
 }

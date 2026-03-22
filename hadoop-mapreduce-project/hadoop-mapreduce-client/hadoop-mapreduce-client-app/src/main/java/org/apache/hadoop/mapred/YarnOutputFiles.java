@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -29,11 +30,11 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.MRConfig;
 
 /**
- * Manipulate the working area for the transient store for maps and reduces.
- *
- * This class is used by map and reduce tasks to identify the directories that
- * they need to write to/read from for intermediate files. The callers of
- * these methods are from child space.
+ * YARN环境下MapReduce任务中间输出文件路径管理类
+ * 
+ * 该类负责管理Map和Reduce任务在YARN运行时本地临时存储目录的路径生成，
+ * 为Map输出、溢写文件、Reduce输入等中间文件提供路径创建和查找能力，
+ * 供任务运行时在本地磁盘读写中间数据使用。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -46,22 +47,30 @@ public class YarnOutputFiles extends MapOutputFile {
   private static final String SPILL_INDEX_FILE_PATTERN = SPILL_FILE_PATTERN
       + ".index";
 
+  /**
+   * 构造空YarnOutputFiles实例，需要后续通过setConf完成初始化
+   */
   public YarnOutputFiles() {
   }
 
-  // assume configured to $localdir/usercache/$user/appcache/$appId
+  // 本地目录分配器，基于配置的本地磁盘目录分配文件路径
+  // 已预配置为使用MR中本地目录配置项MRConfig.LOCAL_DIR
   private LocalDirAllocator lDirAlloc = 
     new LocalDirAllocator(MRConfig.LOCAL_DIR);
 
+  /**
+   * 获取当前任务尝试的输出目录路径
+   * @return 拼接好的任务尝试输出目录路径
+   */
   private Path getAttemptOutputDir() {
     return new Path(JOB_OUTPUT_DIR, conf.get(JobContext.TASK_ATTEMPT_ID));
   }
   
   /**
-   * Return the path to local map output file created earlier
+   * 获取已创建的Map端本地输出文件路径
    * 
-   * @return path
-   * @throws IOException
+   * @return 本地Map输出文件路径
+   * @throws IOException 分配路径时IO异常
    */
   public Path getOutputFile() throws IOException {
     Path attemptOutput =
@@ -70,11 +79,11 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map output file name.
+   * 创建用于写入的Map端本地输出文件路径
    * 
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * @param size 文件预计大小，用于磁盘空间检查
+   * @return 可写入的本地Map输出文件路径
+   * @throws IOException 分配路径时IO异常
    */
   public Path getOutputFileForWrite(long size) throws IOException {
     Path attemptOutput = 
@@ -83,7 +92,10 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map output file name on the same volume.
+   * 在已有文件所在的相同磁盘卷上创建Map输出文件路径
+   * 
+   * @param existing 已有文件，用于定位所在磁盘卷
+   * @return 同磁盘卷上的Map输出文件路径
    */
   public Path getOutputFileForWriteInVolume(Path existing) {
     Path outputDir = new Path(existing.getParent(), JOB_OUTPUT_DIR);
@@ -93,10 +105,10 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Return the path to a local map output index file created earlier
+   * 获取已创建的Map端本地输出索引文件路径
    * 
-   * @return path
-   * @throws IOException
+   * @return 本地Map输出索引文件路径
+   * @throws IOException 查找路径时IO异常
    */
   public Path getOutputIndexFile() throws IOException {
     Path attemptIndexOutput =
@@ -106,11 +118,11 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map output index file name.
+   * 创建用于写入的Map端本地输出索引文件路径
    * 
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * @param size 文件预计大小，用于磁盘空间检查
+   * @return 可写入的本地Map输出索引文件路径
+   * @throws IOException 分配路径时IO异常
    */
   public Path getOutputIndexFileForWrite(long size) throws IOException {
     Path attemptIndexOutput =
@@ -121,7 +133,10 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map output index file name on the same volume.
+   * 在已有文件所在的相同磁盘卷上创建Map输出索引文件路径
+   * 
+   * @param existing 已有文件，用于定位所在磁盘卷
+   * @return 同磁盘卷上的Map输出索引文件路径
    */
   public Path getOutputIndexFileForWriteInVolume(Path existing) {
     Path outputDir = new Path(existing.getParent(), JOB_OUTPUT_DIR);
@@ -132,11 +147,11 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Return a local map spill file created earlier.
+   * 获取已创建的Map端溢写文件路径
    * 
-   * @param spillNumber the number
-   * @return path
-   * @throws IOException
+   * @param spillNumber 溢写编号
+   * @return 本地溢写文件路径
+   * @throws IOException 查找路径时IO异常
    */
   public Path getSpillFile(int spillNumber) throws IOException {
     return lDirAlloc.getLocalPathToRead(
@@ -145,12 +160,12 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map spill file name.
+   * 创建用于写入的Map端溢写文件路径
    * 
-   * @param spillNumber the number
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * @param spillNumber 溢写编号
+   * @param size 文件预计大小，用于磁盘空间检查
+   * @return 可写入的本地溢写文件路径
+   * @throws IOException 分配路径时IO异常
    */
   public Path getSpillFileForWrite(int spillNumber, long size)
       throws IOException {
@@ -160,11 +175,11 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Return a local map spill index file created earlier
+   * 获取已创建的Map端溢写索引文件路径
    * 
-   * @param spillNumber the number
-   * @return path
-   * @throws IOException
+   * @param spillNumber 溢写编号
+   * @return 本地溢写索引文件路径
+   * @throws IOException 查找路径时IO异常
    */
   public Path getSpillIndexFile(int spillNumber) throws IOException {
     return lDirAlloc.getLocalPathToRead(
@@ -173,12 +188,12 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map spill index file name.
+   * 创建用于写入的Map端溢写索引文件路径
    * 
-   * @param spillNumber the number
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * @param spillNumber 溢写编号
+   * @param size 文件预计大小，用于磁盘空间检查
+   * @return 可写入的本地溢写索引文件路径
+   * @throws IOException 分配路径时IO异常
    */
   public Path getSpillIndexFileForWrite(int spillNumber, long size)
       throws IOException {
@@ -188,23 +203,23 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   /**
-   * Return a local reduce input file created earlier
+   * 获取已创建的Reduce端本地输入文件路径
    * 
-   * @param mapId a map task id
-   * @return path
-   * @throws IOException 
+   * @param mapId Map任务编号
+   * @return 本地Reduce输入文件路径
+   * @throws IOException 该方法在Yarn模式下不支持，总是抛出异常
    */
   public Path getInputFile(int mapId) throws IOException {
     throw new UnsupportedOperationException("Incompatible with LocalRunner");
   }
 
   /**
-   * Create a local reduce input file name.
+   * 创建用于写入的Reduce端本地输入文件路径
    * 
-   * @param mapId a map task id
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * @param mapId Map任务ID
+   * @param size 文件预计大小，用于磁盘空间检查
+   * @return 可写入的本地Reduce输入文件路径
+   * @throws IOException 分配路径时IO异常
    */
   public Path getInputFileForWrite(org.apache.hadoop.mapreduce.TaskID mapId,
       long size) throws IOException {
@@ -214,12 +229,19 @@ public class YarnOutputFiles extends MapOutputFile {
         size, conf);
   }
 
-  /** Removes all of the files related to a task. */
+  /**
+   * 删除当前任务所有相关中间文件
+   * @throws IOException 该方法在Yarn模式下不支持，总是抛出异常
+   */
   public void removeAll() throws IOException {
     throw new UnsupportedOperationException("Incompatible with LocalRunner");
   }
 
   @Override
+  /**
+   * 设置任务配置对象，完成实例初始化
+   * @param conf Hadoop配置对象
+   */
   public void setConf(Configuration conf) {
     if (conf instanceof JobConf) {
       this.conf = (JobConf) conf;
@@ -229,6 +251,10 @@ public class YarnOutputFiles extends MapOutputFile {
   }
 
   @Override
+  /**
+   * 获取当前任务配置对象
+   * @return 任务JobConf配置
+   */
   public Configuration getConf() {
     return conf;
   }

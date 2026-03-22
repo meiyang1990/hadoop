@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,7 +20,8 @@
 package org.apache.hadoop.mapreduce.v2.app.webapp;
 
 /**
- * Params constants for the AM webapp and the history webapp.
+ * 定义MapReduce ApplicationMaster Web界面和作业历史Web界面使用的请求参数常量
+ * 统一存放所有Web页面跳转和API请求用到的参数名称，避免硬编码
  */
 public interface AMParams {
   String RM_WEB = "rm.web";

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,17 +21,30 @@ package org.apache.hadoop.mapreduce.v2.app.job.event;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
-
+/**
+ * 任务尝试诊断信息更新事件，用于在MapReduce应用中通知任务尝试有新的诊断日志信息更新
+ * 继承自TaskAttemptEvent，携带任务尝试标识和新增的诊断信息
+ */
 public class TaskAttemptDiagnosticsUpdateEvent extends TaskAttemptEvent {
 
+  // 新增的诊断日志信息
   private String diagnosticInfo;
 
+  /**
+   * 构造任务尝试诊断信息更新事件
+   * @param attemptID 目标任务尝试的ID
+   * @param diagnosticInfo 需要更新的新增诊断信息
+   */
   public TaskAttemptDiagnosticsUpdateEvent(TaskAttemptId attemptID,
       String diagnosticInfo) {
     super(attemptID, TaskAttemptEventType.TA_DIAGNOSTICS_UPDATE);
     this.diagnosticInfo = diagnosticInfo;
   }
 
+  /**
+   * 获取本次更新的新增诊断信息
+   * @return 诊断信息字符串
+   */
   public String getDiagnosticInfo() {
     return diagnosticInfo;
   }

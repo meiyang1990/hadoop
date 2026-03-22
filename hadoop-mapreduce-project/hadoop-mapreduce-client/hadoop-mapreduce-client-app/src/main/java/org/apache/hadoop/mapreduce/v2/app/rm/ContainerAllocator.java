@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,12 +21,21 @@ package org.apache.hadoop.mapreduce.v2.app.rm;
 
 import org.apache.hadoop.yarn.event.EventHandler;
 
+/**
+ * 容器分配器接口，定义MapReduce ApplicationMaster向YARN申请、释放容器的核心能力
+ * 负责处理容器分配相关事件，对接YARN ResourceManager完成资源分配
+ */
 public interface ContainerAllocator extends EventHandler<ContainerAllocatorEvent>{
 
+  /**
+   * 容器分配事件类型枚举，定义所有支持的容器操作事件类型
+   */
   enum EventType {
-
+    /** 请求分配新容器 */
     CONTAINER_REQ,
+    /** 释放不再使用的容器 */
     CONTAINER_DEALLOCATE,
+    /** 标记容器分配失败 */
     CONTAINER_FAILED
   }
 

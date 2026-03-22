@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,10 @@ import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.CounterGroup;
 
+/**
+ * Task计数器分组信息数据访问对象，用于MapReduce应用WebUI展示任务计数器分组数据
+ * 将原生CounterGroup转换为可序列化的JSON/XML格式，供前端接口返回
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class TaskCounterGroupInfo {
@@ -34,9 +39,17 @@ public class TaskCounterGroupInfo {
   protected String counterGroupName;
   protected ArrayList<TaskCounterInfo> counter;
 
+  /**
+   * JAXB反序列化需要的无参构造函数
+   */
   public TaskCounterGroupInfo() {
   }
 
+  /**
+   * 从原生CounterGroup构造Task计数器分组信息，转换为WebUI可用的数据结构
+   * @param name 计数器分组名称
+   * @param group 原生MapReduce计数器分组对象
+   */
   public TaskCounterGroupInfo(String name, CounterGroup group) {
     this.counterGroupName = name;
     this.counter = new ArrayList<TaskCounterInfo>();

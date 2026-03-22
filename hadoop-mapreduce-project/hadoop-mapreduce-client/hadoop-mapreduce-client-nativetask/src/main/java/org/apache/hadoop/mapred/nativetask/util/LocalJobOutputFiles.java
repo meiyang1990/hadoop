@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,6 +27,10 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.TaskID;
 
+/**
+ * 文件：本地作业输出文件管理工具
+ * 功能：为Native MapReduce任务管理本地磁盘上的各类输出文件路径，包括任务输出、溢写、Reduce输入等文件
+ */
 @InterfaceAudience.Private
 public class LocalJobOutputFiles implements NativeTaskOutput {
 
@@ -39,12 +44,19 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   private JobConf conf;
   private LocalDirAllocator lDirAlloc = new LocalDirAllocator("mapred.local.dir");
 
+  /**
+   * 构造本地作业输出文件管理器
+   * @param conf 作业配置对象
+   * @param id 任务ID
+   */
   public LocalJobOutputFiles(Configuration conf, String id) {
     this.conf = new JobConf(conf);
   }
 
   /**
-   * Return the path to local map output file created earlier
+   * 获取已创建的本地Map输出文件路径
+   * @return 本地Map输出文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getOutputFile() throws IOException {
     String path = String.format(OUTPUT_FILE_FORMAT_STRING, TASKTRACKER_OUTPUT);
@@ -52,9 +64,10 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   }
 
   /**
-   * Create a local map output file name.
-   * 
-   * @param size the size of the file
+   * 获取用于写入的本地Map输出文件路径
+   * @param size 文件预期大小
+   * @return 可写入的本地Map输出文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getOutputFileForWrite(long size) throws IOException {
     String path = String.format(OUTPUT_FILE_FORMAT_STRING, TASKTRACKER_OUTPUT);
@@ -62,7 +75,9 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   }
 
   /**
-   * Return the path to a local map output index file created earlier
+   * 获取已创建的本地Map输出索引文件路径
+   * @return 本地Map输出索引文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getOutputIndexFile() throws IOException {
     String path = String.format(OUTPUT_FILE_INDEX_FORMAT_STRING, TASKTRACKER_OUTPUT);
@@ -70,9 +85,10 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   }
 
   /**
-   * Create a local map output index file name.
-   * 
-   * @param size the size of the file
+   * 获取用于写入的本地Map输出索引文件路径
+   * @param size 文件预期大小
+   * @return 可写入的本地Map输出索引文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getOutputIndexFileForWrite(long size) throws IOException {
     String path = String.format(OUTPUT_FILE_INDEX_FORMAT_STRING, TASKTRACKER_OUTPUT);
@@ -80,9 +96,10 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   }
 
   /**
-   * Return a local map spill file created earlier.
-   * 
-   * @param spillNumber the number
+   * 获取已创建的指定序号Map溢写文件路径
+   * @param spillNumber 溢写文件序号
+   * @return 本地Map溢写文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getSpillFile(int spillNumber) throws IOException {
     String path = String.format(SPILL_FILE_FORMAT_STRING, TASKTRACKER_OUTPUT, spillNumber);
@@ -90,10 +107,11 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   }
 
   /**
-   * Create a local map spill file name.
-   * 
-   * @param spillNumber the number
-   * @param size the size of the file
+   * 获取用于写入的指定序号Map溢写文件路径
+   * @param spillNumber 溢写文件序号
+   * @param size 文件预期大小
+   * @return 可写入的本地Map溢写文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getSpillFileForWrite(int spillNumber, long size) throws IOException {
     String path = String.format(SPILL_FILE_FORMAT_STRING, TASKTRACKER_OUTPUT, spillNumber);
@@ -101,9 +119,10 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   }
 
   /**
-   * Return a local map spill index file created earlier
-   * 
-   * @param spillNumber the number
+   * 获取已创建的指定序号Map溢写索引文件路径
+   * @param spillNumber 溢写文件序号
+   * @return 本地Map溢写索引文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getSpillIndexFile(int spillNumber) throws IOException {
     String path = String
@@ -112,10 +131,11 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   }
 
   /**
-   * Create a local map spill index file name.
-   * 
-   * @param spillNumber the number
-   * @param size the size of the file
+   * 获取用于写入的指定序号Map溢写索引文件路径
+   * @param spillNumber 溢写文件序号
+   * @param size 文件预期大小
+   * @return 可写入的本地Map溢写索引文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getSpillIndexFileForWrite(int spillNumber, long size) throws IOException {
     String path = String
@@ -124,9 +144,10 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   }
 
   /**
-   * Return a local reduce input file created earlier
-   * 
-   * @param mapId a map task id
+   * 获取已创建的对应Map任务的Reduce输入文件路径
+   * @param mapId Map任务ID编号
+   * @return 本地Reduce输入文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getInputFile(int mapId) throws IOException {
     return lDirAlloc.getLocalPathToRead(
@@ -135,10 +156,12 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
   }
 
   /**
-   * Create a local reduce input file name.
-   * 
-   * @param mapId a map task id
-   * @param size the size of the file
+   * 获取用于写入的对应Map任务的Reduce输入文件路径
+   * @param mapId Map任务ID对象
+   * @param size 文件预期大小
+   * @param conf 配置对象
+   * @return 可写入的本地Reduce输入文件路径
+   * @throws IOException 获取路径失败时抛出异常
    */
   public Path getInputFileForWrite(TaskID mapId, long size, Configuration conf)
     throws IOException {
@@ -147,11 +170,19 @@ public class LocalJobOutputFiles implements NativeTaskOutput {
         conf);
   }
 
-  /** Removes all of the files related to a task. */
+  /**
+   * 删除当前任务关联的所有本地输出文件
+   * @throws IOException 删除文件失败时抛出异常
+   */
   public void removeAll() throws IOException {
     conf.deleteLocalFiles(TASKTRACKER_OUTPUT);
   }
 
+  /**
+   * 根据分区编号生成最终输出文件名称
+   * @param partition 分区编号
+   * @return 格式化后的输出文件名称
+   */
   public String getOutputName(int partition) {
     return String.format("part-%05d", partition);
   }

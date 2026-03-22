@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -33,10 +34,20 @@ import org.apache.hadoop.yarn.webapp.log.AggregatedLogsPage;
 import com.google.inject.Inject;
 
 /**
- * This class renders the various pages that the History Server WebApp supports
+ * 文件级注释：历史服务器Web应用控制器，负责处理历史服务器所有Web页面请求，
+ * 重写父类AppController的方法，提供MapReduce作业历史查询的页面路由和渲染控制
+ * 
+ * 类级注释：历史服务器Web控制器，管理历史服务器各个页面的渲染逻辑，
+ * 提供作业、任务、尝试、日志、配置等不同页面的请求处理能力
  */
 public class HsController extends AppController {
 
+  /**
+   * 构造方法，通过Guice注入依赖初始化历史服务器控制器
+   * @param app 应用上下文对象
+   * @param conf Hadoop配置对象
+   * @param ctx 请求上下文对象
+   */
   @Inject HsController(App app, Configuration conf, RequestContext ctx) {
     super(app, conf, ctx, "History");
   }
@@ -44,6 +55,9 @@ public class HsController extends AppController {
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#index()
+   */
+  /**
+   * 处理首页请求，设置页面标题
    */
   @Override
   public void index() {
@@ -54,6 +68,10 @@ public class HsController extends AppController {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#jobPage()
    */
+  /**
+   * 获取作业历史页面视图类
+   * @return 历史服务器作业页面视图类
+   */
   @Override
   protected Class<? extends View> jobPage() {
     return HsJobPage.class;
@@ -62,6 +80,10 @@ public class HsController extends AppController {
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#countersPage()
+   */
+  /**
+   * 获取计数器页面视图类
+   * @return 历史服务器计数器页面视图类
    */
   @Override
   public Class<? extends View> countersPage() {
@@ -72,6 +94,10 @@ public class HsController extends AppController {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#tasksPage()
    */
+  /**
+   * 获取任务列表页面视图类
+   * @return 历史服务器任务列表页面视图类
+   */
   @Override
   protected Class<? extends View> tasksPage() {
     return HsTasksPage.class;
@@ -81,6 +107,10 @@ public class HsController extends AppController {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#taskPage()
    */
+  /**
+   * 获取单个任务详情页面视图类
+   * @return 历史服务器任务详情页面视图类
+   */
   @Override
   protected Class<? extends View> taskPage() {
     return HsTaskPage.class;
@@ -89,6 +119,10 @@ public class HsController extends AppController {
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#attemptsPage()
+   */
+  /**
+   * 获取尝试列表页面视图类
+   * @return 历史服务器尝试列表页面视图类
    */
   @Override
   protected Class<? extends View> attemptsPage() {
@@ -102,6 +136,9 @@ public class HsController extends AppController {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#job()
    */
+  /**
+   * 处理作业详情请求，转发给父类处理，Guice需要子类重写才能注入
+   */
   @Override
   public void job() {
     super.job();
@@ -110,6 +147,9 @@ public class HsController extends AppController {
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#jobCounters()
+   */
+  /**
+   * 处理作业计数器请求，转发给父类处理，Guice需要子类重写才能注入
    */
   @Override
   public void jobCounters() {
@@ -120,6 +160,9 @@ public class HsController extends AppController {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#taskCounters()
    */
+  /**
+   * 处理任务计数器请求，转发给父类处理，Guice需要子类重写才能注入
+   */
   @Override
   public void taskCounters() {
     super.taskCounters();
@@ -128,6 +171,9 @@ public class HsController extends AppController {
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#tasks()
+   */
+  /**
+   * 处理任务列表请求，转发给父类处理，Guice需要子类重写才能注入
    */
   @Override
   public void tasks() {
@@ -138,6 +184,9 @@ public class HsController extends AppController {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#task()
    */
+  /**
+   * 处理任务详情请求，转发给父类处理，Guice需要子类重写才能注入
+   */
   @Override
   public void task() {
     super.task();
@@ -147,13 +196,17 @@ public class HsController extends AppController {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#attempts()
    */
+  /**
+   * 处理尝试列表请求，转发给父类处理，Guice需要子类重写才能注入
+   */
   @Override
   public void attempts() {
     super.attempts();
   }
   
   /**
-   * @return the page that will be used to render the /conf page
+   * 获取配置页面视图类
+   * @return 历史服务器配置页面视图类
    */
   @Override
   protected Class<? extends View> confPage() {
@@ -161,49 +214,54 @@ public class HsController extends AppController {
   }
 
   /**
-   * @return the page about the current server.
+   * 获取关于页面视图类
+   * @return 历史服务器关于页面视图类
    */
   protected Class<? extends View> aboutPage() {
     return HsAboutPage.class;
   }
   
   /**
-   * Render a page about the current server.
+   * 处理关于页面请求，渲染关于页面
    */
   public void about() {
     render(aboutPage());
   }
   
   /**
-   * Render the logs page.
+   * 处理日志页面请求，解析请求中的实体ID，设置上下文参数后渲染日志页面
    */
   public void logs() {
+    // 获取请求中的日志实体ID字符串
     String logEntity = $(ENTITY_STRING);
     JobID jid = null;
     try {
+      // 尝试解析为JobID
       jid = JobID.forName(logEntity);
       set(JOB_ID, logEntity);
       requireJob();
     } catch (Exception e) {
-      // fall below
+      // 解析失败，向下尝试解析为TaskAttemptID
     }
 
     if (jid == null) {
       try {
+        // 尝试解析为TaskAttemptID
         TaskAttemptID taskAttemptId = TaskAttemptID.forName(logEntity);
         set(TASK_ID, taskAttemptId.getTaskID().toString());
         set(JOB_ID, taskAttemptId.getJobID().toString());
         requireTask();
         requireJob();
       } catch (Exception e) {
-        // fall below
+        // 解析失败，继续渲染页面，不做额外处理
       }
     }
+    // 渲染历史服务器日志页面
     render(HsLogsPage.class);
   }
 
   /**
-   * Render the nm logs page.
+   * 处理NodeManager聚合日志页面请求，渲染聚合日志页面
    */
   public void nmlogs() {
     render(AggregatedLogsPage.class);
@@ -212,6 +270,10 @@ public class HsController extends AppController {
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#singleCounterPage()
+   */
+  /**
+   * 获取单个计数器页面视图类
+   * @return 历史服务器单个计数器页面视图类
    */
   @Override
   protected Class<? extends View> singleCounterPage() {
@@ -222,6 +284,9 @@ public class HsController extends AppController {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#singleJobCounter()
    */
+  /**
+   * 处理单个作业计数器请求，转发给父类处理，Guice需要子类重写才能注入
+   */
   @Override
   public void singleJobCounter() throws IOException{
     super.singleJobCounter();
@@ -230,6 +295,9 @@ public class HsController extends AppController {
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.app.webapp.AppController#singleTaskCounter()
+   */
+  /**
+   * 处理单个任务计数器请求，转发给父类处理，Guice需要子类重写才能注入
    */
   @Override
   public void singleTaskCounter() throws IOException{

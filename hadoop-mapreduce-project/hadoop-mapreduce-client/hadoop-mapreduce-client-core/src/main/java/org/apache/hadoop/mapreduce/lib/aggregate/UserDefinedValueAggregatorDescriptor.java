@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,13 +29,10 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 
 /**
- * This class implements a wrapper for a user defined value 
- * aggregator descriptor.
- * It serves two functions: One is to create an object of 
- * ValueAggregatorDescriptor from the name of a user defined class
- * that may be dynamically loaded. The other is to
- * delegate invocations of generateKeyValPairs function to the created object.
- * 
+ * 文件：用户自定义值聚合描述符包装类
+ * 属于Hadoop MapReduce Aggregate聚合框架，用于动态加载和封装用户自定义的聚合描述符
+ * 核心职责：1. 动态加载用户自定义的ValueAggregatorDescriptor实现类并实例化
+ *          2. 将generateKeyValPairs等方法调用委托给实际用户自定义实现对象执行
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -47,17 +45,22 @@ public class UserDefinedValueAggregatorDescriptor implements
   private static final Class<?>[] argArray = new Class[] {};
 
   /**
-   * Create an instance of the given class
-   * @param className the name of the class
-   * @return a dynamically created instance of the given class 
+   * 根据类名动态加载并实例化指定类
+   * @param className 需要实例化的类全限定名
+   * @return 动态创建的类实例对象
    */
   public static Object createInstance(String className) {
     Object retv = null;
     try {
+      // 获取当前线程上下文类加载器，用于加载用户自定义类
       ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+      // 加载目标类到JVM
       Class<?> theFilterClass = Class.forName(className, true, classLoader);
+      // 获取无参构造方法
       Constructor<?> meth = theFilterClass.getDeclaredConstructor(argArray);
+      // 绕过访问权限检查，允许实例化私有类
       meth.setAccessible(true);
+      // 通过反射创建实例
       retv = meth.newInstance();
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -65,18 +68,24 @@ public class UserDefinedValueAggregatorDescriptor implements
     return retv;
   }
 
+  /**
+   * 创建用户自定义聚合描述符实例并完成配置
+   * @param conf Hadoop配置对象
+   */
   private void createAggregator(Configuration conf) {
     if (theAggregatorDescriptor == null) {
+      // 反射实例化用户自定义类
       theAggregatorDescriptor = (ValueAggregatorDescriptor)
                                   createInstance(this.className);
+      // 对实例进行配置初始化
       theAggregatorDescriptor.configure(conf);
     }
   }
 
   /**
-   * 
-   * @param className the class name of the user defined descriptor class
-   * @param conf a configure object used for decriptor configuration
+   * 构造方法，初始化包装类并实例化用户自定义聚合描述符
+   * @param className 用户自定义聚合描述符实现类的全限定名
+   * @param conf 用于配置聚合描述符的配置对象
    */
   public UserDefinedValueAggregatorDescriptor(String className, 
       Configuration conf) {
@@ -85,16 +94,10 @@ public class UserDefinedValueAggregatorDescriptor implements
   }
 
   /**
-   *   Generate a list of aggregation-id/value pairs for the given 
-   *   key/value pairs by delegating the invocation to the real object.
-   *   
-   * @param key
-   *          input key
-   * @param val
-   *          input value
-   * @return a list of aggregation id/value pairs. An aggregation id encodes an
-   *         aggregation type which is used to guide the way to aggregate the
-   *         value in the reduce/combiner phrase of an Aggregate based job.
+   * 将调用委托给实际用户自定义聚合描述符，生成聚合键值对列表
+   * @param key 输入数据的键
+   * @param val 输入数据的值
+   * @return 聚合ID/值对列表，聚合ID编码了聚合类型，用于指导Reduce/Combiner阶段的聚合逻辑
    */
   public ArrayList<Entry<Text, Text>> generateKeyValPairs(Object key,
                                                           Object val) {
@@ -106,7 +109,8 @@ public class UserDefinedValueAggregatorDescriptor implements
   }
 
   /**
-   * @return the string representation of this object.
+   * 获取当前对象的字符串表示，包含用户自定义类名
+   * @return 对象字符串描述
    */
   public String toString() {
     return "UserDefinedValueAggregatorDescriptor with class name:" + "\t"
@@ -114,7 +118,8 @@ public class UserDefinedValueAggregatorDescriptor implements
   }
 
   /**
-   *  Do nothing.
+   * 配置方法，此处无需额外配置，空实现
+   * @param conf Hadoop配置对象
    */
   public void configure(Configuration conf) {
 

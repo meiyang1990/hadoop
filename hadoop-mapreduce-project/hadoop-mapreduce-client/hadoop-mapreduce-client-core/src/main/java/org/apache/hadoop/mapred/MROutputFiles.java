@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,27 +30,29 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 
 /**
- * Manipulate the working area for the transient store for maps and reduces.
- *
- * This class is used by map and reduce tasks to identify the directories that
- * they need to write to/read from for intermediate files. The callers of
- * these methods are from the Child running the Task.
+ * 文件级注释：MapReduce任务中间输出文件路径管理工具，为Map和Reduce任务提供本地临时存储目录的路径生成与管理能力
+ * 
+ * 管理Map和Reduce任务临时存储工作区，用于定位中间文件的读写目录，供任务子进程调用获取各类中间文件路径
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class MROutputFiles extends MapOutputFile {
 
+  // 本地目录分配器，基于Hadoop本地目录配置分配存储路径
   private LocalDirAllocator lDirAlloc =
     new LocalDirAllocator(MRConfig.LOCAL_DIR);
 
+  /**
+   * 构造方法：初始化MapReduce输出文件管理器
+   */
   public MROutputFiles() {
   }
 
   /**
-   * Return the path to local map output file created earlier
-   *
-   * @return path
-   * @throws IOException
+   * 获取已创建的本地Map输出文件路径
+   * 
+   * @return 本地Map输出文件路径
+   * @throws IOException 路径获取失败时抛出异常
    */
   @Override
   public Path getOutputFile()
@@ -59,11 +62,11 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map output file name.
-   *
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * 为新创建的本地Map输出文件分配路径
+   * 
+   * @param size 文件预期大小
+   * @return 可写入的本地Map输出文件路径
+   * @throws IOException 路径分配失败时抛出异常
    */
   @Override
   public Path getOutputFileForWrite(long size)
@@ -73,7 +76,10 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map output file name on the same volume.
+   * 在已有文件所在的同一卷上生成Map输出文件路径
+   * 
+   * @param existing 已有文件路径
+   * @return 同一卷上的Map输出文件路径
    */
   @Override
   public Path getOutputFileForWriteInVolume(Path existing) {
@@ -81,10 +87,10 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Return the path to a local map output index file created earlier
-   *
-   * @return path
-   * @throws IOException
+   * 获取已创建的本地Map输出索引文件路径
+   * 
+   * @return 本地Map输出索引文件路径
+   * @throws IOException 路径获取失败时抛出异常
    */
   @Override
   public Path getOutputIndexFile()
@@ -95,11 +101,11 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map output index file name.
-   *
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * 为新创建的本地Map输出索引文件分配路径
+   * 
+   * @param size 文件预期大小
+   * @return 可写入的本地Map输出索引文件路径
+   * @throws IOException 路径分配失败时抛出异常
    */
   @Override
   public Path getOutputIndexFileForWrite(long size)
@@ -110,7 +116,10 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map output index file name on the same volume.
+   * 在已有文件所在的同一卷上生成Map输出索引文件路径
+   * 
+   * @param existing 已有文件路径
+   * @return 同一卷上的Map输出索引文件路径
    */
   @Override
   public Path getOutputIndexFileForWriteInVolume(Path existing) {
@@ -119,11 +128,11 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Return a local map spill file created earlier.
-   *
-   * @param spillNumber the number
-   * @return path
-   * @throws IOException
+   * 获取已创建的指定序号Map spill文件路径
+   * 
+   * @param spillNumber spill文件序号
+   * @return 本地spill文件路径
+   * @throws IOException 路径获取失败时抛出异常
    */
   @Override
   public Path getSpillFile(int spillNumber)
@@ -133,12 +142,12 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map spill file name.
-   *
-   * @param spillNumber the number
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * 为新创建的指定序号Map spill文件分配路径
+   * 
+   * @param spillNumber spill文件序号
+   * @param size 文件预期大小
+   * @return 可写入的本地spill文件路径
+   * @throws IOException 路径分配失败时抛出异常
    */
   @Override
   public Path getSpillFileForWrite(int spillNumber, long size)
@@ -148,11 +157,11 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Return a local map spill index file created earlier
-   *
-   * @param spillNumber the number
-   * @return path
-   * @throws IOException
+   * 获取已创建的指定序号Map spill索引文件路径
+   * 
+   * @param spillNumber spill文件序号
+   * @return 本地spill索引文件路径
+   * @throws IOException 路径获取失败时抛出异常
    */
   @Override
   public Path getSpillIndexFile(int spillNumber)
@@ -162,12 +171,12 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local map spill index file name.
-   *
-   * @param spillNumber the number
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * 为新创建的指定序号Map spill索引文件分配路径
+   * 
+   * @param spillNumber spill文件序号
+   * @param size 文件预期大小
+   * @return 可写入的本地spill索引文件路径
+   * @throws IOException 路径分配失败时抛出异常
    */
   @Override
   public Path getSpillIndexFileForWrite(int spillNumber, long size)
@@ -177,11 +186,11 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Return a local reduce input file created earlier
-   *
-   * @param mapId a map task id
-   * @return path
-   * @throws IOException
+   * 获取指定Map任务对应的本地Reduce输入文件路径
+   * 
+   * @param mapId Map任务ID
+   * @return 本地Reduce输入文件路径
+   * @throws IOException 路径获取失败时抛出异常
    */
   @Override
   public Path getInputFile(int mapId)
@@ -192,12 +201,12 @@ public class MROutputFiles extends MapOutputFile {
   }
 
   /**
-   * Create a local reduce input file name.
-   *
-   * @param mapId a map task id
-   * @param size the size of the file
-   * @return path
-   * @throws IOException
+   * 为指定Map任务对应的Reduce输入文件分配可写入路径
+   * 
+   * @param mapId Map任务ID
+   * @param size 文件预期大小
+   * @return 可写入的本地Reduce输入文件路径
+   * @throws IOException 路径分配失败时抛出异常
    */
   @Override
   public Path getInputFileForWrite(org.apache.hadoop.mapreduce.TaskID mapId,
@@ -208,16 +217,26 @@ public class MROutputFiles extends MapOutputFile {
         size, getConf());
   }
 
-  /** Removes all of the files related to a task. */
+  /**
+   * 清理当前任务关联的所有临时输出文件
+   * 
+   * @throws IOException 文件删除失败时抛出异常
+   */
   @Override
   public void removeAll()
       throws IOException {
     ((JobConf)getConf()).deleteLocalFiles(MRJobConfig.OUTPUT);
   }
 
+  /**
+   * 设置配置对象，确保配置为JobConf类型
+   * 
+   * @param conf 输入配置对象
+   */
   @Override
   public void setConf(Configuration conf) {
     if (!(conf instanceof JobConf)) {
+      // 非JobConf类型则封装为JobConf
       conf = new JobConf(conf);
     }
     super.setConf(conf);

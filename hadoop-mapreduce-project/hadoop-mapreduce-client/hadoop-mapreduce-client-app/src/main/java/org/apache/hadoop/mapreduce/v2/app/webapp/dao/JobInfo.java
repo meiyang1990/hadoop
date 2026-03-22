@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,11 +41,15 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.util.Times;
 
+/**
+ * MapReduce作业信息数据传输对象，用于在Web UI中序列化和传输作业基本信息，
+ * 包含作业基本属性、进度统计、任务尝试状态统计以及访问控制信息。
+ */
 @XmlRootElement(name = "job")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class JobInfo {
 
-  // ok for any user to see
+  // 所有用户均可查看的公开信息
   protected long startTime;
   protected long finishTime;
   protected long elapsedTime;
@@ -65,7 +70,7 @@ public class JobInfo {
   @XmlTransient
   protected String reduceProgressPercent;
 
-  // these should only be seen if acls allow
+  // 仅有权限用户可查看的敏感信息
   protected int mapsPending;
   protected int mapsRunning;
   protected int reducesPending;
@@ -84,9 +89,17 @@ public class JobInfo {
   protected int successfulMapAttempts = 0;
   protected ArrayList<ConfEntryInfo> acls;
 
+  /**
+   * 默认无参构造函数，供JAXB反序列化使用。
+   */
   public JobInfo() {
   }
 
+  /**
+   * 从Job对象构造JobInfo，根据访问权限决定是否填充敏感信息。
+   * @param job 源作业对象
+   * @param hasAccess 当前用户是否有权限查看敏感信息
+   */
   public JobInfo(Job job, Boolean hasAccess) {
     this.id = MRApps.toString(job.getID());
     JobReport report = job.getReport();
@@ -112,12 +125,16 @@ public class JobInfo {
         StringUtils.format("%.2f", getReduceProgress());
 
     this.acls = new ArrayList<ConfEntryInfo>();
+    // 用户有权限时填充敏感信息
     if (hasAccess) {
       this.diagnostics = "";
+      // 统计任务和任务尝试状态数量
       countTasksAndAttempts(job);
 
+      // 标记作业是否运行在uber模式
       this.uberized = job.isUber();
 
+      // 拼接所有诊断信息
       List<String> diagnostics = job.getDiagnostics();
       if (diagnostics != null && !diagnostics.isEmpty()) {
         StringBuilder b = new StringBuilder();
@@ -127,6 +144,7 @@ public class JobInfo {
         this.diagnostics = b.toString();
       }
 
+      // 填充作业访问控制列表信息
       Map<JobACL, AccessControlList> allacls = job.getJobACLs();
       if (allacls != null) {
         for (Map.Entry<JobACL, AccessControlList> entry : allacls.entrySet()) {
@@ -270,21 +288,20 @@ public class JobInfo {
   }
 
   /**
-   * Go through a job and update the member variables with counts for
-   * information to output in the page.
-   *
-   * @param job
-   *          the job to get counts for.
+   * 遍历作业所有任务，统计不同状态的任务和任务尝试数量，更新到当前对象成员变量。
+   * @param job 需要统计的作业对象
    */
   private void countTasksAndAttempts(Job job) {
     final Map<TaskId, Task> tasks = job.getTasks();
     if (tasks == null) {
       return;
     }
+    // 遍历所有任务
     for (Task task : tasks.values()) {
+      // 按任务类型分类统计
       switch (task.getType()) {
       case MAP:
-        // Task counts
+        // 统计Map任务状态数量
         switch (task.getState()) {
         case RUNNING:
           ++this.mapsRunning;
@@ -297,7 +314,7 @@ public class JobInfo {
         }
         break;
       case REDUCE:
-        // Task counts
+        // 统计Reduce任务状态数量
         switch (task.getState()) {
         case RUNNING:
           ++this.reducesRunning;
@@ -313,7 +330,7 @@ public class JobInfo {
         throw new IllegalStateException(
             "Task type is neither map nor reduce: " + task.getType());
       }
-      // Attempts counts
+      // 统计所有任务尝试状态数量
       Map<TaskAttemptId, TaskAttempt> attempts = task.getAttempts();
       int newAttempts, running, successful, failed, killed;
       for (TaskAttempt attempt : attempts.values()) {
@@ -323,6 +340,7 @@ public class JobInfo {
         successful = 0;
         failed = 0;
         killed = 0;
+        // 根据UI分类判断任务尝试状态并累加计数
         if (TaskAttemptStateUI.NEW.correspondsTo(attempt.getState())) {
           ++newAttempts;
         } else if (TaskAttemptStateUI.RUNNING.correspondsTo(attempt.getState())) {
@@ -336,6 +354,7 @@ public class JobInfo {
           ++killed;
         }
 
+        // 按任务类型累加到对应计数器
         switch (task.getType()) {
         case MAP:
           this.newMapAttempts += newAttempts;

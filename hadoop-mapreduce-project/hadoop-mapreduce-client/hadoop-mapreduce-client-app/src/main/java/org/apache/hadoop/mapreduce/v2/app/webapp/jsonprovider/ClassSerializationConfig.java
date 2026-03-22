@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,8 +45,13 @@ import org.apache.hadoop.mapreduce.v2.app.webapp.dao.TasksInfo;
 import org.apache.hadoop.util.Sets;
 import org.apache.hadoop.yarn.webapp.RemoteExceptionData;
 
+/**
+ * MR ApplicationMaster Web UI JSON序列化配置类，配置需要不同序列化处理的DAO类集合
+ * 用于控制JSON响应中不同数据对象的序列化方式，区分包裹式和非包裹式序列化
+ */
 public class ClassSerializationConfig {
 
+  // 预定义需要包裹式JSON序列化的类集合
   private static final Set<Class<?>> CONST_WRAPPED_CLASSES = Sets.newHashSet(
       AMAttemptInfo.class, AMAttemptsInfo.class,
       AppInfo.class, CounterInfo.class, JobTaskAttemptCounterInfo.class,
@@ -57,22 +63,36 @@ public class ClassSerializationConfig {
       ConfEntryInfo.class, RemoteExceptionData.class
   );
 
+  // 预定义需要非包裹式JSON序列化的类集合
   private static final Set<Class<?>> CONST_UNWRAPPED_CLASSES =
       Sets.newHashSet(JobTaskAttemptState.class);
 
+  // 运行时可使用的包裹式序列化类集合，基于预定义集合拷贝
   private final Set<Class<?>> wrappedClasses;
+  // 运行时可使用的非包裹式序列化类集合，基于预定义集合拷贝
   private final Set<Class<?>> unWrappedClasses;
 
 
+  /**
+   * 构造序列化配置对象，初始化可修改的类集合
+   */
   public ClassSerializationConfig() {
     wrappedClasses = new HashSet<>(CONST_WRAPPED_CLASSES);
     unWrappedClasses = new HashSet<>(CONST_UNWRAPPED_CLASSES);
   }
 
+  /**
+   * 获取需要包裹式JSON序列化的类集合
+   * @return 包裹式序列化类集合
+   */
   public Set<Class<?>> getWrappedClasses() {
     return wrappedClasses;
   }
 
+  /**
+   * 获取需要非包裹式JSON序列化的类集合
+   * @return 非包裹式序列化类集合
+   */
   public Set<Class<?>> getUnWrappedClasses() {
     return unWrappedClasses;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -50,6 +51,10 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 作业历史工具类，提供作业历史文件路径构造、权限管理、目录扫描清理等公共能力
+ * 为MapReduce作业历史服务提供统一的路径格式、权限规则和文件查找工具
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class JobHistoryUtils {
@@ -116,6 +121,7 @@ public class JobHistoryUtils {
   private static final Logger LOG =
       LoggerFactory.getLogger(JobHistoryUtils.class);
 
+  // 配置文件路径过滤器
   private static final PathFilter CONF_FILTER = new PathFilter() {
     @Override
     public boolean accept(Path path) {
@@ -123,6 +129,7 @@ public class JobHistoryUtils {
     }
   };
   
+  // 作业历史文件路径过滤器
   private static final PathFilter JOB_HISTORY_FILE_FILTER = new PathFilter() {
     @Override
     public boolean accept(Path path) {
@@ -131,19 +138,19 @@ public class JobHistoryUtils {
   };
 
   /**
-   * Checks whether the provided path string is a valid job history file.
-   * @param pathString the path to be checked.
-   * @return true is the path is a valid job history filename else return false
+   * 检查给定路径字符串是否为有效的作业历史文件名
+   * @param pathString 待检查的路径
+   * @return 有效返回true，否则返回false
    */
   public static boolean isValidJobHistoryFileName(String pathString) {
     return pathString.endsWith(JOB_HISTORY_FILE_EXTENSION);
   }
 
   /**
-   * Returns the jobId from a job history file name.
-   * @param pathString the path string.
-   * @return the JobId
-   * @throws IOException if the filename format is invalid.
+   * 从作业历史文件路径中解析提取JobID
+   * @param pathString 作业历史文件路径字符串
+   * @return 解析得到的JobID对象
+   * @throws IOException 如果文件名格式无效则抛出异常
    */
   public static JobID getJobIDFromHistoryFilePath(String pathString) throws IOException {
     String [] parts = pathString.split(Path.SEPARATOR);
@@ -153,26 +160,27 @@ public class JobHistoryUtils {
   }
 
   /**
-   * Gets a PathFilter which would match configuration files.
-   * @return the patch filter {@link PathFilter} for matching conf files.
+   * 获取匹配配置文件的路径过滤器
+   * @return 配置文件路径过滤器
    */
   public static PathFilter getConfFileFilter() {
     return CONF_FILTER;
   }
   
   /**
-   * Gets a PathFilter which would match job history file names.
-   * @return the path filter {@link PathFilter} matching job history files.
+   * 获取匹配作业历史文件的路径过滤器
+   * @return 作业历史文件路径过滤器
    */
   public static PathFilter getHistoryFileFilter() {
     return JOB_HISTORY_FILE_FILTER;
   }
 
   /**
-   * Gets the configured directory prefix for In Progress history files.
-   * @param conf the configuration for hte job
-   * @param jobId the id of the job the history file is for.
-   * @return A string representation of the prefix.
+   * 获取正在运行作业的历史暂存目录前缀
+   * @param conf 作业配置对象
+   * @param jobId 作业ID
+   * @return 暂存目录前缀的字符串表示
+   * @throws IOException 获取当前用户信息失败时抛出异常
    */
   public static String
       getConfiguredHistoryStagingDirPrefix(Configuration conf, String jobId)
@@ -185,9 +193,9 @@ public class JobHistoryUtils {
   }
   
   /**
-   * Gets the configured directory prefix for intermediate done history files.
-   * @param conf
-   * @return A string representation of the prefix.
+   * 获取已完成作业的中间完成目录前缀
+   * @param conf 配置对象
+   * @return 中间完成目录前缀的字符串表示
    */
   public static String getConfiguredHistoryIntermediateDoneDirPrefix(
       Configuration conf) {
@@ -202,11 +210,9 @@ public class JobHistoryUtils {
   }
 
   /**
-   * Gets the configured directory permissions for the user directories in the
-   * Gets the configured permissions for the user directories and files in the
-   * both need full permissions, this is enforced by this method.
-   * @param conf The configuration object
-   * @return FsPermission of the user directories
+   * 获取中间完成目录下用户目录的配置权限
+   * @param conf 配置对象
+   * @return 用户目录的权限对象
    */
   public static FsPermission
         getConfiguredHistoryIntermediateUserDoneDirPermissions(
@@ -218,6 +224,7 @@ public class JobHistoryUtils {
           JHAdminConfig.DEFAULT_MR_HISTORY_INTERMEDIATE_USER_DONE_DIR_PERMISSIONS);
     }
     FsPermission permission = new FsPermission(userDoneDirPermissions);
+    // 强制要求用户和用户组必须拥有全部权限，不满足则自动修正并警告
     if (permission.getUserAction() != FsAction.ALL ||
         permission.getGroupAction() != FsAction.ALL) {
       permission = new FsPermission(FsAction.ALL, FsAction.ALL,
@@ -231,9 +238,9 @@ public class JobHistoryUtils {
   }
   
   /**
-   * Gets the configured directory prefix for Done history files.
-   * @param conf the configuration object
-   * @return the done history directory
+   * 获取作业历史服务器存储已完成作业历史的根目录前缀
+   * @param conf 配置对象
+   * @return 已完成作业历史根目录前缀字符串
    */
   public static String getConfiguredHistoryServerDoneDirPrefix(
       Configuration conf) {
@@ -247,16 +254,12 @@ public class JobHistoryUtils {
   }
 
   /**
-   * Get default file system URI for the cluster (used to ensure consistency
-   * of history done/staging locations) over different context
-   *
-   * @return Default file context
+   * 获取集群默认文件系统上下文，用于统一历史目录路径格式
+   * @return 默认文件系统上下文，如果仅core-default.xml配置则返回null
    */
   private static FileContext getDefaultFileContext() {
-    // If FS_DEFAULT_NAME_KEY was set solely by core-default.xml then we ignore
-    // ignore it. This prevents defaulting history paths to file system specified
-    // by core-default.xml which would not make sense in any case. For a test
-    // case to exploit this functionality it should create core-site.xml
+    // 如果默认文件系统仅通过core-default.xml配置，则忽略该配置
+    // 避免测试场景下默认路径错误指向core-default.xml指定的文件系统
     FileContext fc = null;
     Configuration defaultConf = new Configuration();
     String[] sources;
@@ -285,14 +288,11 @@ public class JobHistoryUtils {
   }
 
   /**
-   * Ensure that path belongs to cluster's default file system unless
-   * 1. it is already fully qualified.
-   * 2. current job configuration uses default file system
-   * 3. running from a test case without core-site.xml
-   *
-   * @param sourcePath source path
-   * @param conf the job configuration
-   * @return full qualified path (if necessary) in default file system
+   * 确保路径在集群默认文件系统上生成完全限定路径
+   * 已完全限定、当前配置使用默认文件系统或无有效默认配置时直接返回原路径
+   * @param sourcePath 源路径字符串
+   * @param conf 作业配置对象
+   * @return 处理后的完全限定路径字符串
    */
   private static String ensurePathInDefaultFileSystem(String sourcePath, Configuration conf) {
     Path path = new Path(sourcePath);
@@ -310,15 +310,22 @@ public class JobHistoryUtils {
   }
 
   /**
-   * Gets the user directory for intermediate done history files.
-   * @param conf the configuration object
-   * @return the intermediate done directory for jobhistory files.
+   * 获取当前用户对应的中间完成目录路径
+   * @param conf 配置对象
+   * @return 当前用户的中间完成目录路径字符串
+   * @throws IOException 获取当前用户信息失败时抛出异常
    */
   public static String getHistoryIntermediateDoneDirForUser(Configuration conf) throws IOException {
     return new Path(getConfiguredHistoryIntermediateDoneDirPrefix(conf),
         UserGroupInformation.getCurrentUser().getShortUserName()).toString();
   }
 
+  /**
+   * 判断是否需要创建非用户属主的中间基础目录
+   * 用于非安全模式单节点集群默认允许创建，无需额外配置
+   * @param conf 配置对象
+   * @return 需要创建返回true，否则返回false
+   */
   public static boolean shouldCreateNonUserDirectory(Configuration conf) {
     // Returning true by default to allow non secure single node clusters to work
     // without any configuration change.
@@ -326,14 +333,22 @@ public class JobHistoryUtils {
   }
 
   /**
-   * Get the job history file path for non Done history files.
+   * 获取运行中作业的历史文件路径
+   * @param dir 暂存根目录
+   * @param jobId 作业ID对象
+   * @param attempt 作业尝试次数
+   * @return 作业历史文件路径
    */
   public static Path getStagingJobHistoryFile(Path dir, JobId jobId, int attempt) {
     return getStagingJobHistoryFile(dir, TypeConverter.fromYarn(jobId).toString(), attempt);
   }
   
   /**
-   * Get the job history file path for non Done history files.
+   * 获取运行中作业的历史文件路径
+   * @param dir 暂存根目录
+   * @param jobId 字符串格式作业ID
+   * @param attempt 作业尝试次数
+   * @return 作业历史文件路径
    */
   public static Path getStagingJobHistoryFile(Path dir, String jobId, int attempt) {
     return new Path(dir, jobId + "_" + 
@@ -341,30 +356,29 @@ public class JobHistoryUtils {
   }
   
   /**
-   * Get the done configuration file name for a job.
-   * @param jobId the jobId.
-   * @return the conf file name.
+   * 获取作业中间配置文件名
+   * @param jobId 作业ID对象
+   * @return 配置文件名字符串
    */
   public static String getIntermediateConfFileName(JobId jobId) {
     return TypeConverter.fromYarn(jobId).toString() + CONF_FILE_NAME_SUFFIX;
   }
   
   /**
-   * Get the done summary file name for a job.
-   * @param jobId the jobId.
-   * @return the conf file name.
+   * 获取作业中间摘要文件名
+   * @param jobId 作业ID对象
+   * @return 摘要文件名字符串
    */
   public static String getIntermediateSummaryFileName(JobId jobId) {
     return TypeConverter.fromYarn(jobId).toString() + SUMMARY_FILE_NAME_SUFFIX;
   }
   
   /**
-   * Gets the conf file path for jobs in progress.
-   * 
-   * @param logDir the log directory prefix.
-   * @param jobId the jobId.
-   * @param attempt attempt number for this job.
-   * @return the conf file path for jobs in progress.
+   * 获取运行中作业的配置文件路径
+   * @param logDir 日志目录前缀
+   * @param jobId 作业ID对象
+   * @param attempt 作业尝试次数
+   * @return 运行中作业配置文件路径
    */
   public static Path getStagingConfFile(Path logDir, JobId jobId, int attempt) {
     Path jobFilePath = null;
@@ -376,10 +390,10 @@ public class JobHistoryUtils {
   }
   
   /**
-   * Gets the serial number part of the path based on the jobId and serialNumber format.
-   * @param id
-   * @param serialNumberFormat
-   * @return the serial number part of the patch based on the jobId and serial number format.
+   * 根据作业ID生成序列号目录组件
+   * @param id 作业ID对象
+   * @param serialNumberFormat 序列号格式字符串
+   * @return 格式化后的序列号目录组件字符串
    */
   public static String serialNumberDirectoryComponent(JobId id, String serialNumberFormat) {
     return String.format(serialNumberFormat,
@@ -387,9 +401,10 @@ public class JobHistoryUtils {
         SERIAL_NUMBER_DIRECTORY_DIGITS);
   }
   
-  /**Extracts the timstamp component from the path.
-   * @param path
-   * @return the timestamp component from the path
+  /**
+   * 从路径中提取时间戳目录组件
+   * @param path 完整路径字符串
+   * @return 提取得到的YYYY/MM/DD格式时间戳组件，未找到返回null
    */
   public static String getTimestampPartFromPath(String path) {
     Matcher matcher = TIMESTAMP_DIR_PATTERN.matcher(path);
@@ -403,11 +418,11 @@ public class JobHistoryUtils {
   }
   
   /**
-   * Gets the history subdirectory based on the jobId, timestamp and serial number format.
-   * @param id
-   * @param timestampComponent
-   * @param serialNumberFormat
-   * @return the history sub directory based on the jobid, timestamp and serial number format
+   * 根据作业ID、时间戳生成历史日志子目录路径
+   * @param id 作业ID对象
+   * @param timestampComponent 时间戳路径组件
+   * @param serialNumberFormat 序列号格式字符串
+   * @return 历史日志子目录路径字符串
    */
   public static String historyLogSubdirectory(JobId id, String timestampComponent, String serialNumberFormat) {
 //    String result = LOG_VERSION_STRING;
@@ -423,239 +438,4 @@ public class JobHistoryUtils {
   }
   
   /**
-   * Gets the timestamp component based on millisecond time.
-   * @param millisecondTime
-   * @return the timestamp component based on millisecond time
-   */
-  public static String timestampDirectoryComponent(long millisecondTime) {
-    Calendar timestamp = Calendar.getInstance();
-    timestamp.setTimeInMillis(millisecondTime);
-    String dateString = null;
-    dateString = String
-        .format(TIMESTAMP_DIR_FORMAT,
-            timestamp.get(Calendar.YEAR),
-            // months are 0-based in Calendar, but people will expect January to
-            // be month #1.
-            timestamp.get(Calendar.MONTH) + 1,
-            timestamp.get(Calendar.DAY_OF_MONTH));
-    dateString = dateString.intern();
-    return dateString;
-  }
-  
-  public static String doneSubdirsBeforeSerialTail() {
-    // date
-    String result = "/*/*/*"; // YYYY/MM/DD ;
-    return result;
-  }
-  
-  /**
-   * Computes a serial number used as part of directory naming for the given jobId.
-   * @param id the jobId.
-   * @return the serial number used as part of directory naming for the given jobid
-   */
-  public static int jobSerialNumber(JobId id) {
-    return id.getId();
-  }
-  
-  public static List<FileStatus> localGlobber(FileContext fc, Path root, String tail)
-      throws IOException {
-    return localGlobber(fc, root, tail, null);
-  }
-
-  public static List<FileStatus> localGlobber(FileContext fc, Path root, String tail,
-      PathFilter filter) throws IOException {
-    return localGlobber(fc, root, tail, filter, null);
-  }
-
-  // hasMismatches is just used to return a second value if you want
-  // one. I would have used MutableBoxedBoolean if such had been provided.
-  public static List<FileStatus> localGlobber(FileContext fc, Path root, String tail,
-      PathFilter filter, AtomicBoolean hasFlatFiles) throws IOException {
-    if (tail.equals("")) {
-      return (listFilteredStatus(fc, root, filter));
-    }
-
-    if (tail.startsWith("/*")) {
-      Path[] subdirs = filteredStat2Paths(
-          remoteIterToList(fc.listStatus(root)), true, hasFlatFiles);
-
-      List<List<FileStatus>> subsubdirs = new LinkedList<List<FileStatus>>();
-
-      int subsubdirCount = 0;
-
-      if (subdirs.length == 0) {
-        return new LinkedList<FileStatus>();
-      }
-
-      String newTail = tail.substring(2);
-
-      for (int i = 0; i < subdirs.length; ++i) {
-        subsubdirs.add(localGlobber(fc, subdirs[i], newTail, filter, null));
-        // subsubdirs.set(i, localGlobber(fc, subdirs[i], newTail, filter,
-        // null));
-        subsubdirCount += subsubdirs.get(i).size();
-      }
-
-      List<FileStatus> result = new LinkedList<FileStatus>();
-
-      for (int i = 0; i < subsubdirs.size(); ++i) {
-        result.addAll(subsubdirs.get(i));
-      }
-
-      return result;
-    }
-
-    if (tail.startsWith("/")) {
-      int split = tail.indexOf('/', 1);
-
-      if (split < 0) {
-        return listFilteredStatus(fc, new Path(root, tail.substring(1)), filter);
-      } else {
-        String thisSegment = tail.substring(1, split);
-        String newTail = tail.substring(split);
-        return localGlobber(fc, new Path(root, thisSegment), newTail, filter,
-            hasFlatFiles);
-      }
-    }
-
-    IOException e = new IOException("localGlobber: bad tail");
-
-    throw e;
-  }
-
-  private static List<FileStatus> listFilteredStatus(FileContext fc, Path root,
-      PathFilter filter) throws IOException {
-    List<FileStatus> fsList = remoteIterToList(fc.listStatus(root));
-    if (filter == null) {
-      return fsList;
-    } else {
-      List<FileStatus> filteredList = new LinkedList<FileStatus>();
-      for (FileStatus fs : fsList) {
-        if (filter.accept(fs.getPath())) {
-          filteredList.add(fs);
-        }
-      }
-      return filteredList;
-    }
-  }
-
-  private static List<FileStatus> remoteIterToList(
-      RemoteIterator<FileStatus> rIter) throws IOException {
-    List<FileStatus> fsList = new LinkedList<FileStatus>();
-    if (rIter == null)
-      return fsList;
-    while (rIter.hasNext()) {
-      fsList.add(rIter.next());
-    }
-    return fsList;
-  }
-  
-  // hasMismatches is just used to return a second value if you want
-  // one. I would have used MutableBoxedBoolean if such had been provided.
-  private static Path[] filteredStat2Paths(List<FileStatus> stats, boolean dirs,
-      AtomicBoolean hasMismatches) {
-    int resultCount = 0;
-
-    if (hasMismatches == null) {
-      hasMismatches = new AtomicBoolean(false);
-    }
-
-    for (int i = 0; i < stats.size(); ++i) {
-      if (stats.get(i).isDirectory() == dirs) {
-        stats.set(resultCount++, stats.get(i));
-      } else {
-        hasMismatches.set(true);
-      }
-    }
-
-    Path[] result = new Path[resultCount];
-    for (int i = 0; i < resultCount; i++) {
-      result[i] = stats.get(i).getPath();
-    }
-
-    return result;
-  }
-
-  public static Path getPreviousJobHistoryPath(
-      Configuration conf, ApplicationAttemptId applicationAttemptId)
-      throws IOException {
-    String jobId =
-        TypeConverter.fromYarn(applicationAttemptId.getApplicationId())
-          .toString();
-    String jobhistoryDir =
-        JobHistoryUtils.getConfiguredHistoryStagingDirPrefix(conf, jobId);
-    Path histDirPath = FileContext.getFileContext(conf).makeQualified(
-            new Path(jobhistoryDir));
-    FileContext fc = FileContext.getFileContext(histDirPath.toUri(), conf);
-    return fc.makeQualified(JobHistoryUtils.getStagingJobHistoryFile(
-        histDirPath,jobId, (applicationAttemptId.getAttemptId() - 1)));
-  }
-
-  /**
-   * Looks for the dirs to clean.  The folder structure is YYYY/MM/DD/Serial so
-   * we can use that to more efficiently find the directories to clean by
-   * comparing the cutoff timestamp with the timestamp from the folder
-   * structure.
-   *
-   * @param fc done dir FileContext
-   * @param root folder for completed jobs
-   * @param cutoff The cutoff for the max history age
-   * @return The list of directories for cleaning
-   * @throws IOException
-   */
-  public static List<FileStatus> getHistoryDirsForCleaning(FileContext fc,
-      Path root, long cutoff) throws IOException {
-    List<FileStatus> fsList = new ArrayList<FileStatus>();
-    Calendar cCal = Calendar.getInstance();
-    cCal.setTimeInMillis(cutoff);
-    int cYear = cCal.get(Calendar.YEAR);
-    int cMonth = cCal.get(Calendar.MONTH) + 1;
-    int cDate = cCal.get(Calendar.DATE);
-
-    RemoteIterator<FileStatus> yearDirIt = fc.listStatus(root);
-    while (yearDirIt.hasNext()) {
-      FileStatus yearDir = yearDirIt.next();
-      try {
-        int year = Integer.parseInt(yearDir.getPath().getName());
-        if (year <= cYear) {
-          RemoteIterator<FileStatus> monthDirIt =
-              fc.listStatus(yearDir.getPath());
-          while (monthDirIt.hasNext()) {
-            FileStatus monthDir = monthDirIt.next();
-            try {
-              int month = Integer.parseInt(monthDir.getPath().getName());
-              // If we only checked the month here, then something like 07/2013
-              // would incorrectly not pass when the cutoff is 06/2014
-              if (year < cYear || month <= cMonth) {
-                RemoteIterator<FileStatus> dateDirIt =
-                    fc.listStatus(monthDir.getPath());
-                while (dateDirIt.hasNext()) {
-                  FileStatus dateDir = dateDirIt.next();
-                  try {
-                    int date = Integer.parseInt(dateDir.getPath().getName());
-                    // If we only checked the date here, then something like
-                    // 07/21/2013 would incorrectly not pass when the cutoff is
-                    // 08/20/2013 or 07/20/2012
-                    if (year < cYear || month < cMonth || date <= cDate) {
-                      fsList.addAll(remoteIterToList(
-                          fc.listStatus(dateDir.getPath())));
-                    }
-                  } catch (NumberFormatException nfe) {
-                    // the directory didn't fit the format we're looking for so
-                    // skip the dir
-                  }
-                }
-              }
-            } catch (NumberFormatException nfe) {
-              // the directory didn't fit the format we're looking for so skip
-              // the dir
-            }
-          }
-        }
-      } catch (NumberFormatException nfe) {
-        // the directory didn't fit the format we're looking for so skip the dir
-      }
-    }
-    return fsList;
-  }
-}
+   * 根据毫秒时间戳

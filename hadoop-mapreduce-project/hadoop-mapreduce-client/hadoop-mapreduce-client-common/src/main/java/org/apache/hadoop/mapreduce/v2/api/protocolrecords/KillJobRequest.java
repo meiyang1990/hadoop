@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,20 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 
+/**
+ * KillJobRequest协议记录接口，封装终止MapReduce作业的请求信息
+ * 用于客户端与ResourceManager之间的终止作业RPC通信
+ */
 public interface KillJobRequest {
+  /**
+   * 获取需要终止的作业ID
+   * @return 目标作业的唯一标识JobId
+   */
   public abstract JobId getJobId();
   
+  /**
+   * 设置需要终止的作业ID
+   * @param jobId 目标作业的唯一标识JobId
+   */
   public abstract void setJobId(JobId jobId);
 }

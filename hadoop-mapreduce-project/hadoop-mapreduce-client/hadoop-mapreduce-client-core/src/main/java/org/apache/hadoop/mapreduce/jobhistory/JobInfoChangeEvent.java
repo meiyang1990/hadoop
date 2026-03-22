@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,8 +30,7 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 
 /**
- * Event to record changes in the submit and launch time of
- * a job
+ * 作业信息变更事件，用于记录作业提交时间和启动时间的变更，存储到作业历史日志
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -38,10 +38,10 @@ public class JobInfoChangeEvent implements HistoryEvent {
   private JobInfoChange datum = new JobInfoChange();
 
   /** 
-   * Create a event to record the submit and launch time of a job
-   * @param id Job Id 
-   * @param submitTime Submit time of the job
-   * @param launchTime Launch time of the job
+   * 构造作业信息变更事件，记录作业ID、提交时间和启动时间
+   * @param id 作业ID 
+   * @param submitTime 作业提交时间
+   * @param launchTime 作业启动时间
    */
   public JobInfoChangeEvent(JobID id, long submitTime, long launchTime) {
     datum.setJobid(new Utf8(id.toString()));
@@ -51,27 +51,34 @@ public class JobInfoChangeEvent implements HistoryEvent {
 
   JobInfoChangeEvent() { }
 
+  @Override
   public Object getDatum() { return datum; }
+  @Override
   public void setDatum(Object datum) {
     this.datum = (JobInfoChange)datum;
   }
 
-  /** Get the Job ID */
+  /** 获取作业ID */
   public JobID getJobId() { return JobID.forName(datum.getJobid().toString()); }
-  /** Get the Job submit time */
+  /** 获取作业提交时间 */
   public long getSubmitTime() { return datum.getSubmitTime(); }
-  /** Get the Job launch time */
+  /** 获取作业启动时间 */
   public long getLaunchTime() { return datum.getLaunchTime(); }
 
+  @Override
   public EventType getEventType() {
     return EventType.JOB_INFO_CHANGED;
   }
 
   @Override
   public TimelineEvent toTimelineEvent() {
+    // 创建YARN时间线服务事件对象
     TimelineEvent tEvent = new TimelineEvent();
+    // 设置事件ID为事件类型大写名称
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
+    // 添加提交时间信息
     tEvent.addInfo("SUBMIT_TIME", getSubmitTime());
+    // 添加启动时间信息
     tEvent.addInfo("LAUNCH_TIME", getLaunchTime());
     return tEvent;
   }

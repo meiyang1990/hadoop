@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Used when file type differs from the desired file type. like 
- * getting a file when a directory is expected. Or a wrong file type. 
+ * 文件类型不匹配时抛出的异常，例如期望目录但获取到文件、或者文件类型不正确的场景。
+ * 在MapReduce任务读取输入时，用于标识输入路径类型不符合要求的错误。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -34,10 +35,17 @@ public class InvalidFileTypeException
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造无消息的文件类型异常对象
+   */
   public InvalidFileTypeException() {
     super();
   }
 
+  /**
+   * 构造带错误消息的文件类型异常对象
+   * @param msg 异常描述信息
+   */
   public InvalidFileTypeException(String msg) {
     super(msg);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,14 +29,22 @@ import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reporter;
 
 /** 
- * A {@link Mapper} that swaps keys and values. 
+ * 倒置键值对的Mapper实现，将输入的键和值交换后输出
+ * 常用于需要反转键值关系的MapReduce处理场景，例如倒排索引构建
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class InverseMapper<K, V>
     extends MapReduceBase implements Mapper<K, V, V, K> {
 
-  /** The inverse function.  Input keys and values are swapped.*/
+  /**
+   * 倒置键值对映射函数，交换输入的键和值后输出
+   * @param key 输入键
+   * @param value 输入值
+   * @param output 输出收集器
+   * @param reporter 任务报告器
+   * @throws IOException 输出异常
+   */
   public void map(K key, V value,
                   OutputCollector<V, K> output, Reporter reporter)
     throws IOException {

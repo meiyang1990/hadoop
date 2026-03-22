@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,37 +27,40 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
- * Status information on the current state of the Map-Reduce cluster.
+ * 存储MapReduce集群当前状态的指标信息
  * 
- * <p><code>ClusterMetrics</code> provides clients with information such as:
+ * <p><code>ClusterMetrics</code> 向客户端提供以下集群信息:
  * <ol>
  *   <li>
- *   Size of the cluster.  
+ *   集群规模（节点总数）
  *   </li>
  *   <li>
- *   Number of blacklisted and decommissioned trackers.  
+ *   黑名单和已退役节点的数量
  *   </li>
  *   <li>
- *   Slot capacity of the cluster. 
+ *   集群总slot容量
  *   </li>
  *   <li>
- *   The number of currently occupied/reserved map and reduce slots.
+ *   当前已被占用/预留的Map和Reduce slot数量
  *   </li>
  *   <li>
- *   The number of currently running map and reduce tasks.
+ *   当前正在运行的Map和Reduce任务数量
  *   </li>
  *   <li>
- *   The number of job submissions.
+ *   累计作业提交数量
  *   </li>
  * </ol>
  * 
- * <p>Clients can query for the latest <code>ClusterMetrics</code>, via 
- * {@link Cluster#getClusterStatus()}.</p>
+ * <p>客户端可以通过 {@link Cluster#getClusterStatus()} 获取最新的集群指标信息</p>
  * 
  * @see Cluster
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
+/**
+ * 集群指标信息类，存储MapReduce集群当前运行状态的各类统计指标，
+ * 实现Writable接口支持序列化，可在客户端与服务端之间传输
+ */
 public class ClusterMetrics implements Writable {
   private int runningMaps;
   private int runningReduces;
@@ -72,9 +76,27 @@ public class ClusterMetrics implements Writable {
   private int numGraylistedTrackers;
   private int numDecommissionedTrackers;
 
+  /**
+   * 空构造方法，用于反序列化
+   */
   public ClusterMetrics() {
   }
   
+  /**
+   * 构造ClusterMetrics对象，graylisted节点默认设为0
+   * @param runningMaps 当前运行Map任务数
+   * @param runningReduces 当前运行Reduce任务数
+   * @param occupiedMapSlots 已占用Map slot数
+   * @param occupiedReduceSlots 已占用Reduce slot数
+   * @param reservedMapSlots 预留Map slot数
+   * @param reservedReduceSlots 预留Reduce slot数
+   * @param mapSlots 总Map slot容量
+   * @param reduceSlots 总Reduce slot容量
+   * @param totalJobSubmissions 累计作业提交总数
+   * @param numTrackers 活跃TaskTracker节点数
+   * @param numBlacklistedTrackers 黑名单TaskTracker节点数
+   * @param numDecommissionedNodes 已退役节点数
+   */
   public ClusterMetrics(int runningMaps, int runningReduces,
       int occupiedMapSlots, int occupiedReduceSlots, int reservedMapSlots,
       int reservedReduceSlots, int mapSlots, int reduceSlots,
@@ -86,6 +108,22 @@ public class ClusterMetrics implements Writable {
       numDecommissionedNodes);
   }
 
+  /**
+   * 构造完整ClusterMetrics对象，包含所有指标参数
+   * @param runningMaps 当前运行Map任务数
+   * @param runningReduces 当前运行Reduce任务数
+   * @param occupiedMapSlots 已占用Map slot数
+   * @param occupiedReduceSlots 已占用Reduce slot数
+   * @param reservedMapSlots 预留Map slot数
+   * @param reservedReduceSlots 预留Reduce slot数
+   * @param mapSlots 总Map slot容量
+   * @param reduceSlots 总Reduce slot容量
+   * @param totalJobSubmissions 累计作业提交总数
+   * @param numTrackers 活跃TaskTracker节点数
+   * @param numBlacklistedTrackers 黑名单TaskTracker节点数
+   * @param numGraylistedTrackers 灰名单TaskTracker节点数
+   * @param numDecommissionedNodes 已退役节点数
+   */
   public ClusterMetrics(int runningMaps, int runningReduces,
       int occupiedMapSlots, int occupiedReduceSlots, int reservedMapSlots,
       int reservedReduceSlots, int mapSlots, int reduceSlots,
@@ -107,122 +145,128 @@ public class ClusterMetrics implements Writable {
   }
 
   /**
-   * Get the number of running map tasks in the cluster.
+   * 获取集群中当前正在运行的Map任务数量
    * 
-   * @return running maps
+   * @return 正在运行的Map任务数
    */
   public int getRunningMaps() {
     return runningMaps;
   }
   
   /**
-   * Get the number of running reduce tasks in the cluster.
+   * 获取集群中当前正在运行的Reduce任务数量
    * 
-   * @return running reduces
+   * @return 正在运行的Reduce任务数
    */
   public int getRunningReduces() {
     return runningReduces;
   }
   
   /**
-   * Get number of occupied map slots in the cluster.
+   * 获取集群中已被占用的Map slot数量
    * 
-   * @return occupied map slot count
+   * @return 已占用Map slot数量
    */
   public int getOccupiedMapSlots() { 
     return occupiedMapSlots;
   }
   
   /**
-   * Get the number of occupied reduce slots in the cluster.
+   * 获取集群中已被占用的Reduce slot数量
    * 
-   * @return occupied reduce slot count
+   * @return 已占用Reduce slot数量
    */
   public int getOccupiedReduceSlots() { 
     return occupiedReduceSlots; 
   }
 
   /**
-   * Get number of reserved map slots in the cluster.
+   * 获取集群中已预留的Map slot数量
    * 
-   * @return reserved map slot count
+   * @return 预留Map slot数量
    */
   public int getReservedMapSlots() { 
     return reservedMapSlots;
   }
   
   /**
-   * Get the number of reserved reduce slots in the cluster.
+   * 获取集群中已预留的Reduce slot数量
    * 
-   * @return reserved reduce slot count
+   * @return 预留Reduce slot数量
    */
   public int getReservedReduceSlots() { 
     return reservedReduceSlots; 
   }
 
   /**
-   * Get the total number of map slots in the cluster.
+   * 获取集群总Map slot容量
    * 
-   * @return map slot capacity
+   * @return 集群总Map slot容量
    */
   public int getMapSlotCapacity() {
     return totalMapSlots;
   }
   
   /**
-   * Get the total number of reduce slots in the cluster.
+   * 获取集群总Reduce slot容量
    * 
-   * @return reduce slot capacity
+   * @return 集群总Reduce slot容量
    */
   public int getReduceSlotCapacity() {
     return totalReduceSlots;
   }
   
   /**
-   * Get the total number of job submissions in the cluster.
+   * 获取集群累计作业提交总数
    * 
-   * @return total number of job submissions
+   * @return 累计作业提交总数
    */
   public int getTotalJobSubmissions() {
     return totalJobSubmissions;
   }
   
   /**
-   * Get the number of active trackers in the cluster.
+   * 获取集群中活跃TaskTracker节点数量
    * 
-   * @return active tracker count.
+   * @return 活跃TaskTracker节点数量
    */
   public int getTaskTrackerCount() {
     return numTrackers;
   }
   
   /**
-   * Get the number of blacklisted trackers in the cluster.
+   * 获取集群中黑名单TaskTracker节点数量
+   * 黑名单节点不会被分配新任务
    * 
-   * @return blacklisted tracker count
+   * @return 黑名单TaskTracker节点数量
    */
   public int getBlackListedTaskTrackerCount() {
     return numBlacklistedTrackers;
   }
   
   /**
-   * Get the number of graylisted trackers in the cluster.
+   * 获取集群中灰名单TaskTracker节点数量
+   * 灰名单节点会降低分配优先级，仍可分配任务
    * 
-   * @return graylisted tracker count
+   * @return 灰名单TaskTracker节点数量
    */
   public int getGrayListedTaskTrackerCount() {
     return numGraylistedTrackers;
   }
   
   /**
-   * Get the number of decommissioned trackers in the cluster.
+   * 获取集群中已退役TaskTracker节点数量
+   * 已退役节点已下线不再提供服务
    * 
-   * @return decommissioned tracker count
+   * @return 已退役TaskTracker节点数量
    */
   public int getDecommissionedTaskTrackerCount() {
     return numDecommissionedTrackers;
   }
 
+  /**
+   * 从输入流反序列化读取所有集群指标字段
+   */
   @Override
   public void readFields(DataInput in) throws IOException {
     runningMaps = in.readInt();
@@ -240,6 +284,9 @@ public class ClusterMetrics implements Writable {
     numDecommissionedTrackers = in.readInt();
   }
 
+  /**
+   * 将所有集群指标字段序列化写入输出流
+   */
   @Override
   public void write(DataOutput out) throws IOException {
     out.writeInt(runningMaps);

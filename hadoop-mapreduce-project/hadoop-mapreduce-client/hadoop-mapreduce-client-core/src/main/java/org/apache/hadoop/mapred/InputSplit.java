@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,12 +26,10 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
- * <code>InputSplit</code> represents the data to be processed by an 
- * individual {@link Mapper}. 
- *
- * <p>Typically, it presents a byte-oriented view on the input and is the 
- * responsibility of {@link RecordReader} of the job to process this and present
- * a record-oriented view.
+ * 输入分片接口，代表单个Mapper任务需要处理的一块输入数据
+ * <p>
+ * 通常提供按字节划分的输入视图，由作业的RecordReader处理后转换为面向记录的视图供给Mapper读取
+ * </p>
  * 
  * @see InputFormat
  * @see RecordReader
@@ -40,19 +39,19 @@ import org.apache.hadoop.io.Writable;
 public interface InputSplit extends Writable {
 
   /**
-   * Get the total number of bytes in the data of the <code>InputSplit</code>.
+   * 获取当前输入分片包含的数据总字节数
    * 
-   * @return the number of bytes in the input split.
-   * @throws IOException
+   * @return 输入分片的字节大小
+   * @throws IOException  IO异常
    */
   long getLength() throws IOException;
   
   /**
-   * Get the list of hostnames where the input split is located.
+   * 获取当前输入分片数据所在存储节点的主机名列表
+   * 用于YARN的任务本地化调度，优先将任务分配到数据所在节点运行
    * 
-   * @return list of hostnames where data of the <code>InputSplit</code> is
-   *         located as an array of <code>String</code>s.
-   * @throws IOException
+   * @return 存储当前分片数据的节点主机名数组
+   * @throws IOException IO异常
    */
   String[] getLocations() throws IOException;
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -106,20 +107,35 @@ import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenRespo
 import org.apache.hadoop.thirdparty.protobuf.RpcController;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+/**
+ * MRClientProtocol PB服务实现类，负责Protobuf RPC请求格式转换与转发
+ * 将PB格式的RPC请求转换为内部接口调用，并将返回结果转换回PB格式
+ * 代理实际的MRClientProtocol业务处理逻辑，实现RPC层与业务层的解耦
+ */
 public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
 
   private MRClientProtocol real;
   
+  /**
+   * 构造方法，注入实际业务实现实例
+   * @param impl 实际处理客户端请求的MRClientProtocol业务实现
+   */
   public MRClientProtocolPBServiceImpl(MRClientProtocol impl) {
     this.real = impl;
   }
   
   @Override
+  /**
+   * 获取作业报告PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public GetJobReportResponseProto getJobReport(RpcController controller,
       GetJobReportRequestProto proto) throws ServiceException {
+    // 将PB请求转换为内部请求对象
     GetJobReportRequestPBImpl request = new GetJobReportRequestPBImpl(proto);
     try {
+      // 委托给实际业务实现处理请求
       GetJobReportResponse response = real.getJobReport(request);
+      // 将内部响应转换为PB格式返回
       return ((GetJobReportResponsePBImpl)response).getProto();
     } catch (IOException e) {
       throw new ServiceException(e);
@@ -127,6 +143,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 获取任务报告PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public GetTaskReportResponseProto getTaskReport(RpcController controller,
       GetTaskReportRequestProto proto) throws ServiceException {
     GetTaskReportRequest request = new GetTaskReportRequestPBImpl(proto);
@@ -139,6 +158,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 获取任务尝试报告PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public GetTaskAttemptReportResponseProto getTaskAttemptReport(
       RpcController controller, GetTaskAttemptReportRequestProto proto)
       throws ServiceException {
@@ -152,6 +174,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 获取计数器PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public GetCountersResponseProto getCounters(RpcController controller,
       GetCountersRequestProto proto) throws ServiceException {
     GetCountersRequest request = new GetCountersRequestPBImpl(proto);
@@ -164,6 +189,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 获取任务尝试完成事件PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public GetTaskAttemptCompletionEventsResponseProto getTaskAttemptCompletionEvents(
       RpcController controller,
       GetTaskAttemptCompletionEventsRequestProto proto)
@@ -178,6 +206,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 获取多个任务报告PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public GetTaskReportsResponseProto getTaskReports(RpcController controller,
       GetTaskReportsRequestProto proto) throws ServiceException {
     GetTaskReportsRequest request = new GetTaskReportsRequestPBImpl(proto);
@@ -190,6 +221,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 获取诊断信息PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public GetDiagnosticsResponseProto getDiagnostics(RpcController controller,
       GetDiagnosticsRequestProto proto) throws ServiceException {
     GetDiagnosticsRequest request = new GetDiagnosticsRequestPBImpl(proto);
@@ -202,6 +236,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
   
   @Override
+  /**
+   * 获取委派令牌PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public GetDelegationTokenResponseProto getDelegationToken(
       RpcController controller, GetDelegationTokenRequestProto proto)
       throws ServiceException {
@@ -215,6 +252,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
   
   @Override
+  /**
+   * 杀死作业PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public KillJobResponseProto killJob(RpcController controller,
       KillJobRequestProto proto) throws ServiceException {
     KillJobRequest request = new KillJobRequestPBImpl(proto);
@@ -227,6 +267,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 杀死任务PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public KillTaskResponseProto killTask(RpcController controller,
       KillTaskRequestProto proto) throws ServiceException {
     KillTaskRequest request = new KillTaskRequestPBImpl(proto);
@@ -239,6 +282,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 杀死任务尝试PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public KillTaskAttemptResponseProto killTaskAttempt(RpcController controller,
       KillTaskAttemptRequestProto proto) throws ServiceException {
     KillTaskAttemptRequest request = new KillTaskAttemptRequestPBImpl(proto);
@@ -251,6 +297,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 标记任务尝试失败PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public FailTaskAttemptResponseProto failTaskAttempt(RpcController controller,
       FailTaskAttemptRequestProto proto) throws ServiceException {
     FailTaskAttemptRequest request = new FailTaskAttemptRequestPBImpl(proto);
@@ -263,6 +312,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
   
   @Override
+  /**
+   * 续期委派令牌PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public RenewDelegationTokenResponseProto renewDelegationToken(
       RpcController controller, RenewDelegationTokenRequestProto proto)
       throws ServiceException {
@@ -277,6 +329,9 @@ public class MRClientProtocolPBServiceImpl implements MRClientProtocolPB {
   }
 
   @Override
+  /**
+   * 取消委派令牌PB接口实现，处理PB格式请求并返回PB格式响应
+   */
   public CancelDelegationTokenResponseProto cancelDelegationToken(
       RpcController controller, CancelDelegationTokenRequestProto proto)
       throws ServiceException {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,15 +24,22 @@ import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * an IDataLoader loads data on demand
+ * 原生任务数据加载器接口，定义按需加载输入数据的通用规范
+ * 为MapReduce原生任务框架提供可扩展的数据加载能力
  */
 @InterfaceAudience.Private
 public interface IDataLoader {
 
   /**
-   * @return size of data loaded
+   * 加载数据到缓冲区，供原生任务处理
+   * @return 本次加载的数据大小（字节数）
+   * @throws IOException 加载过程中发生IO异常
    */
   public int load() throws IOException;
 
+  /**
+   * 关闭数据加载器，释放占用的资源
+   * @throws IOException 关闭过程中发生IO异常
+   */
   public void close() throws IOException;
 }

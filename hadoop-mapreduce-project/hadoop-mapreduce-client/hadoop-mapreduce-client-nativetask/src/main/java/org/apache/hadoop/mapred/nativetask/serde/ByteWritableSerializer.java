@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,10 +25,20 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.nativetask.INativeComparable;
 
+/**
+ * ByteWritable 自定义序列化器，用于原生任务中字节类型可写对象的序列化，
+ * 实现了原生可比接口，支持在Native层进行排序比较。
+ */
 @InterfaceAudience.Private
 public class ByteWritableSerializer extends DefaultSerializer implements
     INativeComparable {
 
+  /**
+   * 获取 ByteWritable 对象序列化后的固定长度
+   * @param w 待计算长度的可写对象
+   * @return 固定长度，单字节永远返回1
+   * @throws IOException IO异常
+   */
   @Override
   public int getLength(Writable w) throws IOException {
     return 1;

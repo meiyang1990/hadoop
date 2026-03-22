@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,20 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.Counters;
 
+/**
+ * 获取作业/任务计数器响应接口
+ * 定义了MapReduce任务计数器查询响应的数据结构，用于客户端从ApplicationMaster获取任务运行统计信息
+ */
 public interface GetCountersResponse {
+  /**
+   * 获取响应中的计数器对象
+   * @return 包含任务/作业所有统计指标的计数器对象
+   */
   public abstract Counters getCounters();
   
+  /**
+   * 设置响应中的计数器对象
+   * @param counters 包含任务/作业所有统计指标的计数器对象
+   */
   public abstract void setCounters(Counters counters);
 }

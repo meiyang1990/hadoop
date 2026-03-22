@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,20 +26,19 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Closeable;
 
 /** 
- * Base class for {@link Mapper} and {@link Reducer} implementations.
+ * MapReduce旧API中Mapper和Reducer实现的基类
  * 
- * <p>Provides default no-op implementations for a few methods, most non-trivial
- * applications need to override some of them.</p>
+ * <p>为close()和configure()方法提供默认空实现，大多数业务应用需要根据需求重写这些方法</p>
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class MapReduceBase implements Closeable, JobConfigurable {
 
-  /** Default implementation that does nothing. */
+  /** 默认空实现，不执行任何操作 */
   public void close() throws IOException {
   }
 
-  /** Default implementation that does nothing. */
+  /** 默认空实现，不执行任何操作 */
   public void configure(JobConf job) {
   }
 

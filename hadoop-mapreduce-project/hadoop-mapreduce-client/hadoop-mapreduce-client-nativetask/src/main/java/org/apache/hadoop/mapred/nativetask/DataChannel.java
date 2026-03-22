@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,22 +21,26 @@ package org.apache.hadoop.mapred.nativetask;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 原生任务数据通道类型枚举，定义了Native Task不同的数据传输方向类型
+ * 用于标识原生任务处理模块与数据通道的数据交互方向
+ */
 @InterfaceAudience.Private
 public enum DataChannel {
   /**
-   * We will only read data from this channel
+   * 仅从该通道读取数据
    */
   IN,
   /**
-   * We will only write data from this channel
+   * 仅向该通道写入数据
    */
   OUT,
   /**
-   * We will do both read and write for this channel
+   * 同时从该通道读取和写入数据
    */
   INOUT,
   /**
-   * There is no data exchange
+   * 该通道无数据交换
    */
   NONE
 }

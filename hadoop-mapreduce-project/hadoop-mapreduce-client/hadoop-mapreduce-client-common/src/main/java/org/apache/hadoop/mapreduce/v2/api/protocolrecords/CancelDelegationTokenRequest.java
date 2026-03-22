@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,12 +24,26 @@ import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.yarn.api.records.Token;
 
 /**
- * The request issued by the client to the {@code ResourceManager} to cancel a
- * delegation token.
+ * 文件说明：MapReduce V2 客户端取消委托令牌请求协议记录
+ * 功能描述：定义客户端向ResourceManager请求取消MapReduce委托令牌的请求结构
+ */
+/**
+ * 客户端向ResourceManager发起取消委托令牌的请求接口
+ * 核心职责：封装取消委托令牌请求所需的参数，用于MapReduce服务端与客户端之间的RPC通信
+ * 使用场景：当应用不再需要委托令牌时，客户端主动发起取消请求，回收令牌资源
  */
 @Public
 @Evolving
 public interface CancelDelegationTokenRequest {
+  /**
+   * 获取需要取消的委托令牌
+   * @return 待取消的委托令牌实例
+   */
   Token getDelegationToken();
+  
+  /**
+   * 设置需要取消的委托令牌
+   * @param dToken 待取消的委托令牌实例
+   */
   void setDelegationToken(Token dToken);
 }

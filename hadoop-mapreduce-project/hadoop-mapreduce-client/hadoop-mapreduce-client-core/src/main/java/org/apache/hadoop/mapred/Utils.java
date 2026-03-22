@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,22 +25,26 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
 
 /**
- * A utility class. It provides
- *   A path filter utility to filter out output/part files in the output dir
+ * MapReduce 工具类，提供输出目录文件过滤相关工具能力，用于从输出目录中过滤结果分片文件。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class Utils {
+  /**
+   * MapReduce 输出文件工具类，提供不同粒度的输出目录文件过滤实现。
+   */
   public static class OutputFileUtils {
     /**
-     * This class filters output(part) files from the given directory
-     * It does not accept files with filenames _logs and _SUCCESS.
-     * This can be used to list paths of output directory as follows:
-     *   Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir,
-     *                                         new OutputFilesFilter()));
+     * 输出结果文件过滤器，继承OutputLogFilter后额外过滤掉_SUCCESS文件，只保留真正的结果分片文件。
+     * 可用于列出输出目录中的所有结果文件，使用示例：
+     * <pre>
+     * Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir, new OutputFilesFilter()));
+     * </pre>
      */
     public static class OutputFilesFilter extends OutputLogFilter {
+      @Override
       public boolean accept(Path path) {
+        // 先过滤日志目录，再排除成功标记文件
         return super.accept(path) 
                && !FileOutputCommitter.SUCCEEDED_FILE_NAME
                    .equals(path.getName());
@@ -47,14 +52,16 @@ public class Utils {
     }
     
     /**
-     * This class filters log files from directory given
-     * It doesnt accept paths having _logs.
-     * This can be used to list paths of output directory as follows:
-     *   Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir,
-     *                                   new OutputLogFilter()));
+     * 输出日志目录过滤器，过滤掉输出目录中的_logs日志目录，保留其他文件和目录。
+     * 可用于列出输出目录中的非日志文件，使用示例：
+     * <pre>
+     * Path[] fileList = FileUtil.stat2Paths(fs.listStatus(outDir, new OutputLogFilter()));
+     * </pre>
      */
     public static class OutputLogFilter implements PathFilter {
+      @Override
       public boolean accept(Path path) {
+        // 过滤掉名称为_logs的目录
         return !"_logs".equals(path.getName());
       }
     }

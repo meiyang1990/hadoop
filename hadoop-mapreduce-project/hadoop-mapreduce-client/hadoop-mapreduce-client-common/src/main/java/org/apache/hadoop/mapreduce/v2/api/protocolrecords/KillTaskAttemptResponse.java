@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,10 @@
 
 package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
+/**
+ * 终止任务尝试请求的响应接口
+ * 作为MapReduce任务尝试终止RPC调用的返回值载体，属于应用Master与ResourceManager之间的协议定义
+ */
 public interface KillTaskAttemptResponse {
 
 }

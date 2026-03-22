@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,19 +19,24 @@
 package org.apache.hadoop.mapreduce.checkpoint;
 
 /**
- * A naming service that simply returns the name it has been initialized with.
+ * 简单实现的检查点命名服务，始终返回初始化时指定的固定名称（添加固定前缀）
+ * 用于测试场景或不需要动态生成检查点名称的场景，实现CheckpointNamingService接口
  */
 public class SimpleNamingService implements CheckpointNamingService{
 
   final String name;
 
+  /**
+   * 构造简单命名服务，使用指定名称生成检查点名称
+   * @param name 基础名称，用于拼接生成最终检查点名称
+   */
   public SimpleNamingService(String name){
     this.name = name;
   }
 
   /**
-   * Generate a new checkpoint Name
-   * @return the checkpoint name
+   * 生成检查点名称，返回固定格式的检查点名称
+   * @return 拼接好的检查点名称，格式为checkpoint_<初始化时传入的名称>
    */
   public String getNewName(){
     return "checkpoint_" + name;

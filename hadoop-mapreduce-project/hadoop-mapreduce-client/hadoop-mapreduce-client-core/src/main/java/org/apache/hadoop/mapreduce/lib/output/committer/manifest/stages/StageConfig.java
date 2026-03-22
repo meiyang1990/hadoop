@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,147 +36,132 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterConstants.OPT_MANIFEST_SAVE_ATTEMPTS_DEFAULT;
 
 /**
- * Stage Config.
- * Everything to configure a stage which is common to all.
- *
- * It's isolated from the details of MR datatypes (taskID, taskattempt etc);
- * at this point it expects parsed values.
- *
- * It uses the builder API, but once {@link #build()} is called it goes
- * read only. This is to ensure that changes cannot
- * take place when shared across stages.
+ * 清单提交器执行阶段配置类，保存所有执行阶段共享的通用配置信息。
+ * 独立于MR具体数据类型（任务ID、尝试ID等），仅使用解析后的值。
+ * 采用Builder构建API，调用{@link #build()}后配置变为只读，
+ * 保证跨阶段共享时不会被意外修改。
  */
 public class StageConfig {
 
   /**
-   * A flag which freezes the config for
-   * further updates.
+   * 标记配置是否已冻结，冻结后禁止修改。
    */
   private boolean frozen;
 
   /**
-   * IOStatistics to update.
+   * 用于统计IO指标的存储对象。
    */
   private IOStatisticsStore iostatistics;
 
   /**
-   * Job ID; constant over multiple attempts.
+   * 作业ID，在多次作业尝试中保持不变。
    */
   private String jobId;
 
   /**
-   * Where did the job Unique ID come from?
+   * 作业唯一ID的来源描述。
    */
   private String jobIdSource = "";
 
   /**
-   * Number of the job attempt; starts at zero.
+   * 作业尝试编号，从0开始计数。
    */
   private int jobAttemptNumber;
 
   /**
-   * ID of the task.
+   * 任务ID。
    */
   private String taskId;
 
   /**
-   * ID of this specific attempt at a task.
+   * 当前任务尝试的唯一ID。
    */
   private String taskAttemptId;
 
   /**
-   * Destination of job.
+   * 作业输出目标目录。
    */
   private Path destinationDir;
 
   /**
-   * Job attempt dir.
+   * 当前作业尝试的工作目录。
    */
   private Path jobAttemptDir;
 
   /**
-   * temp directory under job dest dir.
+   * 输出目录下的临时文件子目录。
    */
   private Path outputTempSubDir;
 
   /**
-   * Task attempt dir.
+   * 当前任务尝试的工作目录。
    */
   private Path taskAttemptDir;
 
   /**
-   * directory where task manifests must go.
+   * 存放任务清单文件的目录。
    */
   private Path taskManifestDir;
 
   /**
-   * Subdir under the job attempt dir where task
-   * attempts will have subdirectories.
+   * 作业尝试目录下存放所有任务尝试子目录的父目录。
    */
   private Path jobAttemptTaskSubDir;
 
   /**
-   * Callbacks to update store.
-   * This is not made visible to the stages; they must
-   * go through the superclass which
-   * adds statistics and logging.
+   * 文件存储操作回调接口，封装对底层存储的操作。
+   * 不会直接暴露给阶段，阶段需要通过父类调用以添加统计和日志。
    */
   private ManifestStoreOperations operations;
 
   /**
-   * Submitter for doing IO against the store other than
-   * manifest processing.
+   * 用于处理除清单处理外其他IO操作的并行任务提交器。
    */
   private TaskPool.Submitter ioProcessors;
 
   /**
-   * Optional progress callback.
+   * 可选的进度更新回调。
    */
   private Progressable progressable;
 
   /**
-   * Callback when a stage is entered.
+   * 进入执行阶段时的事件回调处理器。
    */
   private StageEventCallbacks enterStageEventHandler;
 
   /**
-   * Thread local serializer; created on demand
-   * and shareable across a sequence of stages.
+   * 线程本地的任务清单JSON序列化器，按需创建，可在多个阶段间共享。
    */
   private final ThreadLocal<JsonSerialization<TaskManifest>> threadLocalSerializer =
       ThreadLocal.withInitial(TaskManifest::serializer);
 
   /**
-   * Delete target paths on commit? Stricter, but
-   * higher IO cost.
+   * 提交时是否删除目标路径，更严格但会增加IO开销。
    */
   private boolean deleteTargetPaths;
 
   /**
-   * Name for logging.
+   * 用于日志输出的名称。
    */
   private String name = "";
 
   /**
-   * Configuration used where needed.
-   * Default value is a configuration with the normal constructor;
-   * jobs should override this with what was passed down.
+   * Hadoop配置对象，默认使用空配置，作业应覆盖为传入的实际配置。
    */
   private Configuration conf = new Configuration();
 
   /**
-   * Entry writer queue capacity.
+   * 入口写入队列的容量。
    */
   private int writerQueueCapacity = DEFAULT_WRITER_QUEUE_CAPACITY;
 
   /**
-   * Number of marker files to include in success file.
+   * 成功标记文件中包含的标记文件数量上限。
    */
   private int successMarkerFileLimit = SUCCESS_MARKER_FILE_LIMIT;
 
   /**
-   * How many attempts to save a manifest by save and rename
-   * before giving up: {@value}.
+   * 保存清单文件时保存并重命名的重试次数，默认值为{@value}。
    */
   private int manifestSaveAttempts = OPT_MANIFEST_SAVE_ATTEMPTS_DEFAULT;
 
@@ -183,7 +169,7 @@ public class StageConfig {
   }
 
   /**
-   * Verify that the config is not yet frozen.
+   * 检查配置是否仍可修改，若已冻结则抛出异常。
    */
   private void checkOpen() {
     Preconditions.checkState(!frozen,
@@ -191,9 +177,8 @@ public class StageConfig {
   }
 
   /**
-   * The build command makes the config immutable.
-   * Idempotent.
-   * @return the now-frozen config
+   * 完成配置构建，将配置设为只读。该操作幂等。
+   * @return 已冻结的配置对象
    */
   public StageConfig build() {
     frozen = true;
@@ -201,9 +186,9 @@ public class StageConfig {
   }
 
   /**
-   * Set job destination dir.
-   * @param dir new dir
-   * @return this
+   * 设置作业输出目标目录。
+   * @param dir 目标目录
+   * @return 当前配置对象
    */
   public StageConfig withDestinationDir(final Path dir) {
     destinationDir = dir;
@@ -211,9 +196,9 @@ public class StageConfig {
   }
 
   /**
-   * Set IOStatistics store.
-   * @param store new store
-   * @return this
+   * 设置IO统计存储对象。
+   * @param store IO统计存储对象
+   * @return 当前配置对象
    */
   public StageConfig withIOStatistics(final IOStatisticsStore store) {
     checkOpen();
@@ -222,9 +207,9 @@ public class StageConfig {
   }
 
   /**
-   * Set builder value.
-   * @param value new value
-   * @return this
+   * 设置IO处理任务提交器。
+   * @param value 任务提交器
+   * @return 当前配置对象
    */
   public StageConfig withIOProcessors(final TaskPool.Submitter value) {
     checkOpen();
@@ -233,9 +218,9 @@ public class StageConfig {
   }
 
   /**
-   * Set Job attempt directory.
-   * @param dir new dir
-   * @return this
+   * 设置作业尝试目录。
+   * @param dir 作业尝试目录
+   * @return 当前配置对象
    */
   public StageConfig withJobAttemptDir(final Path dir) {
     checkOpen();
@@ -244,17 +229,17 @@ public class StageConfig {
   }
 
   /**
-   * Directory to put task manifests into.
-   * @return a path under the job attempt dir.
+   * 获取任务清单文件存放目录。
+   * @return 作业尝试目录下的任务清单目录
    */
   public Path getTaskManifestDir() {
     return taskManifestDir;
   }
 
   /**
-   * Set builder value.
-   * @param value new value
-   * @return the builder
+   * 设置任务清单文件存放目录。
+   * @param value 任务清单目录路径
+   * @return 当前配置对象
    */
   public StageConfig withTaskManifestDir(Path value) {
     checkOpen();
@@ -263,9 +248,9 @@ public class StageConfig {
   }
 
   /**
-   * Set builder value.
-   * @param value new value
-   * @return the builder
+   * 设置作业尝试目录下任务尝试子目录的父目录。
+   * @param value 目录路径
+   * @return 当前配置对象
    */
   public StageConfig withJobAttemptTaskSubDir(Path value) {
     jobAttemptTaskSubDir = value;
@@ -273,19 +258,17 @@ public class StageConfig {
   }
 
   /**
-   * Get the path to the subdirectory under $jobID where task
-   * attempts are. List this dir to find all task attempt dirs.
-   * @return a path under the job attempt dir.
+   * 获取作业尝试目录下存放所有任务尝试的父目录，列出该目录可得到所有任务尝试目录。
+   * @return 作业尝试目录下的任务父目录
    */
   public Path getJobAttemptTaskSubDir() {
     return jobAttemptTaskSubDir;
   }
 
   /**
-   * Set the job directories from the attempt directories
-   * information. Does not set task attempt fields.
-   * @param dirs source of directories.
-   * @return this
+   * 从尝试目录信息对象中批量设置所有作业相关目录，不会设置任务尝试相关字段。
+   * @param dirs 尝试目录信息对象
+   * @return 当前配置对象
    */
   public StageConfig withJobDirectories(
       final ManifestCommitterSupport.AttemptDirectories dirs) {
@@ -301,9 +284,9 @@ public class StageConfig {
   }
 
   /**
-   * Set job ID with no attempt included.
-   * @param value new value
-   * @return this
+   * 设置不包含尝试编号的作业ID。
+   * @param value 作业ID
+   * @return 当前配置对象
    */
   public StageConfig withJobId(final String value) {
     checkOpen();
@@ -316,9 +299,9 @@ public class StageConfig {
   }
 
   /**
-   * Set builder value.
-   * @param value new value
-   * @return this
+   * 设置输出临时子目录。
+   * @param value 临时目录路径
+   * @return 当前配置对象
    */
   public StageConfig withOutputTempSubDir(final Path value) {
     checkOpen();
@@ -327,9 +310,9 @@ public class StageConfig {
   }
 
   /**
-   * Set builder value.
-   * @param value new value
-   * @return this
+   * 设置存储操作回调接口。
+   * @param value 存储操作对象
+   * @return 当前配置对象
    */
   public StageConfig withOperations(final ManifestStoreOperations value) {
     checkOpen();
@@ -338,9 +321,9 @@ public class StageConfig {
   }
 
   /**
-   * Set builder value.
-   * @param value new value
-   * @return this
+   * 设置任务尝试ID。
+   * @param value 任务尝试ID
+   * @return 当前配置对象
    */
   public StageConfig withTaskAttemptId(final String value) {
     checkOpen();
@@ -349,9 +332,9 @@ public class StageConfig {
   }
 
   /**
-   * Set builder value.
-   * @param value new value
-   * @return this
+   * 设置任务ID。
+   * @param value 任务ID
+   * @return 当前配置对象
    */
   public StageConfig withTaskId(final String value) {
     checkOpen();
@@ -360,9 +343,9 @@ public class StageConfig {
   }
 
   /**
-   * Set handler for stage entry events..
-   * @param value new value
-   * @return this
+   * 设置阶段进入事件回调处理器。
+   * @param value 回调处理器
+   * @return 当前配置对象
    */
   public StageConfig withStageEventCallbacks(StageEventCallbacks value) {
     checkOpen();
@@ -371,9 +354,9 @@ public class StageConfig {
   }
 
   /**
-   * Optional progress callback.
-   * @param value new value
-   * @return this
+   * 设置进度回调对象。
+   * @param value 进度回调对象
+   * @return 当前配置对象
    */
   public StageConfig withProgressable(final Progressable value) {
     checkOpen();
@@ -382,9 +365,9 @@ public class StageConfig {
   }
 
   /**
-   * Set the Task attempt directory.
-   * @param value new value
-   * @return this
+   * 设置任务尝试工作目录。
+   * @param value 任务尝试目录路径
+   * @return 当前配置对象
    */
   public StageConfig withTaskAttemptDir(final Path value) {
     checkOpen();
@@ -393,9 +376,9 @@ public class StageConfig {
   }
 
   /**
-   * Set the job attempt number.
-   * @param value new value
-   * @return this
+   * 设置作业尝试编号。
+   * @param value 作业尝试编号
+   * @return 当前配置对象
    */
   public StageConfig withJobAttemptNumber(final int value) {
     checkOpen();
@@ -404,9 +387,9 @@ public class StageConfig {
   }
 
   /**
-   * Set the Job ID source.
-   * @param value new value
-   * @return this
+   * 设置作业ID来源描述。
+   * @param value 来源描述
+   * @return 当前配置对象
    */
   public StageConfig withJobIdSource(final String value) {
     checkOpen();
@@ -415,9 +398,9 @@ public class StageConfig {
   }
 
   /**
-   * Set name of task/job.
-   * @param value new value
-   * @return the builder
+   * 设置日志用名称。
+   * @param value 名称
+   * @return 当前配置对象
    */
   public StageConfig withName(String value) {
     name = value;
@@ -425,17 +408,17 @@ public class StageConfig {
   }
 
   /**
-   * Get name of task/job.
-   * @return name for logging.
+   * 获取日志用名称。
+   * @return 日志名称
    */
   public String getName() {
     return name;
   }
 
   /**
-   * Set configuration.
-   * @param value new value
-   * @return the builder
+   * 设置Hadoop配置对象。
+   * @param value Hadoop配置
+   * @return 当前配置对象
    */
   public StageConfig withConfiguration(Configuration value) {
     conf = value;
@@ -443,25 +426,25 @@ public class StageConfig {
   }
 
   /**
-   * Get configuration.
-   * @return the configuration
+   * 获取Hadoop配置对象。
+   * @return Hadoop配置
    */
   public Configuration getConf() {
     return conf;
   }
 
   /**
-   * Get writer queue capacity.
-   * @return the queue capacity
+   * 获取写入队列容量。
+   * @return 队列容量
    */
   public int getWriterQueueCapacity() {
     return writerQueueCapacity;
   }
 
   /**
-   * Set writer queue capacity.
-   * @param value new value
-   * @return the builder
+   * 设置写入队列容量。
+   * @param value 队列容量
+   * @return 当前配置对象
    */
   public StageConfig withWriterQueueCapacity(final int value) {
     writerQueueCapacity = value;
@@ -469,100 +452,104 @@ public class StageConfig {
   }
 
   /**
-   * Handler for stage entry events.
-   * @return the handler.
+   * 获取阶段进入事件回调处理器。
+   * @return 回调处理器
    */
   public StageEventCallbacks getEnterStageEventHandler() {
     return enterStageEventHandler;
   }
 
   /**
-   * IOStatistics to update.
+   * 获取IO统计存储对象。
+   * @return IO统计存储
    */
   public IOStatisticsStore getIOStatistics() {
     return iostatistics;
   }
 
   /**
-   * Job ID.
+   * 获取作业ID。
+   * @return 作业ID
    */
   public String getJobId() {
     return jobId;
   }
 
   /**
-   * ID of the task.
+   * 获取任务ID。
+   * @return 任务ID
    */
   public String getTaskId() {
     return taskId;
   }
 
   /**
-   * ID of this specific attempt at a task.
+   * 获取任务尝试ID。
+   * @return 任务尝试ID
    */
   public String getTaskAttemptId() {
     return taskAttemptId;
   }
 
   /**
-   * Job attempt dir.
+   * 获取作业尝试目录。
+   * @return 作业尝试目录
    */
   public Path getJobAttemptDir() {
     return jobAttemptDir;
   }
 
   /**
-   * Destination of job.
+   * 获取作业输出目标目录。
+   * @return 目标目录
    */
   public Path getDestinationDir() {
     return destinationDir;
   }
 
   /**
-   * Get the location of the success marker.
-   * @return a path under the destination directory.
+   * 获取作业成功标记文件的路径。
+   * @return 目标目录下的成功标记文件路径
    */
   public Path getJobSuccessMarkerPath() {
     return new Path(destinationDir, SUCCESS_MARKER);
   }
 
   /**
-   * Callbacks to update store.
-   * This is not made visible to the stages; they must
-   * go through the wrapper classes in this class, which
-   * add statistics and logging.
+   * 获取存储操作回调对象。
+   * @return 存储操作对象
    */
   public ManifestStoreOperations getOperations() {
     return operations;
   }
 
   /**
-   * Submitter for doing IO against the store other than
-   * manifest processing.
+   * 获取IO处理任务提交器。
+   * @return 任务提交器
    */
   public TaskPool.Submitter getIoProcessors() {
     return ioProcessors;
   }
 
   /**
-   * Get optional progress callback.
-   * @return callback or null
+   * 获取进度回调对象。
+   * @return 进度回调，可能为null
    */
   public Progressable getProgressable() {
     return progressable;
   }
 
   /**
-   * Task attempt directory.
-   * @return the task attempt dir.
+   * 获取任务尝试工作目录。
+   * @return 任务尝试目录
    */
   public Path getTaskAttemptDir() {
     return taskAttemptDir;
   }
 
   /**
-   * Get the job attempt number.
-   * @return the value
+   * 获取作业尝试编号。
+   * @return 作业尝试编号
    */
   public int getJobAttemptNumber() {
     return jobAttemptNumber;
@@ -573,17 +560,17 @@ public class StageConfig {
   }
 
   /**
-   * Get a thread local task manifest serializer.
-   * @return a serializer.
+   * 获取当前线程的任务清单序列化器。
+   * @return 序列化器对象
    */
   public JsonSerialization<TaskManifest> currentManifestSerializer() {
     return threadLocalSerializer.get();
   }
 
   /**
-   * Set builder value.
-   * @param value new value
-   * @return the builder
+   * 设置提交时是否删除目标路径。
+   * @param value 是否删除
+   * @return 当前配置对象
    */
   public StageConfig withDeleteTargetPaths(boolean value) {
     checkOpen();
@@ -596,9 +583,9 @@ public class StageConfig {
   }
 
   /**
-   * Number of marker files to include in success file.
-   * @param value new value
-   * @return the builder
+   * 设置成功标记文件中包含的标记文件数量上限。
+   * @param value 数量上限
+   * @return 当前配置对象
    */
   public StageConfig withSuccessMarkerFileLimit(final int value) {
     checkOpen();
@@ -616,9 +603,9 @@ public class StageConfig {
   }
 
   /**
-   * Set builder value.
-   * @param value new value
-   * @return the builder
+   * 设置保存清单文件的重试次数。
+   * @param value 重试次数
+   * @return 当前配置对象
    */
   public StageConfig withManifestSaveAttempts(final int value) {
     checkOpen();
@@ -627,9 +614,8 @@ public class StageConfig {
   }
 
   /**
-   * Enter the stage; calls back to
-   * {@link #enterStageEventHandler} if non-null.
-   * @param stage stage entered
+   * 进入执行阶段，若已设置回调处理器则触发回调。
+   * @param stage 阶段名称
    */
   public void enterStage(String stage) {
     if (enterStageEventHandler != null) {
@@ -638,13 +624,4 @@ public class StageConfig {
   }
 
   /**
-   * Exit the stage; calls back to
-   * {@link #enterStageEventHandler} if non-null.
-   * @param stage stage entered
-   */
-  public void exitStage(String stage) {
-    if (enterStageEventHandler != null) {
-      enterStageEventHandler.exitStage(stage);
-    }
-  }
-}
+   * 退出执行阶段，若已设置回调处理器则触发回调

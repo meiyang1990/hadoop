@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -71,6 +72,10 @@ import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 import org.apache.hadoop.yarn.util.Apps;
 
+/**
+ * 表示未运行状态的MapReduce作业，实现MRClientProtocol接口
+ * 用于在作业不存在或未运行时提供默认的空响应，避免空指针异常，适配旧版MapReduce API
+ */
 public class NotRunningJob implements MRClientProtocol {
 
   private RecordFactory recordFactory =
@@ -80,6 +85,10 @@ public class NotRunningJob implements MRClientProtocol {
   private final ApplicationReport applicationReport;
 
 
+  /**
+   * 构造未知应用的默认ApplicationReport，用于无传入报告的场景
+   * @return 未知应用的默认报告实例
+   */
   private ApplicationReport getUnknownApplicationReport() {
     ApplicationId unknownAppId = recordFactory
         .newRecordInstance(ApplicationId.class);
@@ -94,6 +103,11 @@ public class NotRunningJob implements MRClientProtocol {
       YarnConfiguration.DEFAULT_APPLICATION_TYPE, null);
   }
 
+  /**
+   * 构造NotRunningJob实例，初始化作业状态和应用报告
+   * @param applicationReport YARN应用报告，为null时使用默认未知报告
+   * @param jobState 作业状态，标识当前作业的状态
+   */
   NotRunningJob(ApplicationReport applicationReport, JobState jobState) {
     this.applicationReport =
         (applicationReport ==  null) ?

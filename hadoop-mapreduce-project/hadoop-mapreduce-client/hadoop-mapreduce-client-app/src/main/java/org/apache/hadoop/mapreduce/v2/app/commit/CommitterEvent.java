@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,16 @@ package org.apache.hadoop.mapreduce.v2.app.commit;
 
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * MapReduce作业提交器事件基类，封装输出提交流程中的各类事件
+ * 继承YARN AbstractEvent，使用CommitterEventType区分事件类型
+ */
 public class CommitterEvent extends AbstractEvent<CommitterEventType> {
 
+  /**
+   * 构造提交器事件，指定事件类型
+   * @param type 提交器事件类型
+   */
   public CommitterEvent(CommitterEventType type) {
     super(type);
   }

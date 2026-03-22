@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,8 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
- * The token identifier for job token
+ * MapReduce作业令牌标识符，用于标识MapReduce作业的身份认证令牌
+ * 存储作业ID信息，用于作业运行过程中的服务间身份认证
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -39,15 +41,15 @@ public class JobTokenIdentifier extends TokenIdentifier {
   public final static Text KIND_NAME = new Text("mapreduce.job");
   
   /**
-   * Default constructor
+   * 空构造方法，用于反序列化
    */
   public JobTokenIdentifier() {
     this.jobid = new Text();
   }
 
   /**
-   * Create a job token identifier from a jobid
-   * @param jobid the jobid to use
+   * 根据作业ID构造作业令牌标识符
+   * @param jobid 目标作业ID
    */
   public JobTokenIdentifier(Text jobid) {
     this.jobid = jobid;
@@ -69,8 +71,8 @@ public class JobTokenIdentifier extends TokenIdentifier {
   }
   
   /**
-   * Get the jobid
-   * @return the jobid
+   * 获取当前令牌对应的作业ID
+   * @return 作业ID
    */
   public Text getJobId() {
     return jobid;
@@ -88,6 +90,9 @@ public class JobTokenIdentifier extends TokenIdentifier {
     jobid.write(out);
   }
 
+  /**
+   * 作业令牌 renewer 实现，使用默认的 TrivialRenewer 逻辑处理令牌续租
+   */
   @InterfaceAudience.Private
   public static class Renewer extends Token.TrivialRenewer {
     @Override

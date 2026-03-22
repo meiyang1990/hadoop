@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,11 +46,11 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.util.Progressable;
 
 /**
- * The context passed to the {@link Reducer}.
- * @param <KEYIN> the class of the input keys
- * @param <VALUEIN> the class of the input values
- * @param <KEYOUT> the class of the output keys
- * @param <VALUEOUT> the class of the output values
+ * Reduce任务执行时传递给{@link Reducer}的上下文实现，提供对输入键值对、输出写入、进度报告等能力的访问
+ * @param <KEYIN> 输入键的类型
+ * @param <VALUEIN> 输入值的类型
+ * @param <KEYOUT> 输出键的类型
+ * @param <VALUEOUT> 输出值的类型
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -60,11 +61,11 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   private Counter inputValueCounter;
   private Counter inputKeyCounter;
   private RawComparator<KEYIN> comparator;
-  private KEYIN key;                                  // current key
-  private VALUEIN value;                              // current value
-  private boolean firstValue = false;                 // first value in key
-  private boolean nextKeyIsSame = false;              // more w/ this key
-  private boolean hasMore;                            // more in file
+  private KEYIN key;                                  // 当前处理键
+  private VALUEIN value;                              // 当前处理值
+  private boolean firstValue = false;                 // 是否为当前键的第一个值
+  private boolean nextKeyIsSame = false;              // 下一个键是否与当前键相同
+  private boolean hasMore;                            // 输入是否还有更多数据
   protected Progressable reporter;
   private Deserializer<KEYIN> keyDeserializer;
   private Deserializer<VALUEIN> valueDeserializer;
@@ -81,6 +82,22 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   private int currentKeyLength = -1;
   private int currentValueLength = -1;
   
+  /**
+   * 构造Reduce上下文实例，完成反序列化初始化并读取第一个键值对
+   * @param conf 作业配置
+   * @param taskid Reduce任务尝试ID
+   * @param input 排序后的键值对迭代器
+   * @param inputKeyCounter 输入键计数器
+   * @param inputValueCounter 输入值计数器
+   * @param output 输出记录写入器
+   * @param committer 输出提交器
+   * @param reporter 状态报告器
+   * @param comparator 键排序比较器
+   * @param keyClass 输入键类型
+   * @param valueClass 输入值类型
+   * @throws InterruptedException 线程中断异常
+   * @throws IOException IO异常
+   */
   public ReduceContextImpl(Configuration conf, TaskAttemptID taskid,
                            RawKeyValueIterator input, 
                            Counter inputKeyCounter,
@@ -109,7 +126,12 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     this.taskid = taskid;
   }
 
-  /** Start processing next unique key. */
+  /**
+   * 开始处理下一个唯一键，跳过当前键剩余的所有值
+   * @return 是否存在下一个唯一键
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
+   */
   public boolean nextKey() throws IOException,InterruptedException {
     while (hasMore && nextKeyIsSame) {
       nextKeyValue();
@@ -125,7 +147,7 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   }
 
   /**
-   * Advance to the next key/value pair.
+   * 移动到下一个键值对，反序列化键和值并判断下一个键是否与当前键相同
    */
   @Override
   public boolean nextKeyValue() throws IOException, InterruptedException {
@@ -168,6 +190,7 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     return true;
   }
 
+  @Override
   public KEYIN getCurrentKey() {
     return key;
   }
@@ -181,6 +204,9 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     return backupStore;
   }
   
+  /**
+   * 为当前键的所有值实现支持mark/reset的迭代器，支持用户对值组的重复遍历
+   */
   protected class ValueIterator implements ReduceContext.ValueIterator<VALUEIN> {
 
     private boolean inReset = false;
@@ -224,17 +250,16 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
         }
       } 
 
-      // if this is the first record, we don't need to advance
+      // 第一个值无需前进，直接返回当前值
       if (firstValue) {
         firstValue = false;
         return value;
       }
-      // if this isn't the first record and the next key is different, they
-      // can't advance it here.
+      // 已到当前键最后一个值，抛出异常
       if (!nextKeyIsSame) {
         throw new NoSuchElementException("iterate past last value");
       }
-      // otherwise, go to the next key/value pair
+      // 前进到下一个值并返回
       try {
         nextKeyValue();
         return value;
@@ -251,6 +276,10 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
       throw new UnsupportedOperationException("remove not implemented");
     }
 
+    /**
+     * 标记当前遍历位置，将已遍历的数据备份到BackupStore中，用于后续reset
+     * @throws IOException IO异常
+     */
     @Override
     public void mark() throws IOException {
       if (getBackupStore() == null) {
@@ -260,8 +289,7 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
       if (!inReset) {
         backupStore.reinitialize();
         if (currentKeyLength == -1) {
-          // The user has not called next() for this iterator yet, so
-          // there is no current record to mark and copy to backup store.
+          // 用户尚未调用next()，没有当前记录需要备份
           return;
         }
         assert (currentValueLength != -1);
@@ -276,11 +304,13 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
       }
     }
 
+    /**
+     * 将迭代器重置到之前标记的位置，重新开始遍历当前键的值
+     * @throws IOException IO异常，无标记时抛出
+     */
     @Override
     public void reset() throws IOException {
-      // We reached the end of an iteration and user calls a 
-      // reset, but a clearMark was called before, just throw
-      // an exception
+      // 清除标记后调用reset，抛出异常
       if (clearMarkFlag) {
         clearMarkFlag = false;
         backupStore.clearMark();
@@ -294,6 +324,10 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
       backupStore.reset();
     }
 
+    /**
+     * 清除之前设置的标记，释放备份存储空间
+     * @throws IOException IO异常
+     */
     @Override
     public void clearMark() throws IOException {
       if (getBackupStore() == null) {
@@ -309,9 +343,8 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     }
     
     /**
-     * This method is called when the reducer moves from one key to 
-     * another.
-     * @throws IOException
+     * 切换到下一个键时重置备份存储，清空当前键的备份数据
+     * @throws IOException IO异常
      */
     public void resetBackupStore() throws IOException {
       if (getBackupStore() == null) {
@@ -323,12 +356,9 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     }
 
     /**
-     * This method is called to write the record that was most recently
-     * served (before a call to the mark). Since the framework reads one
-     * record in advance, to get this record, we serialize the current key
-     * and value
-     * @param out
-     * @throws IOException
+     * 将标记前最后一次返回的键值对序列化写入备份存储
+     * @param out 备份输出流
+     * @throws IOException IO异常
      */
     private void writeFirstKeyValueBytes(DataOutputStream out) 
     throws IOException {
@@ -347,6 +377,9 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     }
   }
 
+  /**
+   * 可迭代值组包装类，提供ValueIterator实例给Reducer遍历
+   */
   protected class ValueIterable implements Iterable<VALUEIN> {
     private ValueIterator iterator = new ValueIterator();
     @Override
@@ -356,10 +389,10 @@ public class ReduceContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   }
   
   /**
-   * Iterate through the values for the current key, reusing the same value 
-   * object, which is stored in the context.
-   * @return the series of values associated with the current key. All of the 
-   * objects returned directly and indirectly from this method are reused.
+   * 获取当前键对应的所有值的可迭代对象，供Reducer遍历处理
+   * @return 当前键的值组可迭代对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public 
   Iterable<VALUEIN> getValues() throws IOException, InterruptedException {

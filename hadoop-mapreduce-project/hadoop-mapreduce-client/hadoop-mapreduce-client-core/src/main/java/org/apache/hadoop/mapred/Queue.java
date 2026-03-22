@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,44 +33,47 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * A class for storing the properties of a job queue.
+ * 文件概要：MapReduce作业队列模型实现类，用于存储作业队列的配置信息、访问控制和层次结构
+ * 存储作业队列的完整属性，支持层次化队列结构，支撑YARN队列调度和管理功能
+ */
+/**
+ * 作业队列信息模型类，存储单个作业队列的所有属性与层次结构，支持多级嵌套队列
+ * 用于MapReduce框架中管理作业提交队列的权限、状态和调度信息，支撑队列层次化组织与管理
  */
 class Queue implements Comparable<Queue>{
 
   private static final Logger LOG = LoggerFactory.getLogger(Queue.class);
 
-  //Queue name
+  //队列名称
   private String name = null;
 
-  //acls list
+  //访问控制列表，key为操作类型，value为对应的权限控制
   private Map<String, AccessControlList> acls;
 
-  //Queue State
+  //队列运行状态
   private QueueState state = QueueState.RUNNING;
 
-  // An Object that can be used by schedulers to fill in
-  // arbitrary scheduling information. The toString method
-  // of these objects will be called by the framework to
-  // get a String that can be displayed on UI.
+  // 调度器可自定义存储的调度信息对象，框架会调用其toString方法生成UI展示文本
   private Object schedulingInfo;
 
+  //子队列集合
   private Set<Queue> children;
 
+  //队列自定义扩展属性
   private Properties props;
 
   /**
-   * Default constructor is useful in creating the hierarchy.
-   * The variables are populated using mutator methods.
+   * 默认构造函数，用于构造队列层次结构，后续通过setter方法填充属性
    */
   Queue() {
     
   }
 
   /**
-   * Create a job queue
-   * @param name name of the queue
-   * @param acls ACLs for the queue
-   * @param state state of the queue
+   * 构造指定基础属性的作业队列对象
+   * @param name 队列名称
+   * @param acls 队列访问控制列表
+   * @param state 队列运行状态
    */
   Queue(String name, Map<String, AccessControlList> acls, QueueState state) {
 	  this.name = name;
@@ -78,85 +82,76 @@ class Queue implements Comparable<Queue>{
   }
   
   /**
-   * Return the name of the queue
-   * 
-   * @return name of the queue
+   * 获取队列名称
+   * @return 队列名称
    */
   String getName() {
     return name;
   }
   
   /**
-   * Set the name of the queue
-   * @param name name of the queue
+   * 设置队列名称
+   * @param name 队列名称
    */
   void setName(String name) {
     this.name = name;
   }
 
   /**
-   * Return the ACLs for the queue
-   * 
-   * The keys in the map indicate the operations that can be performed,
-   * and the values indicate the list of users/groups who can perform
-   * the operation.
-   * 
-   * @return Map containing the operations that can be performed and
-   *          who can perform the operations.
+   * 获取队列的访问控制列表
+   * Map的key表示可执行的操作，value表示允许执行该操作的用户/组列表
+   * @return 包含操作与对应权限的ACL映射
    */
   Map<String, AccessControlList> getAcls() {
     return acls;
   }
   
   /**
-   * Set the ACLs for the queue
-   * @param acls Map containing the operations that can be performed and
-   *          who can perform the operations.
+   * 设置队列的访问控制列表
+   * @param acls 包含操作与对应权限的ACL映射
    */
   void setAcls(Map<String, AccessControlList> acls) {
     this.acls = acls;
   }
   
   /**
-   * Return the state of the queue.
-   * @return state of the queue
+   * 获取队列当前运行状态
+   * @return 队列运行状态
    */
   QueueState getState() {
     return state;
   }
   
   /**
-   * Set the state of the queue.
-   * @param state state of the queue.
+   * 设置队列运行状态
+   * @param state 队列运行状态
    */
   void setState(QueueState state) {
     this.state = state;
   }
   
   /**
-   * Return the scheduling information for the queue
-   * @return scheduling information for the queue.
+   * 获取队列关联的调度信息
+   * @return 调度器自定义的调度信息对象
    */
   Object getSchedulingInfo() {
     return schedulingInfo;
   }
   
   /**
-   * Set the scheduling information from the queue.
-   * @param schedulingInfo scheduling information for the queue.
+   * 设置队列关联的调度信息
+   * @param schedulingInfo 调度器自定义的调度信息对象
    */
   void setSchedulingInfo(Object schedulingInfo) {
     this.schedulingInfo = schedulingInfo;
   }
 
   /**
-   * Copy the scheduling information from the sourceQueue into this queue
-   * recursively.
-   * 
-   * @param sourceQueue
+   * 从源队列递归复制调度信息到当前队列及其所有子队列
+   * @param sourceQueue 源队列，提供要复制的调度信息
    */
   void copySchedulingInfo(Queue sourceQueue) {
-    // First update the children queues recursively.
+    // 先递归更新所有子队列的调度信息
     Set<Queue> destChildren = getChildren();
     if (destChildren != null) {
       Iterator<Queue> itr1 = destChildren.iterator();
@@ -166,12 +161,13 @@ class Queue implements Comparable<Queue>{
       }
     }
 
-    // Now, copy the information for the root-queue itself
+    // 复制当前队列自身的调度信息
     setSchedulingInfo(sourceQueue.getSchedulingInfo());
   }
 
   /**
-   *
+   * 向当前队列添加子队列，初始化子队列集合若不存在
+   * @param child 要添加的子队列
    */
   void addChild(Queue child) {
     if(children == null) {
@@ -182,52 +178,45 @@ class Queue implements Comparable<Queue>{
   }
 
   /**
-   *
-   * @return
+   * 获取当前队列的所有子队列
+   * @return 子队列集合，若没有子队列返回null
    */
   Set<Queue> getChildren() {
     return children;
   }
 
   /**
-   * 
-   * @param props
+   * 设置队列自定义扩展属性
+   * @param props 自定义属性集合
    */
   void setProperties(Properties props) {
      this.props = props;
   }
 
   /**
-   *
-   * @return
+   * 获取队列自定义扩展属性
+   * @return 自定义属性集合
    */
   Properties getProperties() {
     return this.props;
   }
 
   /**
-   * This methods helps in traversing the
-   * tree hierarchy.
-   *
-   * Returns list of all inner queues.i.e nodes which has children.
-   * below this level.
-   *
-   * Incase of children being null , returns an empty map.
-   * This helps in case of creating union of inner and leaf queues.
-   * @return
+   * 递归获取当前队列下所有拥有子队列的内部队列（非叶子节点）
+   * 返回结果包含所有层级的内部队列，空结果返回空Map
+   * @return 按队列名称索引的所有内部队列映射
    */
   Map<String,Queue> getInnerQueues() {
     Map<String,Queue> l = new HashMap<String,Queue>();
 
-    //If no children , return empty set.
-    //This check is required for root node.
+    // 没有子队列直接返回空Map
     if(children == null) {
       return l;
     }
 
-    //check for children if they are parent.
+    // 遍历检查所有子队列，递归收集内部队列
     for(Queue child:children) {
-      //check if children are themselves parent add them
+      // 如果子队列自身还有子队列，则加入结果并递归收集其内部队列
       if(child.getChildren() != null && child.getChildren().size() > 0) {
         l.put(child.getName(),child);
         l.putAll(child.getInnerQueues());
@@ -237,15 +226,9 @@ class Queue implements Comparable<Queue>{
   }
 
   /**
-   * This method helps in maintaining the single
-   * data structure across QueueManager.
-   *
-   * Now if we just maintain list of root queues we
-   * should be done.
-   *
-   * Doesn't return null .
-   * Adds itself if this is leaf node.
-   * @return
+   * 递归获取当前队列层次下所有叶子队列（没有子队列的队列）
+   * 当前队列本身如果是叶子节点则将自身加入结果，不会返回null
+   * @return 按队列名称索引的所有叶子队列映射
    */
   Map<String,Queue> getLeafQueues() {
     Map<String,Queue> l = new HashMap<String,Queue>();
@@ -254,6 +237,7 @@ class Queue implements Comparable<Queue>{
       return l;
     }
 
+    // 递归收集所有子队列下的叶子队列
     for(Queue child:children) {
       l.putAll(child.getLeafQueues());
     }
@@ -263,6 +247,7 @@ class Queue implements Comparable<Queue>{
 
   @Override
   public int compareTo(Queue queue) {
+    // 按队列名称字典序排序
     return name.compareTo(queue.getName());
   }
   
@@ -289,10 +274,9 @@ class Queue implements Comparable<Queue>{
   }
 
   /**
-   * Return hierarchy of {@link JobQueueInfo} objects
-   * under this Queue.
-   *
-   * @return JobQueueInfo[]
+   * 将当前队列层次结构转换为JobQueueInfo对象，用于对外暴露队列信息
+   * 递归转换所有子队列，深度复制自定义属性保证信息安全
+   * @return 转换完成的根队列JobQueueInfo对象，包含所有子队列层次
    */
   JobQueueInfo getJobQueueInfo() {
     JobQueueInfo queueInfo = new JobQueueInfo();
@@ -304,7 +288,7 @@ class Queue implements Comparable<Queue>{
     }
 
     if (props != null) {
-      //Create deep copy of properties.
+      // 深度复制属性对象，避免外部修改内部属性
       Properties newProps = new Properties();
       for (Object key : props.keySet()) {
         newProps.setProperty(key.toString(), props.getProperty(key.toString()));
@@ -323,30 +307,29 @@ class Queue implements Comparable<Queue>{
   }
 
   /**
-   * For each node validate if current node hierarchy is same newState.
-   * recursively check for child nodes.
-   * 
-   * @param newState
-   * @return
+   * 递归检查当前队列的层次结构是否与新队列结构一致，用于队列刷新时验证结构变化
+   * 检查队列名称、子队列数量和所有子队列的层次结构一致性
+   * @param newState 新的队列状态对象，用于对比层次结构
+   * @return 结构一致返回true，否则返回false
    */
   boolean isHierarchySameAs(Queue newState) {
     if(newState == null) {
       return false;
     }
-    //First check if names are equal
+    // 首先检查队列名称是否一致
     if(!(name.equals(newState.getName())) ) {
       LOG.info(" current name " + name + " not equal to " + newState.getName());
       return false;
     }
 
     if (children == null || children.size() == 0) {
+      // 当前队列没有子队列，新队列有子队列则结构变化
       if(newState.getChildren() != null && newState.getChildren().size() > 0) {
         LOG.info( newState + " has added children in refresh ");
         return false;
       }
     } else if(children.size() > 0) {
-      //check for the individual children and then see if all of them
-      //are updated.
+      // 当前队列有子队列，检查新队列是否有对应子队列
       if (newState.getChildren() == null) {
         LOG.error("In the current state, queue " + getName() + " has "
             + children.size() + " but the new state has none!");
@@ -354,26 +337,28 @@ class Queue implements Comparable<Queue>{
       }
       int childrenSize = children.size();
       int newChildrenSize = newState.getChildren().size();
+      // 子队列数量不一致则结构变化
       if (childrenSize != newChildrenSize) {
         LOG.error("Number of children for queue " + newState.getName()
             + " in newState is " + newChildrenSize + " which is not equal to "
             + childrenSize + " in the current state.");
         return false;
       }
-      //children are pre sorted as they are stored in treeset.
-      //hence order shold be the same.
+      // 子队列存储在TreeSet中已按名称排序，顺序一致可直接遍历对比
       Iterator<Queue> itr1 = children.iterator();
       Iterator<Queue> itr2 = newState.getChildren().iterator();
 
       while(itr1.hasNext()) {
         Queue q = itr1.next();
         Queue newq = itr2.next();
+        // 递归检查每个子队列结构
         if(! (q.isHierarchySameAs(newq)) ) {
           LOG.info(" Queue " + q.getName() + " not equal to " + newq.getName());
           return false;
         }
       }
     }
+    // 所有检查通过，结构一致
     return true;
   }
 }

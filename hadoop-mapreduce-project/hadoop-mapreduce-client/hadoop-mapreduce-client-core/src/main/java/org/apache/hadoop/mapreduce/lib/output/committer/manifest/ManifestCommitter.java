@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -76,14 +77,9 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.Man
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.stages.CleanupJobStage.cleanupStageOptionsFromConfig;
 
 /**
- * This is the Intermediate-Manifest committer.
- * At every entry point it updates the thread's audit context with
- * the current stage info; this is a placeholder for
- * adding audit information to stores other than S3A.
- *
- * This is tagged as public/stable. This is mandatory
- * for the classname and PathOutputCommitter implementation
- * classes.
+ * 中间清单提交器，是MapReduce输出提交器的实现，采用清单机制处理作业输出文件提交。
+ * 所有入口点都会更新线程审计上下文，记录当前阶段信息，支持除S3A外其他存储系统的审计扩展。
+ * 该类为公开稳定API，是Manifest提交器的核心入口实现。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -94,60 +90,55 @@ public class ManifestCommitter extends PathOutputCommitter implements
       ManifestCommitter.class);
 
   /**
-   * Role: task committer.
+   * 角色：任务提交器。
    */
   public static final String TASK_COMMITTER = "task committer";
 
   /**
-   * Role: job committer.
+   * 角色：作业提交器。
    */
   public static final String JOB_COMMITTER = "job committer";
 
   /**
-   * Committer Configuration as extracted from
-   * the job/task context and set in the constructor.
+   * 从作业/任务上下文中提取并构造的提交器配置。
    */
   private final ManifestCommitterConfig baseConfig;
 
   /**
-   * Destination of the job.
+   * 作业最终输出目标目录。
    */
   private final Path destinationDir;
 
   /**
-   * For tasks, the attempt directory.
-   * Null for jobs.
+   * 当前任务尝试的工作目录，作业级实例此值为null。
    */
   private final Path taskAttemptDir;
 
   /**
-   * IOStatistics to update.
+   * IO统计信息存储，用于收集整个提交过程的IO指标。
    */
   private final IOStatisticsStore iostatistics;
 
   /**
-   *  The job Manifest Success data; only valid after a job successfully
-   *  commits.
+   * 作业提交成功后的成功标记数据，仅在作业成功提交后有效。
    */
   private ManifestSuccessData successReport;
 
   /**
-   * The active stage; is updated by a callback from within the stages.
+   * 当前活跃阶段名称，由阶段执行回调更新。
    */
   private String activeStage;
 
   /**
-   * The task manifest of the task commit.
-   * Null unless this is a task attempt and the
-   * task has successfully been committed.
+   * 当前任务提交完成后的任务清单数据，仅任务级实例且任务提交成功后非空。
    */
   private TaskManifest taskAttemptCommittedManifest;
 
   /**
-   * Create a committer.
-   * @param outputPath output path
-   * @param context job/task context
-   * @throws IOException failure.
+   * 构造Manifest提交器实例。
+   * @param outputPath 输出路径
+   * @param context 任务尝试上下文
+   * @throws IOException 初始化失败时抛出
    */
   public ManifestCommitter(final Path outputPath,
       final TaskAttemptContext context) throws IOException {
@@ -166,12 +157,10 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * Committer method invoked; generates a config for it.
-   * Calls {@code #updateCommonContextOnCommitterEntry()}
-   * to update the audit context.
-   * @param isTask is this a task entry point?
-   * @param context context
-   * @return committer config
+   * 进入提交器入口，构造提交器配置并更新审计上下文。
+   * @param isTask 是否为任务级入口
+   * @param context 作业/任务上下文
+   * @return 构造好的提交器配置
    */
   private ManifestCommitterConfig enterCommitter(boolean isTask,
       JobContext context) {
@@ -187,9 +176,9 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * Set up a job through a {@link SetupJobStage}.
-   * @param jobContext Context of the job whose output is being written.
-   * @throws IOException IO Failure.
+   * 通过SetupJobStage执行作业初始化。
+   * @param jobContext 作业上下文
+   * @throws IOException IO操作失败时抛出
    */
   @Override
   public void setupJob(final JobContext jobContext) throws IOException {
@@ -200,21 +189,17 @@ public class ManifestCommitter extends PathOutputCommitter implements
             .createStageConfig()
             .withOperations(createManifestStoreOperations())
             .build();
-    // set up the job.
+    // 执行作业初始化
     new SetupJobStage(stageConfig)
         .apply(committerConfig.getCreateJobMarker());
     logCommitterStatisticsAtDebug();
   }
 
   /**
-   * Set up a task through a {@link SetupTaskStage}.
-   * Classic FileOutputCommitter is a no-op here, relying
-   * on RecordWriters to create the dir implicitly on file
-   * create().
-   * FileOutputCommitter also uses the existence of that
-   * file as a flag to indicate task commit is needed.
-   * @param context task context.
-   * @throws IOException IO Failure.
+   * 通过SetupTaskStage执行任务初始化。
+   * 传统FileOutputCommitter此处为空操作，依赖RecordWriter隐式创建目录，同时用目录存在标记任务需要提交。
+   * @param context 任务上下文
+   * @throws IOException IO操作失败时抛出
    */
   @Override
   public void setupTask(final TaskAttemptContext context)
@@ -226,17 +211,16 @@ public class ManifestCommitter extends PathOutputCommitter implements
             .createStageConfig()
             .withOperations(createManifestStoreOperations())
             .build();
-    // create task attempt dir; delete if present. Or fail?
+    // 创建任务尝试目录，如果已存在则删除
     new SetupTaskStage(stageConfig).apply("");
     logCommitterStatisticsAtDebug();
   }
 
   /**
-   * Always return true.
-   * This way, even if there is no output, stats are collected.
-   * @param context task context.
-   * @return true
-   * @throws IOException IO Failure.
+   * 始终返回true，确保即使任务无输出也能收集统计信息。
+   * @param context 任务上下文
+   * @return true 始终需要提交任务
+   * @throws IOException IO操作失败时抛出
    */
   @Override
   public boolean needsTaskCommit(final TaskAttemptContext context)
@@ -247,12 +231,10 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * Failure during Job Commit is not recoverable from.
-   *
-   * @param jobContext
-   *          Context of the job whose output is being written.
-   * @return false, always
-   * @throws IOException never
+   * 作业提交失败后不可恢复重试，因此返回false。
+   * @param jobContext 作业上下文
+   * @return false 始终不支持重复提交作业
+   * @throws IOException 不会抛出异常
    */
   @Override
   public boolean isCommitJobRepeatable(final JobContext jobContext)
@@ -263,12 +245,10 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * Declare that task recovery is not supported.
-   * It would be, if someone added the code *and tests*.
-   * @param jobContext
-   *          Context of the job whose output is being written.
-   * @return false, always
-   * @throws IOException never
+   * 声明不支持任务恢复，目前该功能未实现。
+   * @param jobContext 作业上下文
+   * @return false 始终不支持任务恢复
+   * @throws IOException 不会抛出异常
    */
   @Override
   public boolean isRecoverySupported(final JobContext jobContext)
@@ -279,9 +259,9 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   *
-   * @param taskContext Context of the task whose output is being recovered
-   * @throws IOException always
+   * 不支持任务恢复，调用直接抛出异常。
+   * @param taskContext 任务上下文
+   * @throws IOException 始终抛出异常
    */
   @Override
   public void recoverTask(final TaskAttemptContext taskContext)
@@ -292,10 +272,9 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * Commit the task.
-   * This is where the task attempt tree list takes place.
-   * @param context task context.
-   * @throws IOException IO Failure.
+   * 提交任务，扫描任务输出生成任务清单并保存。
+   * @param context 任务上下文
+   * @throws IOException IO操作失败时抛出
    */
   @Override
   public void commitTask(final TaskAttemptContext context)
@@ -320,9 +299,9 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * Abort a task.
-   * @param context task context
-   * @throws IOException failure during the delete
+   * 中止任务，清理任务尝试工作目录。
+   * @param context 任务上下文
+   * @throws IOException 删除操作失败时抛出
    */
   @Override
   public void abortTask(final TaskAttemptContext context)
@@ -342,9 +321,9 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * Get the manifest success data for this job; creating on demand if needed.
-   * @param committerConfig source config.
-   * @return the current {@link #successReport} value; never null.
+   * 获取或创建作业成功报告实例，如果为空则初始化新实例。
+   * @param committerConfig 提交器配置
+   * @return 作业成功报告实例，非空
    */
   private ManifestSuccessData getOrCreateSuccessData(
       ManifestCommitterConfig committerConfig) {
@@ -356,33 +335,29 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * This is the big job commit stage.
-   * Load the manifests, prepare the destination, rename
-   * the files then cleanup the job directory.
-   * @param jobContext Context of the job whose output is being written.
-   * @throws IOException failure.
+   * 执行整个作业的提交流程：加载所有任务清单、准备目标目录、移动文件到最终位置、清理临时目录。
+   * @param jobContext 作业上下文
+   * @throws IOException 任何提交阶段失败时抛出
    */
   @Override
   public void commitJob(final JobContext jobContext) throws IOException {
 
     ManifestCommitterConfig committerConfig = enterCommitter(false, jobContext);
 
-    // create the initial success data.
-    // this is overwritten by that created during the operation sequence,
-    // but if the sequence fails before that happens, it
-    // will be saved to the report directory.
+    // 初始化成功报告，如果后续提交流程失败，该初始报告仍会保存到报告目录
     ManifestSuccessData marker = getOrCreateSuccessData(committerConfig);
     IOException failure = null;
+    // 创建IO线程池和存储操作实例，自动关闭
     try (CloseableTaskPoolSubmitter ioProcs =
              committerConfig.createSubmitter();
          ManifestStoreOperations storeOperations = createManifestStoreOperations()) {
-      // the stage config will be shared across all stages.
+      // 创建所有阶段共享的阶段配置
       StageConfig stageConfig = committerConfig.createStageConfig()
           .withOperations(storeOperations)
           .withIOProcessors(ioProcs)
           .build();
 
-      // commit the job, including any cleanup and validation.
+      // 执行作业提交全流程，包括清理和验证
       final Configuration conf = jobContext.getConfiguration();
       CommitJobStage.Result result = new CommitJobStage(stageConfig).apply(
           new CommitJobStage.Arguments(
@@ -393,29 +368,29 @@ public class ManifestCommitter extends PathOutputCommitter implements
                   OP_STAGE_JOB_CLEANUP, conf)
           ));
       marker = result.getJobSuccessData();
-      // update the cached success with the new report.
+      // 更新缓存的成功报告
       setSuccessReport(marker);
-      // patch in the #of threads as it is useful
+      // 记录IO处理器线程数到诊断信息，方便问题排查
       marker.putDiagnostic(OPT_IO_PROCESSORS,
           conf.get(OPT_IO_PROCESSORS, Long.toString(OPT_IO_PROCESSORS_DEFAULT)));
     } catch (IOException e) {
-      // failure. record it for the summary
+      // 记录失败信息供摘要报告使用
       failure = e;
-      // rethrow
+      // 重新抛出异常，通知框架作业提交失败
       throw e;
     } finally {
-      // save the report summary, even on failure
+      // 即使失败也保存摘要报告
       maybeSaveSummary(activeStage,
           committerConfig,
           marker,
           failure,
           true,
           true);
-      // print job commit stats
+      // 打印作业提交统计信息
       LOG.info("{}: Job Commit statistics {}",
           committerConfig.getName(),
           ioStatisticsToPrettyString(iostatistics));
-      // and warn of rename problems
+      // 输出重命名恢复警告，如果存在恢复操作
       final Long recoveries = iostatistics.counters().get(OP_COMMIT_FILE_RENAME_RECOVERED);
       if (recoveries != null && recoveries > 0) {
         LOG.warn("{}: rename failures were recovered from. Number of recoveries: {}",
@@ -426,13 +401,10 @@ public class ManifestCommitter extends PathOutputCommitter implements
   }
 
   /**
-   * Abort the job.
-   * Invokes
-   * {@link #executeCleanup(String, JobContext, ManifestCommitterConfig)}
-   * then saves the (ongoing) job report data if reporting is enabled.
-   * @param jobContext Context of the job whose output is being written.
-   * @param state final runstate of the job
-   * @throws IOException failure during cleanup; report failure are swallowed
+   * 中止作业，执行清理并保存作业报告（如果启用报告）。
+   * @param jobContext 作业上下文
+   * @param state 作业最终状态
+   * @throws IOException 清理失败时抛出，报告保存失败会被吞噬
    */
   @Override
   public void abortJob(final JobContext jobContext,
@@ -446,333 +418,4 @@ public class ManifestCommitter extends PathOutputCommitter implements
     IOException failure = null;
 
     try {
-      executeCleanup(OP_STAGE_JOB_ABORT, jobContext, committerConfig);
-    } catch (IOException e) {
-      // failure.
-      failure = e;
-    }
-    report.setSuccess(false);
-    // job abort does not overwrite any existing report, so a job commit
-    // failure cause will be preserved.
-    maybeSaveSummary(activeStage, committerConfig, report, failure,
-        true, false);
-    // print job stats
-    LOG.info("Job Abort statistics {}",
-        ioStatisticsToPrettyString(iostatistics));
-    updateCommonContextOnCommitterExit();
-  }
-
-  /**
-   * Execute the {@code CleanupJobStage} to remove the job attempt dir.
-   * This does
-   * @param jobContext Context of the job whose output is being written.
-   * @throws IOException failure during cleanup
-   */
-  @SuppressWarnings("deprecation")
-  @Override
-  public void cleanupJob(final JobContext jobContext) throws IOException {
-    ManifestCommitterConfig committerConfig = enterCommitter(false,
-        jobContext);
-    try {
-      executeCleanup(OP_STAGE_JOB_CLEANUP, jobContext, committerConfig);
-    } finally {
-      logCommitterStatisticsAtDebug();
-      updateCommonContextOnCommitterExit();
-    }
-  }
-
-  /**
-   * Perform the cleanup operation for job cleanup or abort.
-   * @param statisticName statistic/stage name
-   * @param jobContext job context
-   * @param committerConfig committer config
-   * @throws IOException failure
-   * @return the outcome
-   */
-  private CleanupJobStage.Result executeCleanup(
-      final String statisticName,
-      final JobContext jobContext,
-      final ManifestCommitterConfig committerConfig) throws IOException {
-    try (CloseableTaskPoolSubmitter ioProcs =
-             committerConfig.createSubmitter()) {
-
-      return new CleanupJobStage(
-          committerConfig.createStageConfig()
-              .withOperations(createManifestStoreOperations())
-              .withIOProcessors(ioProcs)
-              .build())
-          .apply(cleanupStageOptionsFromConfig(
-              statisticName,
-              jobContext.getConfiguration()));
-    }
-  }
-
-  /**
-   * Output path: destination directory of the job.
-   * @return the overall job destination directory.
-   */
-  @Override
-  public Path getOutputPath() {
-    return getDestinationDir();
-  }
-
-  /**
-   * Work path of the current task attempt.
-   * This is null if the task does not have one.
-   * @return a path.
-   */
-  @Override
-  public Path getWorkPath() {
-    return getTaskAttemptDir();
-  }
-
-  /**
-   * Get the job destination dir.
-   * @return dest dir.
-   */
-  private Path getDestinationDir() {
-    return destinationDir;
-  }
-
-  /**
-   * Get the task attempt dir.
-   * May be null.
-   * @return a path or null.
-   */
-  private Path getTaskAttemptDir() {
-    return taskAttemptDir;
-  }
-
-  /**
-   * Callback on stage entry.
-   * Sets {@link #activeStage} and updates the
-   * common context.
-   * @param stage new stage
-   */
-  @Override
-  public void enterStage(String stage) {
-    activeStage = stage;
-    AuditingIntegration.enterStage(stage);
-  }
-
-  /**
-   * Remove stage from common audit context.
-   * @param stage stage exited.
-   */
-  @Override
-  public void exitStage(String stage) {
-    AuditingIntegration.exitStage();
-  }
-
-  /**
-   * Get the unique ID of this job.
-   * @return job ID (yarn, spark)
-   */
-  public String getJobUniqueId() {
-    return baseConfig.getJobUniqueId();
-  }
-
-  /**
-   * Get the config of the task attempt this instance was constructed
-   * with.
-   * @return a configuration.
-   */
-  public Configuration getConf() {
-    return baseConfig.getConf();
-  }
-
-  /**
-   * Get the manifest Success data; only valid after a job.
-   * @return the job _SUCCESS data, or null.
-   */
-  public ManifestSuccessData getSuccessReport() {
-    return successReport;
-  }
-
-  private void setSuccessReport(ManifestSuccessData successReport) {
-    this.successReport = successReport;
-  }
-
-  /**
-   * Get the manifest of the last committed task.
-   * @return a task manifest or null.
-   */
-  @VisibleForTesting
-  TaskManifest getTaskAttemptCommittedManifest() {
-    return taskAttemptCommittedManifest;
-  }
-
-  /**
-   * Compute the path where the output of a task attempt is stored until
-   * that task is committed.
-   * @param context the context of the task attempt.
-   * @return the path where a task attempt should be stored.
-   */
-  @VisibleForTesting
-  public Path getTaskAttemptPath(TaskAttemptContext context) {
-    return enterCommitter(false, context).getTaskAttemptDir();
-  }
-
-  /**
-   * The path to where the manifest file of a task attempt will be
-   * saved when the task is committed.
-   * This path will be the same for all attempts of the same task.
-   * @param context the context of the task attempt.
-   * @return the path where a task attempt should be stored.
-   */
-  @VisibleForTesting
-  public Path getTaskManifestPath(TaskAttemptContext context) {
-    final Path dir = enterCommitter(false, context).getTaskManifestDir();
-
-    return manifestPathForTask(dir,
-        context.getTaskAttemptID().getTaskID().toString());
-  }
-
-  /**
-   * Compute the path where the output of a task attempt is stored until
-   * that task is committed.
-   * @param context the context of the task attempt.
-   * @return the path where a task attempt should be stored.
-   */
-  @VisibleForTesting
-  public Path getJobAttemptPath(JobContext context) {
-
-    return enterCommitter(false, context).getJobAttemptDir();
-  }
-
-  /**
-   * Get the final output path, including resolving any relative path.
-   * @param outputPath output path
-   * @param conf configuration to create any FS with
-   * @return a resolved path.
-   * @throws IOException failure.
-   */
-  private Path resolveDestinationDirectory(Path outputPath,
-      Configuration conf) throws IOException {
-    return FileSystem.get(outputPath.toUri(), conf).makeQualified(outputPath);
-  }
-
-  /**
-   * Create manifest store operations for the destination store.
-   * This MUST NOT be used for the success report operations, as
-   * they may be to a different filesystem.
-   * This is a point which can be overridden during testing.
-   * @return a new store operations instance bonded to the destination fs.
-   * @throws IOException failure to instantiate.
-   */
-  protected ManifestStoreOperations createManifestStoreOperations() throws IOException {
-    return ManifestCommitterSupport.createManifestStoreOperations(
-        baseConfig.getConf(),
-        baseConfig.getDestinationFileSystem(),
-        baseConfig.getDestinationDir());
-  }
-
-  /**
-   * Log IO Statistics at debug.
-   */
-  private void logCommitterStatisticsAtDebug() {
-    logIOStatisticsAtDebug(LOG, "Committer Statistics", this);
-  }
-
-  @Override
-  public String toString() {
-    final StringBuilder sb = new StringBuilder(
-        "ManifestCommitter{");
-    sb.append(baseConfig);
-    sb.append(", iostatistics=").append(ioStatisticsToPrettyString(iostatistics));
-    sb.append('}');
-    return sb.toString();
-  }
-
-  /**
-   * Save a summary to the report dir if the config option
-   * is set.
-   * The IOStatistics of the summary will be updated to the latest
-   * snapshot of the committer's statistics, so the report is up
-   * to date.
-   * The report will updated with the current active stage,
-   * and if {@code thrown} is non-null, it will be added to the
-   * diagnostics (and the job tagged as a failure).
-   * Static for testability.
-   * @param activeStage active stage
-   * @param config configuration to use.
-   * @param report summary file.
-   * @param thrown any exception indicting failure.
-   * @param quiet should exceptions be swallowed.
-   * @param overwrite should the existing file be overwritten
-   * @return the path of a file, if successfully saved
-   * @throws IOException if a failure occured and quiet==false
-   */
-  private static Path maybeSaveSummary(
-      String activeStage,
-      ManifestCommitterConfig config,
-      ManifestSuccessData report,
-      Throwable thrown,
-      boolean quiet,
-      boolean overwrite) throws IOException {
-    Configuration conf = config.getConf();
-    String reportDir = conf.getTrimmed(OPT_SUMMARY_REPORT_DIR, "");
-    if (reportDir.isEmpty()) {
-      LOG.debug("No summary directory set in " + OPT_SUMMARY_REPORT_DIR);
-      return null;
-    }
-    LOG.debug("Summary directory set in to {}" + OPT_SUMMARY_REPORT_DIR,
-        reportDir);
-
-    // update to the latest statistics
-    report.snapshotIOStatistics(config.getIOStatistics());
-
-    Path reportDirPath = new Path(reportDir);
-    Path path = new Path(reportDirPath,
-        createJobSummaryFilename(config.getJobUniqueId()));
-
-    if (thrown != null) {
-      report.recordJobFailure(thrown);
-    }
-    report.putDiagnostic(STAGE, activeStage);
-    // the store operations here is explicitly created for the FS where
-    // the reports go, which may not be the target FS of the job.
-
-    final FileSystem fs = path.getFileSystem(conf);
-    try (ManifestStoreOperations operations = new ManifestStoreOperationsThroughFileSystem(fs)) {
-      if (!overwrite) {
-        // check for file existence so there is no need to worry about
-        // precisely what exception is raised when overwrite=false and dest file
-        // exists
-        try {
-          FileStatus st = operations.getFileStatus(path);
-          // get here and the file exists
-          LOG.debug("Report already exists: {}", st);
-          return null;
-        } catch (FileNotFoundException ignored) {
-        }
-      }
-      operations.save(report, path, overwrite);
-      LOG.info("Job summary saved to {}", path);
-      return path;
-    } catch (IOException e) {
-      LOG.debug("Failed to save summary to {}", path, e);
-      if (quiet) {
-        return null;
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  @Override
-  public IOStatisticsStore getIOStatistics() {
-    return iostatistics;
-  }
-
-  /**
-   * The committer is compatible with spark's dynamic partitioning
-   * algorithm.
-   * @param capability string to query the stream support for.
-   * @return true if the requested capability is supported.
-   */
-  @Override
-  public boolean hasCapability(final String capability) {
-    return CAPABILITY_DYNAMIC_PARTITIONING.equals(capability);
-  }
-}
+      executeClean

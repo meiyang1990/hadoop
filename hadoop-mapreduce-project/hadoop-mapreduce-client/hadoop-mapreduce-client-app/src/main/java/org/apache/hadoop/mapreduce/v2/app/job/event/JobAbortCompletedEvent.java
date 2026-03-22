@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,15 +22,28 @@ package org.apache.hadoop.mapreduce.v2.app.job.event;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 
+/**
+ * 作业终止完成事件，用于通知作业中止操作已完成并携带作业最终状态
+ * 是MapReduce应用 Master 事件驱动模型中处理作业终止流程的核心事件
+ */
 public class JobAbortCompletedEvent extends JobEvent {
 
   private JobStatus.State finalState;
 
+  /**
+   * 构造作业终止完成事件
+   * @param jobID 目标作业ID
+   * @param finalState 作业中止后的最终状态
+   */
   public JobAbortCompletedEvent(JobId jobID, JobStatus.State finalState) {
     super(jobID, JobEventType.JOB_ABORT_COMPLETED);
     this.finalState = finalState;
   }
 
+  /**
+   * 获取作业中止后的最终状态
+   * @return 作业最终状态
+   */
   public JobStatus.State getFinalState() {
     return finalState;
   }

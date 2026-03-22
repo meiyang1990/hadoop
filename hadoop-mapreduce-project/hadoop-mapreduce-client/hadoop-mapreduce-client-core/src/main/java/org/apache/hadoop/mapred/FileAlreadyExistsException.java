@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Used when target file already exists for any operation and 
- * is not configured to be overwritten.  
+ * 文件已存在异常，当目标文件已经存在且未配置允许覆盖时抛出
+ * 用于MapReduce作业输出阶段处理文件冲突场景
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -34,10 +35,17 @@ public class FileAlreadyExistsException
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造无异常信息的文件已存在异常
+   */
   public FileAlreadyExistsException() {
     super();
   }
 
+  /**
+   * 构造带指定错误信息的文件已存在异常
+   * @param msg 异常描述信息
+   */
   public FileAlreadyExistsException(String msg) {
     super(msg);
   }

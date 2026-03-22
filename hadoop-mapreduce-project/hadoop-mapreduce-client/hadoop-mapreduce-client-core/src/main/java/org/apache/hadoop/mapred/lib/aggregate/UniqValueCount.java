@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +23,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that dedupes a sequence of objects.
+ * 用于去重统计唯一值数量的值聚合器实现，为旧版MapReduce API提供适配
+ * 该聚合器对输入的对象序列去重，最终统计得到不重复值的总数
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -30,17 +32,15 @@ public class UniqValueCount
     extends org.apache.hadoop.mapreduce.lib.aggregate.UniqValueCount 
     implements ValueAggregator<Object> {
   /**
-   * the default constructor
-   * 
+   * 默认构造方法
    */
   public UniqValueCount() {
     super();
   }
   
   /**
-   * constructor
-   * @param maxNum the limit in the number of unique values to keep.
-   *  
+   * 带最大唯一值数量限制的构造方法
+   * @param maxNum 需要保留的唯一值数量上限
    */
   public UniqValueCount(long maxNum) {
     super(maxNum);

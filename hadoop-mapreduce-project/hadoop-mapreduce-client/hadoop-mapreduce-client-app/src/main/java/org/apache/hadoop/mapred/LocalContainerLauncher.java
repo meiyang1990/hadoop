@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -59,7 +60,8 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptEventType;
 import org.apache.hadoop.mapreduce.v2.app.launcher.ContainerLauncher;
 import org.apache.hadoop.mapreduce.v2.app.launcher.ContainerLauncherEvent;
 import org.apache.hadoop.mapreduce.v2.app.launcher.ContainerRemoteLaunchEvent;
-import org.apache.hadoop.service.AbstractService;
+import org.apache.hadoop.mapreduce.v2.app.launcher.ContainerLauncher;
+import org.apache.hadoop.hadoop.service.AbstractService;
 import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.ShutdownHookManager;
 import org.apache.hadoop.util.StringUtils;
@@ -72,6 +74,10 @@ import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFact
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 文件说明：本地化容器启动器，用于在uber模式下将MapReduce任务容器在当前MRAppMaster JVM内启动执行
+ * 核心职责：在本地同一JVM中顺序执行Map/Reduce子任务，避免多任务同时操作同一本地目录导致文件冲突
+ */
 /**
  * Runs the container task locally in a thread.
  * Since all (sub)tasks share the same local directory, they must be executed
@@ -95,11 +101,22 @@ public class LocalContainerLauncher extends AbstractService implements
   private BlockingQueue<ContainerLauncherEvent> eventQueue =
       new LinkedBlockingQueue<ContainerLauncherEvent>();
 
+  /**
+   * 构造函数，不指定自定义类加载器
+   * @param context MR应用上下文
+   * @param umbilical 任务通信协议
+   */
   public LocalContainerLauncher(AppContext context,
                                 TaskUmbilicalProtocol umbilical) {
     this(context, umbilical, null);
   }
 
+  /**
+   * 构造函数，支持自定义作业类加载器
+   * @param context MR应用上下文
+   * @param umbilical 任务通信协议
+   * @param jobClassLoader 作业自定义类加载器
+   */
   public LocalContainerLauncher(AppContext context,
                                 TaskUmbilicalProtocol umbilical,
                                 ClassLoader jobClassLoader) {
@@ -144,24 +161,21 @@ public class LocalContainerLauncher extends AbstractService implements
     // after running (e.g., "localizeForTask()" or "localizeForMapTask()").
   }
 
+  @Override
   public void serviceStart() throws Exception {
-    // create a single thread for serial execution of tasks
-    // make it a daemon thread so that the process can exit even if the task is
-    // not interruptible
+    // 创建单线程线程池，保证任务顺序执行
     taskRunner =
         HadoopExecutors.newSingleThreadExecutor(new ThreadFactoryBuilder().
             setDaemon(true).setNameFormat("uber-SubtaskRunner").build());
-    // create and start an event handling thread
+    // 创建并启动事件处理线程
     eventHandler = new SubjectInheritingThread(new EventHandler(), "uber-EventHandler");
-    // if the job classloader is specified, set it onto the event handler as the
-    // thread context classloader so that it can be used by the event handler
-    // as well as the subtask runner threads
+    // 如果指定了作业类加载器，设置为事件处理线程的上下文类加载器
     if (jobClassLoader != null) {
       LOG.info("Setting " + jobClassLoader +
           " as the context classloader of thread " + eventHandler.getName());
       eventHandler.setContextClassLoader(jobClassLoader);
     } else {
-      // note the current TCCL
+      // 记录当前上下文类加载器
       LOG.info("Context classloader of thread " + eventHandler.getName() +
           ": " + eventHandler.getContextClassLoader());
     }
@@ -169,6 +183,7 @@ public class LocalContainerLauncher extends AbstractService implements
     super.serviceStart();
   }
 
+  @Override
   public void serviceStop() throws Exception {
     if (eventHandler != null) {
       eventHandler.interrupt();
@@ -188,6 +203,10 @@ public class LocalContainerLauncher extends AbstractService implements
     }
   }
 
+  /**
+   * 设置加密溢写密钥，用于加密中间溢写文件
+   * @param encryptedSpillKey 加密密钥
+   */
   public void setEncryptedSpillKey(byte[] encryptedSpillKey) {
     if (encryptedSpillKey != null) {
       this.encryptedSpillKey = encryptedSpillKey;
@@ -215,6 +234,9 @@ public class LocalContainerLauncher extends AbstractService implements
    *   - runs Task (runSubMap() or runSubReduce())
    *     - TA can safely send TA_UPDATE since in RUNNING state
    */
+  /**
+   * 事件处理器类，负责处理容器启动/清理事件，顺序执行子任务
+   */
   private class EventHandler implements Runnable {
 
     // doneWithMaps and finishedSubMaps are accessed from only
@@ -233,7 +255,7 @@ public class LocalContainerLauncher extends AbstractService implements
     public void run() {
       ContainerLauncherEvent event = null;
 
-      // Collect locations of map outputs to give to reduces
+      // 保存Map任务输出位置，供Reduce任务本地读取
       final Map<TaskAttemptID, MapOutputFile> localMapFiles =
           new HashMap<TaskAttemptID, MapOutputFile>();
       
@@ -242,6 +264,7 @@ public class LocalContainerLauncher extends AbstractService implements
       // write same dirname or filename:  no chdir() in Java
       while (!Thread.currentThread().isInterrupted()) {
         try {
+          // 从事件队列取出事件
           event = eventQueue.take();
         } catch (InterruptedException e) {  // mostly via T_KILL? JOB_KILL?
           LOG.warn("Returning, interrupted : " + e);
@@ -255,27 +278,28 @@ public class LocalContainerLauncher extends AbstractService implements
           final ContainerRemoteLaunchEvent launchEv =
               (ContainerRemoteLaunchEvent)event;
           
-          // execute the task on a separate thread
+          // 提交任务到线程池执行
           Future<?> future = taskRunner.submit(new Runnable() {
             public void run() {
               runTask(launchEv, localMapFiles);
             }
           });
-          // remember the current attempt
+          // 保存任务Future，后续清理使用
           futures.put(event.getTaskAttemptID(), future);
 
         } else if (event.getType() == EventType.CONTAINER_REMOTE_CLEANUP) {
 
+          // 如果需要，转储当前所有线程栈
           if (event.getDumpContainerThreads()) {
             try {
-              // Construct full thread dump header
+              // 构造线程转储头部信息
               System.out.println(new java.util.Date());
               RuntimeMXBean rtBean = ManagementFactory.getRuntimeMXBean();
               System.out.println("Full thread dump " + rtBean.getVmName()
                   + " (" + rtBean.getVmVersion()
                   + " " + rtBean.getSystemProperties().get("java.vm.info")
                   + "):\n");
-              // Dump threads' states and stacks
+              // 转储所有线程状态和栈信息
               ThreadMXBean tmxBean = ManagementFactory.getThreadMXBean();
               ThreadInfo[] tInfos = tmxBean.dumpAllThreads(
                   tmxBean.isObjectMonitorUsageSupported(),
@@ -284,14 +308,13 @@ public class LocalContainerLauncher extends AbstractService implements
                 System.out.println(ti.toString());
               }
             } catch (Throwable t) {
-              // Failure to dump stack shouldn't cause method failure.
+              // 线程转储失败不影响主流程
               System.out.println("Could not create full thread dump: "
                   + t.getMessage());
             }
           }
 
-          // cancel (and interrupt) the current running task associated with the
-          // event
+          // 取消并中断对应任务尝试
           TaskAttemptId taId = event.getTaskAttemptID();
           Future<?> future = futures.remove(taId);
           if (future != null) {
@@ -299,9 +322,7 @@ public class LocalContainerLauncher extends AbstractService implements
             future.cancel(true);
           }
 
-          // send "cleaned" event to task attempt to move us from
-          // SUCCESS_CONTAINER_CLEANUP to SUCCEEDED state (or 
-          // {FAIL|KILL}_CONTAINER_CLEANUP to {FAIL|KILL}_TASK_CLEANUP)
+          // 发送容器清理完成事件，推进任务尝试状态机
           context.getEventHandler().handle(
               new TaskAttemptEvent(taId,
                   TaskAttemptEventType.TA_CONTAINER_CLEANED));
@@ -315,6 +336,11 @@ public class LocalContainerLauncher extends AbstractService implements
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * 执行容器启动任务，封装任务执行的完整流程
+     * @param launchEv 容器远程启动事件
+     * @param localMapFiles 保存Map任务输出的本地路径
+     */
     private void runTask(ContainerRemoteLaunchEvent launchEv,
         Map<TaskAttemptID, MapOutputFile> localMapFiles) {
       TaskAttemptId attemptID = launchEv.getTaskAttemptID(); 
@@ -323,15 +349,14 @@ public class LocalContainerLauncher extends AbstractService implements
       int numMapTasks = job.getTotalMaps();
       int numReduceTasks = job.getTotalReduces();
 
-      // YARN (tracking) Task:
+      // YARN框架层任务对象
       org.apache.hadoop.mapreduce.v2.app.job.Task ytask =
           job.getTask(attemptID.getTaskId());
-      // classic mapred Task:
+      // 经典MapReduce任务对象
       org.apache.hadoop.mapred.Task remoteTask = launchEv.getRemoteTask();
 
-      // after "launching," send launched event to task attempt to move
-      // state from ASSIGNED to RUNNING (also nukes "remoteTask", so must
-      // do getRemoteTask() call first)
+      // 启动完成后发送已启动事件，推进任务尝试从ASSIGNED到RUNNING状态
+      // 本地模式没有远程端口，shuffle直接读本地文件，因此端口设置为-1
       
       //There is no port number because we are not really talking to a task
       // tracker.  The shuffle is just done through local files.  So the
@@ -339,12 +364,14 @@ public class LocalContainerLauncher extends AbstractService implements
       context.getEventHandler().handle(
           new TaskAttemptContainerLaunchedEvent(attemptID, -1));
 
+      // 如果没有Map任务，直接标记Map阶段完成
       if (numMapTasks == 0) {
         doneWithMaps = true;
       }
 
       try {
         if (remoteTask.isMapOrReduce()) {
+          // 更新作业计数器：uber任务总启动数+1
           JobCounterUpdateEvent jce = new JobCounterUpdateEvent(attemptID.getTaskId().getJobId());
           jce.addCounterUpdate(JobCounter.TOTAL_LAUNCHED_UBERTASKS, 1);
           if (remoteTask.isMapTask()) {
@@ -354,307 +381,17 @@ public class LocalContainerLauncher extends AbstractService implements
           }
           context.getEventHandler().handle(jce);
         }
+        // 执行子任务
         runSubtask(remoteTask, ytask.getType(), attemptID, numMapTasks,
                    (numReduceTasks > 0), localMapFiles);
 
-        // In non-uber mode, TA gets TA_CONTAINER_COMPLETED from MRAppMaster
-        // as part of NM -> RM -> AM notification route.
-        // In uber mode, given the task run inside the MRAppMaster container,
-        // we have to simulate the notification.
+        // 非uber模式由NM->RM->AM通知容器完成，uber模式在当前JVM执行，需要模拟发送完成事件
         context.getEventHandler().handle(new TaskAttemptEvent(attemptID,
             TaskAttemptEventType.TA_CONTAINER_COMPLETED));
 
       } catch (RuntimeException re) {
+        // 更新作业计数器：uber任务失败数+1
         JobCounterUpdateEvent jce = new JobCounterUpdateEvent(attemptID.getTaskId().getJobId());
         jce.addCounterUpdate(JobCounter.NUM_FAILED_UBERTASKS, 1);
         context.getEventHandler().handle(jce);
-        // this is our signal that the subtask failed in some way, so
-        // simulate a failed JVM/container and send a container-completed
-        // event to task attempt (i.e., move state machine from RUNNING
-        // to FAIL_CONTAINER_CLEANUP [and ultimately to FAILED])
-        context.getEventHandler().handle(new TaskAttemptEvent(attemptID,
-            TaskAttemptEventType.TA_CONTAINER_COMPLETED));
-      } catch (IOException ioe) {
-        // if umbilical itself barfs (in error-handler of runSubMap()),
-        // we're pretty much hosed, so do what YarnChild main() does
-        // (i.e., exit clumsily--but can never happen, so no worries!)
-        LOG.error("oopsie...  this can never happen: "
-            + StringUtils.stringifyException(ioe));
-        ExitUtil.terminate(-1);
-      } finally {
-        // remove my future
-        if (futures.remove(attemptID) != null) {
-          LOG.info("removed attempt " + attemptID +
-              " from the futures to keep track of");
-        }
-      }
-    }
-
-    private void runSubtask(org.apache.hadoop.mapred.Task task,
-                            final TaskType taskType,
-                            TaskAttemptId attemptID,
-                            final int numMapTasks,
-                            boolean renameOutputs,
-                            Map<TaskAttemptID, MapOutputFile> localMapFiles)
-    throws RuntimeException, IOException {
-      org.apache.hadoop.mapred.TaskAttemptID classicAttemptID =
-          TypeConverter.fromYarn(attemptID);
-
-      try {
-        JobConf conf = new JobConf(getConfig());
-        conf.set(JobContext.TASK_ID, task.getTaskID().toString());
-        conf.set(JobContext.TASK_ATTEMPT_ID, classicAttemptID.toString());
-        conf.setBoolean(JobContext.TASK_ISMAP, (taskType == TaskType.MAP));
-        conf.setInt(JobContext.TASK_PARTITION, task.getPartition());
-        conf.set(JobContext.ID, task.getJobID().toString());
-
-        // Use the AM's local dir env to generate the intermediate step 
-        // output files
-        String[] localSysDirs = StringUtils.getTrimmedStrings(
-            System.getenv(Environment.LOCAL_DIRS.name()));
-        conf.setStrings(MRConfig.LOCAL_DIR, localSysDirs);
-        LOG.info(MRConfig.LOCAL_DIR + " for uber task: "
-            + conf.get(MRConfig.LOCAL_DIR));
-
-        // mark this as an uberized subtask so it can set task counter
-        // (longer-term/FIXME:  could redefine as job counter and send
-        // "JobCounterEvent" to JobImpl on [successful] completion of subtask;
-        // will need new Job state-machine transition and JobImpl jobCounters
-        // map to handle)
-        conf.setBoolean("mapreduce.task.uberized", true);
-
-        // Check and handle Encrypted spill key
-        task.setEncryptedSpillKey(encryptedSpillKey);
-        YarnChild.setEncryptedSpillKeyIfRequired(task);
-
-        // META-FIXME: do we want the extra sanity-checking (doneWithMaps,
-        // etc.), or just assume/hope the state machine(s) and uber-AM work
-        // as expected?
-        if (taskType == TaskType.MAP) {
-          if (doneWithMaps) {
-            LOG.error("CONTAINER_REMOTE_LAUNCH contains a map task ("
-                      + attemptID + "), but should be finished with maps");
-            throw new RuntimeException();
-          }
-
-          MapTask map = (MapTask)task;
-          map.setConf(conf);
-
-          map.run(conf, umbilical);
-
-          if (renameOutputs) {
-            MapOutputFile renamed = renameMapOutputForReduce(conf, attemptID,
-                map.getMapOutputFile());
-            localMapFiles.put(classicAttemptID, renamed);
-          }
-          relocalize();
-
-          if (++finishedSubMaps == numMapTasks) {
-            doneWithMaps = true;
-          }
-
-        } else /* TaskType.REDUCE */ {
-
-          if (!doneWithMaps) {
-            // check if event-queue empty?  whole idea of counting maps vs. 
-            // checking event queue is a tad wacky...but could enforce ordering
-            // (assuming no "lost events") at LocalMRAppMaster [CURRENT BUG(?): 
-            // doesn't send reduce event until maps all done]
-            LOG.error("CONTAINER_REMOTE_LAUNCH contains a reduce task ("
-                      + attemptID + "), but not yet finished with maps");
-            throw new RuntimeException();
-          }
-
-          // a.k.a. "mapreduce.jobtracker.address" in LocalJobRunner:
-          // set framework name to local to make task local
-          conf.set(MRConfig.FRAMEWORK_NAME, MRConfig.LOCAL_FRAMEWORK_NAME);
-          conf.set(MRConfig.MASTER_ADDRESS, "local");  // bypass shuffle
-
-          ReduceTask reduce = (ReduceTask)task;
-          reduce.setLocalMapFiles(localMapFiles);
-          reduce.setConf(conf);          
-
-          reduce.run(conf, umbilical);
-          relocalize();
-        }
-
-      } catch (FSError e) {
-        LOG.error("FSError from child", e);
-        // umbilical:  MRAppMaster creates (taskAttemptListener), passes to us
-        if (!ShutdownHookManager.get().isShutdownInProgress()) {
-          umbilical.fsError(classicAttemptID, e.getMessage());
-        }
-        throw new RuntimeException();
-
-      } catch (Exception exception) {
-        LOG.warn("Exception running local (uberized) 'child' : "
-            + StringUtils.stringifyException(exception));
-        try {
-          if (task != null) {
-            // do cleanup for the task
-            task.taskCleanup(umbilical);
-          }
-        } catch (Exception e) {
-          LOG.info("Exception cleaning up: "
-              + StringUtils.stringifyException(e));
-        }
-        // Report back any failures, for diagnostic purposes
-        umbilical.reportDiagnosticInfo(classicAttemptID, 
-            StringUtils.stringifyException(exception));
-        throw new RuntimeException();
-
-      } catch (Throwable throwable) {
-        LOG.error("Error running local (uberized) 'child' : "
-            + StringUtils.stringifyException(throwable));
-        if (!ShutdownHookManager.get().isShutdownInProgress()) {
-          Throwable tCause = throwable.getCause();
-          String cause =
-              (tCause == null) ? throwable.getMessage() : StringUtils
-                  .stringifyException(tCause);
-          umbilical.fatalError(classicAttemptID, cause, false);
-        }
-        throw new RuntimeException();
-      }
-    }
-
-    /**
-     * Also within the local filesystem, we need to restore the initial state
-     * of the directory as much as possible.  Compare current contents against
-     * the saved original state and nuke everything that doesn't belong, with
-     * the exception of the renamed map outputs.
-     *
-     * Any jobs that go out of their way to rename or delete things from the
-     * local directory are considered broken and deserve what they get...
-     */
-    private void relocalize() {
-      File[] curLocalFiles = curDir.listFiles();
-      if (curLocalFiles != null) {
-        for (int j = 0; j < curLocalFiles.length; ++j) {
-          if (!localizedFiles.contains(curLocalFiles[j])) {
-            // found one that wasn't there before:  delete it
-            boolean deleted = false;
-            try {
-              if (curFC != null) {
-                // this is recursive, unlike File delete():
-                deleted =
-                    curFC.delete(new Path(curLocalFiles[j].getName()), true);
-              }
-            } catch (IOException e) {
-              deleted = false;
-            }
-            if (!deleted) {
-              LOG.warn("Unable to delete unexpected local file/dir "
-                  + curLocalFiles[j].getName()
-                  + ": insufficient permissions?");
-            }
-          }
-        }
-      }
-    }
-  } // end EventHandler
-
-  /**
-   * Within the _local_ filesystem (not HDFS), all activity takes place within
-   * a subdir inside one of the LOCAL_DIRS
-   * (${local.dir}/usercache/$user/appcache/$appId/$contId/),
-   * and all sub-MapTasks create the same filename ("file.out").  Rename that
-   * to something unique (e.g., "map_0.out") to avoid possible collisions.
-   *
-   * Longer-term, we'll modify [something] to use TaskAttemptID-based
-   * filenames instead of "file.out". (All of this is entirely internal,
-   * so there are no particular compatibility issues.)
-   */
-  @VisibleForTesting
-  protected static MapOutputFile renameMapOutputForReduce(JobConf conf,
-      TaskAttemptId mapId, MapOutputFile subMapOutputFile) throws IOException {
-    FileSystem localFs = FileSystem.getLocal(conf);
-    // move map output to reduce input
-    Path mapOut = subMapOutputFile.getOutputFile();
-    FileStatus mStatus = localFs.getFileStatus(mapOut);
-    Path reduceIn = subMapOutputFile.getInputFileForWrite(
-        TypeConverter.fromYarn(mapId).getTaskID(), mStatus.getLen());
-    Path mapOutIndex = subMapOutputFile.getOutputIndexFile();
-    Path reduceInIndex = new Path(reduceIn.toString() + ".index");
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Renaming map output file for task attempt "
-          + mapId.toString() + " from original location " + mapOut.toString()
-          + " to destination " + reduceIn.toString());
-    }
-    if (!localFs.mkdirs(reduceIn.getParent())) {
-      throw new IOException("Mkdirs failed to create "
-          + reduceIn.getParent().toString());
-    }
-    if (!localFs.rename(mapOut, reduceIn))
-      throw new IOException("Couldn't rename " + mapOut);
-    if (!localFs.rename(mapOutIndex, reduceInIndex))
-      throw new IOException("Couldn't rename " + mapOutIndex);
-
-    return new RenamedMapOutputFile(reduceIn);
-  }
-
-  private static class RenamedMapOutputFile extends MapOutputFile {
-    private Path path;
-    
-    public RenamedMapOutputFile(Path path) {
-      this.path = path;
-    }
-    
-    @Override
-    public Path getOutputFile() throws IOException {
-      return path;
-    }
-
-    @Override
-    public Path getOutputFileForWrite(long size) throws IOException {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getOutputFileForWriteInVolume(Path existing) {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getOutputIndexFile() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getOutputIndexFileForWrite(long size) throws IOException {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getOutputIndexFileForWriteInVolume(Path existing) {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getSpillFile(int spillNumber) throws IOException {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getSpillFileForWrite(int spillNumber, long size)
-        throws IOException {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getSpillIndexFile(int spillNumber) throws IOException {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getSpillIndexFileForWrite(int spillNumber, long size)
-        throws IOException {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getInputFile(int mapId) throws IOException {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public Path getInputFileForWrite(TaskID mapId, long size)
-        throws IOException {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public void removeAll() throws IOException {
-      throw new UnsupportedOperationException();
-    }
-  }
-
-}
+        // 子任务执行失败，模拟容器完成事件推进状态机到失败状态

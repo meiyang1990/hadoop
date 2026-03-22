@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,18 +31,31 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A RecordReader that reads records from an Oracle SQL table.
+ * 专为Oracle数据库设计的RecordReader实现，从Oracle表中读取数据作为MapReduce输入
+ * 适配Oracle特有的分页语法和时区处理逻辑
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T> {
 
-  /** Configuration key to set to a timezone string. */
+  /** 配置项：Oracle会话时区，用于处理TIMESTAMP WITH LOCAL TIME ZONE类型字段 */
   public static final String SESSION_TIMEZONE_KEY = "oracle.sessionTimeZone";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OracleDBRecordReader.class);
 
+  /**
+   * 构造OracleDBRecordReader实例，完成初始化并设置会话时区
+   * @param split 输入分片，对应本次要读取的数据范围
+   * @param inputClass 输出数据类型，需实现DBWritable接口
+   * @param conf Hadoop作业配置
+   * @param conn 数据库连接
+   * @param dbConfig 数据库输入配置
+   * @param cond 查询条件
+   * @param fields 要读取的字段列表
+   * @param table 要读取的表名
+   * @throws SQLException 数据库操作异常时抛出
+   */
   public OracleDBRecordReader(DBInputFormat.DBInputSplit split, 
       Class<T> inputClass, Configuration conf, Connection conn, DBConfiguration dbConfig,
       String cond, String [] fields, String table) throws SQLException {
@@ -49,7 +63,10 @@ public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T
     setSessionTimeZone(conf, conn);
   }
 
-  /** Returns the query for selecting the records from an Oracle DB. */
+  /**
+   * 生成适配Oracle语法的分页查询SQL语句，使用ROWNUM机制实现分片读取
+   * @return 完整的查询SQL字符串
+   */
   protected String getSelectQuery() {
     StringBuilder query = new StringBuilder();
     DBConfiguration dbConf = getDBConf();
@@ -57,7 +74,7 @@ public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T
     String tableName = getTableName();
     String [] fieldNames = getFieldNames();
 
-    // Oracle-specific codepath to use rownum instead of LIMIT/OFFSET.
+    // Oracle使用ROWNUM而非标准LIMIT/OFFSET实现分页，走专属分支
     if(dbConf.getInputQuery() == null) {
       query.append("SELECT ");
   
@@ -76,12 +93,13 @@ public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T
         query.append(" ORDER BY ").append(orderBy);
       }
     } else {
-      //PREBUILT QUERY
+      // 用户已预先定义好查询SQL，直接使用
       query.append(dbConf.getInputQuery());
     }
         
     try {
       DBInputFormat.DBInputSplit split = getSplit();
+      // 分片长度大于0，说明需要分页读取，添加ROWNUM分页包装
       if (split.getLength() > 0){
         String querystring = query.toString();
 
@@ -92,37 +110,33 @@ public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T
         query.append(" ) WHERE dbif_rno > ").append(split.getStart());
       }
     } catch (IOException ex) {
-      // ignore, will not throw.
+      // 获取分片信息失败，不抛出异常，返回无分页的原始查询
     }		      
 
     return query.toString();
   }
 
   /**
-   * Set session time zone
-   * @param conf The current configuration.
-   * We read the 'oracle.sessionTimeZone' property from here.
-   * @param conn The connection to alter the timezone properties of.
+   * 通过反射调用Oracle连接的setSessionTimeZone方法，设置会话时区
+   * 用于正确处理Oracle的TIMESTAMP WITH LOCAL TIME ZONE类型字段
+   * @param conf Hadoop配置，从中读取用户配置的时区值
+   * @param conn Oracle数据库连接
+   * @throws SQLException 反射调用失败或找不到方法时抛出
    */
   public static void setSessionTimeZone(Configuration conf,
       Connection conn) throws SQLException {
-    // need to use reflection to call the method setSessionTimeZone on
-    // the OracleConnection class because oracle specific java libraries are
-    // not accessible in this context.
+    // 通过反射调用OracleConnection的setSessionTimeZone方法，避免编译依赖Oracle驱动
     Method method;
     try {
       method = conn.getClass().getMethod(
               "setSessionTimeZone", new Class [] {String.class});
     } catch (Exception ex) {
       LOG.error("Could not find method setSessionTimeZone in " + conn.getClass().getName(), ex);
-      // rethrow SQLException
+      // 包装异常为SQLException抛出
       throw new SQLException(ex);
     }
 
-    // Need to set the time zone in order for Java
-    // to correctly access the column "TIMESTAMP WITH LOCAL TIME ZONE".
-    // We can't easily get the correct Oracle-specific timezone string
-    // from Java; just let the user set the timezone in a property.
+    // 从配置读取时区，默认使用GMT
     String clientTimeZone = conf.get(SESSION_TIMEZONE_KEY, "GMT");
     try {
       method.setAccessible(true);
@@ -133,11 +147,11 @@ public class OracleDBRecordReader<T extends DBWritable> extends DBRecordReader<T
                " could not be set on Oracle database.");
       LOG.warn("Setting default time zone: GMT");
       try {
-        // "GMT" timezone is guaranteed to exist.
+        // GMT时区一定存在，降级使用默认GMT
         method.invoke(conn, "GMT");
       } catch (Exception ex2) {
         LOG.error("Could not set time zone for oracle connection", ex2);
-        // rethrow SQLException
+        // 仍然失败，抛出异常
         throw new SQLException(ex);
       }
     }

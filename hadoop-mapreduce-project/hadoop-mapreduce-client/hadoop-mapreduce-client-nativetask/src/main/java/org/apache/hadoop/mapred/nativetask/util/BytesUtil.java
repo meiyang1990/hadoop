@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,6 +23,10 @@ import org.apache.hadoop.thirdparty.com.google.common.primitives.Ints;
 import org.apache.hadoop.thirdparty.com.google.common.primitives.Longs;
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 字节数组工具类，为Native Task模块提供基础的字节数组与基础类型相互转换、字节数组可视化格式化能力
+ * 用于本地任务处理过程中的序列化反序列化和调试输出
+ */
 @InterfaceAudience.Private
 public class BytesUtil {
 
@@ -29,10 +34,10 @@ public class BytesUtil {
       "0123456789abcdef".toCharArray();
 
   /**
-   * Converts a big-endian byte array to a long value.
-   *
-   * @param bytes array of bytes
-   * @param offset offset into array
+   * 将大端字节数组从指定偏移位置转换为long类型值
+   * @param bytes 输入字节数组
+   * @param offset 起始偏移位置
+   * @return 转换后的long值
    */
   public static long toLong(byte[] bytes, int offset) {
     return Longs.fromBytes(bytes[offset],
@@ -46,9 +51,10 @@ public class BytesUtil {
   }
 
   /**
-   * Convert a big-endian integer from a byte array to a primitive value.
-   * @param bytes the array to parse from
-   * @param offset the offset in the array
+   * 将大端字节数组从指定偏移位置转换为int类型值
+   * @param bytes 输入字节数组
+   * @param offset 起始偏移位置
+   * @return 转换后的int值
    */
   public static int toInt(byte[] bytes, int offset) {
     return Ints.fromBytes(bytes[offset],
@@ -58,47 +64,47 @@ public class BytesUtil {
   }
 
   /**
-   * Presumes float encoded as IEEE 754 floating-point "single format"
-   * @param bytes byte array
-   * @return Float made from passed byte array.
+   * 将字节数组按IEEE 754单精度浮点数格式转换为float类型值
+   * @param bytes 输入字节数组
+   * @return 转换后的float值
    */
   public static float toFloat(byte [] bytes) {
     return toFloat(bytes, 0);
   }
 
   /**
-   * Presumes float encoded as IEEE 754 floating-point "single format"
-   * @param bytes array to convert
-   * @param offset offset into array
-   * @return Float made from passed byte array.
+   * 将字节数组从指定偏移位置按IEEE 754单精度浮点数格式转换为float类型值
+   * @param bytes 输入字节数组
+   * @param offset 起始偏移位置
+   * @return 转换后的float值
    */
   public static float toFloat(byte [] bytes, int offset) {
     return Float.intBitsToFloat(toInt(bytes, offset));
   }
 
   /**
-   * @param bytes byte array
-   * @return Return double made from passed bytes.
+   * 将整个字节数组按IEEE 754双精度浮点数格式转换为double类型值
+   * @param bytes 输入字节数组
+   * @return 转换后的double值
    */
   public static double toDouble(final byte [] bytes) {
     return toDouble(bytes, 0);
   }
 
   /**
-   * @param bytes byte array
-   * @param offset offset where double is
-   * @return Return double made from passed bytes.
+   * 将字节数组从指定偏移位置按IEEE 754双精度浮点数格式转换为double类型值
+   * @param bytes 输入字节数组
+   * @param offset 起始偏移位置
+   * @return 转换后的double值
    */
   public static double toDouble(final byte [] bytes, final int offset) {
     return Double.longBitsToDouble(toLong(bytes, offset));
   }
 
   /**
-   * Write a printable representation of a byte array.
-   *
-   * @param b byte array
-   * @return the printable presentation
-   * @see #toStringBinary(byte[], int, int)
+   * 将整个字节数组转换为可打印字符串，不可打印字符转为十六进制转义格式
+   * @param b 输入字节数组
+   * @return 可打印的字符串表示
    */
   public static String toStringBinary(final byte [] b) {
     if (b == null)
@@ -107,28 +113,31 @@ public class BytesUtil {
   }
 
   /**
-   * Write a printable representation of a byte array. Non-printable
-   * characters are hex escaped in the format \\x%02X, eg:
-   * \x00 \x05 etc
-   *
-   * @param b array to write out
-   * @param off offset to start at
-   * @param len length to write
-   * @return string output
+   * 将字节数组指定范围转换为可打印字符串，不可打印字符转为\\xHH格式的十六进制转义
+   * @param b 输入字节数组
+   * @param off 起始偏移位置
+   * @param len 转换长度
+   * @return 可打印的字符串表示
    */
   public static String toStringBinary(final byte [] b, int off, int len) {
     StringBuilder result = new StringBuilder();
-    // Just in case we are passed a 'len' that is > buffer length...
+    // 处理偏移超出数组长度的边界情况
     if (off >= b.length) return result.toString();
+    // 处理长度超出数组剩余部分的边界情况，截断长度
     if (off + len > b.length) len = b.length - off;
+    // 遍历指定范围的每个字节
     for (int i = off; i < off + len ; ++i ) {
+      // 获取无符号字节值
       int ch = b[i] & 0xFF;
+      // 判断是否为可打印的安全字符：数字、大小写字母、常见符号
       if ( (ch >= '0' && ch <= '9')
         || (ch >= 'A' && ch <= 'Z')
         || (ch >= 'a' && ch <= 'z')
         || " `~!@#$%^&*()-_=+[]{}|;:'\",.<>/?".indexOf(ch) >= 0 ) {
+        // 可打印字符直接追加
         result.append((char)ch);
       } else {
+        // 不可打印字符转为十六进制转义格式
         result.append("\\x");
         result.append(HEX_CHARS[(ch >> 4) & 0x0F]);
         result.append(HEX_CHARS[ch & 0x0F]);
@@ -138,19 +147,18 @@ public class BytesUtil {
   }
 
   /**
-   * Convert a boolean to a byte array. True becomes -1
-   * and false becomes 0.
-   *
-   * @param b value
-   * @return <code>b</code> encoded in a byte array.
+   * 将布尔值转换为字节数组：true转为-1，false转为0
+   * @param b 输入布尔值
+   * @return 编码后的字节数组
    */
   public static byte [] toBytes(final boolean b) {
     return new byte[] { b ? (byte) -1 : (byte) 0 };
   }
 
   /**
-   * @param f float value
-   * @return the float represented as byte []
+   * 将float值转换为IEEE 754格式的字节数组
+   * @param f 输入float值
+   * @return 编码后的4字节字节数组
    */
   public static byte [] toBytes(final float f) {
     // Encode it as int
@@ -158,11 +166,9 @@ public class BytesUtil {
   }
 
   /**
-   * Serialize a double as the IEEE 754 double format output. The resultant
-   * array will be 8 bytes long.
-   *
-   * @param d value
-   * @return the double represented as byte []
+   * 将double值转换为IEEE 754格式的字节数组
+   * @param d 输入double值
+   * @return 编码后的8字节字节数组
    */
   public static byte [] toBytes(final double d) {
     // Encode it as a long

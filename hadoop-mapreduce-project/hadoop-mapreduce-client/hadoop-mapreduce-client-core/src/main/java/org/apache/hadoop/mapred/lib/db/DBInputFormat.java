@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,6 +36,11 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.Job;
 
+/**
+ * 从关系型数据库读取数据的MapReduce旧API输入格式实现
+ * 支持将数据库表数据分片后并行读取，作为Map任务的输入
+ * 继承新版本API实现，适配旧版MapReduce接口
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 @SuppressWarnings("deprecation")
@@ -42,18 +48,17 @@ public class DBInputFormat<T  extends DBWritable>
     extends org.apache.hadoop.mapreduce.lib.db.DBInputFormat<T> 
     implements InputFormat<LongWritable, T>, JobConfigurable {
   /**
-   * A RecordReader that reads records from a SQL table.
-   * Emits LongWritables containing the record number as 
-   * key and DBWritables as value.  
+   * 从SQL表读取记录的RecordReader实现
+   * 输出key为记录编号（LongWritable），value为实现DBWritable的记录对象
    */
   protected class DBRecordReader extends
       org.apache.hadoop.mapreduce.lib.db.DBRecordReader<T>
       implements RecordReader<LongWritable, T> {
     /**
-     * The constructor is kept to be compatible with M/R 1.x
+     * 兼容旧版MapReduce 1.x的构造方法
      *
-     * @param split The InputSplit to read data for
-     * @throws SQLException
+     * @param split 要读取数据的输入分片
+     * @throws SQLException 数据库访问异常
      */
     protected DBRecordReader(DBInputSplit split, Class<T> inputClass,
         JobConf job) throws SQLException {
@@ -61,8 +66,9 @@ public class DBInputFormat<T  extends DBWritable>
     }
 
     /**
-     * @param split The InputSplit to read data for
-     * @throws SQLException 
+     * 完整构造方法
+     * @param split 要读取数据的输入分片
+     * @throws SQLException 数据库访问异常
      */
     protected DBRecordReader(DBInputSplit split, Class<T> inputClass, 
         JobConf job, Connection conn, DBConfiguration dbConfig, String cond,
@@ -91,14 +97,18 @@ public class DBInputFormat<T  extends DBWritable>
   }
 
   /**
-   * A RecordReader implementation that just passes through to a wrapped
-   * RecordReader built with the new API.
+   * 适配新旧API的RecordReader包装类
+   * 将新版本API的DBRecordReader转换为旧版MapReduce接口要求的实现
    */
   private static class DBRecordReaderWrapper<T extends DBWritable>
       implements RecordReader<LongWritable, T> {
 
     private org.apache.hadoop.mapreduce.lib.db.DBRecordReader<T> rr;
     
+    /**
+     * 构造包装器，包装新版本API的RecordReader
+     * @param inner 新版本API的DBRecordReader实例
+     */
     public DBRecordReaderWrapper(
         org.apache.hadoop.mapreduce.lib.db.DBRecordReader<T> inner) {
       this.rr = inner;
@@ -130,28 +140,29 @@ public class DBInputFormat<T  extends DBWritable>
   }
 
   /**
-   * A Class that does nothing, implementing DBWritable
+   * 空实现的DBWritable类，用于占位场景
    */
   public static class NullDBWritable extends 
       org.apache.hadoop.mapreduce.lib.db.DBInputFormat.NullDBWritable 
       implements DBWritable, Writable {
   }
+  
   /**
-   * A InputSplit that spans a set of rows
+   * 对应数据库查询结果范围的输入分片，包含一组连续行
    */
   protected static class DBInputSplit extends 
       org.apache.hadoop.mapreduce.lib.db.DBInputFormat.DBInputSplit 
       implements InputSplit {
     /**
-     * Default Constructor
+     * 默认构造方法
      */
     public DBInputSplit() {
     }
 
     /**
-     * Convenience Constructor
-     * @param start the index of the first row to select
-     * @param end the index of the last row to select
+     * 构造指定行范围的分片
+     * @param start 第一个待读取行的索引
+     * @param end 最后一个待读取行的索引
      */
     public DBInputSplit(long start, long end) {
       super(start, end);
@@ -167,7 +178,7 @@ public class DBInputFormat<T  extends DBWritable>
   public RecordReader<LongWritable, T> getRecordReader(InputSplit split,
       JobConf job, Reporter reporter) throws IOException {
 
-    // wrap the DBRR in a shim class to deal with API differences.
+    // 使用包装类适配新旧API差异
     return new DBRecordReaderWrapper<T>(
         (org.apache.hadoop.mapreduce.lib.db.DBRecordReader<T>) 
         createDBRecordReader(
@@ -176,8 +187,10 @@ public class DBInputFormat<T  extends DBWritable>
 
   /** {@inheritDoc} */
   public InputSplit[] getSplits(JobConf job, int chunks) throws IOException {
+    // 调用新版本API获取分片列表
     List<org.apache.hadoop.mapreduce.InputSplit> newSplits = 
       super.getSplits(Job.getInstance(job));
+    // 转换为旧版API分片数组返回
     InputSplit[] ret = new InputSplit[newSplits.size()];
     int i = 0;
     for (org.apache.hadoop.mapreduce.InputSplit s : newSplits) {
@@ -189,17 +202,14 @@ public class DBInputFormat<T  extends DBWritable>
   }
 
   /**
-   * Initializes the map-part of the job with the appropriate input settings.
+   * 初始化作业数据库输入配置，通过指定表、条件、排序和字段读取数据
    * 
-   * @param job The job
-   * @param inputClass the class object implementing DBWritable, which is the 
-   * Java object holding tuple fields.
-   * @param tableName The table to read data from
-   * @param conditions The condition which to select data with, eg. '(updated &gt;
-   * 20070101 AND length &gt; 0)'
-   * @param orderBy the fieldNames in the orderBy clause.
-   * @param fieldNames The field names in the table
-   * @see #setInput(JobConf, Class, String, String)
+   * @param job 作业配置对象
+   * @param inputClass 实现DBWritable的记录类型，用于保存数据库行数据
+   * @param tableName 待读取的数据库表名
+   * @param conditions 查询条件，对应SQL的WHERE子句，例如 '(updated > 20070101 AND length > 0)'
+   * @param orderBy 排序字段，对应SQL的ORDER BY子句
+   * @param fieldNames 待读取的表字段名列表
    */
   public static void setInput(JobConf job, Class<? extends DBWritable> inputClass,
       String tableName,String conditions, String orderBy, String... fieldNames) {
@@ -214,17 +224,12 @@ public class DBInputFormat<T  extends DBWritable>
   }
   
   /**
-   * Initializes the map-part of the job with the appropriate input settings.
+   * 初始化作业数据库输入配置，通过自定义SQL查询读取数据
    * 
-   * @param job The job
-   * @param inputClass the class object implementing DBWritable, which is the 
-   * Java object holding tuple fields.
-   * @param inputQuery the input query to select fields. Example : 
-   * "SELECT f1, f2, f3 FROM Mytable ORDER BY f1"
-   * @param inputCountQuery the input query that returns the number of records in
-   * the table. 
-   * Example : "SELECT COUNT(f1) FROM Mytable"
-   * @see #setInput(JobConf, Class, String, String, String, String...)
+   * @param job 作业配置对象
+   * @param inputClass 实现DBWritable的记录类型，用于保存数据库行数据
+   * @param inputQuery 数据查询SQL，例如 "SELECT f1, f2, f3 FROM Mytable ORDER BY f1"
+   * @param inputCountQuery 统计总行数的SQL，用于分片计算，例如 "SELECT COUNT(f1) FROM Mytable"
    */
   public static void setInput(JobConf job, Class<? extends DBWritable> inputClass,
       String inputQuery, String inputCountQuery) {

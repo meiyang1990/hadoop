@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,38 +37,40 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 /**
- * A checksum input stream, used for IFiles.
- * Used to validate the checksum of files created by {@link IFileOutputStream}. 
-*/
+ * IFile 校验和输入流，用于读取 MapReduce 中间文件并验证数据完整性。
+ * 配合 {@link IFileOutputStream} 使用，验证写入的IFile数据校验和是否正确。
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class IFileInputStream extends InputStream {
   
-  private final InputStream in; //The input stream to be verified for checksum.
-  private final FileDescriptor inFd; // the file descriptor, if it is known
-  private final long length; //The total length of the input file
-  private final long dataLength;
-  private DataChecksum sum;
-  private long currentOffset = 0;
-  private final byte b[] = new byte[1];
-  private byte csum[] = null;
-  private int checksumSize;
+  private final InputStream in; // 待校验的底层输入流
+  private final FileDescriptor inFd; // 底层文件描述符（如果可获取），用于预读
+  private final long length; // 输入流总长度（包含校验和字节）
+  private final long dataLength; // 实际数据长度（不包含末尾校验和）
+  private DataChecksum sum; // 数据校验和计算器
+  private long currentOffset = 0; // 当前读取位置偏移量
+  private final byte b[] = new byte[1]; // 单字节读取缓存
+  private byte csum[] = null; // 存储文件末尾存储的校验和
+  private int checksumSize; // 校验和字节长度
 
-  private ReadaheadRequest curReadahead = null;
-  private ReadaheadPool raPool = ReadaheadPool.getInstance();
-  private boolean readahead;
-  private int readaheadLength;
+  private ReadaheadRequest curReadahead = null; // 当前预读请求
+  private ReadaheadPool raPool = ReadaheadPool.getInstance(); // 全局预读池实例
+  private boolean readahead; // 是否开启预读
+  private int readaheadLength; // 单次预读长度
 
   public static final Logger LOG =
       LoggerFactory.getLogger(IFileInputStream.class);
 
-  private boolean disableChecksumValidation = false;
+  private boolean disableChecksumValidation = false; // 是否禁用校验和验证
   
   /**
-   * Create a checksum input stream that reads
-   * @param in The input stream to be verified for checksum.
-   * @param len The length of the input stream including checksum bytes.
+   * 构造IFile校验和输入流
+   * @param in 待读取的底层输入流
+   * @param len 包含校验和的输入流总长度
+   * @param conf Hadoop配置对象，用于读取预读相关配置
    */
   public IFileInputStream(InputStream in, long len, Configuration conf) {
     this.in = in;
@@ -87,6 +90,11 @@ public class IFileInputStream extends InputStream {
     doReadahead();
   }
 
+  /**
+   * 尝试从输入流中获取文件描述符，用于预读优化
+   * @param in 输入流对象
+   * @return 若可获取则返回文件描述符，否则返回null
+   */
   private static FileDescriptor getFileDescriptorIfAvail(InputStream in) {
     FileDescriptor fd = null;
     try {
@@ -102,8 +110,7 @@ public class IFileInputStream extends InputStream {
   }
 
   /**
-   * Close the input stream. Note that we need to read to the end of the
-   * stream to validate the checksum.
+   * 关闭输入流，关闭前会读完所有数据完成校验和验证（如果未读完）
    */
   @Override
   public void close() throws IOException {
@@ -129,18 +136,24 @@ public class IFileInputStream extends InputStream {
    throw new IOException("Skip not supported for IFileInputStream");
   }
   
+  /**
+   * 获取当前读取位置（不超过实际数据长度）
+   * @return 当前读取偏移量
+   */
   public long getPosition() {
     return (currentOffset >= dataLength) ? dataLength : currentOffset;
   }
   
+  /**
+   * 获取校验和字节长度
+   * @return 校验和字节数
+   */
   public long getSize() {
     return checksumSize;
   }
   
   /**
-   * Read bytes from the stream.
-   * At EOF, checksum is validated, but the checksum
-   * bytes are not passed back in the buffer. 
+   * 批量读取数据，不返回校验和，到达数据末尾时自动完成校验和验证
    */
   public int read(byte[] b, int off, int len) throws IOException {
 
@@ -153,6 +166,9 @@ public class IFileInputStream extends InputStream {
     return doRead(b,off,len);
   }
 
+  /**
+   * 提交预读请求到预读池，优化顺序读取性能
+   */
   private void doReadahead() {
     if (raPool != null && inFd != null && readahead) {
       curReadahead = raPool.readaheadStream(
@@ -163,10 +179,12 @@ public class IFileInputStream extends InputStream {
   }
 
   /**
-   * Read bytes from the stream.
-   * At EOF, checksum is validated and sent back
-   * as the last four bytes of the buffer. The caller should handle
-   * these bytes appropriately
+   * 批量读取数据，数据读完后会将校验和也返回给调用方
+   * @param b 存放读取结果的字节数组
+   * @param off 数组起始偏移量
+   * @param len 最多读取字节数
+   * @return 实际读取字节数，到达流末尾返回-1
+   * @throws IOException 读取或校验错误时抛出IO异常
    */
   public int readWithChecksum(byte[] b, int off, int len) throws IOException {
 
@@ -174,9 +192,7 @@ public class IFileInputStream extends InputStream {
       return -1;
     }
     else if (currentOffset >= dataLength) {
-      // If the previous read drained off all the data, then just return
-      // the checksum now. Note that checksum validation would have 
-      // happened in the earlier read
+      // 已读完所有实际数据，现在返回剩余校验和字节
       int lenToCopy = (int) (checksumSize - (currentOffset - dataLength));
       if (len < lenToCopy) {
         lenToCopy = len;
@@ -199,10 +215,17 @@ public class IFileInputStream extends InputStream {
     return bytesRead;
   }
 
+  /**
+   * 实际执行读取和校验计算的核心方法
+   * @param b 存放读取结果的字节数组
+   * @param off 数组起始偏移量
+   * @param len 最多读取字节数
+   * @return 实际读取字节数
+   * @throws IOException 读取错误或校验失败时抛出异常
+   */
   private int doRead(byte[]b, int off, int len) throws IOException {
     
-    // If we are trying to read past the end of data, just read
-    // the left over data
+    // 不超过实际数据边界读取，截断读取长度
     if (currentOffset + len > dataLength) {
       len = (int) dataLength - (int)currentOffset;
     }
@@ -213,6 +236,7 @@ public class IFileInputStream extends InputStream {
       throw new ChecksumException("Checksum Error", 0);
     }
     
+    // 更新当前读取数据的校验和计算
     sum.update(b,off,bytesRead);
 
     currentOffset += bytesRead;
@@ -222,7 +246,7 @@ public class IFileInputStream extends InputStream {
     }
     
     if (currentOffset == dataLength) {
-      // The last four bytes are checksum. Strip them and verify
+      // 读完所有数据，读取文件末尾存储的校验并验证
       csum = new byte[checksumSize];
       IOUtils.readFully(in, csum, 0, checksumSize);
       if (!sum.compare(csum, 0)) {
@@ -239,16 +263,22 @@ public class IFileInputStream extends InputStream {
     int l = read(b,0,1);
     if (l < 0)  return l;
     
-    // Upgrade the b[0] to an int so as not to misinterpret the
-    // first bit of the byte as a sign bit
+    // 将字节转为无符号int，避免符号位扩展导致负数
     int result = 0xFF & b[0];
     return result;
   }
 
+  /**
+   * 获取文件存储的校验和数组
+   * @return 校验和字节数组
+   */
   public byte[] getChecksum() {
     return csum;
   }
 
+  /**
+   * 禁用校验和验证，用于特殊场景
+   */
   void disableChecksumValidation() {
     disableChecksumValidation = true;
   }

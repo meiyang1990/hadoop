@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,21 +48,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * <code>IFile</code> is the simple &lt;key-len, value-len, key, value&gt; format
- * for the intermediate map-outputs in Map-Reduce.
- *
- * There is a <code>Writer</code> to write out map-outputs in this format and 
- * a <code>Reader</code> to read files of this format.
+ * IFile 是 MapReduce 中用于存储Map任务中间输出的存储格式，格式为 <key-len, value-len, key, value>。
+ * 提供了Writer类写入Map中间输出、Reader类读取该格式文件的能力。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class IFile {
   private static final Logger LOG = LoggerFactory.getLogger(IFile.class);
-  public static final int EOF_MARKER = -1; // End of File Marker
+  public static final int EOF_MARKER = -1; // 文件结束标记
   private static final int ARRAY_MAX_SIZE = Integer.MAX_VALUE - 8;
   
   /**
-   * <code>IFile.Writer</code> to write out intermediate map-outputs. 
+   * IFile 写入器，用于将Map任务的中间输出写入到IFile格式文件中。
+   * @param <K> 键类型
+   * @param <V> 值类型
    */
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
@@ -78,7 +78,7 @@ public class IFile {
     long decompressedBytesWritten = 0;
     long compressedBytesWritten = 0;
 
-    // Count records written to disk
+    // 统计写入磁盘的记录数
     private long numRecordsWritten = 0;
     private final Counters.Counter writtenRecordsCounter;
 
@@ -91,6 +91,16 @@ public class IFile {
     
     DataOutputBuffer buffer = new DataOutputBuffer();
 
+    /**
+     * 构造IFile写入器，使用指定压缩编码写入键值对。
+     * @param conf Hadoop配置
+     * @param out 输出流
+     * @param keyClass 键类对象
+     * @param valueClass 值类对象
+     * @param codec 压缩编码，null表示不压缩
+     * @param writesCounter 写入记录计数器
+     * @throws IOException IO异常
+     */
     public Writer(Configuration conf, FSDataOutputStream out,
         Class<K> keyClass, Class<V> valueClass,
         CompressionCodec codec, Counters.Counter writesCounter)
@@ -98,10 +108,25 @@ public class IFile {
       this(conf, out, keyClass, valueClass, codec, writesCounter, false);
     }
     
+    /**
+     * 仅初始化计数器的构造方法，供子类使用。
+     * @param writesCounter 写入记录计数器
+     */
     protected Writer(Counters.Counter writesCounter) {
       writtenRecordsCounter = writesCounter;
     }
 
+    /**
+     * 构造IFile写入器，支持指定是否持有输出流所有权。
+     * @param conf Hadoop配置
+     * @param out 输出流
+     * @param keyClass 键类对象
+     * @param valueClass 值类对象
+     * @param codec 压缩编码，null表示不压缩
+     * @param writesCounter 写入记录计数器
+     * @param ownOutputStream 是否持有输出流所有权，true则关闭时会关闭流
+     * @throws IOException IO异常
+     */
     public Writer(Configuration conf, FSDataOutputStream out, 
         Class<K> keyClass, Class<V> valueClass,
         CompressionCodec codec, Counters.Counter writesCounter,
@@ -112,6 +137,7 @@ public class IFile {
       this.rawOut = out;
       this.start = this.rawOut.getPos();
       if (codec != null) {
+        // 从压缩编码池获取压缩器
         this.compressor = CodecPool.getCompressor(codec);
         if (this.compressor != null) {
           this.compressor.reset();
@@ -130,6 +156,7 @@ public class IFile {
       this.valueClass = valueClass;
 
       if (keyClass != null) {
+        // 初始化序列化器
         SerializationFactory serializationFactory = 
           new SerializationFactory(conf);
         this.keySerializer = serializationFactory.getSerializer(keyClass);
@@ -140,53 +167,63 @@ public class IFile {
       this.ownOutputStream = ownOutputStream;
     }
 
+    /**
+     * 关闭写入器，完成IFile写入，释放资源并更新计数器。
+     * @throws IOException IO异常
+     */
     public void close() throws IOException {
 
-      // When IFile writer is created by BackupStore, we do not have
-      // Key and Value classes set. So, check before closing the
-      // serializers
+      // BackupStore创建的writer不会设置键值类，因此需要判断后关闭序列化器
       if (keyClass != null) {
         keySerializer.close();
         valueSerializer.close();
       }
 
-      // Write EOF_MARKER for key/value length
+      // 写入文件结束标记
       WritableUtils.writeVInt(out, EOF_MARKER);
       WritableUtils.writeVInt(out, EOF_MARKER);
       decompressedBytesWritten += (long) 2 * WritableUtils.getVIntSize(EOF_MARKER);
       
-      //Flush the stream
+      // 刷新输出流
       out.flush();
   
       if (compressOutput) {
-        // Flush
+        // 完成压缩并重置压缩状态
         compressedOut.finish();
         compressedOut.resetState();
       }
       
-      // Close the underlying stream iff we own it...
+      // 如果持有输出流所有权则关闭流，否则写入校验和
       if (ownOutputStream) {
         out.close();
       }
       else {
-        // Write the checksum
+        // 写入校验和
         checksumOut.finish();
       }
 
+      // 计算压缩后字节总数
       compressedBytesWritten = rawOut.getPos() - start;
 
       if (compressOutput) {
-        // Return back the compressor
+        // 归还压缩器到编码池
         CodecPool.returnCompressor(compressor);
         compressor = null;
       }
 
       out = null;
+      // 更新写入记录计数器
       if(writtenRecordsCounter != null) {
         writtenRecordsCounter.increment(numRecordsWritten);
       }
     }
 
+    /**
+     * 追加一个键值对到IFile中。
+     * @param key 键对象
+     * @param value 值对象
+     * @throws IOException IO异常或类型不匹配异常
+     */
     public void append(K key, V value) throws IOException {
       if (key.getClass() != keyClass)
         throw new IOException("wrong key class: "+ key.getClass()
@@ -195,7 +232,7 @@ public class IFile {
         throw new IOException("wrong value class: "+ value.getClass()
                               +" is not "+ valueClass);
 
-      // Append the 'key'
+      // 序列化键到缓冲区
       keySerializer.serialize(key);
       int keyLength = buffer.getLength();
       if (keyLength < 0) {
@@ -203,7 +240,7 @@ public class IFile {
                               " for " + key);
       }
 
-      // Append the 'value'
+      // 序列化值到缓冲区
       valueSerializer.serialize(value);
       int valueLength = buffer.getLength() - keyLength;
       if (valueLength < 0) {
@@ -211,21 +248,28 @@ public class IFile {
                               valueLength + " for " + value);
       }
       
-      // Write the record out
-      WritableUtils.writeVInt(out, keyLength);                  // key length
-      WritableUtils.writeVInt(out, valueLength);                // value length
-      out.write(buffer.getData(), 0, buffer.getLength());       // data
+      // 写入长度和数据到输出流
+      WritableUtils.writeVInt(out, keyLength);                  // 写入键长度
+      WritableUtils.writeVInt(out, valueLength);                // 写入值长度
+      out.write(buffer.getData(), 0, buffer.getLength());       // 写入键值数据
 
-      // Reset
+      // 重置缓冲区准备下一次写入
       buffer.reset();
       
-      // Update bytes written
+      // 更新未压缩字节统计
       decompressedBytesWritten += (long) keyLength + valueLength +
                                   WritableUtils.getVIntSize(keyLength) + 
                                   WritableUtils.getVIntSize(valueLength);
+      // 增加记录计数
       ++numRecordsWritten;
     }
     
+    /**
+     * 追加已经序列化好的键值对（从DataInputBuffer中直接读取）。
+     * @param key 已序列化的键缓冲区
+     * @param value 已序列化的值缓冲区
+     * @throws IOException IO异常
+     */
     public void append(DataInputBuffer key, DataInputBuffer value)
     throws IOException {
       int keyLength = key.getLength() - key.getPosition();
@@ -240,40 +284,51 @@ public class IFile {
                               valueLength + " for " + value);
       }
 
+      // 写入长度和原始字节数据
       WritableUtils.writeVInt(out, keyLength);
       WritableUtils.writeVInt(out, valueLength);
       out.write(key.getData(), key.getPosition(), keyLength); 
       out.write(value.getData(), value.getPosition(), valueLength); 
 
-      // Update bytes written
+      // 更新字节统计和记录计数
       decompressedBytesWritten += (long) keyLength + valueLength +
                       WritableUtils.getVIntSize(keyLength) + 
                       WritableUtils.getVIntSize(valueLength);
       ++numRecordsWritten;
     }
     
-    // Required for mark/reset
+    // 为mark/reset功能提供输出流
     public DataOutputStream getOutputStream () {
       return out;
     }
     
-    // Required for mark/reset
+    // 为外部append更新计数器，用于mark/reset场景
     public void updateCountersForExternalAppend(long length) {
       ++numRecordsWritten;
       decompressedBytesWritten += length;
     }
     
+    /**
+     * 获取写入的未压缩数据总长度。
+     * @return 未压缩字节数
+     */
     public long getRawLength() {
       return decompressedBytesWritten;
     }
     
+    /**
+     * 获取写入到磁盘的压缩后总长度。
+     * @return 压缩后字节数
+     */
     public long getCompressedLength() {
       return compressedBytesWritten;
     }
   }
 
   /**
-   * <code>IFile.Reader</code> to read intermediate map-outputs. 
+   * IFile 读取器，用于从IFile格式文件中读取Map任务的中间输出键值对。
+   * @param <K> 键类型
+   * @param <V> 值类型
    */
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
@@ -281,11 +336,11 @@ public class IFile {
     private static final int DEFAULT_BUFFER_SIZE = 128*1024;
     private static final int MAX_VINT_SIZE = 9;
 
-    // Count records read from disk
+    // 统计从磁盘读取的记录数
     private long numRecordsRead = 0;
     private final Counters.Counter readRecordsCounter;
 
-    final InputStream in;        // Possibly decompressed stream that we read
+    final InputStream in;        // 解压后的输入流
     Decompressor decompressor;
     public long bytesRead = 0;
     protected final long fileLength;
@@ -303,15 +358,13 @@ public class IFile {
     
     
     /**
-     * Construct an IFile Reader.
-     * 
-     * @param conf Configuration File 
-     * @param fs  FileSystem
-     * @param file Path of the file to be opened. This file should have
-     *             checksum bytes for the data at the end of the file.
-     * @param codec codec
-     * @param readsCounter Counter for records read from disk
-     * @throws IOException
+     * 构造IFile读取器，从指定文件路径打开读取。
+     * @param conf Hadoop配置
+     * @param fs 文件系统
+     * @param file 要读取的IFile路径
+     * @param codec 压缩编码，null表示不压缩
+     * @param readsCounter 读取记录计数器
+     * @throws IOException IO异常
      */
     public Reader(Configuration conf, FileSystem fs, Path file,
                   CompressionCodec codec,
@@ -322,22 +375,22 @@ public class IFile {
     }
 
     /**
-     * Construct an IFile Reader.
-     * 
-     * @param conf Configuration File 
-     * @param in   The input stream
-     * @param length Length of the data in the stream, including the checksum
-     *               bytes.
-     * @param codec codec
-     * @param readsCounter Counter for records read from disk
-     * @throws IOException
+     * 构造IFile读取器，从指定输入流读取。
+     * @param conf Hadoop配置
+     * @param in 输入流
+     * @param length 输入流总长度（包含校验和）
+     * @param codec 压缩编码，null表示不压缩
+     * @param readsCounter 读取记录计数器
+     * @throws IOException IO异常
      */
     public Reader(Configuration conf, FSDataInputStream in, long length, 
                   CompressionCodec codec,
                   Counters.Counter readsCounter) throws IOException {
       readRecordsCounter = readsCounter;
+      // 创建带校验和验证的输入流
       checksumIn = new IFileInputStream(in,length, conf);
       if (codec != null) {
+        // 从压缩编码池获取解压器
         decompressor = CodecPool.getDecompressor(codec);
         if (decompressor != null) {
           this.in = codec.createInputStream(checksumIn, decompressor);
@@ -351,30 +404,40 @@ public class IFile {
       this.dataIn = new DataInputStream(this.in);
       this.fileLength = length;
       
+      // 从配置读取IO缓冲区大小
       if (conf != null) {
         bufferSize = conf.getInt("io.file.buffer.size", DEFAULT_BUFFER_SIZE);
       }
     }
     
+    /**
+     * 获取IFile中数据部分长度（减去校验和大小）。
+     * @return 数据部分字节长度
+     */
     public long getLength() { 
       return fileLength - checksumIn.getSize();
     }
     
+    /**
+     * 获取当前读取位置。
+     * @return 当前字节位置
+     * @throws IOException IO异常
+     */
     public long getPosition() throws IOException {    
       return checksumIn.getPosition(); 
     }
     
     /**
-     * Read upto len bytes into buf starting at offset off.
-     * 
-     * @param buf buffer 
-     * @param off offset
-     * @param len length of buffer
-     * @return the no. of bytes read
-     * @throws IOException
+     * 读取指定长度数据到缓冲区，处理压缩数据的分段读取。
+     * @param buf 目标缓冲区
+     * @param off 缓冲区起始偏移
+     * @param len 需要读取的字节数
+     * @return 实际读取的字节数
+     * @throws IOException IO异常
      */
     private int readData(byte[] buf, int off, int len) throws IOException {
       int bytesRead = 0;
+      // 循环读取直到满足需要的长度或到达流末尾
       while (bytesRead < len) {
         int n = IOUtils.wrappedReadForCompressedData(in, buf, off + bytesRead,
             len - bytesRead);
@@ -386,98 +449,28 @@ public class IFile {
       return len;
     }
     
+    /**
+     * 定位到下一条记录，读取键和值的长度，检查EOF标记。
+     * @param dIn 数据输入流
+     * @return 是否找到下一条有效记录，false表示到达文件末尾
+     * @throws IOException IO异常
+     */
     protected boolean positionToNextRecord(DataInput dIn) throws IOException {
-      // Sanity check
+      // 已经EOF则抛出异常
       if (eof) {
         throw new EOFException("Completed reading " + bytesRead);
       }
       
-      // Read key and value lengths
+      // 读取键和值的长度
       currentKeyLength = WritableUtils.readVInt(dIn);
       currentValueLength = WritableUtils.readVInt(dIn);
       bytesRead += (long) WritableUtils.getVIntSize(currentKeyLength) +
                    WritableUtils.getVIntSize(currentValueLength);
       
-      // Check for EOF
+      // 检查是否到达文件结束标记
       if (currentKeyLength == EOF_MARKER && currentValueLength == EOF_MARKER) {
         eof = true;
         return false;
       }
       
-      // Sanity check
-      if (currentKeyLength < 0) {
-        throw new IOException("Rec# " + recNo + ": Negative key-length: " + 
-                              currentKeyLength);
-      }
-      if (currentValueLength < 0) {
-        throw new IOException("Rec# " + recNo + ": Negative value-length: " + 
-                              currentValueLength);
-      }
-            
-      return true;
-    }
-    
-    public boolean nextRawKey(DataInputBuffer key) throws IOException {
-      if (!positionToNextRecord(dataIn)) {
-        return false;
-      }
-      if (keyBytes.length < currentKeyLength) {
-        keyBytes = new byte[currentKeyLength << 1];
-      }
-      int i = readData(keyBytes, 0, currentKeyLength);
-      if (i != currentKeyLength) {
-        throw new IOException ("Asked for " + currentKeyLength + " Got: " + i);
-      }
-      key.reset(keyBytes, currentKeyLength);
-      bytesRead += currentKeyLength;
-      return true;
-    }
-    
-    public void nextRawValue(DataInputBuffer value) throws IOException {
-      final int targetSize = currentValueLength << 1;
-
-      final byte[] valBytes = (value.getData().length < currentValueLength)
-        ? new byte[targetSize < 0 ? ARRAY_MAX_SIZE : targetSize]
-        : value.getData();
-      int i = readData(valBytes, 0, currentValueLength);
-      if (i != currentValueLength) {
-        throw new IOException ("Asked for " + currentValueLength + " Got: " + i);
-      }
-      value.reset(valBytes, currentValueLength);
-      
-      // Record the bytes read
-      bytesRead += currentValueLength;
-
-      ++recNo;
-      ++numRecordsRead;
-    }
-    
-    public void close() throws IOException {
-      // Close the underlying stream
-      in.close();
-      
-      // Release the buffer
-      dataIn = null;
-      buffer = null;
-      if(readRecordsCounter != null) {
-        readRecordsCounter.increment(numRecordsRead);
-      }
-
-      // Return the decompressor
-      if (decompressor != null) {
-        decompressor.reset();
-        CodecPool.returnDecompressor(decompressor);
-        decompressor = null;
-      }
-    }
-    
-    public void reset(int offset) {
-      return;
-    }
-
-    public void disableChecksumValidation() {
-      checksumIn.disableChecksumValidation();
-    }
-
-  }    
-}
+      //

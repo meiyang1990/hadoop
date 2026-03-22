@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,12 +23,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.JobCounter;
 
+/**
+ * Hadoop MapReduce旧版本API中的作业进度信息类，保留旧版作业计数器枚举以保持向后兼容性
+ * 核心职责：为老版本客户端提供兼容支持，新代码应使用org.apache.hadoop.mapreduce.JobCounter
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class JobInProgress {
   
   /**
-   * @deprecated Provided for compatibility. Use {@link JobCounter} instead.
+   * 已废弃的作业计数器枚举，用于兼容旧版API，新代码请使用{@link JobCounter}
+   * 定义了MapReduce作业运行过程中各类统计指标的计数器类型
    */
   @Deprecated
   public enum Counter {

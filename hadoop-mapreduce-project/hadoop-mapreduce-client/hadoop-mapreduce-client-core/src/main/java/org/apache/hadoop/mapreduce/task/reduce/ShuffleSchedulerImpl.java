@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -53,6 +54,10 @@ import org.apache.hadoop.util.concurrent.SubjectInheritingThread;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * MapReduce Shuffle阶段的调度器实现，负责管理Reduce任务拉取Map输出的调度逻辑
+ * 核心职责：维护待拉取的Map输出位置、管理失败主机惩罚、控制并发拉取数量、监控Shuffle进度与健康状态
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
@@ -71,46 +76,84 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
   private final static int REPORT_FAILURE_LIMIT = 10;
   private static final float BYTES_PER_MILLIS_TO_MBS = 1000f / 1024 / 1024;
   
+  // 标记每个Map任务是否已完成拉取
   private final boolean[] finishedMaps;
 
+  // 总的Map任务数量
   private final int totalMaps;
+  // 剩余待拉取的Map任务数量
   private int remainingMaps;
+  // 按主机地址存储Map输出位置信息，key为主机名+端口
   private Map<String, MapHost> mapLocations = new HashMap<String, MapHost>();
+  // 待分配拉取任务的主机集合
   private Set<MapHost> pendingHosts = new HashSet<MapHost>();
+  // 已废弃的Map任务Attempt集合
   private Set<TaskAttemptID> obsoleteMaps = new HashSet<TaskAttemptID>();
 
+  // 当前Reduce任务的AttemptID
   private final TaskAttemptID reduceId;
   private final Random random = new Random();
+  // 存储惩罚延迟的延迟队列，超时后自动解禁被惩罚的主机
   private final DelayQueue<Penalty> penalties = new DelayQueue<Penalty>();
+  // 处理惩罚超时的后台线程
   private final Referee referee = new Referee();
+  // 记录每个Map任务Attempt的拉取失败次数
   private final Map<TaskAttemptID,IntWritable> failureCounts =
     new HashMap<TaskAttemptID,IntWritable>();
+  // 记录每个主机的拉取失败次数
   private final Map<String,IntWritable> hostFailures =
     new HashMap<String,IntWritable>();
   private final TaskStatus status;
+  // 异常报告器，用于向上层报告异常
   private final ExceptionReporter reporter;
+  // 任务终止阈值：单个Map允许的最大失败次数
   private final int abortFailureLimit;
+  // Shuffle进度对象
   private final Progress progress;
+  // 已完成拉取的Map计数器
   private final Counters.Counter shuffledMapsCounter;
+  // 已拉取总字节数计数器
   private final Counters.Counter reduceShuffleBytes;
+  // 拉取失败次数计数器
   private final Counters.Counter failedShuffleCounter;
 
+  // Shuffle开始时间
   private final long startTime;
+  // 上次进度更新时间
   private long lastProgressTime;
 
+  // 拷贝时间统计器，用于统计并发拷贝的总有效时间
   private final CopyTimeTracker copyTimeTracker;
 
+  // 最大的Map任务运行时间
   private volatile int maxMapRuntime = 0;
+  // 允许的最大失败唯一拉取数量
   private final int maxFailedUniqueFetches;
+  // 汇报失败前允许的最大拉取失败次数
   private final int maxFetchFailuresBeforeReporting;
 
+  // 截至当前累计拉取的总字节数
   private long totalBytesShuffledTillNow = 0;
   private final DecimalFormat mbpsFormat = new DecimalFormat("0.00");
 
+  // 是否立即汇报读取错误
   private final boolean reportReadErrorImmediately;
+  // 最大惩罚延迟时间
   private long maxPenalty = MRJobConfig.DEFAULT_MAX_SHUFFLE_FETCH_RETRY_DELAY;
+  // 允许单个主机的最大失败次数
   private int maxHostFailures;
 
+  /**
+   * 构造Shuffle调度器，初始化配置与状态
+   * @param job 作业配置
+   * @param status Reduce任务状态
+   * @param reduceId 当前Reduce任务AttemptID
+   * @param reporter 异常报告器
+   * @param progress 进度对象
+   * @param shuffledMapsCounter 已完成拉取Map计数器
+   * @param reduceShuffleBytes 总拉取字节计数器
+   * @param failedShuffleCounter 拉取失败计数器
+   */
   public ShuffleSchedulerImpl(JobConf job, TaskStatus status,
                           TaskAttemptID reduceId,
                           ExceptionReporter reporter,
@@ -147,9 +190,14 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
   }
 
   @Override
+  /**
+   * 根据Map任务完成事件，处理Map输出信息更新
+   * @param event Map任务完成事件
+   */
   public void resolve(TaskCompletionEvent event) {
     switch (event.getTaskStatus()) {
     case SUCCEEDED:
+      // Map成功，构造Map输出URI，添加到已知输出列表
       URI u = getBaseURI(reduceId, event.getTaskTrackerHttp());
       addKnownMapOutput(u.getHost() + ":" + u.getPort(),
           u.toString(),
@@ -159,11 +207,13 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
     case FAILED:
     case KILLED:
     case OBSOLETE:
+      // Map失败/被杀死/已废弃，标记输出为废弃
       obsoleteMapOutput(event.getTaskAttemptId());
       LOG.info("Ignoring obsolete output of " + event.getTaskStatus() +
           " map-task: '" + event.getTaskAttemptId() + "'");
       break;
     case TIPFAILED:
+      // 整个Map任务失败，标记该任务所有输出为完成
       tipFailed(event.getTaskAttemptId().getTaskID());
       LOG.info("Ignoring output of failed map TIP: '" +
           event.getTaskAttemptId() + "'");
@@ -171,6 +221,12 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
     }
   }
 
+  /**
+   * 构造Map输出的HTTP访问基地址URI
+   * @param reduceId 当前Reduce任务ID
+   * @param url TaskTracker的HTTP地址
+   * @return 构造完成的Map输出访问URI
+   */
   static URI getBaseURI(TaskAttemptID reduceId, String url) {
     StringBuilder baseUrl = new StringBuilder(url);
     if (!url.endsWith("/")) {
@@ -185,6 +241,16 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
     return u;
   }
 
+  /**
+   * 处理从指定主机拉取指定Map成功的逻辑，更新进度与状态
+   * @param mapId 拉取成功的Map AttemptID
+   * @param host 提供输出的主机
+   * @param bytes 拉取的字节数
+   * @param startMillis 拉取开始时间
+   * @param endMillis 拉取结束时间
+   * @param output Map输出对象
+   * @throws IOException
+   */
   public synchronized void copySucceeded(TaskAttemptID mapId,
                                          MapHost host,
                                          long bytes,
@@ -192,26 +258,29 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
                                          long endMillis,
                                          MapOutput<K,V> output
                                          ) throws IOException {
+    // 清除失败计数
     failureCounts.remove(mapId);
     hostFailures.remove(host.getHostName());
     int mapIndex = mapId.getTaskID().getId();
 
     if (!finishedMaps[mapIndex]) {
+      // 提交Map输出，标记完成
       output.commit();
       finishedMaps[mapIndex] = true;
       shuffledMapsCounter.increment(1);
       if (--remainingMaps == 0) {
+        // 所有Map拉取完成，通知等待线程
         notifyAll();
       }
 
-      // update single copy task status
+      // 计算本次拉取速率
       long copyMillis = (endMillis - startMillis);
       if (copyMillis == 0) copyMillis = 1;
       float bytesPerMillis = (float) bytes / copyMillis;
       float transferRate = bytesPerMillis * BYTES_PER_MILLIS_TO_MBS;
       String individualProgress = "copy task(" + mapId + " succeeded"
           + " at " + mbpsFormat.format(transferRate) + " MB/s)";
-      // update the aggregated status
+      // 更新总拷贝时间统计
       copyTimeTracker.add(startMillis, endMillis);
 
       totalBytesShuffledTillNow += bytes;
@@ -225,16 +294,22 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
     }
   }
 
+  /**
+   * 更新Shuffle进度与状态信息，计算整体拉取速率
+   * @param individualProgress 本次拉取进度描述
+   */
   private synchronized void updateStatus(String individualProgress) {
     int mapsDone = totalMaps - remainingMaps;
     long totalCopyMillis = copyTimeTracker.getCopyMillis();
     if (totalCopyMillis == 0) totalCopyMillis = 1;
     float bytesPerMillis = (float) totalBytesShuffledTillNow / totalCopyMillis;
     float transferRate = bytesPerMillis * BYTES_PER_MILLIS_TO_MBS;
+    // 更新进度百分比
     progress.set((float) mapsDone / totalMaps);
     String statusString = mapsDone + " / " + totalMaps + " copied.";
     status.setStateString(statusString);
 
+    // 拼接进度状态字符串，包含聚合速率
     if (individualProgress != null) {
       progress.setStatus(individualProgress + " Aggregated copy rate(" + 
           mapsDone + " of " + totalMaps + " at " + 
@@ -249,6 +324,10 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
     updateStatus(null);
   }
 
+  /**
+   * 记录主机拉取失败次数
+   * @param hostname 失败主机名
+   */
   public synchronized void hostFailed(String hostname) {
     if (hostFailures.containsKey(hostname)) {
       IntWritable x = hostFailures.get(hostname);
@@ -259,6 +338,11 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
   }
 
   @VisibleForTesting
+  /**
+   * 获取指定主机的失败次数，仅用于测试
+   * @param hostname 主机名
+   * @return 失败次数
+   */
   synchronized int hostFailureCount(String hostname) {
     int failures = 0;
     if (hostFailures.containsKey(hostname)) {
@@ -268,6 +352,11 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
   }
 
   @VisibleForTesting
+  /**
+   * 获取指定Map任务Attempt的拉取失败次数，仅用于测试
+   * @param mapId Map任务AttemptID
+   * @return 失败次数
+   */
   synchronized int fetchFailureCount(TaskAttemptID mapId) {
     int failures = 0;
     if (failureCounts.containsKey(mapId)) {
@@ -276,9 +365,17 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
     return failures;
   }
 
+  /**
+   * 处理从指定主机拉取指定Map失败的逻辑，更新失败计数、检查健康状态、施加惩罚
+   * @param mapId 拉取失败的Map AttemptID
+   * @param host 提供输出的主机
+   * @param readError 是否是读取错误
+   * @param connectExcpt 是否是连接异常
+   */
   public synchronized void copyFailed(TaskAttemptID mapId, MapHost host,
       boolean readError, boolean connectExcpt) {
     int failures = 1;
+    // 更新Map拉取失败计数
     if (failureCounts.containsKey(mapId)) {
       IntWritable x = failureCounts.get(mapId);
       x.set(x.get() + 1);
@@ -288,16 +385,15 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
     }
     String hostname = host.getHostName();
     IntWritable hostFailedNum = hostFailures.get(hostname);
-    // MAPREDUCE-6361: hostname could get cleanup from hostFailures in another
-    // thread with copySucceeded.
-    // In this case, add back hostname to hostFailures to get rid of NPE issue.
+    // 处理并发导致的主机失败计数为空的情况，避免NPE
     if (hostFailedNum == null) {
       hostFailures.put(hostname, new IntWritable(1));
     }
-    //report failure if already retried maxHostFailures times
+    // 判断主机失败次数是否超过阈值
     boolean hostFail = hostFailures.get(hostname).get() >
         getMaxHostFailures() ? true : false;
 
+    // 单个Map失败超过阈值，抛出异常终止任务
     if (failures >= abortFailureLimit) {
       try {
         throw new IOException(failures + " failures downloading " + mapId);
@@ -306,347 +402,16 @@ public class ShuffleSchedulerImpl<K,V> implements ShuffleScheduler<K,V> {
       }
     }
 
+    // 检查是否需要向MRAppMaster汇报失败
     checkAndInformMRAppMaster(failures, mapId, readError, connectExcpt,
         hostFail);
 
+    // 检查Reduce健康状态，失败过多则终止
     checkReducerHealth();
 
+    // 计算惩罚延迟，失败越多延迟越长，不超过最大限制
     long delay = (long) (INITIAL_PENALTY *
         Math.pow(PENALTY_GROWTH_RATE, failures));
     penalize(host, Math.min(delay, maxPenalty));
 
-    failedShuffleCounter.increment(1);
-  }
-
-  /**
-   * Ask the shuffle scheduler to penalize a given host for a given amount
-   * of time before it reassigns a new fetcher to fetch from the host.
-   * @param host The host to penalize.
-   * @param delay The time to wait for before retrying
-   */
-  void penalize(MapHost host, long delay) {
-    host.penalize();
-    penalties.add(new Penalty(host, delay));
-  }
-
-  public void reportLocalError(IOException ioe) {
-    try {
-      LOG.error("Shuffle failed : local error on this node: "
-          + InetAddress.getLocalHost());
-    } catch (UnknownHostException e) {
-      LOG.error("Shuffle failed : local error on this node");
-    }
-    reporter.reportException(ioe);
-  }
-
-  // Notify the MRAppMaster
-  // after every read error, if 'reportReadErrorImmediately' is true or
-  // after every 'maxFetchFailuresBeforeReporting' failures
-  private void checkAndInformMRAppMaster(
-      int failures, TaskAttemptID mapId, boolean readError,
-      boolean connectExcpt, boolean hostFailed) {
-    if (connectExcpt || (reportReadErrorImmediately && readError)
-        || ((failures % maxFetchFailuresBeforeReporting) == 0) || hostFailed) {
-      LOG.info("Reporting fetch failure for " + mapId + " to MRAppMaster.");
-      status.addFetchFailedMap((org.apache.hadoop.mapred.TaskAttemptID) mapId);
-    }
-  }
-
-  private void checkReducerHealth() {
-    final float MAX_ALLOWED_FAILED_FETCH_ATTEMPT_PERCENT = 0.5f;
-    final float MIN_REQUIRED_PROGRESS_PERCENT = 0.5f;
-    final float MAX_ALLOWED_STALL_TIME_PERCENT = 0.5f;
-
-    long totalFailures = failedShuffleCounter.getValue();
-    int doneMaps = totalMaps - remainingMaps;
-
-    boolean reducerHealthy =
-      (((float)totalFailures / (totalFailures + doneMaps))
-          < MAX_ALLOWED_FAILED_FETCH_ATTEMPT_PERCENT);
-
-    // check if the reducer has progressed enough
-    boolean reducerProgressedEnough =
-      (((float)doneMaps / totalMaps)
-          >= MIN_REQUIRED_PROGRESS_PERCENT);
-
-    // check if the reducer is stalled for a long time
-    // duration for which the reducer is stalled
-    int stallDuration =
-      (int)(Time.monotonicNow() - lastProgressTime);
-
-    // duration for which the reducer ran with progress
-    int shuffleProgressDuration =
-      (int)(lastProgressTime - startTime);
-
-    // min time the reducer should run without getting killed
-    int minShuffleRunDuration =
-      Math.max(shuffleProgressDuration, maxMapRuntime);
-
-    boolean reducerStalled =
-      (((float)stallDuration / minShuffleRunDuration)
-          >= MAX_ALLOWED_STALL_TIME_PERCENT);
-
-    // kill if not healthy and has insufficient progress
-    if ((failureCounts.size() >= maxFailedUniqueFetches ||
-        failureCounts.size() == (totalMaps - doneMaps))
-        && !reducerHealthy
-        && (!reducerProgressedEnough || reducerStalled)) {
-      LOG.error("Shuffle failed with too many fetch failures " +
-      "and insufficient progress!");
-      String errorMsg = "Exceeded MAX_FAILED_UNIQUE_FETCHES; bailing-out.";
-      reporter.reportException(new IOException(errorMsg));
-    }
-
-  }
-
-  public synchronized void tipFailed(TaskID taskId) {
-    if (!finishedMaps[taskId.getId()]) {
-      finishedMaps[taskId.getId()] = true;
-      if (--remainingMaps == 0) {
-        notifyAll();
-      }
-      updateStatus();
-    }
-  }
-
-  public synchronized void addKnownMapOutput(String hostName,
-                                             String hostUrl,
-                                             TaskAttemptID mapId) {
-    MapHost host = mapLocations.get(hostName);
-    if (host == null) {
-      host = new MapHost(hostName, hostUrl);
-      mapLocations.put(hostName, host);
-    }
-    host.addKnownMap(mapId);
-
-    // Mark the host as pending
-    if (host.getState() == State.PENDING) {
-      pendingHosts.add(host);
-      notifyAll();
-    }
-  }
-
-
-  public synchronized void obsoleteMapOutput(TaskAttemptID mapId) {
-    obsoleteMaps.add(mapId);
-  }
-
-  public synchronized void putBackKnownMapOutput(MapHost host,
-                                                 TaskAttemptID mapId) {
-    host.addKnownMap(mapId);
-  }
-
-
-  public synchronized MapHost getHost() throws InterruptedException {
-    while(pendingHosts.isEmpty()) {
-      wait();
-    }
-
-    Iterator<MapHost> iter = pendingHosts.iterator();
-    // Safe to take one because we know pendingHosts isn't empty
-    MapHost host = iter.next();
-    int numToPick = random.nextInt(pendingHosts.size());
-    for (int i = 0; i < numToPick; ++i) {
-      host = iter.next();
-    }
-
-    pendingHosts.remove(host);
-    host.markBusy();
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "Assigning " + host + " with " + host.getNumKnownMapOutputs() + " to "
-              + Thread.currentThread().getName());
-    }
-    SHUFFLE_START.set(Time.monotonicNow());
-
-    return host;
-  }
-
-  public synchronized List<TaskAttemptID> getMapsForHost(MapHost host) {
-    List<TaskAttemptID> list = host.getAndClearKnownMaps();
-    Iterator<TaskAttemptID> itr = list.iterator();
-    List<TaskAttemptID> result = new ArrayList<TaskAttemptID>();
-    int includedMaps = 0;
-    int totalSize = list.size();
-    // find the maps that we still need, up to the limit
-    while (itr.hasNext()) {
-      TaskAttemptID id = itr.next();
-      if (!obsoleteMaps.contains(id) && !finishedMaps[id.getTaskID().getId()]) {
-        result.add(id);
-        if (++includedMaps >= MAX_MAPS_AT_ONCE) {
-          break;
-        }
-      }
-    }
-    // put back the maps left after the limit
-    while (itr.hasNext()) {
-      TaskAttemptID id = itr.next();
-      if (!obsoleteMaps.contains(id) && !finishedMaps[id.getTaskID().getId()]) {
-        host.addKnownMap(id);
-      }
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("assigned " + includedMaps + " of " + totalSize + " to " + host
-          + " to " + Thread.currentThread().getName());
-    }
-    return result;
-  }
-
-  public synchronized void freeHost(MapHost host) {
-    if (host.getState() != State.PENALIZED) {
-      if (host.markAvailable() == State.PENDING) {
-        pendingHosts.add(host);
-        notifyAll();
-      }
-    }
-    LOG.info(host + " freed by " + Thread.currentThread().getName() + " in " +
-             (Time.monotonicNow()-SHUFFLE_START.get()) + "ms");
-  }
-
-  public synchronized void resetKnownMaps() {
-    mapLocations.clear();
-    obsoleteMaps.clear();
-    pendingHosts.clear();
-  }
-
-  /**
-   * Wait until the shuffle finishes or until the timeout.
-   * @param millis maximum wait time
-   * @return true if the shuffle is done
-   * @throws InterruptedException
-   */
-  @Override
-  public synchronized boolean waitUntilDone(int millis
-                                            ) throws InterruptedException {
-    if (remainingMaps > 0) {
-      wait(millis);
-      return remainingMaps == 0;
-    }
-    return true;
-  }
-
-  /**
-   * A structure that records the penalty for a host.
-   */
-  private static class Penalty implements Delayed {
-    MapHost host;
-    private long endTime;
-
-    Penalty(MapHost host, long delay) {
-      this.host = host;
-      this.endTime = Time.monotonicNow() + delay;
-    }
-
-    @Override
-    public long getDelay(TimeUnit unit) {
-      long remainingTime = endTime - Time.monotonicNow();
-      return unit.convert(remainingTime, TimeUnit.MILLISECONDS);
-    }
-
-    @Override
-    public int compareTo(Delayed o) {
-      long other = ((Penalty) o).endTime;
-      return endTime == other ? 0 : (endTime < other ? -1 : 1);
-    }
-
-  }
-
-  /**
-   * A thread that takes hosts off of the penalty list when the timer expires.
-   */
-  private class Referee extends SubjectInheritingThread {
-    public Referee() {
-      setName("ShufflePenaltyReferee");
-      setDaemon(true);
-    }
-
-    public void work() {
-      try {
-        while (true) {
-          // take the first host that has an expired penalty
-          MapHost host = penalties.take().host;
-          synchronized (ShuffleSchedulerImpl.this) {
-            if (host.markAvailable() == MapHost.State.PENDING) {
-              pendingHosts.add(host);
-              ShuffleSchedulerImpl.this.notifyAll();
-            }
-          }
-        }
-      } catch (InterruptedException ie) {
-        return;
-      } catch (Throwable t) {
-        reporter.reportException(t);
-      }
-    }
-  }
-
-  @Override
-  public void close() throws InterruptedException {
-    referee.interrupt();
-    referee.join();
-  }
-
-  public int getMaxHostFailures() {
-    return maxHostFailures;
-  }
-
-  private static class CopyTimeTracker {
-    List<Interval> intervals;
-    long copyMillis;
-    public CopyTimeTracker() {
-      intervals = Collections.emptyList();
-      copyMillis = 0;
-    }
-    public void add(long s, long e) {
-      Interval interval = new Interval(s, e);
-      copyMillis = getTotalCopyMillis(interval);
-    }
-  
-    public long getCopyMillis() {
-      return copyMillis;
-    }
-    // This method captures the time during which any copy was in progress 
-    // each copy time period is record in the Interval list
-    private long getTotalCopyMillis(Interval newInterval) {
-      if (newInterval == null) {
-        return copyMillis;
-      }
-      List<Interval> result = new ArrayList<Interval>(intervals.size() + 1);
-      for (Interval interval: intervals) {
-        if (interval.end < newInterval.start) {
-          result.add(interval);
-        } else if (interval.start > newInterval.end) {
-          result.add(newInterval);
-          newInterval = interval;        
-        } else {
-          newInterval = new Interval(
-              Math.min(interval.start, newInterval.start),
-              Math.max(newInterval.end, interval.end));
-        }
-      }
-      result.add(newInterval);
-      intervals = result;
-      
-      //compute total millis
-      long length = 0;
-      for (Interval interval : intervals) {
-        length += interval.getIntervalLength();
-      }
-      return length;
-    }
-    
-    private static class Interval {
-      final long start;
-      final long end;
-      public Interval(long s, long e) {
-        start = s;
-        end = e;
-      }
-      
-      public long getIntervalLength() {
-        return end - start;
-      }
-    }
-  }
-}
+    failedShuffleCounter

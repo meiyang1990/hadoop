@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,13 +49,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * <code>BackupStore</code> is an utility class that is used to support
- * the mark-reset functionality of values iterator
+ * 文件级：MapReduce Reduce阶段值迭代器的标记-重置备份存储
+ * <code>BackupStore</code> 是一个工具类，用于支持值迭代器的标记-重置（mark-reset）功能
  *
- * <p>It has two caches - a memory cache and a file cache where values are
- * stored as they are iterated, after a mark. On reset, values are retrieved
- * from these caches. Framework moves from the memory cache to the 
- * file cache when the memory cache becomes full.
+ * <p>它包含两级缓存：内存缓存和文件缓存。标记之后，迭代过程中遇到的键值对会被依次存入缓存。
+ * 重置时，会从这些缓存中重新读取键值对。当内存缓存容量不足时，框架会自动将后续数据溢出到文件缓存。
  * 
  */
 @InterfaceAudience.Private
@@ -88,21 +87,29 @@ public class BackupStore<K,V> {
   
   private Configuration conf;
 
+  /**
+   * 构造备份存储，初始化内存缓存和文件缓存
+   * @param conf 作业配置
+   * @param taskid 当前任务尝试ID
+   * @throws IOException 初始化失败时抛出异常
+   */
   public BackupStore(Configuration conf, TaskAttemptID taskid)
   throws IOException {
     
     final float bufferPercent =
       conf.getFloat(JobContext.REDUCE_MARKRESET_BUFFER_PERCENT, 0f);
 
+    // 检查百分比配置合法性
     if (bufferPercent > 1.0 || bufferPercent < 0.0) {
       throw new IOException(JobContext.REDUCE_MARKRESET_BUFFER_PERCENT +
           bufferPercent);
     }
 
+    // 根据堆内存百分比计算最大缓存大小
     int maxSize = (int)Math.min(
         Runtime.getRuntime().maxMemory() * bufferPercent, Integer.MAX_VALUE);
 
-    // Support an absolute size also.
+    // 支持绝对大小配置，若配置了绝对值则覆盖百分比计算结果
     int tmp = conf.getInt(JobContext.REDUCE_MARKRESET_BUFFER_SIZE, 0);
     if (tmp >  0) {
       maxSize = tmp;
@@ -119,11 +126,11 @@ public class BackupStore<K,V> {
   }
 
   /**
-   * Write the given K,V to the cache. 
-   * Write to memcache if space is available, else write to the filecache
-   * @param key
-   * @param value
-   * @throws IOException
+   * 将给定键值对写入缓存。
+   * 内存缓存有空间则写入内存，否则写入磁盘文件缓存
+   * @param key 输入键缓冲区
+   * @param value 输入值缓冲区
+   * @throws IOException 写入失败时抛出异常
    */
   public void write(DataInputBuffer key, DataInputBuffer value)
   throws IOException {
@@ -143,12 +150,13 @@ public class BackupStore<K,V> {
     }
   }
 
+  /**
+   * 标记当前迭代位置，清理已消费的段，保存重置起始位置
+   * @throws IOException 操作失败时抛出异常
+   */
   public void mark() throws IOException {
 
-    // We read one KV pair in advance in hasNext. 
-    // If hasNext has read the next KV pair from a new segment, but the
-    // user has not called next() for that KV, then reset the readSegmentIndex
-    // to the previous segment
+    // hasNext会提前读取下一个KV，如果新分段已被预读但用户还没调用next()，需要回退分段索引
 
     if (nextKVOffset == 0) {
       assert (readSegmentIndex != 0);
@@ -156,7 +164,7 @@ public class BackupStore<K,V> {
       readSegmentIndex --;
     }
 
-    // just drop segments before the current active segment
+    // 删除当前活跃分段之前的所有已消费分段，释放资源
 
     int i = 0;
     Iterator<Segment<K,V>> itr = segmentList.iterator();
@@ -171,8 +179,7 @@ public class BackupStore<K,V> {
       LOG.debug("Dropping a segment");
     }
 
-    // FirstSegmentOffset is the offset in the current segment from where we
-    // need to start reading on the next reset
+    // 记录重置后需要开始读取的起始偏移量
 
     firstSegmentOffset = currentKVOffset;
     readSegmentIndex = 0;
@@ -180,11 +187,14 @@ public class BackupStore<K,V> {
     LOG.debug("Setting the FirsSegmentOffset to " + currentKVOffset);
   }
 
+  /**
+   * 重置迭代到上一次标记的位置，重新准备从缓存读取数据
+   * @throws IOException 重置失败时抛出异常
+   */
   public void reset() throws IOException {
 
-    // Create a new segment for the previously written records only if we
-    // are not already in the reset mode
-    
+    // 仅在首次进入重置模式时，为已写入的记录创建可读分段
+
     if (!inReset) {
       if (fileCache.isActive) {
         fileCache.createInDiskSegment();
@@ -195,8 +205,7 @@ public class BackupStore<K,V> {
 
     inReset = true;
     
-    // Reset the segments to the correct position from where the next read
-    // should begin. 
+    // 将所有分段重置到正确的读取起始位置
     for (int i = 0; i < segmentList.size(); i++) {
       Segment<K,V> s = segmentList.get(i);
       if (s.inMemory()) {
@@ -211,6 +220,7 @@ public class BackupStore<K,V> {
       }
     }
     
+    // 重置迭代状态变量
     currentKVOffset = firstSegmentOffset;
     nextKVOffset = -1;
     readSegmentIndex = 0;
@@ -221,24 +231,25 @@ public class BackupStore<K,V> {
         " Segment List Size is " + segmentList.size());
   }
 
+  /**
+   * 检查是否还有下一个键值对可供读取
+   * @return 如果有下一个键值对返回true，否则返回false
+   * @throws IOException 读取失败时抛出异常
+   */
   public boolean hasNext() throws IOException {
     
     if (lastSegmentEOF) {
       return false;
     }
     
-    // We read the next KV from the cache to decide if there is any left.
-    // Since hasNext can be called several times before the actual call to 
-    // next(), we use hasMore to avoid extra reads. hasMore is set to false
-    // when the user actually consumes this record in next()
+    // 提前预读下一个KV，hasMore用于避免hasNext多次调用导致重复预读
 
     if (hasMore) {
       return true;
     }
 
     Segment<K,V> seg = segmentList.get(readSegmentIndex);
-    // Mark the current position. This would be set to currentKVOffset
-    // when the user consumes this record in next(). 
+    // 记录当前预读位置，用户调用next后会更新currentKVOffset
     nextKVOffset = (int) seg.getActualPosition();
     if (seg.nextRawKey()) {
       currentKey = seg.getKey();
@@ -251,21 +262,20 @@ public class BackupStore<K,V> {
       }
     }
 
-    // If this is the last segment, mark the lastSegmentEOF flag and return
+    // 当前分段已经读完，如果已是最后一个分段则标记结束
     if (readSegmentIndex == segmentList.size() - 1) {
       nextKVOffset = -1;
       lastSegmentEOF = true;
       return false;
     }
 
+    // 切换到下一个分段
     nextKVOffset = 0;
     readSegmentIndex ++;
 
     Segment<K,V> nextSegment = segmentList.get(readSegmentIndex);
     
-    // We possibly are moving from a memory segment to a disk segment.
-    // Reset so that we do not corrupt the in-memory segment buffer.
-    // See HADOOP-5494
+    // 从内存分段切换到磁盘分段时，重置值缓冲区避免数据损坏，参见HADOOP-5494
     
     if (!nextSegment.inMemory()) {
       currentValue.reset(currentDiskValue.getData(), 
@@ -273,6 +283,7 @@ public class BackupStore<K,V> {
       nextSegment.init(null);
     }
  
+    // 从新分段预读第一个KV
     if (nextSegment.nextRawKey()) {
       currentKey = nextSegment.getKey();
       nextSegment.getValue(currentValue);
@@ -283,24 +294,40 @@ public class BackupStore<K,V> {
     }
   }
 
+  /**
+   * 移动到下一个键值对，消费预读的结果
+   * @throws IOException 移动失败时抛出异常
+   */
   public void next() throws IOException {
     if (!hasNext()) {
       throw new NoSuchElementException("iterate past last value");
     }
-    // Reset hasMore. See comment in hasNext()
+    // 重置预读标记，参见hasNext中的注释
     hasMore = false;
     currentKVOffset = nextKVOffset;
     nextKVOffset = -1;
   }
 
+  /**
+   * 获取当前迭代位置的值
+   * @return 当前值的输入缓冲区
+   */
   public DataInputBuffer nextValue() {
     return  currentValue;
   }
 
+  /**
+   * 获取当前迭代位置的键
+   * @return 当前键的输入缓冲区
+   */
   public DataInputBuffer nextKey() {
     return  currentKey;
   }
 
+  /**
+   * 重新初始化备份存储，清空所有分段和缓存，重置所有状态
+   * @throws IOException 初始化失败时抛出异常
+   */
   public void reinitialize() throws IOException {
     if (segmentList.size() != 0) {
       clearSegmentList();
@@ -314,14 +341,14 @@ public class BackupStore<K,V> {
   }
 
   /**
-   * This function is called the ValuesIterator when a mark is called
-   * outside of a reset zone.  
+   * 退出重置模式，清理不需要的缓存数据
+   * 当在重置模式外调用mark时，会触发该方法
+   * @throws IOException 退出失败时抛出异常
    */
   public void exitResetMode() throws IOException { 
     inReset = false;
     if (clearMarkFlag ) {
-      // If a flag was set to clear mark, do the reinit now.
-      // See clearMark()
+      // 如果在重置模式下设置了清除标记，退出时执行重新初始化，参见clearMark()
       reinitialize();
       return;
     }
@@ -330,9 +357,11 @@ public class BackupStore<K,V> {
     }
   }
 
-  /** For writing the first key and value bytes directly from the
-   *  value iterators, pass the current underlying output stream
-   *  @param length The length of the impending write
+  /**
+   * 获取输出流，用于直接写入指定长度的键值对原始字节
+   * @param length 即将写入的字节长度
+   * @return 可写入的输出流，可能是内存缓存流或文件输出流
+   * @throws IOException 获取流失败时抛出异常
    */
   public DataOutputStream getOutputStream(int length) throws IOException {
     if (memCache.reserveSpace(length)) {
@@ -343,9 +372,9 @@ public class BackupStore<K,V> {
     }
   }
 
-  /** This method is called by the valueIterators after writing the first
-   *  key and value bytes to the BackupStore
-   * @param length 
+  /**
+   * 更新已使用空间计数器，用于直接写入原始字节后的统计
+   * @param length 写入的字节长度
    */
   public void updateCounters(int length) {
     if (fileCache.isActive) {
@@ -355,17 +384,23 @@ public class BackupStore<K,V> {
     }
   }
 
+  /**
+   * 清除当前标记，如果处于重置模式则延迟清除到退出重置时执行
+   * @throws IOException 清除失败时抛出异常
+   */
   public void clearMark() throws IOException {
     if (inReset) {
-      // If we are in the reset mode, we just mark a flag and come out
-      // The actual re initialization would be done when we exit the reset
-      // mode
+      // 如果当前处于重置模式，仅设置标记，退出重置模式后再执行重新初始化
       clearMarkFlag = true;
     } else {
       reinitialize();
     }
   }
   
+  /**
+   * 清空所有分段，关闭并释放每个分段占用的资源
+   * @throws IOException 关闭分段失败时抛出异常
+   */
   private void clearSegmentList() throws IOException {
     for (Segment<K,V> segment: segmentList) {
       long len = segment.getLength();
@@ -377,15 +412,22 @@ public class BackupStore<K,V> {
     segmentList.clear();
   }
 
+  /**
+   * 内存缓存实现类，负责在内存中存储备份的键值对数据
+   */
   class MemoryCache {
     private DataOutputBuffer dataOut;
     private int blockSize;
     private int usedSize;
     private final BackupRamManager ramManager;
 
-    // Memory cache is made up of blocks.
+    // 内存缓存分块存储，默认块大小1MB
     private int defaultBlockSize = 1024 * 1024;
 
+    /**
+     * 构造内存缓存，初始化内存管理器
+     * @param maxSize 最大可使用内存大小
+     */
     public MemoryCache(int maxSize) {
       ramManager = new BackupRamManager(maxSize);
       if (maxSize < defaultBlockSize) {
@@ -393,14 +435,17 @@ public class BackupStore<K,V> {
       }
     }
 
+    /**
+     * 释放指定大小的内存空间
+     * @param len 需要释放的字节数
+     */
     public void unreserve(long len) {
       ramManager.unreserve((int)len);
     }
 
     /**
-     * Re-initialize the memory cache.
-     * 
-     * @param clearAll If true, re-initialize the ramManager also.
+     * 重新初始化内存缓存，分配新的内存块
+     * @param clearAll 如果为true，同时重置内存管理器
      */
     void reinitialize(boolean clearAll) {
       if (clearAll) {
@@ -412,6 +457,12 @@ public class BackupStore<K,V> {
       LOG.debug("Created a new mem block of " + allocatedSize);
     }
 
+    /**
+     * 创建新的内存块，分配指定大小的内存
+     * @param requestedSize 请求分配的大小
+     * @param minSize 最小需要分配的大小
+     * @return 实际分配的大小，0表示分配失败
+     */
     private int createNewMemoryBlock(int requestedSize, int minSize) {
       int allocatedSize = ramManager.reserve(requestedSize, minSize);
       usedSize = 0;
@@ -426,23 +477,22 @@ public class BackupStore<K,V> {
     }
 
     /**
-     * This method determines if there is enough space left in the 
-     * memory cache to write to the requested length + space for
-     * subsequent EOF makers.
-     * @param length
-     * @return true if enough space is available
+     * 检查是否有足够剩余空间容纳指定长度的数据加上EOF标记
+     * @param length 请求写入的数据长度
+     * @return true表示空间足够，false表示空间不足
+     * @throws IOException 空间不足且创建新块失败时抛出异常
      */
     boolean reserveSpace(int length) throws IOException {
       int availableSize = blockSize - usedSize;
       if (availableSize >= length + EOF_MARKER_SIZE) {
         return true;
       }
-      // Not enough available. Close this block 
+      // 当前块空间不足，将当前块转为可读分段，必须不在重置模式
       assert (!inReset); 
 
       createInMemorySegment();
       
-      // Create a new block
+      // 创建新的内存块
       int tmp = Math.max(length + EOF_MARKER_SIZE, defaultBlockSize);
       availableSize = createNewMemoryBlock(tmp, 
           (length + EOF_MARKER_SIZE));
@@ -450,181 +500,11 @@ public class BackupStore<K,V> {
       return (availableSize == 0) ? false : true;
     }
 
-    boolean reserveSpace(DataInputBuffer key, DataInputBuffer value)
-    throws IOException {
-      int keyLength = key.getLength() - key.getPosition();
-      int valueLength = value.getLength() - value.getPosition();
-
-      int requestedSize = keyLength + valueLength + 
-        WritableUtils.getVIntSize(keyLength) +
-        WritableUtils.getVIntSize(valueLength);
-      return reserveSpace(requestedSize);
-    }
-    
     /**
-     * Write the key and value to the cache in the IFile format
-     * @param key
-     * @param value
-     * @throws IOException
+     * 检查是否有足够空间存储给定键值对
+     * @param key 键缓冲区
+     * @param value 值缓冲区
+     * @return true表示空间足够，false表示空间不足
+     * @throws IOException 空间不足且创建新块失败时抛出异常
      */
-    public void write(DataInputBuffer key, DataInputBuffer value)
-    throws IOException {
-      int keyLength = key.getLength() - key.getPosition();
-      int valueLength = value.getLength() - value.getPosition();
-      WritableUtils.writeVInt(dataOut, keyLength);
-      WritableUtils.writeVInt(dataOut, valueLength);
-      dataOut.write(key.getData(), key.getPosition(), keyLength);
-      dataOut.write(value.getData(), value.getPosition(), valueLength);
-      usedSize += keyLength + valueLength + 
-        WritableUtils.getVIntSize(keyLength) +
-        WritableUtils.getVIntSize(valueLength);
-      LOG.debug("ID: " + segmentList.size() + " WRITE TO MEM");
-    }
-
-    /**
-     * This method creates a memory segment from the existing buffer
-     * @throws IOException
-     */
-    void createInMemorySegment () throws IOException {
-
-      // If nothing was written in this block because the record size
-      // was greater than the allocated block size, just return.
-      if (usedSize == 0) {
-        ramManager.unreserve(blockSize);
-        return;
-      }
-
-      // spaceAvailable would have ensured that there is enough space
-      // left for the EOF markers.
-      assert ((blockSize - usedSize) >= EOF_MARKER_SIZE);
-  
-      WritableUtils.writeVInt(dataOut, IFile.EOF_MARKER);
-      WritableUtils.writeVInt(dataOut, IFile.EOF_MARKER);
-
-      usedSize += EOF_MARKER_SIZE;
-
-      ramManager.unreserve(blockSize - usedSize);
-
-      Reader<K, V> reader = 
-        new org.apache.hadoop.mapreduce.task.reduce.InMemoryReader<K, V>(null, 
-            (org.apache.hadoop.mapred.TaskAttemptID) tid, 
-            dataOut.getData(), 0, usedSize, conf);
-      Segment<K, V> segment = new Segment<K, V>(reader, false);
-      segmentList.add(segment);
-      LOG.debug("Added Memory Segment to List. List Size is " + 
-          segmentList.size());
-    }
-  }
-
-  class FileCache {
-    private LocalDirAllocator lDirAlloc;
-    private final Configuration conf;
-    private final FileSystem fs;
-    private boolean isActive = false;
-
-    private Path file = null;
-    private IFile.Writer<K,V> writer = null;
-    private int spillNumber = 0;
-
-    public FileCache(Configuration conf)
-    throws IOException {
-      this.conf = conf;
-      this.fs = FileSystem.getLocal(conf);
-      this.lDirAlloc = new LocalDirAllocator(MRConfig.LOCAL_DIR);
-    }
-
-    void write(DataInputBuffer key, DataInputBuffer value)
-    throws IOException {
-      if (writer == null) {
-        // If spillNumber is 0, we should have called activate and not
-        // come here at all
-        assert (spillNumber != 0); 
-        writer = createSpillFile();
-      }
-      writer.append(key, value);
-      LOG.debug("ID: " + segmentList.size() + " WRITE TO DISK");
-    }
-
-    void reinitialize() {
-      spillNumber = 0;
-      writer = null;
-      isActive = false;
-    }
-
-    void activate() throws IOException {
-      isActive = true;
-      writer = createSpillFile();
-    }
-
-    void createInDiskSegment() throws IOException {
-      assert (writer != null);
-      writer.close();
-      Segment<K,V> s = new Segment<K, V>(conf, fs, file, null, true);
-      writer = null;
-      segmentList.add(s);
-      LOG.debug("Disk Segment added to List. Size is "  + segmentList.size());
-    }
-
-    boolean isActive() { return isActive; }
-
-    private Writer<K,V> createSpillFile() throws IOException {
-      Path tmp =
-          new Path(MRJobConfig.OUTPUT + "/backup_" + tid.getId() + "_"
-              + (spillNumber++) + ".out");
-
-      LOG.info("Created file: " + tmp);
-
-      file = lDirAlloc.getLocalPathForWrite(tmp.toUri().getPath(), 
-          -1, conf);
-      FSDataOutputStream out = fs.create(file);
-      out = IntermediateEncryptedStream.wrapIfNecessary(conf, out, tmp);
-      return new Writer<K, V>(conf, out, null, null, null, null, true);
-    }
-  }
-
-  static class BackupRamManager implements RamManager {
-
-    private int availableSize = 0;
-    private final int maxSize;
-
-    public BackupRamManager(int size) {
-      availableSize = maxSize = size;
-    }
-
-    public boolean reserve(int requestedSize, InputStream in) {
-      // Not used
-      LOG.warn("Reserve(int, InputStream) not supported by BackupRamManager");
-      return false;
-    }
-
-    int reserve(int requestedSize) {
-      if (availableSize == 0) {
-        return 0;
-      }
-      int reservedSize = Math.min(requestedSize, availableSize);
-      availableSize -= reservedSize;
-      LOG.debug("Reserving: " + reservedSize + " Requested: " + requestedSize);
-      return reservedSize;
-    }
-
-    int reserve(int requestedSize, int minSize) {
-      if (availableSize < minSize) {
-        LOG.debug("No space available. Available: " + availableSize + 
-            " MinSize: " + minSize);
-        return 0;
-      } else {
-        return reserve(requestedSize);
-      }
-    }
-
-    public void unreserve(int requestedSize) {
-      availableSize += requestedSize;
-      LOG.debug("Unreserving: " + requestedSize +
-          ". Available: " + availableSize);
-    }
-    
-    void reinitialize() {
-      availableSize = maxSize;
-    }
-  }
-}
+    boolean

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,10 +31,9 @@ import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.io.compress.SplittableCompressionCodec;
 
 /**
- * An {@link InputFormat} for plain text files. Files are broken into lines.
- * Either linefeed or carriage-return are used to signal end of line. Each line
- * is divided into key and value parts by a separator byte. If no such a byte
- * exists, the key will be the entire line and value will be empty.
+ * 面向键值对格式文本文件的InputFormat实现，是MapReduce旧API体系中的文本输入格式。
+ * 将文本文件按行切分，每行通过指定分隔符拆分出key和value两部分，若行中无分隔符则整行作为key，value为空。
+ * 适合处理每行一条记录、键值用分隔符分隔的文本输入数据。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -41,11 +41,23 @@ public class KeyValueTextInputFormat extends FileInputFormat<Text, Text>
   implements JobConfigurable {
 
   private CompressionCodecFactory compressionCodecs = null;
-  
+
+  /**
+   * 作业配置初始化方法，从作业配置中创建压缩编解码器工厂
+   * @param conf 作业配置对象
+   */
+  @Override
   public void configure(JobConf conf) {
     compressionCodecs = new CompressionCodecFactory(conf);
   }
-  
+
+  /**
+   * 判断指定输入文件是否可切分，用于决定是否将文件拆分给多个Map任务处理
+   * @param fs 文件系统对象
+   * @param file 待检查的输入文件路径
+   * @return 未压缩文件/支持切分的压缩格式返回true，不可切分的压缩格式返回false
+   */
+  @Override
   protected boolean isSplitable(FileSystem fs, Path file) {
     final CompressionCodec codec = compressionCodecs.getCodec(file);
     if (null == codec) {
@@ -53,12 +65,20 @@ public class KeyValueTextInputFormat extends FileInputFormat<Text, Text>
     }
     return codec instanceof SplittableCompressionCodec;
   }
-  
+
+  /**
+   * 获取指定输入分片的记录读取器，用于读取分片中的键值对记录
+   * @param genericSplit 待读取的输入分片
+   * @param job 作业配置对象
+   * @param reporter 任务进度汇报器
+   * @return 键值对格式行记录读取器实例
+   * @throws IOException 读取分片信息失败时抛出IO异常
+   */
   public RecordReader<Text, Text> getRecordReader(InputSplit genericSplit,
                                                   JobConf job,
                                                   Reporter reporter)
     throws IOException {
-    
+
     reporter.setStatus(genericSplit.toString());
     return new KeyValueLineRecordReader(job, (FileSplit) genericSplit);
   }

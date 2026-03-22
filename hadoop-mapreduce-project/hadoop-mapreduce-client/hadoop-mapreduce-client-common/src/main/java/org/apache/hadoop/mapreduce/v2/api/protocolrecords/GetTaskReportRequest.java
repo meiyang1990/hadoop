@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,20 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 
+/**
+ * 获取任务报告请求协议接口
+ * 用于MapReduce客户端向ApplicationMaster请求获取指定任务的运行报告
+ */
 public interface GetTaskReportRequest {
+  /**
+   * 获取请求查询的任务ID
+   * @return 目标任务的TaskId对象
+   */
   public abstract TaskId getTaskId();
   
+  /**
+   * 设置请求查询的任务ID
+   * @param taskId 需要获取报告的目标任务ID
+   */
   public abstract void setTaskId(TaskId taskId); 
 }

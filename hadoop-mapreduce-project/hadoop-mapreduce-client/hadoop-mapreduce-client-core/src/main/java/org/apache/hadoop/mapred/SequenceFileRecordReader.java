@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,7 @@ import org.apache.hadoop.io.*;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /** 
- * An {@link RecordReader} for {@link SequenceFile}s. 
+ * 针对SequenceFile文件格式的MapReduce记录读取器，实现从SequenceFile分片中逐条读取键值对记录
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -42,6 +43,12 @@ public class SequenceFileRecordReader<K, V> implements RecordReader<K, V> {
   private boolean more = true;
   protected Configuration conf;
 
+  /**
+   * 构造SequenceFile记录读取器，初始化Reader并同步到分片起始位置
+   * @param conf Hadoop作业配置
+   * @param split 待读取的文件分片
+   * @throws IOException 初始化或IO操作失败时抛出
+   */
   public SequenceFileRecordReader(Configuration conf, FileSplit split)
     throws IOException {
     Path path = split.getPath();
@@ -51,31 +58,44 @@ public class SequenceFileRecordReader<K, V> implements RecordReader<K, V> {
     this.conf = conf;
 
     if (split.getStart() > in.getPosition())
-      in.sync(split.getStart());                  // sync to start
+      in.sync(split.getStart());                  // 同步到分片起始位置
 
     this.start = in.getPosition();
     more = start < end;
   }
 
 
-  /** The class of key that must be passed to {@link
-   * #next(Object, Object)}.. */
+  /** 获取当前SequenceFile中Key的类型，必须传递给next方法 */
   public Class getKeyClass() { return in.getKeyClass(); }
 
-  /** The class of value that must be passed to {@link
-   * #next(Object, Object)}.. */
+  /** 获取当前SequenceFile中Value的类型，必须传递给next方法 */
   public Class getValueClass() { return in.getValueClass(); }
   
+  /**
+   * 创建一个新的Key实例，用于接收读取到的记录键
+   * @return 新建的Key实例
+   */
   @SuppressWarnings("unchecked")
   public K createKey() {
     return (K) ReflectionUtils.newInstance(getKeyClass(), conf);
   }
   
+  /**
+   * 创建一个新的Value实例，用于接收读取到的记录值
+   * @return 新建的Value实例
+   */
   @SuppressWarnings("unchecked")
   public V createValue() {
     return (V) ReflectionUtils.newInstance(getValueClass(), conf);
   }
     
+  /**
+   * 读取下一条键值对记录到传入的对象中
+   * @param key 存储读取结果的Key对象
+   * @param value 存储读取结果的Value对象
+   * @return 是否成功读取到下一条记录，返回false表示分片已读取完成
+   * @throws IOException IO读取失败时抛出
+   */
   public synchronized boolean next(K key, V value) throws IOException {
     if (!more) return false;
     long pos = in.getPosition();
@@ -91,6 +111,12 @@ public class SequenceFileRecordReader<K, V> implements RecordReader<K, V> {
     return more;
   }
   
+  /**
+   * 仅读取下一条记录的Key，用于跳过部分记录的场景
+   * @param key 存储读取结果的Key对象
+   * @return 是否成功读取到下一条Key，返回false表示分片已读取完成
+   * @throws IOException IO读取失败时抛出
+   */
   protected synchronized boolean next(K key)
     throws IOException {
     if (!more) return false;
@@ -104,14 +130,20 @@ public class SequenceFileRecordReader<K, V> implements RecordReader<K, V> {
     return more;
   }
   
+  /**
+   * 获取当前记录的Value，存入传入对象中
+   * @param value 存储读取结果的Value对象
+   * @throws IOException IO读取失败时抛出
+   */
   protected synchronized void getCurrentValue(V value)
     throws IOException {
     in.getCurrentValue(value);
   }
   
   /**
-   * Return the progress within the input split
-   * @return 0.0 to 1.0 of the input byte range
+   * 获取当前读取进度，范围0.0到1.0
+   * @return 已读取部分占当前分片总长度的比例
+   * @throws IOException 获取当前位置失败时抛出
    */
   public float getProgress() throws IOException {
     if (end == start) {
@@ -121,14 +153,28 @@ public class SequenceFileRecordReader<K, V> implements RecordReader<K, V> {
     }
   }
   
+  /**
+   * 获取当前读取位置的字节偏移量
+   * @return 当前字节偏移量
+   * @throws IOException 获取位置失败时抛出
+   */
   public synchronized long getPos() throws IOException {
     return in.getPosition();
   }
   
+  /**
+   * 跳转到指定字节位置进行读取
+   * @param pos 目标字节偏移量
+   * @throws IOException 跳转失败时抛出
+   */
   protected synchronized void seek(long pos) throws IOException {
     in.seek(pos);
   }
+
+  /**
+   * 关闭读取器，释放底层IO资源
+   * @throws IOException 关闭资源失败时抛出
+   */
   public synchronized void close() throws IOException { in.close(); }
   
 }
-

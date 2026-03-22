@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,10 +23,10 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSource;
 import org.apache.hadoop.util.functional.FunctionRaisingIOE;
 
 /**
- * Job Stage is a function raising an IOE. and which also
- * provides IOStats.
- * @param <IN> Type of arguments to the stage.
- * @param <OUT> Type of result.
+ * 文件输出提交器清单提交流程的任务/作业阶段接口，定义阶段的通用能力。
+ * 阶段是一个可抛出IO异常的函数，同时支持提供IO统计信息。
+ * @param <IN> 阶段输入参数类型
+ * @param <OUT> 阶段输出结果类型
  */
 public interface JobOrTaskStage<IN, OUT> extends FunctionRaisingIOE<IN, OUT>,
     IOStatisticsSource {

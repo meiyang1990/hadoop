@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,7 +30,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 
 /**
- * The context for task attempts.
+ * MapReduce任务尝试运行上下文实现类，为单个任务尝试实例提供运行时环境和交互接口
+ * 封装了任务尝试ID、状态管理、进度上报、计数器统计等核心能力，是任务运行过程中与框架交互的入口
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -39,11 +41,22 @@ public class TaskAttemptContextImpl extends JobContextImpl
   private String status = "";
   private StatusReporter reporter;
 
+  /**
+   * 构造任务尝试上下文，使用空报告器（用于不需要进度/状态上报的场景）
+   * @param conf 作业配置对象
+   * @param taskId 当前任务尝试的唯一标识
+   */
   public TaskAttemptContextImpl(Configuration conf, 
                                 TaskAttemptID taskId) {
     this(conf, taskId, new DummyReporter());
   }
 
+  /**
+   * 构造任务尝试上下文，使用自定义状态报告器
+   * @param conf 作业配置对象
+   * @param taskId 当前任务尝试的唯一标识
+   * @param reporter 状态/进度/计数器报告器
+   */
   public TaskAttemptContextImpl(Configuration conf, 
       TaskAttemptID taskId, StatusReporter reporter) {
     super(conf, taskId.getJobID());
@@ -52,15 +65,16 @@ public class TaskAttemptContextImpl extends JobContextImpl
   }
 
   /**
-   * Get the unique name for this task attempt.
+   * 获取当前任务尝试的唯一标识
+   * @return 当前任务尝试的TaskAttemptID对象
    */
   public TaskAttemptID getTaskAttemptID() {
     return taskId;
   }
 
   /**
-   * Get the last set status message.
-   * @return the current status message
+   * 获取当前任务设置的状态描述信息
+   * @return 当前任务状态字符串
    */
   public String getStatus() {
     return status;
@@ -77,27 +91,36 @@ public class TaskAttemptContextImpl extends JobContextImpl
   }
 
   /**
-   * Report progress.
+   * 向框架上报当前任务进度
    */
   @Override
   public void progress() {
     reporter.progress();
   }
 
+  /**
+   * 设置上下文内部保存的状态字符串
+   * @param status 要设置的状态字符串
+   */
   protected void setStatusString(String status) {
     this.status = status;
   }
 
   /**
-   * Set the current status of the task to the given string.
+   * 设置当前任务的运行状态，同时上报给框架
+   * @param status 新的状态描述字符串
    */
   @Override
   public void setStatus(String status) {
+    // 对状态字符串进行标准化处理，截断过长的状态文本
     String normalizedStatus = Task.normalizeStatus(status, conf);
     setStatusString(normalizedStatus);
     reporter.setStatus(normalizedStatus);
   }
 
+  /**
+   * 空实现状态报告器，用于不需要实际上报进度/状态的场景，仅提供计数器占位
+   */
   public static class DummyReporter extends StatusReporter {
     public void setStatus(String s) {
     }

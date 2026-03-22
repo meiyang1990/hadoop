@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,9 +49,8 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.Man
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.ManifestCommitterSupport.getAppAttemptId;
 
 /**
- * The configuration for the committer as built up from the job configuration
- * and data passed down from the committer factory.
- * Isolated for ease of dev/test
+ * 文件说明：Manifest提交器的配置类，从作业配置和提交器工厂传入数据中构建，
+ * 隔离配置逻辑便于开发和测试，为整个提交流程提供统一配置入口。
  */
 public final class ManifestCommitterConfig implements IOStatisticsSource {
 
@@ -58,120 +58,106 @@ public final class ManifestCommitterConfig implements IOStatisticsSource {
       ManifestCommitterConfig.class);
 
   /**
-   * Final destination of work.
-   * This is <i>unqualified</i>.
+   * 作业最终输出目标目录，未做资格化处理。
    */
   private final Path destinationDir;
 
   /**
-   * Role: used in log/text messages.
+   * 角色标识，用于日志和文本消息中区分上下文。
    */
   private final String role;
 
   /**
-   * This is the directory for all intermediate work: where the output
-   * format will write data.
-   * Will be null if built from a job context.
+   * 所有中间工作的目录，输出格式会将数据写入此处；如果从作业上下文构建则为null。
    */
   private final Path taskAttemptDir;
 
-  /** Configuration of the job. */
+  /** 作业配置对象。 */
   private final Configuration conf;
 
-  /** The job context. For a task, this can be cast to a TaskContext. */
+  /** 作业上下文，如果是任务上下文则可以强转为TaskContext。 */
   private final JobContext jobContext;
 
-  /** Should a job marker be created? */
+  /** 是否需要创建作业成功标记文件。 */
   private final boolean createJobMarker;
 
   /**
-   * Job ID Or UUID -without any attempt suffix.
-   * This is expected/required to be unique, though
-   * Spark has had "issues" there until recently
-   * with lack of uniqueness of generated MR Job IDs.
+   * 作业唯一ID，不带尝试编号后缀；要求全局唯一，解决Spark旧版本作业ID不唯一问题。
    */
   private final String jobUniqueId;
 
   /**
-   * Where did the job Unique ID come from?
+   * 作业唯一ID的来源标识。
    */
   private final String jobUniqueIdSource;
 
   /**
-   * Number of this attempt; starts at zero.
+   * 作业尝试编号，从0开始计数。
    */
   private final int jobAttemptNumber;
 
   /**
-   * Job ID + AttemptID.
+   * 作业唯一ID + 尝试编号拼接成的作业尝试ID。
    */
   private final String jobAttemptId;
 
   /**
-   * Task ID: used as the filename of the manifest.
-   * Will be "" if built from a job context.
+   * 任务ID，用作清单文件名；如果从作业上下文构建则为空字符串。
    */
   private final String taskId;
 
   /**
-   * Task attempt ID. Determines the working
-   * directory for task attempts to write data into,
-   * and for the task committer to scan.
-   * Will be "" if built from a job context.
+   * 任务尝试ID，决定任务尝试写入数据的工作目录，供提交器扫描；如果从作业上下文构建则为空字符串。
    */
   private final String taskAttemptId;
 
-  /** Any progressable for progress callbacks. */
+  /** 进度回调接口。 */
   private final Progressable progressable;
 
   /**
-   * IOStatistics to update.
+   * 用于统计更新的IO统计信息存储。
    */
   private final IOStatisticsStore iostatistics;
 
 
-  /** Should the output be validated after the commit? */
+  /** 是否在提交完成后验证输出数据完整性。 */
   private final boolean validateOutput;
 
   /**
-   * Attempt directory management.
+   * 尝试目录管理器，管理所有相关目录路径。
    */
   private final ManifestCommitterSupport.AttemptDirectories dirs;
 
   /**
-   * Callback when a stage is entered.
+   * 阶段进入事件的回调接口。
    */
   private final StageEventCallbacks stageEventCallbacks;
 
   /**
-   * Name for logging.
+   * 日志打印使用的名称标识。
    */
   private final String name;
 
-  /**
-   * Delete target paths on commit? Stricter, but
-   * higher IO cost.
-   */
+  /** 是否在提交时删除目标路径，规则更严格但IO成本更高。 */
   private final boolean deleteTargetPaths;
 
   /**
-   * Entry writer queue capacity.
+   * 条目写入队列的容量。
    */
   private final int writerQueueCapacity;
 
   /**
-   * How many attempts to save a task manifest by save and rename
-   * before giving up.
+   * 保存任务清单时，保存并重命名操作的最大重试次数，失败后放弃。
    */
   private final int saveManifestAttempts;
 
   /**
-   * Constructor.
-   * @param outputPath destination path of the job.
-   * @param role role for log messages.
-   * @param context job/task context
-   * @param iostatistics IO Statistics
-   * @param stageEventCallbacks stage event callbacks.
+   * 构造方法：从作业输出路径、上下文、统计信息和回调构建Manifest提交器配置。
+   * @param outputPath 作业的目标输出路径
+   * @param role 日志消息使用的角色标识
+   * @param context 作业/任务上下文
+   * @param iostatistics IO统计存储
+   * @param stageEventCallbacks 阶段事件回调
    */
 
   ManifestCommitterConfig(
@@ -187,17 +173,18 @@ public final class ManifestCommitterConfig implements IOStatisticsSource {
     this.iostatistics = iostatistics;
     this.stageEventCallbacks = stageEventCallbacks;
 
+    // 生成作业唯一ID和来源
     Pair<String, String> pair = buildJobUUID(conf, context.getJobID());
     this.jobUniqueId = pair.getLeft();
     this.jobUniqueIdSource = pair.getRight();
     this.jobAttemptNumber = getAppAttemptId(context);
     this.jobAttemptId = this.jobUniqueId + "_" + jobAttemptNumber;
 
-    // build directories
+    // 构建各类目录路径
     this.dirs = new ManifestCommitterSupport.AttemptDirectories(outputPath,
         this.jobUniqueId, jobAttemptNumber);
 
-    // read in configuration options
+    // 从配置读取各项参数
     this.createJobMarker = conf.getBoolean(
         SUCCESSFUL_JOB_OUTPUT_DIR_MARKER,
         DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER);
@@ -212,6 +199,7 @@ public final class ManifestCommitterConfig implements IOStatisticsSource {
         DEFAULT_WRITER_QUEUE_CAPACITY);
     int attempts = conf.getInt(OPT_MANIFEST_SAVE_ATTEMPTS,
         OPT_MANIFEST_SAVE_ATTEMPTS_DEFAULT);
+    // 校验重试次数合法性，非法值则重置为最小值1
     if (attempts < 1) {
       LOG.warn("Invalid value for {}: {}",
           OPT_MANIFEST_SAVE_ATTEMPTS, attempts);
@@ -219,22 +207,22 @@ public final class ManifestCommitterConfig implements IOStatisticsSource {
     }
     this.saveManifestAttempts = attempts;
 
-    // if constructed with a task attempt, build the task ID and path.
+    // 如果是任务尝试上下文，构建任务ID和任务尝试目录
     if (context instanceof TaskAttemptContext) {
-      // it's a task
+      // 当前是任务级别上下文
       final TaskAttemptContext tac = (TaskAttemptContext) context;
       TaskAttemptID taskAttempt = Objects.requireNonNull(
           tac.getTaskAttemptID());
       taskAttemptId = taskAttempt.toString();
       taskId = taskAttempt.getTaskID().toString();
-      // Task attempt dir; must be different across instances
+      // 生成任务尝试专属目录，保证不同实例目录隔离
       taskAttemptDir = dirs.getTaskAttemptPath(taskAttemptId);
-      // the context is also the progress callback.
+      // 上下文本身就是进度回调实现
       progressable = tac;
       name = String.format(InternalConstants.NAME_FORMAT_TASK_ATTEMPT, taskAttemptId);
 
     } else {
-      // it's a job
+      // 当前是作业级别上下文
       taskId = "";
       taskAttemptId = "";
       taskAttemptDir = null;
@@ -261,20 +249,17 @@ public final class ManifestCommitterConfig implements IOStatisticsSource {
   }
 
   /**
-   * Get the destination filesystem.
-   * @return destination FS.
-   * @throws IOException Problems binding to the destination FS.
+   * 获取目标输出路径对应的文件系统实例。
+   * @return 目标文件系统
+   * @throws IOException 获取文件系统时发生IO异常
    */
   FileSystem getDestinationFileSystem() throws IOException {
     return FileSystem.get(destinationDir.toUri(), conf);
   }
 
   /**
-   * Create the stage config from the committer
-   * configuration.
-   * This does not bind the store operations
-   * or processors.
-   * @return a stage config with configuration options passed in.
+   * 基于当前配置创建处理阶段配置对象，不绑定存储操作和处理器。
+   * @return 填充好配置的阶段配置对象
    */
   StageConfig createStageConfig() {
     StageConfig stageConfig = new StageConfig();
@@ -357,8 +342,8 @@ public final class ManifestCommitterConfig implements IOStatisticsSource {
   }
 
   /**
-   * Get writer queue capacity.
-   * @return the queue capacity
+   * 获取写入队列容量。
+   * @return 队列容量值
    */
   public int getWriterQueueCapacity() {
     return writerQueueCapacity;
@@ -370,10 +355,8 @@ public final class ManifestCommitterConfig implements IOStatisticsSource {
   }
 
   /**
-   * Create a new submitter task pool from the
-   * {@link ManifestCommitterConstants#OPT_IO_PROCESSORS}
-   * settings.
-   * @return a new thread pool.
+   * 根据配置参数{@link ManifestCommitterConstants#OPT_IO_PROCESSORS}创建异步任务线程池提交器。
+   * @return 新建的线程池提交器
    */
   public CloseableTaskPoolSubmitter createSubmitter() {
     return createSubmitter(
@@ -381,13 +364,14 @@ public final class ManifestCommitterConfig implements IOStatisticsSource {
   }
 
   /**
-   * Create a new submitter task pool.
-   * @param key config key with pool size.
-   * @param defVal default value.
-   * @return a new task pool.
+   * 根据指定配置键和默认值创建异步任务线程池提交器。
+   * @param key 线程池大小配置键
+   * @param defVal 默认线程数
+   * @return 新建的任务池提交器
    */
   public CloseableTaskPoolSubmitter createSubmitter(String key, int defVal) {
     int numThreads = conf.getInt(key, defVal);
+    // 非法值则使用默认值
     if (numThreads <= 0) {
       // ignore the setting if it is too invalid.
       numThreads = defVal;
@@ -396,11 +380,11 @@ public final class ManifestCommitterConfig implements IOStatisticsSource {
   }
 
   /**
-   * Create a new submitter task pool.
+   * 根据指定线程数和作业ID创建异步任务线程池提交器。
    *
-   * @param numThreads thread count.
-   * @param jobAttemptId job ID
-   * @return a new task pool.
+   * @param numThreads 线程数量
+   * @param jobAttemptId 作业尝试ID
+   * @return 新建的任务池提交器
    */
   public static CloseableTaskPoolSubmitter createCloseableTaskSubmitter(
       final int numThreads,

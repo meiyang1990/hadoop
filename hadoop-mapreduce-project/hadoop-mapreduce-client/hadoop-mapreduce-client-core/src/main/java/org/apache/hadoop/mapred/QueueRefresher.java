@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,46 +22,28 @@ package org.apache.hadoop.mapred;
 import java.util.List;
 
 /**
- * Abstract QueueRefresher class. Scheduler's can extend this and return an
- * instance of this in the {@link #getQueueRefresher()} method. The
- * {@link #refreshQueues(List)} method of this instance will be invoked by the
- * {@link QueueManager} whenever it gets a request from an administrator to
- * refresh its own queue-configuration. This method has a documented contract
- * between the {@link QueueManager} and the {@link TaskScheduler}.
- * 
- * Before calling QueueRefresher, the caller must hold the lock to the
- * corresponding {@link TaskScheduler} (generally in the {@link JobTracker}).
+ * 队列配置刷新抽象基类，为MapReduce任务调度器提供队列配置热更新能力。
+ * 任务调度器可以继承该类实现自定义的队列刷新逻辑，QueueManager在接收到管理员
+ * 刷新队列配置请求时，会调用该类的refreshQueues方法完成调度器层面的配置更新。
+ * 调用方在调用此接口前必须持有对应任务调度器的锁（通常在JobTracker中）。
  */
 abstract class QueueRefresher {
 
   /**
-   * Refresh the queue-configuration in the scheduler. This method has the
-   * following contract.
+   * 刷新调度器中的队列配置，遵循以下约定：
    * <ol>
-   * <li>Before this method, {@link QueueManager} does a validation of the new
-   * queue-configuration. For e.g, currently addition of new queues, or
-   * removal of queues at any level in the hierarchy is not supported by
-   * {@link QueueManager} and so are not supported for schedulers too.</li>
-   * <li>Schedulers will be passed a list of {@link JobQueueInfo}s of the root
-   * queues i.e. the queues at the top level. All the descendants are properly
-   * linked from these top-level queues.</li>
-   * <li>Schedulers should use the scheduler specific queue properties from
-   * the newRootQueues, validate the properties themselves and apply them
-   * internally.</li>
-   * <li>
-   * Once the method returns successfully from the schedulers, it is assumed
-   * that the refresh of queue properties is successful throughout and will be
-   * 'committed' internally to {@link QueueManager} too. It is guaranteed that
-   * at no point, after successful return from the scheduler, is the queue
-   * refresh in QueueManager failed. If ever, such abnormalities happen, the
-   * queue framework will be inconsistent and will need a JT restart.</li>
-   * <li>If scheduler throws an exception during {@link #refreshQueues()},
-   * {@link QueueManager} throws away the newly read configuration, retains
-   * the old (consistent) configuration and informs the request issuer about
-   * the error appropriately.</li>
+   * <li>方法调用前，QueueManager已经完成了对新队列配置的校验，当前不支持
+   * 在队列层次结构中新增或删除队列，该限制对所有调度器生效</li>
+   * <li>参数传入的是刷新后的根队列列表，所有子队列已经通过根队列正确关联</li>
+   * <li>调度器需要从新的根队列信息中提取调度器专属属性，自行完成属性校验并在内部应用更新</li>
+   * <li>方法成功返回后，QueueManager会提交本次配置更新，承诺更新后不会出现失败情况；
+   * 如果出现异常会导致队列框架不一致，需要重启JobTracker</li>
+   * <li>如果调度器在刷新过程中抛出异常，QueueManager会丢弃新配置，保留原有一致的旧配置，
+   * 并将错误信息返回给请求发起者</li>
    * </ol>
    * 
-   * @param newRootQueues
+   * @param newRootQueues 刷新后的根队列信息列表，包含完整的队列层次结构
+   * @throws Throwable 刷新过程中发生任何错误时抛出异常，触发回滚
    */
   abstract void refreshQueues(List<JobQueueInfo> newRootQueues)
       throws Throwable;

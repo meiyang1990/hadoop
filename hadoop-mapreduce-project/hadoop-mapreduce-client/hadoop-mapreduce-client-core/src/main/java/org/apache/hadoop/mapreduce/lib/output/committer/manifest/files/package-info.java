@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,21 +18,15 @@
  */
 
 /**
- * Persistence formats.
- * These are the persistence formats used for passing data from tasks
- * to the job committer
- * {@link org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest},
- * and for a {@code _SUCCESS} file, which is in
- * {@link org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestSuccessData}.
- * The {@code _SUCCESS} file is a copy of the S3A Committer
- * {@code org.apache.hadoop.fs.s3a.commit.files.ManifestSuccessData},
- * the intent being that at the JSON-level they are compatible.
- * This is to aid testing/validation and support calls, with one single
- * format to load.
- *
- * Consult the individual formats for their declarations of access;
- * the _SUCCESS file is one which tests may use.
- *
+ * Manifest输出提交器的持久化数据格式包。
+ * 本包定义了任务向作业提交器传递输出数据信息的持久化格式，以及作业成功标记文件(_SUCCESS)的数据结构。
+ * 其中任务输出元数据清单由 {@link org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest} 定义，
+ * 成功标记数据由 {@link org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.ManifestSuccessData} 定义。
+ * 
+ * _SUCCESS文件格式与S3A提交器的{@code org.apache.hadoop.fs.s3a.commit.files.ManifestSuccessData}保持JSON级兼容，
+ * 目的是支持统一格式加载，方便测试、验证和问题排查，
+ * 
+ * 访问控制请参考具体格式的声明，其中_SUCCESS文件格式可供测试使用。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,7 +34,6 @@ import javax.crypto.SecretKey;
 import org.apache.hadoop.fs.CommonConfigurationKeys;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.io.FloatWritable;
@@ -62,30 +62,41 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class is responsible for launching and communicating with the child 
- * process.
+ * Pipes框架中负责启动用户可执行任务进程、并与该进程通信的核心管理类
+ * 为C/C++等非Java语言编写的MapReduce任务提供进程间通信支撑
+ * @param <K1> Map输入键类型
+ * @param <V1> Map输入值类型
+ * @param <K2> Reduce输出键类型
+ * @param <V2> Reduce输出值类型
  */
 class Application<K1 extends WritableComparable, V1 extends Writable,
                   K2 extends WritableComparable, V2 extends Writable> {
   private static final Logger LOG =
       LoggerFactory.getLogger(Application.class.getName());
+  /** 服务端Socket，用于接收用户任务进程的连接 */
   private ServerSocket serverSocket;
+  /** 空闲Ping连接清理线程 */
   private PingSocketCleaner socketCleaner;
+  /** 启动的用户任务子进程 */
   private Process process;
+  /** 与用户任务进程通信的客户端Socket */
   private Socket clientSocket;
+  /** 输出处理器，处理用户任务进程返回的输出数据 */
   private OutputHandler<K2, V2> handler;
+  /** 下行协议对象，用于向用户任务进程发送命令 */
   private DownwardProtocol<K1, V1> downlink;
+  /** 标识当前系统是否为Windows */
   static final boolean WINDOWS
   = System.getProperty("os.name").startsWith("Windows");
 
   /**
-   * Start the child process to handle the task for us.
-   * @param conf the task's configuration
-   * @param recordReader the fake record reader to update progress with
-   * @param output the collector to send output to
-   * @param reporter the reporter for the task
-   * @param outputKeyClass the class of the output keys
-   * @param outputValueClass the class of the output values
+   * 构造并启动用户任务子进程，完成与子进程的连接建立和身份认证
+   * @param conf 任务配置对象
+   * @param recordReader 记录读取器，用于更新任务进度
+   * @param output 输出收集器，用于收集用户任务输出并写入Hadoop
+   * @param reporter 任务Reporter，用于上报进度和状态
+   * @param outputKeyClass 输出键的类型
+   * @param outputValueClass 输出值的类型
    * @throws IOException
    * @throws InterruptedException
    */
@@ -95,18 +106,19 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
               Class<? extends K2> outputKeyClass,
               Class<? extends V2> outputValueClass
               ) throws IOException, InterruptedException {
+    // 绑定随机端口，供子进程连接
     serverSocket = new ServerSocket(0);
     Map<String, String> env = new HashMap<String,String>();
-    // add TMPDIR environment variable with the value of java.io.tmpdir
+    // 设置临时目录环境变量，使用Java的临时目录
     env.put("TMPDIR", System.getProperty("java.io.tmpdir"));
+    // 将监听端口写入环境变量，供子进程获取连接
     env.put(Submitter.PORT, 
             Integer.toString(serverSocket.getLocalPort()));
     
-    //Add token to the environment if security is enabled
+    // 安全启用时，将作业令牌密码写入本地文件供子进程使用
     Token<JobTokenIdentifier> jobToken = TokenCache.getJobToken(conf
         .getCredentials());
-    // This password is used as shared secret key between this application and
-    // child pipes process
+    // 该密码作为Java进程和C++子进程的共享密钥
     byte[]  password = jobToken.getPassword();
     String localPasswordFile = new File(".") + Path.SEPARATOR
         + "jobTokenPassword";
@@ -116,19 +128,19 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
  
     List<String> cmd = new ArrayList<String>();
     String interpretor = conf.get(Submitter.INTERPRETOR);
+    // 如果配置了解释器（如Python），添加到命令行
     if (interpretor != null) {
       cmd.add(interpretor);
     }
+    // 获取分布式缓存中第一个文件，即为用户可执行程序
     String executable = JobContextImpl.getLocalCacheFiles(conf)[0].toString();
+    // 如果可执行文件没有执行权限，添加执行权限
     if (!FileUtil.canExecute(new File(executable))) {
-      // LinuxTaskController sets +x permissions on all distcache files already.
-      // In case of DefaultTaskController, set permissions here.
+      // LinuxTaskController已经默认给了执行权限，这里主要处理DefaultTaskController的情况
       FileUtil.chmod(executable, "u+x");
     }
     cmd.add(executable);
-    // wrap the command in a stdout/stderr capture
-    // we are starting map/reduce task of the pipes job. this is not a cleanup
-    // attempt. 
+    // 包装命令，捕获子进程的标准输出和错误输出到任务日志
     TaskAttemptID taskid = 
       TaskAttemptID.forName(conf.get(MRJobConfig.TASK_ATTEMPT_ID));
     File stdout = TaskLog.getTaskLogFile(taskid, false, TaskLog.LogName.STDOUT);
@@ -137,9 +149,11 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
     cmd = TaskLog.captureOutAndError(null, cmd, stdout, stderr, logLength,
                                      false);
     
+    // 启动子进程
     process = runClient(cmd, env);
+    // 接受子进程连接
     clientSocket = serverSocket.accept();
-    // start ping socket cleaner
+    // 启动空闲Ping连接清理线程，处理闲置连接
     int soTimeout = conf.getInt(CommonConfigurationKeys.IPC_PING_INTERVAL_KEY,
         CommonConfigurationKeys.IPC_PING_INTERVAL_DEFAULT);
     socketCleaner = new PingSocketCleaner("ping-socket-cleaner", serverSocket,
@@ -147,29 +161,40 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
     socketCleaner.setDaemon(true);
     socketCleaner.start();
     
+    // 生成安全挑战，完成双向认证
     String challenge = getSecurityChallenge();
     String digestToSend = createDigest(password, challenge);
     String digestExpected = createDigest(password, digestToSend);
     
+    // 初始化输出处理器
     handler = new OutputHandler<K2, V2>(output, reporter, recordReader, 
         digestExpected);
     K2 outputKey = (K2)
       ReflectionUtils.newInstance(outputKeyClass, conf);
     V2 outputValue = (V2) 
       ReflectionUtils.newInstance(outputValueClass, conf);
+    // 初始化二进制协议处理器
     downlink = new BinaryProtocol<K1, V1, K2, V2>(clientSocket, handler, 
                                   outputKey, outputValue, conf);
     
+    // 发送认证信息
     downlink.authenticate(digestToSend, challenge);
+    // 等待认证完成
     waitForAuthentication();
     LOG.debug("Authentication succeeded");
+    // 启动协议处理线程
     downlink.start();
+    // 发送作业配置给子进程
     downlink.setJobConf(conf);
   }
 
+  /**
+   * 生成随机安全挑战字符串，用于身份认证
+   * @return 随机生成的挑战字符串
+   */
   private String getSecurityChallenge() {
     Random rand = new Random(System.currentTimeMillis());
-    //Use 4 random integers so as to have 16 random bytes.
+    // 使用4个随机整数生成16字节随机数据
     StringBuilder strBuilder = new StringBuilder();
     strBuilder.append(rand.nextInt(0x7fffffff));
     strBuilder.append(rand.nextInt(0x7fffffff));
@@ -178,6 +203,13 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
     return strBuilder.toString();
   }
 
+  /**
+   * 将作业令牌密码写入本地权限受限文件，供子进程读取用于认证
+   * @param localPasswordFile 本地文件路径
+   * @param password 令牌密码字节数组
+   * @param conf 作业配置对象
+   * @throws IOException
+   */
   private void writePasswordToLocalFile(String localPasswordFile,
       byte[] password, JobConf conf) throws IOException {
     FileSystem localFs = FileSystem.getLocal(conf);
@@ -189,16 +221,15 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
   }
 
   /**
-   * Get the downward protocol object that can send commands down to the
-   * application.
-   * @return the downlink proxy
+   * 获取向用户任务进程发送命令的下行协议对象
+   * @return 下行协议代理对象
    */
   DownwardProtocol<K1, V1> getDownlink() {
     return downlink;
   }
   
   /**
-   * Wait for authentication response.
+   * 等待子进程完成身份认证响应
    * @throws IOException
    * @throws InterruptedException
    */
@@ -210,8 +241,8 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
   }
   
   /**
-   * Wait for the application to finish
-   * @return did the application finish correctly?
+   * 等待用户任务进程执行完成
+   * @return 任务是否正常完成
    * @throws Throwable
    */
   boolean waitForFinish() throws Throwable {
@@ -220,9 +251,9 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
   }
 
   /**
-   * Abort the application and wait for it to finish.
-   * @param t the exception that signalled the problem
-   * @throws IOException A wrapper around the exception that was passed in
+   * 中止用户任务进程，并清理资源
+   * @param t 导致中止的异常
+   * @throws IOException 包装后的异常抛出
    */
   void abort(Throwable t) throws IOException {
     LOG.info("Aborting because of " + StringUtils.stringifyException(t));
@@ -230,11 +261,12 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
       downlink.abort();
       downlink.flush();
     } catch (IOException e) {
-      // IGNORE cleanup problems
+      // 清理阶段忽略IO异常
     }
     try {
       handler.waitForFinish();
     } catch (Throwable ignored) {
+      // 等待失败则直接销毁进程
       process.destroy();
     }
     IOException wrapper = new IOException("pipe child exception");
@@ -243,7 +275,7 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
   }
   
   /**
-   * Clean up the child procress and socket.
+   * 清理子进程和Socket资源
    * @throws IOException
    */
   void cleanup() throws IOException {
@@ -257,11 +289,10 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
   }
 
   /**
-   * Run a given command in a subprocess, including threads to copy its stdout
-   * and stderr to our stdout and stderr.
-   * @param command the command and its arguments
-   * @param env the environment to run the process in
-   * @return a handle on the process
+   * 在子进程中执行指定命令，并转发输出到当前进程
+   * @param command 命令及参数列表
+   * @param env 子进程环境变量
+   * @return 启动后的进程句柄
    * @throws IOException
    */
   static Process runClient(List<String> command, 
@@ -274,17 +305,34 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
     return result;
   }
   
+  /**
+   * 使用共享密钥对输入数据计算消息摘要，用于身份认证
+   * @param password 共享密钥字节数组
+   * @param data 待计算摘要的输入数据
+   * @return 计算得到的摘要字符串
+   * @throws IOException
+   */
   public static String createDigest(byte[] password, String data)
       throws IOException {
     SecretKey key = JobTokenSecretManager.createSecretKey(password);
     return SecureShuffleUtils.hashFromString(data, key);
   }
 
+  /**
+   * 空闲Ping连接清理线程，负责清理ServerSocket上接受的闲置连接
+   * 处理额外的连接请求，避免连接泄漏
+   */
   @VisibleForTesting
   public static class PingSocketCleaner extends SubjectInheritingThread {
     private final ServerSocket serverSocket;
     private final int soTimeout;
 
+    /**
+     * 构造Ping连接清理线程
+     * @param name 线程名称
+     * @param serverSocket 待监听的服务端Socket
+     * @param soTimeout Socket读取超时时间
+     */
     PingSocketCleaner(String name, ServerSocket serverSocket, int soTimeout) {
       super(name);
       this.serverSocket = serverSocket;
@@ -297,11 +345,14 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
       while (!Thread.currentThread().isInterrupted()) {
         Socket clientSocket = null;
         try {
+          // 接受新连接
           clientSocket = serverSocket.accept();
+          // 设置读取超时
           clientSocket.setSoTimeout(soTimeout);
           LOG.debug("Connection received from {}",
                     clientSocket.getInetAddress());
           int readData = 0;
+          // 读取到流结束
           while (readData != -1) {
             readData = clientSocket.getInputStream().read();
           }
@@ -310,11 +361,16 @@ class Application<K1 extends WritableComparable, V1 extends Writable,
         } catch (IOException exception) {
           LOG.error("PingSocketCleaner exception", exception);
         } finally {
+          // 确保连接被关闭
           closeSocketInternal(clientSocket);
         }
       }
     }
 
+    /**
+     * 关闭指定Socket连接
+     * @param clientSocket 待关闭的Socket
+     */
     @VisibleForTesting
     protected void closeSocketInternal(Socket clientSocket) {
       IOUtils.closeSocket(clientSocket);

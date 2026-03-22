@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,60 +25,59 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.io.Writable;
 
 /**
- * A named counter that tracks the progress of a map/reduce job.
- *
- * <p><code>Counters</code> represent global counters, defined either by the
- * Map-Reduce framework or applications. Each <code>Counter</code> is named by
- * an {@link Enum} and has a long for the value.</p>
- *
- * <p><code>Counters</code> are bunched into Groups, each comprising of
- * counters from a particular <code>Enum</code> class.
+ * MapReduce作业进度统计计数器接口，用于跟踪MapReduce作业执行过程中的各类指标统计。
+ * 
+ * <p>计数器可以由MapReduce框架或用户应用定义，每个计数器拥有唯一名称，维护一个长整型统计值。
+ * 计数器按分组进行组织，同一分组通常来自同一个枚举类，方便统一管理同一类指标。</p>
+ * 
+ * <p>常用于统计作业处理的记录数、字节数、异常次数等各类运行指标，用于作业监控和调优分析。</p>
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface Counter extends Writable {
 
   /**
-   * Set the display name of the counter
-   * @param displayName of the counter
-   * @deprecated (and no-op by default)
+   * 设置计数器的展示名称
+   * @param displayName 计数器展示名称
+   * @deprecated 已废弃，默认无操作
    */
   @Deprecated
   void setDisplayName(String displayName);
 
   /**
-   * @return the name of the counter
+   * 获取计数器的名称
+   * @return 计数器名称
    */
   String getName();
 
   /**
-   * Get the display name of the counter.
-   * @return the user facing name of the counter
+   * 获取计数器的展示名称，用于前端UI展示
+   * @return 面向用户展示的计数器名称
    */
   String getDisplayName();
 
   /**
-   * What is the current value of this counter?
-   * @return the current value
+   * 获取计数器当前的统计值
+   * @return 计数器当前值
    */
   long getValue();
 
   /**
-   * Set this counter by the given value
-   * @param value the value to set
+   * 直接设置计数器的统计值
+   * @param value 要设置的值
    */
   void setValue(long value);
 
   /**
-   * Increment this counter by the given value
-   * @param incr the value to increase this counter by
+   * 将计数器的值增加指定增量
+   * @param incr 增量值，可正可负
    */
   void increment(long incr);
  
   @Private
   /**
-   * Return the underlying object if this is a facade.
-   * @return the undelying object.
+   * 如果当前是外观包装对象，获取其底层包装的原始计数器对象
+   * @return 底层原始计数器对象
    */
   Counter getUnderlyingCounter();
 }

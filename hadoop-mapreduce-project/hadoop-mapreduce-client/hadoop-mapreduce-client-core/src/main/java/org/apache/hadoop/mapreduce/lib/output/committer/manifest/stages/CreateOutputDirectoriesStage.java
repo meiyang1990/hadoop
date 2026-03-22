@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -53,27 +54,10 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
 import static org.apache.hadoop.util.OperationDuration.humanTime;
 
 /**
- * Prepare the destination directory tree, as efficiently as possible.
- * possible -and doing those IO operations in the thread pool.
- *
- * The classic FileOutputCommitter does a recursive treewalk and
- * deletes any files found at paths where directories are to be created.
- *
- * Each task manifest's directories are combined with those of the other tasks
- * to build a set of all directories which are needed, without duplicates.
- *
- * This stage requires the aggregate set of manifests to contain
- * all directories to create, including level,
- * and expects them to have been probed for existence/state.
- *
- * For each level, all dirs are processed in parallel to
- * be created or, if files, deleted.
- *
- * The stage returns the list of directories created, and for testing,
- * the map of paths to outcomes.
- *
- * Directory creation can be surprisingly slow against object stores,
- * do use benchmarks from real test runs when tuning this algorithm.
+ * 文件级说明：Manifest提交器输出目录准备阶段，高效并行创建输出目录树。
+ * 继承传统FileOutputCommitter的处理逻辑：在需要创建目录的路径如果存在文件，需要先删除该文件。
+ * 合并所有任务分片的目录需求，去重后按目录层级并行处理，提升对象存储下的创建效率。
+ * 输入是聚合后的所有待创建目录信息，且已经提前探测过目录存在性与状态，输出为创建结果。
  */
 public class CreateOutputDirectoriesStage extends
     AbstractJobOrTaskStage<
@@ -84,22 +68,32 @@ public class CreateOutputDirectoriesStage extends
       CreateOutputDirectoriesStage.class);
 
   /**
-   * Directories as a map of (path, DirMapState).
+   * 存储目录路径与对应状态的并发映射表。
    */
   private final Map<Path, DirMapState> dirMap = new ConcurrentHashMap<>();
 
   /**
-   * A list of created paths for the results.
+   * 存储实际创建成功的目录列表，用于结果返回。
    */
   private final List<Path> createdDirectories = new ArrayList<>();
 
+  /**
+   * 构造创建输出目录阶段实例，初始化目录映射表。
+   * @param stageConfig 阶段配置信息
+   */
   public CreateOutputDirectoriesStage(final StageConfig stageConfig) {
     super(false, stageConfig, OP_STAGE_JOB_CREATE_TARGET_DIRS, true);
-    // add the dest dir to the dir map as we expect the job setup to create it.
+    // 将根输出目录加入目录映射，作业初始化阶段已经创建完成
     dirMap.put(getDestinationDir(), DirMapState.dirWasCreated);
   }
 
   @Override
+  /**
+   * 执行创建输出目录树阶段主流程。
+   * @param manifestDirs 所有聚合后的待创建目录条目
+   * @return 创建结果，包含创建的目录集合与所有目录状态映射
+   * @throws IOException IO操作异常
+   */
   protected Result executeStage(
       final Collection<DirEntry> manifestDirs)
       throws IOException {
@@ -110,65 +104,53 @@ public class CreateOutputDirectoriesStage extends
   }
 
   /**
-   * Build the list of directories to create.
-   * @param manifestDirs dir entries from the manifests
-   * @return the list of paths which have been created.
+   * 处理所有待创建目录，分类叶子目录与父目录，删除冲突文件，并行创建叶子目录。
+   * @param manifestDirs 来自所有任务manifest的目录条目集合
+   * @return 实际创建成功的目录路径列表
+   * @throws IOException IO操作异常
    */
   private List<Path> createAllDirectories(final Collection<DirEntry> manifestDirs)
       throws IOException {
 
-    // all directories which need to exist across all
-    // tasks.
-    // leaf directories
+    // 保存叶子目录（最底层需要创建的目录）
     final Map<Path, DirEntry> leaves = new HashMap<>();
-    // parent directories. these do not need to be
-    // explicitly created.
+    // 保存父目录（不需要显式创建，创建叶子目录时会自动生成）
     final Map<Path, DirEntry> parents = new HashMap<>();
-    // the files which must be deleted as a directory
-    // will be created at that path.
+    // 保存路径存在文件、需要先删除才能创建目录的路径集合
     final Set<Path> filesToDelete = new HashSet<>();
 
-    // sort the values of dir map by directory level: parent dirs will
-    // come first in the sorting
+    // 按目录层级排序，父目录在前，叶子目录在后
     List<DirEntry> destDirectories = new ArrayList<>(manifestDirs);
 
     Collections.sort(destDirectories, Comparator.comparingInt(DirEntry::getLevel));
-    // iterate through the directory map
+    // 遍历所有目录条目进行分类整理
     for (DirEntry entry: destDirectories) {
-      // add the dest entry
       final Path path = entry.getDestPath();
       if (!leaves.containsKey(path)) {
         leaves.put(path, entry);
 
-        // if it is a file to delete, record this.
+        // 如果当前路径是文件，加入待删除集合
         if (entry.getStatus() == EntryStatus.file) {
           filesToDelete.add(path);
         }
         final Path parent = path.getParent();
         if (parent != null && leaves.containsKey(parent)) {
-          // there's a parent dir, move it from the leaf list
-          // to parent list
+          // 父目录已经在叶子集合中，需要移动到父目录集合，不再显式创建
           parents.put(parent, leaves.remove(parent));
         }
       }
     }
 
-    // at this point then there is a map of all directories which
-    // are leaf entries and so need to be created if not present,
-    // and the maximum level is known.
-    // we can iterate through all levels deleting any files if there are any.
-
-    // Prepare parent directories.
+    // 分类完成，现在先删除所有冲突文件
     deleteFiles(filesToDelete);
 
-    // Now the real work.
+    // 统计目录数量并输出日志
     final int createCount = leaves.size();
     LOG.info("Preparing {} directory/directories; {} parent dirs implicitly created."
             + " Files deleted: {}",
         createCount, parents.size(), filesToDelete.size());
 
-    // now probe for and create the leaf dirs, which are those at the
-    // bottom level
+    // 使用线程池并行创建所有叶子目录，统计操作耗时
     Duration d = measureDurationOfInvocation(getIOStatistics(), OP_CREATE_DIRECTORIES, () ->
         TaskPool.foreach(leaves.values())
             .executeWith(getIOProcessors(createCount))
@@ -180,14 +162,14 @@ public class CreateOutputDirectoriesStage extends
   }
 
   /**
-   * How many failures have been reported.
+   * 记录创建失败次数的计数器。
    */
   private final AtomicInteger failureCount = new AtomicInteger();
 
   /**
-   * report a single directory failure.
-   * @param dirEntry dir which could not be deleted
-   * @param e exception raised.
+   * 报告单个目录创建失败，记录日志并递增失败计数。
+   * @param dirEntry 创建失败的目录条目
+   * @param e 捕获到的异常
    */
   private void reportMkDirFailure(DirEntry dirEntry, Exception e) {
     Path path = dirEntry.getDestPath();
@@ -199,19 +181,20 @@ public class CreateOutputDirectoriesStage extends
   }
 
   /**
-   * Delete all directories where there is a file.
-   * @param filesToDelete set of dirs to where there is a file.
-   * @throws IOException IO problem
+   * 并行删除所有需要创建目录位置上已存在的文件。
+   * @param filesToDelete 需要删除的文件路径集合
+   * @throws IOException IO操作异常
    */
   private void deleteFiles(final Set<Path> filesToDelete)
       throws IOException {
 
     final int size = filesToDelete.size();
     if (size == 0) {
-      // nothing to delete.
+      // 没有需要删除的文件，直接返回
       return;
     }
     LOG.info("{}: Directory entries containing files to delete: {}", getName(), size);
+    // 使用线程池并行删除，统计操作耗时
     Duration d = measureDurationOfInvocation(getIOStatistics(),
         OP_PREPARE_DIR_ANCESTORS, () ->
             TaskPool.foreach(filesToDelete)
@@ -225,33 +208,32 @@ public class CreateOutputDirectoriesStage extends
   }
 
   /**
-   * Prepare a parent directory.
-   * @param dir directory to probe
-   * @throws IOException failure in probe other than FNFE
+   * 删除指定路径上的文件，更新目录状态。
+   * @param dir 需要删除文件的路径
+   * @throws IOException IO操作异常
    */
   private void deleteDirWithFile(Path dir) throws IOException {
-    // report progress back
+    // 上报作业进度
     progress();
     LOG.info("{}: Deleting file {}", getName(), dir);
     deleteFile(dir, OP_DELETE);
-    // note its final state
+    // 更新目录状态为文件已删除
     addToDirectoryMap(dir, DirMapState.fileNowDeleted);
   }
 
 
   /**
-   * Create a directory is required, updating the directory map
-   * and, if the operation took place, the list of created dirs.
-   * Reports progress on invocation.
-   * @param dirEntry entry
-   * @throws PathIOException if after multiple attempts, the dest dir couldn't be created.
-   * @throws IOException failure.
+   * 创建单个目录，根据探测结果处理不同情况，更新状态。
+   * @param dirEntry 待创建目录条目
+   * @throws PathIOException 多次尝试后仍无法创建目录
+   * @throws IOException 其他IO异常
    */
   private void createOneDirectory(final DirEntry dirEntry) throws IOException {
-    // report progress back
+    // 上报作业进度
     progress();
     final Path dir = dirEntry.getDestPath();
     updateAuditContext(OP_STAGE_JOB_CREATE_TARGET_DIRS);
+    // 尝试创建目录，获取操作结果状态
     final DirMapState state = maybeCreateOneDirectory(dirEntry);
     switch (state) {
     case dirFoundInStore:
@@ -270,94 +252,83 @@ public class CreateOutputDirectoriesStage extends
 
 
   /**
-   * Try to efficiently and robustly create a directory in a method which is
-   * expected to be executed in parallel with operations creating
-   * peer directories.
-   * A return value of {@link DirMapState#dirWasCreated} or
-   * {@link DirMapState#dirCreatedOnSecondAttempt} indicates
-   * this thread did the creation.
-   * Other outcomes imply it already existed; if the directory
-   * cannot be created/found then a {@link PathIOException} is thrown.
-   * The outcome should be added to the {@link #dirMap} to avoid further creation attempts.
-   * @param dirEntry dir to create
-   * @return Outcome of the operation, such as whether the entry was created, found in store.
-   *           It will always be a success outcome of some form.
-   * @throws PathIOException if after multiple attempts, the dest dir couldn't be created.
-   * @throws IOException Other IO failure
+   * 尝试高效健壮地创建单个目录，支持并发创建，处理创建失败的重试与恢复。
+   * @param dirEntry 待创建目录条目
+   * @return 操作结果状态，标识目录是已存在、本次创建还是重试创建
+   * @throws PathIOException 多次尝试后仍无法创建目录
+   * @throws IOException 其他IO异常
    */
   private DirMapState maybeCreateOneDirectory(DirEntry dirEntry) throws IOException {
     final EntryStatus status = dirEntry.getStatus();
     if (status == EntryStatus.dir) {
+      // 已经存在目录，直接返回状态
       return DirMapState.dirFoundInStore;
     }
-    // present in case directories are ever created in task commits
+    // 目录已经在任务提交阶段创建完成
     if (status == EntryStatus.created_dir) {
       return DirMapState.dirWasCreated;
     }
 
-    // here the dir doesn't exist because
-    // it was a file and has been deleted, or
-    // checks failed. create it.
+    // 当前路径不存在目录：要么是文件已删除，要么是探测未找到，需要创建
     final Path path = dirEntry.getDestPath();
 
     LOG.info("Creating directory {}", path);
 
     try {
       if (mkdirs(path, false)) {
-        // success -return immediately.
+        // 第一次创建成功，直接返回
         return DirMapState.dirWasCreated;
       }
+      // 创建返回false，统计计数
       getIOStatistics().incrementCounter(OP_MKDIRS_RETURNED_FALSE);
 
       LOG.info("{}: mkdirs({}) returned false, attempting to recover",
           getName(), path);
     } catch (IOException e) {
-      // can be caused by file existing, etc.
+      // 创建抛出异常，可能是文件已存在等原因，记录日志进入恢复流程
       LOG.info("{}: mkdir({}) raised exception {}", getName(), path, e.toString());
       LOG.debug("{}: Mkdir stack", getName(), e);
     }
 
-    // fallback to checking the FS, in case a different process did it.
+    // 恢复流程：检查文件系统当前状态，可能其他并发进程已经创建了目录
     FileStatus st = getFileStatusOrNull(path);
     if (st != null) {
       if (!st.isDirectory()) {
-        // is bad: delete a file
+        // 路径存在但还是文件，删除该文件后重试创建
         LOG.info("{}: Deleting file where a directory should go: {}",
             getName(), st);
         deleteFile(path, OP_DELETE_FILE_UNDER_DESTINATION);
       } else {
-        // is good.
+        // 路径已经是目录，虽然创建失败但实际存在，直接返回
         LOG.warn("{}: Even though mkdirs({}) failed, there is now a directory there",
             getName(), path);
         return DirMapState.dirFoundInStore;
       }
     } else {
-      // nothing found. This should never happen.
+      // 路径不存在，mkdir失败但没有阻碍创建，继续重试
       LOG.warn("{}: Although mkdirs({}) returned false, there's nothing at that path to prevent it",
           getName(), path);
 
     }
 
-    // try to create the directory again
-    // if this fails, and IOE is still raised, that
-    // propagate to the caller.
+    // 第二次尝试创建目录，失败则抛出异常
     if (!mkdirs(path, false)) {
 
-      // mkdirs failed again
+      // 第二次创建仍然失败，增加统计计数
       getIOStatistics().incrementCounter(OP_MKDIRS_RETURNED_FALSE);
 
-      // require the dir to exist, raising an exception if it does not.
+      // 校验目录必须存在，不存在则抛出异常
       directoryMustExist("Creating directory ", path);
     }
 
-    // we only get here if the second attempt recovered
+    // 第二次尝试成功，返回对应状态
     return DirMapState.dirCreatedOnSecondAttempt;
 
   }
 
   /**
-   * Add a created dir to the list of created dirs.
-   * @param dir new dir.
+   * 将创建成功的目录加入结果列表，线程安全。
+   * @param dir 创建成功的目录路径
    */
   private void addCreatedDirectory(final Path dir) {
     synchronized (createdDirectories) {
@@ -366,9 +337,9 @@ public class CreateOutputDirectoriesStage extends
   }
 
   /**
-   * Add a dir  to the directory map if there is not already an entry there.
-   * @param dir directory.
-   * @param state state of entry
+   * 将目录状态加入映射表，如果已存在则不覆盖。
+   * @param dir 目录路径
+   * @param state 目录状态
    */
   private void addToDirectoryMap(final Path dir,
       DirMapState state) {
@@ -379,18 +350,21 @@ public class CreateOutputDirectoriesStage extends
 
 
   /**
-   * Result of the operation.
+   * 创建输出目录阶段的结果类，封装创建结果信息。
    */
   public static final class Result {
 
-    /** directories created. */
+    /** 创建成功的目录集合 */
     private final Set<Path> createdDirectories;
 
-    /**
-     * Map of dirs built up during preparation.
-     */
+    /** 所有目录路径与对应状态的映射表 */
     private final Map<Path, DirMapState> dirMap;
 
+    /**
+     * 构造结果实例。
+     * @param createdDirectories 创建成功的目录集合
+     * @param dirMap 目录状态映射表
+     */
     public Result(Set<Path> createdDirectories,
         Map<Path, DirMapState> dirMap) {
       this.createdDirectories = requireNonNull(createdDirectories);
@@ -414,16 +388,24 @@ public class CreateOutputDirectoriesStage extends
   }
 
   /**
-   * Enumeration of dir states in the dir map.
+   * 目录状态枚举，标识目录在准备阶段的处理结果。
    */
   public enum DirMapState {
+    /** 目录已经在文件系统中存在 */
     dirFoundInStore,
+    /** 目录已经在映射表中存在 */
     dirFoundInMap,
+    /** 本次流程第一次尝试创建成功 */
     dirWasCreated,
+    /** 第二次尝试才创建成功 */
     dirCreatedOnSecondAttempt,
+    /** 原有文件已删除，可以创建目录 */
     fileNowDeleted,
+    /** 祖先目录已经是目录或不存在 */
     ancestorWasDirOrMissing,
+    /** 父路径不是文件，无需处理 */
     parentWasNotFile,
+    /** 作为已创建目录的父目录，已隐式创建 */
     parentOfCreatedDir
   }
 

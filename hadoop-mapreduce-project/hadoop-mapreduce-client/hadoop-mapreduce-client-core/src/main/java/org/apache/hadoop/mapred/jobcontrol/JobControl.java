@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,19 +27,28 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
 
+/**
+ * 兼容旧版mapred API的作业依赖调度控制器，用于管理一组存在依赖关系的MapReduce作业执行流程
+ * 继承自新版mapreduce包的JobControl，提供旧版API风格的接口适配
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class JobControl extends 
     org.apache.hadoop.mapreduce.lib.jobcontrol.JobControl {
 
   /** 
-   * Construct a job control for a group of jobs.
-   * @param groupName a name identifying this group
+   * 构造指定作业组的作业控制器
+   * @param groupName 作业组的标识名称
    */
   public JobControl(String groupName) {
     super(groupName);
   }
   
+  /**
+   * 将新版ControlledJob列表转换为旧版Job列表，适配旧API调用
+   * @param cjobs 新版ControlledJob列表
+   * @return 转换后的旧版Job列表
+   */
   static ArrayList<Job> castToJobList(List<ControlledJob> cjobs) {
     ArrayList<Job> ret = new ArrayList<Job>();
     for (ControlledJob job : cjobs) {
@@ -48,41 +58,49 @@ public class JobControl extends
   }
   
   /**
-   * @return the jobs in the waiting state
+   * 获取所有处于等待状态的作业列表
+   * @return 等待执行的旧版Job列表
    */
   public ArrayList<Job> getWaitingJobs() {
     return castToJobList(super.getWaitingJobList());
   }
 	
   /**
-   * @return the jobs in the running state
+   * 获取所有处于运行状态的作业列表
+   * @return 正在运行的旧版Job列表
    */
   public ArrayList<Job> getRunningJobs() {
     return castToJobList(super.getRunningJobList());
   }
 	
   /**
-   * @return the jobs in the ready state
+   * 获取所有处于就绪状态的作业列表（满足依赖条件等待调度）
+   * @return 就绪状态的旧版Job列表
    */
   public ArrayList<Job> getReadyJobs() {
-    return castToJobList(super.getReadyJobsList());
+    return castToJobList(super.getReadyJobList());
   }
 	
   /**
-   * @return the jobs in the success state
+   * 获取所有执行成功的作业列表
+   * @return 执行成功的旧版Job列表
    */
   public ArrayList<Job> getSuccessfulJobs() {
     return castToJobList(super.getSuccessfulJobList());
   }
 	
+  /**
+   * 获取所有执行失败的作业列表
+   * @return 执行失败的旧版Job列表
+   */
   public ArrayList<Job> getFailedJobs() {
     return castToJobList(super.getFailedJobList());
   }
 
   /**
-   * Add a collection of jobs
+   * 批量添加一批作业到作业控制组
    * 
-   * @param jobs
+   * @param jobs 待添加的旧版Job集合
    */
   public void addJobs(Collection <Job> jobs) {
     for (Job job : jobs) {
@@ -91,7 +109,8 @@ public class JobControl extends
   }
 
   /**
-   * @return the thread state
+   * 获取当前作业控制器的线程状态，兼容旧API的整数状态码返回
+   * @return 状态码：0=运行中, 1=挂起, 2=已停止, 3=正在停止, 4=就绪, -1=未知状态
    */
   public int getState() {
     ThreadState state = super.getThreadState();

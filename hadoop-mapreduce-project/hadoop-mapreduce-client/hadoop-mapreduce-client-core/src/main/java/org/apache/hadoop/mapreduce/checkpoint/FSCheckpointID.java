@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,20 +26,31 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 
 /**
- * A FileSystem based checkpoint ID contains reference to the Path
- * where the checkpoint has been saved.
+ * 基于文件系统的检查点ID实现，存储检查点在文件系统中的保存路径
+ * 用于MapReduce任务检查点机制中标识检查点的存储位置
  */
 public class FSCheckpointID implements CheckpointID {
 
   private Path path;
 
+  /**
+   * 空构造函数，供反序列化使用
+   */
   public FSCheckpointID(){
   }
 
+  /**
+   * 根据指定路径构造文件系统检查点ID
+   * @param path 检查点在文件系统中的存储路径
+   */
   public FSCheckpointID(Path path) {
     this.path = path;
   }
 
+  /**
+   * 获取检查点存储路径
+   * @return 检查点在文件系统中的路径
+   */
   public Path getPath() {
     return path;
   }

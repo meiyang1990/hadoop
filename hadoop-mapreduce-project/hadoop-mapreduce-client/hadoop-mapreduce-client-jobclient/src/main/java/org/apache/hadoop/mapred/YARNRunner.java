@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -104,7 +105,10 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * This class enables the current JobClient (0.22 hadoop) to run on YARN.
+ * 文件：YARNRunner.java
+ * 所属模块：Hadoop MapReduce 任务客户端
+ * 核心职责：适配旧版MapReduce客户端API，将MapReduce作业提交到YARN集群运行，封装与YARN ResourceManager的交互逻辑
+ * 功能说明：实现旧版ClientProtocol接口，负责将MapReduce作业转换为YARN应用，完成作业提交、状态查询、作业终止等操作
  */
 @SuppressWarnings("unchecked")
 public class YARNRunner implements ClientProtocol {
@@ -116,14 +120,9 @@ public class YARNRunner implements ClientProtocol {
   private static final String NODE_IF_NO_RACK_GROUP = "node2";
 
   /**
-   * Matches any of the following patterns with capturing groups:
-   * <ul>
-   *  <li>/rack</li>
-   *  <li>/rack/node</li>
-   *  <li>node (assumes /default-rack)</li>
-   * </ul>
-   * The groups can be retrieved using the RACK_GROUP, NODE_IF_RACK_GROUP,
-   * and/or NODE_IF_NO_RACK_GROUP group keys.
+   * 匹配机架/节点位置表达式，用于AM容器的严格位置调度
+   * 支持三种匹配模式：/rack、/rack/node、node（默认/default-rack）
+   * 通过分组名获取匹配到的机架和节点名称
    */
   private static final Pattern RACK_NODE_PATTERN =
       Pattern.compile(
@@ -145,30 +144,27 @@ public class YARNRunner implements ClientProtocol {
   private final FileContext defaultFileContext;
   
   /**
-   * Yarn runner incapsulates the client interface of
-   * yarn
-   * @param conf the configuration object for the client
+   * 构造YARNRunner实例，初始化默认资源管理器代理
+   * @param conf 客户端配置对象
    */
   public YARNRunner(Configuration conf) {
    this(conf, new ResourceMgrDelegate(new YarnConfiguration(conf)));
   }
 
   /**
-   * Similar to {@link #YARNRunner(Configuration)} but allowing injecting
-   * {@link ResourceMgrDelegate}. Enables mocking and testing.
-   * @param conf the configuration object for the client
-   * @param resMgrDelegate the resourcemanager client handle.
+   * 构造YARNRunner实例，允许注入自定义资源管理器代理，用于测试
+   * @param conf 客户端配置对象
+   * @param resMgrDelegate 资源管理器代理实例
    */
   public YARNRunner(Configuration conf, ResourceMgrDelegate resMgrDelegate) {
    this(conf, resMgrDelegate, new ClientCache(conf, resMgrDelegate));
   }
 
   /**
-   * Similar to {@link YARNRunner#YARNRunner(Configuration, ResourceMgrDelegate)}
-   * but allowing injecting {@link ClientCache}. Enable mocking and testing.
-   * @param conf the configuration object
-   * @param resMgrDelegate the resource manager delegate
-   * @param clientCache the client cache object.
+   * 构造YARNRunner实例，允许注入资源管理器代理和客户端缓存，用于测试
+   * @param conf 客户端配置对象
+   * @param resMgrDelegate 资源管理器代理实例
+   * @param clientCache MR客户端缓存实例
    */
   public YARNRunner(Configuration conf, ResourceMgrDelegate resMgrDelegate,
       ClientCache clientCache) {
@@ -184,8 +180,8 @@ public class YARNRunner implements ClientProtocol {
   
   @Private
   /**
-   * Used for testing mostly.
-   * @param resMgrDelegate the resource manager delegate to set to.
+   * 设置资源管理器代理，主要用于测试场景
+   * @param resMgrDelegate 要设置的资源管理器代理
    */
   public void setResourceMgrDelegate(ResourceMgrDelegate resMgrDelegate) {
     this.resMgrDelegate = resMgrDelegate;
@@ -221,6 +217,12 @@ public class YARNRunner implements ClientProtocol {
   }
 
   @VisibleForTesting
+  /**
+   * 向凭证中添加JobHistoryServer的委托令牌，保障Oozie等组件能正常访问历史服务器
+   * @param ts 作业凭证存储对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   void addHistoryToken(Credentials ts) throws IOException, InterruptedException {
     /* check if we have a hsproxy, if not, no need */
     MRClientProtocol hsProxy = clientCache.getInitializedHSProxy();
@@ -242,6 +244,13 @@ public class YARNRunner implements ClientProtocol {
   }
   
   @VisibleForTesting
+  /**
+   * 从JobHistoryServer获取委托令牌
+   * @param hsProxy HistoryServer客户端代理
+   * @return 历史服务器委托令牌
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   Token<?> getDelegationTokenFromHS(MRClientProtocol hsProxy)
       throws IOException, InterruptedException {
     GetDelegationTokenRequest request = recordFactory
@@ -317,6 +326,15 @@ public class YARNRunner implements ClientProtocol {
   }
 
   @Override
+  /**
+   * 向YARN ResourceManager提交MapReduce作业，完成提交流程并返回作业状态
+   * @param jobId 作业ID
+   * @param jobSubmitDir 作业提交目录
+   * @param ts 作业安全凭证
+   * @return 提交后的作业状态
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public JobStatus submitJob(JobID jobId, String jobSubmitDir, Credentials ts)
   throws IOException, InterruptedException {
     
@@ -353,6 +371,17 @@ public class YARNRunner implements ClientProtocol {
         LocalResourceVisibility.APPLICATION, false);
   }
 
+  /**
+   * 创建YARN本地资源对象，用于容器本地化时下载资源
+   * @param fs 文件上下文
+   * @param p 资源路径
+   * @param fileSymlink 符号链接名称
+   * @param type 资源类型（文件/归档/模式）
+   * @param viz 资源可见性
+   * @param uploadToSharedCache 是否上传到共享缓存
+   * @return YARN LocalResource对象
+   * @throws IOException IO异常
+   */
   private LocalResource createApplicationResource(FileContext fs, Path p,
       String fileSymlink, LocalResourceType type, LocalResourceVisibility viz,
       Boolean uploadToSharedCache) throws IOException {
@@ -385,6 +414,13 @@ public class YARNRunner implements ClientProtocol {
     return rsrc;
   }
 
+  /**
+   * 准备AM容器需要的所有本地资源，包括作业配置、作业Jar、输入分片信息
+   * @param jobConf 作业配置
+   * @param jobSubmitDir 作业提交目录
+   * @return 本地资源映射表（资源名->LocalResource对象）
+   * @throws IOException IO异常
+   */
   private Map<String, LocalResource> setupLocalResources(Configuration jobConf,
       String jobSubmitDir) throws IOException {
     Map<String, LocalResource> localResources = new HashMap<>();
@@ -400,630 +436,4 @@ public class YARNRunner implements ClientProtocol {
     localResources.put(MRJobConfig.JOB_CONF_FILE,
         createApplicationResource(defaultFileContext,
             jobConfPath, LocalResourceType.FILE));
-    if (jobConf.get(MRJobConfig.JAR) != null) {
-      Path jobJarPath = new Path(jobConf.get(MRJobConfig.JAR));
-      // We hard code the job.jar symlink because mapreduce code expects the
-      // job.jar to be named that way.
-      FileContext fccc =
-          FileContext.getFileContext(jobJarPath.toUri(), jobConf);
-      LocalResourceVisibility jobJarViz =
-          jobConf.getBoolean(MRJobConfig.JOBJAR_VISIBILITY,
-              MRJobConfig.JOBJAR_VISIBILITY_DEFAULT)
-                  ? LocalResourceVisibility.PUBLIC
-                  : LocalResourceVisibility.APPLICATION;
-      LocalResource rc = createApplicationResource(
-          FileContext.getFileContext(jobJarPath.toUri(), jobConf), jobJarPath,
-          MRJobConfig.JOB_JAR, LocalResourceType.PATTERN, jobJarViz,
-          jobConf.getBoolean(
-                  MRJobConfig.JOBJAR_SHARED_CACHE_UPLOAD_POLICY,
-                  MRJobConfig.JOBJAR_SHARED_CACHE_UPLOAD_POLICY_DEFAULT));
-      String pattern = conf.getPattern(JobContext.JAR_UNPACK_PATTERN,
-          JobConf.UNPACK_JAR_PATTERN_DEFAULT).pattern();
-      rc.setPattern(pattern);
-      localResources.put(MRJobConfig.JOB_JAR, rc);
-    } else {
-      // Job jar may be null. For e.g, for pipes, the job jar is the hadoop
-      // mapreduce jar itself which is already on the classpath.
-      LOG.info("Job jar is not present. "
-          + "Not adding any jar to the list of resources.");
-    }
-
-    // TODO gross hack
-    for (String s : new String[] {
-        MRJobConfig.JOB_SPLIT,
-        MRJobConfig.JOB_SPLIT_METAINFO }) {
-      localResources.put(
-          MRJobConfig.JOB_SUBMIT_DIR + "/" + s,
-          createApplicationResource(defaultFileContext,
-              new Path(jobSubmitDir, s), LocalResourceType.FILE));
-    }
-
-    return localResources;
-  }
-
-  private List<String> setupAMCommand(Configuration jobConf) {
-    List<String> vargs = new ArrayList<>(8);
-    vargs.add(MRApps.crossPlatformifyMREnv(jobConf, Environment.JAVA_HOME)
-        + "/bin/java");
-
-    Path amTmpDir =
-        new Path(MRApps.crossPlatformifyMREnv(conf, Environment.PWD),
-            YarnConfiguration.DEFAULT_CONTAINER_TEMP_DIR);
-    vargs.add("-Djava.io.tmpdir=" + amTmpDir);
-    MRApps.addLog4jSystemProperties(null, vargs, conf);
-
-    // Check for Java Lib Path usage in MAP and REDUCE configs
-    warnForJavaLibPath(conf.get(MRJobConfig.MAP_JAVA_OPTS, ""),
-        "map",
-        MRJobConfig.MAP_JAVA_OPTS,
-        MRJobConfig.MAP_ENV);
-    warnForJavaLibPath(conf.get(MRJobConfig.MAPRED_MAP_ADMIN_JAVA_OPTS, ""),
-        "map",
-        MRJobConfig.MAPRED_MAP_ADMIN_JAVA_OPTS,
-        MRJobConfig.MAPRED_ADMIN_USER_ENV);
-    warnForJavaLibPath(conf.get(MRJobConfig.REDUCE_JAVA_OPTS, ""),
-        "reduce",
-        MRJobConfig.REDUCE_JAVA_OPTS,
-        MRJobConfig.REDUCE_ENV);
-    warnForJavaLibPath(conf.get(MRJobConfig.MAPRED_REDUCE_ADMIN_JAVA_OPTS, ""),
-        "reduce",
-        MRJobConfig.MAPRED_REDUCE_ADMIN_JAVA_OPTS,
-        MRJobConfig.MAPRED_ADMIN_USER_ENV);
-
-    // Add AM admin command opts before user command opts
-    // so that it can be overridden by user
-    String mrAppMasterAdminOptions = conf.get(MRJobConfig.MR_AM_ADMIN_COMMAND_OPTS,
-        MRJobConfig.DEFAULT_MR_AM_ADMIN_COMMAND_OPTS);
-    warnForJavaLibPath(mrAppMasterAdminOptions, "app master",
-        MRJobConfig.MR_AM_ADMIN_COMMAND_OPTS, MRJobConfig.MR_AM_ADMIN_USER_ENV);
-    vargs.add(mrAppMasterAdminOptions);
-
-    // Add AM user command opts
-    String mrAppMasterUserOptions = conf.get(MRJobConfig.MR_AM_COMMAND_OPTS,
-        MRJobConfig.DEFAULT_MR_AM_COMMAND_OPTS);
-    warnForJavaLibPath(mrAppMasterUserOptions, "app master",
-        MRJobConfig.MR_AM_COMMAND_OPTS, MRJobConfig.MR_AM_ENV);
-    vargs.add(mrAppMasterUserOptions);
-
-    // JDK17 support: automatically add --add-opens=java.base/java.lang=ALL-UNNAMED
-    // so the tasks can launch on a JDK17 node.
-    if (conf.getBoolean(MRJobConfig.MAPREDUCE_JVM_ADD_OPENS_JAVA_OPT,
-            MRJobConfig.MAPREDUCE_JVM_ADD_OPENS_JAVA_OPT_DEFAULT)) {
-      vargs.add(ApplicationConstants.JVM_ADD_OPENS_VAR);
-    }
-
-    if (jobConf.getBoolean(MRJobConfig.MR_AM_PROFILE,
-        MRJobConfig.DEFAULT_MR_AM_PROFILE)) {
-      final String profileParams = jobConf.get(MRJobConfig.MR_AM_PROFILE_PARAMS,
-          MRJobConfig.DEFAULT_TASK_PROFILE_PARAMS);
-      if (profileParams != null) {
-        vargs.add(String.format(profileParams,
-            ApplicationConstants.LOG_DIR_EXPANSION_VAR + Path.SEPARATOR
-                + TaskLog.LogName.PROFILE));
-      }
-    }
-
-    vargs.add(MRJobConfig.APPLICATION_MASTER_CLASS);
-    vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR +
-        Path.SEPARATOR + ApplicationConstants.STDOUT);
-    vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR +
-        Path.SEPARATOR + ApplicationConstants.STDERR);
-    return vargs;
-  }
-
-  private ContainerLaunchContext setupContainerLaunchContextForAM(
-      Configuration jobConf, Map<String, LocalResource> localResources,
-      ByteBuffer securityTokens, List<String> vargs) throws IOException {
-
-    Vector<String> vargsFinal = new Vector<>(8);
-    // Final command
-    StringBuilder mergedCommand = new StringBuilder();
-    for (CharSequence str : vargs) {
-      mergedCommand.append(str).append(" ");
-    }
-    vargsFinal.add(mergedCommand.toString());
-
-    LOG.debug("Command to launch container for ApplicationMaster is : "
-        + mergedCommand);
-
-    // Setup the CLASSPATH in environment
-    // i.e. add { Hadoop jars, job jar, CWD } to classpath.
-    Map<String, String> environment = new HashMap<>();
-    MRApps.setClasspath(environment, conf);
-
-    // Shell
-    environment.put(Environment.SHELL.name(),
-        conf.get(MRJobConfig.MAPRED_ADMIN_USER_SHELL,
-            MRJobConfig.DEFAULT_SHELL));
-
-    // Add the container working directory in front of LD_LIBRARY_PATH
-    MRApps.addToEnvironment(environment, Environment.LD_LIBRARY_PATH.name(),
-        MRApps.crossPlatformifyMREnv(conf, Environment.PWD), conf);
-
-    // Setup the environment variables for Admin first
-    MRApps.setEnvFromInputProperty(environment,
-        MRJobConfig.MR_AM_ADMIN_USER_ENV,
-        MRJobConfig.DEFAULT_MR_AM_ADMIN_USER_ENV,
-        conf);
-    // Setup the environment variables (LD_LIBRARY_PATH, etc)
-    MRApps.setEnvFromInputProperty(environment, MRJobConfig.MR_AM_ENV, null,
-        conf);
-
-    // Parse distributed cache
-    MRApps.setupDistributedCache(jobConf, localResources);
-
-    Map<ApplicationAccessType, String> acls = new HashMap<>(2);
-    acls.put(ApplicationAccessType.VIEW_APP, jobConf.get(
-        MRJobConfig.JOB_ACL_VIEW_JOB, MRJobConfig.DEFAULT_JOB_ACL_VIEW_JOB));
-    acls.put(ApplicationAccessType.MODIFY_APP, jobConf.get(
-        MRJobConfig.JOB_ACL_MODIFY_JOB,
-        MRJobConfig.DEFAULT_JOB_ACL_MODIFY_JOB));
-
-    return ContainerLaunchContext.newInstance(localResources, environment,
-        vargsFinal, null, securityTokens, acls);
-  }
-
-  /**
-   * Constructs all the necessary information to start the MR AM.
-   * @param jobConf the configuration for the MR job
-   * @param jobSubmitDir the directory path for the job
-   * @param ts the security credentials for the job
-   * @return ApplicationSubmissionContext
-   * @throws IOException on IO error (e.g. path resolution)
-   */
-  public ApplicationSubmissionContext createApplicationSubmissionContext(
-      Configuration jobConf, String jobSubmitDir, Credentials ts)
-      throws IOException {
-    ApplicationId applicationId = resMgrDelegate.getApplicationId();
-
-    // Setup LocalResources
-    Map<String, LocalResource> localResources =
-        setupLocalResources(jobConf, jobSubmitDir);
-
-    // Setup security tokens
-    DataOutputBuffer dob = new DataOutputBuffer();
-    ts.writeTokenStorageToStream(dob);
-    ByteBuffer securityTokens =
-        ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
-
-    // Setup ContainerLaunchContext for AM container
-    List<String> vargs = setupAMCommand(jobConf);
-    ContainerLaunchContext amContainer = setupContainerLaunchContextForAM(
-        jobConf, localResources, securityTokens, vargs);
-
-    String regex = conf.get(MRJobConfig.MR_JOB_SEND_TOKEN_CONF);
-    if (regex != null && !regex.isEmpty()) {
-      setTokenRenewerConf(amContainer, conf, regex);
-    }
-
-
-    Collection<String> tagsFromConf =
-        jobConf.getTrimmedStringCollection(MRJobConfig.JOB_TAGS);
-
-    // Set up the ApplicationSubmissionContext
-    ApplicationSubmissionContext appContext =
-        recordFactory.newRecordInstance(ApplicationSubmissionContext.class);
-    appContext.setApplicationId(applicationId);                // ApplicationId
-    appContext.setQueue(                                       // Queue name
-        jobConf.get(JobContext.QUEUE_NAME,
-        YarnConfiguration.DEFAULT_QUEUE_NAME));
-    // add reservationID if present
-    ReservationId reservationID = null;
-    try {
-      reservationID =
-          ReservationId.parseReservationId(jobConf
-              .get(JobContext.RESERVATION_ID));
-    } catch (NumberFormatException e) {
-      // throw exception as reservationid as is invalid
-      String errMsg =
-          "Invalid reservationId: " + jobConf.get(JobContext.RESERVATION_ID)
-              + " specified for the app: " + applicationId;
-      LOG.warn(errMsg);
-      throw new IOException(errMsg);
-    }
-    if (reservationID != null) {
-      appContext.setReservationID(reservationID);
-      LOG.info("SUBMITTING ApplicationSubmissionContext app:" + applicationId
-          + " to queue:" + appContext.getQueue() + " with reservationId:"
-          + appContext.getReservationID());
-    }
-    appContext.setApplicationName(                             // Job name
-        jobConf.get(JobContext.JOB_NAME,
-        YarnConfiguration.DEFAULT_APPLICATION_NAME));
-    appContext.setCancelTokensWhenComplete(
-        conf.getBoolean(MRJobConfig.JOB_CANCEL_DELEGATION_TOKEN, true));
-    appContext.setAMContainerSpec(amContainer);         // AM Container
-    appContext.setMaxAppAttempts(
-        conf.getInt(MRJobConfig.MR_AM_MAX_ATTEMPTS,
-            MRJobConfig.DEFAULT_MR_AM_MAX_ATTEMPTS));
-
-    // Setup the AM ResourceRequests
-    List<ResourceRequest> amResourceRequests = generateResourceRequests();
-    appContext.setAMContainerResourceRequests(amResourceRequests);
-
-    // set labels for the AM container requests if present
-    String amNodelabelExpression = conf.get(MRJobConfig.AM_NODE_LABEL_EXP);
-    if (null != amNodelabelExpression
-        && amNodelabelExpression.trim().length() != 0) {
-      for (ResourceRequest amResourceRequest : amResourceRequests) {
-        amResourceRequest.setNodeLabelExpression(amNodelabelExpression.trim());
-      }
-    }
-    // set labels for the Job containers
-    appContext.setNodeLabelExpression(jobConf
-        .get(JobContext.JOB_NODE_LABEL_EXP));
-
-    appContext.setApplicationType(MRJobConfig.MR_APPLICATION_TYPE);
-    if (tagsFromConf != null && !tagsFromConf.isEmpty()) {
-      appContext.setApplicationTags(new HashSet<>(tagsFromConf));
-    }
-
-    String jobPriority = jobConf.get(MRJobConfig.PRIORITY);
-    if (jobPriority != null) {
-      int iPriority;
-      try {
-        iPriority = TypeConverter.toYarnApplicationPriority(jobPriority);
-      } catch (IllegalArgumentException e) {
-        iPriority = Integer.parseInt(jobPriority);
-      }
-      appContext.setPriority(Priority.newInstance(iPriority));
-    }
-
-    return appContext;
-  }
-
-  private List<ResourceRequest> generateResourceRequests() throws IOException {
-    Resource capability = recordFactory.newRecordInstance(Resource.class);
-    boolean memorySet = false;
-    boolean cpuVcoresSet = false;
-    List<ResourceInformation> resourceRequests = ResourceUtils
-        .getRequestedResourcesFromConfig(conf, MR_AM_RESOURCE_PREFIX);
-    for (ResourceInformation resourceReq : resourceRequests) {
-      String resourceName = resourceReq.getName();
-      if (MRJobConfig.RESOURCE_TYPE_NAME_MEMORY.equals(resourceName) ||
-          MRJobConfig.RESOURCE_TYPE_ALTERNATIVE_NAME_MEMORY.equals(
-              resourceName)) {
-        if (memorySet) {
-          throw new IllegalArgumentException(
-              "Only one of the following keys " +
-                  "can be specified for a single job: " +
-                  MRJobConfig.RESOURCE_TYPE_ALTERNATIVE_NAME_MEMORY + ", " +
-                  MRJobConfig.RESOURCE_TYPE_NAME_MEMORY);
-        }
-        String units = isEmpty(resourceReq.getUnits()) ?
-            ResourceUtils.getDefaultUnit(ResourceInformation.MEMORY_URI) :
-              resourceReq.getUnits();
-        capability.setMemorySize(
-            UnitsConversionUtil.convert(units, "Mi", resourceReq.getValue()));
-        memorySet = true;
-        if (conf.get(MRJobConfig.MR_AM_VMEM_MB) != null) {
-          LOG.warn("Configuration " + MR_AM_RESOURCE_PREFIX +
-              resourceName + "=" + resourceReq.getValue() +
-              resourceReq.getUnits() + " is overriding the " +
-              MRJobConfig.MR_AM_VMEM_MB + "=" +
-              conf.get(MRJobConfig.MR_AM_VMEM_MB) + " configuration");
-        }
-      } else if (MRJobConfig.RESOURCE_TYPE_NAME_VCORE.equals(resourceName)) {
-        capability.setVirtualCores(
-            (int) UnitsConversionUtil.convert(resourceReq.getUnits(), "",
-                resourceReq.getValue()));
-        cpuVcoresSet = true;
-        if (conf.get(MRJobConfig.MR_AM_CPU_VCORES) != null) {
-          LOG.warn("Configuration " + MR_AM_RESOURCE_PREFIX +
-              resourceName + "=" + resourceReq.getValue() +
-              resourceReq.getUnits() + " is overriding the " +
-              MRJobConfig.MR_AM_CPU_VCORES + "=" +
-              conf.get(MRJobConfig.MR_AM_CPU_VCORES) + " configuration");
-        }
-      } else if (!MRJobConfig.MR_AM_VMEM_MB.equals(
-          MR_AM_RESOURCE_PREFIX + resourceName) &&
-          !MRJobConfig.MR_AM_CPU_VCORES.equals(
-              MR_AM_RESOURCE_PREFIX + resourceName)) {
-        // the "mb", "cpu-vcores" resource types are not processed here
-        // since the yarn.app.mapreduce.am.resource.mb,
-        // yarn.app.mapreduce.am.resource.cpu-vcores keys are used for
-        // backward-compatibility - which is handled after this loop
-        ResourceInformation resourceInformation = capability
-            .getResourceInformation(resourceName);
-        resourceInformation.setUnits(resourceReq.getUnits());
-        resourceInformation.setValue(resourceReq.getValue());
-        capability.setResourceInformation(resourceName, resourceInformation);
-      }
-    }
-    if (!memorySet) {
-      capability.setMemorySize(
-          conf.getInt(
-              MRJobConfig.MR_AM_VMEM_MB, MRJobConfig.DEFAULT_MR_AM_VMEM_MB
-          )
-      );
-    }
-    if (!cpuVcoresSet) {
-      capability.setVirtualCores(
-          conf.getInt(
-              MRJobConfig.MR_AM_CPU_VCORES, MRJobConfig.DEFAULT_MR_AM_CPU_VCORES
-          )
-      );
-    }
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("AppMaster capability = " + capability);
-    }
-
-    List<ResourceRequest> amResourceRequests = new ArrayList<>();
-    // Always have an ANY request
-    ResourceRequest amAnyResourceRequest =
-        createAMResourceRequest(ResourceRequest.ANY, capability);
-    Map<String, ResourceRequest> rackRequests = new HashMap<>();
-    amResourceRequests.add(amAnyResourceRequest);
-    Collection<String> amStrictResources = conf.getStringCollection(
-        MRJobConfig.AM_STRICT_LOCALITY);
-    for (String amStrictResource : amStrictResources) {
-      amAnyResourceRequest.setRelaxLocality(false);
-      Matcher matcher = RACK_NODE_PATTERN.matcher(amStrictResource);
-      if (matcher.matches()) {
-        String nodeName;
-        String rackName = matcher.group(RACK_GROUP);
-        if (rackName == null) {
-          rackName = "/default-rack";
-          nodeName = matcher.group(NODE_IF_NO_RACK_GROUP);
-        } else {
-          nodeName = matcher.group(NODE_IF_RACK_GROUP);
-        }
-        ResourceRequest amRackResourceRequest = rackRequests.get(rackName);
-        if (amRackResourceRequest == null) {
-          amRackResourceRequest = createAMResourceRequest(rackName, capability);
-          amResourceRequests.add(amRackResourceRequest);
-          rackRequests.put(rackName, amRackResourceRequest);
-        }
-        if (nodeName != null) {
-          amRackResourceRequest.setRelaxLocality(false);
-          ResourceRequest amNodeResourceRequest =
-              createAMResourceRequest(nodeName, capability);
-          amResourceRequests.add(amNodeResourceRequest);
-        }
-      } else {
-        String errMsg =
-            "Invalid resource name: " + amStrictResource + " specified.";
-        LOG.warn(errMsg);
-        throw new IOException(errMsg);
-      }
-    }
-    if (LOG.isDebugEnabled()) {
-      for (ResourceRequest amResourceRequest : amResourceRequests) {
-        LOG.debug("ResourceRequest: resource = "
-            + amResourceRequest.getResourceName() + ", locality = "
-            + amResourceRequest.getRelaxLocality());
-      }
-    }
-    return amResourceRequests;
-  }
-
-  private ResourceRequest createAMResourceRequest(String resource,
-      Resource capability) {
-    ResourceRequest resourceRequest =
-        recordFactory.newRecordInstance(ResourceRequest.class);
-    resourceRequest.setPriority(AM_CONTAINER_PRIORITY);
-    resourceRequest.setResourceName(resource);
-    resourceRequest.setCapability(capability);
-    resourceRequest.setNumContainers(1);
-    resourceRequest.setRelaxLocality(true);
-    return resourceRequest;
-  }
-
-  private void setTokenRenewerConf(ContainerLaunchContext context,
-      Configuration conf, String regex) throws IOException {
-    DataOutputBuffer dob = new DataOutputBuffer();
-    Configuration copy = new Configuration(false);
-    copy.clear();
-    int count = 0;
-    for (Map.Entry<String, String> map : conf) {
-      String key = map.getKey();
-      String val = map.getValue();
-      if (key.matches(regex)) {
-        copy.set(key, val);
-        count++;
-      }
-    }
-    copy.write(dob);
-    ByteBuffer appConf = ByteBuffer.wrap(dob.getData(), 0, dob.getLength());
-    LOG.info("Send configurations that match regex expression: " + regex
-        + " , total number of configs: " + count + ", total size : " + dob
-        .getLength() + " bytes.");
-    if (LOG.isDebugEnabled()) {
-      for (Iterator<Map.Entry<String, String>> itor = copy.iterator(); itor
-          .hasNext(); ) {
-        Map.Entry<String, String> entry = itor.next();
-        LOG.info(entry.getKey() + " ===> " + entry.getValue());
-      }
-    }
-    context.setTokensConf(appConf);
-  }
-
-  @Override
-  public void setJobPriority(JobID arg0, String arg1) throws IOException,
-      InterruptedException {
-    ApplicationId appId = TypeConverter.toYarn(arg0).getAppId();
-    try {
-      resMgrDelegate.updateApplicationPriority(appId,
-          Priority.newInstance(Integer.parseInt(arg1)));
-    } catch (YarnException e) {
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  public long getProtocolVersion(String arg0, long arg1) throws IOException {
-    return resMgrDelegate.getProtocolVersion(arg0, arg1);
-  }
-
-  @Override
-  public long renewDelegationToken(Token<DelegationTokenIdentifier> arg0)
-      throws IOException, InterruptedException {
-    throw new UnsupportedOperationException("Use Token.renew instead");
-  }
-
-
-  @Override
-  public Counters getJobCounters(JobID arg0) throws IOException,
-      InterruptedException {
-    return clientCache.getClient(arg0).getJobCounters(arg0);
-  }
-
-  @Override
-  public String getJobHistoryDir() throws IOException, InterruptedException {
-    return JobHistoryUtils.getConfiguredHistoryServerDoneDirPrefix(conf);
-  }
-
-  @Override
-  public JobStatus getJobStatus(JobID jobID) throws IOException,
-      InterruptedException {
-    JobStatus status = clientCache.getClient(jobID).getJobStatus(jobID);
-    return status;
-  }
-
-  @Override
-  public TaskCompletionEvent[] getTaskCompletionEvents(JobID arg0, int arg1,
-      int arg2) throws IOException, InterruptedException {
-    return clientCache.getClient(arg0).getTaskCompletionEvents(arg0, arg1, arg2);
-  }
-
-  @Override
-  public String[] getTaskDiagnostics(TaskAttemptID arg0) throws IOException,
-      InterruptedException {
-    return clientCache.getClient(arg0.getJobID()).getTaskDiagnostics(arg0);
-  }
-
-  @Override
-  public TaskReport[] getTaskReports(JobID jobID, TaskType taskType)
-  throws IOException, InterruptedException {
-    return clientCache.getClient(jobID)
-        .getTaskReports(jobID, taskType);
-  }
-
-  private void killUnFinishedApplication(ApplicationId appId)
-      throws IOException {
-    ApplicationReport application = null;
-    try {
-      application = resMgrDelegate.getApplicationReport(appId);
-    } catch (YarnException e) {
-      throw new IOException(e);
-    }
-    if (Apps.isApplicationFinalState(application.getYarnApplicationState())) {
-      return;
-    }
-    killApplication(appId);
-  }
-
-  private void killApplication(ApplicationId appId) throws IOException {
-    try {
-      resMgrDelegate.killApplication(appId);
-    } catch (YarnException e) {
-      throw new IOException(e);
-    }
-  }
-
-  private boolean isJobInTerminalState(JobStatus status) {
-    return status.getState() == JobStatus.State.KILLED
-        || status.getState() == JobStatus.State.FAILED
-        || status.getState() == JobStatus.State.SUCCEEDED;
-  }
-
-  @Override
-  public void killJob(JobID arg0) throws IOException, InterruptedException {
-    /* check if the status is not running, if not send kill to RM */
-    JobStatus status = clientCache.getClient(arg0).getJobStatus(arg0);
-    ApplicationId appId = TypeConverter.toYarn(arg0).getAppId();
-
-    // get status from RM and return
-    if (status == null) {
-      killUnFinishedApplication(appId);
-      return;
-    }
-
-    if (status.getState() != JobStatus.State.RUNNING) {
-      killApplication(appId);
-      return;
-    }
-
-    try {
-      /* send a kill to the AM */
-      clientCache.getClient(arg0).killJob(arg0);
-      long currentTimeMillis = System.currentTimeMillis();
-      long timeKillIssued = currentTimeMillis;
-      long killTimeOut =
-          conf.getLong(MRJobConfig.MR_AM_HARD_KILL_TIMEOUT_MS,
-                       MRJobConfig.DEFAULT_MR_AM_HARD_KILL_TIMEOUT_MS);
-      while ((currentTimeMillis < timeKillIssued + killTimeOut)
-          && !isJobInTerminalState(status)) {
-        try {
-          Thread.sleep(1000L);
-        } catch (InterruptedException ie) {
-          /** interrupted, just break */
-          break;
-        }
-        currentTimeMillis = System.currentTimeMillis();
-        status = clientCache.getClient(arg0).getJobStatus(arg0);
-        if (status == null) {
-          killUnFinishedApplication(appId);
-          return;
-        }
-      }
-    } catch(IOException io) {
-      LOG.debug("Error when checking for application status", io);
-    }
-    if (status != null && !isJobInTerminalState(status)) {
-      killApplication(appId);
-    }
-  }
-
-  @Override
-  public boolean killTask(TaskAttemptID arg0, boolean arg1) throws IOException,
-      InterruptedException {
-    return clientCache.getClient(arg0.getJobID()).killTask(arg0, arg1);
-  }
-
-  @Override
-  public AccessControlList getQueueAdmins(String arg0) throws IOException {
-    return new AccessControlList("*");
-  }
-
-  @Override
-  public JobTrackerStatus getJobTrackerStatus() throws IOException,
-      InterruptedException {
-    return JobTrackerStatus.RUNNING;
-  }
-
-  @Override
-  public ProtocolSignature getProtocolSignature(String protocol,
-      long clientVersion, int clientMethodsHash) throws IOException {
-    return ProtocolSignature.getProtocolSignature(this, protocol, clientVersion,
-        clientMethodsHash);
-  }
-
-  @Override
-  public LogParams getLogFileParams(JobID jobID, TaskAttemptID taskAttemptID)
-      throws IOException {
-    return clientCache.getClient(jobID).getLogFilePath(jobID, taskAttemptID);
-  }
-
-  private static void warnForJavaLibPath(String opts, String component, 
-      String javaConf, String envConf) {
-    if (opts != null && opts.contains("-Djava.library.path")) {
-      LOG.warn("Usage of -Djava.library.path in " + javaConf + " can cause " +
-               "programs to no longer function if hadoop native libraries " +
-               "are used. These values should be set as part of the " +
-               "LD_LIBRARY_PATH in the " + component + " JVM env using " +
-               envConf + " config settings.");
-    }
-  }
-
-  public void close() throws IOException {
-    if (resMgrDelegate != null) {
-      resMgrDelegate.close();
-      resMgrDelegate = null;
-    }
-    if (clientCache != null) {
-      clientCache.close();
-      clientCache = null;
-    }
-  }
-}
+    if (

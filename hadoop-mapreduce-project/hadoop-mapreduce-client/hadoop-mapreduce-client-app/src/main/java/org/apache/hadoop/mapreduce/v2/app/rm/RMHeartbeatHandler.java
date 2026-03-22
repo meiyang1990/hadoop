@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,8 +19,20 @@
 
 package org.apache.hadoop.mapreduce.v2.app.rm;
 
+/**
+ * RM心跳处理器接口，定义MapReduce应用程序与ResourceManager心跳交互的回调能力
+ * 用于获取最后一次心跳时间，以及注册下次心跳时需要执行的任务
+ */
 public interface RMHeartbeatHandler {
+  /**
+   * 获取上次向ResourceManager发送心跳的时间戳
+   * @return 上次心跳的时间戳（毫秒）
+   */
   long getLastHeartbeatTime();
 
+  /**
+   * 注册下次心跳发送后需要执行的回调任务
+   * @param callback 要在下次心跳时执行的任务
+   */
   void runOnNextHeartbeat(Runnable callback);
 }

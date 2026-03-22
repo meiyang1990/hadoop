@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,9 +48,8 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.security.token.TokenInfo;
 
 /** 
- * Protocol that a JobClient and the central JobTracker use to communicate.  The
- * JobClient can use these methods to submit a Job for execution, and learn about
- * the current system status.
+ * MapReduce客户端与JobTracker服务端通信的RPC协议接口。
+ * 客户端通过该协议提供的方法提交作业、查询集群和作业状态、管理作业生命周期。
  */ 
 @KerberosInfo(
     serverPrincipal = JTConfig.JT_USER_NAME)
@@ -119,215 +119,259 @@ public interface ClientProtocol extends VersionedProtocol {
    * Version 38: Added getLogFilePath(JobID, TaskAttemptID) as part of 
    *             MAPREDUCE-3146
    */
+  /** 协议版本号，用于RPC兼容性检查 */
   public static final long versionID = 37L;
 
   /**
-   * Allocate a name for the job.
-   * @return a unique job name for submitting jobs.
-   * @throws IOException
+   * 申请生成一个唯一的作业ID
+   * @return 用于提交作业的唯一作业ID
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public JobID getNewJobID() throws IOException, InterruptedException;
 
   /**
-   * Submit a Job for execution.  Returns the latest profile for
-   * that job.
+   * 向JobTracker提交作业执行
+   * @param jobId 作业ID
+   * @param jobSubmitDir 作业提交目录，存储作业配置和资源
+   * @param ts 用户凭证信息，用于访问Staging区域
+   * @return 提交后作业的最新状态
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public JobStatus submitJob(JobID jobId, String jobSubmitDir, Credentials ts)
       throws IOException, InterruptedException;
 
   /**
-   * Get the current status of the cluster
+   * 获取当前集群的指标信息
    * 
-   * @return summary of the state of the cluster
+   * @return 集群状态汇总指标
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public ClusterMetrics getClusterMetrics() 
   throws IOException, InterruptedException;
 
   /**
-   * Get the JobTracker's status.
+   * 获取JobTracker服务的当前状态
    * 
-   * @return {@link JobTrackerStatus} of the JobTracker
-   * @throws IOException
-   * @throws InterruptedException
+   * @return JobTracker的状态对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public JobTrackerStatus getJobTrackerStatus() throws IOException,
     InterruptedException;
 
+  /**
+   * 获取TaskTracker超时时间间隔，超过该时间未心跳则判定节点下线
+   * @return TaskTracker超时时间间隔（毫秒）
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public long getTaskTrackerExpiryInterval() throws IOException,
                                                InterruptedException;
   
   /**
-   * Get the administrators of the given job-queue.
-   * This method is for hadoop internal use only.
-   * @param queueName
-   * @return Queue administrators ACL for the queue to which job is
-   *         submitted to
-   * @throws IOException
+   * 获取指定作业队列的管理员ACL，仅Hadoop内部使用
+   * @param queueName 队列名称
+   * @return 队列管理员访问控制列表
+   * @throws IOException IO异常
    */
   public AccessControlList getQueueAdmins(String queueName) throws IOException;
 
   /**
-   * Kill the indicated job
+   * 杀死指定ID的作业
+   * @param jobid 待杀死的作业ID
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public void killJob(JobID jobid) throws IOException, InterruptedException;
 
   /**
-   * Set the priority of the specified job
-   * @param jobid ID of the job
-   * @param priority Priority to be set for the job
+   * 修改指定作业的优先级
+   * @param jobid 作业ID
+   * @param priority 要设置的优先级
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public void setJobPriority(JobID jobid, String priority) 
   throws IOException, InterruptedException;
   
   /**
-   * Kill indicated task attempt.
-   * @param taskId the id of the task to kill.
-   * @param shouldFail if true the task is failed and added to failed tasks list, otherwise
-   * it is just killed, w/o affecting job failure status.  
+   * 杀死指定的任务尝试
+   * @param taskId 待杀死的任务尝试ID
+   * @param shouldFail 如果为true，任务将被标记为失败并计入作业失败统计；否则仅杀死不影响作业状态
+   * @return 是否成功杀死任务
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */ 
   public boolean killTask(TaskAttemptID taskId, boolean shouldFail) 
   throws IOException, InterruptedException;
   
   /**
-   * Grab a handle to a job that is already known to the JobTracker.
-   * @return Status of the job, or null if not found.
+   * 获取指定作业的当前状态
+   * @param jobid 作业ID
+   * @return 作业状态对象，未找到作业则返回null
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public JobStatus getJobStatus(JobID jobid) 
   throws IOException, InterruptedException;
 
   /**
-   * Grab the current job counters
+   * 获取指定作业的当前计数器
+   * @param jobid 作业ID
+   * @return 作业所有计数器信息
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public Counters getJobCounters(JobID jobid) 
   throws IOException, InterruptedException;
     
   /**
-   * Grab a bunch of info on the tasks that make up the job
+   * 获取指定作业对应类型的所有任务报告
+   * @param jobid 作业ID
+   * @param type 任务类型（Map/Reduce）
+   * @return 对应类型任务的报告数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public TaskReport[] getTaskReports(JobID jobid, TaskType type)
   throws IOException, InterruptedException;
 
   /**
-   * A MapReduce system always operates on a single filesystem.  This 
-   * function returns the fs name.  ('local' if the localfs; 'addr:port' 
-   * if dfs).  The client can then copy files into the right locations 
-   * prior to submitting the job.
+   * 获取MapReduce系统使用的文件系统标识
+   * 客户端可根据该标识将作业文件复制到正确的存储位置
+   * @return 文件系统名称：本地文件系统返回"local"，HDFS返回"addr:port"
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public String getFilesystemName() throws IOException, InterruptedException;
 
   /** 
-   * Get all the jobs submitted. 
-   * @return array of JobStatus for the submitted jobs
+   * 获取所有已提交的作业状态
+   * @return 所有已提交作业的状态数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public JobStatus[] getAllJobs() throws IOException, InterruptedException;
   
   /**
-   * Get task completion events for the jobid, starting from fromEventId. 
-   * Returns empty array if no events are available. 
-   * @param jobid job id 
-   * @param fromEventId event id to start from.
-   * @param maxEvents the max number of events we want to look at 
-   * @return array of task completion events. 
-   * @throws IOException
+   * 获取指定作业从某个事件ID开始的任务完成事件
+   * @param jobid 作业ID
+   * @param fromEventId 起始事件ID
+   * @param maxEvents 最多返回的事件数量
+   * @return 任务完成事件数组，无可用事件则返回空数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public TaskCompletionEvent[] getTaskCompletionEvents(JobID jobid,
     int fromEventId, int maxEvents) throws IOException, InterruptedException;
     
   /**
-   * Get the diagnostics for a given task in a given job
-   * @param taskId the id of the task
-   * @return an array of the diagnostic messages
+   * 获取指定任务尝试的诊断日志信息
+   * @param taskId 任务尝试ID
+   * @return 诊断消息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public String[] getTaskDiagnostics(TaskAttemptID taskId) 
   throws IOException, InterruptedException;
 
   /** 
-   * Get all active trackers in cluster. 
-   * @return array of TaskTrackerInfo
+   * 获取集群中所有活跃的TaskTracker信息
+   * @return 活跃TaskTracker信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public TaskTrackerInfo[] getActiveTrackers() 
   throws IOException, InterruptedException;
 
   /** 
-   * Get all blacklisted trackers in cluster. 
-   * @return array of TaskTrackerInfo
+   * 获取集群中所有被拉黑的TaskTracker信息
+   * @return 被拉黑TaskTracker信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public TaskTrackerInfo[] getBlacklistedTrackers() 
   throws IOException, InterruptedException;
 
   /**
-   * Grab the jobtracker system directory path 
-   * where job-specific files are to be placed.
-   * 
-   * @return the system directory where job-specific files are to be placed.
+   * 获取JobTracker系统目录路径，用于存放作业相关文件
+   * @return 系统目录路径
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public String getSystemDir() throws IOException, InterruptedException;
   
   /**
-   * Get a hint from the JobTracker 
-   * where job-specific files are to be placed.
-   * 
-   * @return the directory where job-specific files are to be placed.
+   * 获取作业Staging区域根目录路径提示，用于存放作业提交文件
+   * @return Staging区域根目录路径
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public String getStagingAreaDir() throws IOException, InterruptedException;
 
   /**
-   * Gets the directory location of the completed job history files.
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取已完成作业历史文件存储目录
+   * @return 作业历史目录路径
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public String getJobHistoryDir() 
   throws IOException, InterruptedException;
 
   /**
-   * Gets set of Queues associated with the Job Tracker
-   * 
-   * @return Array of the Queue Information Object
-   * @throws IOException 
+   * 获取JobTracker上所有队列信息
+   * @return 队列信息对象数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public QueueInfo[] getQueues() throws IOException, InterruptedException;
   
   /**
-   * Gets scheduling information associated with the particular Job queue
-   * 
-   * @param queueName Queue Name
-   * @return Scheduling Information of the Queue
-   * @throws IOException 
+   * 获取指定作业队列的调度信息
+   * @param queueName 队列名称
+   * @return 指定队列的调度信息
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public QueueInfo getQueue(String queueName) 
   throws IOException, InterruptedException;
   
   /**
-   * Gets the Queue ACLs for current user
-   * @return array of QueueAclsInfo object for current user.
-   * @throws IOException
+   * 获取当前用户有权限访问的所有队列ACL信息
+   * @return 当前用户的队列ACL信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public QueueAclsInfo[] getQueueAclsForCurrentUser() 
   throws IOException, InterruptedException;
   
   /**
-   * Gets the root level queues.
-   * @return array of JobQueueInfo object.
-   * @throws IOException
+   * 获取所有根级队列
+   * @return 根队列信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public QueueInfo[] getRootQueues() throws IOException, InterruptedException;
   
   /**
-   * Returns immediate children of queueName.
-   * @param queueName
-   * @return array of JobQueueInfo which are children of queueName
-   * @throws IOException
+   * 获取指定队列的直接子队列
+   * @param queueName 父队列名称
+   * @return 子队列信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public QueueInfo[] getChildQueues(String queueName) 
   throws IOException, InterruptedException;
 
   /**
-   * Get a new delegation token.
-   * @param renewer the user other than the creator (if any) that can renew the 
-   *        token
-   * @return the new delegation token
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取新的委托令牌，用于身份认证
+   * @param renewer 允许更新该令牌的用户
+   * @return 新生成的委托令牌
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public 
   Token<DelegationTokenIdentifier> getDelegationToken(Text renewer
@@ -335,34 +379,33 @@ public interface ClientProtocol extends VersionedProtocol {
                                                           InterruptedException;
   
   /**
-   * Renew an existing delegation token
-   * @param token the token to renew
-   * @return the new expiration time
-   * @throws IOException
-   * @throws InterruptedException
+   * 更新现有委托令牌，延长过期时间
+   * @param token 待更新的委托令牌
+   * @return 更新后的过期时间
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public long renewDelegationToken(Token<DelegationTokenIdentifier> token
                                    ) throws IOException,
                                             InterruptedException;
   
   /**
-   * Cancel a delegation token.
-   * @param token the token to cancel
-   * @throws IOException
-   * @throws InterruptedException
+   * 取消现有委托令牌
+   * @param token 待取消的委托令牌
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public void cancelDelegationToken(Token<DelegationTokenIdentifier> token
                                     ) throws IOException,
                                              InterruptedException;
   
   /**
-   * Gets the location of the log file for a job if no taskAttemptId is
-   * specified, otherwise gets the log location for the taskAttemptId.
-   * @param jobID the jobId.
-   * @param taskAttemptID the taskAttemptId.
-   * @return log params.
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取日志文件路径参数，若指定任务尝试ID则获取对应任务日志，否则获取作业日志
+   * @param jobID 作业ID
+   * @param taskAttemptID 任务尝试ID，可为null
+   * @return 日志路径参数
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public LogParams getLogFileParams(JobID jobID, TaskAttemptID taskAttemptID)
       throws IOException, InterruptedException;

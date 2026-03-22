@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,8 +34,18 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * MapReduce V2 框架对象构建工具类，提供各类核心实体对象的快捷创建方法
+ * 统一封装Record对象初始化逻辑，简化MapReduce各类标识、报告信息的构建
+ */
 public class MRBuilderUtils {
 
+  /**
+   * 根据应用ID和作业编号创建新的作业ID对象
+   * @param appId YARN应用ID
+   * @param id 作业在应用内的编号
+   * @return 构建完成的JobId对象
+   */
   public static JobId newJobId(ApplicationId appId, int id) {
     JobId jobId = Records.newRecord(JobId.class);
     jobId.setAppId(appId);
@@ -42,11 +53,25 @@ public class MRBuilderUtils {
     return jobId;
   }
 
+  /**
+   * 根据集群时间戳、应用编号和作业编号创建新的作业ID对象
+   * @param clusterTs 集群时间戳，用于生成应用ID
+   * @param appIdInt 应用编号
+   * @param id 作业在应用内的编号
+   * @return 构建完成的JobId对象
+   */
   public static JobId newJobId(long clusterTs, int appIdInt, int id) {
     ApplicationId appId = ApplicationId.newInstance(clusterTs, appIdInt);
     return MRBuilderUtils.newJobId(appId, id);
   }
 
+  /**
+   * 根据作业ID、任务编号和任务类型创建新的任务ID对象
+   * @param jobId 所属作业ID
+   * @param id 任务在作业内的编号
+   * @param taskType 任务类型（MAP/REDUCE）
+   * @return 构建完成的TaskId对象
+   */
   public static TaskId newTaskId(JobId jobId, int id, TaskType taskType) {
     TaskId taskId = Records.newRecord(TaskId.class);
     taskId.setJobId(jobId);
@@ -55,6 +80,12 @@ public class MRBuilderUtils {
     return taskId;
   }
 
+  /**
+   * 根据任务ID和尝试编号创建新的任务尝试ID对象
+   * @param taskId 所属任务ID
+   * @param attemptId 任务尝试编号
+   * @return 构建完成的TaskAttemptId对象
+   */
   public static TaskAttemptId newTaskAttemptId(TaskId taskId, int attemptId) {
     TaskAttemptId taskAttemptId =
         Records.newRecord(TaskAttemptId.class);
@@ -63,6 +94,25 @@ public class MRBuilderUtils {
     return taskAttemptId;
   }
 
+  /**
+   * 创建新的作业报告对象，使用默认优先级0
+   * @param jobId 作业ID
+   * @param jobName 作业名称
+   * @param userName 提交作业用户名
+   * @param state 作业当前状态
+   * @param submitTime 作业提交时间
+   * @param startTime 作业启动时间
+   * @param finishTime 作业完成时间
+   * @param setupProgress 作业初始化阶段进度
+   * @param mapProgress Map阶段进度
+   * @param reduceProgress Reduce阶段进度
+   * @param cleanupProgress 作业清理阶段进度
+   * @param jobFile 作业配置文件路径
+   * @param amInfos 应用Master信息列表
+   * @param isUber 是否运行在Uber模式（所有任务都在AM容器中运行）
+   * @param diagnostics 诊断信息
+   * @return 构建完成的JobReport对象
+   */
   public static JobReport newJobReport(JobId jobId, String jobName,
       String userName, JobState state, long submitTime, long startTime,
       long finishTime, float setupProgress, float mapProgress,
@@ -74,6 +124,26 @@ public class MRBuilderUtils {
         Priority.newInstance(0));
   }
 
+  /**
+   * 创建新的作业报告对象，支持自定义优先级
+   * @param jobId 作业ID
+   * @param jobName 作业名称
+   * @param userName 提交作业用户名
+   * @param state 作业当前状态
+   * @param submitTime 作业提交时间
+   * @param startTime 作业启动时间
+   * @param finishTime 作业完成时间
+   * @param setupProgress 作业初始化阶段进度
+   * @param mapProgress Map阶段进度
+   * @param reduceProgress Reduce阶段进度
+   * @param cleanupProgress 作业清理阶段进度
+   * @param jobFile 作业配置文件路径
+   * @param amInfos 应用Master信息列表
+   * @param isUber 是否运行在Uber模式（所有任务都在AM容器中运行）
+   * @param diagnostics 诊断信息
+   * @param priority 作业调度优先级
+   * @return 构建完成的JobReport对象
+   */
   public static JobReport newJobReport(JobId jobId, String jobName,
       String userName, JobState state, long submitTime, long startTime, long finishTime,
       float setupProgress, float mapProgress, float reduceProgress,
@@ -99,6 +169,16 @@ public class MRBuilderUtils {
     return report;
   }
 
+  /**
+   * 创建新的应用Master（ApplicationMaster）信息对象，记录AM的位置和启动信息
+   * @param appAttemptId YARN应用尝试ID
+   * @param startTime AM启动时间
+   * @param containerId AM运行所在容器ID
+   * @param nmHost AM所在NodeManager主机地址
+   * @param nmPort NodeManager服务端口
+   * @param nmHttpPort NodeManager HTTP监控端口
+   * @return 构建完成的AMInfo对象
+   */
   public static AMInfo newAMInfo(ApplicationAttemptId appAttemptId,
       long startTime, ContainerId containerId, String nmHost, int nmPort,
       int nmHttpPort) {

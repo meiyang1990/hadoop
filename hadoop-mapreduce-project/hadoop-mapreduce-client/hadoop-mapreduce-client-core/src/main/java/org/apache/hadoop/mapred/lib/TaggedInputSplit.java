@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,8 +33,9 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringInterner;
 
 /**
- * An {@link InputSplit} that tags another InputSplit with extra data for use
- * by {@link DelegatingInputFormat}s and {@link DelegatingMapper}s.
+ * 文件：带标签的输入分片，为原生InputSplit附加输入格式和Mapper类信息
+ * 供DelegatingInputFormat和DelegatingMapper使用，支持多输入格式多Mapper的作业场景
+ * 实现了InputSplit接口和Configurable接口，可被Hadoop框架序列化和反序列化
  */
 class TaggedInputSplit implements Configurable, InputSplit {
 
@@ -52,12 +54,12 @@ class TaggedInputSplit implements Configurable, InputSplit {
   }
 
   /**
-   * Creates a new TaggedInputSplit.
+   * 构造一个带标签的输入分片
    * 
-   * @param inputSplit The InputSplit to be tagged
-   * @param conf The configuration to use
-   * @param inputFormatClass The InputFormat class to use for this job
-   * @param mapperClass The Mapper class to use for this job
+   * @param inputSplit 待标记的原始输入分片
+   * @param conf 作业配置对象
+   * @param inputFormatClass 该分片对应的输入格式类
+   * @param mapperClass 该分片对应的Mapper处理类
    */
   public TaggedInputSplit(InputSplit inputSplit, Configuration conf,
       Class<? extends InputFormat> inputFormatClass,
@@ -70,70 +72,93 @@ class TaggedInputSplit implements Configurable, InputSplit {
   }
 
   /**
-   * Retrieves the original InputSplit.
+   * 获取被标记的原始输入分片
    * 
-   * @return The InputSplit that was tagged
+   * @return 原始输入分片对象
    */
   public InputSplit getInputSplit() {
     return inputSplit;
   }
 
   /**
-   * Retrieves the InputFormat class to use for this split.
+   * 获取该分片对应的输入格式类
    * 
-   * @return The InputFormat class to use
+   * @return 输入格式类对象
    */
   public Class<? extends InputFormat> getInputFormatClass() {
     return inputFormatClass;
   }
 
   /**
-   * Retrieves the Mapper class to use for this split.
+   * 获取该分片对应的Mapper处理类
    * 
-   * @return The Mapper class to use
+   * @return Mapper处理类对象
    */
   public Class<? extends Mapper> getMapperClass() {
     return mapperClass;
   }
 
+  @Override
   public long getLength() throws IOException {
     return inputSplit.getLength();
   }
 
+  @Override
   public String[] getLocations() throws IOException {
     return inputSplit.getLocations();
   }
 
   @SuppressWarnings("unchecked")
+  @Override
   public void readFields(DataInput in) throws IOException {
+    // 读取分片类类型
     inputSplitClass = (Class<? extends InputSplit>) readClass(in);
+    // 通过反射实例化分片对象
     inputSplit = (InputSplit) ReflectionUtils
        .newInstance(inputSplitClass, conf);
+    // 读取分片自身字段
     inputSplit.readFields(in);
+    // 读取输入格式类
     inputFormatClass = (Class<? extends InputFormat>) readClass(in);
+    // 读取Mapper处理类
     mapperClass = (Class<? extends Mapper>) readClass(in);
   }
 
+  /**
+   * 从序列化输入中读取类名并加载类对象
+   * @param in 数据输入流
+   * @return 加载后的类对象
+   * @throws IOException IO异常
+   */
   private Class<?> readClass(DataInput in) throws IOException {
+    // 读取类名字符串，使用弱引用缓存
     String className = StringInterner.weakIntern(Text.readString(in));
     try {
+      // 从配置中加载类
       return conf.getClassByName(className);
     } catch (ClassNotFoundException e) {
       throw new RuntimeException("readObject can't find class", e);
     }
   }
 
+  @Override
   public void write(DataOutput out) throws IOException {
+    // 写入原始分片类名
     Text.writeString(out, inputSplitClass.getName());
+    // 写入原始分片序列化数据
     inputSplit.write(out);
+    // 写入输入格式类名
     Text.writeString(out, inputFormatClass.getName());
+    // 写入Mapper类名
     Text.writeString(out, mapperClass.getName());
   }
 
+  @Override
   public Configuration getConf() {
     return conf;
   }
 
+  @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -21,13 +22,25 @@ package org.apache.hadoop.mapreduce.v2.app.webapp;
 import org.apache.hadoop.yarn.webapp.SubView;
 import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 
+/**
+ * MapReduce Application Master信息页面视图
+ * 负责渲染Web UI中Application Master基本信息页面，继承通用应用视图基类
+ */
 public class InfoPage extends AppView {
 
+  /**
+   * 在HTML头渲染前执行预处理，设置页面标题
+   * @param html HTML页面构建器
+   */
   @Override protected void preHead(Page.HTML<__> html) {
     commonPreHead(html);
     setTitle("About the Application Master");
   }
 
+  /**
+   * 获取页面内容子视图
+   * @return 返回信息块子视图类
+   */
   @Override protected Class<? extends SubView> content() {
     return InfoBlock.class;
   }

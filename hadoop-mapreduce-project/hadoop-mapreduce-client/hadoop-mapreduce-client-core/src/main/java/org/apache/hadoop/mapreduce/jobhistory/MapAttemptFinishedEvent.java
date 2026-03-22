@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,8 +36,8 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 import org.apache.hadoop.yarn.util.SystemClock;
 
 /**
- * Event to record successful completion of a map attempt.
- *
+ * MapReduce任务中Map尝试运行完成事件，记录Map尝试运行结束相关信息用于作业历史日志
+ * 负责存储Map尝试完成后的状态、时间、资源使用等元数据，支持Avro序列化和时间线服务导出
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -62,25 +63,19 @@ public class MapAttemptFinishedEvent implements HistoryEvent {
   private long startTime;
 
   /** 
-   * Create an event for successful completion of map attempts.
-   * @param id Task Attempt ID
-   * @param taskType Type of the task
-   * @param taskStatus Status of the task
-   * @param mapFinishTime Finish time of the map phase
-   * @param finishTime Finish time of the attempt
-   * @param hostname Name of the host where the map executed
-   * @param port RPC port for the tracker host.
-   * @param rackName Name of the rack where the map executed
-   * @param state State string for the attempt
-   * @param counters Counters for the attempt
-   * @param allSplits the "splits", or a pixelated graph of various
-   *        measurable worker node state variables against progress.
-   *        Currently there are four; wallclock time, CPU time,
-   *        virtual memory and physical memory. 
-   *
-   *        If you have no splits data, code {@code null} for this
-   *        parameter.
-   * @param startTs Task start time to be used for writing entity to ATSv2.
+   * 构造Map尝试完成事件，初始化所有事件字段，拆分进度分片数据
+   * @param id 任务尝试ID
+   * @param taskType 任务类型
+   * @param taskStatus 任务状态
+   * @param mapFinishTime Map阶段完成时间戳
+   * @param finishTime 尝试完成时间戳
+   * @param hostname 执行尝试的节点主机名
+   * @param port 节点追踪器RPC端口
+   * @param rackName 执行尝试的机架名称
+   * @param state 尝试状态字符串
+   * @param counters 尝试的计数器集合
+   * @param allSplits 进度分片数据，包含墙钟时间、CPU时间、虚拟内存、物理内存的进度分布，无数据则传null
+   * @param startTs 任务开始时间戳，用于写入ATSv2时间线服务
    */
   public MapAttemptFinishedEvent(TaskAttemptID id, TaskType taskType,
       String taskStatus, long mapFinishTime, long finishTime, String hostname,
@@ -97,13 +92,20 @@ public class MapAttemptFinishedEvent implements HistoryEvent {
     this.state = state;
     this.counters = counters;
     this.allSplits = allSplits;
+    // 从分片数组中提取墙钟时间分片
     this.clockSplits = ProgressSplitsBlock.arrayGetWallclockTime(allSplits);
+    // 从分片数组中提取CPU使用时间分片
     this.cpuUsages = ProgressSplitsBlock.arrayGetCPUTime(allSplits);
+    // 从分片数组中提取虚拟内存使用分片
     this.vMemKbytes = ProgressSplitsBlock.arrayGetVMemKbytes(allSplits);
+    // 从分片数组中提取物理内存使用分片
     this.physMemKbytes = ProgressSplitsBlock.arrayGetPhysMemKbytes(allSplits);
     this.startTime = startTs;
   }
 
+  /**
+   * 简化构造函数，自动获取当前系统时间作为开始时间
+   */
   public MapAttemptFinishedEvent(TaskAttemptID id, TaskType taskType,
       String taskStatus, long mapFinishTime, long finishTime, String hostname,
       int port, String rackName, String state, Counters counters,
@@ -114,12 +116,9 @@ public class MapAttemptFinishedEvent implements HistoryEvent {
   }
 
   /** 
-   * @deprecated please use the constructor with an additional
-   *              argument, an array of splits arrays instead.  See
-   *              {@link org.apache.hadoop.mapred.ProgressSplitsBlock}
-   *              for an explanation of the meaning of that parameter.
+   * @deprecated 请使用带进度分片参数的新构造函数，该构造函数留作向后兼容
    *
-   * Create an event for successful completion of map attempts
+   * 创建Map尝试完成事件
    * @param id Task Attempt ID
    * @param taskType Type of the task
    * @param taskStatus Status of the task
@@ -137,8 +136,15 @@ public class MapAttemptFinishedEvent implements HistoryEvent {
         state, counters, null);
   }
 
+  /**
+   * 无参构造函数，供Avro反序列化使用
+   */
   MapAttemptFinishedEvent() {}
 
+  /**
+   * 获取Avro序列化数据对象，延迟初始化并填充所有字段
+   * @return 填充完成的Avro MapAttemptFinished对象
+   */
   public Object getDatum() {
     if (datum == null) {
       datum = new MapAttemptFinished();
@@ -156,18 +162,26 @@ public class MapAttemptFinishedEvent implements HistoryEvent {
       datum.setState(new Utf8(state));
       datum.setCounters(EventWriter.toAvro(counters));
 
+      // 将墙钟时间分片转换为Avro数组格式
       datum.setClockSplits(AvroArrayUtils.toAvro(ProgressSplitsBlock
           .arrayGetWallclockTime(allSplits)));
+      // 将CPU使用分片转换为Avro数组格式
       datum.setCpuUsages(AvroArrayUtils.toAvro(ProgressSplitsBlock
           .arrayGetCPUTime(allSplits)));
+      // 将虚拟内存分片转换为Avro数组格式
       datum.setVMemKbytes(AvroArrayUtils.toAvro(ProgressSplitsBlock
           .arrayGetVMemKbytes(allSplits)));
+      // 将物理内存分片转换为Avro数组格式
       datum.setPhysMemKbytes(AvroArrayUtils.toAvro(ProgressSplitsBlock
           .arrayGetPhysMemKbytes(allSplits)));
     }
     return datum;
   }
 
+  /**
+   * 从Avro对象反序列化事件数据，解析并填充所有字段
+   * @param oDatum Avro序列化的MapAttemptFinished对象
+   */
   public void setDatum(Object oDatum) {
     this.datum = (MapAttemptFinished)oDatum;
     this.attemptId = TaskAttemptID.forName(datum.getAttemptId().toString());
@@ -254,6 +268,10 @@ public class MapAttemptFinishedEvent implements HistoryEvent {
   }
   
   @Override
+  /**
+   * 将当前事件转换为YARN时间线服务可识别的TimelineEvent对象，填充所有事件元信息
+   * @return 填充完成的TimelineEvent对象
+   */
   public TimelineEvent toTimelineEvent() {
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
@@ -271,6 +289,10 @@ public class MapAttemptFinishedEvent implements HistoryEvent {
   }
 
   @Override
+  /**
+   * 将事件中的计数器转换为YARN时间线服务可识别的指标集合
+   * @return 转换完成的TimelineMetric集合
+   */
   public Set<TimelineMetric> getTimelineMetrics() {
     Set<TimelineMetric> metrics = JobHistoryEventUtils
         .countersToTimelineMetric(getCounters(), finishTime);

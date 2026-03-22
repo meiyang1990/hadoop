@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -50,6 +51,10 @@ import org.apache.hadoop.mapreduce.v2.hs.webapp.dao.JobInfo;
 import org.apache.hadoop.mapreduce.v2.hs.webapp.dao.JobsInfo;
 import org.apache.hadoop.yarn.webapp.RemoteExceptionData;
 
+/**
+ * JAXB上下文解析器，为历史服务器Web REST API提供XML/JSON序列化支持
+ * 注册所有需要JAXB序列化的DAO数据对象类，供Jersey框架使用
+ */
 @Singleton
 @Provider
 public class JAXBContextResolver implements ContextResolver<JAXBContext> {
@@ -57,7 +62,7 @@ public class JAXBContextResolver implements ContextResolver<JAXBContext> {
   private JAXBContext context;
   private final Set<Class> types;
 
-  // you have to specify all the dao classes here
+  // 需要JAXB序列化的所有DAO类列表
   private final Class[] cTypes = { HistoryInfo.class, JobInfo.class,
       JobsInfo.class, TaskInfo.class, TasksInfo.class, TaskAttemptsInfo.class,
       ConfInfo.class, CounterInfo.class, JobTaskCounterInfo.class,
@@ -67,11 +72,20 @@ public class JAXBContextResolver implements ContextResolver<JAXBContext> {
       TaskCounterGroupInfo.class, AMAttemptInfo.class, AMAttemptsInfo.class,
       RemoteExceptionData.class };
 
+  /**
+   * 构造函数，初始化JAXB上下文，注册所有需要序列化的DAO类
+   * @throws Exception 初始化失败时抛出异常
+   */
   public JAXBContextResolver() throws Exception {
     this.types = new HashSet<>(Arrays.asList(cTypes));
     this.context = new JettisonJaxbContext(cTypes);
   }
 
+  /**
+   * 根据对象类型获取对应的JAXB上下文，如果该类型需要序列化则返回已初始化的上下文
+   * @param objectType 需要序列化的对象类型
+   * @return 匹配到类型返回预初始化的JAXB上下文，否则返回null
+   */
   @Override
   public JAXBContext getContext(Class<?> objectType) {
     return (types.contains(objectType)) ? context : null;

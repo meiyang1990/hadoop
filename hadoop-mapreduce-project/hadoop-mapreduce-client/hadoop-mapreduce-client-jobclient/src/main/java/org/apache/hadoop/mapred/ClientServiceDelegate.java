@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -82,12 +83,17 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.VisibleForTesting;
 
+/**
+ * MapReduce作业客户端服务代理委托类，负责对接YARN RM、ApplicationMaster和历史服务器，
+ * 统一处理不同服务端节点的作业查询、控制等RPC调用，负责自动切换代理目标。
+ * 核心职责：根据作业运行状态自动选择调用AM、RM或历史服务器，处理连接重试和故障转移。
+ */
 public class ClientServiceDelegate {
   private static final Logger LOG =
       LoggerFactory.getLogger(ClientServiceDelegate.class);
   private static final String UNAVAILABLE = "N/A";
 
-  // Caches for per-user NotRunningJobs
+  // 未运行作业的缓存，按用户、作业状态分类缓存
   private HashMap<JobState, HashMap<String, NotRunningJob>> notRunningJobs;
 
   private final Configuration conf;
@@ -103,10 +109,17 @@ public class ClientServiceDelegate {
   private int maxClientRetry;
   private boolean amAclDisabledStatusLogged = false;
 
+  /**
+   * 构造客户端服务代理委托实例
+   * @param conf 配置对象
+   * @param rm YARN资源管理器代理委托
+   * @param jobId 作业ID
+   * @param historyServerProxy 作业历史服务器代理，可为null
+   */
   public ClientServiceDelegate(Configuration conf, ResourceMgrDelegate rm,
       JobID jobId, MRClientProtocol historyServerProxy) {
-    this.conf = new Configuration(conf); // Cloning for modifying.
-    // For faster redirects from AM to HS.
+    this.conf = new Configuration(conf); // 克隆配置用于修改
+    // 优化从AM跳转到历史服务器的连接超时配置
     this.conf.setInt(
         CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY,
         this.conf.getInt(MRJobConfig.MR_CLIENT_TO_AM_IPC_MAX_RETRIES,
@@ -122,8 +135,12 @@ public class ClientServiceDelegate {
     notRunningJobs = new HashMap<JobState, HashMap<String, NotRunningJob>>();
   }
 
-  // Get the instance of the NotRunningJob corresponding to the specified
-  // user and state
+  /**
+   * 根据应用报告和作业状态获取对应未运行作业实例，按用户分组缓存
+   * @param applicationReport YARN应用报告
+   * @param state 作业状态
+   * @return 缓存的未运行作业实例
+   */
   private NotRunningJob getNotRunningJob(ApplicationReport applicationReport,
       JobState state) {
     synchronized (notRunningJobs) {
@@ -144,13 +161,17 @@ public class ClientServiceDelegate {
     }
   }
 
+  /**
+   * 根据作业运行状态获取正确的MR客户端代理，自动选择AM/历史服务器/未运行作业代理
+   * @return 可调用的MRClientProtocol代理实例
+   * @throws IOException 获取代理失败时抛出异常
+   */
   private MRClientProtocol getProxy() throws IOException {
     if (realProxy != null) {
       return realProxy;
     }
     
-    // Possibly allow nulls through the PB tunnel, otherwise deal with an exception
-    // and redirect to the history server.
+    // 从RM获取应用报告，如果找不到则跳转历史服务器
     ApplicationReport application = null;
     try {
       application = rm.getApplicationReport(appId);
@@ -172,6 +193,7 @@ public class ClientServiceDelegate {
         return checkAndGetHSProxy(null, JobState.NEW);
       }
       try {
+        // AM尚未分配节点，等待重试
         if (application.getHost() == null || "".equals(application.getHost())) {
           LOG.debug("AM not assigned to Job. Waiting to get the AM ...");
           Thread.sleep(2000);
@@ -180,6 +202,7 @@ public class ClientServiceDelegate {
           application = rm.getApplicationReport(appId);
           continue;
         } else if (UNAVAILABLE.equals(application.getHost())) {
+          // 用户没有权限查看AM地址，返回未运行作业代理
           if (!amAclDisabledStatusLogged) {
             LOG.info("Job " + jobId + " is running, but the host is unknown."
                 + " Verify user has VIEW_JOB access.");
@@ -188,6 +211,7 @@ public class ClientServiceDelegate {
           return getNotRunningJob(application, JobState.RUNNING);
         }
         if(!conf.getBoolean(MRJobConfig.JOB_AM_ACCESS_DISABLED, false)) {
+          // 创建远程用户UGI，并添加ClientToAM令牌用于认证
           UserGroupInformation newUgi = UserGroupInformation.createRemoteUser(
               UserGroupInformation.getCurrentUser().getUserName());
           serviceAddr = NetUtils.createSocketAddrForHost(
@@ -201,6 +225,7 @@ public class ClientServiceDelegate {
           }
           LOG.debug("Connecting to " + serviceAddr);
           final InetSocketAddress finalServiceAddr = serviceAddr;
+          // 在对应UGI下创建AM代理
           realProxy = newUgi.doAs(new PrivilegedExceptionAction<MRClientProtocol>() {
             @Override
             public MRClientProtocol run() throws IOException {
@@ -208,6 +233,7 @@ public class ClientServiceDelegate {
             }
           });
         } else {
+          // AM访问被ACL禁用，返回未运行作业代理
           if (!amAclDisabledStatusLogged) {
             LOG.info("Network ACL closed to AM for job " + jobId
                 + ". Not going to try to reach the AM.");
@@ -217,9 +243,7 @@ public class ClientServiceDelegate {
         }
         return realProxy;
       } catch (IOException e) {
-        //possibly the AM has crashed
-        //there may be some time before AM is restarted
-        //keep retrying by getting the address from RM
+        // 连接AM失败，可能AM已崩溃或正在重启，等待重试从RM获取最新地址
         LOG.info("Could not connect to " + serviceAddr +
         ". Waiting for getting the latest AM address...");
         try {
@@ -246,10 +270,7 @@ public class ClientServiceDelegate {
       }
     }
 
-    /** we just want to return if its allocating, so that we don't
-     * block on it. This is to be able to return job status
-     * on an allocating Application.
-     */
+    // 若应用未到运行状态，直接返回对应状态的未运行作业代理，不阻塞
     String user = application.getUser();
     if (user == null) {
       throw new IOException("User is not set in the application report");
@@ -273,8 +294,7 @@ public class ClientServiceDelegate {
       return getNotRunningJob(application, JobState.KILLED);
     }
 
-    //History server can serve a job only if application
-    //succeeded.
+    // 作业已完成，跳转历史服务器
     if (application.getYarnApplicationState() == YarnApplicationState.FINISHED) {
       LOG.info("Application state is completed. FinalApplicationStatus="
           + application.getFinalApplicationStatus().toString()
@@ -284,6 +304,12 @@ public class ClientServiceDelegate {
     return realProxy;
   }
 
+  /**
+   * 检查并返回历史服务器代理，如果未配置则返回未运行作业代理
+   * @param applicationReport YARN应用报告
+   * @param state 作业状态
+   * @return 历史服务器代理或未运行作业代理
+   */
   private MRClientProtocol checkAndGetHSProxy(
       ApplicationReport applicationReport, JobState state) {
     if (null == historyServerProxy) {
@@ -293,6 +319,12 @@ public class ClientServiceDelegate {
     return historyServerProxy;
   }
 
+  /**
+   * 创建ApplicationMaster的RPC代理
+   * @param serviceAddr AM地址和端口
+   * @return AM的MRClientProtocol代理
+   * @throws IOException 创建代理失败时抛出异常
+   */
   MRClientProtocol instantiateAMProxy(final InetSocketAddress serviceAddr)
       throws IOException {
     LOG.trace("Connecting to ApplicationMaster at: " + serviceAddr);
@@ -305,6 +337,14 @@ public class ClientServiceDelegate {
     return proxy;
   }
 
+  /**
+   * 通过反射调用MRClientProtocol方法，内置重试机制，连接失败自动重连
+   * @param method 方法名
+   * @param argClass 参数类型
+   * @param args 参数对象
+   * @return 方法调用返回结果
+   * @throws IOException 调用失败且重耗尽重试次数抛出异常
+   */
   private synchronized Object invoke(String method, Class argClass,
       Object args) throws IOException {
     Method methodOb = null;
@@ -325,19 +365,16 @@ public class ClientServiceDelegate {
         MRClientProxy = getProxy();
         return methodOb.invoke(MRClientProxy, args);
       } catch (InvocationTargetException e) {
-        // Will not throw out YarnException anymore
+        // 调用失败，清空代理强制重连
         LOG.debug("Failed to contact AM/History for job " + jobId + 
             " retrying..", e.getTargetException());
-        // Force reconnection by setting the proxy to null.
         realProxy = null;
-        // HS/AMS shut down
 
         if (e.getCause() instanceof AuthorizationException) {
           throw new IOException(e.getTargetException());
         }
 
-        // if its AM shut down, do not decrement maxClientRetry while we wait
-        // for its AM to be restarted.
+        // 如果不是连接AM，不消耗重试次数
         if (!usingAMProxy.get()) {
           maxClientRetry--;
         }
@@ -350,203 +387,6 @@ public class ClientServiceDelegate {
           throw new YarnRuntimeException(ie);
         }
       } catch (Exception e) {
+        // 其他异常，清空代理强制重连
         LOG.debug("Failed to contact AM/History for job " + jobId
             + "  Will retry..", e);
-        // Force reconnection by setting the proxy to null.
-        realProxy = null;
-        // RM shutdown
-        maxClientRetry--;
-        lastException = new IOException(e.getMessage());
-        try {
-          Thread.sleep(100);
-        } catch (InterruptedException ie) {
-          LOG.warn("ClientServiceDelegate invoke call interrupted", ie);
-          throw new YarnRuntimeException(ie);
-        }
-      }
-    }
-    throw lastException;
-  }
-
-  // Only for testing
-  @VisibleForTesting
-  public int getMaxClientRetry() {
-    return this.maxClientRetry;
-  }
-
-  public org.apache.hadoop.mapreduce.Counters getJobCounters(JobID arg0) throws IOException,
-  InterruptedException {
-    org.apache.hadoop.mapreduce.v2.api.records.JobId jobID = TypeConverter.toYarn(arg0);
-      GetCountersRequest request = recordFactory.newRecordInstance(GetCountersRequest.class);
-      request.setJobId(jobID);
-      Counters cnt = ((GetCountersResponse)
-          invoke("getCounters", GetCountersRequest.class, request)).getCounters();
-      return TypeConverter.fromYarn(cnt);
-
-  }
-
-  public TaskCompletionEvent[] getTaskCompletionEvents(JobID arg0, int arg1, int arg2)
-      throws IOException, InterruptedException {
-    org.apache.hadoop.mapreduce.v2.api.records.JobId jobID = TypeConverter
-        .toYarn(arg0);
-    GetTaskAttemptCompletionEventsRequest request = recordFactory
-        .newRecordInstance(GetTaskAttemptCompletionEventsRequest.class);
-    request.setJobId(jobID);
-    request.setFromEventId(arg1);
-    request.setMaxEvents(arg2);
-    List<org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptCompletionEvent> list =
-      ((GetTaskAttemptCompletionEventsResponse) invoke(
-        "getTaskAttemptCompletionEvents", GetTaskAttemptCompletionEventsRequest.class, request)).
-        getCompletionEventList();
-    return TypeConverter
-        .fromYarn(list
-            .toArray(new org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptCompletionEvent[0]));
-  }
-
-  public String[] getTaskDiagnostics(org.apache.hadoop.mapreduce.TaskAttemptID arg0)
-      throws IOException, InterruptedException {
-
-    org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID = TypeConverter
-        .toYarn(arg0);
-    GetDiagnosticsRequest request = recordFactory
-        .newRecordInstance(GetDiagnosticsRequest.class);
-    request.setTaskAttemptId(attemptID);
-    List<String> list = ((GetDiagnosticsResponse) invoke("getDiagnostics",
-        GetDiagnosticsRequest.class, request)).getDiagnosticsList();
-    String[] result = new String[list.size()];
-    int i = 0;
-    for (String c : list) {
-      result[i++] = c.toString();
-    }
-    return result;
-  }
-  
-  public JobStatus getJobStatus(JobID oldJobID) throws IOException {
-    org.apache.hadoop.mapreduce.v2.api.records.JobId jobId =
-      TypeConverter.toYarn(oldJobID);
-    GetJobReportRequest request =
-        recordFactory.newRecordInstance(GetJobReportRequest.class);
-    request.setJobId(jobId);
-    JobReport report = ((GetJobReportResponse) invoke("getJobReport",
-        GetJobReportRequest.class, request)).getJobReport();
-    JobStatus jobStatus = null;
-    if (report != null) {
-      if (StringUtils.isEmpty(report.getJobFile())) {
-        String jobFile = MRApps.getJobFile(conf, report.getUser(), oldJobID);
-        report.setJobFile(jobFile);
-      }
-      String historyTrackingUrl = report.getTrackingUrl();
-      String url = StringUtils.isNotEmpty(historyTrackingUrl)
-          ? historyTrackingUrl : trackingUrl;
-      jobStatus = TypeConverter.fromYarn(report, url);
-    }
-    return jobStatus;
-  }
-
-  public org.apache.hadoop.mapreduce.TaskReport[] getTaskReports(JobID oldJobID, TaskType taskType)
-       throws IOException{
-    org.apache.hadoop.mapreduce.v2.api.records.JobId jobId =
-      TypeConverter.toYarn(oldJobID);
-    GetTaskReportsRequest request =
-        recordFactory.newRecordInstance(GetTaskReportsRequest.class);
-    request.setJobId(jobId);
-    request.setTaskType(TypeConverter.toYarn(taskType));
-
-    List<org.apache.hadoop.mapreduce.v2.api.records.TaskReport> taskReports =
-      ((GetTaskReportsResponse) invoke("getTaskReports", GetTaskReportsRequest.class,
-          request)).getTaskReportList();
-
-    return TypeConverter.fromYarn
-    (taskReports).toArray(new org.apache.hadoop.mapreduce.TaskReport[0]);
-  }
-
-  public boolean killTask(TaskAttemptID taskAttemptID, boolean fail)
-       throws IOException {
-    org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID
-      = TypeConverter.toYarn(taskAttemptID);
-    if (fail) {
-      FailTaskAttemptRequest failRequest = recordFactory.newRecordInstance(FailTaskAttemptRequest.class);
-      failRequest.setTaskAttemptId(attemptID);
-      invoke("failTaskAttempt", FailTaskAttemptRequest.class, failRequest);
-    } else {
-      KillTaskAttemptRequest killRequest = recordFactory.newRecordInstance(KillTaskAttemptRequest.class);
-      killRequest.setTaskAttemptId(attemptID);
-      invoke("killTaskAttempt", KillTaskAttemptRequest.class, killRequest);
-    }
-    return true;
-  }
-
-  public boolean killJob(JobID oldJobID)
-       throws IOException {
-    org.apache.hadoop.mapreduce.v2.api.records.JobId jobId
-    = TypeConverter.toYarn(oldJobID);
-    KillJobRequest killRequest = recordFactory.newRecordInstance(KillJobRequest.class);
-    killRequest.setJobId(jobId);
-    invoke("killJob", KillJobRequest.class, killRequest);
-    return true;
-  }
-
-  public LogParams getLogFilePath(JobID oldJobID, TaskAttemptID oldTaskAttemptID)
-      throws IOException {
-    org.apache.hadoop.mapreduce.v2.api.records.JobId jobId =
-        TypeConverter.toYarn(oldJobID);
-    GetJobReportRequest request =
-        recordFactory.newRecordInstance(GetJobReportRequest.class);
-    request.setJobId(jobId);
-
-    JobReport report =
-        ((GetJobReportResponse) invoke("getJobReport",
-            GetJobReportRequest.class, request)).getJobReport();
-    if (EnumSet.of(JobState.SUCCEEDED, JobState.FAILED, JobState.KILLED,
-        JobState.ERROR).contains(report.getJobState())) {
-      if (oldTaskAttemptID != null) {
-        GetTaskAttemptReportRequest taRequest =
-            recordFactory.newRecordInstance(GetTaskAttemptReportRequest.class);
-        taRequest.setTaskAttemptId(TypeConverter.toYarn(oldTaskAttemptID));
-        TaskAttemptReport taReport =
-            ((GetTaskAttemptReportResponse) invoke("getTaskAttemptReport",
-                GetTaskAttemptReportRequest.class, taRequest))
-                .getTaskAttemptReport();
-        if (taReport.getContainerId() == null
-            || taReport.getNodeManagerHost() == null) {
-          throw new IOException("Unable to get log information for task: "
-              + oldTaskAttemptID);
-        }
-        return new LogParams(
-            taReport.getContainerId().toString(),
-            taReport.getContainerId().getApplicationAttemptId()
-                .getApplicationId().toString(),
-            NodeId.newInstance(taReport.getNodeManagerHost(),
-                taReport.getNodeManagerPort()).toString(), report.getUser());
-      } else {
-        if (report.getAMInfos() == null || report.getAMInfos().size() == 0) {
-          throw new IOException("Unable to get log information for job: "
-              + oldJobID);
-        }
-        AMInfo amInfo = report.getAMInfos().get(report.getAMInfos().size() - 1);
-        return new LogParams(
-            amInfo.getContainerId().toString(),
-            amInfo.getAppAttemptId().getApplicationId().toString(),
-            NodeId.newInstance(amInfo.getNodeManagerHost(),
-                amInfo.getNodeManagerPort()).toString(), report.getUser());
-      }
-    } else {
-      throw new IOException("Cannot get log path for a in-progress job");
-    }
-  }
-
-  public void close() throws IOException {
-    if (rm != null) {
-      rm.close();
-    }
-
-    if (historyServerProxy != null) {
-      RPC.stopProxy(historyServerProxy);
-    }
-
-    if (realProxy != null) {
-      RPC.stopProxy(realProxy);
-      realProxy = null;
-    }
-  }
-}

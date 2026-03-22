@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,12 +42,10 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.Ab
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.AbstractManifestData.verify;
 
 /**
- * A File entry in the task manifest.
- * Uses shorter field names for smaller files.
- * Used as a Hadoop writable when saved to in intermediate file
- * during job commit.
+ * 文件清单中的文件条目实体类，用于存储任务输出文件的映射关系。
+ * 使用短字段名压缩清单文件体积，同时支持Hadoop Writable序列化和JSON序列化，
+ * 在作业提交过程中用于持久化存储任务生成的文件信息。
  */
-
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -64,24 +63,23 @@ public final class FileEntry implements Serializable, Writable {
   private long size;
 
   /**
-   * Etag value if we can extract this.
+   * 文件的ETag校验值，云存储文件中提取。
    */
   @JsonProperty("e")
   private String etag;
 
   /**
-   * Constructor for serialization/deserialization.
-   * Do Not Delete.
+   * 序列化/反序列化专用空构造方法，不可删除。
    */
   public FileEntry() {
   }
 
   /**
-   * Construct an entry.
-   * @param source source path.
-   * @param dest destination path.
-   * @param size file size.
-   * @param etag optional etag
+   * 构造文件条目对象。
+   * @param source 源文件路径字符串
+   * @param dest 目标输出路径字符串
+   * @param size 文件大小(字节)
+   * @param etag 可选ETag校验值
    */
   public FileEntry(
       final String source,
@@ -96,11 +94,11 @@ public final class FileEntry implements Serializable, Writable {
 
 
   /**
-   * Construct an entry.
-   * @param source source path.
-   * @param dest destination path.
-   * @param size file size.
-   * @param etag optional etag
+   * 构造文件条目对象，接收Path类型参数。
+   * @param source 源文件路径
+   * @param dest 目标输出路径
+   * @param size 文件大小(字节)
+   * @param etag 可选ETag校验值
    */
   public FileEntry(
       final Path source,
@@ -153,6 +151,10 @@ public final class FileEntry implements Serializable, Writable {
     this.etag = etag;
   }
 
+  /**
+   * 验证当前条目数据完整性，检查必填字段是否合法。
+   * @throws IOException 数据不合法时抛出异常
+   */
   public void validate() throws IOException {
     final String s = toString();
     verify(source != null && source.length() > 0,
@@ -195,6 +197,11 @@ public final class FileEntry implements Serializable, Writable {
     return Objects.hash(source, dest);
   }
 
+  /**
+   * 将条目序列化写入输出流，遵循Hadoop Writable规范。
+   * @param out 数据输出流
+   * @throws IOException 写入失败时抛出
+   */
   @Override
   public void write(final DataOutput out) throws IOException {
     Text.writeString(out, requireNonNull(source, "null source"));
@@ -203,6 +210,11 @@ public final class FileEntry implements Serializable, Writable {
     WritableUtils.writeVLong(out, size);
   }
 
+  /**
+   * 从输入流反序列化读取条目数据，遵循Hadoop Writable规范。
+   * @param in 数据输入流
+   * @throws IOException 读取失败时抛出
+   */
   @Override
   public void readFields(final DataInput in) throws IOException {
     source = Text.readString(in);

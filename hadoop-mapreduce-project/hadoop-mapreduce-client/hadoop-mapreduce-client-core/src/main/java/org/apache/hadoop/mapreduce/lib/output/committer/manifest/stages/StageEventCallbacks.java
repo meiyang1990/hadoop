@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,19 +20,20 @@
 package org.apache.hadoop.mapreduce.lib.output.committer.manifest.stages;
 
 /**
- * Callbacks on stage entry/exit.
+ * 提交任务处理流水线阶段的进入/退出事件回调接口，用于监控阶段执行流程。
+ * 为Manifest输出提交器的阶段化处理流程提供事件钩子，支持日志记录、监控统计等扩展能力。
  */
 public interface StageEventCallbacks {
 
   /**
-   * Callback on stage entry.
-   * @param stage new stage
+   * 进入新阶段时的回调方法。
+   * @param stage 进入的阶段名称
    */
   void enterStage(String stage);
 
   /**
-   * Callback on stage exit.
-   * @param stage stage exited.
+   * 退出阶段时的回调方法。
+   * @param stage 退出的阶段名称
    */
   void exitStage(String stage);
 }

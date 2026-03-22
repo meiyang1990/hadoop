@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -41,7 +42,8 @@ import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 import com.google.inject.Inject;
 
 /**
- * Render all of the jobs that the history server is aware of.
+ * 历史服务器WebUI中已完成作业列表页面的渲染块，负责生成历史作业表格的HTML结构和数据。
+ * 核心职责：遍历所有已完成历史作业，根据权限过滤，生成前端DataTable可解析的作业数据，输出到HTML页面。
  */
 public class HsJobsBlock extends HtmlBlock {
   final AppContext appContext;
@@ -51,6 +53,12 @@ public class HsJobsBlock extends HtmlBlock {
   private boolean isFilterAppListByUserEnabled;
   private JobACLsManager aclsManager;
 
+  /**
+   * 构造函数，通过Guice注入依赖，初始化权限配置和ACL管理器
+   * @param conf Hadoop配置对象
+   * @param appCtx 历史服务器应用上下文，存储所有已完成作业信息
+   * @param ctx Web视图上下文
+   */
   @Inject
   HsJobsBlock(Configuration conf, AppContext appCtx, ViewContext ctx) {
     super(ctx);
@@ -64,7 +72,13 @@ public class HsJobsBlock extends HtmlBlock {
    * (non-Javadoc)
    * @see org.apache.hadoop.yarn.webapp.view.HtmlBlock#render(org.apache.hadoop.yarn.webapp.view.HtmlBlock.Block)
    */
+
+  /**
+   * 渲染已退休作业列表的HTML页面，生成表格结构和作业数据供前端渲染
+   * @param html HTML块输出对象
+   */
   @Override protected void render(Block html) {
+    // 构建表格表头，定义各列名称
     TBODY<TABLE<Hamlet>> tbody = html.
       h2("Retired Jobs").
       table("#jobs").
@@ -85,17 +99,18 @@ public class HsJobsBlock extends HtmlBlock {
             th("Elapsed Time").__().__().
         tbody();
     LOG.info("Getting list of all Jobs.");
-    // Write all the data into a JavaScript array of arrays for JQuery
-    // DataTables to display
+    // 构造JavaScript二维数组，供前端jQuery DataTables渲染表格
     StringBuilder jobsTableData = new StringBuilder("[\n");
+    // 遍历所有历史作业
     for (Job j : appContext.getAllJobs().values()) {
       JobInfo job = new JobInfo(j);
       ugi = getCallerUGI();
-      // Allow to list only per-user apps if incoming ugi has permission.
+      // 如果开启按用户过滤应用列表，且当前用户没有该作业的查看权限，则跳过该作业不展示
       if (isFilterAppListByUserEnabled && ugi != null && !aclsManager
           .checkAccess(ugi, JobACL.VIEW_JOB, job.getUserName(), null)) {
         continue;
       }
+      // 将作业信息格式化后添加到JSON数组，处理转义和HTML链接
       jobsTableData.append("[\"")
       .append(dateFormat.format(new Date(job.getSubmitTime()))).append("\",\"")
       .append(job.getFormattedStartTimeStr(dateFormat)).append("\",\"")
@@ -118,13 +133,15 @@ public class HsJobsBlock extends HtmlBlock {
                   job.getFinishTime(), false))).append("\"],\n");
     }
 
-    //Remove the last comma and close off the array of arrays
+    // 移除最后一条数据多余的逗号，闭合JSON数组
     if(jobsTableData.charAt(jobsTableData.length() - 2) == ',') {
       jobsTableData.delete(jobsTableData.length()-2, jobsTableData.length()-1);
     }
     jobsTableData.append("]");
+    // 将作业数据输出为JavaScript变量，供前端DataTables使用
     html.script().$type("text/javascript").
         __("var jobsTableData=" + jobsTableData).__();
+    // 生成表脚搜索输入框，每个列对应一个搜索框
     tbody.__().
     tfoot().
       tr().

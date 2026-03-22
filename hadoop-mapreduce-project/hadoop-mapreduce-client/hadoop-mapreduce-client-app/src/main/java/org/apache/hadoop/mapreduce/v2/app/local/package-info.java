@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * 本地运行MapReduce应用客户端包，提供单机本地模式下MapReduce作业运行的核心实现
+ * 用于开发测试场景，在单个进程内完成整个MapReduce作业的执行，不需要依赖YARN集群
  */
 @InterfaceAudience.Private
 package org.apache.hadoop.mapreduce.v2.app.local;

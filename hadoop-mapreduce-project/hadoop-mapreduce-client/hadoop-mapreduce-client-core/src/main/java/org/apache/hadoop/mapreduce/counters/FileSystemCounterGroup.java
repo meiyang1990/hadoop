@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,7 +29,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.hadoop.thirdparty.com.google.common.base.Joiner;
-import static org.apache.hadoop.util.Preconditions.*;
+import static org.apache.hadoop.util.Preconditions.checkNotNull;
 import org.apache.hadoop.thirdparty.com.google.common.collect.AbstractIterator;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Iterators;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
@@ -44,47 +45,67 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * An abstract class to provide common implementation of the filesystem
- * counter group in both mapred and mapreduce packages.
- *
- * @param <C> the type of the Counter for the group
+ * 文件系统计数器组的抽象基类，同时兼容mapred和mapreduce包的公共实现，
+ * 用于按文件系统scheme分类统计各文件系统的IO操作指标。
+ * 
+ * @param <C> 组内计数器的具体类型
  */
 @InterfaceAudience.Private
 public abstract class FileSystemCounterGroup<C extends Counter>
     implements CounterGroupBase<C> {
 
+  // 允许的最大文件系统scheme数量，用于边界检查
   static final int MAX_NUM_SCHEMES = 100; // intern/sanity check
+  // 存储全局唯一化后的scheme字符串，减少内存占用
   static final ConcurrentMap<String, String> schemes = Maps.newConcurrentMap();
   
   private static final Logger LOG =
       LoggerFactory.getLogger(FileSystemCounterGroup.class);
 
-  // C[] would need Array.newInstance which requires a Class<C> reference.
-  // Just a few local casts probably worth not having to carry it around.
-  // Initialized lazily, since in some situations millions of empty maps can
-  // waste a substantial (e.g. 4% as we observed) portion of the heap
+  // 延迟初始化计数器存储，避免空组占用过多内存
+  // key：文件系统scheme，value：对应scheme的所有计数器数组，按枚举ordinal索引存储
   private Map<String, Object[]> map;
+  // 计数器组的显示名称
   private String displayName;
 
   private static final Joiner NAME_JOINER = Joiner.on('_');
   private static final Joiner DISP_JOINER = Joiner.on(": ");
 
+  /**
+   * 文件系统计数器具体实现，存储单个scheme下单个指标的计数值。
+   */
   @InterfaceAudience.Private
   public static class FSCounter extends AbstractCounter {
+    // 所属文件系统scheme
     final String scheme;
+    // 计数器对应的指标类型
     final FileSystemCounter key;
+    // 当前计数值
     private long value;
 
+    /**
+     * 构造文件系统计数器实例。
+     * @param scheme 文件系统scheme
+     * @param ref 计数器指标类型
+     */
     public FSCounter(String scheme, FileSystemCounter ref) {
       this.scheme = scheme;
       key = ref;
     }
     
+    /**
+     * 获取计数器所属文件系统scheme。
+     * @return 文件系统scheme
+     */
     @Private
     public String getScheme() {
       return scheme;
     }
     
+    /**
+     * 获取计数器对应的文件系统指标类型。
+     * @return 文件系统计数器枚举
+     */
     @Private
     public FileSystemCounter getFileSystemCounter() {
       return key;
@@ -100,6 +121,11 @@ public abstract class FileSystemCounterGroup<C extends Counter>
       return DISP_JOINER.join(scheme, localizeCounterName(key.name()));
     }
 
+    /**
+     * 从资源包获取本地化的计数器名称。
+     * @param counterName 计数器原始名称
+     * @return 本地化后的显示名称
+     */
     protected String localizeCounterName(String counterName) {
       return ResourceBundles.getCounterName(FileSystemCounter.class.getName(),
                                             counterName, counterName);
@@ -179,7 +205,11 @@ public abstract class FileSystemCounterGroup<C extends Counter>
     return counter;
   }
 
-  // Parse generic counter name into [scheme, key]
+  /**
+   * 解析通用计数器名称，拆分为scheme和计数器key两部分。
+   * @param counterName 格式为 scheme_counterName 的计数器全名
+   * @return 拆分后的数组，[0]为scheme，[1]为计数器key
+   */
   private String[] parseCounterName(String counterName) {
     int schemeEnd = counterName.indexOf('_');
     if (schemeEnd < 0) {
@@ -212,6 +242,12 @@ public abstract class FileSystemCounterGroup<C extends Counter>
     return findCounter(counterName, false);
   }
 
+  /**
+   * 根据文件系统scheme和计数器key查找或创建计数器。
+   * @param scheme 文件系统scheme
+   * @param key 文件系统计数器枚举
+   * @return 对应计数器实例
+   */
   @SuppressWarnings("unchecked")
   public synchronized C findCounter(String scheme, FileSystemCounter key) {
     final String canonicalScheme = checkScheme(scheme);
@@ -231,6 +267,11 @@ public abstract class FileSystemCounterGroup<C extends Counter>
     return (C) counters[ord];
   }
 
+  /**
+   * 校验并标准化文件系统scheme，限制最大scheme数量。
+   * @param scheme 原始scheme字符串
+   * @return 标准化后的全局唯一scheme
+   */
   private String checkScheme(String scheme) {
     String fixed = StringUtils.toUpperCase(scheme);
     String interned = schemes.putIfAbsent(fixed, fixed);
@@ -243,10 +284,10 @@ public abstract class FileSystemCounterGroup<C extends Counter>
   }
 
   /**
-   * Abstract factory method to create a file system counter
-   * @param scheme of the file system
-   * @param key the enum of the file system counter
-   * @return a new file system counter
+   * 抽象工厂方法，由子类实现创建具体类型的计数器。
+   * @param scheme 文件系统scheme
+   * @param key 计数器枚举key
+   * @return 新的计数器实例
    */
   protected abstract C newCounter(String scheme, FileSystemCounter key);
 
@@ -274,22 +315,23 @@ public abstract class FileSystemCounterGroup<C extends Counter>
   }
 
   /**
-   * FileSystemGroup ::= #scheme (scheme #counter (key value)*)*
+   * 序列化文件系统计数器组到输出流。
+   * 格式：#scheme (scheme #counter (key value)*)*
    */
   @Override
   public synchronized void write(DataOutput out) throws IOException {
     if (map != null) {
-      WritableUtils.writeVInt(out, map.size()); // #scheme
+      WritableUtils.writeVInt(out, map.size()); // 写入scheme数量
       for (Map.Entry<String, Object[]> entry : map.entrySet()) {
-        WritableUtils.writeString(out, entry.getKey()); // scheme
-        // #counter for the above scheme
+        WritableUtils.writeString(out, entry.getKey()); // 写入scheme名称
+        // 写入当前scheme已设置的计数器数量
         WritableUtils.writeVInt(out, numSetCounters(entry.getValue()));
         for (Object counter : entry.getValue()) {
           if (counter == null) continue;
           @SuppressWarnings("unchecked")
           FSCounter c = (FSCounter) ((Counter) counter).getUnderlyingCounter();
-          WritableUtils.writeVInt(out, c.key.ordinal());  // key
-          WritableUtils.writeVLong(out, c.getValue());    // value
+          WritableUtils.writeVInt(out, c.key.ordinal());  // 写入计数器key序号
+          WritableUtils.writeVLong(out, c.getValue());    // 写入计数器值
         }
       }
     } else {
@@ -297,6 +339,11 @@ public abstract class FileSystemCounterGroup<C extends Counter>
     }
   }
 
+  /**
+   * 统计数组中非空计数器的数量。
+   * @param counters 计数器数组
+   * @return 非空计数器数量
+   */
   private int numSetCounters(Object[] counters) {
     int n = 0;
     for (Object counter : counters) if (counter != null) ++n;
@@ -305,14 +352,14 @@ public abstract class FileSystemCounterGroup<C extends Counter>
 
   @Override
   public void readFields(DataInput in) throws IOException {
-    int numSchemes = WritableUtils.readVInt(in);    // #scheme
+    int numSchemes = WritableUtils.readVInt(in);    // 读取scheme数量
     FileSystemCounter[] enums = FileSystemCounter.values();
     for (int i = 0; i < numSchemes; ++i) {
-      String scheme = WritableUtils.readString(in); // scheme
-      int numCounters = WritableUtils.readVInt(in); // #counter
+      String scheme = WritableUtils.readString(in); // 读取scheme名称
+      int numCounters = WritableUtils.readVInt(in); // 读取计数器数量
       for (int j = 0; j < numCounters; ++j) {
-        findCounter(scheme, enums[WritableUtils.readVInt(in)])  // key
-            .setValue(WritableUtils.readVLong(in)); // value
+        findCounter(scheme, enums[WritableUtils.readVInt(in)])  // 根据序号获取counter
+            .setValue(WritableUtils.readVLong(in)); // 设置计数值
       }
     }
   }
@@ -351,7 +398,7 @@ public abstract class FileSystemCounterGroup<C extends Counter>
 
   @Override
   public synchronized int hashCode() {
-    // need to be deep as counters is an array
+    // 深度计算哈希，因为计数器存储在数组中
     int hash = FileSystemCounter.class.hashCode();
     if (map != null) {
       for (Object[] counters : map.values()) {

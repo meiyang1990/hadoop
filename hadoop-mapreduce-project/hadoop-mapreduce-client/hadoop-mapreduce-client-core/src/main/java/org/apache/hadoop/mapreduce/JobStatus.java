@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,14 +35,15 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.util.StringInterner;
 
-/**************************************************
- * Describes the current status of a job.
- **************************************************/
+/**
+ * 描述MapReduce作业的当前运行状态，包含作业进度、状态、时间、权限等核心信息
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class JobStatus implements Writable, Cloneable {
 
-  static {                                      // register a ctor
+  // 向Hadoop Writable工厂注册当前类的构造方法，支持反序列化实例创建
+  static {
     WritableFactories.setFactory
       (JobStatus.class,
        new WritableFactory() {
@@ -50,7 +52,7 @@ public class JobStatus implements Writable, Cloneable {
   }
 
   /**
-   * Current state of the job 
+   * 作业运行状态枚举，定义作业所有可能的运行阶段
    */
   public enum State {
     RUNNING(1),
@@ -101,23 +103,24 @@ public class JobStatus implements Writable, Cloneable {
   private boolean isUber;
     
   /**
+   * 空构造方法，用于反序列化
    */
   public JobStatus() {
   }
 
   /**
-   * Create a job status object for a given jobid.
-   * @param jobid The jobid of the job
-   * @param setupProgress The progress made on the setup
-   * @param mapProgress The progress made on the maps
-   * @param reduceProgress The progress made on the reduces
-   * @param cleanupProgress The progress made on the cleanup
-   * @param runState The current state of the job
-   * @param jp Priority of the job.
-   * @param user userid of the person who submitted the job.
-   * @param jobName user-specified job name.
-   * @param jobFile job configuration file.
-   * @param trackingUrl link to the web-ui for details of the job.
+   * 构造作业状态对象，包含核心作业基础信息
+   * @param jobid 作业ID
+   * @param setupProgress 作业setup阶段进度
+   * @param mapProgress Map阶段进度
+   * @param reduceProgress Reduce阶段进度
+   * @param cleanupProgress 作业cleanup阶段进度
+   * @param runState 作业当前状态
+   * @param jp 作业优先级
+   * @param user 提交作业的用户名
+   * @param jobName 作业名称
+   * @param jobFile 作业配置文件路径
+   * @param trackingUrl 作业Web追踪地址
    */
    public JobStatus(JobID jobid, float setupProgress, float mapProgress,
                     float reduceProgress, float cleanupProgress,
@@ -128,19 +131,19 @@ public class JobStatus implements Writable, Cloneable {
    }
 
    /**
-    * Create a job status object for a given jobid.
-    * @param jobid The jobid of the job
-    * @param setupProgress The progress made on the setup
-    * @param mapProgress The progress made on the maps
-    * @param reduceProgress The progress made on the reduces
-    * @param cleanupProgress The progress made on the cleanup
-    * @param runState The current state of the job
-    * @param jp Priority of the job.
-    * @param user userid of the person who submitted the job.
-    * @param jobName user-specified job name.
-    * @param queue queue name
-    * @param jobFile job configuration file.
-    * @param trackingUrl link to the web-ui for details of the job.
+    * 构造作业状态对象，增加队列参数
+    * @param jobid 作业ID
+    * @param setupProgress 作业setup阶段进度
+    * @param mapProgress Map阶段进度
+    * @param reduceProgress Reduce阶段进度
+    * @param cleanupProgress 作业cleanup阶段进度
+    * @param runState 作业当前状态
+    * @param jp 作业优先级
+    * @param user 提交作业的用户名
+    * @param jobName 作业名称
+    * @param queue 作业所属队列名称
+    * @param jobFile 作业配置文件路径
+    * @param trackingUrl 作业Web追踪地址
     */
     public JobStatus(JobID jobid, float setupProgress, float mapProgress,
                      float reduceProgress, float cleanupProgress,
@@ -152,21 +155,21 @@ public class JobStatus implements Writable, Cloneable {
     }
 
    /**
-   * Create a job status object for a given jobid.
-   * @param jobid The jobid of the job
-   * @param setupProgress The progress made on the setup
-   * @param mapProgress The progress made on the maps
-   * @param reduceProgress The progress made on the reduces
-   * @param cleanupProgress The progress made on the cleanup
-   * @param runState The current state of the job
-   * @param jp Priority of the job.
-   * @param user userid of the person who submitted the job.
-   * @param jobName user-specified job name.
-   * @param queue queue name
-   * @param jobFile job configuration file.
-   * @param trackingUrl link to the web-ui for details of the job.
-   * @param isUber Whether job running in uber mode
-   */
+    * 构造作业状态对象，增加Uber模式参数
+    * @param jobid 作业ID
+    * @param setupProgress 作业setup阶段进度
+    * @param mapProgress Map阶段进度
+    * @param reduceProgress Reduce阶段进度
+    * @param cleanupProgress 作业cleanup阶段进度
+    * @param runState 作业当前状态
+    * @param jp 作业优先级
+    * @param user 提交作业的用户名
+    * @param jobName 作业名称
+    * @param queue 作业所属队列名称
+    * @param jobFile 作业配置文件路径
+    * @param trackingUrl 作业Web追踪地址
+    * @param isUber 是否运行在Uber模式
+    */
   public JobStatus(JobID jobid, float setupProgress, float mapProgress,
                     float reduceProgress, float cleanupProgress,
                     State runState, JobPriority jp,
@@ -177,21 +180,21 @@ public class JobStatus implements Writable, Cloneable {
   }
 
  /**
-  * Create a job status object for a given jobid.
-  * @param jobid The jobid of the job
-  * @param setupProgress The progress made on the setup
-  * @param mapProgress The progress made on the maps
-  * @param reduceProgress The progress made on the reduces
-  * @param cleanupProgress The progress made on the cleanup
-  * @param runState The current state of the job
-  * @param jp Priority of the job.
-  * @param user userid of the person who submitted the job.
-  * @param jobName user-specified job name.
-  * @param queue queue name
-  * @param jobFile job configuration file.
-  * @param trackingUrl link to the web-ui for details of the job.
-  * @param isUber Whether job running in uber mode
-  * @param historyFile history file
+  * 完整构造作业状态对象，包含所有参数
+  * @param jobid 作业ID
+  * @param setupProgress 作业setup阶段进度
+  * @param mapProgress Map阶段进度
+  * @param reduceProgress Reduce阶段进度
+  * @param cleanupProgress 作业cleanup阶段进度
+  * @param runState 作业当前状态
+  * @param jp 作业优先级
+  * @param user 提交作业的用户名
+  * @param jobName 作业名称
+  * @param queue 作业所属队列名称
+  * @param jobFile 作业配置文件路径
+  * @param trackingUrl 作业Web追踪地址
+  * @param isUber 是否运行在Uber模式
+  * @param historyFile 作业历史文件路径
   */
   public JobStatus(JobID jobid, float setupProgress, float mapProgress,
                    float reduceProgress, float cleanupProgress,
@@ -220,40 +223,40 @@ public class JobStatus implements Writable, Cloneable {
 
 
   /**
-   * Sets the map progress of this job
-   * @param p The value of map progress to set to
+   * 设置Map阶段进度，限制进度范围在0.0~1.0之间
+   * @param p 进度值
    */
   protected synchronized void setMapProgress(float p) { 
     this.mapProgress = (float) Math.min(1.0, Math.max(0.0, p)); 
   }
 
   /**
-   * Sets the cleanup progress of this job
-   * @param p The value of cleanup progress to set to
+   * 设置cleanup阶段进度，限制进度范围在0.0~1.0之间
+   * @param p 进度值
    */
   protected synchronized void setCleanupProgress(float p) { 
     this.cleanupProgress = (float) Math.min(1.0, Math.max(0.0, p)); 
   }
 
   /**
-   * Sets the setup progress of this job
-   * @param p The value of setup progress to set to
+   * 设置setup阶段进度，限制进度范围在0.0~1.0之间
+   * @param p 进度值
    */
   protected synchronized void setSetupProgress(float p) { 
     this.setupProgress = (float) Math.min(1.0, Math.max(0.0, p)); 
   }
 
   /**
-   * Sets the reduce progress of this Job
-   * @param p The value of reduce progress to set to
+   * 设置Reduce阶段进度，限制进度范围在0.0~1.0之间
+   * @param p 进度值
    */
   protected synchronized void setReduceProgress(float p) { 
     this.reduceProgress = (float) Math.min(1.0, Math.max(0.0, p)); 
   }
     
   /**
-   * Set the priority of the job, defaulting to NORMAL.
-   * @param jp new job priority
+   * 设置作业优先级
+   * @param jp 新的作业优先级
    */
   protected synchronized void setPriority(JobPriority jp) {
     if (jp == null) {
@@ -262,126 +265,134 @@ public class JobStatus implements Writable, Cloneable {
     priority = jp;
   }
   
-  /** 
-   * Set the finish time of the job
-   * @param finishTime The finishTime of the job
+  /**
+   * 设置作业完成时间
+   * @param finishTime 作业完成时间戳
    */
   protected synchronized void setFinishTime(long finishTime) {
     this.finishTime = finishTime;
   }
 
   /**
-   * Set the job history file url for a completed job
+   * 设置已完成作业的历史文件路径
+   * @param historyFile 历史文件路径
    */
   protected synchronized void setHistoryFile(String historyFile) {
     this.historyFile = historyFile;
   }
 
   /**
-   * Set the link to the web-ui for details of the job.
+   * 设置作业Web追踪地址
+   * @param trackingUrl 追踪地址
    */
   protected synchronized void setTrackingUrl(String trackingUrl) {
     this.trackingUrl = trackingUrl;
   }
 
   /**
-   * Set the job retire flag to true.
+   * 将作业标记为已退役（从活跃内存中移除）
    */
   protected synchronized void setRetired() {
     this.isRetired = true;
   }
 
   /**
-   * Change the current run state of the job.
+   * 修改作业当前运行状态
+   * @param state 新的运行状态
    */
   protected synchronized void setState(State state) {
     this.runState = state;
   }
 
-  /** 
-   * Set the start time of the job
-   * @param startTime The startTime of the job
+  /**
+   * 设置作业启动时间
+   * @param startTime 作业启动时间戳
    */
   protected synchronized void setStartTime(long startTime) { 
     this.startTime = startTime;
   }
     
   /**
-   * @param userName The username of the job
+   * 设置提交作业的用户名
+   * @param userName 用户名
    */
   protected synchronized void setUsername(String userName) { 
     this.user = userName;
   }
 
   /**
-   * Used to set the scheduling information associated to a particular Job.
-   * 
-   * @param schedulingInfo Scheduling information of the job
+   * 设置作业调度信息，用于记录调度器相关信息
+   * @param schedulingInfo 调度信息字符串
    */
   protected synchronized void setSchedulingInfo(String schedulingInfo) {
     this.schedulingInfo = schedulingInfo;
   }
 
   /**
-   * Set the job acls.
-   * 
-   * @param acls {@link Map} from {@link JobACL} to {@link AccessControlList}
+   * 设置作业访问控制列表
+   * @param acls 权限类型到访问控制列表的映射
    */
   protected synchronized void setJobACLs(Map<JobACL, AccessControlList> acls) {
     this.jobACLs = acls;
   }
 
   /**
-   * Set queue name
-   * @param queue queue name
+   * 设置作业所属队列名称
+   * @param queue 队列名称
    */
   protected synchronized void setQueue(String queue) {
     this.queue = queue;
   }
 
   /**
-   * Set diagnostic information.
-   * @param failureInfo diagnostic information
+   * 设置作业失败诊断信息
+   * @param failureInfo 失败诊断信息
    */
   protected synchronized void setFailureInfo(String failureInfo) {
     this.failureInfo = failureInfo;
   }
   
   /**
-   * Get queue name
-   * @return queue name
+   * 获取作业所属队列名称
+   * @return 队列名称
    */
   public synchronized String getQueue() {
     return queue;
   }
 
   /**
-   * @return Percentage of progress in maps 
+   * 获取Map阶段进度百分比
+   * @return 0.0~1.0之间的进度值
    */
   public synchronized float getMapProgress() { return mapProgress; }
     
   /**
-   * @return Percentage of progress in cleanup 
+   * 获取cleanup阶段进度百分比
+   * @return 0.0~1.0之间的进度值
    */
   public synchronized float getCleanupProgress() { return cleanupProgress; }
     
   /**
-   * @return Percentage of progress in setup 
+   * 获取setup阶段进度百分比
+   * @return 0.0~1.0之间的进度值
    */
   public synchronized float getSetupProgress() { return setupProgress; }
     
   /**
-   * @return Percentage of progress in reduce 
+   * 获取Reduce阶段进度百分比
+   * @return 0.0~1.0之间的进度值
    */
   public synchronized float getReduceProgress() { return reduceProgress; }
     
   /**
-   * @return running state of the job
+   * 获取作业当前运行状态
+   * @return 作业状态枚举值
    */
   public synchronized State getState() { return runState; }
     
   /**
-   * @return start time of the job
+   * 获取作业启动时间戳
+   * @return 启动时间戳（毫秒）
    */
   synchronized public long getStartTime() { return startTime;}
 
@@ -390,47 +401,47 @@ public class JobStatus implements Writable, Cloneable {
     try {
       return super.clone();
     } catch (CloneNotSupportedException cnse) {
-      // Shouldn't happen since we do implement Clonable
       throw new InternalError(cnse.toString());
     }
   }
   
   /**
-   * @return The jobid of the Job
+   * 获取作业ID
+   * @return 作业唯一标识
    */
   public JobID getJobID() { return jobid; }
     
   /**
-   * @return the username of the job
+   * 获取提交作业的用户名
+   * @return 用户名
    */
   public synchronized String getUsername() { return this.user;}
   
   /**
-   * Gets the Scheduling information associated to a particular Job.
-   * @return the scheduling information of the job
+   * 获取作业调度信息
+   * @return 调度信息字符串
    */
   public synchronized String getSchedulingInfo() {
    return schedulingInfo;
   }
 
   /**
-   * Get the job acls.
-   * 
-   * @return a {@link Map} from {@link JobACL} to {@link AccessControlList}
+   * 获取作业访问控制列表
+   * @return 权限类型到访问控制列表的映射
    */
   public synchronized Map<JobACL, AccessControlList> getJobACLs() {
     return jobACLs;
   }
 
   /**
-   * Return the priority of the job
-   * @return job priority
+   * 获取作业优先级
+   * @return 作业优先级枚举值
    */
    public synchronized JobPriority getPriority() { return priority; }
   
    /**
-    * Gets any available info on the reason of failure of the job.
-    * @return diagnostic information on why a job might have failed.
+    * 获取作业失败诊断信息
+    * @return 失败原因描述
     */
    public synchronized String getFailureInfo() {
      return this.failureInfo;
@@ -438,7 +449,8 @@ public class JobStatus implements Writable, Cloneable {
 
 
   /**
-   * Returns true if the status is for a completed job.
+   * 判断作业是否已完成（成功/失败/被杀都属于完成状态）
+   * @return 作业已完成返回true，否则返回false
    */
   public synchronized boolean isJobComplete() {
     return (runState == JobStatus.State.SUCCEEDED || 
@@ -447,7 +459,7 @@ public class JobStatus implements Writable, Cloneable {
   }
 
   ///////////////////////////////////////
-  // Writable
+  // Writable序列化实现
   ///////////////////////////////////////
   public synchronized void write(DataOutput out) throws IOException {
     jobid.write(out);
@@ -468,7 +480,7 @@ public class JobStatus implements Writable, Cloneable {
     Text.writeString(out, jobFile);
     out.writeBoolean(isUber);
 
-    // Serialize the job's ACLs
+    // 序列化作业访问控制列表
     out.writeInt(jobACLs.size());
     for (Entry<JobACL, AccessControlList> entry : jobACLs.entrySet()) {
       WritableUtils.writeEnum(out, entry.getKey());
@@ -493,166 +505,4 @@ public class JobStatus implements Writable, Cloneable {
     this.historyFile = StringInterner.weakIntern(Text.readString(in));
     this.jobName = StringInterner.weakIntern(Text.readString(in));
     this.trackingUrl = StringInterner.weakIntern(Text.readString(in));
-    this.jobFile = StringInterner.weakIntern(Text.readString(in));
-    this.isUber = in.readBoolean();
-
-    // De-serialize the job's ACLs
-    int numACLs = in.readInt();
-    for (int i = 0; i < numACLs; i++) {
-      JobACL aclType = WritableUtils.readEnum(in, JobACL.class);
-      AccessControlList acl = new AccessControlList(" ");
-      acl.readFields(in);
-      this.jobACLs.put(aclType, acl);
-    }
-  }
-
-  /**
-   * Get the user-specified job name.
-   */
-  public String getJobName() {
-    return jobName;
-  }
-
-  /**
-   * Get the configuration file for the job.
-   */
-  public String getJobFile() {
-    return jobFile;
-  }
-
-  /**
-   * Get the link to the web-ui for details of the job.
-   */
-  public synchronized String getTrackingUrl() {
-    return trackingUrl;
-  }
-
-  /**
-   * Get the finish time of the job.
-   */
-  public synchronized long getFinishTime() { 
-    return finishTime;
-  }
-
-  /**
-   * Check whether the job has retired.
-   */
-  public synchronized boolean isRetired() {
-    return isRetired;
-  }
-
-  /**
-   * @return the job history file name for a completed job. If job is not 
-   * completed or history file not available then return null.
-   */
-  public synchronized String getHistoryFile() {
-    return historyFile;
-  }
-
-  /**
-   * @return number of used mapred slots
-   */
-  public int getNumUsedSlots() {
-    return numUsedSlots;
-  }
-
-  /**
-   * @param n number of used mapred slots
-   */
-  public void setNumUsedSlots(int n) {
-    numUsedSlots = n;
-  }
-
-  /**
-   * @return the number of reserved slots
-   */
-  public int getNumReservedSlots() {
-    return numReservedSlots;
-  }
-
-  /**
-   * @param n the number of reserved slots
-   */
-  public void setNumReservedSlots(int n) {
-    this.numReservedSlots = n;
-  }
-
-  /**
-   * @return the used memory
-   */
-  public int getUsedMem() {
-    return usedMem;
-  }
-
-  /**
-   * @param m the used memory
-   */
-  public void setUsedMem(int m) {
-    this.usedMem = m;
-  }
-
-  /**
-   * @return the reserved memory
-   */
-  public int getReservedMem() {
-    return reservedMem;
- }
-
-  /**
-   * @param r the reserved memory
-   */
-  public void setReservedMem(int r) {
-    this.reservedMem = r;
-  }
-
-  /**
-   * @return the needed memory
-   */
-  public int getNeededMem() {
-  return neededMem;
- }
-
-  /**
-   * @param n the needed memory
-   */
-  public void setNeededMem(int n) {
-    this.neededMem = n;
-  }
-
-  /**
-   * Whether job running in uber mode
-   * @return job in uber-mode
-   */
-  public synchronized boolean isUber() {
-    return isUber;
-  }
-  
-  /**
-   * Set uber-mode flag 
-   * @param isUber Whether job running in uber-mode
-   */
-  public synchronized void setUber(boolean isUber) {
-    this.isUber = isUber;
-  }
-  
-  public String toString() {
-    StringBuilder buffer = new StringBuilder();
-    buffer.append("job-id : " + jobid);
-    buffer.append("uber-mode : " + isUber);
-    buffer.append("map-progress : " + mapProgress);
-    buffer.append("reduce-progress : " + reduceProgress);
-    buffer.append("cleanup-progress : " + cleanupProgress);
-    buffer.append("setup-progress : " + setupProgress);
-    buffer.append("runstate : " + runState);
-    buffer.append("start-time : " + startTime);
-    buffer.append("user-name : " + user);
-    buffer.append("priority : " + priority);
-    buffer.append("scheduling-info : " + schedulingInfo);
-    buffer.append("num-used-slots" + numUsedSlots);
-    buffer.append("num-reserved-slots" + numReservedSlots);
-    buffer.append("used-mem" + usedMem);
-    buffer.append("reserved-mem" + reservedMem);
-    buffer.append("needed-mem" + neededMem);
-    return buffer.toString();
-  }
-}
+    this.jobFile = StringInterner

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,20 +42,15 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.ManifestCommitterSupport.createManifestOutcome;
 
 /**
- * This stage renames all the files.
- * Input:
+ * 文件重命名阶段，完成作业提交过程中所有任务输出文件从临时目录到最终输出目录的重命名操作。
+ * 输入：
  * <ol>
- *   <li>{@link LoadedManifestData} from the {@link LoadManifestsStage}</li>
- *   <li>the set of directories created, as returned by
- *     {@link CreateOutputDirectoriesStage}.</li>
+ *   <li>{@link LoadManifestsStage}加载得到的{@link LoadedManifestData}</li>
+ *   <li>{@link CreateOutputDirectoriesStage}创建完成的输出目录集合</li>
  * </ol>
- * The files to rename are determined by reading the entry file referenced
- * in the {@link LoadedManifestData}; these are read and renamed incrementally.
- *
- * If the job is configured to delete target files, if the parent dir
- * had to be created, the delete() call can be skipped.
- * It returns a manifest success data file summarizing the
- * output, but does not add iostatistics to it.
+ * 需要重命名的文件通过LoadedManifestData中记录的入口文件读取，采用增量方式逐个处理。
+ * 如果配置了删除目标文件且目标父目录为本次新创建，则可以跳过删除已存在目标文件的操作。
+ * 阶段返回汇总输出信息的作业成功清单文件，但不会在其中添加IO统计信息。
  */
 public class RenameFilesStage extends
     AbstractJobOrTaskStage<
@@ -65,43 +61,48 @@ public class RenameFilesStage extends
       RenameFilesStage.class);
 
   /**
-   * List of all files committed.
+   * 已提交成功的文件列表。
    */
   private final List<FileEntry> filesCommitted = new ArrayList<>();
 
   /**
-   * Total file size.
+   * 已提交文件总大小。
    */
   private long totalFileSize = 0;
 
+  /** 本次提交创建的所有输出目录集合 */
   private Set<Path> createdDirectories;
 
+  /**
+   * 构造RenameFilesStage实例。
+   * @param stageConfig 阶段配置
+   */
   public RenameFilesStage(final StageConfig stageConfig) {
     super(false, stageConfig, OP_STAGE_JOB_RENAME_FILES, true);
   }
 
   /**
-   * Get the list of files committed.
-   * Access is not synchronized.
-   * @return direct access to the list of files.
+   * 获取已提交成功的文件列表。
+   * 访问未做同步，调用方需保证线程安全。
+   * @return 已提交文件列表的直接引用
    */
   public synchronized  List<FileEntry> getFilesCommitted() {
     return filesCommitted;
   }
 
   /**
-   * Get the total file size of the committed task.
-   * @return a number greater than or equal to zero.
+   * 获取已提交文件总大小。
+   * @return 总大小，大于等于0
    */
   public synchronized long getTotalFileSize() {
     return totalFileSize;
   }
 
   /**
-   * Rename files in job commit.
-   * @param args tuple of (manifest data, set of created dirs)
-   * @return the job report.
-   * @throws IOException failure
+   * 执行文件重命名阶段逻辑，完成所有任务输出文件的提交重命名。
+   * @param args 三元组，包含(已加载清单数据、本次创建目录集合、结果文件保留的路径数量)
+   * @return 作业提交成功数据对象
+   * @throws IOException IO操作失败时抛出
    */
   @Override
   protected ManifestSuccessData executeStage(
@@ -111,6 +112,7 @@ public class RenameFilesStage extends
 
     final LoadedManifestData manifestData = args.getLeft();
     createdDirectories = args.getMiddle();
+    // 创建入口文件IO处理器
     final EntryFileIO entryFileIO = new EntryFileIO(getStageConfig().getConf());
 
 
@@ -120,55 +122,53 @@ public class RenameFilesStage extends
     LOG.info("{}: Executing Manifest Job Commit with {} files",
         getName(), manifestData.getFileCount());
 
-    // iterate over the entries in the file.
+    // 遍历读取入口文件中的所有文件条目
     try (SequenceFile.Reader reader = entryFileIO.createReader(
         manifestData.getEntrySequenceData())) {
 
+      // 使用线程池并行处理每个文件的重命名提交
       TaskPool.foreach(entryFileIO.iterateOver(reader))
           .executeWith(getIOProcessors())
           .stopOnFailure()
           .run(this::commitOneFile);
     }
 
-    // synchronized block to keep spotbugs happy.
+    // 获取已提交文件列表用于日志和结果输出
     List<FileEntry> committed = getFilesCommitted();
     LOG.info("{}: Files committed: {}. Total size {}",
         getName(), committed.size(), getTotalFileSize());
 
-    // Add a subset of the destination files to the success file;
-    // enough for simple testing
+    // 抽取部分目标路径写入成功清单，满足简单测试需求，避免结果文件过大
     success.setFilenamePaths(
         committed
             .subList(0, Math.min(committed.size(), args.getRight()))
             .stream().map(FileEntry::getDestPath)
             .collect(Collectors.toList()));
 
+    // 标记提交成功
     success.setSuccess(true);
 
     return success;
   }
 
   /**
-   * Commit one file by rename, then, if that doesn't fail,
-   * add to the files committed list.
-   * @param entry entry to commit.
-   * @throws IOException faiure.
+   * 提交单个文件：执行重命名操作，成功后添加到已提交列表。
+   * @param entry 待提交的文件条目
+   * @throws IOException IO操作失败时抛出
    */
   private void commitOneFile(FileEntry entry) throws IOException {
     updateAuditContext(OP_STAGE_JOB_RENAME_FILES);
 
-    // report progress back
+    // 向框架报告进度，避免超时
     progress();
 
-    // if the dest dir is to be deleted,
-    // look to see if the parent dir was created.
-    // if it was. we know that the file doesn't exist.
+    // 判断是否需要删除已存在的目标文件：如果父目录是本次新创建，目标文件肯定不存在，可以跳过删除
     final boolean deleteDest = getStageConfig().getDeleteTargetPaths()
         && !createdDirectories.contains(entry.getDestPath().getParent());
-    // do the rename
+    // 执行文件提交重命名操作
     commitFile(entry, deleteDest);
 
-    // update the list and IOStats
+    // 更新已提交列表和总大小，同步保证线程安全
     synchronized (this) {
       filesCommitted.add(entry);
       totalFileSize += entry.getSize();

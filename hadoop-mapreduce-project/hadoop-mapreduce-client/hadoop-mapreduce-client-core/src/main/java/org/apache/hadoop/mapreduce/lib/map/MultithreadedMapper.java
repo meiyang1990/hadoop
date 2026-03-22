@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,20 +43,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Multithreaded implementation for @link org.apache.hadoop.mapreduce.Mapper.
+ * 多线程版本的Mapper实现，用于IO密集型Map任务提升吞吐
  * <p>
- * It can be used instead of the default implementation,
- * {@link org.apache.hadoop.mapred.MapRunner}, when the Map operation is not CPU
- * bound in order to improve throughput.
+ * 当Map操作不是CPU密集型时（例如依赖外部IO操作），可以使用该实现代替默认实现提升吞吐量
  * <p>
- * Mapper implementations using this MapRunnable must be thread-safe.
+ * 使用该MapRunnable的用户自定义Mapper必须是线程安全的
  * <p>
- * The Map-Reduce job has to be configured with the mapper to use via 
- * {@link #setMapperClass(Job, Class)} and
- * the number of thread the thread-pool can use with the
- * {@link #getNumberOfThreads(JobContext)} method. The default
- * value is 10 threads.
- * <p>
+ * 需要通过 {@link #setMapperClass(Job, Class)} 配置实际执行的Mapper类，
+ * 通过 {@link #getNumberOfThreads(JobContext)} 配置线程池线程数，默认值为10个线程
+ * </p>
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -72,31 +68,31 @@ public class MultithreadedMapper<K1, V1, K2, V2>
   private List<MapRunner> runners;
 
   /**
-   * The number of threads in the thread pool that will run the map function.
-   * @param job the job
-   * @return the number of threads
+   * 从作业配置中获取线程池的线程数量
+   * @param job 作业对象
+   * @return 配置的线程数量，默认返回10
    */
   public static int getNumberOfThreads(JobContext job) {
     return job.getConfiguration().getInt(NUM_THREADS, 10);
   }
 
   /**
-   * Set the number of threads in the pool for running maps.
-   * @param job the job to modify
-   * @param threads the new number of threads
+   * 设置线程池运行Map任务的线程数量
+   * @param job 要修改的作业对象
+   * @param threads 新的线程数量
    */
   public static void setNumberOfThreads(Job job, int threads) {
     job.getConfiguration().setInt(NUM_THREADS, threads);
   }
 
   /**
-   * Get the application's mapper class.
-   * @param <K1> the map's input key type
-   * @param <V1> the map's input value type
-   * @param <K2> the map's output key type
-   * @param <V2> the map's output value type
-   * @param job the job
-   * @return the mapper class to run
+   * 从作业配置中获取实际执行逻辑的Mapper类
+   * @param <K1> Map输入key类型
+   * @param <V1> Map输入value类型
+   * @param <K2> Map输出key类型
+   * @param <V2> Map输出value类型
+   * @param job 作业对象
+   * @return 配置的Mapper类，默认返回Mapper基类
    */
   @SuppressWarnings("unchecked")
   public static <K1,V1,K2,V2>
@@ -106,13 +102,13 @@ public class MultithreadedMapper<K1, V1, K2, V2>
   }
   
   /**
-   * Set the application's mapper class.
-   * @param <K1> the map input key type
-   * @param <V1> the map input value type
-   * @param <K2> the map output key type
-   * @param <V2> the map output value type
-   * @param job the job to modify
-   * @param cls the class to use as the mapper
+   * 设置实际执行逻辑的Mapper类
+   * @param <K1> Map输入key类型
+   * @param <V1> Map输入value类型
+   * @param <K2> Map输出key类型
+   * @param <V2> Map输出value类型
+   * @param job 要修改的作业对象
+   * @param cls 作为实际Mapper的类
    */
   public static <K1,V1,K2,V2> 
   void setMapperClass(Job job, 
@@ -125,28 +121,35 @@ public class MultithreadedMapper<K1, V1, K2, V2>
   }
 
   /**
-   * Run the application's maps using a thread pool.
+   * 使用线程池多线程执行用户Map任务
    */
   @Override
   public void run(Context context) throws IOException, InterruptedException {
     outer = context;
+    // 获取配置的线程数量
     int numberOfThreads = getNumberOfThreads(context);
+    // 获取实际执行的Mapper类
     mapClass = getMapperClass(context);
+    // 调试日志输出配置信息
     if (LOG.isDebugEnabled()) {
       LOG.debug("Configuring multithread runner to use " + numberOfThreads + 
                 " threads");
     }
     
+    // 初始化MapRunner线程列表
     runners =  new ArrayList<MapRunner>(numberOfThreads);
+    // 启动所有工作线程
     for(int i=0; i < numberOfThreads; ++i) {
       MapRunner thread = new MapRunner(context);
       thread.start();
       runners.add(i, thread);
     }
+    // 等待所有线程执行完成，收集异常
     for(int i=0; i < numberOfThreads; ++i) {
       MapRunner thread = runners.get(i);
       thread.join();
       Throwable th = thread.throwable;
+      // 如果线程抛出异常，向上抛出
       if (th != null) {
         if (th instanceof IOException) {
           throw (IOException) th;
@@ -159,6 +162,11 @@ public class MultithreadedMapper<K1, V1, K2, V2>
     }
   }
 
+  /**
+   * 为子线程Mapper提供的RecordReader包装类，保证读取时线程安全
+   * @param <K1> 输入key类型
+   * @param <V1> 输入value类型
+   */
   private class SubMapRecordReader extends RecordReader<K1,V1> {
     private K1 key;
     private V1 value;
@@ -183,10 +191,12 @@ public class MultithreadedMapper<K1, V1, K2, V2>
 
     @Override
     public boolean nextKeyValue() throws IOException, InterruptedException {
+      // 对外部上下文加锁，保证多线程读取安全
       synchronized (outer) {
         if (!outer.nextKeyValue()) {
           return false;
         }
+        // 拷贝当前键值对给子线程
         key = ReflectionUtils.copy(outer.getConfiguration(),
                                    outer.getCurrentKey(), key);
         value = ReflectionUtils.copy(conf, outer.getCurrentValue(), value);
@@ -204,6 +214,11 @@ public class MultithreadedMapper<K1, V1, K2, V2>
     }
   }
   
+  /**
+   * 为子线程Mapper提供的RecordWriter包装类，保证输出时线程安全
+   * @param <K2> 输出key类型
+   * @param <V2> 输出value类型
+   */
   private class SubMapRecordWriter extends RecordWriter<K2,V2> {
 
     @Override
@@ -214,12 +229,16 @@ public class MultithreadedMapper<K1, V1, K2, V2>
     @Override
     public void write(K2 key, V2 value) throws IOException,
                                                InterruptedException {
+      // 对外部上下文加锁，保证多线程输出安全
       synchronized (outer) {
         outer.write(key, value);
       }
     }  
   }
 
+  /**
+   * 为子线程Mapper提供的状态上报包装类，代理到外部上下文
+   */
   private class SubMapStatusReporter extends StatusReporter {
 
     @Override
@@ -248,15 +267,26 @@ public class MultithreadedMapper<K1, V1, K2, V2>
     }
   }
 
+  /**
+   * 实际执行用户Map任务的工作线程，继承SubjectInheritingThread继承访问主体
+   */
   private class MapRunner extends SubjectInheritingThread {
     private Mapper<K1,V1,K2,V2> mapper;
     private Context subcontext;
     private Throwable throwable;
     private RecordReader<K1,V1> reader = new SubMapRecordReader();
 
+    /**
+     * 构造MapRunner工作线程，初始化实际Mapper和子上下文
+     * @param context 外部Mapper上下文
+     * @throws IOException 初始化IO异常
+     * @throws InterruptedException 中断异常
+     */
     MapRunner(Context context) throws IOException, InterruptedException {
+      // 反射实例化用户Mapper
       mapper = ReflectionUtils.newInstance(mapClass, 
                                            context.getConfiguration());
+      // 构造子Map上下文，注入包装好的Reader、Writer和Reporter
       MapContext<K1, V1, K2, V2> mapContext = 
         new MapContextImpl<K1, V1, K2, V2>(outer.getConfiguration(), 
                                            outer.getTaskAttemptID(),
@@ -269,12 +299,16 @@ public class MultithreadedMapper<K1, V1, K2, V2>
       reader.initialize(context.getInputSplit(), context);
     }
 
+    /**
+     * 线程工作方法，执行Mapper逻辑并捕获异常
+     */
     @Override
     public void work() {
       try {
         mapper.run(subcontext);
         reader.close();
       } catch (Throwable ie) {
+        // 保存异常供主线程处理
         throwable = ie;
       }
     }

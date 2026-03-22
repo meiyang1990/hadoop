@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,10 +22,15 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * An interface for reporting exceptions to other threads
+ * MapReduce Shuffle阶段异常上报接口，用于将后台线程抛出的异常转发给主线程处理
+ * 实现了跨线程的异常传递，保证Reduce任务能正确感知Shuffle过程中的错误
  */
 @InterfaceAudience.LimitedPrivate({"MapReduce"})
 @InterfaceStability.Unstable
 public interface ExceptionReporter {
+  /**
+   * 上报异常给目标线程处理
+   * @param t 需要上报的异常对象
+   */
   void reportException(Throwable t);
 }

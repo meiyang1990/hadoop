@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,8 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.JobConf;
 
 /** 
- * This class implements the common functionalities of 
- * the subclasses of ValueAggregatorDescriptor class.
+ * 提供ValueAggregatorDescriptor子类需要复用的通用基础功能，兼容旧版Mapred API
+ * 是MapReduce聚合框架中聚合器描述符的基础实现类
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -59,15 +60,15 @@ public class ValueAggregatorBaseDescriptor extends org.apache.hadoop.mapreduce.
   static public final String STRING_VALUE_MIN = org.apache.hadoop.mapreduce.
     lib.aggregate.ValueAggregatorBaseDescriptor.STRING_VALUE_MIN;
 
+  // 唯一值统计的最大允许数量，默认无上限
   private static long maxNumItems = Long.MAX_VALUE; 
   
- /**
-   * 
-   * @param type the aggregation type
-   * @param id the aggregation id
-   * @param val the val associated with the id to be aggregated
-   * @return an Entry whose key is the aggregation id prefixed with 
-   * the aggregation type.
+  /**
+   * 生成带聚合类型前缀的聚合键值对，用于Map输出阶段标识不同聚合任务
+   * @param type 聚合类型
+   * @param id 聚合ID
+   * @param val 需要聚合的值
+   * @return 键为聚合ID加聚合类型前缀的键值对Entry
    */
   public static Entry<Text, Text> generateEntry(String type, String id, Text val) {
     return org.apache.hadoop.mapreduce.lib.aggregate.
@@ -75,9 +76,9 @@ public class ValueAggregatorBaseDescriptor extends org.apache.hadoop.mapreduce.
   }
 
   /**
-   * 
-   * @param type the aggregation type
-   * @return a value aggregator of the given type.
+   * 根据给定聚合类型创建对应的聚合器实例
+   * @param type 聚合类型
+   * @return 对应类型的聚合器对象
    */
   static public ValueAggregator generateValueAggregator(String type) {
     ValueAggregator retv = null;
@@ -102,12 +103,12 @@ public class ValueAggregatorBaseDescriptor extends org.apache.hadoop.mapreduce.
   }
 
   /**
-   * get the input file name.
-   * 
-   * @param job a job configuration object
+   * 从作业配置中初始化参数，读取唯一值统计的最大数量限制
+   * @param job 作业配置对象
    */
   public void configure(JobConf job) {
     super.configure(job);
+    // 从配置获取唯一值统计的最大允许数量，默认无上限
     maxNumItems = job.getLong("aggregate.max.num.unique.values",
                               Long.MAX_VALUE);
   }

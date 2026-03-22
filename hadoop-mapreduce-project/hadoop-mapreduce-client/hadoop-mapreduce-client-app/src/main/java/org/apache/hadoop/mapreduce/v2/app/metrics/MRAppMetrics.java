@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,10 @@ import org.apache.hadoop.metrics2.lib.MutableCounterInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
 
+/**
+ * MapReduce ApplicationMaster 指标收集类，负责统计整个MR应用生命周期中
+ * 作业和任务的各类运行指标，供Hadoopmetrics2系统采集上报。
+ */
 @Metrics(about="MR App Metrics", context="mapred")
 public class MRAppMetrics {
   @Metric MutableCounterInt jobsSubmitted;
@@ -50,10 +55,19 @@ public class MRAppMetrics {
   @Metric MutableGaugeInt reducesRunning;
   @Metric MutableGaugeInt reducesWaiting;
   
+  /**
+   * 使用默认指标系统创建MR应用指标实例。
+   * @return 创建完成的MRAppMetrics实例
+   */
   public static MRAppMetrics create() {
     return create(DefaultMetricsSystem.instance());
   }
 
+  /**
+   * 使用指定指标系统创建MR应用指标实例，同时初始化JVM指标。
+   * @param ms 指标系统实例
+   * @return 注册到指标系统后的MRAppMetrics实例
+   */
   public static MRAppMetrics create(MetricsSystem ms) {
     JvmMetrics.initSingleton("MRAppMaster", null);
     return ms.register(new MRAppMetrics());
@@ -61,38 +75,74 @@ public class MRAppMetrics {
 
   // potential instrumentation interface methods
 
+  /**
+   * 统计已提交的作业数量，提交后计数器加1。
+   * @param job 提交的作业对象
+   */
   public void submittedJob(Job job) {
     jobsSubmitted.incr();
   }
 
+  /**
+   * 统计完成的作业数量，完成后计数器加1。
+   * @param job 完成的作业对象
+   */
   public void completedJob(Job job) {
     jobsCompleted.incr();
   }
 
+  /**
+   * 统计失败的作业数量，失败后计数器加1。
+   * @param job 失败的作业对象
+   */
   public void failedJob(Job job) {
     jobsFailed.incr();
   }
 
+  /**
+   * 统计被杀死的作业数量，杀死后计数器加1。
+   * @param job 被杀死的作业对象
+   */
   public void killedJob(Job job) {
     jobsKilled.incr();
   }
 
+  /**
+   * 统计处于准备阶段的作业数量，进入准备后指标加1。
+   * @param job 进入准备阶段的作业对象
+   */
   public void preparingJob(Job job) {
     jobsPreparing.incr();
   }
 
+  /**
+   * 统计处于准备阶段的作业数量，离开准备后指标减1。
+   * @param job 离开准备阶段的作业对象
+   */
   public void endPreparingJob(Job job) {
     jobsPreparing.decr();
   }
 
+  /**
+   * 统计处于运行阶段的作业数量，进入运行后指标加1。
+   * @param job 进入运行阶段的作业对象
+   */
   public void runningJob(Job job) {
     jobsRunning.incr();
   }
 
+  /**
+   * 统计处于运行阶段的作业数量，离开运行后指标减1。
+   * @param job 离开运行阶段的作业对象
+   */
   public void endRunningJob(Job job) {
     jobsRunning.decr();
   }
 
+  /**
+   * 统计已启动的任务数量，按任务类型分类计数，同时更新等待状态指标。
+   * @param task 启动的任务对象
+   */
   public void launchedTask(Task task) {
     switch (task.getType()) {
       case MAP:
@@ -105,6 +155,10 @@ public class MRAppMetrics {
     endWaitingTask(task);
   }
 
+  /**
+   * 统计完成的任务数量，按任务类型分类计数。
+   * @param task 完成的任务对象
+   */
   public void completedTask(Task task) {
     switch (task.getType()) {
       case MAP:
@@ -116,6 +170,10 @@ public class MRAppMetrics {
     }
   }
 
+  /**
+   * 统计失败的任务数量，按任务类型分类计数。
+   * @param task 失败的任务对象
+   */
   public void failedTask(Task task) {
     switch (task.getType()) {
       case MAP:
@@ -127,6 +185,10 @@ public class MRAppMetrics {
     }
   }
 
+  /**
+   * 统计被杀死的任务数量，按任务类型分类计数。
+   * @param task 被杀死的任务对象
+   */
   public void killedTask(Task task) {
     switch (task.getType()) {
       case MAP:
@@ -138,6 +200,10 @@ public class MRAppMetrics {
     }
   }
 
+  /**
+   * 统计处于运行状态的任务数量，进入运行后按类型指标加1。
+   * @param task 进入运行状态的任务对象
+   */
   public void runningTask(Task task) {
     switch (task.getType()) {
       case MAP:
@@ -149,6 +215,10 @@ public class MRAppMetrics {
     }
   }
 
+  /**
+   * 统计处于运行状态的任务数量，退出运行后按类型指标减1。
+   * @param task 退出运行状态的任务对象
+   */
   public void endRunningTask(Task task) {
     switch (task.getType()) {
       case MAP:
@@ -160,6 +230,10 @@ public class MRAppMetrics {
     }
   }
 
+  /**
+   * 统计处于等待状态的任务数量，进入等待后按类型指标加1。
+   * @param task 进入等待状态的任务对象
+   */
   public void waitingTask(Task task) {
     switch (task.getType()) {
       case MAP:
@@ -170,6 +244,10 @@ public class MRAppMetrics {
     }
   }
 
+  /**
+   * 统计处于等待状态的任务数量，退出等待后按类型指标减1。
+   * @param task 退出等待状态的任务对象
+   */
   public void endWaitingTask(Task task) {
     switch (task.getType()) {
       case MAP:

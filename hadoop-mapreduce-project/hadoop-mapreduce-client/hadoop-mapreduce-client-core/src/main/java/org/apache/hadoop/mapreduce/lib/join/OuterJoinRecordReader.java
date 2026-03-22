@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,20 +28,33 @@ import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
 
 /**
- * Full outer join.
+ * 全外连接记录读取器，实现MapReduce端的全外连接逻辑
+ * 全外连接会保留所有输入中匹配和不匹配的记录，对于不匹配的键对应位置填充空值
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class OuterJoinRecordReader<K extends WritableComparable<?>>
     extends JoinRecordReader<K> {
 
+  /**
+   * 构造全外连接记录读取器
+   * @param id 读取器标识ID
+   * @param conf 作业配置对象
+   * @param capacity 元组容纳的最大元素数量
+   * @param cmpcl 键比较器类
+   * @throws IOException 初始化过程中发生IO异常
+   */
   OuterJoinRecordReader(int id, Configuration conf, int capacity,
       Class<? extends WritableComparator> cmpcl) throws IOException {
     super(id, conf, capacity, cmpcl);
   }
 
   /**
-   * Emit everything from the collector.
+   * 组合不同来源的记录，全外连接总是输出所有收集到的元组
+   * 无论键是否在所有输入都存在，都输出该元组
+   * @param srcs 不同输入来源的记录值数组
+   * @param dst 输出结果元组
+   * @return 总是返回true，表示所有组合都需要输出
    */
   protected boolean combine(Object[] srcs, TupleWritable dst) {
     assert srcs.length == dst.size();

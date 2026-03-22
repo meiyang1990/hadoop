@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -29,6 +30,10 @@ import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 import org.apache.hadoop.yarn.proto.YarnProtos.ApplicationAttemptIdProto;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 
+/**
+ * AMInfo的Protobuf实现，基于ProtoBase实现AM信息的序列化与反序列化，
+ * 存储MapReduce ApplicationMaster的运行基本信息，用于RPC通信和状态持久化。
+ */
 public class AMInfoPBImpl extends ProtoBase<AMInfoProto> implements AMInfo {
 
   AMInfoProto proto = AMInfoProto.getDefaultInstance();
@@ -38,15 +43,23 @@ public class AMInfoPBImpl extends ProtoBase<AMInfoProto> implements AMInfo {
   private ApplicationAttemptId appAttemptId;
   private ContainerId containerId;
   
+  /**
+   * 无参构造函数，初始化Protobuf构建器。
+   */
   public AMInfoPBImpl() {
     builder = AMInfoProto.newBuilder();
   }
 
+  /**
+   * 通过已有的AMInfoProto构造AMInfoPBImpl对象。
+   * @param proto 已构建完成的AMInfoProto实例
+   */
   public AMInfoPBImpl(AMInfoProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  @Override
   public synchronized AMInfoProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -54,6 +67,9 @@ public class AMInfoPBImpl extends ProtoBase<AMInfoProto> implements AMInfo {
     return proto;
   }
 
+  /**
+   * 将本地缓存的对象字段合并到Protobuf Builder中。
+   */
   private synchronized void mergeLocalToBuilder() {
     if (this.appAttemptId != null
         && !((ApplicationAttemptIdPBImpl) this.appAttemptId).getProto().equals(
@@ -67,6 +83,9 @@ public class AMInfoPBImpl extends ProtoBase<AMInfoProto> implements AMInfo {
     }
   }
 
+  /**
+   * 将本地修改合并到最终的Protobuf对象中。
+   */
   private synchronized void mergeLocalToProto() {
     if (viaProto)
       maybeInitBuilder();
@@ -75,6 +94,9 @@ public class AMInfoPBImpl extends ProtoBase<AMInfoProto> implements AMInfo {
     viaProto = true;
   }
 
+  /**
+   * 如果当前是Proto模式，初始化Builder用于修改。
+   */
   private synchronized void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = AMInfoProto.newBuilder(proto);
@@ -181,20 +203,40 @@ public class AMInfoPBImpl extends ProtoBase<AMInfoProto> implements AMInfo {
     builder.setNodeManagerHttpPort(httpPort);
   }
 
+  /**
+   * 将Protobuf格式的ApplicationAttemptId转换为API层对象。
+   * @param p Protobuf格式的ApplicationAttemptId
+   * @return API层ApplicationAttemptId对象
+   */
   private ApplicationAttemptIdPBImpl convertFromProtoFormat(
       ApplicationAttemptIdProto p) {
     return new ApplicationAttemptIdPBImpl(p);
   }
 
+  /**
+   * 将Protobuf格式的ContainerId转换为API层对象。
+   * @param p Protobuf格式的ContainerId
+   * @return API层ContainerId对象
+   */
   private ContainerIdPBImpl convertFromProtoFormat(ContainerIdProto p) {
     return new ContainerIdPBImpl(p);
   }
 
+  /**
+   * 将API层ApplicationAttemptId转换为Protobuf格式。
+   * @param t API层ApplicationAttemptId对象
+   * @return Protobuf格式的ApplicationAttemptId
+   */
   private
       ApplicationAttemptIdProto convertToProtoFormat(ApplicationAttemptId t) {
     return ((ApplicationAttemptIdPBImpl) t).getProto();
   }
 
+  /**
+   * 将API层ContainerId转换为Protobuf格式。
+   * @param t API层ContainerId对象
+   * @return Protobuf格式的ContainerId
+   */
   private ContainerIdProto convertToProtoFormat(ContainerId t) {
     return ((ContainerIdPBImpl) t).getProto();
   }

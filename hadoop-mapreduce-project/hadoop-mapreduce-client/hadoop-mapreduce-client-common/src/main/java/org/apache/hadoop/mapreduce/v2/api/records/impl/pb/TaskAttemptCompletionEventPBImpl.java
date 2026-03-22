@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,25 +30,41 @@ import org.apache.hadoop.mapreduce.v2.proto.MRProtos.TaskAttemptIdProto;
 import org.apache.hadoop.mapreduce.v2.util.MRProtoUtils;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 
-
-    
+/**
+ * 任务尝试完成事件的Protobuf序列化实现，基于ProtoBase实现，负责MapReduce任务尝试完成事件的PB格式转换与存储
+ * 是Hadoop MapReduce API层记录类型的PB实现，用于RPC通信中的序列化与反序列化
+ */
 public class TaskAttemptCompletionEventPBImpl extends ProtoBase<TaskAttemptCompletionEventProto> implements TaskAttemptCompletionEvent {
+  // Protobuf默认实例，当通过只读模式访问时使用
   TaskAttemptCompletionEventProto proto = TaskAttemptCompletionEventProto.getDefaultInstance();
+  // Protobuf构建器，当修改对象状态时使用
   TaskAttemptCompletionEventProto.Builder builder = null;
+  // 当前是否通过现有proto实例构建标记
   boolean viaProto = false;
   
+  // 缓存任务尝试ID对象，避免重复转换
   private TaskAttemptId taskAttemptId = null;
   
-  
+  /**
+   * 空构造函数，初始化Protobuf构建器
+   */
   public TaskAttemptCompletionEventPBImpl() {
     builder = TaskAttemptCompletionEventProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造实现类
+   * @param proto 已构造完成的TaskAttemptCompletionEventProto实例
+   */
   public TaskAttemptCompletionEventPBImpl(TaskAttemptCompletionEventProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
+  /**
+   * 获取当前对象对应的Protobuf实例，合并本地修改后生成最终proto
+   * @return 序列化完成的TaskAttemptCompletionEventProto实例
+   */
   public TaskAttemptCompletionEventProto getProto() {
       mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -55,12 +72,18 @@ public class TaskAttemptCompletionEventPBImpl extends ProtoBase<TaskAttemptCompl
     return proto;
   }
 
+  /**
+   * 将本地缓存的领域对象合并到Protobuf构建器中
+   */
   private void mergeLocalToBuilder() {
     if (this.taskAttemptId != null) {
       builder.setAttemptId(convertToProtoFormat(this.taskAttemptId));
     }
   }
 
+  /**
+   * 将本地修改合并到Protobuf实例中
+   */
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -69,6 +92,9 @@ public class TaskAttemptCompletionEventPBImpl extends ProtoBase<TaskAttemptCompl
     viaProto = true;
   }
 
+  /**
+   * 如果当前是只读proto模式，初始化构建器以便修改
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = TaskAttemptCompletionEventProto.newBuilder(proto);
@@ -86,6 +112,7 @@ public class TaskAttemptCompletionEventPBImpl extends ProtoBase<TaskAttemptCompl
     if (!p.hasAttemptId()) {
       return null;
     }
+    // 从Protobuf格式转换为领域对象并缓存
     this.taskAttemptId = convertFromProtoFormat(p.getAttemptId());
     return this.taskAttemptId;
   }
@@ -97,12 +124,14 @@ public class TaskAttemptCompletionEventPBImpl extends ProtoBase<TaskAttemptCompl
       builder.clearAttemptId();
     this.taskAttemptId = attemptId;
   }
+
   @Override
   public TaskAttemptCompletionEventStatus getStatus() {
     TaskAttemptCompletionEventProtoOrBuilder p = viaProto ? proto : builder;
     if (!p.hasStatus()) {
       return null;
     }
+    // 从Protobuf枚举转换为领域枚举
     return convertFromProtoFormat(p.getStatus());
   }
 
@@ -113,8 +142,10 @@ public class TaskAttemptCompletionEventPBImpl extends ProtoBase<TaskAttemptCompl
       builder.clearStatus();
       return;
     }
+    // 将领域枚举转换为Protobuf枚举
     builder.setStatus(convertToProtoFormat(status));
   }
+
   @Override
   public String getMapOutputServerAddress() {
     TaskAttemptCompletionEventProtoOrBuilder p = viaProto ? proto : builder;
@@ -133,6 +164,7 @@ public class TaskAttemptCompletionEventPBImpl extends ProtoBase<TaskAttemptCompl
     }
     builder.setMapOutputServerAddress((mapOutputServerAddress));
   }
+
   @Override
   public int getAttemptRunTime() {
     TaskAttemptCompletionEventProtoOrBuilder p = viaProto ? proto : builder;
@@ -144,6 +176,7 @@ public class TaskAttemptCompletionEventPBImpl extends ProtoBase<TaskAttemptCompl
     maybeInitBuilder();
     builder.setAttemptRunTime((attemptRunTime));
   }
+
   @Override
   public int getEventId() {
     TaskAttemptCompletionEventProtoOrBuilder p = viaProto ? proto : builder;
@@ -156,22 +189,40 @@ public class TaskAttemptCompletionEventPBImpl extends ProtoBase<TaskAttemptCompl
     builder.setEventId((eventId));
   }
 
+  /**
+   * 将Protobuf格式的TaskAttemptId转换为PBImpl领域对象
+   * @param p Protobuf格式的TaskAttemptIdProto
+   * @return 转换后的TaskAttemptIdPBImpl实例
+   */
   private TaskAttemptIdPBImpl convertFromProtoFormat(TaskAttemptIdProto p) {
     return new TaskAttemptIdPBImpl(p);
   }
 
+  /**
+   * 将领域格式的TaskAttemptId转换为Protobuf格式
+   * @param t 领域对象TaskAttemptId
+   * @return Protobuf格式的TaskAttemptIdProto
+   */
   private TaskAttemptIdProto convertToProtoFormat(TaskAttemptId t) {
     return ((TaskAttemptIdPBImpl)t).getProto();
   }
 
+  /**
+   * 将领域枚举TaskAttemptCompletionEventStatus转换为Protobuf枚举
+   * @param e 领域枚举实例
+   * @return Protobuf枚举实例
+   */
   private TaskAttemptCompletionEventStatusProto convertToProtoFormat(TaskAttemptCompletionEventStatus e) {
     return MRProtoUtils.convertToProtoFormat(e);
   }
 
+  /**
+   * 将Protobuf枚举转换为领域枚举TaskAttemptCompletionEventStatus
+   * @param e Protobuf枚举实例
+   * @return 领域枚举实例
+   */
   private TaskAttemptCompletionEventStatus convertFromProtoFormat(TaskAttemptCompletionEventStatusProto e) {
     return MRProtoUtils.convertFromProtoFormat(e);
   }
 
-
-
-}  
+}

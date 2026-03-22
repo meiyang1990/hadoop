@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,25 +32,37 @@ import org.apache.hadoop.mapred.TextInputFormat;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
- * Dummy input format used when non-Java a {@link RecordReader} is used by
- * the Pipes' application.
- *
- * The only useful thing this does is set up the Map-Reduce job to get the
- * {@link PipesDummyRecordReader}, everything else left for the 'actual'
- * InputFormat specified by the user which is given by 
- * <i>mapreduce.pipes.inputformat</i>.
+ * Pipes非Java输入格式，供Pipes应用使用非Java RecordReader时使用
+ * 
+ * 该类仅作为占位实现，负责提供占位用的PipesDummyRecordReader，输入分片生成功能
+ * 委托给用户通过mapreduce.pipes.inputformat配置指定的真实输入格式类完成
  */
 class PipesNonJavaInputFormat 
 implements InputFormat<FloatWritable, NullWritable> {
 
+  /**
+   * 获取记录读取器，返回占位用的虚拟记录读取器
+   * @param genericSplit 输入分片
+   * @param job 作业配置
+   * @param reporter 进度报告器
+   * @return 虚拟记录读取器实例
+   * @throws IOException IO异常
+   */
   public RecordReader<FloatWritable, NullWritable> getRecordReader(
       InputSplit genericSplit, JobConf job, Reporter reporter)
       throws IOException {
     return new PipesDummyRecordReader(job, genericSplit);
   }
   
+  /**
+   * 生成输入分片，委托给用户配置的真实输入格式类完成分片生成
+   * @param job 作业配置
+   * @param numSplits 期望分片数量
+   * @return 生成的输入分片数组
+   * @throws IOException IO异常
+   */
   public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
-    // Delegate the generation of input splits to the 'original' InputFormat
+    // 委托给用户配置的原始输入格式生成分片
     return ReflectionUtils.newInstance(
         job.getClass(Submitter.INPUT_FORMAT, 
                      TextInputFormat.class, 
@@ -57,16 +70,13 @@ implements InputFormat<FloatWritable, NullWritable> {
   }
 
   /**
-   * A dummy {@link org.apache.hadoop.mapred.RecordReader} to help track the
-   * progress of Hadoop Pipes' applications when they are using a non-Java
-   * <code>RecordReader</code>.
-   *
-   * The <code>PipesDummyRecordReader</code> is informed of the 'progress' of
-   * the task by the {@link OutputHandler#progress(float)} which calls the
-   * {@link #next(FloatWritable, NullWritable)} with the progress as the
-   * <code>key</code>.
+   * 虚拟记录读取器，用于Pipes应用使用非Java RecordReader时跟踪任务进度
+   * 
+   * 非Java端通过OutputHandler#progress上报进度，进度值作为key传入next方法，
+   * 本类保存进度值供框架查询，从而实现非Java任务进度对Hadoop框架的可见性
    */
   static class PipesDummyRecordReader implements RecordReader<FloatWritable, NullWritable> {
+    // 当前任务进度，范围[0.0, 1.0]
     float progress = 0.0f;
     
     public PipesDummyRecordReader(Configuration job, InputSplit split)
@@ -88,10 +98,21 @@ implements InputFormat<FloatWritable, NullWritable> {
       return 0;
     }
 
+    /**
+     * 获取当前任务进度
+     * @return 当前进度值[0.0, 1.0]
+     */
     public float getProgress() {
       return progress;
     }
 
+    /**
+     * 接收非Java端上报的进度，更新进度值
+     * @param key 封装了进度值的FloatWritable对象
+     * @param value 占位值，未使用
+     * @return 始终返回true，表示还有进度可接收
+     * @throws IOException IO异常
+     */
     public synchronized boolean next(FloatWritable key, NullWritable value)
         throws IOException {
       progress = key.get();

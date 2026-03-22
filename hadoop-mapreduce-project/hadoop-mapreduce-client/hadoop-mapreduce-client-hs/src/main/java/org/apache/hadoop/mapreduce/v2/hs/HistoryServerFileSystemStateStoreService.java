@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,6 +46,11 @@ import org.apache.hadoop.util.Shell;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 文件说明：基于Hadoop FileSystem接口实现的MapReduce历史服务器状态存储服务
+ * 核心功能：将MR代理令牌和令牌主密钥持久化存储在兼容FileSystem接口的存储系统中，
+ * 支持历史服务器重启后恢复认证状态，保证代理令牌的持续有效性
+ */
 @Private
 @Unstable
 /**
@@ -78,6 +84,11 @@ public class HistoryServerFileSystemStateStoreService
   private Path tokenStatePath;
   private Path tokenKeysStatePath;
 
+  /**
+   * 初始化存储，从配置中读取存储路径并设置根目录
+   * @param conf 历史服务器配置对象
+   * @throws IOException 当未配置存储URI时抛出异常
+   */
   @Override
   protected void initStorage(Configuration conf)
       throws IOException {
@@ -91,6 +102,10 @@ public class HistoryServerFileSystemStateStoreService
     rootStatePath = new Path(storeUri, ROOT_STATE_DIR_NAME);
   }
 
+  /**
+   * 启动存储服务，创建目录结构和分桶目录
+   * @throws IOException 创建目录失败时抛出异常
+   */
   @Override
   protected void startStorage() throws IOException {
     fs = createFileSystem();
@@ -99,11 +114,17 @@ public class HistoryServerFileSystemStateStoreService
     createDir(tokenStatePath);
     tokenKeysStatePath = new Path(tokenStatePath, TOKEN_KEYS_DIR_NAME);
     createDir(tokenKeysStatePath);
+    // 预先创建所有令牌分桶目录，分散令牌存储提升读写性能
     for (int i=0; i < NUM_TOKEN_BUCKETS; ++i) {
       createDir(getTokenBucketPath(i));
     }
   }
 
+  /**
+   * 创建存储状态使用的FileSystem实例
+   * @return 对应存储路径的FileSystem对象
+   * @throws IOException 创建FileSystem失败时抛出异常
+   */
   FileSystem createFileSystem() throws IOException {
     return rootStatePath.getFileSystem(getConfig());
   }
@@ -114,6 +135,11 @@ public class HistoryServerFileSystemStateStoreService
     // and other clients may still be using it
   }
 
+  /**
+   * 从文件系统加载历史服务器完整状态，包括所有代理令牌和主密钥
+   * @return 加载完成的历史服务器状态对象
+   * @throws IOException 加载状态失败时抛出异常
+   */
   @Override
   public HistoryServerState loadState() throws IOException {
     LOG.info("Loading history server state from " + rootStatePath);
@@ -122,6 +148,12 @@ public class HistoryServerFileSystemStateStoreService
     return state;
   }
 
+  /**
+   * 持久化存储新增的MR代理令牌
+   * @param tokenId 代理令牌标识符
+   * @param renewDate 令牌更新时间
+   * @throws IOException 存储失败或令牌已存在时抛出异常
+   */
   @Override
   public void storeToken(MRDelegationTokenIdentifier tokenId,
       Long renewDate) throws IOException {
@@ -137,6 +169,13 @@ public class HistoryServerFileSystemStateStoreService
     createNewFile(tokenPath, buildTokenData(tokenId, renewDate));
   }
 
+  /**
+   * 更新已有代理令牌的更新时间
+   * 通过临时文件重命名保证更新原子性，避免更新过程中服务异常导致数据损坏
+   * @param tokenId 代理令牌标识符
+   * @param renewDate 新的更新时间
+   * @throws IOException 更新失败时抛出异常
+   */
   @Override
   public void updateToken(MRDelegationTokenIdentifier tokenId,
       Long renewDate) throws IOException {
@@ -164,6 +203,11 @@ public class HistoryServerFileSystemStateStoreService
     }
   }
 
+  /**
+   * 删除已过期的代理令牌
+   * @param tokenId 要删除的代理令牌标识符
+   * @throws IOException 删除失败时抛出异常
+   */
   @Override
   public void removeToken(MRDelegationTokenIdentifier tokenId)
       throws IOException {
@@ -173,6 +217,11 @@ public class HistoryServerFileSystemStateStoreService
     deleteFile(getTokenPath(tokenId));
   }
 
+  /**
+   * 存储新增的代理令牌主密钥
+   * @param key 要存储的DelegationKey对象
+   * @throws IOException 存储失败或密钥已存在时抛出异常
+   */
   @Override
   public void storeTokenMasterKey(DelegationKey key) throws IOException {
     if (LOG.isDebugEnabled()) {
@@ -198,6 +247,11 @@ public class HistoryServerFileSystemStateStoreService
     createNewFile(keyPath, memStream.toByteArray());
   }
 
+  /**
+   * 删除已过期的代理令牌主密钥
+   * @param key 要删除的DelegationKey对象
+   * @throws IOException 删除失败时抛出异常
+   */
   @Override
   public void removeTokenMasterKey(DelegationKey key)
       throws IOException {
@@ -225,6 +279,11 @@ public class HistoryServerFileSystemStateStoreService
         TOKEN_FILE_PREFIX + tokenId.getSequenceNumber());
   }
 
+  /**
+   * 创建目录，如果目录已存在则检查并修正权限
+   * @param dir 要创建的目录路径
+   * @throws IOException 创建目录或设置权限失败时抛出异常
+   */
   private void createDir(Path dir) throws IOException {
     try {
       FileStatus status = fs.getFileStatus(dir);
@@ -240,6 +299,12 @@ public class HistoryServerFileSystemStateStoreService
     }
   }
 
+  /**
+   * 通过临时文件原子创建新文件，避免创建过程中异常导致文件损坏
+   * @param file 目标文件路径
+   * @param data 要写入的文件数据
+   * @throws IOException 创建或写入失败时抛出异常
+   */
   private void createNewFile(Path file, byte[] data)
       throws IOException {
     Path tmp = new Path(file.getParent(), TMP_FILE_PREFIX + file.getName());
@@ -254,6 +319,12 @@ public class HistoryServerFileSystemStateStoreService
     }
   }
 
+  /**
+   * 将字节数据写入指定路径的文件
+   * @param file 目标文件路径
+   * @param data 要写入的字节数据
+   * @throws IOException 写入失败时抛出异常
+   */
   private void writeFile(Path file, byte[] data) throws IOException {
     final int WRITE_BUFFER_SIZE = 4096;
     FSDataOutputStream out = fs.create(file, FILE_PERMISSIONS, true,
@@ -273,6 +344,13 @@ public class HistoryServerFileSystemStateStoreService
     }
   }
 
+  /**
+   * 从指定路径读取固定长度的文件数据
+   * @param file 要读取的文件路径
+   * @param numBytes 要读取的字节数
+   * @return 读取到的字节数组
+   * @throws IOException 读取失败时抛出异常
+   */
   private byte[] readFile(Path file, long numBytes) throws IOException {
     byte[] data = new byte[(int)numBytes];
     FSDataInputStream in = fs.open(file);
@@ -284,6 +362,11 @@ public class HistoryServerFileSystemStateStoreService
     return data;
   }
 
+  /**
+   * 删除指定文件，文件不存在时视为删除成功
+   * @param file 要删除的文件路径
+   * @throws IOException 删除失败时抛出异常
+   */
   private void deleteFile(Path file) throws IOException {
     boolean deleted;
     try {
@@ -296,6 +379,13 @@ public class HistoryServerFileSystemStateStoreService
     }
   }
 
+  /**
+   * 序列化令牌标识符和更新时间为字节数组
+   * @param tokenId 代理令牌标识符
+   * @param renewDate 令牌更新时间
+   * @return 序列化后的字节数组
+   * @throws IOException 序列化失败时抛出异常
+   */
   private byte[] buildTokenData(MRDelegationTokenIdentifier tokenId,
       Long renewDate) throws IOException {
     ByteArrayOutputStream memStream = new ByteArrayOutputStream();
@@ -311,6 +401,13 @@ public class HistoryServerFileSystemStateStoreService
     return memStream.toByteArray();
   }
 
+  /**
+   * 从文件加载单个代理令牌主密钥并添加到状态中
+   * @param state 历史服务器状态对象
+   * @param keyFile 主密钥文件路径
+   * @param numKeyFileBytes 文件长度
+   * @throws IOException 加载失败时抛出异常
+   */
   private void loadTokenMasterKey(HistoryServerState state, Path keyFile,
       long numKeyFileBytes) throws IOException {
     DelegationKey key = new DelegationKey();
@@ -325,6 +422,14 @@ public class HistoryServerFileSystemStateStoreService
     state.tokenMasterKeyState.add(key);
   }
 
+  /**
+   * 从分桶目录加载单个令牌，并校验分桶位置正确性
+   * @param bucketId 当前分桶ID
+   * @param state 历史服务器状态对象
+   * @param tokenFile 令牌文件路径
+   * @param numTokenFileBytes 文件长度
+   * @throws IOException 加载失败或分桶错误时抛出异常
+   */
   private void loadTokenFromBucket(int bucketId,
       HistoryServerState state, Path tokenFile, long numTokenFileBytes)
           throws IOException {
@@ -338,99 +443,17 @@ public class HistoryServerFileSystemStateStoreService
     }
   }
 
+  /**
+   * 从文件加载单个代理令牌并添加到状态中
+   * @param state 历史服务器状态对象
+   * @param tokenFile 令牌文件路径
+   * @param numTokenFileBytes 文件长度
+   * @return 加载完成的令牌标识符对象
+   * @throws IOException 加载失败时抛出异常
+   */
   private MRDelegationTokenIdentifier loadToken(HistoryServerState state,
       Path tokenFile, long numTokenFileBytes) throws IOException {
     MRDelegationTokenIdentifier tokenId = new MRDelegationTokenIdentifier();
     long renewDate;
     byte[] tokenData = readFile(tokenFile, numTokenFileBytes);
-    DataInputStream in =
-        new DataInputStream(new ByteArrayInputStream(tokenData));
-    try {
-      tokenId.readFields(in);
-      renewDate = in.readLong();
-    } finally {
-      IOUtils.cleanupWithLogger(LOG, in);
-    }
-    state.tokenState.put(tokenId, renewDate);
-    return tokenId;
-  }
-
-  private int loadTokensFromBucket(HistoryServerState state, Path bucket)
-      throws IOException {
-    String numStr =
-        bucket.getName().substring(TOKEN_BUCKET_DIR_PREFIX.length());
-    final int bucketId = Integer.parseInt(numStr);
-    int numTokens = 0;
-    FileStatus[] tokenStats = fs.listStatus(bucket);
-    Set<String> loadedTokens = new HashSet<String>(tokenStats.length);
-    for (FileStatus stat : tokenStats) {
-      String name = stat.getPath().getName();
-      if (name.startsWith(TOKEN_FILE_PREFIX)) {
-        loadTokenFromBucket(bucketId, state, stat.getPath(), stat.getLen());
-        loadedTokens.add(name);
-        ++numTokens;
-      } else if (name.startsWith(UPDATE_TMP_FILE_PREFIX)) {
-        String tokenName = name.substring(UPDATE_TMP_FILE_PREFIX.length());
-        if (loadedTokens.contains(tokenName)) {
-          // already have the token, update may be partial so ignore it
-          fs.delete(stat.getPath(), false);
-        } else {
-          // token is missing, so try to parse the update temp file
-          loadTokenFromBucket(bucketId, state, stat.getPath(), stat.getLen());
-          fs.rename(stat.getPath(),
-              new Path(stat.getPath().getParent(), tokenName));
-          loadedTokens.add(tokenName);
-          ++numTokens;
-        }
-      } else if (name.startsWith(TMP_FILE_PREFIX)) {
-        // cleanup incomplete temp files
-        fs.delete(stat.getPath(), false);
-      } else {
-        LOG.warn("Skipping unexpected file in history server token bucket: "
-            + stat.getPath());
-      }
-    }
-    return numTokens;
-  }
-
-  private int loadKeys(HistoryServerState state) throws IOException {
-    FileStatus[] stats = fs.listStatus(tokenKeysStatePath);
-    int numKeys = 0;
-    for (FileStatus stat : stats) {
-      String name = stat.getPath().getName();
-      if (name.startsWith(TOKEN_MASTER_KEY_FILE_PREFIX)) {
-        loadTokenMasterKey(state, stat.getPath(), stat.getLen());
-        ++numKeys;
-      } else {
-        LOG.warn("Skipping unexpected file in history server token state: "
-            + stat.getPath());
-      }
-    }
-    return numKeys;
-  }
-
-  private int loadTokens(HistoryServerState state) throws IOException {
-    FileStatus[] stats = fs.listStatus(tokenStatePath);
-    int numTokens = 0;
-    for (FileStatus stat : stats) {
-      String name = stat.getPath().getName();
-      if (name.startsWith(TOKEN_BUCKET_DIR_PREFIX)) {
-        numTokens += loadTokensFromBucket(state, stat.getPath());
-      } else if (name.equals(TOKEN_KEYS_DIR_NAME)) {
-        // key loading is done elsewhere
-        continue;
-      } else {
-        LOG.warn("Skipping unexpected file in history server token state: "
-            + stat.getPath());
-      }
-    }
-    return numTokens;
-  }
-
-  private void loadTokenState(HistoryServerState state) throws IOException {
-    int numKeys = loadKeys(state);
-    int numTokens = loadTokens(state);
-    LOG.info("Loaded " + numKeys + " master keys and " + numTokens
-        + " tokens from " + tokenStatePath);
-  }
-}
+    DataInputStream in

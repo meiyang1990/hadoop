@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,8 +28,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
- * A class that allows a map/red job to work on a sample of sequence files.
- * The sample is decided by the filter class set by the job.
+ * 文件功能说明：SequenceFile文件的输入格式过滤器，支持通过自定义过滤规则对SequenceFile中的记录进行采样，
+ * 允许MapReduce作业只处理符合过滤条件的记录样本，常用于数据采样场景。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -41,11 +42,13 @@ public class SequenceFileInputFilter<K, V>
   public SequenceFileInputFilter() {
   }
     
-  /** Create a record reader for the given split
-   * @param split file split
-   * @param job job configuration
-   * @param reporter reporter who sends report to task tracker
-   * @return RecordReader
+  /**
+   * 为指定输入分片创建记录读取器，应用过滤规则读取记录
+   * @param split 待处理的文件分片
+   * @param job 作业配置对象
+   * @param reporter 任务进度上报器
+   * @return 过滤后的记录读取器
+   * @throws IOException 创建读取器时IO异常
    */
   public RecordReader<K, V> getRecordReader(InputSplit split,
                                       JobConf job, Reporter reporter)
@@ -57,10 +60,10 @@ public class SequenceFileInputFilter<K, V>
   }
 
 
-  /** set the filter class
-   * 
-   * @param conf application configuration
-   * @param filterClass filter class
+  /**
+   * 将指定过滤类设置到作业配置中，指定作业使用的过滤实现
+   * @param conf 应用配置对象
+   * @param filterClass 过滤类的Class对象
    */
   public static void setFilterClass(Configuration conf, Class filterClass) {
     conf.set(FILTER_CLASS, filterClass.getName());
@@ -68,25 +71,32 @@ public class SequenceFileInputFilter<K, V>
 
          
   /**
-   * filter interface
+   * 过滤器接口，定义记录过滤的统一契约
    */
   public interface Filter extends 
       org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFilter.Filter {
   }
     
   /**
-   * base class for Filters
+   * 过滤器抽象基类，为所有过滤器提供公共基础实现
    */
   public static abstract class FilterBase extends org.apache.hadoop.mapreduce.
       lib.input.SequenceFileInputFilter.FilterBase
       implements Filter {
   }
     
-  /** Records filter by matching key to regex
+  /**
+   * 基于正则表达式的过滤器，仅保留键匹配正则表达式的记录
    */
   public static class RegexFilter extends FilterBase {
     org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFilter.
       RegexFilter rf;
+    /**
+     * 将正则表达式模式保存到配置中
+     * @param conf 配置对象
+     * @param regex 正则表达式字符串
+     * @throws PatternSyntaxException 正则语法错误时抛出
+     */
     public static void setPattern(Configuration conf, String regex)
         throws PatternSyntaxException {
       org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFilter.
@@ -98,33 +108,36 @@ public class SequenceFileInputFilter<K, V>
              RegexFilter();
     }
         
-    /** configure the Filter by checking the configuration
+    /**
+     * 从配置中加载正则表达式，初始化过滤器
+     * @param conf 配置对象
      */
     public void setConf(Configuration conf) {
       rf.setConf(conf);
     }
 
 
-    /** Filtering method
-     * If key matches the regex, return true; otherwise return false
-     * @see org.apache.hadoop.mapred.SequenceFileInputFilter.Filter#accept(Object)
+    /**
+     * 判断当前记录是否符合过滤条件
+     * @param key 记录的键
+     * @return 匹配返回true，保留记录；否则返回false过滤掉记录
      */
     public boolean accept(Object key) {
       return rf.accept(key);
     }
   }
 
-  /** This class returns a percentage of records
-   * The percentage is determined by a filtering frequency <i>f</i> using
-   * the criteria record# % f == 0.
-   * For example, if the frequency is 10, one out of 10 records is returned.
+  /**
+   * 基于百分比采样的过滤器，按照固定频率对记录进行采样，保留符合记录编号取模条件的记录
+   * 例如频率为10时，每10条记录保留1条（记录编号对10取模为0）
    */
   public static class PercentFilter extends FilterBase {
     org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFilter.
 	      PercentFilter pf;
-    /** set the frequency and stores it in conf
-     * @param conf configuration
-     * @param frequency filtering frequencey
+    /**
+     * 将采样频率保存到配置中
+     * @param conf 配置对象
+     * @param frequency 采样频率，每frequency条记录保留1条
      */
     public static void setFrequency(Configuration conf, int frequency) {
        org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFilter.
@@ -136,35 +149,36 @@ public class SequenceFileInputFilter<K, V>
         PercentFilter();
     }
 	        
-    /** configure the filter by checking the configuration
-     * 
-     * @param conf configuration
+    /**
+     * 从配置中加载采样频率，初始化过滤器
+     * @param conf 配置对象
      */
     public void setConf(Configuration conf) {
       pf.setConf(conf);
     }
 
-    /** Filtering method
-     * If record# % frequency==0, return true; otherwise return false
-     * @see org.apache.hadoop.mapred.SequenceFileInputFilter.Filter#accept(Object)
+    /**
+     * 判断当前记录是否符合过滤条件
+     * @param key 记录的键
+     * @return 取模结果为0返回true，保留记录；否则返回false过滤掉记录
      */
     public boolean accept(Object key) {
       return pf.accept(key);
     }
   }
 
-  /** This class returns a set of records by examing the MD5 digest of its
-   * key against a filtering frequency <i>f</i>. The filtering criteria is
-   * MD5(key) % f == 0.
+  /**
+   * 基于MD5哈希的过滤器，对键进行MD5哈希后按频率采样，保留哈希值取模符合条件的记录
+   * 相比百分比采样，MD5采样可以实现更均匀的随机采样，适合乱序数据
    */
   public static class MD5Filter extends FilterBase {
     public static final int MD5_LEN = org.apache.hadoop.mapreduce.lib.
       input.SequenceFileInputFilter.MD5Filter.MD5_LEN;
     org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFilter.MD5Filter mf;
-    /** set the filtering frequency in configuration
-     * 
-     * @param conf configuration
-     * @param frequency filtering frequency
+    /**
+     * 将采样频率保存到配置中
+     * @param conf 配置对象
+     * @param frequency 采样频率，每frequency条记录保留1条
      */
     public static void setFrequency(Configuration conf, int frequency) {
       org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFilter.MD5Filter.
@@ -176,37 +190,54 @@ public class SequenceFileInputFilter<K, V>
         SequenceFileInputFilter.MD5Filter();
     }
         
-    /** configure the filter according to configuration
-     * 
-     * @param conf configuration
+    /**
+     * 从配置中加载采样频率，初始化过滤器
+     * @param conf 配置对象
      */
     public void setConf(Configuration conf) {
       mf.setConf(conf);
     }
 
-    /** Filtering method
-     * If MD5(key) % frequency==0, return true; otherwise return false
-     * @see org.apache.hadoop.mapred.SequenceFileInputFilter.Filter#accept(Object)
+    /**
+     * 判断当前记录是否符合过滤条件
+     * @param key 记录的键
+     * @return MD5哈希值对频率取模为0返回true，保留记录；否则返回false过滤掉记录
      */
     public boolean accept(Object key) {
       return mf.accept(key);
     }
   }
     
+  /**
+   * 封装过滤逻辑的记录读取器，在读取SequenceFile记录时应用过滤规则，只返回符合条件的记录
+   */
   private static class FilterRecordReader<K, V>
     extends SequenceFileRecordReader<K, V> {
     
     private Filter filter;
         
+    /**
+     * 构造过滤读取器，根据配置实例化过滤器
+     * @param conf 作业配置
+     * @param split 文件分片
+     * @throws IOException 读取分片时IO异常
+     */
     public FilterRecordReader(Configuration conf, FileSplit split)
       throws IOException {
       super(conf, split);
-      // instantiate filter
+      // 从配置中实例化过滤器，默认使用百分比过滤器
       filter = (Filter)ReflectionUtils.newInstance(
                                                    conf.getClass(FILTER_CLASS, PercentFilter.class), 
                                                    conf);
     }
         
+    /**
+     * 读取下一条符合过滤条件的记录
+     * @param key 存储读取到的键
+     * @param value 存储读取到的值
+     * @return 成功读取到符合条件的记录返回true，已读完所有记录返回false
+     * @throws IOException 读取记录时IO异常
+     */
     public synchronized boolean next(K key, V value) throws IOException {
       while (next(key)) {
         if (filter.accept(key)) {

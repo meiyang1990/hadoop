@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,43 +26,53 @@ import org.apache.hadoop.mapred.Partitioner;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
- * This partitioner is one that can either be set manually per a record or it
- * can fall back onto a Java partitioner that was set by the user.
+ * Pipes框架的分区器实现，支持C++端手动指定分区，或回退到用户配置的Java分区器
+ * 用于Hadoop Pipes（允许C++编写MapReduce任务）场景，适配混合Java/C++的分区需求
  */
 class PipesPartitioner<K extends WritableComparable,
                        V extends Writable>
   implements Partitioner<K, V> {
   
+  // 线程本地缓存，存储当前记录手动指定的分区编号
   private static final ThreadLocal<Integer> CACHE = new ThreadLocal<Integer>();
+  // 用户配置的备用Java分区器实例
   private Partitioner<K, V> part = null;
   
+  /**
+   * 配置分区器，从作业配置中加载用户指定的Java分区器并实例化
+   * @param conf 作业配置对象
+   */
   @SuppressWarnings("unchecked")
   public void configure(JobConf conf) {
+    // 通过反射创建用户指定的Java分区器实例
     part =
       ReflectionUtils.newInstance(Submitter.getJavaPartitioner(conf), conf);
   }
 
   /**
-   * Set the next key to have the given partition.
-   * @param newValue the next partition value
+   * 设置当前线程下一条记录的手动分区编号，供C++端设置分区使用
+   * @param newValue 下一条记录要使用的分区编号
    */
   static void setNextPartition(int newValue) {
     CACHE.set(newValue);
   }
 
   /**
-   * If a partition result was set manually, return it. Otherwise, we call
-   * the Java partitioner.
-   * @param key the key to partition
-   * @param value the value to partition
-   * @param numPartitions the number of reduces
+   * 计算当前键值对对应的分区编号，优先使用手动指定的分区，否则回退到用户Java分区器
+   * @param key 分区键
+   * @param value 分区值
+   * @param numPartitions Reduce分区总数
+   * @return 最终分区编号
    */
   public int getPartition(K key, V value, 
                           int numPartitions) {
+    // 获取当前线程缓存的手动分区编号
     Integer result = CACHE.get();
+    // 没有手动指定分区时，调用用户Java分区器计算
     if (result == null) {
       return part.getPartition(key, value, numPartitions);
     } else {
+      // 使用手动指定的分区，并清空缓存
       return result;
     }
   }

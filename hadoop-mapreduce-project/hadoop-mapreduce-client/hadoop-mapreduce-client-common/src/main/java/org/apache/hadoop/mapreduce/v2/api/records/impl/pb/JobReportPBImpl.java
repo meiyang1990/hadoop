@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,27 +38,43 @@ import org.apache.hadoop.yarn.api.records.impl.pb.PriorityPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 import org.apache.hadoop.yarn.proto.YarnProtos.PriorityProto;
 
-
-    
+/**
+ * JobReport的Protobuf实现类，基于Protobuf序列化框架，
+ * 负责存储MapReduce作业的运行报告信息，实现作业状态与进度的序列化传递
+ */    
 public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     JobReport {
+  // 缓存的Protobuf对象实例
   JobReportProto proto = JobReportProto.getDefaultInstance();
+  // Protobuf构建器，用于构造修改对象
   JobReportProto.Builder builder = null;
+  // 标记当前是否通过现有Protobuf对象构建
   boolean viaProto = false;
 
+  // 缓存作业ID对象
   private JobId jobId = null;
+  // 缓存ApplicationMaster信息列表
   private List<AMInfo> amInfos = null;
+  // 缓存作业优先级对象
   private Priority jobPriority = null;
 
+  /**
+   * 构造空的JobReportPBImpl对象，初始化Protobuf构建器
+   */
   public JobReportPBImpl() {
     builder = JobReportProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造JobReportPBImpl
+   * @param proto 已有的JobReportProto对象
+   */
   public JobReportPBImpl(JobReportProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
+  @Override
   public synchronized JobReportProto getProto() {
       mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -65,6 +82,9 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     return proto;
   }
 
+  /**
+   * 将本地缓存的自定义对象合并到Protobuf构建器中
+   */
   private synchronized void mergeLocalToBuilder() {
     if (this.jobId != null) {
       builder.setJobId(convertToProtoFormat(this.jobId));
@@ -77,6 +97,9 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     }
   }
 
+  /**
+   * 将本地修改合并生成最终的Protobuf对象
+   */
   private synchronized void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -85,6 +108,9 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     viaProto = true;
   }
 
+  /**
+   * 如果当前是从已有Protobuf构建，初始化Protobuf构建器
+   */
   private synchronized void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = JobReportProto.newBuilder(proto);
@@ -113,6 +139,7 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
       builder.clearJobId();
     this.jobId = jobId;
   }
+
   @Override
   public synchronized JobState getJobState() {
     JobReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -131,6 +158,7 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     }
     builder.setJobState(convertToProtoFormat(jobState));
   }
+
   @Override
   public synchronized float getMapProgress() {
     JobReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -142,6 +170,7 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     maybeInitBuilder();
     builder.setMapProgress((mapProgress));
   }
+
   @Override
   public synchronized float getReduceProgress() {
     JobReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -153,6 +182,7 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     maybeInitBuilder();
     builder.setReduceProgress((reduceProgress));
   }
+
   @Override
   public synchronized float getCleanupProgress() {
     JobReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -164,6 +194,7 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     maybeInitBuilder();
     builder.setCleanupProgress((cleanupProgress));
   }
+
   @Override
   public synchronized float getSetupProgress() {
     JobReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -199,6 +230,7 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     maybeInitBuilder();
     builder.setStartTime((startTime));
   }
+
   @Override
   public synchronized long getFinishTime() {
     JobReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -291,6 +323,9 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
   }
   
   
+  /**
+   * 从Protobuf中lazy初始化AM信息列表
+   */
   private synchronized void initAMInfos() {
     if (this.amInfos != null) {
       return;
@@ -305,6 +340,9 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     }
   }
 
+  /**
+   * 将本地缓存的AM信息列表写入Protobuf构建器
+   */
   private synchronized void addAMInfosToProto() {
     maybeInitBuilder();
     builder.clearAmInfos();
@@ -315,34 +353,74 @@ public class JobReportPBImpl extends ProtoBase<JobReportProto> implements
     }
   }
 
+  /**
+   * 将Protobuf格式的AMInfo转换为本地实现对象
+   * @param p Protobuf格式AMInfo
+   * @return 本地AMInfo实现
+   */
   private AMInfoPBImpl convertFromProtoFormat(AMInfoProto p) {
     return new AMInfoPBImpl(p);
   }
 
+  /**
+   * 将本地AMInfo对象转换为Protobuf格式
+   * @param t 本地AMInfo实现
+   * @return Protobuf格式AMInfo
+   */
   private AMInfoProto convertToProtoFormat(AMInfo t) {
     return ((AMInfoPBImpl)t).getProto();
   }
 
+  /**
+   * 将Protobuf格式的JobId转换为本地实现对象
+   * @param p Protobuf格式JobId
+   * @return 本地JobId实现
+   */
   private JobIdPBImpl convertFromProtoFormat(JobIdProto p) {
     return new JobIdPBImpl(p);
   }
 
+  /**
+   * 将本地JobId对象转换为Protobuf格式
+   * @param t 本地JobId实现
+   * @return Protobuf格式JobId
+   */
   private JobIdProto convertToProtoFormat(JobId t) {
     return ((JobIdPBImpl)t).getProto();
   }
 
+  /**
+   * 将本地JobState枚举转换为Protobuf格式枚举
+   * @param e 本地JobState枚举
+   * @return Protobuf格式JobState枚举
+   */
   private JobStateProto convertToProtoFormat(JobState e) {
     return MRProtoUtils.convertToProtoFormat(e);
   }
 
+  /**
+   * 将Protobuf格式JobState枚举转换为本地枚举
+   * @param e Protobuf格式JobState枚举
+   * @return 本地JobState枚举
+   */
   private JobState convertFromProtoFormat(JobStateProto e) {
     return MRProtoUtils.convertFromProtoFormat(e);
   }
 
+  /**
+   * 将Protobuf格式的Priority转换为本地实现对象
+   * @param p Protobuf格式Priority
+   * @return 本地Priority实现
+   */
   private PriorityPBImpl convertFromProtoFormat(PriorityProto p) {
     return new PriorityPBImpl(p);
   }
 
+  /**
+   * 将本地Priority对象转换为Protobuf格式
+   * @param t 本地Priority实现
+   * @return Protobuf格式Priority
+   */
   private PriorityProto convertToProtoFormat(Priority t) {
     return ((PriorityPBImpl)t).getProto();
   }

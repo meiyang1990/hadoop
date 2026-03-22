@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,6 +26,10 @@ import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.mapreduce.v2.hs.JobHistoryServer;
 import org.apache.hadoop.util.VersionInfo;
 
+/**
+ * 作业历史服务器信息数据传输对象，用于Web REST API返回历史服务器基本信息
+ * 包含服务器启动时间和Hadoop版本构建信息，供前端UI展示
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class HistoryInfo {
@@ -34,6 +39,9 @@ public class HistoryInfo {
   protected String hadoopBuildVersion;
   protected String hadoopVersionBuiltOn;
 
+  /**
+   * 构造历史信息对象，从全局获取历史服务器启动时间和版本信息
+   */
   public HistoryInfo() {
     this.startedOn = JobHistoryServer.historyServerTimeStamp;
     this.hadoopVersion = VersionInfo.getVersion();
@@ -41,18 +49,34 @@ public class HistoryInfo {
     this.hadoopVersionBuiltOn = VersionInfo.getDate();
   }
 
+  /**
+   * 获取Hadoop版本号
+   * @return Hadoop版本字符串
+   */
   public String getHadoopVersion() {
     return this.hadoopVersion;
   }
 
+  /**
+   * 获取Hadoop构建版本信息
+   * @return 包含commit哈希的构建版本字符串
+   */
   public String getHadoopBuildVersion() {
     return this.hadoopBuildVersion;
   }
 
+  /**
+   * 获取Hadoop版本构建日期
+   * @return 构建日期字符串
+   */
   public String getHadoopVersionBuiltOn() {
     return this.hadoopVersionBuiltOn;
   }
 
+  /**
+   * 获取历史服务器启动时间戳
+   * @return 启动时间毫秒时间戳
+   */
   public long getStartedOn() {
     return this.startedOn;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,20 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 
+/**
+ * 终止任务请求接口，定义KillTask RPC请求的数据结构
+ * 用于MapReduce客户端向ApplicationMaster请求终止指定任务
+ */
 public interface KillTaskRequest {
+  /**
+   * 获取需要终止的任务ID
+   * @return 目标任务的TaskId对象
+   */
   public abstract TaskId getTaskId();
   
+  /**
+   * 设置需要终止的任务ID
+   * @param taskId 目标任务的TaskId对象
+   */
   public abstract void setTaskId(TaskId taskId);
 }

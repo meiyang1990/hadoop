@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,25 +34,42 @@ import org.apache.hadoop.mapreduce.v2.proto.MRProtos.CountersProtoOrBuilder;
 import org.apache.hadoop.mapreduce.v2.proto.MRProtos.StringCounterGroupMapProto;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 
-
-    
+/**
+ * 基于Protobuf实现的MapReduce计数器集合实现类
+ * 负责管理多个计数器分组，提供计数器的增删改查和增量更新功能
+ * 维护Java对象模型与Protobuf PB数据结构之间的转换
+ */
 public class CountersPBImpl extends ProtoBase<CountersProto> implements Counters {
+  // Protobuf默认实例，当viaProto为true时使用
   CountersProto proto = CountersProto.getDefaultInstance();
+  // Protobuf构建器，当viaProto为false时使用
   CountersProto.Builder builder = null;
+  // 当前是否使用proto存储数据，false表示使用本地Java对象存储
   boolean viaProto = false;
 
+  // 本地缓存的计数器分组集合，key为分组名称
   private Map<String, CounterGroup> counterGroups = null;
 
-  
+  /**
+   * 构造空的计数器集合对象，初始化Protobuf构建器
+   */
   public CountersPBImpl() {
     builder = CountersProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造计数器集合
+   * @param proto 已有的CountersProto对象
+   */
   public CountersPBImpl(CountersProto proto) {
     this.proto = proto;
     viaProto = true;
   }
-  
+
+  /**
+   * 获取当前计数器集合对应的Protobuf对象，合并本地修改到proto
+   * @return 转换后的CountersProto对象
+   */
   public CountersProto getProto() {
       mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -59,12 +77,18 @@ public class CountersPBImpl extends ProtoBase<CountersProto> implements Counters
     return proto;
   }
 
+  /**
+   * 将本地缓存的计数器分组合并到Protobuf构建器中
+   */
   private void mergeLocalToBuilder() {
     if (this.counterGroups != null) {
       addCounterGroupsToProto();
     }
   }
 
+  /**
+   * 将本地修改合并到Protobuf对象，完成本地到PB的转换
+   */
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -73,6 +97,10 @@ public class CountersPBImpl extends ProtoBase<CountersProto> implements Counters
     viaProto = true;
   }
 
+  /**
+   * 如果当前使用proto存储，则初始化Protobuf构建器
+   * 准备进行本地修改
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = CountersProto.newBuilder(proto);
@@ -80,17 +108,18 @@ public class CountersPBImpl extends ProtoBase<CountersProto> implements Counters
     viaProto = false;
   }
     
-  
   @Override
   public Map<String, CounterGroup> getAllCounterGroups() {
     initCounterGroups();
     return this.counterGroups;
   }
+
   @Override
   public CounterGroup getCounterGroup(String key) {
     initCounterGroups();
     return this.counterGroups.get(key);
   }
+
   @Override
   public Counter getCounter(Enum<?> key) {
     CounterGroup group = getCounterGroup(key.getDeclaringClass().getName());
@@ -116,7 +145,10 @@ public class CountersPBImpl extends ProtoBase<CountersProto> implements Counters
     Counter counter = getCounterGroup(groupName).getCounter(key.name());
     counter.setValue(counter.getValue() + amount);
   }
- 
+
+  /**
+   * 从Protobuf初始化本地缓存的计数器分组集合，懒加载机制
+   */
   private void initCounterGroups() {
     if (this.counterGroups != null) {
       return;
@@ -138,6 +170,9 @@ public class CountersPBImpl extends ProtoBase<CountersProto> implements Counters
     this.counterGroups.putAll(counterGroups);
   }
   
+  /**
+   * 将本地缓存的计数器分组转换后添加到Protobuf构建器
+   */
   private void addCounterGroupsToProto() {
     maybeInitBuilder();
     builder.clearCounterGroups();
@@ -171,27 +206,40 @@ public class CountersPBImpl extends ProtoBase<CountersProto> implements Counters
     };
     builder.addAllCounterGroups(iterable);
   }
+
   @Override
   public void setCounterGroup(String key, CounterGroup val) {
     initCounterGroups();
     this.counterGroups.put(key, val);
   }
+
   @Override
   public void removeCounterGroup(String key) {
     initCounterGroups();
     this.counterGroups.remove(key);
   }
+
   @Override
   public void clearCounterGroups() {
     initCounterGroups();
     this.counterGroups.clear();
   }
 
+  /**
+   * 将Protobuf格式的CounterGroup转换为Java对象实现
+   * @param p Protobuf格式的CounterGroupProto
+   * @return 转换后的CounterGroupPBImpl对象
+   */
   private CounterGroupPBImpl convertFromProtoFormat(CounterGroupProto p) {
     return new CounterGroupPBImpl(p);
   }
 
+  /**
+   * 将Java对象格式的CounterGroup转换为Protobuf格式
+   * @param t Java对象格式的CounterGroup
+   * @return 转换后的CounterGroupProto对象
+   */
   private CounterGroupProto convertToProtoFormat(CounterGroup t) {
     return ((CounterGroupPBImpl)t).getProto();
   }
-}  
+}

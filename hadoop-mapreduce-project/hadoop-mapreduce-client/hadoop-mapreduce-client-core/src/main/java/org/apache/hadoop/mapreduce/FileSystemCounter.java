@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,12 +21,22 @@ package org.apache.hadoop.mapreduce;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 文件系统操作计数器枚举，定义了MapReduce任务中统计文件系统I/O操作的各类指标
+ * 用于收集和监控MapReduce作业运行过程中文件系统的读写流量和操作次数
+ */
 @InterfaceAudience.Private
 public enum FileSystemCounter {
+  /** 总读取字节数 */
   BYTES_READ,
+  /** 总写入字节数 */
   BYTES_WRITTEN,
+  /** 总读操作次数 */
   READ_OPS,
+  /** 大规模读操作次数 */
   LARGE_READ_OPS,
+  /** 总写操作次数 */
   WRITE_OPS,
+  /** 纠删码模式下总读取字节数 */
   BYTES_READ_EC,
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -26,26 +27,30 @@ import static org.apache.hadoop.yarn.webapp.view.JQueryUI.initID;
 import org.apache.hadoop.yarn.webapp.SubView;
 
 /**
- * Render a page that describes a specific job.
+ * 历史服务器端单个MapReduce作业详情页面渲染类
+ * 负责生成作业详情页面的整体框架，并指定作业详情内容区块的渲染实现
  */
 public class HsJobPage extends HsView {
 
-  /*
-   * (non-Javadoc)
-   * @see org.apache.hadoop.mapreduce.v2.hs.webapp.HsView#preHead(org.apache.hadoop.yarn.webapp.hamlet.Hamlet.HTML)
+  /**
+   * 页面head标签渲染前的初始化处理，设置页面标题和导航栏配置
+   * @param html 页面HTML对象
    */
   @Override protected void preHead(Page.HTML<__> html) {
+    // 从请求中获取作业ID参数
     String jobID = $(JOB_ID);
+    // 设置页面标题，处理作业ID缺失的错误情况
     set(TITLE, jobID.isEmpty() ? "Bad request: missing job ID"
                : join("MapReduce Job ", $(JOB_ID)));
+    // 执行通用页面头部初始化
     commonPreHead(html);
-    //Override the nav config from the commonPreHead
+    // 覆盖通用配置，设置导航手风琴菜单默认展开第二个菜单项（作业信息）
     set(initID(ACCORDION, "nav"), "{autoHeight:false, active:1}");
   }
 
   /**
-   * The content of this page is the JobBlock
-   * @return HsJobBlock.class
+   * 获取页面主体内容区块的渲染类
+   * @return 作业详情内容区块渲染类
    */
   @Override protected Class<? extends SubView> content() {
     return HsJobBlock.class;

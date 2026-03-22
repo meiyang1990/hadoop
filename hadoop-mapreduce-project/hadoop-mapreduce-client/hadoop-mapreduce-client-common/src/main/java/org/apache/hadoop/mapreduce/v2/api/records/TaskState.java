@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,10 @@
 
 package org.apache.hadoop.mapreduce.v2.api.records;
 
+/**
+ * MapReduce任务状态枚举，定义了任务从创建到结束的所有可能状态
+ * 用于在YARN和MapReduce框架中标识单个Map/Reduce任务的运行状态
+ */
 public enum TaskState {
   NEW, SCHEDULED, RUNNING, SUCCEEDED, FAILED, KILLED
 }

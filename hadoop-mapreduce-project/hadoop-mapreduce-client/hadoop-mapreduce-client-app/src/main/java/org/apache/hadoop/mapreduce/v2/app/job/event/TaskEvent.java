@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,18 +23,28 @@ import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 
 /**
- * this class encapsulates task related events.
- *
+ * 文件级：MapReduce应用端任务事件基类，封装所有和任务相关的事件公共信息
+ * 类级：任务相关事件的基类，承载任务ID和事件类型信息，供不同具体任务事件继承扩展
  */
 public class TaskEvent extends AbstractEvent<TaskEventType> {
 
+  // 关联的任务ID
   private TaskId taskID;
 
+  /**
+   * 构造任务事件对象，关联指定任务ID和事件类型
+   * @param taskID 事件关联的任务ID
+   * @param type 任务事件类型
+   */
   public TaskEvent(TaskId taskID, TaskEventType type) {
     super(type);
     this.taskID = taskID;
   }
 
+  /**
+   * 获取事件关联的任务ID
+   * @return 任务ID对象
+   */
   public TaskId getTaskID() {
     return taskID;
   }

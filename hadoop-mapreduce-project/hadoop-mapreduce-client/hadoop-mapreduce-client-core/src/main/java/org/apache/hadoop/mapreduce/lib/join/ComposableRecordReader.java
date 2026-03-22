@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,10 @@ import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapreduce.RecordReader;
 
 /**
+ * 文件级注释：MapReduce连接操作中可组合RecordReader的抽象基类，定义了连接操作所需的额外接口
+ * 为多数据源合并连接提供统一的抽象接口，支持排序后的按键连接操作
+ */
+/**
  * Additional operations required of a RecordReader to participate in a join.
  */
 @InterfaceAudience.Public
@@ -37,44 +42,56 @@ public abstract class ComposableRecordReader<K extends WritableComparable<?>,
     implements Comparable<ComposableRecordReader<K,?>> {
 
   /**
-   * Return the position in the collector this class occupies.
+   * 获取当前RecordReader在输入集合中的索引位置
+   * @return 索引ID
    */
   abstract int id();
 
   /**
-   * Return the key this RecordReader would supply on a call to next(K,V)
+   * 获取当前RecordReader头部的键对象
+   * @return 当前键对象引用
    */
   abstract K key();
 
   /**
-   * Clone the key at the head of this RecordReader into the object provided.
+   * 将当前RecordReader头部键克隆到提供的对象中
+   * @param key 用于存储克隆结果的目标键对象
+   * @throws IOException IO异常
    */
   abstract void key(K key) throws IOException;
 
   /**
-   * Create instance of key.
+   * 创建一个新的键对象实例
+   * @return 新建的键对象
    */
   abstract K createKey();
   
   /**
-   * Create instance of value.
+   * 创建一个新的值对象实例
+   * @return 新建的值对象
    */
   abstract V createValue();
   
   /**
-   * Returns true if the stream is not empty, but provides no guarantee that
-   * a call to next(K,V) will succeed.
+   * 检查流中是否还有剩余数据，不保证next调用一定成功
+   * @return 流不为空返回true，否则返回false
    */
   abstract boolean hasNext();
 
   /**
-   * Skip key-value pairs with keys less than or equal to the key provided.
+   * 跳过所有键小于等于指定键的键值对
+   * @param key 目标比较键
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   abstract void skip(K key) throws IOException, InterruptedException;
 
   /**
-   * While key-value pairs from this RecordReader match the given key, register
-   * them with the JoinCollector provided.
+   * 将所有匹配指定键的键值对收集到连接收集器中，用于连接操作合并
+   * @param jc 连接收集器，用于存储匹配到的所有值
+   * @param key 目标匹配键
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   @SuppressWarnings("unchecked")
   abstract void accept(CompositeRecordReader.JoinCollector jc, K key) 

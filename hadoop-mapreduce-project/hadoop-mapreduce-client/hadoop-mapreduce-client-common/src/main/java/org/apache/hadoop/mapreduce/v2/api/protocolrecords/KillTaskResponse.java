@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,10 @@
 
 package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
+/**
+ * 终止任务响应协议接口，定义了ApplicationMaster向MR任务服务端发起终止任务请求后的响应结构
+ * 属于MapReduce V2协议层的请求响应数据结构接口，由Protobuf生成具体实现
+ */
 public interface KillTaskResponse {
 
 }

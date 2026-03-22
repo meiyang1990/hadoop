@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,6 +30,10 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * MapReduce作业访问权限控制管理器，负责检查用户对作业的操作权限，
+ * 支持基于ACL的权限管理，区分管理员、作业所有者和普通用户的权限。
+ */
 @InterfaceAudience.Private
 public class JobACLsManager {
 
@@ -36,11 +41,19 @@ public class JobACLsManager {
   Configuration conf;
   private final AccessControlList adminAcl;
 
+  /**
+   * 构造作业权限管理器，从配置中初始化MapReduce管理员ACL
+   * @param conf 配置对象
+   */
   public JobACLsManager(Configuration conf) {
     adminAcl = new AccessControlList(conf.get(MRConfig.MR_ADMINS, " "));
     this.conf = conf;
   }
 
+  /**
+   * 检查ACL权限控制功能是否已启用
+   * @return true表示启用，false表示禁用
+   */
   public boolean areACLsEnabled() {
     return conf.getBoolean(MRConfig.MR_ACLS_ENABLED, false);
   }
@@ -62,6 +75,7 @@ public class JobACLsManager {
       return acls;
     }
 
+    // 遍历所有作业权限类型，从配置中解析ACL并保存
     for (JobACL aclName : JobACL.values()) {
       String aclConfigName = aclName.getAclName();
       String aclConfigured = conf.get(aclConfigName);
@@ -76,9 +90,9 @@ public class JobACLsManager {
   }
 
   /**
-    * Is the calling user an admin for the mapreduce cluster
-    * i.e. member of mapreduce.cluster.administrators
-    * @return true, if user is an admin
+    * 检查调用用户是否属于MapReduce集群管理员组
+    * @param callerUGI 调用者用户信息
+    * @return true表示用户是管理员
     */
    boolean isMRAdmin(UserGroupInformation callerUGI) {
      if (adminAcl.isUserAllowed(callerUGI)) {
@@ -96,24 +110,27 @@ public class JobACLsManager {
    * <li>The owner of the job can do any operation on the job</li>
    * <li>For all other users/groups job-acls are checked</li>
    * </ul>
-   * @param callerUGI
-   * @param jobOperation
-   * @param jobOwner
-   * @param jobACL
+   * @param callerUGI 调用者用户信息
+   * @param jobOperation 要执行的作业操作类型
+   * @param jobOwner 作业所有者用户名
+   * @param jobACL 对应操作的访问控制列表
+   * @return true表示允许访问，false表示拒绝
    */
   public boolean checkAccess(UserGroupInformation callerUGI,
       JobACL jobOperation, String jobOwner, AccessControlList jobACL) {
 
+    // 调试模式下记录访问检查日志
     if (LOG.isDebugEnabled()) {
       LOG.debug("checkAccess job acls, jobOwner: " + jobOwner + " jobacl: "
           + jobOperation.toString() + " user: " + callerUGI.getShortUserName());
     }
     String user = callerUGI.getShortUserName();
+    // ACL未启用时直接允许所有访问
     if (!areACLsEnabled()) {
       return true;
     }
 
-    // Allow Job-owner for any operation on the job
+    // 允许三种情况通过检查：MapReduce管理员、作业所有者、ACL列表中允许的用户
     if (isMRAdmin(callerUGI)
         || user.equals(jobOwner)
         || (null != jobACL && jobACL.isUserAllowed(callerUGI))) {

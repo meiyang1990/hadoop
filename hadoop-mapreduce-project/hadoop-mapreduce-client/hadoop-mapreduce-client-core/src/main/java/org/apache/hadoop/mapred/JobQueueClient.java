@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,6 +43,10 @@ import org.apache.hadoop.util.ToolRunner;
  * 
  **/
 
+/**
+ * 作业队列客户端，提供从JobTracker获取作业队列相关信息的客户端工具
+ * 支持列出所有队列、查看指定队列信息、查看当前用户队列ACL权限等功能
+ */
 class JobQueueClient extends Configured implements Tool {
 
   JobClient jc;
@@ -53,16 +58,28 @@ class JobQueueClient extends Configured implements Tool {
     setConf(conf);
   }
 
+  /**
+   * 初始化JobClient客户端实例
+   * @param conf 作业配置对象
+   * @throws IOException 初始化失败抛出IO异常
+   */
   private void init(JobConf conf) throws IOException {
     setConf(conf);
     jc = new JobClient(conf);
   }
 
   @Override
+  /**
+   * 执行命令行工具入口方法，解析参数并调用对应功能
+   * @param argv 命令行参数数组
+   * @return 执行结果退出码，0表示成功，-1表示失败
+   * @throws Exception 执行过程中抛出异常
+   */
   public int run(String[] argv) throws Exception {
     int exitcode = -1;
 
     if (argv.length < 1) {
+      // 参数不足，显示帮助信息
       displayUsage("");
       return exitcode;
     }
@@ -72,6 +89,7 @@ class JobQueueClient extends Configured implements Tool {
     boolean displayQueueInfoWithoutJobs = false;
     boolean displayQueueAclsInfoForCurrentUser = false;
 
+    // 解析命令行参数
     if ("-list".equals(cmd)) {
       displayQueueList = true;
     } else if ("-showacls".equals(cmd)) {
@@ -95,8 +113,10 @@ class JobQueueClient extends Configured implements Tool {
       return exitcode;
     }
     
+    // 初始化客户端
     JobConf conf = new JobConf(getConf());
     init(conf);
+    // 根据参数执行对应功能
     if (displayQueueList) {
       displayQueueList();
       exitcode = 0;
@@ -114,12 +134,25 @@ class JobQueueClient extends Configured implements Tool {
   }
 
 // format and print information about the passed in job queue.
+  /**
+   * 格式化并打印指定作业队列的信息，输出到指定Writer
+   * @param jobQueueInfo 作业队列信息对象
+   * @param writer 输出目标Writer
+   * @throws IOException 写入异常
+   */
   void printJobQueueInfo(JobQueueInfo jobQueueInfo, Writer writer)
     throws IOException {
     printJobQueueInfo(jobQueueInfo, writer, "");
   }
 
   // format and print information about the passed in job queue.
+  /**
+   * 格式化并打印指定作业队列的信息（支持层级缩进输出子队列）
+   * @param jobQueueInfo 作业队列信息对象
+   * @param writer 输出目标Writer
+   * @param prefix 行前缀缩进，用于输出层级结构
+   * @throws IOException 写入异常
+   */
   @SuppressWarnings("deprecation")
   void printJobQueueInfo(JobQueueInfo jobQueueInfo, Writer writer,
     String prefix) throws IOException {
@@ -128,6 +161,7 @@ class JobQueueClient extends Configured implements Tool {
       writer.flush();
       return;
     }
+    // 输出队列基本信息
     writer.write(String.format(prefix + "======================\n"));
     writer.write(String.format(prefix + "Queue Name : %s \n",
         jobQueueInfo.getQueueName()));
@@ -135,6 +169,7 @@ class JobQueueClient extends Configured implements Tool {
         jobQueueInfo.getQueueState()));
     writer.write(String.format(prefix + "Scheduling Info : %s \n",
         jobQueueInfo.getSchedulingInfo()));
+    // 递归输出子队列
     List<JobQueueInfo> childQueues = jobQueueInfo.getChildren();
     if (childQueues != null && childQueues.size() > 0) {
       for (int i = 0; i < childQueues.size(); i++) {
@@ -144,6 +179,10 @@ class JobQueueClient extends Configured implements Tool {
     writer.flush();
   }
   
+  /**
+   * 显示所有根队列的基本信息，输出到标准输出
+   * @throws IOException 获取队列信息失败抛出IO异常
+   */
   private void displayQueueList() throws IOException {
     JobQueueInfo[] rootQueues = jc.getRootQueues();
     for (JobQueueInfo queue : rootQueues) {
@@ -153,10 +192,9 @@ class JobQueueClient extends Configured implements Tool {
   }
   
   /**
-   * Expands the hierarchy of queues and gives the list of all queues in 
-   * depth-first order
-   * @param rootQueues the top-level queues
-   * @return the list of all the queues in depth-first order.
+   * 深度优先展开队列层级结构，返回所有队列的扁平列表
+   * @param rootQueues 顶级根队列数组
+   * @return 深度优先顺序排列的所有队列列表
    */
   List<JobQueueInfo> expandQueueList(JobQueueInfo[] rootQueues) {
     List<JobQueueInfo> allQueues = new ArrayList<JobQueueInfo>();
@@ -172,11 +210,11 @@ class JobQueueClient extends Configured implements Tool {
   }
  
   /**
-   * Method used to display information pertaining to a Single JobQueue
-   * registered with the {@link QueueManager}. Display of the Jobs is determine
-   * by the boolean
-   * 
-   * @throws IOException, InterruptedException
+   * 显示指定队列的详细信息，可选择是否同时显示队列中的作业列表
+   * @param queue 目标队列名称
+   * @param showJobs 是否显示队列中的作业列表
+   * @throws IOException 获取信息失败抛出IO异常
+   * @throws InterruptedException 中断异常
    */
   private void displayQueueInfo(String queue, boolean showJobs)
       throws IOException, InterruptedException {
@@ -186,8 +224,10 @@ class JobQueueClient extends Configured implements Tool {
       System.out.println("Queue \"" + queue + "\" does not exist.");
       return;
     }
+    // 打印队列基本信息
     printJobQueueInfo(jobQueueInfo, new PrintWriter(new OutputStreamWriter(
         System.out, StandardCharsets.UTF_8)));
+    // 如果需要显示作业且当前队列是叶子队列，打印作业列表
     if (showJobs && (jobQueueInfo.getChildren() == null ||
         jobQueueInfo.getChildren().size() == 0)) {
       JobStatus[] jobs = jobQueueInfo.getJobStatuses();
@@ -197,6 +237,10 @@ class JobQueueClient extends Configured implements Tool {
     }
   }
    
+  /**
+   * 显示当前登录用户对各队列拥有的ACL操作权限
+   * @throws IOException 获取权限信息失败抛出IO异常
+   */
   private void displayQueueAclsInfoForCurrentUser() throws IOException {
     QueueAclsInfo[] queueAclsInfoList = jc.getQueueAclsForCurrentUser();
     UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
@@ -204,12 +248,14 @@ class JobQueueClient extends Configured implements Tool {
       System.out.println("Queue acls for user :  " + ugi.getShortUserName());
       System.out.println("\nQueue  Operations");
       System.out.println("=====================");
+      // 遍历每个队列，输出权限操作
       for (QueueAclsInfo queueInfo : queueAclsInfoList) {
         System.out.print(queueInfo.getQueueName() + "  ");
         String[] ops = queueInfo.getOperations();
         Arrays.sort(ops);
         int max = ops.length - 1;
         for (int j = 0; j < ops.length; j++) {
+          // 移除acl-前缀，简化输出
           System.out.print(ops[j].replaceFirst("acl-", ""));
           if (j < max) {
             System.out.print(",");
@@ -223,6 +269,10 @@ class JobQueueClient extends Configured implements Tool {
     }
   }
 
+  /**
+   * 显示工具命令行使用帮助信息
+   * @param cmd 输入的命令名称
+   */
   private void displayUsage(String cmd) {
     String prefix = "Usage: queue ";
     if ("-queueinfo".equals(cmd)) {
@@ -236,6 +286,11 @@ class JobQueueClient extends Configured implements Tool {
     }
   }
 
+  /**
+   * 工具主入口方法
+   * @param argv 命令行参数
+   * @throws Exception 执行异常
+   */
   public static void main(String[] argv) throws Exception {
     int res = ToolRunner.run(new JobQueueClient(), argv);
     System.exit(res);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,10 @@
 
 package org.apache.hadoop.mapreduce.v2.api.records;
 
+/**
+ * MapReduce任务执行阶段枚举
+ * 定义了MapReduce作业从启动到结束的各个执行阶段，用于标识任务当前所处的执行步骤
+ */
 public enum Phase {
   STARTING, MAP, SHUFFLE, SORT, REDUCE, CLEANUP
 }

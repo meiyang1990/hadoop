@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,8 +34,13 @@ import java.util.List;
 
 
 /**
+ * 文件级注释：为旧版MapReduce API的ChainMapper和ChainReducer提供公共基础功能，实现多处理单元的链式调用
  * The Chain class provides all the common functionality for the
  * {@link ChainMapper} and the {@link ChainReducer} classes.
+ */
+/**
+ * 链式处理基类，为ChainMapper和ChainReducer提供公共能力，支持多个Map/Reduce处理单元按顺序链式执行
+ * 继承自new MapReduce API的Chain基础类，兼容旧版mapred API
  */
 class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
 
@@ -48,42 +54,39 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
 
   // to cache the key/value output class serializations for each chain element
   // to avoid everytime lookup.
+  // 缓存每个Map单元输出键的序列化实例，避免重复查找
   private List<Serialization> mappersKeySerialization =
     new ArrayList<Serialization>();
+  // 缓存每个Map单元输出值的序列化实例，避免重复查找
   private List<Serialization> mappersValueSerialization =
     new ArrayList<Serialization>();
+  // Reduce单元输出键的序列化实例缓存
   private Serialization reducerKeySerialization;
+  // Reduce单元输出值的序列化实例缓存
   private Serialization reducerValueSerialization;
 
   /**
-   * Creates a Chain instance configured for a Mapper or a Reducer.
+   * 创建链式处理实例，指定链式属于Mapper还是Reducer
    *
-   * @param isMap TRUE indicates the chain is for a Mapper, FALSE that is for a
-   *              Reducer.
+   * @param isMap TRUE表示是Mapper的链，FALSE表示是Reducer的链
    */
   Chain(boolean isMap) {
     super(isMap);
   }
 
   /**
-   * Adds a Mapper class to the chain job's JobConf.
-   * <p/>
-   * The configuration properties of the chain job have precedence over the
-   * configuration properties of the Mapper.
+   * 将Mapper类添加到链式任务的JobConf配置中
+   * 链式任务本身的配置优先级高于单个Mapper的配置
    *
-   * @param isMap            indicates if the Chain is for a Mapper or for a
-   * Reducer.
-   * @param jobConf              chain job's JobConf to add the Mapper class.
-   * @param klass            the Mapper class to add.
-   * @param inputKeyClass    mapper input key class.
-   * @param inputValueClass  mapper input value class.
-   * @param outputKeyClass   mapper output key class.
-   * @param outputValueClass mapper output value class.
-   * @param byValue          indicates if key/values should be passed by value
-   * to the next Mapper in the chain, if any.
-   * @param mapperConf       a JobConf with the configuration for the Mapper
-   * class. It is recommended to use a JobConf without default values using the
-   * <code>JobConf(boolean loadDefaults)</code> constructor with FALSE.
+   * @param isMap            标识当前链属于Mapper还是Reducer
+   * @param jobConf          链式任务的JobConf，用于添加Mapper配置
+   * @param klass            要添加的Mapper类
+   * @param inputKeyClass    Mapper输入键类型
+   * @param inputValueClass  Mapper输入值类型
+   * @param outputKeyClass   Mapper输出键类型
+   * @param outputValueClass Mapper输出值类型
+   * @param byValue          是否按值传递键值对给链中下一个Mapper
+   * @param mapperConf       Mapper自身的配置，建议使用不加载默认配置的JobConf减少开销
    */
   public static <K1, V1, K2, V2> void addMapper(boolean isMap, JobConf jobConf,
                            Class<? extends Mapper<K1, V1, K2, V2>> klass,
@@ -119,22 +122,17 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
   }
 
   /**
-   * Sets the Reducer class to the chain job's JobConf.
-   * <p/>
-   * The configuration properties of the chain job have precedence over the
-   * configuration properties of the Reducer.
+   * 设置Reducer类到链式任务的JobConf配置中
+   * 链式任务本身的配置优先级高于Reducer的配置
    *
-   * @param jobConf              chain job's JobConf to add the Reducer class.
-   * @param klass            the Reducer class to add.
-   * @param inputKeyClass    reducer input key class.
-   * @param inputValueClass  reducer input value class.
-   * @param outputKeyClass   reducer output key class.
-   * @param outputValueClass reducer output value class.
-   * @param byValue          indicates if key/values should be passed by value
-   * to the next Mapper in the chain, if any.
-   * @param reducerConf      a JobConf with the configuration for the Reducer
-   * class. It is recommended to use a JobConf without default values using the
-   * <code>JobConf(boolean loadDefaults)</code> constructor with FALSE.
+   * @param jobConf          链式任务的JobConf，用于添加Reducer配置
+   * @param klass            要添加的Reducer类
+   * @param inputKeyClass    Reducer输入键类型
+   * @param inputValueClass  Reducer输入值类型
+   * @param outputKeyClass   Reducer输出键类型
+   * @param outputValueClass Reducer输出值类型
+   * @param byValue          是否按值传递键值对给链中后续Mapper（仅Reducer链生效）
+   * @param reducerConf      Reducer自身的配置，建议使用不加载默认配置的JobConf减少开销
    */
   public static <K1, V1, K2, V2> void setReducer(JobConf jobConf,
                           Class<? extends Reducer<K1, V1, K2, V2>> klass,
@@ -151,8 +149,8 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
     // if the Reducer does not have a private JobConf create an empty one
     if (reducerConf == null) {
       // using a JobConf without defaults to make it lightweight.
-      // still the chain JobConf may have all defaults and this conf is
-      // overlapped to the chain JobConf one.
+      // still the chain jobConf may have all defaults and this conf is
+      // overlapped to the chain jobConf one.
       reducerConf = new JobConf(false);
     }
 
@@ -165,24 +163,28 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
   }
 
   /**
-   * Configures all the chain elements for the task.
+   * 初始化链中所有处理单元，反射实例化并缓存序列化对象
    *
-   * @param jobConf chain job's JobConf.
+   * @param jobConf 链式任务的JobConf配置
    */
   public void configure(JobConf jobConf) {
     String prefix = getPrefix(isMap);
     chainJobConf = jobConf;
     SerializationFactory serializationFactory =
       new SerializationFactory(chainJobConf);
+    // 获取链中Mapper的数量
     int index = jobConf.getInt(prefix + CHAIN_MAPPER_SIZE, 0);
+    // 遍历实例化每个Mapper
     for (int i = 0; i < index; i++) {
       Class<? extends Mapper> klass =
         jobConf.getClass(prefix + CHAIN_MAPPER_CLASS + i, null, Mapper.class);
+      // 获取当前Mapper的私有配置，与全局配置合并
       JobConf mConf = new JobConf(
         getChainElementConf(jobConf, prefix + CHAIN_MAPPER_CONFIG + i));
+      // 反射实例化Mapper
       Mapper mapper = ReflectionUtils.newInstance(klass, mConf);
       mappers.add(mapper);
-
+      // 如果按值传递，缓存序列化实例，否则缓存null
       if (mConf.getBoolean(MAPPER_BY_VALUE, true)) {
         mappersKeySerialization.add(serializationFactory.getSerialization(
           mConf.getClass(MAPPER_OUTPUT_KEY_CLASS, null)));
@@ -193,12 +195,14 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
         mappersValueSerialization.add(null);
       }
     }
+    // 实例化Reducer（仅存在于Reducer链）
     Class<? extends Reducer> klass =
       jobConf.getClass(prefix + CHAIN_REDUCER_CLASS, null, Reducer.class);
     if (klass != null) {
       JobConf rConf = new JobConf(
         getChainElementConf(jobConf, prefix + CHAIN_REDUCER_CONFIG));
       reducer = ReflectionUtils.newInstance(klass, rConf);
+      // 如果按值传递，缓存序列化实例，否则置空
       if (rConf.getBoolean(REDUCER_BY_VALUE, true)) {
         reducerKeySerialization = serializationFactory
           .getSerialization(rConf.getClass(REDUCER_OUTPUT_KEY_CLASS, null));
@@ -212,39 +216,39 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
   }
 
   /**
-   * Returns the chain job conf.
+   * 获取当前链式任务的全局JobConf配置
    *
-   * @return the chain job conf.
+   * @return 链式任务的JobConf
    */
   protected JobConf getChainJobConf() {
     return chainJobConf;
   }
 
   /**
-   * Returns the first Mapper instance in the chain.
+   * 获取链中第一个Mapper实例
    *
-   * @return the first Mapper instance in the chain or NULL if none.
+   * @return 第一个Mapper实例，如果没有则返回null
    */
   public Mapper getFirstMap() {
     return (mappers.size() > 0) ? mappers.get(0) : null;
   }
 
   /**
-   * Returns the Reducer instance in the chain.
+   * 获取链中Reducer实例
    *
-   * @return the Reducer instance in the chain or NULL if none.
+   * @return Reducer实例，如果不存在则返回null
    */
   public Reducer getReducer() {
     return reducer;
   }
 
   /**
-   * Returns the OutputCollector to be used by a Mapper instance in the chain.
+   * 获取指定索引Mapper对应的输出收集器，处理链式调用逻辑
    *
-   * @param mapperIndex index of the Mapper instance to get the OutputCollector.
-   * @param output      the original OutputCollector of the task.
-   * @param reporter    the reporter of the task.
-   * @return the OutputCollector to be used in the chain.
+   * @param mapperIndex 当前Mapper在链中的索引
+   * @param output      任务原始输出收集器
+   * @param reporter    任务进度汇报器
+   * @return 适配链式逻辑的输出收集器
    */
   @SuppressWarnings({"unchecked"})
   public OutputCollector getMapperCollector(int mapperIndex,
@@ -258,11 +262,11 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
   }
 
   /**
-   * Returns the OutputCollector to be used by a Mapper instance in the chain.
+   * 获取Reducer对应的输出收集器，处理链式调用逻辑
    *
-   * @param output   the original OutputCollector of the task.
-   * @param reporter the reporter of the task.
-   * @return the OutputCollector to be used in the chain.
+   * @param output   任务原始输出收集器
+   * @param reporter 任务进度汇报器
+   * @return 适配链式逻辑的输出收集器
    */
   @SuppressWarnings({"unchecked"})
   public OutputCollector getReducerCollector(OutputCollector output,
@@ -273,10 +277,9 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
   }
 
   /**
-   * Closes all the chain elements.
+   * 关闭链中所有处理单元，释放资源
    *
-   * @throws IOException thrown if any of the chain elements threw an
-   *                     IOException exception.
+   * @throws IOException 任意处理单元关闭时抛出IO异常则向上抛出
    */
   public void close() throws IOException {
     for (Mapper map : mappers) {
@@ -290,6 +293,7 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
   // using a ThreadLocal to reuse the ByteArrayOutputStream used for ser/deser
   // it has to be a thread local because if not it would break if used from a
   // MultiThreadedMapRunner.
+  // 使用ThreadLocal缓存序列化缓冲区，支持多线程环境下的复用，避免并发冲突
   private final ThreadLocal<DataOutputBuffer> threadLocalDataOutputBuffer =
     new ThreadLocal<DataOutputBuffer>() {
       protected DataOutputBuffer initialValue() {
@@ -298,11 +302,8 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
     };
 
   /**
-   * OutputCollector implementation used by the chain tasks.
-   * <p/>
-   * If it is not the end of the chain, a {@link #collect} invocation invokes
-   * the next Mapper in the chain. If it is the end of the chain the task
-   * OutputCollector is called.
+   * 链式处理专用输出收集器，实现处理单元之间的链式调用
+   * 非链尾输出会自动调用下一个处理单元，链尾输出才会写入原始收集器
    */
   private class ChainOutputCollector<K, V> implements OutputCollector<K, V> {
     private int nextMapperIndex;
@@ -312,7 +313,7 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
     private Reporter reporter;
 
     /*
-     * Constructor for Mappers
+     * Mapper专用构造函数
      */
     public ChainOutputCollector(int index, Serialization<K> keySerialization,
                                 Serialization<V> valueSerialization,
@@ -325,7 +326,7 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
     }
 
     /*
-     * Constructor for Reducer
+     * Reducer专用构造函数
      */
     public ChainOutputCollector(Serialization<K> keySerialization,
                                 Serialization<V> valueSerialization,
@@ -340,22 +341,22 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
     @SuppressWarnings({"unchecked"})
     public void collect(K key, V value) throws IOException {
       if (nextMapperIndex < mappers.size()) {
-        // there is a next mapper in chain
+        // 链还有下一个Mapper，触发下一个Mapper处理
 
-        // only need to ser/deser if there is next mapper in the chain
+        // 需要按值传递时，通过序列化深拷贝键值对
         if (keySerialization != null) {
           key = makeCopyForPassByValue(keySerialization, key);
           value = makeCopyForPassByValue(valueSerialization, value);
         }
 
-        // gets ser/deser and mapper of next in chain
+        // 获取下一个Mapper的序列化信息和实例
         Serialization nextKeySerialization =
           mappersKeySerialization.get(nextMapperIndex);
         Serialization nextValueSerialization =
           mappersValueSerialization.get(nextMapperIndex);
         Mapper nextMapper = mappers.get(nextMapperIndex);
 
-        // invokes next mapper in chain
+        // 调用下一个Mapper处理当前输出
         nextMapper.map(key, value,
                        new ChainOutputCollector(nextMapperIndex,
                                                 nextKeySerialization,
@@ -363,11 +364,19 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
                                                 output, reporter),
                        reporter);
       } else {
-        // end of chain, user real output collector
+        // 已经是链尾，输出到原始收集器
         output.collect(key, value);
       }
     }
 
+    /**
+     * 通过序列化深拷贝对象，实现按值传递
+     *
+     * @param serialization 序列化实例
+     * @param obj 原始对象
+     * @return 深拷贝后的新对象
+     * @throws IOException 序列化/反序列化IO异常
+     */
     private <E> E makeCopyForPassByValue(Serialization<E> serialization,
                                           E obj) throws IOException {
       Serializer<E> ser =
@@ -375,14 +384,18 @@ class Chain extends org.apache.hadoop.mapreduce.lib.chain.Chain {
       Deserializer<E> deser =
         serialization.getDeserializer(GenericsUtil.getClass(obj));
 
+      // 获取线程缓存的输出缓冲区
       DataOutputBuffer dof = threadLocalDataOutputBuffer.get();
 
+      // 序列化原始对象到缓冲区
       dof.reset();
       ser.open(dof);
       ser.serialize(obj);
       ser.close();
+      // 创建新对象实例
       obj = ReflectionUtils.newInstance(GenericsUtil.getClass(obj),
                                         getChainJobConf());
+      // 反序列化到新对象完成拷贝
       ByteArrayInputStream bais =
         new ByteArrayInputStream(dof.getData(), 0, dof.getLength());
       deser.open(bais);

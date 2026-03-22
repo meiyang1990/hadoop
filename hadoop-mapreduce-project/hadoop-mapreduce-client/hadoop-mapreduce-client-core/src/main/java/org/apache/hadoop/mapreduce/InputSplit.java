@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,6 +30,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.RecordReader;
 
 /**
+ * 文件级注释：InputSplit是MapReduce框架中定义输入切片的抽象基类，每个切片对应一个Mapper任务处理的数据
  * <code>InputSplit</code> represents the data to be processed by an 
  * individual {@link Mapper}. 
  *
@@ -43,18 +45,18 @@ import org.apache.hadoop.mapreduce.RecordReader;
 @InterfaceStability.Stable
 public abstract class InputSplit {
   /**
-   * Get the size of the split, so that the input splits can be sorted by size.
-   * @return the number of bytes in the split
+   * 获取当前输入切片的总字节大小，用于对输入切片按大小排序，优化任务调度
+   * @return 切片的字节数
    * @throws IOException
    * @throws InterruptedException
    */
   public abstract long getLength() throws IOException, InterruptedException;
 
   /**
-   * Get the list of nodes by name where the data for the split would be local.
+   * 获取当前切片数据所在的节点主机名列表，用于数据本地性任务调度
    * The locations do not need to be serialized.
    * 
-   * @return a new array of the node nodes.
+   * @return 存储当前切片数据的节点名数组
    * @throws IOException
    * @throws InterruptedException
    */
@@ -62,12 +64,9 @@ public abstract class InputSplit {
     String[] getLocations() throws IOException, InterruptedException;
   
   /**
-   * Gets info about which nodes the input split is stored on and how it is
-   * stored at each location.
+   * 获取切片存储位置的详细信息，包括每个位置是否存储在内存中
    * 
-   * @return list of <code>SplitLocationInfo</code>s describing how the split
-   *    data is stored at each location. A null value indicates that all the
-   *    locations have the data stored on disk.
+   * @return 存储位置信息数组，null表示所有位置数据都存储在磁盘
    * @throws IOException
    */
   @Evolving

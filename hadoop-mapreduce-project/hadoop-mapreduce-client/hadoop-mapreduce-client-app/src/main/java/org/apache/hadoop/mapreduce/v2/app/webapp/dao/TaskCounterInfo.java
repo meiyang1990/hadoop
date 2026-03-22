@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +22,9 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * MapReduce任务计数器信息数据传输对象，用于在Web UI界面展示任务计数器数据
+ */
 @XmlRootElement(name = "counter")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class TaskCounterInfo {
@@ -28,18 +32,34 @@ public class TaskCounterInfo {
   protected String name;
   protected long value;
 
+  /**
+   * 空构造函数，供JAXB序列化/反序列化使用
+   */
   public TaskCounterInfo() {
   }
 
+  /**
+   * 构造任务计数器信息对象
+   * @param name 计数器名称
+   * @param value 计数器数值
+   */
   public TaskCounterInfo(String name, long value) {
     this.name = name;
     this.value = value;
   }
 
+  /**
+   * 获取计数器名称
+   * @return 计数器名称
+   */
   public String getName() {
     return name;
   }
 
+  /**
+   * 获取计数器数值
+   * @return 计数器数值
+   */
   public long getValue() {
     return value;
   }

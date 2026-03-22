@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,8 +29,10 @@ import org.apache.hadoop.yarn.util.AbstractLivelinessMonitor;
 import org.apache.hadoop.yarn.util.SystemClock;
 
 /**
- * This class generates TA_TIMED_OUT if the task attempt stays in FINISHING
- * state for too long.
+ * 文件职责：MapReduce ApplicationMaster中监控任务尝试结束阶段的存活监视器
+ * 
+ * 本类负责监控处于FINISHING状态的任务尝试，如果任务尝试长时间停留在该状态未完成，
+ * 会主动发送超时事件将其判定为超时失败，避免作业卡住。
  */
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class TaskAttemptFinishingMonitor extends
@@ -37,23 +40,39 @@ public class TaskAttemptFinishingMonitor extends
 
   private EventHandler eventHandler;
 
+  /**
+   * 构造函数，初始化任务尝试结束状态监视器
+   * @param eventHandler 事件处理器，用于发送超时事件
+   */
   public TaskAttemptFinishingMonitor(EventHandler eventHandler) {
     super("TaskAttemptFinishingMonitor", SystemClock.getInstance());
     this.eventHandler = eventHandler;
   }
 
+  /**
+   * 从配置中初始化超时参数和检查间隔
+   * @param conf MapReduce作业配置
+   */
   public void init(Configuration conf) {
     super.init(conf);
+    // 读取任务超时时间配置
     int expireIntvl = conf.getInt(MRJobConfig.TASK_EXIT_TIMEOUT,
         MRJobConfig.TASK_EXIT_TIMEOUT_DEFAULT);
+    // 读取超时检查间隔配置
     int checkIntvl = conf.getInt(
         MRJobConfig.TASK_EXIT_TIMEOUT_CHECK_INTERVAL_MS,
         MRJobConfig.TASK_EXIT_TIMEOUT_CHECK_INTERVAL_MS_DEFAULT);
 
+    // 设置过期时间
     setExpireInterval(expireIntvl);
+    // 设置监控检查间隔
     setMonitorInterval(checkIntvl);
   }
 
+  /**
+   * 处理过期的任务尝试，发送超时事件通知AM处理
+   * @param id 已超时的任务尝试ID
+   */
   @Override
   protected void expire(TaskAttemptId id) {
     eventHandler.handle(

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,8 +28,10 @@ import org.apache.hadoop.mapreduce.v2.proto.MRServiceProtos.GetJobReportResponse
 import org.apache.hadoop.mapreduce.v2.proto.MRServiceProtos.GetJobReportResponseProtoOrBuilder;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 
-
-    
+/**
+ * GetJobReportResponse 的 Protobuf 实现类，封装获取作业报告响应的 Protobuf 编解码逻辑
+ * 是 MapReduce 服务端与客户端交互中获取作业报告响应的具体数据载体
+ */
 public class GetJobReportResponsePBImpl extends ProtoBase<GetJobReportResponseProto> implements GetJobReportResponse {
   GetJobReportResponseProto proto = GetJobReportResponseProto.getDefaultInstance();
   GetJobReportResponseProto.Builder builder = null;
@@ -37,15 +40,23 @@ public class GetJobReportResponsePBImpl extends ProtoBase<GetJobReportResponsePr
   private JobReport jobReport = null;
   
   
+  /**
+   * 构造空的获取作业报告响应对象，初始化 Protobuf Builder
+   */
   public GetJobReportResponsePBImpl() {
     builder = GetJobReportResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有的 Protobuf 对象构造获取作业报告响应对象
+   * @param proto 已序列化的获取作业报告响应 Protobuf 对象
+   */
   public GetJobReportResponsePBImpl(GetJobReportResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
+  @Override
   public GetJobReportResponseProto getProto() {
       mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -84,6 +95,7 @@ public class GetJobReportResponsePBImpl extends ProtoBase<GetJobReportResponsePr
     if (!p.hasJobReport()) {
       return null;
     }
+    // 从 Protobuf 反序列化转换为 JobReport 对象，缓存到本地字段
     this.jobReport = convertFromProtoFormat(p.getJobReport());
     return this.jobReport;
   }
@@ -96,14 +108,14 @@ public class GetJobReportResponsePBImpl extends ProtoBase<GetJobReportResponsePr
     this.jobReport = jobReport;
   }
 
+  // 将 Protobuf 格式的 JobReport 转换为内存对象格式
   private JobReportPBImpl convertFromProtoFormat(JobReportProto p) {
     return new JobReportPBImpl(p);
   }
 
+  // 将内存对象格式的 JobReport 转换为 Protobuf 格式
   private JobReportProto convertToProtoFormat(JobReport t) {
     return ((JobReportPBImpl)t).getProto();
   }
 
-
-
-}  
+}

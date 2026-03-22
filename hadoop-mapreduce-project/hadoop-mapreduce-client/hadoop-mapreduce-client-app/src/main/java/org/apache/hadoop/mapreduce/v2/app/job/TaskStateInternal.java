@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,10 @@
 
 package org.apache.hadoop.mapreduce.v2.app.job;
 
+/**
+ * MapReduce任务内部状态枚举，定义了ApplicationMaster端任务生命周期的所有内部状态
+ * 用于任务状态流转管理，是MapReduce应用内部任务状态机的核心状态定义
+ */
 public enum TaskStateInternal {
   NEW, SCHEDULED, RUNNING, SUCCEEDED, FAILED, KILL_WAIT, KILLED
 }

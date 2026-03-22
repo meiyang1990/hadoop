@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,8 +41,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Partitioner effecting a total order by reading split points from
- * an externally generated source.
+ * 文件：全排序分区器，通过读取外部生成的分割点实现键的全局有序分区
+ * 核心作用：为全排序作业提供分区策略，使得每个Reduce分区处理一段有序的键范围，输出结果整体全局有序
+ * 支持两种查找分区方式：二分查找和Trie树快速查找，对二进制可比键默认启用Trie树优化
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -60,17 +62,15 @@ public class TotalOrderPartitioner<K,V>
   private static final Logger LOG =
       LoggerFactory.getLogger(TotalOrderPartitioner.class);
 
+  /**
+   * 构造函数，初始化空的全排序分区器
+   */
   public TotalOrderPartitioner() { }
 
   /**
-   * Read in the partition file and build indexing data structures.
-   * If the keytype is {@link org.apache.hadoop.io.BinaryComparable} and
-   * <code>total.order.partitioner.natural.order</code> is not false, a trie
-   * of the first <code>total.order.partitioner.max.trie.depth</code>(2) + 1 bytes
-   * will be built. Otherwise, keys will be located using a binary search of
-   * the partition keyset using the {@link org.apache.hadoop.io.RawComparator}
-   * defined for this job. The input file must be sorted with the same
-   * comparator and contain {@link Job#getNumReduceTasks()} - 1 keys.
+   * 读取分区文件构建分区索引数据结构，完成分区器初始化
+   * 如果键类型是BinaryComparable且启用自然排序，则构建Trie树加速分区查找
+   * 否则使用二分查找在分区键集合中定位分区。分区文件必须包含R-1个已排序键（R为Reduce数量）
    */
   @SuppressWarnings("unchecked") // keytype from conf not static
   public void setConf(Configuration conf) {
@@ -79,17 +79,20 @@ public class TotalOrderPartitioner<K,V>
       String parts = getPartitionFile(conf);
       final Path partFile = new Path(parts);
       final FileSystem fs = (DEFAULT_PATH.equals(parts))
-        ? FileSystem.getLocal(conf)     // assume in DistributedCache
-        : partFile.getFileSystem(conf);
+        ? FileSystem.getLocal(conf)     // 默认路径在分布式缓存中，使用本地文件系统读取
+        : partFile.getFileSystem(conf); // 自定义路径从对应文件系统读取
 
       Job job = Job.getInstance(conf);
       Class<K> keyClass = (Class<K>)job.getMapOutputKeyClass();
+      // 从分区文件中读取所有分割点
       K[] splitPoints = readPartitions(fs, partFile, keyClass, conf);
+      // 校验分割点数量是否符合要求（必须等于Reduce数量减1）
       if (splitPoints.length != job.getNumReduceTasks() - 1) {
         throw new IOException("Wrong number of partitions in keyset");
       }
       RawComparator<K> comparator =
         (RawComparator<K>) job.getSortComparator();
+      // 校验分割点是否有序
       for (int i = 0; i < splitPoints.length - 1; ++i) {
         if (comparator.compare(splitPoints[i], splitPoints[i+1]) >= 0) {
           throw new IOException("Split points are out of order");
@@ -97,18 +100,13 @@ public class TotalOrderPartitioner<K,V>
       }
       boolean natOrder =
         conf.getBoolean(NATURAL_ORDER, true);
+      // 符合条件则构建Trie树加速分区查找
       if (natOrder && BinaryComparable.class.isAssignableFrom(keyClass)) {
         partitions = buildTrie((BinaryComparable[])splitPoints, 0,
             splitPoints.length, new byte[0],
-            // Now that blocks of identical splitless trie nodes are 
-            // represented reentrantly, and we develop a leaf for any trie
-            // node with only one split point, the only reason for a depth
-            // limit is to refute stack overflow or bloat in the pathological
-            // case where the split points are long and mostly look like bytes 
-            // iii...iixii...iii   .  Therefore, we make the default depth
-            // limit large but not huge.
             conf.getInt(MAX_TRIE_DEPTH, 200));
       } else {
+        // 否则使用二分查找实现
         partitions = new BinarySearchNode(splitPoints, comparator);
       }
     } catch (IOException e) {
@@ -116,48 +114,60 @@ public class TotalOrderPartitioner<K,V>
     }
   }
 
+  /**
+   * 获取分区器配置
+   * @return 分区器配置对象
+   */
   public Configuration getConf() {
     return conf;
   }
   
-  // by construction, we know if our keytype
+  /**
+   * 根据键获取对应分区编号，实现分区逻辑
+   * @param key Map输出键
+   * @param value Map输出值
+   * @param numPartitions 分区总数
+   * @return 该键对应的分区编号
+   */
   @SuppressWarnings("unchecked") // is memcmp-able and uses the trie
   public int getPartition(K key, V value, int numPartitions) {
     return partitions.findPartition(key);
   }
 
   /**
-   * Set the path to the SequenceFile storing the sorted partition keyset.
-   * It must be the case that for <code>R</code> reduces, there are <code>R-1</code>
-   * keys in the SequenceFile.
+   * 设置存储排序分区键集合的SequenceFile路径
+   * @param conf 作业配置
+   * @param p 分区文件路径
    */
   public static void setPartitionFile(Configuration conf, Path p) {
     conf.set(PARTITIONER_PATH, p.toString());
   }
 
   /**
-   * Get the path to the SequenceFile storing the sorted partition keyset.
-   * @see #setPartitionFile(Configuration, Path)
+   * 获取存储排序分区键集合的SequenceFile路径
+   * @param conf 作业配置
+   * @return 分区文件路径字符串
    */
   public static String getPartitionFile(Configuration conf) {
     return conf.get(PARTITIONER_PATH, DEFAULT_PATH);
   }
 
   /**
-   * Interface to the partitioner to locate a key in the partition keyset.
+   * 分区查找节点接口，定义查找键所在分区的抽象方法
+   * @param <T> 键类型
    */
   interface Node<T> {
     /**
-     * Locate partition in keyset K, st [Ki..Ki+1) defines a partition,
-     * with implicit K0 = -inf, Kn = +inf, and |K| = #partitions - 1.
+     * 在分区键集合中定位给定键对应的分区编号
+     * @param key 待查找的键
+     * @return 分区编号
      */
     int findPartition(T key);
   }
 
   /**
-   * Base class for trie nodes. If the keytype is memcomp-able, this builds
-   * tries of the first <code>total.order.partitioner.max.trie.depth</code>
-   * bytes.
+   * Trie节点抽象基类，为二进制可比键构建Trie树提供基础
+   * 根据键的前缀字节构建多层Trie树，加速分区查找
    */
   static abstract class TrieNode implements Node<BinaryComparable> {
     private final int level;
@@ -170,9 +180,8 @@ public class TotalOrderPartitioner<K,V>
   }
 
   /**
-   * For types that are not {@link org.apache.hadoop.io.BinaryComparable} or
-   * where disabled by <code>total.order.partitioner.natural.order</code>,
-   * search the partition keyset with a binary search.
+   * 二分查找分区节点，针对非BinaryComparable类型或禁用自然排序时使用
+   * 通过二分查找在分区分割点数组中定位键所在分区
    */
   class BinarySearchNode implements Node<K> {
     private final K[] splitPoints;
@@ -188,8 +197,8 @@ public class TotalOrderPartitioner<K,V>
   }
 
   /**
-   * An inner trie node that contains 256 children based on the next
-   * character.
+   * Trie内部节点，每个节点包含256个子节点（对应一个字节的所有可能值）
+   * 根据当前层级字节值选择对应子节点继续向下查找
    */
   class InnerTrieNode extends TrieNode {
     private TrieNode[] child = new TrieNode[256];
@@ -199,46 +208,42 @@ public class TotalOrderPartitioner<K,V>
     }
     public int findPartition(BinaryComparable key) {
       int level = getLevel();
+      // 键长度小于当前层级，使用第0个子节点处理
       if (key.getLength() <= level) {
         return child[0].findPartition(key);
       }
+      // 根据当前层级字节值选择子节点继续查找
       return child[0xFF & key.getBytes()[level]].findPartition(key);
     }
   }
   
   /**
-   * @param level        the tree depth at this node
-   * @param splitPoints  the full split point vector, which holds
-   *                     the split point or points this leaf node
-   *                     should contain
-   * @param lower        first INcluded element of splitPoints
-   * @param upper        first EXcluded element of splitPoints
-   * @return  a leaf node.  They come in three kinds: no split points 
-   *          [and the findParttion returns a canned index], one split
-   *          point [and we compare with a single comparand], or more
-   *          than one [and we do a binary search].  The last case is
-   *          rare.
+   * 根据当前节点包含的分割点数量，创建对应类型的叶子Trie节点
+   * @param level 当前节点在Trie中的深度
+   * @param splitPoints 全部分割点数组
+   * @param lower 当前区间包含的第一个分割点索引
+   * @param upper 当前区间不包含的第一个分割点索引
+   * @return 对应类型的叶子Trie节点
    */
   private TrieNode LeafTrieNodeFactory
              (int level, BinaryComparable[] splitPoints, int lower, int upper) {
       switch (upper - lower) {
       case 0:
+          // 无分割点，返回无分割节点
           return new UnsplitTrieNode(level, lower);
           
       case 1:
+          // 一个分割点，返回单分割点节点
           return new SinglySplitTrieNode(level, splitPoints, lower);
           
       default:
+          // 多个分割点，返回通用叶子节点（内部使用二分查找）
           return new LeafTrieNode(level, splitPoints, lower, upper);
       }
   }
 
   /**
-   * A leaf trie node that scans for the key between lower..upper.
-   * 
-   * We don't generate many of these now, since we usually continue trie-ing 
-   * when more than one split point remains at this level. and we make different
-   * objects for nodes with 0 or 1 split point.
+   * 通用叶子Trie节点，当当前层级仍包含多个分割点时使用，内部通过二分查找定位分区
    */
   private class LeafTrieNode extends TrieNode {
     final int lower;
@@ -256,6 +261,9 @@ public class TotalOrderPartitioner<K,V>
     }
   }
   
+  /**
+   * 无分割点叶子Trie节点，所有命中该节点的键都固定返回同一个分区编号
+   */
   private class UnsplitTrieNode extends TrieNode {
       final int result;
       
@@ -269,6 +277,9 @@ public class TotalOrderPartitioner<K,V>
       }
   }
   
+  /**
+   * 单分割点叶子Trie节点，仅包含一个分割点，直接比较即可得到分区编号
+   */
   private class SinglySplitTrieNode extends TrieNode {
       final int               lower;
       final BinaryComparable  mySplitPoint;
@@ -286,12 +297,13 @@ public class TotalOrderPartitioner<K,V>
 
 
   /**
-   * Read the cut points from the given IFile.
-   * @param fs The file system
-   * @param p The path to read
-   * @param keyClass The map output key class
-   * @param job The job config
-   * @throws IOException
+   * 从指定SequenceFile中读取所有分割点
+   * @param fs 分区文件所在文件系统
+   * @param p 分区文件路径
+   * @param keyClass Map输出键类型
+   * @param conf 作业配置
+   * @return 分割点数组
+   * @throws IOException 读取文件时发生IO异常
    */
                                  // matching key types enforced by passing in
   @SuppressWarnings("unchecked") // map output key class
@@ -303,6 +315,7 @@ public class TotalOrderPartitioner<K,V>
     ArrayList<K> parts = new ArrayList<K>();
     K key = ReflectionUtils.newInstance(keyClass, conf);
     try {
+      // 遍历SequenceFile读取所有分割点
       while ((key = (K) reader.next(key)) != null) {
         parts.add(key);
         key = ReflectionUtils.newInstance(keyClass, conf);
@@ -310,18 +323,15 @@ public class TotalOrderPartitioner<K,V>
       reader.close();
       reader = null;
     } finally {
+      // 确保资源关闭
       IOUtils.cleanupWithLogger(LOG, reader);
     }
     return parts.toArray((K[])Array.newInstance(keyClass, parts.size()));
   }
   
   /**
-   * 
-   * This object contains a TrieNodeRef if there is such a thing that
-   * can be repeated.  Two adjacent trie node slots that contain no 
-   * split points can be filled with the same trie node, even if they
-   * are not on the same level.  See buildTreeRec, below.
-   *
+   * 携带可复用Trie节点引用的辅助类，用于复用语义相同的无分割节点，减少内存占用
+   * 相邻的无分割节点语义相同，可以复用同一个对象实例
    */  
   private class CarriedTrieNodeRef
   {
@@ -334,14 +344,13 @@ public class TotalOrderPartitioner<K,V>
 
   
   /**
-   * Given a sorted set of cut points, build a trie that will find the correct
-   * partition quickly.
-   * @param splits the list of cut points
-   * @param lower the lower bound of partitions 0..numPartitions-1
-   * @param upper the upper bound of partitions 0..numPartitions-1
-   * @param prefix the prefix that we have already checked against
-   * @param maxDepth the maximum depth we will build a trie for
-   * @return the trie node that will divide the splits correctly
+   * 根据已排序分割点集合构建Trie树，用于快速分区查找
+   * @param splits 已排序分割点数组
+   * @param lower 当前区间的下界（包含）
+   * @param upper 当前区间的上界（不包含）
+   * @param prefix 当前已处理的键前缀
+   * @param maxDepth Trie树最大深度
+   * @return 构建完成的根Trie节点
    */
   private TrieNode buildTrie(BinaryComparable[] splits, int lower,
           int upper, byte[] prefix, int maxDepth) {
@@ -350,47 +359,39 @@ public class TotalOrderPartitioner<K,V>
   }
   
   /**
-   * This is the core of buildTrie.  The interface, and stub, above, just adds
-   * an empty CarriedTrieNodeRef.  
-   * 
-   * We build trie nodes in depth first order, which is also in key space
-   * order.  Every leaf node is referenced as a slot in a parent internal
-   * node.  If two adjacent slots [in the DFO] hold leaf nodes that have
-   * no split point, then they are not separated by a split point either, 
-   * because there's no place in key space for that split point to exist.
-   * 
-   * When that happens, the leaf nodes would be semantically identical, and
-   * we reuse the object.  A single CarriedTrieNodeRef "ref" lives for the 
-   * duration of the tree-walk.  ref carries a potentially reusable, unsplit
-   * leaf node for such reuse until a leaf node with a split arises, which 
-   * breaks the chain until we need to make a new unsplit leaf node.
-   * 
-   * Note that this use of CarriedTrieNodeRef means that for internal nodes, 
-   * for internal nodes if this code is modified in any way we still need 
-   * to make or fill in the subnodes in key space order.
+   * 递归构建Trie树的核心方法，支持复用无分割节点节省内存
+   * 按深度优先顺序构建，相邻无分割节点语义相同，复用同一个对象实例
+   * @param splits 已排序分割点数组
+   * @param lower 当前区间的下界（包含）
+   * @param upper 当前区间的上界（不包含）
+   * @param prefix 当前已处理的键前缀
+   * @param maxDepth Trie树最大深度
+   * @param ref 携带可复用无分割节点的引用
+   * @return 当前层级构建完成的Trie节点
    */
   private TrieNode buildTrieRec(BinaryComparable[] splits, int lower,
       int upper, byte[] prefix, int maxDepth, CarriedTrieNodeRef ref) {
     final int depth = prefix.length;
-    // We generate leaves for a single split point as well as for 
-    // no split points.
+    // 达到最大深度或区间分割点少于2个，生成叶子节点
     if (depth >= maxDepth || lower >= upper - 1) {
-        // If we have two consecutive requests for an unsplit trie node, we
-        // can deliver the same one the second time.
+        // 可复用已有无分割节点
         if (lower == upper && ref.content != null) {
             return ref.content;
         }
         TrieNode  result = LeafTrieNodeFactory(depth, splits, lower, upper);
+        // 如果是无分割节点，保存供后续复用
         ref.content = lower == upper ? result : null;
         return result;
     }
+    // 创建当前层级内部节点
     InnerTrieNode result = new InnerTrieNode(depth);
     byte[] trial = Arrays.copyOf(prefix, prefix.length + 1);
-    // append an extra byte on to the prefix
+    // 按字节值遍历所有可能的子节点
     int         currentBound = lower;
     for(int ch = 0; ch < 0xFF; ++ch) {
       trial[depth] = (byte) (ch + 1);
       lower = currentBound;
+      // 找到当前字节范围对应的分割点区间
       while (currentBound < upper) {
         if (splits[currentBound].compareTo(trial, 0, trial.length) >= 0) {
           break;
@@ -398,10 +399,11 @@ public class TotalOrderPartitioner<K,V>
         currentBound += 1;
       }
       trial[depth] = (byte) ch;
+      // 递归构建当前字节对应子节点
       result.child[0xFF & ch]
                    = buildTrieRec(splits, lower, currentBound, trial, maxDepth, ref);
     }
-    // pick up the rest
+    // 处理最后一个字节0xFF的情况
     trial[depth] = (byte)0xFF;
     result.child[0xFF] 
                  = buildTrieRec(splits, lower, currentBound, trial, maxDepth, ref);

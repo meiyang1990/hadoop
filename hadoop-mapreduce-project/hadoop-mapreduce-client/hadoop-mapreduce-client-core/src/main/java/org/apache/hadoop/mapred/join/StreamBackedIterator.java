@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,9 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
- * This class provides an implementation of ResetableIterator. This
- * implementation uses a byte array to store elements added to it.
+ * MapReduce 旧版API的流式支持可重置迭代器实现
+ * 基于字节数组存储添加的元素，提供可重复遍历的迭代能力，用于MapReduce连接操作中对多个输入流的数据合并处理
+ * 继承新版API实现，适配旧版mapred接口规范
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,6 +21,10 @@ package org.apache.hadoop.mapreduce.v2.api;
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.yarn.proto.MRClientProtocol.MRClientProtocolService;
 
+/**
+ * MR客户端协议PB序列化接口，基于Protobuf实现MapReduce客户端到ApplicationMaster的阻塞式RPC通信协议
+ * 定义了Hadoop RPC层需要的协议信息，继承Protobuf生成的阻塞服务接口
+ */
 @ProtocolInfo(
     protocolName = "org.apache.hadoop.mapreduce.v2.api.MRClientProtocolPB",
     protocolVersion = 1)

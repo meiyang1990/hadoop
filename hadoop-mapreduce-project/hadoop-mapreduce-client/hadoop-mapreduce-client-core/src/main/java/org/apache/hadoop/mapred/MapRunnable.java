@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,10 +25,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Expert: Generic interface for {@link Mapper}s.
+ * Map任务执行器通用接口，为高级用户自定义Map处理逻辑提供扩展能力。
  * 
- * <p>Custom implementations of <code>MapRunnable</code> can exert greater 
- * control on map processing e.g. multi-threaded, asynchronous mappers etc.</p>
+ * <p>自定义实现该接口可以对Map处理过程获得更大的控制权限，例如可以实现多线程Map、异步Map等高级处理场景。</p>
  * 
  * @see Mapper
  */
@@ -37,15 +37,14 @@ public interface MapRunnable<K1, V1, K2, V2>
     extends JobConfigurable {
   
   /** 
-   * Start mapping input <code>&lt;key, value&gt;</code> pairs.
+   * 启动Map任务执行，处理输入键值对并输出映射结果。
    *  
-   * <p>Mapping of input records to output records is complete when this method 
-   * returns.</p>
+   * <p>当该方法返回时，表示当前分片的所有输入记录映射处理全部完成。</p>
    * 
-   * @param input the {@link RecordReader} to read the input records.
-   * @param output the {@link OutputCollector} to collect the outputrecords.
-   * @param reporter {@link Reporter} to report progress, status-updates etc.
-   * @throws IOException
+   * @param input 输入记录读取器，用于从输入分片读取键值对
+   * @param output 输出收集器，用于收集Map处理产生的中间输出键值对
+   * @param reporter 进度报告器，用于向框架报告Map任务进度、更新状态
+   * @throws IOException 读取输入或写出输出时发生IO异常抛出
    */
   void run(RecordReader<K1, V1> input, OutputCollector<K2, V2> output,
            Reporter reporter)

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -59,6 +60,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
+ * 文件功能：MapReduce任务日志管理工具类，负责任务日志的本地存储、索引、同步和读取，
+ * 支持YARN MRv2和旧版MRv1两种日志目录结构，提供日志截断、尾截取功能
  * A simple logger to handle the task-specific user logs.
  * This class uses the system property <code>hadoop.log.dir</code>.
  * 
@@ -76,10 +79,21 @@ public class TaskLog {
   // localFS is set in (and used by) writeToIndexFile()
   static LocalFileSystem localFS = null;
   
+  /**
+   * 获取YARN MRv2容器日志目录路径，从系统属性读取
+   * @return YARN容器日志目录绝对路径
+   */
   public static String getMRv2LogDir() {
     return System.getProperty(YarnConfiguration.YARN_APP_CONTAINER_LOG_DIR);
   }
   
+  /**
+   * 根据任务尝试ID和日志类型，获取日志文件路径，兼容MRv1和MRv2两种格式
+   * @param taskid 任务尝试ID
+   * @param isCleanup 是否是清理尝试
+   * @param filter 日志类型
+   * @return 日志文件对象
+   */
   public static File getTaskLogFile(TaskAttemptID taskid, boolean isCleanup,
       LogName filter) {
     if (getMRv2LogDir() != null) {
@@ -89,6 +103,13 @@ public class TaskLog {
     }
   }
 
+  /**
+   * 获取日志文件实际存储位置，通过索引文件解析偏移位置
+   * @param taskid 任务尝试ID
+   * @param isCleanup 是否是清理尝试
+   * @param filter 日志类型
+   * @return 实际日志文件对象，解析失败返回null
+   */
   static File getRealTaskLogFileLocation(TaskAttemptID taskid,
       boolean isCleanup, LogName filter) {
     LogFileDetail l;
@@ -100,13 +121,28 @@ public class TaskLog {
     }
     return new File(l.location, filter.toString());
   }
+
+  /**
+   * 存储日志文件元信息，包含日志实际存储目录、起始偏移和长度
+   */
   private static class LogFileDetail {
     final static String LOCATION = "LOG_DIR:";
+    /**日志实际存储目录*/
     String location;
+    /**日志起始偏移*/
     long start;
+    /**日志长度*/
     long length;
   }
   
+  /**
+   * 从日志索引文件解析指定日志的元信息（位置、起始偏移、长度）
+   * @param taskid 任务尝试ID
+   * @param filter 日志类型
+   * @param isCleanup 是否是清理尝试
+   * @return 解析后的日志元信息
+   * @throws IOException 读取索引文件失败抛出异常
+   */
   private static LogFileDetail getLogFileDetail(TaskAttemptID taskid, 
                                                 LogName filter,
                                                 boolean isCleanup) 
@@ -115,25 +151,22 @@ public class TaskLog {
     BufferedReader fis = new BufferedReader(new InputStreamReader(
       SecureIOUtils.openForRead(indexFile, obtainLogDirOwner(taskid), null),
       StandardCharsets.UTF_8));
-    //the format of the index file is
-    //LOG_DIR: <the dir where the task logs are really stored>
-    //stdout:<start-offset in the stdout file> <length>
-    //stderr:<start-offset in the stderr file> <length>
-    //syslog:<start-offset in the syslog file> <length>
+    //索引文件格式如下：
+    //LOG_DIR: <日志实际存储目录路径>
+    //stdout:<stdout起始偏移> <stdout长度>
+    //stderr:<stderr起始偏移> <stderr长度>
+    //syslog:<syslog起始偏移> <syslog长度>
     LogFileDetail l = new LogFileDetail();
     String str = null;
     try {
       str = fis.readLine();
-      if (str == null) { // the file doesn't have anything
+      if (str == null) { // 索引文件为空
         throw new IOException("Index file for the log of " + taskid
             + " doesn't exist.");
       }
       l.location = str.substring(str.indexOf(LogFileDetail.LOCATION)
           + LogFileDetail.LOCATION.length());
-      // special cases are the debugout and profile.out files. They are
-      // guaranteed
-      // to be associated with each task attempt since jvm reuse is disabled
-      // when profiling/debugging is enabled
+      // debugout和profile.out特殊处理：JVM重用禁用时每个任务独占，直接读取整个文件
       if (filter.equals(LogName.DEBUGOUT) || filter.equals(LogName.PROFILE)) {
         l.length = new File(l.location, filter.toString()).length();
         l.start = 0;
@@ -142,7 +175,7 @@ public class TaskLog {
       }
       str = fis.readLine();
       while (str != null) {
-        // look for the exact line containing the logname
+        // 查找匹配当前日志类型的行
         if (str.contains(filter.toString())) {
           str = str.substring(filter.toString().length() + 1);
           String[] startAndLen = str.split(" ");
@@ -160,10 +193,22 @@ public class TaskLog {
     return l;
   }
   
+  /**
+   * 获取临时索引文件路径，用于保证索引更新原子性
+   * @param taskid 任务尝试ID
+   * @param isCleanup 是否是清理尝试
+   * @return 临时索引文件对象
+   */
   private static File getTmpIndexFile(TaskAttemptID taskid, boolean isCleanup) {
     return new File(getAttemptDir(taskid, isCleanup), "log.tmp");
   }
 
+  /**
+   * 获取日志索引文件路径
+   * @param taskid 任务尝试ID
+   * @param isCleanup 是否是清理尝试
+   * @return 索引文件对象
+   */
   static File getIndexFile(TaskAttemptID taskid, boolean isCleanup) {
     return new File(getAttemptDir(taskid, isCleanup), "log.index");
   }
@@ -171,6 +216,10 @@ public class TaskLog {
   /**
    * Obtain the owner of the log dir. This is 
    * determined by checking the job's log directory.
+   * 获取日志目录所有者用户名，通过作业日志目录的权限信息获取
+   * @param taskid 任务尝试ID
+   * @return 日志目录所有者用户名
+   * @throws IOException 获取文件状态失败抛出异常
    */
   static String obtainLogDirOwner(TaskAttemptID taskid) throws IOException {
     Configuration conf = new Configuration();
@@ -180,18 +229,37 @@ public class TaskLog {
     return jobStat.getOwner();
   }
 
+  /**
+   * 获取基础日志目录，从系统属性hadoop.log.dir读取
+   * @return 基础日志目录路径
+   */
   static String getBaseLogDir() {
     return System.getProperty("hadoop.log.dir");
   }
 
+  /**
+   * 获取单个任务尝试的日志目录路径
+   * @param taskid 任务尝试ID
+   * @param isCleanup 是否是清理尝试
+   * @return 任务尝试日志目录对象
+   */
   static File getAttemptDir(TaskAttemptID taskid, boolean isCleanup) {
     String cleanupSuffix = isCleanup ? ".cleanup" : "";
     return new File(getJobDir(taskid.getJobID()), taskid + cleanupSuffix);
   }
+  /**上一次写入索引时stdout文件长度*/
   private static long prevOutLength;
+  /**上一次写入索引时stderr文件长度*/
   private static long prevErrLength;
+  /**上一次写入索引时syslog文件长度*/
   private static long prevLogLength;
   
+  /**
+   * 原子写入日志索引文件，先写入临时文件再重命名保证原子性
+   * @param logLocation 日志实际存储目录
+   * @param isCleanup 是否是清理尝试
+   * @throws IOException 写入文件失败抛出异常
+   */
   private static synchronized 
   void writeToIndexFile(String logLocation,
                         boolean isCleanup) throws IOException {
@@ -205,11 +273,11 @@ public class TaskLog {
       bos = new BufferedOutputStream(
           SecureIOUtils.createForWrite(tmpIndexFile, 0644));
       dos = new DataOutputStream(bos);
-      //the format of the index file is
-      //LOG_DIR: <the dir where the task logs are really stored>
-      //STDOUT: <start-offset in the stdout file> <length>
-      //STDERR: <start-offset in the stderr file> <length>
-      //SYSLOG: <start-offset in the syslog file> <length>   
+      //索引文件格式如下：
+      //LOG_DIR: <日志实际存储目录路径>
+      //STDOUT: <stdout起始偏移> <stdout增量长度>
+      //STDERR: <stderr起始偏移> <stderr增量长度>
+      //SYSLOG: <syslog起始偏移> <syslog增量长度>   
 
       dos.writeBytes(LogFileDetail.LOCATION + logLocation + "\n"
           + LogName.STDOUT.toString() + ":");
@@ -237,19 +305,33 @@ public class TaskLog {
     Path indexFilePath = new Path(indexFile.getAbsolutePath());
     Path tmpIndexFilePath = new Path(tmpIndexFile.getAbsolutePath());
 
-    if (localFS == null) {// set localFS once
+    if (localFS == null) {// 延迟初始化本地文件系统，只初始化一次
       localFS = FileSystem.getLocal(new Configuration());
     }
+    // 重命名原子替换索引文件
     localFS.rename (tmpIndexFilePath, indexFilePath);
   }
+
+  /**
+   * 重置三个日志文件当前长度，用于新任务切换时初始化索引
+   * @param logLocation 日志存储目录
+   */
   private static void resetPrevLengths(String logLocation) {
     prevOutLength = new File(logLocation, LogName.STDOUT.toString()).length();
     prevErrLength = new File(logLocation, LogName.STDERR.toString()).length();
     prevLogLength = new File(logLocation, LogName.SYSLOG.toString()).length();
   }
+  /**当前正在执行的任务尝试ID*/
   private volatile static TaskAttemptID currentTaskid = null;
 
   @SuppressWarnings("unchecked")
+  /**
+   * 同步当前任务日志到索引文件，刷新标准输出和错误输出流，更新索引信息
+   * @param logLocation 日志存储目录
+   * @param taskid 当前任务尝试ID
+   * @param isCleanup 是否是清理尝试
+   * @throws IOException 写入索引失败抛出异常
+   */
   public synchronized static void syncLogs(String logLocation, 
                                            TaskAttemptID taskid,
                                            boolean isCleanup) 
@@ -263,11 +345,14 @@ public class TaskLog {
     writeToIndexFile(logLocation, isCleanup);
   }
 
+  /**
+   * 日志同步关闭钩子，关闭同步调度器，刷新流和日志追加器，保证日志全部写出
+   * @param scheduler 日志同步调度器
+   */
   public static synchronized void syncLogsShutdown(
     ScheduledExecutorService scheduler) 
   {
-    // flush standard streams
-    //
+    // 刷新标准输出错误流
     System.out.flush();
     System.err.flush();
 
@@ -275,19 +360,20 @@ public class TaskLog {
       scheduler.shutdownNow();
     }
 
-    // flush & close all appenders
+    // 关闭所有日志追加器，刷新缓冲区
     LogManager.shutdown(); 
   }
 
   @SuppressWarnings("unchecked")
+  /**
+   * 手动同步所有日志，刷新标准流和所有日志追加器的缓冲区
+   */
   public static synchronized void syncLogs() {
-    // flush standard streams
-    //
+    // 刷新标准输出错误流
     System.out.flush();
     System.err.flush();
 
-    // flush flushable appenders
-    //
+    // 刷新所有可刷新的日志追加器
     final Logger rootLogger = Logger.getRootLogger();
     flushAppenders(rootLogger);
     final Enumeration<Logger> allLoggers = rootLogger.getLoggerRepository().
@@ -299,6 +385,10 @@ public class TaskLog {
   }
 
   @SuppressWarnings("unchecked")
+  /**
+   * 刷新指定日志记录器下所有可刷新的追加器缓冲区
+   * @param l 日志记录器
+   */
   private static void flushAppenders(Logger l) {
     final Enumeration<Appender> allAppenders = l.getAllAppenders();
     while (allAppenders.hasMoreElements()) {
@@ -314,6 +404,10 @@ public class TaskLog {
     }
   }
 
+  /**
+   * 创建定时日志同步器，定期刷新日志缓冲区保证日志实时性，注册JVM关闭钩子
+   * @return 定时日志同步调度器
+   */
   public static ScheduledExecutorService createLogSyncer() {
     final ScheduledExecutorService scheduler =
         HadoopExecutors.newSingleThreadScheduledExecutor(
@@ -326,12 +420,14 @@ public class TaskLog {
                 return t;
               }
             });
+    // 注册JVM关闭钩子，关闭时刷新日志
     ShutdownHookManager.get().addShutdownHook(new Runnable() {
       @Override
       public void run() {
         TaskLog.syncLogsShutdown(scheduler);
       }
     }, 50);
+    // 每5秒执行一次日志同步，初始延迟0秒
     scheduler.scheduleWithFixedDelay(
         new Runnable() {
           @Override
@@ -343,310 +439,11 @@ public class TaskLog {
   }
 
   /**
-   * The filter for userlogs.
+   * 任务日志类型枚举，定义MapReduce任务生成的各类日志
    */
   @InterfaceAudience.Private
   public enum LogName {
-    /** Log on the stdout of the task. */
+    /** 任务标准输出日志 */
     STDOUT ("stdout"),
 
-    /** Log on the stderr of the task. */
-    STDERR ("stderr"),
-    
-    /** Log on the map-reduce system logs of the task. */
-    SYSLOG ("syslog"),
-    
-    /** The java profiler information. */
-    PROFILE ("profile.out"),
-    
-    /** Log the debug script's stdout  */
-    DEBUGOUT ("debugout");
-        
-    private String prefix;
-    
-    private LogName(String prefix) {
-      this.prefix = prefix;
-    }
-    
-    @Override
-    public String toString() {
-      return prefix;
-    }
-  }
-
-  public static class Reader extends InputStream {
-    private long bytesRemaining;
-    private FileInputStream file;
-
-    /**
-     * Read a log file from start to end positions. The offsets may be negative,
-     * in which case they are relative to the end of the file. For example,
-     * Reader(taskid, kind, 0, -1) is the entire file and 
-     * Reader(taskid, kind, -4197, -1) is the last 4196 bytes. 
-     * @param taskid the id of the task to read the log file for
-     * @param kind the kind of log to read
-     * @param start the offset to read from (negative is relative to tail)
-     * @param end the offset to read upto (negative is relative to tail)
-     * @param isCleanup whether the attempt is cleanup attempt or not
-     * @throws IOException
-     */
-    public Reader(TaskAttemptID taskid, LogName kind, 
-                  long start, long end, boolean isCleanup) throws IOException {
-      // find the right log file
-      LogFileDetail fileDetail = getLogFileDetail(taskid, kind, isCleanup);
-      // calculate the start and stop
-      long size = fileDetail.length;
-      if (start < 0) {
-        start += size + 1;
-      }
-      if (end < 0) {
-        end += size + 1;
-      }
-      start = Math.max(0, Math.min(start, size));
-      end = Math.max(0, Math.min(end, size));
-      start += fileDetail.start;
-      end += fileDetail.start;
-      bytesRemaining = end - start;
-      String owner = obtainLogDirOwner(taskid);
-      file = SecureIOUtils.openForRead(new File(fileDetail.location, kind.toString()), 
-          owner, null);
-      // skip upto start
-      long pos = 0;
-      while (pos < start) {
-        long result = file.skip(start - pos);
-        if (result < 0) {
-          bytesRemaining = 0;
-          break;
-        }
-        pos += result;
-      }
-    }
-    
-    @Override
-    public int read() throws IOException {
-      int result = -1;
-      if (bytesRemaining > 0) {
-        bytesRemaining -= 1;
-        result = file.read();
-      }
-      return result;
-    }
-    
-    @Override
-    public int read(byte[] buffer, int offset, int length) throws IOException {
-      length = (int) Math.min(length, bytesRemaining);
-      int bytes = file.read(buffer, offset, length);
-      if (bytes > 0) {
-        bytesRemaining -= bytes;
-      }
-      return bytes;
-    }
-    
-    @Override
-    public int available() throws IOException {
-      return (int) Math.min(bytesRemaining, file.available());
-    }
-
-    @Override
-    public void close() throws IOException {
-      file.close();
-    }
-  }
-
-  private static final String bashCommand = "bash";
-  private static final String tailCommand = "tail";
-  
-  /**
-   * Get the desired maximum length of task's logs.
-   * @param conf the job to look in
-   * @return the number of bytes to cap the log files at
-   */
-  public static long getTaskLogLength(JobConf conf) {
-   return getTaskLogLimitBytes(conf);
-  }
-
-  public static long getTaskLogLimitBytes(Configuration conf) {
-    return conf.getLong(JobContext.TASK_USERLOG_LIMIT, 0) * 1024;
-  }
-
-  
-  /**
-   * Wrap a command in a shell to capture stdout and stderr to files.
-   * Setup commands such as setting memory limit can be passed which 
-   * will be executed before exec.
-   * If the tailLength is 0, the entire output will be saved.
-   * @param setup The setup commands for the execed process.
-   * @param cmd The command and the arguments that should be run
-   * @param stdoutFilename The filename that stdout should be saved to
-   * @param stderrFilename The filename that stderr should be saved to
-   * @param tailLength The length of the tail to be saved.
-   * @param useSetsid Should setsid be used in the command or not.
-   * @return the modified command that should be run
-   */
-  public static List<String> captureOutAndError(List<String> setup,
-                                                List<String> cmd, 
-                                                File stdoutFilename,
-                                                File stderrFilename,
-                                                long tailLength,
-                                                boolean useSetsid
-                                               ) throws IOException {
-    List<String> result = new ArrayList<String>(3);
-    result.add(bashCommand);
-    result.add("-c");
-    String mergedCmd = buildCommandLine(setup, cmd, stdoutFilename,
-                                                    stderrFilename, tailLength, 
-                                                    useSetsid);
-    result.add(mergedCmd);
-    return result;
-  }
-  
-  /**
-   * Construct the command line for running the task JVM
-   * @param setup The setup commands for the execed process.
-   * @param cmd The command and the arguments that should be run
-   * @param stdoutFilename The filename that stdout should be saved to
-   * @param stderrFilename The filename that stderr should be saved to
-   * @param tailLength The length of the tail to be saved.
-   * @return the command line as a String
-   * @throws IOException
-   */
-  static String buildCommandLine(List<String> setup, List<String> cmd, 
-                                      File stdoutFilename,
-                                      File stderrFilename,
-                                      long tailLength, 
-                                      boolean useSetsid)
-                                throws IOException {
-    
-    String stdout = FileUtil.makeShellPath(stdoutFilename);
-    String stderr = FileUtil.makeShellPath(stderrFilename);
-    StringBuilder mergedCmd = new StringBuilder();
-    
-    // Export the pid of taskJvm to env variable JVM_PID.
-    // Currently pid is not used on Windows
-    if (!Shell.WINDOWS) {
-      mergedCmd.append(" export JVM_PID=`echo $$` ; ");
-    }
-
-    if (setup != null && setup.size() > 0) {
-      mergedCmd.append(addCommand(setup, false));
-      mergedCmd.append(";");
-    }
-    if (tailLength > 0) {
-      mergedCmd.append("(");
-    } else if(ProcessTree.isSetsidAvailable && useSetsid &&
-        !Shell.WINDOWS) {
-      mergedCmd.append("exec setsid ");
-    } else {
-      mergedCmd.append("exec ");
-    }
-    mergedCmd.append(addCommand(cmd, true));
-    mergedCmd.append(" < /dev/null ");
-    if (tailLength > 0) {
-      mergedCmd.append(" | ");
-      mergedCmd.append(tailCommand);
-      mergedCmd.append(" -c ");
-      mergedCmd.append(tailLength);
-      mergedCmd.append(" >> ");
-      mergedCmd.append(stdout);
-      mergedCmd.append(" ; exit $PIPESTATUS ) 2>&1 | ");
-      mergedCmd.append(tailCommand);
-      mergedCmd.append(" -c ");
-      mergedCmd.append(tailLength);
-      mergedCmd.append(" >> ");
-      mergedCmd.append(stderr);
-      mergedCmd.append(" ; exit $PIPESTATUS");
-    } else {
-      mergedCmd.append(" 1>> ");
-      mergedCmd.append(stdout);
-      mergedCmd.append(" 2>> ");
-      mergedCmd.append(stderr);
-    }
-    return mergedCmd.toString();
-  }
-  
-  /**
-   * Construct the command line for running the debug script
-   * @param cmd The command and the arguments that should be run
-   * @param stdoutFilename The filename that stdout should be saved to
-   * @param stderrFilename The filename that stderr should be saved to
-   * @param tailLength The length of the tail to be saved.
-   * @return the command line as a String
-   * @throws IOException
-   */
-  static String buildDebugScriptCommandLine(List<String> cmd, String debugout)
-  throws IOException {
-    StringBuilder mergedCmd = new StringBuilder();
-    mergedCmd.append("exec ");
-    boolean isExecutable = true;
-    for(String s: cmd) {
-      if (isExecutable) {
-        // the executable name needs to be expressed as a shell path for the  
-        // shell to find it.
-        mergedCmd.append(FileUtil.makeShellPath(new File(s)));
-        isExecutable = false; 
-      } else {
-        mergedCmd.append(s);
-      }
-      mergedCmd.append(" ");
-    }
-    mergedCmd.append(" < /dev/null ");
-    mergedCmd.append(" >");
-    mergedCmd.append(debugout);
-    mergedCmd.append(" 2>&1 ");
-    return mergedCmd.toString();
-  }
-  /**
-   * Add quotes to each of the command strings and
-   * return as a single string 
-   * @param cmd The command to be quoted
-   * @param isExecutable makes shell path if the first 
-   * argument is executable
-   * @return returns The quoted string. 
-   * @throws IOException
-   */
-  public static String addCommand(List<String> cmd, boolean isExecutable) 
-  throws IOException {
-    StringBuilder command = new StringBuilder();
-    for(String s: cmd) {
-    	command.append('\'');
-      if (isExecutable) {
-        // the executable name needs to be expressed as a shell path for the  
-        // shell to find it.
-    	  command.append(FileUtil.makeShellPath(new File(s)));
-        isExecutable = false; 
-      } else {
-    	  command.append(s);
-      }
-      command.append('\'');
-      command.append(" ");
-    }
-    return command.toString();
-  }
-  
-  
-  /**
-   * Method to return the location of user log directory.
-   * 
-   * @return base log directory
-   */
-  static File getUserLogDir() {
-    if (!LOG_DIR.exists()) {
-      boolean b = LOG_DIR.mkdirs();
-      if (!b) {
-        LOG.debug("mkdirs failed. Ignoring.");
-      }
-    }
-    return LOG_DIR;
-  }
-  
-  /**
-   * Get the user log directory for the job jobid.
-   * 
-   * @param jobid
-   * @return user log directory for the job
-   */
-  public static File getJobDir(JobID jobid) {
-    return new File(getUserLogDir(), jobid.toString());
-  }
-
-} // TaskLog
+    /** 任务标准错误

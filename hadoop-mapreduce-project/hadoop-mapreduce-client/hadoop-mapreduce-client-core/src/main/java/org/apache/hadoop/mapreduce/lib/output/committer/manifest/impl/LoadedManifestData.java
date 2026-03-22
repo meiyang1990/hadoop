@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,34 +29,32 @@ import org.apache.hadoop.mapreduce.lib.output.committer.manifest.stages.LoadMani
 import static java.util.Objects.requireNonNull;
 
 /**
- * Information about the loaded manifest data;
- * Returned from {@link LoadManifestsStage} and then
- * used for renaming the work.
+ * 已加载的任务输出清单数据容器，保存LoadManifestsStage加载完成后输出的数据结构，
+ * 供后续文件重命名提交阶段使用，包含需要创建的目录信息和待重命名文件的序列化数据。
  */
 public final class LoadedManifestData {
 
   /**
-   * Directories.
+   * 需要创建的目录条目集合。
    */
   private final Collection<DirEntry> directories;
 
   /**
-   * Path of the intermediate cache of
-   * files to rename.
-   * This will be a sequence file of long -> FileEntry
+   * 待重命名文件条目序列化文件路径，存储在本地文件系统，
+   * 文件格式为SequenceFile，key为long类型，value为FileEntry
    */
   private final Path entrySequenceData;
 
   /**
-   * How many files will be renamed.
+   * 待重命名文件总数。
    */
   private final int fileCount;
 
   /**
-   * Data about the loaded manifests.
-   * @param directories directories
-   * @param entrySequenceData Path in local fs to the entry sequence data.
-   * @param fileCount number of files.
+   * 构造已加载清单数据对象。
+   * @param directories 需要创建的目录条目集合
+   * @param entrySequenceData 本地文件系统中待重命名文件序列化数据的路径
+   * @param fileCount 待重命名文件总数
    */
   public LoadedManifestData(
       final Collection<DirEntry> directories,
@@ -66,32 +65,41 @@ public final class LoadedManifestData {
     this.entrySequenceData = requireNonNull(entrySequenceData);
   }
 
+  /**
+   * 获取需要创建的目录条目集合。
+   * @return 需要创建的目录集合
+   */
   public Collection<DirEntry> getDirectories() {
     return directories;
   }
 
+  /**
+   * 获取待重命名文件总数。
+   * @return 文件总数
+   */
   public int getFileCount() {
     return fileCount;
   }
 
   /**
-   * Get the path to the entry sequence data file.
-   * @return the path
+   * 获取待重命名文件序列化数据的路径。
+   * @return 序列化文件路径
    */
   public Path getEntrySequenceData() {
     return entrySequenceData;
   }
 
   /**
-   * Get the entry sequence data as a file.
+   * 将序列化文件路径转换为Java本地File对象。
+   * @return 序列化数据文件
    */
   public File getEntrySequenceFile() {
     return new File(entrySequenceData.toUri());
   }
 
   /**
-   * Delete the entry sequence file.
-   * @return whether or not the delete was successful.
+   * 删除本地存储的序列化数据文件，作业提交完成后清理临时文件。
+   * @return 删除操作是否成功
    */
   public boolean deleteEntrySequenceFile() {
     return getEntrySequenceFile().delete();

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,12 +23,22 @@ import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 
+/**
+ * 作业提交器的作业终止事件，封装作业终止时需要传递给提交器处理的相关信息。
+ * 用于在MapReduce应用作业中止流程中，触发输出提交器执行作业终止清理操作。
+ */
 public class CommitterJobAbortEvent extends CommitterEvent {
 
   private JobId jobID;
   private JobContext jobContext;
   private JobStatus.State finalState;
 
+  /**
+   * 构造作业终止事件，封装终止相关信息。
+   * @param jobID 终止作业的ID
+   * @param jobContext 作业上下文对象，包含作业运行时配置和信息
+   * @param finalState 作业终止后的最终状态
+   */
   public CommitterJobAbortEvent(JobId jobID, JobContext jobContext,
       JobStatus.State finalState) {
     super(CommitterEventType.JOB_ABORT);
@@ -36,14 +47,26 @@ public class CommitterJobAbortEvent extends CommitterEvent {
     this.finalState = finalState;
   }
 
+  /**
+   * 获取终止作业的ID。
+   * @return 作业ID
+   */
   public JobId getJobID() {
     return jobID;
   }
 
+  /**
+   * 获取终止作业的上下文对象。
+   * @return 作业上下文
+   */
   public JobContext getJobContext() {
     return jobContext;
   }
 
+  /**
+   * 获取作业终止后的最终状态。
+   * @return 作业最终状态
+   */
   public JobStatus.State getFinalState() {
     return finalState;
   }

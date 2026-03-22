@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,13 +19,14 @@
 package org.apache.hadoop.mapreduce.checkpoint;
 
 /**
- * This class represent a naming service for checkpoints.
+ * 检查点命名服务接口，为MapReduce检查点生成唯一名称标识
+ * 核心职责是提供检查点命名抽象，支持不同命名策略的实现
  */
 public interface CheckpointNamingService {
 
   /**
-   * Generate a new checkpoint Name
-   * @return the checkpoint name
+   * 生成一个新的检查点名称
+   * @return 生成的检查点唯一名称
    */
   public String getNewName();
 

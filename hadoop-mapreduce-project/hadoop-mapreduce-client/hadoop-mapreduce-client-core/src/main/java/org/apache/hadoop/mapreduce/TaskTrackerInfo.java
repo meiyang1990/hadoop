@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,24 +28,41 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
 
 /**
- * Information about TaskTracker.
+ * TaskTracker节点信息数据容器，存储TaskTracker的基本信息以及黑名单状态相关数据，
+ * 在MapReduce框架中用于JobTracker判断是否向该节点分配任务。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class TaskTrackerInfo implements Writable {
+  // TaskTracker节点名称
   String name;
+  // 是否被列入黑名单
   boolean isBlacklisted = false;
+  // 被加入黑名单的原因
   String reasonForBlacklist = "";
+  // 黑名单详情报告
   String blacklistReport = "";
   
+  /**
+   * 空构造方法，用于反序列化创建对象。
+   */
   public TaskTrackerInfo() {
   }
-  // construct an active tracker
+
+  /**
+   * 构造可用TaskTracker信息，构造状态为非黑名单的正常节点信息。
+   * @param name TaskTracker节点名称
+   */
   public TaskTrackerInfo(String name) {
     this.name = name;
   }
 
-  // construct blacklisted tracker
+  /**
+   * 构造已被拉黑的TaskTracker信息，记录黑名单相关信息。
+   * @param name TaskTracker节点名称
+   * @param reasonForBlacklist 被拉黑的原因
+   * @param report 黑名单详情报告
+   */
   public TaskTrackerInfo(String name, String reasonForBlacklist,
       String report) {
     this.name = name;
@@ -54,36 +72,35 @@ public class TaskTrackerInfo implements Writable {
   }
 
   /**
-   * Gets the tasktracker's name.
+   * 获取TaskTracker节点名称。
    * 
-   * @return tracker's name.
+   * @return TaskTracker节点名称
    */
   public String getTaskTrackerName() {
     return name;
   }
   
   /**
-   * Whether tracker is blacklisted
-   * @return true if tracker is blacklisted
-   *         false otherwise
+   * 判断当前TaskTracker是否被列入黑名单（黑名单节点不会分配新任务）。
+   * @return true表示已被拉黑，false表示节点正常可用
    */
   public boolean isBlacklisted() {
     return isBlacklisted;
   }
   
   /**
-   * Gets the reason for which the tasktracker was blacklisted.
+   * 获取TaskTracker被列入黑名单的原因。
    * 
-   * @return reason which tracker was blacklisted
+   * @return 被拉黑原因描述
    */
   public String getReasonForBlacklist() {
     return reasonForBlacklist;
   }
 
   /**
-   * Gets a descriptive report about why the tasktracker was blacklisted.
+   * 获取TaskTracker被列入黑名单的详细描述报告。
    * 
-   * @return report describing why the tasktracker was blacklisted.
+   * @return 黑名单详情报告文本
    */
   public String getBlacklistReport() {
     return blacklistReport;
@@ -91,17 +108,25 @@ public class TaskTrackerInfo implements Writable {
   
   @Override
   public void readFields(DataInput in) throws IOException {
+    // 反序列化读取节点名称
     name = Text.readString(in);
+    // 反序列化读取黑名单标记
     isBlacklisted = in.readBoolean();
+    // 反序列化读取拉黑原因
     reasonForBlacklist = Text.readString(in);
+    // 反序列化读取黑名单报告
     blacklistReport = Text.readString(in);
   }
 
   @Override
   public void write(DataOutput out) throws IOException {
+    // 序列化输出节点名称
     Text.writeString(out, name);
+    // 序列化输出黑名单标记
     out.writeBoolean(isBlacklisted);
+    // 序列化输出拉黑原因
     Text.writeString(out, reasonForBlacklist);
+    // 序列化输出黑名单报告
     Text.writeString(out, blacklistReport);
   }
 

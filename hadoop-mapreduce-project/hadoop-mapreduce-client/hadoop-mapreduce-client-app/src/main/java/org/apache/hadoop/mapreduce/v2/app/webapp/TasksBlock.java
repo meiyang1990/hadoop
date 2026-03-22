@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -37,14 +38,28 @@ import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * 任务列表页面HTML块，负责在MapReduce ApplicationMaster WebUI中渲染任务列表表格
+ * 核心职责：根据过滤条件（任务类型、任务状态）筛选任务，构造前端表格所需的JSON数据，生成任务列表HTML结构
+ */
 public class TasksBlock extends HtmlBlock {
   final App app;
 
-  @Inject TasksBlock(App app) {
+  @Inject 
+  /**
+   * 构造函数，通过依赖注入获取Application上下文
+   * @param app Application上下文对象，包含当前作业信息
+   */
+  TasksBlock(App app) {
     this.app = app;
   }
 
+  /**
+   * 渲染任务列表HTML块
+   * @param html HTML块输出对象
+   */
   @Override protected void render(Block html) {
+    // 当前作业不存在时，仅渲染标题
     if (app.getJob() == null) {
       html.
         h2($(TITLE));
@@ -52,9 +67,11 @@ public class TasksBlock extends HtmlBlock {
     }
     TaskType type = null;
     String symbol = $(TASK_TYPE);
+    // 从请求参数解析任务类型过滤条件
     if (!symbol.isEmpty()) {
       type = MRApps.taskType(symbol);
     }
+    // 创建任务列表表格框架并渲染表头
     TBODY<TABLE<Hamlet>> tbody = html.
       table("#tasks").
         thead().
@@ -67,42 +84,51 @@ public class TasksBlock extends HtmlBlock {
             th("Finish Time").
             th("Elapsed Time").__().__().
         tbody();
+    // 构建前端表格所需的JSON数据数组
     StringBuilder tasksTableData = new StringBuilder("[\n");
 
+    // 遍历当前作业所有任务，按过滤条件筛选并构造表格数据
     for (Task task : app.getJob().getTasks().values()) {
+      // 按任务类型过滤，不符合则跳过
       if (type != null && task.getType() != type) {
         continue;
       }
       String taskStateStr = $(TASK_STATE);
+      // 未指定状态过滤条件时默认显示所有状态
       if (taskStateStr == null || taskStateStr.trim().equals("")) {
         taskStateStr = "ALL";
       }
 
+      // 按任务状态过滤
       if (!taskStateStr.equalsIgnoreCase("ALL"))
       {
         try {
-          // get stateUI enum
+          // 解析状态过滤条件
           MRApps.TaskStateUI stateUI = MRApps.taskState(taskStateStr);
+          // 当前任务状态不匹配则跳过
           if (!stateUI.correspondsTo(task.getState()))
           {
             continue;
           }
         } catch (IllegalArgumentException e) {
-          continue; // not supported state, ignore
+          continue; // 非法状态值，跳过该任务
         }
       }
 
+      // 构造任务信息数据对象
       TaskInfo info = new TaskInfo(task);
       String tid = info.getId();
       String pct = StringUtils.format("%.2f", info.getProgress());
+      // 将任务信息拼接为JSON数组项，包含HTML链接和进度条
       tasksTableData.append("[\"<a href='").append(url("task", tid))
       .append("'>").append(tid).append("</a>\",\"")
-      //Progress bar
+      // 拼接进度条HTML
       .append("<br title='").append(pct)
       .append("'> <div class='").append(C_PROGRESSBAR).append("' title='")
       .append(join(pct, '%')).append("'> ").append("<div class='")
       .append(C_PROGRESSBAR_VALUE).append("' style='")
       .append(join("width:", pct, '%')).append("'> </div> </div>\",\"")
+      // 转义任务状态文本防止XSS和JSON解析错误
       .append(StringEscapeUtils.escapeEcmaScript(
               StringEscapeUtils.escapeHtml4(info.getStatus()))).append("\",\"")
 
@@ -111,14 +137,17 @@ public class TasksBlock extends HtmlBlock {
       .append(info.getFinishTime()).append("\",\"")
       .append(info.getElapsedTime()).append("\"],\n");
     }
-    //Remove the last comma and close off the array of arrays
+    // 移除最后一项多余的逗号，保证JSON格式合法
     if(tasksTableData.charAt(tasksTableData.length() - 2) == ',') {
       tasksTableData.delete(tasksTableData.length()-2, tasksTableData.length()-1);
     }
+    // 关闭JSON数组
     tasksTableData.append("]");
+    // 将JSON数据写入页面JavaScript变量，供前端表格渲染使用
     html.script().$type("text/javascript").
         __("var tasksTableData=" + tasksTableData).__();
 
+    // 关闭表格标签
     tbody.__().__();
   }
 }

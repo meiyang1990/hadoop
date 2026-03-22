@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,9 +34,9 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_SAVE_SUCCESS;
 
 /**
- * Save the _SUCCESS file to the destination directory
- * via a temp file in the job attempt dir.
- * Returns the path of the file
+ * 作业提交完成阶段：将_SUCCESS标记文件保存到输出目标目录
+ * 先写入作业尝试临时目录的临时文件，再原子重命名到最终位置，保证一致性
+ * 最终返回成功标记文件的路径
  */
 public class SaveSuccessFileStage extends
     AbstractJobOrTaskStage<ManifestSuccessData, Path> {
@@ -43,36 +44,42 @@ public class SaveSuccessFileStage extends
   private static final Logger LOG = LoggerFactory.getLogger(
       SaveSuccessFileStage.class);
 
+  /**
+   * 构造保存_SUCCESS标记文件阶段实例
+   * @param stageConfig 阶段配置信息
+   */
   public SaveSuccessFileStage(final StageConfig stageConfig) {
     super(false, stageConfig, OP_STAGE_JOB_SAVE_SUCCESS, false);
   }
 
   /**
-   * Stage name is always job commit.
-   * @param arguments args to the invocation.
-   * @return stage name
+   * 获取当前阶段名称，始终返回作业提交阶段名称
+   * @param arguments 输入参数，本次为成功元数据
+   * @return 阶段名称
    */
   @Override
   protected String getStageName(ManifestSuccessData arguments) {
-    // set it to the job commit stage, always.
+    // 始终归为作业提交阶段统计
     return OP_STAGE_JOB_COMMIT;
   }
 
   /**
-   * Execute.
-   * @param successData success data to save
-   * @return path saved to.
-   * @throws IOException failure
+   * 执行保存_SUCCESS标记文件的核心逻辑
+   * @param successData 需要保存的作业成功元数据
+   * @return 最终成功标记文件路径
+   * @throws IOException 文件操作失败时抛出异常
    */
   @Override
   protected Path executeStage(final ManifestSuccessData successData)
       throws IOException {
-    // Save the marker
+    // 获取最终_SUCCESS文件的目标路径
     Path successFile = getStageConfig().getJobSuccessMarkerPath();
+    // 先创建临时文件到作业尝试目录，避免失败留下不完整标记
     Path successTempFile = new Path(getJobAttemptDir(), SUCCESS_MARKER + TMP_SUFFIX);
     LOG.debug("{}: Saving _SUCCESS file to {} via {}", successFile,
         getName(),
         successTempFile);
+    // 保存元数据到临时文件并重命名到最终位置，完成后统计操作指标
     saveManifest(() -> successData, successTempFile, successFile, OP_SAVE_SUMMARY_FILE);
     return successFile;
   }

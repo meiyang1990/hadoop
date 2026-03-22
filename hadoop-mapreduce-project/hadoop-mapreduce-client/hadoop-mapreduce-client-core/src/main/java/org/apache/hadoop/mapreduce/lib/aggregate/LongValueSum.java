@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that sums up 
- * a sequence of long values.
+ * 长整型数值求和聚合器，为MapReduce聚合框架实现对一系列长整型值的累加求和功能
+ * 用于MapReduce的Combiner阶段对相同key的数值进行预聚合，减少网络传输量
  * 
  */
 @InterfaceAudience.Public
@@ -35,7 +36,7 @@ public class LongValueSum implements ValueAggregator<String> {
   long sum = 0;
     
   /**
-   *  the default constructor
+   * 默认构造函数，初始化时重置求和结果
    *
    */
   public LongValueSum() {
@@ -43,10 +44,9 @@ public class LongValueSum implements ValueAggregator<String> {
   }
 
   /**
-   * add a value to the aggregator
+   * 添加一个新的数值到累加器中，将字符串表示的长整型值解析后累加
    * 
-   * @param val
-   *          an object whose string representation represents a long value.
+   * @param val 需要累加的对象，其字符串表示对应一个长整型值
    * 
    */
   public void addNextValue(Object val) {
@@ -54,10 +54,9 @@ public class LongValueSum implements ValueAggregator<String> {
   }
     
   /**
-   * add a value to the aggregator
+   * 添加一个长整型值到累加器中直接累加
    * 
-   * @param val
-   *          a long value.
+   * @param val 需要累加的长整型值
    * 
    */
   public void addNextValue(long val) {
@@ -65,30 +64,31 @@ public class LongValueSum implements ValueAggregator<String> {
   }
     
   /**
-   * @return the aggregated value
+   * 获取当前累加得到的总和
+   * @return 累加求和的最终结果
    */
   public long getSum() {
     return this.sum;
   }
     
   /**
-   * @return the string representation of the aggregated value
+   * 获取聚合结果的字符串报告
+   * @return 累加总和的字符串表示
    */
   public String getReport() {
     return ""+sum;
   }
 
   /**
-   * reset the aggregator
+   * 重置聚合器，清空当前累加结果
    */
   public void reset() {
     sum = 0;
   }
 
   /**
-   * @return return an array of one element. The element is a string
-   *         representation of the aggregated value. The return value is
-   *         expected to be used by the a combiner.
+   * 生成供Combiner使用的聚合输出结果
+   * @return 只包含一个元素的字符串数组，元素为累加总和的字符串表示，供Combiner处理
    */
   public ArrayList<String> getCombinerOutput() {
     ArrayList<String> retv = new ArrayList<String>(1);
@@ -96,5 +96,3 @@ public class LongValueSum implements ValueAggregator<String> {
     return retv;
   }
 }
-
-

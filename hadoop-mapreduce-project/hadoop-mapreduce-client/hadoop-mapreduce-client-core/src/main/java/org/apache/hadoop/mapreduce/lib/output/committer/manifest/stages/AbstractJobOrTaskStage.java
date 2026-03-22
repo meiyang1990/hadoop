@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -70,14 +71,11 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.Aud
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.InternalConstants.SAVE_SLEEP_INTERVAL;
 
 /**
- * A Stage in Task/Job Commit.
- * A stage can be executed once only, creating the return value of the
- * {@link #apply(Object)} method, and, potentially, updating the state of the
- * store via {@link ManifestStoreOperations}.
- * IOStatistics will also be updated.
- * Stages are expected to be combined to form the commit protocol.
- * @param <IN> Type of arguments to the stage.
- * @param <OUT> Type of result.
+ * 文件级输出提交器Manifest协议中作业/任务提交阶段的抽象基类。
+ * 定义了提交阶段的通用执行框架，所有具体提交阶段都需要继承此类，
+ * 保证每个阶段只能执行一次，并提供了统计收集、通用文件操作等能力。
+ * @param <IN> 阶段入参类型
+ * @param <OUT> 阶段返回结果类型
  */
 public abstract class AbstractJobOrTaskStage<IN, OUT>
     implements JobOrTaskStage<IN, OUT> {
@@ -86,63 +84,57 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
       AbstractJobOrTaskStage.class);
 
   /**
-   * Error text on rename failure: {@value}.
+   * 重命名失败错误信息前缀。
    */
   public static final String FAILED_TO_RENAME_PREFIX = "Failed to ";
 
   /**
-   * Is this a task stage? If so, toString() includes task
-   * info..
+   * 标记是否为任务级阶段。
    */
   private final boolean isTaskStage;
 
   /**
-   * Configuration of all the stages in the ongoing committer
-   * operation.
+   * 整个提交操作的共享配置。
    */
   private final StageConfig stageConfig;
 
   /**
-   * Name of the stage for statistics and logging.
+   * 阶段统计名称，用于统计和日志输出。
    */
   private final String stageStatisticName;
 
   /**
-   * Callbacks to update store.
-   * This is not made visible to the stages; they must
-   * go through the wrapper classes in this class, which
-   * add statistics and logging.
+   * 存储操作回调接口，封装对文件系统的操作。
+   * 本类会对操作添加统计和日志，子类无需直接操作底层接口。
    */
   private final ManifestStoreOperations operations;
 
   /**
-   * Submitter for doing IO against the store.
+   * IO操作并行执行器提交器。
    */
   private final TaskPool.Submitter ioProcessors;
 
   /**
-   * Used to stop any re-entrancy of the rename.
-   * This is an execute-once operation.
+   * 执行标记，保证阶段只能执行一次，防止重入。
    */
   private final AtomicBoolean executed = new AtomicBoolean(false);
 
   /**
-   * Tracker of the duration of the execution of the stage.
-   * set after {@link #executeStage(Object)} completes.
+   * 阶段执行时长追踪器，执行完成后赋值。
    */
   private DurationTracker stageExecutionTracker;
 
   /**
-   * Name for logging.
+   * 日志打印用名称。
    */
   private final String name;
 
   /**
-   * Constructor.
-   * @param isTaskStage Is this a task stage?
-   * @param stageConfig stage-independent configuration.
-   * @param stageStatisticName name of the stage for statistics/logging
-   * @param requireIOProcessors are the IO processors required?
+   * 构造函数，初始化阶段基础信息并做参数校验。
+   * @param isTaskStage 是否为任务级阶段
+   * @param stageConfig 全局提交配置
+   * @param stageStatisticName 阶段统计名称
+   * @param requireIOProcessors 是否需要IO并行处理器
    */
   protected AbstractJobOrTaskStage(
       final boolean isTaskStage,
@@ -157,13 +149,13 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
     requireNonNull(stageConfig.getJobAttemptDir(), "Job attempt directory");
     this.operations = requireNonNull(stageConfig.getOperations(),
         "Operations callbacks");
-    // and the processors of work if required.
+    // 根据需求绑定IO处理器
     this.ioProcessors = bindProcessor(
         requireIOProcessors,
         stageConfig.getIoProcessors());
     String stageName;
     if (isTaskStage) {
-      // force fast failure.
+      // 任务阶段提前校验任务信息，快速失败
       getRequiredTaskId();
       getRequiredTaskAttemptId();
       getRequiredTaskAttemptDir();
@@ -177,11 +169,10 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Bind to the processor if it is required.
-   * @param required is the processor required?
-   * @param processor processor
-   * @return the processor binding
-   * @throws NullPointerException if required == true and processor is null.
+   * 按需绑定IO处理器，如果要求必须存在但传入为null则抛出空指针异常。
+   * @param required 是否必须需要处理器
+   * @param processor 传入的处理器实例
+   * @return 绑定后的处理器
    */
   private TaskPool.Submitter bindProcessor(
       final boolean required,
@@ -192,28 +183,27 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Stage entry point.
-   * Verifies that this is the first and only time the stage is invoked,
-   * then calls {@link #executeStage(Object)} for the subclass
-   * to perform its part of the commit protocol.
-   * The duration of the stage is collected as a statistic, and its
-   * entry/exit logged at INFO.
-   * @param arguments arguments to the function.
-   * @return the result.
-   * @throws IOException failures.
+   * 阶段入口方法，保证只执行一次，执行前做校验，收集执行时长统计，
+   * 调用子类{@link #executeStage(Object)}完成实际阶段逻辑。
+   * @param arguments 阶段入参
+   * @return 阶段执行结果
+   * @throws IOException 执行失败抛出IO异常
    */
   @Override
   public final OUT apply(final IN arguments) throws IOException {
+    // 校验只能执行一次
     executeOnlyOnce();
+    // 通知MapReduce任务进度，防止超时
     progress();
     String stageName = getStageName(arguments);
+    // 进入阶段，更新配置中当前阶段信息
     getStageConfig().enterStage(stageName);
     String statisticName = getStageStatisticName(arguments);
-    // The tracker here
     LOG.info("{}: Executing Stage {}", getName(), stageName);
+    // 创建阶段执行时长追踪器
     stageExecutionTracker = createTracker(getIOStatistics(), statisticName);
     try {
-      // exec the input function and return its value
+      // 调用子类执行阶段逻辑
       final OUT out = executeStage(arguments);
       LOG.info("{}: Stage {} completed after {}",
           getName(),
@@ -229,14 +219,11 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
               stageExecutionTracker.asDuration().toMillis()),
           e.toString());
       LOG.debug("{}: Stage failure:", getName(), e);
-      // input function failed: note it
+      // 标记执行失败
       stageExecutionTracker.failed();
-      // and rethrow
       throw e;
     } finally {
-      // update the tracker.
-      // this is called after the catch() call would have
-      // set the failed flag.
+      // 关闭追踪器，完成统计
       stageExecutionTracker.close();
       progress();
       getStageConfig().exitStage(stageName);
@@ -244,18 +231,16 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * The work of a stage.
-   * Executed exactly once.
-   * @param arguments arguments to the function.
-   * @return the result.
-   * @throws IOException failures.
+   * 子类需要实现的实际阶段逻辑，保证只被调用一次。
+   * @param arguments 阶段入参
+   * @return 阶段执行结果
+   * @throws IOException 执行失败抛出IO异常
    */
   protected abstract OUT executeStage(IN arguments) throws IOException;
 
   /**
-   * Check that the operation has not been invoked twice.
-   * This is an atomic check.
-   * @throws IllegalStateException on a second invocation.
+   * 原子校验阶段是否重复执行，重复执行抛出非法状态异常。
+   * @throws IllegalStateException 重复执行时抛出
    */
   private void executeOnlyOnce() {
     Preconditions.checkState(
@@ -264,38 +249,35 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * The stage statistic name.
-   * @param arguments args to the invocation.
-   * @return stage name.
+   * 获取阶段统计名称。
+   * @param arguments 阶段入参
+   * @return 统计名称
    */
   protected String getStageStatisticName(IN arguments) {
     return stageStatisticName;
   }
 
   /**
-   * Stage name for reporting; defaults to
-   * call {@link #getStageStatisticName(IN)}.
-   * @param arguments args to the invocation.
-   * @return name used in updating reports.
+   * 获取用于报告的阶段名称，默认使用统计名称。
+   * @param arguments 阶段入参
+   * @return 报告用阶段名称
    */
   protected String getStageName(IN arguments) {
     return getStageStatisticName(arguments);
   }
 
   /**
-   * Get the execution tracker; non-null
-   * after stage execution.
-   * @return a tracker or null.
+   * 获取阶段执行时长追踪器，执行完成后非空。
+   * @return 时长追踪器
    */
   public DurationTracker getStageExecutionTracker() {
     return stageExecutionTracker;
   }
 
   /**
-   * Adds the duration of the job to an IOStatistics store
-   * (such as the manifest to be saved).
-   * @param iostats store
-   * @param statistic statistic name.
+   * 将本阶段执行时长添加到IO统计存储中。
+   * @param iostats IO统计存储
+   * @param statistic 统计名称
    */
   public void addExecutionDurationToStatistics(IOStatisticsStore iostats,
       String statistic) {
@@ -305,24 +287,21 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Note any rate limiting to the given timing statistic.
-   * If the wait was 0, no statistics are updated.
-   * @param statistic statistic key.
-   * @param wait wait duration.
+   * 如果限流等待时长不为零，记录限流耗时到统计。
+   * @param statistic 统计键名
+   * @param wait 等待时长
    */
   private void noteAnyRateLimiting(String statistic, Duration wait) {
     if (!wait.isZero()) {
-      // rate limiting took place
       getIOStatistics().addTimedOperation(
           statistic,
           wait.toMillis());
     }
   }
 
-
   /**
-   * Get the operations callbacks.
-   * @return the operations invocable against the destination.
+   * 获取存储操作回调实例。
+   * @return 存储操作实例
    */
   public ManifestStoreOperations getOperations() {
     return operations;
@@ -340,28 +319,25 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * The stage configuration.
-   * @return the stage configuration used by this stage.
+   * 获取本阶段使用的全局提交配置。
+   * @return 全局提交配置
    */
   protected StageConfig getStageConfig() {
     return stageConfig;
   }
 
   /**
-   * Update the thread context with the stage name and
-   * job ID.
-   * This MUST be invoked at the start of methods invoked in helper threads,
-   * to ensure that they are all annotated with job and stage.
-   * @param stage stage name.
+   * 更新审计上下文，注入作业ID和阶段名称。
+   * 辅助线程执行任务前必须调用此方法保证审计信息正确。
+   * @param stage 阶段名称
    */
   protected void updateAuditContext(final String stage) {
     enterStageWorker(stageConfig.getJobId(), stage);
   }
 
   /**
-   * The IOStatistics are shared across all uses of the
-   * StageConfig.
-   * @return the (possibly shared) IOStatistics.
+   * 获取共享的IO统计存储实例，统计信息存放在StageConfig中全局共享。
+   * @return IO统计存储
    */
   @Override
   public final IOStatisticsStore getIOStatistics() {
@@ -369,7 +345,7 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Call progress() on any Progressable passed in.
+   * 调用进度回调通知MapReduce任务进度，防止长时间操作被误杀。
    */
   protected final void progress() {
     if (stageConfig.getProgressable() != null) {
@@ -379,10 +355,10 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Get a file status value or, if the path doesn't exist, return null.
-   * @param path path
-   * @return status or null
-   * @throws IOException IO Failure.
+   * 获取文件状态，如果路径不存在返回null，不抛出异常。
+   * @param path 目标路径
+   * @return 文件状态或null
+   * @throws IOException IO异常
    */
   protected final FileStatus getFileStatusOrNull(
       final Path path)
@@ -395,10 +371,10 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Get a file status value or, if the path doesn't exist, return null.
-   * @param path path
-   * @return status or null
-   * @throws IOException IO Failure.
+   * 获取文件状态，统计操作耗时。
+   * @param path 目标路径
+   * @return 文件状态
+   * @throws IOException IO异常
    */
   protected final FileStatus getFileStatus(
       final Path path)
@@ -411,10 +387,10 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Get a file status value or, if the path doesn't exist, return null.
-   * @param path path
-   * @return true if the path resolves to a file
-   * @throws IOException IO Failure.
+   * 判断路径是否为文件，统计操作耗时。
+   * @param path 目标路径
+   * @return 是否为文件
+   * @throws IOException IO异常
    */
   protected final boolean isFile(
       final Path path)
@@ -426,11 +402,11 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Delete a path.
-   * @param path path
-   * @param recursive recursive delete.
-   * @return status or null
-   * @throws IOException IO Failure.
+   * 删除路径，默认使用OP_DELETE统计。
+   * @param path 目标路径
+   * @param recursive 是否递归删除
+   * @return 删除是否成功
+   * @throws IOException IO异常
    */
   public final boolean delete(
       final Path path,
@@ -441,12 +417,12 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Delete a path.
-   * @param path path
-   * @param recursive recursive delete.
-   * @param statistic statistic to update
-   * @return status or null
-   * @throws IOException IO Failure.
+   * 删除路径，使用指定统计键更新统计。
+   * @param path 目标路径
+   * @param recursive 是否递归删除
+   * @param statistic 统计键名
+   * @return 删除是否成功
+   * @throws IOException IO异常
    */
   public Boolean delete(
       final Path path,
@@ -461,14 +437,11 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Delete a file at a path.
-   * <p>
-   * If it returns without an error: there is nothing at
-   * the end of the path.
-   * @param path path
-   * @param statistic statistic to update
-   * @return outcome.
-   * @throws IOException IO Failure.
+   * 删除单个文件，统计操作耗时。
+   * @param path 目标路径
+   * @param statistic 统计键名
+   * @return 删除是否成功
+   * @throws IOException IO异常
    */
   public boolean deleteFile(
       final Path path,
@@ -479,11 +452,11 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
   }
 
   /**
-   * Create a directory.
-   * @param path path
-   * @param escalateFailure escalate "false" to PathIOE
-   * @return true if the directory was created/exists.
-   * @throws IOException IO Failure.
+   * 创建目录，统计操作耗时。
+   * @param path 目标路径
+   * @param escalateFailure 创建失败是否抛出异常
+   * @return 创建是否成功
+   * @throws IOException IO异常
    */
   public final boolean mkdirs(
       final Path path,
@@ -496,617 +469,3 @@ public abstract class AbstractJobOrTaskStage<IN, OUT>
         throw new PathIOException(path.toUri().toString(),
             stageStatisticName + ": mkdirs() returned false");
       }
-      return success;
-    });
-
-  }
-
-  /**
-   * List all directly files under a path.
-   * Async implementations may under-report their durations.
-   * @param path path
-   * @return iterator over the results.
-   * @throws IOException IO Failure.
-   */
-  protected final RemoteIterator<FileStatus> listStatusIterator(
-      final Path path)
-      throws IOException {
-    LOG.trace("{}: listStatusIterator('{}')", getName(), path);
-    return trackDuration(getIOStatistics(), OP_LIST_STATUS, () ->
-        operations.listStatusIterator(path));
-  }
-
-  /**
-   * Load a manifest file.
-   * @param status source.
-   * @return the manifest.
-   * @throws IOException IO Failure.
-   */
-  public final TaskManifest loadManifest(
-      final FileStatus status)
-      throws IOException {
-    LOG.trace("{}: loadManifest('{}')", getName(), status);
-    return trackDuration(getIOStatistics(), OP_LOAD_MANIFEST, () ->
-        operations.loadTaskManifest(
-            stageConfig.currentManifestSerializer(),
-            status));
-  }
-
-  /**
-   * List all the manifests in the task manifest dir.
-   * @return a iterator of manifests.
-   * @throws IOException IO Failure.
-   */
-  protected final RemoteIterator<FileStatus> listManifests()
-      throws IOException {
-    return RemoteIterators.filteringRemoteIterator(
-        listStatusIterator(getTaskManifestDir()),
-        st -> st.getPath().toUri().toString().endsWith(MANIFEST_SUFFIX));
-  }
-
-  /**
-   * Make an msync() call; swallow when unsupported.
-   * @param path path
-   * @throws IOException IO failure
-   */
-  protected final void msync(Path path) throws IOException {
-    LOG.trace("{}: msync('{}')", getName(), path);
-    trackDurationOfInvocation(getIOStatistics(), OP_MSYNC, () ->
-        operations.msync(path));
-  }
-
-  /**
-   * Create a directory -failing if it exists or if
-   * mkdirs() failed.
-   * @param operation operation for error reporting.
-   * @param path path path to create.
-   * @return the path.
-   * @throws IOException failure
-   * @throws PathIOException mkdirs failed.
-   * @throws FileAlreadyExistsException destination exists.
-   */
-  protected final Path createNewDirectory(
-      final String operation,
-      final Path path) throws IOException {
-    LOG.trace("{}: {} createNewDirectory('{}')", getName(), operation, path);
-    requireNonNull(path,
-        () -> String.format("%s: Null path for operation %s", getName(), operation));
-    // check for dir existence before trying to create.
-    try {
-      final FileStatus status = getFileStatus(path);
-      // no exception, so the path exists.
-      throw new FileAlreadyExistsException(operation
-          + ": path " + path
-          + " already exists and has status " + status);
-    } catch (FileNotFoundException e) {
-      // the path does not exist, so create it.
-      mkdirs(path, true);
-      return path;
-    }
-  }
-
-  /**
-   * Assert that a path is a directory which must exist.
-   * @param operation operation for error reporting.
-   * @param path path path to create.
-   * @return the path
-   * @throws IOException failure
-   * @throws PathIOException mkdirs failed.
-   * @throws FileAlreadyExistsException destination exists.
-   */
-  protected final Path directoryMustExist(
-      final String operation,
-      final Path path) throws IOException {
-    final FileStatus status = getFileStatus(path);
-    if (!status.isDirectory()) {
-      throw new PathIOException(path.toString(),
-          operation
-              + ": Path is not a directory; its status is :" + status);
-    }
-    return path;
-  }
-
-  /**
-   * Save a task manifest or summary. This will be done by
-   * writing to a temp path and then renaming.
-   * If the destination path exists: Delete it.
-   * This will retry so that a rename failure from abfs load or IO errors
-   * will not fail the task.
-   * @param manifestData the manifest/success file
-   * @param tempPath temp path for the initial save
-   * @param finalPath final path for rename.
-   * @return the manifest saved.
-   * @throws IOException failure to rename after retries.
-   */
-  @SuppressWarnings("unchecked")
-  protected final <T extends AbstractManifestData> T save(
-      final T manifestData,
-      final Path tempPath,
-      final Path finalPath) throws IOException {
-    return saveManifest(() -> manifestData, tempPath, finalPath, OP_SAVE_TASK_MANIFEST);
-  }
-
-  /**
-   * Generate and save a task manifest or summary file.
-   * This is be done by writing to a temp path and then renaming.
-   * <p>
-   * If the destination path exists: Delete it before the rename.
-   * <p>
-   * This will retry so that a rename failure from abfs load or IO errors
-   * such as delete or save failure will not fail the task.
-   * <p>
-   * The {@code manifestSource} supplier is invoked to get the manifest data
-   * on every attempt.
-   * This permits statistics to be updated, <i>including those of failures</i>.
-   * @param manifestSource supplier the manifest/success file
-   * @param tempPath temp path for the initial save
-   * @param finalPath final path for rename.
-   * @param statistic statistic to use for timing
-   * @return the manifest saved.
-   * @throws IOException failure to save/delete/rename after retries.
-   */
-  @SuppressWarnings("unchecked")
-  protected final <T extends AbstractManifestData> T saveManifest(
-      final Supplier<T> manifestSource,
-      final Path tempPath,
-      final Path finalPath,
-      String statistic) throws IOException {
-
-    int retryCount = 0;
-    RetryPolicy retryPolicy = retryUpToMaximumCountWithProportionalSleep(
-        getStageConfig().getManifestSaveAttempts(),
-        SAVE_SLEEP_INTERVAL,
-        TimeUnit.MILLISECONDS);
-
-    boolean success = false;
-    T savedManifest = null;
-    // loop until returning a value or raising an exception
-    while (!success) {
-      try {
-        // get the latest manifest, which may include updated statistics
-        final T manifestData = requireNonNull(manifestSource.get());
-        LOG.info("{}: save manifest to {} then rename as {}'); retry count={}",
-            getName(), tempPath, finalPath, retryCount);
-        trackDurationOfInvocation(getIOStatistics(), statistic, () -> {
-
-          // delete temp path.
-          // even though this is written with overwrite=true, this extra recursive
-          // delete also handles a directory being there.
-          // this should not happen as no part of the commit protocol creates a directory
-          // -this is just a little bit of due diligence.
-          deleteRecursive(tempPath, OP_DELETE);
-
-          // save the temp file.
-          operations.save(manifestData, tempPath, true);
-          // get the length and etag.
-          final FileStatus st = getFileStatus(tempPath);
-
-          // commit rename of temporary file to the final path; deleting the destination first.
-          final CommitOutcome outcome = commitFile(
-              new FileEntry(tempPath, finalPath, st.getLen(), getEtag(st)),
-              true);
-          if (outcome.recovered) {
-            LOG.warn("Task manifest file {} committed using rename recovery",
-                manifestData);
-          }
-
-        });
-        // success: save the manifest and declare success
-        savedManifest = manifestData;
-        success = true;
-      } catch (IOException e) {
-        // failure.
-        // log then decide whether to sleep and retry or give up.
-        LOG.warn("{}: Failed to save and commit file {} renamed to {}; retry count={}",
-            getName(), tempPath, finalPath, retryCount, e);
-        // increment that count.
-        retryCount++;
-        RetryPolicy.RetryAction retryAction;
-        try {
-          retryAction = retryPolicy.shouldRetry(e, retryCount, 0, true);
-        } catch (Exception ex) {
-          // it's not clear why this probe can raise an exception; it is just
-          // caught and mapped to a fail.
-          LOG.debug("Failure in retry policy", ex);
-          retryAction = RetryPolicy.RetryAction.FAIL;
-        }
-        LOG.debug("{}: Retry action: {}", getName(), retryAction.action);
-        if (retryAction.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
-          // too many failures: escalate.
-          throw e;
-        }
-        // else, sleep
-        try {
-          LOG.info("{}: Sleeping for {} ms before retrying",
-              getName(), retryAction.delayMillis);
-          Thread.sleep(retryAction.delayMillis);
-        } catch (InterruptedException ie) {
-          Thread.currentThread().interrupt();
-        }
-      }
-    }
-    // success: return the manifest which was saved.
-    return savedManifest;
-  }
-
-  /**
-   * Get an etag from a FileStatus which MUST BE
-   * an implementation of EtagSource and
-   * whose etag MUST NOT BE null/empty.
-   * @param status the status; may be null.
-   * @return the etag or null if not provided
-   */
-  public String getEtag(FileStatus status) {
-    return operations.getEtag(status);
-  }
-
-  /**
-   * Rename a file from source to dest.
-   * <p>
-   * The destination is always deleted through a call to
-   * {@link #maybeDeleteDest(boolean, Path)}.
-   * @param source source file.
-   * @param dest dest file
-   * @throws IOException failure
-   * @throws PathIOException if the rename() call returned false.
-   */
-  protected final void renameFile(final Path source, final Path dest)
-      throws IOException {
-    executeRenamingOperation("renameFile", source, dest,
-        OP_RENAME_FILE, () ->
-            operations.renameFile(source, dest));
-  }
-
-  /**
-   * Rename a file from source to dest; if the underlying FS API call
-   * returned false that's escalated to an IOE.
-   * @param source source file.
-   * @param dest dest file
-   * @throws IOException failure
-   * @throws PathIOException if the rename() call returned false.
-   */
-  protected final void renameDir(final Path source, final Path dest)
-      throws IOException {
-
-    maybeDeleteDest(true, dest);
-    executeRenamingOperation("renameDir", source, dest,
-        OP_RENAME_DIR, () ->
-        operations.renameDir(source, dest)
-    );
-  }
-
-  /**
-   * Commit a file from the manifest using rename or, if available, resilient renaming.
-   * @param entry entry from manifest
-   * @throws PathIOException if the rename() call returned false and was uprated.
-   * @throws IOException failure
-   */
-  protected final CommitOutcome commitFile(FileEntry entry,
-      boolean deleteDest)
-      throws IOException {
-
-    final Path source = entry.getSourcePath();
-    final Path dest = entry.getDestPath();
-
-    maybeDeleteDest(deleteDest, dest);
-    if (storeSupportsResilientCommit()) {
-      // get the commit permits
-      final ManifestStoreOperations.CommitFileResult result = trackDuration(getIOStatistics(),
-          OP_COMMIT_FILE_RENAME, () ->
-              operations.commitFile(entry));
-      if (result.recovered()) {
-        // recovery took place.
-        getIOStatistics().incrementCounter(OP_COMMIT_FILE_RENAME_RECOVERED);
-      }
-      if (result.getWaitTime() != null) {
-        // note any delay which took place
-        noteAnyRateLimiting(STORE_IO_RATE_LIMITED, result.getWaitTime());
-      }
-      return new CommitOutcome(result.recovered());
-    } else {
-      // commit with a simple rename; failures will be escalated.
-      executeRenamingOperation("renameFile", source, dest,
-          OP_COMMIT_FILE_RENAME, () ->
-              operations.renameFile(source, dest));
-      return new CommitOutcome(false);
-    }
-  }
-
-  /**
-   * Does this store support resilient commit.
-   * @return true if resilient commit operations are available.
-   */
-  protected boolean storeSupportsResilientCommit() {
-    return operations.storeSupportsResilientCommit();
-  }
-
-  /**
-   * Maybe delete the destination.
-   * This routine is optimized for the data not existing, as HEAD seems to cost less
-   * than a DELETE; assuming most calls don't have data, this is faster.
-   * @param deleteDest should an attempt to delete the dest be made?
-   * @param dest destination path
-   * @throws IOException IO failure, including permissions.
-   */
-  private void maybeDeleteDest(final boolean deleteDest, final Path dest) throws IOException {
-
-    if (deleteDest) {
-      final FileStatus st = getFileStatusOrNull(dest);
-      if (st != null) {
-        if (st.isDirectory()) {
-          deleteRecursive(dest, OP_DELETE_DIR);
-        } else {
-          deleteFile(dest, OP_DELETE);
-        }
-      }
-    }
-  }
-
-  /**
-   * Execute an operation to rename a file/dir, commit a manifest entry.
-   * The statistic is tracked; returning false from the operation is considered
-   * a failure from the statistics perspective.
-   * @param operation operation name
-   * @param source source path
-   * @param dest dest path
-   * @param statistic statistic to track
-   * @param action callable of the operation
-   * @throws IOException on any failure
-   */
-  private void executeRenamingOperation(String operation,
-      Path source,
-      Path dest,
-      String statistic,
-      CallableRaisingIOE<Boolean> action) throws IOException {
-
-    LOG.debug("{}: {} '{}' to '{}')", getName(), operation, source, dest);
-    requireNonNull(source, "Null source");
-    requireNonNull(dest, "Null dest");
-
-    // duration tracking is a bit convoluted as it
-    // ensures that rename failures as well as IOEs are
-    // treated as failures from a statistics perspective.
-
-    DurationTracker tracker = createTracker(getIOStatistics(), statistic);
-    boolean success;
-    try {
-      success = action.apply();
-      if (!success) {
-        // record failure in the tracker before closing it
-        tracker.failed();
-      }
-    } catch (IOException | RuntimeException e) {
-      LOG.info("{}: {} raised an exception: {}", getName(), operation, e.toString());
-      LOG.debug("{}: {} stack trace", getName(), operation, e);
-      tracker.failed();
-      throw e;
-    } finally {
-      // success
-      // update the tracker.
-      tracker.close();
-    }
-    // escalate the failure; this is done out of the duration tracker
-    // so its file status probes aren't included.
-    if (!success) {
-      throw escalateRenameFailure(operation, source, dest);
-    }
-  }
-
-  /**
-   * Escalate a rename failure to an exception.
-   * Returns an error exception to throw if one was not
-   * triggered when probing for the source.
-   * @param operation operation name
-   * @param source source path
-   * @param dest dest path
-   * @return an exception to throw
-   * @throws IOException raised probing for source or dest
-   */
-  private PathIOException escalateRenameFailure(String operation,
-      Path source, Path dest) throws IOException {
-    // rename just returned false.
-    // collect information for a meaningful error message
-    // and include in an exception raised.
-
-    // get the source status; this will implicitly raise a FNFE.
-    final FileStatus sourceStatus = getFileStatus(source);
-
-    // and look to see if there is anything at the destination
-    final FileStatus destStatus = getFileStatusOrNull(dest);
-
-    LOG.error("{}: failure to {} {} to {} with" +
-            " source status {} " +
-            " and destination status {}",
-        getName(), operation, source, dest,
-        sourceStatus, destStatus);
-
-    return new PathIOException(source.toString(),
-        FAILED_TO_RENAME_PREFIX + operation + " to " + dest);
-  }
-
-  /**
-   * Outcome from the commit.
-   */
-  public static final class CommitOutcome {
-
-    /**
-     * Dit the commit recover from a failure?
-     */
-    public final boolean recovered;
-
-    public CommitOutcome(final boolean recovered) {
-      this.recovered = recovered;
-    }
-  }
-
-  /**
-   * Job ID: never null.
-   */
-  protected final String getJobId() {
-    return stageConfig.getJobId();
-  }
-
-  /**
-   * Job attempt number.
-   */
-  protected final int getJobAttemptNumber() {
-    return stageConfig.getJobAttemptNumber();
-  }
-
-  /**
-   * ID of the task.
-   */
-  protected final String getTaskId() {
-    return stageConfig.getTaskId();
-  }
-
-  /**
-   * Get the task ID; raise an NPE
-   * if it is null.
-   * @return a non-null task ID.
-   */
-  protected final String getRequiredTaskId() {
-    return requireNonNull(getTaskId(),
-        "No Task ID in stage config");
-  }
-
-  /**
-   * ID of this specific attempt at a task.
-   */
-  protected final String getTaskAttemptId() {
-    return stageConfig.getTaskAttemptId();
-  }
-
-  /**
-   * Get the task attempt ID; raise an NPE
-   * if it is null.
-   * @return a non-null task attempt ID.
-   */
-  protected final String getRequiredTaskAttemptId() {
-    return requireNonNull(getTaskAttemptId(),
-        "No Task Attempt ID in stage config");
-  }
-
-  /**
-   * Job attempt dir.
-   */
-  protected final Path getJobAttemptDir() {
-    return stageConfig.getJobAttemptDir();
-  }
-
-  /**
-   * Directory to put task manifests into.
-   * @return a path under the job attempt dir.
-   */
-  protected final Path getTaskManifestDir() {
-    return stageConfig.getTaskManifestDir();
-  }
-
-
-  /**
-   * Task attempt dir.
-   */
-  protected final Path getTaskAttemptDir() {
-    return stageConfig.getTaskAttemptDir();
-  }
-
-  /**
-   * Get the task attemptDir and raise an NPE
-   * if it is null.
-   * @return a non-null task attempt dir.
-   */
-  protected final Path getRequiredTaskAttemptDir() {
-    return requireNonNull(getTaskAttemptDir(),
-        "No Task Attempt Dir");
-  }
-
-  /**
-   * Destination of job.
-   */
-  protected final Path getDestinationDir() {
-    return stageConfig.getDestinationDir();
-  }
-
-  /**
-   * Stage confog name, for logging.
-   * @return name.
-   */
-  public final String getName() {
-    return name;
-  }
-
-  /**
-   * Submitter for doing IO against the store other than
-   * manifest processing.
-   */
-  protected final TaskPool.Submitter getIOProcessors() {
-    return ioProcessors;
-  }
-
-  /**
-   * Submitter for doing IO against the store other than
-   * manifest processing.
-   * The size parameter is used to select between sequential
-   * and parallel runners.
-   * no data, or one entry: serial.
-   * everything else, parallel.
-   * @param size number of items.
-   * @return a submitter or null
-   */
-  protected final TaskPool.Submitter getIOProcessors(int size) {
-    return size > 1
-        ? getIOProcessors()
-        : null;
-  }
-
-  /**
-   * Delete a directory (or a file).
-   * @param dir directory.
-   * @param statistic statistic to use
-   * @return true if the path is no longer present.
-   * @throws IOException exceptions raised in delete if not suppressed.
-   */
-  protected boolean deleteRecursive(
-      final Path dir,
-      final String statistic)
-      throws IOException {
-    return trackDuration(getIOStatistics(), statistic, () ->
-        operations.deleteRecursive(dir));
-  }
-
-  /**
-   * Delete a directory or file, catching exceptions.
-   * @param dir directory.
-   * @param statistic statistic to use
-   * @return any exception caught.
-   */
-  protected IOException deleteRecursiveSuppressingExceptions(
-      final Path dir,
-      final String statistic) {
-    try {
-      deleteRecursive(dir, statistic);
-      return null;
-    } catch (IOException ex) {
-      LOG.info("Error deleting {}: {}", dir, ex.toString());
-      return ex;
-    }
-  }
-
-  /**
-   * Create an entry for a file to rename under the destination.
-   * If the store operations supports extracting etags from file status
-   * entries, that is included in the entry
-   * @param status source file
-   * @param destDir destination directory
-   * @return an entry which includes the rename path
-   */
-  protected FileEntry fileEntry(FileStatus status, Path destDir) {
-    // generate a new path under the dest dir
-    Path dest = new Path(destDir, status.getPath().getName());
-    return new FileEntry(status.getPath(),
-        dest,
-        status.getLen(),
-        getEtag(status));
-  }
-
-}

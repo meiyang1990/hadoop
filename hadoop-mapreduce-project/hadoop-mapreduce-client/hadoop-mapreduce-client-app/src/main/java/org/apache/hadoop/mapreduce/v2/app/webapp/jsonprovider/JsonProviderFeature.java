@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,13 +25,20 @@ import javax.ws.rs.core.FeatureContext;
 import org.glassfish.jersey.CommonProperties;
 import org.glassfish.jersey.internal.InternalProperties;
 
+/**
+ * 自定义JSON序列化功能类，用于MapReduce应用Web服务的JSON响应处理。
+ * 禁用Jersey默认的JSON序列化功能，注册自定义的JSON提供器实现定制化序列化。
+ */
 public class JsonProviderFeature implements Feature {
   @Override
   public boolean configure(FeatureContext context) {
-    //Auto discovery should be disabled to ensure the custom providers will be used
+    // 禁用Jersey自动发现的MOXy JSON功能，确保使用自定义提供器
     context.property(CommonProperties.MOXY_JSON_FEATURE_DISABLE, true);
+    // 设置当前自定义JSON功能标识
     context.property(InternalProperties.JSON_FEATURE, "JsonProviderFeature");
+    // 注册带根元素包裹的自定义JSON提供器，设置优先级
     context.register(IncludeRootJSONProvider.class, 2001);
+    // 注册不带根元素包裹的自定义JSON提供器，设置优先级
     context.register(ExcludeRootJSONProvider.class, 2002);
     return true;
   }

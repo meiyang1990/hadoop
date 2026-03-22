@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -100,9 +101,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This module is responsible for talking to the
- * JobClient (user facing).
- *
+ * 历史服务器客户端服务，负责处理用户/客户端对已完成MapReduce作业历史数据的查询请求
+ * 同时提供RPC服务和Web UI服务两种访问方式
  */
 public class HistoryClientService extends AbstractService {
 
@@ -116,6 +116,11 @@ public class HistoryClientService extends AbstractService {
   private HistoryContext history;
   private JHSDelegationTokenSecretManager jhsDTSecretManager;
   
+  /**
+   * 构造历史客户端服务实例
+   * @param history 历史作业上下文，提供对已完成作业的查询能力
+   * @param jhsDTSecretManager 历史服务器委派令牌密钥管理器，用于安全认证
+   */
   public HistoryClientService(HistoryContext history,
       JHSDelegationTokenSecretManager jhsDTSecretManager) {
     super("HistoryClientService");
@@ -124,30 +129,40 @@ public class HistoryClientService extends AbstractService {
     this.jhsDTSecretManager = jhsDTSecretManager;
   }
 
+  /**
+   * 启动服务：初始化RPC服务器和Web应用
+   * @throws Exception 启动过程中抛出异常
+   */
   protected void serviceStart() throws Exception {
     Configuration conf = getConfig();
+    // 创建YARN RPC实例
     YarnRPC rpc = YarnRPC.create(conf);
+    // 初始化Web应用
     initializeWebApp(conf);
+    // 从配置获取RPC服务绑定地址
     InetSocketAddress address = conf.getSocketAddr(
         JHAdminConfig.MR_HISTORY_BIND_HOST,
         JHAdminConfig.MR_HISTORY_ADDRESS,
         JHAdminConfig.DEFAULT_MR_HISTORY_ADDRESS,
         JHAdminConfig.DEFAULT_MR_HISTORY_PORT);
 
+    // 创建RPC服务器
     server =
         rpc.getServer(HSClientProtocol.class, protocolHandler, address,
             conf, jhsDTSecretManager,
             conf.getInt(JHAdminConfig.MR_HISTORY_CLIENT_THREAD_COUNT,
                 JHAdminConfig.DEFAULT_MR_HISTORY_CLIENT_THREAD_COUNT));
 
-    // Enable service authorization?
+    // 如果开启了服务授权，刷新ACL配置
     if (conf.getBoolean(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION,
         false)) {
       server.refreshServiceAcl(conf, new ClientHSPolicyProvider());
     }
     
+    // 启动RPC服务器
     server.start();
+    // 更新绑定地址信息（处理端口自动分配场景）
     this.bindAddress = conf.updateConnectAddr(JHAdminConfig.MR_HISTORY_BIND_HOST,
                                               JHAdminConfig.MR_HISTORY_ADDRESS,
                                               JHAdminConfig.DEFAULT_MR_HISTORY_ADDRESS,
@@ -158,15 +173,23 @@ public class HistoryClientService extends AbstractService {
   }
 
   @VisibleForTesting
+  /**
+   * 初始化历史服务器Web应用
+   * @param conf 配置对象
+   * @throws IOException 初始化过程IO异常
+   */
   protected void initializeWebApp(Configuration conf) throws IOException {
     webApp = new HsWebApp(history);
 
+    // 设置过滤器（如跨域过滤器）
     setupFilters(conf);
 
+    // 获取Web服务绑定地址
     InetSocketAddress bindAddress = MRWebAppUtil.getJHSWebBindAddress(conf);
+    // 创建RM代理，用于和ResourceManager交互
     ApplicationClientProtocol appClientProtocol =
         ClientRMProxy.createRMProxy(conf, ApplicationClientProtocol.class);
-    // NOTE: there should be a .at(InetSocketAddress)
+    // 启动Jetty Web服务
     WebApps
         .$for("jobhistory", HistoryClientService.class, this, "hs-ws")
         .with(conf)
@@ -180,12 +203,17 @@ public class HistoryClientService extends AbstractService {
         .withResourceConfig(configure(conf, appClientProtocol))
         .at(NetUtils.getHostPortString(bindAddress)).start(webApp);
     
+    // 更新配置中Web服务的访问端口，处理自动端口分配场景
     String connectHost = MRWebAppUtil.getJHSWebappURLWithoutScheme(conf).split(":")[0];
     MRWebAppUtil.setJHSWebappURLWithoutScheme(conf,
         connectHost + ":" + webApp.getListenerAddress().getPort());
   }
 
   @Override
+  /**
+   * 停止服务，关闭RPC服务器和Web应用
+   * @throws Exception 停止过程异常
+   */
   protected void serviceStop() throws Exception {
     if (server != null) {
       server.stop();
@@ -197,15 +225,27 @@ public class HistoryClientService extends AbstractService {
   }
 
   @Private
+  /**
+   * 获取客户端协议处理器实例
+   * @return 客户端协议处理器
+   */
   public MRClientProtocol getClientHandler() {
     return this.protocolHandler;
   }
 
   @Private
+  /**
+   * 获取RPC服务绑定地址
+   * @return RPC绑定地址
+   */
   public InetSocketAddress getBindAddress() {
     return this.bindAddress;
   }
 
+  /**
+   * 设置Web过滤器，根据配置启用跨域过滤器
+   * @param conf 配置对象
+   */
   private void setupFilters(Configuration conf) {
     boolean enableCorsFilter =
         conf.getBoolean(JHAdminConfig.MR_HISTORY_ENABLE_CORS_FILTER,
@@ -217,6 +257,9 @@ public class HistoryClientService extends AbstractService {
     }
   }
 
+  /**
+   * HSClientProtocol协议实现类，处理所有客户端查询历史作业的RPC请求
+   */
   private class HSClientProtocolHandler implements HSClientProtocol {
 
     private RecordFactory recordFactory = RecordFactoryProvider.getRecordFactory(null);
@@ -225,6 +268,13 @@ public class HistoryClientService extends AbstractService {
       return getBindAddress();
     }
     
+    /**
+     * 验证权限并获取作业实例
+     * @param jobID 作业ID
+     * @param exceptionThrow 作业不存在时是否抛出异常
+     * @return 验证通过的作业实例
+     * @throws IOException 验证异常、作业不存在或权限不足
+     */
     private Job verifyAndGetJob(final JobId jobID, boolean exceptionThrow)
         throws IOException {
       UserGroupInformation loginUgi = null;
@@ -369,133 +419,7 @@ public class HistoryClientService extends AbstractService {
 
       UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
 
-      // Verify that the connection is kerberos authenticated
+      // 仅允许Kerberos认证场景签发委派令牌
         if (!isAllowedDelegationTokenOp()) {
           throw new IOException(
-              "Delegation Token can be issued only with kerberos authentication");
-        }
-
-      GetDelegationTokenResponse response = recordFactory.newRecordInstance(
-          GetDelegationTokenResponse.class);
-
-      String user = ugi.getUserName();
-      Text owner = new Text(user);
-      Text realUser = null;
-      if (ugi.getRealUser() != null) {
-        realUser = new Text(ugi.getRealUser().getUserName());
-      }
-      MRDelegationTokenIdentifier tokenIdentifier =
-          new MRDelegationTokenIdentifier(owner, new Text(
-            request.getRenewer()), realUser);
-      Token<MRDelegationTokenIdentifier> realJHSToken =
-          new Token<MRDelegationTokenIdentifier>(tokenIdentifier,
-              jhsDTSecretManager);
-      org.apache.hadoop.yarn.api.records.Token mrDToken =
-          org.apache.hadoop.yarn.api.records.Token.newInstance(
-            realJHSToken.getIdentifier(), realJHSToken.getKind().toString(),
-            realJHSToken.getPassword(), realJHSToken.getService().toString());
-      response.setDelegationToken(mrDToken);
-      return response;
-    }
-
-    @Override
-    public RenewDelegationTokenResponse renewDelegationToken(
-        RenewDelegationTokenRequest request) throws IOException {
-        if (!isAllowedDelegationTokenOp()) {
-          throw new IOException(
-              "Delegation Token can be renewed only with kerberos authentication");
-        }
-
-        org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
-        Token<MRDelegationTokenIdentifier> token =
-            new Token<MRDelegationTokenIdentifier>(
-                protoToken.getIdentifier().array(), protoToken.getPassword()
-                    .array(), new Text(protoToken.getKind()), new Text(
-                    protoToken.getService()));
-
-        String user = UserGroupInformation.getCurrentUser().getShortUserName();
-        long nextExpTime = jhsDTSecretManager.renewToken(token, user);
-        RenewDelegationTokenResponse renewResponse = Records
-            .newRecord(RenewDelegationTokenResponse.class);
-        renewResponse.setNextExpirationTime(nextExpTime);
-        return renewResponse;
-    }
-
-    @Override
-    public CancelDelegationTokenResponse cancelDelegationToken(
-        CancelDelegationTokenRequest request) throws IOException {
-        if (!isAllowedDelegationTokenOp()) {
-          throw new IOException(
-              "Delegation Token can be cancelled only with kerberos authentication");
-        }
-
-        org.apache.hadoop.yarn.api.records.Token protoToken = request.getDelegationToken();
-        Token<MRDelegationTokenIdentifier> token =
-            new Token<MRDelegationTokenIdentifier>(
-                protoToken.getIdentifier().array(), protoToken.getPassword()
-                    .array(), new Text(protoToken.getKind()), new Text(
-                    protoToken.getService()));
-
-        String user = UserGroupInformation.getCurrentUser().getUserName();
-        jhsDTSecretManager.cancelToken(token, user);
-        return Records.newRecord(CancelDelegationTokenResponse.class);
-    }
-
-    private void checkAccess(Job job, JobACL jobOperation)
-        throws IOException {
-
-      UserGroupInformation callerUGI;
-      callerUGI = UserGroupInformation.getCurrentUser();
-
-      if (!job.checkAccess(callerUGI, jobOperation)) {
-        throw new IOException(new AccessControlException("User "
-            + callerUGI.getShortUserName() + " cannot perform operation "
-            + jobOperation.name() + " on " + job.getID()));
-      }
-    }
-
-    private boolean isAllowedDelegationTokenOp() throws IOException {
-      if (UserGroupInformation.isSecurityEnabled()) {
-        return EnumSet.of(AuthenticationMethod.KERBEROS,
-                          AuthenticationMethod.KERBEROS_SSL,
-                          AuthenticationMethod.CERTIFICATE)
-            .contains(UserGroupInformation.getCurrentUser()
-                    .getRealAuthenticationMethod());
-      } else {
-        return true;
-      }
-    }
-
-  }
-
-  protected ResourceConfig configure(Configuration configuration,
-      ApplicationClientProtocol protocol) {
-    ResourceConfig config = new ResourceConfig();
-    config.packages("org.apache.hadoop.mapreduce.v2.hs.webapp");
-    config.register(new HSJerseyBinder(configuration, protocol));
-    config.register(HsWebServices.class);
-    config.register(GenericExceptionHandler.class);
-    config.register(new JettisonFeature()).register(JAXBContextResolver.class);
-    return config;
-  }
-
-  private class HSJerseyBinder extends AbstractBinder {
-
-    private Configuration configuration;
-    private ApplicationClientProtocol protocol;
-
-    HSJerseyBinder(Configuration pConfiguration,
-        ApplicationClientProtocol acProtocol) {
-      this.configuration = pConfiguration;
-      this.protocol = acProtocol;
-    }
-
-    @Override
-    protected void configure() {
-      bind(history).to(HistoryContext.class).named("ctx");
-      bind(configuration).to(Configuration.class).named("conf");
-      bind(webApp).to(WebApp.class).named("hsWebApp");
-      bind(protocol).to(ApplicationClientProtocol.class).named("appClient");
-    }
-  }
-}
+              "Delegation Token

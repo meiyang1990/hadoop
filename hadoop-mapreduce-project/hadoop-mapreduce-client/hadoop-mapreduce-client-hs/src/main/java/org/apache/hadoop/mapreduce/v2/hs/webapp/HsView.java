@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,47 +31,67 @@ import static org.apache.hadoop.yarn.webapp.view.JQueryUI.tableInit;
 import org.apache.hadoop.yarn.webapp.SubView;
 import org.apache.hadoop.yarn.webapp.view.TwoColumnLayout;
 
-
 /**
- * A view that should be used as the base class for all history server pages.
+ * 历史服务器Web页面的基类视图，所有历史服务器页面都继承此类。
+ * 提供统一的页面布局初始化、表格配置和导航处理，为所有HS页面提供公共基础能力。
  */
 public class HsView extends TwoColumnLayout {
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.yarn.webapp.view.TwoColumnLayout#preHead(org.apache.hadoop.yarn.webapp.hamlet.Hamlet.HTML)
    */
+  /**
+   * 在HTML页面head部分之前进行页面初始化，配置公共JS和页面样式。
+   * @param html HTML页面对象
+   */
   @Override protected void preHead(Page.HTML<__> html) {
+    // 执行所有子类通用的预初始化逻辑
     commonPreHead(html);
+    // 设置作业表格的ID
     set(DATATABLES_ID, "jobs");
+    // 初始化作业表格的DataTables配置
     set(initID(DATATABLES, "jobs"), jobsTableInit());
+    // 设置表格初始化后的后置处理脚本
     set(postInitID(DATATABLES, "jobs"), jobsPostTableInit());
+    // 设置作业表格的样式
     setTableStyles(html, "jobs");
   }
 
   /**
-   * The prehead that should be common to all subclasses.
-   * @param html used to render.
+   * 所有子类通用的预初始化方法，初始化左侧导航手风琴组件。
+   * @param html HTML页面对象，用于渲染
    */
   protected void commonPreHead(Page.HTML<__> html) {
+    // 设置导航手风琴组件ID
     set(ACCORDION_ID, "nav");
+    // 初始化手风琴配置，默认展开第一个导航项
     set(initID(ACCORDION, "nav"), "{autoHeight:false, active:0}");
   }
 
   /**
-   * Determine which navigation column is active.
+   * 根据是否有任务ID参数，设置左侧导航栏哪一项默认激活。
+   * 当查看任务详情时激活任务相关导航，否则激活作业相关导航。
    */
   protected void setActiveNavColumnForTask() {
+    // 从请求参数获取任务ID
     String tid = $(TASK_ID);
+    // 默认激活第二项（任务导航）
     String activeNav = "2";
+    // 如果没有任务ID参数，则激活第一项（作业导航）
     if((tid == null || tid.isEmpty())) {
       activeNav = "1";
     }
+    // 更新手风琴初始化配置，设置正确的激活项
     set(initID(ACCORDION, "nav"), "{autoHeight:false, active:"+activeNav+"}");
   }
 
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.yarn.webapp.view.TwoColumnLayout#nav()
+   */
+  /**
+   * 获取左侧导航栏区块类。
+   * @return 导航栏区块类
    */
   @Override
   protected Class<? extends SubView> nav() {
@@ -81,6 +102,10 @@ public class HsView extends TwoColumnLayout {
    * (non-Javadoc)
    * @see org.apache.hadoop.yarn.webapp.view.TwoColumnLayout#content()
    */
+  /**
+   * 获取主内容区默认区块类，默认显示作业列表。
+   * @return 内容区块类
+   */
   @Override
   protected Class<? extends SubView> content() {
     return HsJobsBlock.class;
@@ -89,9 +114,8 @@ public class HsView extends TwoColumnLayout {
   //TODO We need a way to move all of the javascript/CSS that is for a subview
   // into that subview.
   /**
-   * @return The end of a javascript map that is the jquery datatable 
-   * configuration for the jobs table.  the Jobs table is assumed to be
-   * rendered by the class returned from {@link #content()} 
+   * 生成作业列表表格的DataTables初始化配置JavaScript。
+   * @return DataTables配置字符串，插入到页面初始化脚本中。
    */
   private String jobsTableInit() {
     return tableInit().
@@ -110,8 +134,9 @@ public class HsView extends TwoColumnLayout {
   }
   
   /**
-   * @return javascript to add into the jquery block after the table has
-   *  been initialized. This code adds in per field filtering.
+   * 生成作业列表表格初始化完成后的后置处理JavaScript。
+   * 为表格每一列添加表头搜索过滤功能。
+   * @return 初始化后的JavaScript代码字符串
    */
   private String jobsPostTableInit() {
     return "var asInitVals = new Array();\n" +

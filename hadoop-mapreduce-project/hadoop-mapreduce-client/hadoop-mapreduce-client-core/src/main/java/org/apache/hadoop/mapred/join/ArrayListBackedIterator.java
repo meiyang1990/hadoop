@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,10 +25,12 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Writable;
 
 /**
- * This class provides an implementation of ResetableIterator. The
- * implementation uses an {@link java.util.ArrayList} to store elements
- * added to it, replaying them as requested.
- * Prefer {@link StreamBackedIterator}.
+ * 文件说明：MapReduce旧版API中基于ArrayList实现的可重置迭代器
+ * 
+ * 该类提供了ResetableIterator接口的实现，使用ArrayList存储添加的元素，
+ * 可根据请求重新遍历已存储的元素。优先推荐使用StreamBackedIterator。
+ * 继承了新版MapReduce API的ArrayListBackedIterator实现，适配旧版接口。
+ * 主要用于MapReduce连接操作中，支持对多个数据源的元组进行重复遍历。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -35,10 +38,17 @@ public class ArrayListBackedIterator<X extends Writable> extends
     org.apache.hadoop.mapreduce.lib.join.ArrayListBackedIterator<X>
     implements ResetableIterator<X> {
 
+  /**
+   * 构造空的基于ArrayList的可重置迭代器
+   */
   public ArrayListBackedIterator() {
     super();
   }
 
+  /**
+   * 使用已有的ArrayList数据构造可重置迭代器
+   * @param data 存储待迭代元素的ArrayList
+   */
   public ArrayListBackedIterator(ArrayList<X> data) {
     super(data);
   }

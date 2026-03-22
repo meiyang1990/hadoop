@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,9 @@
 
 package org.apache.hadoop.mapreduce.v2.api.records;
 
+/**
+ * MapReduce任务类型枚举，定义MapReduce作业中两种基础任务类型
+ */
 public enum TaskType {
   MAP, REDUCE
 }

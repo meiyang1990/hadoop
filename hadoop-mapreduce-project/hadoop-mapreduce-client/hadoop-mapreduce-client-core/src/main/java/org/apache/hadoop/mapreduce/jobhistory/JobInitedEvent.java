@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,7 +30,7 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 
 /**
- * Event to record the initialization of a job
+ * 作业初始化完成事件，用于在作业历史中记录作业初始化完成的信息
  *
  */
 @InterfaceAudience.Private
@@ -38,13 +39,13 @@ public class JobInitedEvent implements HistoryEvent {
   private JobInited datum = new JobInited();
 
   /**
-   * Create an event to record job initialization
-   * @param id
-   * @param launchTime
-   * @param totalMaps
-   * @param totalReduces
-   * @param jobStatus
-   * @param uberized True if the job's map and reduce stages were combined
+   * 创建作业初始化完成事件，用于记录作业初始化信息
+   * @param id 作业ID
+   * @param launchTime 作业启动时间
+   * @param totalMaps 作业总的Map任务数
+   * @param totalReduces 作业总的Reduce任务数
+   * @param jobStatus 作业初始状态
+   * @param uberized 作业是否开启uber模式（Map和Reduce阶段在同一个JVM中运行）
    */
   public JobInitedEvent(JobID id, long launchTime, int totalMaps,
                         int totalReduces, String jobStatus, boolean uberized) {
@@ -61,36 +62,44 @@ public class JobInitedEvent implements HistoryEvent {
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) { this.datum = (JobInited)datum; }
 
-  /** Get the job ID */
+  /** 获取作业ID */
   public JobID getJobId() { return JobID.forName(datum.getJobid().toString()); }
-  /** Get the launch time */
+  /** 获取作业启动时间 */
   public long getLaunchTime() { return datum.getLaunchTime(); }
-  /** Get the total number of maps */
+  /** 获取作业总的Map任务数 */
   public int getTotalMaps() { return datum.getTotalMaps(); }
-  /** Get the total number of reduces */
+  /** 获取作业总的Reduce任务数 */
   public int getTotalReduces() { return datum.getTotalReduces(); }
-  /** Get the status */
+  /** 获取作业初始状态 */
   public String getStatus() { return datum.getJobStatus().toString(); }
-  /** Get the event type */
+  /** 获取事件类型 */
   public EventType getEventType() {
     return EventType.JOB_INITED;
   }
-  /** Get whether the job's map and reduce stages were combined */
+  /** 获取作业是否开启uber模式 */
   public boolean getUberized() { return datum.getUberized(); }
 
   @Override
+  /** 将当前事件转换为YARN时间线服务事件 */
   public TimelineEvent toTimelineEvent() {
     TimelineEvent tEvent = new TimelineEvent();
+    // 设置事件ID为事件类型大写名称
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
+    // 添加启动时间信息
     tEvent.addInfo("START_TIME", getLaunchTime());
+    // 添加作业状态信息
     tEvent.addInfo("STATUS", getStatus());
+    // 添加总Map任务数信息
     tEvent.addInfo("TOTAL_MAPS", getTotalMaps());
+    // 添加总Reduce任务数信息
     tEvent.addInfo("TOTAL_REDUCES", getTotalReduces());
+    // 添加uber模式标识信息
     tEvent.addInfo("UBERIZED", getUberized());
     return tEvent;
   }
 
   @Override
+  /** 获取时间线指标，本事件无指标，返回null */
   public Set<TimelineMetric> getTimelineMetrics() {
     return null;
   }

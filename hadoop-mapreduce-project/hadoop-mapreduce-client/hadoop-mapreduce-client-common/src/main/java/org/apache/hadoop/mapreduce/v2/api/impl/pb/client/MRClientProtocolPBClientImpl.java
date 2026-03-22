@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -101,6 +102,10 @@ import org.apache.hadoop.security.proto.SecurityProtos.GetDelegationTokenRequest
 import org.apache.hadoop.security.proto.SecurityProtos.RenewDelegationTokenRequestProto;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+/**
+ * MapReduce客户端协议Protobuf实现，基于Hadoop RPC框架实现客户端侧代理，
+ * 负责将本地API调用转换为Protobuf序列化的RPC请求发送给服务端，并将响应转换为本地对象。
+ */
 public class MRClientProtocolPBClientImpl implements MRClientProtocol,
     Closeable {
 
@@ -108,6 +113,13 @@ public class MRClientProtocolPBClientImpl implements MRClientProtocol,
   
   public MRClientProtocolPBClientImpl() {};
   
+  /**
+   * 构造MR客户端代理，初始化与服务端的RPC连接
+   * @param clientVersion 客户端版本号，用于服务端版本兼容性检查
+   * @param addr 服务端地址
+   * @param conf Hadoop配置对象
+   * @throws IOException 初始化连接失败时抛出异常
+   */
   public MRClientProtocolPBClientImpl(long clientVersion,
       InetSocketAddress addr, Configuration conf) throws IOException {
     RPC.setProtocolEngine(conf, MRClientProtocolPB.class,
@@ -130,10 +142,13 @@ public class MRClientProtocolPBClientImpl implements MRClientProtocol,
   @Override
   public GetJobReportResponse getJobReport(GetJobReportRequest request)
       throws IOException {
+    // 将请求对象转换为Protobuf proto对象
     GetJobReportRequestProto requestProto = ((GetJobReportRequestPBImpl)request).getProto();
     try {
+      // 调用RPC代理获取响应，包装为本地API响应对象返回
       return new GetJobReportResponsePBImpl(proxy.getJobReport(null, requestProto));
     } catch (ServiceException e) {
+      // 解包RPC异常并抛出
       throw unwrapAndThrowException(e);
     }
   }
@@ -288,12 +303,20 @@ public class MRClientProtocolPBClientImpl implements MRClientProtocol,
     }
   }
 
+  /**
+   * 解包Protobuf RPC服务异常，转换为符合接口约定的IOException抛出
+   * @param se 原始Protobuf服务异常
+   * @return 解包后的IOException
+   */
   private IOException unwrapAndThrowException(ServiceException se) {
     if (se.getCause() instanceof RemoteException) {
+      // 解包Hadoop RPC远程异常
       return ((RemoteException) se.getCause()).unwrapRemoteException();
     } else if (se.getCause() instanceof IOException) {
+      // 直接返回IO异常
       return (IOException)se.getCause();
     } else {
+      // 非预期异常封装为未声明异常抛出
       throw new UndeclaredThrowableException(se.getCause());
     }
   }

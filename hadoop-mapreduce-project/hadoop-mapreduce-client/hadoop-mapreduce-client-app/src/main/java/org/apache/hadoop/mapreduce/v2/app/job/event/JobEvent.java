@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,18 +23,28 @@ import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 
 /**
- * This class encapsulates job related events.
- *
+ * 封装MapReduce作业相关事件的基类，所有作业级别事件都继承此类
+ * 用于在ApplicationMaster内部传递作业状态变更通知
  */
 public class JobEvent extends AbstractEvent<JobEventType> {
 
+  // 关联的作业ID
   private JobId jobID;
 
+  /**
+   * 构造作业事件实例
+   * @param jobID 关联的作业ID
+   * @param type 作业事件类型
+   */
   public JobEvent(JobId jobID, JobEventType type) {
     super(type);
     this.jobID = jobID;
   }
 
+  /**
+   * 获取当前事件关联的作业ID
+   * @return 作业ID对象
+   */
   public JobId getJobId() {
     return jobID;
   }

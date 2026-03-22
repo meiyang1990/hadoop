@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,10 +16,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/**
+ * MapReduce 安全相关工具包，提供Shuffle阶段和溢写过程的数据加密能力
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 /**
- * Helper classes for the shuffle/spill encryptions.
+ * 提供 Shuffle/溢写 加密所需的辅助工具类。
  */
 package org.apache.hadoop.mapreduce.security;
 import org.apache.hadoop.classification.InterfaceAudience;

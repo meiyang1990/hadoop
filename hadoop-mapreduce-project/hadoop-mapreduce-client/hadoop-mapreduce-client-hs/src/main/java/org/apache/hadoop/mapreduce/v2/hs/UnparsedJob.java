@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,10 +36,9 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * A job that has too many tasks associated with it, of which we do not parse
- * its job history file, to prevent the Job History Server from hanging on
- * parsing the file. It is meant to be used only by JHS to indicate if the
- * history file of a job is fully parsed or not.
+ * 未完全解析的作业占位类，用于处理任务数量过多的作业历史文件。
+ * 当作业任务数超过JHS配置的解析上限时，为避免JHS解析过程挂起，不完整解析该作业历史文件，
+ * 使用此类作为占位表示该作业历史未完全解析，仅供作业历史服务器(JHS)内部使用。
  */
 public class UnparsedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job {
   private final JobIndexInfo jobIndexInfo;
@@ -46,6 +46,13 @@ public class UnparsedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job {
   private JobReport jobReport;
   private final HistoryFileManager.HistoryFileInfo jhfInfo;
 
+  /**
+   * 构造未完全解析作业对象
+   * @param maxTasksAllowed JHS允许解析的最大任务数
+   * @param jobIndexInfo 作业索引信息
+   * @param jhfInfo 历史文件信息
+   * @throws IOException 加载配置文件失败时抛出
+   */
   public UnparsedJob(int maxTasksAllowed, JobIndexInfo jobIndexInfo,
       HistoryFileManager.HistoryFileInfo jhfInfo) throws IOException {
     this.jobIndexInfo = jobIndexInfo;
@@ -53,6 +60,10 @@ public class UnparsedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job {
     this.maxTasksAllowed = maxTasksAllowed;
   }
 
+  /**
+   * 获取JHS配置允许解析的最大任务数
+   * @return 允许解析的最大任务数
+   */
   public int getMaxTasksAllowed() {
     return maxTasksAllowed;
   }
@@ -74,12 +85,17 @@ public class UnparsedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job {
 
   @Override
   public synchronized JobReport getReport() {
+    // 延迟初始化作业报告
     if(jobReport == null) {
       jobReport = constructJobReport();
     }
     return jobReport;
   }
 
+  /**
+   * 构造未解析作业的作业报告，从作业索引信息中提取基本信息
+   * @return 填充完成的作业报告对象
+   */
   public JobReport constructJobReport() {
     JobReport report = Records.newRecord(JobReport.class);
     report.setJobId(getID());

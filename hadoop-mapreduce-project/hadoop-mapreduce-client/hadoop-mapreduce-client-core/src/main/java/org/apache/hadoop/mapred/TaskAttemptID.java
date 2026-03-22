@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,6 +45,10 @@ import org.apache.hadoop.mapreduce.TaskType;
  * 
  * @see JobID
  * @see TaskID
+ *
+ * 旧版MapReduce API的任务尝试ID类，封装单个任务某次运行尝试的唯一标识
+ * 每个任务可能因推测执行或失败重试产生多个运行尝试，每个尝试对应一个唯一ID
+ * 继承自新版org.apache.hadoop.mapreduce.TaskAttemptID，兼容旧API接口
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -53,6 +58,7 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
    * Constructs a TaskAttemptID object from given {@link TaskID}.  
    * @param taskId TaskID that this task belongs to  
    * @param id the task attempt number
+   * 根据所属任务ID和尝试编号构造任务尝试ID
    */
   public TaskAttemptID(TaskID taskId, int id) {
     super(taskId, id);
@@ -66,6 +72,7 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
    * @param taskId taskId number
    * @param id the task attempt number
    * @deprecated Use {@link #TaskAttemptID(String, int, TaskType, int, int)}.
+   * 根据JobTracker标识、作业编号、任务类型、任务编号、尝试编号构造任务尝试ID（已废弃）
    */
   @Deprecated
   public TaskAttemptID(String jtIdentifier, int jobId, boolean isMap, 
@@ -81,12 +88,16 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
    * @param type the TaskType 
    * @param taskId taskId number
    * @param id the task attempt number
+   * 根据JobTracker标识、作业编号、任务类型、任务编号、尝试编号构造任务尝试ID
    */
   public TaskAttemptID(String jtIdentifier, int jobId, TaskType type, 
                        int taskId, int id) {
     this(new TaskID(jtIdentifier, jobId, type, taskId), id);
   }
   
+  /**
+   * 无参构造函数，创建空的任务尝试ID对象，用于反序列化
+   */
   public TaskAttemptID() { 
     super(new TaskID(), 0);
   }
@@ -95,6 +106,7 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
    * Downgrade a new TaskAttemptID to an old one
    * @param old the new id
    * @return either old or a new TaskAttemptID constructed to match old
+   * 将新版API的TaskAttemptID转换为旧版API的TaskAttemptID，兼容旧API调用
    */
   public static 
   TaskAttemptID downgrade(org.apache.hadoop.mapreduce.TaskAttemptID old) {
@@ -105,14 +117,28 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
     }
   }
 
+  /**
+   * 获取当前任务尝试所属任务的旧版TaskID
+   * @return 旧版TaskID对象
+   */
   public TaskID getTaskID() {
     return (TaskID) super.getTaskID();
   }
 
+  /**
+   * 获取当前任务尝试所属作业的旧版JobID
+   * @return 旧版JobID对象
+   */
   public JobID getJobID() {
     return (JobID) super.getJobID();
   }
 
+  /**
+   * 从DataInput流中反序列化读取TaskAttemptID（已废弃）
+   * @param in 输入数据流
+   * @return 反序列化得到的TaskAttemptID对象
+   * @throws IOException 读取数据时抛出IO异常
+   */
   @Deprecated
   public static TaskAttemptID read(DataInput in) throws IOException {
     TaskAttemptID taskId = new TaskAttemptID();
@@ -123,6 +149,7 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
   /** Construct a TaskAttemptID object from given string 
    * @return constructed TaskAttemptID object or null if the given String is null
    * @throws IllegalArgumentException if the given string is malformed
+   * 从字符串格式解析构造TaskAttemptID对象
    */
   public static TaskAttemptID forName(String str
                                       ) throws IllegalArgumentException {
@@ -147,6 +174,7 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
    * @param taskId taskId number, or null
    * @param attemptId the task attempt number, or null
    * @return a regex pattern matching TaskAttemptIDs
+   * 生成匹配任务尝试ID的正则表达式（已废弃，基于布尔类型表示任务类型）
    */
   @Deprecated
   public static String getTaskAttemptIDsPattern(String jtIdentifier,
@@ -172,23 +200,38 @@ public class TaskAttemptID extends org.apache.hadoop.mapreduce.TaskAttemptID {
    * @param taskId taskId number, or null
    * @param attemptId the task attempt number, or null
    * @return a regex pattern matching TaskAttemptIDs
+   * 生成匹配任务尝试ID的正则表达式（已废弃，基于TaskType表示任务类型）
    */
   @Deprecated
   public static String getTaskAttemptIDsPattern(String jtIdentifier,
       Integer jobId, TaskType type, Integer taskId, Integer attemptId) {
+    // 构建正则前缀"attempt_"
     StringBuilder builder = new StringBuilder(ATTEMPT).append(SEPARATOR);
+    // 添加不带前缀的任务尝试匹配部分
     builder.append(getTaskAttemptIDsPatternWOPrefix(jtIdentifier, jobId,
         type, taskId, attemptId));
     return builder.toString();
   }
   
+  /**
+   * 生成不带前缀"attempt_"的任务尝试ID正则匹配部分（已废弃）
+   * @param jtIdentifier jobTracker identifier, or null
+   * @param jobId job number, or null
+   * @param type the {@link TaskType} 
+   * @param taskId taskId number, or null
+   * @param attemptId the task attempt number, or null
+   * @return 正则匹配部分的StringBuilder
+   */
   @Deprecated
   static StringBuilder getTaskAttemptIDsPatternWOPrefix(String jtIdentifier
       , Integer jobId, TaskType type, Integer taskId, Integer attemptId) {
     StringBuilder builder = new StringBuilder();
+    // 拼接任务ID部分的正则
     builder.append(TaskID.getTaskIDsPatternWOPrefix(jtIdentifier
         , jobId, type, taskId))
+        // 添加分隔符
         .append(SEPARATOR)
+        // 添加尝试编号匹配规则：指定则匹配固定值，否则匹配任意数字
         .append(attemptId != null ? attemptId : "[0-9]*");
     return builder;
   }

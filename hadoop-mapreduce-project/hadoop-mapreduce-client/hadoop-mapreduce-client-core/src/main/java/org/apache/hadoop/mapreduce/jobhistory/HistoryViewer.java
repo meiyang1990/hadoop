@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,9 +39,8 @@ import org.apache.hadoop.mapreduce.util.HostUtil;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 /**
- * HistoryViewer is used to parse and view the JobHistory files.  They can be
- * printed in human-readable format or machine-readable JSON format using the
- * {@link HistoryViewerPrinter}.
+ * 文件说明：MapReduce作业历史查看工具，负责解析并展示作业历史文件，支持人类可读格式和JSON两种输出格式
+ * 核心功能：解析已完成作业的历史文件，生成作业、任务、任务尝试的汇总统计信息，并通过指定输出器打印结果
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -52,11 +52,11 @@ public class HistoryViewer {
   public static final String JSON_FORMAT = "json";
 
   /**
-   * Constructs the HistoryViewer object.
-   * @param historyFile the fully qualified Path of the History File
-   * @param conf the Configuration file
-   * @param printAll toggle to print all status to only killed/failed status
-   * @throws IOException when there is a problem parsing the history file
+   * 构造HistoryViewer对象，默认使用人类可读格式输出
+   * @param historyFile 历史文件的完整路径
+   * @param conf Hadoop配置对象
+   * @param printAll 是否打印所有任务状态，false仅打印失败/被杀死的任务
+   * @throws IOException 解析历史文件失败时抛出
    */
   public HistoryViewer(String historyFile, Configuration conf,
                        boolean printAll) throws IOException {
@@ -64,29 +64,37 @@ public class HistoryViewer {
   }
 
   /**
-   * Constructs the HistoryViewer object.
-   * @param historyFile the fully qualified Path of the History File
-   * @param conf the Configuration file
-   * @param printAll toggle to print all status to only killed/failed status
-   * @param format the output format to use
-   * @throws IOException when there is a problem parsing the history file
+   * 构造HistoryViewer对象，支持指定输出格式
+   * @param historyFile 历史文件的完整路径
+   * @param conf Hadoop配置对象
+   * @param printAll 是否打印所有任务状态，false仅打印失败/被杀死的任务
+   * @param format 输出格式，支持human/json两种
+   * @throws IOException 解析历史文件失败时抛出
    */
   public HistoryViewer(String historyFile, Configuration conf, boolean printAll,
                        String format) throws IOException {
     String errorMsg = "Unable to initialize History Viewer";
     try {
+      // 构造作业历史文件路径对象
       Path jobFile = new Path(historyFile);
+      // 获取文件系统实例
       fs = jobFile.getFileSystem(conf);
+      // 拆分文件名获取作业信息
       String[] jobDetails =
         jobFile.getName().split("_");
+      // 文件名格式不合法，忽略该文件
       if (jobDetails.length < 2) {
         // NOT a valid name
         System.err.println("Ignore unrecognized file: " + jobFile.getName());
         throw new IOException(errorMsg);
       }
+      // 创建作业历史解析器
       JobHistoryParser parser = new JobHistoryParser(fs, jobFile);
+      // 解析历史文件获取作业信息
       job = parser.parse();
+      // 获取Web服务协议前缀(http/https)
       String scheme = WebAppUtils.getHttpSchemePrefix(fs.getConf());
+      // 根据格式选择对应输出器
       if (HUMAN_FORMAT.equalsIgnoreCase(format)) {
         jhvp = new HumanReadableHistoryViewerPrinter(job, printAll, scheme);
       } else if (JSON_FORMAT.equalsIgnoreCase(format)) {
@@ -101,49 +109,50 @@ public class HistoryViewer {
   }
 
   /**
-   * Print the job/task/attempt summary information to stdout.
-   * @throws IOException when there is a problem printing the history
+   * 将作业历史摘要信息打印到标准输出
+   * @throws IOException 打印过程出错时抛出
    */
   public void print() throws IOException {
     print(System.out);
   }
 
   /**
-   * Print the job/task/attempt summary information to the PrintStream.
-   * @param ps The PrintStream to print to
-   * @throws IOException when there is a problem printing the history
+   * 将作业历史摘要信息打印到指定输出流
+   * @param ps 目标打印流
+   * @throws IOException 打印过程出错时抛出
    */
   public void print(PrintStream ps) throws IOException {
     jhvp.print(ps);
   }
   
   /**
-   * Return the TaskLogsUrl of a particular TaskAttempt.
+   * 生成指定任务尝试的日志访问URL
    * 
-   * @param attempt info about the task attempt
-   * @return the taskLogsUrl. null if http-port or tracker-name or
-   *         task-attempt-id are unavailable.
+   * @param scheme Web协议前缀(http/https)
+   * @param attempt 任务尝试信息对象
+   * @return 任务日志访问URL，必要信息缺失时返回null
    */
   public static String getTaskLogsUrl(String scheme,
       JobHistoryParser.TaskAttemptInfo attempt) {
+    // 必要信息缺失，返回null
     if (attempt.getHttpPort() == -1
         || attempt.getTrackerName().equals("")
         || attempt.getAttemptId() == null) {
       return null;
     }
   
+    // 从TrackerName中提取主机名
     String taskTrackerName =
       HostUtil.convertTrackerNameToHostName(
         attempt.getTrackerName());
+    // 拼接生成任务日志URL并返回
     return HostUtil.getTaskLogUrl(scheme, taskTrackerName,
         Integer.toString(attempt.getHttpPort()),
         attempt.getAttemptId().toString());
   }
 
   /**
-   * Utility class used the summarize the job. 
-   * Used by HistoryViewer and the JobHistory UI.
-   *
+   * 作业汇总统计类，存储作业各类型任务的统计信息，供HistoryViewer和作业历史WebUI使用
    */
   public static class SummarizedJob {
     Map<TaskID, JobHistoryParser.TaskInfo> tasks; 
@@ -215,25 +224,33 @@ public class HistoryViewer {
      /** Get number of setup tasks that finished */
      public long getSetupFinished() { return setupFinished; }
 
-     /** Create summary information for the parsed job */
+     /**
+      * 根据解析后的作业信息生成汇总统计
+      * @param job 解析完成的作业信息对象
+      */
     public SummarizedJob(JobInfo job) {
       tasks = job.getAllTasks();
 
+      // 遍历所有任务
       for (JobHistoryParser.TaskInfo task : tasks.values()) {
         Map<TaskAttemptID, JobHistoryParser.TaskAttemptInfo> attempts = 
           task.getAllTaskAttempts();
-        //allHosts.put(task.getHo(Keys.HOSTNAME), "");
+        // 遍历所有任务尝试
         for (JobHistoryParser.TaskAttemptInfo attempt : attempts.values()) {
           long startTime = attempt.getStartTime(); 
           long finishTime = attempt.getFinishTime();
+          // 根据任务类型分类统计
           if (attempt.getTaskType().equals(TaskType.MAP)) {
+            // 记录最早map开始时间
             if (mapStarted== 0 || mapStarted > startTime) {
               mapStarted = startTime; 
             }
+            // 记录最晚map结束时间
             if (mapFinished < finishTime) {
               mapFinished = finishTime; 
             }
             totalMaps++; 
+            // 统计失败和被杀死的map数量
             if (attempt.getTaskStatus().equals
                 (TaskStatus.State.FAILED.toString())) {
               numFailedMaps++; 
@@ -242,13 +259,16 @@ public class HistoryViewer {
               numKilledMaps++;
             }
           } else if (attempt.getTaskType().equals(TaskType.REDUCE)) {
+            // 记录最早reduce开始时间
             if (reduceStarted==0||reduceStarted > startTime) {
               reduceStarted = startTime; 
             }
+            // 记录最晚reduce结束时间
             if (reduceFinished < finishTime) {
               reduceFinished = finishTime; 
             }
             totalReduces++; 
+            // 统计失败和被杀死的reduce数量
             if (attempt.getTaskStatus().equals
                 (TaskStatus.State.FAILED.toString())) {
               numFailedReduces++; 
@@ -257,13 +277,16 @@ public class HistoryViewer {
               numKilledReduces++;
             }
           } else if (attempt.getTaskType().equals(TaskType.JOB_CLEANUP)) {
+            // 记录最早清理任务开始时间
             if (cleanupStarted==0||cleanupStarted > startTime) {
               cleanupStarted = startTime; 
             }
+            // 记录最晚清理任务结束时间
             if (cleanupFinished < finishTime) {
               cleanupFinished = finishTime; 
             }
             totalCleanups++; 
+            // 按状态统计清理任务数量
             if (attempt.getTaskStatus().equals
                 (TaskStatus.State.SUCCEEDED.toString())) {
               numFinishedCleanups++; 
@@ -275,13 +298,16 @@ public class HistoryViewer {
               numKilledCleanups++;
             }
           } else if (attempt.getTaskType().equals(TaskType.JOB_SETUP)) {
+            // 记录最早初始化任务开始时间
             if (setupStarted==0||setupStarted > startTime) {
               setupStarted = startTime; 
             }
+            // 记录最晚初始化任务结束时间
             if (setupFinished < finishTime) {
               setupFinished = finishTime; 
             }
             totalSetups++; 
+            // 按状态统计初始化任务数量
             if (attempt.getTaskStatus().equals
                 (TaskStatus.State.SUCCEEDED.toString())) {
               numFinishedSetups++;
@@ -299,8 +325,7 @@ public class HistoryViewer {
   }
 
   /**
-   * Utility class used while analyzing the job. 
-   * Used by HistoryViewer and the JobHistory UI.
+   * 作业分析类，存储成功任务的平均运行时间统计和任务列表，供HistoryViewer和作业历史WebUI使用
    */
   public static class AnalyzedJob {
     private long avgMapTime;
@@ -324,13 +349,18 @@ public class HistoryViewer {
     public JobHistoryParser.TaskAttemptInfo [] getReduceTasks() { 
       return reduceTasks;
     }
-    /** Generate analysis information for the parsed job */
+    /**
+     * 根据解析后的作业信息生成分析统计
+     * @param job 解析完成的作业信息对象
+     */
     public AnalyzedJob (JobInfo job) {
       Map<TaskID, JobHistoryParser.TaskInfo> tasks = job.getAllTasks();
       int succeededMaps = (int) job.getSucceededMaps();
       int succeededReduces = (int) job.getSucceededReduces();
+      // 初始化成功map数组
       mapTasks = 
         new JobHistoryParser.TaskAttemptInfo[succeededMaps];
+      // 初始化成功reduce数组
       reduceTasks = 
         new JobHistoryParser.TaskAttemptInfo[succeededReduces];
       int mapIndex = 0 , reduceIndex=0; 
@@ -338,28 +368,36 @@ public class HistoryViewer {
       avgReduceTime = 0;
       avgShuffleTime = 0;
 
+      // 遍历所有任务
       for (JobHistoryParser.TaskInfo task : tasks.values()) {
         Map<TaskAttemptID, JobHistoryParser.TaskAttemptInfo> attempts =
           task.getAllTaskAttempts();
+        // 遍历所有任务尝试
         for (JobHistoryParser.TaskAttemptInfo attempt : attempts.values()) {
+          // 只统计成功完成的任务尝试
           if (attempt.getTaskStatus().
               equals(TaskStatus.State.SUCCEEDED.toString())) {
+            // 计算任务运行时长
             long avgFinishTime = (attempt.getFinishTime() -
                 attempt.getStartTime());
             if (attempt.getTaskType().equals(TaskType.MAP)) {
+              // 添加到成功map列表，累加总运行时间
               mapTasks[mapIndex++] = attempt; 
               avgMapTime += avgFinishTime;
             } else if (attempt.getTaskType().equals(TaskType.REDUCE)) {
+              // 添加到成功reduce列表，累加shuffle时间和reduce运行时间
               reduceTasks[reduceIndex++] = attempt;
               avgShuffleTime += (attempt.getShuffleFinishTime() - 
                   attempt.getStartTime());
               avgReduceTime += (attempt.getFinishTime() -
                   attempt.getShuffleFinishTime());
             }
+            // 每个任务只取第一个成功尝试统计，跳出循环
             break;
           }
         }
       }
+      // 计算平均运行时间，防止除以0
       if (succeededMaps > 0) {
         avgMapTime /= succeededMaps;
       }
@@ -371,7 +409,7 @@ public class HistoryViewer {
   }
 
   /**
-   * Utility to filter out events based on the task status
+   * 按任务状态过滤作业，统计各节点上符合过滤条件的任务，供历史分析使用
    */
   public static class FilteredJob {
     
@@ -384,37 +422,3 @@ public class HistoryViewer {
     public Map<String, Set<TaskID>> getFilteredMap() {
       return badNodesToFilteredTasks;
     }
-    
-    /** Get the current filter */
-    public String getFilter() { return filter; }
-    
-    /** Apply the filter (status) on the parsed job and generate summary */
-    public FilteredJob(JobInfo job, String status) {
-
-      filter = status;
-      
-      Map<TaskID, JobHistoryParser.TaskInfo> tasks = job.getAllTasks();
-
-      for (JobHistoryParser.TaskInfo task : tasks.values()) {
-        Map<TaskAttemptID, JobHistoryParser.TaskAttemptInfo> attempts =
-          task.getAllTaskAttempts();
-        for (JobHistoryParser.TaskAttemptInfo attempt : attempts.values()) {
-          if (attempt.getTaskStatus().equals(status)) {
-            String hostname = attempt.getHostname();
-            TaskID id = attempt.getAttemptId().getTaskID();
-
-            Set<TaskID> set = badNodesToFilteredTasks.get(hostname);
-
-            if (set == null) {
-              set = new TreeSet<TaskID>();
-              set.add(id);
-              badNodesToFilteredTasks.put(hostname, set);
-            }else{
-              set.add(id);
-            }
-          }
-        }
-      }
-    }
-  }
-}

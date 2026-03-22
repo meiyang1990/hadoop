@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,7 +30,7 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 
 /**
- * Event to record updates to a task
+ * 任务更新事件，用于记录任务运行过程中的更新信息到作业历史
  *
  */
 @InterfaceAudience.Private
@@ -38,9 +39,9 @@ public class TaskUpdatedEvent implements HistoryEvent {
   private TaskUpdated datum = new TaskUpdated();
 
   /**
-   * Create an event to record task updates
-   * @param id Id of the task
-   * @param finishTime Finish time of the task
+   * 创建任务更新事件，用于记录任务更新
+   * @param id 任务ID
+   * @param finishTime 任务完成时间
    */
   public TaskUpdatedEvent(TaskID id, long finishTime) {
     datum.setTaskid(new Utf8(id.toString()));
@@ -52,26 +53,30 @@ public class TaskUpdatedEvent implements HistoryEvent {
   public Object getDatum() { return datum; }
   public void setDatum(Object datum) { this.datum = (TaskUpdated)datum; }
 
-  /** Get the task ID */
+  /** 获取任务ID */
   public TaskID getTaskId() {
     return TaskID.forName(datum.getTaskid().toString());
   }
-  /** Get the task finish time */
+  /** 获取任务完成时间 */
   public long getFinishTime() { return datum.getFinishTime(); }
-  /** Get the event type */
+  /** 获取事件类型 */
   public EventType getEventType() {
     return EventType.TASK_UPDATED;
   }
 
   @Override
+  /** 将当前事件转换为YARN时间线服务可存储的事件格式 */
   public TimelineEvent toTimelineEvent() {
     TimelineEvent tEvent = new TimelineEvent();
+    // 设置事件ID，使用大写化的事件类型名称
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
+    // 添加任务完成时间信息
     tEvent.addInfo("FINISH_TIME", getFinishTime());
     return tEvent;
   }
 
   @Override
+  /** 获取该事件对应的时间线指标，此事件无指标返回null */
   public Set<TimelineMetric> getTimelineMetrics() {
     return null;
   }

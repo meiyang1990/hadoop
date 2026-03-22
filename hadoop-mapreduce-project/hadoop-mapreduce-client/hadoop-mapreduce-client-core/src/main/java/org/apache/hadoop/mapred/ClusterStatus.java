@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,32 +35,31 @@ import org.apache.hadoop.mapreduce.Cluster.JobTrackerStatus;
 import org.apache.hadoop.util.StringInterner;
 
 /**
- * Status information on the current state of the Map-Reduce cluster.
+ * 存储MapReduce集群当前状态的信息类，供客户端获取集群概览使用
  * 
- * <p><code>ClusterStatus</code> provides clients with information such as:
+ * <p><code>ClusterStatus</code> 向客户端提供以下信息:
  * <ol>
  *   <li>
- *   Size of the cluster. 
+ *   集群规模（节点数量）
  *   </li>
  *   <li>
- *   Name of the trackers. 
+ *   所有TaskTracker节点名称
  *   </li>
  *   <li>
- *   Task capacity of the cluster. 
+ *   集群任务总容量
  *   </li>
  *   <li>
- *   The number of currently running map and reduce tasks.
+ *   当前正在运行的Map和Reduce任务数量
  *   </li>
  *   <li>
- *   State of the <code>JobTracker</code>.
+ *   JobTracker运行状态
  *   </li>
  *   <li>
- *   Details regarding black listed trackers.
+ *   黑名单TaskTracker的详细信息
  *   </li>
  * </ol>
  * 
- * <p>Clients can query for the latest <code>ClusterStatus</code>, via 
- * {@link JobClient#getClusterStatus()}.</p>
+ * <p>客户端可通过 {@link JobClient#getClusterStatus()} 获取最新集群状态</p>
  * 
  * @see JobClient
  */
@@ -67,11 +67,10 @@ import org.apache.hadoop.util.StringInterner;
 @InterfaceStability.Stable
 public class ClusterStatus implements Writable {
   /**
-   * Class which encapsulates information about a blacklisted tasktracker.
+   * 封装被列入黑名单的TaskTracker节点信息
    *  
-   * The information includes the tasktracker's name and reasons for
-   * getting blacklisted. The toString method of the class will print
-   * the information in a whitespace separated fashion to enable parsing.
+   * 包含TaskTracker节点名称、被拉黑原因、详细描述报告。
+   * toString方法输出空格分隔格式，方便后续解析处理。
    */
   public static class BlackListInfo implements Writable {
 
@@ -86,54 +85,53 @@ public class ClusterStatus implements Writable {
     
 
     /**
-     * Gets the blacklisted tasktracker's name.
+     * 获取被拉黑TaskTracker的节点名称
      * 
-     * @return tracker's name.
+     * @return TaskTracker节点名称
      */
     public String getTrackerName() {
       return trackerName;
     }
 
     /**
-     * Gets the reason for which the tasktracker was blacklisted.
+     * 获取TaskTracker被拉黑的原因
      * 
-     * @return reason which tracker was blacklisted
+     * @return 拉黑原因
      */
     public String getReasonForBlackListing() {
       return reasonForBlackListing;
     }
 
     /**
-     * Sets the blacklisted tasktracker's name.
+     * 设置被拉黑TaskTracker的节点名称
      * 
-     * @param trackerName of the tracker.
+     * @param trackerName TaskTracker节点名称
      */
     void setTrackerName(String trackerName) {
       this.trackerName = trackerName;
     }
 
     /**
-     * Sets the reason for which the tasktracker was blacklisted.
+     * 设置TaskTracker被拉黑的原因
      * 
-     * @param reasonForBlackListing
+     * @param reasonForBlackListing 拉黑原因
      */
     void setReasonForBlackListing(String reasonForBlackListing) {
       this.reasonForBlackListing = reasonForBlackListing;
     }
 
     /**
-     * Gets a descriptive report about why the tasktracker was blacklisted.
+     * 获取TaskTracker被拉黑的详细描述报告
      * 
-     * @return report describing why the tasktracker was blacklisted.
+     * @return 拉黑原因详细报告
      */
     public String getBlackListReport() {
       return blackListReport;
     }
 
     /**
-     * Sets a descriptive report about why the tasktracker was blacklisted.
-     * @param blackListReport report describing why the tasktracker 
-     *                        was blacklisted.
+     * 设置TaskTracker被拉黑的详细描述报告
+     * @param blackListReport 拉黑原因详细报告
      */
     void setBlackListReport(String blackListReport) {
       this.blackListReport = blackListReport;
@@ -141,6 +139,7 @@ public class ClusterStatus implements Writable {
 
     @Override
     public void readFields(DataInput in) throws IOException {
+      // 从输入流反序列化黑名单信息，使用弱引用字符串驻留节省内存
       trackerName = StringInterner.weakIntern(Text.readString(in));
       reasonForBlackListing = StringInterner.weakIntern(Text.readString(in));
       blackListReport = StringInterner.weakIntern(Text.readString(in));
@@ -148,6 +147,7 @@ public class ClusterStatus implements Writable {
 
     @Override
     public void write(DataOutput out) throws IOException {
+      // 序列化黑名单信息到输出流
       Text.writeString(out, trackerName);
       Text.writeString(out, reasonForBlackListing);
       Text.writeString(out, blackListReport);
@@ -155,12 +155,8 @@ public class ClusterStatus implements Writable {
 
     @Override
     /**
-     * Print information related to the blacklisted tasktracker in a
-     * whitespace separated fashion.
-     * 
-     * The method changes any newlines in the report describing why
-     * the tasktracker was blacklisted to a ':' for enabling better
-     * parsing.
+     * 以空格分隔格式输出黑名单节点信息，将报告中的换行替换为冒号方便解析
+     * @return 格式化的黑名单节点信息字符串
      */
     public String toString() {
       StringBuilder sb = new StringBuilder();
@@ -226,16 +222,16 @@ public class ClusterStatus implements Writable {
   ClusterStatus() {}
   
   /**
-   * Construct a new cluster status.
+   * 构造集群状态对象
    * 
-   * @param trackers no. of tasktrackers in the cluster
-   * @param blacklists no of blacklisted task trackers in the cluster
-   * @param ttExpiryInterval the tasktracker expiry interval
-   * @param maps no. of currently running map-tasks in the cluster
-   * @param reduces no. of currently running reduce-tasks in the cluster
-   * @param maxMaps the maximum no. of map tasks in the cluster
-   * @param maxReduces the maximum no. of reduce tasks in the cluster
-   * @param status the {@link JobTrackerStatus} of the <code>JobTracker</code>
+   * @param trackers 集群中TaskTracker总数量
+   * @param blacklists 集群中黑名单TaskTracker数量
+   * @param ttExpiryInterval TaskTracker超时判断时间间隔
+   * @param maps 当前正在运行的Map任务数量
+   * @param reduces 当前正在运行的Reduce任务数量
+   * @param maxMaps 集群最大可运行Map任务总数
+   * @param maxReduces 集群最大可运行Reduce任务总数
+   * @param status JobTracker的运行状态
    */
   ClusterStatus(int trackers, int blacklists, long ttExpiryInterval, 
                 int maps, int reduces,
@@ -245,17 +241,17 @@ public class ClusterStatus implements Writable {
   }
 
   /**
-   * Construct a new cluster status.
+   * 构造集群状态对象
    * 
-   * @param trackers no. of tasktrackers in the cluster
-   * @param blacklists no of blacklisted task trackers in the cluster
-   * @param ttExpiryInterval the tasktracker expiry interval
-   * @param maps no. of currently running map-tasks in the cluster
-   * @param reduces no. of currently running reduce-tasks in the cluster
-   * @param maxMaps the maximum no. of map tasks in the cluster
-   * @param maxReduces the maximum no. of reduce tasks in the cluster
-   * @param status the {@link JobTrackerStatus} of the <code>JobTracker</code>
-   * @param numDecommissionedNodes number of decommission trackers
+   * @param trackers 集群中TaskTracker总数量
+   * @param blacklists 集群中黑名单TaskTracker数量
+   * @param ttExpiryInterval TaskTracker超时判断时间间隔
+   * @param maps 当前正在运行的Map任务数量
+   * @param reduces 当前正在运行的Reduce任务数量
+   * @param maxMaps 集群最大可运行Map任务总数
+   * @param maxReduces 集群最大可运行Reduce任务总数
+   * @param status JobTracker的运行状态
+   * @param numDecommissionedNodes 已下线节点数量
    */
   ClusterStatus(int trackers, int blacklists, long ttExpiryInterval, int maps,
       int reduces, int maxMaps, int maxReduces, JobTrackerStatus status,
@@ -265,18 +261,18 @@ public class ClusterStatus implements Writable {
   }
 
   /**
-   * Construct a new cluster status.
+   * 构造集群状态对象
    * 
-   * @param trackers no. of tasktrackers in the cluster
-   * @param blacklists no of blacklisted task trackers in the cluster
-   * @param ttExpiryInterval the tasktracker expiry interval
-   * @param maps no. of currently running map-tasks in the cluster
-   * @param reduces no. of currently running reduce-tasks in the cluster
-   * @param maxMaps the maximum no. of map tasks in the cluster
-   * @param maxReduces the maximum no. of reduce tasks in the cluster
-   * @param status the {@link JobTrackerStatus} of the <code>JobTracker</code>
-   * @param numDecommissionedNodes number of decommission trackers
-   * @param numGrayListedTrackers number of graylisted trackers
+   * @param trackers 集群中TaskTracker总数量
+   * @param blacklists 集群中黑名单TaskTracker数量
+   * @param ttExpiryInterval TaskTracker超时判断时间间隔
+   * @param maps 当前正在运行的Map任务数量
+   * @param reduces 当前正在运行的Reduce任务数量
+   * @param maxMaps 集群最大可运行Map任务总数
+   * @param maxReduces 集群最大可运行Reduce任务总数
+   * @param status JobTracker的运行状态
+   * @param numDecommissionedNodes 已下线节点数量
+   * @param numGrayListedTrackers 灰名单节点数量
    */
   ClusterStatus(int trackers, int blacklists, long ttExpiryInterval, int maps,
       int reduces, int maxMaps, int maxReduces, JobTrackerStatus status,
@@ -294,16 +290,16 @@ public class ClusterStatus implements Writable {
   }
 
   /**
-   * Construct a new cluster status.
+   * 构造包含详细节点信息的集群状态对象
    * 
-   * @param activeTrackers active tasktrackers in the cluster
-   * @param blacklistedTrackers blacklisted tasktrackers in the cluster
-   * @param ttExpiryInterval the tasktracker expiry interval
-   * @param maps no. of currently running map-tasks in the cluster
-   * @param reduces no. of currently running reduce-tasks in the cluster
-   * @param maxMaps the maximum no. of map tasks in the cluster
-   * @param maxReduces the maximum no. of reduce tasks in the cluster
-   * @param status the {@link JobTrackerStatus} of the <code>JobTracker</code>
+   * @param activeTrackers 集群中活跃TaskTracker节点名称集合
+   * @param blacklistedTrackers 集群中黑名单TaskTracker信息集合
+   * @param ttExpiryInterval TaskTracker超时判断时间间隔
+   * @param maps 当前正在运行的Map任务数量
+   * @param reduces 当前正在运行的Reduce任务数量
+   * @param maxMaps 集群最大可运行Map任务总数
+   * @param maxReduces 集群最大可运行Reduce任务总数
+   * @param status JobTracker的运行状态
    */
   ClusterStatus(Collection<String> activeTrackers, 
       Collection<BlackListInfo> blacklistedTrackers,
@@ -316,20 +312,18 @@ public class ClusterStatus implements Writable {
 
 
   /**
-   * Construct a new cluster status.
+   * 构造包含详细节点信息的集群状态对象
    * 
-   * @param activeTrackers active tasktrackers in the cluster
-   * @param blackListedTrackerInfo blacklisted tasktrackers information 
-   * in the cluster
-   * @param ttExpiryInterval the tasktracker expiry interval
-   * @param maps no. of currently running map-tasks in the cluster
-   * @param reduces no. of currently running reduce-tasks in the cluster
-   * @param maxMaps the maximum no. of map tasks in the cluster
-   * @param maxReduces the maximum no. of reduce tasks in the cluster
-   * @param status the {@link JobTrackerStatus} of the <code>JobTracker</code>
-   * @param numDecommissionNodes number of decommission trackers
+   * @param activeTrackers 集群中活跃TaskTracker节点名称集合
+   * @param blackListedTrackerInfo 集群中黑名单TaskTracker信息集合
+   * @param ttExpiryInterval TaskTracker超时判断时间间隔
+   * @param maps 当前正在运行的Map任务数量
+   * @param reduces 当前正在运行的Reduce任务数量
+   * @param maxMaps 集群最大可运行Map任务总数
+   * @param maxReduces 集群最大可运行Reduce任务总数
+   * @param status JobTracker的运行状态
+   * @param numDecommissionNodes 已下线节点数量
    */
-  
   ClusterStatus(Collection<String> activeTrackers,
       Collection<BlackListInfo> blackListedTrackerInfo, long ttExpiryInterval,
       int maps, int reduces, int maxMaps, int maxReduces,
@@ -342,27 +336,27 @@ public class ClusterStatus implements Writable {
   }
 
   /**
-   * Get the number of task trackers in the cluster.
+   * 获取集群中活跃TaskTracker的总数量
    * 
-   * @return the number of task trackers in the cluster.
+   * @return 活跃TaskTracker数量
    */
   public int getTaskTrackers() {
     return numActiveTrackers;
   }
   
   /**
-   * Get the names of task trackers in the cluster.
+   * 获取集群中所有活跃TaskTracker的名称集合
    * 
-   * @return the active task trackers in the cluster.
+   * @return 活跃TaskTracker名称集合
    */
   public Collection<String> getActiveTrackerNames() {
     return activeTrackers;
   }
 
   /**
-   * Get the names of task trackers in the cluster.
+   * 获取集群中所有黑名单TaskTracker的名称集合
    * 
-   * @return the blacklisted task trackers in the cluster.
+   * @return 黑名单TaskTracker名称集合
    */
   public Collection<String> getBlacklistedTrackerNames() {
     ArrayList<String> blacklistedTrackers = new ArrayList<String>();
@@ -373,12 +367,11 @@ public class ClusterStatus implements Writable {
   }
 
   /**
-   * Get the names of graylisted task trackers in the cluster.
+   * 获取集群中所有灰名单TaskTracker的名称集合
    *
-   * The gray list of trackers is no longer available on M/R 2.x. The function
-   * is kept to be compatible with M/R 1.x applications.
+   * M/R 2.x版本已不再支持灰名单机制，此方法仅为兼容旧版M/R 1.x应用保留
    *
-   * @return an empty graylisted task trackers in the cluster.
+   * @return 返回空集合
    */
   @Deprecated
   public Collection<String> getGraylistedTrackerNames() {
@@ -386,12 +379,11 @@ public class ClusterStatus implements Writable {
   }
 
   /**
-   * Get the number of graylisted task trackers in the cluster.
+   * 获取集群中灰名单TaskTracker的总数量
    *
-   * The gray list of trackers is no longer available on M/R 2.x. The function
-   * is kept to be compatible with M/R 1.x applications.
+   * M/R 2.x版本已不再支持灰名单机制，此方法仅为兼容旧版M/R 1.x应用保留
    *
-   * @return 0 graylisted task trackers in the cluster.
+   * @return 返回0
    */
   @Deprecated
   public int getGraylistedTrackers() {
@@ -399,77 +391,77 @@ public class ClusterStatus implements Writable {
   }
 
   /**
-   * Get the number of blacklisted task trackers in the cluster.
+   * 获取集群中黑名单TaskTracker的总数量
    * 
-   * @return the number of blacklisted task trackers in the cluster.
+   * @return 黑名单TaskTracker数量
    */
   public int getBlacklistedTrackers() {
     return numBlacklistedTrackers;
   }
   
   /**
-   * Get the number of excluded hosts in the cluster.
-   * @return the number of excluded hosts in the cluster.
+   * 获取集群中被排除（下线）节点的总数量
+   * @return 被排除节点数量
    */
   public int getNumExcludedNodes() {
     return numExcludedNodes;
   }
   
   /**
-   * Get the tasktracker expiry interval for the cluster
-   * @return the expiry interval in msec
+   * 获取TaskTracker超时判断时间间隔
+   * @return 超时时间间隔，单位毫秒
    */
   public long getTTExpiryInterval() {
     return ttExpiryInterval;
   }
   
   /**
-   * Get the number of currently running map tasks in the cluster.
+   * 获取当前集群中正在运行的Map任务数量
    * 
-   * @return the number of currently running map tasks in the cluster.
+   * @return 当前运行Map任务数
    */
   public int getMapTasks() {
     return map_tasks;
   }
   
   /**
-   * Get the number of currently running reduce tasks in the cluster.
+   * 获取当前集群中正在运行的Reduce任务数量
    * 
-   * @return the number of currently running reduce tasks in the cluster.
+   * @return 当前运行Reduce任务数
    */
   public int getReduceTasks() {
     return reduce_tasks;
   }
   
   /**
-   * Get the maximum capacity for running map tasks in the cluster.
+   * 获取集群最大可同时运行Map任务总数
    * 
-   * @return the maximum capacity for running map tasks in the cluster.
+   * @return 集群Map任务总容量
    */
   public int getMaxMapTasks() {
     return max_map_tasks;
   }
 
   /**
-   * Get the maximum capacity for running reduce tasks in the cluster.
+   * 获取集群最大可同时运行Reduce任务总数
    * 
-   * @return the maximum capacity for running reduce tasks in the cluster.
+   * @return 集群Reduce任务总容量
    */
   public int getMaxReduceTasks() {
     return max_reduce_tasks;
   }
   
   /**
-   * Get the JobTracker's status.
+   * 获取JobTracker的运行状态
    * 
-   * @return {@link JobTrackerStatus} of the JobTracker
+   * @return JobTracker运行状态
    */
   public JobTrackerStatus getJobTrackerStatus() {
     return status;
   }
   
   /**
-   * Returns UNINITIALIZED_MEMORY_VALUE (-1)
+   * 已废弃，返回未初始化内存标记值-1
    */
   @Deprecated
   public long getMaxMemory() {
@@ -477,7 +469,7 @@ public class ClusterStatus implements Writable {
   }
   
   /**
-   * Returns UNINITIALIZED_MEMORY_VALUE (-1)
+   * 已废弃，返回未初始化内存标记值-1
    */
   @Deprecated
   public long getUsedMemory() {
@@ -485,85 +477,30 @@ public class ClusterStatus implements Writable {
   }
 
   /**
-   * Gets the list of blacklisted trackers along with reasons for blacklisting.
+   * 获取所有黑名单TaskTracker的详细信息集合
    * 
-   * @return the collection of {@link BlackListInfo} objects. 
-   * 
+   * @return 黑名单TaskTracker信息对象集合
    */
   public Collection<BlackListInfo> getBlackListedTrackersInfo() {
     return blacklistedTrackersInfo;
   }
 
   /**
-   * Get the current state of the <code>JobTracker</code>,
-   * as {@link JobTracker.State}
+   * 获取JobTracker状态（兼容旧版API）
    *
-   * {@link JobTracker.State} should no longer be used on M/R 2.x. The function
-   * is kept to be compatible with M/R 1.x applications.
+   * M/R 2.x已不再使用该状态，此方法仅为兼容旧版M/R 1.x应用保留
    *
-   * @return the invalid state of the <code>JobTracker</code>.
+   * @return 始终返回RUNNING状态
    */
   @Deprecated
   public JobTracker.State getJobTrackerState() {
     return JobTracker.State.RUNNING;
   }
 
+  /**
+   * 序列化集群状态对象到输出流
+   * @param out 输出流
+   * @throws IOException 序列化过程IO异常
+   */
   public void write(DataOutput out) throws IOException {
-    if (activeTrackers.size() == 0) {
-      out.writeInt(numActiveTrackers);
-      out.writeInt(0);
-    } else {
-      out.writeInt(activeTrackers.size());
-      out.writeInt(activeTrackers.size());
-      for (String tracker : activeTrackers) {
-        Text.writeString(out, tracker);
-      }
-    }
-    if (blacklistedTrackersInfo.size() == 0) {
-      out.writeInt(numBlacklistedTrackers);
-      out.writeInt(blacklistedTrackersInfo.size());
-    } else {
-      out.writeInt(blacklistedTrackersInfo.size());
-      out.writeInt(blacklistedTrackersInfo.size());
-      for (BlackListInfo tracker : blacklistedTrackersInfo) {
-        tracker.write(out);
-      }
-    }
-    out.writeInt(numExcludedNodes);
-    out.writeLong(ttExpiryInterval);
-    out.writeInt(map_tasks);
-    out.writeInt(reduce_tasks);
-    out.writeInt(max_map_tasks);
-    out.writeInt(max_reduce_tasks);
-    WritableUtils.writeEnum(out, status);
-    out.writeInt(grayListedTrackers);
-  }
-
-  public void readFields(DataInput in) throws IOException {
-    numActiveTrackers = in.readInt();
-    int numTrackerNames = in.readInt();
-    if (numTrackerNames > 0) {
-      for (int i = 0; i < numTrackerNames; i++) {
-        String name = StringInterner.weakIntern(Text.readString(in));
-        activeTrackers.add(name);
-      }
-    }
-    numBlacklistedTrackers = in.readInt();
-    int blackListTrackerInfoSize = in.readInt();
-    if(blackListTrackerInfoSize > 0) {
-      for (int i = 0; i < blackListTrackerInfoSize; i++) {
-        BlackListInfo info = new BlackListInfo();
-        info.readFields(in);
-        blacklistedTrackersInfo.add(info);
-      }
-    }
-    numExcludedNodes = in.readInt();
-    ttExpiryInterval = in.readLong();
-    map_tasks = in.readInt();
-    reduce_tasks = in.readInt();
-    max_map_tasks = in.readInt();
-    max_reduce_tasks = in.readInt();
-    status = WritableUtils.readEnum(in, JobTrackerStatus.class);
-    grayListedTrackers = in.readInt();
-  }
-}
+    // 序列化活跃节点信息

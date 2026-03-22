@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,37 +34,60 @@ import java.text.NumberFormat;
  * task number.
  * </p>
  */
+/**
+ * MapReduce任务唯一标识符抽象类，用于标识Map或Reduce任务
+ * 核心职责：维护任务所属作业、任务类型、任务编号信息，提供任务比较、格式化输出能力
+ */
 public abstract class TaskId implements Comparable<TaskId> {
 
   /**
-   * @return the associated <code>JobId</code>
+   * 获取当前任务所属的作业ID
+   * @return 关联的JobId对象
    */
   public abstract JobId getJobId();
 
   /**
-   * @return the type of the task - MAP/REDUCE
+   * 获取当前任务的类型（MAP/REDUCE）
+   * @return 任务类型枚举
    */
   public abstract TaskType getTaskType();
 
   /**
-   * @return the task number.
+   * 获取当前任务在作业中的编号
+   * @return 任务编号
    */
   public abstract int getId();
 
+  /**
+   * 设置当前任务所属的作业ID
+   * @param jobId 要关联的作业ID
+   */
   public abstract void setJobId(JobId jobId);
 
+  /**
+   * 设置当前任务的类型
+   * @param taskType 任务类型枚举（MAP/REDUCE）
+   */
   public abstract void setTaskType(TaskType taskType);
 
+  /**
+   * 设置当前任务在作业中的编号
+   * @param id 任务编号
+   */
   public abstract void setId(int id);
 
+  // TaskId字符串前缀标识
   protected static final String TASK = "task";
 
+  // 线程本地的任务编号格式化器，保证6位数字输出，线程安全
   static final ThreadLocal<NumberFormat> taskIdFormat =
       new ThreadLocal<NumberFormat>() {
         @Override
         public NumberFormat initialValue() {
           NumberFormat fmt = NumberFormat.getInstance();
+          // 不使用千分位分组
           fmt.setGroupingUsed(false);
+          // 最小保留6位整数长度，不足补零
           fmt.setMinimumIntegerDigits(6);
           return fmt;
         }
@@ -99,22 +123,30 @@ public abstract class TaskId implements Comparable<TaskId> {
       
   @Override
   public String toString() {
+    // 构建标准格式TaskId字符串
     StringBuilder builder = new StringBuilder(TASK);
     JobId jobId = getJobId();
+    // 拼接集群时间戳
     builder.append("_").append(jobId.getAppId().getClusterTimestamp());
+    // 拼接应用编号
     builder.append("_").append(
         JobId.jobIdFormat.get().format(jobId.getAppId().getId()));
     builder.append("_");
+    // 拼接任务类型标识（m表示map，r表示reduce）
     builder.append(getTaskType() == TaskType.MAP ? "m" : "r").append("_");
+    // 拼接格式化后的任务编号
     builder.append(taskIdFormat.get().format(getId()));
     return builder.toString();
   }
 
   @Override
   public int compareTo(TaskId other) {
+    // 先比较所属作业ID，作业不同直接返回作业比较结果
     int jobIdComp = this.getJobId().compareTo(other.getJobId());
     if (jobIdComp == 0) {
+      // 作业相同，比较任务类型
       if (this.getTaskType() == other.getTaskType()) {
+        // 类型相同，比较任务编号
         return this.getId() - other.getId();
       } else {
         return this.getTaskType().compareTo(other.getTaskType());

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +22,10 @@ package org.apache.hadoop.mapred.nativetask.serde;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.mapred.nativetask.INativeComparable;
 
+/**
+ * VIntWritable 可变长度整数类型的原生任务序列化器
+ * 继承默认序列化实现，支持原生任务比较接口，用于原生Task中VIntWritable类型数据的序列化与排序比较
+ */
 @InterfaceAudience.Private
 public class VIntWritableSerializer extends DefaultSerializer implements
     INativeComparable {

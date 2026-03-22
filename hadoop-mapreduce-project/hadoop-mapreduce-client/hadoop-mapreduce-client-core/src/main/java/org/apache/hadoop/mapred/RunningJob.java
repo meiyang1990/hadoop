@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
-
-/** 
+/**
+ * 文件描述：Hadoop MapReduce 旧版API中运行中作业的查询接口，为客户端提供作业状态、进度等信息查询能力
+ * 
  * <code>RunningJob</code> is the user-interface to query for details on a 
  * running Map-Reduce job.
  * 
@@ -40,16 +42,16 @@ import org.apache.hadoop.conf.Configuration;
 public interface RunningJob {
 
   /**
-   * Get the underlying job configuration
+   * 获取当前作业的配置对象
    *
-   * @return the configuration of the job.
+   * @return 当前作业的配置对象
    */
   public Configuration getConfiguration();
 
   /**
-   * Get the job identifier.
+   * 获取当前作业的唯一标识对象
    * 
-   * @return the job identifier.
+   * @return 当前作业的JobID标识对象
    */
   public JobID getID();
   
@@ -60,135 +62,127 @@ public interface RunningJob {
   public String getJobID();
   
   /**
-   * Get the name of the job.
+   * 获取当前作业的名称
    * 
-   * @return the name of the job.
+   * @return 当前作业的名称字符串
    */
   public String getJobName();
 
   /**
-   * Get the path of the submitted job configuration.
+   * 获取提交作业时配置文件的路径
    * 
-   * @return the path of the submitted job configuration.
+   * @return 提交作业配置文件的路径字符串
    */
   public String getJobFile();
 
   /**
-   * Get the URL where some job progress information will be displayed.
+   * 获取当前作业进度跟踪页面的URL
    * 
-   * @return the URL where some job progress information will be displayed.
+   * @return 作业进度跟踪页面的URL字符串
    */
   public String getTrackingURL();
 
   /**
-   * Get the <i>progress</i> of the job's map-tasks, as a float between 0.0 
-   * and 1.0.  When all map tasks have completed, the function returns 1.0.
+   * 获取当前作业Map阶段的进度，范围在0.0到1.0之间，全部完成返回1.0
    * 
-   * @return the progress of the job's map-tasks.
-   * @throws IOException
+   * @return Map阶段进度值（0.0-1.0）
+   * @throws IO异常
    */
   public float mapProgress() throws IOException;
 
   /**
-   * Get the <i>progress</i> of the job's reduce-tasks, as a float between 0.0 
-   * and 1.0.  When all reduce tasks have completed, the function returns 1.0.
+   * 获取当前作业Reduce阶段的进度，范围在0.0到1.0之间，全部完成返回1.0
    * 
-   * @return the progress of the job's reduce-tasks.
-   * @throws IOException
+   * @return Reduce阶段进度值（0.0-1.0）
+   * @throws IO异常
    */
   public float reduceProgress() throws IOException;
 
   /**
-   * Get the <i>progress</i> of the job's cleanup-tasks, as a float between 0.0 
-   * and 1.0.  When all cleanup tasks have completed, the function returns 1.0.
+   * 获取当前作业Cleanup阶段的进度，范围在0.0到1.0之间，全部完成返回1.0
    * 
-   * @return the progress of the job's cleanup-tasks.
-   * @throws IOException
+   * @return Cleanup阶段进度值（0.0-1.0）
+   * @throws IO异常
    */
   public float cleanupProgress() throws IOException;
 
   /**
-   * Get the <i>progress</i> of the job's setup-tasks, as a float between 0.0 
-   * and 1.0.  When all setup tasks have completed, the function returns 1.0.
+   * 获取当前作业Setup阶段的进度，范围在0.0到1.0之间，全部完成返回1.0
    * 
-   * @return the progress of the job's setup-tasks.
-   * @throws IOException
+   * @return Setup阶段进度值（0.0-1.0）
+   * @throws IO异常
    */
   public float setupProgress() throws IOException;
 
   /**
-   * Check if the job is finished or not. 
-   * This is a non-blocking call.
+   * 检查作业是否已完成，非阻塞调用
    * 
-   * @return <code>true</code> if the job is complete, else <code>false</code>.
-   * @throws IOException
+   * @return <code>true</code> 作业已完成，否则返回<code>false</code>
+   * @throws IO异常
    */
   public boolean isComplete() throws IOException;
 
   /**
-   * Check if the job completed successfully. 
+   * 检查作业是否成功完成
    * 
-   * @return <code>true</code> if the job succeeded, else <code>false</code>.
-   * @throws IOException
+   * @return <code>true</code> 作业执行成功，否则返回<code>false</code>
+   * @throws IO异常
    */
   public boolean isSuccessful() throws IOException;
   
   /**
-   * Blocks until the job is complete.
+   * 阻塞等待直到作业完成
    * 
-   * @throws IOException
+   * @throws IO异常
    */
   public void waitForCompletion() throws IOException;
 
   /**
-   * Returns the current state of the Job.
-   * {@link JobStatus}
+   * 返回当前作业的状态枚举值，对应{@link JobStatus}中的状态定义
    * 
-   * @throws IOException
+   * @return 当前作业状态编码
+   * @throws IO异常
    */
   public int getJobState() throws IOException;
   
   /**
-   * Returns a snapshot of the current status, {@link JobStatus}, of the Job.
-   * Need to call again for latest information.
+   * 返回当前作业状态的快照对象{@link JobStatus}，需要重新调用获取最新状态
    * 
-   * @throws IOException
+   * @return 当前作业状态快照对象
+   * @throws IO异常
    */
   public JobStatus getJobStatus() throws IOException;
 
   /**
-   * Kill the running job. Blocks until all job tasks have been killed as well.
-   * If the job is no longer running, it simply returns.
+   * 终止正在运行的作业，阻塞等待所有任务被杀死后返回，如果作业已停止则直接返回
    * 
-   * @throws IOException
+   * @throws IO异常
    */
   public void killJob() throws IOException;
   
   /**
-   * Set the priority of a running job.
-   * @param priority the new priority for the job.
-   * @throws IOException
+   * 修改正在运行作业的优先级
+   * @param priority 作业新的优先级
+   * @throws IO异常
    */
   public void setJobPriority(String priority) throws IOException;
   
   /**
-   * Get events indicating completion (success/failure) of component tasks.
+   * 获取任务完成（成功/失败）事件列表，用于分页查询
    *  
-   * @param startFrom index to start fetching events from
-   * @return an array of {@link TaskCompletionEvent}s
-   * @throws IOException
+   * @param startFrom 起始查询下标
+   * @return 任务完成事件数组 {@link TaskCompletionEvent}
+   * @throws IO异常
    */
   public TaskCompletionEvent[] getTaskCompletionEvents(int startFrom) 
   throws IOException;
   
   /**
-   * Kill indicated task attempt.
+   * 终止指定的任务尝试
    * 
-   * @param taskId the id of the task to be terminated.
-   * @param shouldFail if true the task is failed and added to failed tasks 
-   *                   list, otherwise it is just killed, w/o affecting 
-   *                   job failure status.  
-   * @throws IOException
+   * @param taskId 待终止任务尝试的ID
+   * @param shouldFail 如果为true，将该任务标记为失败并计入失败任务列表；否则仅杀死任务，不影响作业整体失败状态
+   * @throws IO异常
    */
   public void killTask(TaskAttemptID taskId, boolean shouldFail) throws IOException;
   
@@ -197,43 +191,40 @@ public interface RunningJob {
   public void killTask(String taskId, boolean shouldFail) throws IOException;
   
   /**
-   * Gets the counters for this job.
+   * 获取当前作业的所有统计计数器
    * 
-   * @return the counters for this job or null if the job has been retired.
-   * @throws IOException
+   * @return 作业计数器对象，如果作业已退役则返回null
+   * @throws IO异常
    */
   public Counters getCounters() throws IOException;
   
   /**
-   * Gets the diagnostic messages for a given task attempt.
-   * @param taskid
-   * @return the list of diagnostic messages for the task
-   * @throws IOException
+   * 获取指定任务尝试的诊断信息
+   * @param taskid 任务尝试ID
+   * @return 任务诊断信息字符串数组
+   * @throws IO异常
    */
   public String[] getTaskDiagnostics(TaskAttemptID taskid) throws IOException;
 
   /**
-   * Get the url where history file is archived. Returns empty string if 
-   * history file is not available yet. 
+   * 获取作业历史文件归档的URL，历史文件尚未生成则返回空字符串
    * 
-   * @return the url where history file is archived
-   * @throws IOException
+   * @return 作业历史文件归档URL
+   * @throws IO异常
    */
   public String getHistoryUrl() throws IOException;
 
   /**
-   * Check whether the job has been removed from JobTracker memory and retired.
-   * On retire, the job history file is copied to a location known by 
-   * {@link #getHistoryUrl()}
-   * @return <code>true</code> if the job retired, else <code>false</code>.
-   * @throws IOException
+   * 检查作业是否已从JobTracker内存中移除并退役，退役后作业历史文件会被拷贝到getHistoryUrl()指定位置
+   * @return <code>true</code> 作业已退役，否则返回<code>false</code>
+   * @throws IO异常
    */
   public boolean isRetired() throws IOException;
   
   /**
-   * Get failure info for the job.
-   * @return the failure info for the job.
-   * @throws IOException
+   * 获取作业失败信息
+   * @return 作业失败原因描述，如果未失败则返回空
+   * @throws IO异常
    */
   public String getFailureInfo() throws IOException;
 }

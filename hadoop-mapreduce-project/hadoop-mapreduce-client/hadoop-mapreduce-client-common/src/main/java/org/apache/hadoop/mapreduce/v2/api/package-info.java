@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * MapReduce V2版本核心客户端API包，定义了客户端与MapReduce服务端交互的核心接口
+ * 本包仅用于Hadoop内部模块使用，不对外公开为公共API
  */
 @InterfaceAudience.Private
 package org.apache.hadoop.mapreduce.v2.api;

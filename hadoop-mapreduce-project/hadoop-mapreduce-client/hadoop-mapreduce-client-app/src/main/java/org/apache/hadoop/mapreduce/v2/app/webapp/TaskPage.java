@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -48,8 +49,14 @@ import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * MapReduce任务详情页面视图，负责渲染任务页面的整体结构和内容
+ */
 public class TaskPage extends AppView {
 
+  /**
+   * 任务尝试列表区块，负责渲染任务所有尝试的详情表格
+   */
   static class AttemptsBlock extends HtmlBlock {
     final App app;
     final boolean enableUIActions;
@@ -62,6 +69,10 @@ public class TaskPage extends AppView {
               MRConfig.DEFAULT_MASTER_WEBAPP_UI_ACTIONS_ENABLED);
     }
 
+    /**
+     * 渲染任务尝试列表HTML内容
+     * @param html HTML块输出对象
+     */
     @Override
     protected void render(Block html) {
       if (!isValidRequest()) {
@@ -72,8 +83,7 @@ public class TaskPage extends AppView {
 
       JobId jobId = app.getJob().getID();
       if (enableUIActions) {
-        // Kill task attempt
-
+        // 注入杀死任务尝试的前端JS逻辑
         StringBuilder script = new StringBuilder();
         script
             .append("function confirmAction(appID, jobID, taskID, attID) {\n")
@@ -104,6 +114,7 @@ public class TaskPage extends AppView {
         html.script().$type("text/javascript").__(script.toString()).__();
       }
 
+      // 创建表格表头
       TR<THEAD<TABLE<Hamlet>>> tr = html.table("#attempts").thead().tr();
       tr.th(".id", "Attempt").
       th(".progress", "Progress").
@@ -120,10 +131,10 @@ public class TaskPage extends AppView {
       }
 
       TBODY<TABLE<Hamlet>> tbody = tr.__().__().tbody();
-      // Write all the data into a JavaScript array of arrays for JQuery
-      // DataTables to display
+      // 将数据预构造为JS二维数组，供DataTables前端渲染
       StringBuilder attemptsTableData = new StringBuilder("[\n");
 
+      // 遍历所有任务尝试，构造表格数据
       for (TaskAttempt attempt : getTaskAttempts()) {
         TaskAttemptInfo ta = new MapTaskAttemptInfo(attempt, true);
         String progress = StringUtils.format("%.2f", ta.getProgress());
@@ -137,12 +148,12 @@ public class TaskPage extends AppView {
         .append(ta.getState().toString()).append("\",\"")
         .append(StringEscapeUtils.escapeEcmaScript(
               StringEscapeUtils.escapeHtml4(ta.getStatus()))).append("\",\"")
-
+        // 节点地址链接
         .append(nodeHttpAddr == null ? "N/A" :
             "<a class='nodelink' href='" + MRWebAppUtil.getYARNWebappScheme() + nodeHttpAddr + "'>"
                 + nodeHttpAddr + "</a>")
         .append("\",\"")
-
+        // 容器日志链接
         .append(ta.getAssignedContainerId() == null ? "N/A" :
           "<a class='logslink' href='" + url(MRWebAppUtil.getYARNWebappScheme(), nodeHttpAddr, "node"
             , "containerlogs", ta.getAssignedContainerIdStr(), app.getJob()
@@ -156,12 +167,14 @@ public class TaskPage extends AppView {
             StringEscapeUtils.escapeHtml4(diag)));
         if (enableUIActions) {
           attemptsTableData.append("\",\"");
+          // 已结束任务不提供杀死操作
           if (EnumSet.of(
                   TaskAttemptState.SUCCEEDED,
                   TaskAttemptState.FAILED,
                   TaskAttemptState.KILLED).contains(attempt.getState())) {
             attemptsTableData.append("N/A");
           } else {
+            // 未结束任务添加杀死操作按钮
             attemptsTableData
               .append("<a href=javascript:void(0) onclick=confirmAction('")
               .append(jobId.getAppId()).append("','")
@@ -173,11 +186,12 @@ public class TaskPage extends AppView {
           attemptsTableData.append("\"],\n");
         }
       }
-      //Remove the last comma and close off the array of arrays
+      // 移除最后一条数据多余的逗号
       if(attemptsTableData.charAt(attemptsTableData.length() - 2) == ',') {
         attemptsTableData.delete(attemptsTableData.length()-2, attemptsTableData.length()-1);
       }
       attemptsTableData.append("]");
+      // 将构造好的数据注入页面JS
       html.script().$type("text/javascript").
           __("var attemptsTableData=" + attemptsTableData).__();
 
@@ -189,16 +203,29 @@ public class TaskPage extends AppView {
       return ta.getId();
     }
 
+    /**
+     * 检查请求是否有效，当前任务存在则有效
+     * @return 是否为有效请求
+     */
     protected boolean isValidRequest() {
       return app.getTask() != null;
     }
 
+    /**
+     * 获取当前任务的所有尝试列表
+     * @return 任务尝试集合
+     */
     protected Collection<TaskAttempt> getTaskAttempts() {
       return app.getTask().getAttempts().values();
     }
   }
 
-  @Override protected void preHead(Page.HTML<__> html) {
+  @Override
+  /**
+   * 在HTML头部注入所需资源和初始化参数
+   * @param html HTML页面对象
+   */
+  protected void preHead(Page.HTML<__> html) {
     commonPreHead(html);
 
     set(initID(ACCORDION, "nav"), "{autoHeight:false, active:3}");
@@ -207,10 +234,19 @@ public class TaskPage extends AppView {
     setTableStyles(html, "attempts");
   }
 
-  @Override protected Class<? extends SubView> content() {
+  @Override
+  /**
+   * 获取页面内容区块类型
+   * @return 内容区块类
+   */
+  protected Class<? extends SubView> content() {
     return AttemptsBlock.class;
   }
 
+  /**
+   * 构造任务尝试表格DataTables初始化配置
+   * @return DataTables初始化JSON字符串
+   */
   private String attemptsTableInit() {
     return tableInit()
     .append(", 'aaData': attemptsTableData")
@@ -218,7 +254,7 @@ public class TaskPage extends AppView {
     .append(", bProcessing: true")
     .append("\n,aoColumnDefs:[\n")
 
-    //logs column should not filterable (it includes container ID which may pollute searches)
+    // 日志列不允许搜索，避免容器ID干扰搜索结果
     .append("\n{'aTargets': [ 5 ]")
     .append(", 'bSearchable': false }")
 
@@ -231,7 +267,7 @@ public class TaskPage extends AppView {
     .append("\n, {'sType':'numeric', 'aTargets': [ 8")
     .append(" ], 'mRender': renderHadoopElapsedTime }]")
 
-    // Sort by id upon page load
+    // 页面加载后按尝试ID升序排序
     .append("\n, aaSorting: [[0, 'asc']]")
     .append("}").toString();
   }

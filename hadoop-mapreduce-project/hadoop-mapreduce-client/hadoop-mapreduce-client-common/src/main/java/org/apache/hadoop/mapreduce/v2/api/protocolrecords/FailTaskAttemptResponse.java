@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,11 @@
 
 package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
+/**
+ * 标记接口，用于封装任务尝试失败请求的响应实体
+ * 属于MapReduce应用Master与MR协议之间的数据交换载体，
+ * 用于标识失败任务尝试操作的响应结果
+ */
 public interface FailTaskAttemptResponse {
 
 }

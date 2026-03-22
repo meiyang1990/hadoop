@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,10 +20,18 @@
 package org.apache.hadoop.mapred;
 
 /**
- * A simple wrapper for increasing the visibility.
+ * WrappedJvmID 类是 JVMId 的包装类，用于提升 JVMId 的访问可见性。
+ * 在 MapReduce 任务执行过程中，用于跨包访问 JVMId 标识信息，
+ * 标识一个MapReduce任务的JVM进程ID。
  */
 public class WrappedJvmID extends JVMId {
 
+  /**
+   * 构造 WrappedJvmID 实例，将参数透传给父类 JVMId 构造函数
+   * @param jobID 所属作业ID
+   * @param mapTask 是否是Map任务
+   * @param nextLong JVM的唯一编号
+   */
   public WrappedJvmID(JobID jobID, boolean mapTask, long nextLong) {
     super(jobID, mapTask, nextLong);
   }

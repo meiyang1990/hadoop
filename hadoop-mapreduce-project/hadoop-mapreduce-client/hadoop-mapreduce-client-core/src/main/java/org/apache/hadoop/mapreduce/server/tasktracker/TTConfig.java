@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,23 +23,30 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.MRConfig;
 
 /**
- * Place holder for MapReduce server-level configuration.
- * (formerly TaskTracker configuration)
+ * MapReduce TaskTracker服务端配置项常量接口，保存所有TaskTracker相关的配置键定义
+ * 原为旧版MapReduce架构中TaskTracker的专用配置类，继承MR通用配置
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface TTConfig extends MRConfig {
 
   /**
-   *  @deprecated Use
-   *  {@link org.apache.hadoop.mapreduce.MRJobConfig#SHUFFLE_INDEX_CACHE}
-   *  instead
+   *  @deprecated 请改用 {@link org.apache.hadoop.mapreduce.MRJobConfig#SHUFFLE_INDEX_CACHE}
+   *   shuffle索引缓存内存配置键，单位MB
    */
   @Deprecated
   public static final String TT_INDEX_CACHE = 
     "mapreduce.tasktracker.indexcache.mb";
+  
+  /**
+   * TaskTracker上最大Map任务槽数量配置键，控制同时运行的Map任务数
+   */
   public static final String TT_MAP_SLOTS = 
     "mapreduce.tasktracker.map.tasks.maximum";
+  
+  /**
+   * TaskTracker资源计算器插件类配置键，用于扩展自定义资源计算逻辑
+   */
   public static final String TT_RESOURCE_CALCULATOR_PLUGIN = 
     "mapreduce.tasktracker.resourcecalculatorplugin";
 }

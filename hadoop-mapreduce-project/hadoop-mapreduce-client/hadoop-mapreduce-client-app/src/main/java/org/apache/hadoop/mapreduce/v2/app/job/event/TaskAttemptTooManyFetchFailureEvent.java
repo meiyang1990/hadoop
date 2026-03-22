@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -21,17 +22,18 @@ package org.apache.hadoop.mapreduce.v2.app.job.event;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
 /**
- * TaskAttemptTooManyFetchFailureEvent is used for TA_TOO_MANY_FETCH_FAILURE.
+ * 任务尝试过多获取失败事件，当Reduce任务多次拉取某个Map任务输出失败时触发
+ * 用于通知作业调度器标记对应的Map任务尝试失败并重试
  */
 public class TaskAttemptTooManyFetchFailureEvent extends TaskAttemptEvent {
   private TaskAttemptId reduceID;
   private String  reduceHostname;
 
   /**
-   * Create a new TaskAttemptTooManyFetchFailureEvent.
-   * @param attemptId the id of the mapper task attempt
-   * @param reduceId the id of the reporting reduce task attempt.
-   * @param reduceHost the hostname of the reporting reduce task attempt.
+   * 构造任务尝试过多获取失败事件
+   * @param attemptId 发生获取失败的Map任务尝试ID
+   * @param reduceId 报告失败的Reduce任务尝试ID
+   * @param reduceHost 报告失败的Reduce任务所在主机名
    */
   public TaskAttemptTooManyFetchFailureEvent(TaskAttemptId attemptId,
       TaskAttemptId reduceId, String reduceHost) {
@@ -40,10 +42,18 @@ public class TaskAttemptTooManyFetchFailureEvent extends TaskAttemptEvent {
     this.reduceHostname = reduceHost;
   }
 
+  /**
+   * 获取报告失败的Reduce任务尝试ID
+   * @return 报告失败的Reduce任务尝试ID
+   */
   public TaskAttemptId getReduceId() {
     return reduceID;
   }
 
+  /**
+   * 获取报告失败的Reduce任务所在主机名
+   * @return 报告失败的Reduce任务主机名
+   */
   public String getReduceHost() {
     return reduceHostname;
   }  

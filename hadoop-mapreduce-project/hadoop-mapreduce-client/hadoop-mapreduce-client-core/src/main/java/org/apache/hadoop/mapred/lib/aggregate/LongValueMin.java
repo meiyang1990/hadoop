@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that maintain the minimum of 
- * a sequence of long values.
+ * 长整型最小值聚合器，为旧版MapReduce API提供长整型序列最小值聚合能力
+ * 继承新版MapReduce的实现，适配旧版API接口，用于聚合分组后所有长整型值的最小值
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable

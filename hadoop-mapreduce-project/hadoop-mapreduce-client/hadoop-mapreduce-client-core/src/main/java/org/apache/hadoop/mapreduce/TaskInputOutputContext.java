@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,12 +25,12 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * A context object that allows input and output from the task. It is only
- * supplied to the {@link Mapper} or {@link Reducer}.
- * @param <KEYIN> the input key type for the task
- * @param <VALUEIN> the input value type for the task
- * @param <KEYOUT> the output key type for the task
- * @param <VALUEOUT> the output value type for the task
+ * MapReduce任务输入输出处理的上下文接口，提供任务读取输入、写入输出的核心能力
+ * 仅提供给{@link Mapper}和{@link Reducer}使用，封装任务的输入输出操作
+ * @param <KEYIN> 任务输入键类型
+ * @param <VALUEIN> 任务输入值类型
+ * @param <KEYOUT> 任务输出键类型
+ * @param <VALUEOUT> 任务输出值类型
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -37,36 +38,42 @@ public interface TaskInputOutputContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
        extends TaskAttemptContext {
 
   /**
-   * Advance to the next key, value pair, returning null if at end.
-   * @return the key object that was read into, or null if no more
+   * 移动到下一个键值对，用于遍历任务的所有输入数据
+   * @return 如果还有下一个键值对返回true，到达输入末尾返回false
+   * @throws IOException 读取输入时IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public boolean nextKeyValue() throws IOException, InterruptedException;
  
   /**
-   * Get the current key.
-   * @return the current key object or null if there isn't one
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取当前遍历到的输入键对象
+   * @return 当前输入键，没有更多数据时返回null
+   * @throws IOException 读取键时IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public KEYIN getCurrentKey() throws IOException, InterruptedException;
 
   /**
-   * Get the current value.
-   * @return the value object that was read into
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取当前遍历到的输入值对象
+   * @return 当前输入值，没有更多数据时返回null
+   * @throws IOException 读取值时IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public VALUEIN getCurrentValue() throws IOException, InterruptedException;
 
   /**
-   * Generate an output key/value pair.
+   * 输出一个键值对到任务结果
+   * @param key 输出键
+   * @param value 输出值
+   * @throws IOException 写入输出时IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public void write(KEYOUT key, VALUEOUT value) 
       throws IOException, InterruptedException;
 
   /**
-   * Get the {@link OutputCommitter} for the task-attempt.
-   * @return the <code>OutputCommitter</code> for the task-attempt
+   * 获取当前任务尝试的输出提交器，用于输出结果的提交和回滚
+   * @return 当前任务尝试的OutputCommitter实例
    */
   public OutputCommitter getOutputCommitter();
 }

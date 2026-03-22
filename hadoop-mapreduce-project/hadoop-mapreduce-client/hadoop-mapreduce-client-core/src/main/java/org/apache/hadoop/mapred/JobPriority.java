@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,23 +22,29 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Used to describe the priority of the running job. 
- * DEFAULT : While submitting a job, if the user is not specifying priority,
- * YARN has the capability to pick the default priority as per its config.
- * Hence MapReduce can indicate such cases with this new enum.
- * UNDEFINED_PRIORITY : YARN supports priority as an integer. Hence other than
- * the five defined enums, YARN can consider other integers also. To generalize
- * such cases, this specific enum is used.
+ * 作业优先级枚举，定义MapReduce作业调度优先级
+ * <p>
+ * 核心职责：为YARN资源调度提供作业优先级分级标识，用于调度器分配资源时的优先级排序
+ * <ul>
+ *   <li>DEFAULT：用户提交作业未指定优先级时使用，让YARN根据自身配置选择默认优先级</li>
+ *   <li>UNDEFINED_PRIORITY：处理YARN支持的整数优先级中不属于预定义五级的情况，用于兼容自定义优先级</li>
+ * </ul>
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public enum JobPriority {
-
+  /** 最高优先级 */
   VERY_HIGH,
+  /** 高优先级 */
   HIGH,
+  /** 普通优先级 */
   NORMAL,
+  /** 低优先级 */
   LOW,
+  /** 最低优先级 */
   VERY_LOW,
+  /** 默认优先级，用户未指定时使用 */
   DEFAULT,
+  /** 未定义优先级，兼容YARN自定义整数优先级 */
   UNDEFINED_PRIORITY;
 }

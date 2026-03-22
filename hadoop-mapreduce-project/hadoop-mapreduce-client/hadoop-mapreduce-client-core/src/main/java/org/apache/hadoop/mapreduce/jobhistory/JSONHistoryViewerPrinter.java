@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,8 +39,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 /**
- * Used by the {@link HistoryViewer} to print job history in a machine-readable
- * JSON format.
+ * 供HistoryViewer使用的JSON格式作业历史输出器，将作业历史以机器可读的JSON格式输出
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -50,6 +50,12 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
   private String scheme;
   private JSONObject json;
 
+  /**
+   * 构造JSON格式历史输出器
+   * @param job 解析完成的作业信息对象
+   * @param printAll 是否输出所有任务尝试信息
+   * @param scheme 访问日志的URL协议
+   */
   JSONHistoryViewerPrinter(JobHistoryParser.JobInfo job, boolean printAll,
                            String scheme) {
     this.job = job;
@@ -58,10 +64,9 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
   }
 
   /**
-   * Print out the Job History to the given {@link PrintStream} in a
-   * machine-readable JSON format.
-   * @param ps the {@link PrintStream} to print to
-   * @throws IOException when a problem occurs while printing
+   * 将作业历史以JSON格式输出到指定PrintStream
+   * @param ps 输出目标PrintStream
+   * @throws IOException 输出过程中发生IO异常时抛出
    */
   @Override
   public void print(PrintStream ps) throws IOException {
@@ -69,8 +74,11 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
 
     Writer writer = null;
     try {
+      // 输出作业基本信息
       printJobDetails();
+      // 输出各类任务统计汇总
       printTaskSummary();
+      // 输出失败/被杀死的任务详情
       printTasks();
 
       writer = new OutputStreamWriter(ps, StandardCharsets.UTF_8);
@@ -86,6 +94,10 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
     }
   }
 
+  /**
+   * 将作业基本信息填充到JSON对象中
+   * @throws JSONException JSON构造异常时抛出
+   */
   private void printJobDetails() throws JSONException {
     json.put("hadoopJob", job.getJobId().toString());
     json.put("user", job.getUsername());
@@ -100,6 +112,13 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
         job.getReduceCounters());
   }
 
+  /**
+   * 将作业全局计数器信息填充到JSON对象中，分别统计Map、Reduce和总计
+   * @param totalCounters 作业全局计数器
+   * @param mapCounters Map阶段总计数器
+   * @param reduceCounters Reduce阶段总计数器
+   * @throws JSONException JSON构造异常时抛出
+   */
   private void printJobCounters(Counters totalCounters, Counters mapCounters,
                                 Counters reduceCounters) throws JSONException {
     // Killed jobs might not have counters
@@ -134,6 +153,10 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
     }
   }
 
+  /**
+   * 将不同类型任务的统计汇总信息填充到JSON对象中
+   * @throws JSONException JSON构造异常时抛出
+   */
   private void printTaskSummary() throws JSONException {
     HistoryViewer.SummarizedJob ts = new HistoryViewer.SummarizedJob(job);
     JSONObject jSums = new JSONObject();
@@ -172,10 +195,15 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
     json.put("taskSummary", jSums);
   }
 
+  /**
+   * 将失败/被杀死的任务详情填充到JSON对象中，printAll开启时会输出所有成功任务和任务尝试信息
+   * @throws JSONException JSON构造异常时抛出
+   */
   private void printTasks() throws JSONException {
     Map<TaskID, JobHistoryParser.TaskInfo> tasks = job.getAllTasks();
     JSONArray jTasks = new JSONArray();
     for (JobHistoryParser.TaskInfo task : tasks.values()) {
+      // 跳过任务清理任务，只输出需要展示的任务
       if (!task.getTaskType().equals(TaskType.TASK_CLEANUP) &&
           ((printAll && task.getTaskStatus().equals(
               TaskStatus.State.SUCCEEDED.toString()))
@@ -187,12 +215,15 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
         jTask.put("status", task.getTaskStatus());
         jTask.put("startTime", task.getStartTime());
         jTask.put("finishTime", task.getFinishTime());
+        // 有错误信息则添加错误信息
         if (!task.getError().isEmpty()) {
           jTask.put("error", task.getError());
         }
+        // Map任务添加输入块位置信息
         if (task.getTaskType().equals(TaskType.MAP)) {
           jTask.put("inputSplits", task.getSplitLocations());
         }
+        // printAll开启时输出任务计数器和所有任务尝试信息
         if (printAll) {
           printTaskCounters(jTask, task.getCounters());
           JSONObject jAtt = new JSONObject();
@@ -200,15 +231,18 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
               task.getAllTaskAttempts().values()) {
             jAtt.put("attemptId", attempt.getAttemptId());
             jAtt.put("startTime", attempt.getStartTime());
+            // Reduce任务添加shuffle和排序完成时间
             if (task.getTaskType().equals(TaskType.REDUCE)) {
               jAtt.put("shuffleFinished", attempt.getShuffleFinishTime());
               jAtt.put("sortFinished", attempt.getSortFinishTime());
             }
             jAtt.put("finishTime", attempt.getFinishTime());
             jAtt.put("hostName", attempt.getHostname());
+            // 有错误信息则添加错误信息
             if (!attempt.getError().isEmpty()) {
               jAtt.put("error", task.getError());
             }
+            // 生成任务日志访问URL并添加
             String taskLogsUrl = HistoryViewer.getTaskLogsUrl(scheme, attempt);
             if (taskLogsUrl != null) {
               jAtt.put("taskLogs", taskLogsUrl);
@@ -222,6 +256,12 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
     }
   }
 
+  /**
+   * 将单个任务的计数器信息填充到任务JSON对象中
+   * @param jTask 任务JSON对象
+   * @param taskCounters 任务计数器
+   * @throws JSONException JSON构造异常时抛出
+   */
   private void printTaskCounters(JSONObject jTask, Counters taskCounters)
       throws JSONException {
     // Killed tasks might not have counters
@@ -246,6 +286,11 @@ class JSONHistoryViewerPrinter implements HistoryViewerPrinter {
     }
   }
 
+  /**
+   * 修正Shuffle Errors计数器组的名称，改为全限定类名格式保持兼容性
+   * @param name 原始组名
+   * @return 修正后的组名
+   */
   private String fixGroupNameForShuffleErrors(String name) {
     String retName = name;
 

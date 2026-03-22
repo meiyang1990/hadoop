@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,36 +33,34 @@ import org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManif
 import org.apache.hadoop.util.JsonSerialization;
 
 /**
- * Implementation of manifest store operations through the filesystem API.
- * This class is subclassed in the ABFS module, which does add the resilient
- * commit method.
+ * 文件层面板清单提交器的清单存储操作实现，基于标准Hadoop FileSystem API实现。
+ * 该类在ABFS模块中存在子类实现，添加了弹性提交方法。
  */
 @InterfaceAudience.LimitedPrivate("mapreduce, object-stores")
 @InterfaceStability.Unstable
 public class ManifestStoreOperationsThroughFileSystem extends ManifestStoreOperations {
 
   /**
-   * Filesystem; set in {@link #bindToFileSystem(FileSystem, Path)}.
+   * 操作使用的文件系统，在{@link #bindToFileSystem(FileSystem, Path)}中绑定。
    */
   private FileSystem fileSystem;
 
   /**
-   * Has a call to FileSystem.msync() failed as unsupported?
-   * If so, no new attempts will be made when
-   * (@link {@link #msync(Path)} is invoked.
+   * 标记FileSystem.msync()调用是否因不支持而失败。
+   * 如果标记为true，后续调用{@link #msync(Path)}将不再尝试执行。
    */
   private boolean msyncUnsupported = false;
 
   /**
-   * Direct Constructor.
-   * @param fileSystem filesystem to write through.
+   * 直接构造函数，指定操作使用的文件系统。
+   * @param fileSystem 要操作的文件系统
    */
   public ManifestStoreOperationsThroughFileSystem(final FileSystem fileSystem) {
     this.fileSystem = fileSystem;
   }
 
   /**
-   * Constructor used for introspection-based binding.
+   * 用于反射绑定的空构造函数。
    */
   public ManifestStoreOperationsThroughFileSystem() {
   }
@@ -73,8 +72,8 @@ public class ManifestStoreOperationsThroughFileSystem extends ManifestStoreOpera
   }
 
   /**
-   * Get the filesystem.
-   * @return the filesystem; null until bound.
+   * 获取当前操作使用的文件系统。
+   * @return 当前绑定的文件系统，绑定前返回null
    */
   public FileSystem getFileSystem() {
     return fileSystem;
@@ -91,10 +90,10 @@ public class ManifestStoreOperationsThroughFileSystem extends ManifestStoreOpera
   }
 
   /**
-   * Using FileSystem.isFile to offer stores the option to optimize their probes.
-   * @param path path to probe
-   * @return true if the path resolves to a file.
-   * @throws IOException IO failure.
+   * 使用FileSystem.isFile方法判断路径是否为文件，允许存储系统优化探测逻辑。
+   * @param path 要探测的路径
+   * @return 如果路径对应文件则返回true
+   * @throws IOException IO操作失败
    */
   @SuppressWarnings("deprecation")
   @Override
@@ -147,9 +146,9 @@ public class ManifestStoreOperationsThroughFileSystem extends ManifestStoreOpera
   }
 
   /**
-   * Probe filesystem capabilities.
-   * @param path path to probe.
-   * @return true if the FS declares its renames work.
+   * 探测文件系统是否支持重命名保留ETag。
+   * @param path 要探测的路径
+   * @return 如果文件系统声明重命名后保留ETag则返回true
    */
   @Override
   public boolean storePreservesEtagsThroughRenames(Path path) {
@@ -162,29 +161,24 @@ public class ManifestStoreOperationsThroughFileSystem extends ManifestStoreOpera
   }
 
   /**
-   * Invokes FileSystem msync(); swallows UnsupportedOperationExceptions.
-   * This ensures client metadata caches are in sync in an HDFS-HA deployment.
-   * No other filesystems support this; in the absence of a hasPathCapability()
-   * probe, after the operation is rejected, an atomic boolean is set
-   * to stop further attempts from even trying.
-   * @param path path
-   * @throws IOException failure to synchronize.
+   * 调用FileSystem的msync方法同步客户端元数据缓存，捕获并处理不支持该操作的异常。
+   * 该操作用于保证HDFS-HA部署场景下客户端元数据缓存同步。
+   * 大多数文件系统不支持该操作，首次调用失败后会设置标记，禁止后续重复尝试。
+   * @param path 要同步的路径
+   * @throws IOException 同步操作失败时抛出
    */
   @Override
   public void msync(Path path) throws IOException {
-    // there's need for atomicity here, as the sole cost of
-    // multiple failures
+    // 如果已经确认不支持msync，直接返回
     if (msyncUnsupported) {
       return;
     }
-    // qualify so we can be confident that the FS being synced
-    // is the one we expect.
+    // 标准化路径，确保路径格式正确
     fileSystem.makeQualified(path);
     try {
       fileSystem.msync();
     } catch (UnsupportedOperationException ignored) {
-      // this exception is the default.
-      // set the unsupported flag so no future attempts are made.
+      // 捕获不支持异常，标记为不支持，避免后续重复尝试
       msyncUnsupported = true;
     }
   }

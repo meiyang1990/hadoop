@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,39 +26,28 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 
 /** 
- * <code>InputFormat</code> describes the input-specification for a 
- * Map-Reduce job. 
+ * InputFormat 接口定义了MapReduce作业的输入规范，是MapReduce旧版API中输入处理的核心抽象。
  * 
- * <p>The Map-Reduce framework relies on the <code>InputFormat</code> of the
- * job to:<p>
+ * <p>MapReduce框架依赖InputFormat完成三个核心职责：<p>
  * <ol>
  *   <li>
- *   Validate the input-specification of the job. 
- *   <li>
- *   Split-up the input file(s) into logical {@link InputSplit}s, each of 
- *   which is then assigned to an individual {@link Mapper}.
+ *   验证作业的输入配置是否合法
  *   </li>
  *   <li>
- *   Provide the {@link RecordReader} implementation to be used to glean
- *   input records from the logical <code>InputSplit</code> for processing by 
- *   the {@link Mapper}.
+ *   将输入文件切分为逻辑{@link InputSplit}分片，每个分片分配给一个独立的{@link Mapper}处理
+ *   </li>
+ *   <li>
+ *   提供{@link RecordReader}实现，用于从逻辑分片中读取键值对记录，供Mapper处理
  *   </li>
  * </ol>
  * 
- * <p>The default behavior of file-based {@link InputFormat}s, typically 
- * sub-classes of {@link FileInputFormat}, is to split the 
- * input into <i>logical</i> {@link InputSplit}s based on the total size, in 
- * bytes, of the input files. However, the {@link FileSystem} blocksize of  
- * the input files is treated as an upper bound for input splits. A lower bound 
- * on the split size can be set via 
+ * <p>基于文件的InputFormat（通常是{@link FileInputFormat}的子类）默认切分逻辑是：
+ * 根据输入文件总字节数切分为逻辑分片，分片大小上限为HDFS文件块大小，下限可通过配置参数
  * <a href="{@docRoot}/../hadoop-mapreduce-client/hadoop-mapreduce-client-core/mapred-default.xml#mapreduce.input.fileinputformat.split.minsize">
- * mapreduce.input.fileinputformat.split.minsize</a>.</p>
+ * mapreduce.input.fileinputformat.split.minsize</a>设置。</p>
  * 
- * <p>Clearly, logical splits based on input-size is insufficient for many 
- * applications since record boundaries are to be respected. In such cases, the
- * application has to also implement a {@link RecordReader} on whom lies the
- * responsibilty to respect record-boundaries and present a record-oriented
- * view of the logical <code>InputSplit</code> to the individual task.
+ * <p>基于大小的逻辑切分无法满足所有应用场景，对于需要保证记录边界的场景，应用需要自行实现
+ * {@link RecordReader}，由RecordReader负责处理记录边界，为Mapper提供面向记录的分片视图。
  *
  * @see InputSplit
  * @see RecordReader
@@ -69,34 +59,32 @@ import org.apache.hadoop.fs.FileSystem;
 public interface InputFormat<K, V> {
 
   /** 
-   * Logically split the set of input files for the job.  
+   * 对作业的输入文件集合进行逻辑切分，生成输入分片数组。
    * 
-   * <p>Each {@link InputSplit} is then assigned to an individual {@link Mapper}
-   * for processing.</p>
+   * <p>每个输入分片会被分配给一个独立的Mapper处理。</p>
    *
-   * <p><i>Note</i>: The split is a <i>logical</i> split of the inputs and the
-   * input files are not physically split into chunks. For e.g. a split could
-   * be <i>&lt;input-file-path, start, offset&gt;</i> tuple.
+   * <p><i>注意</i>: 切分是对输入的逻辑划分，输入文件不会被物理切割。例如分片可以表示为
+   * <i>&lt;输入文件路径, 起始偏移, 长度&gt;</i>三元组。
    * 
-   * @param job job configuration.
-   * @param numSplits the desired number of splits, a hint.
-   * @return an array of {@link InputSplit}s for the job.
+   * @param job 作业配置对象
+   * @param numSplits 期望的分片数量，仅供参考
+   * @return 作业的输入分片数组
+   * @throws IOException 切分过程中发生IO异常时抛出
    */
   InputSplit[] getSplits(JobConf job, int numSplits) throws IOException;
 
   /** 
-   * Get the {@link RecordReader} for the given {@link InputSplit}.
+   * 获取指定输入分片对应的RecordReader，用于读取分片中的键值对记录。
    *
-   * <p>It is the responsibility of the <code>RecordReader</code> to respect
-   * record boundaries while processing the logical split to present a 
-   * record-oriented view to the individual task.</p>
+   * <p>RecordReader需要负责在处理逻辑分片时保证记录边界，为任务提供面向记录的视图。</p>
    * 
-   * @param split the {@link InputSplit}
-   * @param job the job that this split belongs to
-   * @return a {@link RecordReader}
+   * @param split 待处理的输入分片
+   * @param job 该分片所属作业的配置
+   * @param reporter 任务进度上报器
+   * @return 用于读取分片记录的RecordReader
+   * @throws IOException 获取或初始化Reader过程中发生IO异常时抛出
    */
   RecordReader<K, V> getRecordReader(InputSplit split,
                                      JobConf job, 
                                      Reporter reporter) throws IOException;
 }
-

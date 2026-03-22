@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,22 +23,41 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * 存储YARN集群资源能力信息，为MapReduce应用Master资源分配提供集群能力参考
+ * 核心保存集群单容器可分配的最大资源配额，用于任务资源请求合理性校验
+ */
 @InterfaceAudience.LimitedPrivate("MapReduce")
 public class ClusterInfo {
   private Resource maxContainerCapability;
 
+  /**
+   * 默认构造函数，初始化空的最大容器资源配置
+   */
   public ClusterInfo() {
     this.maxContainerCapability = Records.newRecord(Resource.class);
   }
 
+  /**
+   * 带参数构造函数，使用指定的最大容器资源创建集群信息对象
+   * @param maxCapability 集群允许单个容器使用的最大资源配额
+   */
   public ClusterInfo(Resource maxCapability) {
     this.maxContainerCapability = maxCapability;
   }
 
+  /**
+   * 获取集群允许单个容器使用的最大资源配额
+   * @return 单容器最大资源能力对象
+   */
   public Resource getMaxContainerCapability() {
     return maxContainerCapability;
   }
 
+  /**
+   * 设置集群允许单个容器使用的最大资源配额
+   * @param maxContainerCapability 待设置的单容器最大资源能力
+   */
   public void setMaxContainerCapability(Resource maxContainerCapability) {
     this.maxContainerCapability = maxContainerCapability;
   }

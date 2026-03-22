@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -34,6 +35,11 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * 已完成任务尝试的历史实体，存储从作业历史解析出的已完成任务尝试信息
+ * 用于历史服务器中展示已完成任务尝试的状态、指标和诊断信息
+ * 实现了TaskAttempt接口，提供对已完成任务尝试信息的访问
+ */
 public class CompletedTaskAttempt implements TaskAttempt {
 
   private final TaskAttemptInfo attemptInfo;
@@ -44,6 +50,11 @@ public class CompletedTaskAttempt implements TaskAttempt {
 
   private String localDiagMessage;
 
+  /**
+   * 构造已完成任务尝试对象，从历史解析信息中初始化任务尝试数据
+   * @param taskId 所属任务ID
+   * @param attemptInfo 作业历史解析得到的任务尝试信息
+   */
   CompletedTaskAttempt(TaskId taskId, TaskAttemptInfo attemptInfo) {
     this.attemptInfo = attemptInfo;
     this.attemptId = TypeConverter.toYarn(attemptInfo.getAttemptId());
@@ -60,46 +71,81 @@ public class CompletedTaskAttempt implements TaskAttempt {
   }
 
   @Override
+  /**
+   * 获取节点ID，历史查询场景不支持此操作，直接抛出异常
+   */
   public NodeId getNodeId() throws UnsupportedOperationException{
     throw new UnsupportedOperationException();
   }
   
   @Override
+  /**
+   * 获取任务尝试分配的容器ID
+   * @return 容器ID，从历史信息中获取
+   */
   public ContainerId getAssignedContainerID() {
     return attemptInfo.getContainerId();
   }
 
   @Override
+  /**
+   * 获取分配容器的NodeManager地址
+   * @return NodeManager地址(host:port格式)，从历史信息构建
+   */
   public String getAssignedContainerMgrAddress() {
     return attemptInfo.getHostname() + ":" + attemptInfo.getPort();
   }
 
   @Override
+  /**
+   * 获取节点的HTTP服务地址
+   * @return 节点HTTP地址，从历史信息构建
+   */
   public String getNodeHttpAddress() {
     return attemptInfo.getTrackerName() + ":" + attemptInfo.getHttpPort();
   }
   
   @Override
+  /**
+   * 获取节点所在机架名称
+   * @return 机架名称，从历史信息获取
+   */
   public String getNodeRackName() {
     return attemptInfo.getRackname();
   }
 
   @Override
+  /**
+   * 获取任务尝试的计数器
+   * @return 计数器对象，从历史信息获取
+   */
   public Counters getCounters() {
     return attemptInfo.getCounters();
   }
 
   @Override
+  /**
+   * 获取当前任务尝试ID
+   * @return 任务尝试ID
+   */
   public TaskAttemptId getID() {
     return attemptId;
   }
 
   @Override
+  /**
+   * 获取任务尝试进度，已完成任务进度固定为100%
+   * @return 进度值，固定为1.0
+   */
   public float getProgress() {
     return 1.0f;
   }
 
   @Override
+  /**
+   * 获取任务尝试报告，延迟构造报告对象保证线程安全
+   * @return 任务尝试报告，包含所有历史信息
+   */
   public synchronized TaskAttemptReport getReport() {
     if (report == null) {
       constructTaskAttemptReport();
@@ -108,50 +154,89 @@ public class CompletedTaskAttempt implements TaskAttempt {
   }
 
   @Override
+  /**
+   * 获取任务尝试所处阶段，已完成任务固定为清理阶段
+   * @return 阶段，固定为CLEANUP
+   */
   public Phase getPhase() {
     return Phase.CLEANUP;
   }
 
   @Override
+  /**
+   * 获取任务尝试最终状态
+   * @return 任务尝试状态
+   */
   public TaskAttemptState getState() {
     return state;
   }
 
   @Override
+  /**
+   * 判断任务尝试是否已完成，已完成任务固定返回true
+   * @return 固定为true
+   */
   public boolean isFinished() {
     return true;
   }
 
   @Override
+  /**
+   * 获取任务尝试的诊断信息列表
+   * @return 诊断信息列表，包含错误和异常信息
+   */
   public List<String> getDiagnostics() {
     return diagnostics;
   }
 
   @Override
+  /**
+   * 获取任务尝试启动时间
+   * @return 启动时间戳，从历史信息获取
+   */
   public long getLaunchTime() {
     return attemptInfo.getStartTime();
   }
 
   @Override
+  /**
+   * 获取任务尝试完成时间
+   * @return 完成时间戳，从历史信息获取
+   */
   public long getFinishTime() {
     return attemptInfo.getFinishTime();
   }
   
   @Override
+  /**
+   * 获取shuffle阶段完成时间
+   * @return shuffle完成时间戳，从历史信息获取
+   */
   public long getShuffleFinishTime() {
     return attemptInfo.getShuffleFinishTime();
   }
 
   @Override
+  /**
+   * 获取排序阶段完成时间
+   * @return 排序完成时间戳，从历史信息获取
+   */
   public long getSortFinishTime() {
     return attemptInfo.getSortFinishTime();
   }
 
   @Override
+  /**
+   * 获取shuffle服务端口号
+   * @return shuffle端口号，从历史信息获取
+   */
   public int getShufflePort() {
     return attemptInfo.getShufflePort();
   }
 
+  /**
+   * 构造TaskAttemptReport对象，填充所有历史信息到报告中
+   */
   private void constructTaskAttemptReport() {
     report = Records.newRecord(TaskAttemptReport.class);
 

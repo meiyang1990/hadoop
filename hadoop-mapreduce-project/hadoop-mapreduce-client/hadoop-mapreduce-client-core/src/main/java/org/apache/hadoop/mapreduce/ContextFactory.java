@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,8 @@ import java.lang.reflect.InvocationTargetException;
 import org.apache.hadoop.conf.Configuration;
  
 /**
- * A factory to allow applications to deal with inconsistencies between
- * MapReduce Context Objects API between hadoop-0.20 and later versions.
+ * 为兼容Hadoop 0.20版本与后续版本之间的MapReduce Context对象API差异提供工厂类，
+ * 允许上层应用在不同版本API下统一创建和克隆Context对象。
  */
 public class ContextFactory {
 
@@ -46,6 +47,7 @@ public class ContextFactory {
   static {
     boolean v21 = true;
     final String PACKAGE = "org.apache.hadoop.mapreduce";
+    // 探测当前环境是否使用v21版本API
     try {
       Class.forName(PACKAGE + ".task.JobContextImpl");
     } catch (ClassNotFoundException cnfe) {
@@ -59,6 +61,7 @@ public class ContextFactory {
     Class<?> mapContextCls;
     Class<?> innerMapContextCls;
     try {
+      // 根据API版本加载对应Context类
       if (v21) {
         jobContextCls = 
           Class.forName(PACKAGE+".task.JobContextImpl");
@@ -86,13 +89,16 @@ public class ContextFactory {
       throw new IllegalArgumentException("Can't find class", e);
     }
     try {
+      // 获取JobContext构造方法并设置可访问
       JOB_CONTEXT_CONSTRUCTOR = 
         jobContextCls.getConstructor(Configuration.class, JobID.class);
       JOB_CONTEXT_CONSTRUCTOR.setAccessible(true);
+      // 获取TaskAttemptContext构造方法并设置可访问
       TASK_CONTEXT_CONSTRUCTOR = 
         taskContextCls.getConstructor(Configuration.class, 
                                       TaskAttemptID.class);
       TASK_CONTEXT_CONSTRUCTOR.setAccessible(true);
+      // v21版本额外处理，获取MapContextImpl和包装类构造方法
       if (useV21) {
         MAP_CONTEXT_CONSTRUCTOR = 
           innerMapContextCls.getConstructor(mapCls,
@@ -110,6 +116,7 @@ public class ContextFactory {
           innerMapContextCls.getDeclaredField("mapContext");
         WRAPPED_CONTEXT_FIELD.setAccessible(true);
       } else {
+        // 旧版本初始化v21特有成员为null
         MAP_CONTEXT_CONSTRUCTOR = 
           innerMapContextCls.getConstructor(mapCls,
                                             Configuration.class, 
@@ -123,6 +130,7 @@ public class ContextFactory {
         WRAPPED_CONTEXT_FIELD = null;
       }
       MAP_CONTEXT_CONSTRUCTOR.setAccessible(true);
+      // 通过反射获取需要的内部字段并设置可访问
       REPORTER_FIELD = taskContextCls.getDeclaredField("reporter");
       REPORTER_FIELD.setAccessible(true);
       READER_FIELD = mapContextCls.getDeclaredField("reader");
@@ -141,11 +149,10 @@ public class ContextFactory {
   }
 
   /**
-   * Clone a {@link JobContext} or {@link TaskAttemptContext} with a 
-   * new configuration.
-   * @param original the original context
-   * @param conf the new configuration
-   * @return a new context object
+   * 使用新配置克隆JobContext或TaskAttemptContext对象，保持上下文信息复用配置变更。
+   * @param original 原始上下文对象
+   * @param conf 新的配置对象
+   * @return 克隆后的新上下文对象
    * @throws InterruptedException 
    * @throws IOException 
    */
@@ -177,17 +184,17 @@ public class ContextFactory {
   }
   
   /**
-   * Copy a custom WrappedMapper.Context, optionally replacing 
-   * the input and output.
-   * @param <K1> input key type
-   * @param <V1> input value type
-   * @param <K2> output key type
-   * @param <V2> output value type
-   * @param context the context to clone
-   * @param conf a new configuration
-   * @param reader Reader to read from. Null means to clone from context.
-   * @param writer Writer to write to. Null means to clone from context.
-   * @return a new context. it will not be the same class as the original.
+   * 克隆WrappedMapper.Context对象，可选择替换输入读取器和输出写入器，
+   * 用于在自定义处理逻辑中修改上下文而不影响原有对象。
+   * @param <K1> 输入键类型
+   * @param <V1> 输入值类型
+   * @param <K2> 输出键类型
+   * @param <V2> 输出值类型
+   * @param context 待克隆的Map上下文
+   * @param conf 新配置
+   * @param reader 新的输入读取器，null则从原上下文复制
+   * @param writer 新的输出写入器，null则从原上下文复制
+   * @return 克隆后的新Context对象，类不一定与原对象相同
    * @throws IOException
    * @throws InterruptedException
    */
@@ -199,20 +206,21 @@ public class ContextFactory {
                        RecordWriter<K2,V2> writer
                       ) throws IOException, InterruptedException {
     try {
-      // get the outer object pointer
+      // 获取内部Map对象的外部实例引用
       Object outer = OUTER_MAP_FIELD.get(context);
-      // if it is a wrapped 21 context, unwrap it
+      // 解包v21版本的包装Context，获取实际MapContext实例
       if ("org.apache.hadoop.mapreduce.lib.map.WrappedMapper$Context".equals
             (context.getClass().getName())) {
         context = (MapContext<K1,V1,K2,V2>) WRAPPED_CONTEXT_FIELD.get(context);
       }
-      // if the reader or writer aren't given, use the same ones
+      // 未传入新reader/writer时，从原上下文获取复用
       if (reader == null) {
         reader = (RecordReader<K1,V1>) READER_FIELD.get(context);
       }
       if (writer == null) {
         writer = (RecordWriter<K2,V2>) WRITER_FIELD.get(context);
       }
+      // 根据API版本构造新Context对象
       if (useV21) {
         Object basis = 
           MAP_CONTEXT_IMPL_CONSTRUCTOR.newInstance(conf, 

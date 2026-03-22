@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,12 +48,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Provides a way to access information about the map/reduce cluster.
+ * 文件：org.apache.hadoop.mapreduce.Cluster
+ * 提供访问MapReduce集群信息和操作集群作业的客户端入口，封装了与服务端通信的底层协议，为上层Job API提供集群服务能力。
+ * 支持不同集群部署模式（本地、YARN）的协议适配，通过SPI机制加载对应的协议提供者。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class Cluster {
   
+  /**
+   * JobTracker（资源协调者）的运行状态枚举
+   */
   @InterfaceStability.Evolving
   public enum JobTrackerStatus {INITIALIZING, RUNNING};
 
@@ -72,6 +78,9 @@ public class Cluster {
       ServiceLoader.load(ClientProtocolProvider.class);
   private volatile List<ClientProtocolProvider> providerList = null;
 
+  /**
+   * 延迟初始化协议提供者列表，通过SPI加载所有可用的ClientProtocolProvider，线程安全的双重检查锁定实现
+   */
   private void initProviderList() {
     if (providerList == null) {
       synchronized (frameworkLoader) {
@@ -82,6 +91,7 @@ public class Cluster {
               localProviderList.add(provider);
             }
           } catch(ServiceConfigurationError | LinkageError e) {
+            // 加载协议提供者失败，记录日志不中断流程，后续会尝试其他提供者
             LOG.info("Failed to instantiate ClientProtocolProvider, please "
                          + "check the /META-INF/services/org.apache."
                          + "hadoop.mapreduce.protocol.ClientProtocolProvider "
@@ -93,14 +103,26 @@ public class Cluster {
     }
   }
 
+  // 静态块加载MapReduce配置资源
   static {
     ConfigUtil.loadResources();
   }
   
+  /**
+   * 构造Cluster对象，从配置中自动发现集群地址
+   * @param conf Hadoop配置对象
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   public Cluster(Configuration conf) throws IOException {
     this(null, conf);
   }
 
+  /**
+   * 构造Cluster对象，指定JobTracker地址
+   * @param jobTrackAddr JobTracker的网络地址
+   * @param conf Hadoop配置对象
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   public Cluster(InetSocketAddress jobTrackAddr, Configuration conf) 
       throws IOException {
     this.conf = conf;
@@ -108,10 +130,17 @@ public class Cluster {
     initialize(jobTrackAddr, conf);
   }
   
+  /**
+   * 初始化Cluster，遍历所有协议提供者，找到适配当前配置的可用协议并建立连接
+   * @param jobTrackAddr JobTracker地址，为null时从配置自动发现
+   * @param conf Hadoop配置对象
+   * @throws IOException 没有可用协议提供者时抛出异常
+   */
   private void initialize(InetSocketAddress jobTrackAddr, Configuration conf)
       throws IOException {
 
     initProviderList();
+    // 初始化异常，收集所有提供者初始化失败的信息
     final IOException initEx = new IOException(
         "Cannot initialize Cluster. Please check your configuration for "
             + MRConfig.FRAMEWORK_NAME
@@ -120,11 +149,13 @@ public class Cluster {
       LOG.info(
           "Initializing cluster for Job Tracker=" + jobTrackAddr.toString());
     }
+    // 遍历所有提供者尝试创建客户端协议
     for (ClientProtocolProvider provider : providerList) {
       LOG.debug("Trying ClientProtocolProvider : "
           + provider.getClass().getName());
       ClientProtocol clientProtocol = null;
       try {
+        // 根据是否指定地址调用对应创建方法
         if (jobTrackAddr == null) {
           clientProtocol = provider.create(conf);
         } else {
@@ -132,16 +163,19 @@ public class Cluster {
         }
 
         if (clientProtocol != null) {
+          // 找到可用提供者，保存引用并终止遍历
           clientProtocolProvider = provider;
           client = clientProtocol;
           LOG.debug("Picked " + provider.getClass().getName()
               + " as the ClientProtocolProvider");
           break;
         } else {
+          // 该提供者不适用当前配置
           LOG.debug("Cannot pick " + provider.getClass().getName()
               + " as the ClientProtocolProvider - returned null protocol");
         }
       } catch (Exception e) {
+        // 该提供者初始化失败，记录异常信息到根异常
         final String errMsg = "Failed to use " + provider.getClass().getName()
             + " due to error: ";
         initEx.addSuppressed(new IOException(errMsg, e));
@@ -149,6 +183,7 @@ public class Cluster {
       }
     }
 
+    // 没有找到可用协议提供者，抛出收集后的异常
     if (null == clientProtocolProvider || null == client) {
       throw initEx;
     }
@@ -163,13 +198,19 @@ public class Cluster {
   }
   
   /**
-   * Close the <code>Cluster</code>.
-   * @throws IOException
+   * 关闭Cluster连接，释放底层协议资源
+   * @throws IOException 关闭失败时抛出IO异常
    */
   public synchronized void close() throws IOException {
     clientProtocolProvider.close(client);
   }
 
+  /**
+   * 将服务端返回的JobStatus数组转换为Job对象数组
+   * @param stats 服务端返回的作业状态数组
+   * @return 封装好的Job对象数组
+   * @throws IOException 创建Job对象失败时抛出IO异常
+   */
   private Job[] getJobs(JobStatus[] stats) throws IOException {
     List<Job> jobs = new ArrayList<Job>();
     for (JobStatus stat : stats) {
@@ -179,16 +220,16 @@ public class Cluster {
   }
 
   /**
-   * Get the file system where job-specific files are stored
-   * 
-   * @return object of FileSystem
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取存储作业文件的Hadoop文件系统对象
+   * @return 作业所在文件系统对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public synchronized FileSystem getFileSystem() 
       throws IOException, InterruptedException {
     if (this.fs == null) {
       try {
+        // 使用当前用户权限获取文件系统
         this.fs = ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
           public FileSystem run() throws IOException, InterruptedException {
             final Path sysDir = new Path(client.getSystemDir());
@@ -203,12 +244,11 @@ public class Cluster {
   }
 
   /**
-   * Get job corresponding to jobid.
-   * 
-   * @param jobId
-   * @return object of {@link Job}
-   * @throws IOException
-   * @throws InterruptedException
+   * 根据作业ID获取对应Job对象
+   * @param jobId 作业ID
+   * @return 对应Job对象，如果作业不存在返回null
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public Job getJob(JobID jobId) throws IOException, InterruptedException {
     JobStatus status = client.getJobStatus(jobId);
@@ -217,7 +257,7 @@ public class Cluster {
       try {
         conf = new JobConf(status.getJobFile());
       } catch (RuntimeException ex) {
-        // If job file doesn't exist it means we can't find the job
+        // 如果是作业配置文件不存在，说明找不到作业，返回null
         if (ex.getCause() instanceof FileNotFoundException) {
           return null;
         } else {
@@ -230,23 +270,21 @@ public class Cluster {
   }
   
   /**
-   * Get all the queues in cluster.
-   * 
-   * @return array of {@link QueueInfo}
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取集群所有队列信息
+   * @return 队列信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public QueueInfo[] getQueues() throws IOException, InterruptedException {
     return client.getQueues();
   }
   
   /**
-   * Get queue information for the specified name.
-   * 
-   * @param name queuename
-   * @return object of {@link QueueInfo}
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取指定名称队列的信息
+   * @param name 队列名称
+   * @return 指定队列的信息对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public QueueInfo getQueue(String name) 
       throws IOException, InterruptedException {
@@ -254,12 +292,12 @@ public class Cluster {
   }
 
   /**
-   * Get log parameters for the specified jobID or taskAttemptID
-   * @param jobID the job id.
-   * @param taskAttemptID the task attempt id. Optional.
-   * @return the LogParams
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取指定作业/任务尝试的日志参数（日志地址等信息）
+   * @param jobID 作业ID
+   * @param taskAttemptID 任务尝试ID，可选
+   * @return 日志参数对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public LogParams getLogParams(JobID jobID, TaskAttemptID taskAttemptID)
       throws IOException, InterruptedException {
@@ -267,22 +305,20 @@ public class Cluster {
   }
 
   /**
-   * Get current cluster status.
-   * 
-   * @return object of {@link ClusterMetrics}
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取集群当前指标状态
+   * @return 集群指标对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public ClusterMetrics getClusterStatus() throws IOException, InterruptedException {
     return client.getClusterMetrics();
   }
   
   /**
-   * Get all active trackers in the cluster.
-   * 
-   * @return array of {@link TaskTrackerInfo}
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取集群所有活跃的TaskTracker节点信息
+   * @return 活跃TaskTracker数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public TaskTrackerInfo[] getActiveTaskTrackers() 
       throws IOException, InterruptedException  {
@@ -290,11 +326,10 @@ public class Cluster {
   }
   
   /**
-   * Get blacklisted trackers.
-   * 
-   * @return array of {@link TaskTrackerInfo}
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取集群所有被拉黑的TaskTracker节点信息
+   * @return 拉黑TaskTracker数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public TaskTrackerInfo[] getBlackListedTaskTrackers() 
       throws IOException, InterruptedException  {
@@ -302,11 +337,10 @@ public class Cluster {
   }
   
   /**
-   * Get all the jobs in cluster.
-   * 
-   * @return array of {@link Job}
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取集群所有作业的Job对象数组
+   * @return 所有作业数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    * @deprecated Use {@link #getAllJobStatuses()} instead.
    */
   @Deprecated
@@ -315,20 +349,20 @@ public class Cluster {
   }
 
   /**
-   * Get job status for all jobs in the cluster.
-   * @return job status for all jobs in cluster
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取集群所有作业的状态数组
+   * @return 所有作业状态数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public JobStatus[] getAllJobStatuses() throws IOException, InterruptedException {
     return client.getAllJobs();
   }
 
   /**
-   * Grab the jobtracker system directory path where 
-   * job-specific files will  be placed.
-   * 
-   * @return the system directory where job-specific files are to be placed.
+   * 获取JobTracker系统目录路径，用于存放作业相关文件
+   * @return 系统目录Path对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public Path getSystemDir() throws IOException, InterruptedException {
     if (sysDir == null) {
@@ -338,10 +372,10 @@ public class Cluster {
   }
   
   /**
-   * Grab the jobtracker's view of the staging directory path where 
-   * job-specific files will  be placed.
-   * 
-   * @return the staging directory where job-specific files are to be placed.
+   * 获取JobTracker的暂存区目录路径，用于存放作业提交过程中的临时文件
+   * @return 暂存区目录Path对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public Path getStagingAreaDir() throws IOException, InterruptedException {
     if (stagingAreaDir == null) {
@@ -351,13 +385,11 @@ public class Cluster {
   }
 
   /**
-   * Get the job history file path for a given job id. The job history file at 
-   * this path may or may not be existing depending on the job completion state.
-   * The file is present only for the completed jobs.
-   * @param jobId the JobID of the job submitted by the current user.
-   * @return the file path of the job history file
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取指定作业的作业历史文件URL路径，仅已完成作业存在该文件
+   * @param jobId 作业ID
+   * @return 作业历史文件URL路径字符串
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public String getJobHistoryUrl(JobID jobId) throws IOException, 
     InterruptedException {
@@ -369,9 +401,10 @@ public class Cluster {
   }
 
   /**
-   * Gets the Queue ACLs for current user
-   * @return array of QueueAclsInfo object for current user.
-   * @throws IOException
+   * 获取当前用户有权限访问的队列ACL信息
+   * @return 当前用户的队列ACL信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public QueueAclsInfo[] getQueueAclsForCurrentUser() 
       throws IOException, InterruptedException  {
@@ -379,19 +412,21 @@ public class Cluster {
   }
 
   /**
-   * Gets the root level queues.
-   * @return array of JobQueueInfo object.
-   * @throws IOException
+   * 获取根级队列列表
+   * @return 根队列信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public QueueInfo[] getRootQueues() throws IOException, InterruptedException {
     return client.getRootQueues();
   }
   
   /**
-   * Returns immediate children of queueName.
-   * @param queueName
-   * @return array of JobQueueInfo which are children of queueName
-   * @throws IOException
+   * 获取指定队列的直接子队列列表
+   * @param queueName 父队列名称
+   * @return 子队列信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public QueueInfo[] getChildQueues(String queueName) 
       throws IOException, InterruptedException {
@@ -399,11 +434,10 @@ public class Cluster {
   }
   
   /**
-   * Get the JobTracker's status.
-   * 
-   * @return {@link JobTrackerStatus} of the JobTracker
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取JobTracker当前运行状态
+   * @return JobTracker状态枚举
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public JobTrackerStatus getJobTrackerStatus() throws IOException,
       InterruptedException {
@@ -411,8 +445,10 @@ public class Cluster {
   }
   
   /**
-   * Get the tasktracker expiry interval for the cluster
-   * @return the expiry interval in msec
+   * 获取TaskTracker心跳过期时间间隔
+   * @return 过期时间间隔，单位毫秒
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public long getTaskTrackerExpiryInterval() throws IOException,
       InterruptedException {
@@ -420,10 +456,11 @@ public class Cluster {
   }
 
   /**
-   * Get a delegation token for the user from the JobTracker.
-   * @param renewer the user who can renew the token
-   * @return the new token
-   * @throws IOException
+   * 从JobTracker获取当前用户的 delegation token
+   * @param renewer 可以更新该token的用户
+   * @return 新生成的delegation token
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    */
   public Token<DelegationTokenIdentifier> 
       getDelegationToken(Text renewer) throws IOException, InterruptedException{
@@ -432,11 +469,12 @@ public class Cluster {
   }
 
   /**
-   * Renew a delegation token
-   * @param token the token to renew
-   * @return the new expiration time
-   * @throws InvalidToken
-   * @throws IOException
+   * 更新delegation token有效期
+   * @param token 需要更新的token
+   * @return 新的过期时间戳
+   * @throws InvalidToken token无效时抛出
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    * @deprecated Use {@link Token#renew} instead
    */
   public long renewDelegationToken(Token<DelegationTokenIdentifier> token
@@ -446,9 +484,10 @@ public class Cluster {
   }
 
   /**
-   * Cancel a delegation token from the JobTracker
-   * @param token the token to cancel
-   * @throws IOException
+   * 取消delegation token
+   * @param token 需要取消的token
+   * @throws IOException IO异常
+   * @throws InterruptedException 线程中断异常
    * @deprecated Use {@link Token#cancel} instead
    */
   public void cancelDelegationToken(Token<DelegationTokenIdentifier> token

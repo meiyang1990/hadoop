@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,34 +38,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class implements a mapper/reducer class that can be used to perform
- * field selections in a manner similar to unix cut. The input data is treated
- * as fields separated by a user specified separator (the default value is
- * "\t"). The user can specify a list of fields that form the map output keys,
- * and a list of fields that form the map output values. If the inputformat is
- * TextInputFormat, the mapper will ignore the key to the map function. and the
- * fields are from the value only. Otherwise, the fields are the union of those
- * from the key and those from the value.
+ * 实现类似Unix cut命令的字段选择功能，同时实现了Mapper和Reducer接口，可以在Map阶段和Reduce阶段完成字段抽取
  * 
- * The field separator is under attribute "mapreduce.fieldsel.data.field.separator"
+ * 输入数据按用户指定分隔符切分为多个字段，用户可分别指定哪些字段作为输出key、哪些作为输出value
+ * 如果输入格式是TextInputFormat，Mapper会忽略输入key，仅从输入value中提取字段；否则会合并key和value的所有字段
  * 
- * The map output field list spec is under attribute 
- * "mapreduce.fieldsel.map.output.key.value.fields.spec".
- * The value is expected to be like "keyFieldsSpec:valueFieldsSpec"
- * key/valueFieldsSpec are comma (,) separated field spec: fieldSpec,fieldSpec,fieldSpec ...
- * Each field spec can be a simple number (e.g. 5) specifying a specific field, or a range
- * (like 2-5) to specify a range of fields, or an open range (like 3-) specifying all 
- * the fields starting from field 3. The open range field spec applies value fields only.
- * They have no effect on the key fields.
+ * 分隔符配置项：mapreduce.fieldsel.data.field.separator
+ * Map输出字段规则配置项：mapreduce.fieldsel.map.output.key.value.fields.spec
+ * 格式为 "keyFieldsSpec:valueFieldsSpec"，key/valueFieldsSpec是逗号分隔的字段定义：
+ * 每个字段定义可以是单个字段编号（如5）、字段范围（如2-5）、开放范围（如3-，表示从3开始的所有字段）
+ * 开放范围仅对value字段生效，对key字段无效
  * 
- * Here is an example: "4,3,0,1:6,5,1-3,7-". It specifies to use fields 4,3,0 and 1 for keys,
- * and use fields 6,5,1,2,3,7 and above for values.
+ * 示例："4,3,0,1:6,5,1-3,7-" 表示key使用4、3、0、1号字段，value使用6、5、1、2、3、7及之后的所有字段
  * 
- * The reduce output field list spec is under attribute 
- * "mapreduce.fieldsel.reduce.output.key.value.fields.spec".
- * 
- * The reducer extracts output key/value pairs in a similar manner, except that
- * the key is never ignored.
+ * Reduce输出字段规则配置项：mapreduce.fieldsel.reduce.output.key.value.fields.spec
+ * Reduce阶段提取输出key/value规则类似，但不会忽略输入key
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -95,6 +83,10 @@ public class FieldSelectionMapReduce<K, V>
   public static final Logger LOG =
       LoggerFactory.getLogger("FieldSelectionMapReduce");
 
+  /**
+   * 将当前字段选择配置转换为字符串，用于日志输出
+   * @return 配置详情字符串
+   */
   private String specToString() {
     StringBuilder sb = new StringBuilder();
     sb.append("fieldSeparator: ").append(fieldSeparator).append("\n");
@@ -137,38 +129,56 @@ public class FieldSelectionMapReduce<K, V>
   }
 
   /**
-   * The identify function. Input key/value pair is written directly to output.
+   * Map阶段字段选择处理，根据配置从输入中抽取指定字段输出为key和value
    */
   public void map(K key, V val,
       OutputCollector<Text, Text> output, Reporter reporter) 
       throws IOException {
+    // 创建字段选择助手，初始化为空文本
     FieldSelectionHelper helper = new FieldSelectionHelper(
       FieldSelectionHelper.emptyText, FieldSelectionHelper.emptyText);
+    // 根据配置抽取key和value字段
     helper.extractOutputKeyValue(key.toString(), val.toString(),
       fieldSeparator, mapOutputKeyFieldList, mapOutputValueFieldList,
       allMapValueFieldsFrom, ignoreInputKey, true);
+    // 输出抽取结果
     output.collect(helper.getKey(), helper.getValue());
   }
 
+  /**
+   * 解析Map和Reduce的输出字段规则，提取出选中的字段编号列表和开放范围起始位置
+   */
   private void parseOutputKeyValueSpec() {
+    // 解析Map输出字段规则，获取value开放范围起始位置
     allMapValueFieldsFrom = FieldSelectionHelper.parseOutputKeyValueSpec(
       mapOutputKeyValueSpec, mapOutputKeyFieldList, mapOutputValueFieldList);
     
+    // 解析Reduce输出字段规则，获取value开放范围起始位置
     allReduceValueFieldsFrom = FieldSelectionHelper.parseOutputKeyValueSpec(
       reduceOutputKeyValueSpec, reduceOutputKeyFieldList,
       reduceOutputValueFieldList);
   }
 
+  /**
+   * 初始化配置，从JobConf中读取字段选择相关配置并解析
+   * @param job 作业配置对象
+   */
   public void configure(JobConf job) {
+    // 读取字段分隔符，默认使用制表符
     this.fieldSeparator = job.get(FieldSelectionHelper.DATA_FIELD_SEPARATOR,
         "\t");
+    // 读取Map输出字段规则，默认所有字段都作为key输出，value为空
     this.mapOutputKeyValueSpec = job.get(
         FieldSelectionHelper.MAP_OUTPUT_KEY_VALUE_SPEC, "0-:");
+    // 如果输入格式是TextInputFormat，则忽略输入key
     this.ignoreInputKey = TextInputFormat.class.getCanonicalName().equals(
         job.getInputFormat().getClass().getCanonicalName());
+    // 读取Reduce输出字段规则，默认所有字段都作为key输出，value为空
     this.reduceOutputKeyValueSpec = job.get(
         FieldSelectionHelper.REDUCE_OUTPUT_KEY_VALUE_SPEC, "0-:");
+    // 解析Map和Reduce输出字段规则
     parseOutputKeyValueSpec();
+    // 打印配置信息到日志
     LOG.info(specToString());
   }
 
@@ -177,15 +187,23 @@ public class FieldSelectionMapReduce<K, V>
 
   }
 
+  /**
+   * Reduce阶段字段选择处理，对每个输入value抽取指定字段输出
+   */
   public void reduce(Text key, Iterator<Text> values,
                      OutputCollector<Text, Text> output, Reporter reporter)
     throws IOException {
+    // 将输入key加上分隔符，拼接到value字段前一起提取
     String keyStr = key.toString() + this.fieldSeparator;
+    // 遍历所有输入value
     while (values.hasNext()) {
+        // 创建字段选择助手
         FieldSelectionHelper helper = new FieldSelectionHelper();
+        // 根据配置从key和输入value中抽取输出字段
         helper.extractOutputKeyValue(keyStr, values.next().toString(),
           fieldSeparator, reduceOutputKeyFieldList,
           reduceOutputValueFieldList, allReduceValueFieldsFrom, false, false);
+        // 输出抽取结果
       output.collect(helper.getKey(), helper.getValue());
     }
   }

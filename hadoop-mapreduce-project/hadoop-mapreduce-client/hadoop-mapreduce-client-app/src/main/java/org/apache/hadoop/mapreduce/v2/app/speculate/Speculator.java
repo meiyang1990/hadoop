@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,24 +23,31 @@ import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptStatusUpdateEvent
 import org.apache.hadoop.yarn.event.EventHandler;
 
 /**
- * Speculator component. Task Attempts' status updates are sent to this
- * component. Concrete implementation runs the speculative algorithm and
- * sends the TaskEventType.T_ADD_ATTEMPT.
- *
- * An implementation also has to arrange for the jobs to be scanned from
- * time to time, to launch the speculations.
+ * MapReduce任务推测执行组件接口定义。
+ * 负责接收任务尝试的状态更新，基于具体推测执行算法判断是否需要启动新的推测尝试，
+ * 并发起添加新任务尝试的请求。实现类需要定期扫描作业任务，触发推测执行启动。
  */
 public interface Speculator
               extends EventHandler<SpeculatorEvent> {
 
+  /**
+   * 推测处理事件类型枚举
+   */
   enum EventType {
+    /** 任务尝试状态更新事件 */
     ATTEMPT_STATUS_UPDATE,
+    /** 任务尝试启动事件 */
     ATTEMPT_START,
+    /** 任务容器需求更新事件 */
     TASK_CONTAINER_NEED_UPDATE,
+    /** 作业创建事件 */
     JOB_CREATE
   }
 
-  // This will be implemented if we go to a model where the events are
-  //  processed within the TaskAttempts' state transitions' code.
+  /**
+   * 处理任务尝试状态更新。
+   * 该方法用于事件在任务尝试状态转换中处理的场景模式
+   * @param status 任务尝试当前状态
+   */
   public void handleAttempt(TaskAttemptStatus status);
 }

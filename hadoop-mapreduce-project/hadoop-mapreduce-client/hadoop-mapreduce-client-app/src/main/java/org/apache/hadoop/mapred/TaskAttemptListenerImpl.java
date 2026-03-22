@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -67,12 +68,10 @@ import org.apache.hadoop.util.Time;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
 /**
- * This class is responsible for talking to the task umblical.
- * It also converts all the old data structures
- * to yarn data structures.
- * 
- * This class HAS to be in this package to access package private 
- * methods/classes.
+ * 文件说明：MapReduce ApplicationMaster端任务尝试监听器实现，处理旧MapReduce API任务尝试与YARN的交互
+ * 核心职责：接收子任务JVM通过RPC发来的状态更新、心跳等请求，将旧版MapReduce数据结构转换为YARN格式，
+ *          转发给ApplicationMaster内部事件处理系统，管理任务尝试生命周期和JVM任务分配
+ * 说明：本类必须放在当前包才能访问包私有方法/类
  */
 public class TaskAttemptListenerImpl extends CompositeService 
     implements TaskUmbilicalProtocol, TaskAttemptListener {
@@ -88,20 +87,24 @@ public class TaskAttemptListenerImpl extends CompositeService
   private RMHeartbeatHandler rmHeartbeatHandler;
   private long commitWindowMs;
   private InetSocketAddress address;
+  // JVMID到当前运行任务的映射，用于JVM复用场景给启动的JVM分配任务
   private ConcurrentMap<WrappedJvmID, org.apache.hadoop.mapred.Task>
     jvmIDToActiveAttemptMap
       = new ConcurrentHashMap<WrappedJvmID, org.apache.hadoop.mapred.Task>();
 
+  // 任务尝试ID到最新状态的映射，用于合并状态更新
   private ConcurrentMap<TaskAttemptId,
       AtomicReference<TaskAttemptStatus>> attemptIdToStatus
         = new ConcurrentHashMap<>();
 
   /**
-   * A Map to keep track of the history of logging each task attempt.
+   * A Map to keep track of the History of logging each task attempt.
    */
+  // 保存每个任务尝试的进度日志记录，用于控制日志输出频率
   private ConcurrentHashMap<TaskAttemptID, TaskProgressLogPair>
       taskAttemptLogProgressStamps = new ConcurrentHashMap<>();
 
+  // 已启动的JVM集合，只有完成注册的JVM才能分配任务
   private Set<WrappedJvmID> launchedJVMs = Collections
       .newSetFromMap(new ConcurrentHashMap<WrappedJvmID, Boolean>());
 
@@ -109,6 +112,13 @@ public class TaskAttemptListenerImpl extends CompositeService
   private AMPreemptionPolicy preemptionPolicy;
   private byte[] encryptedSpillKey;
 
+  /**
+   * 构造TaskAttemptListenerImpl实例
+   * @param context ApplicationMaster上下文对象
+   * @param jobTokenSecretManager Job令牌密钥管理器，用于RPC安全认证
+   * @param rmHeartbeatHandler ResourceManager心跳处理器，用于判断是否可以提交输出
+   * @param preemptionPolicy 任务抢占策略处理器
+   */
   public TaskAttemptListenerImpl(AppContext context,
       JobTokenSecretManager jobTokenSecretManager,
       RMHeartbeatHandler rmHeartbeatHandler,
@@ -117,6 +127,14 @@ public class TaskAttemptListenerImpl extends CompositeService
             preemptionPolicy, null);
   }
 
+  /**
+   * 构造TaskAttemptListenerImpl实例，支持指定shuffle加密密钥
+   * @param context ApplicationMaster上下文对象
+   * @param jobTokenSecretManager Job令牌密钥管理器，用于RPC安全认证
+   * @param rmHeartbeatHandler ResourceManager心跳处理器，用于判断是否可以提交输出
+   * @param preemptionPolicy 任务抢占策略处理器
+   * @param secretShuffleKey shuffle溢写加密密钥
+   */
   public TaskAttemptListenerImpl(AppContext context,
       JobTokenSecretManager jobTokenSecretManager,
       RMHeartbeatHandler rmHeartbeatHandler,
@@ -132,9 +150,10 @@ public class TaskAttemptListenerImpl extends CompositeService
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     registerHeartbeatHandler(conf);
+    // 从配置读取提交窗口超时时间，用于避免脑裂场景下重复提交
     commitWindowMs = conf.getLong(MRJobConfig.MR_AM_COMMIT_WINDOW_MS,
         MRJobConfig.DEFAULT_MR_AM_COMMIT_WINDOW_MS);
-    // initialize the delta threshold for logging the task progress.
+    // 初始化任务进度日志的增量阈值
     MRJobConfUtil.setTaskLogProgressDeltaThresholds(conf);
     super.serviceInit(conf);
   }
@@ -145,6 +164,10 @@ public class TaskAttemptListenerImpl extends CompositeService
     super.serviceStart();
   }
 
+  /**
+   * 注册任务心跳处理器，将其作为复合服务添加到当前服务
+   * @param conf 配置对象
+   */
   protected void registerHeartbeatHandler(Configuration conf) {
     taskHeartbeatHandler = new TaskHeartbeatHandler(context.getEventHandler(), 
         context.getClock(), conf.getInt(MRJobConfig.MR_AM_TASK_LISTENER_THREAD_COUNT, 
@@ -152,9 +175,13 @@ public class TaskAttemptListenerImpl extends CompositeService
     addService(taskHeartbeatHandler);
   }
 
+  /**
+   * 启动监听任务JVM请求的RPC服务器
+   */
   protected void startRpcServer() {
     Configuration conf = getConfig();
     try {
+      // 构建RPC服务器，绑定TaskUmbilicalProtocol协议
       server = new RPC.Builder(conf).setProtocol(TaskUmbilicalProtocol.class)
           .setInstance(this).setBindAddress("0.0.0.0")
           .setPortRangeConfig(MRJobConfig.MR_AM_JOB_CLIENT_PORT_RANGE)
@@ -163,7 +190,7 @@ public class TaskAttemptListenerImpl extends CompositeService
           MRJobConfig.DEFAULT_MR_AM_TASK_LISTENER_THREAD_COUNT))
           .setVerbose(false).setSecretManager(jobTokenSecretManager).build();
 
-      // Enable service authorization?
+      // 如果开启服务授权，刷新服务访问控制列表
       if (conf.getBoolean(
           CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, 
           false)) {
@@ -171,6 +198,7 @@ public class TaskAttemptListenerImpl extends CompositeService
       }
 
       server.start();
+      // 构建对外提供服务的地址，使用NodeManager主机名+RPC服务器端口
       this.address = NetUtils.createSocketAddrForHost(
           context.getNMHostname(),
           server.getListenerAddress().getPort());
@@ -190,6 +218,9 @@ public class TaskAttemptListenerImpl extends CompositeService
     super.serviceStop();
   }
 
+  /**
+   * 停止RPC服务器，释放端口资源
+   */
   protected void stopRpcServer() {
     if (server != null) {
       server.stop();
@@ -202,61 +233,51 @@ public class TaskAttemptListenerImpl extends CompositeService
   }
 
   /**
-   * Child checking whether it can commit.
-   * 
-   * <br>
-   * Commit is a two-phased protocol. First the attempt informs the
-   * ApplicationMaster that it is
-   * {@link #commitPending(TaskAttemptID, TaskStatus)}. Then it repeatedly polls
-   * the ApplicationMaster whether it {@link #canCommit(TaskAttemptID)} This is
-   * a legacy from the centralized commit protocol handling by the JobTracker.
+   * 任务尝试询问ApplicationMaster是否可以提交输出，实现两阶段提交协议
+   * @param taskAttemptID 旧API格式任务尝试ID
+   * @return true表示允许提交，false表示需要重试
+   * @throws IOException IO异常
    */
   @Override
   public boolean canCommit(TaskAttemptID taskAttemptID) throws IOException {
     LOG.info("Commit go/no-go request from " + taskAttemptID.toString());
-    // An attempt is asking if it can commit its output. This can be decided
-    // only by the task which is managing the multiple attempts. So redirect the
-    // request there.
+    // 将旧API任务尝试ID转换为YARN格式
     org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID =
         TypeConverter.toYarn(taskAttemptID);
 
+    // 标记该任务尝试正在进展，更新心跳时间
     taskHeartbeatHandler.progressing(attemptID);
 
-    // tell task to retry later if AM has not heard from RM within the commit
-    // window to help avoid double-committing in a split-brain situation
+    // 如果AM超过提交窗口未收到RM心跳，返回false避免脑裂场景重复提交
     long now = context.getClock().getTime();
     if (now - rmHeartbeatHandler.getLastHeartbeatTime() > commitWindowMs) {
       return false;
     }
 
+    // 转发请求给对应Task实例，由Task判断当前尝试是否可以提交（处理推测执行场景）
     Job job = context.getJob(attemptID.getTaskId().getJobId());
     Task task = job.getTask(attemptID.getTaskId());
     return task.canCommit(attemptID);
   }
 
   /**
-   * TaskAttempt is reporting that it is in commit_pending and it is waiting for
-   * the commit Response
-   * 
-   * <br>
-   * Commit it a two-phased protocol. First the attempt informs the
-   * ApplicationMaster that it is
-   * {@link #commitPending(TaskAttemptID, TaskStatus)}. Then it repeatedly polls
-   * the ApplicationMaster whether it {@link #canCommit(TaskAttemptID)} This is
-   * a legacy from the centralized commit protocol handling by the JobTracker.
+   * 任务尝试通知ApplicationMaster已进入提交等待状态
+   * @param taskAttemptID 旧API格式任务尝试ID
+   * @param taskStatsu 任务状态
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   @Override
   public void commitPending(TaskAttemptID taskAttemptID, TaskStatus taskStatsu)
           throws IOException, InterruptedException {
     LOG.info("Commit-pending state update from " + taskAttemptID.toString());
-    // An attempt is asking if it can commit its output. This can be decided
-    // only by the task which is managing the multiple attempts. So redirect the
-    // request there.
+    // 将旧API任务尝试ID转换为YARN格式
     org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID =
         TypeConverter.toYarn(taskAttemptID);
 
+    // 标记该任务尝试正在进展，更新心跳时间
     taskHeartbeatHandler.progressing(attemptID);
-    //Ignorable TaskStatus? - since a task will send a LastStatusUpdate
+    // 发送提交等待事件给事件处理器
     context.getEventHandler().handle(
         new TaskAttemptEvent(attemptID, 
             TaskAttemptEventType.TA_COMMIT_PENDING));
@@ -266,13 +287,16 @@ public class TaskAttemptListenerImpl extends CompositeService
   public void preempted(TaskAttemptID taskAttemptID, TaskStatus taskStatus)
           throws IOException, InterruptedException {
     LOG.info("Preempted state update from " + taskAttemptID.toString());
-    // An attempt is telling us that it got preempted.
+    // 将旧API任务尝试ID转换为YARN格式
     org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID =
         TypeConverter.toYarn(taskAttemptID);
 
+    // 向抢占策略报告抢占成功
     preemptionPolicy.reportSuccessfulPreemption(attemptID);
+    // 标记该任务尝试正在进展，更新心跳时间
     taskHeartbeatHandler.progressing(attemptID);
 
+    // 发送任务已抢占事件给事件处理器
     context.getEventHandler().handle(
         new TaskAttemptEvent(attemptID,
             TaskAttemptEventType.TA_PREEMPTED));
@@ -282,11 +306,14 @@ public class TaskAttemptListenerImpl extends CompositeService
   public void done(TaskAttemptID taskAttemptID) throws IOException {
     LOG.info("Done acknowledgment from " + taskAttemptID.toString());
 
+    // 将旧API任务尝试ID转换为YARN格式
     org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID =
         TypeConverter.toYarn(taskAttemptID);
 
+    // 标记该任务尝试正在进展，更新心跳时间
     taskHeartbeatHandler.progressing(attemptID);
 
+    // 发送任务完成事件给事件处理器
     context.getEventHandler().handle(
         new TaskAttemptEvent(attemptID, TaskAttemptEventType.TA_DONE));
   }
@@ -294,16 +321,19 @@ public class TaskAttemptListenerImpl extends CompositeService
   @Override
   public void fatalError(TaskAttemptID taskAttemptID, String msg, boolean fastFail)
       throws IOException {
-    // This happens only in Child and in the Task.
+    // 该方法仅在子任务JVM中触发，报告致命错误
     LOG.error("Task: " + taskAttemptID + " - exited : " + msg);
+    // 上报诊断信息
     reportDiagnosticInfo(taskAttemptID, "Error: " + msg);
 
+    // 将旧API任务尝试ID转换为YARN格式
     org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID =
         TypeConverter.toYarn(taskAttemptID);
 
-    // handling checkpoints
+    // 通知抢占策略该容器失败
     preemptionPolicy.handleFailedContainer(attemptID);
 
+    // 发送任务失败事件给事件处理器
     context.getEventHandler().handle(
         new TaskAttemptFailEvent(attemptID, fastFail));
   }
@@ -311,17 +341,20 @@ public class TaskAttemptListenerImpl extends CompositeService
   @Override
   public void fsError(TaskAttemptID taskAttemptID, String message)
       throws IOException {
-    // This happens only in Child.
+    // 该方法仅在子任务JVM中触发，报告文件系统错误
     LOG.error("Task: " + taskAttemptID + " - failed due to FSError: "
         + message);
+    // 上报诊断信息
     reportDiagnosticInfo(taskAttemptID, "FSError: " + message);
 
+    // 将旧API任务尝试ID转换为YARN格式
     org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID =
         TypeConverter.toYarn(taskAttemptID);
 
-    // handling checkpoints
+    // 通知抢占策略该容器失败
     preemptionPolicy.handleFailedContainer(attemptID);
 
+    // 发送任务失败事件给事件处理器
     context.getEventHandler().handle(
         new TaskAttemptFailEvent(attemptID));
   }
@@ -340,12 +373,15 @@ public class TaskAttemptListenerImpl extends CompositeService
 
     // TODO: shouldReset is never used. See TT. Ask for Removal.
     boolean shouldReset = false;
+    // 将旧API任务尝试ID转换为YARN格式
     org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID =
       TypeConverter.toYarn(taskAttemptID);
+    // 从Job中获取指定范围的Map尝试完成事件
     TaskCompletionEvent[] events =
         context.getJob(attemptID.getTaskId().getJobId()).getMapAttemptCompletionEvents(
             startIndex, maxEvents);
 
+    // 标记该任务尝试正在进展，更新心跳时间
     taskHeartbeatHandler.progressing(attemptID);
     
     return new MapTaskCompletionEventsUpdate(events, shouldReset);
@@ -354,20 +390,18 @@ public class TaskAttemptListenerImpl extends CompositeService
   @Override
   public void reportDiagnosticInfo(TaskAttemptID taskAttemptID, String diagnosticInfo)
  throws IOException {
+    // 使用弱引用驻留字符串，节省内存
     diagnosticInfo = StringInterner.weakIntern(diagnosticInfo);
     LOG.info("Diagnostics report from " + taskAttemptID.toString() + ": "
         + diagnosticInfo);
 
+    // 将旧API任务尝试ID转换为YARN格式
     org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID =
       TypeConverter.toYarn(taskAttemptID);
+    // 标记该任务尝试正在进展，更新心跳时间
     taskHeartbeatHandler.progressing(attemptID);
 
-    // This is mainly used for cases where we want to propagate exception traces
-    // of tasks that fail.
-
-    // This call exists as a hadoop mapreduce legacy wherein all changes in
-    // counters/progress/phase/output-size are reported through statusUpdate()
-    // call but not diagnosticInformation.
+    // 发送诊断信息更新事件给事件处理器
     context.getEventHandler().handle(
         new TaskAttemptDiagnosticsUpdateEvent(attemptID, diagnosticInfo));
   }
@@ -376,346 +410,4 @@ public class TaskAttemptListenerImpl extends CompositeService
   public AMFeedback statusUpdate(TaskAttemptID taskAttemptID,
       TaskStatus taskStatus) throws IOException, InterruptedException {
 
-    org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId yarnAttemptID =
-        TypeConverter.toYarn(taskAttemptID);
-
-    AMFeedback feedback = new AMFeedback();
-    feedback.setTaskFound(true);
-
-    AtomicReference<TaskAttemptStatus> lastStatusRef =
-        attemptIdToStatus.get(yarnAttemptID);
-    if (lastStatusRef == null) {
-      // The task is not known, but it could be in the process of tearing
-      // down gracefully or receiving a thread dump signal. Tolerate unknown
-      // tasks as long as they have unregistered recently.
-      if (!taskHeartbeatHandler.hasRecentlyUnregistered(yarnAttemptID)) {
-        LOG.error("Status update was called with illegal TaskAttemptId: "
-            + yarnAttemptID);
-        feedback.setTaskFound(false);
-      }
-      return feedback;
-    }
-
-    // Propagating preemption to the task if TASK_PREEMPTION is enabled
-    if (getConfig().getBoolean(MRJobConfig.TASK_PREEMPTION, false)
-        && preemptionPolicy.isPreempted(yarnAttemptID)) {
-      feedback.setPreemption(true);
-      LOG.info("Setting preemption bit for task: "+ yarnAttemptID
-          + " of type " + yarnAttemptID.getTaskId().getTaskType());
-    }
-
-    if (taskStatus == null) {
-      //We are using statusUpdate only as a simple ping
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Ping from " + taskAttemptID.toString());
-      }
-      // Consider ping from the tasks for liveliness check
-      if (getConfig().getBoolean(MRJobConfig.MR_TASK_ENABLE_PING_FOR_LIVELINESS_CHECK,
-          MRJobConfig.DEFAULT_MR_TASK_ENABLE_PING_FOR_LIVELINESS_CHECK)) {
-        taskHeartbeatHandler.progressing(yarnAttemptID);
-      }
-      return feedback;
-    }
-
-    // if we are here there is an actual status update to be processed
-
-    taskHeartbeatHandler.progressing(yarnAttemptID);
-    TaskAttemptStatus taskAttemptStatus =
-        new TaskAttemptStatus();
-    taskAttemptStatus.id = yarnAttemptID;
-    // Task sends the updated progress to the TT.
-    taskAttemptStatus.progress = taskStatus.getProgress();
-    // log the new progress
-    taskAttemptLogProgressStamps.computeIfAbsent(taskAttemptID,
-        k -> new TaskProgressLogPair(taskAttemptID))
-        .update(taskStatus.getProgress());
-    // Task sends the updated state-string to the TT.
-    taskAttemptStatus.stateString = taskStatus.getStateString();
-    // Task sends the updated phase to the TT.
-    taskAttemptStatus.phase = TypeConverter.toYarn(taskStatus.getPhase());
-    // Counters are updated by the task. Convert counters into new format as
-    // that is the primary storage format inside the AM to avoid multiple
-    // conversions and unnecessary heap usage.
-    taskAttemptStatus.counters = new org.apache.hadoop.mapreduce.Counters(
-      taskStatus.getCounters());
-
-    // Map Finish time set by the task (map only)
-    if (taskStatus.getIsMap() && taskStatus.getMapFinishTime() != 0) {
-      taskAttemptStatus.mapFinishTime = taskStatus.getMapFinishTime();
-    }
-
-    // Shuffle Finish time set by the task (reduce only).
-    if (!taskStatus.getIsMap() && taskStatus.getShuffleFinishTime() != 0) {
-      taskAttemptStatus.shuffleFinishTime = taskStatus.getShuffleFinishTime();
-    }
-
-    // Sort finish time set by the task (reduce only).
-    if (!taskStatus.getIsMap() && taskStatus.getSortFinishTime() != 0) {
-      taskAttemptStatus.sortFinishTime = taskStatus.getSortFinishTime();
-    }
-
-    // Not Setting the task state. Used by speculation - will be set in TaskAttemptImpl
-    //taskAttemptStatus.taskState =  TypeConverter.toYarn(taskStatus.getRunState());
-    
-    //set the fetch failures
-    if (taskStatus.getFetchFailedMaps() != null 
-        && taskStatus.getFetchFailedMaps().size() > 0) {
-      taskAttemptStatus.fetchFailedMaps = 
-        new ArrayList<org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId>();
-      for (TaskAttemptID failedMapId : taskStatus.getFetchFailedMaps()) {
-        taskAttemptStatus.fetchFailedMaps.add(
-            TypeConverter.toYarn(failedMapId));
-      }
-    }
-
- // Task sends the information about the nextRecordRange to the TT
-    
-//    TODO: The following are not needed here, but needed to be set somewhere inside AppMaster.
-//    taskStatus.getRunState(); // Set by the TT/JT. Transform into a state TODO
-//    taskStatus.getStartTime(); // Used to be set by the TaskTracker. This should be set by getTask().
-//    taskStatus.getFinishTime(); // Used to be set by TT/JT. Should be set when task finishes
-//    // This was used by TT to do counter updates only once every minute. So this
-//    // isn't ever changed by the Task itself.
-//    taskStatus.getIncludeCounters();
-
-    coalesceStatusUpdate(yarnAttemptID, taskAttemptStatus, lastStatusRef);
-
-    return feedback;
-  }
-
-  @Override
-  public long getProtocolVersion(String arg0, long arg1) throws IOException {
-    return TaskUmbilicalProtocol.versionID;
-  }
-
-  @Override
-  public void reportNextRecordRange(TaskAttemptID taskAttemptID, Range range)
-      throws IOException {
-    // This is used when the feature of skipping records is enabled.
-
-    // This call exists as a hadoop mapreduce legacy wherein all changes in
-    // counters/progress/phase/output-size are reported through statusUpdate()
-    // call but not the next record range information.
-    throw new IOException("Not yet implemented.");
-  }
-
-  @Override
-  public JvmTask getTask(JvmContext context) throws IOException {
-
-    // A rough imitation of code from TaskTracker.
-
-    JVMId jvmId = context.jvmId;
-    LOG.info("JVM with ID : " + jvmId + " asked for a task");
-
-    JvmTask jvmTask = null;
-    // TODO: Is it an authorized container to get a task? Otherwise return null.
-
-    // TODO: Child.java's firstTaskID isn't really firstTaskID. Ask for update
-    // to jobId and task-type.
-
-    WrappedJvmID wJvmID = new WrappedJvmID(jvmId.getJobId(), jvmId.isMap,
-        jvmId.getId());
-
-    // Try to look up the task. We remove it directly as we don't give
-    // multiple tasks to a JVM
-    if (!jvmIDToActiveAttemptMap.containsKey(wJvmID)) {
-      LOG.info("JVM with ID: " + jvmId + " is invalid and will be killed.");
-      jvmTask = TASK_FOR_INVALID_JVM;
-    } else {
-      if (!launchedJVMs.contains(wJvmID)) {
-        jvmTask = null;
-        LOG.info("JVM with ID: " + jvmId
-            + " asking for task before AM launch registered. Given null task");
-      } else {
-        // remove the task as it is no more needed and free up the memory.
-        // Also we have already told the JVM to process a task, so it is no
-        // longer pending, and further request should ask it to exit.
-        org.apache.hadoop.mapred.Task task =
-            jvmIDToActiveAttemptMap.remove(wJvmID);
-        launchedJVMs.remove(wJvmID);
-        LOG.info("JVM with ID: " + jvmId + " given task: " + task.getTaskID());
-        task.setEncryptedSpillKey(encryptedSpillKey);
-        jvmTask = new JvmTask(task, false);
-      }
-    }
-    return jvmTask;
-  }
-
-  @Override
-  public void registerPendingTask(
-      org.apache.hadoop.mapred.Task task, WrappedJvmID jvmID) {
-    // Create the mapping so that it is easy to look up
-    // when the jvm comes back to ask for Task.
-
-    // A JVM not present in this map is an illegal task/JVM.
-    jvmIDToActiveAttemptMap.put(jvmID, task);
-  }
-
-  @Override
-  public void registerLaunchedTask(
-      org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID,
-      WrappedJvmID jvmId) {
-    // The AM considers the task to be launched (Has asked the NM to launch it)
-    // The JVM will only be given a task after this registartion.
-    launchedJVMs.add(jvmId);
-
-    taskHeartbeatHandler.register(attemptID);
-
-    attemptIdToStatus.put(attemptID, new AtomicReference<>());
-  }
-
-  @Override
-  public void unregister(
-      org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId attemptID,
-      WrappedJvmID jvmID) {
-
-    // Unregistration also comes from the same TaskAttempt which does the
-    // registration. Events are ordered at TaskAttempt, so unregistration will
-    // always come after registration.
-
-    // Remove from launchedJVMs before jvmIDToActiveAttemptMap to avoid
-    // synchronization issue with getTask(). getTask should be checking
-    // jvmIDToActiveAttemptMap before it checks launchedJVMs.
- 
-    // remove the mappings if not already removed
-    launchedJVMs.remove(jvmID);
-    jvmIDToActiveAttemptMap.remove(jvmID);
-
-    //unregister this attempt
-    taskHeartbeatHandler.unregister(attemptID);
-
-    attemptIdToStatus.remove(attemptID);
-  }
-
-  @Override
-  public ProtocolSignature getProtocolSignature(String protocol,
-      long clientVersion, int clientMethodsHash) throws IOException {
-    return ProtocolSignature.getProtocolSignature(this, 
-        protocol, clientVersion, clientMethodsHash);
-  }
-
-  // task checkpoint bookeeping
-  @Override
-  public TaskCheckpointID getCheckpointID(TaskID taskId) {
-    TaskId tid = TypeConverter.toYarn(taskId);
-    return preemptionPolicy.getCheckpointID(tid);
-  }
-
-  @Override
-  public void setCheckpointID(TaskID taskId, TaskCheckpointID cid) {
-    TaskId tid = TypeConverter.toYarn(taskId);
-    preemptionPolicy.setCheckpointID(tid, cid);
-  }
-
-  private void coalesceStatusUpdate(TaskAttemptId yarnAttemptID,
-      TaskAttemptStatus taskAttemptStatus,
-      AtomicReference<TaskAttemptStatus> lastStatusRef) {
-    List<TaskAttemptId> fetchFailedMaps = taskAttemptStatus.fetchFailedMaps;
-    TaskAttemptStatus lastStatus = null;
-    boolean done = false;
-    while (!done) {
-      lastStatus = lastStatusRef.get();
-      if (lastStatus != null && lastStatus.fetchFailedMaps != null) {
-        // merge fetchFailedMaps from the previous update
-        if (taskAttemptStatus.fetchFailedMaps == null) {
-          taskAttemptStatus.fetchFailedMaps = lastStatus.fetchFailedMaps;
-        } else {
-          taskAttemptStatus.fetchFailedMaps =
-              new ArrayList<>(lastStatus.fetchFailedMaps.size() +
-                  fetchFailedMaps.size());
-          taskAttemptStatus.fetchFailedMaps.addAll(
-              lastStatus.fetchFailedMaps);
-          taskAttemptStatus.fetchFailedMaps.addAll(
-              fetchFailedMaps);
-        }
-      }
-
-      // lastStatusRef may be changed by either the AsyncDispatcher when
-      // it processes the update, or by another IPC server handler
-      done = lastStatusRef.compareAndSet(lastStatus, taskAttemptStatus);
-      if (!done) {
-        LOG.info("TaskAttempt " + yarnAttemptID +
-            ": lastStatusRef changed by another thread, retrying...");
-        // let's revert taskAttemptStatus.fetchFailedMaps
-        taskAttemptStatus.fetchFailedMaps = fetchFailedMaps;
-      }
-    }
-
-    boolean asyncUpdatedNeeded = (lastStatus == null);
-    if (asyncUpdatedNeeded) {
-      context.getEventHandler().handle(
-          new TaskAttemptStatusUpdateEvent(taskAttemptStatus.id,
-              lastStatusRef));
-    }
-  }
-
-  @VisibleForTesting
-  ConcurrentMap<TaskAttemptId,
-      AtomicReference<TaskAttemptStatus>> getAttemptIdToStatus() {
-    return attemptIdToStatus;
-  }
-
-  /**
-   * Entity to keep track of the taskAttempt, last time it was logged,
-   * and the
-   * progress that has been logged.
-   */
-  class TaskProgressLogPair {
-
-    /**
-     * The taskAttemptId of that history record.
-     */
-    private final TaskAttemptID taskAttemptID;
-    /**
-     * Timestamp of last time the progress was logged.
-     */
-    private volatile long logTimeStamp;
-    /**
-     * Snapshot of the last logged progress.
-     */
-    private volatile double prevProgress;
-
-    TaskProgressLogPair(final TaskAttemptID attemptID) {
-      taskAttemptID = attemptID;
-      prevProgress = 0.0;
-      logTimeStamp = 0;
-    }
-
-    private void resetLog(final boolean doLog,
-        final float progress, final double processedProgress,
-        final long timestamp) {
-      if (doLog) {
-        prevProgress = processedProgress;
-        logTimeStamp = timestamp;
-        LOG.info("Progress of TaskAttempt " + taskAttemptID + " is : "
-            + progress);
-      } else {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Progress of TaskAttempt " + taskAttemptID + " is : "
-              + progress);
-        }
-      }
-    }
-
-    public void update(final float progress) {
-      final double processedProgress =
-          MRJobConfUtil.convertTaskProgressToFactor(progress);
-      final double diffProgress = processedProgress - prevProgress;
-      final long currentTime = Time.monotonicNow();
-      boolean result =
-          (Double.compare(diffProgress,
-              MRJobConfUtil.getTaskProgressMinDeltaThreshold()) >= 0);
-      if (!result) {
-        // check if time has expired.
-        result = ((currentTime - logTimeStamp)
-            >= MRJobConfUtil.getTaskProgressWaitDeltaTimeThreshold());
-      }
-      // It is helpful to log the progress when it reaches 1.0F.
-      if (Float.compare(progress, 1.0f) == 0) {
-        result = true;
-        taskAttemptLogProgressStamps.remove(taskAttemptID);
-      }
-      resetLog(result, progress, processedProgress, currentTime);
-    }
-  }
-}
+    // 将旧API任务尝试

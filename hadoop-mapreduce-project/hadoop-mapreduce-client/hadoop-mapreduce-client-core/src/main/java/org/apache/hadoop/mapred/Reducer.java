@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,79 +29,58 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.io.Closeable;
 
 /** 
- * Reduces a set of intermediate values which share a key to a smaller set of
- * values.  
+ * MapReduce旧API中的Reducer接口，定义了对Mapper输出的分组中间数据进行归约处理的核心规范。
  * 
- * <p>The number of <code>Reducer</code>s for the job is set by the user via 
- * {@link JobConf#setNumReduceTasks(int)}. <code>Reducer</code> implementations 
- * can access the {@link JobConf} for the job via the 
- * {@link JobConfigurable#configure(JobConf)} method and initialize themselves. 
- * Similarly they can use the {@link Closeable#close()} method for
- * de-initialization.</p>
-
- * <p><code>Reducer</code> has 3 primary phases:</p>
+ * <p>作业的Reducer数量由用户通过 {@link JobConf#setNumReduceTasks(int)} 设置。
+ * Reducer实现可以通过 {@link JobConfigurable#configure(JobConf)} 获取作业配置完成初始化，
+ * 通过 {@link Closeable#close()} 方法完成资源清理的反初始化。</p>
+ *
+ * <p>Reducer执行过程分为三个主要阶段：</p>
  * <ol>
  *   <li>
  *   
- *   <b id="Shuffle">Shuffle</b>
+ *   <b id="Shuffle">混洗阶段</b>
  *   
- *   <p><code>Reducer</code> is input the grouped output of a {@link Mapper}.
- *   In the phase the framework, for each <code>Reducer</code>, fetches the 
- *   relevant partition of the output of all the <code>Mapper</code>s, via HTTP. 
- *   </p>
+ *   <p>Reducer需要获取所有Mapper输出中属于当前Reducer分区的数据，框架会通过HTTP从各个Mapper节点拉取对应分区输出。</p>
  *   </li>
  *   
  *   <li>
- *   <b id="Sort">Sort</b>
+ *   <b id="Sort">排序阶段</b>
  *   
- *   <p>The framework groups <code>Reducer</code> inputs by <code>key</code>s 
- *   (since different <code>Mapper</code>s may have output the same key) in this
- *   stage.</p>
+ *   <p>框架将拉取到的中间数据按照key分组，不同Mapper可能输出相同key，此阶段会将相同key的所有value汇聚在一起。</p>
  *   
- *   <p>The shuffle and sort phases occur simultaneously i.e. while outputs are
- *   being fetched they are merged.</p>
+ *   <p>混洗和排序阶段是同时进行的，一边拉取数据一边进行合并排序。</p>
  *      
- *   <b id="SecondarySort">SecondarySort</b>
+ *   <b id="SecondarySort">二次排序</b>
  *   
- *   <p>If equivalence rules for keys while grouping the intermediates are 
- *   different from those for grouping keys before reduction, then one may 
- *   specify a <code>Comparator</code> via 
- *   {@link JobConf#setOutputValueGroupingComparator(Class)}.Since 
- *   {@link JobConf#setOutputKeyComparatorClass(Class)} can be used to 
- *   control how intermediate keys are grouped, these can be used in conjunction 
- *   to simulate <i>secondary sort on values</i>.</p>
+ *   <p>如果分组key的比较规则和排序规则不同，可以通过 {@link JobConf#setOutputValueGroupingComparator(Class)}
+ *   指定分组比较器，结合 {@link JobConf#setOutputKeyComparatorClass(Class)} 的key排序规则，实现对value的二次排序。</p>
  *   
  *   
- *   For example, say that you want to find duplicate web pages and tag them 
- *   all with the url of the "best" known example. You would set up the job 
- *   like:
+ *   例如，需求是找到重复网页，用已知最优网页的URL标记所有重复页，作业配置如下：
  *   <ul>
- *     <li>Map Input Key: url</li>
- *     <li>Map Input Value: document</li>
- *     <li>Map Output Key: document checksum, url pagerank</li>
- *     <li>Map Output Value: url</li>
- *     <li>Partitioner: by checksum</li>
- *     <li>OutputKeyComparator: by checksum and then decreasing pagerank</li>
- *     <li>OutputValueGroupingComparator: by checksum</li>
+ *     <li>Map输入Key：网页URL</li>
+ *     <li>Map输入Value：网页文档内容</li>
+ *     <li>Map输出Key：文档校验和 + URL的PageRank</li>
+ *     <li>Map输出Value：网页URL</li>
+ *     <li>分区器：按校验和分区</li>
+ *     <li>输出Key比较器：先按校验和排序，再按PageRank降序排序</li>
+ *     <li>输出值分组比较器：仅按校验和分组</li>
  *   </ul>
  *   </li>
  *   
  *   <li>   
- *   <b id="Reduce">Reduce</b>
+ *   <b id="Reduce">归约阶段</b>
  *   
- *   <p>In this phase the 
- *   {@link #reduce(Object, Iterator, OutputCollector, Reporter)}
- *   method is called for each <code>&lt;key, (list of values)&gt;</code> pair in
- *   the grouped inputs.</p>
- *   <p>The output of the reduce task is typically written to the 
- *   {@link FileSystem} via 
- *   {@link OutputCollector#collect(Object, Object)}.</p>
+ *   <p>此阶段对每个分组后的&lt;key, 所有value列表&gt;调用 {@link #reduce(Object, Iterator, OutputCollector, Reporter)}
+ *   方法执行自定义归约逻辑。</p>
+ *   <p>归约输出结果通常会通过 {@link OutputCollector#collect(Object, Object)} 写入最终文件到 {@link FileSystem}。</p>
  *   </li>
  * </ol>
  * 
- * <p>The output of the <code>Reducer</code> is <b>not re-sorted</b>.</p>
+ * <p>Reducer的输出不会再次排序。</p>
  * 
- * <p>Example:</p>
+ * <p>示例实现：</p>
  * <p><blockquote><pre>
  *     public class MyReducer&lt;K extends WritableComparable, V extends Writable&gt; 
  *     extends MapReduceBase implements Reducer&lt;K, V, K, V&gt; {
@@ -168,33 +148,23 @@ import org.apache.hadoop.io.Closeable;
 public interface Reducer<K2, V2, K3, V3> extends JobConfigurable, Closeable {
   
   /** 
-   * <i>Reduces</i> values for a given key.  
+   * 对同一个key的所有value执行归约处理，是Reducer的核心方法。
    * 
-   * <p>The framework calls this method for each 
-   * <code>&lt;key, (list of values)&gt;</code> pair in the grouped inputs.
-   * Output values must be of the same type as input values.  Input keys must 
-   * not be altered. The framework will <b>reuse</b> the key and value objects
-   * that are passed into the reduce, therefore the application should clone
-   * the objects they want to keep a copy of. In many cases, all values are 
-   * combined into zero or one value.
-   * </p>
+   * <p>框架会对每个分组后的&lt;key, value列表&gt;调用一次此方法。输入key对象不能被修改，
+   * 框架会复用传入的key和value对象，如果需要保存对象引用，必须手动克隆对象。
+   * 通常会将所有value归约为0个或1个输出值。</p>
    *   
-   * <p>Output pairs are collected with calls to  
-   * {@link OutputCollector#collect(Object,Object)}.</p>
+   * <p>归约结果通过 {@link OutputCollector#collect(Object,Object)} 输出。</p>
    *
-   * <p>Applications can use the {@link Reporter} provided to report progress 
-   * or just indicate that they are alive. In scenarios where the application 
-   * takes a significant amount of time to process individual key/value 
-   * pairs, this is crucial since the framework might assume that the task has 
-   * timed-out and kill that task. The other way of avoiding this is to set 
+   * <p>可以通过 {@link Reporter} 报告任务进度，表明任务还在正常运行。如果处理单个key/value组需要较长时间，
+   * 必须定期报告进度，否则框架会认为任务超时并将其杀死。也可以通过调整
    * <a href="{@docRoot}/../hadoop-mapreduce-client/hadoop-mapreduce-client-core/mapred-default.xml#mapreduce.task.timeout">
-   * mapreduce.task.timeout</a> to a high-enough value (or even zero for no 
-   * time-outs).</p>
+   * mapreduce.task.timeout</a> 参数增大超时时间，设置为0表示关闭超时检查。</p>
    * 
-   * @param key the key.
-   * @param values the list of values to reduce.
-   * @param output to collect keys and combined values.
-   * @param reporter facility to report progress.
+   * @param key 分组后的输入key
+   * @param values 当前key对应的所有value迭代器
+   * @param output 输出收集器，用于收集归约结果
+   * @param reporter 任务进度和指标报告工具
    */
   void reduce(K2 key, Iterator<V2> values,
               OutputCollector<K3, V3> output, Reporter reporter)

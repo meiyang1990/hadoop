@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -32,14 +33,27 @@ import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * MapReduce Application Web UI 作业列表块渲染类
+ * 负责在应用页面渲染当前所有活跃作业的信息表格，展示作业基本信息和执行进度
+ */
 public class JobsBlock extends HtmlBlock {
   final AppContext appContext;
 
+  /**
+   * 构造方法，通过依赖注入获取应用上下文
+   * @param appCtx MapReduce应用上下文，包含所有作业信息
+   */
   @Inject JobsBlock(AppContext appCtx) {
     appContext = appCtx;
   }
 
+  /**
+   * 渲染作业列表HTML块，生成活跃作业信息表格
+   * @param html HTML块构建对象
+   */
   @Override protected void render(Block html) {
+    // 构建表格表头，定义各列含义
     TBODY<TABLE<Hamlet>> tbody = html.
       h2("Active Jobs").
       table("#jobs").
@@ -55,27 +69,28 @@ public class JobsBlock extends HtmlBlock {
             th("Reduces Total").
             th("Reduces Completed").__().__().
         tbody();
+    // 遍历所有作业，逐行渲染作业信息
     for (Job j : appContext.getAllJobs().values()) {
       JobInfo job = new JobInfo(j, false);
       tbody.
         tr().
           td().
-            span().$title(String.valueOf(job.getId())).__(). // for sorting
-            a(url("job", job.getId()), job.getId()).__().
+            span().$title(String.valueOf(job.getId())).__(). // 用于前端排序
+            a(url("job", job.getId()), job.getId()).__(). // 生成作业详情链接
           td(job.getName()).
           td(job.getState()).
           td().
-            span().$title(job.getMapProgressPercent()).__(). // for sorting
+            span().$title(job.getMapProgressPercent()).__(). // 用于前端排序
             div(_PROGRESSBAR).
-              $title(join(job.getMapProgressPercent(), '%')). // tooltip
+              $title(join(job.getMapProgressPercent(), '%')). // 进度提示浮窗
               div(_PROGRESSBAR_VALUE).
                 $style(join("width:", job.getMapProgressPercent(), '%')).__().__().__().
           td(String.valueOf(job.getMapsTotal())).
           td(String.valueOf(job.getMapsCompleted())).
           td().
-            span().$title(job.getReduceProgressPercent()).__(). // for sorting
+            span().$title(job.getReduceProgressPercent()).__(). // 用于前端排序
             div(_PROGRESSBAR).
-              $title(join(job.getReduceProgressPercent(), '%')). // tooltip
+              $title(join(job.getReduceProgressPercent(), '%')). // 进度提示浮窗
               div(_PROGRESSBAR_VALUE).
                 $style(join("width:", job.getReduceProgressPercent(), '%')).__().__().__().
           td(String.valueOf(job.getReducesTotal())).

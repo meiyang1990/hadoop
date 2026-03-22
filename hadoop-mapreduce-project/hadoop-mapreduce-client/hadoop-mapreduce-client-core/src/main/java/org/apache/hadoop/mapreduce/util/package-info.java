@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+/**
+ * MapReduce框架工具类包，提供MapReduce客户端核心模块内部使用的通用工具能力
+ * 供MapReduce核心功能实现复用，不对外暴露公共API
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -52,11 +53,10 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.util.Preconditions.checkState;
 
 /**
- * Read or write entry file.
- * This can be used to create a simple reader, or to create
- * a writer queue where different threads can queue data for
- * writing.
- * The entry file is a SequenceFile with KV = {NullWritable, FileEntry};
+ * 文件条目IO工具类，用于读写存放文件元数据条目的SequenceFile文件。
+ * 支持同步读写，也支持异步写队列，允许多线程并发提交文件条目，由后台线程统一写入。
+ * 条目文件本质是键值为{NullWritable, FileEntry}的SequenceFile。
+ * 属于MapReduce输出提交器清单功能的底层IO工具，用于汇总多个任务生成的文件元数据。
  */
 public class EntryFileIO {
 
@@ -64,44 +64,42 @@ public class EntryFileIO {
       EntryFileIO.class);
 
   /**
-   * How long should the writer shutdown take?
+   * 写入器关闭超时时间，单位秒。
    */
   public static final int WRITER_SHUTDOWN_TIMEOUT_SECONDS = 60;
 
   /**
-   * How long should trying to queue a write block before giving up
-   * with an error?
-   * This is a safety feature to ensure that if something has gone wrong
-   * in the queue code the job fails with an error rather than just hangs
+   * 写入队列入队超时时间，单位分钟。
+   * 这是安全机制，避免队列异常时作业挂起不退出，超时后入队失败直接返回错误。
    */
   public static final int WRITER_QUEUE_PUT_TIMEOUT_MINUTES = 10;
 
-  /** Configuration used to load filesystems. */
+  /** 用于加载文件系统的配置对象。 */
   private final Configuration conf;
 
   /**
-   * Constructor.
-   * @param conf Configuration used to load filesystems
+   * 构造函数。
+   * @param conf 用于加载文件系统的配置
    */
   public EntryFileIO(final Configuration conf) {
     this.conf = conf;
   }
 
   /**
-   * Create a writer to a local file.
-   * @param file file
-   * @return the writer
-   * @throws IOException failure to create the file
+   * 创建本地文件的SequenceFile写入器。
+   * @param file 本地文件路径
+   * @return SequenceFile写入器
+   * @throws IOException 创建文件失败时抛出
    */
   public SequenceFile.Writer createWriter(File file) throws IOException {
     return createWriter(toPath(file));
   }
 
   /**
-   * Create a writer to a file on any FS.
-   * @param path path to write to.
-   * @return the writer
-   * @throws IOException failure to create the file
+   * 创建任意文件系统上文件的SequenceFile写入器。
+   * @param path 写入目标路径
+   * @return SequenceFile写入器
+   * @throws IOException 创建文件失败时抛出
    */
   public SequenceFile.Writer createWriter(Path path) throws IOException {
     return SequenceFile.createWriter(conf,
@@ -112,20 +110,20 @@ public class EntryFileIO {
 
 
   /**
-   * Reader is created with sequential reads.
-   * @param file file
-   * @return the reader
-   * @throws IOException failure to open
+   * 创建本地文件的SequenceFile读取器，用于顺序读取。
+   * @param file 本地文件路径
+   * @return SequenceFile读取器
+   * @throws IOException 打开文件失败时抛出
    */
   public SequenceFile.Reader createReader(File file) throws IOException {
     return createReader(toPath(file));
   }
 
   /**
-   * Reader is created with sequential reads.
-   * @param path path
-   * @return the reader
-   * @throws IOException failure to open
+   * 创建任意文件系统上文件的SequenceFile读取器，用于顺序读取。
+   * @param path 读取目标路径
+   * @return SequenceFile读取器
+   * @throws IOException 打开文件失败时抛出
    */
   public SequenceFile.Reader createReader(Path path) throws IOException {
     return new SequenceFile.Reader(conf,
@@ -133,20 +131,20 @@ public class EntryFileIO {
   }
 
   /**
-   * Iterator to retrieve file entries from the sequence file.
-   * Closeable: cast and invoke to close the reader.
-   * @param reader reader;
-   * @return iterator
+   * 创建文件条目迭代器，从SequenceFile中顺序读取文件条目。
+   * 需要强转关闭，关闭迭代器会同时关闭底层读取器。
+   * @param reader SequenceFile读取器
+   * @return 文件条目远程迭代器
    */
   public RemoteIterator<FileEntry> iterateOver(SequenceFile.Reader reader) {
     return new EntryIterator(reader);
   }
 
   /**
-   * Create and start an entry writer.
-   * @param writer writer
-   * @param capacity queue capacity
-   * @return the writer.
+   * 创建并启动异步条目写入器，后台线程处理队列写入。
+   * @param writer 底层SequenceFile写入器
+   * @param capacity 队列容量
+   * @return 启动完成的异步写入器
    */
   public EntryWriter launchEntryWriter(SequenceFile.Writer writer, int capacity) {
     final EntryWriter ew = new EntryWriter(writer, capacity);
@@ -155,12 +153,12 @@ public class EntryFileIO {
   }
 
   /**
-   * Write a sequence of entries to the writer.
-   * @param writer writer
-   * @param entries entries
-   * @param close close the stream afterwards
-   * @return number of entries written
-   * @throws IOException write failure.
+   * 同步批量写入文件条目到写入器，可选择写入后关闭流。
+   * @param writer SequenceFile写入器
+   * @param entries 待写入的文件条目集合
+   * @param close 是否写入完成后关闭流
+   * @return 写入的条目数量
+   * @throws IOException 写入失败时抛出
    */
   public static int write(SequenceFile.Writer writer,
       Collection<FileEntry> entries,
@@ -181,9 +179,9 @@ public class EntryFileIO {
 
 
   /**
-   * Given a file, create a Path.
-   * @param file file
-   * @return path to the file
+   * 将Java本地File对象转换为Hadoop Path对象。
+   * @param file Java本地文件对象
+   * @return Hadoop Path对象
    */
   public static Path toPath(final File file) {
     return new Path(file.toURI());
@@ -191,17 +189,17 @@ public class EntryFileIO {
 
 
   /**
-   * Actions in the queue.
+   * 写入队列支持的操作类型枚举。
    */
   private enum Actions {
-    /** Write the supplied list of entries. */
+    /** 写入一批条目。 */
     write,
-    /** Stop the processor thread. */
+    /** 停止处理线程。 */
     stop
   }
 
   /**
-   * What gets queued: an action and a list of entries.
+   * 队列中的元素，包含操作类型和待写入条目列表。
    */
   private static final class QueueEntry {
 
@@ -220,68 +218,43 @@ public class EntryFileIO {
   }
 
   /**
-   * A Writer thread takes reads from a queue containing
-   * list of entries to save; these are serialized via the writer to
-   * the output stream.
-   * Other threads can queue the file entry lists from loaded manifests
-   * for them to be written.
-   * These threads will be blocked when the queue capacity is reached.
-   * This is quite a complex process, with the main troublespots in the code
-   * being:
-   * - managing the shutdown
-   * - failing safely on write failures, restarting all blocked writers in the process
+   * 异步文件条目写入器，使用阻塞队列实现多线程生产-单线程消费写入。
+   * 多个线程可并发提交文件条目列表，后台线程统一序列化写入SequenceFile。
+   * 队列满时生产者会阻塞，超时后入队失败；支持安全关闭，等待所有队列条目写入完成后关闭流。
+   * 核心设计用于汇总多个MapReduce任务生成的文件元数据，生成最终的清单文件。
    */
   public static final class EntryWriter implements Closeable {
 
-    /**
-     * The destination of the output.
-     */
+    /** 底层SequenceFile写入器，负责实际写入。 */
     private final SequenceFile.Writer writer;
 
-    /**
-     * Blocking queue of actions.
-     */
+    /** 阻塞队列，存放待处理的操作和条目。 */
     private final BlockingQueue<QueueEntry> queue;
 
-    /**
-     * stop flag.
-     */
+    /** 停止标志，通知处理线程退出循环。 */
     private final AtomicBoolean stop = new AtomicBoolean(false);
 
-    /**
-     * Is the processor thread active.
-     */
+    /** 处理线程是否处于活跃状态。 */
     private final AtomicBoolean active = new AtomicBoolean(false);
 
     private final int capacity;
 
-    /**
-     * Executor of writes.
-     */
+    /** 执行后台处理线程的线程池。 */
     private ExecutorService executor;
 
-    /**
-     * Future invoked.
-     */
+    /** 后台处理任务的Future对象。 */
     private Future<Integer> future;
 
-    /**
-     * count of file entries saved; only updated in one thread
-     * so volatile.
-     */
+    /** 已写入条目计数器，仅在后台线程更新，使用原子变量保证可见性。 */
     private final AtomicInteger count = new AtomicInteger();
 
-    /**
-     * Any failure caught on the writer thread; this should be
-     * raised within the task/job thread as it implies that the
-     * entire write has failed.
-     */
+    /** 保存后台线程写入过程中捕获的IO异常，供主线程检查抛出。 */
     private final AtomicReference<IOException> failure = new AtomicReference<>();
 
     /**
-     * Create.
-     * @param writer writer
-     * @param capacity capacity.
+     * 构造异步写入器。
+     * @param writer 底层SequenceFile写入器
+     * @param capacity 队列容量
      */
     private EntryWriter(SequenceFile.Writer writer, int capacity) {
       checkState(capacity > 0, "invalid queue capacity %s", capacity);
@@ -291,31 +264,31 @@ public class EntryFileIO {
     }
 
     /**
-     * Is the writer active?
-     * @return true if the processor thread is live
+     * 检查写入器是否活跃。
+     * @return 处理线程存活时返回true
      */
     public boolean isActive() {
       return active.get();
     }
 
     /**
-     * Get count of files processed.
-     * @return the count
+     * 获取已写入的条目总数。
+     * @return 已写入条目数
      */
     public int getCount() {
       return count.get();
     }
 
     /**
-     * Any failure.
-     * @return any IOException caught when writing the output
+     * 获取写入过程中发生的异常。
+     * @return 如果发生写入异常返回异常对象，否则返回null
      */
     public IOException getFailure() {
       return failure.get();
     }
 
     /**
-     * Start the thread.
+     * 启动后台处理线程。
      */
     private void start() {
       checkState(executor == null, "already started");
@@ -326,19 +299,20 @@ public class EntryFileIO {
     }
 
     /**
-     * Add a list of entries to the queue.
-     * @param entries entries.
-     * @return whether the queue worked.
+     * 将一批文件条目加入写入队列。
+     * @param entries 待写入的条目列表
+     * @return 入队成功返回true，失败返回false
      */
     public boolean enqueue(List<FileEntry> entries) {
       if (entries.isEmpty()) {
         LOG.debug("ignoring enqueue of empty list");
-        // exit fast, but return true.
+        // 空列表快速返回，仍然返回成功
         return true;
       }
       if (active.get()) {
         try {
           LOG.debug("Queueing {} entries", entries.size());
+          // 超时入队，避免队列异常挂起
           final boolean enqueued = queue.offer(new QueueEntry(Actions.write, entries),
               WRITER_QUEUE_PUT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
           if (!enqueued) {
@@ -357,9 +331,9 @@ public class EntryFileIO {
     }
 
     /**
-     * Queue and process entries until done.
-     * @return count of entries written.
-     * @throws UncheckedIOException on write failure
+     * 后台处理循环，从队列取出操作并执行，直到收到停止指令。
+     * @return 处理完成的总条目数
+     * @throws UncheckedIOException 写入失败时抛出未检查IO异常
      */
     private int processor() {
       Thread.currentThread().setName("EntryIOWriter");
@@ -368,14 +342,14 @@ public class EntryFileIO {
           final QueueEntry queueEntry = queue.take();
           switch (queueEntry.action) {
 
-          case stop:  // stop the operation
+          case stop:  // 停止处理
             LOG.debug("Stop processing");
             stop.set(true);
             break;
 
-          case write:  // write data
-          default:  // here to shut compiler up
-            // write
+          case write:  // 写入一批条目
+          default:  // 兼容编译器检查
+            // 写入所有条目
             final List<FileEntry> entries = queueEntry.entries;
             LOG.debug("Adding block of {} entries", entries.size());
             for (FileEntry entry : entries) {
@@ -389,21 +363,21 @@ public class EntryFileIO {
         failure.set(e);
         throw new UncheckedIOException(e);
       } catch (InterruptedException e) {
-        // being stopped implicitly
+        // 隐式停止
         LOG.debug("interrupted", e);
       } finally {
         stop.set(true);
         active.set(false);
-        // clear the queue, so wake up on any failure mode.
+        // 清空队列，唤醒所有阻塞线程
         queue.clear();
       }
       return count.get();
     }
 
     /**
-     * write one entry.
-     * @param entry entry to write
-     * @throws IOException on write failure
+     * 写入单个文件条目。
+     * @param entry 待写入条目
+     * @throws IOException 写入失败时抛出
      */
     private void append(FileEntry entry) throws IOException {
       writer.append(NullWritable.get(), entry);
@@ -413,49 +387,44 @@ public class EntryFileIO {
     }
 
     /**
-     * Close: stop accepting new writes, wait for queued writes to complete.
-     * @throws IOException failure closing that writer, or somehow the future
-     * raises an IOE which isn't caught for later.
+     * 关闭写入器：停止接受新入队，等待所有队列条目写入完成后关闭流。
+     * @throws IOException 关闭过程中发生IO异常或写入失败时抛出
      */
     @Override
     public void close() throws IOException {
 
-      // declare as inactive.
-      // this stops queueing more data, but leaves
-      // the worker thread still polling and writing.
+      // 标记为不活跃，停止接受新入队
       if (!active.getAndSet(false)) {
-        // already stopped
+        // 已经停止，直接返回
         return;
       }
       LOG.debug("Shutting down writer; entry lists in queue: {}",
           capacity - queue.remainingCapacity());
 
-      // signal queue closure by queuing a stop option.
-      // this is added at the end of the list of queued blocks,
-      // of which are written.
+      // 入队停止操作，会在所有现有条目处理完后执行
       try {
         queue.put(new QueueEntry(Actions.stop));
       } catch (InterruptedException e) {
         Thread.interrupted();
       }
       try {
-        // wait for the op to finish.
+        // 等待处理完成，超时则强制关闭
         int total = FutureIO.awaitFuture(future, WRITER_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         LOG.debug("Processed {} files", total);
         executor.shutdown();
       } catch (TimeoutException e) {
         LOG.warn("Timeout waiting for write thread to finish");
-        // trouble. force close
+        // 超时强制关闭线程池
         executor.shutdownNow();
-        // close the stream
       } finally {
+        // 无论如何都关闭底层写入流
         writer.close();
       }
     }
 
     /**
-     * Raise any IOException caught during execution of the writer thread.
-     * @throws IOException if one was caught and saved.
+     * 如果后台线程写入过程发生过异常，在此抛出该异常。
+     * @throws IOException 保存了异常时抛出
      */
     public void maybeRaiseWriteException() throws IOException {
       final IOException f = failure.get();
@@ -478,9 +447,8 @@ public class EntryFileIO {
 
 
   /**
-   * Iterator to retrieve file entries from the sequence file.
-   * Closeable; it will close automatically when the last element is read.
-   * No thread safety.
+   * 文件条目迭代器，从SequenceFile中顺序读取文件条目。
+   * 读取到文件末尾后自动关闭底层读取器，非线程安全，仅支持单线程遍历。
    */
   @VisibleForTesting
   static final class EntryIterator implements RemoteIterator<FileEntry>, Closeable {
@@ -494,8 +462,8 @@ public class EntryFileIO {
     private int count;
 
     /**
-     * Create an iterator.
-     * @param reader the file to read from.
+     * 构造迭代器。
+     * @param reader 底层SequenceFile读取器
      */
     private EntryIterator(final SequenceFile.Reader reader) {
       this.reader = requireNonNull(reader);
@@ -524,11 +492,9 @@ public class EntryFileIO {
     }
 
     /**
-     * Fetch the next entry.
-     * If there is none, then the reader is closed before `false`
-     * is returned.
-     * @return true if a record was retrieved.
-     * @throws IOException IO failure.
+     * 预读取下一个条目，读取失败或到末尾时自动关闭读取器。
+     * @return 成功读取到条目返回true，到文件末尾返回false
+     * @throws IOE 读取过程发生IO异常时抛出
      */
     private boolean fetchNext() throws IOException {
       FileEntry readBack = new FileEntry();
@@ -554,8 +520,8 @@ public class EntryFileIO {
     }
 
     /**
-     * Is the stream closed.
-     * @return true if closed.
+     * 检查迭代器是否已关闭。
+     * @return 已关闭返回true
      */
     public boolean isClosed() {
       return closed;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,32 +26,28 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * <code>MarkableIteratorInterface</code> is an interface for a iterator that 
- * supports mark-reset functionality. 
- *
- * <p>Mark can be called at any point during the iteration process and a reset
- * will go back to the last record before the call to the previous mark.
- * 
+ * 支持标记-重置功能的迭代器接口，扩展了标准Iterator接口
+ * 允许在迭代过程中标记位置，之后可以重置迭代器回到标记位置重新遍历，
+ * 主要用于MapReduce中需要重复遍历数据的场景
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 interface MarkableIteratorInterface<VALUE> extends Iterator<VALUE> {
   /**
-   * Mark the current record. A subsequent call to reset will rewind
-   * the iterator to this record.
-   * @throws IOException
+   * 在当前迭代位置标记，后续调用reset会将迭代器回退到该位置
+   * @throws IOException 标记过程中发生IO异常时抛出
    */
   void mark() throws IOException;
   
   /**
-   * Reset the iterator to the last record before a call to the previous mark
-   * @throws IOException
+   * 将迭代器重置到上一次调用mark方法标记的位置
+   * @throws IOException 重置过程中发生IO异常时抛出
    */
   void reset() throws IOException;
   
   /**
-   * Clear any previously set mark
-   * @throws IOException
+   * 清除之前设置的所有标记
+   * @throws IOException 清除标记过程中发生IO异常时抛出
    */
   void clearMark() throws IOException;
 }

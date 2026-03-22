@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -31,7 +32,7 @@ import org.apache.hadoop.mapreduce.v2.app.webapp.ConfBlock;
 import org.apache.hadoop.yarn.webapp.SubView;
 
 /**
- * Render a page with the configuration for a give job in it.
+ * 历史服务器端作业配置页面，用于展示指定已完成作业的配置信息
  */
 public class HsConfPage extends HsView {
 
@@ -39,39 +40,50 @@ public class HsConfPage extends HsView {
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.hs.webapp.HsView#preHead(org.apache.hadoop.yarn.webapp.hamlet.Hamlet.HTML)
    */
+  /**
+   * 页面头部预处理，设置页面标题、初始化前端组件配置
+   * @param html html页面根节点
+   */
   @Override protected void preHead(Page.HTML<__> html) {
+    // 获取请求中的作业ID参数
     String jobID = $(JOB_ID);
+    // 设置页面标题，处理缺少作业ID的错误情况
     set(TITLE, jobID.isEmpty() ? "Bad request: missing job ID"
         : join("Configuration for MapReduce Job ", $(JOB_ID)));
+    // 执行通用头部预处理逻辑
     commonPreHead(html);
+    // 设置配置表格ID
     set(DATATABLES_ID, "conf");
+    // 初始化配置表格的DataTables设置
     set(initID(DATATABLES, "conf"), confTableInit());
+    // 设置配置表格初始化后执行的脚本
     set(postInitID(DATATABLES, "conf"), confPostTableInit());
+    // 设置配置表格样式
     setTableStyles(html, "conf");
 
-    //Override the default nav config
+    // 覆盖默认导航手风琴组件设置，设置第二个导航项默认激活
     set(initID(ACCORDION, "nav"), "{autoHeight:false, active:1}");
   }
 
   /**
-   * The body of this block is the configuration block.
-   * @return HsConfBlock.class
+   * 获取页面主体内容区块类型
+   * @return 配置区块类，用于渲染作业配置内容
    */
   @Override protected Class<? extends SubView> content() {
     return ConfBlock.class;
   }
 
   /**
-   * @return the end of the JS map that is the jquery datatable config for the
-   * conf table.
+   * 生成配置表格DataTables初始化配置JSON
+   * @return 表格初始化配置字符串
    */
   private String confTableInit() {
     return tableInit().append("}").toString();
   }
 
   /**
-   * @return the java script code to allow the jquery conf datatable to filter
-   * by column.
+   * 生成配置表格列过滤功能初始化JavaScript代码
+   * @return 实现表格按列过滤的JS代码
    */
   private String confPostTableInit() {
     return "var confInitVals = new Array();\n" +

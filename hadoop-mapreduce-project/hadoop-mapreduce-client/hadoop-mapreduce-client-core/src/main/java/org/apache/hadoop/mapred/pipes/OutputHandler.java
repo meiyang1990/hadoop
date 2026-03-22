@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,7 +33,16 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
 
 /**
- * Handles the upward (C++ to Java) messages from the application.
+ * 文件: OutputHandler.java
+ * 功能: 处理Pipes框架中从C++应用侧向上发送到Java侧的消息，
+ *       负责将C++输出的键值对、进度、状态、计数器等信息转发给MapReduce框架处理，
+ *       同时处理任务完成、失败通知和身份认证逻辑
+ * 所属模块: Hadoop MapReduce Pipes（C++ MapReduce编程支持）
+ */
+/**
+ * 处理从C++应用到Java的上行消息，实现Pipes协议的上行处理接口
+ * @param <K> 输出键类型
+ * @param <V> 输出值类型
  */
 class OutputHandler<K extends WritableComparable,
                     V extends Writable>
@@ -45,15 +55,18 @@ class OutputHandler<K extends WritableComparable,
   
   private Throwable exception = null;
   RecordReader<FloatWritable,NullWritable> recordReader = null;
+  // 存储已注册计数器，ID对应MapReduce框架中的Counter对象
   private Map<Integer, Counters.Counter> registeredCounters = 
     new HashMap<Integer, Counters.Counter>();
 
   private String expectedDigest = null;
   private boolean digestReceived = false;
   /**
-   * Create a handler that will handle any records output from the application.
-   * @param collector the "real" collector that takes the output
-   * @param reporter the reporter for reporting progress
+   * 构造OutputHandler处理器，用于处理应用输出消息
+   * @param collector 收集输出键值对的收集器
+   * @param reporter 用于上报进度和状态的报告器
+   * @param recordReader 进度读取器
+   * @param expectedDigest 预期的认证摘要，用于身份认证
    */
   public OutputHandler(OutputCollector<K, V> collector, Reporter reporter, 
                        RecordReader<FloatWritable,NullWritable> recordReader,
@@ -65,14 +78,14 @@ class OutputHandler<K extends WritableComparable,
   }
 
   /**
-   * The task output a normal record.
+   * 处理应用输出的普通键值对，转发给输出收集器
    */
   public void output(K key, V value) throws IOException {
     collector.collect(key, value);
   }
 
   /**
-   * The task output a record with a partition number attached.
+   * 处理带分区编号的输出键值对，指定目标Reduce分区
    */
   public void partitionedOutput(int reduce, K key, 
                                 V value) throws IOException {
@@ -81,16 +94,17 @@ class OutputHandler<K extends WritableComparable,
   }
 
   /**
-   * Update the status message for the task.
+   * 处理应用上报的状态消息，更新任务状态
    */
   public void status(String msg) {
     reporter.setStatus(msg);
   }
 
+  // 进度键对象，复用避免重复创建
   private FloatWritable progressKey = new FloatWritable(0.0f);
   private NullWritable nullValue = NullWritable.get();
   /**
-   * Update the amount done and call progress on the reporter.
+   * 处理应用上报的进度信息，更新进度并通知框架
    */
   public void progress(float progress) throws IOException {
     progressValue = progress;
@@ -103,7 +117,7 @@ class OutputHandler<K extends WritableComparable,
   }
 
   /**
-   * The task finished successfully.
+   * 处理任务成功完成通知
    */
   public void done() throws IOException {
     synchronized (this) {
@@ -113,15 +127,15 @@ class OutputHandler<K extends WritableComparable,
   }
 
   /**
-   * Get the current amount done.
-   * @return a float between 0.0 and 1.0
+   * 获取当前任务完成进度
+   * @return 0.0到1.0之间的进度值
    */
   public float getProgress() {
     return progressValue;
   }
 
   /**
-   * The task failed with an exception.
+   * 处理任务执行失败通知，保存异常信息
    */
   public void failed(Throwable e) {
     synchronized (this) {
@@ -131,9 +145,9 @@ class OutputHandler<K extends WritableComparable,
   }
 
   /**
-   * Wait for the task to finish or abort.
-   * @return did the task finish correctly?
-   * @throws Throwable
+   * 阻塞等待任务完成或失败，返回执行结果
+   * @return 任务是否成功完成
+   * @throws Throwable 如果任务失败，抛出原始异常
    */
   public synchronized boolean waitForFinish() throws Throwable {
     while (!done && exception == null) {
@@ -145,11 +159,24 @@ class OutputHandler<K extends WritableComparable,
     return done;
   }
 
+  /**
+   * 注册计数器，建立C++侧计数器ID到Java侧Counter对象的映射
+   * @param id 计数器ID
+   * @param group 计数器分组名称
+   * @param name 计数器名称
+   * @throws IOException
+   */
   public void registerCounter(int id, String group, String name) throws IOException {
     Counters.Counter counter = reporter.getCounter(group, name);
     registeredCounters.put(id, counter);
   }
 
+  /**
+   * 按ID增加指定计数器的值
+   * @param id 计数器ID
+   * @param amount 增量值
+   * @throws IOException 如果计数器ID无效则抛出异常
+   */
   public void incrementCounter(int id, long amount) throws IOException {
     if (id < registeredCounters.size()) {
       Counters.Counter counter = registeredCounters.get(id);
@@ -159,6 +186,12 @@ class OutputHandler<K extends WritableComparable,
     }
   }
   
+  /**
+   * 处理C++侧发来的认证摘要，验证身份
+   * @param digest 接收到的认证摘要
+   * @return 认证是否成功
+   * @throws IOException
+   */
   public synchronized boolean authenticate(String digest) throws IOException {
     boolean success = true;
     if (!expectedDigest.equals(digest)) {
@@ -172,8 +205,7 @@ class OutputHandler<K extends WritableComparable,
   }
 
   /**
-   * This is called by Application and blocks the thread until
-   * authentication response is received.
+   * 阻塞等待认证结果返回，直到收到认证响应或发生异常
    * @throws IOException
    * @throws InterruptedException
    */

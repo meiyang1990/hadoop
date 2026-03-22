@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,16 +30,11 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
- * A wrapper class for a record reader that handles a single file split. It
- * delegates most of the methods to the wrapped instance. A concrete subclass
- * needs to provide a constructor that calls this parent constructor with the
- * appropriate input format. The subclass constructor must satisfy the specific
- * constructor signature that is required by
- * <code>CombineFileRecordReader</code>.
- *
- * Subclassing is needed to get a concrete record reader wrapper because of the
- * constructor requirement.
- *
+ * CombineFileInputFormat 合并小文件分片场景下的 RecordReader 包装类。
+ * 本类将单个小文件对应的原始 RecordReader 封装，把大多数方法委托给内部包装的实际 RecordReader 实例处理。
+ * 具体实现子类需要提供符合 CombineFileRecordReader 要求的构造函数签名，调用父类构造器传入对应输入格式。
+ * 子类化是为了满足构造函数签名要求，从而获得具体可用的 RecordReader 包装类。
+ * 
  * @see CombineFileRecordReader
  * @see CombineFileInputFormat
  */
@@ -46,9 +42,20 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 @InterfaceStability.Stable
 public abstract class CombineFileRecordReaderWrapper<K,V>
   extends RecordReader<K,V> {
+  // 包装后单个小文件对应的文件分片
   private final FileSplit fileSplit;
+  // 实际处理数据读取的委托 RecordReader
   private final RecordReader<K,V> delegate;
 
+  /**
+   * 构造 CombineFileRecordReaderWrapper 实例，从合并分片中提取单个小文件分片并创建对应 RecordReader。
+   * @param inputFormat 输入格式，用于创建单个分片的 RecordReader
+   * @param split 合并多个小文件的 CombineFileSplit
+   * @param context 任务尝试上下文
+   * @param idx 当前要处理的小文件在合并分片中的索引
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   protected CombineFileRecordReaderWrapper(FileInputFormat<K,V> inputFormat,
     CombineFileSplit split, TaskAttemptContext context, Integer idx)
     throws IOException, InterruptedException {
@@ -60,25 +67,39 @@ public abstract class CombineFileRecordReaderWrapper<K,V>
     delegate = inputFormat.createRecordReader(fileSplit, context);
   }
 
+  /**
+   * 初始化包装的 RecordReader，校验分片一致性后委托初始化。
+   * @param split 输入分片
+   * @param context 任务尝试上下文
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public void initialize(InputSplit split, TaskAttemptContext context)
     throws IOException, InterruptedException {
-    // it really should be the same file split at the time the wrapper instance
-    // was created
+    // 校验当前分片信息和构造时提取的分片信息一致，确保一致性
     assert fileSplitIsValid(context);
 
     delegate.initialize(fileSplit, context);
   }
 
+  /**
+   * 校验当前包装的分片信息和作业配置中的输入信息一致，保证数据一致性。
+   * @param context 任务尝试上下文
+   * @return 信息一致返回true，否则返回false
+   */
   private boolean fileSplitIsValid(TaskAttemptContext context) {
     Configuration conf = context.getConfiguration();
+    // 从配置获取Map任务输入起始偏移量
     long offset = conf.getLong(MRJobConfig.MAP_INPUT_START, 0L);
     if (fileSplit.getStart() != offset) {
       return false;
     }
+    // 从配置获取Map任务输入路径长度
     long length = conf.getLong(MRJobConfig.MAP_INPUT_PATH, 0L);
     if (fileSplit.getLength() != length) {
       return false;
     }
+    // 从配置获取Map任务输入文件路径
     String path = conf.get(MRJobConfig.MAP_INPUT_FILE);
     if (!fileSplit.getPath().toString().equals(path)) {
       return false;
@@ -86,22 +107,27 @@ public abstract class CombineFileRecordReaderWrapper<K,V>
     return true;
   }
 
+  @Override
   public boolean nextKeyValue() throws IOException, InterruptedException {
     return delegate.nextKeyValue();
   }
 
+  @Override
   public K getCurrentKey() throws IOException, InterruptedException {
     return delegate.getCurrentKey();
   }
 
+  @Override
   public V getCurrentValue() throws IOException, InterruptedException {
     return delegate.getCurrentValue();
   }
 
+  @Override
   public float getProgress() throws IOException, InterruptedException {
     return delegate.getProgress();
   }
 
+  @Override
   public void close() throws IOException {
     delegate.close();
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * MapReduce ApplicationMaster Web UI 包
+ * 提供 MapReduce 作业运行时的可视化监控页面，展示作业进度、任务状态、计数器等运行信息
  */
 @InterfaceAudience.Private
 package org.apache.hadoop.mapreduce.v2.app.webapp;

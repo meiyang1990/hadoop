@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,35 +33,22 @@ import org.apache.hadoop.mapreduce.JobStatus;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
- * This is a special committer which creates the factory for the committer and
- * runs off that. Why does it exist? So that you can explicitly instantiate
- * a committer by classname and yet still have the actual implementation
- * driven dynamically by the factory options and destination filesystem.
- * This simplifies integration
- * with existing code which takes the classname of a committer.
- * There's no factory for this, as that would lead to a loop.
- *
- * All commit protocol methods and accessors are delegated to the
- * wrapped committer.
- *
- * How to use:
- *
+ * 绑定动态输出提交器的代理实现，支持通过类名实例化并动态加载实际输出提交器。
+ * 核心作用是兼容现有通过类名配置提交器的代码，同时保留根据输出文件系统动态选择提交器的能力。
+ * 所有输出提交生命周期操作都会委托给内部绑定的实际提交器执行，自身不实现核心逻辑。
+ * 该类本身不需要对应的工厂类，避免循环依赖。
+ * 
+ * 使用方式：
  * <ol>
  *   <li>
- *     In applications which take a classname of committer in
- *     a configuration option, set it to the canonical name of this class
- *     (see {@link #NAME}). When this class is instantiated, it will
- *     use the factory mechanism to locate the configured committer for the
- *     destination.
+ *     在配置项中需要填写提交器类名的地方，填写此类的规范名称（见{@link #NAME}）。
+ *     此类实例化时，会通过工厂机制根据输出路径自动定位对应文件系统的配置提交器。
  *   </li>
  *   <li>
- *     In code, explicitly create an instance of this committer through
- *     its constructor, then invoke commit lifecycle operations on it.
- *     The dynamically configured committer will be created in the constructor
- *     and have the lifecycle operations relayed to it.
+ *     在代码中显式通过构造函数创建实例，然后调用生命周期方法。
+ *     动态配置的提交器会在构造阶段被创建，所有操作都会转发给它执行。
  *   </li>
  * </ol>
- *
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
@@ -68,25 +56,26 @@ public class BindingPathOutputCommitter extends PathOutputCommitter
     implements IOStatisticsSource, StreamCapabilities {
 
   /**
-   * The classname for use in configurations.
+   * 用于配置的类全限定名常量。
    */
   public static final String NAME
       = BindingPathOutputCommitter.class.getCanonicalName();
 
   /**
-   * The bound committer.
+   * 被代理的实际输出提交器实例。
    */
   private final PathOutputCommitter committer;
 
   /**
-   * Instantiate.
-   * @param outputPath output path (may be null)
-   * @param context task context
-   * @throws IOException on any failure.
+   * 构造绑定输出提交器，动态创建实际的输出提交器实例。
+   * @param outputPath 输出路径，可为null
+   * @param context 任务尝试上下文
+   * @throws IOException 创建失败时抛出异常
    */
   public BindingPathOutputCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {
     super(outputPath, context);
+    // 根据输出路径获取对应工厂，创建实际输出提交器
     committer = PathOutputCommitterFactory.getCommitterFactory(outputPath,
         context.getConfiguration())
         .createOutputCommitter(outputPath, context);
@@ -180,19 +169,20 @@ public class BindingPathOutputCommitter extends PathOutputCommitter
   }
 
   /**
-   * Get the inner committer.
-   * @return the bonded committer.
+   * 获取内部绑定的实际输出提交器。
+   * @return 被代理的实际输出提交器实例
    */
   public PathOutputCommitter getCommitter() {
     return committer;
   }
 
   /**
-   * Pass through if the inner committer supports StreamCapabilities.
+   * 委托内部提交器检查是否支持指定能力。
    * {@inheritDoc}
    */
   @Override
   public boolean hasCapability(final String capability) {
+    // 如果内部提交器实现了StreamCapabilities接口，委托调用
     if (committer instanceof StreamCapabilities) {
       return ((StreamCapabilities) committer).hasCapability(capability);
     } else {
@@ -202,6 +192,7 @@ public class BindingPathOutputCommitter extends PathOutputCommitter
 
   @Override
   public IOStatistics getIOStatistics() {
+    // 从内部提交器提取IO统计信息
     return IOStatisticsSupport.retrieveIOStatistics(committer);
   }
 }

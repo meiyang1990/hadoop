@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,10 +25,20 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.nativetask.INativeComparable;
 
+/**
+ * DoubleWritable 原生任务序列化器，实现原生字节比较能力
+ * 用于原生任务中对DoubleWritable类型键值对的序列化和比较
+ */
 @InterfaceAudience.Private
 public class DoubleWritableSerializer extends DefaultSerializer implements
     INativeComparable {
 
+  /**
+   * 获取 DoubleWritable 对象序列化后的固定字节长度
+   * @param w 待计算长度的 Writable 对象
+   * @return 固定长度 8 字节（double类型占8字节）
+   * @throws IOException IO异常
+   */
   @Override
   public int getLength(Writable w) throws IOException {
     return 8;

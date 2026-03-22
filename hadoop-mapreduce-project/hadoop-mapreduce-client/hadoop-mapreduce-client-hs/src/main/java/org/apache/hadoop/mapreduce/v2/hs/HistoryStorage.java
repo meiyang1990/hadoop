@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -28,52 +29,49 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Provides an API to query jobs that have finished.
+ * 文件说明：MapReduce历史服务器的作业历史存储服务接口，定义查询已完成MapReduce作业的标准API
  * 
- * For those implementing this API be aware that there is no feedback when
- * files are removed from HDFS.  You may rely on HistoryFileManager to help
- * you know when that has happened if you have not made a complete backup of
- * the data stored on HDFS.
+ * 实现注意事项：当HDFS上的历史文件被删除时，本接口不会收到回调通知。
+ * 如果实现方没有完整备份HDFS上存储的历史数据，可以依赖HistoryFileManager来感知文件删除事件。
+ * 核心职责：为历史作业查询提供统一抽象，支持不同实现的存储后端接入历史服务器。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public interface HistoryStorage {
   
   /**
-   * Give the Storage a reference to a class that can be used to interact with
-   * history files.
-   * @param hsManager the class that is used to interact with history files.
+   * 注入历史文件管理器，用于和HDFS上的历史文件交互
+   * @param hsManager 历史文件管理器实例，用于操作历史文件
    */
   void setHistoryFileManager(HistoryFileManager hsManager);
   
   /**
-   * Look for a set of partial jobs.
-   * @param offset the offset into the list of jobs.
-   * @param count the maximum number of jobs to return.
-   * @param user only return jobs for the given user.
-   * @param queue only return jobs for in the given queue.
-   * @param sBegin only return Jobs that started on or after the given time.
-   * @param sEnd only return Jobs that started on or before the given time.
-   * @param fBegin only return Jobs that ended on or after the given time.
-   * @param fEnd only return Jobs that ended on or before the given time.
-   * @param jobState only return Jobs that are in the given job state.
-   * @return The list of filtered jobs.
+   * 根据过滤条件分页查询部分作业信息（仅返回摘要信息）
+   * @param offset 分页起始偏移量
+   * @param count 单次返回最大作业数量
+   * @param user 按用户名过滤，为null不过滤
+   * @param queue 按队列名过滤，为null不过滤
+   * @param sBegin 只返回开始时间大于等于该值的作业，为null不过滤
+   * @param sEnd 只返回开始时间小于等于该值的作业，为null不过滤
+   * @param fBegin 只返回结束时间大于等于该值的作业，为null不过滤
+   * @param fEnd 只返回结束时间小于等于该值的作业，为null不过滤
+   * @param jobState 只返回该状态的作业，为null不过滤
+   * @return 过滤后的作业摘要列表
    */
   JobsInfo getPartialJobs(Long offset, Long count, String user, 
       String queue, Long sBegin, Long sEnd, Long fBegin, Long fEnd, 
       JobState jobState);
   
   /**
-   * Get all of the cached jobs.  This only returns partial jobs and is here for
-   * legacy reasons.
-   * @return all of the cached jobs
+   * 获取所有缓存的作业摘要信息，仅为兼容旧版保留接口
+   * @return 所有缓存作业Id与作业摘要的映射表
    */
   Map<JobId, Job> getAllPartialJobs();
   
   /**
-   * Get a fully parsed job.
-   * @param jobId the id of the job
-   * @return the job, or null if it is not found.
+   * 获取完整解析后的作业全量信息
+   * @param jobId 目标作业Id
+   * @return 全量作业信息，找不到返回null
    */
   Job getFullJob(JobId jobId);
 }

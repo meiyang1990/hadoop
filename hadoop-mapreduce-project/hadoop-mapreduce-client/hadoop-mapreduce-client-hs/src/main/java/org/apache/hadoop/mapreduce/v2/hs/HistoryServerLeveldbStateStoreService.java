@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -49,6 +50,10 @@ import org.iq80.leveldb.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 基于LevelDB实现的MapReduce历史服务器状态存储服务
+ * 负责持久化存储MR代理令牌相关状态信息，支持历史服务器恢复时加载已有状态
+ */
 public class HistoryServerLeveldbStateStoreService extends
     HistoryServerStateStoreService {
 
@@ -70,33 +75,43 @@ public class HistoryServerLeveldbStateStoreService extends
   }
 
   @Override
+  /**
+   * 启动LevelDB状态存储，打开或创建数据库，并进行版本检查
+   */
   protected void startStorage() throws IOException {
+    // 创建存储目录
     Path storeRoot = createStorageDir(getConfig());
     Options options = new Options();
     options.createIfMissing(false);
     LOG.info("Using state database at " + storeRoot + " for recovery");
     File dbfile = new File(storeRoot.toString());
     try {
+      // 尝试打开已存在的数据库
       db = JniDBFactory.factory.open(dbfile, options);
     } catch (NativeDB.DBException e) {
+      // 数据库不存在则创建新数据库
       if (e.isNotFound() || e.getMessage().contains(" does not exist ")) {
         LOG.info("Creating state database at " + dbfile);
         options.createIfMissing(true);
         try {
           db = JniDBFactory.factory.open(dbfile, options);
-          // store version
+          // 存储版本信息
           storeVersion();
         } catch (DBException dbErr) {
           throw new IOException(dbErr.getMessage(), dbErr);
         }
       } else {
-        throw e;
+          throw e;
       }
     }
+    // 检查存储版本兼容性
     checkVersion();
   }
 
   @Override
+  /**
+   * 关闭LevelDB存储
+   */
   protected void closeStorage() throws IOException {
     if (db != null) {
       db.close();
@@ -105,25 +120,40 @@ public class HistoryServerLeveldbStateStoreService extends
   }
 
   @Override
+  /**
+   * 从LevelDB加载所有状态，恢复历史服务器状态
+   * @return 恢复后的历史服务器状态对象
+   * @throws IOException IO异常
+   */
   public HistoryServerState loadState() throws IOException {
     HistoryServerState state = new HistoryServerState();
+    // 加载令牌主密钥
     int numKeys = loadTokenMasterKeys(state);
     LOG.info("Recovered " + numKeys + " token master keys");
+    // 加载代理令牌状态
     int numTokens = loadTokens(state);
     LOG.info("Recovered " + numTokens + " tokens");
     return state;
   }
 
+  /**
+   * 从LevelDB加载所有令牌主密钥到状态对象
+   * @param state 目标状态对象
+   * @return 加载的主密钥数量
+   * @throws IOException IO异常
+   */
   private int loadTokenMasterKeys(HistoryServerState state)
       throws IOException {
     int numKeys = 0;
     LeveldbIterator iter = null;
     try {
       iter = new LeveldbIterator(db);
+      // 定位到第一个令牌主密钥记录
       iter.seek(bytes(TOKEN_MASTER_KEY_KEY_PREFIX));
       while (iter.hasNext()) {
         Entry<byte[],byte[]> entry = iter.next();
         String key = asString(entry.getKey());
+        // 超出前缀范围停止遍历
         if (!key.startsWith(TOKEN_MASTER_KEY_KEY_PREFIX)) {
           break;
         }
@@ -131,6 +161,7 @@ public class HistoryServerLeveldbStateStoreService extends
           LOG.debug("Loading master key from " + key);
         }
         try {
+          // 解析并添加主密钥
           loadTokenMasterKey(state, entry.getValue());
         } catch (IOException e) {
           throw new IOException("Error loading token master key from " + key,
@@ -148,6 +179,12 @@ public class HistoryServerLeveldbStateStoreService extends
     return numKeys;
   }
 
+  /**
+   * 反序列化并添加单个令牌主密钥到状态对象
+   * @param state 目标状态对象
+   * @param data 序列化后的二进制数据
+   * @throws IOException IO异常
+   */
   private void loadTokenMasterKey(HistoryServerState state, byte[] data)
       throws IOException {
     DelegationKey key = new DelegationKey();
@@ -161,15 +198,23 @@ public class HistoryServerLeveldbStateStoreService extends
     state.tokenMasterKeyState.add(key);
   }
 
+  /**
+   * 从LevelDB加载所有代理令牌到状态对象
+   * @param state 目标状态对象
+   * @return 加载的令牌数量
+   * @throws IOException IO异常
+   */
   private int loadTokens(HistoryServerState state) throws IOException {
     int numTokens = 0;
     LeveldbIterator iter = null;
     try {
       iter = new LeveldbIterator(db);
+      // 定位到第一个代理令牌记录
       iter.seek(bytes(TOKEN_STATE_KEY_PREFIX));
       while (iter.hasNext()) {
         Entry<byte[],byte[]> entry = iter.next();
         String key = asString(entry.getKey());
+        // 超出前缀范围停止遍历
         if (!key.startsWith(TOKEN_STATE_KEY_PREFIX)) {
           break;
         }
@@ -177,6 +222,7 @@ public class HistoryServerLeveldbStateStoreService extends
           LOG.debug("Loading token from " + key);
         }
         try {
+          // 解析并添加令牌
           loadToken(state, entry.getValue());
         } catch (IOException e) {
           throw new IOException("Error loading token state from " + key, e);
@@ -193,6 +239,12 @@ public class HistoryServerLeveldbStateStoreService extends
     return numTokens;
   }
 
+  /**
+   * 反序列化并添加单个代理令牌到状态对象
+   * @param state 目标状态对象
+   * @param data 序列化后的二进制数据
+   * @throws IOException IO异常
+   */
   private void loadToken(HistoryServerState state, byte[] data)
       throws IOException {
     MRDelegationTokenIdentifier tokenId = new MRDelegationTokenIdentifier();
@@ -208,6 +260,12 @@ public class HistoryServerLeveldbStateStoreService extends
   }
 
   @Override
+  /**
+   * 存储新增的MR代理令牌到LevelDB
+   * @param tokenId 令牌标识符
+   * @param renewDate 令牌更新时间
+   * @throws IOException IO异常
+   */
   public void storeToken(MRDelegationTokenIdentifier tokenId, Long renewDate)
       throws IOException {
     if (LOG.isDebugEnabled()) {
@@ -234,12 +292,23 @@ public class HistoryServerLeveldbStateStoreService extends
   }
 
   @Override
+  /**
+   * 更新MR代理令牌更新时间，复用存储逻辑
+   * @param tokenId 令牌标识符
+   * @param renewDate 新的更新时间
+   * @throws IOException IO异常
+   */
   public void updateToken(MRDelegationTokenIdentifier tokenId, Long renewDate)
       throws IOException {
     storeToken(tokenId, renewDate);
   }
 
   @Override
+  /**
+   * 从LevelDB删除指定代理令牌
+   * @param tokenId 要删除的令牌标识符
+   * @throws IOException IO异常
+   */
   public void removeToken(MRDelegationTokenIdentifier tokenId)
       throws IOException {
     String dbKey = getTokenDatabaseKey(tokenId);
@@ -255,6 +324,11 @@ public class HistoryServerLeveldbStateStoreService extends
   }
 
   @Override
+  /**
+   * 存储新增的令牌主密钥到LevelDB
+   * @param masterKey 要存储的主密钥对象
+   * @throws IOException IO异常
+   */
   public void storeTokenMasterKey(DelegationKey masterKey)
       throws IOException {
     if (LOG.isDebugEnabled()) {
@@ -280,6 +354,11 @@ public class HistoryServerLeveldbStateStoreService extends
   }
 
   @Override
+  /**
+   * 从LevelDB删除指定令牌主密钥
+   * @param masterKey 要删除的主密钥对象
+   * @throws IOException IO异常
+   */
   public void removeTokenMasterKey(DelegationKey masterKey)
       throws IOException {
     if (LOG.isDebugEnabled()) {
@@ -298,6 +377,12 @@ public class HistoryServerLeveldbStateStoreService extends
     return TOKEN_MASTER_KEY_KEY_PREFIX + masterKey.getKeyId();
   }
 
+  /**
+   * 根据配置创建LevelDB存储目录，设置700权限
+   * @param conf 配置对象
+   * @return 存储目录路径
+   * @throws IOException 未配置路径或创建目录失败抛出异常
+   */
   private Path createStorageDir(Configuration conf) throws IOException {
     String confPath = conf.get(JHAdminConfig.MR_HS_LEVELDB_STATE_STORE_PATH);
     if (confPath == null) {
@@ -310,6 +395,11 @@ public class HistoryServerLeveldbStateStoreService extends
     return root;
   }
 
+  /**
+   * 从LevelDB加载存储 schema 版本信息
+   * @return 加载到的版本，不存在返回默认1.0版本
+   * @throws IOException IO异常
+   */
   Version loadVersion() throws IOException {
     byte[] data = db.get(bytes(DB_SCHEMA_VERSION_KEY));
     // if version is not stored previously, treat it as 1.0.
@@ -321,10 +411,19 @@ public class HistoryServerLeveldbStateStoreService extends
     return version;
   }
 
+  /**
+   * 存储当前版本信息到LevelDB
+   * @throws IOException IO异常
+   */
   private void storeVersion() throws IOException {
     dbStoreVersion(CURRENT_VERSION_INFO);
   }
 
+  /**
+   * 将指定版本存储到LevelDB
+   * @param version 要存储的版本对象
+   * @throws IOException IO异常
+   */
   void dbStoreVersion(Version state) throws IOException {
     String key = DB_SCHEMA_VERSION_KEY;
     byte[] data =
@@ -336,6 +435,10 @@ public class HistoryServerLeveldbStateStoreService extends
     }
   }
 
+  /**
+   * 获取当前存储 schema 版本
+   * @return 当前版本对象
+   */
   Version getCurrentVersion() {
     return CURRENT_VERSION_INFO;
   }
@@ -349,6 +452,10 @@ public class HistoryServerLeveldbStateStoreService extends
    * 4) Within a major upgrade, say 1.2 to 2.0:
    *    throw exception and indicate user to use a separate upgrade tool to
    *    upgrade state or remove incompatible old state.
+   */
+  /**
+   * 检查存储 schema 版本兼容性，不兼容则抛出异常
+   * @throws IOException 版本不兼容抛出异常
    */
   private void checkVersion() throws IOException {
     Version loadedVersion = loadVersion();

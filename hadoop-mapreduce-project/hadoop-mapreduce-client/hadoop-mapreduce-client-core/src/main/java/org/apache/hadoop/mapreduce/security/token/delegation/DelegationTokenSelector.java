@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,13 +23,17 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSelector;
 
 /**
- * A delegation token that is specialized for MapReduce
+ * MapReduce 场景专用的代理令牌选择器，从凭据中筛选出对应MapReduce服务的代理令牌
+ * 继承通用抽象选择器实现，专门适配MapReduce的代理令牌类型
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class DelegationTokenSelector
     extends AbstractDelegationTokenSelector<DelegationTokenIdentifier>{
 
+  /**
+   * 构造MapReduce专用的代理令牌选择器，传入MapReduce代理令牌类型标识
+   */
   public DelegationTokenSelector() {
     super(DelegationTokenIdentifier.MAPREDUCE_DELEGATION_KIND);
   }

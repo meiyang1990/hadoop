@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,5 +16,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  * 
- */ 
+ */
+
+/**
+ * 文件缓存包，提供MapReduce任务执行过程中的本地文件缓存能力。
+ * 核心功能是将作业依赖的共享文件从HDFS下载到本地节点进行缓存，
+ * 避免同一节点上多个任务重复下载相同文件，提升任务执行效率减少网络传输。
+ */
 package org.apache.hadoop.filecache;

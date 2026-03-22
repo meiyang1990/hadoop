@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,8 +41,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.Credentials;
 
 /**
- * A {@link Reducer} which wraps a given one to allow for custom 
- * {@link Reducer.Context} implementations.
+ * WrappedReducer 是对已有 Reducer 的包装类，支持用户自定义 Reducer.Context 实现，
+ * 通过代理模式将所有方法转发给原始 ReduceContext，方便扩展上下文功能而无需重写所有方法。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -49,21 +50,31 @@ public class WrappedReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     extends Reducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {
 
   /**
-   * A a wrapped {@link Reducer.Context} for custom implementations.
-   * @param reduceContext <code>ReduceContext</code> to be wrapped
-   * @return a wrapped <code>Reducer.Context</code> for custom implementations
+   * 根据给定的 ReduceContext 创建并返回包装后的 Reducer.Context 实例，
+   * 用于支持自定义上下文功能扩展。
+   * @param reduceContext 原始的 ReduceContext 实例
+   * @return 包装后的 Reducer.Context 实例
    */
   public Reducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT>.Context 
   getReducerContext(ReduceContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> reduceContext) {
     return new Context(reduceContext);
   }
   
+  /**
+   * 包装 ReduceContext 的内部 Context 类，继承自 Reducer.Context，
+   * 将所有接口方法代理转发给持有的原始 ReduceContext 实例，简化自定义扩展。
+   */
   @InterfaceStability.Evolving
   public class Context 
       extends Reducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT>.Context {
 
+    // 被包装的原始 ReduceContext 实例
     protected ReduceContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> reduceContext;
 
+    /**
+     * 构造函数，传入需要包装的原始 ReduceContext 实例。
+     * @param reduceContext 原始 ReduceContext 实例
+     */
     public Context(ReduceContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> reduceContext)
     {
       this.reduceContext = reduceContext; 

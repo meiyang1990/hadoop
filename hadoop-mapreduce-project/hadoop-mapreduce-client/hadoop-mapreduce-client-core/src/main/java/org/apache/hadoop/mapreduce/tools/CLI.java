@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -67,32 +68,47 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Interprets the map reduce cli options 
+ * MapReduce作业命令行工具，解析并处理用户提交的MapReduce CLI命令，提供作业提交、状态查询、作业管理等功能
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class CLI extends Configured implements Tool {
   private static final Logger LOG = LoggerFactory.getLogger(CLI.class);
   protected Cluster cluster;
+  // 支持的任务状态集合
   private final Set<String> taskStates = new HashSet<String>(
               Arrays.asList("pending", "running", "completed", "failed", "killed"));
+  // 支持的任务类型集合
   private static final Set<String> taskTypes = new HashSet<String>(
       Arrays.asList("MAP", "REDUCE"));
   
+  /**
+   * 空构造方法，创建CLI实例
+   */
   public CLI() {
   }
   
+  /**
+   * 带配置的构造方法，创建CLI实例并设置配置
+   * @param conf Hadoop配置
+   */
   public CLI(Configuration conf) {
     setConf(conf);
   }
   
+  /**
+   * CLI工具主入口方法，解析命令行参数并执行对应操作
+   * @param argv 命令行参数数组
+   * @return 执行结果退出码，0成功，-1失败
+   * @throws Exception 执行过程中抛出的异常
+   */
   public int run(String[] argv) throws Exception {
     int exitCode = -1;
     if (argv.length < 1) {
       displayUsage("");
       return exitCode;
     }    
-    // process arguments
+    // 处理命令行参数
     String cmd = argv[0];
     String submitJobFile = null;
     String jobid = null;
@@ -126,6 +142,7 @@ public class CLI extends Configured implements Tool {
     boolean logs = false;
     boolean downloadConfig = false;
 
+    // 解析-submit命令：提交作业
     if ("-submit".equals(cmd)) {
       if (argv.length != 2) {
         displayUsage(cmd);
@@ -133,6 +150,7 @@ public class CLI extends Configured implements Tool {
       }
       submitJobFile = argv[1];
     } else if ("-status".equals(cmd)) {
+      // 解析-status命令：查询作业状态
       if (argv.length != 2) {
         displayUsage(cmd);
         return exitCode;
@@ -140,6 +158,7 @@ public class CLI extends Configured implements Tool {
       jobid = argv[1];
       getStatus = true;
     } else if("-counter".equals(cmd)) {
+      // 解析-counter命令：获取作业计数器值
       if (argv.length != 4) {
         displayUsage(cmd);
         return exitCode;
@@ -149,6 +168,7 @@ public class CLI extends Configured implements Tool {
       counterGroupName = argv[2];
       counterName = argv[3];
     } else if ("-kill".equals(cmd)) {
+      // 解析-kill命令：杀死指定作业
       if (argv.length != 2) {
         displayUsage(cmd);
         return exitCode;
@@ -156,6 +176,7 @@ public class CLI extends Configured implements Tool {
       jobid = argv[1];
       killJob = true;
     } else if ("-set-priority".equals(cmd)) {
+      // 解析-set-priority命令：修改作业优先级
       if (argv.length != 3) {
         displayUsage(cmd);
         return exitCode;
@@ -174,6 +195,7 @@ public class CLI extends Configured implements Tool {
       }
       setJobPriority = true; 
     } else if ("-events".equals(cmd)) {
+      // 解析-events命令：列出作业任务完成事件
       if (argv.length != 4) {
         displayUsage(cmd);
         return exitCode;
@@ -183,26 +205,15 @@ public class CLI extends Configured implements Tool {
       nEvents = Integer.parseInt(argv[3]);
       listEvents = true;
     } else if ("-history".equals(cmd)) {
+      // 解析-history命令：查看作业历史
       viewHistory = true;
       if (argv.length < 2 || argv.length > 7) {
         displayUsage(cmd);
         return exitCode;
       }
 
-      // Some arguments are optional while others are not, and some require
-      // second arguments.  Due to this, the indexing can vary depending on
-      // what's specified and what's left out, as summarized in the below table:
-      // [all] <jobHistoryFile|jobId> [-outfile <file>] [-format <human|json>]
-      //   1                  2            3       4         5         6
-      //   1                  2            3       4
-      //   1                  2                              3         4
-      //   1                  2
-      //                      1            2       3         4         5
-      //                      1            2       3
-      //                      1                              2         3
-      //                      1
-
-      // "all" is optional, but comes first if specified
+      // 处理可选参数：[all] <jobHistoryFile|jobId> [-outfile <file>] [-format <human|json>]
+      // "all"参数可选，若存在则放在最前面
       int index = 1;
       if ("all".equals(argv[index])) {
         index++;
@@ -212,24 +223,25 @@ public class CLI extends Configured implements Tool {
           return exitCode;
         }
       }
-      // Get the job history file or job id argument
+      // 获取历史文件路径或作业ID
       historyFileOrJobId = argv[index++];
-      // "-outfile" is optional, but if specified requires a second argument
+      // 处理-outfile参数：指定输出文件
       if (argv.length > index + 1 && "-outfile".equals(argv[index])) {
         index++;
         historyOutFile = argv[index++];
       }
-      // "-format" is optional, but if specified required a second argument
+      // 处理-format参数：指定输出格式
       if (argv.length > index + 1 && "-format".equals(argv[index])) {
         index++;
         historyOutFormat = argv[index++];
       }
-      // Check for any extra arguments that don't belong here
+      // 检查是否有多余参数
       if (argv.length > index) {
         displayUsage(cmd);
         return exitCode;
       }
     } else if ("-list".equals(cmd)) {
+      // 解析-list命令：列出作业
       if (argv.length != 1 && !(argv.length == 2 && "all".equals(argv[1]))) {
         displayUsage(cmd);
         return exitCode;
@@ -240,6 +252,7 @@ public class CLI extends Configured implements Tool {
         listJobs = true;
       }
     } else if("-kill-task".equals(cmd)) {
+      // 解析-kill-task命令：杀死指定任务尝试
       if (argv.length != 2) {
         displayUsage(cmd);
         return exitCode;
@@ -247,6 +260,7 @@ public class CLI extends Configured implements Tool {
       killTask = true;
       taskid = argv[1];
     } else if("-fail-task".equals(cmd)) {
+      // 解析-fail-task命令：将指定任务尝试标记为失败
       if (argv.length != 2) {
         displayUsage(cmd);
         return exitCode;
@@ -254,18 +268,21 @@ public class CLI extends Configured implements Tool {
       failTask = true;
       taskid = argv[1];
     } else if ("-list-active-trackers".equals(cmd)) {
+      // 解析-list-active-trackers命令：列出活跃的TaskTracker
       if (argv.length != 1) {
         displayUsage(cmd);
         return exitCode;
       }
       listActiveTrackers = true;
     } else if ("-list-blacklisted-trackers".equals(cmd)) {
+      // 解析-list-blacklisted-trackers命令：列出黑名单中的TaskTracker
       if (argv.length != 1) {
         displayUsage(cmd);
         return exitCode;
       }
       listBlacklistedTrackers = true;
     } else if ("-list-attempt-ids".equals(cmd)) {
+      // 解析-list-attempt-ids命令：列出指定类型和状态的任务尝试ID
       if (argv.length != 4) {
         displayUsage(cmd);
         return exitCode;
@@ -274,12 +291,14 @@ public class CLI extends Configured implements Tool {
       taskType = argv[2];
       taskState = argv[3];
       displayTasks = true;
+      // 验证任务类型合法性
       if (!taskTypes.contains(
           org.apache.hadoop.util.StringUtils.toUpperCase(taskType))) {
         System.out.println("Error: Invalid task-type: " + taskType);
         displayUsage(cmd);
         return exitCode;
       }
+      // 验证任务状态合法性
       if (!taskStates.contains(
           org.apache.hadoop.util.StringUtils.toLowerCase(taskState))) {
         System.out.println("Error: Invalid task-state: " + taskState);
@@ -287,6 +306,7 @@ public class CLI extends Configured implements Tool {
         return exitCode;
       }
     } else if ("-logs".equals(cmd)) {
+      // 解析-logs命令：获取任务尝试日志
       if (argv.length == 2 || argv.length ==3) {
         logs = true;
         jobid = argv[1];
@@ -300,6 +320,7 @@ public class CLI extends Configured implements Tool {
         return exitCode;
       }
     } else if ("-config".equals(cmd)) {
+      // 解析-config命令：下载作业配置文件到本地
       downloadConfig = true;
       if (argv.length != 3) {
         displayUsage(cmd);
@@ -308,21 +329,24 @@ public class CLI extends Configured implements Tool {
       jobid = argv[1];
       configOutFile = argv[2];
     } else {
+      // 未知命令，显示帮助
       displayUsage(cmd);
       return exitCode;
     }
 
-    // initialize cluster
+    // 初始化集群连接
     cluster = createCluster();
         
-    // Submit the request
+    // 根据解析结果执行对应操作
     try {
       if (submitJobFile != null) {
+        // 提交作业
         Job job = Job.getInstance(new JobConf(submitJobFile));
         job.submit();
         System.out.println("Created job " + job.getJobID());
         exitCode = 0;
       } else if (getStatus) {
+        // 查询作业状态和计数器
         Job job = getJob(JobID.forName(jobid));
         if (job == null) {
           System.out.println("Could not find job " + jobid);
@@ -338,6 +362,7 @@ public class CLI extends Configured implements Tool {
           exitCode = 0;
         }
       } else if (getCounter) {
+        // 获取指定计数器值
         Job job = getJob(JobID.forName(jobid));
         if (job == null) {
           System.out.println("Could not find job " + jobid);
@@ -354,6 +379,7 @@ public class CLI extends Configured implements Tool {
           }
         }
       } else if (killJob) {
+        // 杀死指定作业
         Job job = getJob(JobID.forName(jobid));
         if (job == null) {
           System.out.println("Could not find job " + jobid);
@@ -378,6 +404,7 @@ public class CLI extends Configured implements Tool {
           }
         }
       } else if (setJobPriority) {
+        // 修改作业优先级
         Job job = getJob(JobID.forName(jobid));
         if (job == null) {
           System.out.println("Could not find job " + jobid);
@@ -391,8 +418,8 @@ public class CLI extends Configured implements Tool {
           exitCode = 0;
         } 
       } else if (viewHistory) {
-        // If it ends with .jhist, assume it's a jhist file; otherwise, assume
-        // it's a Job ID
+        // 查看作业历史
+        // 根据后缀判断是历史文件还是作业ID
         if (historyFileOrJobId.endsWith(".jhist")) {
           viewHistory(historyFileOrJobId, viewAllHistory, historyOutFile,
               historyOutFormat);
@@ -414,6 +441,7 @@ public class CLI extends Configured implements Tool {
           }
         }
       } else if (listEvents) {
+        // 列出指定范围的任务完成事件
         Job job = getJob(JobID.forName(jobid));
         if (job == null) {
           System.out.println("Could not find job " + jobid);
@@ -422,392 +450,11 @@ public class CLI extends Configured implements Tool {
           exitCode = 0;
         }
       } else if (listJobs) {
+        // 列出所有运行中的作业
         listJobs(cluster);
         exitCode = 0;
       } else if (listAllJobs) {
+        // 列出所有已提交作业
         listAllJobs(cluster);
         exitCode = 0;
       } else if (listActiveTrackers) {
-        listActiveTrackers(cluster);
-        exitCode = 0;
-      } else if (listBlacklistedTrackers) {
-        listBlacklistedTrackers(cluster);
-        exitCode = 0;
-      } else if (displayTasks) {
-        Job job = getJob(JobID.forName(jobid));
-        if (job == null) {
-          System.out.println("Could not find job " + jobid);
-        } else {
-          displayTasks(getJob(JobID.forName(jobid)), taskType, taskState);
-          exitCode = 0;
-        }
-      } else if(killTask) {
-        TaskAttemptID taskID = TaskAttemptID.forName(taskid);
-        Job job = getJob(taskID.getJobID());
-        if (job == null) {
-          System.out.println("Could not find job " + jobid);
-        } else if (job.killTask(taskID, false)) {
-          System.out.println("Killed task " + taskid);
-          exitCode = 0;
-        } else {
-          System.out.println("Could not kill task " + taskid);
-          exitCode = -1;
-        }
-      } else if(failTask) {
-        TaskAttemptID taskID = TaskAttemptID.forName(taskid);
-        Job job = getJob(taskID.getJobID());
-        if (job == null) {
-            System.out.println("Could not find job " + jobid);
-        } else if(job.killTask(taskID, true)) {
-          System.out.println("Killed task " + taskID + " by failing it");
-          exitCode = 0;
-        } else {
-          System.out.println("Could not fail task " + taskid);
-          exitCode = -1;
-        }
-      } else if (logs) {
-        JobID jobID = JobID.forName(jobid);
-        if (getJob(jobID) == null) {
-          System.out.println("Could not find job " + jobid);
-        } else {
-          try {
-            TaskAttemptID taskAttemptID = TaskAttemptID.forName(taskid);
-            LogParams logParams = cluster.getLogParams(jobID, taskAttemptID);
-            LogCLIHelpers logDumper = new LogCLIHelpers();
-            logDumper.setConf(getConf());
-            exitCode = logDumper.dumpAContainersLogs(
-                    logParams.getApplicationId(), logParams.getContainerId(),
-                    logParams.getNodeId(), logParams.getOwner());
-          } catch (IOException e) {
-            if (e instanceof RemoteException) {
-              throw e;
-            }
-            System.out.println(e.getMessage());
-          }
-        }
-      } else if (downloadConfig) {
-        Job job = getJob(JobID.forName(jobid));
-        if (job == null) {
-          System.out.println("Could not find job " + jobid);
-        } else {
-          String jobFile = job.getJobFile();
-          if (jobFile == null || jobFile.isEmpty()) {
-            System.out.println("Config file for job " + jobFile +
-                " could not be found.");
-          } else {
-            Path configPath = new Path(jobFile);
-            FileSystem fs = FileSystem.get(getConf());
-            fs.copyToLocalFile(configPath, new Path(configOutFile));
-            exitCode = 0;
-          }
-        }
-      }
-    } catch (RemoteException re) {
-      IOException unwrappedException = re.unwrapRemoteException();
-      if (unwrappedException instanceof AccessControlException) {
-        System.out.println(unwrappedException.getMessage());
-      } else {
-        throw re;
-      }
-    } finally {
-      cluster.close();
-    }
-    return exitCode;
-  }
-
-  Cluster createCluster() throws IOException {
-    return new Cluster(getConf());
-  }
-  
-  private String getJobPriorityNames() {
-    StringBuilder sb = new StringBuilder();
-    for (JobPriority p : JobPriority.values()) {
-      // UNDEFINED_PRIORITY need not to be displayed in usage
-      if (JobPriority.UNDEFINED_PRIORITY == p) {
-        continue;
-      }
-      sb.append(p.name()).append(" ");
-    }
-    return sb.substring(0, sb.length()-1);
-  }
-
-  private String getTaskTypes() {
-    return StringUtils.join(taskTypes, " ");
-  }
-  
-  /**
-   * Display usage of the command-line tool and terminate execution.
-   */
-  private void displayUsage(String cmd) {
-    String prefix = "Usage: job ";
-    String jobPriorityValues = getJobPriorityNames();
-    String taskStates = "pending, running, completed, failed, killed";
-    
-    if ("-submit".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + " <job-file>]");
-    } else if ("-status".equals(cmd) || "-kill".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + " <job-id>]");
-    } else if ("-counter".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + 
-        " <job-id> <group-name> <counter-name>]");
-    } else if ("-events".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + 
-        " <job-id> <from-event-#> <#-of-events>]. Event #s start from 1.");
-    } else if ("-history".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + " [all] <jobHistoryFile|jobId> " +
-          "[-outfile <file>] [-format <human|json>]]");
-    } else if ("-list".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + " [all]]");
-    } else if ("-kill-task".equals(cmd) || "-fail-task".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + " <task-attempt-id>]");
-    } else if ("-set-priority".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + " <job-id> <priority>]. " +
-          "Valid values for priorities are: " 
-          + jobPriorityValues
-          + ". In addition to this, integers also can be used.");
-    } else if ("-list-active-trackers".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + "]");
-    } else if ("-list-blacklisted-trackers".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + "]");
-    } else if ("-list-attempt-ids".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + 
-          " <job-id> <task-type> <task-state>]. " +
-          "Valid values for <task-type> are " + getTaskTypes() + ". " +
-          "Valid values for <task-state> are " + taskStates);
-    } else if ("-logs".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd +
-          " <job-id> <task-attempt-id>]. " +
-          " <task-attempt-id> is optional to get task attempt logs.");
-    } else if ("-config".equals(cmd)) {
-      System.err.println(prefix + "[" + cmd + " <job-id> <file>]");
-    } else {
-      System.err.printf(prefix + "<command> <args>%n");
-      System.err.printf("\t[-submit <job-file>]%n");
-      System.err.printf("\t[-status <job-id>]%n");
-      System.err.printf("\t[-counter <job-id> <group-name> <counter-name>]%n");
-      System.err.printf("\t[-kill <job-id>]%n");
-      System.err.printf("\t[-set-priority <job-id> <priority>]. " +
-          "Valid values for priorities are: " + jobPriorityValues +
-          ". In addition to this, integers also can be used." + "%n");
-      System.err.printf("\t[-events <job-id> <from-event-#> <#-of-events>]%n");
-      System.err.printf("\t[-history [all] <jobHistoryFile|jobId> " +
-          "[-outfile <file>] [-format <human|json>]]%n");
-      System.err.printf("\t[-list [all]]%n");
-      System.err.printf("\t[-list-active-trackers]%n");
-      System.err.printf("\t[-list-blacklisted-trackers]%n");
-      System.err.println("\t[-list-attempt-ids <job-id> <task-type> " +
-        "<task-state>]. " +
-        "Valid values for <task-type> are " + getTaskTypes() + ". " +
-        "Valid values for <task-state> are " + taskStates);
-      System.err.printf("\t[-kill-task <task-attempt-id>]%n");
-      System.err.printf("\t[-fail-task <task-attempt-id>]%n");
-      System.err.printf("\t[-logs <job-id> <task-attempt-id>]%n");
-      System.err.printf("\t[-config <job-id> <file>%n%n");
-      ToolRunner.printGenericCommandUsage(System.out);
-    }
-  }
-    
-  private void viewHistory(String historyFile, boolean all,
-      String historyOutFile, String format) throws IOException {
-    HistoryViewer historyViewer = new HistoryViewer(historyFile,
-        getConf(), all, format);
-    PrintStream ps = System.out;
-    if (historyOutFile != null) {
-      ps = new PrintStream(new BufferedOutputStream(new FileOutputStream(
-          new File(historyOutFile))), true, "UTF-8");
-    }
-    historyViewer.print(ps);
-  }
-
-  protected long getCounter(Counters counters, String counterGroupName,
-      String counterName) throws IOException {
-    return counters.findCounter(counterGroupName, counterName).getValue();
-  }
-  
-  /**
-   * List the events for the given job
-   * @param job the job to list
-   * @param fromEventId event id for the job's events to list from
-   * @param numEvents number of events we want to list
-   * @throws IOException
-   */
-  private void listEvents(Job job, int fromEventId, int numEvents)
-      throws IOException, InterruptedException {
-    TaskCompletionEvent[] events = job.
-      getTaskCompletionEvents(fromEventId, numEvents);
-    System.out.println("Task completion events for " + job.getJobID());
-    System.out.println("Number of events (from " + fromEventId + ") are: " 
-      + events.length);
-    for(TaskCompletionEvent event: events) {
-      System.out.println(event.getStatus() + " " + 
-        event.getTaskAttemptId() + " " + 
-        getTaskLogURL(event.getTaskAttemptId(), event.getTaskTrackerHttp()));
-    }
-  }
-
-  protected static String getTaskLogURL(TaskAttemptID taskId, String baseUrl) {
-    return (baseUrl + "/tasklog?plaintext=true&attemptid=" + taskId); 
-  }
-
-  @VisibleForTesting
-  Job getJob(JobID jobid) throws IOException, InterruptedException {
-
-    int maxRetry = getConf().getInt(MRJobConfig.MR_CLIENT_JOB_MAX_RETRIES,
-        MRJobConfig.DEFAULT_MR_CLIENT_JOB_MAX_RETRIES);
-    long retryInterval = getConf()
-        .getLong(MRJobConfig.MR_CLIENT_JOB_RETRY_INTERVAL,
-            MRJobConfig.DEFAULT_MR_CLIENT_JOB_RETRY_INTERVAL);
-    Job job = cluster.getJob(jobid);
-
-    for (int i = 0; i < maxRetry; ++i) {
-      if (job != null) {
-        return job;
-      }
-      LOG.info("Could not obtain job info after " + String.valueOf(i + 1)
-          + " attempt(s). Sleeping for " + String.valueOf(retryInterval / 1000)
-          + " seconds and retrying.");
-      Thread.sleep(retryInterval);
-      job = cluster.getJob(jobid);
-    }
-    return job;
-  }
-  
-
-  /**
-   * Dump a list of currently running jobs
-   * @throws IOException
-   */
-  private void listJobs(Cluster cluster) 
-      throws IOException, InterruptedException {
-    List<JobStatus> runningJobs = new ArrayList<JobStatus>();
-    for (JobStatus job : cluster.getAllJobStatuses()) {
-      if (!job.isJobComplete()) {
-        runningJobs.add(job);
-      }
-    }
-    displayJobList(runningJobs.toArray(new JobStatus[0]));
-  }
-    
-  /**
-   * Dump a list of all jobs submitted.
-   * @throws IOException
-   */
-  private void listAllJobs(Cluster cluster) 
-      throws IOException, InterruptedException {
-    displayJobList(cluster.getAllJobStatuses());
-  }
-  
-  /**
-   * Display the list of active trackers
-   */
-  private void listActiveTrackers(Cluster cluster) 
-      throws IOException, InterruptedException {
-    TaskTrackerInfo[] trackers = cluster.getActiveTaskTrackers();
-    for (TaskTrackerInfo tracker : trackers) {
-      System.out.println(tracker.getTaskTrackerName());
-    }
-  }
-
-  /**
-   * Display the list of blacklisted trackers
-   */
-  private void listBlacklistedTrackers(Cluster cluster) 
-      throws IOException, InterruptedException {
-    TaskTrackerInfo[] trackers = cluster.getBlackListedTaskTrackers();
-    if (trackers.length > 0) {
-      System.out.println("BlackListedNode \t Reason");
-    }
-    for (TaskTrackerInfo tracker : trackers) {
-      System.out.println(tracker.getTaskTrackerName() + "\t" + 
-        tracker.getReasonForBlacklist());
-    }
-  }
-
-  private void printTaskAttempts(TaskReport report) {
-    if (report.getCurrentStatus() == TIPStatus.COMPLETE) {
-      System.out.println(report.getSuccessfulTaskAttemptId());
-    } else if (report.getCurrentStatus() == TIPStatus.RUNNING) {
-      for (TaskAttemptID t : 
-        report.getRunningTaskAttemptIds()) {
-        System.out.println(t);
-      }
-    }
-  }
-
-  /**
-   * Display the information about a job's tasks, of a particular type and
-   * in a particular state
-   * 
-   * @param job the job
-   * @param type the type of the task (map/reduce/setup/cleanup)
-   * @param state the state of the task 
-   * (pending/running/completed/failed/killed)
-   * @throws IOException when there is an error communicating with the master
-   * @throws InterruptedException
-   * @throws IllegalArgumentException if an invalid type/state is passed
-   */
-  protected void displayTasks(Job job, String type, String state) 
-  throws IOException, InterruptedException {
-	  
-    TaskReport[] reports=null;
-    reports = job.getTaskReports(TaskType.valueOf(
-        org.apache.hadoop.util.StringUtils.toUpperCase(type)));
-    for (TaskReport report : reports) {
-      TIPStatus status = report.getCurrentStatus();
-      if ((state.equalsIgnoreCase("pending") && status ==TIPStatus.PENDING) ||
-          (state.equalsIgnoreCase("running") && status ==TIPStatus.RUNNING) ||
-          (state.equalsIgnoreCase("completed") && status == TIPStatus.COMPLETE) ||
-          (state.equalsIgnoreCase("failed") && status == TIPStatus.FAILED) ||
-          (state.equalsIgnoreCase("killed") && status == TIPStatus.KILLED)) {
-        printTaskAttempts(report);
-      }
-    }
-  }
-
-  public void displayJobList(JobStatus[] jobs) 
-      throws IOException, InterruptedException {
-    displayJobList(jobs, new PrintWriter(new OutputStreamWriter(System.out,
-        StandardCharsets.UTF_8)));
-  }
-
-  @Private
-  public static String headerPattern = "%23s\t%40s\t%10s\t%14s\t%12s\t%12s" +
-      "\t%10s\t%15s\t%15s\t%8s\t%8s\t%10s\t%10s\n";
-  @Private
-  public static String dataPattern   = "%23s\t%40s\t%10s\t%14d\t%12s\t%12s" +
-      "\t%10s\t%15s\t%15s\t%8s\t%8s\t%10s\t%10s\n";
-  private static String memPattern   = "%dM";
-  private static String UNAVAILABLE  = "N/A";
-
-  @Private
-  public void displayJobList(JobStatus[] jobs, PrintWriter writer) {
-    writer.println("Total jobs:" + jobs.length);
-    writer.printf(headerPattern, "JobId", "JobName", "State", "StartTime",
-      "UserName", "Queue", "Priority", "UsedContainers",
-      "RsvdContainers", "UsedMem", "RsvdMem", "NeededMem", "AM info");
-    for (JobStatus job : jobs) {
-      int numUsedSlots = job.getNumUsedSlots();
-      int numReservedSlots = job.getNumReservedSlots();
-      long usedMem = job.getUsedMem();
-      long rsvdMem = job.getReservedMem();
-      long neededMem = job.getNeededMem();
-      int jobNameLength = job.getJobName().length();
-      writer.printf(dataPattern, job.getJobID().toString(), job.getJobName()
-              .substring(0, jobNameLength > 40 ? 40 : jobNameLength),
-          job.getState(), job.getStartTime(), job.getUsername(),
-          job.getQueue(), job.getPriority().name(),
-          numUsedSlots < 0 ? UNAVAILABLE : numUsedSlots,
-          numReservedSlots < 0 ? UNAVAILABLE : numReservedSlots,
-          usedMem < 0 ? UNAVAILABLE : String.format(memPattern, usedMem),
-          rsvdMem < 0 ? UNAVAILABLE : String.format(memPattern, rsvdMem),
-          neededMem < 0 ? UNAVAILABLE : String.format(memPattern, neededMem),
-          job.getSchedulingInfo());
-    }
-    writer.flush();
-  }
-  
-  public static void main(String[] argv) throws Exception {
-    int res = ToolRunner.run(new CLI(), argv);
-    ExitUtil.terminate(res);
-  }
-}

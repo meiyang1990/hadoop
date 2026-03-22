@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,25 +26,29 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /** 
- * A report on the state of a task. 
+ * MapReduce v1 API 任务运行状态报告类，封装单个任务的运行进度、状态、诊断信息等运行数据。
+ * 继承自新API的org.apache.hadoop.mapreduce.TaskReport，提供向下兼容的旧API封装。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class TaskReport extends org.apache.hadoop.mapreduce.TaskReport {
   
+  /**
+   * 构造空的任务状态报告对象
+   */
   public TaskReport() {
     super();
   }
   
   /**
-   * Creates a new TaskReport object
-   * @param taskid
-   * @param progress
-   * @param state
-   * @param diagnostics
-   * @param startTime
-   * @param finishTime
-   * @param counters
+   * 构造包含完整任务状态信息的任务报告（已废弃）
+   * @param taskid 任务ID
+   * @param progress 任务执行进度
+   * @param state 任务状态字符串
+   * @param diagnostics 诊断信息数组
+   * @param startTime 任务开始时间
+   * @param finishTime 任务结束时间
+   * @param counters 任务计数器
    * @deprecated
    */
   @Deprecated
@@ -55,15 +60,15 @@ public class TaskReport extends org.apache.hadoop.mapreduce.TaskReport {
   }
   
   /**
-   * Creates a new TaskReport object
-   * @param taskid
-   * @param progress
-   * @param state
-   * @param diagnostics
-   * @param currentStatus
-   * @param startTime
-   * @param finishTime
-   * @param counters
+   * 构造包含完整任务状态信息的任务报告
+   * @param taskid 任务ID
+   * @param progress 任务执行进度
+   * @param state 任务状态字符串
+   * @param diagnostics 诊断信息数组
+   * @param currentStatus 当前任务尝试状态
+   * @param startTime 任务开始时间
+   * @param finishTime 任务结束时间
+   * @param counters 任务计数器
    */
   TaskReport(TaskID taskid, float progress, String state,
              String[] diagnostics, TIPStatus currentStatus, 
@@ -73,6 +78,11 @@ public class TaskReport extends org.apache.hadoop.mapreduce.TaskReport {
       finishTime, new org.apache.hadoop.mapreduce.Counters(counters));
   }
   
+  /**
+   * 将新API的TaskReport对象降级转换为旧API的TaskReport对象，保持兼容
+   * @param report 新API版本的任务状态报告
+   * @return 旧API版本的任务状态报告
+   */
   static TaskReport downgrade(
       org.apache.hadoop.mapreduce.TaskReport report) {
     return new TaskReport(TaskID.downgrade(report.getTaskID()),
@@ -81,46 +91,68 @@ public class TaskReport extends org.apache.hadoop.mapreduce.TaskReport {
       Counters.downgrade(report.getTaskCounters()));
   }
   
+  /**
+   * 将新API的TaskReport数组批量降级转换为旧API的TaskReport数组
+   * @param reports 新API版本的任务状态报告数组
+   * @return 旧API版本的任务状态报告数组
+   */
   static TaskReport[] downgradeArray(org.apache.hadoop.
       mapreduce.TaskReport[] reports) {
     List<TaskReport> ret = new ArrayList<TaskReport>();
+    // 遍历逐个转换每个报告对象
     for (org.apache.hadoop.mapreduce.TaskReport report : reports) {
       ret.add(downgrade(report));
     }
     return ret.toArray(new TaskReport[0]);
   }
   
-  /** The string of the task id. */
+  /**
+   * 获取任务ID的字符串形式
+   * @return 任务ID字符串
+   */
   public String getTaskId() {
     return TaskID.downgrade(super.getTaskID()).toString();
   }
 
-  /** The id of the task. */
+  /**
+   * 获取旧API格式的任务ID对象
+   * @return 旧API任务ID
+   */
   public TaskID getTaskID() {
     return TaskID.downgrade(super.getTaskID());
   }
 
+  /**
+   * 获取旧API格式的任务计数器
+   * @return 任务计数器
+   */
   public Counters getCounters() { 
     return Counters.downgrade(super.getTaskCounters()); 
   }
   
   /** 
-   * set successful attempt ID of the task. 
+   * 设置任务成功运行的尝试ID
+   * @param t 成功的尝试ID
    */ 
   public void setSuccessfulAttempt(TaskAttemptID t) {
     super.setSuccessfulAttemptId(t);
   }
+
   /**
-   * Get the attempt ID that took this task to completion
+   * 获取完成该任务的成功尝试ID
+   * @return 成功尝试ID
    */
   public TaskAttemptID getSuccessfulTaskAttempt() {
     return TaskAttemptID.downgrade(super.getSuccessfulTaskAttemptId());
   }
+
   /** 
-   * set running attempt(s) of the task. 
+   * 设置当前正在运行的任务尝试ID集合
+   * @param runningAttempts 正在运行的尝试ID集合
    */ 
   public void setRunningTaskAttempts(
       Collection<TaskAttemptID> runningAttempts) {
+    // 将旧API尝试ID转换为新API格式
     Collection<org.apache.hadoop.mapreduce.TaskAttemptID> attempts = 
       new ArrayList<org.apache.hadoop.mapreduce.TaskAttemptID>();
     for (TaskAttemptID id : runningAttempts) {
@@ -128,10 +160,13 @@ public class TaskReport extends org.apache.hadoop.mapreduce.TaskReport {
     }
     super.setRunningTaskAttemptIds(attempts);
   }
+
   /**
-   * Get the running task attempt IDs for this task
+   * 获取当前正在运行的任务尝试ID集合
+   * @return 正在运行的尝试ID集合
    */
   public Collection<TaskAttemptID> getRunningTaskAttempts() {
+    // 将新API尝试ID转换为旧API格式
     Collection<TaskAttemptID> attempts = new ArrayList<TaskAttemptID>();
     for (org.apache.hadoop.mapreduce.TaskAttemptID id : 
          super.getRunningTaskAttemptIds()) {
@@ -141,15 +176,16 @@ public class TaskReport extends org.apache.hadoop.mapreduce.TaskReport {
   }
   
   /** 
-   * set finish time of task. 
-   * @param finishTime finish time of task. 
+   * 设置任务结束时间
+   * @param finishTime 任务结束时间
    */
   protected void setFinishTime(long finishTime) {
     super.setFinishTime(finishTime);
   }
 
   /** 
-   * set start time of the task. 
+   * 设置任务开始时间
+   * @param startTime 任务开始时间
    */ 
   protected void setStartTime(long startTime) {
     super.setStartTime(startTime);

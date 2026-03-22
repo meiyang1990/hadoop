@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,7 +33,7 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 
 /**
- * Event to record start of a task attempt
+ * 任务尝试启动事件，用于记录任务尝试开始运行的历史信息，供作业历史服务存储和查询
  *
  */
 @InterfaceAudience.Private
@@ -41,16 +42,16 @@ public class TaskAttemptStartedEvent implements HistoryEvent {
   private TaskAttemptStarted datum = new TaskAttemptStarted();
 
   /**
-   * Create an event to record the start of an attempt
-   * @param attemptId Id of the attempt
-   * @param taskType Type of task
-   * @param startTime Start time of the attempt
-   * @param trackerName Name of the Task Tracker where attempt is running
-   * @param httpPort The port number of the tracker
-   * @param shufflePort The shuffle port number of the container
-   * @param containerId The containerId for the task attempt.
-   * @param locality The locality of the task attempt
-   * @param avataar The avataar of the task attempt
+   * 构造任务尝试启动事件，记录任务尝试启动的各项信息
+   * @param attemptId 任务尝试ID
+   * @param taskType 任务类型（Map/Reduce）
+   * @param startTime 任务尝试启动时间戳
+   * @param trackerName 运行该任务尝试的TaskTracker节点名称
+   * @param httpPort TaskTracker节点的HTTP服务端口
+   * @param shufflePort 容器的Shuffle服务端口
+   * @param containerId 运行该任务尝试的YARN容器ID
+   * @param locality 任务尝试的数据本地性信息
+   * @param avataar 任务尝试的调度标识（推测执行相关）
    */
   public TaskAttemptStartedEvent( TaskAttemptID attemptId,  
       TaskType taskType, long startTime, String trackerName,
@@ -74,6 +75,17 @@ public class TaskAttemptStartedEvent implements HistoryEvent {
 
   // TODO Remove after MrV1 is removed.
   // Using a dummy containerId to prevent jobHistory parse failures.
+  /**
+   * 兼容MRv1的构造方法，使用虚拟容器ID避免作业历史解析失败，MRv1移除后将删除该方法
+   * @param attemptId 任务尝试ID
+   * @param taskType 任务类型（Map/Reduce）
+   * @param startTime 任务尝试启动时间戳
+   * @param trackerName 运行该任务尝试的TaskTracker节点名称
+   * @param httpPort TaskTracker节点的HTTP服务端口
+   * @param shufflePort 容器的Shuffle服务端口
+   * @param locality 任务尝试的数据本地性信息
+   * @param avataar 任务尝试的调度标识（推测执行相关）
+   */
   public TaskAttemptStartedEvent(TaskAttemptID attemptId, TaskType taskType,
       long startTime, String trackerName, int httpPort, int shufflePort,
       String locality, String avataar) {
@@ -89,27 +101,27 @@ public class TaskAttemptStartedEvent implements HistoryEvent {
     this.datum = (TaskAttemptStarted)datum;
   }
 
-  /** Get the task id */
+  /** 获取任务ID */
   public TaskID getTaskId() {
     return TaskID.forName(datum.getTaskid().toString());
   }
-  /** Get the tracker name */
+  /** 获取运行该任务尝试的节点名称 */
   public String getTrackerName() { return datum.getTrackerName().toString(); }
-  /** Get the start time */
+  /** 获取任务尝试启动时间 */
   public long getStartTime() { return datum.getStartTime(); }
-  /** Get the task type */
+  /** 获取任务类型 */
   public TaskType getTaskType() {
     return TaskType.valueOf(datum.getTaskType().toString());
   }
-  /** Get the HTTP port */
+  /** 获取HTTP服务端口 */
   public int getHttpPort() { return datum.getHttpPort(); }
-  /** Get the shuffle port */
+  /** 获取Shuffle服务端口 */
   public int getShufflePort() { return datum.getShufflePort(); }
-  /** Get the attempt id */
+  /** 获取任务尝试ID */
   public TaskAttemptID getTaskAttemptId() {
     return TaskAttemptID.forName(datum.getAttemptId().toString());
   }
-  /** Get the event type */
+  /** 获取事件类型，根据任务类型返回Map尝试启动或Reduce尝试启动 */
   public EventType getEventType() {
     // Note that the task type can be setup/map/reduce/cleanup but the 
     // attempt-type can only be map/reduce.
@@ -117,18 +129,18 @@ public class TaskAttemptStartedEvent implements HistoryEvent {
            ? EventType.MAP_ATTEMPT_STARTED 
            : EventType.REDUCE_ATTEMPT_STARTED;
   }
-  /** Get the ContainerId */
+  /** 获取运行该任务尝试的YARN容器ID */
   public ContainerId getContainerId() {
     return ContainerId.fromString(datum.getContainerId().toString());
   }
-  /** Get the locality */
+  /** 获取任务尝试的数据本地性信息 */
   public String getLocality() {
     if (datum.getLocality() != null) {
       return datum.getLocality().toString();
     }
     return null;
   }
-  /** Get the avataar */
+  /** 获取任务尝试的调度标识 */
   public String getAvataar() {
     if (datum.getAvataar() != null) {
       return datum.getAvataar().toString();
@@ -137,6 +149,7 @@ public class TaskAttemptStartedEvent implements HistoryEvent {
   }
 
   @Override
+  /** 将当前事件转换为YARN时间线服务可用的事件对象 */
   public TimelineEvent toTimelineEvent() {
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
@@ -153,6 +166,7 @@ public class TaskAttemptStartedEvent implements HistoryEvent {
   }
 
   @Override
+  /** 获取当前事件关联的时间线指标，本事件无指标，返回null */
   public Set<TimelineMetric> getTimelineMetrics() {
     return null;
   }

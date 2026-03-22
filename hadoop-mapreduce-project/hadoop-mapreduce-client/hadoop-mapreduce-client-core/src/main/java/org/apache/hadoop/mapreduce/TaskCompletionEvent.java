@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,42 +29,37 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 
 /**
- * This is used to track task completion events on 
- * job tracker. 
+ * 文件：org.apache.hadoop.mapreduce.TaskCompletionEvent
+ * 模块：hadoop-mapreduce-client-core
+ * 核心职责：用于在JobTracker（历史MR架构）中跟踪任务完成事件，封装任务执行结束后的状态信息
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class TaskCompletionEvent implements Writable{
+  /**
+   * 任务完成状态枚举，定义所有可能的任务执行结果状态
+   */
   @InterfaceAudience.Public
   @InterfaceStability.Evolving
-  /**
-   * Task Completion Statuses
-   */
   static public enum Status {
     /**
-     * Task Event Attempt failed but there are attempts remaining.
+     * 本次尝试失败，但仍有剩余尝试次数，任务会继续重试
      */
     FAILED,
     /**
-     * Task Event was killed.
+     * 任务尝试被手动杀死
      */
     KILLED,
     /**
-     * Task Event was successful.
+     * 任务尝试执行成功
      */
     SUCCEEDED,
     /**
-     * Used to Override a previously successful event status.
-     * Example:  Map attempt runs and a SUCCEEDED event is sent. Later a task
-     * is retroactively failed due to excessive fetch failure during shuffle
-     * phase. When the retroactive attempt failure occurs, an OBSOLETE event is
-     * sent for the map attempt indicating the prior event is no longer valid.
+     * 标记之前成功的事件已失效，例如：map任务成功后，shuffle阶段因拉取失败被判定失败，旧的成功事件标记为失效
      */
     OBSOLETE,
     /**
-     * Task Event attempt failed and no further attempts exist.
-     * reached MAX attempts. When a reducer receives a TIPFAILED event it
-     * gives up trying to shuffle data from that map task.
+     * 整个任务尝试失败，已达到最大重试次数，reducer收到此事件后会停止从该map拉取数据
      */
     TIPFAILED
   }
@@ -78,21 +74,20 @@ public class TaskCompletionEvent implements Writable{
   public static final TaskCompletionEvent[] EMPTY_ARRAY = 
     new TaskCompletionEvent[0];
   /**
-   * Default constructor for Writable.
-   *
+   * 供Writable反序列化使用的默认构造函数
    */
   public TaskCompletionEvent(){
     taskId = new TaskAttemptID();
   }
 
   /**
-   * Constructor. eventId should be created externally and incremented
-   * per event for each job. 
-   * @param eventId event id, event id should be unique and assigned in
-   *  incrementally, starting from 0. 
-   * @param taskId task id
-   * @param status task's status 
-   * @param taskTrackerHttp task tracker's host:port for http. 
+   * 构造任务完成事件对象
+   * @param eventId 事件ID，每个作业内全局递增唯一，从0开始
+   * @param taskId 任务尝试ID
+   * @param idWithinJob 任务在作业内的编号
+   * @param isMap 是否为Map任务
+   * @param status 任务完成状态
+   * @param taskTrackerHttp 运行该任务的TaskTracker的Http地址（host:port）
    */
   public TaskCompletionEvent(int eventId, 
                              TaskAttemptID taskId,
@@ -109,78 +104,79 @@ public class TaskCompletionEvent implements Writable{
     this.taskTrackerHttp = taskTrackerHttp;
   }
   /**
-   * Returns event Id. 
-   * @return event id
+   * 获取事件ID
+   * @return 事件ID
    */
   public int getEventId() {
     return eventId;
   }
   
   /**
-   * Returns task id. 
-   * @return task id
+   * 获取任务尝试ID
+   * @return 任务尝试ID
    */
   public TaskAttemptID getTaskAttemptId() {
     return taskId;
   }
   
   /**
-   * Returns {@link Status}
-   * @return task completion status
+   * 获取任务完成状态
+   * @return 任务完成状态枚举值
    */
   public Status getStatus() {
     return status;
   }
   /**
-   * http location of the tasktracker where this task ran. 
-   * @return http location of tasktracker user logs
+   * 获取运行该任务的TaskTracker的Http地址，用于访问任务日志
+   * @return TaskTracker的Http地址
    */
   public String getTaskTrackerHttp() {
     return taskTrackerHttp;
   }
 
   /**
-   * Returns time (in millisec) the task took to complete. 
+   * 获取任务执行总耗时（毫秒）
+   * @return 任务执行耗时（毫秒）
    */
   public int getTaskRunTime() {
     return taskRunTime;
   }
 
   /**
-   * Set the task completion time
-   * @param taskCompletionTime time (in millisec) the task took to complete
+   * 设置任务完成耗时
+   * @param taskCompletionTime 任务执行耗时（毫秒）
    */
   protected void setTaskRunTime(int taskCompletionTime) {
     this.taskRunTime = taskCompletionTime;
   }
 
   /**
-   * set event Id. should be assigned incrementally starting from 0. 
-   * @param eventId
+   * 设置事件ID
+   * @param eventId 事件ID
    */
   protected void setEventId(int eventId) {
     this.eventId = eventId;
   }
 
   /**
-   * Sets task id. 
-   * @param taskId
+   * 设置任务尝试ID
+   * @param taskId 任务尝试ID
    */
   protected void setTaskAttemptId(TaskAttemptID taskId) {
     this.taskId = taskId;
   }
   
   /**
-   * Set task status. 
-   * @param status
+   * 设置任务状态
+   * @param status 任务状态枚举
    */
   protected void setTaskStatus(Status status) {
     this.status = status;
   }
   
   /**
-   * Set task tracker http location. 
-   * @param taskTrackerHttp
+   * 设置TaskTracker的Http地址
+   * @param taskTrackerHttp TaskTracker的Http地址
    */
   protected void setTaskTrackerHttp(String taskTrackerHttp) {
     this.taskTrackerHttp = taskTrackerHttp;
@@ -200,8 +196,10 @@ public class TaskCompletionEvent implements Writable{
   public boolean equals(Object o) {
     if(o == null)
       return false;
+    // 类型不匹配直接返回不相等
     if(o.getClass().equals(this.getClass())) {
       TaskCompletionEvent event = (TaskCompletionEvent) o;
+      // 比对所有字段判断是否相等
       return this.isMap == event.isMapTask() 
              && this.eventId == event.getEventId()
              && this.idWithinJob == event.idWithinJob() 
@@ -215,36 +213,61 @@ public class TaskCompletionEvent implements Writable{
 
   @Override
   public int hashCode() {
+    // 复用toString计算哈希值
     return toString().hashCode(); 
   }
 
+  /**
+   * 判断当前任务是否为Map任务
+   * @return true表示Map任务，false表示Reduce任务
+   */
   public boolean isMapTask() {
     return isMap;
   }
     
+  /**
+   * 获取任务在作业内的编号
+   * @return 任务在作业内的编号
+   */
   public int idWithinJob() {
     return idWithinJob;
   }
   //////////////////////////////////////////////
-  // Writable
+  // Writable 序列化接口实现
   //////////////////////////////////////////////
+  @Override
   public void write(DataOutput out) throws IOException {
+    // 序列化任务尝试ID
     taskId.write(out); 
+    // 可变长度整数序列化作业内编号
     WritableUtils.writeVInt(out, idWithinJob);
+    // 序列化是否为Map任务标志
     out.writeBoolean(isMap);
+    // 可变长度序列化状态枚举
     WritableUtils.writeEnum(out, status); 
+    // 序列化TaskTracker Http地址
     WritableUtils.writeString(out, taskTrackerHttp);
+    // 可变长度序列化任务执行耗时
     WritableUtils.writeVInt(out, taskRunTime);
+    // 可变长度序列化事件ID
     WritableUtils.writeVInt(out, eventId);
   }
   
+  @Override
   public void readFields(DataInput in) throws IOException {
+    // 反序列化任务尝试ID
     taskId.readFields(in); 
+    // 反序列化作业内编号
     idWithinJob = WritableUtils.readVInt(in);
+    // 反序列化是否为Map任务标志
     isMap = in.readBoolean();
+    // 反序列化状态枚举
     status = WritableUtils.readEnum(in, Status.class);
+    // 反序列化TaskTracker Http地址
     taskTrackerHttp = WritableUtils.readString(in);
+    // 反序列化任务执行耗时
     taskRunTime = WritableUtils.readVInt(in);
+    // 反序列化事件ID
     eventId = WritableUtils.readVInt(in);
   }
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,7 +19,13 @@
 
 package org.apache.hadoop.mapreduce.v2.api.records;
 
+/**
+ * MapReduce任务尝试类型枚举，标识该任务尝试是初始任务还是推测执行任务
+ * 用于YARN应用Master区分不同类型的任务尝试，支持推测执行功能
+ */
 public enum Avataar {
+  /** 初始创建的普通任务尝试 */
   VIRGIN,
+  /** 推测执行生成的任务尝试 */
   SPECULATIVE
 }

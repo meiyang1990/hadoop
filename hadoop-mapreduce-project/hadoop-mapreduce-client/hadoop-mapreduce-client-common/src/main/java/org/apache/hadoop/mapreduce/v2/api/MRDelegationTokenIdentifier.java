@@ -1,4 +1,4 @@
-
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,25 +27,29 @@ import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 
 /**
- * {@link TokenIdentifier} that identifies delegation tokens 
- * issued by JobHistoryServer to delegate
- * MR tasks talking to the JobHistoryServer.
+ * MapReduce 代理令牌标识符实现类，用于标识JobHistoryServer颁发的代理令牌，
+ * 允许MR任务通过代理令牌认证访问JobHistoryServer服务。
+ * 继承了Hadoop通用代理令牌标识符的基础能力，定义了MR场景下的特定令牌类型。
  */
 @Private
 // TODO Move to a different package.
 public class MRDelegationTokenIdentifier extends AbstractDelegationTokenIdentifier {
 
+  // MR代理令牌的类型名称常量
   public static final Text KIND_NAME = new Text("MR_DELEGATION_TOKEN");
 
  
+  /**
+   * 空构造函数，用于反序列化创建对象
+   */
   public MRDelegationTokenIdentifier() {
   }
   
   /**
-   * Create a new delegation token identifier
-   * @param owner the effective username of the token owner
-   * @param renewer the username of the renewer
-   * @param realUser the real username of the token owner
+   * 创建新的MR代理令牌标识符
+   * @param owner 令牌所有者的有效用户名
+   * @param renewer 有权更新令牌的用户名
+   * @param realUser 令牌对应用户的真实用户名（代理场景下区分有效用户和真实用户）
    */
   public MRDelegationTokenIdentifier(Text owner, Text renewer, Text realUser) {
     super(owner, renewer, realUser);
@@ -57,6 +61,9 @@ public class MRDelegationTokenIdentifier extends AbstractDelegationTokenIdentifi
     return KIND_NAME;
   }
 
+  /**
+   * MR代理令牌更新器实现，Hadoop令牌系统自动调用识别对应类型令牌进行更新
+   */
   @InterfaceAudience.Private
   public static class Renewer extends Token.TrivialRenewer {
     @Override

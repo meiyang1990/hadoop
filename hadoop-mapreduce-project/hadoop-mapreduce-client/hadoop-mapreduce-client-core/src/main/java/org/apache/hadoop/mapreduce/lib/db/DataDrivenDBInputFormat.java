@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,10 +45,9 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * A InputFormat that reads input data from an SQL table.
- * Operates like DBInputFormat, but instead of using LIMIT and OFFSET to demarcate
- * splits, it tries to generate WHERE clauses which separate the data into roughly
- * equivalent shards.
+ * 文件说明：数据驱动型数据库输入格式，用于从SQL表读取数据作为MapReduce输入
+ * 核心功能：不同于DBInputFormat使用LIMIT/OFFSET划分分片，该类通过生成WHERE条件
+ *          将数据划分为近似等规模的数据分片，支持并行读取数据库数据
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -57,13 +57,11 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
   private static final Logger LOG =
       LoggerFactory.getLogger(DataDrivenDBInputFormat.class);
 
-  /** If users are providing their own query, the following string is expected to
-      appear in the WHERE clause, which will be substituted with a pair of conditions
-      on the input to allow input splits to parallelise the import. */
+  /** 用户自定义查询中占位符，将被替换为分片范围条件，实现并行分片读取 */
   public static final String SUBSTITUTE_TOKEN = "$CONDITIONS";
 
   /**
-   * A InputSplit that spans a set of rows
+   * 类说明：数据驱动型数据库分片，代表一组数据行范围的输入分片
    */
   @InterfaceStability.Evolving
   public static class DataDrivenDBInputSplit extends DBInputFormat.DBInputSplit {
@@ -72,15 +70,15 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
     private String upperBoundClause;
 
     /**
-     * Default Constructor
+     * 默认构造函数
      */
     public DataDrivenDBInputSplit() {
     }
 
     /**
-     * Convenience Constructor
-     * @param lower the string to be put in the WHERE clause to guard on the 'lower' end
-     * @param upper the string to be put in the WHERE clause to guard on the 'upper' end
+     * 构造函数，根据上下边界条件创建分片
+     * @param lower WHERE子句中的下限条件字符串
+     * @param upper WHERE子句中的上限条件字符串
      */
     public DataDrivenDBInputSplit(final String lower, final String upper) {
       this.lowerBoundClause = lower;
@@ -89,7 +87,8 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
 
 
     /**
-     * @return The total row count in this split
+     * 获取当前分片总行数，无法提前确定所以返回0
+     * @return 0 表示未知总行数
      */
     public long getLength() throws IOException {
       return 0; // unfortunately, we don't know this.
@@ -117,7 +116,9 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
   }
 
   /**
-   * @return the DBSplitter implementation to use to divide the table/query into InputSplits.
+   * 根据SQL数据类型获取对应的数据分片器实现
+   * @param sqlDataType JDBC SQL数据类型常量
+   * @return 对应类型的分片器实例，不支持的类型返回null
    */
   protected DBSplitter getSplitter(int sqlDataType) {
     switch (sqlDataType) {
@@ -160,11 +161,10 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
   /** {@inheritDoc} */
   public List<InputSplit> getSplits(JobContext job) throws IOException {
 
+    // 从配置获取目标map任务数量
     int targetNumTasks = job.getConfiguration().getInt(MRJobConfig.NUM_MAPS, 1);
     if (1 == targetNumTasks) {
-      // There's no need to run a bounding vals query; just return a split
-      // that separates nothing. This can be considerably more optimal for a
-      // large table with no index.
+      // 只需要一个分片，无需查询边界，直接返回全表分片，对于无索引大表更高效
       List<InputSplit> singletonSplit = new ArrayList<InputSplit>();
       singletonSplit.add(new DataDrivenDBInputSplit("1=1", "1=1"));
       return singletonSplit;
@@ -173,25 +173,26 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
     ResultSet results = null;
     Statement statement = null;
     try {
+      // 创建数据库语句对象
       statement = connection.createStatement();
 
+      // 执行查询获取拆分列的最大最小值
       results = statement.executeQuery(getBoundingValsQuery());
       results.next();
 
-      // Based on the type of the results, use a different mechanism
-      // for interpolating split points (i.e., numeric splits, text splits,
-      // dates, etc.)
+      // 根据拆分列的数据类型获取对应分片器
       int sqlDataType = results.getMetaData().getColumnType(1);
       DBSplitter splitter = getSplitter(sqlDataType);
       if (null == splitter) {
         throw new IOException("Unknown SQL data type: " + sqlDataType);
       }
 
+      // 调用分片器生成分片列表返回
       return splitter.split(job.getConfiguration(), results, getDBConf().getInputOrderBy());
     } catch (SQLException e) {
       throw new IOException(e.getMessage());
     } finally {
-      // More-or-less ignore SQL exceptions here, but log in case we need it.
+      // 关闭结果集，忽略异常仅记录日志
       try {
         if (null != results) {
           results.close();
@@ -199,7 +200,7 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
       } catch (SQLException se) {
         LOG.debug("SQLException closing resultset: " + se.toString());
       }
-
+      // 关闭语句对象，忽略异常仅记录日志
       try {
         if (null != statement) {
           statement.close();
@@ -207,7 +208,7 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
       } catch (SQLException se) {
         LOG.debug("SQLException closing statement: " + se.toString());
       }
-
+      // 提交事务并关闭连接，忽略异常仅记录日志
       try {
         connection.commit();
         closeConnection();
@@ -218,20 +219,17 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
   }
 
   /**
-   * @return a query which returns the minimum and maximum values for
-   * the order-by column.
-   *
-   * The min value should be in the first column, and the
-   * max value should be in the second column of the results.
+   * 生成查询拆分列最小最大值的SQL语句
+   * @return 包含拆分列MIN和MAX结果的SQL查询语句
    */
   protected String getBoundingValsQuery() {
-    // If the user has provided a query, use that instead.
+    // 如果用户自定义了边界查询，直接返回用户定义
     String userQuery = getDBConf().getInputBoundingQuery();
     if (null != userQuery) {
       return userQuery;
     }
 
-    // Auto-generate one based on the table name we've been provided with.
+    // 根据表名自动生成边界查询语句
     StringBuilder query = new StringBuilder();
 
     String splitCol = getDBConf().getInputOrderBy();
@@ -246,18 +244,15 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
     return query.toString();
   }
 
-  /** Set the user-defined bounding query to use with a user-defined query.
-      This *must* include the substring "$CONDITIONS"
-      (DataDrivenDBInputFormat.SUBSTITUTE_TOKEN) inside the WHERE clause,
-      so that DataDrivenDBInputFormat knows where to insert split clauses.
-      e.g., "SELECT foo FROM mytable WHERE $CONDITIONS"
-      This will be expanded to something like:
-        SELECT foo FROM mytable WHERE (id &gt; 100) AND (id &lt; 250)
-      inside each split.
-    */
+  /**
+   * 设置用户自定义边界查询，用于分片计算拆分列的最大最小值
+   * 用户自定义查询必须包含占位符$CONDITIONS，分片条件会替换该占位符
+   * @param conf 作业配置对象
+   * @param query 用户定义的边界查询语句
+   */
   public static void setBoundingQuery(Configuration conf, String query) {
     if (null != query) {
-      // If the user's settng a query, warn if they don't allow conditions.
+      // 如果查询中没有占位符，输出警告提示用户
       if (query.indexOf(SUBSTITUTE_TOKEN) == -1) {
         LOG.warn("Could not find " + SUBSTITUTE_TOKEN + " token in query: " + query
             + "; splits may not partition data.");
@@ -267,6 +262,13 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
     conf.set(DBConfiguration.INPUT_BOUNDING_QUERY, query);
   }
 
+  /**
+   * 创建对应数据库类型的数据记录读取器
+   * @param split 输入分片对象
+   * @param conf 作业配置对象
+   * @return 适用于当前数据库的记录读取器实例
+   * @throws IOException 创建失败抛出异常
+   */
   protected RecordReader<LongWritable, T> createDBRecordReader(DBInputSplit split,
       Configuration conf) throws IOException {
 
@@ -278,14 +280,14 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
     LOG.debug("Creating db record reader for db product: " + dbProductName);
 
     try {
-      // use database product name to determine appropriate record reader.
+      // 根据数据库产品类型选择对应读取器实现
       if (dbProductName.startsWith("MYSQL")) {
-        // use MySQL-specific db reader.
+        // 使用MySQL特定读取器
         return new MySQLDataDrivenDBRecordReader<T>(split, inputClass,
             conf, createConnection(), dbConf, dbConf.getInputConditions(),
             dbConf.getInputFieldNames(), dbConf.getInputTableName());
       } else {
-        // Generic reader.
+        // 使用通用读取器
         return new DataDrivenDBRecordReader<T>(split, inputClass,
             conf, createConnection(), dbConf, dbConf.getInputConditions(),
             dbConf.getInputFieldNames(), dbConf.getInputTableName(),
@@ -299,10 +301,16 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
   // Configuration methods override superclass to ensure that the proper
   // DataDrivenDBInputFormat gets used.
 
-  /** Note that the "orderBy" column is called the "splitBy" in this version.
-    * We reuse the same field, but it's not strictly ordering it -- just partitioning
-    * the results.
-    */
+  /**
+   * 配置作业输入，基于表名进行分片，指定拆分列
+   * 此处拆分列对应于DBInputFormat中的排序列，本质用于数据划分而非排序
+   * @param job 作业对象
+   * @param inputClass DBWritable实现类，用于反序列化数据行
+   * @param tableName 数据库表名
+   * @param conditions 数据过滤条件
+   * @param splitBy 用于划分分片的列名
+   * @param fieldNames 需要读取的字段名列表
+   */
   public static void setInput(Job job, 
       Class<? extends DBWritable> inputClass,
       String tableName,String conditions, 
@@ -311,9 +319,13 @@ public class DataDrivenDBInputFormat<T extends DBWritable>
     job.setInputFormatClass(DataDrivenDBInputFormat.class);
   }
 
-  /** setInput() takes a custom query and a separate "bounding query" to use
-      instead of the custom "count query" used by DBInputFormat.
-    */
+  /**
+   * 配置作业输入，使用用户自定义查询和自定义边界查询
+   * @param job 作业对象
+   * @param inputClass DBWritable实现类，用于反序列化数据行
+   * @param inputQuery 用户自定义数据查询
+   * @param inputBoundingQuery 获取拆分列最大最小值的边界查询
+   */
   public static void setInput(Job job,
       Class<? extends DBWritable> inputClass,
       String inputQuery, String inputBoundingQuery) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that sums up a sequence of double
- * values.
+ * Double类型值求和聚合器，为旧版MapReduce API提供兼容实现，对一系列Double类型输入值进行累加求和。
+ * 继承新版MapReduce API的实现，适配旧版API接口规范。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable

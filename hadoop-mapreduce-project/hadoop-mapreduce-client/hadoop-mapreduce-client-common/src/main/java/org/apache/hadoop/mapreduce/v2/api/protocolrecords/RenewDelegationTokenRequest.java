@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,12 +24,23 @@ import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.yarn.api.records.Token;
 
 /**
- * The request issued by the client to renew a delegation token from
- * the {@code ResourceManager}.
+ * 文件说明：MapReduce协议记录模块，定义更新委托令牌请求接口
+ * 
+ * 更新MapReduce委托令牌的请求接口，由客户端发送给ResourceManager，用于延长委托令牌的有效期
+ * 委托令牌用于MapReduce作业执行过程中的身份认证，过期前需要更新延长生命周期
  */
 @Public
 @Evolving
 public interface RenewDelegationTokenRequest {
+  /**
+   * 获取需要更新有效期的委托令牌
+   * @return 待更新的委托令牌对象
+   */
   Token getDelegationToken();
+
+  /**
+   * 设置需要更新有效期的委托令牌
+   * @param dToken 待更新的委托令牌对象
+   */
   void setDelegationToken(Token dToken);
 }
