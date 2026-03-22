@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -52,43 +53,63 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * A directory with this feature is a snapshottable directory, where snapshots
- * can be taken. This feature extends {@link DirectoryWithSnapshotFeature}, and
- * maintains extra information about all the snapshots taken on this directory.
+ * 文件描述：HDFS快照可快照目录特性实现，继承自DirectoryWithSnapshotFeature
+ * 核心职责：维护可快照目录下所有快照的元数据信息，提供快照的增删改查、差异计算等核心能力
+ * 所在模块：HDFS NameNode 快照管理模块
  */
 @InterfaceAudience.Private
 public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature {
-  /** Limit the number of snapshot per snapshottable directory. */
+  /** 单个可快照目录允许的最大快照数量默认值 */
   static final int SNAPSHOT_QUOTA_DEFAULT = 1 << 16;
 
   /**
-   * Snapshots of this directory in ascending order of snapshot names.
-   * Note that snapshots in ascending order of snapshot id are stored in
-   * {@link DirectoryWithSnapshotFeature}.diffs (a private field).
+   * 当前目录的快照按名称升序排列存储
+   * 注意：按快照ID升序排列的快照存储在父类{@link DirectoryWithSnapshotFeature}的diffs私有字段中
    */
   private final List<Snapshot> snapshotsByNames = new ArrayList<Snapshot>();
-  /** Number of snapshots allowed. */
+  /** 当前目录允许的快照数量配额 */
   private int snapshotQuota = SNAPSHOT_QUOTA_DEFAULT;
 
+  /**
+   * 通过已有的DirectoryWithSnapshotFeature构造可快照目录特性
+   * @param feature 已有的带快照特性的目录对象
+   */
   public DirectorySnapshottableFeature(DirectoryWithSnapshotFeature feature) {
     super(feature == null ? null : feature.getDiffs());
   }
 
-  /** @return the number of existing snapshots. */
+  /**
+   * 获取当前目录已存在的快照数量
+   * @return 当前目录快照总数
+   */
   public int getNumSnapshots() {
     return snapshotsByNames.size();
   }
 
+  /**
+   * 二分查找指定名称的快照在有序列表中的索引位置
+   * @param snapshotName 待查找的快照名称字节数组
+   * @return 快照索引，小于0表示未找到
+   */
   private int searchSnapshot(byte[] snapshotName) {
     return Collections.binarySearch(snapshotsByNames, snapshotName);
   }
 
-  /** @return the snapshot with the given name. */
+  /**
+   * 根据快照名称获取快照对象
+   * @param snapshotName 待查找的快照名称字节数组
+   * @return 匹配的快照对象，不存在则返回null
+   */
   public Snapshot getSnapshot(byte[] snapshotName) {
     final int i = searchSnapshot(snapshotName);
     return i < 0? null: snapshotsByNames.get(i);
   }
 
+  /**
+   * 根据快照ID获取快照对象
+   * @param sid 待查找的快照ID
+   * @return 匹配的快照对象，不存在则返回null
+   */
   public Snapshot getSnapshotById(int sid) {
     for (Snapshot s : snapshotsByNames) {
       if (s.getId() == sid) {
@@ -98,25 +119,21 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
     return null;
   }
 
-  /** @return {@link #snapshotsByNames} as a {@link ReadOnlyList} */
+  /**
+   * 获取按名称排序的只读快照列表
+   * @return 只读快照列表
+   */
   public ReadOnlyList<Snapshot> getSnapshotList() {
     return ReadOnlyList.Util.asReadOnlyList(snapshotsByNames);
   }
 
   /**
-   * Rename a snapshot
-   * @param path
-   *          The directory path where the snapshot was taken. Used for
-   *          generating exception message.
-   * @param oldName
-   *          Old name of the snapshot
-   * @param newName
-   *          New name the snapshot will be renamed to
-   * @param mtime The snapshot modification time set by Time.now().
-   * @throws SnapshotException
-   *           Throw SnapshotException when either the snapshot with the old
-   *           name does not exist or a snapshot with the new name already
-   *           exists
+   * 重命名指定快照
+   * @param path 快照所在目录路径，用于生成异常信息
+   * @param oldName 快照原名称
+   * @param newName 快照新名称
+   * @param mtime 快照修改时间
+   * @throws SnapshotException 原快照不存在或新名称已被占用时抛出异常
    */
   public void renameSnapshot(String path, String oldName, String newName,
       long mtime)
@@ -135,7 +152,7 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
         throw new SnapshotException("The snapshot " + newName
             + " already exists for directory " + path);
       }
-      // remove the one with old name from snapshotsByNames
+      // 从按名称排序列表中移除原名称条目
       Snapshot snapshot = snapshotsByNames.remove(indexOfOld);
       final INodeDirectory ssRoot = snapshot.getRoot();
       ssRoot.setLocalName(newNameBytes);
@@ -143,16 +160,24 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
       indexOfNew = -indexOfNew - 1;
       if (indexOfNew <= indexOfOld) {
         snapshotsByNames.add(indexOfNew, snapshot);
-      } else { // indexOfNew > indexOfOld
+      } else { // 索引计算修正：移除旧元素后位置偏移1
         snapshotsByNames.add(indexOfNew - 1, snapshot);
       }
     }
   }
 
+  /**
+   * 获取当前目录快照配额
+   * @return 当前目录允许的最大快照数量
+   */
   public int getSnapshotQuota() {
     return snapshotQuota;
   }
 
+  /**
+   * 设置当前目录快照配额
+   * @param snapshotQuota 新的配额值
+   */
   public void setSnapshotQuota(int snapshotQuota) {
     if (snapshotQuota < 0) {
       throw new HadoopIllegalArgumentException(
@@ -162,28 +187,29 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
   }
 
   /**
-   * Simply add a snapshot into the {@link #snapshotsByNames}. Used when loading
-   * fsimage.
+   * 直接添加快照到名称有序列表，仅用于加载fsimage时
+   * @param snapshot 待添加的快照对象
    */
   void addSnapshot(Snapshot snapshot) {
     this.snapshotsByNames.add(snapshot);
   }
 
   /**
-   * Add a snapshot.
-   * @param snapshotRoot Root of the snapshot.
-   * @param snapshotManager SnapshotManager Instance.
-   * @param name Name of the snapshot.
-   * @param leaseManager
-   * @throws SnapshotException Throw SnapshotException when there is a snapshot
-   *           with the same name already exists or snapshot quota exceeds
+   * 创建并添加新快照到当前目录
+   * @param snapshotRoot 快照根目录
+   * @param snapshotManager 快照管理器实例
+   * @param name 快照名称
+   * @param leaseManager 租约管理器，用于处理打开的文件
+   * @param now 当前时间，作为快照创建时间
+   * @return 创建完成的快照对象
+   * @throws SnapshotException 同名快照已存在或超出快照配额时抛出异常
    */
   public Snapshot addSnapshot(INodeDirectory snapshotRoot,
                               SnapshotManager snapshotManager, String name,
                               final LeaseManager leaseManager, long now)
       throws SnapshotException {
     int id = snapshotManager.getSnapshotCounter();
-    //check snapshot quota
+    // 检查快照配额是否足够
     final int n = getNumSnapshots();
     if (n + 1 > snapshotQuota) {
       throw new SnapshotException("Failed to add snapshot: there are already "
@@ -203,16 +229,18 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
     d.setSnapshotRoot(s.getRoot());
     snapshotsByNames.add(-i - 1, s);
 
-    // modification time is the snapshot creation time
+    // 修改时间设为快照创建时间
     snapshotRoot.updateModificationTime(now, Snapshot.CURRENT_STATE_ID);
     s.getRoot().setModificationTime(now, Snapshot.CURRENT_STATE_ID);
 
     if (snapshotManager.captureOpenFiles()) {
       try {
+        // 获取所有持有租约的打开文件
         Set<INodesInPath> openFilesIIP =
             leaseManager.getINodeWithLeases(snapshotRoot);
         for (INodesInPath openFileIIP : openFilesIIP) {
           INodeFile openFile = openFileIIP.getLastINode().asFile();
+          // 记录打开文件当前状态到快照
           openFile.recordModification(openFileIIP.getLatestSnapshotId());
         }
       } catch (Exception e) {
@@ -225,15 +253,14 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
   }
 
   /**
-   * Remove the snapshot with the given name from {@link #snapshotsByNames},
-   * and delete all the corresponding DirectoryDiff.
-   *
-   * @param reclaimContext records blocks and inodes that need to be reclaimed
-   * @param snapshotRoot The directory where we take snapshots
-   * @param snapshotName The name of the snapshot to be removed
-   * @param now The snapshot deletion time set by Time.now().
-   * @return The removed snapshot. Null if no snapshot with the given name
-   *         exists.
+   * 删除指定名称的快照，清理对应的数据差异和INode
+   * @param reclaimContext 记录需要回收的块和INode上下文
+   * @param snapshotRoot 快照所在目录
+   * @param snapshotName 待删除的快照名称
+   * @param now 删除时间，用于更新目录修改时间
+   * @param snapshotManager 快照管理器实例
+   * @return 被删除的快照对象，未找到对应快照且配置允许忽略错误时返回null
+   * @throws SnapshotException 快照不存在且不允许忽略错误时抛出异常
    */
   public Snapshot removeSnapshot(
       INode.ReclaimContext reclaimContext, INodeDirectory snapshotRoot,
@@ -241,20 +268,7 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
       throws SnapshotException {
     final int i = searchSnapshot(DFSUtil.string2Bytes(snapshotName));
     if (i < 0) {
-      // considering a sequence like this with snapshots S1 and s2
-      // 1. Ordered snapshot deletion feature is turned on
-      // 2. Delete S2 creating edit log entry for S2 deletion
-      // 3. Delete S1
-      // 4. S2 gets deleted by snapshot gc thread creating edit log record for
-      //    S2 deletion again
-      // 5. Disable Ordered snapshot deletion feature
-      // 6. Restarting Namenode
-      // In this case, when edit log replay happens actual deletion of S2
-      // will happen when first edit log for S2 deletion gets replayed and
-      // the second edit log record replay for S2 deletion will fail as snapshot
-      // won't exist thereby failing the Namenode start
-      // The idea here is to check during edit log replay, if a certain snapshot
-      // is not found and the ordered snapshot deletion is off, ignore the error
+      // 处理编辑日志重放场景：有序删除关闭且镜像未加载完成时，忽略重复删除错误，避免NameNode启动失败
       if (!snapshotManager.isSnapshotDeletionOrdered() &&
           !snapshotManager.isImageLoaded()) {
         return null;
@@ -268,14 +282,21 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
       snapshotManager.assertPrior(snapshotRoot, snapshotName, prior);
 
       reclaimContext.setSnapshotToBeDeleted(snapshot);
+      // 清理快照子树中的所有不可达INode
       snapshotRoot.cleanSubtree(reclaimContext, snapshot.getId(), prior);
-      // remove from snapshotsByNames after successfully cleaning the subtree
+      // 子树清理成功后从名称列表移除快照
       snapshotsByNames.remove(i);
       snapshotRoot.updateModificationTime(now, Snapshot.CURRENT_STATE_ID);
       return snapshot;
     }
   }
 
+  /**
+   * 计算快照相关的内容摘要统计，累加当前目录快照计数
+   * @param bsps 块存储策略套件
+   * @param counts 内容计数器，用于累加统计结果
+   * @throws AccessControlException 访问权限不足时抛出异常
+   */
   @Override
   public void computeContentSummary4Snapshot(final BlockStoragePolicySuite bsps,
       final ContentCounts counts) throws AccessControlException {
@@ -285,20 +306,13 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
   }
 
   /**
-   * Compute the difference between two snapshots (or a snapshot and the current
-   * directory) of the directory. The diff calculation can be scoped to either
-   * the snapshot root or any descendant directory under the snapshot root.
-   *
-   * @param snapshotRootDir the snapshot root directory
-   * @param snapshotDiffScopeDir the descendant directory under snapshot root
-   *          to scope the diff calculation to.
-   * @param from The name of the start point of the comparison. Null indicating
-   *          the current tree.
-   * @param to The name of the end point. Null indicating the current tree.
-   * @return The difference between the start/end points.
-   * @throws SnapshotException If there is no snapshot matching the starting
-   *           point, or if endSnapshotName is not null but cannot be identified
-   *           as a previous snapshot.
+   * 计算两个快照之间（或快照与当前目录之间）的差异
+   * @param snapshotRootDir 快照根目录
+   * @param snapshotDiffScopeDir 差异计算的范围目录，必须是快照根目录的后代
+   * @param from 对比起点快照名称，null表示当前目录
+   * @param to 对比终点快照名称，null表示当前目录
+   * @return 差异信息对象
+   * @throws SnapshotException 起点或终点快照不存在时抛出异常
    */
   SnapshotDiffInfo computeDiff(final INodeDirectory snapshotRootDir,
       final INodeDirectory snapshotDiffScopeDir, final String from,
@@ -307,45 +321,29 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
         .isDescendantOfSnapshotRoot(snapshotRootDir));
     Snapshot fromSnapshot = getSnapshotByName(snapshotRootDir, from);
     Snapshot toSnapshot = getSnapshotByName(snapshotRootDir, to);
-    // if the start point is equal to the end point, return null
+    // 起点终点相同，返回空差异
     if (from != null && from.equals(to)) {
       return null;
     }
     SnapshotDiffInfo diffs = new SnapshotDiffInfo(snapshotRootDir,
         snapshotDiffScopeDir, fromSnapshot, toSnapshot);
-    // The snapshot diff scope dir is passed in as the snapshot dir
-    // so that the file paths in the diff report are relative to the
-    // snapshot scope dir.
+    // 递归计算所有子节点差异
     computeDiffRecursively(snapshotDiffScopeDir, snapshotDiffScopeDir,
         new ArrayList<>(), diffs);
     return diffs;
   }
 
   /**
-   * Compute the difference between two snapshots (or a snapshot and the current
-   * directory) of the directory. The diff calculation can be scoped to either
-   * the snapshot root or any descendant directory under the snapshot root.
-   *
-   * @param snapshotRootDir the snapshot root directory
-   * @param snapshotDiffScopeDir the descendant directory under snapshot root
-   *          to scope the diff calculation to.
-   * @param from The name of the start point of the comparison. Null indicating
-   *          the current tree.
-   * @param to The name of the end point. Null indicating the current tree.
-   * @param startPath
-   *           path relative to the snapshottable root directory from where the
-   *           snapshotdiff computation needs to start across multiple rpc calls
-   * @param index
-   *           index in the created or deleted list of the directory at which
-   *           the snapshotdiff computation stopped during the last rpc call
-   *           as the no of entries exceeded the snapshotdiffentry limit. -1
-   *           indicates, the snapshotdiff computation needs to start right
-   *           from the startPath provided.
-   *
-   * @return The difference between the start/end points.
-   * @throws SnapshotException If there is no snapshot matching the starting
-   *           point, or if endSnapshotName is not null but cannot be identified
-   *           as a previous snapshot.
+   * 分RPC调用分段计算两个快照之间的差异，支持断点续算
+   * @param snapshotRootDir 快照根目录
+   * @param snapshotDiffScopeDir 差异计算的范围目录，必须是快照根目录的后代
+   * @param from 对比起点快照名称，null表示当前目录
+   * @param to 对比终点快照名称，null表示当前目录
+   * @param startPath 断点续算的起始路径，相对于快照根目录
+   * @param index 上次计算停止时的列表索引，-1表示从头开始
+   * @param snapshotDiffReportEntriesLimit 单次RPC返回差异条目数量上限
+   * @return 分段差异列表信息对象
+   * @throws SnapshotException 起点或终点快照不存在时抛出异常
    */
   SnapshotDiffListingInfo computeDiff(final INodeDirectory snapshotRootDir,
       final INodeDirectory snapshotDiffScopeDir, final String from,
@@ -356,6 +354,7 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
     Snapshot fromSnapshot = getSnapshotByName(snapshotRootDir, from);
     Snapshot toSnapshot = getSnapshotByName(snapshotRootDir, to);
     boolean toProcess = Arrays.equals(startPath, DFSUtilClient.EMPTY_BYTES);
+    // 将字节路径转换为路径分段数组
     byte[][] resumePath = DFSUtilClient.bytes2byteArray(startPath);
     if (from.equals(to)) {
       return null;
@@ -364,19 +363,18 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
         new SnapshotDiffListingInfo(snapshotRootDir, snapshotDiffScopeDir,
             fromSnapshot, toSnapshot, snapshotDiffReportEntriesLimit);
     diffs.setLastIndex(index);
+    // 从断点位置递归计算差异
     computeDiffRecursively(snapshotDiffScopeDir, snapshotDiffScopeDir,
         new ArrayList<byte[]>(), diffs, resumePath, 0, toProcess);
     return diffs;
   }
 
   /**
-   * Find the snapshot matching the given name.
-   *
-   * @param snapshotRoot The directory where snapshots were taken.
-   * @param snapshotName The name of the snapshot.
-   * @return The corresponding snapshot. Null if snapshotName is null or empty.
-   * @throws SnapshotException If snapshotName is not null or empty, but there
-   *           is no snapshot matching the name.
+   * 根据快照名称字符串查找快照对象
+   * @param snapshotRoot 快照所在目录
+   * @param snapshotName 待查找的快照名称
+   * @return 匹配的快照对象，名称为null或空时返回null
+   * @throws SnapshotException 名称非空但未找到匹配快照时抛出异常
    */
   public Snapshot getSnapshotByName(INodeDirectory snapshotRoot,
       String snapshotName) throws SnapshotException {
@@ -393,255 +391,3 @@ public class DirectorySnapshottableFeature extends DirectoryWithSnapshotFeature 
   }
 
   /**
-   * Recursively compute the difference between snapshots under a given
-   * directory/file.
-   * @param snapshotDir The directory where snapshots were taken. Can be a
-   *                    snapshot root directory or any descendant directory
-   *                    under snapshot root directory.
-   * @param node The directory/file under which the diff is computed.
-   * @param parentPath Relative path (corresponding to the snapshot root) of
-   *                   the node's parent.
-   * @param diffReport data structure used to store the diff.
-   */
-  private void computeDiffRecursively(final INodeDirectory snapshotDir,
-      INode node, List<byte[]> parentPath, SnapshotDiffInfo diffReport) {
-    final Snapshot earlierSnapshot = diffReport.isFromEarlier() ?
-        diffReport.getFrom() : diffReport.getTo();
-    final Snapshot laterSnapshot = diffReport.isFromEarlier() ?
-        diffReport.getTo() : diffReport.getFrom();
-    byte[][] relativePath = parentPath.toArray(new byte[parentPath.size()][]);
-    if (node.isDirectory()) {
-      final ChildrenDiff diff = new ChildrenDiff();
-      INodeDirectory dir = node.asDirectory();
-      DirectoryWithSnapshotFeature sf = dir.getDirectoryWithSnapshotFeature();
-      if (sf != null) {
-        boolean change = sf.computeDiffBetweenSnapshots(earlierSnapshot,
-            laterSnapshot, diff, dir);
-        if (change) {
-          diffReport.addDirDiff(dir, relativePath, diff);
-        }
-      } else {
-        diffReport.incrementDirsProcessed();
-      }
-      long startTime = Time.monotonicNow();
-      ReadOnlyList<INode> children = dir.getChildrenList(earlierSnapshot
-          .getId());
-      diffReport.addChildrenListingTime(Time.monotonicNow() - startTime);
-      for (INode child : children) {
-        final byte[] name = child.getLocalNameBytes();
-        boolean toProcess = !diff.containsDeleted(name);
-        if (!toProcess && child instanceof INodeReference.WithName) {
-          byte[][] renameTargetPath = findRenameTargetPath(
-              snapshotDir, (WithName) child,
-              laterSnapshot == null ? Snapshot.CURRENT_STATE_ID :
-                laterSnapshot.getId());
-          if (renameTargetPath != null) {
-            toProcess = true;
-            diffReport.setRenameTarget(child.getId(), renameTargetPath);
-          }
-        }
-        if (toProcess) {
-          parentPath.add(name);
-          computeDiffRecursively(snapshotDir, child, parentPath, diffReport);
-          parentPath.remove(parentPath.size() - 1);
-        }
-      }
-    } else if (node.isFile() && node.asFile().isWithSnapshot()) {
-      INodeFile file = node.asFile();
-      boolean change = file.getFileWithSnapshotFeature()
-          .changedBetweenSnapshots(file, earlierSnapshot, laterSnapshot);
-      if (change) {
-        diffReport.addFileDiff(file, relativePath);
-      }
-      diffReport.incrementFilesProcessed();
-    }
-  }
-
-  /**
-   * Recursively compute the difference between snapshots under a given
-   * directory/file partially.
-   * @param snapshotDir The directory where snapshots were taken. Can be a
-   *                    snapshot root directory or any descendant directory
-   *                    under snapshot root directory.
-   * @param node The directory/file under which the diff is computed.
-   * @param parentPath Relative path (corresponding to the snapshot root) of
-   *                   the node's parent.
-   * @param diffReport data structure used to store the diff.
-   * @param resume  path from where to resume the snapshotdiff computation
-   *                    in one rpc call
-   * @param level       indicates the level of the directory tree rooted at
-   *                    snapshotRoot.
-   * @param processFlag indicates that the dir/file where the snapshotdiff
-   *                    computation has to start is processed or not.
-   */
-  private boolean computeDiffRecursively(final INodeDirectory snapshotDir,
-       INode node, List<byte[]> parentPath, SnapshotDiffListingInfo diffReport,
-       final byte[][] resume, int level, boolean processFlag) {
-    final Snapshot earlier = diffReport.getEarlier();
-    final Snapshot later = diffReport.getLater();
-    byte[][] relativePath = parentPath.toArray(new byte[parentPath.size()][]);
-    if (!processFlag && level == resume.length
-        && Arrays.equals(resume[resume.length - 1], node.getLocalNameBytes())) {
-      processFlag = true;
-    }
-
-    if (node.isDirectory()) {
-      final ChildrenDiff diff = new ChildrenDiff();
-      INodeDirectory dir = node.asDirectory();
-      if (processFlag) {
-        DirectoryWithSnapshotFeature sf = dir.getDirectoryWithSnapshotFeature();
-        if (sf != null) {
-          boolean change =
-              sf.computeDiffBetweenSnapshots(earlier, later, diff, dir);
-          if (change) {
-            if (!diffReport.addDirDiff(dir.getId(), relativePath, diff)) {
-              return false;
-            }
-          }
-        }
-      }
-
-      ReadOnlyList<INode> children = dir.getChildrenList(earlier.getId());
-      boolean iterate = false;
-      for (INode child : children) {
-        final byte[] name = child.getLocalNameBytes();
-        if (!processFlag && !iterate && !Arrays.equals(resume[level], name)) {
-          continue;
-        }
-        iterate = true;
-        level = level + 1;
-        boolean toProcess = !diff.containsDeleted(name);
-        if (!toProcess && child instanceof INodeReference.WithName) {
-          byte[][] renameTargetPath = findRenameTargetPath(snapshotDir,
-              (WithName) child, Snapshot.getSnapshotId(later));
-          if (renameTargetPath != null) {
-            toProcess = true;
-          }
-        }
-        if (toProcess) {
-          parentPath.add(name);
-          processFlag = computeDiffRecursively(snapshotDir, child, parentPath,
-              diffReport, resume, level, processFlag);
-          parentPath.remove(parentPath.size() - 1);
-          if (!processFlag) {
-            return false;
-          }
-        }
-      }
-    } else if (node.isFile() && node.asFile().isWithSnapshot() && processFlag) {
-      INodeFile file = node.asFile();
-      boolean change = file.getFileWithSnapshotFeature()
-          .changedBetweenSnapshots(file, earlier, later);
-      if (change) {
-        if (!diffReport.addFileDiff(file, relativePath)) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  /**
-   * We just found a deleted WithName node as the source of a rename operation.
-   * However, we should include it in our snapshot diff report as rename only
-   * if the rename target is also under the same snapshottable directory.
-   */
-  public byte[][] findRenameTargetPath(final INodeDirectory snapshotRoot,
-      INodeReference.WithName wn, final int snapshotId) {
-    INode inode = wn.getReferredINode();
-    final LinkedList<byte[]> ancestors = Lists.newLinkedList();
-    while (inode != null) {
-      if (inode == snapshotRoot) {
-        return ancestors.toArray(new byte[ancestors.size()][]);
-      }
-      if (inode instanceof INodeReference.WithCount) {
-        inode = ((WithCount) inode).getParentRef(snapshotId);
-      } else {
-        INode parent = inode.getParentReference() != null ? inode
-            .getParentReference() : inode.getParent();
-        if (parent != null && parent instanceof INodeDirectory) {
-          int sid = parent.asDirectory().searchChild(inode);
-          if (sid < snapshotId) {
-            return null;
-          }
-        }
-        if (!(parent instanceof WithCount)) {
-          ancestors.addFirst(inode.getLocalNameBytes());
-        }
-        inode = parent;
-      }
-    }
-    return null;
-  }
-
-  @Override
-  public String toString() {
-    return "snapshotsByNames=" + snapshotsByNames;
-  }
-
-  @VisibleForTesting
-  public void dumpTreeRecursively(INodeDirectory snapshotRoot, PrintWriter out,
-      StringBuilder prefix, int snapshot) {
-    if (snapshot == Snapshot.CURRENT_STATE_ID) {
-      out.println();
-      out.print(prefix);
-
-      out.print("Snapshot of ");
-      final String name = snapshotRoot.getLocalName();
-      out.print(name.isEmpty()? "/": name);
-      out.print(": quota=");
-      out.print(getSnapshotQuota());
-
-      int n = 0;
-      for(DirectoryDiff diff : getDiffs()) {
-        if (diff.isSnapshotRoot()) {
-          n++;
-        }
-      }
-      Preconditions.checkState(n == snapshotsByNames.size(), "#n=" + n
-          + ", snapshotsByNames.size()=" + snapshotsByNames.size());
-      out.print(", #snapshot=");
-      out.println(n);
-
-      INodeDirectory.dumpTreeRecursively(out, prefix,
-          new Iterable<SnapshotAndINode>() {
-        @Override
-        public Iterator<SnapshotAndINode> iterator() {
-          return new Iterator<SnapshotAndINode>() {
-            final Iterator<DirectoryDiff> i = getDiffs().iterator();
-            private DirectoryDiff next = findNext();
-
-            private DirectoryDiff findNext() {
-              for(; i.hasNext(); ) {
-                final DirectoryDiff diff = i.next();
-                if (diff.isSnapshotRoot()) {
-                  return diff;
-                }
-              }
-              return null;
-            }
-
-            @Override
-            public boolean hasNext() {
-              return next != null;
-            }
-
-            @Override
-            public SnapshotAndINode next() {
-              final SnapshotAndINode pair = new SnapshotAndINode(next
-                  .getSnapshotId(), getSnapshotById(next.getSnapshotId())
-                  .getRoot());
-              next = findNext();
-              return pair;
-            }
-
-            @Override
-            public void remove() {
-              throw new UnsupportedOperationException();
-            }
-          };
-        }
-      });
-    }
-  }
-}

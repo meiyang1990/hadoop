@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,149 +28,158 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 
 /**
- * A generic abstract class to support journaling of edits logs into 
- * a persistent storage.
+ * @file org/apache/hadoop/hdfs/server/namenode/EditLogOutputStream.java
+ * @brief HDFS NameNode编辑日志输出抽象基类，支持将编辑日志持久化到存储介质
+ * 
+ * 该抽象类定义了编辑日志输出的统一接口，为不同的持久化存储实现提供公共模板，
+ * 统计同步操作耗时和次数等监控指标，是NameNode编辑日志写入流程的核心抽象。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public abstract class EditLogOutputStream implements Closeable {
-  // these are statistics counters
-  private long numSync;        // number of sync(s) to disk
-  private long totalTimeSync;  // total time to sync
-  // The version of the current edit log
+  // 同步操作统计计数器
+  private long numSync;        // 磁盘同步操作次数
+  private long totalTimeSync;  // 同步操作总耗时
+  // 当前编辑日志的版本号
   private int currentLogVersion;
 
+  /**
+   * 构造方法，初始化同步统计计数器
+   * @throws IOException 构造过程可能抛出IO异常
+   */
   public EditLogOutputStream() throws IOException {
     numSync = totalTimeSync = 0;
   }
 
   /**
-   * Get the last txId journalled in the stream.
-   * The txId is recorded when FSEditLogOp is written to the stream.
-   * The default implementation is dummy.
-   * JournalSet tracks the txId uniformly for all underlying streams.
+   * 获取当前流中已经写入的最后一个事务ID
+   * JournalSet会统一管理所有底层流的事务ID，默认实现返回无效事务ID
+   * @return 最后写入的事务ID，默认返回INVALID_TXID
    */
   public long getLastJournalledTxId() {
     return HdfsServerConstants.INVALID_TXID;
   };
 
   /**
-   * Write edits log operation to the stream.
-   * 
-   * @param op operation
-   * @throws IOException
+   * 将一条编辑日志操作写入输出流
+   * @param op 要写入的编辑日志操作对象
+   * @throws IOException 写入过程IO异常
    */
   abstract public void write(FSEditLogOp op) throws IOException;
 
   /**
-   * Write raw data to an edit log. This data should already have
-   * the transaction ID, checksum, etc included. It is for use
-   * within the BackupNode when replicating edits from the
-   * NameNode.
-   *
-   * @param bytes the bytes to write.
-   * @param offset offset in the bytes to write from
-   * @param length number of bytes to write
-   * @throws IOException
+   * 将已经格式化好的原始字节数据直接写入编辑日志
+   * 用于BackupNode从NameNode复制编辑日志场景，数据已经包含事务ID、校验和等信息
+   * @param bytes 要写入的字节数组
+   * @param offset 起始偏移量
+   * @param length 要写入的字节长度
+   * @throws IOException 写入过程IO异常
    */
   abstract public void writeRaw(byte[] bytes, int offset, int length)
       throws IOException;
 
   /**
-   * Create and initialize underlying persistent edits log storage.
-   * 
-   * @param layoutVersion The LayoutVersion of the journal
-   * @throws IOException
+   * 创建并初始化底层持久化编辑日志存储
+   * @param layoutVersion 日志存储的布局版本号
+   * @throws IOException 初始化过程IO异常
    */
   abstract public void create(int layoutVersion) throws IOException;
 
   /**
-   * Close the journal.
-   * @throws IOException if the journal can't be closed,
-   *         or if there are unflushed edits
+   * 关闭编辑日志输出流，会刷新未持久化的数据
+   * @throws IOException 关闭过程IO异常，或存在未刷新数据时抛出
    */
   @Override
   abstract public void close() throws IOException;
 
   /**
-   * Close the stream without necessarily flushing any pending data.
-   * This may be called after a previous write or close threw an exception.
+   * 中止输出流，不保证刷新未持久化的数据，常用于出现异常后的清理
+   * @throws IOException 中止过程IO异常
    */
   abstract public void abort() throws IOException;
   
   /**
-   * All data that has been written to the stream so far will be flushed.
-   * New data can be still written to the stream while flushing is performed.
+   * 将当前已写入的数据标记为可刷新，允许后续刷新操作持久化数据，刷新过程仍可继续写入新数据
+   * @throws IOException 标记过程IO异常
    */
   abstract public void setReadyToFlush() throws IOException;
 
   /**
-   * Flush and sync all data that is ready to be flush 
-   * {@link #setReadyToFlush()} into underlying persistent store.
-   * @param durable if true, the edits should be made truly durable before
-   * returning
-   * @throws IOException
+   * 将已标记为就绪的数据刷新并同步到底层持久化存储
+   * @param durable 如果为true，则需要确保数据真正持久化到磁盘后再返回
+   * @throws IOException 刷新同步过程IO异常
    */
   abstract protected void flushAndSync(boolean durable) throws IOException;
 
   /**
-   * Flush data to persistent store.
-   * Collect sync metrics.
+   * 刷新数据到持久化存储，默认持久化并收集同步监控指标
+   * @throws IOException 刷新过程IO异常
    */
   public void flush() throws IOException {
     flush(true);
   }
   
+  /**
+   * 刷新数据到持久化存储，统计同步操作次数和耗时
+   * @param durable 是否需要确保数据持久化到磁盘
+   * @throws IOException 刷新过程IO异常
+   */
   public void flush(boolean durable) throws IOException {
+    // 同步次数累加
     numSync++;
+    // 记录同步开始时间
     long start = monotonicNow();
+    // 执行实际刷新同步
     flushAndSync(durable);
+    // 计算同步耗时并累加总耗时
     long end = monotonicNow();
     totalTimeSync += (end - start);
   }
 
   /**
-   * Implement the policy when to automatically sync the buffered edits log
-   * The buffered edits can be flushed when the buffer becomes full or
-   * a certain period of time is elapsed.
-   * 
-   * @return true if the buffered data should be automatically synced to disk
+   * 判断是否需要强制同步缓冲的编辑日志，实现自动同步策略
+   * 当缓冲已满或超过指定时间间隔时，触发自动同步
+   * @return true表示缓冲数据需要自动同步到磁盘
    */
   public boolean shouldForceSync() {
     return false;
   }
   
   /**
-   * Return total time spent in {@link #flushAndSync(boolean)}
+   * 获取所有同步操作的总耗时
+   * @return 同步总耗时，单位毫秒
    */
   long getTotalSyncTime() {
     return totalTimeSync;
   }
 
   /**
-   * Return number of calls to {@link #flushAndSync(boolean)}
+   * 获取同步操作的总次数
+   * @return 同步操作次数
    */
   protected long getNumSync() {
     return numSync;
   }
 
   /**
-   * @return a short text snippet suitable for describing the current
-   * status of the stream
+   * 生成当前输出流状态的简要描述报告，用于监控和调试
+   * @return 状态描述文本
    */
   public String generateReport() {
     return toString();
   }
 
   /**
-   * @return The version of the current edit log
+   * 获取当前编辑日志的版本号
+   * @return 当前日志版本号
    */
   public int getCurrentLogVersion() {
     return currentLogVersion;
   }
 
   /**
-   * @param logVersion The version of the current edit log
+   * 设置当前编辑日志的版本号
+   * @param logVersion 要设置的日志版本号
    */
   public void setCurrentLogVersion(int logVersion) {
     this.currentLogVersion = logVersion;

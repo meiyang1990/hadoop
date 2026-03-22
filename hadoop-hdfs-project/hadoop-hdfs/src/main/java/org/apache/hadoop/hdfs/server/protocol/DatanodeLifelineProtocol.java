@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,6 +27,14 @@ import org.apache.hadoop.io.retry.Idempotent;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
+ * 文件所属模块：HDFS服务端核心协议
+ * 核心职责：定义DataNode向NameNode发送生命维持（lifeline）心跳消息的RPC协议
+ * 功能说明：当DataNode通过本协议定期向NameNode发送存活状态报告，
+ *          让NameNode确认DataNode是否正常运行，区别于常规心跳，
+ *          主要用于节点存活探测场景
+ * 认证信息：用于DataNode -> NameNode的反向生命探测通信
+ */
+/**
  * Protocol used by a DataNode to send lifeline messages to a NameNode.
  */
 @KerberosInfo(
@@ -34,6 +43,18 @@ import org.apache.hadoop.security.KerberosInfo;
 @InterfaceAudience.Private
 public interface DatanodeLifelineProtocol {
 
+  /**
+   * DataNode向NameNode发送生命维持消息，上报节点当前状态信息
+   * @param registration DataNode注册信息，包含节点标识
+   * @param reports 存储块报告，列出各存储块状态
+   * @param dnCacheCapacity DataNode缓存总容量
+   * @param dnCacheUsed DataNode已用缓存容量
+   * @param xmitsInProgress 当前正在进行的块传输数量
+   * @param xceiverCount 当前运行的数据传输线程数
+   * @param failedVolumes 失败的卷数量
+   * @param volumeFailureSummary 卷失败详细信息
+   * @throws IOException RPC调用异常
+   */
   @Idempotent
   void sendLifeline(DatanodeRegistration registration, StorageReport[] reports,
       long dnCacheCapacity, long dnCacheUsed, int xmitsInProgress,

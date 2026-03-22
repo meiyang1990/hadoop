@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -19,53 +20,54 @@ package org.apache.hadoop.hdfs.server.namenode.startupprogress;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * Indicates a particular type of {@link Step}.
+ * 文件级注释：HDFS NameNode启动阶段步骤类型枚举，定义了NameNode启动过程中各个初始化阶段的类型
+ *
+ * 枚举，标识NameNode启动进度中每个启动步骤的具体类型
  */
 @InterfaceAudience.Private
 public enum StepType {
   /**
-   * The namenode has entered safemode and is awaiting block reports from
-   * datanodes.
+   * NameNode已进入安全模式，等待所有DataNode上报块信息
    */
   AWAITING_REPORTED_BLOCKS("AwaitingReportedBlocks", "awaiting reported blocks"),
 
   /**
-   * The namenode is performing an operation related to delegation keys.
+   * NameNode正在加载维护 delegation 密钥相关数据
    */
   DELEGATION_KEYS("DelegationKeys", "delegation keys"),
 
   /**
-   * The namenode is performing an operation related to delegation tokens.
+   * NameNode正在加载维护 delegation 令牌相关数据
    */
   DELEGATION_TOKENS("DelegationTokens", "delegation tokens"),
 
   /**
-   * The namenode is performing an operation related to inodes.
+   * NameNode正在加载文件系统inode元数据
    */
   INODES("Inodes", "inodes"),
 
   /**
-   * The namenode is performing an operation related to cache pools.
+   * NameNode正在加载缓存池配置信息
    */
   CACHE_POOLS("CachePools", "cache pools"),
 
   /**
-   * The namenode is performing an operation related to cache entries.
+   * NameNode正在加载缓存条目信息
    */
   CACHE_ENTRIES("CacheEntries", "cache entries"),
 
   /**
-   * The namenode is performing an operation related to erasure coding policies.
+   * NameNode正在加载纠删码策略配置
    */
   ERASURE_CODING_POLICIES("ErasureCodingPolicies", "erasure coding policies");
 
   private final String name, description;
 
   /**
-   * Private constructor of enum.
+   * 枚举构造方法，初始化步骤类型的名称和描述
    * 
-   * @param name String step type name
-   * @param description String step type description
+   * @param name 步骤类型名称
+   * @param description 步骤类型描述
    */
   private StepType(String name, String description) {
     this.name = name;
@@ -73,18 +75,18 @@ public enum StepType {
   }
 
   /**
-   * Returns step type description.
+   * 获取当前启动步骤类型的描述文本
    * 
-   * @return String step type description
+   * @return 步骤类型描述
    */
   public String getDescription() {
     return description;
   }
 
   /**
-   * Returns step type name.
+   * 获取当前启动步骤类型的名称
    * 
-   * @return String step type name
+   * @return 步骤类型名称
    */
   public String getName() {
     return name;

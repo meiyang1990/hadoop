@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,16 +21,18 @@ package org.apache.hadoop.hdfs.tools.offlineImageViewer;
 import java.util.EnumSet;
 
 /**
+ * 文件级注释：HDFS离线镜像检查工具中，描述Protobuf格式FsImage损坏信息的数据容器
+ * 存储损坏节点ID、损坏类型和损坏子节点数量，用于报表输出和结果统计
+ */
+/**
  * Class representing a corruption in the PBImageCorruptionDetector processor.
  */
 public class PBImageCorruption {
   private static final String WITH = "With";
 
   /**
-   * PBImageCorruptionType is a wrapper for getting a string output for
-   * different types of corruption. Could be added more cases if
-   * other types are revealed. Currently hasMissingChild and
-   * isCorruptNode are the relevant cases.
+   * 枚举类，定义Protobuf格式FsImage支持的损坏类型
+   * 目前支持损坏节点本身、节点缺失子节点两种损坏类型，可扩展新增其他类型
    */
   private enum PBImageCorruptionType {
     CORRUPT_NODE("CorruptNode"),
@@ -51,6 +54,13 @@ public class PBImageCorruption {
   private EnumSet<PBImageCorruptionType> type;
   private int numOfCorruptChildren;
 
+  /**
+   * 构造方法，创建一个FsImage损坏信息实例
+   * @param id 损坏节点的ID
+   * @param missingChild 是否存在子节点缺失损坏
+   * @param corruptNode 是否存在节点本身损坏
+   * @param numOfCorruptChildren 损坏子节点的数量
+   */
   PBImageCorruption(long id, boolean missingChild, boolean corruptNode,
                     int numOfCorruptChildren) {
     if (!missingChild && !corruptNode) {
@@ -68,22 +78,40 @@ public class PBImageCorruption {
     this.numOfCorruptChildren = numOfCorruptChildren;
   }
 
+  /**
+   * 添加子节点缺失损坏类型到当前损坏信息
+   */
   void addMissingChildCorruption() {
     type.add(PBImageCorruptionType.MISSING_CHILD);
   }
 
+  /**
+   * 添加节点本身损坏类型到当前损坏信息
+   */
   void addCorruptNodeCorruption() {
     type.add(PBImageCorruptionType.CORRUPT_NODE);
   }
 
+  /**
+   * 设置损坏子节点的数量
+   * @param numOfCorruption 损坏子节点数量
+   */
   void setNumberOfCorruption(int numOfCorruption) {
     this.numOfCorruptChildren = numOfCorruption;
   }
 
+  /**
+   * 获取损坏节点的ID
+   * @return 损坏节点ID
+   */
   long getId() {
     return id;
   }
 
+  /**
+   * 获取当前损坏信息的格式化类型字符串，支持多种损坏类型拼接
+   * @return 格式化后的损坏类型描述字符串
+   */
   String getType() {
     StringBuilder s = new StringBuilder();
     if (type.contains(PBImageCorruptionType.CORRUPT_NODE)) {
@@ -100,6 +128,10 @@ public class PBImageCorruption {
     return s.toString();
   }
 
+  /**
+   * 获取损坏子节点的数量
+   * @return 损坏子节点数量
+   */
   int getNumOfCorruptChildren() {
     return numOfCorruptChildren;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,8 +47,8 @@ import java.util.concurrent.CompletionService;
 import java.util.concurrent.Future;
 
 /**
- * Manage striped readers that performs reading of block data from remote to
- * serve input data for the erasure decoding.
+ * 条带化读取管理器，负责从多个源DataNode读取条带块数据，为纠删码解码提供输入数据。
+ * 管理并行读取流程，处理读取失败、超时的故障恢复，保证获取足够的源数据用于解码。
  */
 @InterfaceAudience.Private
 class StripedReader {
@@ -72,12 +73,13 @@ class StripedReader {
   private final int minRequiredSources;
   // the number of xmits used by the re-construction task.
   private final int xmits;
-  // The buffers and indices for striped blocks whose length is 0
+  // 存储长度为0的条带块对应的缓冲区和索引
   private ByteBuffer[] zeroStripeBuffers;
   private short[] zeroStripeIndices;
 
-  // sources
+  // 存活块索引数组
   private final byte[] liveIndices;
+  // 源DataNode节点数组
   private final DatanodeInfo[] sources;
 
   private final List<StripedBlockReader> readers;
@@ -85,6 +87,13 @@ class StripedReader {
   private final Map<Future<BlockReadStats>, Integer> futures = new HashMap<>();
   private final CompletionService<BlockReadStats> readService;
 
+  /**
+   * 构造条带化读取器，初始化纠删码重建所需的配置和元数据。
+   * @param reconstructor 纠删码重建器实例
+   * @param datanode 当前DataNode实例
+   * @param conf Hadoop配置
+   * @param stripedReconInfo 条带重建信息，包含EC策略、块组信息、源节点等
+   */
   StripedReader(StripedReconstructor reconstructor, DataNode datanode,
       Configuration conf, StripedReconstructionInfo stripedReconInfo) {
     stripedReadTimeoutInMills = conf.getInt(
@@ -131,6 +140,10 @@ class StripedReader {
         "liveBlockIndices and source datanodes should match");
   }
 
+  /**
+   * 初始化读取器：初始化所有块读取器、缓冲区大小和空条带。
+   * @throws IOException 初始化失败抛出异常
+   */
   void init() throws IOException {
     initReaders();
 
@@ -139,6 +152,10 @@ class StripedReader {
     initZeroStrip();
   }
 
+  /**
+   * 初始化块读取器，预先创建minRequiredSources个可用的读取器，保证至少获取最小要求的源节点。
+   * @throws IOException 无法获取足够源节点时抛出异常
+   */
   private void initReaders() throws IOException {
     // Store the array indices of source DNs we have read successfully.
     // In each iteration of read, the successList list may be updated if
@@ -165,6 +182,12 @@ class StripedReader {
     }
   }
 
+  /**
+   * 创建指定源索引处的条带块读取器。
+   * @param idxInSources 源数组中的索引
+   * @param offsetInBlock 块内读取偏移量
+   * @return 创建好的条带块读取器实例
+   */
   StripedBlockReader createReader(int idxInSources, long offsetInBlock) {
     return new StripedBlockReader(this, datanode,
         conf, liveIndices[idxInSources],
@@ -172,6 +195,9 @@ class StripedReader {
         sources[idxInSources], offsetInBlock);
   }
 
+  /**
+   * 根据校验和对齐要求，计算最终的读取缓冲区大小。
+   */
   private void initBufferSize() {
     int bytesPerChecksum = checksum.getBytesPerChecksum();
     // The bufferSize is flat to divide bytesPerChecksum
@@ -180,7 +206,7 @@ class StripedReader {
         readBufferSize - readBufferSize % bytesPerChecksum;
   }
 
-  // init checksum from block reader
+  // 从第一个块读取器初始化校验和，后续读取器校验和需和第一个保持一致
   private void initOrVerifyChecksum(StripedBlockReader reader) {
     if (checksum == null) {
       checksum = reader.getBlockReader().getDataChecksum();
@@ -189,10 +215,17 @@ class StripedReader {
     }
   }
 
+  /**
+   * 从重建器分配指定大小的读取缓冲区。
+   * @return 分配好的字节缓冲区
+   */
   protected ByteBuffer allocateReadBuffer() {
     return reconstructor.allocateBuffer(getBufferSize());
   }
 
+  /**
+   * 初始化空条带的缓冲区和索引，用于处理长度为0的块。
+   */
   private void initZeroStrip() {
     if (zeroStripeBuffers != null) {
       for (int i = 0; i < zeroStripeBuffers.length; i++) {
@@ -202,6 +235,7 @@ class StripedReader {
 
     BitSet bitset = reconstructor.getLiveBitSet();
     int k = 0;
+    // 遍历所有条带，收集已损坏且长度为0的块索引存入零条带数组
     for (int i = 0; i < dataBlkNum + parityBlkNum; i++) {
       if (!bitset.get(i)) {
         if (reconstructor.getBlockLen(i) <= 0) {
@@ -211,6 +245,12 @@ class StripedReader {
     }
   }
 
+  /**
+   * 计算本次读取实际需要读取的长度，不超过块剩余长度和重建要求长度。
+   * @param index 块索引
+   * @param reconstructLength 重建要求长度
+   * @return 实际读取长度
+   */
   private int getReadLength(int index, int reconstructLength) {
     // the reading length should not exceed the length for reconstruction
     long blockLen = reconstructor.getBlockLen(index);
@@ -218,9 +258,15 @@ class StripedReader {
     return (int) Math.min(remaining, reconstructLength);
   }
 
+  /**
+   * 获取解码所需的所有输入缓冲区，包含成功读取的块和零填充的空块。
+   * @param toReconstructLen 本次重建长度
+   * @return 输入缓冲区数组，按块索引排列
+   */
   ByteBuffer[] getInputBuffers(int toReconstructLen) {
     ByteBuffer[] inputs = new ByteBuffer[dataBlkNum + parityBlkNum];
 
+    // 填充成功读取的块数据
     for (int i = 0; i < successList.length; i++) {
       int index = successList[i];
       StripedBlockReader reader = getReader(index);
@@ -229,6 +275,7 @@ class StripedReader {
       inputs[reader.getIndex()] = (ByteBuffer)buffer.flip();
     }
 
+    // 填充长度为0的空块，用零补齐
     if (successList.length < dataBlkNum) {
       for (int i = 0; i < zeroStripeBuffers.length; i++) {
         ByteBuffer buffer = zeroStripeBuffers[i];
@@ -241,6 +288,11 @@ class StripedReader {
     return inputs;
   }
 
+  /**
+   * 将缓冲区填充到指定长度，不足部分补零。
+   * @param buffer 目标缓冲区
+   * @param len 目标长度
+   */
   private void paddingBufferToLen(ByteBuffer buffer, int len) {
     if (len > buffer.limit()) {
       buffer.limit(len);
@@ -252,28 +304,28 @@ class StripedReader {
   }
 
   /**
-   * Read from minimum source DNs required for reconstruction in the iteration.
-   * First try the success list which we think they are the best DNs
-   * If source DN is corrupt or slow, try to read some other source DN,
-   * and will update the success list.
-   *
-   * Remember the updated success list and return it for following
-   * operations and next iteration read.
-   *
-   * @param reconstructLength the length to reconstruct.
-   * @return updated success list of source DNs we do real read
-   * @throws IOException
+   * 读取重建所需最小数量的源数据，处理失败/超时自动切换到其他源节点，更新成功列表。
+   * 读取完成后上报损坏块给NameNode。
+   * @param reconstructLength 本次需要重建的数据长度
+   * @throws IOException 无法读取足够源数据时抛出异常
    */
   void readMinimumSources(int reconstructLength) throws IOException {
     CorruptedBlocks corruptedBlocks = new CorruptedBlocks();
     try {
       successList = doReadMinimumSources(reconstructLength, corruptedBlocks);
     } finally {
-      // report corrupted blocks to NN
+      // 上报检测到的损坏块给NameNode
       datanode.reportCorruptedBlocks(corruptedBlocks);
     }
   }
 
+  /**
+   * 实际执行最小源数据读取，并行读取并处理失败、超时故障，动态替换故障源。
+   * @param reconstructLength 本次重建长度
+   * @param corruptedBlocks 用于收集损坏块
+   * @return 更新后的成功源索引数组
+   * @throws IOException 无法获取足够源数据时抛出异常
+   */
   int[] doReadMinimumSources(int reconstructLength,
                              CorruptedBlocks corruptedBlocks)
       throws IOException {
@@ -286,6 +338,7 @@ class StripedReader {
      * Read from minimum source DNs required, the success list contains
      * source DNs which we think best.
      */
+    // 先提交上一轮成功列表中的源节点进行读取
     for (int i = 0; i < minRequiredSources; i++) {
       StripedBlockReader reader = readers.get(successList[i]);
       int toRead = getReadLength(liveIndices[successList[i]],
@@ -296,13 +349,14 @@ class StripedReader {
         Future<BlockReadStats> f = readService.submit(readCallable);
         futures.put(f, successList[i]);
       } else {
-        // If the read length is 0, we don't need to do real read
+        // 读取长度为0，无需实际读取，直接加入成功列表
         reader.getReadBuffer().position(0);
         newSuccess[nSuccess++] = successList[i];
       }
       usedFlag.set(successList[i]);
     }
 
+    // 处理已完成的读取结果
     while (!futures.isEmpty()) {
       try {
         StripingChunkReadResult result =
@@ -310,24 +364,26 @@ class StripedReader {
                 readService, futures, stripedReadTimeoutInMills);
         int resultIndex = -1;
         if (result.state == StripingChunkReadResult.SUCCESSFUL) {
+          // 读取成功，记录结果索引
           resultIndex = result.index;
         } else if (result.state == StripingChunkReadResult.FAILED) {
           // If read failed for some source DN, we should not use it anymore
           // and schedule read from another source DN.
+          // 读取失败，关闭失败读取器，调度新源节点读取
           StripedBlockReader failedReader = readers.get(result.index);
           failedReader.closeBlockReader();
           resultIndex = scheduleNewRead(usedFlag,
               reconstructLength, corruptedBlocks);
         } else if (result.state == StripingChunkReadResult.TIMEOUT) {
-          // If timeout, we also schedule a new read.
+          // 读取超时，同样调度新源节点读取
           resultIndex = scheduleNewRead(usedFlag,
               reconstructLength, corruptedBlocks);
         }
         if (resultIndex >= 0) {
+          // 获取到有效成功源，加入成功列表
           newSuccess[nSuccess++] = resultIndex;
           if (nSuccess >= minRequiredSources) {
-            // cancel remaining reads if we read successfully from minimum
-            // number of source DNs required by reconstruction.
+            // 已经收集到足够源，取消剩余未完成读取，清理资源
             cancelReads(futures.keySet());
             clearFuturesAndService();
             break;
@@ -352,165 +408,14 @@ class StripedReader {
   }
 
   /**
-   * Schedule a read from some new source DN if some DN is corrupted
-   * or slow, this is called from the read iteration.
-   * Initially we may only have <code>minRequiredSources</code> number of
-   * StripedBlockReader.
-   * If the position is at the end of target block, don't need to do
-   * real read, and return the array index of source DN, otherwise -1.
-   *
-   * @param used the used source DNs in this iteration.
-   * @return the array index of source DN if don't need to do real read.
+   * 当原有源读取失败/超时后，调度一个新的源节点进行读取。
+   * 优先从未使用过的新源创建读取器，没有新源则复用已创建但未使用的读取器。
+   * @param used 当前迭代已使用的源标记
+   * @param reconstructLength 本次重建长度
+   * @param corruptedBlocks 损坏块收集器
+   * @return 如果不需要实际读取返回源索引，否则返回-1
    */
   private int scheduleNewRead(BitSet used, int reconstructLength,
                               CorruptedBlocks corruptedBlocks) {
     StripedBlockReader reader = null;
-    // step1: initially we may only have <code>minRequiredSources</code>
-    // number of StripedBlockReader, and there may be some source DNs we never
-    // read before, so will try to create StripedBlockReader for one new source
-    // DN and try to read from it. If found, go to step 3.
-    int m = readers.size();
-    int toRead = 0;
-    while (reader == null && m < sources.length) {
-      reader = createReader(m, reconstructor.getPositionInBlock());
-      readers.add(reader);
-      toRead = getReadLength(liveIndices[m], reconstructLength);
-      if (toRead > 0) {
-        if (reader.getBlockReader() == null) {
-          reader = null;
-          m++;
-        }
-      } else {
-        used.set(m);
-        return m;
-      }
-    }
-
-    // step2: if there is no new source DN we can use, try to find a source
-    // DN we ever read from but because some reason, e.g., slow, it
-    // is not in the success DN list at the begin of this iteration, so
-    // we have not tried it in this iteration. Now we have a chance to
-    // revisit it again.
-    for (int i = 0; reader == null && i < readers.size(); i++) {
-      if (!used.get(i)) {
-        StripedBlockReader stripedReader = readers.get(i);
-        toRead = getReadLength(liveIndices[i], reconstructLength);
-        if (toRead > 0) {
-          stripedReader.closeBlockReader();
-          stripedReader.resetBlockReader(reconstructor.getPositionInBlock());
-          if (stripedReader.getBlockReader() != null) {
-            stripedReader.getReadBuffer().position(0);
-            m = i;
-            reader = stripedReader;
-          }
-        } else {
-          used.set(i);
-          stripedReader.getReadBuffer().position(0);
-          return i;
-        }
-      }
-    }
-
-    // step3: schedule if find a correct source DN and need to do real read.
-    if (reader != null) {
-      Callable<BlockReadStats> readCallable =
-          reader.readFromBlock(toRead, corruptedBlocks);
-      Future<BlockReadStats> f = readService.submit(readCallable);
-      futures.put(f, m);
-      used.set(m);
-    }
-
-    return -1;
-  }
-
-  // Cancel all reads.
-  private static void cancelReads(Collection<Future<BlockReadStats>> futures) {
-    for (Future<BlockReadStats> future : futures) {
-      future.cancel(true);
-    }
-  }
-
-  // remove all stale futures from readService, and clear futures.
-  private void clearFuturesAndService() {
-    while (!futures.isEmpty()) {
-      try {
-        Future<BlockReadStats> future = readService.poll(
-            stripedReadTimeoutInMills, TimeUnit.MILLISECONDS
-        );
-        futures.remove(future);
-      } catch (InterruptedException e) {
-        LOG.info("Clear stale futures from service is interrupted.", e);
-      }
-    }
-  }
-
-  void close() {
-    if (zeroStripeBuffers != null) {
-      for (ByteBuffer zeroStripeBuffer : zeroStripeBuffers) {
-        reconstructor.freeBuffer(zeroStripeBuffer);
-      }
-    }
-    zeroStripeBuffers = null;
-
-    for (StripedBlockReader reader : readers) {
-      reader.closeBlockReader();
-      reconstructor.freeBuffer(reader.getReadBuffer());
-      reader.freeReadBuffer();
-    }
-  }
-
-  StripedReconstructor getReconstructor() {
-    return reconstructor;
-  }
-
-  StripedBlockReader getReader(int i) {
-    return readers.get(i);
-  }
-
-  int getBufferSize() {
-    return bufferSize;
-  }
-
-  DataChecksum getChecksum() {
-    return checksum;
-  }
-
-  void clearBuffers() {
-    if (zeroStripeBuffers != null) {
-      for (ByteBuffer zeroStripeBuffer : zeroStripeBuffers) {
-        zeroStripeBuffer.clear();
-      }
-    }
-
-    for (StripedBlockReader reader : readers) {
-      if (reader.getReadBuffer() != null) {
-        reader.getReadBuffer().clear();
-      }
-    }
-  }
-
-  InetSocketAddress getSocketAddress4Transfer(DatanodeInfo dnInfo) {
-    return reconstructor.getSocketAddress4Transfer(dnInfo);
-  }
-
-  CachingStrategy getCachingStrategy() {
-    return reconstructor.getCachingStrategy();
-  }
-
-  /**
-   * Return the xmits of this EC reconstruction task.
-   * <p>
-   * DN uses it to coordinate with NN to adjust the speed of scheduling the
-   * EC reconstruction tasks to this DN.
-   *
-   * @return the xmits of this reconstruction task.
-   */
-  int getXmits() {
-    return xmits;
-  }
-
-  public int getMinRequiredSources() {
-    return minRequiredSources;
-  }
-
-}
+    // step1: 优先尝试从未

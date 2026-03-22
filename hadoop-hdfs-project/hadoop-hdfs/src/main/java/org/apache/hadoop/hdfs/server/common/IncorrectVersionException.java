@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,19 +24,29 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * The exception is thrown when external version does not match 
- * current version of the application.
- * 
+ * HDFS版本不匹配异常，当外部组件版本与当前应用版本不兼容时抛出
+ * 通常用于HDFS不同节点之间版本协商检查，确保集群节点版本兼容
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class IncorrectVersionException extends IOException {
   private static final long serialVersionUID = 1L;
   
+  /**
+   * 构造函数，使用自定义异常信息创建版本不匹配异常
+   * @param message 异常描述信息
+   */
   public IncorrectVersionException(String message) {
     super(message);
   }
 
+  /**
+   * 构造函数，基于远端守护进程版本过低场景创建异常
+   * @param minimumVersion 当前节点要求的远端最低兼容版本
+   * @param reportedVersion 远端实际上报的版本
+   * @param remoteDaemon 远端守护进程名称
+   * @param thisDaemon 当前本地守护进程名称
+   */
   public IncorrectVersionException(String minimumVersion, String reportedVersion,
       String remoteDaemon, String thisDaemon) {
     this("The reported " + remoteDaemon + " version is too low to communicate" +
@@ -44,11 +55,23 @@ public class IncorrectVersionException extends IOException {
         minimumVersion + "'");
   }
   
+  /**
+   * 构造函数，基于布局版本不匹配场景创建异常
+   * @param currentLayoutVersion 当前期望的布局版本
+   * @param versionReported 实际上报的布局版本
+   * @param ofWhat 版本所属对象描述
+   */
   public IncorrectVersionException(int currentLayoutVersion,
       int versionReported, String ofWhat) {
     this(versionReported, ofWhat, currentLayoutVersion);
   }
   
+  /**
+   * 构造函数，基于数字版本号不匹配场景创建异常
+   * @param versionReported 实际上报的版本号
+   * @param ofWhat 版本所属对象描述
+   * @param versionExpected 期望的版本号
+   */
   public IncorrectVersionException(int versionReported,
                                    String ofWhat,
                                    int versionExpected) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,30 +25,20 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 
 /**
- * A BlockStorageMovementCommand is an instruction to a DataNode to move the
- * given set of blocks to specified target DataNodes to fulfill the block
- * storage policy.
- *
- * Upon receiving this command, this DataNode pass the array of block movement
- * details to
- * {@link org.apache.hadoop.hdfs.server.sps.ExternalSPSBlockMoveTaskHandler}
- * service. Later, ExternalSPSBlockMoveTaskHandler will schedule block movement
- * tasks for these blocks and monitors the completion of each task. After the
- * block movement attempt is finished(with success or failure) this DataNode
- * will send response back to NameNode about the block movement attempt
- * finished details.
+ * 文件说明：HDFS数据节点块存储移动命令，定义NameNode向DataNode下发的块移动指令，用于满足块存储策略要求。
+ * 
+ * 核心作用：封装需要移动的块列表和目标信息，由NameNode发给目标DataNode，驱动外部存储策略满足服务(SPS)执行块移动任务。
+ * DataNode收到命令后会转交外部SPS处理器调度任务，任务完成后将结果回传给NameNode。
  */
 public class BlockStorageMovementCommand extends DatanodeCommand {
   private final String blockPoolId;
   private final Collection<BlockMovingInfo> blockMovingTasks;
 
   /**
-   * Block storage movement command constructor.
-   *
-   * @param action
-   *          protocol specific action
-   * @param blockMovingInfos
-   *          block to storage info that will be used for movement
+   * 构造块存储移动命令对象
+   * @param action 协议指定的动作类型
+   * @param blockPoolId 块池ID
+   * @param blockMovingInfos 需要执行移动的块信息集合
    */
   public BlockStorageMovementCommand(int action, String blockPoolId,
       Collection<BlockMovingInfo> blockMovingInfos) {
@@ -57,21 +48,23 @@ public class BlockStorageMovementCommand extends DatanodeCommand {
   }
 
   /**
-   * Returns block pool ID.
+   * 获取命令所属块池ID
+   * @return 块池ID
    */
   public String getBlockPoolId() {
     return blockPoolId;
   }
 
   /**
-   * Returns the list of blocks to be moved.
+   * 获取所有需要移动的块任务信息集合
+   * @return 待移动块信息集合
    */
   public Collection<BlockMovingInfo> getBlockMovingTasks() {
     return blockMovingTasks;
   }
 
   /**
-   * Stores block to storage info that can be used for block movement.
+   * 单个块移动信息类，存储单个块的源、目标位置和存储类型信息，用于块移动任务执行。
    */
   public static class BlockMovingInfo {
     private Block blk;
@@ -81,14 +74,12 @@ public class BlockStorageMovementCommand extends DatanodeCommand {
     private StorageType targetStorageType;
 
     /**
-     * Block to storage info constructor.
-     *
-     * @param block
-     *          block info
-     * @param sourceDnInfo
-     *          node that can be the source of a block move
-     * @param srcStorageType
-     *          type of source storage media
+     * 构造单个块移动信息对象
+     * @param block 需要移动的块
+     * @param sourceDnInfo 源数据节点
+     * @param targetDnInfo 目标数据节点
+     * @param srcStorageType 源存储介质类型
+     * @param targetStorageType 目标存储介质类型
      */
     public BlockMovingInfo(Block block, DatanodeInfo sourceDnInfo,
         DatanodeInfo targetDnInfo, StorageType srcStorageType,

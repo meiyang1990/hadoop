@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,6 +32,10 @@ import javax.management.StandardMBean;
 import java.util.HashSet;
 
 /**
+ * 文件说明：外部存储策略满足器（ExternalSPS）的JMX指标暴露实现类
+ * 核心职责：将ExternalSPS的运行状态指标通过JMX MBean暴露，供监控系统采集查看
+ */
+/**
  * Expose the ExternalSPS metrics.
  */
 public class ExternalSPSBeanMetrics implements ExternalSPSMXBean {
@@ -39,11 +44,18 @@ public class ExternalSPSBeanMetrics implements ExternalSPSMXBean {
       LoggerFactory.getLogger(ExternalSPSBeanMetrics.class);
 
   /**
-   * ExternalSPS bean.
+   * ExternalSPS JMX MBean对象名
    */
   private ObjectName externalSPSBeanName;
+  /**
+   * 持有存储策略满足器实例引用，用于获取运行指标
+   */
   private StoragePolicySatisfier storagePolicySatisfier;
 
+  /**
+   * 构造函数，注册ExternalSPS的JMX MBean到MBean服务器
+   * @param sps 存储策略满足器实例
+   */
   public ExternalSPSBeanMetrics(StoragePolicySatisfier sps) {
     try {
       this.storagePolicySatisfier = sps;
@@ -56,7 +68,7 @@ public class ExternalSPSBeanMetrics implements ExternalSPSMXBean {
   }
 
   /**
-   * Unregister the JMX interfaces.
+   * 注销JMX MBean，释放资源，关闭指标暴露
    */
   public void close() {
     if (externalSPSBeanName != null) {
@@ -70,6 +82,9 @@ public class ExternalSPSBeanMetrics implements ExternalSPSMXBean {
     return storagePolicySatisfier.processingQueueSize();
   }
 
+  /**
+   * 测试专用方法，向处理队列添加测试数据，用于指标验证
+   */
   @VisibleForTesting
   public void updateProcessingQueueSize() {
     storagePolicySatisfier.getStorageMovementQueue()
@@ -81,6 +96,9 @@ public class ExternalSPSBeanMetrics implements ExternalSPSMXBean {
     return storagePolicySatisfier.getAttemptedItemsMonitor().getMovementFinishedBlocksCount();
   }
 
+  /**
+   * 测试专用方法，向已完成移动块集合添加测试数据，用于指标验证
+   */
   @VisibleForTesting
   public void updateMovementFinishedBlocksCount() {
     storagePolicySatisfier.getAttemptedItemsMonitor().getMovementFinishedBlocks()
@@ -92,6 +110,9 @@ public class ExternalSPSBeanMetrics implements ExternalSPSMXBean {
     return storagePolicySatisfier.getAttemptedItemsMonitor().getAttemptedItemsCount();
   }
 
+  /**
+   * 测试专用方法，向已尝试移动项集合添加测试数据，用于指标验证
+   */
   @VisibleForTesting
   public void updateAttemptedItemsCount() {
     storagePolicySatisfier.getAttemptedItemsMonitor().getStorageMovementAttemptedItems()

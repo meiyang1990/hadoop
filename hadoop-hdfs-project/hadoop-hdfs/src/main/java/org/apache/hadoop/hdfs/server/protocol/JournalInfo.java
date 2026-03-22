@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,7 +21,8 @@ package org.apache.hadoop.hdfs.server.protocol;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * Information that describes a journal
+ * HDFS日志（Journal）元信息描述类，用于在HA架构的NameNode节点间传递日志管理器基本信息
+ * 包含日志的版本、集群标识和命名空间标识等核心元数据
  */
 @InterfaceAudience.Private
 public class JournalInfo {
@@ -28,20 +30,38 @@ public class JournalInfo {
   private final String clusterId;
   private final int namespaceId;
 
+  /**
+   * 构造Journal信息对象，存储日志管理器核心元数据
+   * @param lv 日志布局版本号
+   * @param clusterId HDFS集群唯一标识
+   * @param nsId 命名空间唯一标识
+   */
   public JournalInfo(int lv, String clusterId, int nsId) {
     this.layoutVersion = lv;
     this.clusterId = clusterId;
     this.namespaceId = nsId;
   }
 
+  /**
+   * 获取日志布局版本号
+   * @return 布局版本号
+   */
   public int getLayoutVersion() {
     return layoutVersion;
   }
 
+  /**
+   * 获取HDFS集群唯一标识
+   * @return 集群ID
+   */
   public String getClusterId() {
     return clusterId;
   }
 
+  /**
+   * 获取命名空间唯一标识
+   * @return 命名空间ID
+   */
   public int getNamespaceId() {
     return namespaceId;
   }

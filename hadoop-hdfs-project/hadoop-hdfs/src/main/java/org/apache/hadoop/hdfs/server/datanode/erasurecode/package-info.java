@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,9 @@
  */
 
 /**
- * Datanode side striping + erasure coding related task processing.
+ * 本包提供HDFS DataNode节点侧的条带化存储与纠删码相关任务处理能力。
+ * 负责在DataNode节点上执行纠删码块的编码、解码、修复等底层计算工作，是HDFS纠删码特性
+ * 在数据节点侧的核心实现包，支撑HDFS在节省存储空间的同时保障数据可靠性。
  */
 @InterfaceAudience.LimitedPrivate({"HDFS"})
 @InterfaceStability.Evolving

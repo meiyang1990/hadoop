@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,6 +47,8 @@ import java.util.Map.Entry;
 import static org.apache.hadoop.hdfs.server.namenode.top.window.RollingWindowManager.TopWindow;
 
 /**
+ * 文件级注释：NameNode 热点操作用户统计模块核心类，维护滚动时间窗口内的用户操作计数，用于统计占用NameNode操作最多的用户
+ *
  * The interface to the top metrics.
  * <p>
  * Metrics are collected by a custom audit logger, {@link org.apache.hadoop
@@ -72,6 +75,10 @@ public class TopMetrics implements MetricsSource {
       "NNTopUserOpCounts";
   private final boolean isMetricsSourceEnabled;
 
+  /**
+   * 输出NNTop配置信息到日志，用于调试和问题排查
+   * @param conf Hadoop配置对象
+   */
   private static void logConf(Configuration conf) {
     LOG.info("NNTop conf: " + DFSConfigKeys.NNTOP_BUCKETS_PER_WINDOW_KEY +
         " = " +  conf.get(DFSConfigKeys.NNTOP_BUCKETS_PER_WINDOW_KEY));
@@ -82,12 +89,18 @@ public class TopMetrics implements MetricsSource {
   }
 
   /**
+   * 滚动窗口管理器映射，键为窗口时长（分钟），值为对应时长的滚动窗口管理器
    * A map from reporting periods to WindowManager. Thread-safety is provided by
    * the fact that the mapping is not changed after construction.
    */
   final Map<Integer, RollingWindowManager> rollingWindowManagers =
       new HashMap<Integer, RollingWindowManager>();
 
+  /**
+   * 构造函数，根据配置初始化所有指定时长的滚动窗口
+   * @param conf Hadoop配置对象
+   * @param reportingPeriods 需要统计的所有时间窗口时长数组
+   */
   public TopMetrics(Configuration conf, int[] reportingPeriods) {
     logConf(conf);
     for (int i = 0; i < reportingPeriods.length; i++) {
@@ -99,8 +112,8 @@ public class TopMetrics implements MetricsSource {
   }
 
   /**
-   * Get a list of the current TopWindow statistics, one TopWindow per tracked
-   * time interval.
+   * 获取所有时间窗口的当前统计快照，用于对外暴露统计结果
+   * @return 所有时间窗口的统计结果列表
    */
   public List<TopWindow> getTopWindows() {
     long monoTime = Time.monotonicNow();
@@ -115,17 +128,18 @@ public class TopMetrics implements MetricsSource {
   }
 
   /**
+   * 从审计日志提取需要统计的信息并上报，保持和审计日志信息一致
    * Pick the same information that DefaultAuditLogger does before writing to a
    * log file. This is to be consistent when {@link TopMetrics} is charged with
    * data read back from log files instead of being invoked directly by the
    * FsNamesystem
-   * @param succeeded
-   * @param userName
-   * @param addr
-   * @param cmd
-   * @param src
-   * @param dst
-   * @param status
+   * @param succeeded 操作是否成功
+   * @param userName 操作用户名
+   * @param addr 客户端地址
+   * @param cmd 操作命令类型
+   * @param src 源路径
+   * @param dst 目标路径
+   * @param status 文件状态
    */
   public void report(boolean succeeded, String userName, InetAddress addr,
       String cmd, String src, String dst, FileStatus status) {
@@ -133,11 +147,22 @@ public class TopMetrics implements MetricsSource {
     report(userName, cmd);
   }
 
+  /**
+   * 上报当前时间点的用户操作
+   * @param userName 操作用户名
+   * @param cmd 操作命令类型
+   */
   public void report(String userName, String cmd) {
     long currTime = Time.monotonicNow();
     report(currTime, userName, cmd);
   }
 
+  /**
+   * 上报指定时间点的用户操作，对所有时间窗口执行计数
+   * @param currTime 操作发生时间
+   * @param userName 操作用户名
+   * @param cmd 操作命令类型
+   */
   public void report(long currTime, String userName, String cmd) {
     LOG.debug("a metric is reported: cmd: {} user: {}", cmd, userName);
     userName = UserGroupInformation.trimLoginMethod(userName);
@@ -148,12 +173,13 @@ public class TopMetrics implements MetricsSource {
   }
 
   /**
+   * 实现MetricsSource接口，将统计数据导出给Hadoop metrics2系统，供外部监控系统采集
    * Flatten out the top window metrics into
    * {@link org.apache.hadoop.metrics2.MetricsRecord}s for consumption by
    * external metrics systems. Each metrics record added corresponds to the
    * reporting period a.k.a window length of the configured rolling windows.
-   * @param collector
-   * @param all
+   * @param collector 指标收集器
+   * @param all 是否导出所有指标
    */
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
@@ -161,9 +187,11 @@ public class TopMetrics implements MetricsSource {
       return;
     }
 
+    // 遍历所有时间窗口，逐个导出指标
     for (final TopWindow window : getTopWindows()) {
       MetricsRecordBuilder rb = collector.addRecord(buildOpRecordName(window))
           .setContext("dfs");
+      // 遍历每个操作类型，导出该操作总计数和TOP用户计数
       for (final Op op: window.getOps()) {
         rb.addCounter(buildOpTotalCountMetricsInfo(op), op.getTotalCount());
         for (User user : op.getTopUsers()) {
@@ -173,16 +201,32 @@ public class TopMetrics implements MetricsSource {
     }
   }
 
+  /**
+   * 构建指定时间窗口的指标记录名称
+   * @param window 时间窗口对象
+   * @return 指标记录名称
+   */
   private String buildOpRecordName(TopWindow window) {
     return TOPMETRICS_METRICS_SOURCE_NAME + ".windowMs="
       + window.getWindowLenMs();
   }
 
+  /**
+   * 构建操作总计数的指标信息
+   * @param op 操作对象
+   * @return 指标信息对象
+   */
   private MetricsInfo buildOpTotalCountMetricsInfo(Op op) {
     return Interns.info("op=" + StringUtils.deleteWhitespace(op.getOpType())
       + ".TotalCount", "Total operation count");
   }
 
+  /**
+   * 构建用户操作计数的指标信息
+   * @param op 操作对象
+   * @param user 用户统计对象
+   * @return 指标信息对象
+   */
   private MetricsInfo buildOpRecordMetricsInfo(Op op, User user) {
     return Interns.info("op=" + StringUtils.deleteWhitespace(op.getOpType())
       + ".user=" + user.getUser()

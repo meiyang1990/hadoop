@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,7 +47,10 @@ import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IO_FILE_BUFFER_SIZE_KEY;
 
 /**
- * This abstract class is used as a base class for provided replicas.
+ * 文件路径: hadoop-hdfs-project/hadoop-hdfs/src/main/java/org/apache/hadoop/hdfs/server/datanode/ProvidedReplica.java
+ *
+ * 提供存储模式下数据块副本的抽象基类，用于表示存储在外部第三方存储系统（如对象存储）中的数据块副本，
+ * DataNode本身不存储实际数据，仅保留元数据信息，读取数据时直接从外部存储获取。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -55,8 +59,7 @@ public abstract class ProvidedReplica extends ReplicaInfo {
   public static final Logger LOG =
       LoggerFactory.getLogger(ProvidedReplica.class);
 
-  // Null checksum information for provided replicas.
-  // Shared across all replicas.
+  // 提供存储副本使用空校验和，所有实例共享该数组
   static final byte[] NULL_CHECKSUM_ARRAY =
       FsDatasetUtil.createNullChecksumByteArray();
   private URI fileURI;
@@ -68,16 +71,16 @@ public abstract class ProvidedReplica extends ReplicaInfo {
   private FileSystem remoteFS;
 
   /**
-   * Constructor.
+   * 构造基于URI路径的提供存储副本实例。
    *
-   * @param blockId block id
-   * @param fileURI remote URI this block is to be read from
-   * @param fileOffset the offset in the remote URI
-   * @param blockLen the length of the block
-   * @param genStamp the generation stamp of the block
-   * @param volume the volume this block belongs to
-   * @param conf the configuration
-   * @param remoteFS reference to the remote filesystem to use for this replica.
+   * @param blockId 数据块ID
+   * @param fileURI 存储数据块的外部存储URI
+   * @param fileOffset 数据块在外部存储文件中的偏移量
+   * @param blockLen 数据块长度
+   * @param genStamp 数据块生成戳
+   * @param volume 副本所属的DataNode卷
+   * @param conf Hadoop配置对象
+   * @param remoteFS 外部存储文件系统引用，若为null则自动创建
    */
   public ProvidedReplica(long blockId, URI fileURI, long fileOffset,
       long blockLen, long genStamp, PathHandle pathHandle, FsVolumeSpi volume,
@@ -102,22 +105,17 @@ public abstract class ProvidedReplica extends ReplicaInfo {
   }
 
   /**
-   * Constructor.
+   * 构造基于前缀+后缀路径的提供存储副本实例，用于路径分片场景。
    *
-   * @param blockId block id
-   * @param pathPrefix A prefix of the {@link Path} associated with this replica
-   *          on the remote {@link FileSystem}.
-   * @param pathSuffix A suffix of the {@link Path} associated with this replica
-   *          on the remote {@link FileSystem}. Resolving the {@code pathSuffix}
-   *          against the {@code pathPrefix} should provide the exact
-   *          {@link Path} of the data associated with this replica on the
-   *          remote {@link FileSystem}.
-   * @param fileOffset the offset in the remote URI
-   * @param blockLen the length of the block
-   * @param genStamp the generation stamp of the block
-   * @param volume the volume this block belongs to
-   * @param conf the configuration
-   * @param remoteFS reference to the remote filesystem to use for this replica.
+   * @param blockId 数据块ID
+   * @param pathPrefix 远程文件路径前缀
+   * @param pathSuffix 远程文件路径后缀，与前缀拼接得到完整路径
+   * @param fileOffset 数据块在外部存储文件中的偏移量
+   * @param blockLen 数据块长度
+   * @param genStamp 数据块生成戳
+   * @param volume 副本所属的DataNode卷
+   * @param conf Hadoop配置对象
+   * @param remoteFS 外部存储文件系统引用，若为null则自动创建
    */
   public ProvidedReplica(long blockId, Path pathPrefix, String pathSuffix,
       long fileOffset, long blockLen, long genStamp, PathHandle pathHandle,
@@ -143,6 +141,11 @@ public abstract class ProvidedReplica extends ReplicaInfo {
     }
   }
 
+  /**
+   * 拷贝构造函数，基于已有ProvidedReplica创建新实例。
+   *
+   * @param r 要拷贝的源ProvidedReplica实例
+   */
   public ProvidedReplica(ProvidedReplica r) {
     super(r);
     this.fileURI = r.fileURI;
@@ -169,6 +172,11 @@ public abstract class ProvidedReplica extends ReplicaInfo {
     return pathPrefix;
   }
 
+  /**
+   * 根据存储方式拼接并返回数据块在外部存储的完整URI。
+   *
+   * @return 数据块完整URI
+   */
   private URI getRemoteURI() {
     if (fileURI != null) {
       return fileURI;
@@ -184,6 +192,7 @@ public abstract class ProvidedReplica extends ReplicaInfo {
     if (remoteFS != null) {
       FSDataInputStream ins;
       try {
+        // 优先使用PathHandle打开文件，PathHandle可优化路径解析开销
         if (pathHandle != null) {
           ins = remoteFS.open(pathHandle, conf.getInt(IO_FILE_BUFFER_SIZE_KEY,
               IO_FILE_BUFFER_SIZE_DEFAULT));
@@ -193,8 +202,9 @@ public abstract class ProvidedReplica extends ReplicaInfo {
       } catch (UnsupportedOperationException e) {
         throw new IOException("PathHandle specified, but unsuported", e);
       }
-
+      // 定位到数据块在文件中的起始位置加上请求偏移
       ins.seek(fileOffset + seekOffset);
+      // 返回 bounded 流，限制只能读取当前数据块长度，不读取后续其他数据
       return new BoundedInputStream(
           new FSDataInputStream(ins), getBlockDataLength());
     } else {
@@ -224,6 +234,7 @@ public abstract class ProvidedReplica extends ReplicaInfo {
   public boolean blockDataExists() {
     if(remoteFS != null) {
       try {
+        // 检查外部存储中数据文件是否存在
         return remoteFS.exists(new Path(getRemoteURI()));
       } catch (IOException e) {
         return false;
@@ -247,6 +258,7 @@ public abstract class ProvidedReplica extends ReplicaInfo {
   @Override
   public LengthInputStream getMetadataInputStream(long offset)
       throws IOException {
+    // 返回空校验和流，提供存储不维护本地校验和
     return new LengthInputStream(new ByteArrayInputStream(NULL_CHECKSUM_ARRAY),
         NULL_CHECKSUM_ARRAY.length);
   }
@@ -313,8 +325,10 @@ public abstract class ProvidedReplica extends ReplicaInfo {
     if (info.getFileRegion().equals(
         new FileRegion(this.getBlockId(), new Path(getRemoteURI()),
             fileOffset, this.getNumBytes(), this.getGenerationStamp()))) {
+      // 扫描信息与当前副本信息一致，返回匹配
       return 0;
     } else {
+      // 不匹配时返回块长度差值
       return (int) (info.getBlockLength() - getNumBytes());
     }
   }

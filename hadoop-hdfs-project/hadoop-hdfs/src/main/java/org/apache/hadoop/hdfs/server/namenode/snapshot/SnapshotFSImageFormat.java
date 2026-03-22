@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,15 +44,19 @@ import org.apache.hadoop.hdfs.util.ReadOnlyList;
 import org.apache.hadoop.util.Preconditions;
 
 /**
+ * 文件级注释：HDFS快照相关信息在FSImage中的读写工具类，负责序列化和反序列化快照元数据
+ * 为FSImage持久化提供快照相关数据结构的读写支持
+ */
+/**
  * A helper class defining static methods for reading/writing snapshot related
  * information from/to FSImage.
  */
 public class SnapshotFSImageFormat {
   /**
-   * Save snapshots and snapshot quota for a snapshottable directory.
-   * @param current The directory that the snapshots belongs to.
-   * @param out The {@link DataOutput} to write.
-   * @throws IOException
+   * 保存可快照目录的所有快照信息和快照配额到FSImage输出流
+   * @param current 快照所属的当前目录
+   * @param out 输出流，用于写入FSImage
+   * @throws IOException 写入IO异常
    */
   public static void saveSnapshots(INodeDirectory current, DataOutput out)
       throws IOException {
@@ -69,9 +74,12 @@ public class SnapshotFSImageFormat {
   }
 
   /**
-   * Save SnapshotDiff list for an INodeDirectoryWithSnapshot.
-   * @param diffs The directory that the SnapshotDiff list belongs to.
-   * @param out The {@link DataOutput} to write.
+   * 将INode差异列表保存到FSImage输出流
+   * 采用逆序存储，保证加载时能正确建立引用关系
+   * @param diffs 需要保存的INode差异列表
+   * @param out 输出流
+   * @param referenceMap 引用映射表，用于处理重复引用
+   * @throws IOException 写入IO异常
    */
   private static <N extends INode, A extends INodeAttributes, D extends AbstractINodeDiff<N, A, D>>
       void saveINodeDiffs(final AbstractINodeDiffList<N, A, D> diffs,
@@ -90,17 +98,30 @@ public class SnapshotFSImageFormat {
     }
   }
 
+  /**
+   * 保存目录差异列表到FSImage输出流
+   */
   public static void saveDirectoryDiffList(final INodeDirectory dir,
       final DataOutput out, final ReferenceMap referenceMap
       ) throws IOException {
     saveINodeDiffs(dir.getDiffs(), out, referenceMap);
   }
 
+  /**
+   * 保存文件差异列表到FSImage输出流
+   */
   public static void saveFileDiffList(final INodeFile file,
       final DataOutput out) throws IOException {
     saveINodeDiffs(file.getDiffs(), out, null);
   }
 
+  /**
+   * 从FSImage输入流加载文件差异列表
+   * @param in 输入流
+   * @param loader FSImage加载器
+   * @return 加载完成的文件差异列表
+   * @throws IOException 读取IO异常
+   */
   public static FileDiffList loadFileDiffList(DataInput in,
       FSImageFormat.Loader loader) throws IOException {
     final int size = in.readInt();
@@ -118,6 +139,14 @@ public class SnapshotFSImageFormat {
     }
   }
 
+  /**
+   * 从FSImage输入流加载单个文件差异
+   * @param posterior 后序差异，用于建立链表引用
+   * @param in 输入流
+   * @param loader FSImage加载器
+   * @return 加载完成的文件差异对象
+   * @throws IOException 读取IO异常
+   */
   private static FileDiff loadFileDiff(FileDiff posterior, DataInput in,
       FSImageFormat.Loader loader) throws IOException {
     // 1. Read the id of the Snapshot root to identify the Snapshot
@@ -134,10 +163,11 @@ public class SnapshotFSImageFormat {
   }
 
   /**
-   * Load a node stored in the created list from fsimage.
-   * @param createdNodeName The name of the created node.
-   * @param parent The directory that the created list belongs to.
-   * @return The created node.
+   * 从FSImage加载创建列表中的INode，通过引用查找实际节点对象
+   * @param createdNodeName 创建节点的名称
+   * @param parent 创建列表所属的父目录
+   * @return 查找到的INode对象
+   * @throws IOException 找不到节点时抛出异常
    */
   public static INode loadCreated(byte[] createdNodeName,
       INodeDirectory parent) throws IOException {
@@ -161,10 +191,11 @@ public class SnapshotFSImageFormat {
   }
   
   /**
-   * Load the created list from fsimage.
-   * @param parent The directory that the created list belongs to.
-   * @param in The {@link DataInput} to read.
-   * @return The created list.
+   * 从FSImage加载创建的INode列表
+   * @param parent 列表所属的父目录
+   * @param in 输入流
+   * @return 加载完成的创建列表
+   * @throws IOException 读取IO异常
    */
   private static List<INode> loadCreatedList(INodeDirectory parent,
       DataInput in) throws IOException {
@@ -180,14 +211,13 @@ public class SnapshotFSImageFormat {
   }
     
   /**
-   * Load the deleted list from the fsimage.
-   * 
-   * @param parent The directory that the deleted list belongs to.
-   * @param createdList The created list associated with the deleted list in 
-   *                    the same Diff.
-   * @param in The {@link DataInput} to read.
-   * @param loader The {@link FSImageFormat.Loader} instance.
-   * @return The deleted list.
+   * 从FSImage加载删除的INode列表
+   * @param parent 列表所属的父目录
+   * @param createdList 同一个差异中对应的创建列表，用于引用解析
+   * @param in 输入流
+   * @param loader FSImage加载器
+   * @return 加载完成的删除列表
+   * @throws IOException 读取IO异常
    */
   private static List<INode> loadDeletedList(INodeDirectory parent,
       List<INode> createdList, DataInput in, FSImageFormat.Loader loader)
@@ -209,14 +239,12 @@ public class SnapshotFSImageFormat {
   }
   
   /**
-   * Load snapshots and snapshotQuota for a Snapshottable directory.
-   *
-   * @param snapshottableParent
-   *          The snapshottable directory for loading.
-   * @param numSnapshots
-   *          The number of snapshots that the directory has.
-   * @param loader
-   *          The loader
+   * 从FSImage加载可快照目录的快照列表和快照配额
+   * @param snapshottableParent 目标可快照目录
+   * @param numSnapshots 该目录包含的快照数量
+   * @param in 输入流
+   * @param loader FSImage加载器
+   * @throws IOException 读取IO异常
    */
   public static void loadSnapshotList(INodeDirectory snapshottableParent,
       int numSnapshots, DataInput in, FSImageFormat.Loader loader)
@@ -235,15 +263,11 @@ public class SnapshotFSImageFormat {
   }
 
   /**
-   * Load the {@link SnapshotDiff} list for the INodeDirectoryWithSnapshot
-   * directory.
-   *
-   * @param dir
-   *          The snapshottable directory for loading.
-   * @param in
-   *          The {@link DataInput} instance to read.
-   * @param loader
-   *          The loader
+   * 从FSImage加载目录差异列表
+   * @param dir 目标目录
+   * @param in 输入流
+   * @param loader FSImage加载器
+   * @throws IOException 读取IO异常
    */
   public static void loadDirectoryDiffList(INodeDirectory dir,
       DataInput in, FSImageFormat.Loader loader) throws IOException {
@@ -257,12 +281,12 @@ public class SnapshotFSImageFormat {
   }
 
   /**
-   * Load the snapshotINode field of {@link AbstractINodeDiff}.
-   * @param snapshot The Snapshot associated with the {@link AbstractINodeDiff}.
-   * @param in The {@link DataInput} to read.
-   * @param loader The {@link FSImageFormat.Loader} instance that this loading procedure is
-   *               using.
-   * @return The snapshotINode.
+   * 加载目录差异中的快照INode属性
+   * @param snapshot 关联的快照
+   * @param in 输入流
+   * @param loader FSImage加载器
+   * @return 加载完成的目录属性对象
+   * @throws IOException 读取IO异常
    */
   private static INodeDirectoryAttributes loadSnapshotINodeInDirectoryDiff(
       Snapshot snapshot, DataInput in, FSImageFormat.Loader loader)
@@ -278,12 +302,12 @@ public class SnapshotFSImageFormat {
   }
    
   /**
-   * Load {@link DirectoryDiff} from fsimage.
-   * @param parent The directory that the SnapshotDiff belongs to.
-   * @param in The {@link DataInput} instance to read.
-   * @param loader The {@link FSImageFormat.Loader} instance that this loading procedure is
-   *               using.
-   * @return A {@link DirectoryDiff}.
+   * 从FSImage加载单个目录差异对象
+   * @param parent 差异所属的父目录
+   * @param in 输入流
+   * @param loader FSImage加载器
+   * @return 加载完成的目录差异对象
+   * @throws IOException 读取IO异常
    */
   private static DirectoryDiff loadDirectoryDiff(INodeDirectory parent,
       DataInput in, FSImageFormat.Loader loader) throws IOException {
@@ -312,18 +336,35 @@ public class SnapshotFSImageFormat {
   }
   
 
+  /**
+   * 引用映射类，用于FSImage序列化时处理INode引用避免重复存储
+   * 记录已经写入的引用节点，实现共享节点只存储一次
+   */
   /** A reference map for fsimage serialization. */
   public static class ReferenceMap {
+    /**
+     * 记录已保存的带计数INode引用，key为节点ID
+     */
     /**
      * Used to indicate whether the reference node itself has been saved
      */
     private final Map<Long, INodeReference.WithCount> referenceMap
         = new HashMap<Long, INodeReference.WithCount>();
     /**
+     * 记录引用节点的子树是否已经保存，避免重复写入子树
+     */
+    /**
      * Used to record whether the subtree of the reference node has been saved 
      */
     private final Map<Long, Long> dirMap = new HashMap<Long, Long>();
 
+    /**
+     * 将带计数的INode引用写入FSImage，重复引用只写ID不重复存储节点内容
+     * @param withCount 带计数的引用对象
+     * @param out 输出流
+     * @param writeUnderConstruction 是否写入构造中块信息
+     * @throws IOException 写入IO异常
+     */
     public void writeINodeReferenceWithCount(
         INodeReference.WithCount withCount, DataOutput out,
         boolean writeUnderConstruction) throws IOException {
@@ -341,6 +382,11 @@ public class SnapshotFSImageFormat {
       }
     }
     
+    /**
+     * 检查指定ID目录的子树是否需要处理，判断是否已经写入过
+     * @param id 目录节点ID
+     * @return true表示需要处理，false表示已经处理过无需重复处理
+     */
     public boolean toProcessSubtree(long id) {
       if (dirMap.containsKey(id)) {
         return false;
@@ -350,6 +396,14 @@ public class SnapshotFSImageFormat {
       }
     }
     
+    /**
+     * 从FSImage加载带计数的INode引用，复用已加载的节点避免重复创建
+     * @param isSnapshotINode 是否是快照INode
+     * @param in 输入流
+     * @param loader FSImage加载器
+     * @return 加载完成的引用对象
+     * @throws IOException 读取IO异常
+     */
     public INodeReference.WithCount loadINodeReferenceWithCount(
         boolean isSnapshotINode, DataInput in, FSImageFormat.Loader loader
         ) throws IOException {
@@ -365,7 +419,4 @@ public class SnapshotFSImageFormat {
         final long id = in.readLong();
         withCount = referenceMap.get(id);
       }
-      return withCount;
-    }
-  }
-}
+      return

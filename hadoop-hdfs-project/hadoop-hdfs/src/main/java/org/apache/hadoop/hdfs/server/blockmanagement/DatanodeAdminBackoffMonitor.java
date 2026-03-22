@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,6 +38,12 @@ import java.util.LinkedList;
 import java.util.stream.Collectors;
 
 /**
+ * 文件：org.apache.hadoop.hdfs.server.blockmanagement.DatanodeAdminBackoffMonitor.java
+ * 所属模块：HDFS 服务端，块管理模块
+ * 核心职责：退避式数据节点退役/维护监控器，控制退服过程中块复制的速率，避免一下子把复制队列打满，
+ *          保证在批量数据节点退服场景下，集群依然稳定运行，逐步完成块复制，最终才将节点标记为退服完成。
+ */
+/**
  * This class implements the logic to track decommissioning and entering
  * maintenance nodes, ensure all their blocks are adequately replicated
  * before they are moved to the decommissioned or maintenance state.
@@ -46,6 +53,12 @@ import java.util.stream.Collectors;
  *
  * HDFS-14854 contains details about the overall design of this class.
  *
+ */
+/**
+ * 退避式数据节点退服/维护监控器，采用流量控制方式分批处理待复制块，避免复制队列过载
+ * 核心职责：跟踪正在退役/进入维护的节点，逐步将需要复制的块放入复制队列，
+ * 等所有块都完成足够复制后，才将节点移动到最终的退服/维护状态。
+ * 继承自基础监控类，实现了数据节点管理监控接口。
  */
 public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
     implements DatanodeAdminMonitorInterface  {
@@ -68,6 +81,7 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
    * reports or other events. Before being finally marking as decommissioned,
    * another check is done with the actual block map.
    */
+  /** 待退服/待进入维护节点的跟踪Map：Key是数据节点描述符，Value是该节点上待复制的块集合 */
   private HashMap<DatanodeDescriptor, HashMap<BlockInfo, Integer>>
       outOfServiceNodeBlocks = new HashMap<>();
 
@@ -75,21 +89,25 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
    * The number of blocks to process when moving blocks to pendingReplication
    * before releasing and reclaiming the namenode lock.
    */
+  /** 每次持有锁处理块的最大数量，处理完后释放锁让其他任务执行 */
   private volatile int blocksPerLock;
 
   /**
    * The number of blocks that have been checked on this tick.
    */
+  /** 当前监控周期内已检查的块数量 */
   private int numBlocksChecked = 0;
   /**
    * The maximum number of blocks to hold in PendingRep at any time.
    */
+  /** 等待复制队列中允许存放的最大块数量 */
   private volatile int pendingRepLimit;
 
   /**
    * The list of blocks which have been placed onto the replication queue
    * and are waiting to be sufficiently replicated.
    */
+  /** 已放入复制队列、等待完成复制的块集合：按数据节点分组存放 */
   private final Map<DatanodeDescriptor, List<BlockInfo>>
       pendingRep = new HashMap<>();
 
@@ -100,6 +118,10 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
   }
 
 
+  /**
+   * 从配置文件加载退避监控器的各项参数，包括等待队列大小限制和每次锁处理块数量，
+   * 对无效配置会使用默认值并打错误日志。
+   */
   @Override
   protected void processConf() {
     this.pendingRepLimit = conf.getInt(
@@ -138,9 +160,9 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * Queue a node to be removed from tracking. This method must be called
-   * under the namenode write lock.
-   * @param dn The datanode to stop tracking for decommission.
+   * 停止跟踪指定数据节点的退服/维护流程，将节点加入取消队列，后续会从跟踪列表中移除。
+   * 调用该方法必须持有NameNode写锁。
+   * @param dn 需要停止跟踪的数据节点
    */
   @Override
   public void stopTrackingNode(DatanodeDescriptor dn) {
@@ -148,17 +170,29 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
     getCancelledNodes().add(dn);
   }
 
+  /**
+   * 获取当前正在跟踪的节点总数。
+   * @return 当前正在跟踪的退服/维护节点数量
+   */
   @Override
   public int getTrackedNodeCount() {
     return outOfServiceNodeBlocks.size();
   }
 
+  /**
+   * 获取当前监控周期检查过的节点数量。
+   * @return 当前周期检查的节点总数
+   */
   @Override
   public int getNumNodesChecked() {
     // We always check all nodes on each tick
     return outOfServiceNodeBlocks.size();
   }
 
+  /**
+   * 监控线程主执行方法，每个周期执行一次退服/维护节点检查流程。
+   * 按顺序处理取消节点、处理排队节点、检查节点块复制进度、处理完成节点。
+   */
   @Override
   public void run() {
     LOG.debug("DatanodeAdminMonitorV2 is running.");
@@ -167,9 +201,9 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
           "decommissioning/maintenance checks.");
       return;
     }
-    // Reset the checked count at beginning of each iteration
+    // 每个周期开始前重置已检查块计数
     numBlocksChecked = 0;
-    // Check decommission or maintenance progress.
+    // 检查退服或维护进度
     try {
       namesystem.writeLock(RwLockMode.BM);
       try {
@@ -183,10 +217,10 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
          * back again. If we process these the other way around, the added
          * node will be removed from tracking by the pending cancel.
          */
+        // 先处理已取消退服的节点
         processCancelledNodes();
 
-        // Having more nodes decommissioning than can be tracked will impact decommissioning
-        // performance due to queueing delay
+        // 如果并发退服节点超过最大跟踪限制，输出警告并把不健康节点重新排队腾出空间
         int numTrackedNodes = outOfServiceNodeBlocks.size();
         int numQueuedNodes = getPendingNodes().size();
         int numDecommissioningNodes = numTrackedNodes + numQueuedNodes;
@@ -196,7 +230,7 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
                   + "{} nodes are currently queued waiting to be decommissioned.",
               numDecommissioningNodes, maxConcurrentTrackedNodes, numQueuedNodes);
 
-          // Re-queue unhealthy nodes to make space for decommissioning healthy nodes
+          // 筛选出不健康节点，重新排队，给健康节点腾跟踪位置
           final List<DatanodeDescriptor> unhealthyDns = outOfServiceNodeBlocks.keySet().stream()
               .filter(dn -> !blockManager.isNodeHealthyForDecommissionOrMaintenance(dn))
               .collect(Collectors.toList());
@@ -207,20 +241,18 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
           });
         }
 
+        // 将排队节点加入跟踪列表
         processPendingNodes();
       } finally {
         namesystem.writeUnlock(RwLockMode.BM, "DatanodeAdminMonitorV2Thread");
       }
-      // After processing the above, various parts of the check() method will
-      // take and drop the read / write lock as needed. Aside from the
-      // cancelled and pending lists, nothing outside of the monitor thread
-      // modifies anything inside this class, so many things can be done
-      // without any lock.
+      // 后续检查过程中会根据需要自行获取释放读写锁，无需持续持有
       check();
     } catch (Exception e) {
       LOG.warn("DatanodeAdminMonitor caught exception when processing node.",
           e);
     }
+    // 如果本次周期有检查输出统计日志
     if (numBlocksChecked + outOfServiceNodeBlocks.size() > 0) {
       LOG.info("Checked {} blocks this tick. {} nodes are now " +
           "in maintenance or transitioning state. {} nodes pending. {} " +
@@ -231,11 +263,9 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * Move any pending nodes into outOfServiceNodeBlocks to initiate the
-   * decommission or maintenance mode process.
-   *
-   * This method must be executed under the namenode write lock to prevent
-   * the pendingNodes list from being modified externally.
+   * 将排队等待的节点加入跟踪列表，启动退服/维护流程，
+   * 控制并发跟踪节点数量不超过配置最大值。
+   * 调用该方法必须持有NameNode写锁，避免并发修改排队列表。
    */
   private void processPendingNodes() {
     while (!getPendingNodes().isEmpty() &&
@@ -246,11 +276,8 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * Process any nodes which have had their decommission or maintenance mode
-   * cancelled by an administrator.
-   *
-   * This method must be executed under the
-   * write lock to prevent the cancelledNodes list being modified externally.
+   * 处理被管理员取消退服/维护的节点，从所有跟踪列表中移除这些节点。
+   * 调用该方法必须持有NameNode写锁，避免并发修改取消列表。
    */
   private void processCancelledNodes() {
     while(!getCancelledNodes().isEmpty()) {
@@ -261,24 +288,14 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * This method performs each of the steps to track a node from
-   * decommissioning or entering maintenance to the end state.
-   *
-   * First, any newly added nodes are scanned.
-   *
-   * Then any expired maintenance nodes are handled.
-   *
-   * Next the pendingRep map is scanned and all blocks which are now
-   * sufficiently replicated are removed
-   *
-   * Then new blocks are moved to pendingRep
-   *
-   * Finally we check if any nodes have completed the replication process and
-   * if so move them to their final states.
-   *
-   * This methods which this method calls will take and release the namenode
-   * read and write lock several times.
-   *
+   * 核心检查流程，按步骤推进所有跟踪节点的退服/维护进度：
+   * 1. 扫描新增节点的存储，加载所有待处理块
+   * 2. 处理已过期的维护节点，将其恢复为服务中状态
+   * 3. 清理等待复制队列中已完成复制的块
+   * 4. 将新一批块移动到等待复制队列，放入BlockManager复制队列
+   * 5. 检查是否有节点完成所有块复制
+   * 6. 将完成节点标记为最终状态
+   * 该方法调用的子方法会多次获取释放NameNode锁，不会长时间持有锁阻塞其他操作。
    */
   private void check() {
     final List<DatanodeDescriptor> toRemove = new ArrayList<>();
@@ -299,31 +316,37 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
     //        to be processed, but it requires only the read lock and it will
     //        be dropped and re-taken frequently. We may want to throttle this
     //        to process only a few nodes per iteration.
+    // 扫描所有未初始化的新增节点，加载其存储上的块信息
     outOfServiceNodeBlocks.keySet()
         .stream()
         .filter(n -> outOfServiceNodeBlocks.get(n) == null)
         .forEach(n -> scanDatanodeStorage(n, true));
 
+    // 处理已过期的维护节点
     processMaintenanceNodes();
     // First check the pending replication list and remove any blocks
     // which are now replicated OK. This list is constrained in size so this
     // call should not be overly expensive.
+    // 清理已完成复制的块
     processPendingReplication();
 
     // Now move a limited number of blocks to pending
+    // 将新一批块加入等待复制队列
     moveBlocksToPending();
 
     // Check if any nodes have reached zero blocks and also update the stats
     // exposed via JMX for all nodes still being processed.
+    // 检查哪些节点已经完成所有块复制
     checkForCompletedNodes(toRemove);
 
     // Finally move the nodes to their final state if they are ready.
+    // 处理完成节点，将其标记为最终状态
     processCompletedNodes(toRemove);
   }
 
   /**
-   * Checks for any nodes which are in maintenance and if maintenance has
-   * expired, the node will be moved back to in_service (or dead) as required.
+   * 检查所有维护中节点的过期时间，如果维护已过期，停止维护将节点恢复为服务中状态。
+   * 处理每个节点后主动释放锁再重新获取，避免长时间阻塞其他操作。
    */
   private void processMaintenanceNodes() {
     // Check for any maintenance state nodes which need to be expired
@@ -349,498 +372,8 @@ public class DatanodeAdminBackoffMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * Loop over all nodes in the passed toRemove list and move the node to
-   * the required end state. This will also remove any entries from
-   * outOfServiceNodeBlocks and pendingRep for the node if required.
-   *
-   * @param toRemove The list of nodes to process for completion.
+   * 处理所有已完成块复制的节点，根据节点类型将其标记为退服完成或维护完成状态。
+   * @param toRemove 需要处理的已完成节点列表
    */
   private void processCompletedNodes(List<DatanodeDescriptor> toRemove) {
-    if (toRemove.size() == 0) {
-      // If there are no nodes to process simply return and avoid
-      // taking the write lock at all.
-      return;
-    }
-    namesystem.writeLock(RwLockMode.BM);
-    try {
-      for (DatanodeDescriptor dn : toRemove) {
-        final boolean isHealthy =
-            blockManager.isNodeHealthyForDecommissionOrMaintenance(dn);
-        if (isHealthy) {
-          if (dn.isDecommissionInProgress()) {
-            dnAdmin.setDecommissioned(dn);
-            outOfServiceNodeBlocks.remove(dn);
-            pendingRep.remove(dn);
-          } else if (dn.isEnteringMaintenance()) {
-            // IN_MAINTENANCE node remains in the outOfServiceNodeBlocks to
-            // to track maintenance expiration.
-            dnAdmin.setInMaintenance(dn);
-            pendingRep.remove(dn);
-          } else if (dn.isInService()) {
-            // Decom / maint was cancelled and the node is yet to be processed
-            // from cancelledNodes
-            LOG.info("Node {} completed decommission and maintenance " +
-                "but has been moved back to in service", dn);
-            pendingRep.remove(dn);
-            outOfServiceNodeBlocks.remove(dn);
-            continue;
-          } else {
-            // Should not happen
-            LOG.error("Node {} is in an unexpected state {} and has been "+
-                    "removed from tracking for decommission or maintenance",
-                dn, dn.getAdminState());
-            pendingRep.remove(dn);
-            outOfServiceNodeBlocks.remove(dn);
-            continue;
-          }
-          LOG.info("Node {} is sufficiently replicated and healthy, "
-              + "marked as {}.", dn, dn.getAdminState());
-        } else {
-          LOG.info("Node {} isn't healthy."
-                  + " It needs to replicate {} more blocks."
-                  + " {} is still in progress.", dn,
-              getPendingCountForNode(dn), dn.getAdminState());
-        }
-      }
-    } finally {
-      namesystem.writeUnlock(RwLockMode.BM, "processCompletedNodes");
-    }
-  }
-
-  /**
-   * Loop over all nodes and check for any which have zero unprocessed or
-   * pending blocks. If the node has zero blocks pending, the storage is
-   * rescanned to ensure no transient blocks were missed on the first pass.
-   *
-   * If, after rescan the number of blocks pending replication is zero, the
-   * node is added to the passed removeList which will later be processed to
-   * complete the decommission or entering maintenance process.
-   *
-   * @param removeList Nodes which have zero pending blocks are added to this
-   *                   list.
-   */
-  private void checkForCompletedNodes(List<DatanodeDescriptor> removeList) {
-    for (DatanodeDescriptor dn : outOfServiceNodeBlocks.keySet()) {
-      // If the node is already in maintenance, we don't need to perform
-      // any further checks on it.
-      if (dn.isInMaintenance()) {
-        LOG.debug("Node {} is currently in maintenance", dn);
-        continue;
-      } else if (!dn.isInService()) {
-        // A node could be inService if decom or maint has been cancelled, but
-        // the cancelled list is yet to be processed. We don't need to check
-        // inService nodes here
-        int outstandingBlocks = getPendingCountForNode(dn);
-        if (outstandingBlocks == 0) {
-          scanDatanodeStorage(dn, false);
-          outstandingBlocks = getPendingCountForNode(dn);
-        }
-        LOG.info("Node {} has {} blocks yet to process", dn, outstandingBlocks);
-        if (outstandingBlocks == 0) {
-          removeList.add(dn);
-        }
-      }
-    }
-  }
-
-  /**
-   * Returns the number of block pending for the given node by adding those
-   * blocks in pendingRep and outOfServiceNodeBlocks.
-   *
-   * @param dn The datanode to return the count for
-   * @return The total block count, or zero if none are pending
-   */
-  private int getPendingCountForNode(DatanodeDescriptor dn) {
-    int count = 0;
-    HashMap<BlockInfo, Integer> blocks = outOfServiceNodeBlocks.get(dn);
-    if (blocks != null) {
-      count += blocks.size();
-    }
-    List<BlockInfo> pendingBlocks = pendingRep.get(dn);
-    if (pendingBlocks != null) {
-      count += pendingBlocks.size();
-    }
-    return count;
-  }
-
-  /**
-   * Iterate across all nodes in outOfServiceNodeBlocks which have blocks yet
-   * to be processed.
-   *
-   * The block is removed from outOfServiceNodeBlocks and if it needs
-   * replication it is added to the pendingRep map and also to the
-   * BlockManager replication queue.
-   *
-   * Any block that does not need replication is discarded.
-   *
-   * The method will return when there are the pendingRep map has
-   * pendingRepLimit blocks or there are no further blocks to process.
-   */
-  private void moveBlocksToPending() {
-    int blocksProcessed = 0;
-    int pendingCount = getPendingCount();
-    int yetToBeProcessed = getYetToBeProcessedCount();
-
-    if (pendingCount == 0 && yetToBeProcessed == 0) {
-      // There are no blocks to process so just return
-      LOG.debug("There are no pending or blocks yet to be processed");
-      return;
-    }
-
-    namesystem.writeLock(RwLockMode.GLOBAL);
-    try {
-      long repQueueSize = blockManager.getLowRedundancyBlocksCount();
-
-      LOG.info("There are {} blocks pending replication and the limit is "+
-          "{}. A further {} blocks are waiting to be processed. "+
-          "The replication queue currently has {} blocks",
-          pendingCount, pendingRepLimit, yetToBeProcessed, repQueueSize);
-
-      if (pendingCount >= pendingRepLimit) {
-        // Only add more blocks to the replication queue if we don't already
-        // have too many pending
-        return;
-      }
-
-      // Create a "Block Iterator" for each node decommissioning or entering
-      // maintenance. These iterators will be used "round robined" to add blocks
-      // to the replication queue and PendingRep
-      HashMap<DatanodeDescriptor, Iterator<BlockInfo>>
-          iterators = new HashMap<>();
-      for (Map.Entry<DatanodeDescriptor, HashMap<BlockInfo, Integer>> e
-          : outOfServiceNodeBlocks.entrySet()) {
-        iterators.put(e.getKey(), e.getValue().keySet().iterator());
-      }
-
-      // Now loop until we fill the pendingRep map with pendingRepLimit blocks
-      // or run out of blocks to add.
-      Iterator<DatanodeDescriptor> nodeIter =
-          Iterables.cycle(iterators.keySet()).iterator();
-      while (nodeIter.hasNext()) {
-        // Cycle through each node with blocks which still need processed
-        DatanodeDescriptor dn = nodeIter.next();
-        Iterator<BlockInfo> blockIt = iterators.get(dn);
-        while (blockIt.hasNext()) {
-          // Process the blocks for the node until we find one that needs
-          // replication
-          if (blocksProcessed >= blocksPerLock) {
-            blocksProcessed = 0;
-            namesystem.writeUnlock(RwLockMode.GLOBAL, "moveBlocksToPending");
-            namesystem.writeLock(RwLockMode.GLOBAL);
-          }
-          blocksProcessed++;
-          if (nextBlockAddedToPending(blockIt, dn)) {
-            // Exit the inner "block" loop so an iterator for the next datanode
-            // is used for the next block.
-            pendingCount++;
-            break;
-          }
-        }
-        if (!blockIt.hasNext()) {
-          // remove the iterator as there are no blocks left in it
-          nodeIter.remove();
-        }
-        if (pendingCount >= pendingRepLimit) {
-          // We have scheduled the limit of blocks for replication, so do
-          // not add any more
-          break;
-        }
-      }
-    } finally {
-      namesystem.writeUnlock(RwLockMode.GLOBAL, "moveBlocksToPending");
-    }
-    LOG.debug("{} blocks are now pending replication", pendingCount);
-  }
-
-  /**
-   * Takes and removes the next block from the given iterator and checks if it
-   * needs additional replicas. If it does, it will be scheduled for
-   * reconstruction and added to the pendingRep map.
-   * @param it The iterator to take the next block from
-   * @param dn The datanodeDescriptor the iterator applies to
-   * @return True if the block needs replication, otherwise false
-   */
-  private boolean nextBlockAddedToPending(Iterator<BlockInfo> it,
-      DatanodeDescriptor dn) {
-    BlockInfo block = it.next();
-    it.remove();
-    numBlocksChecked++;
-    if (!isBlockReplicatedOk(dn, block, true, null)) {
-      pendingRep.computeIfAbsent(dn, k -> new LinkedList<>()).add(block);
-      return true;
-    }
-    return false;
-  }
-
-  private int getPendingCount() {
-    if (pendingRep.size() == 0) {
-      return 0;
-    }
-    return pendingRep.values()
-        .stream()
-        .map(a -> a.size())
-        .reduce(0, (a, b) -> a + b);
-  }
-
-  private int getYetToBeProcessedCount() {
-    if (outOfServiceNodeBlocks.size() == 0) {
-      return 0;
-    }
-    return outOfServiceNodeBlocks.values()
-        .stream()
-        .map(a -> a.size())
-        .reduce(0, (a, b) -> a + b);
-  }
-
-  /**
-   * Scan all the blocks held on a datanodes. For a node being decommissioned
-   * we assume that the majority of blocks on the node will need to have new
-   * replicas made, and therefore we do not check if they are under replicated
-   * here and instead add them to the list of blocks to track.
-   *
-   * For a node being moved into maintenance, we assume most blocks will be
-   * replicated OK and hence we do check their under-replicated status here,
-   * hopefully reducing the number of blocks to track.
-   *
-   * On a re-scan (initalScan = false) we assume the node has been processed
-   * already, and hence there should be few under-replicated blocks, so we
-   * check the under-replicated status before adding the blocks to the
-   * tracking list.
-   *
-   * This means that for a node being decomission there should be a large
-   * number of blocks to process later but for maintenance, a smaller number.
-   *
-   * As this method does not schedule any blocks for reconstuction, this
-   * scan can be performed under the namenode readlock, and the lock is
-   * dropped and reaquired for each storage on the DN.
-   *
-   * @param dn - The datanode to process
-   * @param initialScan - True is this is the first time scanning the node
-   *                    or false if it is a rescan.
-   */
-  private void scanDatanodeStorage(DatanodeDescriptor dn,
-                                   Boolean initialScan) {
-    HashMap<BlockInfo, Integer> blockList = outOfServiceNodeBlocks.get(dn);
-    if (blockList == null) {
-      blockList = new HashMap<>();
-      outOfServiceNodeBlocks.put(dn, blockList);
-    }
-
-    DatanodeStorageInfo[] storage;
-    namesystem.readLock(RwLockMode.BM);
-    try {
-      storage = dn.getStorageInfos();
-    } finally {
-      namesystem.readUnlock(RwLockMode.BM, "scanDatanodeStorage");
-    }
-
-    for (DatanodeStorageInfo s : storage) {
-      // isBlockReplicatedOk involves FS.
-      namesystem.readLock(RwLockMode.GLOBAL);
-      try {
-        // As the lock is dropped and re-taken between each storage, we need
-        // to check the storage is still present before processing it, as it
-        // may have been removed.
-        if (dn.getStorageInfo(s.getStorageID()) == null) {
-          continue;
-        }
-        Iterator<BlockInfo> it = s.getBlockIterator();
-        while (it.hasNext()) {
-          BlockInfo b = it.next();
-          if (!initialScan || dn.isEnteringMaintenance()) {
-            // this is a rescan, so most blocks should be replicated now,
-            // or this node is going into maintenance. On a healthy
-            // cluster using racks or upgrade domain, a node should be
-            // able to go into maintenance without replicating many blocks
-            // so we will check them immediately.
-            if (!isBlockReplicatedOk(dn, b, false, null)) {
-              blockList.put(b, null);
-            }
-          } else {
-            blockList.put(b, null);
-          }
-          numBlocksChecked++;
-        }
-      } finally {
-        namesystem.readUnlock(RwLockMode.GLOBAL, "scanDatanodeStorage");
-      }
-    }
-  }
-
-  /**
-   * Process the list of pendingReplication Blocks. These are the blocks
-   * which have been moved from outOfServiceNodeBlocks, confirmed to be
-   * under-replicated and were added to the blockManager replication
-   * queue.
-   *
-   * Any blocks which have been confirmed to be replicated sufficiently are
-   * removed from the list.
-   *
-   * The datanode stats are also updated in this method, updating the total
-   * pending block count, the number of blocks in PendingRep which are in
-   * open files and the number of blocks in PendingRep which are only on
-   * out of service nodes.
-   *
-   * As this method makes changes to the replication queue, it acquires the
-   * namenode write lock while it runs.
-   */
-  private void processPendingReplication() {
-    namesystem.writeLock(RwLockMode.GLOBAL);
-    try {
-      for (Iterator<Map.Entry<DatanodeDescriptor, List<BlockInfo>>>
-           entIt = pendingRep.entrySet().iterator(); entIt.hasNext();) {
-        Map.Entry<DatanodeDescriptor, List<BlockInfo>> entry = entIt.next();
-        DatanodeDescriptor dn = entry.getKey();
-        List<BlockInfo> blocks = entry.getValue();
-        if (blocks == null) {
-          // should not be able to happen
-          entIt.remove();
-          continue;
-        }
-        Iterator<BlockInfo> blockIt =  blocks.iterator();
-        BlockStats suspectBlocks = new BlockStats();
-        while(blockIt.hasNext()) {
-          BlockInfo b = blockIt.next();
-          if (isBlockReplicatedOk(dn, b, true, suspectBlocks)) {
-            blockIt.remove();
-          }
-          numBlocksChecked++;
-        }
-        if (blocks.size() == 0) {
-          entIt.remove();
-        }
-        // Update metrics for this datanode.
-        dn.getLeavingServiceStatus().set(
-            suspectBlocks.getOpenFileCount(),
-            suspectBlocks.getOpenFiles(),
-            getPendingCountForNode(dn),
-            suspectBlocks.getOutOfServiceBlockCount());
-      }
-    } finally {
-      namesystem.writeUnlock(RwLockMode.GLOBAL, "processPendingReplication");
-    }
-  }
-
-  /**
-   * Checks if a block is sufficiently replicated and optionally schedules
-   * it for reconstruction if it is not.
-   *
-   * If a BlockStats object is passed, this method will also update it if the
-   * block is part of an open file or only on outOfService nodes.
-   *
-   * @param datanode The datanode the block belongs to
-   * @param block The block to check
-   * @param scheduleReconStruction Whether to add the block to the replication
-   *                               queue if it is not sufficiently replicated.
-   *                               Passing true will add it to the replication
-   *                               queue, and false will not.
-   * @param suspectBlocks If non-null check if the block is part of an open
-   *                      file or only on out of service nodes and update the
-   *                      passed object accordingly.
-   * @return
-   */
-  private boolean isBlockReplicatedOk(DatanodeDescriptor datanode,
-      BlockInfo block, boolean scheduleReconStruction,
-      BlockStats suspectBlocks) {
-    if (blockManager.blocksMap.getStoredBlock(block) == null) {
-      LOG.trace("Removing unknown block {}", block);
-      return true;
-    }
-
-    long bcId = block.getBlockCollectionId();
-    if (bcId == INodeId.INVALID_INODE_ID) {
-      // Orphan block, will be invalidated eventually. Skip.
-      return false;
-    }
-
-    final BlockCollection bc = blockManager.getBlockCollection(block);
-    final NumberReplicas num = blockManager.countNodes(block);
-    final int liveReplicas = num.liveReplicas();
-
-    // Schedule low redundancy blocks for reconstruction
-    // if not already pending.
-    boolean isDecommission = datanode.isDecommissionInProgress();
-    boolean isMaintenance = datanode.isEnteringMaintenance();
-
-    if (scheduleReconStruction) {
-      addReconstructionBlockIfNeeded(isDecommission, block, num, liveReplicas);
-    }
-
-    if (suspectBlocks != null) {
-      // Only if we pass a BlockStats object should we do these
-      // checks, as they should only be checked when processing PendingRep.
-      if (bc.isUnderConstruction()) {
-        INode ucFile = namesystem.getFSDirectory().getInode(bc.getId());
-        if (!(ucFile instanceof INodeFile) ||
-            !ucFile.asFile().isUnderConstruction()) {
-          LOG.warn("File {} is not under construction. Skipping add to " +
-              "low redundancy open files!", ucFile.getLocalName());
-        } else {
-          suspectBlocks.addOpenFile(ucFile.getId());
-        }
-      }
-      if ((liveReplicas == 0) && (num.outOfServiceReplicas() > 0)) {
-        suspectBlocks.incrementOutOfServiceBlocks();
-      }
-    }
-
-    // Even if the block is without sufficient redundancy,
-    // it might not block decommission/maintenance if it
-    // has sufficient redundancy.
-    if (dnAdmin.isSufficient(block, bc, num, isDecommission, isMaintenance)) {
-      return true;
-    }
-    return false;
-  }
-
-  @VisibleForTesting
-  @Override
-  public int getPendingRepLimit() {
-    return pendingRepLimit;
-  }
-
-  public void setPendingRepLimit(int pendingRepLimit) {
-    this.pendingRepLimit = pendingRepLimit;
-  }
-
-  @VisibleForTesting
-  @Override
-  public int getBlocksPerLock() {
-    return blocksPerLock;
-  }
-
-  public void setBlocksPerLock(int blocksPerLock) {
-    this.blocksPerLock = blocksPerLock;
-  }
-
-  static class BlockStats {
-    private LightWeightHashSet<Long> openFiles =
-        new LightWeightLinkedSet<>();
-    private int openFileBlockCount = 0;
-    private int outOfServiceBlockCount = 0;
-
-    public void addOpenFile(long id) {
-      // Several blocks can be part of the same file so track how
-      // many adds we get, as the same file could be added several times
-      // for different blocks.
-      openFileBlockCount++;
-      openFiles.add(id);
-    }
-
-    public void incrementOutOfServiceBlocks() {
-      outOfServiceBlockCount++;
-    }
-
-    public LightWeightHashSet<Long> getOpenFiles() {
-      return openFiles;
-    }
-
-    public int getOpenFileCount() {
-      return openFileBlockCount;
-    }
-
-    public int getOutOfServiceBlockCount() {
-      return outOfServiceBlockCount;
-    }
-  }
-}
+    if (toRemove.size() == 0)

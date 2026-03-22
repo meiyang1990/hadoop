@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,145 +24,141 @@ import org.apache.hadoop.classification.InterfaceStability;
 import java.util.Map;
 
 /**
- * 
- * This is the JMX management interface for data node information.
- * End users shouldn't be implementing these interfaces, and instead
- * access this information through the JMX APIs.
+ * DataNode节点信息的JMX管理接口。
+ * 终端用户不应该自行实现该接口，应通过JMX API获取对应监控信息。
+ * 该接口为Hadoop HDFS DataNode提供JMX监控能力，暴露节点运行时指标供监控系统采集。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public interface DataNodeMXBean {
   
   /**
-   * Gets the version of Hadoop.
+   * 获取Hadoop版本号。
    * 
-   * @return the version of Hadoop
+   * @return Hadoop版本字符串
    */
   public String getVersion();
 
   /**
-   * Get the version of software running on the DataNode
+   * 获取DataNode运行的软件版本。
    *
-   * @return a string representing the version
+   * @return 代表软件版本的字符串
    */
   public String getSoftwareVersion();
 
   /**
-   * Gets the rpc port.
+   * 获取DataNode的RPC服务端口。
    * 
-   * @return the rpc port
+   * @return RPC端口字符串
    */
   public String getRpcPort();
   
   /**
-   * Gets the http port.
+   * 获取DataNode的HTTP服务端口。
    * 
-   * @return the http port
+   * @return HTTP端口字符串
    */
   public String getHttpPort();
 
   /**
-   * Gets the data port.
+   * 获取DataNode的数据传输端口。
    *
-   * @return the data port
+   * @return 数据传输端口字符串
    */
   String getDataPort();
 
   /**
-   * Gets the namenode IP addresses.
+   * 获取当前DataNode连接的所有NameNode的IP地址。
    * 
-   * @return the namenode IP addresses that the datanode is talking to
+   * @return 当前DataNode正在通信的NameNode地址字符串
    */
   public String getNamenodeAddresses();
 
   /**
-   * Gets the datanode hostname.
+   * 获取当前DataNode的主机名。
    *
-   * @return the datanode hostname for the datanode.
+   * @return DataNode的主机名字符串
    */
   public String getDatanodeHostname();
 
   /**
-   * Gets information of the block pool service actors.
+   * 获取所有块池服务执行器的信息。
    *
-   * @return block pool service actors info
+   * @return 块池服务执行器信息字符串
    */
   String getBPServiceActorInfo();
 
   /**
-   * Gets the information of each volume on the Datanode. Please
-   * see the implementation for the format of returned information.
+   * 获取DataNode上所有存储卷的信息，返回格式请参考具体实现。
    * 
-   * @return the volume info
+   * @return 存储卷信息字符串
    */
   public String getVolumeInfo();
   
   /**
-   * Gets the cluster id.
+   * 获取当前集群的ID。
    * 
-   * @return the cluster id
+   * @return 集群ID字符串
    */
   public String getClusterId();
 
   /**
-   * Returns the number of active xceivers.
+   * 获取当前活跃的数据传输服务线程数。
+   * @return 活跃数据传输线程数量
    */
   public int getXceiverCount();
 
   /**
-   * Returns the number of Datanode threads actively transferring blocks.
+   * 获取当前正在主动传输块的线程数量。
+   * @return 活跃块传输线程数量
    */
   int getActiveTransferThreadCount();
 
   /**
-   * Returns an estimate of the number of data replication/reconstruction tasks
-   * running currently.
+   * 获取当前正在运行的数据块复制/重构任务估算数量。
+   * @return 进行中的数据传输任务数
    */
   public int getXmitsInProgress();
 
   /**
-   * Gets the network error counts on a per-Datanode basis.
+   * 获取DataNode节点层面的网络错误统计。
+   * @return 按目标节点分组的网络错误计数，第一层key为目标节点地址，第二层key为错误类型，value为错误次数
    */
   public Map<String, Map<String, Long>> getDatanodeNetworkCounts();
 
   /**
-   * Gets the diskBalancer Status.
-   * Please see implementation for the format of the returned information.
+   * 获取磁盘均衡器的运行状态，返回格式请参考具体实现。
    *
-   * @return  DiskBalancer Status
+   * @return 磁盘均衡器状态字符串
    */
   String getDiskBalancerStatus();
 
   /**
-   * Gets the average info (e.g. time) of SendPacketDownstream when the DataNode
-   * acts as the penultimate (2nd to the last) node in pipeline.
-   * <p>
-   * Example Json:
-   * {"[185.164.159.81:9801]RollingAvgTime":504.867,
-   *  "[49.236.149.246:9801]RollingAvgTime":504.463,
-   *  "[84.125.113.65:9801]RollingAvgTime":497.954}
-   * </p>
+   * 获取DataNode作为管道倒数第二个节点时，向下游发送数据包的平均指标（如平均耗时）。
+   * 返回示例为JSON格式，包含每个下游节点的滚动平均耗时。
+   *
+   * @return 平均指标JSON字符串
    */
   String getSendPacketDownstreamAvgInfo();
 
   /**
-   * Gets the slow disks in the Datanode.
+   * 获取DataNode中被判定为慢盘的磁盘列表。
    *
-   * @return list of slow disks
+   * @return 慢盘列表字符串
    */
   String getSlowDisks();
 
   /**
-   * Gets if security is enabled.
+   * 获取安全认证是否开启的状态。
    *
-   * @return true, if security is enabled.
+   * @return true表示安全认证已启用
    */
   boolean isSecurityEnabled();
 
   /**
-   * Get the start time of the DataNode.
+   * 获取DataNode进程的启动时间戳。
    *
-   * @return Start time of the DataNode.
+   * @return DataNode启动时间（毫秒时间戳）
    */
   long getDNStartedTimeInMillis();
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,6 +38,9 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.util.StringUtils;
 
 /**
+ * 文件级注释：Protobuf格式FSImage离线查看工具主入口类，支持多种处理方式将HDFS fsimage文件转换为XML、文本等格式输出，
+ * 也支持从XML反向生成二进制fsimage、分析文件大小分布、以只读WebHDFS方式暴露镜像、检查镜像损坏等功能，无需运行集群即可离线处理。
+ * 
  * OfflineImageViewerPB to dump the contents of an Hadoop image file to XML or
  * the console. Main entry point into utility, either via the command line or
  * programmatically.
@@ -130,7 +134,7 @@ public class OfflineImageViewerPB {
       + "-h,--help              Display usage information and exit\n";
 
   /**
-   * Build command-line options and descriptions
+   * 构建命令行选项定义
    */
   private static Options buildOptions() {
     Options options = new Options();
@@ -157,26 +161,28 @@ public class OfflineImageViewerPB {
   }
 
   /**
-   * Entry point to command-line-driven operation. User may specify options and
-   * start fsimage viewer from the command line. Program will process image file
-   * and exit cleanly or, if an error is encountered, inform user and exit.
-   * 
-   * @param args
-   *          Command line options
-   * @throws IOException
+   * 命令行入口方法，解析命令行参数并执行fsimage处理，处理完成后退出
+   * @param args 命令行参数
+   * @throws IOException 处理过程中IO异常
    */
   public static void main(String[] args) throws Exception {
     int status = run(args);
     ExitUtil.terminate(status);
   }
 
+  /**
+   * 工具运行主方法，解析命令行参数、选择对应的处理器执行fsimage处理，返回执行状态码
+   * @param args 命令行参数数组
+   * @return 执行状态码，0表示成功，非0表示失败
+   * @throws Exception 处理过程中抛出的各类异常
+   */
   public static int run(String[] args) throws Exception {
     Options options = buildOptions();
     if (args.length == 0) {
       printUsage();
       return 0;
     }
-    // print help and exit with zero exit code
+    // 如果只有帮助参数，打印帮助并退出，返回成功状态码
     if (args.length == 1 && isHelpOption(args[0])) {
       printUsage();
       return 0;
@@ -193,8 +199,7 @@ public class OfflineImageViewerPB {
     }
 
     if (cmd.hasOption("h")) {
-      // print help and exit with non zero exit code since
-      // it is not expected to give help and other options together.
+      // 同时指定帮助和其他参数时，打印帮助并返回错误状态码
       printUsage();
       return -1;
     }
@@ -210,24 +215,29 @@ public class OfflineImageViewerPB {
     Configuration conf = new Configuration();
     PrintStream out = null;
     try {
+      // 输出到stdout或ReverseXML场景使用System.out，否则创建输出文件输出流
       out = outputFile.equals("-") || "REVERSEXML".equalsIgnoreCase(processor) ?
         System.out : new PrintStream(outputFile, "UTF-8");
       switch (StringUtils.toUpperCase(processor)) {
       case "FILEDISTRIBUTION":
+        // 获取文件分布分析参数
         long maxSize = Long.parseLong(cmd.getOptionValue("maxSize", "0"));
         int step = Integer.parseInt(cmd.getOptionValue("step", "0"));
         boolean formatOutput = cmd.hasOption("format");
+        // 打开fsimage，执行文件分布分析并输出结果
         try (RandomAccessFile r = new RandomAccessFile(inputFile, "r")) {
           new FileDistributionCalculator(conf, maxSize, step, formatOutput, out)
             .visit(r);
         }
         break;
       case "XML":
+        // 打开fsimage，输出XML格式结果
         try (RandomAccessFile r = new RandomAccessFile(inputFile, "r")) {
           new PBImageXmlWriter(conf, out).visit(r);
         }
         break;
       case "REVERSEXML":
+        // 从输入XML反向生成二进制fsimage
         try {
           OfflineImageReconstructor.run(inputFile, outputFile);
         } catch (Exception e) {
@@ -238,6 +248,7 @@ public class OfflineImageViewerPB {
         }
         break;
       case "WEB":
+        // 启动Web服务，以只读WebHDFS API方式暴露fsimage
         String addr = cmd.getOptionValue("addr", "localhost:5978");
         try (WebImageViewer viewer =
             new WebImageViewer(NetUtils.createSocketAddr(addr), conf)) {
@@ -245,8 +256,10 @@ public class OfflineImageViewerPB {
         }
         break;
       case "DELIMITED":
+        // 获取分隔格式输出参数
         boolean printStoragePolicy = cmd.hasOption("sp");
         boolean printECPolicy = cmd.hasOption("ec");
+        // 输出分隔文本格式的fsimage内容
         try (PBImageDelimitedTextWriter writer =
             new PBImageDelimitedTextWriter(out, delimiter,
                 tempPath, printStoragePolicy, printECPolicy, threads,
@@ -255,16 +268,19 @@ public class OfflineImageViewerPB {
         }
         break;
       case "DETECTCORRUPTION":
+        // 检测fsimage损坏，输出损坏摘要
         try (PBImageCorruptionDetector detector =
             new PBImageCorruptionDetector(out, delimiter, tempPath)) {
           detector.visit(inputFile);
         }
         break;
       default:
+        // 处理器参数无效，打印错误和帮助
         System.err.println("Invalid processor specified : " + processor);
         printUsage();
         return -1;
       }
+      // 检查输出流是否出错
       if ((out != null) && out.checkError()) {
         System.err.println("CRITICAL FAILURE: PrintStream reported a write error " +
                 "(e.g., Disk Full).");
@@ -277,6 +293,7 @@ public class OfflineImageViewerPB {
       System.err.println("Encountered exception.  Exiting: " + e.getMessage());
       e.printStackTrace(System.err);
     } finally {
+      // 关闭文件输出流，保留System.out不关闭
       if (out != null && out != System.out) {
         out.close();
       }
@@ -285,12 +302,17 @@ public class OfflineImageViewerPB {
   }
 
   /**
-   * Print application usage instructions.
+   * 打印工具使用帮助信息
    */
   private static void printUsage() {
     System.out.println(usage);
   }
 
+  /**
+   * 判断输入参数是否为帮助请求
+   * @param arg 输入参数
+   * @return 是否为帮助参数
+   */
   private static boolean isHelpOption(String arg) {
     return arg.equalsIgnoreCase(HELP_OPT) ||
         arg.equalsIgnoreCase(HELP_LONGOPT);

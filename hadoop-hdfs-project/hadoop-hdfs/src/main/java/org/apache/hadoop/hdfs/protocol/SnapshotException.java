@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,18 +20,34 @@ package org.apache.hadoop.hdfs.protocol;
 
 import java.io.IOException;
 
-/** Snapshot related exception. */
+/**
+ * HDFS快照操作异常类，封装所有与HDFS快照相关的操作异常。
+ * 当快照创建、删除、重命名等操作出现错误时抛出该异常。
+ */
 public class SnapshotException extends IOException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造带错误消息的快照异常
+   * @param message 异常描述信息
+   */
   public SnapshotException(final String message) {
     super(message);
   }
 
+  /**
+   * 构造包装底层异常的快照异常
+   * @param cause 原始异常对象
+   */
   public SnapshotException(final Throwable cause) {
     super(cause);
   }
 
+  /**
+   * 构造带错误消息且包装底层异常的快照异常
+   * @param message 异常描述信息
+   * @param cause 原始异常对象
+   */
   public SnapshotException(final String message, final Throwable cause) {
     super(message, cause);
   }

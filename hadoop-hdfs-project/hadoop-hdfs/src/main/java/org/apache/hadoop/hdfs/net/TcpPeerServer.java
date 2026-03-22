@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,6 +31,10 @@ import org.apache.hadoop.hdfs.DFSUtilClient;
 import org.apache.hadoop.hdfs.server.datanode.SecureDataNodeStarter.SecureResources;
 import org.apache.hadoop.ipc.Server;
 
+/**
+ * TCP协议Peer服务端实现，负责监听并接受客户端的TCP连接，
+ * 为HDFS数据传输提供基于TCP的连接接入能力，支持普通和安全两种模式。
+ */
 @InterfaceAudience.Private
 public class TcpPeerServer implements PeerServer {
   static final Logger LOG = LoggerFactory.getLogger(TcpPeerServer.class);
@@ -37,12 +42,12 @@ public class TcpPeerServer implements PeerServer {
   private final ServerSocket serverSocket;
 
   /**
-   * Create a non-secure TcpPeerServer.
+   * 构造非安全模式的TcpPeerServer，绑定指定地址并开始监听连接请求。
    *
-   * @param socketWriteTimeout    The Socket write timeout in ms.
-   * @param bindAddr              The address to bind to.
-   * @param backlogLength         The length of the tcp accept backlog
-   * @throws IOException
+   * @param socketWriteTimeout  socket写入超时时间，单位毫秒。大于0时开启NIO模式
+   * @param bindAddr  需要绑定监听的本地地址
+   * @param backlogLength  TCP连接请求积压队列的最大长度
+   * @throws IOException  绑定或创建ServerSocket失败时抛出
    */
   public TcpPeerServer(int socketWriteTimeout,
                        InetSocketAddress bindAddr,
@@ -53,16 +58,18 @@ public class TcpPeerServer implements PeerServer {
   }
 
   /**
-   * Create a secure TcpPeerServer.
+   * 构造安全模式的TcpPeerServer，使用安全启动提供的已初始化ServerSocket。
    *
-   * @param secureResources   Security resources.
+   * @param secureResources  安全DataNode启动提供的安全资源对象，包含已配置好的监听Socket
    */
   public TcpPeerServer(SecureResources secureResources) {
     this.serverSocket = secureResources.getStreamingSocket();
   }
   
   /**
-   * @return     the IP address which this TcpPeerServer is listening on.
+   * 获取当前服务正在监听流式数据连接的地址。
+   *
+   * @return  监听地址，包含本地IP和端口
    */
   public InetSocketAddress getStreamingAddr() {
     return new InetSocketAddress(
@@ -81,6 +88,13 @@ public class TcpPeerServer implements PeerServer {
   }
 
   @Override
+  /**
+   * 接受一个新的 incoming TCP连接，并封装为Peer对象返回。
+   *
+   * @return  封装了新连接的Peer对象
+   * @throws IOException  接受连接失败时抛出
+   * @throws SocketTimeoutException  接受连接超时抛出
+   */
   public Peer accept() throws IOException, SocketTimeoutException {
     Peer peer = DFSUtilClient.peerFromSocket(serverSocket.accept());
     return peer;
@@ -92,6 +106,10 @@ public class TcpPeerServer implements PeerServer {
   }
   
   @Override
+  /**
+   * 关闭当前服务端监听Socket，释放相关资源。
+   * 关闭失败会记录错误日志，不抛出异常。
+   */
   public void close() throws IOException {
     try {
       serverSocket.close();

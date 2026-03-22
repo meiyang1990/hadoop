@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,48 +35,66 @@ import org.apache.hadoop.hdfs.server.blockmanagement.BlockManager;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
- * This class is used in Namesystem's web server to do fsck on namenode.
+ * 文件系统检查(Fsck)HTTP服务Servlet，运行在NameNode Web服务中，提供HDFS文件系统健康检查能力
  */
 @InterfaceAudience.Private
 public class FsckServlet extends DfsServlet {
   /** for java.io.Serializable */
   private static final long serialVersionUID = 1L;
 
-  /** Handle fsck request */
+  /**
+   * 处理HTTP GET请求，执行NameNode文件系统检查操作
+   */
   @Override
   public void doGet(HttpServletRequest request, HttpServletResponse response
       ) throws IOException {
     @SuppressWarnings("unchecked")
+    // 获取请求所有参数
     final Map<String,String[]> pmap = request.getParameterMap();
+    // 获取响应输出流
     final PrintWriter out = response.getWriter();
+    // 获取请求来源地址
     final InetAddress remoteAddress =
       InetAddress.getByName(request.getRemoteAddr());
+    // 获取Servlet上下文
     final ServletContext context = getServletContext();
+    // 从Servlet上下文中获取Hadoop配置
     final Configuration conf = NameNodeHttpServer.getConfFromContext(context);
 
+    // 获取请求对应用户信息，用于权限认证
     final UserGroupInformation ugi = getUGI(request, conf);
     try {
+      // 以请求用户身份执行fsck操作
       ugi.doAs((PrivilegedExceptionAction<Object>) () -> {
+        // 从Servlet上下文获取NameNode实例
         NameNode nn = NameNodeHttpServer.getNameNodeFromContext(context);
 
+        // 获取NameNode文件系统管理器
         final FSNamesystem namesystem = nn.getNamesystem();
+        // 获取块管理器
         final BlockManager bm = namesystem.getBlockManager();
+        // 获取当前在线DataNode总数
         final int totalDatanodes =
             namesystem.getNumberOfDatanodes(DatanodeReportType.LIVE);
+        // 创建fsck检查实例
         NamenodeFsck fsck = new NamenodeFsck(conf, nn,
             bm.getDatanodeManager().getNetworkTopology(), pmap, out,
             totalDatanodes, remoteAddress);
+        // 获取审计日志来源标识
         String auditSource = fsck.getAuditSource();
         boolean success = false;
         try {
+          // 执行文件系统检查
           fsck.fsck();
           success = true;
         } finally {
+          // 记录fsck操作审计日志
           namesystem.logFsckEvent(success, auditSource, remoteAddress);
         }
         return null;
       });
     } catch (InterruptedException e) {
+      // 操作被中断，返回400错误
       response.sendError(400, e.getMessage());
     }
   }

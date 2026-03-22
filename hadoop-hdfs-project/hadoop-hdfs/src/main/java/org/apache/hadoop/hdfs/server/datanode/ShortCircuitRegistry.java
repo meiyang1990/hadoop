@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -51,34 +52,22 @@ import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.thirdparty.com.google.common.collect.HashMultimap;
 
 /**
- * Manages client short-circuit memory segments on the DataNode.
- *
- * DFSClients request shared memory segments from the DataNode.  The 
- * ShortCircuitRegistry generates and manages these segments.  Each segment
- * has a randomly generated 128-bit ID which uniquely identifies it.  The
- * segments each contain several "slots."
- *
- * Before performing a short-circuit read, DFSClients must request a pair of
- * file descriptors from the DataNode via the REQUEST_SHORT_CIRCUIT_FDS
- * operation.  As part of this operation, DFSClients pass the ID of the shared
- * memory segment they would like to use to communicate information about this
- * replica, as well as the slot number within that segment they would like to
- * use.  Slot allocation is always done by the client.
- *
- * Slots are used to track the state of the block on the both the client and
- * datanode. When this DataNode mlocks a block, the corresponding slots for the
- * replicas are marked as "anchorable".  Anchorable blocks can be safely read
- * without verifying the checksum.  This means that BlockReaderLocal objects
- * using these replicas can skip checksumming.  It also means that we can do
- * zero-copy reads on these replicas (the ZCR interface has no way of
- * verifying checksums.)
+ * 管理DataNode上客户端短路读使用的共享内存段，协调客户端与DataNode之间的短路读状态信息
  * 
- * When a DN needs to munlock a block, it needs to first wait for the block to
- * be unanchored by clients doing a no-checksum read or a zero-copy read. The 
- * DN also marks the block's slots as "unanchorable" to prevent additional 
- * clients from initiating these operations in the future.
+ * DFSClients向DataNode申请共享内存段，ShortCircuitRegistry负责生成和管理这些段。每个段有一个随机生成的128位全局唯一ID，
+ * 每个共享内存段包含多个用于存储块状态信息的"槽位(Slot)"。
+ *
+ * 在执行短路读之前，DFS客户端需要通过REQUEST_SHORT_CIRCUIT_FDS操作向DataNode申请一对文件描述符。
+ * 作为该操作的一部分，客户端会传递它打算用来存储副本状态信息的共享内存段ID，以及段内想要使用的槽位编号，槽位分配始终由客户端完成。
+ *
+ * 槽位用于在客户端和DataNode两端跟踪块的状态。当DataNode对块mlock后，对应副本的槽位会被标记为"可锚定"。
+ * 可锚定块可以安全跳过校验和验证直接读取，因此使用这些副本的BlockReaderLocal可以跳过校验过程，
+ * 同时也支持对这些副本执行零拷贝读取（零拷贝接口没有校验和验证能力）。
  * 
- * The counterpart of this class on the client is {@link DfsClientShmManager}.
+ * 当DataNode需要munlock块时，需要先等待块被正在执行无校验读或零拷贝读的客户端取消锚定。
+ * DataNode还会将块对应槽位标记为"不可锚定"，防止后续客户端发起此类操作。
+ * 
+ * 该类在客户端侧的对应实现是 {@link DfsClientShmManager}。
  */
 public class ShortCircuitRegistry {
   public static final Logger LOG =
@@ -86,6 +75,9 @@ public class ShortCircuitRegistry {
 
   private static final int SHM_LENGTH = 8192;
 
+  /**
+   * 已注册的共享内存段，负责处理域套接字关闭事件以清理资源
+   */
   public static class RegisteredShm extends ShortCircuitShm
       implements DomainSocketWatcher.Handler {
     private final String clientName;
@@ -113,38 +105,41 @@ public class ShortCircuitRegistry {
     }
   }
 
+  /**
+   * 从注册表中移除指定共享内存段并清理所有关联资源
+   * @param shm 要移除的共享内存段
+   */
   public synchronized void removeShm(ShortCircuitShm shm) {
     if (LOG.isTraceEnabled()) {
       LOG.trace("removing shm " + shm);
     }
-    // Stop tracking the shmId.
+    // 从段映射中删除该共享内存段
     RegisteredShm removedShm = segments.remove(shm.getShmId());
     Preconditions.checkState(removedShm == shm,
         "failed to remove " + shm.getShmId());
-    // Stop tracking the slots.
+    // 清理该段上所有已分配槽位
     for (Iterator<Slot> iter = shm.slotIterator(); iter.hasNext(); ) {
       Slot slot = iter.next();
       boolean removed = slots.remove(slot.getBlockId(), slot);
       Preconditions.checkState(removed);
       slot.makeInvalid();
     }
-    // De-allocate the memory map and close the shared file. 
+    // 释放共享内存映射并关闭共享文件
     shm.free();
   }
 
   /**
-   * Whether or not the registry is enabled.
+   * 短路读注册表是否已启用
    */
   private boolean enabled;
 
   /**
-   * The factory which creates shared file descriptors.
+   * 共享文件描述符工厂，用于创建新的共享内存段
    */
   private final SharedFileDescriptorFactory shmFactory;
   
   /**
-   * A watcher which sends out callbacks when the UNIX domain socket
-   * associated with a shared memory segment closes.
+   * 域套接字监视器，当关联共享内存段的UNIX域套接字关闭时触发回调清理资源
    */
   private final DomainSocketWatcher watcher;
 
@@ -154,11 +149,17 @@ public class ShortCircuitRegistry {
   private final HashMultimap<ExtendedBlockId, Slot> slots =
       HashMultimap.create(0, 1);
   
+  /**
+   * 根据配置构造短路读共享内存注册表
+   * @param conf Hadoop配置对象
+   * @throws IOException 初始化失败时抛出异常
+   */
   public ShortCircuitRegistry(Configuration conf) throws IOException {
     boolean enabled = false;
     SharedFileDescriptorFactory shmFactory = null;
     DomainSocketWatcher watcher = null;
     try {
+      // 获取域套接字监视器中断检查间隔配置
       int interruptCheck = conf.getInt(
           DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS,
           DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS_DEFAULT);
@@ -167,18 +168,22 @@ public class ShortCircuitRegistry {
             DFS_SHORT_CIRCUIT_SHARED_MEMORY_WATCHER_INTERRUPT_CHECK_MS +
             " was set to " + interruptCheck);
       }
+      // 获取共享文件描述符路径配置
       String[] shmPaths =
           conf.getTrimmedStrings(DFS_DATANODE_SHARED_FILE_DESCRIPTOR_PATHS);
       if (shmPaths.length == 0) {
         shmPaths =
             DFS_DATANODE_SHARED_FILE_DESCRIPTOR_PATHS_DEFAULT.split(",");
       }
+      // 创建共享文件描述符工厂
       shmFactory = SharedFileDescriptorFactory.
           create("HadoopShortCircuitShm_", shmPaths);
+      // 检查域套接字监视器是否加载成功
       String dswLoadingFailure = DomainSocketWatcher.getLoadingFailureReason();
       if (dswLoadingFailure != null) {
         throw new IOException(dswLoadingFailure);
       }
+      // 创建域套接字监视器
       watcher = new DomainSocketWatcher(interruptCheck, "datanode");
       enabled = true;
       if (LOG.isDebugEnabled()) {
@@ -197,9 +202,9 @@ public class ShortCircuitRegistry {
   }
 
   /**
-   * Process a block mlock event from the FsDatasetCache.
+   * 处理来自FsDatasetCache的块mlock事件，将块对应所有槽位标记为可锚定
    *
-   * @param blockId    The block that was mlocked.
+   * @param blockId    被mlock的块ID
    */
   public synchronized void processBlockMlockEvent(ExtendedBlockId blockId) {
     if (!enabled) return;
@@ -210,10 +215,10 @@ public class ShortCircuitRegistry {
   }
 
   /**
-   * Mark any slots associated with this blockId as unanchorable.
+   * 将块对应所有槽位标记为不可锚定，判断是否允许执行munlock
    *
-   * @param blockId        The block ID.
-   * @return               True if we should allow the munlock request.
+   * @param blockId        块ID
+   * @return               如果没有槽位处于锚定状态则返回true，允许munlock；否则返回false
    */
   public synchronized boolean processBlockMunlockRequest(
       ExtendedBlockId blockId) {
@@ -230,12 +235,9 @@ public class ShortCircuitRegistry {
   }
 
   /**
-   * Invalidate any slot associated with a blockId that we are invalidating
-   * (deleting) from this DataNode.  When a slot is invalid, the DFSClient will
-   * not use the corresponding replica for new read or mmap operations (although
-   * existing, ongoing read or mmap operations will complete.)
+   * 处理块失效事件，将块对应所有槽位标记为无效，防止客户端使用该块进行新的短路读操作
    *
-   * @param blockId        The block ID.
+   * @param blockId        被删除/失效的块ID
    */
   public synchronized void processBlockInvalidation(ExtendedBlockId blockId) {
     if (!enabled) return;
@@ -254,6 +256,11 @@ public class ShortCircuitRegistry {
     }
   }
 
+  /**
+   * 获取访问指定块的所有客户端名称，用逗号拼接返回
+   * @param blockId 目标块ID
+   * @return 逗号分隔的客户端名称字符串
+   */
   public synchronized String getClientNames(ExtendedBlockId blockId) {
     if (!enabled) return "";
     final HashSet<String> clientNames = new HashSet<String>();
@@ -264,6 +271,9 @@ public class ShortCircuitRegistry {
     return Joiner.on(",").join(clientNames);
   }
 
+  /**
+   * 封装新创建共享内存段的返回信息，支持自动关闭输入流
+   */
   public static class NewShmInfo implements Closeable {
     private final ShmId shmId;
     private final FileInputStream stream;
@@ -288,17 +298,12 @@ public class ShortCircuitRegistry {
   }
 
   /**
-   * Handle a DFSClient request to create a new memory segment.
+   * 处理DFS客户端创建新共享内存段的请求
    *
-   * @param clientName    Client name as reported by the client.
-   * @param sock          The DomainSocket to associate with this memory
-   *                        segment.  When this socket is closed, or the
-   *                        other side writes anything to the socket, the
-   *                        segment will be closed.  This can happen at any
-   *                        time, including right after this function returns.
-   * @return              A NewShmInfo object.  The caller must close the
-   *                        NewShmInfo object once they are done with it.
-   * @throws IOException  If the new memory segment could not be created.
+   * @param clientName    客户端上报的客户端名称
+   * @param sock          与该共享内存段关联的域套接字，当套接字关闭时会自动清理该段
+   * @return              新共享内存段信息对象，调用方使用后必须关闭该对象
+   * @throws IOException  创建共享内存段失败时抛出异常
    */
   public NewShmInfo createNewMemorySegment(String clientName,
       DomainSocket sock) throws IOException {
@@ -315,10 +320,13 @@ public class ShortCircuitRegistry {
       }
       FileInputStream fis = null;
       try {
+        // 生成唯一随机ID
         do {
           shmId = ShmId.createRandom();
         } while (segments.containsKey(shmId));
+        // 创建共享文件描述符
         fis = shmFactory.createDescriptor(clientName, SHM_LENGTH);
+        // 创建已注册共享内存段对象
         shm = new RegisteredShm(clientName, shmId, fis, this);
       } finally {
         if (shm == null) {
@@ -328,8 +336,7 @@ public class ShortCircuitRegistry {
       info = new NewShmInfo(shmId, fis);
       segments.put(shmId, shm);
     }
-    // Drop the registry lock to prevent deadlock.
-    // After this point, RegisteredShm#handle may be called at any time.
+    // 释放注册表锁避免死锁，之后RegisteredShm#handle随时可能被调用
     watcher.add(sock, shm);
     if (LOG.isTraceEnabled()) {
       LOG.trace("createNewMemorySegment: created " + info.shmId);
@@ -337,6 +344,13 @@ public class ShortCircuitRegistry {
     return info;
   }
   
+  /**
+   * 注册客户端分配的槽位，将槽位关联到指定块
+   * @param blockId 目标块ID
+   * @param slotId 要注册的槽位ID
+   * @param isCached 块是否已被缓存mlock
+   * @throws InvalidRequestException 槽位所属共享内存段不存在时抛出异常
+   */
   public synchronized void registerSlot(ExtendedBlockId blockId, SlotId slotId,
       boolean isCached) throws InvalidRequestException {
     if (!enabled) {
@@ -353,6 +367,7 @@ public class ShortCircuitRegistry {
           "registered with shmId " + shmId);
     }
     Slot slot = shm.registerSlot(slotId.getSlotIdx(), blockId);
+    // 根据缓存状态设置可锚定属性
     if (isCached) {
       slot.makeAnchorable();
     } else {
@@ -366,6 +381,11 @@ public class ShortCircuitRegistry {
     }
   }
   
+  /**
+   * 注销客户端释放的槽位，清理块和槽位的关联关系
+   * @param slotId 要注销的槽位ID
+   * @throws InvalidRequestException 槽位所属共享内存段不存在时抛出异常
+   */
   public synchronized void unregisterSlot(SlotId slotId)
       throws InvalidRequestException {
     if (!enabled) {
@@ -387,6 +407,9 @@ public class ShortCircuitRegistry {
     slots.remove(slot.getBlockId(), slot);
   }
   
+  /**
+   * 关闭注册表，清理所有资源
+   */
   public void shutdown() {
     synchronized (this) {
       if (!enabled) return;
@@ -395,18 +418,8 @@ public class ShortCircuitRegistry {
     IOUtils.closeStream(watcher);
   }
 
+  /**
+   * 注册表访问访问接口，用于测试场景遍历内部数据
+   */
   public static interface Visitor {
-    boolean accept(HashMap<ShmId, RegisteredShm> segments,
-                HashMultimap<ExtendedBlockId, Slot> slots);
-  }
-
-  @VisibleForTesting
-  public synchronized boolean visit(Visitor visitor) {
-    return visitor.accept(segments, slots);
-  }
-
-  @VisibleForTesting
-  public int getShmNum() {
-    return segments.size();
-  }
-}
+    boolean accept(

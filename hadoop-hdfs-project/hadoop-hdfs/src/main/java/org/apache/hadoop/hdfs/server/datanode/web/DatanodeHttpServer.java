@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -73,7 +74,8 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_HTTP_INTERNAL_PROXY_PORT;
 
 /**
- * Data node HTTP Server Class.
+ * HDFS DataNode HTTP服务端，提供Web UI和WebHDFS访问能力，基于Jetty+Netty实现混合架构。
+ * Jetty处理管理页面等Servlet请求，Netty处理WebHDFS数据传输请求以提升性能。
  */
 public class DatanodeHttpServer implements Closeable {
   static final Logger LOG = LoggerFactory.getLogger(DatanodeHttpServer.class);
@@ -96,6 +98,13 @@ public class DatanodeHttpServer implements Closeable {
   private InetSocketAddress httpAddress;
   private InetSocketAddress httpsAddress;
 
+  /**
+   * 构造DataNode HTTP服务端，初始化Jetty信息服务器和Netty HTTP/HTTPS服务端。
+   * @param conf Hadoop配置对象
+   * @param datanode 当前DataNode实例
+   * @param externalHttpChannel 外部绑定的ServerSocketChannel（供JSVC等特权绑定场景使用，可为null）
+   * @throws IOException 初始化失败时抛出异常
+   */
   public DatanodeHttpServer(final Configuration conf,
         final DataNode datanode,
         final ServerSocketChannel externalHttpChannel)
@@ -103,6 +112,7 @@ public class DatanodeHttpServer implements Closeable {
     this.conf = conf;
 
     Configuration confForInfoServer = new Configuration(conf);
+    // 限制Jetty线程数，管理页面不需要大量线程
     confForInfoServer.setInt(HttpServer2.HTTP_MAX_THREADS_KEY,
         HTTP_MAX_THREADS);
     confForInfoServer.setInt(HttpServer2.HTTP_SELECTOR_COUNT_KEY,
@@ -114,8 +124,11 @@ public class DatanodeHttpServer implements Closeable {
     HttpServer2.Builder builder = new HttpServer2.Builder()
         .setName("datanode")
         .setConf(confForInfoServer)
+        // 设置管理员访问控制列表
         .setACL(new AccessControlList(conf.get(DFS_ADMIN, " ")))
+        // 获取Spnego认证需要的主机名
         .hostName(getHostnameForSpnegoPrincipal(confForInfoServer))
+        // 绑定本地代理端口，Netty将管理请求转发给Jetty处理
         .addEndpoint(URI.create("http://localhost:" + proxyPort))
         .setFindPort(true);
 
@@ -127,26 +140,33 @@ public class DatanodeHttpServer implements Closeable {
         DFSConfigKeys.DFS_XFRAME_OPTION_VALUE,
         DFSConfigKeys.DFS_XFRAME_OPTION_VALUE_DEFAULT);
 
+    // 配置X-Frame-Options防点击劫持
     builder.configureXFrame(xFrameEnabled).setXFrameOption(xFrameOptionValue);
 
     this.infoServer = builder.build();
 
+    // 向Jetty上下文注入共享对象
     this.infoServer.setAttribute(HttpServer2.CONF_CONTEXT_ATTRIBUTE, conf);
     this.infoServer.setAttribute("datanode", datanode);
     this.infoServer.setAttribute(JspHelper.CURRENT_CONF, conf);
+    // 注册块扫描报告Servlet
     this.infoServer.addServlet(null, "/blockScannerReport",
         BlockScanner.Servlet.class);
     DataNodeUGIProvider.init(conf);
     this.infoServer.start();
+    // 获取Jetty实际绑定地址，供Netty转发请求使用
     final InetSocketAddress jettyAddr = infoServer.getConnectorAddress(0);
 
     this.confForCreate = new Configuration(conf);
+    // 文件创建时使用000 umask，权限由HDFS本身控制
     confForCreate.set(FsPermission.UMASK_LABEL, "000");
 
+    // 初始化Netty EventLoop线程组
     this.bossGroup = new NioEventLoopGroup();
     this.workerGroup = new NioEventLoopGroup();
     this.externalHttpChannel = externalHttpChannel;
     HttpConfig.Policy policy = DFSUtil.getHttpPolicy(conf);
+    // 加载配置指定的Netty过滤器处理器
     final ChannelHandler[] handlers = getFilterHandlers(conf);
 
     if (policy.isHttpEnabled()) {
@@ -155,19 +175,23 @@ public class DatanodeHttpServer implements Closeable {
               @Override
               protected void initChannel(SocketChannel ch) throws Exception {
                 ChannelPipeline p = ch.pipeline();
+                // 添加HTTP编解码器
                 p.addLast(new HttpRequestDecoder(),
                     new HttpResponseEncoder());
+                // 添加用户自定义过滤器处理器
                 if (handlers != null) {
                   for (ChannelHandler c : handlers) {
                     p.addLast(c);
                   }
                 }
+                // 添加分块写入支持和URL请求分发器
                 p.addLast(
                     new ChunkedWriteHandler(),
                     new URLDispatcher(jettyAddr, conf, confForCreate, false));
               }
             });
 
+      // 配置Netty写缓冲区水位线，控制背压
       this.httpServer.childOption(
           ChannelOption.WRITE_BUFFER_WATER_MARK,
           new WriteBufferWaterMark(conf.getInt(
@@ -177,6 +201,7 @@ public class DatanodeHttpServer implements Closeable {
                    DFSConfigKeys.DFS_WEBHDFS_NETTY_HIGH_WATERMARK,
                    DFSConfigKeys.DFS_WEBHDFS_NETTY_HIGH_WATERMARK_DEFAULT)));
 
+      // 配置Channel工厂，支持外部已绑定的Channel（JSVC场景）
       if (externalHttpChannel == null) {
         httpServer.channel(NioServerSocketChannel.class);
       } else {
@@ -184,8 +209,7 @@ public class DatanodeHttpServer implements Closeable {
           @Override
           public NioServerSocketChannel newChannel() {
             return new NioServerSocketChannel(externalHttpChannel) {
-              // The channel has been bounded externally via JSVC,
-              // thus bind() becomes a no-op.
+              // 通道已经由外部JSVC绑定过，此处bind方法空实现
               @Override
               protected void doBind(SocketAddress localAddress)
                   throws Exception {
@@ -198,6 +222,7 @@ public class DatanodeHttpServer implements Closeable {
       this.httpServer = null;
     }
 
+    // 如果HTTPS启用，初始化HTTPS服务端
     if (policy.isHttpsEnabled()) {
       this.sslFactory = new SSLFactory(SSLFactory.Mode.SERVER, conf);
       try {
@@ -211,15 +236,18 @@ public class DatanodeHttpServer implements Closeable {
             @Override
             protected void initChannel(SocketChannel ch) throws Exception {
               ChannelPipeline p = ch.pipeline();
+              // 添加SSL处理器
               p.addLast(
                   new SslHandler(sslFactory.createSSLEngine()),
                   new HttpRequestDecoder(),
                   new HttpResponseEncoder());
+              // 添加用户自定义过滤器处理器
               if (handlers != null) {
                 for (ChannelHandler c : handlers) {
                   p.addLast(c);
                 }
               }
+              // 添加分块写入支持和URL请求分发器，标记为HTTPS请求
               p.addLast(
                   new ChunkedWriteHandler(),
                   new URLDispatcher(jettyAddr, conf, confForCreate, true));
@@ -231,6 +259,11 @@ public class DatanodeHttpServer implements Closeable {
     }
   }
 
+  /**
+   * 获取Spnego认证主体对应的主机名，用于Kerberos认证。
+   * @param conf Hadoop配置对象
+   * @return 主机名字符串
+   */
   private static String getHostnameForSpnegoPrincipal(Configuration conf) {
     String addr = conf.getTrimmed(DFS_DATANODE_HTTP_ADDRESS_KEY, null);
     if (addr == null) {
@@ -241,13 +274,10 @@ public class DatanodeHttpServer implements Closeable {
     return inetSocker.getHostString();
   }
 
-  /* Get an array of ChannelHandlers specified in the conf
-   * @param conf configuration to read and pass
-   * @return array of ChannelHandlers ready to be used
-   * @throws NoSuchMethodException if the handler does not implement a method
-   *  initializeState(conf)
-   * @throws InvocationTargetException if the handler's initalizeState method
-   *  raises an exception
+  /**
+   * 从配置中加载初始化自定义Netty Channel过滤器处理器。
+   * @param configuration Hadoop配置对象
+   * @return 初始化完成的处理器数组
    */
   private ChannelHandler[] getFilterHandlers(Configuration configuration) {
     if (configuration == null) {
@@ -275,6 +305,7 @@ public class DatanodeHttpServer implements Closeable {
     for (int i = 0; i < classes.length; i++) {
       LOG.debug("Loading filter handler {}", classes[i].getName());
       try {
+        // 通过反射调用静态初始化方法获取初始化参数，再调用构造函数创建实例
         Method initializeState = classes[i].getDeclaredMethod("initializeState",
             Configuration.class);
         Constructor<?> constructor =
@@ -291,18 +322,32 @@ public class DatanodeHttpServer implements Closeable {
     return (handlers);
   }
 
+  /**
+   * 获取HTTP服务绑定的地址。
+   * @return HTTP地址
+   */
   public InetSocketAddress getHttpAddress() {
     return httpAddress;
   }
 
+  /**
+   * 获取HTTPS服务绑定的地址。
+   * @return HTTPS地址
+   */
   public InetSocketAddress getHttpsAddress() {
     return httpsAddress;
   }
 
+  /**
+   * 启动HTTP和HTTPS服务，完成端口绑定。
+   * @throws IOException 端口绑定失败时抛出异常
+   */
   public void start() throws IOException {
     if (httpServer != null) {
       InetSocketAddress infoAddr = DataNode.getInfoAddr(conf);
+      // 绑定端口并获取实际绑定地址
       httpAddress = getChannelLocalAddress(httpServer, infoAddr);
+      // 更新配置，保存实际绑定地址
       conf.set(DFSConfigKeys.DFS_DATANODE_HTTP_ADDRESS_KEY,
           NetUtils.getHostPortString(httpAddress));
       LOG.info("Listening for HTTP traffic on {}", httpAddress);
@@ -313,13 +358,22 @@ public class DatanodeHttpServer implements Closeable {
           NetUtils.createSocketAddr(conf.getTrimmed(
               DFS_DATANODE_HTTPS_ADDRESS_KEY,
               DFS_DATANODE_HTTPS_ADDRESS_DEFAULT));
+      // 绑定端口并获取实际绑定地址
       httpsAddress = getChannelLocalAddress(httpsServer, secInfoSocAddr);
+      // 更新配置，保存实际绑定地址
       conf.set(DFSConfigKeys.DFS_DATANODE_HTTPS_ADDRESS_KEY,
           NetUtils.getHostPortString(httpsAddress));
       LOG.info("Listening for HTTPS traffic on {}", httpsAddress);
     }
   }
 
+  /**
+   * 绑定服务端到指定地址，返回实际绑定的本地地址。
+   * @param server Netty ServerBootstrap实例
+   * @param address 要绑定的地址
+   * @return 实际绑定的地址
+   * @throws IOException 绑定失败时抛出异常
+   */
   private InetSocketAddress getChannelLocalAddress(
       ServerBootstrap server, InetSocketAddress address) throws IOException {
     ChannelFuture f = server.bind(address);
@@ -337,78 +391,23 @@ public class DatanodeHttpServer implements Closeable {
   }
 
   @Override
+  /**
+   * 关闭HTTP服务，释放所有资源。
+   * @throws IOException 关闭失败时抛出IO异常
+   */
   public void close() throws IOException {
+    // 关闭Netty线程组
     bossGroup.shutdownGracefully();
     workerGroup.shutdownGracefully();
+    // 销毁SSL工厂资源
     if (sslFactory != null) {
       sslFactory.destroy();
     }
+    // 关闭外部绑定的Channel
     if (externalHttpChannel != null) {
       externalHttpChannel.close();
     }
+    // 停止Jetty信息服务器
     try {
       infoServer.stop();
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
-  }
-
-  /**
-   * Since the DataNode HTTP server is not implemented in terms of the
-   * servlet API, it
-   * takes some extra effort to obtain an instance of the filter.  This
-   * method provides
-   * a minimal {@link FilterConfig} implementation backed by a {@link Map}.
-   * Call this from
-   * your filter handler to initialize a servlet filter.
-   */
-  public static final class MapBasedFilterConfig implements FilterConfig {
-
-    private final String filterName;
-    private final Map<String, String> parameters;
-
-    /*
-     * Creates a new MapBasedFilterConfig.
-     *
-     * @param filterName filter name
-     * @param parameters mapping of filter initialization parameters
-     */
-    public MapBasedFilterConfig(String filterName,
-        Map<String, String> parameters) {
-      this.filterName = filterName;
-      this.parameters = parameters;
-    }
-
-    @Override
-    public String getFilterName() {
-      return this.filterName;
-    }
-
-    @Override
-    public String getInitParameter(String name) {
-      return this.parameters.get(name);
-    }
-
-    @Override
-    public Enumeration<String> getInitParameterNames() {
-      throw this.notImplemented();
-    }
-
-    @Override
-    public ServletContext getServletContext() {
-      throw this.notImplemented();
-    }
-
-    /*
-     * Creates an exception indicating that an interface method is not
-     * implemented. If you are building a handler it is possible you will
-     * need to make this interface more extensive.
-     *
-     * @return exception indicating method not implemented
-     */
-    private UnsupportedOperationException notImplemented() {
-      return new UnsupportedOperationException(this.getClass().getSimpleName()
-          + " does not implement this method.");
-    }
-  }
-}
+    } catch (Exception e

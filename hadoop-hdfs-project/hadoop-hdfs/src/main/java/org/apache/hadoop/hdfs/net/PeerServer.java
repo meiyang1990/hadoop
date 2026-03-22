@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,46 +23,50 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 
+/**
+ * HDFS网络连接服务端接口，定义了接收客户端Peer连接的通用能力
+ * 为不同传输实现（如普通TCP、域套接字等）提供统一的服务端抽象
+ */
 @InterfaceAudience.Private
 public interface PeerServer extends Closeable {
   /**
-   * Set the receive buffer size of the PeerServer.
+   * 设置服务端接收缓冲区大小
    * 
-   * @param size     The receive buffer size.
+   * @param size 接收缓冲区大小（字节）
+   * @throws IOException 如果设置失败抛出IO异常
    */
   public void setReceiveBufferSize(int size) throws IOException;
 
   /**
-   * Get the receive buffer size of the PeerServer.
+   * 获取当前服务端接收缓冲区大小
    *
-   * @return     The receive buffer size.
+   * @return 当前接收缓冲区大小（字节）
+   * @throws IOException 如果获取失败抛出IO异常
    */
   int getReceiveBufferSize() throws IOException;
 
   /**
-   * Listens for a connection to be made to this server and accepts
-   * it. The method blocks until a connection is made.
+   * 阻塞等待并接收新的客户端连接，返回对应Peer对象
+   * 方法会阻塞直到有新连接建立或超时
    *
-   * @exception IOException  if an I/O error occurs when waiting for a
-   *               connection.
-   * @exception SecurityException  if a security manager exists and its  
-   *             <code>checkAccept</code> method doesn't allow the operation.
-   * @exception SocketTimeoutException if a timeout was previously set and
-   *             the timeout has been reached.
+   * @return 新建立连接对应的Peer对象
+   * @exception IOException 等待连接过程中发生IO错误时抛出
+   * @exception SecurityException 安全管理器不允许接受连接时抛出
+   * @exception SocketTimeoutException 已设置超时且等待超时时抛出
    */
   public Peer accept() throws IOException, SocketTimeoutException;
 
   /**
-   * @return                 A string representation of the address we're
-   *                         listening on.
+   * 获取服务端监听地址的字符串表示，用于日志和调试
+   *
+   * @return 服务端监听地址的字符串描述
    */
   public String getListeningString();
 
   /**
-   * Free the resources associated with this peer server.
-   * This normally includes sockets, etc.
+   * 关闭服务端，释放关联资源（如监听Socket等）
    *
-   * @throws IOException     If there is an error closing the PeerServer
+   * @throws IOException 关闭过程中发生IO错误时抛出
    */
   public void close() throws IOException;
 }

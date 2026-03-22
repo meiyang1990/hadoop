@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,6 +36,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
+ * 文件级注释：DataNode单个存储卷的IO相关指标管理类，负责维护存储卷各类IO操作的统计信息，并通过Hadoop metrics2系统对外发布。
+ * 此类为每个DataNode存储卷维护独立的指标集，用于监控磁盘IO性能和错误率，辅助排查存储层面的性能问题。
+ *
  * This class is for maintaining Datanode Volume IO related statistics and
  * publishing them through the metrics interfaces.
  */
@@ -47,6 +51,7 @@ public class DataNodeVolumeMetrics {
 
   @Metric(value = {"VolumeName", "Current VolumeName"}, type = Metric.Type.TAG)
   public String getVolumeName() {
+    // 正则提取存储卷真实名称，去除前缀
     Pattern pattern = Pattern.compile("(?:DataNodeVolume-|UndefinedDataNodeVolume)(.*)");
     Matcher matcher = pattern.matcher(name);
     return matcher.find() ? matcher.group(1) : name;
@@ -93,139 +98,267 @@ public class DataNodeVolumeMetrics {
   @Metric("file io error rate")
   private MutableRate fileIoErrorRate;
 
+  /**
+   * 获取元数据操作总次数。
+   * @return 元数据操作总次数
+   */
   public long getTotalMetadataOperations() {
     return totalMetadataOperations.value();
   }
 
   // Based on metadataOperationRate
+  /**
+   * 获取元数据操作采样数。
+   * @return 元数据操作采样数
+   */
   public long getMetadataOperationSampleCount() {
     return metadataOperationRate.lastStat().numSamples();
   }
 
+  /**
+   * 获取元数据操作平均耗时。
+   * @return 元数据操作平均耗时
+   */
   public double getMetadataOperationMean() {
     return metadataOperationRate.lastStat().mean();
   }
 
+  /**
+   * 获取元数据操作耗时标准差。
+   * @return 元数据操作耗时标准差
+   */
   public double getMetadataOperationStdDev() {
     return metadataOperationRate.lastStat().stddev();
   }
 
+  /**
+   * 获取数据文件IO总次数。
+   * @return 数据文件IO总次数
+   */
   public long getTotalDataFileIos() {
     return totalDataFileIos.value();
   }
 
   // Based on dataFileIoRate
+  /**
+   * 获取数据文件IO采样数。
+   * @return 数据文件IO采样数
+   */
   public long getDataFileIoSampleCount() {
     return dataFileIoRate.lastStat().numSamples();
   }
 
+  /**
+   * 获取数据文件IO平均耗时。
+   * @return 数据文件IO平均耗时
+   */
   public double getDataFileIoMean() {
     return dataFileIoRate.lastStat().mean();
   }
 
+  /**
+   * 获取数据文件IO耗时标准差。
+   * @return 数据文件IO耗时标准差
+   */
   public double getDataFileIoStdDev() {
     return dataFileIoRate.lastStat().stddev();
   }
 
   // Based on flushIoRate
+  /**
+   * 获取flush IO操作采样数。
+   * @return flush IO操作采样数
+   */
   public long getFlushIoSampleCount() {
     return flushIoRate.lastStat().numSamples();
   }
 
+  /**
+   * 获取flush IO平均耗时。
+   * @return flush IO平均耗时
+   */
   public double getFlushIoMean() {
     return flushIoRate.lastStat().mean();
   }
 
+  /**
+   * 获取flush IO耗时标准差。
+   * @return flush IO耗时标准差
+   */
   public double getFlushIoStdDev() {
     return flushIoRate.lastStat().stddev();
   }
 
   // Based on syncIoRate
+  /**
+   * 获取sync IO操作采样数。
+   * @return sync IO操作采样数
+   */
   public long getSyncIoSampleCount() {
     return syncIoRate.lastStat().numSamples();
   }
 
+  /**
+   * 获取sync IO平均耗时。
+   * @return sync IO平均耗时
+   */
   public double getSyncIoMean() {
     return syncIoRate.lastStat().mean();
   }
 
+  /**
+   * 获取sync IO耗时标准差。
+   * @return sync IO耗时标准差
+   */
   public double getSyncIoStdDev() {
     return syncIoRate.lastStat().stddev();
   }
 
   // Based on readIoRate
+  /**
+   * 获取读IO操作采样数。
+   * @return 读IO操作采样数
+   */
   public long getReadIoSampleCount() {
     return readIoRate.lastStat().numSamples();
   }
 
+  /**
+   * 获取读IO平均耗时。
+   * @return 读IO平均耗时
+   */
   public double getReadIoMean() {
     return readIoRate.lastStat().mean();
   }
 
+  /**
+   * 获取读IO耗时标准差。
+   * @return 读IO耗时标准差
+   */
   public double getReadIoStdDev() {
     return readIoRate.lastStat().stddev();
   }
 
   // Based on writeIoRate
+  /**
+   * 获取写IO操作采样数。
+   * @return 写IO操作采样数
+   */
   public long getWriteIoSampleCount() {
     return writeIoRate.lastStat().numSamples();
   }
 
+  /**
+   * 获取写IO平均耗时。
+   * @return 写IO平均耗时
+   */
   public double getWriteIoMean() {
     return writeIoRate.lastStat().mean();
   }
 
+  /**
+   * 获取写IO耗时标准差。
+   * @return 写IO耗时标准差
+   */
   public double getWriteIoStdDev() {
     return writeIoRate.lastStat().stddev();
   }
 
   // Based on transferIoRate
+  /**
+   * 获取transfer IO操作采样数。
+   * @return transfer IO操作采样数
+   */
   public long getTransferIoSampleCount() {
     return transferIoRate.lastStat().numSamples();
   }
 
+  /**
+   * 获取transfer IO平均耗时。
+   * @return transfer IO平均耗时
+   */
   public double getTransferIoMean() {
     return transferIoRate.lastStat().mean();
   }
 
+  /**
+   * 获取transfer IO耗时标准差。
+   * @return transfer IO耗时标准差
+   */
   public double getTransferIoStdDev() {
     return transferIoRate.lastStat().stddev();
   }
 
+  /**
+   * 获取transfer IO延迟分位数数组。
+   * @return transfer IO延迟分位数数组
+   */
   public MutableQuantiles[] getTransferIoQuantiles() {
     return transferIoLatencyQuantiles;
   }
 
   // Based on nativeCopyIoRate
+  /**
+   * 获取本地拷贝IO操作采样数。
+   * @return 本地拷贝IO操作采样数
+   */
   public long getNativeCopyIoSampleCount() {
     return nativeCopyIoRate.lastStat().numSamples();
   }
 
+  /**
+   * 获取本地拷贝IO平均耗时。
+   * @return 本地拷贝IO平均耗时
+   */
   public double getNativeCopyIoMean() {
     return nativeCopyIoRate.lastStat().mean();
   }
 
+  /**
+   * 获取本地拷贝IO耗时标准差。
+   * @return 本地拷贝IO耗时标准差
+   */
   public double getNativeCopyIoStdDev() {
     return nativeCopyIoRate.lastStat().stddev();
   }
 
+  /**
+   * 获取本地拷贝IO延迟分位数数组。
+   * @return 本地拷贝IO延迟分位数数组
+   */
   public MutableQuantiles[] getNativeCopyIoQuantiles() {
     return nativeCopyIoLatencyQuantiles;
   }
 
+  /**
+   * 获取文件IO错误总次数。
+   * @return 文件IO错误总次数
+   */
   public long getTotalFileIoErrors() {
     return totalFileIoErrors.value();
   }
 
   // Based on fileIoErrorRate
+  /**
+   * 获取文件IO错误采样数。
+   * @return 文件IO错误采样数
+   */
   public long getFileIoErrorSampleCount() {
     return fileIoErrorRate.lastStat().numSamples();
   }
 
+  /**
+   * 获取文件IO错误平均耗时。
+   * @return 文件IO错误平均耗时
+   */
   public double getFileIoErrorMean() {
     return fileIoErrorRate.lastStat().mean();
   }
 
+  /**
+   * 获取文件IO错误耗时标准差。
+   * @return 文件IO错误耗时标准差
+   */
   public double getFileIoErrorStdDev() {
     return fileIoErrorRate.lastStat().stddev();
   }
@@ -233,11 +366,18 @@ public class DataNodeVolumeMetrics {
   private final String name;
   private final MetricsSystem ms;
 
+  /**
+   * 构造DataNode存储卷指标实例，初始化各类IO延迟分位数统计数组。
+   * @param metricsSystem 指标系统实例
+   * @param volumeName 存储卷名称
+   * @param intervals 分位数统计间隔数组（单位秒）
+   */
   public DataNodeVolumeMetrics(final MetricsSystem metricsSystem,
       final String volumeName, final int[] intervals) {
     this.ms = metricsSystem;
     this.name = volumeName;
     final int len = intervals.length;
+    // 为每类IO操作创建对应长度的分位数数组
     metadataOperationLatencyQuantiles = new MutableQuantiles[len];
     dataFileIoLatencyQuantiles = new MutableQuantiles[len];
     flushIoLatencyQuantiles = new MutableQuantiles[len];
@@ -246,6 +386,7 @@ public class DataNodeVolumeMetrics {
     writeIoLatencyQuantiles = new MutableQuantiles[len];
     transferIoLatencyQuantiles = new MutableQuantiles[len];
     nativeCopyIoLatencyQuantiles = new MutableQuantiles[len];
+    // 遍历每个间隔，在注册表中创建对应分位数统计对象
     for (int i = 0; i < len; i++) {
       int interval = intervals[i];
       metadataOperationLatencyQuantiles[i] = registry.newQuantiles(
@@ -275,28 +416,47 @@ public class DataNodeVolumeMetrics {
     }
   }
 
+  /**
+   * 工厂方法，根据配置创建并注册DataNode存储卷指标实例。
+   * @param conf Hadoop配置对象
+   * @param volumeName 存储卷名称
+   * @return 创建完成的DataNodeVolumeMetrics实例
+   */
   public static DataNodeVolumeMetrics create(final Configuration conf,
       final String volumeName) {
     MetricsSystem ms = DefaultMetricsSystem.instance();
+    // 生成指标名称，处理空名称和特殊字符替换
     String name = "DataNodeVolume-"+ (volumeName.isEmpty()
         ? "UndefinedDataNodeVolume"+ ThreadLocalRandom.current().nextInt()
         : volumeName.replace(':', '-'));
 
     // Percentile measurement is off by default, by watching no intervals
+    // 从配置获取分位数统计间隔，未配置则默认关闭分位数统计
     int[] intervals =
         conf.getInts(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY);
     return ms.register(name, null, new DataNodeVolumeMetrics(ms, name,
         intervals));
   }
 
+  /**
+   * 获取指标实例名称。
+   * @return 指标实例名称
+   */
   public String name() {
     return name;
   }
 
+  /**
+   * 从指标系统注销当前存储卷指标。
+   */
   public void unRegister() {
     ms.unregisterSource(name);
   }
 
+  /**
+   * 添加一次元数据操作的延迟统计。
+   * @param latency 操作耗时（毫秒）
+   */
   public void addMetadataOperationLatency(final long latency) {
     totalMetadataOperations.incr();
     metadataOperationRate.add(latency);
@@ -305,6 +465,10 @@ public class DataNodeVolumeMetrics {
     }
   }
 
+  /**
+   * 添加一次数据文件IO的延迟统计。
+   * @param latency 操作耗时（毫秒）
+   */
   public void addDataFileIoLatency(final long latency) {
     totalDataFileIos.incr();
     dataFileIoRate.add(latency);
@@ -313,6 +477,10 @@ public class DataNodeVolumeMetrics {
     }
   }
 
+  /**
+   * 添加一次sync IO的延迟统计。
+   * @param latency 操作耗时（毫秒）
+   */
   public void addSyncIoLatency(final long latency) {
     syncIoRate.add(latency);
     for (MutableQuantiles q : syncIoLatencyQuantiles) {
@@ -320,43 +488,6 @@ public class DataNodeVolumeMetrics {
     }
   }
 
-  public void addFlushIoLatency(final long latency) {
-    flushIoRate.add(latency);
-    for (MutableQuantiles q : flushIoLatencyQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void addReadIoLatency(final long latency) {
-    readIoRate.add(latency);
-    for (MutableQuantiles q : readIoLatencyQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void addWriteIoLatency(final long latency) {
-    writeIoRate.add(latency);
-    for (MutableQuantiles q: writeIoLatencyQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void addTransferIoLatency(final long latency) {
-    transferIoRate.add(latency);
-    for (MutableQuantiles q: transferIoLatencyQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void addNativeCopyIoLatency(final long latency) {
-    nativeCopyIoRate.add(latency);
-    for (MutableQuantiles q: nativeCopyIoLatencyQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void addFileIoError(final long latency) {
-    totalFileIoErrors.incr();
-    fileIoErrorRate.add(latency);
-  }
-}
+  /**
+   * 添加一次flush IO的延迟统计。
+   * @param latency

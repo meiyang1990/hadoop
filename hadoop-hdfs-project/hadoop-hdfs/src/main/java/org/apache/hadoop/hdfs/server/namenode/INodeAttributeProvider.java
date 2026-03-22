@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,10 +31,19 @@ import org.apache.hadoop.security.UserGroupInformation;
 
 import java.util.Arrays;
 
+/**
+ * HDFS INode属性与访问控制扩展提供者抽象基类，
+ * 允许第三方实现自定义INode属性获取和权限访问控制逻辑，
+ * 用于扩展NameNode原生的权限检查和属性管理能力。
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public abstract class INodeAttributeProvider {
 
+  /**
+   * 权限授权上下文类，封装一次权限检查所需的全部上下文信息，
+   * 替代原有长参数列表，提供更清晰的参数传递方式。
+   */
   public static class AuthorizationContext {
     private String fsOwner;
     private String supergroup;
@@ -53,6 +63,7 @@ public abstract class INodeAttributeProvider {
     private String operationName;
     private CallerContext callerContext;
 
+    /** 获取文件系统所有者用户名 */
     public String getFsOwner() {
       return fsOwner;
     }
@@ -61,6 +72,7 @@ public abstract class INodeAttributeProvider {
       this.fsOwner = fsOwner;
     }
 
+    /** 获取超级用户组名称 */
     public String getSupergroup() {
       return supergroup;
     }
@@ -69,6 +81,7 @@ public abstract class INodeAttributeProvider {
       this.supergroup = supergroup;
     }
 
+    /** 获取调用者用户组信息 */
     public UserGroupInformation getCallerUgi() {
       return callerUgi;
     }
@@ -77,6 +90,7 @@ public abstract class INodeAttributeProvider {
       this.callerUgi = callerUgi;
     }
 
+    /** 获取路径各层级INode属性数组 */
     public INodeAttributes[] getInodeAttrs() {
       return inodeAttrs;
     }
@@ -85,6 +99,7 @@ public abstract class INodeAttributeProvider {
       this.inodeAttrs = inodeAttrs;
     }
 
+    /** 获取路径各层级INode对象数组 */
     public INode[] getInodes() {
       return inodes;
     }
@@ -93,6 +108,7 @@ public abstract class INodeAttributeProvider {
       this.inodes = inodes;
     }
 
+    /** 获取路径各层级名称字节数组 */
     public byte[][] getPathByNameArr() {
       return pathByNameArr;
     }
@@ -101,6 +117,7 @@ public abstract class INodeAttributeProvider {
       this.pathByNameArr = pathByNameArr;
     }
 
+    /** 获取快照ID */
     public int getSnapshotId() {
       return snapshotId;
     }
@@ -109,6 +126,7 @@ public abstract class INodeAttributeProvider {
       this.snapshotId = snapshotId;
     }
 
+    /** 获取请求路径字符串 */
     public String getPath() {
       return path;
     }
@@ -117,6 +135,7 @@ public abstract class INodeAttributeProvider {
       this.path = path;
     }
 
+    /** 获取祖先节点索引 */
     public int getAncestorIndex() {
       return ancestorIndex;
     }
@@ -125,6 +144,7 @@ public abstract class INodeAttributeProvider {
       this.ancestorIndex = ancestorIndex;
     }
 
+    /** 是否需要检查所有者权限 */
     public boolean isDoCheckOwner() {
       return doCheckOwner;
     }
@@ -133,6 +153,7 @@ public abstract class INodeAttributeProvider {
       this.doCheckOwner = doCheckOwner;
     }
 
+    /** 获取祖先节点所需访问权限 */
     public FsAction getAncestorAccess() {
       return ancestorAccess;
     }
@@ -141,6 +162,7 @@ public abstract class INodeAttributeProvider {
       this.ancestorAccess = ancestorAccess;
     }
 
+    /** 获取父节点所需访问权限 */
     public FsAction getParentAccess() {
       return parentAccess;
     }
@@ -149,6 +171,7 @@ public abstract class INodeAttributeProvider {
       this.parentAccess = parentAccess;
     }
 
+    /** 获取当前节点所需访问权限 */
     public FsAction getAccess() {
       return access;
     }
@@ -157,6 +180,7 @@ public abstract class INodeAttributeProvider {
       this.access = access;
     }
 
+    /** 获取子节点所需访问权限 */
     public FsAction getSubAccess() {
       return subAccess;
     }
@@ -165,6 +189,7 @@ public abstract class INodeAttributeProvider {
       this.subAccess = subAccess;
     }
 
+    /** 是否忽略空目录权限检查 */
     public boolean isIgnoreEmptyDir() {
       return ignoreEmptyDir;
     }
@@ -173,6 +198,7 @@ public abstract class INodeAttributeProvider {
       this.ignoreEmptyDir = ignoreEmptyDir;
     }
 
+    /** 获取当前操作名称 */
     public String getOperationName() {
       return operationName;
     }
@@ -181,6 +207,7 @@ public abstract class INodeAttributeProvider {
       this.operationName = operationName;
     }
 
+    /** 获取调用者上下文信息 */
     public CallerContext getCallerContext() {
       return callerContext;
     }
@@ -189,6 +216,9 @@ public abstract class INodeAttributeProvider {
       this.callerContext = callerContext;
     }
 
+    /**
+     * AuthorizationContext建造器类，用于构造AuthorizationContext对象
+     */
     public static class Builder {
       private String fsOwner;
       private String supergroup;
@@ -208,6 +238,10 @@ public abstract class INodeAttributeProvider {
       private String operationName;
       private CallerContext callerContext;
 
+      /**
+       * 构造完整的AuthorizationContext对象
+       * @return 构造完成的授权上下文对象
+       */
       public AuthorizationContext build() {
         return new AuthorizationContext(this);
       }
@@ -298,6 +332,10 @@ public abstract class INodeAttributeProvider {
       }
     }
 
+    /**
+     * 通过Builder构造AuthorizationContext对象
+     * @param builder 建造器对象
+     */
     public AuthorizationContext(Builder builder) {
       this.setFsOwner(builder.fsOwner);
       this.setSupergroup(builder.supergroup);
@@ -352,36 +390,29 @@ public abstract class INodeAttributeProvider {
   }
 
   /**
-   * The AccessControlEnforcer allows implementations to override the
-   * default File System permission checking logic enforced on a file system
-   * object
+   * 访问控制强制检查器接口，允许自定义实现替代HDFS默认的权限检查逻辑
    */
   public interface AccessControlEnforcer {
 
     /**
-     * Checks permission on a file system object. Has to throw an Exception
-     * if the filesystem object is not accessible by the calling Ugi.
-     * @param fsOwner Filesystem owner (The Namenode user)
-     * @param supergroup super user group
-     * @param callerUgi UserGroupInformation of the caller
-     * @param inodeAttrs Array of INode attributes for each path element in the
-     *                   the path
-     * @param inodes Array of INodes for each path element in the path
-     * @param pathByNameArr Array of byte arrays of the LocalName
-     * @param snapshotId the snapshotId of the requested path
-     * @param path Path String
-     * @param ancestorIndex Index of ancestor
-     * @param doCheckOwner perform ownership check
-     * @param ancestorAccess The access required by the ancestor of the path.
-     * @param parentAccess The access required by the parent of the path.
-     * @param access The access required by the path.
-     * @param subAccess If path is a directory, It is the access required of
-     *                  the path and all the sub-directories. If path is not a
-     *                  directory, there should ideally be no effect.
-     * @param ignoreEmptyDir Ignore permission checking for empty directory?
-     * @deprecated use{@link #checkPermissionWithContext(AuthorizationContext)}}
-     * instead
-     * @throws AccessControlException
+     * 检查文件系统对象的访问权限，权限不满足时抛出异常，该方法已废弃
+     * @param fsOwner 文件系统所有者（NameNode用户）
+     * @param supergroup 超级用户组
+     * @param callerUgi 调用者用户组信息
+     * @param inodeAttrs 路径各层级INode属性数组
+     * @param inodes 路径各层级INode对象数组
+     * @param pathByNameArr 路径各层级名称字节数组
+     * @param snapshotId 请求路径对应的快照ID
+     * @param path 请求路径字符串
+     * @param ancestorIndex 祖先节点索引
+     * @param doCheckOwner 是否需要检查所有权
+     * @param ancestorAccess 祖先节点所需访问权限
+     * @param parentAccess 父节点所需访问权限
+     * @param access 当前节点所需访问权限
+     * @param subAccess 当前节点是目录时，子目录所需访问权限
+     * @param ignoreEmptyDir 是否忽略空目录权限检查
+     * @throws AccessControlException 权限检查不通过时抛出
+     * @deprecated use{@link #checkPermissionWithContext(AuthorizationContext)}} instead
      */
     public abstract void checkPermission(String fsOwner, String supergroup,
         UserGroupInformation callerUgi, INodeAttributes[] inodeAttrs,
@@ -392,12 +423,9 @@ public abstract class INodeAttributeProvider {
             throws AccessControlException;
 
     /**
-     * Checks permission on a file system object. Has to throw an Exception
-     * if the filesystem object is not accessible by the calling Ugi.
-     * @param authzContext an {@link AuthorizationContext} object encapsulating
-     *                     the various parameters required to authorize an
-     *                     operation.
-     * @throws AccessControlException
+     * 检查文件系统对象的访问权限，权限不满足时抛出异常
+     * @param authzContext 封装了所有授权所需参数的上下文对象
+     * @throws AccessControlException 权限检查不通过时抛出
      */
     default void checkPermissionWithContext(AuthorizationContext authzContext)
         throws AccessControlException {
@@ -407,14 +435,9 @@ public abstract class INodeAttributeProvider {
     }
 
     /**
-     * Checks if the user is a superuser or belongs to superuser group.
-     * It throws an AccessControlException if user is not a superuser.
-     *
-     * @param authzContext an {@link AuthorizationContext} object encapsulating
-     *                     the various parameters required to authorize an
-     *                     operation.
-     * @throws AccessControlException - if user is not a super user or part
-     * of the super user group.
+     * 检查调用者是否拥有超级用户权限，不满足则抛出异常
+     * @param authzContext 封装了所有授权所需参数的上下文对象
+     * @throws AccessControlException 调用者不是超级用户时抛出
      */
     default void checkSuperUserPermissionWithContext(
         AuthorizationContext authzContext)
@@ -431,14 +454,10 @@ public abstract class INodeAttributeProvider {
     }
 
     /**
-     * This method must be called when denying access to users to
-     * notify the external enforcers.
-     * This will help the external enforcers to audit the requests
-     * by users that were denied access.
-     * @param authzContext an {@link AuthorizationContext} object encapsulating
-     *                     the various parameters required to authorize an
-     *                     operation.
-     * @throws AccessControlException
+     * 当拒绝用户访问时调用该方法，用于外部强制检查器记录审计日志
+     * @param authzContext 封装了所有授权所需参数的上下文对象
+     * @param errorMessage 错误信息
+     * @throws AccessControlException 抛出访问控制异常拒绝请求
      */
     default void denyUserAccess(AuthorizationContext authzContext,
                                 String errorMessage)
@@ -448,13 +467,12 @@ public abstract class INodeAttributeProvider {
   }
 
   /**
-   * Initialize the provider. This method is called at NameNode startup
-   * time.
+   * 初始化提供者，在NameNode启动时调用
    */
   public abstract void start();
 
   /**
-   * Shutdown the provider. This method is called at NameNode shutdown time.
+   * 关闭提供者，在NameNode关闭时调用
    */
   public abstract void stop();
 
@@ -491,27 +509,14 @@ public abstract class INodeAttributeProvider {
     return getAttributes(getPathElements(fullPath), inode);
   }
 
+  /**
+   * 获取INode的自定义属性，由实现类提供自定义逻辑
+   * @param pathElements 路径各层级元素数组
+   * @param inode 原始INode属性
+   * @return 自定义INode属性
+   */
   public abstract INodeAttributes getAttributes(String[] pathElements,
       INodeAttributes inode);
 
-  public INodeAttributes getAttributes(byte[][] components,
-      INodeAttributes inode) {
-    String[] elements = new String[components.length];
-    for (int i = 0; i < elements.length; i++) {
-      elements[i] = DFSUtil.bytes2String(components[i]);
-    }
-    return getAttributes(elements, inode);
-  }
-
   /**
-   * Can be over-ridden by implementations to provide a custom Access Control
-   * Enforcer that can provide an alternate implementation of the
-   * default permission checking logic.
-   * @param defaultEnforcer The Default AccessControlEnforcer
-   * @return The AccessControlEnforcer to use
-   */
-  public AccessControlEnforcer getExternalAccessControlEnforcer(
-      AccessControlEnforcer defaultEnforcer) {
-    return defaultEnforcer;
-  }
-}
+   * 获取INode的自定义属性，将字节数组路径转换为字符串

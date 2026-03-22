@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,66 +22,65 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This is the JMX management interface for NameNode status information.
- * End users shouldn't be implementing these interfaces, and instead
- * access this information through the JMX APIs. *
+ * NameNode状态信息的JMX管理接口，用于通过JMX暴露NameNode运行状态指标供监控系统采集。
+ * 终端用户不应直接实现该接口，应通过JMX API访问其中暴露的状态信息。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public interface NameNodeStatusMXBean {
 
   /**
-   * Gets the NameNode role.
+   * 获取当前NameNode的角色（HA场景下区分Active/Standby）。
    *
-   * @return the NameNode role.
+   * @return 当前NameNode的角色字符串
    */
   public String getNNRole();
 
   /**
-   * Gets the NameNode state.
+   * 获取当前NameNode的运行状态。
    *
-   * @return the NameNode state.
+   * @return 当前NameNode的状态字符串
    */
   public String getState();
 
   /**
-   * Gets the host and port colon separated.
+   * 获取当前NameNode的主机地址和端口，格式为冒号分隔。
    *
-   * @return host and port colon separated.
+   * @return 冒号分隔的主机端口字符串
    */
   public String getHostAndPort();
 
   /**
-   * Gets if security is enabled.
+   * 检查当前NameNode是否启用安全认证。
    *
-   * @return true, if security is enabled.
+   * @return true表示安全认证已启用，false表示未启用
    */
   public boolean isSecurityEnabled();
 
   /**
-   * Gets the most recent HA transition time in milliseconds from the epoch.
+   * 获取最近一次HA状态切换的时间，单位为从纪元开始的毫秒数。
    *
-   * @return the most recent HA transition time in milliseconds from the epoch.
+   * @return 最近一次HA状态切换时间戳，单位毫秒
    */
   public long getLastHATransitionTime();
 
   /**
-   * Gets number of bytes in blocks with future generation stamps.
-   * @return number of bytes that can be deleted if exited from safe mode.
+   * 获取具有未来世代戳的数据块总字节数。
+   * @return 退出安全模式后可删除的字节总数
    */
   long getBytesWithFutureGenerationStamps();
 
   /**
-   * Retrieves information about slow DataNodes, if the feature is
-   * enabled. The report is in a JSON format.
+   * 获取慢DataNodes报告，功能开启时返回JSON格式的慢节点信息。
+   * @return JSON格式的慢节点报告
    */
   String getSlowPeersReport();
 
 
   /**
-   *  Gets the topN slow disks in the cluster, if the feature is enabled.
+   * 获取集群中TopN慢磁盘信息，功能开启时返回JSON格式的慢磁盘报告。
    *
-   *  @return JSON string of list of diskIDs and latencies
+   * @return JSON格式的慢磁盘ID与延迟列表字符串
    */
   String getSlowDisksReport();
 }

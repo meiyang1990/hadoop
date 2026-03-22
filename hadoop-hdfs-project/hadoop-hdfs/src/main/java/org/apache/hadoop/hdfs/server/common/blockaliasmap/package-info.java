@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * The AliasMap defines mapping of PROVIDED HDFS blocks to data in remote
- * storage systems.
+ * 块别名映射包，提供HDFS本地块到远端存储系统数据的映射能力，
+ * 用于支持HDFS数据分层存储，让冷数据迁移到远端存储后仍可被正常访问。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable

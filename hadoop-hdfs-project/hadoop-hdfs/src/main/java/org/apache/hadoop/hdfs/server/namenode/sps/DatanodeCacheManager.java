@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,29 +35,34 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The Datanode cache Manager handles caching of {@link DatanodeStorageReport}.
- *
- * This class is instantiated by StoragePolicySatisifer. It maintains the array
- * of datanode storage reports. It has a configurable refresh interval and
- * periodically refresh the datanode cache by fetching latest
- * {@link Context#getLiveDatanodeStorageReport()} once it reaches refresh
- * interval.
+ * 文件级注释：数据节点缓存管理器，为存储策略满足器SPS维护数据节点存储信息缓存
+ * 
+ * 该类由StoragePolicySatisfier实例化，负责缓存数据节点的存储报告信息。
+ * 支持按配置的刷新间隔，定期从NameNode获取最新的活跃数据节点存储信息更新本地缓存，
+ * 为块迁移任务调度提供可用数据节点的查询能力。
  */
 @InterfaceAudience.Private
 public class DatanodeCacheManager {
   private static final Logger LOG = LoggerFactory
       .getLogger(DatanodeCacheManager.class);
 
+  // 缓存数据节点存储信息的映射表
   private final DatanodeMap datanodeMap;
+  // 集群网络拓扑信息缓存
   private NetworkTopology cluster;
 
   /**
-   * Interval between scans in milliseconds.
+   * 缓存刷新间隔，单位毫秒
    */
   private final long refreshIntervalMs;
 
+  // 上次访问缓存的时间戳
   private long lastAccessedTime;
 
+  /**
+   * 构造方法：初始化数据节点缓存管理器，从配置读取刷新间隔
+   * @param conf Hadoop配置对象
+   */
   public DatanodeCacheManager(Configuration conf) {
     refreshIntervalMs = conf.getLong(
         DFSConfigKeys.DFS_SPS_DATANODE_CACHE_REFRESH_INTERVAL_MS,
@@ -68,53 +74,67 @@ public class DatanodeCacheManager {
   }
 
   /**
-   * Returns the live datanodes and its storage details, which has available
-   * space (&gt; 0) to schedule block moves. This will return array of datanodes
-   * from its local cache. It has a configurable refresh interval in millis and
-   * periodically refresh the datanode cache by fetching latest
-   * {@link Context#getLiveDatanodeStorageReport()} once it elapsed refresh
-   * interval.
+   * 获取带有可用空间的活跃数据节点存储信息缓存，到期自动刷新
+   * 
+   * 从本地缓存返回数据节点信息，如果距离上次刷新已经超过配置间隔，
+   * 则从NameNode获取最新的活跃数据节点存储报告更新本地缓存后返回。
+   * 仅保留有剩余可用空间的数据节点，用于块迁移任务调度。
    *
-   * @throws IOException
+   * @param spsContext SPS上下文，提供获取活跃数据节点和网络拓扑的能力
+   * @return 缓存的数据节点存储信息映射表
+   * @throws IOException 获取数据节点信息异常时抛出
    */
   public DatanodeMap getLiveDatanodeStorageReport(
       Context spsContext) throws IOException {
+    // 获取当前 monotonic 时间戳
     long now = Time.monotonicNow();
+    // 计算距离上次访问经过的时间
     long elapsedTimeMs = now - lastAccessedTime;
+    // 判断是否需要刷新缓存
     boolean refreshNeeded = elapsedTimeMs >= refreshIntervalMs;
+    // 更新上次访问时间为当前时间
     lastAccessedTime = now;
     if (refreshNeeded) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("elapsedTimeMs > refreshIntervalMs : {} > {},"
             + " so refreshing cache", elapsedTimeMs, refreshIntervalMs);
       }
+      // 清空之前的缓存
       datanodeMap.reset(); // clear all previously cached items.
 
-      // Fetch live datanodes from namenode and prepare DatanodeMap.
+      // 从NameNode获取最新的活跃数据节点存储报告，构建新的缓存
       DatanodeStorageReport[] liveDns = spsContext
           .getLiveDatanodeStorageReport();
+      // 遍历所有活跃数据节点
       for (DatanodeStorageReport storage : liveDns) {
         StorageReport[] storageReports = storage.getStorageReports();
         List<StorageType> storageTypes = new ArrayList<>();
         List<Long> remainingSizeList = new ArrayList<>();
+        // 遍历数据节点的所有存储目录
         for (StorageReport t : storageReports) {
+          // 仅保留剩余空间大于0的存储，用于块迁移
           if (t.getRemaining() > 0) {
             storageTypes.add(t.getStorage().getStorageType());
             remainingSizeList.add(t.getRemaining());
           }
         }
+        // 将数据节点添加到缓存映射
         datanodeMap.addTarget(storage.getDatanodeInfo(), storageTypes,
             remainingSizeList);
       }
       if (LOG.isDebugEnabled()) {
         LOG.debug("LIVE datanodes: {}", datanodeMap);
       }
-      // get network topology
+      // 更新集群网络拓扑缓存
       cluster = spsContext.getNetworkTopology(datanodeMap);
     }
     return datanodeMap;
   }
 
+  /**
+   * 获取缓存的集群网络拓扑信息
+   * @return 当前缓存的集群网络拓扑
+   */
   NetworkTopology getCluster() {
     return cluster;
   }

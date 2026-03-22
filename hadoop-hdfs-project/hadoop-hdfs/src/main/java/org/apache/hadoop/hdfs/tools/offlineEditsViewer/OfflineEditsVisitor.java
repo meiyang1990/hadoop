@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,35 +25,30 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp;
 
 /**
- * An implementation of OfflineEditsVisitor can traverse the structure of an
- * Hadoop edits log and respond to each of the structures within the file.
+ * 离线编辑日志查看器的访问者接口，定义了遍历HDFS编辑日志结构的标准协议，
+ * 不同实现类可以针对遍历到的编辑日志操作执行不同的处理逻辑。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 abstract public interface OfflineEditsVisitor {
   /**
-   * Begin visiting the edits log structure.  Opportunity to perform
-   * any initialization necessary for the implementing visitor.
+   * 开始遍历编辑日志，提供访问者初始化机会，在遍历所有操作前执行。
    * 
-   * @param version     Edit log version
+   * @param version 编辑日志版本号
    */
   abstract void start(int version) throws IOException;
 
   /**
-   * Finish visiting the edits log structure.  Opportunity to perform any
-   * clean up necessary for the implementing visitor.
+   * 结束遍历编辑日志，提供访问者资源清理机会，在所有操作遍历完成后执行。
    * 
-   * @param error        If the visitor was closed because of an 
-   *                     unrecoverable error in the input stream, this 
-   *                     is the exception.
+   * @param error 如果遍历因输入流不可恢复错误终止，此处为对应的异常；正常完成则为null
    */
   abstract void close(Throwable error) throws IOException;
 
   /**
-   * Begin visiting an element that encloses another element, such as
-   * the beginning of the list of blocks that comprise a file.
+   * 访问一条编辑日志操作，对遍历到的单个编辑操作执行自定义处理。
    *
-   * @param op Token being visited
+   * @param op 待访问的编辑日志操作对象
    */
   abstract void visitOp(FSEditLogOp op)
      throws IOException;

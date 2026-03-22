@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,53 +24,44 @@ import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * An ImageLoader can accept a DataInputStream to an Hadoop FSImage file
- * and walk over its structure using the supplied ImageVisitor.
- *
- * Each implementation of ImageLoader is designed to rapidly process an
- * image file.  As long as minor changes are made from one layout version
- * to another, it is acceptable to tweak one implementation to read the next.
- * However, if the layout version changes enough that it would make a
- * processor slow or difficult to read, another processor should be created.
- * This allows each processor to quickly read an image without getting
- * bogged down in dealing with significant differences between layout versions.
+ * HDFS FSImage离线查看工具的FSImage加载器接口，负责从FSImage输入流中解析结构，并调用访问者处理各节点。
+ * 
+ * 设计思路：不同FSImage布局版本可对应不同实现，当版本变更较大时新增实现，保证每个加载器的处理效率，避免兼容逻辑过多导致性能下降。
+ * 核心职责：将FSImage二进制文件解析后，通过访问者模式把结构交给外部处理器处理。
  */
 interface ImageLoader {
 
   /**
-   * @param in DataInputStream pointing to an Hadoop FSImage file
-   * @param v Visit to apply to the FSImage file
-   * @param enumerateBlocks Should visitor visit each of the file blocks?
+   * 从输入流加载FSImage，遍历文件结构并调用访问者处理各个节点。
+   * @param in 指向FSImage文件的输入流
+   * @param v 用于处理FSImage结构的访问者
+   * @param enumerateBlocks 是否需要遍历访问每个文件的块信息
+   * @throws IOException 读取文件或访问过程中发生IO异常
    */
   public void loadImage(DataInputStream in, ImageVisitor v,
       boolean enumerateBlocks) throws IOException;
 
   /**
-   * Can this processor handle the specified version of FSImage file?
-   *
-   * @param version FSImage version file
-   * @return True if this instance can process the file
+   * 判断当前加载器是否支持处理指定版本的FSImage。
+   * @param version FSImage布局版本号
+   * @return 当前加载器能否处理该版本，返回true表示支持
    */
   public boolean canLoadVersion(int version);
 
   /**
-   * Factory for obtaining version of image loader that can read
-   * a particular image format.
+   * ImageLoader工厂类，根据FSImage版本号获取对应的加载器实例。
+   * 由于Java接口不支持静态方法，因此将工厂实现为接口内部的静态类。
    */
   @InterfaceAudience.Private
   public class LoaderFactory {
-    // Java doesn't support static methods on interfaces, which necessitates
-    // this factory class
 
     /**
-     * Find an image loader capable of interpreting the specified
-     * layout version number.  If none, return null;
-     *
-     * @param version fsimage layout version number to be processed
-     * @return ImageLoader that can interpret specified version, or null
+     * 根据FSImage布局版本号，获取对应支持该版本的加载器实例。
+     * @param version 需要处理的FSImage布局版本号
+     * @return 支持该版本的ImageLoader，找不到对应加载器则返回null
      */
     static public ImageLoader getLoader(int version) {
-      // Easy to add more image processors as they are written
+      // 所有已实现的加载器列表，新增版本加载器可直接在此添加
       ImageLoader[] loaders = { new ImageLoaderCurrent() };
 
       for (ImageLoader l : loaders) {

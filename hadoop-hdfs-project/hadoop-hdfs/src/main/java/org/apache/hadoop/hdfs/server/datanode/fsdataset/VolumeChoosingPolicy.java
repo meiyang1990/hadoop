@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,23 +24,20 @@ import java.util.List;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * This interface specifies the policy for choosing volumes to store replicas.
+ * 文件存储卷选择策略接口，定义DataNode为数据块副本选择存储卷的策略规范
+ * 为HDFS DataNode存储层提供可扩展的存储卷选择策略支持
  */
 @InterfaceAudience.Private
 public interface VolumeChoosingPolicy<V extends FsVolumeSpi> {
 
   /**
-   * Choose a volume to place a replica,
-   * given a list of volumes and the replica size sought for storage.
+   * 根据给定的可用存储卷列表和待存储副本大小，选择一个合适的存储卷存放数据块副本
    * 
-   * The caller should synchronize access to the list of volumes.
-   * 
-   * @param volumes - a list of available volumes.
-   * @param replicaSize - the size of the replica for which a volume is sought.
-   * @param storageId - the storage id of the Volume nominated by the namenode.
-   *                  This can usually be ignored by the VolumeChoosingPolicy.
-   * @return the chosen volume.
-   * @throws IOException when disks are unavailable or are full.
+   * @param volumes 可用的存储卷列表，调用方需要保证对该列表的线程安全访问
+   * @param replicaSize 待存储副本的大小，单位为字节
+   * @param storageId NameNode指定的期望存储卷ID，大多数策略可忽略该参数
+   * @return 选中的存储卷对象
+   * @throws IOException 当所有磁盘都不可用或者没有足够空间存储副本时抛出
    */
   V chooseVolume(List<V> volumes, long replicaSize, String storageId)
       throws IOException;

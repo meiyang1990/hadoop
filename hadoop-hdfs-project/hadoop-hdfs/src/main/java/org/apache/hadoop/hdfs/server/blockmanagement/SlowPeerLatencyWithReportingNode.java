@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,8 +26,8 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * This class represents the reporting node and the slow node's latency as observed by the
- * reporting node. This class is used by SlowPeerJsonReport class.
+ * 存储数据节点上报的慢节点延迟统计信息，用于慢节点JSON日志上报。
+ * 记录了报告节点自身观测到的目标慢节点的延迟数据，以及基于统计得到的异常判定阈值。
  */
 @InterfaceAudience.Private
 final class SlowPeerLatencyWithReportingNode
@@ -47,6 +48,14 @@ final class SlowPeerLatencyWithReportingNode
   @JsonProperty("UpperLimitLatency")
   private final Double upperLimitLatency;
 
+  /**
+   * 构造慢节点延迟上报信息对象，封装报告节点观测到的延迟统计数据。
+   * @param reportingNode 报告延迟信息的数据节点地址
+   * @param reportedLatency 报告节点观测到的目标慢节点延迟值
+   * @param medianLatency 全局延迟中位数，用于异常判定
+   * @param madLatency 延迟绝对偏差中位数，用于异常判定
+   * @param upperLimitLatency 判定慢节点的延迟上限阈值
+   */
   SlowPeerLatencyWithReportingNode(
       @JsonProperty("ReportingNode")
           String reportingNode,
@@ -65,31 +74,61 @@ final class SlowPeerLatencyWithReportingNode
     this.upperLimitLatency = upperLimitLatency;
   }
 
+  /**
+   * 获取报告延迟信息的数据节点地址。
+   * @return 报告节点地址字符串
+   */
   public String getReportingNode() {
     return reportingNode;
   }
 
+  /**
+   * 获取报告节点观测到的目标慢节点延迟值。
+   * @return 观测到的延迟值（毫秒）
+   */
   public Double getReportedLatency() {
     return reportedLatency;
   }
 
+  /**
+   * 获取全局延迟中位数统计值。
+   * @return 延迟中位数
+   */
   public Double getMedianLatency() {
     return medianLatency;
   }
 
+  /**
+   * 获取延迟绝对偏差中位数（MAD）统计值。
+   * @return 绝对偏差中位数
+   */
   public Double getMadLatency() {
     return madLatency;
   }
 
+  /**
+   * 获取判定慢节点的延迟上限阈值。
+   * @return 延迟上限阈值（毫秒）
+   */
   public Double getUpperLimitLatency() {
     return upperLimitLatency;
   }
 
+  /**
+   * 按报告节点地址字典序比较两个对象，用于排序。
+   * @param o 待比较的另一个对象
+   * @return 比较结果，小于0表示当前节点在前，大于0表示待比较节点在前
+   */
   @Override
   public int compareTo(SlowPeerLatencyWithReportingNode o) {
     return this.reportingNode.compareTo(o.getReportingNode());
   }
 
+  /**
+   * 判断两个对象是否相等，对比所有字段。
+   * @param o 待比较对象
+   * @return 所有字段都相等返回true，否则返回false
+   */
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -111,6 +150,10 @@ final class SlowPeerLatencyWithReportingNode
         .isEquals();
   }
 
+  /**
+   * 计算对象哈希码，基于所有字段生成。
+   * @return 对象哈希码
+   */
   @Override
   public int hashCode() {
     return new HashCodeBuilder(17, 37)

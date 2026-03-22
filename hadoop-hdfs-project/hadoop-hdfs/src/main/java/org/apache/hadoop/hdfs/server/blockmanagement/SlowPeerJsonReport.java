@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,8 +28,8 @@ import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * This structure is a thin wrapper over slow peer reports to make Json
- * [de]serialization easy.
+ * 慢节点Peer报告JSON序列化数据结构，封装慢Peer报告数据，方便Jackson进行JSON序列化和反序列化
+ * 用于HDFS慢数据节点检测功能中，报告检测结果的JSON格式输出
  */
 @InterfaceAudience.Private
 final class SlowPeerJsonReport {
@@ -39,6 +40,11 @@ final class SlowPeerJsonReport {
   @JsonProperty("SlowPeerLatencyWithReportingNodes")
   private final SortedSet<SlowPeerLatencyWithReportingNode> slowPeerLatencyWithReportingNodes;
 
+  /**
+   * 构造慢PeerJSON报告对象
+   * @param slowNode 被检测为慢节点的节点地址
+   * @param slowPeerLatencyWithReportingNodes 报告该节点为慢节点的所有报告节点及其延迟信息集合
+   */
   SlowPeerJsonReport(
       @JsonProperty("SlowNode")
           String slowNode,
@@ -48,10 +54,18 @@ final class SlowPeerJsonReport {
     this.slowPeerLatencyWithReportingNodes = slowPeerLatencyWithReportingNodes;
   }
 
+  /**
+   * 获取慢节点地址
+   * @return 慢节点地址字符串
+   */
   public String getSlowNode() {
     return slowNode;
   }
 
+  /**
+   * 获取所有报告信息集合
+   * @return 有序的慢Peer延迟与报告节点信息集合
+   */
   public SortedSet<SlowPeerLatencyWithReportingNode> getSlowPeerLatencyWithReportingNodes() {
     return slowPeerLatencyWithReportingNodes;
   }

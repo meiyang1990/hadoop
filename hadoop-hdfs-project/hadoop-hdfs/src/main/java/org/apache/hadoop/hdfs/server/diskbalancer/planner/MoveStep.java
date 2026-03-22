@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,14 +23,12 @@ import org.apache.hadoop.hdfs.server.diskbalancer.datamodel.DiskBalancerVolume;
 import org.apache.hadoop.util.StringUtils;
 
 /**
- * Ignore fields with default values. In most cases Throughtput, diskErrors
- * tolerancePercent and bandwidth will be the system defaults.
- * So we will avoid serializing them into JSON.
+ * 磁盘均衡器单次数据搬移任务描述，记录从源磁盘到目标磁盘的数据迁移信息
+ * 忽略默认值字段序列化，减少JSON输出体积
  */
 @JsonInclude(JsonInclude.Include.NON_DEFAULT)
 /**
- * Move step is a step that planner can execute that will move data from one
- * volume to another.
+ * 表示磁盘均衡规划器生成的一次数据搬移步骤，将数据从一个磁盘卷移动到另一个磁盘卷，实现磁盘空间均衡
  */
 public class MoveStep implements Step {
   private DiskBalancerVolume sourceVolume;
@@ -43,13 +42,13 @@ public class MoveStep implements Step {
   private long bandwidth;
 
   /**
-   * Constructs a MoveStep for the volume set.
+   * 构造数据搬移步骤
    *
-   * @param sourceVolume      - Source Disk
-   * @param idealStorage      - Ideal Storage Value for this disk set
-   * @param destinationVolume - Destination dis
-   * @param bytesToMove       - number of bytes to move
-   * @param volumeSetID       - a diskBalancer generated id.
+   * @param sourceVolume      源磁盘卷，数据从该卷迁出
+   * @param idealStorage      当前卷组的理想存储容量值，用于均衡目标
+   * @param destinationVolume 目标磁盘卷，数据迁入该卷
+   * @param bytesToMove       需要移动的字节数
+   * @param volumeSetID       卷组ID，标识当前步骤所属的磁盘卷组
    */
   public MoveStep(DiskBalancerVolume sourceVolume, double idealStorage,
                   DiskBalancerVolume destinationVolume, long bytesToMove,
@@ -63,15 +62,15 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Empty Constructor for JSON serialization.
+   * 空构造函数，供JSON序列化/反序列化使用
    */
   public MoveStep() {
   }
 
   /**
-   * Returns number of bytes to move.
+   * 获取本次需要移动的字节数
    *
-   * @return - long
+   * @return 需要移动的字节数
    */
   @Override
   public long getBytesToMove() {
@@ -79,9 +78,9 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Gets the destination volume.
+   * 获取本次数据搬移的目标磁盘卷
    *
-   * @return - volume
+   * @return 目标磁盘卷
    */
   @Override
   public DiskBalancerVolume getDestinationVolume() {
@@ -89,9 +88,9 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Gets the IdealStorage.
+   * 获取均衡后卷组的理想存储容量值
    *
-   * @return float
+   * @return 理想存储容量值
    */
   @Override
   public double getIdealStorage() {
@@ -99,9 +98,9 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Gets Source Volume.
+   * 获取本次数据搬移的源磁盘卷
    *
-   * @return -- Source Volume
+   * @return 源磁盘卷
    */
 
   @Override
@@ -110,9 +109,9 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Gets a volume Set ID.
+   * 获取当前步骤所属卷组的ID
    *
-   * @return String
+   * @return 卷组ID
    */
   @Override
   public String getVolumeSetID() {
@@ -120,54 +119,54 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Set source volume.
+   * 设置源磁盘卷
    *
-   * @param sourceVolume - volume
+   * @param sourceVolume 源磁盘卷对象
    */
   public void setSourceVolume(DiskBalancerVolume sourceVolume) {
     this.sourceVolume = sourceVolume;
   }
 
   /**
-   * Sets destination volume.
+   * 设置目标磁盘卷
    *
-   * @param destinationVolume - volume
+   * @param destinationVolume 目标磁盘卷对象
    */
   public void setDestinationVolume(DiskBalancerVolume destinationVolume) {
     this.destinationVolume = destinationVolume;
   }
 
   /**
-   * Sets Ideal Storage.
+   * 设置理想存储容量值
    *
-   * @param idealStorage - ideal Storage
+   * @param idealStorage 理想存储容量值
    */
   public void setIdealStorage(double idealStorage) {
     this.idealStorage = idealStorage;
   }
 
   /**
-   * Sets bytes to move.
+   * 设置需要移动的字节数
    *
-   * @param bytesToMove - number of bytes
+   * @param bytesToMove 需要移动的字节数
    */
   public void setBytesToMove(long bytesToMove) {
     this.bytesToMove = bytesToMove;
   }
 
   /**
-   * Sets volume id.
+   * 设置卷组ID
    *
-   * @param volumeSetID - volume ID
+   * @param volumeSetID 卷组ID
    */
   public void setVolumeSetID(String volumeSetID) {
     this.volumeSetID = volumeSetID;
   }
 
   /**
-   * Returns a string representation of the object.
+   * 格式化输出当前搬移步骤的信息
    *
-   * @return a string representation of the object.
+   * @return 格式化后的步骤信息字符串
    */
   @Override
   public String toString() {
@@ -180,10 +179,10 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Returns human readable move sizes.
+   * 将字节大小转换为人类可读的格式
    *
-   * @param size - bytes being moved.
-   * @return String
+   * @param size 需要转换的字节大小
+   * @return 人类可读的容量字符串
    */
   @Override
   public String getSizeString(long size) {
@@ -191,9 +190,8 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Gets Maximum numbers of errors to be tolerated before this
-   * move operation is aborted.
-   * @return  long.
+   * 获取本次搬移允许容忍的最大磁盘错误数，超过该值则终止本次搬移
+   * @return  容忍的最大磁盘错误数
    */
   @Override
   public long getMaxDiskErrors() {
@@ -201,9 +199,8 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Sets the maximum numbers of Errors to be tolerated before this
-   * step is aborted.
-   * @param maxDiskErrors - long
+   * 设置本次搬移允许容忍的最大磁盘错误数
+   * @param maxDiskErrors 容忍的最大磁盘错误数
    */
   @Override
   public void setMaxDiskErrors(long maxDiskErrors) {
@@ -211,15 +208,9 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Tolerance Percentage indicates when a move operation is considered good
-   * enough. This is a percentage of deviation from ideal that is considered
-   * fine.
+   * 获取均衡容差百分比，当实际存储与理想存储的偏差在容差范围内时，可认为均衡完成，无需继续搬移
    *
-   * For example : if the ideal amount on each disk was 1 TB and the
-   * tolerance was 10%, then getting to 900 GB on the destination disk is
-   * considered good enough.
-   *
-   * @return tolerance percentage.
+   * @return 容差百分比
    */
   @Override
   public long getTolerancePercent() {
@@ -227,8 +218,8 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Sets the tolerance percentage.
-   * @param tolerancePercent  - long
+   * 设置均衡容差百分比
+   * @param tolerancePercent 容差百分比
    */
   @Override
   public void setTolerancePercent(long tolerancePercent) {
@@ -236,10 +227,8 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Gets the disk Bandwidth. That is the MB/Sec to copied. We will max out
-   * on this amount of throughput. This is useful to prevent too much I/O on
-   * datanode while data node is in use.
-   * @return  long.
+   * 获取本次搬移允许使用的最大磁盘带宽，单位MB/s，用于限制均衡操作对DataNode正常服务的影响
+   * @return  最大磁盘带宽，单位MB/s
    */
   @Override
   public long getBandwidth() {
@@ -247,9 +236,8 @@ public class MoveStep implements Step {
   }
 
   /**
-   * Sets the maximum disk bandwidth per sec to use for this step.
-   * @param bandwidth  - Long, MB / Sec of data to be moved between
-   *                   source and destinatin volume.
+   * 设置本次搬移允许使用的最大磁盘带宽
+   * @param bandwidth  最大磁盘带宽，单位MB/s
    */
   @Override
   public void setBandwidth(long bandwidth) {

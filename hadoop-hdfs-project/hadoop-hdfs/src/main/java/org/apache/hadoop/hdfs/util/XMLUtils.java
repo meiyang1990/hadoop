@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,14 +31,14 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * General xml utilities.
- *   
+ * HDFS XML处理工具类，提供XML字符串转义/反转义、SAX事件生成、XML节点树存储等功能。
+ * 主要用于处理HDFS配置文件和元数据持久化中的XML相关操作。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class XMLUtils {
   /**
-   * Exception that reflects an invalid XML document.
+   * XML文档非法异常，用于表示解析的XML文档不符合格式要求。
    */
   static public class InvalidXmlException extends RuntimeException {
     private static final long serialVersionUID = 1L;
@@ -47,7 +48,7 @@ public class XMLUtils {
   }
   
   /**
-   * Exception that reflects a string that cannot be unmangled.
+   * XML反转义错误异常，用于表示无法将转义后的字符串还原为原始字符串。
    */
   public static class UnmanglingError extends RuntimeException {
     private static final long serialVersionUID = 1L;
@@ -63,15 +64,10 @@ public class XMLUtils {
   
 
   /**
-   * Given a code point, determine if it should be mangled before being
-   * represented in an XML document.
-   * 
-   * Any code point that isn't valid in XML must be mangled.
-   * See http://en.wikipedia.org/wiki/Valid_characters_in_XML for a
-   * quick reference, or the w3 standard for the authoritative reference.
-   * 
-   * @param cp      The code point
-   * @return        True if the code point should be mangled
+   * 判断给定Unicode码点是否需要在XML文档中转义。
+   * 根据XML规范，非法字符和反斜杠需要转义处理。
+   * @param cp 待检查的Unicode码点
+   * @return true表示该码点需要转义，false表示可以直接使用
    */
   private static boolean codePointMustBeMangled(int cp) {
     if (cp < 0x20) {
@@ -81,8 +77,7 @@ public class XMLUtils {
     } else if ((cp == 0xfffe) || (cp == 0xffff)) {
       return true;
     } else if (cp == 0x5c) {
-      // we mangle backslash to simplify decoding... it's
-      // easier if backslashes always begin mangled sequences. 
+      // 对反斜杠转义，简化解码过程，确保转义序列总是以反斜杠开头
       return true;
     }
     return false;
@@ -90,10 +85,21 @@ public class XMLUtils {
 
   private static final int NUM_SLASH_POSITIONS = 4;
 
+  /**
+   * 将需要转义的码点格式化为转义字符串。
+   * 格式为 \ABCD;，ABCD是码点4位十六进制值。
+   * @param cp 需要转义的Unicode码点
+   * @return 格式化后的转义字符串
+   */
   private static String mangleCodePoint(int cp) {
     return String.format("\\%0" + NUM_SLASH_POSITIONS + "x;", cp);
   }
 
+  /**
+   * 将特殊XML字符转换为对应的实体引用。
+   * @param cp Unicode码点
+   * @return 如果是需要转义的特殊字符，返回对应的实体引用；否则返回null
+   */
   private static String codePointToEntityRef(int cp) {
     switch (cp) {
       case '&':
@@ -112,27 +118,11 @@ public class XMLUtils {
   }
 
   /**
-   * Mangle a string so that it can be represented in an XML document.
-   * 
-   * There are three kinds of code points in XML:
-   * - Those that can be represented normally,
-   * - Those that have to be escaped (for example, &amp; must be represented
-   *     as {@literal &amp;})
-   * - Those that cannot be represented at all in XML.
-   *
-   * The built-in SAX functions will handle the first two types for us just
-   * fine.  However, sometimes we come across a code point of the third type.
-   * In this case, we have to mangle the string in order to represent it at
-   * all.  We also mangle backslash to avoid confusing a backslash in the
-   * string with part our escape sequence.
-   * 
-   * The encoding used here is as follows: an illegal code point is
-   * represented as '\ABCD;', where ABCD is the hexadecimal value of 
-   * the code point.
-   *
-   * @param str     The input string.
-   *
-   * @return        The mangled string.
+   * 转义字符串使其可以安全放入XML文档中。
+   * 对XML非法字符进行自定义转义，对XML特殊字符可选择生成标准实体引用。
+   * @param str 原始输入字符串
+   * @param createEntityRefs 是否对特殊XML字符生成标准实体引用
+   * @return 转义完成后的字符串
    */
   public static String mangleXmlString(String str, boolean createEntityRefs) {
     final StringBuilder bld = new StringBuilder();
@@ -161,14 +151,11 @@ public class XMLUtils {
   }
 
   /**
-   * Demangle a string from an XML document.
-   * See {@link #mangleXmlString(String, boolean)} for a description of the
-   * mangling format.
-   *
-   * @param str    The string to be demangled.
-   * 
-   * @return       The unmangled string
-   * @throws       UnmanglingError if the input is malformed.
+   * 对XML中的转义字符串进行反转义，还原为原始字符串。
+   * @param str 待反转义的字符串
+   * @param decodeEntityRefs 是否反转义标准XML实体引用
+   * @return 还原后的原始字符串
+   * @throws UnmanglingError 当输入格式错误时抛出异常
    */
   public static String unmangleXmlString(String str, boolean decodeEntityRefs)
         throws UnmanglingError {
@@ -179,6 +166,7 @@ public class XMLUtils {
     for (int i = 0; i < str.length(); i++) {
       char ch = str.charAt(i);
       if (entityRef != null) {
+        // 正在解析实体引用，累积字符直到遇到分号
         entityRef.append(ch);
         if (ch == ';') {
           String e = entityRef.toString();
@@ -198,9 +186,11 @@ public class XMLUtils {
           entityRef = null;
         }
       } else  if ((slashPosition >= 0) && (slashPosition < NUM_SLASH_POSITIONS)) {
+        // 正在累积转义码点的十六进制字符
         escapedCp += ch;
         ++slashPosition;
       } else if (slashPosition == NUM_SLASH_POSITIONS) {
+        // 十六进制字符收集完成，检查并解析码点
         if (ch != ';') {
           throw new UnmanglingError("unterminated code point escape: " +
               "expected semicolon at end.");
@@ -213,6 +203,7 @@ public class XMLUtils {
         escapedCp = "";
         slashPosition = -1;
       } else if (ch == '\\') {
+        // 遇到反斜杠，开始新的转义序列
         slashPosition = 0;
       } else {
         boolean startingEntityRef = false;
@@ -220,13 +211,16 @@ public class XMLUtils {
           startingEntityRef = (ch == '&');
         }
         if (startingEntityRef) {
+          // 开始解析实体引用
           entityRef = new StringBuilder();
           entityRef.append("&");
         } else {
+          // 普通字符直接添加
           bld.append(ch);
         }
       }
     }
+    // 检查输入是否正常结束，没有未完成的转义序列
     if (entityRef != null) {
       throw new UnmanglingError("unterminated entity ref starting with " +
           entityRef.toString());
@@ -238,11 +232,12 @@ public class XMLUtils {
   }
   
   /**
-   * Add a SAX tag with a string inside.
-   *
-   * @param contentHandler     the SAX content handler
-   * @param tag                the element tag to use  
-   * @param val                the string to put inside the tag
+   * 向SAX内容处理器添加一个包含字符串内容的XML标签。
+   * 自动对字符串内容进行转义处理，生成对应的SAX开始/内容/结束事件。
+   * @param contentHandler SAX内容处理器
+   * @param tag XML标签名称
+   * @param val 标签包含的字符串内容
+   * @throws SAXException 由SAX处理器抛出异常
    */
   public static void addSaxString(ContentHandler contentHandler,
       String tag, String val) throws SAXException {
@@ -253,13 +248,13 @@ public class XMLUtils {
   }
 
   /**
-   * Represents a bag of key-value pairs encountered during parsing an XML
-   * file.
+   * 表示XML解析过程中的一个节点 stanza，存储节点值和子节点集合，用于构建XML解析树。
+   * 支持按名称查询子节点和节点值，是HDFS XML配置解析的基础数据结构。
    */
   static public class Stanza {
     private final TreeMap<String, LinkedList <Stanza > > subtrees;
 
-    /** The unmangled value of this stanza. */
+    /** 当前节点自身的文本值 */
     private String value;
     
     public Stanza() {
@@ -275,23 +270,20 @@ public class XMLUtils {
       return this.value;
     }
     
-    /** 
-     * Discover if a stanza has a given entry.
-     *
-     * @param name        entry to look for
-     * 
-     * @return            true if the entry was found
+    /**
+     * 检查当前节点是否包含指定名称的子节点。
+     * @param name 子节点名称
+     * @return true表示存在至少一个对应名称的子节点
      */
     public boolean hasChildren(String name) {
       return subtrees.containsKey(name);
     }
     
-    /** 
-     * Pull an entry from a stanza.
-     *
-     * @param name        entry to look for
-     * 
-     * @return            the entry
+    /**
+     * 获取当前节点下指定名称的所有子节点列表。
+     * @param name 子节点名称
+     * @return 指定名称的子节点列表
+     * @throws InvalidXmlException 如果不存在该名称的子节点，抛出异常
      */
     public List<Stanza> getChildren(String name) throws InvalidXmlException {
       LinkedList <Stanza> children = subtrees.get(name);
@@ -301,12 +293,11 @@ public class XMLUtils {
       return children;
     }
     
-    /** 
-     * Pull a string entry from a stanza.
-     *
-     * @param name        entry to look for
-     * 
-     * @return            the entry
+    /**
+     * 获取当前节点下指定名称唯一子节点的文本值。
+     * @param name 子节点名称
+     * @return 指定子节点的文本值
+     * @throws InvalidXmlException 如果不存在该节点或存在多个该节点，抛出异常
      */
     public String getValue(String name) throws InvalidXmlException {
       String ret = getValueOrNull(name);
@@ -316,12 +307,11 @@ public class XMLUtils {
       return ret;
     }
 
-    /** 
-     * Pull a string entry from a stanza, or null.
-     *
-     * @param name        entry to look for
-     * 
-     * @return            the entry, or null if it was not found.
+    /**
+     * 获取当前节点下指定名称唯一子节点的文本值，不存在则返回null。
+     * @param name 子节点名称
+     * @return 指定子节点的文本值，不存在则返回null
+     * @throws InvalidXmlException 如果存在多个该名称的子节点，抛出异常
      */
     public String getValueOrNull(String name) throws InvalidXmlException {
       if (!subtrees.containsKey(name)) {
@@ -334,11 +324,10 @@ public class XMLUtils {
       return l.get(0).getValue();
     }
     
-    /** 
-     * Add an entry to a stanza.
-     *
-     * @param name        name of the entry to add
-     * @param child       the entry to add
+    /**
+     * 向当前节点添加一个子节点。
+     * @param name 子节点名称
+     * @param child 子节点Stanza对象
      */
     public void addChild(String name, Stanza child) {
       LinkedList<Stanza> l;
@@ -351,8 +340,9 @@ public class XMLUtils {
       l.add(child);
     }
     
-    /** 
-     * Convert a stanza to a human-readable string.
+    /**
+     * 将当前Stanza转换为人类可读的字符串表示，用于调试和日志输出。
+     * @return 格式化后的字符串表示
      */
     @Override
     public String toString() {

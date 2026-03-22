@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -57,8 +58,9 @@ import org.apache.hadoop.thirdparty.com.google.common.collect.ArrayListMultimap;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ListMultimap;
 
 /**
- * Periodically scans the data directories for block and block metadata files.
- * Reconciles the differences with block information maintained in the dataset.
+ * 数据节点目录扫描器，定期扫描数据目录下的块文件和元数据文件，
+ * 并与内存中维护的块信息进行差异比对，修正不一致数据。
+ * 是DataNode保证磁盘数据和内存元数据一致性的核心后台组件。
  */
 @InterfaceAudience.Private
 public class DirectoryScanner implements Runnable {
@@ -78,36 +80,33 @@ public class DirectoryScanner implements Runnable {
   private boolean retainDiffs = false;
 
   /**
-   * Total combined wall clock time (in milliseconds) spent by the report
-   * compiler threads executing. Used for testing purposes.
+   * 报告编译线程总共花费的运行时间（毫秒），仅用于测试。
    */
   @VisibleForTesting
   final AtomicLong timeRunningMs = new AtomicLong(0L);
 
   /**
-   * Total combined wall clock time (in milliseconds) spent by the report
-   * compiler threads blocked by the throttle. Used for testing purposes.
+   * 报告编译线程总共花费的等待时间（毫秒），仅用于测试。
    */
   @VisibleForTesting
   final AtomicLong timeWaitingMs = new AtomicLong(0L);
 
   /**
-   * The complete list of block differences indexed by block pool ID.
+   * 按块池ID索引的所有块差异完整列表。
    */
   @VisibleForTesting
   final BlockPoolReport diffs = new BlockPoolReport();
 
   /**
-   * Statistics about the block differences in each blockpool, indexed by block
-   * pool ID.
+   * 按块池ID索引的每个块池的差异统计信息。
    */
   @VisibleForTesting
   final Map<String, Stats> stats;
 
   /**
-   * Allow retaining diffs for unit test and analysis. Defaults to false (off).
+   * 设置是否保留差异结果，用于单元测试和问题分析，默认关闭。
    *
-   * @param b whether to retain diffs
+   * @param b 是否保留差异
    */
   @VisibleForTesting
   public void setRetainDiffs(boolean b) {
@@ -115,7 +114,7 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Stats tracked for reporting and testing, per blockpool
+   * 每个块池的扫描差异统计信息，用于日志输出和测试验证。
    */
   @VisibleForTesting
   static class Stats {
@@ -128,9 +127,9 @@ public class DirectoryScanner implements Runnable {
     long duplicateBlocks = 0;
 
     /**
-     * Create a new Stats object for the given blockpool ID.
+     * 为指定块池创建统计对象。
      *
-     * @param bpid blockpool ID
+     * @param bpid 块池ID
      */
     public Stats(String bpid) {
       this.bpid = bpid;
@@ -148,10 +147,8 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Helper class for compiling block info reports from report compiler threads.
-   * Contains a volume, a set of block pool IDs, and a collection of ScanInfo
-   * objects. If a block pool exists but has no ScanInfo objects associated with
-   * it, there will be no mapping for that particular block pool.
+   * 报告编译线程收集块信息的辅助类，保存一个存储卷的块扫描结果，
+   * 按块池ID组织所有ScanInfo对象。
    */
   @VisibleForTesting
   public static class ScanInfoVolumeReport {
@@ -164,9 +161,9 @@ public class DirectoryScanner implements Runnable {
     private final BlockPoolReport blockPoolReport;
 
     /**
-     * Create a new info list.
+     * 创建一个空的卷扫描结果对象。
      *
-     * @param volume
+     * @param volume 目标存储卷
      */
     ScanInfoVolumeReport(final FsVolumeSpi volume) {
       this.volume = volume;
@@ -174,10 +171,10 @@ public class DirectoryScanner implements Runnable {
     }
 
     /**
-     * Create a new info list initialized to the given expected size.
+     * 创建一个预分配了块池容量的卷扫描结果对象。
      *
-     * @param volume
-     * @param blockPools list of known block pools
+     * @param volume 目标存储卷
+     * @param blockPools 已知块池列表
      */
     ScanInfoVolumeReport(final FsVolumeSpi volume,
         final Collection<String> blockPools) {
@@ -210,7 +207,7 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Helper class for compiling block info reports per block pool.
+   * 按块池组织块扫描信息的辅助类，保存一个块池下所有扫描到的块信息。
    */
   @VisibleForTesting
   public static class BlockPoolReport {
@@ -223,7 +220,7 @@ public class DirectoryScanner implements Runnable {
     private final ListMultimap<String, ScanInfo> map;
 
     /**
-     * Create a block pool report.
+     * 创建一个空的块池报告对象。
      */
     BlockPoolReport() {
       this.blockPools = new HashSet<>(2);
@@ -231,9 +228,9 @@ public class DirectoryScanner implements Runnable {
     }
 
     /**
-     * Create a new block pool report initialized to the given expected size.
+     * 创建一个预分配了块池容量的块池报告对象。
      *
-     * @param blockPools initial list of known block pools
+     * @param blockPools 初始已知块池列表
      */
     BlockPoolReport(final Collection<String> blockPools) {
       this.blockPools = new HashSet<>(blockPools);
@@ -247,6 +244,9 @@ public class DirectoryScanner implements Runnable {
       this.map.putAll(bpid, scanInfos);
     }
 
+    /**
+     * 对每个块池中的块按块ID排序，为后续双指针差异比对做准备。
+     */
     public void sortBlocks() {
       for (final String bpid : this.map.keySet()) {
         final List<ScanInfo> list = this.map.get(bpid);
@@ -279,10 +279,10 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Create a new directory scanner, but don't cycle it running yet.
+   * 构造目录扫描器实例，根据配置初始化参数，但不启动扫描任务。
    *
-   * @param dataset the dataset to scan
-   * @param conf the Configuration object
+   * @param dataset 需要扫描的数据集对象
+   * @param conf Hadoop配置对象
    */
   public DirectoryScanner(FsDatasetSpi<?> dataset, Configuration conf) {
     this.dataset = dataset;
@@ -356,12 +356,12 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Start the scanner. The scanner will run every
-   * {@link DFSConfigKeys#DFS_DATANODE_DIRECTORYSCAN_INTERVAL_KEY} seconds.
+   * 启动周期目录扫描器，扫描任务将按照配置的间隔定期执行。
    */
   @VisibleForTesting
   public void start() {
     shouldRun.set(true);
+    // 随机化首次扫描时间，避免所有DataNode同时启动扫描导致资源竞争
     long firstScanTime = ThreadLocalRandom.current().nextLong(scanPeriodMsecs);
 
     LOG.info(
@@ -373,9 +373,9 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Return whether the scanner has been started.
+   * 获取扫描器是否已启动的状态。
    *
-   * @return whether the scanner has been started
+   * @return 扫描器是否已启动
    */
   @VisibleForTesting
   boolean getRunStatus() {
@@ -383,7 +383,7 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Clear the current cache of diffs and statistics.
+   * 清空当前缓存的差异结果和统计信息。
    */
   private void clear() {
     synchronized (diffs) {
@@ -393,13 +393,12 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Main program loop for DirectoryScanner. Runs {@link #reconcile()} and
-   * handles any exceptions.
+   * 目录扫描器主循环方法，由定时任务调用，执行一次完整的差异比对与 reconcile，处理异常保证周期调度不中断。
    */
   @Override
   public void run() {
     if (!shouldRun.get()) {
-      // shutdown has been activated
+      // 已经触发了关闭命令，直接终止本次周期任务
       LOG.warn(
           "This cycle terminating immediately because 'shouldRun' has been deactivated");
       return;
@@ -408,12 +407,12 @@ public class DirectoryScanner implements Runnable {
       reconcile();
       dataset.setLastDirScannerFinishTime(System.currentTimeMillis());
     } catch (Exception e) {
-      // Log and continue - allows Executor to run again next cycle
+      // 记录异常后继续，不影响下一个周期执行
       LOG.error(
           "Exception during DirectoryScanner execution - will continue next cycle",
           e);
     } catch (Error er) {
-      // Non-recoverable error - re-throw after logging the problem
+      // 不可恢复错误，记录后重新抛出，永久终止周期扫描
       LOG.error(
           "System Error during DirectoryScanner execution - permanently terminating periodic scanner",
           er);
@@ -422,10 +421,7 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Stops the directory scanner. This method will wait for 1 minute for the
-   * main thread to exit and an additional 1 minute for the report compilation
-   * threads to exit. If a thread does not exit in that time period, it is left
-   * running, and an error is logged.
+   * 关闭目录扫描器，等待线程池退出，最长等待2分钟。
    */
   void shutdown() {
     LOG.info("Shutdown has been called");
@@ -460,322 +456,29 @@ public class DirectoryScanner implements Runnable {
   }
 
   /**
-   * Reconcile differences between disk and in-memory blocks
+   *  reconcile磁盘和内存块信息的差异，修正不一致。
+   * @throws IOException IO异常
    */
   @VisibleForTesting
   public void reconcile() throws IOException {
     LOG.debug("reconcile start DirectoryScanning");
+    // 扫描磁盘生成差异列表
     scan();
+    // 注入点，单元测试使用，等待存储移除操作完成
     DataNodeFaultInjector.get().waitUntilStorageRemoved();
-    // HDFS-14476: run checkAndUpdate with batch to avoid holding the lock too
-    // long
+    // 分批修改，避免长时间占用锁影响DataNode正常服务（HDFS-14476）
     int loopCount = 0;
     synchronized (diffs) {
       for (final Map.Entry<String, ScanInfo> entry : diffs.getEntries()) {
+        // 调用数据集修正差异
         dataset.checkAndUpdate(entry.getKey(), entry.getValue());
 
+        // 每处理完一批，休眠指定间隔，释放锁避免长时间阻塞
         if (loopCount % reconcileBlocksBatchSize == 0) {
           try {
             Thread.sleep(reconcileBlocksBatchInterval);
           } catch (InterruptedException e) {
-            // do nothing
+            // 中断不处理，继续执行
           }
         }
         loopCount++;
-      }
-    }
-
-    if (!retainDiffs) {
-      clear();
-    }
-  }
-
-  /**
-   * Scan for the differences between disk and in-memory blocks Scan only the
-   * "finalized blocks" lists of both disk and memory.
-   */
-  private void scan() {
-    BlockPoolReport blockPoolReport = new BlockPoolReport();
-
-    clear();
-
-    Collection<ScanInfoVolumeReport> volumeReports = getVolumeReports();
-    for (ScanInfoVolumeReport volumeReport : volumeReports) {
-      for (String blockPoolId : volumeReport.getBlockPoolIds()) {
-        List<ScanInfo> scanInfos = volumeReport.getScanInfo(blockPoolId);
-        blockPoolReport.addAll(blockPoolId, scanInfos);
-      }
-    }
-
-    // Pre-sort the reports outside of the lock
-    blockPoolReport.sortBlocks();
-    DataNodeFaultInjector.get().delayDiffRecord();
-
-    for (final String bpid : blockPoolReport.getBlockPoolIds()) {
-      List<ScanInfo> blockpoolReport = blockPoolReport.getScanInfo(bpid);
-
-      Stats statsRecord = new Stats(bpid);
-      stats.put(bpid, statsRecord);
-      Collection<ScanInfo> diffRecord = new ArrayList<>();
-
-      statsRecord.totalBlocks = blockpoolReport.size();
-      final List<ReplicaInfo> bl = dataset.getFinalizedBlocks(bpid);
-      Collections.sort(bl); // Sort based on blockId
-
-      int d = 0; // index for blockpoolReport
-      int m = 0; // index for memReprot
-      while (m < bl.size() && d < blockpoolReport.size()) {
-        ReplicaInfo memBlock = bl.get(m);
-        ScanInfo info = blockpoolReport.get(d);
-        if (info.getBlockId() < memBlock.getBlockId()) {
-          if (!dataset.isDeletingBlock(bpid, info.getBlockId())) {
-            // Block is missing in memory
-            statsRecord.missingMemoryBlocks++;
-            addDifference(diffRecord, statsRecord, info);
-          }
-          d++;
-          continue;
-        }
-        if (info.getBlockId() > memBlock.getBlockId()) {
-          // Block is missing on the disk
-          addDifference(diffRecord, statsRecord, memBlock.getBlockId(),
-              info.getVolume());
-          m++;
-          continue;
-        }
-
-        // Block and meta must be regular file
-        boolean isRegular = FileUtil.isRegularFile(info.getBlockFile(), false) &&
-                FileUtil.isRegularFile(info.getMetaFile(), false);
-        if (!isRegular) {
-          statsRecord.mismatchBlocks++;
-          addDifference(diffRecord, statsRecord, info);
-        } else {
-          // Block file and/or metadata file exists on the disk
-          // Block exists in memory
-          if (info.getBlockFile() == null) {
-            // Block metadata file exits and block file is missing
-            addDifference(diffRecord, statsRecord, info);
-          } else if (info.getGenStamp() != memBlock.getGenerationStamp()
-                  || info.getBlockLength() != memBlock.getNumBytes()) {
-            // Block metadata file is missing or has wrong generation stamp,
-            // or block file length is different than expected
-            statsRecord.mismatchBlocks++;
-            addDifference(diffRecord, statsRecord, info);
-          } else if (memBlock.compareWith(info) != 0) {
-            // volumeMap record and on-disk files do not match.
-            statsRecord.duplicateBlocks++;
-            addDifference(diffRecord, statsRecord, info);
-          }
-        }
-        d++;
-
-        if (d < blockpoolReport.size()) {
-          // There may be multiple on-disk records for the same block, do not
-          // increment the memory record pointer if so.
-          ScanInfo nextInfo = blockpoolReport.get(d);
-          if (nextInfo.getBlockId() != info.getBlockId()) {
-            ++m;
-          }
-        } else {
-          ++m;
-        }
-      }
-      while (m < bl.size()) {
-        ReplicaInfo current = bl.get(m++);
-        addDifference(diffRecord, statsRecord, current.getBlockId(),
-            current.getVolume());
-      }
-      while (d < blockpoolReport.size()) {
-        if (!dataset.isDeletingBlock(bpid,
-            blockpoolReport.get(d).getBlockId())) {
-          statsRecord.missingMemoryBlocks++;
-          addDifference(diffRecord, statsRecord, blockpoolReport.get(d));
-        }
-        d++;
-      }
-      synchronized (diffs) {
-        diffs.addAll(bpid, diffRecord);
-      }
-      LOG.info("Scan Results: {}", statsRecord);
-    }
-  }
-
-  /**
-   * Add the ScanInfo object to the list of differences and adjust the stats
-   * accordingly. This method is called when a block is found on the disk, but
-   * the in-memory block is missing or does not match the block on the disk.
-   *
-   * @param diffRecord the collection to which to add the info
-   * @param statsRecord the stats to update
-   * @param info the differing info
-   */
-  private void addDifference(Collection<ScanInfo> diffRecord, Stats statsRecord,
-      ScanInfo info) {
-    statsRecord.missingMetaFile += info.getMetaFile() == null ? 1 : 0;
-    statsRecord.missingBlockFile += info.getBlockFile() == null ? 1 : 0;
-    diffRecord.add(info);
-  }
-
-  /**
-   * Add a new ScanInfo object to the collection of differences and adjust the
-   * stats accordingly. This method is called when a block is not found on the
-   * disk.
-   *
-   * @param diffRecord the collection to which to add the info
-   * @param statsRecord the stats to update
-   * @param blockId the id of the missing block
-   * @param vol the volume that contains the missing block
-   */
-  private void addDifference(Collection<ScanInfo> diffRecord, Stats statsRecord,
-      long blockId, FsVolumeSpi vol) {
-    statsRecord.missingBlockFile++;
-    statsRecord.missingMetaFile++;
-    diffRecord.add(new ScanInfo(blockId, null, null, null, vol));
-  }
-
-  /**
-   * Get the lists of blocks on the disks in the data set.
-   */
-  @VisibleForTesting
-  public Collection<ScanInfoVolumeReport> getVolumeReports() {
-    List<ScanInfoVolumeReport> volReports = new ArrayList<>();
-    List<Future<ScanInfoVolumeReport>> compilersInProgress = new ArrayList<>();
-
-    // First get list of data directories
-    try (FsDatasetSpi.FsVolumeReferences volumes =
-        dataset.getFsVolumeReferences()) {
-
-      for (final FsVolumeSpi volume : volumes) {
-        // Disable scanning PROVIDED volumes to keep overhead low
-        if (volume.getStorageType() != StorageType.PROVIDED) {
-          ReportCompiler reportCompiler = new ReportCompiler(volume);
-          Future<ScanInfoVolumeReport> result =
-              reportCompileThreadPool.submit(reportCompiler);
-          compilersInProgress.add(result);
-        }
-      }
-
-      for (Future<ScanInfoVolumeReport> future : compilersInProgress) {
-        try {
-          final ScanInfoVolumeReport result = future.get();
-          if (!CollectionUtils.addIgnoreNull(volReports, result)) {
-            // This compiler thread were interrupted, give up on this run
-            volReports.clear();
-            break;
-          }
-        } catch (Exception ex) {
-          LOG.warn("Error compiling report. Continuing.", ex);
-        }
-      }
-    } catch (IOException e) {
-      LOG.error("Unexpected IOException by closing FsVolumeReference", e);
-    }
-
-    return volReports;
-  }
-
-  /**
-   * The ReportCompiler class encapsulates the process of searching a datanode's
-   * disks for block information. It operates by performing a DFS of the volume
-   * to discover block information.
-   *
-   * When the ReportCompiler discovers block information, it create a new
-   * ScanInfo object for it and adds that object to its report list. The report
-   * list is returned by the {@link #call()} method.
-   */
-  public class ReportCompiler implements Callable<ScanInfoVolumeReport> {
-    private final FsVolumeSpi volume;
-    // Variable for tracking time spent running for throttling purposes
-    private final StopWatch throttleTimer = new StopWatch();
-    // Variable for tracking time spent running and waiting for testing
-    // purposes
-    private final StopWatch perfTimer = new StopWatch();
-
-    /**
-     * Create a report compiler for the given volume.
-     *
-     * @param volume the target volume
-     */
-    public ReportCompiler(FsVolumeSpi volume) {
-      this.volume = volume;
-    }
-
-    /**
-     * Run this report compiler thread.
-     *
-     * @return the block info report list
-     * @throws IOException if the block pool is not found
-     */
-    @Override
-    public ScanInfoVolumeReport call() throws IOException {
-      String[] bpList = volume.getBlockPoolList();
-      ScanInfoVolumeReport result =
-          new ScanInfoVolumeReport(volume, Arrays.asList(bpList));
-      perfTimer.start();
-      throttleTimer.start();
-      for (String bpid : bpList) {
-        List<ScanInfo> report = new ArrayList<>(DEFAULT_MAP_SIZE);
-
-        perfTimer.reset().start();
-        throttleTimer.reset().start();
-
-        try {
-          // ScanInfos are added directly to 'report' list
-          volume.compileReport(bpid, report, this);
-          result.addAll(bpid, report);
-        } catch (InterruptedException ex) {
-          // Exit quickly and flag the scanner to do the same
-          result = null;
-          break;
-        }
-      }
-      LOG.trace("Scanner volume report: {}", result);
-      return result;
-    }
-
-    /**
-     * Called by the thread before each potential disk scan so that a pause can
-     * be optionally inserted to limit the number of scans per second. The limit
-     * is controlled by
-     * {@link DFSConfigKeys#DFS_DATANODE_DIRECTORYSCAN_THROTTLE_LIMIT_MS_PER_SEC_KEY}.
-     */
-    public void throttle() throws InterruptedException {
-      accumulateTimeRunning();
-
-      if (throttleLimitMsPerSec > 0L) {
-        final long runningTime = throttleTimer.now(TimeUnit.MILLISECONDS);
-        if (runningTime >= throttleLimitMsPerSec) {
-          final long sleepTime;
-          if (runningTime >= 1000L) {
-            LOG.warn("Unable to throttle within the second. Blocking for 1s.");
-            sleepTime = 1000L;
-          } else {
-            // Sleep for the expected time plus any time processing ran over
-            final long overTime = runningTime - throttleLimitMsPerSec;
-            sleepTime = (1000L - throttleLimitMsPerSec) + overTime;
-          }
-          Thread.sleep(sleepTime);
-          throttleTimer.reset().start();
-        }
-        accumulateTimeWaiting();
-      }
-    }
-
-    /**
-     * Helper method to measure time running.
-     */
-    private void accumulateTimeRunning() {
-      timeRunningMs.getAndAdd(perfTimer.now(TimeUnit.MILLISECONDS));
-      perfTimer.reset().start();
-    }
-
-    /**
-     * Helper method to measure time waiting.
-     */
-    private void accumulateTimeWaiting() {
-      timeWaitingMs.getAndAdd(perfTimer.now(TimeUnit.MILLISECONDS));
-      perfTimer.reset().start();
-    }
-  }
-}

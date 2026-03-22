@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,17 +24,11 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSource;
 
 /**
- * 
- * This Interface defines the methods to get the status of a the FSDataset of
- * a data node.
- * It is also used for publishing via JMX (hence we follow the JMX naming
- * convention.) 
- *  * Note we have not used the MetricsDynamicMBeanBase to implement this
- * because the interface for the FSDatasetMBean is stable and should
- * be published as an interface.
- * 
+ * 数据节点FSDataset存储状态的JMX MBean接口，用于暴露存储指标给监控系统
+ * 遵循JMX命名规范，可通过JMX发布存储相关运行指标
+ * 本接口保持稳定，未使用MetricsDynamicMBeanBase实现，直接以接口形式发布
  * <p>
- * Data Node runtime statistic  info is report in another MBean
+ * 数据节点运行时统计信息在另一个MBean中发布
  * @see org.apache.hadoop.hdfs.server.datanode.metrics.DataNodeMetrics
  *
  */
@@ -41,95 +36,103 @@ import org.apache.hadoop.metrics2.MetricsSource;
 public interface FSDatasetMBean extends MetricsSource {
   
   /**
-   * Returns the total space (in bytes) used by a block pool
-   * @return  the total space used by a block pool
-   * @throws IOException
+   * 获取指定块池已使用的存储空间大小（字节）
+   * @param bpid 块池ID
+   * @return 块池已使用空间字节数
+   * @throws IO异常
    */  
   public long getBlockPoolUsed(String bpid) throws IOException;
   
   /**
-   * Returns the total space (in bytes) used by dfs datanode
-   * @return  the total space used by dfs datanode
-   * @throws IOException
+   * 获取数据节点DFS已使用的总存储空间大小（字节）
+   * @return DFS已使用总空间字节数
+   * @throws IO异常
    */  
   public long getDfsUsed() throws IOException;
     
   /**
-   * Returns total capacity (in bytes) of storage (used and unused)
-   * @return  total capacity of storage (used and unused)
-   * @throws IOException
+   * 获取存储总容量（字节，包含已用和未用空间）
+   * @return 存储总容量字节数
+   * @throws IO异常
    */
   public long getCapacity() throws IOException;
 
   /**
-   * Returns the amount of free storage space (in bytes)
-   * @return The amount of free storage space
-   * @throws IOException
+   * 获取剩余可用存储空间大小（字节）
+   * @return 剩余可用空间字节数
+   * @throws IO异常
    */
   public long getRemaining() throws IOException;
   
   /**
-   * Returns the storage id of the underlying storage
+   * 获取底层存储的存储标识信息
+   * @return 底层存储标识字符串
    */
   public String getStorageInfo();
 
   /**
-   * Returns the number of failed volumes in the datanode.
-   * @return The number of failed volumes in the datanode.
+   * 获取数据节点上故障卷的数量
+   * @return 故障卷数量
    */
   public int getNumFailedVolumes();
 
   /**
-   * Returns each storage location that has failed, sorted.
-   * @return each storage location that has failed, sorted
+   * 获取排序后的所有故障存储路径数组
+   * @return 排序后的故障存储路径数组
    */
   String[] getFailedStorageLocations();
 
   /**
-   * Returns the date/time of the last volume failure in milliseconds since
-   * epoch.
-   * @return date/time of last volume failure in milliseconds since epoch
+   * 获取上次卷故障发生的时间戳（毫秒，从纪元开始计算）
+   * @return 上次卷故障的时间戳
    */
   long getLastVolumeFailureDate();
 
   /**
-   * Returns an estimate of total capacity lost due to volume failures in bytes.
-   * @return estimate of total capacity lost in bytes
+   * 获取因卷故障损失的总容量估算值（字节）
+   * @return 容量损失估算值（字节）
    */
   long getEstimatedCapacityLostTotal();
 
   /**
-   * Returns the amount of cache used by the datanode (in bytes).
+   * 获取数据节点已使用的缓存大小（字节）
+   * @return 已使用缓存字节数
    */
   public long getCacheUsed();
 
   /**
-   * Returns the total cache capacity of the datanode (in bytes).
+   * 获取数据节点缓存总容量（字节）
+   * @return 缓存总容量字节数
    */
   public long getCacheCapacity();
 
   /**
-   * Returns the number of blocks cached.
+   * 获取已缓存的块数量
+   * @return 已缓存块数量
    */
   public long getNumBlocksCached();
 
   /**
-   * Returns the number of blocks that the datanode was unable to cache
+   * 获取缓存失败的块数量
+   * @return 缓存失败块数量
    */
   public long getNumBlocksFailedToCache();
 
   /**
-   * Returns the number of blocks that the datanode was unable to uncache
+   * 获取解除缓存失败的块数量
+   * @return 解除缓存失败块数量
    */
   public long getNumBlocksFailedToUncache();
 
   /**
-   * Returns the last time in milliseconds when the directory scanner successfully ran.
+   * 获取目录扫描器上次成功完成扫描的时间戳（毫秒）
+   * @return 上次目录扫描成功完成的时间戳
    */
   long getLastDirScannerFinishTime();
 
   /**
-   * Returns the count of pending and running asynchronous disk operations.
+   * 获取等待中和运行中的异步磁盘操作数量
+   * @return 待处理异步删除操作数量
    */
   long getPendingAsyncDeletions();
 }

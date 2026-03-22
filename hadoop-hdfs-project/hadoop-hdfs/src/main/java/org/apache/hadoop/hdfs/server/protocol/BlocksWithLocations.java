@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,14 +25,16 @@ import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.Block;
 
 /**
- * Maintains an array of blocks and their corresponding storage IDs.
+ * HDFS服务器端协议中，存储多个数据块及其位置信息的容器类
+ * 用于在NameNode和DataNode之间传输块位置信息，包含多个块的位置集合
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class BlocksWithLocations {
 
   /**
-   * A class to keep track of a block and its locations
+   * 维护单个数据块及其所有存储位置信息的内部类
+   * 存储块本身、所在DataNode、存储ID和存储类型等位置相关信息
    */
   @InterfaceAudience.Private
   @InterfaceStability.Evolving
@@ -41,7 +44,13 @@ public class BlocksWithLocations {
     final String[] storageIDs;
     final StorageType[] storageTypes;
     
-    /** constructor */
+    /**
+     * 构造单个块位置信息对象
+     * @param block 数据块对象
+     * @param datanodeUuids 存储该块的所有DataNode的UUID数组
+     * @param storageIDs 存储该块的所有存储ID数组
+     * @param storageTypes 存储该块的所有存储类型数组
+     */
     public BlockWithLocations(Block block, String[] datanodeUuids,
         String[] storageIDs, StorageType[] storageTypes) {
       this.block = block;
@@ -50,22 +59,34 @@ public class BlocksWithLocations {
       this.storageTypes = storageTypes;
     }
     
-    /** get the block */
+    /**
+     * 获取该位置信息对应的数据块
+     * @return 数据块对象
+     */
     public Block getBlock() {
       return block;
     }
     
-    /** get the block's datanode locations */
+    /**
+     * 获取存储该块的所有DataNode的UUID数组
+     * @return DataNode UUID数组
+     */
     public String[] getDatanodeUuids() {
       return datanodeUuids;
     }
 
-    /** get the block's storage locations */
+    /**
+     * 获取存储该块的所有存储ID数组
+     * @return 存储ID数组
+     */
     public String[] getStorageIDs() {
       return storageIDs;
     }
 
-    /** @return the storage types */
+    /**
+     * 获取存储该块的所有存储类型数组
+     * @return 存储类型数组
+     */
     public StorageType[] getStorageTypes() {
       return storageTypes;
     }
@@ -92,15 +113,27 @@ public class BlocksWithLocations {
     }
   }
 
+  /**
+   * 纠删码条纹块的位置信息类，继承普通块位置信息，扩展纠删码相关属性
+   * 用于存储纠删码组中内部块索引、数据块数量和单元大小等纠删码特有信息
+   */
   public static class StripedBlockWithLocations extends BlockWithLocations {
     final byte[] indices;
     final short dataBlockNum;
     final int cellSize;
 
+    /**
+     * 构造纠删码条纹块位置信息对象
+     * @param blk 普通块位置信息基础对象
+     * @param indices 纠删码组内各个块的索引数组
+     * @param dataBlockNum 纠删码组中数据块的数量
+     * @param cellSize 纠删码单元大小
+     */
     public StripedBlockWithLocations(BlockWithLocations blk, byte[] indices,
          short dataBlockNum, int cellSize) {
       super(blk.getBlock(), blk.getDatanodeUuids(), blk.getStorageIDs(),
           blk.getStorageTypes());
+      // 校验DataNode数量和块索引数量一致
       Preconditions.checkArgument(
           blk.getDatanodeUuids().length == indices.length);
       this.indices = indices;
@@ -108,14 +141,26 @@ public class BlocksWithLocations {
       this.cellSize = cellSize;
     }
 
+    /**
+     * 获取纠删码组内各个块的索引数组
+     * @return 块索引数组
+     */
     public byte[] getIndices() {
       return indices;
     }
 
+    /**
+     * 获取纠删码组中数据块的数量
+     * @return 数据块数量
+     */
     public short getDataBlockNum() {
       return dataBlockNum;
     }
 
+    /**
+     * 获取纠删码单元大小
+     * @return 纠删码单元大小（字节）
+     */
     public int getCellSize() {
       return cellSize;
     }
@@ -123,12 +168,18 @@ public class BlocksWithLocations {
 
   private final BlockWithLocations[] blocks;
 
-  /** Constructor with one parameter */
+  /**
+   * 构造多个块位置信息容器
+   * @param blocks 块位置信息数组
+   */
   public BlocksWithLocations(BlockWithLocations[] blocks) {
     this.blocks = blocks;
   }
 
-  /** getter */
+  /**
+   * 获取所有块位置信息数组
+   * @return 块位置信息数组
+   */
   public BlockWithLocations[] getBlocks() {
     return blocks;
   }

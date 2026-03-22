@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,42 +38,59 @@ import org.apache.hadoop.io.retry.Idempotent;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * Protocol used to communicate between {@link QuorumJournalManager}
- * and each {@link JournalNode}.
+ * QJournal协议接口，用于{@link QuorumJournalManager}（NameNode侧日志管理器）
+ * 和各个{@link JournalNode}（日志节点）之间的RPC通信。
  * 
- * This is responsible for sending edits as well as coordinating
- * recovery of the nodes.
+ * 负责编辑日志的写入传输，以及日志节点之间的恢复协调，是HDFS QJM共享存储HA方案的核心通信协议。
  */
 @KerberosInfo(
     serverPrincipal = DFSConfigKeys.DFS_JOURNALNODE_KERBEROS_PRINCIPAL_KEY,
     clientPrincipal = DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY)
 @InterfaceAudience.Private
 public interface QJournalProtocol {
+  /** 协议版本ID */
   public static final long versionID = 1L;
 
   /**
-   * @return true if the given journal has been formatted and
-   * contains valid data.
+   * 检查指定日志是否已完成格式化并包含有效数据。
+   * @param journalId 日志ID
+   * @param nameServiceId 命名服务ID
+   * @return 如果已格式化返回true，否则返回false
+   * @throws IOException 通信或IO异常
    */
   boolean isFormatted(String journalId,
                       String nameServiceId) throws IOException;
 
   /**
-   * Get the current state of the journal, including the most recent
-   * epoch number and the HTTP port.
+   * 获取日志节点当前的日志状态，包含最新的epoch编号和HTTP端口信息。
+   * @param journalId 日志ID
+   * @param nameServiceId 命名服务ID
+   * @return 日志状态响应对象
+   * @throws IOException 通信或IO异常
    */
   GetJournalStateResponseProto getJournalState(String journalId,
                                                String nameServiceId)
       throws IOException;
   
   /**
-   * Format the underlying storage for the given namespace.
+   * 对指定命名空间的底层存储进行格式化。
+   * @param journalId 日志ID
+   * @param nameServiceId 命名服务ID
+   * @param nsInfo 命名空间信息
+   * @param force 是否强制格式化
+   * @throws IOException 通信或IO异常
    */
   void format(String journalId, String nameServiceId,
       NamespaceInfo nsInfo, boolean force) throws IOException;
 
   /**
-   * Begin a new epoch. See the HDFS-3077 design doc for details.
+   * 开启一个新的epoch，用于选举激活后的版本号隔离，详见HDFS-3077设计文档。
+   * @param journalId 日志ID
+   * @param nameServiceId 命名服务ID
+   * @param nsInfo 命名空间信息
+   * @param epoch 新的epoch编号
+   * @return 新纪元响应对象
+   * @throws IOException 通信或IO异常
    */
   NewEpochResponseProto newEpoch(String journalId,
                                         String nameServiceId,
@@ -80,9 +98,13 @@ public interface QJournalProtocol {
                                         long epoch) throws IOException;
   
   /**
-   * Journal edit records.
-   * This message is sent by the active name-node to the JournalNodes
-   * to write edits to their local logs.
+   * 写入编辑日志记录，由激活的NameNode发送给JournalNode，将编辑日志写入本地磁盘。
+   * @param reqInfo 请求信息（包含epoch等身份校验信息）
+   * @param segmentTxId 日志分段起始事务ID
+   * @param firstTxnId 本次写入第一个事务ID
+   * @param numTxns 本次写入事务数量
+   * @param records 序列化后的编辑记录字节数组
+   * @throws IOException 通信或IO异常
    */
   public void journal(RequestInfo reqInfo,
                       long segmentTxId,
@@ -92,48 +114,50 @@ public interface QJournalProtocol {
 
   
   /**
-   * Heartbeat.
-   * This is a no-op on the server, except that it verifies that the
-   * caller is in fact still the active writer, and provides up-to-date
-   * information on the most recently committed txid.
+   * 心跳检查，服务端默认无操作，仅用于校验调用方仍然是激活的写入者，同时返回最新已提交事务ID。
+   * @param reqInfo 请求信息
+   * @throws IOException 通信或IO异常
    */
   public void heartbeat(RequestInfo reqInfo) throws IOException;
   
   /**
-   * Start writing to a new log segment on the JournalNode.
-   * Before calling this, one should finalize the previous segment
-   * using {@link #finalizeLogSegment(RequestInfo, long, long)}.
-   * 
-   * @param txid the first txid in the new log
-   * @param layoutVersion the LayoutVersion of the new log
+   * 在JournalNode上开始写入一个新的编辑日志分段。调用此方法前需要先通过
+   * {@link #finalizeLogSegment(RequestInfo, long, long)}完成上一个分段。
+   * @param reqInfo 请求信息
+   * @param txid 新分段第一个事务ID
+   * @param layoutVersion 新日志的布局版本号
+   * @throws IOException 通信或IO异常
    */
   public void startLogSegment(RequestInfo reqInfo,
       long txid, int layoutVersion) throws IOException;
 
   /**
-   * Finalize the given log segment on the JournalNode. The segment
-   * is expected to be in-progress and starting at the given startTxId.
-   *
-   * @param startTxId the starting transaction ID of the log
-   * @param endTxId the expected last transaction in the given log
-   * @throws IOException if no such segment exists
+   * 在JournalNode上完成指定日志分段，该分段必须处于正在写入状态，且从指定startTxId开始。
+   * @param reqInfo 请求信息
+   * @param startTxId 分段起始事务ID
+   * @param endTxId 分段最后一个事务ID
+   * @throws IOException 如果对应分段不存在则抛出异常
    */
   public void finalizeLogSegment(RequestInfo reqInfo,
       long startTxId, long endTxId) throws IOException;
 
   /**
-   * @throws IOException 
-   * @see JournalManager#purgeLogsOlderThan(long)
+   * 清理早于指定事务ID的旧日志，对应{@link JournalManager#purgeLogsOlderThan(long)}。
+   * @param requestInfo 请求信息
+   * @param minTxIdToKeep 需要保留的最小事务ID
+   * @throws IOException 通信或IO异常
    */
   public void purgeLogsOlderThan(RequestInfo requestInfo, long minTxIdToKeep)
       throws IOException;
   
   /**
-   * @param jid the journal from which to enumerate edits
-   * @param sinceTxId the first transaction which the client cares about
-   * @param inProgressOk whether or not to check the in-progress edit log 
-   *        segment       
-   * @return a list of edit log segments since the given transaction ID.
+   * 获取自指定事务ID之后的所有编辑日志分段清单。
+   * @param jid 日志ID
+   * @param nameServiceId 命名服务ID
+   * @param sinceTxId 客户端关注的第一个事务ID
+   * @param inProgressOk 是否返回正在写入中的未完成分段
+   * @return 编辑日志清单响应对象
+   * @throws IOException 通信或IO异常
    */
   GetEditLogManifestResponseProto getEditLogManifest(String jid,
                                                      String nameServiceId,
@@ -142,56 +166,93 @@ public interface QJournalProtocol {
       throws IOException;
 
   /**
-   * Fetch edit logs present in the Journal's in-memory cache of edits
-   * ({@link org.apache.hadoop.hdfs.qjournal.server.JournaledEditsCache}).
-   * To enable this cache, in-progress edit log tailing must be enabled via the
-   * {@value DFSConfigKeys#DFS_HA_TAILEDITS_INPROGRESS_KEY} configuration key.
+   * 从JournalNode的内存编辑缓存中拉取编辑日志，缓存由{@link org.apache.hadoop.hdfs.qjournal.server.JournaledEditsCache}实现。
+   * 需要通过{@value DFSConfigKeys#DFS_HA_TAILEDITS_INPROGRESS_KEY}配置开启渐进式尾日志才能启用该缓存。
    *
-   * @param jid The ID of the journal from which to fetch edits.
-   * @param nameServiceId The ID of the namespace for which to fetch edits.
-   * @param sinceTxId Fetch edits starting at this transaction ID
-   * @param maxTxns Request at most this many transactions to be returned
-   * @throws IOException If there was an issue encountered while fetching edits
-   *     from the cache, including a cache miss (cache does not contain the
-   *     requested edits). The caller should then attempt to fetch the edits via
-   *     the streaming mechanism (starting with
-   *     {@link #getEditLogManifest(String, String, long, boolean)}).
-   * @return Response containing serialized edits to be loaded
+   * @param jid 日志ID
+   * @param nameServiceId 命名空间ID
+   * @param sinceTxId 从该事务ID开始拉取编辑
+   * @param maxTxns 本次最多返回的事务数量
+   * @throws IOException 如果拉取失败（包括缓存未命中请求的事务），则抛出异常，调用方需要回退到通过getEditLogManifest的流式拉取机制
+   * @return 包含序列化编辑日志的响应对象
    * @see org.apache.hadoop.hdfs.qjournal.server.JournaledEditsCache
    */
   GetJournaledEditsResponseProto getJournaledEdits(String jid,
       String nameServiceId, long sinceTxId, int maxTxns) throws IOException;
 
   /**
-   * Begin the recovery process for a given segment. See the HDFS-3077
-   * design document for details.
+   * 开始指定分段的恢复流程，详见HDFS-3077设计文档。
+   * @param reqInfo 请求信息
+   * @param segmentTxId 需要恢复的分段起始事务ID
+   * @return 恢复准备响应对象
+   * @throws IOException 通信或IO异常
    */
   public PrepareRecoveryResponseProto prepareRecovery(RequestInfo reqInfo,
       long segmentTxId) throws IOException;
 
   /**
-   * Accept a proposed recovery for the given transaction ID.
+   * 确认接受指定事务ID的恢复提议，完成分段恢复。
+   * @param reqInfo 请求信息
+   * @param stateToAccept 需要接受的分段状态
+   * @param fromUrl 提议来源URL
+   * @throws IOException 通信或IO异常
    */
   public void acceptRecovery(RequestInfo reqInfo,
       SegmentStateProto stateToAccept, URL fromUrl) throws IOException;
 
+  /**
+   * 执行升级前的准备操作。
+   * @param journalId 日志ID
+   * @throws IOException 通信或IO异常
+   */
   void doPreUpgrade(String journalId) throws IOException;
 
+  /**
+   * 执行存储升级操作。
+   * @param journalId 日志ID
+   * @param sInfo 存储信息
+   * @throws IOException 通信或IO异常
+   */
   public void doUpgrade(String journalId, StorageInfo sInfo) throws IOException;
 
+  /**
+   * 执行升级完成后的最终化操作。
+   * @param journalId 日志ID
+   * @param nameServiceid 命名服务ID
+   * @throws IOException 通信或IO异常
+   */
   void doFinalize(String journalId,
                          String nameServiceid) throws IOException;
 
+  /**
+   * 检查是否可以回滚到目标布局版本。
+   * @param journalId 日志ID
+   * @param nameServiceid 命名服务ID
+   * @param storage 当前存储信息
+   * @param prevStorage 回滚目标存储信息
+   * @param targetLayoutVersion 目标布局版本
+   * @return 如果可以回滚返回true，否则返回false
+   * @throws IOException 通信或IO异常
+   */
   Boolean canRollBack(String journalId, String nameServiceid,
                       StorageInfo storage, StorageInfo prevStorage,
                       int targetLayoutVersion) throws IOException;
 
+  /**
+   * 执行回滚操作，恢复到升级前状态。
+   * @param journalId 日志ID
+   * @param nameServiceid 命名服务ID
+   * @throws IOException 通信或IO异常
+   */
   void doRollback(String journalId,
                          String nameServiceid) throws IOException;
 
   /**
-   * Discard journal segments whose first TxId is greater than or equal to the
-   * given txid.
+   * 丢弃所有起始事务ID大于等于指定txid的日志分段。
+   * @param journalId 日志ID
+   * @param nameServiceId 命名服务ID
+   * @param startTxId 起始事务ID阈值
+   * @throws IOException 通信或IO异常
    */
   @Idempotent
   void discardSegments(String journalId,
@@ -199,6 +260,13 @@ public interface QJournalProtocol {
                        long startTxId)
       throws IOException;
 
+  /**
+   * 获取日志的创建时间戳。
+   * @param journalId 日志ID
+   * @param nameServiceId 命名服务ID
+   * @return 日志创建时间戳
+   * @throws IOException 通信或IO异常
+   */
   Long getJournalCTime(String journalId,
                        String nameServiceId) throws IOException;
 }

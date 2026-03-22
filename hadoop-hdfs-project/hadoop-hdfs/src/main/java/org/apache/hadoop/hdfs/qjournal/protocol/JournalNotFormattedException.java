@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,13 +22,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import java.io.IOException;
 
 /**
- * Exception indicating that a call has been made to a JournalNode
- * which is not yet formatted.
+ * QJournal日志节点未格式化异常类，用于表示对尚未格式化的JournalNode发起操作请求时抛出的异常
+ * 在HDFS QJM共享编辑日志方案中，JournalNode需要先格式化才能存储编辑日志，未格式化时操作抛出此异常
  */
 @InterfaceAudience.Private
 public class JournalNotFormattedException extends IOException {
   private static final long serialVersionUID = 1L;
   
+  /**
+   * 构造指定异常信息的未格式化异常实例
+   * @param msg 异常描述信息
+   */
   public JournalNotFormattedException(String msg) {
     super(msg);
   }

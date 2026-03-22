@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,12 +49,10 @@ import static io.netty.handler.codec.http.HttpHeaderValues.CLOSE;
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
 
-/*
- * Netty handler that integrates with the {@link
- * HostRestrictingAuthorizationFilter}.  If
- * the filter determines that the request is allowed, then this handler forwards
- * the request to the next handler in the Netty pipeline.  Otherwise, this
- * handler drops the request and sends an HTTP 403 response.
+/**
+ * Datanode Web服务Netty管道的IP地址访问限制授权处理器。
+ * 集成HostRestrictingAuthorizationFilter实现IP访问控制，当请求被禁止时返回403响应，
+ * 请求合法时则转发给后续处理器继续处理。
  */
 @InterfaceAudience.Private
 @Sharable
@@ -62,20 +61,14 @@ final class HostRestrictingAuthorizationFilterHandler
 
   private static final Logger LOG =
       LoggerFactory.getLogger(HostRestrictingAuthorizationFilterHandler.class);
+  /** 共享的IP访问限制过滤器实例，初始化后无状态，可被多通道复用 */
   private final
   HostRestrictingAuthorizationFilter hostRestrictingAuthorizationFilter;
 
-  /*
-   * Creates a new HostRestrictingAuthorizationFilterHandler.  There will be
-   * a new instance created for each new Netty channel/pipeline serving a new
-   * request.
-   *
-   * To prevent the cost of repeated initialization of the filter, this
-   * constructor requires the caller to pass in a pre-built, fully initialized
-   * filter instance.  The filter is stateless after initialization, so it can
-   * be shared across multiple Netty channels/pipelines.
-   *
-   * @param hostRestrictingAuthorizationFilter initialized filter
+  /**
+   * 构造函数，使用已初始化完成的IP访问限制过滤器。
+   * 过滤器初始化后为无状态，可在多个Netty管道间共享，避免重复初始化开销。
+   * @param hostRestrictingAuthorizationFilter 已完成初始化的IP访问限制过滤器
    */
   public HostRestrictingAuthorizationFilterHandler(
       HostRestrictingAuthorizationFilter hostRestrictingAuthorizationFilter) {
@@ -83,38 +76,27 @@ final class HostRestrictingAuthorizationFilterHandler
         hostRestrictingAuthorizationFilter;
   }
 
-  /*
-   * Creates a new HostRestrictingAuthorizationFilterHandler.  There will be
-   * a new instance created for each new Netty channel/pipeline serving a new
-   * request.
-   * To prevent the cost of repeated initialization of the filter, this
-   * constructor requires the caller to pass in a pre-built, fully initialized
-   * filter instance.  The filter is stateless after initialization, so it can
-   * be shared across multiple Netty channels/pipelines.
+  /**
+   * 无参构造函数，内部自行完成过滤器的初始化，从Hadoop配置中读取访问规则。
    */
   public HostRestrictingAuthorizationFilterHandler() {
     Configuration conf = new Configuration();
     this.hostRestrictingAuthorizationFilter = initializeState(conf);
   }
 
-  /*
-   * Creates a {@link HostRestrictingAuthorizationFilter} for the
-   * {@DatanodeHttpServer}.
-   * This method takes care of configuration and implementing just enough of the
-   * servlet API and related interfaces so that the DataNode can get a fully
-   * initialized
-   * instance of the filter.
-   *
-   * @param conf configuration to read
-   * @return initialized filter, or null if CSRF protection not enabled
-   * @throws IllegalStateException if filter fails initialization
+  /**
+   * 为Datanode HTTP服务初始化IP访问限制过滤器，适配Servlet Filter接口要求。
+   * 从Hadoop配置中读取IP访问规则，完成过滤器初始化。
+   * @param conf Hadoop配置对象
+   * @return 初始化完成的IP访问限制过滤器
+   * @throws IllegalStateException 过滤器初始化失败时抛出
    */
   public static HostRestrictingAuthorizationFilter
   initializeState(Configuration conf) {
     String confName = HostRestrictingAuthorizationFilter.HDFS_CONFIG_PREFIX +
         HostRestrictingAuthorizationFilter.RESTRICTION_CONFIG;
     String confValue = conf.get(confName);
-    // simply pass a blank value if we do not have one set
+    // 未配置则传入空字符串
     confValue = (confValue == null ? "" : confValue);
 
     Map<String, String> confMap =
@@ -134,13 +116,10 @@ final class HostRestrictingAuthorizationFilterHandler
     return hostRestrictingAuthorizationFilter;
   }
 
-  /*
-   * Finish handling this pipeline by writing a response with the
-   * "Connection: close" header, flushing, and scheduling a close of the
-   * connection.
-   *
-   * @param ctx context to receive the response
-   * @param resp response to send
+  /**
+   * 发送HTTP响应并关闭连接，添加Connection: close响应头。
+   * @param ctx Netty通道处理上下文
+   * @param resp 要发送的HTTP响应
    */
   private static void sendResponseAndClose(ChannelHandlerContext ctx,
       DefaultHttpResponse resp) {
@@ -151,6 +130,7 @@ final class HostRestrictingAuthorizationFilterHandler
   @Override
   protected void channelRead0(final ChannelHandlerContext ctx,
       final HttpRequest req) throws Exception {
+    // 将Netty请求包装后交给IP访问过滤器处理
     hostRestrictingAuthorizationFilter
         .handleInteraction(new NettyHttpInteraction(ctx, req));
   }
@@ -158,12 +138,13 @@ final class HostRestrictingAuthorizationFilterHandler
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
     LOG.error("Exception in " + this.getClass().getSimpleName(), cause);
+    // 发生异常返回500错误并关闭连接
     sendResponseAndClose(ctx,
         new DefaultHttpResponse(HTTP_1_1, INTERNAL_SERVER_ERROR));
   }
 
-  /*
-   * {@link HttpInteraction} implementation for use in a Netty pipeline.
+  /**
+   * 适配Netty请求的HttpInteraction实现，将Netty HTTP请求适配给通用IP访问过滤器。
    */
   private static final class NettyHttpInteraction implements HttpInteraction {
 
@@ -171,11 +152,10 @@ final class HostRestrictingAuthorizationFilterHandler
     private final HttpRequest req;
     private boolean committed;
 
-    /*
-     * Creates a new NettyHttpInteraction.
-     *
-     * @param ctx context to receive the response
-     * @param req request to process
+    /**
+     * 构造函数，封装Netty请求和上下文。
+     * @param ctx Netty通道处理上下文
+     * @param req Netty HTTP请求对象
      */
     public NettyHttpInteraction(ChannelHandlerContext ctx, HttpRequest req) {
       this.committed = false;
@@ -190,6 +170,7 @@ final class HostRestrictingAuthorizationFilterHandler
 
     @Override
     public String getRemoteAddr() {
+      // 获取客户端IP地址
       return ((InetSocketAddress) ctx.channel().remoteAddress()).
           getAddress().getHostAddress();
     }
@@ -197,6 +178,7 @@ final class HostRestrictingAuthorizationFilterHandler
     @Override
     public String getQueryString() {
       try {
+        // 解析请求查询参数部分
         return (new URI(req.uri()).getQuery());
       } catch (URISyntaxException e) {
         return null;
@@ -206,13 +188,14 @@ final class HostRestrictingAuthorizationFilterHandler
     @Override
     public String getRequestURI() {
       String uri = req.uri();
-      // Netty's getUri includes the query string, while Servlet's does not
+      // Netty的uri包含查询参数，需要截取出不含查询参数的请求路径
       return (uri.substring(0, uri.indexOf("?") >= 0 ? uri.indexOf("?") :
           uri.length()));
     }
 
     @Override
     public String getRemoteUser() {
+      // 从URL查询参数中解析用户名参数
       QueryStringDecoder queryString = new QueryStringDecoder(req.getUri());
       List<String> p = queryString.parameters().get(UserParam.NAME);
       String user = (p == null ? null : p.get(0));
@@ -226,12 +209,14 @@ final class HostRestrictingAuthorizationFilterHandler
 
     @Override
     public void proceed() {
+      // 请求通过授权，增加引用计数后转发给下一个处理器
       ReferenceCountUtil.retain(req);
       ctx.fireChannelRead(req);
     }
 
     @Override
     public void sendError(int code, String message) {
+      // 请求被拒绝，返回错误码并关闭连接
       HttpResponseStatus status = new HttpResponseStatus(code, message);
       sendResponseAndClose(ctx, new DefaultHttpResponse(HTTP_1_1, status));
       this.committed = true;

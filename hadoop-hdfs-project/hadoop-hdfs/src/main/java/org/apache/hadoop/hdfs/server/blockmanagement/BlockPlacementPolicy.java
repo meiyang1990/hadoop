@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -39,14 +40,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** 
- * This interface is used for choosing the desired number of targets
- * for placing block replicas.
+ * HDFS 块副本放置策略抽象基类，定义了选择数据节点放置块副本的统一接口规范。
+ * 不同的放置策略实现负责根据集群拓扑、存储类型等条件决定副本的分布位置。
  */
 @InterfaceAudience.Private
 public abstract class BlockPlacementPolicy {
   public static final Logger LOG = LoggerFactory.getLogger(
       BlockPlacementPolicy.class);
 
+  /**
+   * 副本数量不足异常，当无法满足要求的副本数量时抛出该异常。
+   */
   @InterfaceAudience.Private
   public static class NotEnoughReplicasException extends Exception {
     private static final long serialVersionUID = 1L;
@@ -56,20 +60,19 @@ public abstract class BlockPlacementPolicy {
   }
     
   /**
-   * choose <i>numOfReplicas</i> data nodes for <i>writer</i> 
-   * to re-replicate a block with size <i>blocksize</i> 
-   * If not, return as many as we can.
+   * 为块重复制操作选择指定数量的数据节点用于放置新增副本。
+   * 如果无法满足所需数量，则返回尽可能多的可用节点。
    *
-   * @param srcPath the file to which this chooseTargets is being invoked.
-   * @param numOfReplicas additional number of replicas wanted.
-   * @param writer the writer's machine, null if not in the cluster.
-   * @param chosen datanodes that have been chosen as targets.
-   * @param returnChosenNodes decide if the chosenNodes are returned.
-   * @param excludedNodes datanodes that should not be considered as targets.
-   * @param blocksize size of the data to be written.
-   * @param flags Block placement flags.
-   * @return array of DatanodeDescriptor instances chosen as target
-   * and sorted as a pipeline.
+   * @param srcPath 当前块所属的文件路径
+   * @param numOfReplicas 需要新增的副本数量
+   * @param writer 写入节点，写入者不在集群内时为null
+   * @param chosen 已经选择好的目标节点列表
+   * @param returnChosenNodes 是否需要将已选择节点一起返回
+   * @param excludedNodes 需要排除的节点列表，这些节点不能作为目标
+   * @param blocksize 块大小
+   * @param storagePolicy 块存储策略
+   * @param flags 块放置标志位
+   * @return 排序为管道顺序的目标数据节点存储信息数组
    */
   public abstract DatanodeStorageInfo[] chooseTarget(String srcPath,
                                              int numOfReplicas,
@@ -82,9 +85,18 @@ public abstract class BlockPlacementPolicy {
                                              EnumSet<AddBlockFlag> flags);
   
   /**
-   * @param favoredNodes datanodes that should be favored as targets. This
-   *          is only a hint and due to cluster state, namenode may not be 
-   *          able to place the blocks on these datanodes.
+   * 基于优先节点列表选择块副本放置目标节点。
+   * 优先节点仅作为提示，NameNode可能因集群状态无法满足放置要求。
+   *
+   * @param src 当前块所属的文件路径
+   * @param numOfReplicas 需要的副本数量
+   * @param writer 写入节点，写入者不在集群内时为null
+   * @param excludedNodes 需要排除的节点列表
+   * @param blocksize 块大小
+   * @param favoredNodes 优先放置节点列表
+   * @param storagePolicy 块存储策略
+   * @param flags 块放置标志位
+   * @return 排序为管道顺序的目标数据节点存储信息数组
    */
   DatanodeStorageInfo[] chooseTarget(String src,
       int numOfReplicas, Node writer,
@@ -103,7 +115,10 @@ public abstract class BlockPlacementPolicy {
   }
 
   /**
-   * @param storageTypes storage types that should be used as targets.
+   * 基于指定存储类型要求选择块副本放置目标节点。
+   *
+   * @param storageTypes 目标存储类型及对应数量要求
+   * @return 排序为管道顺序的目标数据节点存储信息数组
    */
   public DatanodeStorageInfo[] chooseTarget(String srcPath, int numOfReplicas,
       Node writer, List<DatanodeStorageInfo> chosen, boolean returnChosenNodes,
@@ -114,35 +129,27 @@ public abstract class BlockPlacementPolicy {
   }
 
   /**
-   * Verify if the block's placement meets requirement of placement policy,
-   * i.e. replicas are placed on no less than minRacks racks in the system.
-   * 
-   * @param locs block with locations
-   * @param numOfReplicas replica number of file to be verified
-   * @return the result of verification
+   * 验证现有块副本放置是否满足当前策略要求。
+   * 例如验证副本是否分布在最小要求数量的不同机架上。
+   *
+   * @param locs 当前块的所有副本位置信息
+   * @param numOfReplicas 文件期望的副本数量
+   * @return 验证结果对象，包含是否符合要求及具体状态信息
    */
   public abstract BlockPlacementStatus verifyBlockPlacement(
       DatanodeInfo[] locs, int numOfReplicas);
 
   /**
-   * Select the excess replica storages for deletion based on either
-   * delNodehint/Excess storage types.
+   * 根据节点提示和多余存储类型选择需要删除的超额副本。
+   * 用于副本过量时清理多余副本，维持期望副本数量。
    *
-   * @param availableReplicas
-   *          available replicas
-   * @param delCandidates
-   *          Candidates for deletion. For normal replication, this set is the
-   *          same with availableReplicas. For striped blocks, this set is a
-   *          subset of availableReplicas.
-   * @param expectedNumOfReplicas
-   *          The expected number of replicas remaining in the delCandidates
-   * @param excessTypes
-   *          type of the storagepolicy
-   * @param addedNode
-   *          New replica reported
-   * @param delNodeHint
-   *          Hint for excess storage selection
-   * @return Returns the list of excess replicas chosen for deletion
+   * @param availableReplicas 当前所有可用副本
+   * @param delCandidates 待删除候选副本集合，普通复制与availableReplicas相同，EC条带块是子集
+   * @param expectedNumOfReplicas 删除后剩余期望副本数量
+   * @param excessTypes 需要删除的多余存储类型列表
+   * @param addedNode 新增的副本节点，可为null
+   * @param delNodeHint 优先删除节点提示，可为null
+   * @return 选中需要删除的超额副本存储信息列表
    */
   public abstract List<DatanodeStorageInfo> chooseReplicasToDelete(
       Collection<DatanodeStorageInfo> availableReplicas,
@@ -151,35 +158,37 @@ public abstract class BlockPlacementPolicy {
       DatanodeDescriptor delNodeHint);
 
   /**
-   * Used to setup a BlockPlacementPolicy object. This should be defined by 
-   * all implementations of a BlockPlacementPolicy.
-   * 
-   * @param conf the configuration object
-   * @param stats retrieve cluster status from here
-   * @param clusterMap cluster topology
+   * 初始化块放置策略对象，所有具体实现必须实现该方法。
+   * 在策略对象创建后调用，完成配置加载和依赖初始化。
+   *
+   * @param conf Hadoop配置对象
+   * @param stats 集群状态信息获取接口
+   * @param clusterMap 集群网络拓扑
+   * @param host2datanodeMap 主机到数据节点映射
    */
   protected abstract void initialize(Configuration conf,  FSClusterStats stats,
                                      NetworkTopology clusterMap, 
                                      Host2NodesMap host2datanodeMap);
 
   /**
-   * Check if the move is allowed. Used by balancer and other tools.
+   * 检查副本移动操作是否被当前放置策略允许。
+   * 用于均衡器等工具进行数据负载均衡时的判断。
    *
-   * @param candidates all replicas including source and target
-   * @param source source replica of the move
-   * @param target target replica of the move
+   * @param candidates 包含源和目标的所有副本集合
+   * @param source 移动操作的源副本
+   * @param target 移动操作的目标副本
+   * @return 是否允许移动
    */
   public abstract boolean isMovable(Collection<DatanodeInfo> candidates,
       DatanodeInfo source, DatanodeInfo target);
 
   /**
-   * Adjust rackmap, moreThanOne, and exactlyOne after removing replica on cur.
+   * 在移除选中副本后调整机架分组集合，更新多副本机架和单副本机架列表。
    *
-   * @param rackMap a map from rack to replica
-   * @param moreThanOne The List of replica nodes on rack which has more than 
-   *        one replica
-   * @param exactlyOne The List of replica nodes on rack with only one replica
-   * @param cur current replica to remove
+   * @param rackMap 机架到副本存储列表的映射
+   * @param moreThanOne 包含超过一个副本的机架上的存储列表
+   * @param exactlyOne 仅包含一个副本的机架上的存储列表
+   * @param cur 需要移除的当前副本存储
    */
   public void adjustSetsWithChosenReplica(
       final Map<String, List<DatanodeStorageInfo>> rackMap,
@@ -187,24 +196,39 @@ public abstract class BlockPlacementPolicy {
       final List<DatanodeStorageInfo> exactlyOne,
       final DatanodeStorageInfo cur) {
     
+    // 获取当前副本所在机架
     final String rack = getRack(cur.getDatanodeDescriptor());
+    // 获取该机架下的所有存储列表
     final List<DatanodeStorageInfo> storages = rackMap.get(rack);
+    // 移除当前副本
     storages.remove(cur);
+    // 如果机架下没有存储了，从机架映射中移除该机架
     if (storages.isEmpty()) {
       rackMap.remove(rack);
     }
+    // 如果当前副本原本在多副本机架列表中
     if (moreThanOne.remove(cur)) {
+      // 移除后该机架仅剩一个副本
       if (storages.size() == 1) {
         final DatanodeStorageInfo remaining = storages.get(0);
+        // 从多副本列表移除剩余副本，加入单副本列表
         if (moreThanOne.remove(remaining)) {
           exactlyOne.add(remaining);
         }
       }
     } else {
+      // 当前副本原本在单副本列表，直接移除
       exactlyOne.remove(cur);
     }
   }
 
+  /**
+   * 从输入对象中提取数据节点信息。
+   * 支持直接输入DatanodeInfo或DatanodeStorageInfo两种类型。
+   *
+   * @param datanode 输入对象，可以是DatanodeInfo或DatanodeStorageInfo
+   * @return 提取出的DatanodeInfo对象
+   */
   protected <T> DatanodeInfo getDatanodeInfo(T datanode) {
     Preconditions.checkArgument(
         datanode instanceof DatanodeInfo ||
@@ -218,23 +242,23 @@ public abstract class BlockPlacementPolicy {
   }
 
   /**
-   * Get rack string from a data node
-   * @return rack of data node
+   * 获取数据节点所在机架的网络位置字符串。
+   *
+   * @param datanode 数据节点信息
+   * @return 机架位置字符串
    */
   protected String getRack(final DatanodeInfo datanode) {
     return datanode.getNetworkLocation();
   }
 
   /**
-   * Split data nodes into two sets, one set includes nodes on rack with
-   * more than one  replica, the other set contains the remaining nodes.
+   * 根据机架信息将候选节点拆分到两个集合：所在机架有多个副本的节点集合、所在机架仅有一个副本的节点集合。
    *
-   * @param availableSet all the available DataNodes/storages of the block
-   * @param candidates DatanodeStorageInfo/DatanodeInfo to be split
-   *        into two sets
-   * @param rackMap a map from rack to datanodes
-   * @param moreThanOne contains nodes on rack with more than one replica
-   * @param exactlyOne remains contains the remaining nodes
+   * @param availableSet 块所有可用的节点/存储集合
+   * @param candidates 需要拆分的候选节点/存储集合
+   * @param rackMap 机架到节点/存储列表的映射（输出参数）
+   * @param moreThanOne 输出：所在机架有多个副本的候选节点集合
+   * @param exactlyOne 输出：所在机架仅有一个副本的候选节点集合
    */
   public <T> void splitNodesWithRack(
       final Iterable<T> availableSet,
@@ -242,6 +266,7 @@ public abstract class BlockPlacementPolicy {
       final Map<String, List<T>> rackMap,
       final List<T> moreThanOne,
       final List<T> exactlyOne) {
+    // 第一步：按机架分组所有可用节点
     for(T s: availableSet) {
       final String rackName = getRack(getDatanodeInfo(s));
       List<T> storageList = rackMap.get(rackName);
@@ -251,37 +276,46 @@ public abstract class BlockPlacementPolicy {
       }
       storageList.add(s);
     }
+    // 第二步：将候选节点拆分到两个集合
     for (T candidate : candidates) {
       final String rackName = getRack(getDatanodeInfo(candidate));
       if (rackMap.get(rackName).size() == 1) {
-        // exactlyOne contains nodes on rack with only one replica
+        // 该机架只有一个副本，加入单副本集合
         exactlyOne.add(candidate);
       } else {
-        // moreThanOne contains nodes on rack with more than one replica
+        // 该机架有多个副本，加入多副本集合
         moreThanOne.add(candidate);
       }
     }
   }
 
   /**
-   * Updates the value used for excludeSlowNodesEnabled, which is set by
-   * {@code DFSConfigKeys.DFS_NAMENODE_BLOCKPLACEMENTPOLICY_EXCLUDE_SLOW_NODES_ENABLED_KEY}
-   * initially.
+   * 更新是否排除慢节点的配置项，初始值由配置参数
+   * DFS_NAMENODE_BLOCKPLACEMENTPOLICY_EXCLUDE_SLOW_NODES_ENABLED_KEY指定。
    *
-   * @param enable true, we will filter out slow nodes
-   * when choosing targets for blocks, otherwise false not filter.
+   * @param enable true表示选择块目标节点时过滤慢节点，false不过滤
    */
   public abstract void setExcludeSlowNodesEnabled(boolean enable);
 
+  /**
+   * 获取当前是否排除慢节点的配置值。
+   *
+   * @return 是否排除慢节点
+   */
   public abstract boolean getExcludeSlowNodesEnabled();
 
   /**
-   * Updates the value used for minBlocksForWrite, which is set by
-   * {@code DFSConfigKeys.DFS_NAMENODE_BLOCKPLACEMENTPOLICY_MIN_BLOCKS_FOR_WRITE_KEY}.
+   * 更新允许写入的最小块数量配置，初始值由配置参数
+   * DFS_NAMENODE_BLOCKPLACEMENTPOLICY_MIN_BLOCKS_FOR_WRITE_KEY指定。
    *
-   * @param minBlocksForWrite the minimum number of blocks required for write operations.
+   * @param minBlocksForWrite 写入操作要求的最小块数量
    */
   public abstract void setMinBlocksForWrite(int minBlocksForWrite);
 
+  /**
+   * 获取当前允许写入的最小块数量配置值。
+   *
+   * @return 最小块数量
+   */
   public abstract int getMinBlocksForWrite();
 }

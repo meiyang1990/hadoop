@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,7 @@
  * limitations under the License.
  */
 /**
- * Data node HTTP classes.
+ * HDFS DataNode Web服务相关类包，提供DataNode的HTTP接口支持，
+ * 用于DataNode监控、信息查询等Web层面的功能。
  */
 package org.apache.hadoop.hdfs.server.datanode.web;

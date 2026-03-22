@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,252 +21,243 @@ package org.apache.hadoop.hdfs.server.namenode.metrics;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * 
- * This Interface defines the methods to get the status of a the FSNamesystem of
- * a name node.
- * It is also used for publishing via JMX (hence we follow the JMX naming
- * convention.)
- * 
- * Note we have not used the MetricsDynamicMBeanBase to implement this
- * because the interface for the NameNodeStateMBean is stable and should
- * be published as an interface.
- * 
- * <p>
- * Name Node runtime activity statistic  info is reported in
- * @see org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics
- *
+ * 文件系统名称节点FSNamesystem的JMX MBean接口，用于通过JMX暴露FSNamesystem运行状态指标
+ * 遵循JMX命名规范，对外提供HDFS元数据、存储容量、数据节点状态、块复制等核心统计信息
  */
 @InterfaceAudience.Private
 public interface FSNamesystemMBean {
 
   /**
-   * The state of the file system: Safemode or Operational
-   * @return the state
+   * 获取文件系统当前运行状态
+   * @return 状态名称：安全模式Safemode 或 正常运行Operational
    */
   public String getFSState();
   
   
   /**
-   * Number of allocated blocks in the system
-   * @return -  number of allocated blocks
+   * 获取系统中已分配的数据块总数
+   * @return 已分配块数量
    */
   public long getBlocksTotal();
 
   /**
-   * Total storage capacity
-   * @return -  total capacity in bytes
+   * 获取HDFS集群总存储容量
+   * @return 总容量，单位字节
    */
   public long getCapacityTotal();
 
 
   /**
-   * Free (unused) storage capacity
-   * @return -  free capacity in bytes
+   * 获取HDFS集群剩余未使用存储容量
+   * @return 剩余容量，单位字节
    */
   public long getCapacityRemaining();
  
   /**
-   * Used storage capacity
-   * @return -  used capacity in bytes
+   * 获取HDFS集群已使用存储容量
+   * @return 已使用容量，单位字节
    */
   public long getCapacityUsed();
 
   /**
-   * Total PROVIDED storage capacity.
-   * @return -  total PROVIDED storage capacity in bytes
+   * 获取提供存储（第三方缓存存储）的总容量
+   * @return 提供存储总容量，单位字节
    */
   public long getProvidedCapacityTotal();
 
   /**
-   * Total number of files and directories
-   * @return -  num of files and directories
+   * 获取系统中文件和目录总数量
+   * @return 文件和目录总数
    */
   public long getFilesTotal();
  
   /**
-   * Get aggregated count of all blocks pending to be reconstructed.
-   * @deprecated Use {@link #getPendingReconstructionBlocks()} instead.
+   * 获取待重建块的聚合总数（已废弃）
+   * @deprecated 请使用 {@link #getPendingReconstructionBlocks()} 替代
    */
   @Deprecated
   public long getPendingReplicationBlocks();
 
   /**
-   * Get aggregated count of all blocks pending to be reconstructed.
-   * @return Number of blocks to be replicated.
+   * 获取待重建块的聚合总数
+   * @return 等待复制重建的块数量
    */
   public long getPendingReconstructionBlocks();
 
   /**
-   * Get aggregated count of all blocks with low redundancy.
-   * @deprecated Use {@link #getLowRedundancyBlocks()} instead.
+   * 获取低冗余块的聚合总数（已废弃）
+   * @deprecated 请使用 {@link #getLowRedundancyBlocks()} 替代
    */
   @Deprecated
   public long getUnderReplicatedBlocks();
 
   /**
-   * Get aggregated count of all blocks with low redundancy.
-   * @return Number of blocks with low redundancy.
+   * 获取低冗余块的聚合总数
+   * @return 副本数低于配置要求的块数量
    */
   public long getLowRedundancyBlocks();
 
   /**
-   * Blocks scheduled for replication
-   * @return -  num of blocks scheduled for replication
+   * 获取已调度等待复制的块数量
+   * @return 已调度待复制的块数量
    */
   public long getScheduledReplicationBlocks();
 
   /**
-   * Total Load on the FSNamesystem
-   * @return -  total load of FSNamesystem
+   * 获取FSNamesystem的总负载
+   * @return FSNamesystem总负载值
    */
   public int getTotalLoad();
 
   /**
-   * Number of Live data nodes
-   * @return number of live data nodes
+   * 获取存活数据节点数量
+   * @return 存活DataNode数量
    */
   public int getNumLiveDataNodes();
   
   /**
-   * Number of dead data nodes
-   * @return number of dead data nodes
+   * 获取死亡数据节点数量
+   * @return 死亡DataNode数量
    */
   public int getNumDeadDataNodes();
   
   /**
-   * Number of stale data nodes
-   * @return number of stale data nodes
+   * 获取状态超时（ stale ）数据节点数量
+   * @return 状态超时DataNode数量
    */
   public int getNumStaleDataNodes();
 
   /**
-   * Number of decommissioned Live data nodes
-   * @return number of decommissioned live data nodes
+   * 获取已完成退役且仍存活的数据节点数量
+   * @return 已退役存活DataNode数量
    */
   public int getNumDecomLiveDataNodes();
 
   /**
-   * Number of decommissioned dead data nodes
-   * @return number of decommissioned dead data nodes
+   * 获取已完成退役且死亡的数据节点数量
+   * @return 已退役死亡DataNode数量
    */
   public int getNumDecomDeadDataNodes();
 
   /**
-   * @return Number of in-service data nodes, where NumInServiceDataNodes =
-   * NumLiveDataNodes - NumDecomLiveDataNodes - NumInMaintenanceLiveDataNodes
+   * 获取正常提供服务的存活数据节点数量
+   * 计算公式：NumInServiceDataNodes = NumLiveDataNodes - NumDecomLiveDataNodes - NumInMaintenanceLiveDataNodes
+   * @return 正常服务的存活DataNode数量
    */
   int getNumInServiceLiveDataNodes();
 
   /**
-   * Number of failed data volumes across all live data nodes.
-   * @return number of failed data volumes across all live data nodes
+   * 获取所有存活数据节点中失败磁盘卷的总数
+   * @return 失败磁盘卷总数量
    */
   int getVolumeFailuresTotal();
 
   /**
-   * Returns an estimate of total capacity lost due to volume failures in bytes
-   * across all live data nodes.
-   * @return estimate of total capacity lost in bytes
+   * 获取因磁盘卷故障损失的总容量估算值
+   * @return 损失容量估算值，单位字节
    */
   long getEstimatedCapacityLostTotal();
 
   /**
-   * Number of data nodes that are in the decommissioning state
+   * 获取正在进行退役操作的数据节点数量
+   * @return 正在退役的DataNode数量
    */
   public int getNumDecommissioningDataNodes();
 
   /**
-   * The statistics of snapshots
+   * 获取快照统计信息
+   * @return 快照统计信息字符串
    */
   public String getSnapshotStats();
 
   /**
-   * Return the maximum number of inodes in the file system
+   * 获取文件系统支持的最大inode数量
+   * @return 最大inode数量
    */
   public long getMaxObjects();
 
   /**
-   * Number of blocks pending deletion
-   * @return number of blocks pending deletion
+   * 获取等待删除的块数量
+   * @return 待删除块数量
    */
   long getPendingDeletionBlocks();
 
   /**
-   * Time when block deletions will begin
-   * @return time when block deletions will begin
+   * 获取块删除任务开始时间戳
+   * @return 块删除开始时间（毫秒时间戳）
    */
   long getBlockDeletionStartTime();
 
   /**
-   * Number of content stale storages.
-   * @return number of content stale storages
+   * 获取内容过期存储的数量
+   * @return 内容过期存储数量
    */
   public int getNumStaleStorages();
 
   /**
-   * Returns a nested JSON object listing the top users for different RPC 
-   * operations over tracked time windows.
-   * 
-   * @return JSON string
+   * 获取不同时间窗口内RPC操作排名靠前用户的统计结果
+   * @return 包含Top用户统计的JSON字符串
    */
   public String getTopUserOpCounts();
 
   /**
-   * Return the number of encryption zones in the system.
+   * 获取系统中加密区域的数量
+   * @return 加密区域数量
    */
   int getNumEncryptionZones();
 
   /**
-   * Returns the length of the wait Queue for the FSNameSystemLock.
-   *
-   * A larger number here indicates lots of threads are waiting for
-   * FSNameSystemLock.
-   * @return int - Number of Threads waiting to acquire FSNameSystemLock
+   * 获取FSNamesystem锁的等待队列长度
+   * 数值越大说明越多线程在等待获取FSNamesystem锁，反映元数据操作竞争程度
+   * @return 等待获取FSNamesystem锁的线程数量
    */
   int getFsLockQueueLength();
 
   /**
-   * Return total number of Sync Operations on FSEditLog.
+   * 获取FSEditLog日志同步操作总次数
+   * @return 同步操作总次数
    */
   long getTotalSyncCount();
 
   /**
-   * Return total time spent doing sync operations on FSEditLog.
+   * 获取FSEditLog日志同步操作总耗时统计
+   * @return 同步操作总耗时统计字符串
    */
   String getTotalSyncTimes();
 
   /**
-   * @return Number of IN_MAINTENANCE live data nodes
+   * 获取处于维护模式的存活数据节点数量
+   * @return 维护模式存活DataNode数量
    */
   int getNumInMaintenanceLiveDataNodes();
 
   /**
-   * @return Number of IN_MAINTENANCE dead data nodes
+   * 获取处于维护模式的死亡数据节点数量
+   * @return 维护模式死亡DataNode数量
    */
   int getNumInMaintenanceDeadDataNodes();
 
   /**
-   * @return Number of ENTERING_MAINTENANCE data nodes
+   * 获取正在进入维护模式的数据节点数量
+   * @return 正在进入维护模式的DataNode数量
    */
   int getNumEnteringMaintenanceDataNodes();
 
   /**
-   * Get the current number of delegation tokens in memory.
-   * @return number of DTs
+   * 获取当前内存中保存的代理令牌总数
+   * @return 代理令牌数量
    */
   long getCurrentTokensCount();
 
   /**
-   * Returns the number of paths to be processed by storage policy satisfier.
-   *
-   * @return The number of paths to be processed by sps.
+   * 获取存储策略满足器待处理的路径数量
+   * @return SPS待处理路径数量
    */
   int getPendingSPSPaths();
 
   /**
-   * Get the progress of the reconstruction queues initialisation.
-   *
-   * @return Returns values between 0 and 1 for the progress.
+   * 获取块重建队列初始化进度
+   * @return 初始化进度，范围0到1
    */
   float getReconstructionQueuesInitProgress();
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,7 +19,7 @@
 package org.apache.hadoop.hdfs.server.protocol;
 
 /**
- * Summarizes information about data volume failures on a DataNode.
+ * DataNode节点数据卷故障信息汇总类，用于在DataNode向NameNode上报状态时传递本地卷故障情况
  */
 public class VolumeFailureSummary {
   private final String[] failedStorageLocations;
@@ -26,12 +27,11 @@ public class VolumeFailureSummary {
   private final long estimatedCapacityLostTotal;
 
   /**
-   * Creates a new VolumeFailureSummary.
+   * 构造DataNode卷故障信息汇总对象
    *
-   * @param failedStorageLocations storage locations that have failed
-   * @param lastVolumeFailureDate date/time of last volume failure in
-   *     milliseconds since epoch
-   * @param estimatedCapacityLostTotal estimate of capacity lost in bytes
+   * @param failedStorageLocations 已发生故障的存储位置列表
+   * @param lastVolumeFailureDate 最近一次卷故障发生的时间，单位为从纪元开始的毫秒数
+   * @param estimatedCapacityLostTotal 故障导致损失的总存储容量估计值，单位为字节
    */
   public VolumeFailureSummary(String[] failedStorageLocations,
       long lastVolumeFailureDate, long estimatedCapacityLostTotal) {
@@ -41,30 +41,28 @@ public class VolumeFailureSummary {
   }
 
   /**
-   * Returns each storage location that has failed, sorted.
+   * 获取所有已故障的存储位置列表（已排序）
    *
-   * @return each storage location that has failed, sorted
+   * @return 已故障存储位置数组，已排序
    */
   public String[] getFailedStorageLocations() {
     return this.failedStorageLocations;
   }
 
   /**
-   * Returns the date/time of the last volume failure in milliseconds since
-   * epoch.
+   * 获取最近一次卷故障的时间戳
    *
-   * @return date/time of last volume failure in milliseconds since epoch
+   * @return 最近一次卷故障发生时间，单位为从纪元开始的毫秒数
    */
   public long getLastVolumeFailureDate() {
     return this.lastVolumeFailureDate;
   }
 
   /**
-   * Returns estimate of capacity lost.  This is said to be an estimate, because
-   * in some cases it's impossible to know the capacity of the volume, such as if
-   * we never had a chance to query its capacity before the failure occurred.
+   * 获取故障导致损失的总存储容量估计值
+   * 该值为估计值：如果卷故障发生前未成功获取到容量信息，则无法得到精确值
    *
-   * @return estimate of capacity lost in bytes
+   * @return 损失的总容量估计值，单位为字节
    */
   public long getEstimatedCapacityLostTotal() {
     return this.estimatedCapacityLostTotal;

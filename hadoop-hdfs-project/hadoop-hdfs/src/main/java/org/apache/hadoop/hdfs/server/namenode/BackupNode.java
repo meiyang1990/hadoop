@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,17 +57,14 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.thirdparty.protobuf.BlockingService;
 
 /**
- * BackupNode.
+ * 备份节点（BackupNode），负责同步主NameNode的元数据并生成检查点
  * <p>
- * Backup node can play two roles.
+ * Backup node可以扮演两种角色：
  * <ol>
- * <li>{@link NamenodeRole#CHECKPOINT} node periodically creates checkpoints, 
- * that is downloads image and edits from the active node, merges them, and
- * uploads the new image back to the active.</li>
- * <li>{@link NamenodeRole#BACKUP} node keeps its namespace in sync with the
- * active node, and periodically creates checkpoints by simply saving the
- * namespace image to local disk(s).</li>
+ * <li>{@link NamenodeRole#CHECKPOINT} 检查点节点定期从活跃主节点下载镜像和编辑日志，合并生成新检查点，再将新镜像上传回主节点。</li>
+ * <li>{@link NamenodeRole#BACKUP} 备份节点实时保持命名空间与主节点同步，只需要定期将命名空间保存到本地磁盘即可生成检查点。</li>
  * </ol>
+ * 本类是HDFS元数据备份与检查点机制的核心服务实现，为主NameNode提供元数据冗余备份能力。
  */
 @InterfaceAudience.Private
 @Metrics(context="dfs")
@@ -79,15 +77,21 @@ public class BackupNode extends NameNode {
   private static final float  BN_SAFEMODE_THRESHOLD_PCT_DEFAULT = 1.5f;
   private static final int    BN_SAFEMODE_EXTENSION_DEFAULT = Integer.MAX_VALUE;
 
-  /** Name-node proxy */
+  /** 活跃主NameNode的RPC代理 */
   NamenodeProtocol namenode;
-  /** Name-node RPC address */
+  /** 活跃主NameNode的RPC地址 */
   String nnRpcAddress;
-  /** Name-node HTTP address */
+  /** 活跃主NameNode的HTTP地址 */
   URL nnHttpAddress;
-  /** Checkpoint manager */
+  /** 检查点管理器，负责定期触发检查点流程 */
   Checkpointer checkpointManager;
   
+  /**
+   * 构造BackupNode实例
+   * @param conf Hadoop配置对象
+   * @param role BackupNode角色（CHECKPOINT/BACKUP）
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   BackupNode(Configuration conf, NamenodeRole role) throws IOException {
     super(conf, role);
   }
@@ -131,43 +135,48 @@ public class BackupNode extends NameNode {
 
   @Override // NameNode
   protected void loadNamesystem(Configuration conf) throws IOException {
+    // 覆盖配置：BackupNode始终保持安全模式，阈值设为超过100%确保不会自动退出安全模式
     conf.setFloat(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHOLD_PCT_KEY,
                                 BN_SAFEMODE_THRESHOLD_PCT_DEFAULT);
     conf.setInt(DFSConfigKeys.DFS_NAMENODE_SAFEMODE_EXTENSION_KEY,
                                 BN_SAFEMODE_EXTENSION_DEFAULT);
+    // 创建BackupImage实例，管理备份节点的元数据存储
     BackupImage bnImage = new BackupImage(conf);
+    // 初始化FSNamesystem，加载命名空间
     this.namesystem = new FSNamesystem(conf, bnImage);
+    // 备份节点不需要做配额检查
     namesystem.dir.disableQuotaChecks();
     bnImage.setNamesystem(namesystem);
+    // 恢复并读取现有元数据
     bnImage.recoverCreateRead();
   }
 
   @Override // NameNode
   protected void initialize(Configuration conf) throws IOException {
-    // async edit logs are incompatible with backup node due to race
-    // conditions resulting from laxer synchronization
+    // 由于同步竞态条件，BackupNode不支持异步日志写入，强制关闭
     conf.setBoolean(DFSConfigKeys.DFS_NAMENODE_EDITS_ASYNC_LOGGING, false);
 
-    // Trash is disabled in BackupNameNode,
-    // but should be turned back on if it ever becomes active.
+    // 回收站在BackupNode上禁用，如果未来切换为活跃节点会重新启用
     conf.setLong(CommonConfigurationKeys.FS_TRASH_INTERVAL_KEY, 
                  CommonConfigurationKeys.FS_TRASH_INTERVAL_DEFAULT);
+    // 与主NameNode握手，获取命名空间信息
     NamespaceInfo nsInfo = handshake(conf);
     super.initialize(conf);
+    // 设置块池ID
     namesystem.setBlockPoolId(nsInfo.getBlockPoolID());
 
     if (false == namesystem.isInSafeMode()) {
+      // 强制进入安全模式，BackupNode始终保持安全模式
       namesystem.setSafeMode(SafeModeAction.SAFEMODE_ENTER);
     }
 
-    // Backup node should never do lease recovery,
-    // therefore lease hard limit should never expire.
+    // BackupNode永远不需要做租约恢复，因此将租约硬限设为永不过期
     namesystem.leaseManager.setLeasePeriod(
         HdfsConstants.LEASE_SOFTLIMIT_PERIOD, Long.MAX_VALUE);
 
-    // register with the active name-node 
+    // 向活跃主NameNode注册当前BackupNode
     registerWith(nsInfo);
-    // Checkpoint daemon should start after the rpc server started
+    // RPC服务启动后再启动检查点守护线程
     runCheckpointDaemon(conf);
     InetSocketAddress addr = getHttpAddress();
     if (addr != null) {
@@ -190,19 +199,13 @@ public class BackupNode extends NameNode {
   void stop(boolean reportError) {
    
     if(checkpointManager != null) {
-      // Prevent from starting a new checkpoint.
-      // Checkpoints that has already been started may proceed until 
-      // the error reporting to the name-node is complete.
-      // Checkpoint manager should not be interrupted yet because it will
-      // close storage file channels and the checkpoint may fail with 
-      // ClosedByInterruptException.
+      // 阻止新检查点启动，已开始的检查点会继续执行完成
       checkpointManager.shouldRun = false;
     }
     
-    // reportError is a test hook to simulate backupnode crashing and not
-    // doing a clean exit w.r.t active namenode
+    // reportError用于测试场景，模拟BackupNode异常退出不通知主节点
     if (reportError && namenode != null && getRegistration() != null) {
-      // Exclude this node from the list of backup streams on the name-node
+      // 通知主节点将本节点从备份流列表移除
       try {
         namenode.errorReport(getRegistration(), NamenodeProtocol.FATAL,
             "Shutting down.");
@@ -210,24 +213,23 @@ public class BackupNode extends NameNode {
         LOG.error("Failed to report to name-node.", e);
       }
     }
-    // Stop the RPC client
+    // 停止RPC客户端代理
     if (namenode != null) {
       RPC.stopProxy(namenode);
     }
     namenode = null;
-    // Stop the checkpoint manager
+    // 停止检查点管理器线程
     if(checkpointManager != null) {
       checkpointManager.interrupt();
       checkpointManager = null;
     }
 
-    // Abort current log segment - otherwise the NN shutdown code
-    // will close it gracefully, which is incorrect.
+    // 终止当前日志段，避免正常关闭导致错误
     if (namesystem != null) {
       getFSImage().getEditLog().abortCurrentLogSegment();
     }
 
-    // Stop name-node threads
+    // 调用父类停止基础服务
     super.stop();
   }
   
@@ -237,8 +239,17 @@ public class BackupNode extends NameNode {
     throw new UnsupportedActionException("setSafeMode");
   }
   
+  /**
+   * BackupNode的RPC服务端实现，实现JournalProtocol接收主节点发送的编辑日志
+   */
   static class BackupNodeRpcServer extends NameNodeRpcServer implements
       JournalProtocol {
+    /**
+     * 构造BackupNode RPC服务端
+     * @param conf Hadoop配置对象
+     * @param nn BackupNode实例
+     * @throws IOException 初始化失败时抛出IO异常
+     */
     private BackupNodeRpcServer(Configuration conf, BackupNode nn)
         throws IOException {
       super(conf, nn);
@@ -251,7 +262,7 @@ public class BackupNode extends NameNode {
     }
     
     /** 
-     * Verifies a journal request
+     * 校验来自主节点的日志请求，验证命名空间ID和集群ID一致性
      */
     private void verifyJournalRequest(JournalInfo journalInfo)
         throws IOException {
@@ -306,34 +317,45 @@ public class BackupNode extends NameNode {
   
   //////////////////////////////////////////////////////
   
-
+  /**
+   * 判断启动时是否需要执行检查点
+   * @return 启动时需要执行检查点返回true，否则返回false
+   */
   boolean shouldCheckpointAtStartup() {
     FSImage fsImage = getFSImage();
     if(isRole(NamenodeRole.CHECKPOINT)) {
       assert fsImage.getStorage().getNumStorageDirs() > 0;
+      // 检查点节点如果没有版本文件说明是第一次启动，需要执行检查点
       return ! fsImage.getStorage().getStorageDir(0).getVersionFile().exists();
     }
     
-    // BN always checkpoints on startup in order to get in sync with namespace
+    // 备份节点启动时总是需要执行检查点，确保和主节点命名空间同步
     return true;
   }
 
+  /**
+   * 和主NameNode建立连接并完成握手，版本验证，获取命名空间信息
+   * @param conf Hadoop配置对象
+   * @return 主节点返回的命名空间信息
+   * @throws IOException 握手失败时抛出IO异常
+   */
   private NamespaceInfo handshake(Configuration conf) throws IOException {
-    // connect to name node
+    // 连接主NameNode
     InetSocketAddress nnAddress = NameNode.getServiceAddress(conf, true);
+    // 创建非HA模式下的主NameNode代理
     this.namenode = NameNodeProxies.createNonHAProxy(conf, nnAddress,
         NamenodeProtocol.class, UserGroupInformation.getCurrentUser(),
         true).getProxy();
     this.nnRpcAddress = NetUtils.getHostPortString(nnAddress);
     this.nnHttpAddress = DFSUtil.getInfoServer(nnAddress, conf,
         DFSUtil.getHttpClientScheme(conf)).toURL();
-    // get version and id info from the name-node
+    // 从主节点获取版本和ID信息
     NamespaceInfo nsInfo = null;
     while(!isStopRequested()) {
       try {
         nsInfo = handshake(namenode);
         break;
-      } catch(SocketTimeoutException e) {  // name-node is busy
+      } catch(SocketTimeoutException e) {  // 主节点忙，重试连接
         LOG.info("Problem connecting to server: " + nnAddress);
         try {
           Thread.sleep(1000);
@@ -346,7 +368,9 @@ public class BackupNode extends NameNode {
   }
 
   /**
-   * Start a backup node daemon.
+   * 启动检查点守护线程
+   * @param conf Hadoop配置对象
+   * @throws IOException 启动失败时抛出IO异常
    */
   private void runCheckpointDaemon(Configuration conf) throws IOException {
     checkpointManager = new Checkpointer(conf, this);
@@ -354,147 +378,34 @@ public class BackupNode extends NameNode {
   }
 
   /**
-   * Checkpoint.<br>
-   * Tests may use it to initiate a checkpoint process.
-   * @throws IOException
+   * 触发一次检查点流程，供测试使用
+   * @throws IOException 检查点执行失败抛出IO异常
    */
   void doCheckpoint() throws IOException {
     checkpointManager.doCheckpoint();
   }
 
   /**
-   * Register this backup node with the active name-node.
-   * @param nsInfo namespace information
-   * @throws IOException
+   * 向活跃主NameNode注册当前BackupNode
+   * @param nsInfo 命名空间信息
+   * @throws IOException 注册失败抛出IO异常
    */
   private void registerWith(NamespaceInfo nsInfo) throws IOException {
     BackupImage bnImage = (BackupImage)getFSImage();
     NNStorage storage = bnImage.getStorage();
-    // verify namespaceID
-    if (storage.getNamespaceID() == 0) { // new backup storage
+    // 验证命名空间ID
+    if (storage.getNamespaceID() == 0) { // 新备份存储，初始化存储信息
       storage.setStorageInfo(nsInfo);
       storage.setBlockPoolID(nsInfo.getBlockPoolID());
       storage.setClusterID(nsInfo.getClusterID());
-    } else {
+    } else { // 已有存储，验证信息一致性
       nsInfo.validateStorage(storage);
     }
+    // 初始化编辑日志
     bnImage.initEditLog(StartupOption.REGULAR);
     setRegistration();
     NamenodeRegistration nnReg = null;
     while(!isStopRequested()) {
       try {
-        nnReg = namenode.registerSubordinateNamenode(getRegistration());
-        break;
-      } catch(SocketTimeoutException e) {  // name-node is busy
-        LOG.info("Problem connecting to name-node: " + nnRpcAddress);
-        try {
-          Thread.sleep(1000);
-        } catch (InterruptedException ie) {
-          LOG.warn("Encountered exception ", e);
-        }
-      }
-    }
-
-    String msg = null;
-    if(nnReg == null) // consider as a rejection
-      msg = "Registration rejected by " + nnRpcAddress;
-    else if(!nnReg.isRole(NamenodeRole.NAMENODE)) {
-      msg = "Name-node " + nnRpcAddress + " is not active";
-    }
-    if(msg != null) {
-      msg += ". Shutting down.";
-      LOG.error(msg);
-      throw new IOException(msg); // stop the node
-    }
-    nnRpcAddress = nnReg.getAddress();
-  }
-
-  // TODO: move to a common with DataNode util class
-  private static NamespaceInfo handshake(NamenodeProtocol namenode)
-  throws IOException, SocketTimeoutException {
-    NamespaceInfo nsInfo;
-    nsInfo = namenode.versionRequest();  // throws SocketTimeoutException 
-    String errorMsg = null;
-    // verify build version
-    if( ! nsInfo.getBuildVersion().equals( Storage.getBuildVersion())) {
-      errorMsg = "Incompatible build versions: active name-node BV = " 
-        + nsInfo.getBuildVersion() + "; backup node BV = "
-        + Storage.getBuildVersion();
-      LOG.error(errorMsg);
-      throw new IOException(errorMsg);
-    }
-    assert HdfsServerConstants.NAMENODE_LAYOUT_VERSION == nsInfo.getLayoutVersion() :
-      "Active and backup node layout versions must be the same. Expected: "
-      + HdfsServerConstants.NAMENODE_LAYOUT_VERSION + " actual "+ nsInfo.getLayoutVersion();
-    return nsInfo;
-  }
-
-  @Override
-  protected String getNameServiceId(Configuration conf) {
-    return DFSUtil.getBackupNameServiceId(conf);
-  }
-
-  @Override
-  protected HAState createHAState(Configuration conf) {
-    return new BackupState();
-  }
-
-  @Override // NameNode
-  protected NameNodeHAContext createHAContext() {
-    return new BNHAContext();
-  }
-
-  private class BNHAContext extends NameNodeHAContext {
-    @Override // NameNodeHAContext
-    public void checkOperation(OperationCategory op)
-        throws StandbyException {
-      if (op == OperationCategory.UNCHECKED ||
-          op == OperationCategory.CHECKPOINT) {
-        return;
-      }
-      if (OperationCategory.JOURNAL != op &&
-          !(OperationCategory.READ == op && !isRole(NamenodeRole.CHECKPOINT))) {
-        String msg = "Operation category " + op
-            + " is not supported at " + getRole();
-        throw new StandbyException(msg);
-      }
-    }
-
-    @Override // NameNodeHAContext
-    public void prepareToStopStandbyServices() throws ServiceFailedException {
-    }
-
-    /**
-     * Start services for BackupNode.
-     * <p>
-     * The following services should be muted
-     * (not run or not pass any control commands to DataNodes)
-     * on BackupNode:
-     * {@link LeaseManager.Monitor} protected by SafeMode.
-     * {@link BlockManager.RedundancyMonitor} protected by SafeMode.
-     * {@link HeartbeatManager.Monitor} protected by SafeMode.
-     * {@link DatanodeAdminManager.Monitor} need to prohibit refreshNodes().
-     * {@link PendingReconstructionBlocks.PendingReconstructionMonitor}
-     * harmless, because RedundancyMonitor is muted.
-     */
-    @Override
-    public void startActiveServices() throws IOException {
-      try {
-        namesystem.startActiveServices();
-      } catch (Throwable t) {
-        doImmediateShutdown(t);
-      }
-    }
-
-    @Override
-    public void stopActiveServices() throws IOException {
-      try {
-        if (namesystem != null) {
-          namesystem.stopActiveServices();
-        }
-      } catch (Throwable t) {
-        doImmediateShutdown(t);
-      }
-    }
-  }
-}
+        // 向主节点注册当前下级NameNode
+        nnReg = namenode.registerSubordinate

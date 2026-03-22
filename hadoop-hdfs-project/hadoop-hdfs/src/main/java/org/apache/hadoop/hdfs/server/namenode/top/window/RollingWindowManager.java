@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,6 +38,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * 文件级注释：
+ * 滚动窗口管理器，用于管理一组RollingWindow，为NameNode TOP指标系统提供核心能力，
+ * 支持按操作类型和用户统计请求量，滑动窗口过期清理，并获取当前TOP N用户指标。
+ * 本类是metrics系统获取当前TOP指标的入口接口，通过ConcurrentHashMap和线程安全的RollingWindow保证线程安全。
+ * 
  * A class to manage the set of {@link RollingWindow}s. This class is the
  * interface of metrics system to the {@link RollingWindow}s to retrieve the
  * current top metrics.
@@ -49,8 +55,11 @@ public class RollingWindowManager {
   public static final Logger LOG = LoggerFactory.getLogger(
       RollingWindowManager.class);
 
+  // 滑动窗口总长度，单位毫秒
   private final int windowLenMs;
+  // 每个窗口包含的桶数量，用于分段滑动过期，例如每分钟10个桶
   private final int bucketsPerWindow; // e.g., 10 buckets per minute
+  // 需要返回的TOP用户数量，例如报告TOP 10用户
   private final int topUsersCnt; // e.g., report top 10 metrics
 
   static private class RollingWindowMap extends
@@ -59,6 +68,7 @@ public class RollingWindowManager {
   }
 
   /**
+   * 滚动窗口快照类，保存一个窗口内所有操作类型的TOP用户排名结果。
    * Represents a snapshot of the rolling window. It contains one Op per 
    * operation in the window, with ranked users for each Op.
    */
@@ -89,6 +99,7 @@ public class RollingWindowManager {
   }
 
   /**
+   * 操作统计类，保存一个操作类型下的TOP用户排名和总请求量。
    * Represents an operation within a TopWindow. It contains a ranked 
    * set of the top users for the operation.
    */
@@ -101,6 +112,7 @@ public class RollingWindowManager {
     public Op(String opType, UserCounts users, int limit) {
       this.opType = opType;
       this.users = new ArrayList<>(users);
+      // 按请求量降序排序
       this.users.sort(Collections.reverseOrder());
       this.totalCount = users.getTotal();
       this.limit = limit;
@@ -139,6 +151,7 @@ public class RollingWindowManager {
   }
 
   /**
+   * 用户请求统计类，保存用户名和该用户的请求次数。
    * Represents a user who called an Op within a TopWindow. Specifies the 
    * user and the number of times the user called the operation.
    */
@@ -170,7 +183,7 @@ public class RollingWindowManager {
 
     @Override
     public boolean equals(Object o) {
-      return (o instanceof User) && user.equals(((User)o).user);
+      return (o instanceof User) && user.equals(((User)o).user;
     }
 
     @Override
@@ -179,6 +192,9 @@ public class RollingWindowManager {
     }
   }
 
+  /**
+   * 用户计数集合类，负责累加合并同一用户的请求量，并计算总请求数。
+   */
   private static class UserCounts extends ArrayList<User> {
     private long total = 0;
 
@@ -190,11 +206,13 @@ public class RollingWindowManager {
     public boolean add(User user) {
       long count = user.getCount();
       int i = indexOf(user);
+      // 用户不存在则新增，存在则累加计数
       if (i == -1) {
         super.add(new User(user.getUser(), count));
       } else {
         get(i).add(count);
       }
+      // 累加总请求数
       total += count;
       return true;
     }
@@ -211,6 +229,7 @@ public class RollingWindowManager {
   }
 
   /**
+   * 指标到滚动窗口映射的顶级存储结构：key为操作类型，value为该操作下所有用户的滚动窗口映射。
    * A mapping from each reported metric to its {@link RollingWindowMap} that
    * maintains the set of {@link RollingWindow}s for the users that have
    * operated on that metric.
@@ -218,6 +237,11 @@ public class RollingWindowManager {
   public ConcurrentHashMap<String, RollingWindowMap> metricMap =
       new ConcurrentHashMap<>();
 
+  /**
+   * 构造滚动窗口管理器，从配置中初始化窗口参数并做参数校验。
+   * @param conf Hadoop配置对象
+   * @param reportingPeriodMs 报告周期，即滑动窗口长度，单位毫秒
+   */
   public RollingWindowManager(Configuration conf, int reportingPeriodMs) {
     
     windowLenMs = reportingPeriodMs;
@@ -239,13 +263,12 @@ public class RollingWindowManager {
   }
 
   /**
-   * Called when the metric command is changed by "delta" units at time "time"
-   * via user "user"
+   * 记录一次用户操作指标，更新对应用户对应操作的滚动窗口计数。
    *
-   * @param time the time of the event
-   * @param command the metric that is updated, e.g., the operation name
-   * @param user the user that updated the metric
-   * @param delta the amount of change in the metric, e.g., +1
+   * @param time 事件发生时间戳
+   * @param command 操作类型，即指标名称
+   * @param user 发起操作的用户名
+   * @param delta 计数增量，一般为+1
    */
   public void recordMetric(long time, String command,
       String user, long delta) {
@@ -254,17 +277,17 @@ public class RollingWindowManager {
   }
 
   /**
-   * Take a snapshot of current top users in the past period.
+   * 对当前所有指标生成TOP用户快照，清理过期无请求的窗口，聚合生成结果。
    *
-   * @param time the current time
-   * @return a TopWindow describing the top users for each metric in the 
-   *         window.
+   * @param time 当前时间戳
+   * @return 包含所有操作类型TOP用户统计的窗口快照
    */
   public TopWindow snapshot(long time) {
     TopWindow window = new TopWindow(windowLenMs);
     Set<String> metricNames = metricMap.keySet();
     LOG.debug("iterating in reported metrics, size={} values={}",
         metricNames.size(), metricNames);
+    // 用于聚合所有操作的总请求量
     UserCounts totalCounts = new UserCounts(metricMap.size());
     for (Map.Entry<String, RollingWindowMap> entry : metricMap.entrySet()) {
       String metricName = entry.getKey();
@@ -275,25 +298,25 @@ public class RollingWindowManager {
         totalCounts.addAll(topN);
       }
     }
-    // synthesize the overall total op count with the top users for every op.
+    // 聚合所有操作的TOP用户，生成全操作总统计
     Set<User> topUsers = new HashSet<>();
     for (Op op : window.getOps()) {
       topUsers.addAll(op.getTopUsers());
     }
-    // intersect totals with the top users.
+    // 只保留各操作TOP用户的总计数
     totalCounts.retainAll(topUsers);
-    // allowed to exceed the per-op topUsersCnt to capture total ops for
-    // any user
+    // 添加全操作汇总，不限制TOP数量，允许超过单操作限制以保留所有TOP用户的总统计
     window.addOp(new Op(TopConf.ALL_CMDS, totalCounts, Integer.MAX_VALUE));
     return window;
   }
 
   /**
-   * Calculates the top N users over a time interval.
+   * 计算单个指标的TOP N用户，同时清理过期无请求的用户窗口。
    * 
-   * @param time the current time
-   * @param metricName Name of metric
-   * @return
+   * @param time 当前时间戳
+   * @param metricName 指标/操作类型名称
+   * @param rollingWindows 该指标下所有用户的滚动窗口映射
+   * @return 该指标按请求量排序的用户计数集合
    */
   private UserCounts getTopUsersForMetric(long time, String metricName,
       RollingWindowMap rollingWindows) {
@@ -304,8 +327,9 @@ public class RollingWindowManager {
       Map.Entry<String, RollingWindow> entry = iterator.next();
       String userName = entry.getKey();
       RollingWindow aWindow = entry.getValue();
+      // 获取当前窗口有效时间内的总请求量
       long windowSum = aWindow.getSum(time);
-      // do the gc here
+      // 清理请求量为0的过期窗口，释放内存
       if (windowSum == 0) {
         LOG.debug("gc window of metric: {} userName: {}",
             metricName, userName);
@@ -322,14 +346,16 @@ public class RollingWindowManager {
   }
 
   /**
-   * Get the rolling window specified by metric and user.
+   * 获取指定操作和用户对应的滚动窗口，如果不存在则创建新窗口。
+   * 使用putIfAbsent保证并发安全。
    *
-   * @param metric the updated metric
-   * @param user the user that updated the metric
-   * @return the rolling window
+   * @param metric 指标/操作类型
+   * @param user 用户名
+   * @return 对应操作和用户的滚动窗口实例
    */
   private RollingWindow getRollingWindow(String metric, String user) {
     RollingWindowMap rwMap = metricMap.get(metric);
+    // 操作不存在则创建新映射，并发安全处理
     if (rwMap == null) {
       rwMap = new RollingWindowMap();
       RollingWindowMap prevRwMap = metricMap.putIfAbsent(metric, rwMap);
@@ -341,6 +367,7 @@ public class RollingWindowManager {
     if (window != null) {
       return window;
     }
+    // 用户不存在则创建新窗口，并发安全处理
     window = new RollingWindow(windowLenMs, bucketsPerWindow);
     RollingWindow prevWindow = rwMap.putIfAbsent(user, window);
     if (prevWindow != null) {

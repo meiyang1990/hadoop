@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,36 +28,31 @@ import java.util.Iterator;
 import java.util.LinkedList;
 
 /**
- * A DelimitedImageVisitor generates a text representation of the fsimage,
- * with each element separated by a delimiter string.  All of the elements
- * common to both inodes and inodes-under-construction are included. When 
- * processing an fsimage with a layout version that did not include an 
- * element, such as AccessTime, the output file will include a column
- * for the value, but no value will be included.
+ * 文件级注释：HDFS fsimage离线查看工具的分隔符输出访问者，将fsimage转换为带分隔符的文本格式
  * 
- * Individual block information for each file is not currently included.
- * 
- * The default delimiter is tab, as this is an unlikely value to be included
- * an inode path or other text metadata.  The delimiter value can be via the
- * constructor.
+ * 本类将fsimage中的inode信息输出为文本，每个字段用指定分隔符分隔，包含普通inode和构建中inode的公共字段。
+ * 对于旧版本fsimage中不存在的字段（如访问时间），输出会保留对应列但留空。
+ * 当前不输出每个文件的具体块信息。默认分隔符为制表符，避免与路径文本冲突，可通过构造函数自定义分隔符。
  */
 class DelimitedImageVisitor extends TextWriterImageVisitor {
   private static final String defaultDelimiter = "\t"; 
   
+  // 存储当前处理的嵌套元素栈，用于跟踪元素层级
   final private LinkedList<ImageElement> elemQ = new LinkedList<ImageElement>();
+  // 累计当前文件的总大小（所有块大小之和）
   private long fileSize = 0l;
-  // Elements of fsimage we're interested in tracking
+  // 需要采集并输出的fsimage元素列表，同时决定输出顺序
   private final Collection<ImageElement> elementsToTrack;
-  // Values for each of the elements in elementsToTrack
+  // 存储当前inode各采集元素的值
   private final AbstractMap<ImageElement, String> elements = 
                                             new HashMap<ImageElement, String>();
+  // 字段分隔符
   private final String delimiter;
 
   {
     elementsToTrack = new ArrayList<ImageElement>();
     
-    // This collection determines what elements are tracked and the order
-    // in which they are output
+    // 该列表决定需要输出哪些字段，以及输出顺序
     Collections.addAll(elementsToTrack,  ImageElement.INODE_PATH,
                                          ImageElement.REPLICATION,
                                          ImageElement.MODIFICATION_TIME,
@@ -71,15 +67,33 @@ class DelimitedImageVisitor extends TextWriterImageVisitor {
                                          ImageElement.GROUP_NAME);
   }
   
+  /**
+   * 构造函数，使用默认分隔符输出到指定文件
+   * @param filename 输出文件路径
+   * @throws IOException 输出文件创建失败时抛出
+   */
   public DelimitedImageVisitor(String filename) throws IOException {
     this(filename, false);
   }
 
+  /**
+   * 构造函数，使用默认分隔符，可选择输出到屏幕
+   * @param outputFile 输出文件路径
+   * @param printToScreen 是否打印到屏幕，true打印到屏幕，false输出到文件
+   * @throws IOException 输出文件创建失败时抛出
+   */
   public DelimitedImageVisitor(String outputFile, boolean printToScreen) 
                                                            throws IOException {
     this(outputFile, printToScreen, defaultDelimiter);
   }
   
+  /**
+   * 构造函数，可自定义分隔符和输出位置
+   * @param outputFile 输出文件路径
+   * @param printToScreen 是否打印到屏幕
+   * @param delimiter 自定义字段分隔符
+   * @throws IOException 输出文件创建失败时抛出
+   */
   public DelimitedImageVisitor(String outputFile, boolean printToScreen, 
                                String delimiter) throws IOException {
     super(outputFile, printToScreen);
@@ -88,8 +102,7 @@ class DelimitedImageVisitor extends TextWriterImageVisitor {
   }
 
   /**
-   * Reset the values of the elements we're tracking in order to handle
-   * the next file
+   * 重置当前采集的元素值和文件大小，准备处理下一个inode
    */
   private void reset() {
     elements.clear();
@@ -101,9 +114,10 @@ class DelimitedImageVisitor extends TextWriterImageVisitor {
   
   @Override
   void leaveEnclosingElement() throws IOException {
+    // 弹出当前处理完的闭合元素
     ImageElement elem = elemQ.pop();
 
-    // If we're done with an inode, write out our results and start over
+    // 处理完一个inode（普通或构建中），输出结果并重置状态
     if(elem == ImageElement.INODE || 
        elem == ImageElement.INODE_UNDER_CONSTRUCTION) {
       writeLine();
@@ -113,8 +127,8 @@ class DelimitedImageVisitor extends TextWriterImageVisitor {
   }
 
   /**
-   * Iterate through all the elements we're tracking and, if a value was
-   * recorded for it, write it out.
+   * 将当前采集的所有字段按顺序输出，使用分隔符分隔
+   * @throws IOException 写入失败时抛出
    */
   private void writeLine() throws IOException {
     Iterator<ImageElement> it = elementsToTrack.iterator();
@@ -123,14 +137,17 @@ class DelimitedImageVisitor extends TextWriterImageVisitor {
       ImageElement e = it.next();
       
       String v = null;
+      // 文件大小使用累计计算的结果
       if(e == ImageElement.NUM_BYTES)
         v = String.valueOf(fileSize);
       else
         v = elements.get(e);
       
+      // 输出非空值
       if(v != null)
         write(v);
       
+      // 最后一个字段后不加分隔符
       if(it.hasNext())
         write(delimiter);
     }
@@ -138,14 +155,15 @@ class DelimitedImageVisitor extends TextWriterImageVisitor {
 
   @Override
   void visit(ImageElement element, String value) throws IOException {
-    // Explicitly label the root path
+    // 根inode路径为空，显式替换为/
     if(element == ImageElement.INODE_PATH && value.equals(""))
       value = "/";
     
-    // Special case of file size, which is sum of the num bytes in each block
+    // 文件大小需要累加每个块的大小
     if(element == ImageElement.NUM_BYTES)
       fileSize += Long.parseLong(value);
     
+    // 存储需要采集的元素值（NUM_BYTES单独处理不存储）
     if(elements.containsKey(element) && element != ImageElement.NUM_BYTES)
       elements.put(element, value);
     
@@ -153,20 +171,22 @@ class DelimitedImageVisitor extends TextWriterImageVisitor {
 
   @Override
   void visitEnclosingElement(ImageElement element) throws IOException {
+    // 将嵌套元素压入栈
     elemQ.push(element);
   }
 
   @Override
   void visitEnclosingElement(ImageElement element, ImageElement key,
       String value) throws IOException {
-    // Special case as numBlocks is an attribute of the blocks element
+    // 块数量作为blocks元素的属性需要单独处理
     if(key == ImageElement.NUM_BLOCKS 
         && elements.containsKey(ImageElement.NUM_BLOCKS))
       elements.put(key, value);
     
+    // 将嵌套元素压入栈
     elemQ.push(element);
   }
   
   @Override
-  void start() throws IOException { /* Nothing to do */ }
+  void start() throws IOException { /* 启动阶段无需操作 */ }
 }

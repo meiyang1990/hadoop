@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,13 +39,16 @@ import org.apache.hadoop.util.Preconditions;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMESERVICES;
 
 /**
- * One of the NN NameNodes acting as the target of an administrative command
- * (e.g. failover).
+ * @file NNHAServiceTarget.java
+ * @brief HDFS高可用场景中，表示NameNode作为高可用管理命令的操作目标
+ *
+ * 该类继承自HAServiceTarget，封装了目标NameNode的地址、配置和隔离相关信息，
+ * 供故障转移等高可用管理命令使用，用于对指定NameNode执行管理操作。
  */
 @InterfaceAudience.Private
 public class NNHAServiceTarget extends HAServiceTarget {
 
-  // Keys added to the fencing script environment
+  // 隔离脚本环境中添加的键名
   private static final String NAMESERVICE_ID_KEY = "nameserviceid";
   private static final String NAMENODE_ID_KEY = "namenodeid";
   
@@ -59,12 +63,10 @@ public class NNHAServiceTarget extends HAServiceTarget {
   private boolean autoFailoverEnabled;
 
   /**
-   * Create a NNHAServiceTarget for a namenode.
-   * Look up addresses from configuration.
-   *
-   * @param conf          HDFS configuration.
-   * @param nsId          nsId of this nn.
-   * @param nnId          nnId of this nn.
+   * 构造目标NameNode的高可用服务目标，从配置中查找地址信息
+   * @param conf HDFS配置对象
+   * @param nsId 当前NameNode所属的名称服务ID
+   * @param nnId 当前NameNode的节点ID
    */
   public NNHAServiceTarget(Configuration conf,
       String nsId, String nnId) {
@@ -89,14 +91,12 @@ public class NNHAServiceTarget extends HAServiceTarget {
   }
 
   /**
-   * Create a NNHAServiceTarget for a namenode.
-   * Addresses are provided so we don't need to lookup the config.
-   *
-   * @param conf          HDFS configuration.
-   * @param nsId          nsId of this nn.
-   * @param nnId          nnId of this nn.
-   * @param addr          Provided service address.
-   * @param lifelineAddr  Provided lifeline address.
+   * 构造目标NameNode的高可用服务目标，直接使用提供的地址无需从配置查找
+   * @param conf HDFS配置对象
+   * @param nsId 当前NameNode所属的名称服务ID
+   * @param nnId 当前NameNode的节点ID
+   * @param addr 提供的服务地址
+   * @param lifelineAddr 提供的生命线地址
    */
   public NNHAServiceTarget(Configuration conf,
       String nsId, String nnId,
@@ -109,16 +109,24 @@ public class NNHAServiceTarget extends HAServiceTarget {
     initializeFailoverConfig();
   }
 
+  /**
+   * 初始化目标NameNode的配置，根据nsId和nnId设置对应配置项
+   * @param conf 原始配置对象
+   * @param providedNsId 传入的名称服务ID
+   * @param providedNnId 传入的NameNode节点ID
+   */
   private void initializeNnConfig(Configuration conf,
       String providedNsId, String providedNnId) {
     Preconditions.checkNotNull(providedNnId);
 
     if (providedNsId == null) {
+      // 自动从配置中推断唯一名称服务ID
       providedNsId = DFSUtil.getOnlyNameServiceIdOrNull(conf);
       if (providedNsId == null) {
         String errorString = "Unable to determine the name service ID.";
         String[] dfsNames = conf.getStrings(DFS_NAMESERVICES);
         if ((dfsNames != null) && (dfsNames.length > 1)) {
+          // 多名称服务场景下无法自动推断，提示用户指定
           errorString = "Unable to determine the name service ID. " +
               "This is an HA configuration with multiple name services " +
               "configured. " + DFS_NAMESERVICES + " is set to " +
@@ -128,8 +136,7 @@ public class NNHAServiceTarget extends HAServiceTarget {
       }
     }
 
-    // Make a copy of the conf, and override configs based on the
-    // target node -- not the node we happen to be running on.
+    // 复制配置，根据目标节点覆盖对应配置项，使用目标节点配置而非运行节点配置
     this.targetConf = new HdfsConfiguration(conf);
     NameNode.initializeGenericKeys(targetConf, providedNsId, providedNnId);
 
@@ -137,11 +144,15 @@ public class NNHAServiceTarget extends HAServiceTarget {
     this.nnId = providedNnId;
   }
 
+  /**
+   * 初始化故障转移相关配置，包括自动故障转移、ZKFC地址和隔离器配置
+   */
   private void initializeFailoverConfig() {
     this.autoFailoverEnabled = targetConf.getBoolean(
         DFSConfigKeys.DFS_HA_AUTO_FAILOVER_ENABLED_KEY,
         DFSConfigKeys.DFS_HA_AUTO_FAILOVER_ENABLED_DEFAULT);
     if (autoFailoverEnabled) {
+      // 自动故障转移开启时，获取ZKFC端口并设置地址
       int port = DFSZKFailoverController.getZkfcPort(targetConf);
       if (port != 0) {
         setZkfcPort(port);
@@ -149,26 +160,38 @@ public class NNHAServiceTarget extends HAServiceTarget {
     }
 
     try {
+      // 创建隔离器，用于故障转移时隔离原Active节点
       this.fencer = NodeFencer.create(targetConf,
           DFSConfigKeys.DFS_HA_FENCE_METHODS_KEY);
     } catch (BadFencingConfigurationException e) {
+      // 保存隔离配置错误，后续检查时抛出
       this.fenceConfigError = e;
     }
   }
 
   /**
-   * @return the NN's IPC address.
+   * 获取NameNode的RPC服务地址
+   * @return NameNode IPC地址
    */
   @Override
   public InetSocketAddress getAddress() {
     return addr;
   }
 
+  /**
+   * 获取健康监测使用的生命线地址
+   * @return 生命线RPC地址，可用于独立的健康检查
+   */
   @Override
   public InetSocketAddress getHealthMonitorAddress() {
     return lifelineAddr;
   }
 
+  /**
+   * 获取ZKFC（ZK故障转移控制器）的RPC地址
+   * @return ZKFC地址
+   * @throws IllegalStateException 自动故障转移未开启时抛出
+   */
   @Override
   public InetSocketAddress getZKFCAddress() {
     Preconditions.checkState(autoFailoverEnabled,
@@ -178,12 +201,20 @@ public class NNHAServiceTarget extends HAServiceTarget {
     return zkfcAddr;
   }
   
+  /**
+   * 设置ZKFC端口，构造ZKFC地址
+   * @param port ZKFC端口号
+   */
   void setZkfcPort(int port) {
     assert autoFailoverEnabled;
           
     this.zkfcAddr = new InetSocketAddress(addr.getAddress(), port);
   }
 
+  /**
+   * 检查隔离配置是否合法
+   * @throws BadFencingConfigurationException 配置错误时抛出该异常
+   */
   @Override
   public void checkFencingConfigured() throws BadFencingConfigurationException {
     if (fenceConfigError != null) {
@@ -195,6 +226,10 @@ public class NNHAServiceTarget extends HAServiceTarget {
     }
   }
   
+  /**
+   * 获取隔离器实例
+   * @return 配置好的节点隔离器
+   */
   @Override
   public NodeFencer getFencer() {
     return fencer;
@@ -205,14 +240,26 @@ public class NNHAServiceTarget extends HAServiceTarget {
     return "NameNode at " + (lifelineAddr != null ? lifelineAddr : addr);
   }
 
+  /**
+   * 获取当前目标所属的名称服务ID
+   * @return 名称服务ID
+   */
   public String getNameServiceId() {
     return this.nsId;
   }
   
+  /**
+   * 获取当前目标NameNode的节点ID
+   * @return NameNode节点ID
+   */
   public String getNameNodeId() {
     return this.nnId;
   }
 
+  /**
+   * 添加隔离参数到环境变量，供隔离脚本使用
+   * @param ret 存储参数的Map，参数会添加到该Map中
+   */
   @Override
   protected void addFencingParameters(Map<String, String> ret) {
     super.addFencingParameters(ret);
@@ -221,11 +268,19 @@ public class NNHAServiceTarget extends HAServiceTarget {
     ret.put(NAMENODE_ID_KEY, getNameNodeId());
   }
 
+  /**
+   * 检查是否启用自动故障转移
+   * @return true表示启用自动故障转移，false表示手动故障转移
+   */
   @Override
   public boolean isAutoFailoverEnabled() {
     return autoFailoverEnabled;
   }
 
+  /**
+   * 检查是否支持Observer角色
+   * @return HDFS NameNode支持Observer角色，返回true
+   */
   @Override
   public boolean supportObserver() {
     return true;

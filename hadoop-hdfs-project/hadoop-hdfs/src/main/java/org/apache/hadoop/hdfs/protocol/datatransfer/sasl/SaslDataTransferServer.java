@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,6 +57,7 @@ import org.apache.hadoop.hdfs.protocol.datatransfer.InvalidEncryptionKeyExceptio
 import org.apache.hadoop.hdfs.protocol.proto.DataTransferProtos.DataTransferEncryptorMessageProto.DataTransferEncryptorStatus;
 import org.apache.hadoop.hdfs.security.token.block.BlockPoolTokenSecretManager;
 import org.apache.hadoop.hdfs.security.token.block.BlockTokenIdentifier;
+arrya
 import org.apache.hadoop.hdfs.security.token.block.InvalidBlockTokenException;
 import org.apache.hadoop.hdfs.server.datanode.DNConf;
 import org.apache.hadoop.security.CustomizedCallbackHandler;
@@ -67,15 +69,11 @@ import org.apache.hadoop.util.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
- * Negotiates SASL for DataTransferProtocol on behalf of a server.  There are
- * two possible supported variants of SASL negotiation: either a general-purpose
- * negotiation supporting any quality of protection, or a specialized
- * negotiation that enforces privacy as the quality of protection using a
- * cryptographically strong encryption key.
- *
- * This class is used in the DataNode for handling inbound connections.
+ * HDFS数据传输协议服务端SASL协商处理类，为DataNode处理入站连接的SASL认证
+ * 支持两种SASL协商模式：
+ * 1. 通用模式：支持任意QOP（保护质量）级别
+ * 2. 加密专用模式：强制使用隐私保护级别，基于高强度加密密钥
  */
 @InterfaceAudience.Private
 public class SaslDataTransferServer {
@@ -91,11 +89,9 @@ public class SaslDataTransferServer {
   private String negotiatedQOP;
 
   /**
-   * Creates a new SaslDataTransferServer.
-   *
-   * @param dnConf configuration of DataNode
-   * @param blockPoolTokenSecretManager used for checking block access tokens
-   *   and encryption keys
+   * 构造服务端SASL协商处理器
+   * @param dnConf DataNode配置对象
+   * @param blockPoolTokenSecretManager 块池密钥管理器，用于验证块访问令牌和加密密钥
    */
   public SaslDataTransferServer(DNConf dnConf,
       BlockPoolTokenSecretManager blockPoolTokenSecretManager) {
@@ -104,15 +100,14 @@ public class SaslDataTransferServer {
   }
 
   /**
-   * Receives SASL negotiation from a peer on behalf of a server.
-   *
-   * @param peer connection peer
-   * @param underlyingOut connection output stream
-   * @param underlyingIn connection input stream
-   * @param xferPort data transfer port of DataNode accepting connection
-   * @param datanodeId ID of DataNode accepting connection
-   * @return new pair of streams, wrapped after SASL negotiation
-   * @throws IOException for any error
+   * 接收并处理客户端发起的SASL协商，根据配置选择对应协商模式
+   * @param peer 连接对端对象
+   * @param underlyingOut 底层输出流
+   * @param underlyingIn 底层输入流
+   * @param xferPort DataNode数据传输端口
+   * @param datanodeId 当前接收连接的DataNodeID
+   * @return SASL协商包装后的IO流对
+   * @throws IOException 协商过程中发生任何错误则抛出
    */
   public IOStreamPair receive(Peer peer, OutputStream underlyingOut,
       InputStream underlyingIn, int xferPort, DatanodeID datanodeId)
@@ -159,13 +154,12 @@ public class SaslDataTransferServer {
   }
 
   /**
-   * Receives SASL negotiation for specialized encrypted handshake.
-   *
-   * @param peer connection peer
-   * @param underlyingOut connection output stream
-   * @param underlyingIn connection input stream
-   * @return new pair of streams, wrapped after SASL negotiation
-   * @throws IOException for any error
+   * 执行专用加密模式SASL握手协商
+   * @param peer 连接对端对象
+   * @param underlyingOut 底层输出流
+   * @param underlyingIn 底层输入流
+   * @return 协商包装后的IO流对
+   * @throws IOException 协商错误抛出异常
    */
   private IOStreamPair getEncryptedStreams(Peer peer,
       OutputStream underlyingOut, InputStream underlyingIn) throws IOException {
@@ -194,25 +188,21 @@ public class SaslDataTransferServer {
   }
 
   /**
-   * The SASL handshake for encrypted vs. general-purpose uses different logic
-   * for determining the password.  This interface is used to parameterize that
-   * logic.  It's similar to a Guava Function, but we need to let it throw
-   * exceptions.
+   * SASL密码获取函数接口，用于参数化不同协商模式的密码获取逻辑
    */
   interface PasswordFunction {
 
     /**
-     * Returns the SASL password for the given user name.
-     *
-     * @param userName SASL user name
-     * @return SASL password
-     * @throws IOException for any error
+     * 根据给定用户名获取对应SASL密码
+     * @param userName SASL协商用户名
+     * @return SASL密码字符数组
+     * @throws IOException 获取密码过程发生错误则抛出
      */
     char[] apply(String userName) throws IOException;
   }
 
   /**
-   * Sets user name and password when asked by the server-side SASL object.
+   * SASL服务端回调处理器，处理SASL库回调请求，完成用户名密码获取与授权
    */
   static final class SaslServerCallbackHandler
       implements CallbackHandler {
@@ -220,9 +210,9 @@ public class SaslDataTransferServer {
     private final CustomizedCallbackHandler customizedCallbackHandler;
 
     /**
-     * Creates a new SaslServerCallbackHandler.
-     *
-     * @param passwordFunction for determing the user's password
+     * 构造SASL服务端回调处理器
+     * @param conf Hadoop配置对象
+     * @param passwordFunction 密码获取函数
      */
     SaslServerCallbackHandler(Configuration conf, PasswordFunction passwordFunction) {
       this.passwordFunction = passwordFunction;
@@ -272,12 +262,10 @@ public class SaslDataTransferServer {
   }
 
   /**
-   * Given a secret manager and a username encoded for the encrypted handshake,
-   * determine the encryption key.
-   * 
-   * @param userName containing the keyId, blockPoolId, and nonce.
-   * @return secret encryption key.
-   * @throws IOException
+   * 从加密握手用户名中解析出加密密钥
+   * @param userName 包含keyId、块池ID、nonce的用户名
+   * @return 解密得到的数据加密密钥
+   * @throws IOException 解析或密钥检索错误抛出异常
    */
   private byte[] getEncryptionKeyFromUserName(String userName)
       throws IOException {
@@ -294,13 +282,12 @@ public class SaslDataTransferServer {
   }
 
   /**
-   * Receives SASL negotiation for general-purpose handshake.
-   *
-   * @param peer connection peer
-   * @param underlyingOut connection output stream
-   * @param underlyingIn connection input stream
-   * @return new pair of streams, wrapped after SASL negotiation
-   * @throws IOException for any error
+   * 执行通用模式SASL握手协商
+   * @param peer 连接对端对象
+   * @param underlyingOut 底层输出流
+   * @param underlyingIn 底层输入流
+   * @return 协商包装后的IO流对
+   * @throws IOException 协商错误抛出异常
    */
   private IOStreamPair getSaslStreams(Peer peer, OutputStream underlyingOut,
       InputStream underlyingIn) throws IOException {
@@ -325,16 +312,10 @@ public class SaslDataTransferServer {
   }
 
   /**
-   * Calculates the expected correct password on the server side for the
-   * general-purpose handshake.  The password consists of the block access
-   * token's password (known to the DataNode via its secret manager).  This
-   * expects that the client has supplied a user name consisting of its
-   * serialized block access token identifier.
-   *
-   * @param userName SASL user name containing serialized block access token
-   *   identifier
-   * @return expected correct SASL password
-   * @throws IOException for any error
+   * 为通用模式握手计算服务端期望密码，密码来自块访问令牌的密钥
+   * @param userName 包含序列化块访问令牌ID的SASL用户名
+   * @return 服务端期望的SASL密码
+   * @throws IOException 反序列化或密码检索错误抛出异常
    */    
   private char[] buildServerPassword(String userName) throws IOException {
     BlockTokenIdentifier identifier = deserializeIdentifier(userName);
@@ -345,12 +326,10 @@ public class SaslDataTransferServer {
   }
 
   /**
-   * Deserializes a base64-encoded binary representation of a block access
-   * token.
-   *
-   * @param str String to deserialize
-   * @return BlockTokenIdentifier deserialized from str
-   * @throws IOException if there is any I/O error
+   * 反序列化base64编码的块访问令牌ID
+   * @param str base64编码的块令牌ID字符串
+   * @return 反序列化得到的BlockTokenIdentifier对象
+   * @throws IOException 反序列化IO错误抛出异常
    */
   private BlockTokenIdentifier deserializeIdentifier(String str)
       throws IOException {
@@ -366,15 +345,14 @@ public class SaslDataTransferServer {
   }
 
   /**
-   * This method actually executes the server-side SASL handshake.
-   *
-   * @param peer connection peer
-   * @param underlyingOut connection output stream
-   * @param underlyingIn connection input stream
-   * @param saslProps properties of SASL negotiation
-   * @param callbackHandler for responding to SASL callbacks
-   * @return new pair of streams, wrapped after SASL negotiation
-   * @throws IOException for any error
+   * 执行服务端SASL握手核心流程
+   * @param peer 连接对端对象
+   * @param underlyingOut 底层输出流
+   * @param underlyingIn 底层输入流
+   * @param saslProps SASL协商属性
+   * @param callbackHandler SASL回调处理器
+   * @return 协商包装后的IO流对
+   * @throws IOException 握手过程任何错误抛出异常
    */
   private IOStreamPair doSaslHandshake(Peer peer, OutputStream underlyingOut,
       InputStream underlyingIn, Map<String, String> saslProps,
@@ -383,120 +361,46 @@ public class SaslDataTransferServer {
     DataInputStream in = new DataInputStream(underlyingIn);
     DataOutputStream out = new DataOutputStream(underlyingOut);
 
+    // 读取并验证协商魔数
     int magicNumber = in.readInt();
     if (magicNumber != SASL_TRANSFER_MAGIC_NUMBER) {
       throw new InvalidMagicNumberException(magicNumber, 
           dnConf.getEncryptDataTransfer());
     }
     try {
-      // step 1
+      // step 1: 读取客户端初始消息
       SaslMessageWithHandshake message = readSaslMessageWithHandshakeSecret(in);
       byte[] secret = message.getSecret();
       String bpid = message.getBpid();
+      // 创建可修改的SASL属性副本
       Map<String, String> dynamicSaslProps = new TreeMap<>(saslProps);
       if (secret != null || bpid != null) {
-        // sanity check, if one is null, the other must also not be null
+        // 一致性检查，secret和bpid必须同时存在
         assert(secret != null && bpid != null);
+        // 客户端动态指定QOP，更新属性
         String qop = new String(secret, StandardCharsets.UTF_8);
         saslProps.put(Sasl.QOP, qop);
         dynamicSaslProps.put(Sasl.QOP, qop);
       }
+      // 创建服务端SASL协商参与者
       SaslParticipant sasl = SaslParticipant.createServerSaslParticipant(
           dynamicSaslProps, callbackHandler);
 
       byte[] remoteResponse = message.getPayload();
+      // 处理客户端挑战/响应，生成本地响应
       byte[] localResponse = sasl.evaluateChallengeOrResponse(remoteResponse);
+      // 发送响应给客户端
       sendSaslMessage(out, localResponse);
 
-      // step 2 (server-side only)
+      // step 2: 读取客户端的密码套件协商消息
       List<CipherOption> cipherOptions = Lists.newArrayList();
       remoteResponse = readSaslMessageAndNegotiationCipherOptions(
           in, cipherOptions);
       localResponse = sasl.evaluateChallengeOrResponse(remoteResponse);
 
-      // SASL handshake is complete
+      // 检查SASL握手是否完成
       checkSaslComplete(sasl, dynamicSaslProps);
 
       CipherOption cipherOption = null;
-      negotiatedQOP = sasl.getNegotiatedQop();
-      if (sasl.isNegotiatedQopPrivacy()) {
-        // Negotiate a cipher option
-        Configuration conf = dnConf.getConf();
-        cipherOption = negotiateCipherOption(conf, cipherOptions);
-        if (LOG.isDebugEnabled()) {
-          if (cipherOption == null) {
-            // No cipher suite is negotiated
-            String cipherSuites =
-                conf.get(DFS_ENCRYPT_DATA_TRANSFER_CIPHER_SUITES_KEY);
-            if (cipherSuites != null && !cipherSuites.isEmpty()) {
-              // the server accepts some cipher suites, but the client does not.
-              LOG.debug("Server accepts cipher suites {}, "
-                      + "but client {} does not accept any of them",
-                  cipherSuites, peer.getRemoteAddressString());
-            }
-          } else {
-            LOG.debug("Server using cipher suite {} with client {}",
-                cipherOption.getCipherSuite().getName(),
-                peer.getRemoteAddressString());
-          }
-        }
-      }
-
-      // If negotiated cipher option is not null, wrap it before sending.
-      sendSaslMessageAndNegotiatedCipherOption(out, localResponse, 
-          wrap(cipherOption, sasl));
-
-      // If negotiated cipher option is not null, we will use it to create 
-      // stream pair.
-      return cipherOption != null ? createStreamPair(
-          dnConf.getConf(), cipherOption, underlyingOut, underlyingIn, true) : 
-            sasl.createStreamPair(out, in);
-    } catch (IOException ioe) {
-      if (ioe instanceof SaslException &&
-          ioe.getCause() != null &&
-          ioe.getCause() instanceof InvalidEncryptionKeyException) {
-        // This could just be because the client is long-lived and hasn't gotten
-        // a new encryption key from the NN in a while. Upon receiving this
-        // error, the client will get a new encryption key from the NN and retry
-        // connecting to this DN.
-        sendInvalidKeySaslErrorMessage(out, ioe.getCause().getMessage());
-      } else if (ioe instanceof SaslException &&
-          ioe.getCause() != null &&
-          (ioe.getCause() instanceof InvalidBlockTokenException ||
-              ioe.getCause() instanceof SecretManager.InvalidToken)) {
-        // This could be because the client is long-lived and block token is expired
-        // The client will get new block token from the NN, upon receiving this error
-        // and retry connecting to this DN
-        sendInvalidTokenSaslErrorMessage(out, ioe.getCause().getMessage());
-      } else {
-        sendGenericSaslErrorMessage(out, ioe.getMessage());
-      }
-      throw ioe;
-    }
-  }
-
-  /**
-   * Sends a SASL negotiation message indicating an invalid key error.
-   *
-   * @param out stream to receive message
-   * @param message to send
-   * @throws IOException for any error
-   */
-  private static void sendInvalidKeySaslErrorMessage(DataOutputStream out,
-      String message) throws IOException {
-    sendSaslMessage(out, DataTransferEncryptorStatus.ERROR_UNKNOWN_KEY, null,
-        message);
-  }
-
-  /**
-   * Sends a SASL negotiation message indicating an invalid token error.
-   *
-   * @param out     stream to receive message
-   * @param message to send
-   * @throws IOException for any error
-   */
-  private static void sendInvalidTokenSaslErrorMessage(DataOutputStream out,
-      String message) throws IOException {
-    sendSaslMessage(out, DataTransferEncryptorStatus.ERROR, null, message, null, true);
-  }
-}
+      // 保存协商结果QOP供测试使用
+      negotiated

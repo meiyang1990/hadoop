@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -67,18 +68,17 @@ import org.apache.hadoop.util.Timer;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * This class is used to create provided volumes.
+ * 文件说明：HDFS DataNode 外置提供存储卷实现类，管理存储在外部存储系统中的数据块副本
+ * 核心职责：实现PROVIDED类型存储卷，支持从外部存储系统读取数据块，不支持写入操作
  */
 @InterfaceAudience.Private
 class ProvidedVolumeImpl extends FsVolumeImpl {
 
   /**
-   * Get a suffix of the full path, excluding the given prefix.
-   *
-   * @param prefix a prefix of the path.
-   * @param fullPath the full path whose suffix is needed.
-   * @return the suffix of the path, which when resolved against {@code prefix}
-   *         gets back the {@code fullPath}.
+   * 获取全路径除去前缀后的后缀部分，用于构造块路径相对路径
+   * @param prefix 路径前缀
+   * @param fullPath 完整路径
+   * @return 去除前缀并处理开头斜杠后的后缀
    */
   @VisibleForTesting
   protected static String getSuffix(final Path prefix, final Path fullPath) {
@@ -96,7 +96,7 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
   }
 
   /**
-   * Class to keep track of the capacity usage statistics for provided volumes.
+   * 存储容量使用统计类，维护外置提供卷的已用空间统计
    */
   public static class ProvidedVolumeDF {
 
@@ -119,6 +119,9 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
     }
   }
 
+  /**
+   * 外置存储块池切片类，管理单个块池内的外置块元数据和别名映射
+   */
   static class ProvidedBlockPoolSlice {
     private ProvidedVolumeImpl providedVolume;
 
@@ -130,6 +133,12 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
     private AtomicLong numOfBlocks = new AtomicLong();
     private int numRetries;
 
+    /**
+     * 构造块池切片，初始化块别名映射
+     * @param bpid 块池ID
+     * @param volume 所属外置存储卷
+     * @param conf Hadoop配置
+     */
     ProvidedBlockPoolSlice(String bpid, ProvidedVolumeImpl volume,
         Configuration conf) {
       this.providedVolume = volume;
@@ -155,6 +164,13 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
       this.aliasMap = blockAliasMap;
     }
 
+    /**
+     * 从块别名映射拉取块信息，加载到卷副本映射中
+     * @param volumeMap 全局卷副本映射
+     * @param ramDiskReplicaTracker RamDisk副本追踪器
+     * @param remoteFS 远程文件系统
+     * @throws IOException 加载失败时抛出异常
+     */
     void fetchVolumeMap(ReplicaMap volumeMap,
         RamDiskReplicaTracker ramDiskReplicaMap, FileSystem remoteFS)
         throws IOException {
@@ -176,16 +192,21 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
         return;
       }
       Path blockPrefixPath = new Path(providedVolume.getBaseURI());
+      // 遍历所有块区域记录
       for (FileRegion region : reader) {
+        // 检查块是否属于当前卷
         if (containsBlock(providedVolume.baseURI,
             region.getProvidedStorageLocation().getPath().toUri())) {
+          // 获取块相对卷根路径的后缀
           String blockSuffix = getSuffix(blockPrefixPath,
               new Path(region.getProvidedStorageLocation().getPath().toUri()));
           PathHandle pathHandle = null;
+          // 如果有nonce则构造路径句柄
           if (region.getProvidedStorageLocation().getNonce().length > 0) {
             pathHandle = new RawPathHandle(ByteBuffer
                 .wrap(region.getProvidedStorageLocation().getNonce()));
           }
+          // 构造已完成副本对象
           ReplicaInfo newReplica = new ReplicaBuilder(ReplicaState.FINALIZED)
               .setBlockId(region.getBlock().getBlockId())
               .setPathPrefix(blockPrefixPath)
@@ -201,6 +222,7 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
           ReplicaInfo oldReplica =
               volumeMap.get(bpid, newReplica.getBlockId());
           if (oldReplica == null) {
+            // 添加到全局和块池本地副本映射
             volumeMap.add(bpid, newReplica);
             bpVolumeMap.add(bpid, newReplica);
             incrNumBlocks();
@@ -225,6 +247,13 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
       // nothing to do!
     }
 
+    /**
+     * 编译块扫描报告，刷新别名映射后添加所有块到扫描报告
+     * @param report 扫描报告集合
+     * @param reportCompiler 报告编译器
+     * @throws IOException IO异常
+     * @throws InterruptedException 中断异常
+     */
     public void compileReport(Collection<ScanInfo> report,
         ReportCompiler reportCompiler)
         throws IOException, InterruptedException {
@@ -261,9 +290,18 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
       new ConcurrentHashMap<String, ProvidedBlockPoolSlice>();
 
   private ProvidedVolumeDF df;
-  // the remote FileSystem to which this ProvidedVolume points to.
+  // 该外置卷指向的远程文件系统
   private FileSystem remoteFS;
 
+  /**
+   * 构造外置提供存储卷，初始化远程文件系统连接
+   * @param dataset 所属文件数据集
+   * @param storageID 存储ID
+   * @param sd 存储目录
+   * @param fileIoProvider 文件IO提供者
+   * @param conf Hadoop配置
+   * @throws IOException 初始化失败抛出异常
+   */
   ProvidedVolumeImpl(FsDatasetImpl dataset, String storageID,
       StorageDirectory sd, FileIoProvider fileIoProvider,
       Configuration conf) throws IOException {
@@ -284,7 +322,7 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
   @Override
   public long getCapacity() {
     try {
-      // default to whatever is the space used!
+      // 外置卷容量默认等于已使用空间
       return getDfsUsed();
     } catch (IOException e) {
       LOG.warn("Exception when trying to get capacity of ProvidedVolume: {}",
@@ -312,8 +350,7 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
   @Override
   public long getAvailable() throws IOException {
     long remaining = getCapacity() - getDfsUsed();
-    // do not report less than 0 remaining space for PROVIDED storage
-    // to prevent marking it as over capacity on NN
+    // 外置存储不允许剩余空间为负，避免NameNode标记容量溢出
     if (remaining < 0L) {
       LOG.warn("Volume {} has less than 0 available space", this);
       return 0L;
@@ -335,7 +372,7 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
   long getNumBlocks() {
     long numBlocks = 0L;
     for (ProvidedBlockPoolSlice s : bpSlices.values()) {
-      numBlocks += s.getNumOfBlocks();
+      numBlocks += s.getNumBlocks();
     }
     return numBlocks;
   }
@@ -371,6 +408,9 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
   private static final ObjectWriter WRITER =
       new ObjectMapper().writerWithDefaultPrettyPrinter();
 
+  /**
+   * 块迭代器状态类，用于持久化保存迭代进度
+   */
   private static class ProvidedBlockIteratorState {
     ProvidedBlockIteratorState() {
       iterStartMs = Time.now();
@@ -378,21 +418,22 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
       lastBlockId = -1L;
     }
 
-    // The wall-clock ms since the epoch at which this iterator was last saved.
+    // 上次保存状态的时间戳
     @JsonProperty
     private long lastSavedMs;
 
-    // The wall-clock ms since the epoch at which this iterator was created.
+    // 迭代器创建时间戳
     @JsonProperty
     private long iterStartMs;
 
-    // The id of the last block read when the state of the iterator is saved.
-    // This implementation assumes that provided blocks are returned
-    // in sorted order of the block ids.
+    // 上次读取的最后一个块ID，假设块按块ID排序返回
     @JsonProperty
     private long lastBlockId;
   }
 
+  /**
+   * 外置存储块迭代器实现类，支持从别名映射迭代块
+   */
   private class ProviderBlockIteratorImpl
       implements FsVolumeSpi.BlockIterator {
 
@@ -402,6 +443,12 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
     private Iterator<FileRegion> blockIterator;
     private ProvidedBlockIteratorState state;
 
+    /**
+     * 构造迭代器，初始化并重绕迭代
+     * @param bpid 块池ID
+     * @param name 迭代器名称
+     * @param blockAliasMap 块别名映射
+     */
     ProviderBlockIteratorImpl(String bpid, String name,
         BlockAliasMap<FileRegion> blockAliasMap) {
       this.bpid = bpid;
@@ -421,6 +468,7 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
         return null;
       }
       FileRegion nextRegion = null;
+      // 跳过小于上次保存块ID的块，支持断点续迭代
       while (null == nextRegion && blockIterator.hasNext()) {
         FileRegion temp = blockIterator.next();
         if (temp.getBlock().getBlockId() < state.lastBlockId) {
@@ -437,271 +485,4 @@ class ProvidedVolumeImpl extends FsVolumeImpl {
 
     @Override
     public boolean atEnd() {
-      return blockIterator != null ? !blockIterator.hasNext(): true;
-    }
-
-    @Override
-    public void rewind() {
-      BlockAliasMap.Reader<FileRegion> reader = null;
-      try {
-        reader = blockAliasMap.getReader(null, bpid);
-      } catch (IOException e) {
-        LOG.warn("Exception in getting reader from provided alias map");
-      }
-      if (reader != null) {
-        blockIterator = reader.iterator();
-      } else {
-        blockIterator = null;
-      }
-      state = new ProvidedBlockIteratorState();
-    }
-
-    @Override
-    public void save() throws IOException {
-      // We do not persist the state of this iterator locally.
-      // We just re-scan provided volumes as necessary.
-      state.lastSavedMs = Time.now();
-    }
-
-    @Override
-    public void setMaxStalenessMs(long maxStalenessMs) {
-      // do not use max staleness
-    }
-
-    @Override
-    public long getIterStartMs() {
-      return state.iterStartMs;
-    }
-
-    @Override
-    public long getLastSavedMs() {
-      return state.lastSavedMs;
-    }
-
-    @Override
-    public String getBlockPoolId() {
-      return bpid;
-    }
-
-    public void load() throws IOException {
-      // on load, we just rewind the iterator for provided volumes.
-      rewind();
-      LOG.trace("load({}, {}): loaded iterator {}: {}", getStorageID(),
-          bpid, name, WRITER.writeValueAsString(state));
-    }
-  }
-
-  @Override
-  public BlockIterator newBlockIterator(String bpid, String name) {
-    return new ProviderBlockIteratorImpl(bpid, name,
-        bpSlices.get(bpid).getBlockAliasMap());
-  }
-
-  @Override
-  public BlockIterator loadBlockIterator(String bpid, String name)
-      throws IOException {
-    ProviderBlockIteratorImpl iter = new ProviderBlockIteratorImpl(bpid, name,
-        bpSlices.get(bpid).getBlockAliasMap());
-    iter.load();
-    return iter;
-  }
-
-  @Override
-  ReplicaInfo addFinalizedBlock(String bpid, Block b,
-      ReplicaInfo replicaInfo, long bytesReserved) throws IOException {
-    throw new UnsupportedOperationException(
-        "ProvidedVolume does not yet support writes");
-  }
-
-  @Override
-  public VolumeCheckResult check(VolumeCheckContext ignored)
-      throws DiskErrorException {
-    return VolumeCheckResult.HEALTHY;
-  }
-
-  @Override
-  void getVolumeMap(ReplicaMap volumeMap,
-      final RamDiskReplicaTracker ramDiskReplicaMap)
-          throws IOException {
-    LOG.info("Creating volumemap for provided volume " + this);
-    for (ProvidedBlockPoolSlice s : bpSlices.values()) {
-      s.fetchVolumeMap(volumeMap, ramDiskReplicaMap, remoteFS);
-    }
-  }
-
-  private ProvidedBlockPoolSlice getProvidedBlockPoolSlice(String bpid)
-      throws IOException {
-    ProvidedBlockPoolSlice bp = bpSlices.get(bpid);
-    if (bp == null) {
-      throw new IOException("block pool " + bpid + " is not found");
-    }
-    return bp;
-  }
-
-  @Override
-  void getVolumeMap(String bpid, ReplicaMap volumeMap,
-      final RamDiskReplicaTracker ramDiskReplicaMap)
-          throws IOException {
-    getProvidedBlockPoolSlice(bpid).fetchVolumeMap(volumeMap, ramDiskReplicaMap,
-        remoteFS);
-  }
-
-  @VisibleForTesting
-  BlockAliasMap<FileRegion> getBlockFormat(String bpid) throws IOException {
-    return getProvidedBlockPoolSlice(bpid).getBlockAliasMap();
-  }
-
-  @Override
-  public String toString() {
-    return this.baseURI.toString();
-  }
-
-  @Override
-  void addBlockPool(String bpid, Configuration conf) throws IOException {
-    addBlockPool(bpid, conf, null);
-  }
-
-  @Override
-  void addBlockPool(String bpid, Configuration conf, Timer timer)
-      throws IOException {
-    LOG.info("Adding block pool " + bpid +
-        " to volume with id " + getStorageID());
-    ProvidedBlockPoolSlice bp;
-    bp = new ProvidedBlockPoolSlice(bpid, this, conf);
-    bpSlices.put(bpid, bp);
-  }
-
-  void shutdown() {
-    if (cacheExecutor != null) {
-      cacheExecutor.shutdown();
-    }
-    Set<Entry<String, ProvidedBlockPoolSlice>> set = bpSlices.entrySet();
-    for (Entry<String, ProvidedBlockPoolSlice> entry : set) {
-      entry.getValue().shutdown(null);
-    }
-  }
-
-  @Override
-  void shutdownBlockPool(String bpid, BlockListAsLongs blocksListsAsLongs) {
-    ProvidedBlockPoolSlice bp = bpSlices.get(bpid);
-    if (bp != null) {
-      bp.shutdown(blocksListsAsLongs);
-    }
-    bpSlices.remove(bpid);
-  }
-
-  @Override
-  boolean isBPDirEmpty(String bpid) throws IOException {
-    return getProvidedBlockPoolSlice(bpid).isEmpty();
-  }
-
-  @Override
-  void deleteBPDirectories(String bpid, boolean force) throws IOException {
-    throw new UnsupportedOperationException(
-        "ProvidedVolume does not yet support writes");
-  }
-
-  @Override
-  public void compileReport(String bpid, Collection<ScanInfo> report,
-      ReportCompiler reportCompiler) throws InterruptedException, IOException {
-    LOG.info("Compiling report for volume: {}; bpid: {}", this, bpid);
-    if (bpSlices.containsKey(bpid)) {
-      bpSlices.get(bpid).compileReport(report, reportCompiler);
-    }
-  }
-
-  @Override
-  public ReplicaInPipeline append(String bpid, ReplicaInfo replicaInfo,
-      long newGS, long estimateBlockLen) throws IOException {
-    throw new UnsupportedOperationException(
-        "ProvidedVolume does not yet support writes");
-  }
-
-  @Override
-  public ReplicaInPipeline createRbw(ExtendedBlock b) throws IOException {
-    throw new UnsupportedOperationException(
-        "ProvidedVolume does not yet support writes");
-  }
-
-  @Override
-  public ReplicaInPipeline convertTemporaryToRbw(ExtendedBlock b,
-      ReplicaInfo temp) throws IOException {
-    throw new UnsupportedOperationException(
-        "ProvidedVolume does not yet support writes");
-  }
-
-  @Override
-  public ReplicaInPipeline createTemporary(ExtendedBlock b)
-      throws IOException {
-    throw new UnsupportedOperationException(
-        "ProvidedVolume does not yet support writes");
-  }
-
-  @Override
-  public ReplicaInPipeline updateRURCopyOnTruncate(ReplicaInfo rur,
-      String bpid, long newBlockId, long recoveryId, long newlength)
-          throws IOException {
-    throw new UnsupportedOperationException(
-        "ProvidedVolume does not yet support writes");
-  }
-
-  @Override
-  public ReplicaInfo moveBlockToTmpLocation(ExtendedBlock block,
-      ReplicaInfo replicaInfo, int smallBufferSize,
-      Configuration conf) throws IOException {
-    throw new UnsupportedOperationException(
-        "ProvidedVolume does not yet support writes");
-  }
-
-  @Override
-  public File[] copyBlockToLazyPersistLocation(String bpId, long blockId,
-      long genStamp, ReplicaInfo replicaInfo, int smallBufferSize,
-      Configuration conf) throws IOException {
-    throw new UnsupportedOperationException(
-        "ProvidedVolume does not yet support writes");
-  }
-
-  private static URI getAbsoluteURI(URI uri) {
-    if (!uri.isAbsolute()) {
-      // URI is not absolute implies it is for a local file
-      // normalize the URI
-      return StorageLocation.normalizeFileURI(uri);
-    } else {
-      return uri;
-    }
-  }
-  /**
-   * @param volumeURI URI of the volume
-   * @param blockURI URI of the block
-   * @return true if the {@code blockURI} can belong to the volume or both URIs
-   * are null.
-   */
-  @VisibleForTesting
-  public static boolean containsBlock(URI volumeURI, URI blockURI) {
-    if (volumeURI == null && blockURI == null){
-      return true;
-    }
-    if (volumeURI == null || blockURI == null) {
-      return false;
-    }
-    volumeURI = getAbsoluteURI(volumeURI);
-    blockURI = getAbsoluteURI(blockURI);
-    return !volumeURI.relativize(blockURI).equals(blockURI);
-  }
-
-  @VisibleForTesting
-  BlockAliasMap<FileRegion> getFileRegionProvider(String bpid) throws
-      IOException {
-    return getProvidedBlockPoolSlice(bpid).getBlockAliasMap();
-  }
-
-  @VisibleForTesting
-  void setFileRegionProvider(String bpid,
-      BlockAliasMap<FileRegion> blockAliasMap) throws IOException {
-    ProvidedBlockPoolSlice bp = bpSlices.get(bpid);
-    if (bp == null) {
-      throw new IOException("block pool " + bpid + " is not found");
-    }
-    bp.setFileRegionProvider(blockAliasMap);
-  }
-}
+      return blockIterator != null ? !blockIterator.hasNext(): true

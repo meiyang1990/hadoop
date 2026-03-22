@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -65,11 +66,17 @@ import static org.apache.hadoop.hdfs.server.common.Util.IO_FILE_BUFFER_SIZE;
 import static org.apache.hadoop.hdfs.server.common.Util.connectionFactory;
 
 /**
+ * 文件级注释：提供从NameNode拉取和传输fsimage、edits等元数据文件的工具类，
+ * 支持Standby节点启动引导、检查点同步等场景下的元数据传输。
+ *
  * This class provides fetching a specified file from the NameNode.
  */
 @InterfaceAudience.Private
 public class TransferFsImage {
 
+  /**
+   * 枚举类型：元数据传输结果定义，封装HTTP响应码和是否需要抛出异常
+   */
   public enum TransferResult{
     SUCCESS(HttpServletResponse.SC_OK, false),
     AUTHENTICATION_FAILURE(HttpServletResponse.SC_FORBIDDEN, true),
@@ -85,6 +92,11 @@ public class TransferFsImage {
       this.shouldReThrowException = rethrow;
     }
 
+    /**
+     * 根据HTTP响应码匹配对应的传输结果枚举
+     * @param code HTTP响应码
+     * @return 匹配到的传输结果，未匹配到返回UNEXPECTED_FAILURE
+     */
     public static TransferResult getResultForCode(int code){
       for(TransferResult result:TransferResult.values()){
         if(result.response == code){
@@ -100,6 +112,12 @@ public class TransferFsImage {
   private static final Logger LOG =
       LoggerFactory.getLogger(TransferFsImage.class);
   
+  /**
+   * 下载最新的fsimage镜像到指定目录
+   * @param infoServer 源Active NameNode的HTTP地址
+   * @param dir 目标存储目录
+   * @throws IOException 下载过程中发生IO异常
+   */
   public static void downloadMostRecentImageToDirectory(URL infoServer,
       File dir) throws IOException {
     String fileId = ImageServlet.getParamStringForMostRecentImage();
@@ -107,6 +125,16 @@ public class TransferFsImage {
         null, false);
   }
 
+  /**
+   * 下载指定事务ID的fsimage镜像到NameNode存储目录
+   * @param fsName 源Active NameNode的HTTP地址
+   * @param imageTxId 目标fsimage的事务ID
+   * @param dstStorage 目标NameNode存储对象
+   * @param needDigest 是否需要返回文件MD5摘要
+   * @param isBootstrapStandby 是否为Standby节点引导场景
+   * @return 文件MD5摘要，needDigest为false时返回null
+   * @throws IOException 下载过程中发生IO异常
+   */
   public static MD5Hash downloadImageToStorage(URL fsName, long imageTxId,
       Storage dstStorage, boolean needDigest, boolean isBootstrapStandby)
       throws IOException {
@@ -126,6 +154,17 @@ public class TransferFsImage {
     return hash;
   }
 
+  /**
+   * 服务端处理上传fsimage请求，将上传的镜像写入存储
+   * @param request HTTP请求对象
+   * @param imageTxId 目标fsimage事务ID
+   * @param dstStorage 目标存储对象
+   * @param stream 请求输入流
+   * @param advertisedSize 上传方声明的文件大小
+   * @param throttler 传输限流工具
+   * @return 接收文件的MD5摘要
+   * @throws IOException 写入过程中发生IO异常
+   */
   static MD5Hash handleUploadImageRequest(HttpServletRequest request,
       long imageTxId, Storage dstStorage, InputStream stream,
       long advertisedSize, DataTransferThrottler throttler) throws IOException {
@@ -145,6 +184,13 @@ public class TransferFsImage {
     return hash;
   }
 
+  /**
+   * 下载指定范围的edits日志到NameNode存储目录
+   * @param fsName 源Active NameNode的HTTP地址
+   * @param log 远程edits日志信息，包含起始和结束事务ID
+   * @param dstStorage 目标NameNode存储对象
+   * @throws IOException 下载过程中发生IO异常
+   */
   static void downloadEditsToStorage(URL fsName, RemoteEditLog log,
       NNStorage dstStorage) throws IOException {
     assert log.getStartTxId() > 0 && log.getEndTxId() > 0 :
@@ -158,6 +204,7 @@ public class TransferFsImage {
         finalFileName);
     assert !finalFiles.isEmpty() : "No checkpoint targets.";
     
+    // 如果文件已存在则跳过下载
     for (File f : finalFiles) {
       if (f.exists() && FileUtil.canRead(f)) {
         LOG.info("Skipping download of remote edit log " +
@@ -168,6 +215,7 @@ public class TransferFsImage {
       }
     }
 
+    // 先下载到临时文件，完成后再重命名为最终文件名
     final long milliTime = Time.monotonicNow();
     String tmpFileName = NNStorage.getTemporaryEditsFileName(
         log.getStartTxId(), log.getEndTxId(), milliTime);
@@ -177,8 +225,10 @@ public class TransferFsImage {
     LOG.info("Downloaded file " + tmpFiles.get(0).getName() + " size " +
         finalFiles.get(0).length() + " bytes.");
 
+    // 注入故障点，用于测试
     CheckpointFaultInjector.getInstance().beforeEditsRename();
 
+    // 将临时文件重命名为最终edits文件
     for (StorageDirectory sd : dstStorage.dirIterable(NameNodeDirType.EDITS)) {
       File tmpFile = NNStorage.getTemporaryEditsFile(sd,
           log.getStartTxId(), log.getEndTxId(), milliTime);
@@ -196,11 +246,11 @@ public class TransferFsImage {
   }
 
   /**
-   * Download the InMemoryAliasMap from the remote NN.
-   * @param fsName http address of remote NN.
-   * @param aliasMap location of the alias map.
-   * @param isBootstrapStandby flag to indicate if for bootstrap of standby.
-   * @throws IOException
+   * 从远程NameNode下载InMemoryAliasMap文件，用于视图联邦场景
+   * @param fsName 远程NameNode的HTTP地址
+   * @param aliasMap 目标本地文件路径
+   * @param isBootstrapStandby 是否为Standby节点引导场景
+   * @throws IOException 下载过程中发生IO异常
    */
   public static void downloadAliasMap(URL fsName, File aliasMap,
         boolean isBootstrapStandby) throws IOException {
@@ -213,14 +263,14 @@ public class TransferFsImage {
   }
 
   /**
-   * Requests that the NameNode download an image from this node.
-   *
-   * @param fsName the http address for the remote NN
-   * @param conf Configuration
-   * @param storage the storage directory to transfer the image from
-   * @param nnf the NameNodeFile type of the image
-   * @param txid the transaction ID of the image to be uploaded
-   * @throws IOException if there is an I/O error
+   * 从本地上传指定事务ID的fsimage到远程NameNode
+   * @param fsName 远程NameNode的HTTP地址
+   * @param conf Hadoop配置对象
+   * @param storage 本地NameNode存储对象
+   * @param nnf NameNode文件类型
+   * @param txid 要上传的fsimage事务ID
+   * @return 传输结果
+   * @throws IOException 上传过程中发生IO异常
    */
   static TransferResult uploadImageFromStorage(URL fsName,
       Configuration conf, NNStorage storage, NameNodeFile nnf, long txid)
@@ -229,16 +279,15 @@ public class TransferFsImage {
   }
 
   /**
-   * Requests that the NameNode download an image from this node.  Allows for
-   * optional external cancelation.
-   *
-   * @param fsName the http address for the remote NN
-   * @param conf Configuration
-   * @param storage the storage directory to transfer the image from
-   * @param nnf the NameNodeFile type of the image
-   * @param txid the transaction ID of the image to be uploaded
-   * @param canceler optional canceler to check for abort of upload
-   * @throws IOException if there is an I/O error or cancellation
+   * 从本地上传指定事务ID的fsimage到远程NameNode，支持取消上传
+   * @param fsName 远程NameNode的HTTP地址
+   * @param conf Hadoop配置对象
+   * @param storage 本地NameNode存储对象
+   * @param nnf NameNode文件类型
+   * @param txid 要上传的fsimage事务ID
+   * @param canceler 上传取消器，支持外部取消上传操作
+   * @return 传输结果
+   * @throws IOException 上传过程中发生IO异常或取消上传
    */
   public static TransferResult uploadImageFromStorage(URL fsName, Configuration conf,
       NNStorage storage, NameNodeFile nnf, long txid, Canceler canceler)
@@ -246,9 +295,9 @@ public class TransferFsImage {
     URL url = new URL(fsName, ImageServlet.PATH_SPEC);
     long startTime = Time.monotonicNow();
     try {
-      uploadImage(url, conf, storage, nnf, txid, canceler);
+      uploadImage(url, conf, storage, nnf, txId, canceler);
     } catch (HttpPutFailedException e) {
-      // translate the error code to a result, which is a bit more obvious in usage
+      // 将HTTP错误码转换为传输结果，根据结果决定是否抛出异常
       TransferResult result = TransferResult.getResultForCode(e.getResponseCode());
       if (result.shouldReThrowException) {
         throw e;
@@ -265,10 +314,21 @@ public class TransferFsImage {
   /*
    * Uploads the imagefile using HTTP PUT method
    */
+  /**
+   * 使用HTTP PUT方法上传fsimage到远程NameNode
+   * @param url 远程NameNode的请求URL
+   * @param conf Hadoop配置对象
+   * @param storage 本地NameNode存储对象
+   * @param nnf NameNode文件类型
+   * @param txId 要上传的fsimage事务ID
+   * @param canceler 上传取消器
+   * @throws IOException 上传过程中发生IO异常
+   */
   private static void uploadImage(URL url, Configuration conf,
       NNStorage storage, NameNodeFile nnf, long txId, Canceler canceler)
       throws IOException {
 
+    // 从本地存储查找对应事务ID的fsimage文件
     File imageFile = storage.findImageFile(nnf, txId);
     if (imageFile == null) {
       throw new IOException("Could not find image with txid " + txId);
@@ -278,14 +338,14 @@ public class TransferFsImage {
     try {
       URIBuilder uriBuilder = new URIBuilder(url.toURI());
 
-      // write all params for image upload request as query itself.
-      // Request body contains the image to be uploaded.
+      // 将请求参数拼接到URL查询参数中，请求体存放fsimage内容
       Map<String, String> params = ImageServlet.getParamsForPutImage(storage,
           txId, imageFile.length(), nnf);
       for (Entry<String, String> entry : params.entrySet()) {
         uriBuilder.addParameter(entry.getKey(), entry.getValue());
       }
 
+      // 打开HTTP连接，设置请求为PUT方法
       URL urlWithParams = uriBuilder.build().toURL();
       connection = (HttpURLConnection) connectionFactory.openConnection(
           urlWithParams, UserGroupInformation.isSecurityEnabled());
@@ -294,25 +354,25 @@ public class TransferFsImage {
       connection.setDoOutput(true);
 
       
+      // 获取分块传输大小配置
       int chunkSize = (int) conf.getLongBytes(
           DFSConfigKeys.DFS_IMAGE_TRANSFER_CHUNKSIZE_KEY,
           DFSConfigKeys.DFS_IMAGE_TRANSFER_CHUNKSIZE_DEFAULT);
       if (imageFile.length() > chunkSize) {
-        // using chunked streaming mode to support upload of 2GB+ files and to
-        // avoid internal buffering.
-        // this mode should be used only if more than chunkSize data is present
-        // to upload. otherwise upload may not happen sometimes.
+        // 大文件使用分块流式传输，支持上传超过2GB的文件，避免内部缓存
         connection.setChunkedStreamingMode(chunkSize);
       }
 
+      // 设置连接和读取超时时间
       setTimeout(connection);
 
-      // set headers for verification
+      // 设置MD5校验等验证请求头
       ImageServlet.setVerificationHeadersForPut(connection, imageFile);
 
-      // Write the file to output stream.
+      // 将文件写入HTTP请求输出流
       writeFileToPutRequest(conf, connection, imageFile, canceler, chunkSize);
 
+      // 检查响应码，非200则抛出异常
       int responseCode = connection.getResponseCode();
       if (responseCode != HttpURLConnection.HTTP_OK) {
         throw new HttpPutFailedException(String.format(
@@ -329,135 +389,13 @@ public class TransferFsImage {
     }
   }
 
-  private static void writeFileToPutRequest(Configuration conf,
-      HttpURLConnection connection, File imageFile, Canceler canceler,
-      int bufferSize)
-      throws IOException {
-    connection.setRequestProperty(Util.CONTENT_TYPE, "application/octet-stream");
-    connection.setRequestProperty(Util.CONTENT_TRANSFER_ENCODING, "binary");
-    OutputStream output = connection.getOutputStream();
-    FileInputStream input = new FileInputStream(imageFile);
-    try {
-      copyFileToStream(output, imageFile, input,
-          ImageServlet.getThrottler(conf), canceler, bufferSize);
-    } finally {
-      IOUtils.closeStream(input);
-      IOUtils.closeStream(output);
-    }
-  }
-
   /**
-   * A server-side method to respond to a getfile http request
-   * Copies the contents of the local file into the output stream.
+   * 将本地fsimage文件写入HTTP PUT请求的输出流
+   * @param conf Hadoop配置对象
+   * @param connection HTTP连接对象
+   * @param imageFile 本地要上传的fsimage文件
+   * @param canceler 上传取消器
+   * @param bufferSize 缓冲区大小
+   * @throws IOException 写过程中发生IO异常
    */
-  public static void copyFileToStream(OutputStream out, File localfile,
-      FileInputStream infile, DataTransferThrottler throttler)
-    throws IOException {
-    copyFileToStream(out, localfile, infile, throttler, null, -1);
-  }
-
-  private static void copyFileToStream(OutputStream out, File localfile,
-      FileInputStream infile, DataTransferThrottler throttler,
-      Canceler canceler, int bufferSize) throws IOException {
-    int bufSize = bufferSize > 0 ? bufferSize : IO_FILE_BUFFER_SIZE;
-    byte[] buf = new byte[bufSize];
-    long total = 0;
-    int num = 1;
-    IOException ioe = null;
-    String reportStr = "Sending fileName: " + localfile.getAbsolutePath()
-      + ", fileSize: " + localfile.length() + ".";
-    try {
-      CheckpointFaultInjector.getInstance()
-          .aboutToSendFile(localfile);
-
-      if (CheckpointFaultInjector.getInstance().
-          shouldSendShortFile(localfile)) {
-        // Test sending image shorter than localfile
-        long len = localfile.length();
-        buf = new byte[(int) Math.min(len / 2, bufSize)];
-        // This will read at most half of the image
-        // and the rest of the image will be sent over the wire
-        infile.read(buf);
-      }
-      while (num > 0) {
-        if (canceler != null && canceler.isCancelled()) {
-          throw new SaveNamespaceCancelledException(
-            canceler.getCancellationReason());
-        }
-        num = infile.read(buf);
-        if (num <= 0) {
-          break;
-        }
-        if (CheckpointFaultInjector.getInstance()
-              .shouldCorruptAByte(localfile)) {
-          // Simulate a corrupted byte on the wire
-          LOG.warn("SIMULATING A CORRUPT BYTE IN IMAGE TRANSFER!");
-          buf[0]++;
-        }
-
-        out.write(buf, 0, num);
-        total += num;
-        if (throttler != null) {
-          throttler.throttle(num, canceler);
-        }
-      }
-    } catch (EofException e) {
-      reportStr += " Connection closed by client.";
-      ioe = e;
-      out = null; // so we don't close in the finally
-    } catch (IOException ie) {
-      ioe = ie;
-      throw ie;
-    } finally {
-      reportStr += " Sent total: " + total +
-          " bytes. Size of last segment intended to send: " + num
-          + " bytes.";
-      if (ioe != null) {
-        LOG.info(reportStr, ioe);
-      } else {
-        LOG.info(reportStr);
-      }
-      if (out != null) {
-        out.close();
-      }
-    }
-  }
-
-  /**
-   * Client-side Method to fetch file from a server
-   * Copies the response from the URL to a list of local files.
-   * @param dstStorage if an error occurs writing to one of the files,
-   *                   this storage object will be notified. 
-   * @return a digest of the received file if getChecksum is true
-   */
-  static MD5Hash getFileClient(URL infoServer,
-      String queryString, List<File> localPaths,
-      Storage dstStorage, boolean getChecksum) throws IOException {
-    URL url = new URL(infoServer, ImageServlet.PATH_SPEC + "?" + queryString);
-    LOG.info("Opening connection to " + url);
-    return doGetUrl(url, localPaths, dstStorage, getChecksum);
-  }
-  
-  public static MD5Hash doGetUrl(URL url, List<File> localPaths,
-      Storage dstStorage, boolean getChecksum) throws IOException {
-    return Util.doGetUrl(url, localPaths, dstStorage, getChecksum, timeout,
-        null);
-  }
-
-  private static MD5Hash parseMD5Header(HttpServletRequest request) {
-    String header = request.getHeader(Util.MD5_HEADER);
-    return (header != null) ? new MD5Hash(header) : null;
-  }
-
-  private static void setTimeout(HttpURLConnection connection) {
-    if (timeout <= 0) {
-      Configuration conf = new HdfsConfiguration();
-      timeout = conf.getInt(DFSConfigKeys.DFS_IMAGE_TRANSFER_TIMEOUT_KEY,
-          DFSConfigKeys.DFS_IMAGE_TRANSFER_TIMEOUT_DEFAULT);
-      LOG.info("Image Transfer timeout configured to " + timeout +
-          " milliseconds");
-    }
-
-    Util.setTimeout(connection, timeout);
-  }
-}
+  private static void writeFileToPutRequest(

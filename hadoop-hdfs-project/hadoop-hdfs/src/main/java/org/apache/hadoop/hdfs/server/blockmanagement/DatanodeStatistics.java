@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,64 +23,118 @@ import java.util.Map;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 
-/** Datanode statistics */
+/**
+ * Datanode统计信息接口，定义了获取HDFS集群所有DataNode聚合统计信息的方法。
+ * 用于提供集群容量、存储使用、心跳等全局统计数据，支撑监控显示和资源调度决策。
+ */
 public interface DatanodeStatistics {
 
-  /** @return the total capacity */
+  /**
+   * 获取所有在线DataNode的总存储容量。
+   * @return 总容量，单位字节
+   */
   public long getCapacityTotal();
 
-  /** @return the used capacity */
+  /**
+   * 获取所有在线DataNode已使用的存储容量。
+   * @return 已使用容量，单位字节
+   */
   public long getCapacityUsed();
 
-  /** @return the percentage of the used capacity over the total capacity. */
+  /**
+   * 获取已使用容量占总容量的百分比。
+   * @return 已使用容量百分比
+   */
   public float getCapacityUsedPercent();
 
-  /** @return the remaining capacity */
+  /**
+   * 获取所有在线DataNode剩余的存储容量。
+   * @return 剩余容量，单位字节
+   */
   public long getCapacityRemaining();
 
-  /** @return the percentage of the remaining capacity over the total capacity. */
+  /**
+   * 获取剩余容量占总容量的百分比。
+   * @return 剩余容量百分比
+   */
   public float getCapacityRemainingPercent();
 
-  /** @return the block pool used. */
+  /**
+   * 获取块池已使用的存储容量。
+   * @return 块池已使用容量，单位字节
+   */
   public long getBlockPoolUsed();
 
-  /** @return the percentage of the block pool used space over the total capacity. */
+  /**
+   * 获取块池已使用容量占总容量的百分比。
+   * @return 块池已使用容量百分比
+   */
   public float getPercentBlockPoolUsed();
   
-  /** @return the total cache capacity of all DataNodes */
+  /**
+   * 获取所有DataNode的总缓存容量。
+   * @return 总缓存容量，单位字节
+   */
   public long getCacheCapacity();
 
-  /** @return the total cache used by all DataNodes */
+  /**
+   * 获取所有DataNode已使用的缓存容量。
+   * @return 已使用缓存容量，单位字节
+   */
   public long getCacheUsed();
 
-  /** @return the xceiver count */
+  /**
+   * 获取当前所有DataNode的数据传输线程数总和。
+   * @return 数据传输线程总数
+   */
   public int getXceiverCount();
 
-  /** @return average xceiver count for non-decommission(ing|ed) nodes */
+  /**
+   * 获取在线（非退役/已退役）DataNode的数据传输线程平均数。
+   * @return 在线节点平均数据传输线程数
+   */
   public int getInServiceXceiverCount();
   
-  /** @return number of non-decommission(ing|ed) nodes */
+  /**
+   * 获取在线（非退役/已退役）DataNode的数量。
+   * @return 在线DataNode节点数量
+   */
   public int getNumDatanodesInService();
 
-  /** @return average xceiver count for writable volumes. */
-  int getInServiceAvailableVolumeCount();
   /**
-   * @return the total used space by data nodes for non-DFS purposes
-   * such as storing temporary files on the local file system
+   * 获取在线节点可写卷的平均数量。
+   * @return 在线节点平均可写卷数量
+   */
+  int getInServiceAvailableVolumeCount();
+
+  /**
+   * 获取DataNode上非DFS用途占用的存储容量（比如本地临时文件等）。
+   * @return 非DFS使用的容量，单位字节
    */
   public long getCapacityUsedNonDFS();
 
-  /** The same as {@link ClientProtocol#getStats()}.
-   * The block related entries are set to -1.
+  /**
+   * 获取兼容ClientProtocol的统计数组，块相关统计项设为-1。
+   * 兼容旧版本客户端获取集群统计信息的接口。
+   * @return 统计数组，格式与ClientProtocol.getStats()保持一致
    */
   public long[] getStats();
 
-  /** @return the expired heartbeats */
+  /**
+   * 获取过期心跳的数量，即错过心跳上报的节点数量。
+   * @return 过期心跳数量
+   */
   public int getExpiredHeartbeats();
 
-  /** @return Storage Tier statistics*/
+  /**
+   * 获取不同存储层级的统计信息。
+   * @return 存储类型到对应统计信息的映射
+   */
   Map<StorageType, StorageTypeStats> getStorageTypeStats();
 
-  /** @return the provided capacity */
+  /**
+   * 获取所有DataNode提供的外部存储总容量。
+   * @return 外部提供的总容量，单位字节
+   */
   public long getProvidedCapacity();
 }

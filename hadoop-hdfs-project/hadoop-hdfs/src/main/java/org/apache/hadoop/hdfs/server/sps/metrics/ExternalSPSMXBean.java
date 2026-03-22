@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,35 +19,37 @@
 package org.apache.hadoop.hdfs.server.sps.metrics;
 
 import org.apache.hadoop.classification.InterfaceAudience;
-import org.apache.hadoop.classification.InterfaceStability;
+org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This is the JMX management interface for ExternalSPS information.
- * End users shouldn't be implementing these interfaces, and instead
- * access this information through the JMX APIs.
+ * External SPS（外部存储策略满足器）的JMX管理接口，用于暴露监控指标。
+ * 终端用户不应该自行实现该接口，应通过JMX API获取对应监控信息。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public interface ExternalSPSMXBean {
 
   /**
-   * Gets the queue size of StorageMovementNeeded.
+   * 获取需要存储移动任务的处理队列长度。
+   * 该指标反映当前积压等待处理的移动任务数量，用于监控系统负载。
    *
-   * @return the queue size of StorageMovementNeeded.
+   * @return 需要存储移动任务的处理队列长度
    */
   int getProcessingQueueSize();
 
   /**
-   * Gets the count of movement finished blocks.
+   * 获取已完成移动的块总数。
+   * 该指标反映SPS累计完成的数据块存储移动任务量，用于统计处理进度。
    *
-   * @return the count of movement finished blocks.
+   * @return 已完成移动的数据块总数
    */
   int getMovementFinishedBlocksCount();
 
   /**
-   * Gets the count of attempted items.
+   * 获取已尝试处理的移动任务总数。
+   * 该指标包含成功和失败的尝试，用于统计总处理吞吐量和计算成功率。
    *
-   * @return the count of attempted items.
+   * @return 已尝试处理的移动任务总数
    */
   int getAttemptedItemsCount();
 }

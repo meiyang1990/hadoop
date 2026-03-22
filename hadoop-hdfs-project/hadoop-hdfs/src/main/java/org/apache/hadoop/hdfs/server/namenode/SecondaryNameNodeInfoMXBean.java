@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,45 +22,51 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * JMX information of the secondary NameNode
+ * SecondaryNameNode的JMX监控信息MXBean接口
+ * 提供SecondaryNameNode运行状态指标的JMX暴露能力，供监控系统集成
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface SecondaryNameNodeInfoMXBean extends VersionInfoMXBean {
   /**
-   * Gets the host and port colon separated.
+   * 获取SecondaryNameNode的主机地址与端口，格式为"主机:端口"
+   * @return 冒号分隔的主机地址和端口字符串
    */
   public String getHostAndPort();
 
   /**
-   * Gets if security is enabled.
-   *
-   * @return true, if security is enabled.
+   * 获取是否开启安全认证
+   * @return true表示安全认证已启用，false表示未启用
    */
   boolean isSecurityEnabled();
 
   /**
-   * @return the timestamp of when the SNN starts
+   * 获取SecondaryNameNode启动时间戳
+   * @return SecondaryNameNode启动时间的毫秒时间戳
    */
   public long getStartTime();
 
   /**
-   * @return the timestamp of the last checkpoint
+   * 获取上一次检查点完成的时间戳
+   * @return 上一次检查点操作完成的毫秒时间戳
    */
   public long getLastCheckpointTime();
 
   /**
-   * @return the number of msec since the last checkpoint, or -1 if no
-   * checkpoint has been done yet.
+   * 获取距离上一次检查点经过的时间
+   * @return 距离上一次检查点的毫秒数，若未进行过检查点则返回-1
    */
   public long getLastCheckpointDeltaMs();
 
   /**
-   * @return the directories that store the checkpoint images
+   * 获取存储检查点镜像的目录列表
+   * @return 存储检查点镜像的目录路径数组
    */
   public String[] getCheckpointDirectories();
+
   /**
-   * @return the directories that store the edit logs
+   * 获取存储检查点编辑日志的目录列表
+   * @return 存储编辑日志的目录路径数组
    */
   public String[] getCheckpointEditlogDirectories();
 }

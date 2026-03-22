@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,30 +18,19 @@
  */
 
 /**
- * Planner takes a DiskBalancerVolumeSet, threshold and
- * computes a series of steps that lead to an even data
- * distribution between volumes of this DiskBalancerVolumeSet.
+ * HDFS磁盘均衡器的规划器包，负责生成磁盘间数据均衡的移动计划。
  *
- * The main classes of this package are steps and planner.
+ * 核心职责：接收DataNode上一组磁盘的使用情况，根据设定的均衡阈值，
+ * 迭代生成一系列数据移动步骤，最终让这组磁盘的数据分布达到均衡状态。
  *
- * Here is a high level view of how planner operates:
- *
- * DiskBalancerVolumeSet current = volumeSet;
- *
- * while(current.isBalancingNeeded(thresholdValue)) {
- *
- *   // Creates a plan , like move 20 GB data from v1 {@literal ->} v2
- *   Step step = planner.plan(current, thresholdValue);
- *
- *   // we add that to our plan
- *   planner.addStep(current, step);
- *
- *   // Apply the step to current state of the diskSet to
- *   //compute the next state
- *   current = planner.apply(current, step);
- * }
- *
- * //when we are done , return the list of steps
- * return planner;
+ * 规划器核心工作流程：
+ * <ol>
+ * <li>检查当前磁盘集合是否需要均衡，如果已经满足均衡条件则停止规划</li>
+ * <li>基于当前磁盘使用率分布，生成单步数据移动计划（确定源磁盘、目标磁盘和移动数据量）</li>
+ * <li>将该步骤添加到整体计划中</li>
+ * <li>更新磁盘集合的状态，模拟执行该步骤后的磁盘使用率变化</li>
+ * <li>重复上述过程，直到达到均衡条件或无法继续优化</li>
+ * </ol>
+ * 本包是HDFS磁盘均衡器的核心规划逻辑模块，最终生成的计划会被均衡执行器执行，完成实际数据移动。
  */
 package org.apache.hadoop.hdfs.server.diskbalancer.planner;

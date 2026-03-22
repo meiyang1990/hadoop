@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,15 +22,24 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * A DropSPSWorkCommand is an instruction to a datanode to drop the SPSWorker's
- * pending block storage movement queues.
+ * 文件所属模块：HDFS服务端协议
+ * 核心职责：定义名称节点下发给数据节点的删除SPS待处理任务命令，用于停止正在进行的块存储移动任务
+ *
+ * 该类表示NameNode通知DataNode清理SPSWorker中待处理的块存储移动队列的命令，
+ * SPS是HDFS中存储策略满足器(Storage Policy Satisfier)，负责执行块的存储层迁移任务。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class DropSPSWorkCommand extends DatanodeCommand {
+  /**
+   * 全局单例命令实例，NameNode下发命令时复用该实例
+   */
   public static final DropSPSWorkCommand DNA_DROP_SPS_WORK_COMMAND =
       new DropSPSWorkCommand();
 
+  /**
+   * 构造删除SPS待处理任务命令，注册对应命令类型
+   */
   public DropSPSWorkCommand() {
     super(DatanodeProtocol.DNA_DROP_SPS_WORK_COMMAND);
   }

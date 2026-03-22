@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,10 +33,8 @@ import java.util.EnumSet;
 import java.util.HashMap;
 
 /**
- * The HDFS-specific representation of a network topology inner node. The
- * difference is this class includes the information about the storage type
- * info of this subtree. This info will be used when selecting subtrees
- * in block placement.
+ * HDFS特定的网络拓扑内层节点实现。在通用网络拓扑节点基础上增加了子树存储类型统计信息，
+ * 该信息用于数据块放置时选择合适的拓扑子树，满足数据放置的存储类型要求。
  */
 public class DFSTopologyNodeImpl extends InnerNodeImpl {
 
@@ -45,6 +44,9 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
   static final InnerNodeImpl.Factory FACTORY
       = new DFSTopologyNodeImpl.Factory();
 
+  /**
+   * DFSTopologyNodeImpl节点工厂，负责创建HDFS特定拓扑内层节点实例
+   */
   static final class Factory extends InnerNodeImpl.Factory {
     private Factory() {}
 
@@ -55,36 +57,16 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
   }
 
   /**
-   * The core data structure of this class. The information about what storage
-   * types this subtree has. Basically, a map whose key is a child
-   * id, value is a enum map including the counts of each storage type. e.g.
-   * DISK type has count 5 means there are 5 leaf datanodes with DISK type
-   * available. This value is set/updated upon datanode joining and leaving.
-   *
-   * NOTE : It might be sufficient to keep only a map from storage type
-   * to count, omitting the child node id. But this might make it hard to keep
-   * consistency when there are updates from children.
-   *
-   * For example, if currently R has two children A and B with storage X, Y, and
-   * A : X=1 Y=1
-   * B : X=2 Y=2
-   * so we store X=3 Y=3 as total on R.
-   *
-   * Now say A has a new X plugged in and becomes X=2 Y=1.
-   *
-   * If we know that "A adds one X", it is easy to update R by +1 on X. However,
-   * if we don't know "A adds one X", but instead got "A now has X=2 Y=1",
-   * (which seems to be the case in current heartbeat) we will not know how to
-   * update R. While if we store on R "A has X=1 and Y=1" then we can simply
-   * update R by completely replacing the A entry and all will be good.
+   * 当前节点下所有子节点的存储类型统计。
+   * 键为子节点ID，值为该子节点下各存储类型的数据节点数量统计。
+   * 存储每个子节点独立的统计信息保证更新一致性，当子节点存储信息变化时可以快速更新当前节点统计。
    */
   private final HashMap
       <String, EnumMap<StorageType, Integer>> childrenStorageInfo;
 
   /**
-   * This map stores storage type counts of the subtree. We can always get this
-   * info by iterate over the childrenStorageInfo variable. But for optimization
-   * purpose, we store this info directly to avoid the iteration.
+   * 当前节点整个子树的各存储类型总数据节点数量统计。
+   * 缓存该统计信息避免每次查询都遍历所有子节点，优化查询性能。
    */
   private final EnumMap<StorageType, Integer> storageTypeCounts;
 
@@ -101,6 +83,11 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
     storageTypeCounts = new EnumMap<>(StorageType.class);
   }
 
+  /**
+   * 获取当前子树中指定存储类型的可用数据节点总数
+   * @param type 存储类型
+   * @return 指定存储类型的数据节点总数，不存在则返回0
+   */
   public int getSubtreeStorageCount(StorageType type) {
     if (storageTypeCounts.containsKey(type)) {
       return storageTypeCounts.get(type);
@@ -109,8 +96,12 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
     }
   }
 
+  /**
+   * 增加指定存储类型的总计数
+   * @param type 存储类型
+   */
   private void incStorageTypeCount(StorageType type) {
-    // no locking because the caller is synchronized already
+    // 调用方已经持有锁，无需额外加锁
     if (storageTypeCounts.containsKey(type)) {
       storageTypeCounts.put(type, storageTypeCounts.get(type)+1);
     } else {
@@ -118,8 +109,12 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
     }
   }
 
+  /**
+   * 减少指定存储类型的总计数
+   * @param type 存储类型
+   */
   private void decStorageTypeCount(StorageType type) {
-    // no locking because the caller is synchronized already
+    // 调用方已经持有锁，无需额外加锁
     int current = storageTypeCounts.get(type);
     current -= 1;
     if (current == 0) {
@@ -130,23 +125,13 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
   }
 
   /**
-   * Called when add() is called to add a node that already exist.
-   *
-   * In normal execution, nodes are added only once and this should not happen.
-   * However if node restarts, we may run into the case where the same node
-   * tries to add itself again with potentially different storage type info.
-   * In this case this method will update the meta data according to the new
-   * storage info.
-   *
-   * Note that it is important to also update all the ancestors if we do have
-   * updated the local node storage info.
-   *
-   * @param dnDescriptor the node that is added another time, with potentially
-   *                     different storage types.
+   * 更新已存在数据节点的存储类型信息。当数据节点重启后存储类型发生变化时调用该方法，
+   * 更新当前节点及所有祖先节点的存储类型统计。
+   * @param dnDescriptor 重新添加的数据节点描述符，可能包含新的存储类型信息
    */
   private void updateExistingDatanode(DatanodeDescriptor dnDescriptor) {
     if (childrenStorageInfo.containsKey(dnDescriptor.getName())) {
-      // all existing node should have an entry in childrenStorageInfo
+      // 先检查存储类型集合是否发生变化
       boolean same = dnDescriptor.getStorageTypes().size()
           == childrenStorageInfo.get(dnDescriptor.getName()).keySet().size();
       for (StorageType type :
@@ -154,18 +139,15 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
         same = same && dnDescriptor.hasStorageType(type);
       }
       if (same) {
-        // if the storage type hasn't been changed, do nothing.
+        // 存储类型无变化，直接返回
         return;
       }
-      // not same means we need to update the storage info.
+      // 存储类型发生变化，需要逐层更新统计
       DFSTopologyNodeImpl parent = (DFSTopologyNodeImpl)getParent();
+      // 移除数据节点已不再持有的存储类型统计
       for (StorageType type :
           childrenStorageInfo.get(dnDescriptor.getName()).keySet()) {
         if (!dnDescriptor.hasStorageType(type)) {
-          // remove this type, because the new storage info does not have it.
-          // also need to remove decrement the count for all the ancestors.
-          // since this is the parent of n, where n is a datanode,
-          // the map must have 1 as the value of all keys
           childrenStorageInfo.get(dnDescriptor.getName()).remove(type);
           decStorageTypeCount(type);
           if (parent != null) {
@@ -173,11 +155,10 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
           }
         }
       }
+      // 新增数据节点新增持有的存储类型统计
       for (StorageType type : dnDescriptor.getStorageTypes()) {
         if (!childrenStorageInfo.get(dnDescriptor.getName())
             .containsKey(type)) {
-          // there is a new type in new storage info, add this locally,
-          // as well as all ancestors.
           childrenStorageInfo.get(dnDescriptor.getName()).put(type, 1);
           incStorageTypeCount(type);
           if (parent != null) {
@@ -196,18 +177,19 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
           + ", which is located at " + n.getNetworkLocation()
           + ", is not a descendant of " + getPath(this));
     }
-    // In HDFS topology, the leaf node should always be DatanodeDescriptor
+    // HDFS拓扑的叶子节点必须是DatanodeDescriptor
     if (!(n instanceof DatanodeDescriptor)) {
       throw new IllegalArgumentException("Unexpected node type "
           + n.getClass().getName());
     }
     DatanodeDescriptor dnDescriptor = (DatanodeDescriptor) n;
     if (isParent(n)) {
-      // this node is the parent of n; add n directly
+      // 当前节点是n的直接父节点，直接添加n作为子节点
       n.setParent(this);
       n.setLevel(this.level + 1);
       Node prev = childrenMap.put(n.getName(), n);
       if (prev != null) {
+        // 节点已存在，更新存储信息并返回
         for(int i=0; i<children.size(); i++) {
           if (children.get(i).getName().equals(n.getName())) {
             children.set(i, n);
@@ -216,6 +198,7 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
           }
         }
       }
+      // 添加新节点，更新存储统计
       children.add(n);
       numOfLeaves++;
       if (!childrenStorageInfo.containsKey(dnDescriptor.getName())) {
@@ -228,18 +211,19 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
       }
       return true;
     } else {
-      // find the next ancestor node
+      // 找到下一层祖先节点，递归添加
       String parentName = getNextAncestorName(n);
       InnerNode parentNode = (InnerNode)childrenMap.get(parentName);
       if (parentNode == null) {
-        // create a new InnerNode
+        // 下一层节点不存在，创建新的拓扑节点
         parentNode = createParentNode(parentName);
         children.add(parentNode);
         childrenMap.put(parentNode.getName(), parentNode);
       }
-      // add n to the subtree of the next ancestor node
+      // 递归添加节点到子树
       if (parentNode.add(n)) {
         numOfLeaves++;
+        // 更新当前节点存储统计
         if (!childrenStorageInfo.containsKey(parentNode.getName())) {
           childrenStorageInfo.put(
               parentNode.getName(), new EnumMap<>(StorageType.class));
@@ -273,6 +257,11 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
   }
 
 
+  /**
+   * 创建下一层拓扑父节点
+   * @param parentName 父节点名称
+   * @return 新建的DFSTopologyNodeImpl实例
+   */
   private DFSTopologyNodeImpl createParentNode(String parentName) {
     return new DFSTopologyNodeImpl(
         parentName, getPath(this), this, this.getLevel() + 1);
@@ -296,20 +285,21 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
           + ", which is located at " + n.getNetworkLocation()
           + ", is not a descendant of " + getPath(this));
     }
-    // In HDFS topology, the leaf node should always be DatanodeDescriptor
+    // HDFS拓扑的叶子节点必须是DatanodeDescriptor
     if (!(n instanceof DatanodeDescriptor)) {
       throw new IllegalArgumentException("Unexpected node type "
           + n.getClass().getName());
     }
     DatanodeDescriptor dnDescriptor = (DatanodeDescriptor) n;
     if (isParent(n)) {
-      // this node is the parent of n; remove n directly
+      // 当前节点是n的直接父节点，直接移除n
       if (childrenMap.containsKey(n.getName())) {
         for (int i=0; i<children.size(); i++) {
           if (children.get(i).getName().equals(n.getName())) {
             children.remove(i);
             childrenMap.remove(n.getName());
             childrenStorageInfo.remove(dnDescriptor.getName());
+            // 更新存储统计
             for (StorageType st : dnDescriptor.getStorageTypes()) {
               decStorageTypeCount(st);
             }
@@ -321,17 +311,16 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
       }
       return false;
     } else {
-      // find the next ancestor node: the parent node
+      // 找到下一层祖先节点，递归移除
       String parentName = getNextAncestorName(n);
       DFSTopologyNodeImpl parentNode =
           (DFSTopologyNodeImpl)childrenMap.get(parentName);
       if (parentNode == null) {
         return false;
       }
-      // remove n from the parent node
       boolean isRemoved = parentNode.remove(n);
       if (isRemoved) {
-        // if the parent node has no children, remove the parent node too
+        // 更新当前节点存储统计
         EnumMap<StorageType, Integer> currentCount =
             childrenStorageInfo.get(parentNode.getName());
         EnumSet<StorageType> toRemove = EnumSet.noneOf(StorageType.class);
@@ -348,6 +337,7 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
         for (StorageType st : dnDescriptor.getStorageTypes()) {
           decStorageTypeCount(st);
         }
+        // 如果子节点已经没有任何孩子，移除该子节点
         if (parentNode.getNumOfChildren() == 0) {
           for(int i=0; i < children.size(); i++) {
             if (children.get(i).getName().equals(parentName)) {
@@ -365,50 +355,41 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
   }
 
   /**
-   * Called by a child node of the current node to increment a storage count.
-   *
-   * lock is needed as different datanodes may call recursively to modify
-   * the same parent.
-   * TODO : this may not happen at all, depending on how heartheat is processed
-   * @param childName the name of the child that tries to add the storage type
-   * @param type the type being incremented.
+   * 子节点新增存储类型时，递归更新当前节点及所有祖先节点的存储统计。
+   * 该方法由子节点调用，用于向上传播存储类型变化。
+   * @param childName 新增存储类型的子节点名称
+   * @param type 新增的存储类型
    */
   public synchronized void childAddStorage(
       String childName, StorageType type) {
     LOG.debug("child add storage: {}:{}", childName, type);
-    // childrenStorageInfo should definitely contain this node already
-    // because updateStorage is called after node added
+    // 子节点必须已经存在于childrenStorageInfo中
     Preconditions.checkArgument(childrenStorageInfo.containsKey(childName));
     EnumMap<StorageType, Integer> typeCount =
         childrenStorageInfo.get(childName);
+    // 更新子节点存储计数
     if (typeCount.containsKey(type)) {
       typeCount.put(type, typeCount.get(type) + 1);
     } else {
-      // Please be aware that, the counts are always "number of datanodes in
-      // this subtree" rather than "number of storages in this storage".
-      // so if the caller is a datanode, it should always be this branch rather
-      // than the +1 branch above. This depends on the caller in
-      // DatanodeDescriptor to make sure only when a *new* storage type is added
-      // it calls this. (should not call this when a already existing storage
-      // is added).
-      // but no such restriction for inner nodes.
       typeCount.put(type, 1);
     }
+    // 更新当前节点总计数
     if (storageTypeCounts.containsKey(type)) {
       storageTypeCounts.put(type, storageTypeCounts.get(type) + 1);
     } else {
       storageTypeCounts.put(type, 1);
     }
+    // 递归向上更新祖先节点
     if (getParent() != null) {
       ((DFSTopologyNodeImpl)getParent()).childAddStorage(getName(), type);
     }
   }
 
   /**
-   * Called by a child node of the current node to decrement a storage count.
-   *
-   * @param childName the name of the child removing a storage type.
-   * @param type the type being removed.
+   * 子节点移除存储类型时，递归更新当前节点及所有祖先节点的存储统计。
+   * 该方法由子节点调用，用于向上传播存储类型变化。
+   * @param childName 移除存储类型的子节点名称
+   * @param type 移除的存储类型
    */
   public synchronized void childRemoveStorage(
       String childName, StorageType type) {
@@ -417,17 +398,20 @@ public class DFSTopologyNodeImpl extends InnerNodeImpl {
     EnumMap<StorageType, Integer> typeCount =
         childrenStorageInfo.get(childName);
     Preconditions.checkArgument(typeCount.containsKey(type));
+    // 更新子节点存储计数
     if (typeCount.get(type) > 1) {
       typeCount.put(type, typeCount.get(type) - 1);
     } else {
       typeCount.remove(type);
     }
+    // 更新当前节点总计数
     Preconditions.checkArgument(storageTypeCounts.containsKey(type));
     if (storageTypeCounts.get(type) > 1) {
       storageTypeCounts.put(type, storageTypeCounts.get(type) - 1);
     } else {
       storageTypeCounts.remove(type);
     }
+    // 递归向上更新祖先节点
     if (getParent() != null) {
       ((DFSTopologyNodeImpl)getParent()).childRemoveStorage(getName(), type);
     }

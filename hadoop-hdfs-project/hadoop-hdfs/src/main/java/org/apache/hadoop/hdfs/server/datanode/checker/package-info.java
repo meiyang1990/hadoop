@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,11 @@
  */
 
 /**
- * Datanode support for running disk checks.
+ * @package org.apache.hadoop.hdfs.server.datanode.checker
+ * @brief HDFS DataNode磁盘健康检查模块
+ * 
+ * 该包提供DataNode节点磁盘的健康检查能力，用于定期检测存储磁盘的可用性和健康状态，
+ * 及时发现坏盘、磁盘IO错误等问题，保障HDFS数据存储的可靠性。
  */
 @InterfaceAudience.LimitedPrivate({"HDFS"})
 @InterfaceStability.Evolving

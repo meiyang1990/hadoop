@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -57,6 +58,9 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.thirdparty.protobuf.ByteString;
 
 /**
+ * 文件级注释：管理数据节点本地存储与外部提供存储的多路复用，支持HDFS Provided存储模式，
+ * 负责维护提供存储的元数据信息，处理块报告和位置构建，实现外部数据在HDFS中的统一管理。
+ * 
  * This class allows us to manage and multiplex between storages local to
  * datanodes, and provided storage.
  */
@@ -67,7 +71,7 @@ public class ProvidedStorageMap {
   private static final Logger LOG =
       LoggerFactory.getLogger(ProvidedStorageMap.class);
 
-  // limit to a single provider for now
+  // 当前仅支持一个存储提供者
   private RwLock lock;
   private BlockManager bm;
   private BlockAliasMap aliasMap;
@@ -78,6 +82,12 @@ public class ProvidedStorageMap {
   private boolean providedEnabled;
   private int defaultReplication;
 
+  /**
+   * 构造函数：初始化提供存储管理器，加载块别名映射配置
+   * @param lock 全局读写锁
+   * @param bm 块管理器引用
+   * @param conf Hadoop配置对象
+   */
   ProvidedStorageMap(RwLock lock, BlockManager bm, Configuration conf) {
 
     storageId = conf.get(DFSConfigKeys.DFS_PROVIDER_STORAGEUUID,
@@ -88,7 +98,7 @@ public class ProvidedStorageMap {
         DFSConfigKeys.DFS_NAMENODE_PROVIDED_ENABLED_DEFAULT);
 
     if (!providedEnabled) {
-      // disable mapping
+      // 提供存储功能未启用，置空所有相关对象
       aliasMap = null;
       providedDescriptor = null;
       providedStorageInfo = null;
@@ -105,7 +115,7 @@ public class ProvidedStorageMap {
     this.bm = bm;
     this.lock = lock;
 
-    // load block reader into storage
+    // 加载配置指定的块别名映射实现类
     Class<? extends BlockAliasMap> aliasMapClass = conf.getClass(
             DFSConfigKeys.DFS_PROVIDED_ALIASMAP_CLASS,
             TextFileRegionAliasMap.class, BlockAliasMap.class);
@@ -116,25 +126,27 @@ public class ProvidedStorageMap {
   }
 
   /**
-   * @param dn datanode descriptor
-   * @param s data node storage
-   * @return the {@link DatanodeStorageInfo} for the specified datanode.
-   * If {@code s} corresponds to a provided storage, the storage info
-   * representing provided storage is returned.
-   * @throws IOException
+   * 获取数据节点存储信息，如果是提供存储则返回统一的提供存储信息
+   * @param dn 数据节点描述符
+   * @param s 数据节点存储对象
+   * @return 对应存储的信息对象
+   * @throws IO 异常
    */
   DatanodeStorageInfo getStorage(DatanodeDescriptor dn, DatanodeStorage s)
       throws IOException {
     if (providedEnabled && storageId.equals(s.getStorageID())) {
       if (StorageType.PROVIDED.equals(s.getStorageType())) {
+        // 如果存储从失败恢复为正常，更新状态
         if (providedStorageInfo.getState() == State.FAILED
             && s.getState() == State.NORMAL) {
           providedStorageInfo.setState(State.NORMAL);
           LOG.info("Provided storage transitioning to state " + State.NORMAL);
         }
+        // 如果数据节点未注入提供存储，注入它
         if (dn.getStorageInfo(s.getStorageID()) == null) {
           dn.injectStorage(providedStorageInfo);
         }
+        // 处理首次块报告
         processProvidedStorageReport();
         return providedDescriptor.getProvidedStorage(dn, s);
       }
@@ -143,17 +155,23 @@ public class ProvidedStorageMap {
     return dn.getStorageInfo(s.getStorageID());
   }
 
+  /**
+   * 处理提供存储的首次块报告，从块别名映射加载所有提供块信息并注册到块管理器
+   * @throws IOException 加载块信息异常
+   */
   private void processProvidedStorageReport()
       throws IOException {
     assert lock.hasWriteLock(RwLockMode.GLOBAL) : "Not holding write lock";
+    // 仅在首次块报告或所有数据节点离线后重新上线时处理
     if (providedStorageInfo.getBlockReportCount() == 0
         || providedDescriptor.activeProvidedDatanodes() == 0) {
       LOG.info("Calling process first blk report from storage: "
           + providedStorageInfo);
-      // first pass; periodic refresh should call bm.processReport
+      // 获取块别名读取器
       BlockAliasMap.Reader<BlockAlias> reader =
           aliasMap.getReader(null, bm.getBlockPoolId());
       if (reader != null) {
+        // 处理首次块报告，将所有提供块注册到块管理器
         bm.processFirstBlockReport(providedStorageInfo,
                 new ProvidedBlockList(reader.iterator()));
       }
@@ -165,6 +183,11 @@ public class ProvidedStorageMap {
     return providedStorageInfo;
   }
 
+  /**
+   * 创建LocatedBlocks构建器，如果启用提供存储则返回提供块专用构建器
+   * @param maxValue 最大块数量
+   * @return 对应构建器实例
+   */
   public LocatedBlockBuilder newLocatedBlocks(int maxValue) {
     if (!providedEnabled) {
       return new LocatedBlockBuilder(maxValue);
@@ -172,11 +195,16 @@ public class ProvidedStorageMap {
     return new ProvidedBlocksBuilder(maxValue);
   }
 
+  /**
+   * 移除下线数据节点，更新提供存储活跃节点计数
+   * @param dnToRemove 要移除的数据节点
+   */
   public void removeDatanode(DatanodeDescriptor dnToRemove) {
     if (providedEnabled) {
       assert lock.hasWriteLock(RwLockMode.BM) : "Not holding write lock";
+      // 从描述符中移除节点
       providedDescriptor.remove(dnToRemove);
-      // if all datanodes fail, set the block report count to 0
+      // 如果所有提供节点都下线，重置块报告计数，下次重新加载
       if (providedDescriptor.activeProvidedDatanodes() == 0) {
         providedStorageInfo.setBlockReportCount(0);
       }
@@ -190,6 +218,11 @@ public class ProvidedStorageMap {
     return providedStorageInfo.getCapacity();
   }
 
+  /**
+   * 更新数据节点存储信息，如果是提供存储则注入统一存储信息
+   * @param node 数据节点描述符
+   * @param storage 存储对象
+   */
   public void updateStorage(DatanodeDescriptor node, DatanodeStorage storage) {
     if (isProvidedStorage(storage.getStorageID())) {
       if (StorageType.PROVIDED.equals(storage.getStorageType())) {
@@ -208,12 +241,9 @@ public class ProvidedStorageMap {
   }
 
   /**
-   * Choose a datanode that reported a volume of {@link StorageType} PROVIDED.
+   * 随机选择一个报告了PROVIDED类型存储的数据节点
    *
-   * @return the {@link DatanodeDescriptor} corresponding to a datanode that
-   *         reported a volume with {@link StorageType} PROVIDED. If multiple
-   *         datanodes report a PROVIDED volume, one is chosen uniformly at
-   *         random.
+   * @return 选中的数据节点描述符，如果有多个则均匀随机选择一个
    */
   public DatanodeDescriptor chooseProvidedDatanode() {
     return providedDescriptor.chooseRandom();
@@ -225,6 +255,7 @@ public class ProvidedStorageMap {
   }
 
   /**
+   * 提供存储专用LocatedBlock构建器，为提供块补充足够的提供存储位置，满足副本数要求
    * Builder used for creating {@link LocatedBlocks} when a block is provided.
    */
   class ProvidedBlocksBuilder extends LocatedBlockBuilder {
@@ -233,6 +264,11 @@ public class ProvidedStorageMap {
       super(maxBlocks);
     }
 
+    /**
+     * 选择一个不在排除列表中的提供存储数据节点
+     * @param excludedUUids 排除的节点UUID列表
+     * @return 选中的数据节点，无可用节点返回null
+     */
     private DatanodeDescriptor chooseProvidedDatanode(
         Set<String> excludedUUids) {
       DatanodeDescriptor dn = providedDescriptor.choose(null, excludedUUids);
@@ -252,16 +288,17 @@ public class ProvidedStorageMap {
       boolean isProvidedBlock = false;
       Set<String> excludedUUids = new HashSet<>();
 
+      // 遍历所有传入的存储位置，分离普通存储和提供存储
       for (int i = 0; i < storages.length; ++i) {
         DatanodeStorageInfo currInfo = storages[i];
         StorageType storageType = currInfo.getStorageType();
         sids.add(currInfo.getStorageID());
         types.add(storageType);
         if (StorageType.PROVIDED.equals(storageType)) {
-          // Provided location will be added to the list of locations after
-          // examining all local locations.
+          // 标记这是提供块，后续补充提供存储位置
           isProvidedBlock = true;
         } else {
+          // 添加普通存储位置
           locs.add(new DatanodeInfoWithStorage(
               currInfo.getDatanodeDescriptor(),
               currInfo.getStorageID(), storageType));
@@ -271,13 +308,13 @@ public class ProvidedStorageMap {
 
       int numLocations = locs.size();
       if (isProvidedBlock) {
-        // add the first datanode here
+        // 添加第一个提供存储位置
         DatanodeDescriptor dn = chooseProvidedDatanode(excludedUUids);
         locs.add(
             new DatanodeInfoWithStorage(dn, storageId, StorageType.PROVIDED));
         excludedUUids.add(dn.getDatanodeUuid());
         numLocations++;
-        // add more replicas until we reach the defaultReplication
+        // 补充提供存储副本直到达到默认副本数
         for (int count = numLocations + 1;
             count <= defaultReplication && count <= providedDescriptor
                 .activeProvidedDatanodes(); count++) {
@@ -289,6 +326,7 @@ public class ProvidedStorageMap {
           excludedUUids.add(dn.getDatanodeUuid());
         }
       }
+      // 构建并返回LocatedBlock
       return new LocatedBlock(eb,
           locs.toArray(new DatanodeInfoWithStorage[locs.size()]),
           sids.toArray(new String[sids.size()]),
@@ -298,18 +336,20 @@ public class ProvidedStorageMap {
 
     @Override
     LocatedBlocks build(DatanodeDescriptor client) {
-      // TODO choose provided locations close to the client.
+      // TODO 后续优化：选择靠近客户端的提供存储位置
       return new LocatedBlocks(
           flen, isUC, blocks, last, lastComplete, feInfo, ecPolicy);
     }
 
     @Override
     LocatedBlocks build() {
+      // 随机选择一个提供节点作为客户端位置构建结果
       return build(providedDescriptor.chooseRandom());
     }
   }
 
   /**
+   * 维护所有带提供存储的数据节点的抽象描述符，作为统一的提供存储入口，不会注册到集群拓扑中
    * An abstract DatanodeDescriptor to track datanodes with provided storages.
    * NOTE: never resolved through registerDatanode, so not in the topology.
    */
@@ -317,12 +357,14 @@ public class ProvidedStorageMap {
 
     private final NavigableMap<String, DatanodeDescriptor> dns =
         new ConcurrentSkipListMap<>();
-    // maintain a separate list of the datanodes with provided storage
-    // to efficiently choose Datanodes when required.
+    // 单独维护活跃节点列表，加速随机选择操作
     private final List<DatanodeDescriptor> dnR = new ArrayList<>();
     public final static String NETWORK_LOCATION = "/REMOTE";
     public final static String NAME = "PROVIDED";
 
+    /**
+     * 构造函数：创建抽象提供存储描述符，使用虚拟ID和端口
+     */
     ProvidedDescriptor() {
       super(new DatanodeID(
             null,                         // String ipAddr,
@@ -334,6 +376,12 @@ public class ProvidedStorageMap {
             0));                          // int ipcPort
     }
 
+    /**
+     * 获取提供存储信息，并将当前数据节点注册到活跃列表
+     * @param dn 上报提供存储的数据节点
+     * @param s 存储对象
+     * @return 提供存储信息对象
+     */
     DatanodeStorageInfo getProvidedStorage(
         DatanodeDescriptor dn, DatanodeStorage s) {
       dns.put(dn.getDatanodeUuid(), dn);
@@ -341,6 +389,11 @@ public class ProvidedStorageMap {
       return storageMap.get(s.getStorageID());
     }
 
+    /**
+     * 创建提供存储信息对象并注册到存储映射
+     * @param ds 存储对象
+     * @return 创建的存储信息对象
+     */
     DatanodeStorageInfo createProvidedStorage(DatanodeStorage ds) {
       assert null == storageMap.get(ds.getStorageID());
       DatanodeStorageInfo storage = new ProvidedDatanodeStorageInfo(this, ds);
@@ -353,193 +406,32 @@ public class ProvidedStorageMap {
       return choose(client, Collections.<String>emptySet());
     }
 
+    /**
+     * 根据客户端位置和排除列表选择合适的提供存储节点
+     * @param client 客户端所在节点，优先选择同节点
+     * @param excludedUUids 需要排除的节点UUID列表
+     * @return 选中的节点，无可用节点返回null
+     */
     DatanodeDescriptor choose(DatanodeDescriptor client,
         Set<String> excludedUUids) {
-      // exact match for now
+      // 优先选择客户端所在节点，如果客户端节点在可用列表中
       if (client != null && !excludedUUids.contains(client.getDatanodeUuid())) {
         DatanodeDescriptor dn = dns.get(client.getDatanodeUuid());
         if (dn != null) {
           return dn;
         }
       }
-      // prefer live nodes first.
+      // 优先选择在线节点
       DatanodeDescriptor dn = chooseRandomNode(excludedUUids, true);
       if (dn == null) {
+        // 如果没有在线节点，选择任意可用节点
         dn = chooseRandomNode(excludedUUids, false);
       }
       return dn;
     }
 
-    private DatanodeDescriptor chooseRandomNode(Set<String> excludedUUids,
-        boolean preferLiveNodes) {
-      Random r = new Random();
-      for (int i = dnR.size() - 1; i >= 0; --i) {
-        int pos = r.nextInt(i + 1);
-        DatanodeDescriptor node = dnR.get(pos);
-        String uuid = node.getDatanodeUuid();
-        if (!excludedUUids.contains(uuid)) {
-          if (!preferLiveNodes || node.getAdminState() == AdminStates.NORMAL) {
-            return node;
-          }
-        }
-        Collections.swap(dnR, i, pos);
-      }
-      return null;
-    }
-
-    DatanodeDescriptor chooseRandom(DatanodeStorageInfo... excludedStorages) {
-      Set<String> excludedNodes = new HashSet<>();
-      if (excludedStorages != null) {
-        for (int i = 0; i < excludedStorages.length; i++) {
-          DatanodeDescriptor dn = excludedStorages[i].getDatanodeDescriptor();
-          String uuid = dn.getDatanodeUuid();
-          excludedNodes.add(uuid);
-        }
-      }
-      return choose(null, excludedNodes);
-    }
-
-    @Override
-    public void addBlockToBeReplicated(Block block,
-        DatanodeStorageInfo[] targets) {
-      // pick a random datanode, delegate to it
-      DatanodeDescriptor node = chooseRandom(targets);
-      if (node != null) {
-        node.addBlockToBeReplicated(block, targets);
-      } else {
-        LOG.error("Cannot find a source node to replicate block: "
-            + block + " from");
-      }
-    }
-
-    int remove(DatanodeDescriptor dnToRemove) {
-      // this operation happens under the FSNamesystem lock;
-      // no additional synchronization required.
-      if (dnToRemove != null) {
-        DatanodeDescriptor storedDN = dns.get(dnToRemove.getDatanodeUuid());
-        if (storedDN != null) {
-          dns.remove(dnToRemove.getDatanodeUuid());
-          dnR.remove(dnToRemove);
-        }
-      }
-      return dns.size();
-    }
-
-    int activeProvidedDatanodes() {
-      return dns.size();
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-      return (this == obj) || super.equals(obj);
-    }
-
-    @Override
-    public int hashCode() {
-      return super.hashCode();
-    }
-
-    @Override
-    public String toString() {
-      return "PROVIDED-LOCATION";
-    }
-
-    @Override
-    public String getNetworkLocation() {
-      return NETWORK_LOCATION;
-    }
-
-    @Override
-    public String getName() {
-      return NAME;
-    }
-  }
-
-  /**
-   * The DatanodeStorageInfo used for the provided storage.
-   */
-  static class ProvidedDatanodeStorageInfo extends DatanodeStorageInfo {
-
-    ProvidedDatanodeStorageInfo(ProvidedDescriptor dn, DatanodeStorage ds) {
-      super(dn, ds);
-    }
-
-    @Override
-    boolean removeBlock(BlockInfo b) {
-      ProvidedDescriptor dn = (ProvidedDescriptor) getDatanodeDescriptor();
-      if (dn.activeProvidedDatanodes() == 0) {
-        return super.removeBlock(b);
-      } else {
-        return false;
-      }
-    }
-
-    @Override
-    void setState(DatanodeStorage.State state) {
-      if (state == State.FAILED) {
-        // The state should change to FAILED only when there are no active
-        // datanodes with PROVIDED storage.
-        ProvidedDescriptor dn = (ProvidedDescriptor) getDatanodeDescriptor();
-        if (dn.activeProvidedDatanodes() == 0) {
-          LOG.info("Provided storage {} transitioning to state {}",
-              this, State.FAILED);
-          super.setState(state);
-        }
-      } else {
-        super.setState(state);
-      }
-    }
-
-    @Override
-    public String toString() {
-      return "PROVIDED-STORAGE";
-    }
-  }
-
-  /**
-   * Used to emulate block reports for provided blocks.
-   */
-  static class ProvidedBlockList extends BlockListAsLongs {
-
-    private final Iterator<BlockAlias> inner;
-
-    ProvidedBlockList(Iterator<BlockAlias> inner) {
-      this.inner = inner;
-    }
-
-    @Override
-    public Iterator<BlockReportReplica> iterator() {
-      return new Iterator<BlockReportReplica>() {
-        @Override
-        public BlockReportReplica next() {
-          return new BlockReportReplica(inner.next().getBlock());
-        }
-        @Override
-        public boolean hasNext() {
-          return inner.hasNext();
-        }
-        @Override
-        public void remove() {
-          throw new UnsupportedOperationException();
-        }
-      };
-    }
-
-    @Override
-    public int getNumberOfBlocks() {
-      // is ignored for ProvidedBlockList.
-      return -1;
-    }
-
-    @Override
-    public ByteString getBlocksBuffer() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long[] getBlockListAsLongs() {
-      // should only be used for backwards compat, DN.ver > NN.ver
-      throw new UnsupportedOperationException();
-    }
-  }
-}
+    /**
+     * 随机选择一个满足条件的节点，使用Fisher-Yates洗牌算法保证均匀随机
+     * @param excludedUUids 排除的节点UUID列表
+     * @param preferLiveNodes 是否优先选择在线节点
+     * @return

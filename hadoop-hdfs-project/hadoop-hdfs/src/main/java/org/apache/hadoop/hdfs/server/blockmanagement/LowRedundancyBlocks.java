@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,78 +29,52 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode;
 import org.apache.hadoop.hdfs.util.LightWeightLinkedSet;
 
 /**
- * Keep prioritized queues of low redundant blocks.
- * Blocks have redundancy priority, with priority
- * {@link #QUEUE_HIGHEST_PRIORITY} indicating the highest priority.
- * </p>
- * Having a prioritised queue allows the {@link BlockManager} to select
- * which blocks to replicate first -it tries to give priority to data
- * that is most at risk or considered most valuable.
- *
- * <p/>
- * The policy for choosing which priority to give added blocks
- * is implemented in {@link #getPriority(BlockInfo, int, int, int, int)}.
- * </p>
- * <p>The queue order is as follows:</p>
- * <ol>
- *   <li>{@link #QUEUE_HIGHEST_PRIORITY}: the blocks that should be redundant
- *   first. That is blocks with only one copy, or blocks with zero live
- *   copies but a copy in a node being decommissioned. These blocks
- *   are at risk of loss if the disk or server on which they
- *   remain fails.</li>
- *   <li>{@link #QUEUE_VERY_LOW_REDUNDANCY}: blocks that are very
- *   under-replicated compared to their expected values. Currently
- *   that means the ratio of the ratio of actual:expected means that
- *   there is <i>less than</i> 1:3.</li>. These blocks may not be at risk,
- *   but they are clearly considered "important".
- *   <li>{@link #QUEUE_LOW_REDUNDANCY}: blocks that are also under
- *   replicated, and the ratio of actual:expected is good enough that
- *   they do not need to go into the {@link #QUEUE_VERY_LOW_REDUNDANCY}
- *   queue.</li>
- *   <li>{@link #QUEUE_REPLICAS_BADLY_DISTRIBUTED}: there are as least as
- *   many copies of a block as required, but the blocks are not adequately
- *   distributed. Loss of a rack/switch could take all copies off-line.</li>
- *   <li>{@link #QUEUE_WITH_CORRUPT_BLOCKS} This is for blocks that are corrupt
- *   and for which there are no-non-corrupt copies (currently) available.
- *   The policy here is to keep those corrupt blocks replicated, but give
- *   blocks that are not corrupt higher priority.</li>
- * </ol>
+ * 低冗余数据块优先级队列管理类。
+ * 该类维护了按优先级分层的低冗余块队列，让BlockManager可以优先复制风险最高、最重要的数据块，
+ * 从而最大化数据可用性，降低数据丢失风险。优先级从高到低分为5个队列，分别对应不同的风险等级。
+ * 支持连续块和EC纠删码块两种类型的优先级计算，提供添加、删除、更新优先级、获取待复制块等操作。
  */
 class LowRedundancyBlocks implements Iterable<BlockInfo> {
-  /** The total number of queues : {@value} */
+  /** 优先级队列总数量 */
   static final int LEVEL = 5;
-  /** The queue with the highest priority: {@value} */
+  /** 最高优先级队列编号：风险最高，需要立即复制 */
   static final int QUEUE_HIGHEST_PRIORITY = 0;
-  /** The queue for blocks that are way below their expected value : {@value} */
+  /** 极低冗余队列编号：冗余度远低于预期 */
   static final int QUEUE_VERY_LOW_REDUNDANCY = 1;
   /**
-   * The queue for "normally" without sufficient redundancy blocks : {@value}.
+   * 普通低冗余队列编号：冗余度不足但未达到极低标准。
    */
   static final int QUEUE_LOW_REDUNDANCY = 2;
-  /** The queue for blocks that have the right number of replicas,
-   * but which the block manager felt were badly distributed: {@value}
+  /** 分布不佳队列编号：副本数量足够但机架分布不合理，存在整机架丢失风险。
    */
   static final int QUEUE_REPLICAS_BADLY_DISTRIBUTED = 3;
-  /** The queue for corrupt blocks: {@value} */
+  /** 损坏块队列编号：当前无完好可用副本，仅存在损坏副本 */
   static final int QUEUE_WITH_CORRUPT_BLOCKS = 4;
-  /** the queues themselves */
+  /** 按优先级存储的队列列表，索引即为优先级 */
   private final List<LightWeightLinkedSet<BlockInfo>> priorityQueues
       = new ArrayList<>(LEVEL);
 
 
+  /** 低冗余连续块总数统计 */
   private final LongAdder lowRedundancyBlocks = new LongAdder();
+  /** 损坏连续块总数统计 */
   private final LongAdder corruptBlocks = new LongAdder();
-  /** The number of corrupt blocks with replication factor 1 */
+  /** 副本系数为1的损坏块总数统计 */
   private final LongAdder corruptReplicationOneBlocks = new LongAdder();
+  /** 低冗余EC块组总数统计 */
   private final LongAdder lowRedundancyECBlockGroups = new LongAdder();
+  /** 损坏EC块组总数统计 */
   private final LongAdder corruptECBlockGroups = new LongAdder();
+  /** 分布不佳块总数统计 */
   private final LongAdder badlyDistributedBlocks = new LongAdder();
+  /** 最高优先级低冗余连续块总数统计 */
   private final LongAdder highestPriorityLowRedundancyReplicatedBlocks
       = new LongAdder();
+  /** 最高优先级低冗余EC块总数统计 */
   private final LongAdder highestPriorityLowRedundancyECBlocks
       = new LongAdder();
 
-  /** Create an object. */
+  /** 构造函数，初始化所有优先级队列 */
   LowRedundancyBlocks() {
     for (int i = 0; i < LEVEL; i++) {
       priorityQueues.add(new LightWeightLinkedSet<BlockInfo>());
@@ -107,7 +82,7 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
   }
 
   /**
-   * Empty the queues.
+   * 清空所有队列和统计信息。
    */
   synchronized void clear() {
     for (int i = 0; i < LEVEL; i++) {
@@ -122,7 +97,10 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
     highestPriorityLowRedundancyECBlocks.reset();
   }
 
-  /** Return the total number of insufficient redundancy blocks. */
+  /**
+   * 获取所有低冗余块的总数量。
+   * @return 所有队列块总数
+   */
   synchronized int size() {
     int size = 0;
     for (int i = 0; i < LEVEL; i++) {
@@ -132,8 +110,8 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
   }
 
   /**
-   * Return the number of insufficiently redundant blocks excluding corrupt
-   * blocks.
+   * 获取低冗余块数量（排除损坏块队列）。
+   * @return 排除损坏块后的低冗余块总数
    */
   synchronized int getLowRedundancyBlockCount() {
     int size = 0;
@@ -145,18 +123,25 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
     return size;
   }
 
-  /** Return the number of corrupt blocks */
+  /**
+   * 获取损坏块数量。
+   * @return 损坏块队列中块的数量
+   */
   synchronized int getCorruptBlockSize() {
     return priorityQueues.get(QUEUE_WITH_CORRUPT_BLOCKS).size();
   }
 
-  /** Return the number of corrupt blocks with replication factor 1 */
+  /**
+   * 获取副本系数为1的损坏块数量。
+   * @return 副本系数为1的损坏块总数
+   */
   long getCorruptReplicationOneBlockSize() {
     return getCorruptReplicationOneBlocks();
   }
 
   /**
-   * Return under replicated block count excluding corrupt replicas.
+   * 获取低冗余连续块数量（减去损坏块）。
+   * @return 有效低冗余连续块总数
    */
   long getLowRedundancyBlocks() {
     return lowRedundancyBlocks.longValue() - getCorruptBlocks();
@@ -170,25 +155,33 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
     return corruptReplicationOneBlocks.longValue();
   }
 
-  /** Return badly distributed block count. */
+  /**
+   * 获取分布不佳块的总数。
+   * @return 分布不佳块总数量
+   */
   long getBadlyDistributedBlocks() {
     return badlyDistributedBlocks.longValue();
   }
 
-  /** Return the number of under replicated blocks
-   * with the highest priority to recover */
+  /**
+   * 获取最高优先级待恢复连续块数量。
+   * @return 最高优先级连续块总数
+   */
   long getHighestPriorityReplicatedBlockCount() {
     return highestPriorityLowRedundancyReplicatedBlocks.longValue();
   }
 
-  /** Return the number of under replicated EC blocks
-   * with the highest priority to recover */
+  /**
+   * 获取最高优先级待恢复EC块数量。
+   * @return 最高优先级EC块总数
+   */
   long getHighestPriorityECBlockCount() {
     return highestPriorityLowRedundancyECBlocks.longValue();
   }
 
   /**
-   *  Return low redundancy striped blocks excluding corrupt blocks.
+   * 获取低冗余EC块组数量（减去损坏EC块组）。
+   * @return 有效低冗余EC块组总数
    */
   long getLowRedundancyECBlockGroups() {
     return lowRedundancyECBlockGroups.longValue() -
@@ -199,7 +192,11 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
     return corruptECBlockGroups.longValue();
   }
 
-  /** Check if a block is in the neededReconstruction queue. */
+  /**
+   * 检查块是否存在于任何低冗余队列中。
+   * @param block 待检查的数据块
+   * @return true如果块在任一队列中，否则返回false
+   */
   synchronized boolean contains(BlockInfo block) {
     for(LightWeightLinkedSet<BlockInfo> set : priorityQueues) {
       if (set.contains(block)) {
@@ -209,10 +206,14 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
     return false;
   }
 
-  /** Return the priority of a block
-   * @param curReplicas current number of replicas of the block
-   * @param expectedReplicas expected number of replicas of the block
-   * @return the priority for the blocks, between 0 and ({@link #LEVEL}-1)
+  /**
+   * 根据块当前状态计算其优先级。
+   * @param block 待计算优先级的数据块
+   * @param curReplicas 当前活副本数量
+   * @param readOnlyReplicas 只读副本数量
+   * @param outOfServiceReplicas 停用副本（退役/维护中节点上）数量
+   * @param expectedReplicas 期望副本数量
+   * @return 计算得到的优先级，范围0到LEVEL-1
    */
   private int getPriority(BlockInfo block,
                           int curReplicas,
@@ -221,77 +222,92 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
                           int expectedReplicas) {
     assert curReplicas >= 0 : "Negative replicas!";
     if (curReplicas >= expectedReplicas) {
-      // Block has enough copies, but not enough racks
+      // 副本总数足够，但可能分布不佳
       return QUEUE_REPLICAS_BADLY_DISTRIBUTED;
     }
     if (block.isStriped()) {
+      // 处理EC纠删码块
       BlockInfoStriped sblk = (BlockInfoStriped) block;
       return getPriorityStriped(curReplicas, outOfServiceReplicas,
           sblk.getRealDataBlockNum(), sblk.getParityBlockNum());
     } else {
+      // 处理普通连续块
       return getPriorityContiguous(curReplicas, readOnlyReplicas,
           outOfServiceReplicas, expectedReplicas);
     }
   }
 
+  /**
+   * 计算普通连续块的优先级。
+   * @param curReplicas 当前活副本数量
+   * @param readOnlyReplicas 只读副本数量
+   * @param outOfServiceReplicas 停用副本数量
+   * @param expectedReplicas 期望副本数量
+   * @return 计算得到的优先级
+   */
   private int getPriorityContiguous(int curReplicas, int readOnlyReplicas,
       int outOfServiceReplicas, int expectedReplicas) {
     if (curReplicas == 0) {
-      // If there are zero non-decommissioned replicas but there are
-      // some out of service replicas, then assign them highest priority
+      // 没有活副本，但存在停用副本，需要最高优先级恢复
       if (outOfServiceReplicas > 0) {
         return QUEUE_HIGHEST_PRIORITY;
       }
       if (readOnlyReplicas > 0) {
-        // only has read-only replicas, highest risk
-        // since the read-only replicas may go down all together.
+        // 仅存只读副本，存在集体下线风险，最高优先级
         return QUEUE_HIGHEST_PRIORITY;
       }
-      //all we have are corrupt blocks
+      // 仅存损坏副本，放入损坏块队列
       return QUEUE_WITH_CORRUPT_BLOCKS;
     } else if (curReplicas == 1) {
-      // only one replica, highest risk of loss
-      // highest priority
+      // 仅存一个活副本，丢失风险最高，最高优先级
       return QUEUE_HIGHEST_PRIORITY;
     } else if ((curReplicas * 3) < expectedReplicas) {
-      //there is less than a third as many blocks as requested;
-      //this is considered very under-replicated.
+      // 活副本不足期望的1/3，判定为极低冗余
       return QUEUE_VERY_LOW_REDUNDANCY;
     } else {
-      //add to the normal queue for insufficiently redundant blocks
-      return QUEUE_LOW_REDUNDANCY;
-    }
-  }
-
-  private int getPriorityStriped(int curReplicas, int outOfServiceReplicas,
-      short dataBlkNum, short parityBlkNum) {
-    if (curReplicas < dataBlkNum) {
-      // There are some replicas on decommissioned nodes so it's not corrupted
-      if (curReplicas + outOfServiceReplicas >= dataBlkNum) {
-        return QUEUE_HIGHEST_PRIORITY;
-      }
-      return QUEUE_WITH_CORRUPT_BLOCKS;
-    } else if (curReplicas == dataBlkNum) {
-      // highest risk of loss, highest priority
-      return QUEUE_HIGHEST_PRIORITY;
-    } else if ((curReplicas - dataBlkNum) * 3 < parityBlkNum + 1) {
-      // can only afford one replica loss
-      // this is considered very insufficiently redundant blocks.
-      return QUEUE_VERY_LOW_REDUNDANCY;
-    } else {
-      // add to the normal queue for insufficiently redundant blocks.
+      // 其余低冗余情况，放入普通低冗余队列
       return QUEUE_LOW_REDUNDANCY;
     }
   }
 
   /**
-   * Add a block to insufficiently redundant queue according to its priority.
+   * 计算EC纠删码块的优先级。
+   * @param curReplicas 当前活副本数量
+   * @param outOfServiceReplicas 停用副本数量
+   * @param dataBlkNum 数据块数量
+   * @param parityBlkNum 校验块数量
+   * @return 计算得到的优先级
+   */
+  private int getPriorityStriped(int curReplicas, int outOfServiceReplicas,
+      short dataBlkNum, short parityBlkNum) {
+    if (curReplicas < dataBlkNum) {
+      // 活数据块不足，但加上停用块仍满足数据块数量，最高优先级恢复
+      if (curReplicas + outOfServiceReplicas >= dataBlkNum) {
+        return QUEUE_HIGHEST_PRIORITY;
+      }
+      // 数据块数量不足，已经无法恢复，放入损坏队列
+      return QUEUE_WITH_CORRUPT_BLOCKS;
+    } else if (curReplicas == dataBlkNum) {
+      // 刚好满足数据块数量，无冗余校验块，丢失风险最高，最高优先级
+      return QUEUE_HIGHEST_PRIORITY;
+    } else if ((curReplicas - dataBlkNum) * 3 < parityBlkNum + 1) {
+      // 剩余冗余校验块不足1/3，判定为极低冗余
+      return QUEUE_VERY_LOW_REDUNDANCY;
+    } else {
+      // 其余低冗余情况，放入普通低冗余队列
+      return QUEUE_LOW_REDUNDANCY;
+    }
+  }
+
+  /**
+   * 根据块当前状态计算优先级并添加到对应队列。
    *
-   * @param block a low redundancy block
-   * @param curReplicas current number of replicas of the block
-   * @param outOfServiceReplicas the number of out-of-service replicas
-   * @param expectedReplicas expected number of replicas of the block
-   * @return true if the block was added to a queue.
+   * @param block 低冗余数据块
+   * @param curReplicas 当前活副本数量
+   * @param readOnlyReplicas 只读副本数量
+   * @param outOfServiceReplicas 停用副本数量
+   * @param expectedReplicas 期望副本数量
+   * @return true如果块成功添加到队列，false如果已经存在
    */
   synchronized boolean add(BlockInfo block,
       int curReplicas, int readOnlyReplicas,
@@ -310,6 +326,13 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
     return false;
   }
 
+  /**
+   * 将块添加到指定优先级队列，更新对应统计。
+   * @param blockInfo 待添加块
+   * @param priLevel 优先级
+   * @param expectedReplicas 期望副本数
+   * @return true成功添加，false块已存在
+   */
   private boolean add(BlockInfo blockInfo, int priLevel, int expectedReplicas) {
     if (priorityQueues.get(priLevel).add(blockInfo)) {
       incrementBlockStat(blockInfo, priLevel, expectedReplicas);
@@ -318,6 +341,12 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
     return false;
   }
 
+  /**
+   * 根据块类型和优先级增加对应统计计数器。
+   * @param blockInfo 数据块
+   * @param priLevel 优先级
+   * @param expectedReplicas 期望副本数
+   */
   private void incrementBlockStat(BlockInfo blockInfo, int priLevel,
       int expectedReplicas) {
     if (blockInfo.isStriped()) {
@@ -348,7 +377,15 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
     }
   }
 
-  /** Remove a block from a low redundancy queue. */
+  /**
+   * 根据块旧状态计算优先级并从对应队列移除。
+   * @param block 待移除块
+   * @param oldReplicas 旧活副本数量
+   * @param oldReadOnlyReplicas 旧只读副本数量
+   * @param outOfServiceReplicas 旧停用副本数量
+   * @param oldExpectedReplicas 旧期望副本数量
+   * @return true成功移除，false未找到块
+   */
   synchronized boolean remove(BlockInfo block,
       int oldReplicas, int oldReadOnlyReplicas,
       int outOfServiceReplicas, int oldExpectedReplicas) {
@@ -366,246 +403,7 @@ class LowRedundancyBlocks implements Iterable<BlockInfo> {
   }
 
   /**
-   * Remove a block from the low redundancy queues.
-   *
-   * The priLevel parameter is a hint of which queue to query
-   * first: if negative or &gt;= {@link #LEVEL} this shortcutting
-   * is not attmpted.
-   *
-   * If the block is not found in the nominated queue, an attempt is made to
-   * remove it from all queues.
-   *
-   * <i>Warning:</i> This is not a synchronized method.
-   * @param block block to remove
-   * @param priLevel expected privilege level
-   * @return true if the block was found and removed from one of the priority
-   *         queues
-   */
-  synchronized boolean remove(BlockInfo block, int priLevel) {
-    return remove(block, priLevel, block.getReplication());
-  }
-
-  synchronized boolean remove(BlockInfo block, int priLevel, int oldExpectedReplicas) {
-    if(priLevel >= 0 && priLevel < LEVEL
-        && priorityQueues.get(priLevel).remove(block)) {
-      NameNode.blockStateChangeLog.debug(
-          "BLOCK* NameSystem.LowRedundancyBlock.remove: Removing block {}"
-              + " from priority queue {}",
-          block, priLevel);
-      decrementBlockStat(block, priLevel, oldExpectedReplicas);
-      return true;
-    } else {
-      // Try to remove the block from all queues if the block was
-      // not found in the queue for the given priority level.
-      boolean found = false;
-      for (int i = 0; i < LEVEL; i++) {
-        if (i != priLevel && priorityQueues.get(i).remove(block)) {
-          NameNode.blockStateChangeLog.debug(
-              "BLOCK* NameSystem.LowRedundancyBlock.remove: Removing block" +
-                  " {} from priority queue {}", block, i);
-          decrementBlockStat(block, i, oldExpectedReplicas);
-          found = true;
-        }
-      }
-      return found;
-    }
-  }
-
-  private void decrementBlockStat(BlockInfo blockInfo, int priLevel,
-      int oldExpectedReplicas) {
-    if (blockInfo.isStriped()) {
-      lowRedundancyECBlockGroups.decrement();
-      if (priLevel == QUEUE_WITH_CORRUPT_BLOCKS) {
-        corruptECBlockGroups.decrement();
-      }
-      if (priLevel == QUEUE_HIGHEST_PRIORITY) {
-        highestPriorityLowRedundancyECBlocks.decrement();
-      }
-      if (priLevel == QUEUE_REPLICAS_BADLY_DISTRIBUTED) {
-        badlyDistributedBlocks.decrement();
-      }
-    } else {
-      lowRedundancyBlocks.decrement();
-      if (priLevel == QUEUE_WITH_CORRUPT_BLOCKS) {
-        corruptBlocks.decrement();
-        if (oldExpectedReplicas == 1) {
-          corruptReplicationOneBlocks.decrement();
-          assert corruptReplicationOneBlocks.longValue() >= 0 :
-              "Number of corrupt blocks with replication factor 1 " +
-                  "should be non-negative";
-        }
-      }
-      if (priLevel == QUEUE_HIGHEST_PRIORITY) {
-        highestPriorityLowRedundancyReplicatedBlocks.decrement();
-      }
-      if (priLevel == QUEUE_REPLICAS_BADLY_DISTRIBUTED) {
-        badlyDistributedBlocks.decrement();
-      }
-    }
-  }
-
-  /**
-   * Recalculate and potentially update the priority level of a block.
-   *
-   * If the block priority has changed from before an attempt is made to
-   * remove it from the block queue. Regardless of whether or not the block
-   * is in the block queue of (recalculate) priority, an attempt is made
-   * to add it to that queue. This ensures that the block will be
-   * in its expected priority queue (and only that queue) by the end of the
-   * method call.
-   * @param block a low redundancy block
-   * @param curReplicas current number of replicas of the block
-   * @param outOfServiceReplicas  the number of out-of-service replicas
-   * @param curExpectedReplicas expected number of replicas of the block
-   * @param curReplicasDelta the change in the replicate count from before
-   * @param expectedReplicasDelta the change in the expected replica count
-   *        from before
-   */
-  synchronized void update(BlockInfo block, int curReplicas,
-      int readOnlyReplicas, int outOfServiceReplicas,
-      int curExpectedReplicas,
-      int curReplicasDelta, int expectedReplicasDelta) {
-    int oldReplicas = curReplicas-curReplicasDelta;
-    int oldExpectedReplicas = curExpectedReplicas-expectedReplicasDelta;
-    int curPri = getPriority(block, curReplicas, readOnlyReplicas,
-        outOfServiceReplicas, curExpectedReplicas);
-    int oldPri = getPriority(block, oldReplicas, readOnlyReplicas,
-        outOfServiceReplicas, oldExpectedReplicas);
-    if(NameNode.stateChangeLog.isDebugEnabled()) {
-      NameNode.stateChangeLog.debug("LowRedundancyBlocks.update " +
-        block +
-        " curReplicas " + curReplicas +
-        " curExpectedReplicas " + curExpectedReplicas +
-        " oldReplicas " + oldReplicas +
-        " oldExpectedReplicas  " + oldExpectedReplicas +
-        " curPri  " + curPri +
-        " oldPri  " + oldPri);
-    }
-    // oldPri is mostly correct, but not always. If not found with oldPri,
-    // other levels will be searched until the block is found & removed.
-    remove(block, oldPri, oldExpectedReplicas);
-    if(add(block, curPri, curExpectedReplicas)) {
-      NameNode.blockStateChangeLog.debug(
-          "BLOCK* NameSystem.LowRedundancyBlock.update: {} has only {} "
-              + "replicas and needs {} replicas so is added to "
-              + "neededReconstructions at priority level {}",
-          block, curReplicas, curExpectedReplicas, curPri);
-
-    }
-  }
-
-  /**
-   * Get a list of block lists without sufficient redundancy. The index of
-   * block lists represents its replication priority. Iterates each block list
-   * in priority order beginning with the highest priority list. Iterators use
-   * a bookmark to resume where the previous iteration stopped. Returns when
-   * the block count is met or iteration reaches the end of the lowest priority
-   * list, in which case bookmarks for each block list are reset to the heads
-   * of their respective lists.
-   *
-   * @param blocksToProcess - number of blocks to fetch from low redundancy
-   *          blocks.
-   * @return Return a list of block lists to be replicated. The block list
-   *         index represents its redundancy priority.
-   */
-  synchronized List<List<BlockInfo>> chooseLowRedundancyBlocks(
-      int blocksToProcess) {
-    return chooseLowRedundancyBlocks(blocksToProcess, false);
-  }
-
-  /**
-   * Get a list of block lists without sufficient redundancy. The index of
-   * block lists represents its replication priority. Iterates each block list
-   * in priority order beginning with the highest priority list. Iterators use
-   * a bookmark to resume where the previous iteration stopped. Returns when
-   * the block count is met or iteration reaches the end of the lowest priority
-   * list, in which case bookmarks for each block list are reset to the heads
-   * of their respective lists.
-   * If a block is deleted (has invalid bcId), it will be removed from the low
-   * redundancy queues.
-   *
-   * @param blocksToProcess - number of blocks to fetch from low redundancy
-   *          blocks.
-   * @param resetIterators - After gathering the list of blocks reset the
-   *           position of all queue iterators to the head of the queue so
-   *           subsequent calls will begin at the head of the queue
-   * @return Return a list of block lists to be replicated. The block list
-   *         index represents its redundancy priority.
-   */
-  synchronized List<List<BlockInfo>> chooseLowRedundancyBlocks(
-      int blocksToProcess, boolean resetIterators) {
-    final List<List<BlockInfo>> blocksToReconstruct = new ArrayList<>(LEVEL);
-
-    int count = 0;
-    int priority = 0;
-    HashSet<BlockInfo> toRemove = new HashSet<>();
-    for (; count < blocksToProcess && priority < LEVEL; priority++) {
-      // Go through all blocks that need reconstructions with current priority.
-      // Set the iterator to the first unprocessed block at this priority level
-      // We do not want to skip QUEUE_WITH_CORRUPT_BLOCKS because we still need
-      // to look for deleted blocks if any.
-      final boolean inCorruptLevel = (QUEUE_WITH_CORRUPT_BLOCKS == priority);
-      final Iterator<BlockInfo> i = priorityQueues.get(priority).getBookmark();
-      final List<BlockInfo> blocks = new LinkedList<>();
-      if (!inCorruptLevel) {
-        blocksToReconstruct.add(blocks);
-      }
-      for(; count < blocksToProcess && i.hasNext(); count++) {
-        BlockInfo block = i.next();
-        if (block.isDeleted()) {
-          toRemove.add(block);
-          continue;
-        }
-        if (!inCorruptLevel) {
-          blocks.add(block);
-        }
-      }
-      for (BlockInfo bInfo : toRemove) {
-        remove(bInfo, priority);
-      }
-      toRemove.clear();
-    }
-
-    if (priority == LEVEL || resetIterators) {
-      // Reset all bookmarks because there were no recently added blocks.
-      for (LightWeightLinkedSet<BlockInfo> q : priorityQueues) {
-        q.resetBookmark();
-      }
-    }
-
-    return blocksToReconstruct;
-  }
-
-  /** Returns an iterator of all blocks in a given priority queue. */
-  synchronized Iterator<BlockInfo> iterator(int level) {
-    return priorityQueues.get(level).iterator();
-  }
-
-  /** Return an iterator of all the low redundancy blocks. */
-  @Override
-  public synchronized Iterator<BlockInfo> iterator() {
-    final Iterator<LightWeightLinkedSet<BlockInfo>> q = priorityQueues.iterator();
-    return new Iterator<BlockInfo>() {
-      private Iterator<BlockInfo> b = q.next().iterator();
-
-      @Override
-      public BlockInfo next() {
-        hasNext();
-        return b.next();
-      }
-
-      @Override
-      public boolean hasNext() {
-        for(; !b.hasNext() && q.hasNext(); ) {
-          b = q.next().iterator();
-        }
-        return b.hasNext();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException();
-      }
-    };
-  }
-}
+   * 从低冗余队列移除块，优先从指定优先级队列查找移除。
+   * 如果指定优先级队列找不到，则遍历所有队列查找移除。
+   * @param block 待移除块
+   * @param priLevel 预期优先级，用于

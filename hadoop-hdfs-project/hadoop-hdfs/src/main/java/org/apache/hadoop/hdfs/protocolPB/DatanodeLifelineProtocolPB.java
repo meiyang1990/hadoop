@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,12 @@ import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
+ * 文件级注释：DataNode生命线协议Protobuf版本定义，用于DataNode向NameNode发送保活心跳
+ * 协议作用：当常规心跳请求超时时，DataNode通过该轻量级协议发送生命线消息，告知NameNode自身存活状态
  * Protocol used by a DataNode to send lifeline messages to a NameNode.
+ */
+/**
+ * 定义DataNode向NameNode发送存活消息的Protobuf阻塞接口，基于Hadoop RPC框架实现
  */
 @KerberosInfo(
     serverPrincipal = DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY,

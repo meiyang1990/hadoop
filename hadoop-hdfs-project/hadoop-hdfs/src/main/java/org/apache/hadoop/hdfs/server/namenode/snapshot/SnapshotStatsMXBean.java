@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,22 +22,21 @@ import org.apache.hadoop.hdfs.protocol.SnapshotInfo;
 import org.apache.hadoop.hdfs.protocol.SnapshottableDirectoryStatus;
 
 /**
- * This is an interface used to retrieve statistic information related to
- * snapshots
+ * 快照统计信息的JMX管理接口，用于暴露HDFS快照相关统计信息给JMX监控
  */
 public interface SnapshotStatsMXBean {
 
   /**
-   * Return the list of snapshottable directories
+   * 获取所有支持快照功能的目录列表
    *
-   * @return the list of snapshottable directories
+   * @return 支持快照的目录状态Bean数组
    */
   public SnapshottableDirectoryStatus.Bean[] getSnapshottableDirectories();
 
   /**
-   * Return the list of snapshots
+   * 获取当前所有已创建的快照列表
    *
-   * @return the list of snapshots
+   * @return 快照信息Bean数组
    */
   public SnapshotInfo.Bean[] getSnapshots();
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,18 +21,20 @@ package org.apache.hadoop.hdfs.server.common;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.util.SequentialNumber;
 
-/****************************************************************
- * A GenerationStamp is a Hadoop FS primitive, identified by a long.
- ****************************************************************/
+/**
+ * HDFS文件系统核心基础原语，用于生成单调递增的世代时间戳（Generation Stamp）
+ * 该时间戳用于标识HDFS中数据块、inode等对象的版本变化，支持版本识别和冲突检测
+ */
 @InterfaceAudience.Private
 public class GenerationStamp extends SequentialNumber {
   /**
-   * The last reserved generation stamp.
+   * 最后一个被保留的预定义世代时间戳，所有实际使用的时间戳都大于该值
    */
   public static final long LAST_RESERVED_STAMP = 1000L;
 
   /**
-   * Create a new instance, initialized to {@link #LAST_RESERVED_STAMP}.
+   * 构造函数，初始化GenerationStamp，起始值为保留的最大预定义时间戳
+   * 后续每次递增都会生成新的可用世代时间戳
    */
   public GenerationStamp() {
     super(LAST_RESERVED_STAMP);

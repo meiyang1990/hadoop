@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -27,24 +28,47 @@ import org.apache.hadoop.hdfs.server.namenode.ha.HAContext;
 import org.apache.hadoop.hdfs.server.namenode.ha.HAState;
 import org.apache.hadoop.ipc.StandbyException;
 
+/**
+ * HDFS高可用场景下，Backup Namenode的状态实现类。
+ * 负责定义Backup节点状态下的操作权限检查、状态进入/退出处理逻辑，
+ * Backup节点作为热备，会保持与Active节点的状态同步，可以快速切换为Active。
+ */
 @InterfaceAudience.Private
 public class BackupState extends HAState {
 
+  /**
+   * 构造Backup状态对象，基础状态为Standby。
+   */
   public BackupState() {
     super(HAServiceState.STANDBY);
   }
 
+  /**
+   * 检查当前Backup状态下是否允许执行指定类型的操作。
+   * @param context HA上下文环境
+   * @param op 操作类别（读/写）
+   * @throws StandbyException 如果操作不允许则抛出异常
+   */
   @Override // HAState
   public void checkOperation(HAContext context, OperationCategory op)
       throws StandbyException {
     context.checkOperation(op);
   }
 
+  /**
+   * 判断当前状态是否需要填充复制队列。
+   * @return false，Backup状态不需要填充复制队列
+   */
   @Override // HAState
   public boolean shouldPopulateReplQueues() {
     return false;
   }
 
+  /**
+   * 进入Backup状态，启动Backup节点所需的服务。
+   * @param context HA上下文环境
+   * @throws ServiceFailedException 启动服务失败时抛出异常
+   */
   @Override // HAState
   public void enterState(HAContext context) throws ServiceFailedException {
     try {
@@ -54,6 +78,11 @@ public class BackupState extends HAState {
     }
   }
 
+  /**
+   * 退出Backup状态，停止Backup节点运行的服务。
+   * @param context HA上下文环境
+   * @throws ServiceFailedException 停止服务失败时抛出异常
+   */
   @Override // HAState
   public void exitState(HAContext context) throws ServiceFailedException {
     try {
@@ -63,6 +92,11 @@ public class BackupState extends HAState {
     }
   }
 
+  /**
+   * 准备退出Backup状态，执行预停止操作。
+   * @param context HA上下文环境
+   * @throws ServiceFailedException 准备操作失败时抛出异常
+   */
   @Override // HAState
   public void prepareToExitState(HAContext context) throws ServiceFailedException {
     context.prepareToStopStandbyServices();

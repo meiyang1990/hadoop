@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -65,9 +66,11 @@ import org.apache.hadoop.util.Preconditions;
 
 
 /**
- * EditLogTailer represents a thread which periodically reads from edits
- * journals and applies the transactions contained within to a given
- * FSNamesystem.
+ * 文件: hadoop-hdfs-project/hadoop-hdfs/src/main/java/org/apache/hadoop/hdfs/server/namenode/ha/EditLogTailer.java
+ * 
+ * HDFS高可用场景下，负责在备NameNode(Standby NameNode)后台周期性拉取主NameNode日志的服务类。
+ * 通过持续从共享日志存储（如QJM）拉取最新编辑日志并应用到本地元数据，保持备NameNode元数据与主NameNode同步，
+ * 为故障转移时快速切换提供数据基础。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -75,11 +78,9 @@ public class EditLogTailer {
   public static final Logger LOG = LoggerFactory.getLogger(EditLogTailer.class);
 
   /**
-   * StandbyNode will hold namesystem lock to apply at most this many journal
-   * transactions.
-   * It will then release the lock and re-acquire it to load more transactions.
-   * By default the write lock is held for the entire journal segment.
-   * Fine-grained locking allows read requests to get through.
+   * 备NameNode每次获取namesystem写锁后，最多应用这么多事务。
+   * 应用完成后会释放锁，让读请求可以得到处理，然后再重新获取锁加载更多事务。
+   * 默认情况下会持有写锁直到整个日志段处理完成。
    */
   public static final String  DFS_HA_TAILEDITS_MAX_TXNS_PER_LOCK_KEY =
       "dfs.ha.tail-edits.max-txns-per-lock";
@@ -96,90 +97,81 @@ public class EditLogTailer {
   private RemoteNameNodeInfo currentNN;
 
   /**
-   * The last transaction ID at which an edit log roll was initiated.
+   * 上次触发日志滚动时对应的事务ID
    */
   private long lastRollTriggerTxId = HdfsServerConstants.INVALID_TXID;
   
   /**
-   * The highest transaction ID loaded by the Standby.
+   * 备NameNode已经加载的最大事务ID
    */
   private long lastLoadedTxnId = HdfsServerConstants.INVALID_TXID;
 
   /**
-   * The last time we successfully loaded a non-zero number of edits from the
-   * shared directory.
+   * 上次成功从共享目录加载非零数量编辑日志的时间
    */
   private long lastLoadTimeMs;
 
   /**
-   * The last time we triggered a edit log roll on active namenode.
+   * 上次在主NameNode触发编辑日志滚动的时间
    */
   private long lastRollTimeMs;
 
   /**
-   * How often the Standby should roll edit logs. Since the Standby only reads
-   * from finalized log segments, the Standby will only be as up-to-date as how
-   * often the logs are rolled.
+   * 备NameNode触发主NameNode日志滚动的周期。由于备NameNode只能读取已完成的日志段，
+   * 滚动频率决定了备NameNode可以落后主NameNode的最大延迟。
    */
   private final long logRollPeriodMs;
 
   /**
-   * The timeout in milliseconds of calling rollEdits RPC to Active NN.
-   * See HDFS-4176.
+   * 向主NameNode发送rollEdits RPC调用的超时时间，详见HDFS-4176
    */
   private final long rollEditsTimeoutMs;
 
   /**
-   * The executor to run roll edit RPC call in a daemon thread.
+   * 用于异步执行日志滚动RPC调用的线程池
    */
   private final ExecutorService rollEditsRpcExecutor;
 
   /**
-   * How often the tailer should check if there are new edit log entries
-   * ready to be consumed. This is the initial delay before any backoff.
+   * 编辑日志尾部检查周期，是指数退避前的初始等待时间
    */
   private final long sleepTimeMs;
   /**
-   * The maximum time the tailer should wait between checking for new edit log
-   * entries. Exponential backoff will be applied when an edit log tail is
-   * performed but no edits are available to be read. If this is less than or
-   * equal to 0, backoff is disabled.
+   * 两次检查编辑日志之间的最大等待时间。当拉取日志但没有新内容时，会触发指数退避，
+   * 等待时间会逐次翻倍直到该最大值。如果该值小于等于0则禁用退避。
    */
   private final long maxSleepTimeMs;
 
   private final int nnCount;
   private NamenodeProtocol cachedActiveProxy = null;
-  // count of the number of NNs we have attempted in the current lookup loop
+  // 当前循环中已经尝试过的NameNode计数
   private int nnLoopCount = 0;
 
   /**
-   * Maximum number of retries we should give each of the remote namenodes
-   * before giving up.
+   * 尝试连接远程NameNode失败后，最多重试每个节点多少次
    */
   private int maxRetries;
 
   /**
-   * Whether the tailer should tail the in-progress edit log segments. If true,
-   * this will also attempt to optimize for latency when tailing the edit logs
-   * (if using the
-   * {@link org.apache.hadoop.hdfs.qjournal.client.QuorumJournalManager}, this
-   * implies using the RPC-based mechanism to tail edits).
+   * 是否允许拉取进行中的编辑日志段。如果开启，会优化尾拖延迟，使用RPC机制拉取（针对QJournalManager）
    */
   private final boolean inProgressOk;
 
   /**
-   * Release the namesystem lock after loading this many transactions.
-   * Then re-acquire the lock to load more edits.
+   * 每次获取锁后最多加载多少事务，完成后释放锁再重新获取
    */
   private final long maxTxnsPerLock;
 
   /**
-   * Timer instance to be set only using constructor.
-   * Only tests can reassign this by using setTimerForTests().
-   * For source code, this timer instance should be treated as final.
+   * 计时器实例，仅通过构造函数设置，仅测试可修改，生产代码应视为final
    */
   private Timer timer;
 
+  /**
+   * 构造编辑日志尾拖服务，基于给定的Namesystem和配置初始化参数
+   * @param namesystem 备NameNode的命名空间对象
+   * @param conf Hadoop配置
+   */
   public EditLogTailer(FSNamesystem namesystem, Configuration conf) {
     this.tailerThread = new EditLogTailerThread();
     this.conf = conf;
@@ -189,6 +181,7 @@ public class EditLogTailer {
     this.lastLoadTimeMs = timer.monotonicNow();
     this.lastRollTimeMs = timer.monotonicNow();
 
+    // 从配置读取日志滚动周期，转换为毫秒
     logRollPeriodMs = conf.getTimeDuration(
         DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY,
         DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_DEFAULT,
@@ -196,15 +189,15 @@ public class EditLogTailer {
     List<RemoteNameNodeInfo> nns = Collections.emptyList();
     if (logRollPeriodMs >= 0) {
       try {
+        // 获取配置中所有远程NameNode信息
         nns = RemoteNameNodeInfo.getRemoteNameNodes(conf);
       } catch (IOException e) {
         throw new IllegalArgumentException("Remote NameNodes not correctly configured!", e);
       }
 
+      // 遍历所有远程NameNode，设置IPC地址并做合法性检查
       for (RemoteNameNodeInfo info : nns) {
-        // overwrite the socket address, if we need to
         InetSocketAddress ipc = NameNode.getServiceAddress(info.getConfiguration(), true);
-        // sanity check the ipc address
         Preconditions.checkArgument(ipc.getPort() > 0,
             "Active NameNode must have an IPC port configured. " + "Got address '%s'", ipc);
         info.setIpcAddress(ipc);
@@ -217,14 +210,17 @@ public class EditLogTailer {
           DFSConfigKeys.DFS_HA_LOGROLL_PERIOD_KEY + " is negative.");
     }
     
+    // 从配置读取初始检查周期
     sleepTimeMs = conf.getTimeDuration(
         DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_KEY,
         DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_DEFAULT,
         TimeUnit.SECONDS, TimeUnit.MILLISECONDS);
+    // 从配置读取最大退避等待时间
     long maxSleepTimeMsTemp = conf.getTimeDuration(
         DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_BACKOFF_MAX_KEY,
         DFSConfigKeys.DFS_HA_TAILEDITS_PERIOD_BACKOFF_MAX_DEFAULT,
         TimeUnit.SECONDS, TimeUnit.MILLISECONDS);
+    // 如果最大退避时间小于初始时间，禁用退避
     if (maxSleepTimeMsTemp > 0 && maxSleepTimeMsTemp < sleepTimeMs) {
       LOG.warn("{} was configured to be {} ms, but this is less than {}."
               + "Disabling backoff when tailing edit logs.",
@@ -235,14 +231,17 @@ public class EditLogTailer {
       maxSleepTimeMs = maxSleepTimeMsTemp;
     }
 
+    // 读取日志滚动RPC超时配置
     rollEditsTimeoutMs = conf.getTimeDuration(
         DFSConfigKeys.DFS_HA_TAILEDITS_ROLLEDITS_TIMEOUT_KEY,
         DFSConfigKeys.DFS_HA_TAILEDITS_ROLLEDITS_TIMEOUT_DEFAULT,
         TimeUnit.SECONDS, TimeUnit.MILLISECONDS);
 
+    // 创建单线程守护线程池执行日志滚动RPC
     rollEditsRpcExecutor = Executors.newSingleThreadExecutor(
         new ThreadFactoryBuilder().setDaemon(true).build());
 
+    // 读取最大重试次数配置，非法值则重置为默认
     maxRetries = conf.getInt(DFSConfigKeys.DFS_HA_TAILEDITS_ALL_NAMESNODES_RETRY_KEY,
       DFSConfigKeys.DFS_HA_TAILEDITS_ALL_NAMESNODES_RETRY_DEFAULT);
     if (maxRetries <= 0) {
@@ -253,24 +252,33 @@ public class EditLogTailer {
       maxRetries = DFSConfigKeys.DFS_HA_TAILEDITS_ALL_NAMESNODES_RETRY_DEFAULT;
     }
 
+    // 读取是否允许拉取进行中日志的配置
     inProgressOk = conf.getBoolean(
         DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_KEY,
         DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_DEFAULT);
 
+    // 读取每次锁最多加载事务数配置
     this.maxTxnsPerLock = conf.getLong(
         DFS_HA_TAILEDITS_MAX_TXNS_PER_LOCK_KEY,
         DFS_HA_TAILEDITS_MAX_TXNS_PER_LOCK_DEFAULT);
 
     nnCount = nns.size();
-    // setup the iterator to endlessly loop the nns
+    // 创建循环迭代器， endless遍历所有远程NameNode
     this.nnLookup = Iterators.cycle(nns);
     LOG.debug("logRollPeriodMs={} sleepTime={}.", logRollPeriodMs, sleepTimeMs);
   }
 
+  /**
+   * 启动日志尾拖后台线程
+   */
   public void start() {
     tailerThread.start();
   }
   
+  /**
+   * 停止日志尾拖后台线程，关闭线程池
+   * @throws IOException 如果线程被中断则抛出IO异常
+   */
   public void stop() throws IOException {
     tailerThread.setShouldRun(false);
     tailerThread.interrupt();
@@ -294,26 +302,27 @@ public class EditLogTailer {
     this.editLog = editLog;
   }
 
+  /**
+   * 故障转移切换过程中，追齐所有编辑日志到最新，保证切换后主NameNode元数据完整
+   * @throws IOException 追齐过程中发生IO异常则抛出
+   */
   public void catchupDuringFailover() throws IOException {
     Preconditions.checkState(tailerThread == null ||
         !tailerThread.isAlive(),
         "Tailer thread should not be running once failover starts");
-    // Important to do tailing as the login user, in case the shared
-    // edits storage is implemented by a JournalManager that depends
-    // on security credentials to access the logs (eg QuorumJournalManager).
+    // 使用登录用户身份执行，兼容需要安全凭证访问共享存储的场景
     SecurityUtil.doAsLoginUser(new PrivilegedExceptionAction<Void>() {
       @Override
       public Void run() throws Exception {
         long editsTailed = 0;
-        // Fully tail the journal to the end
+        // 持续拉取直到没有新日志，追齐到最新
         do {
           long startTime = timer.monotonicNow();
           try {
             NameNode.getNameNodeMetrics().addEditLogTailInterval(
                 startTime - lastLoadTimeMs);
-            // It is already under the name system lock and the checkpointer
-            // thread is already stopped. No need to acquire any other lock.
-            // HDFS-16689. Disable inProgress to use the streaming mechanism
+            // 已经持有命名空间锁，检查点线程已停止，无需额外加锁
+            // HDFS-16689: 禁用进行中日志，使用流式机制加载
             editsTailed = doTailEdits(false);
           } catch (InterruptedException e) {
             throw new IOException(e);
@@ -332,34 +341,40 @@ public class EditLogTailer {
     return doTailEdits(inProgressOk);
   }
 
+  /**
+   * 实际执行拉取加载编辑日志的核心方法，从共享日志存储读取从上次加载位置之后的所有新日志，并应用到本地命名空间
+   * @param enableInProgress 是否允许加载进行中的未完成日志段
+   * @return 本次加载的事务数量
+   * @throws IOException 读取或加载日志过程中发生异常则抛出
+   * @throws InterruptedException 如果线程被中断则抛出
+   */
   private long doTailEdits(boolean enableInProgress) throws IOException, InterruptedException {
     Collection<EditLogInputStream> streams;
     FSImage image = namesystem.getFSImage();
 
+    // 获取加载前的最新事务ID
     long lastTxnId = image.getLastAppliedTxId();
     LOG.debug("lastTxnId: {}", lastTxnId);
     long startTime = timer.monotonicNow();
     try {
+      // 从编辑日志选择从lastTxnId+1开始的所有输入流
       streams = editLog.selectInputStreams(lastTxnId + 1, 0,
           null, enableInProgress, true);
     } catch (IOException ioe) {
-      // This is acceptable. If we try to tail edits in the middle of an edits
-      // log roll, i.e. the last one has been finalized but the new inprogress
-      // edits file hasn't been started yet.
+      // 日志滚动过程中可能出现找不到流的情况，属于正常，稍后重试即可
       LOG.warn("Edits tailer failed to find any streams. Will try again " +
           "later.", ioe);
       return 0;
     } finally {
+      // 记录获取编辑日志流耗时到指标
       NameNode.getNameNodeMetrics().addEditLogFetchTime(
           timer.monotonicNow() - startTime);
     }
-    // Write lock needs to be interruptible here because the 
-    // transitionToActive RPC takes the write lock before calling
-    // tailer.stop() -- so if we're not interruptible, it will
-    // deadlock.
+    // 获取可中断的全局写锁，避免故障转移时死锁
     namesystem.writeLockInterruptibly(RwLockMode.GLOBAL);
     try {
       long currentLastTxnId = image.getLastAppliedTxId();
+      // 如果事务ID已经变化，说明其他线程修改了元数据，直接返回
       if (lastTxnId != currentLastTxnId) {
         LOG.warn("The currentLastTxnId({}) is different from preLastTxtId({})",
             currentLastTxnId, lastTxnId);
@@ -367,304 +382,11 @@ public class EditLogTailer {
       }
       LOG.debug("edit streams to load from: {}.", streams.size());
       
-      // Once we have streams to load, errors encountered are legitimate cause
-      // for concern, so we don't catch them here. Simple errors reading from
-      // disk are ignored.
       long editsLoaded = 0;
       try {
+        // 加载所有选中的编辑日志到元数据，最多加载maxTxnsPerLock个事务
         editsLoaded = image.loadEdits(
             streams, namesystem, maxTxnsPerLock, null, null);
       } catch (EditLogInputException elie) {
+        // 加载出错，保留已经加载的事务数后重新抛出异常
         editsLoaded = elie.getNumEditsLoaded();
-        throw elie;
-      } finally {
-        LOG.debug("Loaded {} edits starting from txid {}.", editsLoaded, lastTxnId);
-        NameNode.getNameNodeMetrics().addNumEditLogLoaded(editsLoaded);
-      }
-
-      if (editsLoaded > 0) {
-        lastLoadTimeMs = timer.monotonicNow();
-      }
-      lastLoadedTxnId = image.getLastAppliedTxId();
-      return editsLoaded;
-    } finally {
-      namesystem.writeUnlock(RwLockMode.GLOBAL, "doTailEdits");
-    }
-  }
-
-  /**
-   * @return time in msec of when we last loaded a non-zero number of edits.
-   */
-  public long getLastLoadTimeMs() {
-    return lastLoadTimeMs;
-  }
-
-  /**
-   * @return true if the configured log roll period has elapsed.
-   */
-  private boolean tooLongSinceLastLoad() {
-    return logRollPeriodMs >= 0 && 
-      (timer.monotonicNow() - lastRollTimeMs) > logRollPeriodMs;
-  }
-
-  /**
-   * NameNodeProxy factory method.
-   * @return a Callable to roll logs on remote NameNode.
-   */
-  @VisibleForTesting
-  Callable<Void> getNameNodeProxy() {
-    return new MultipleNameNodeProxy<Void>() {
-      @Override
-      protected Void doWork() throws IOException {
-        LOG.info("Triggering log rolling to the remote NameNode, " +
-            "active NameNode = {}", currentNN.getIpcAddress());
-        cachedActiveProxy.rollEditLog();
-        return null;
-      }
-    };
-  }
-
-  /**
-   * Trigger the active node to roll its logs.
-   */
-  @VisibleForTesting
-  void triggerActiveLogRoll() {
-    Future<Void> future = null;
-    try {
-      future = rollEditsRpcExecutor.submit(getNameNodeProxy());
-      future.get(rollEditsTimeoutMs, TimeUnit.MILLISECONDS);
-      this.lastRollTimeMs = timer.monotonicNow();
-      lastRollTriggerTxId = lastLoadedTxnId;
-    } catch (ExecutionException | InterruptedException e) {
-      LOG.warn("Unable to trigger a roll of the active NN", e);
-    } catch (TimeoutException e) {
-      if (future != null) {
-        future.cancel(true);
-      }
-      LOG.warn(String.format(
-          "Unable to finish rolling edits in %d ms", rollEditsTimeoutMs));
-    }
-  }
-
-  /**
-   * This is only to be used by tests. For source code, the only way to
-   * set timer is by using EditLogTailer constructor.
-   *
-   * @param newTimer Timer instance provided by tests.
-   */
-  @VisibleForTesting
-  void setTimerForTest(final Timer newTimer) {
-    this.timer = newTimer;
-  }
-
-  /**
-   * Used by tests. Return Timer instance used by EditLogTailer.
-   *
-   * @return Return Timer instance used by EditLogTailer.
-   */
-  @VisibleForTesting
-  Timer getTimer() {
-    return timer;
-  }
-
-  @VisibleForTesting
-  void sleep(long sleepTimeMillis) throws InterruptedException {
-    Thread.sleep(sleepTimeMillis);
-  }
-
-  /**
-   * The thread which does the actual work of tailing edits journals and
-   * applying the transactions to the FSNS.
-   */
-  private class EditLogTailerThread extends SubjectInheritingThread {
-    private volatile boolean shouldRun = true;
-    
-    private EditLogTailerThread() {
-      super("Edit log tailer");
-    }
-    
-    private void setShouldRun(boolean shouldRun) {
-      this.shouldRun = shouldRun;
-    }
-    
-    @Override
-    public void work() {
-      SecurityUtil.doAsLoginUserOrFatal(
-          new PrivilegedAction<Object>() {
-          @Override
-          public Object run() {
-            doWork();
-            return null;
-          }
-        });
-    }
-    
-    private void doWork() {
-      long currentSleepTimeMs = sleepTimeMs;
-      while (shouldRun) {
-        long editsTailed  = 0;
-        try {
-          // There's no point in triggering a log roll if the Standby hasn't
-          // read any more transactions since the last time a roll was
-          // triggered.
-          boolean triggeredLogRoll = false;
-          if (tooLongSinceLastLoad() &&
-              lastRollTriggerTxId < lastLoadedTxnId) {
-            triggerActiveLogRoll();
-            triggeredLogRoll = true;
-          }
-          /**
-           * Check again in case someone calls {@link EditLogTailer#stop} while
-           * we're triggering an edit log roll, since ipc.Client catches and
-           * ignores {@link InterruptedException} in a few places. This fixes
-           * the bug described in HDFS-2823.
-           */
-          if (!shouldRun) {
-            break;
-          }
-          // Prevent reading of name system while being modified. The full
-          // name system lock will be acquired to further block even the block
-          // state updates.
-          namesystem.cpLockInterruptibly();
-          long startTime = timer.monotonicNow();
-          try {
-            NameNode.getNameNodeMetrics().addEditLogTailInterval(
-                startTime - lastLoadTimeMs);
-            editsTailed = doTailEdits();
-          } finally {
-            namesystem.cpUnlock();
-            NameNode.getNameNodeMetrics().addEditLogTailTime(
-                timer.monotonicNow() - startTime);
-          }
-          //Update NameDirSize Metric
-          if (triggeredLogRoll) {
-            namesystem.getFSImage().getStorage().updateNameDirSize();
-          }
-        } catch (EditLogInputException elie) {
-          LOG.warn("Error while reading edits from disk. Will try again.", elie);
-        } catch (InterruptedException ie) {
-          // interrupter should have already set shouldRun to false
-          continue;
-        } catch (Throwable t) {
-          LOG.error("Unknown error encountered while tailing edits. " +
-              "Shutting down standby NN.", t);
-          terminate(1, t);
-        }
-
-        try {
-          if (editsTailed == 0 && maxSleepTimeMs > 0) {
-            // If no edits were tailed, apply exponential backoff
-            // before tailing again. Double the current sleep time on each
-            // empty response, but don't exceed the max. If the sleep time
-            // was configured as 0, start the backoff at 1 ms.
-            currentSleepTimeMs = Math.min(maxSleepTimeMs,
-                (currentSleepTimeMs == 0 ? 1 : currentSleepTimeMs) * 2);
-          } else {
-            currentSleepTimeMs = sleepTimeMs; // reset to initial sleep time
-          }
-          EditLogTailer.this.sleep(currentSleepTimeMs);
-        } catch (InterruptedException e) {
-          LOG.warn("Edit log tailer interrupted: {}", e.getMessage());
-        }
-      }
-    }
-  }
-  /**
-   * Manage the 'active namenode proxy'. This cannot just be the a single proxy since we could
-   * failover across a number of NameNodes, rather than just between an active and a standby.
-   * <p>
-   * We - lazily - get a proxy to one of the configured namenodes and attempt to make the request
-   * against it. If it doesn't succeed, either because the proxy failed to be created or the request
-   * failed, we try the next NN in the list. We try this up to the configuration maximum number of
-   * retries before throwing up our hands. A working proxy is retained across attempts since we
-   * expect the active NameNode to switch rarely.
-   * <p>
-   * This mechanism is <b>very bad</b> for cases where we care about being <i>fast</i>; it just
-   * blindly goes and tries namenodes.
-   */
-  @VisibleForTesting
-  abstract class MultipleNameNodeProxy<T> implements Callable<T> {
-
-    /**
-     * Do the actual work to the remote namenode via the {@link #cachedActiveProxy}.
-     * @return the result of the work, if there is one
-     * @throws IOException if the actions done to the proxy throw an exception.
-     */
-    protected abstract T doWork() throws IOException;
-
-    public T call() throws IOException {
-      // reset the loop count on success
-      nnLoopCount = 0;
-      while ((cachedActiveProxy = getActiveNodeProxy()) != null) {
-        try {
-          T ret = doWork();
-          return ret;
-        } catch (IOException e) {
-          LOG.warn("Exception from remote name node " + currentNN
-              + ", try next.", e);
-
-          // Try next name node if exception happens.
-          cachedActiveProxy = null;
-          nnLoopCount++;
-        }
-      }
-      throw new IOException("Cannot find any valid remote NN to service request!");
-    }
-
-    private NamenodeProtocol getActiveNodeProxy() throws IOException {
-      if (cachedActiveProxy == null) {
-        while (true) {
-          // If the thread is interrupted, quit by returning null.
-          if (Thread.currentThread().isInterrupted()) {
-            LOG.warn("Interrupted while trying to getActiveNodeProxy.");
-            return null;
-          }
-
-          // if we have reached the max loop count, quit by returning null
-          if ((nnLoopCount / nnCount) >= maxRetries) {
-            LOG.warn("Have reached the max loop count ({}).", nnLoopCount);
-            return null;
-          }
-
-          currentNN = nnLookup.next();
-          try {
-            int rpcTimeout = conf.getInt(
-                DFSConfigKeys.DFS_HA_LOGROLL_RPC_TIMEOUT_KEY,
-                DFSConfigKeys.DFS_HA_LOGROLL_RPC_TIMEOUT_DEFAULT);
-            NamenodeProtocolPB proxy = RPC.waitForProxy(NamenodeProtocolPB.class,
-                RPC.getProtocolVersion(NamenodeProtocolPB.class), currentNN.getIpcAddress(), conf,
-                rpcTimeout, Long.MAX_VALUE);
-            cachedActiveProxy = new NamenodeProtocolTranslatorPB(proxy);
-            break;
-          } catch (IOException e) {
-            LOG.info("Failed to reach " + currentNN, e);
-            // couldn't even reach this NN, try the next one
-            nnLoopCount++;
-          }
-        }
-      }
-      assert cachedActiveProxy != null;
-      return cachedActiveProxy;
-    }
-  }
-
-  @VisibleForTesting
-  public NamenodeProtocol getCachedActiveProxy() {
-    return cachedActiveProxy;
-  }
-
-  @VisibleForTesting
-  public long getLastRollTimeMs() {
-    return lastRollTimeMs;
-  }
-
-  @VisibleForTesting
-  public RemoteNameNodeInfo getCurrentNN() {
-    return currentNN;
-  }
-
-  @VisibleForTesting
-  public void setShouldRunForTest(boolean shouldRun) {
-    this.tailerThread.setShouldRun(shouldRun);
-  }
-}

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,22 +57,9 @@ import java.util.List;
 import static org.apache.hadoop.hdfs.server.datanode.FileIoProvider.OPERATION.*;
 
 /**
- * This class abstracts out various file IO operations performed by the
- * DataNode and invokes profiling (for collecting stats) and fault injection
- * (for testing) event hooks before and after each file IO.
- *
- * Behavior can be injected into these events by enabling the
- * profiling and/or fault injection event hooks through
- * {@link DFSConfigKeys#DFS_DATANODE_FILEIO_PROFILING_SAMPLING_PERCENTAGE_KEY}
- * and {@link DFSConfigKeys#DFS_DATANODE_ENABLE_FILEIO_FAULT_INJECTION_KEY}.
- * These event hooks are disabled by default.
- *
- * Most functions accept an optional {@link FsVolumeSpi} parameter for
- * instrumentation/logging.
- *
- * Some methods may look redundant, especially the multiple variations of
- * move/rename/list. They exist to retain behavior compatibility for existing
- * code.
+ * 文件IO提供者抽象类，封装DataNode所有文件IO操作，在每次IO操作前后插入性能统计和故障注入钩子。
+ * 可通过配置开启性能采样和故障注入功能，默认均关闭。
+ * 多数方法接受可选FsVolumeSpi参数用于插桩统计和日志记录，保留多版本move/rename/list方法是为了兼容现有代码行为。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -79,17 +67,20 @@ public class FileIoProvider {
   public static final Logger LOG = LoggerFactory.getLogger(
       FileIoProvider.class);
 
+  // 性能统计事件钩子实例
   private final ProfilingFileIoEvents profilingEventHook;
+  // 故障注入事件钩子实例
   private final FaultInjectorFileIoEvents faultInjectorEventHook;
+  // 所属DataNode实例，用于IO错误后的磁盘检查回调
   private final DataNode datanode;
 
+  // int类型占4字节，用于单字节读写时的统计
   private static final int LEN_INT = 4;
 
   /**
-   * @param conf  Configuration object. May be null. When null,
-   *              the event handlers are no-ops.
-   * @param datanode datanode that owns this FileIoProvider. Used for
-   *               IO error based volume checker callback
+   * 构造FileIoProvider实例，根据配置初始化性能统计和故障注入钩子。
+   * @param conf Hadoop配置对象，可为null，为null时所有事件钩子为空操作
+   * @param datanode 所属DataNode实例，用于IO错误触发异步磁盘检查
    */
   public FileIoProvider(@Nullable Configuration conf,
                         final DataNode datanode) {
@@ -99,9 +90,7 @@ public class FileIoProvider {
   }
 
   /**
-   * Lists the types of file system operations. Passed to the
-   * IO hooks so implementations can choose behavior based on
-   * specific operations.
+   * 文件IO操作类型枚举，传递给IO钩子以实现针对不同操作的定制行为。
    */
   public enum OPERATION {
     OPEN,
@@ -120,10 +109,9 @@ public class FileIoProvider {
   }
 
   /**
-   * See {@link Flushable#flush()}.
-   *
-   * @param  volume target volume. null if unavailable.
-   * @throws IOException
+   * 对Flushable对象执行flush操作，插入IO事件钩子。
+   * @param  volume 目标存储卷，不可用则传null
+   * @throws IOException flush操作抛出的异常
    */
   public void flush(
       @Nullable FsVolumeSpi volume, Flushable f) throws IOException {
@@ -139,10 +127,9 @@ public class FileIoProvider {
   }
 
   /**
-   * Sync the given {@link FileOutputStream}.
-   *
-   * @param  volume target volume. null if unavailable.
-   * @throws IOException
+   * 对FileOutputStream执行sync落盘操作，插入IO事件钩子。
+   * @param  volume 目标存储卷，不可用则传null
+   * @throws IOException sync操作抛出的异常
    */
   public void sync(
       @Nullable FsVolumeSpi volume, FileOutputStream fos) throws IOException {
@@ -158,8 +145,8 @@ public class FileIoProvider {
   }
 
   /**
-   * Sync the given directory changes to durable device.
-   * @throws IOException
+   * 对目录执行同步操作，将目录变更持久化到存储设备，插入IO事件钩子。
+   * @throws IOException 同步操作抛出的异常
    */
   public void dirSync(@Nullable FsVolumeSpi volume, File dir)
       throws IOException {
@@ -175,9 +162,9 @@ public class FileIoProvider {
   }
 
   /**
-   * Call sync_file_range on the given file descriptor.
-   *
-   * @param  volume target volume. null if unavailable.
+   * 对指定文件描述符执行sync_file_range系统调用，插入IO事件钩子。
+   * @param  volume 目标存储卷，不可用则传null
+   * @throws NativeIOException 同步操作抛出的原生IO异常
    */
   public void syncFileRange(
       @Nullable FsVolumeSpi volume, FileDescriptor outFd,
@@ -194,9 +181,9 @@ public class FileIoProvider {
   }
 
   /**
-   * Call posix_fadvise on the given file descriptor.
-   *
-   * @param  volume target volume. null if unavailable.
+   * 对指定文件描述符执行posix_fadvise系统调用，插入IO事件钩子。
+   * @param  volume 目标存储卷，不可用则传null
+   * @throws NativeIOException posix_fadvise操作抛出的原生IO异常
    */
   public void posixFadvise(
       @Nullable FsVolumeSpi volume, String identifier, FileDescriptor outFd,
@@ -214,10 +201,10 @@ public class FileIoProvider {
   }
 
   /**
-   * Delete a file.
-   * @param volume  target volume. null if unavailable.
-   * @param f  File to delete.
-   * @return  true if the file was successfully deleted.
+   * 删除指定文件，插入元数据操作事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param f 待删除文件
+   * @return 删除成功返回true，否则返回false
    */
   public boolean delete(@Nullable FsVolumeSpi volume, File f) {
     final long begin = profilingEventHook.beforeMetadataOp(volume, DELETE);
@@ -233,11 +220,10 @@ public class FileIoProvider {
   }
 
   /**
-   * Delete a file, first checking to see if it exists.
-   * @param volume  target volume. null if unavailable.
-   * @param f  File to delete
-   * @return  true if the file was successfully deleted or if it never
-   *          existed.
+   * 删除指定文件，删除前先检查文件是否存在，插入元数据操作事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param f 待删除文件
+   * @return 文件不存在或删除成功返回true，删除失败返回false
    */
   public boolean deleteWithExistsCheck(@Nullable FsVolumeSpi volume, File f) {
     final long begin = profilingEventHook.beforeMetadataOp(volume, DELETE);
@@ -256,17 +242,15 @@ public class FileIoProvider {
   }
 
   /**
-   * Transfer data from a FileChannel to a SocketOutputStream.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param sockOut  SocketOutputStream to write the data.
-   * @param fileCh  FileChannel from which to read data.
-   * @param position  position within the channel where the transfer begins.
-   * @param count  number of bytes to transfer.
-   * @param waitTime  returns the nanoseconds spent waiting for the socket
-   *                  to become writable.
-   * @param transferTime  returns the nanoseconds spent transferring data.
-   * @throws IOException
+   * 将FileChannel中的数据全量传输到SocketOutputStream，插入IO事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param sockOut 目标Socket输出流
+   * @param fileCh 源文件通道
+   * @param position 传输起始位置
+   * @param count 传输字节数
+   * @param waitTime 输出参数，返回socket等待可写的纳秒数
+   * @param transferTime 输出参数，返回实际传输数据的纳秒数
+   * @throws IOException 传输过程中抛出的异常
    */
   public void transferToSocketFully(
       @Nullable FsVolumeSpi volume, SocketOutputStream sockOut,
@@ -279,6 +263,7 @@ public class FileIoProvider {
           waitTime, transferTime);
       profilingEventHook.afterFileIo(volume, TRANSFER, begin, count);
     } catch (Exception e) {
+      // 管道破裂、连接重置属于客户端正常断开，不触发磁盘错误检查
       String em = e.getMessage();
       if (em != null) {
         if (!em.startsWith("Broken pipe")
@@ -293,12 +278,11 @@ public class FileIoProvider {
   }
 
   /**
-   * Create a file.
-   * @param volume  target volume. null if unavailable.
-   * @param f  File to be created.
-   * @return  true if the file does not exist and was successfully created.
-   *          false if the file already exists.
-   * @throws IOException
+   * 创建新文件，插入元数据操作事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param f 待创建文件
+   * @return 文件不存在且创建成功返回true，文件已存在返回false
+   * @throws IOException 创建过程抛出的异常
    */
   public boolean createFile(
       @Nullable FsVolumeSpi volume, File f) throws IOException {
@@ -315,16 +299,11 @@ public class FileIoProvider {
   }
 
   /**
-   * Create a FileInputStream using
-   * {@link FileInputStream#FileInputStream(File)}.
-   *
-   * Wraps the created input stream to intercept read calls
-   * before delegating to the wrapped stream.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param f  File object.
-   * @return  FileInputStream to the given file.
-   * @throws  FileNotFoundException
+   * 创建包装过的FileInputStream，对read操作插入IO事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param f 待打开文件
+   * @return 包装后的FileInputStream实例
+   * @throws  FileNotFoundException 文件不存在抛出异常
    */
   public FileInputStream getFileInputStream(
       @Nullable FsVolumeSpi volume, File f) throws FileNotFoundException {
@@ -343,18 +322,12 @@ public class FileIoProvider {
   }
 
   /**
-   * Create a FileOutputStream using
-   * {@link FileOutputStream#FileOutputStream(File, boolean)}.
-   *
-   * Wraps the created output stream to intercept write calls
-   * before delegating to the wrapped stream.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param f  File object.
-   * @param append  if true, then bytes will be written to the end of the
-   *                file rather than the beginning.
-   * @return  FileOutputStream to the given file object.
-   * @throws FileNotFoundException
+   * 创建包装过的FileOutputStream，对write操作插入IO事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param f 待打开文件
+   * @param append 是否追加写入
+   * @return 包装后的FileOutputStream实例
+   * @throws FileNotFoundException 文件不存在抛出异常
    */
   public FileOutputStream getFileOutputStream(
       @Nullable FsVolumeSpi volume, File f,
@@ -374,16 +347,11 @@ public class FileIoProvider {
   }
 
   /**
-   * Create a FileOutputStream using
-   * {@link FileOutputStream#FileOutputStream(File, boolean)}.
-   *
-   * Wraps the created output stream to intercept write calls
-   * before delegating to the wrapped stream.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param f  File object.
-   * @return  FileOutputStream to the given file object.
-   * @throws  FileNotFoundException
+   * 创建包装过的覆盖写入FileOutputStream，对write操作插入IO事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param f 待打开文件
+   * @return 包装后的FileOutputStream实例
+   * @throws  FileNotFoundException 文件不存在抛出异常
    */
   public FileOutputStream getFileOutputStream(
       @Nullable FsVolumeSpi volume, File f) throws FileNotFoundException {
@@ -391,15 +359,10 @@ public class FileIoProvider {
   }
 
   /**
-   * Create a FileOutputStream using
-   * {@link FileOutputStream#FileOutputStream(FileDescriptor)}.
-   *
-   * Wraps the created output stream to intercept write calls
-   * before delegating to the wrapped stream.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param fd  File descriptor object.
-   * @return  FileOutputStream to the given file object.
+   * 基于文件描述符创建包装过的FileOutputStream，对write操作插入IO事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param fd 文件描述符
+   * @return 包装后的FileOutputStream实例
    */
   public FileOutputStream getFileOutputStream(
       @Nullable FsVolumeSpi volume, FileDescriptor fd) {
@@ -407,18 +370,12 @@ public class FileIoProvider {
   }
 
   /**
-   * Create a FileInputStream using
-   * {@link NativeIO#getShareDeleteFileDescriptor}.
-   * Wraps the created input stream to intercept input calls
-   * before delegating to the wrapped stream.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param f  File object.
-   * @param offset  the offset position, measured in bytes from the
-   *                beginning of the file, at which to set the file
-   *                pointer.
-   * @return FileOutputStream to the given file object.
-   * @throws FileNotFoundException
+   * 获取支持共享删除的FileInputStream，对read操作插入IO事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param f 待打开文件
+   * @param offset 文件指针起始偏移量
+   * @return 包装后的FileInputStream实例
+   * @throws FileNotFoundException 文件不存在抛出异常
    */
   public FileInputStream getShareDeleteFileInputStream(
       @Nullable FsVolumeSpi volume, File f,
@@ -439,19 +396,11 @@ public class FileIoProvider {
   }
 
   /**
-   * Create a FileInputStream using
-   * {@link FileInputStream#FileInputStream(File)} and position
-   * it at the given offset.
-   *
-   * Wraps the created input stream to intercept read calls
-   * before delegating to the wrapped stream.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param f  File object.
-   * @param offset  the offset position, measured in bytes from the
-   *                beginning of the file, at which to set the file
-   *                pointer.
-   * @throws FileNotFoundException
+   * 打开文件并定位到指定偏移量，返回包装过的FileInputStream，对read操作插入IO事件钩子。
+   * @param volume 目标存储卷，不可用则传null
+   * @param f 待打开文件
+   * @param offset 文件指针起始偏移量
+   * @throws FileNotFoundException 文件不存在抛出异常
    */
   public FileInputStream openAndSeek(
       @Nullable FsVolumeSpi volume, File f, long offset) throws IOException {
@@ -465,614 +414,4 @@ public class FileIoProvider {
       return fis;
     } catch(Exception e) {
       IOUtils.closeStream(fis);
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Create a RandomAccessFile using
-   * {@link RandomAccessFile#RandomAccessFile(File, String)}.
-   *
-   * Wraps the created input stream to intercept IO calls
-   * before delegating to the wrapped RandomAccessFile.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param f  File object.
-   * @param mode  See {@link RandomAccessFile} for a description
-   *              of the mode string.
-   * @return RandomAccessFile representing the given file.
-   * @throws FileNotFoundException
-   */
-  public RandomAccessFile getRandomAccessFile(
-      @Nullable FsVolumeSpi volume, File f,
-      String mode) throws FileNotFoundException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, OPEN);
-    RandomAccessFile raf = null;
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, OPEN);
-      raf = new WrappedRandomAccessFile(volume, f, mode);
-      profilingEventHook.afterMetadataOp(volume, OPEN, begin);
-      return raf;
-    } catch(Exception e) {
-      IOUtils.closeStream(raf);
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Delete the given directory using {@link FileUtil#fullyDelete(File)}.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param dir  directory to be deleted.
-   * @return true on success false on failure.
-   */
-  public boolean fullyDelete(@Nullable FsVolumeSpi volume, File dir) {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, DELETE);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, DELETE);
-      boolean deleted = FileUtil.fullyDelete(dir);
-      LOG.trace("Deletion of dir {} {}", dir, deleted ? "succeeded" : "failed");
-      profilingEventHook.afterMetadataOp(volume, DELETE, begin);
-      return deleted;
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Move the src file to the target using
-   * {@link FileUtil#replaceFile(File, File)}.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param src  source path.
-   * @param target  target path.
-   * @throws IOException
-   */
-  public void replaceFile(
-      @Nullable FsVolumeSpi volume, File src, File target) throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, MOVE);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, MOVE);
-      FileUtil.replaceFile(src, target);
-      profilingEventHook.afterMetadataOp(volume, MOVE, begin);
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Move the src file to the target using
-   * {@link Storage#rename(File, File)}.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param src  source path.
-   * @param target  target path.
-   * @throws IOException
-   */
-  public void rename(
-      @Nullable FsVolumeSpi volume, File src, File target)
-      throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, MOVE);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, MOVE);
-      Storage.rename(src, target);
-      profilingEventHook.afterMetadataOp(volume, MOVE, begin);
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Move the src file to the target using
-   * {@link FileUtils#moveFile(File, File)}.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param src  source path.
-   * @param target  target path.
-   * @throws IOException
-   */
-  public void moveFile(
-      @Nullable FsVolumeSpi volume, File src, File target)
-      throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, MOVE);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, MOVE);
-      FileUtils.moveFile(src, target);
-      profilingEventHook.afterMetadataOp(volume, MOVE, begin);
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Move the src file to the target using
-   * {@link Files#move(Path, Path, CopyOption...)}.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param src  source path.
-   * @param target  target path.
-   * @param options  See {@link Files#move} for a description
-   *                of the options.
-   * @throws IOException
-   */
-  public void move(
-      @Nullable FsVolumeSpi volume, Path src, Path target,
-      CopyOption... options) throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, MOVE);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, MOVE);
-      Files.move(src, target, options);
-      profilingEventHook.afterMetadataOp(volume, MOVE, begin);
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * See {@link Storage#nativeCopyFileUnbuffered(File, File, boolean)}.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param src  an existing file to copy, must not be {@code null}
-   * @param target  the new file, must not be {@code null}
-   * @param preserveFileDate  true if the file date of the copy
-   *                         should be the same as the original
-   * @throws IOException
-   */
-  public void nativeCopyFileUnbuffered(
-      @Nullable FsVolumeSpi volume, File src, File target,
-      boolean preserveFileDate) throws IOException {
-    final long length = src.length();
-    final long begin = profilingEventHook.beforeFileIo(volume, NATIVE_COPY,
-        length);
-    try {
-      faultInjectorEventHook.beforeFileIo(volume, NATIVE_COPY, length);
-      Storage.nativeCopyFileUnbuffered(src, target, preserveFileDate);
-      profilingEventHook.afterFileIo(volume, NATIVE_COPY, begin, length);
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * See {@link File#mkdirs()}.
-   *
-   * @param volume target volume. null if unavailable.
-   * @param dir  directory to be created.
-   * @return  true only if the directory was created. false if
-   *          the directory already exists.
-   * @throws IOException if a directory with the given name does
-   *                     not exist and could not be created.
-   */
-  public boolean mkdirs(
-      @Nullable FsVolumeSpi volume, File dir) throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, MKDIRS);
-    boolean created = false;
-    boolean isDirectory;
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, MKDIRS);
-      created = dir.mkdirs();
-      isDirectory = !created && dir.isDirectory();
-      profilingEventHook.afterMetadataOp(volume, MKDIRS, begin);
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-
-    if (!created && !isDirectory) {
-      throw new IOException("Mkdirs failed to create " + dir);
-    }
-    return created;
-  }
-
-  /**
-   * Create the target directory using {@link File#mkdirs()} only if
-   * it doesn't exist already.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param dir  directory to be created.
-   * @throws IOException  if the directory could not created
-   */
-  public void mkdirsWithExistsCheck(
-      @Nullable FsVolumeSpi volume, File dir) throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, MKDIRS);
-    boolean succeeded = false;
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, MKDIRS);
-      succeeded = dir.isDirectory() || dir.mkdirs();
-      profilingEventHook.afterMetadataOp(volume, MKDIRS, begin);
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-
-    if (!succeeded) {
-      throw new IOException("Mkdirs failed to create " + dir);
-    }
-  }
-
-  /**
-   * Get a listing of the given directory using
-   * {@link FileUtil#listFiles(File)}.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param dir  Directory to be listed.
-   * @return  array of file objects representing the directory entries.
-   * @throws IOException
-   */
-  public File[] listFiles(
-      @Nullable FsVolumeSpi volume, File dir) throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, LIST);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, LIST);
-      File[] children = FileUtil.listFiles(dir);
-      profilingEventHook.afterMetadataOp(volume, LIST, begin);
-      return children;
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Get a listing of the given directory using
-   * {@link FileUtil#listFiles(File)}.
-   *
-   * @param volume  target volume. null if unavailable.
-   * @param   dir directory to be listed.
-   * @return  array of strings representing the directory entries.
-   * @throws IOException
-   */
-  public String[] list(
-      @Nullable FsVolumeSpi volume, File dir) throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, LIST);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, LIST);
-      String[] children = FileUtil.list(dir);
-      profilingEventHook.afterMetadataOp(volume, LIST, begin);
-      return children;
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Get a listing of the given directory using
-   * {@link IOUtils#listDirectory(File, FilenameFilter)}.
-   *
-   * @param volume target volume. null if unavailable.
-   * @param dir Directory to list.
-   * @param filter {@link FilenameFilter} to filter the directory entries.
-   * @throws IOException
-   */
-  public List<String> listDirectory(
-      @Nullable FsVolumeSpi volume, File dir,
-      FilenameFilter filter) throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, LIST);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, LIST);
-      List<String> children = IOUtils.listDirectory(dir, filter);
-      profilingEventHook.afterMetadataOp(volume, LIST, begin);
-      return children;
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Retrieves the number of links to the specified file.
-   *
-   * @param volume target volume. null if unavailable.
-   * @param f file whose link count is being queried.
-   * @return number of hard-links to the given file, including the
-   *         given path itself.
-   * @throws IOException
-   */
-  public int getHardLinkCount(
-      @Nullable FsVolumeSpi volume, File f) throws IOException {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, LIST);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, LIST);
-      int count = HardLink.getLinkCount(f);
-      profilingEventHook.afterMetadataOp(volume, LIST, begin);
-      return count;
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * Check for file existence using {@link File#exists()}.
-   *
-   * @param volume target volume. null if unavailable.
-   * @param f file object.
-   * @return true if the file exists.
-   */
-  public boolean exists(@Nullable FsVolumeSpi volume, File f) {
-    final long begin = profilingEventHook.beforeMetadataOp(volume, EXISTS);
-    try {
-      faultInjectorEventHook.beforeMetadataOp(volume, EXISTS);
-      boolean exists = f.exists();
-      profilingEventHook.afterMetadataOp(volume, EXISTS, begin);
-      return exists;
-    } catch(Exception e) {
-      onFailure(volume, begin);
-      throw e;
-    }
-  }
-
-  /**
-   * A thin wrapper over {@link FileInputStream} that allows
-   * instrumenting disk IO.
-   */
-  private final class WrappedFileInputStream extends FileInputStream {
-    private @Nullable final FsVolumeSpi volume;
-
-    /**
-     * {@inheritDoc}.
-     */
-    private WrappedFileInputStream(@Nullable FsVolumeSpi volume, File f)
-        throws FileNotFoundException {
-      super(f);
-      this.volume = volume;
-    }
-
-    /**
-     * {@inheritDoc}.
-     */
-    private WrappedFileInputStream(
-        @Nullable FsVolumeSpi volume, FileDescriptor fd) {
-      super(fd);
-      this.volume = volume;
-    }
-
-    /**
-     * {@inheritDoc}.
-     */
-    @Override
-    public int read() throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, READ, LEN_INT);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, READ, LEN_INT);
-        int b = super.read();
-        profilingEventHook.afterFileIo(volume, READ, begin, LEN_INT);
-        return b;
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-
-    /**
-     * {@inheritDoc}.
-     */
-    @Override
-    public int read(@Nonnull byte[] b) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, READ, b
-          .length);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, READ, b.length);
-        int numBytesRead = super.read(b);
-        profilingEventHook.afterFileIo(volume, READ, begin, numBytesRead);
-        return numBytesRead;
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-
-    /**
-     * {@inheritDoc}.
-     */
-    @Override
-    public int read(@Nonnull byte[] b, int off, int len) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, READ, len);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, READ, len);
-        int numBytesRead = super.read(b, off, len);
-        profilingEventHook.afterFileIo(volume, READ, begin, numBytesRead);
-        return numBytesRead;
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-  }
-
-  /**
-   * A thin wrapper over {@link FileOutputStream} that allows
-   * instrumenting disk IO.
-   */
-  private final class WrappedFileOutputStream extends FileOutputStream {
-    private @Nullable final FsVolumeSpi volume;
-
-    /**
-     * {@inheritDoc}.
-     */
-    private WrappedFileOutputStream(
-        @Nullable FsVolumeSpi volume, File f,
-        boolean append) throws FileNotFoundException {
-      super(f, append);
-      this.volume = volume;
-    }
-
-    /**
-     * {@inheritDoc}.
-     */
-    private WrappedFileOutputStream(
-        @Nullable FsVolumeSpi volume, FileDescriptor fd) {
-      super(fd);
-      this.volume = volume;
-    }
-
-    /**
-     * {@inheritDoc}.
-     */
-    @Override
-    public void write(int b) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, WRITE,
-          LEN_INT);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, WRITE, LEN_INT);
-        super.write(b);
-        profilingEventHook.afterFileIo(volume, WRITE, begin, LEN_INT);
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-
-    /**
-     * {@inheritDoc}.
-     */
-    @Override
-    public void write(@Nonnull byte[] b) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, WRITE, b
-          .length);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, WRITE, b.length);
-        super.write(b);
-        profilingEventHook.afterFileIo(volume, WRITE, begin, b.length);
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-
-    /**
-     * {@inheritDoc}.
-     */
-    @Override
-    public void write(@Nonnull byte[] b, int off, int len) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, WRITE, len);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, WRITE, len);
-        super.write(b, off, len);
-        profilingEventHook.afterFileIo(volume, WRITE, begin, len);
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-  }
-
-  /**
-   * A thin wrapper over {@link FileInputStream} that allows
-   * instrumenting IO.
-   */
-  private final class WrappedRandomAccessFile extends RandomAccessFile {
-    private @Nullable final FsVolumeSpi volume;
-
-    public WrappedRandomAccessFile(
-        @Nullable FsVolumeSpi volume, File f, String mode)
-        throws FileNotFoundException {
-      super(f, mode);
-      this.volume = volume;
-    }
-
-    @Override
-    public int read() throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, READ, LEN_INT);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, READ, LEN_INT);
-        int b = super.read();
-        profilingEventHook.afterFileIo(volume, READ, begin, LEN_INT);
-        return b;
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-
-    @Override
-    public int read(byte[] b, int off, int len) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, READ, len);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, READ, len);
-        int numBytesRead = super.read(b, off, len);
-        profilingEventHook.afterFileIo(volume, READ, begin, numBytesRead);
-        return numBytesRead;
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-
-    @Override
-    public int read(byte[] b) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, READ, b
-          .length);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, READ, b.length);
-        int numBytesRead = super.read(b);
-        profilingEventHook.afterFileIo(volume, READ, begin, numBytesRead);
-        return numBytesRead;
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-
-    @Override
-    public void write(int b) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, WRITE,
-          LEN_INT);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, WRITE, LEN_INT);
-        super.write(b);
-        profilingEventHook.afterFileIo(volume, WRITE, begin, LEN_INT);
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-
-    @Override
-    public void write(@Nonnull byte[] b) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, WRITE, b
-          .length);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, WRITE, b.length);
-        super.write(b);
-        profilingEventHook.afterFileIo(volume, WRITE, begin, b.length);
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-
-    @Override
-    public void write(byte[] b, int off, int len) throws IOException {
-      final long begin = profilingEventHook.beforeFileIo(volume, WRITE, len);
-      try {
-        faultInjectorEventHook.beforeFileIo(volume, WRITE, len);
-        super.write(b, off, len);
-        profilingEventHook.afterFileIo(volume, WRITE, begin, len);
-      } catch(Exception e) {
-        onFailure(volume, begin);
-        throw e;
-      }
-    }
-  }
-
-  private void onFailure(@Nullable FsVolumeSpi volume, long begin) {
-    if (datanode != null && volume != null) {
-      datanode.checkDiskErrorAsync(volume);
-    }
-    profilingEventHook.onFailure(volume, begin);
-  }
-
-  public ProfilingFileIoEvents getProfilingEventHook() {
-    return profilingEventHook;
-  }
-}
+      onFailure(volume

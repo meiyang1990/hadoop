@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,14 +36,14 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * executes a given plan.
+ * 磁盘均衡器执行命令类，负责将生成的磁盘均衡计划提交到对应数据节点执行
+ * 是磁盘均衡命令的具体实现，核心职责是读取计划文件并提交给目标数据节点执行均衡任务
  */
 public class ExecuteCommand extends Command {
 
   /**
-   * Constructs ExecuteCommand.
-   *
-   * @param conf - Configuration.
+   * 构造执行命令对象，注册当前命令支持的参数选项
+   * @param conf Hadoop配置对象
    */
   public ExecuteCommand(Configuration conf) {
     super(conf);
@@ -53,9 +54,8 @@ public class ExecuteCommand extends Command {
   }
 
   /**
-   * Executes the Client Calls.
-   *
-   * @param cmd - CommandLine
+   * 执行命令的主入口，解析命令行参数，读取计划文件并提交到目标数据节点
+   * @param cmd 命令行参数对象
    */
   @Override
   public void execute(CommandLine cmd) throws Exception {
@@ -68,11 +68,13 @@ public class ExecuteCommand extends Command {
         "Invalid plan file specified.");
 
     String planData = null;
+    // 自动关闭流读取计划文件内容
     try (FSDataInputStream plan = open(planFile)) {
       planData = IOUtils.toString(plan, StandardCharsets.UTF_8);
     }
 
     boolean skipDateCheck = false;
+    // 检查是否开启跳过日期检查选项
     if(cmd.hasOption(DiskBalancerCLI.SKIPDATECHECK)) {
       skipDateCheck = true;
       LOG.warn("Skipping date check on this plan. This could mean we are " +
@@ -84,23 +86,27 @@ public class ExecuteCommand extends Command {
   }
 
   /**
-   * Submits plan to a given data node.
-   *
-   * @param planFile - Plan file name
-   * @param planData - Plan data in json format
-   * @param skipDateCheck - skips date check
-   * @throws IOException
+   * 将解析完成的均衡计划提交给目标数据节点执行，建立数据节点代理并提交任务
+   * @param planFile 计划文件路径
+   * @param planData JSON格式的计划数据
+   * @param skipDateCheck 是否跳过计划日期检查
+   * @throws IOException 读取计划或RPC调用失败抛出异常
    */
   private void submitPlan(final String planFile, final String planData,
                           boolean skipDateCheck)
           throws IOException {
     Preconditions.checkNotNull(planData);
+    // 解析JSON格式的计划数据
     NodePlan plan = NodePlan.parseJson(planData);
+    // 从计划中获取目标数据节点地址
     String dataNodeAddress = plan.getNodeName() + ":" + plan.getPort();
     Preconditions.checkNotNull(dataNodeAddress);
+    // 获取目标数据节点的RPC代理对象
     ClientDatanodeProtocol dataNode = getDataNodeProxy(dataNodeAddress);
+    // 计算计划数据的SHA1哈希，用于数据节点校验计划完整性
     String planHash = DigestUtils.sha1Hex(planData);
     try {
+      // 向数据节点提交磁盘均衡计划
       dataNode.submitDiskBalancerPlan(planHash, DiskBalancerCLI.PLAN_VERSION,
                                       planFile, planData, skipDateCheck);
     } catch (DiskBalancerException ex) {
@@ -111,7 +117,7 @@ public class ExecuteCommand extends Command {
   }
 
   /**
-   * Gets extended help for this command.
+   * 打印execute命令的扩展帮助信息，说明命令用法和参数说明
    */
   @Override
   public void printHelp() {

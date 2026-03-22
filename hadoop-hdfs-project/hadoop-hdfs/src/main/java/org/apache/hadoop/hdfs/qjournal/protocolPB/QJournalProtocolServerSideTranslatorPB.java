@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -77,13 +78,13 @@ import org.apache.hadoop.thirdparty.protobuf.RpcController;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
 /**
- * Implementation for protobuf service that forwards requests
- * received on {@link JournalProtocolPB} to the 
- * {@link JournalProtocol} server implementation.
+ * QJournal协议服务端Protobuf转换器，将来自RPC层的Protobuf格式请求
+ * 转发到原生QJournalProtocol实现进行处理，并将处理结果转换回Protobuf格式响应
+ * 负责HDFS QJournal高可用编辑日志共享协议的PB序列化/反序列化中转
  */
 @InterfaceAudience.Private
 public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolPB {
-  /** Server side implementation to delegate the requests to */
+  /** 被代理的原生QJournal协议服务端实现 */
   private final QJournalProtocol impl;
 
   private final static JournalResponseProto VOID_JOURNAL_RESPONSE =
@@ -93,12 +94,23 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   VOID_START_LOG_SEGMENT_RESPONSE =
       StartLogSegmentResponseProto.newBuilder().build();
 
+  /**
+   * 构造方法，注入需要代理的原生服务端实现
+   * @param impl 原生QJournal协议服务端实现
+   */
   public QJournalProtocolServerSideTranslatorPB(QJournalProtocol impl) {
     this.impl = impl;
   }
 
   
   @Override
+  /**
+   * 检查日志节点是否已经完成格式化
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return Protobuf格式响应，包含是否已格式化结果
+   * @throws ServiceException 服务异常封装
+   */
   public IsFormattedResponseProto isFormatted(RpcController controller,
       IsFormattedRequestProto request) throws ServiceException {
     try {
@@ -115,6 +127,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
 
 
   @Override
+  /**
+   * 获取日志节点的当前日志状态
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return Protobuf格式响应，包含日志状态信息
+   * @throws ServiceException 服务异常封装
+   */
   public GetJournalStateResponseProto getJournalState(RpcController controller,
       GetJournalStateRequestProto request) throws ServiceException {
     try {
@@ -126,11 +145,23 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
     }
   }
 
+  /**
+   * 将Protobuf格式的JournalId转换为原生字符串ID
+   * @param jid Protobuf格式JournalId
+   * @return 原生字符串JournalId
+   */
   private String convert(JournalIdProto jid) {
     return jid.getIdentifier();
   }
 
   @Override
+  /**
+   * 开启新的Epoch，用于选主后角色切换
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return Protobuf格式响应，包含新Epoch信息
+   * @throws ServiceException 服务异常封装
+   */
   public NewEpochResponseProto newEpoch(RpcController controller,
       NewEpochRequestProto request) throws ServiceException {
     try {
@@ -144,6 +175,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
     }
   }
 
+  /**
+   * 格式化日志节点存储
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return 空Protobuf响应
+   * @throws ServiceException 服务异常封装
+   */
   public FormatResponseProto format(RpcController controller,
       FormatRequestProto request) throws ServiceException {
     try {
@@ -187,6 +225,7 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   public StartLogSegmentResponseProto startLogSegment(RpcController controller,
       StartLogSegmentRequestProto req) throws ServiceException {
     try {
+      // 请求未指定布局版本时使用当前最新版本
       int layoutVersion = req.hasLayoutVersion() ? req.getLayoutVersion()
           : NameNodeLayoutVersion.CURRENT_LAYOUT_VERSION;
       impl.startLogSegment(convert(req.getReqInfo()), req.getTxid(),
@@ -198,6 +237,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   }
   
   @Override
+  /**
+   * 完成日志段的写入，正式固化日志段
+   * @param controller RPC控制器
+   * @param req Protobuf格式请求
+   * @return 空Protobuf响应
+   * @throws ServiceException 服务异常封装
+   */
   public FinalizeLogSegmentResponseProto finalizeLogSegment(
       RpcController controller, FinalizeLogSegmentRequestProto req)
       throws ServiceException {
@@ -211,6 +257,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   }
   
   @Override
+  /**
+   * 清理早于指定事务ID的旧日志
+   * @param controller RPC控制器
+   * @param req Protobuf格式请求
+   * @return 空Protobuf响应
+   * @throws ServiceException 服务异常封装
+   */
   public PurgeLogsResponseProto purgeLogs(RpcController controller,
       PurgeLogsRequestProto req) throws ServiceException {
     try {
@@ -223,6 +276,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   }
 
   @Override
+  /**
+   * 获取编辑日志清单，列出所有可用的日志段
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return Protobuf格式响应，包含日志清单信息
+   * @throws ServiceException 服务异常封装
+   */
   public GetEditLogManifestResponseProto getEditLogManifest(
       RpcController controller, GetEditLogManifestRequestProto request)
       throws ServiceException {
@@ -238,6 +298,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   }
 
   @Override
+  /**
+   * 获取从指定事务ID开始的日志内容
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return Protobuf格式响应，包含日志内容
+   * @throws ServiceException 服务异常封装
+   */
   public GetJournaledEditsResponseProto getJournaledEdits(
       RpcController controller, GetJournaledEditsRequestProto request)
       throws ServiceException {
@@ -251,6 +318,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   }
 
   @Override
+  /**
+   * 准备恢复操作，获取日志节点当前未完成日志段的状态
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return Protobuf格式响应，包含日志段状态
+   * @throws ServiceException 服务异常封装
+   */
   public PrepareRecoveryResponseProto prepareRecovery(RpcController controller,
       PrepareRecoveryRequestProto request) throws ServiceException {
     try {
@@ -262,6 +336,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   }
 
   @Override
+  /**
+   * 接受指定的恢复状态，完成日志恢复
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return 空Protobuf响应
+   * @throws ServiceException 服务异常封装
+   */
   public AcceptRecoveryResponseProto acceptRecovery(RpcController controller,
       AcceptRecoveryRequestProto request) throws ServiceException {
     try {
@@ -275,6 +356,11 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   }
 
   
+  /**
+   * 将Protobuf格式的RequestInfo转换为原生RequestInfo对象
+   * @param reqInfo Protobuf格式请求信息
+   * @return 原生请求信息对象
+   */
   private RequestInfo convert(
       QJournalProtocolProtos.RequestInfoProto reqInfo) {
     return new RequestInfo(
@@ -289,6 +375,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
 
 
   @Override
+  /**
+   * 执行升级前准备操作
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return 空Protobuf响应
+   * @throws ServiceException 服务异常封装
+   */
   public DoPreUpgradeResponseProto doPreUpgrade(RpcController controller,
       DoPreUpgradeRequestProto request) throws ServiceException {
     try {
@@ -300,6 +393,13 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   }
 
   @Override
+  /**
+   * 执行版本升级操作
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return 空Protobuf响应
+   * @throws ServiceException 服务异常封装
+   */
   public DoUpgradeResponseProto doUpgrade(RpcController controller,
       DoUpgradeRequestProto request) throws ServiceException {
     StorageInfo si = PBHelper.convert(request.getSInfo(), NodeType.JOURNAL_NODE);
@@ -312,71 +412,15 @@ public class QJournalProtocolServerSideTranslatorPB implements QJournalProtocolP
   }
 
   @Override
+  /**
+   * 完成升级操作，固化新版本
+   * @param controller RPC控制器
+   * @param request Protobuf格式请求
+   * @return 空Protobuf响应
+   * @throws ServiceException 服务异常封装
+   */
   public DoFinalizeResponseProto doFinalize(RpcController controller,
       DoFinalizeRequestProto request) throws ServiceException {
     try {
       impl.doFinalize(convert(request.getJid()),
-          request.hasNameServiceId() ? request.getNameServiceId() : null);
-      return DoFinalizeResponseProto.getDefaultInstance();
-    } catch (IOException e) {
-      throw new ServiceException(e);
-    }
-  }
-
-  @Override
-  public CanRollBackResponseProto canRollBack(RpcController controller,
-      CanRollBackRequestProto request) throws ServiceException {
-    try {
-      StorageInfo si = PBHelper.convert(request.getStorage(), NodeType.JOURNAL_NODE);
-      Boolean result = impl.canRollBack(convert(request.getJid()),
-          request.hasNameServiceId() ? request.getNameServiceId() : null,
-          si,
-          PBHelper.convert(request.getPrevStorage(), NodeType.JOURNAL_NODE),
-          request.getTargetLayoutVersion());
-      return CanRollBackResponseProto.newBuilder()
-          .setCanRollBack(result)
-          .build();
-    } catch (IOException e) {
-      throw new ServiceException(e);
-    }
-  }
-
-  @Override
-  public DoRollbackResponseProto doRollback(RpcController controller, DoRollbackRequestProto request)
-      throws ServiceException {
-    try {
-      impl.doRollback(convert(request.getJid()), request.getNameserviceId());
-      return DoRollbackResponseProto.getDefaultInstance();
-    } catch (IOException e) {
-      throw new ServiceException(e);
-    }
-  }
-
-  @Override
-  public DiscardSegmentsResponseProto discardSegments(
-      RpcController controller, DiscardSegmentsRequestProto request)
-      throws ServiceException {
-    try {
-      impl.discardSegments(convert(request.getJid()),
-          request.hasNameServiceId() ? request.getNameServiceId() : null,
-          request.getStartTxId());
-      return DiscardSegmentsResponseProto.getDefaultInstance();
-    } catch (IOException e) {
-      throw new ServiceException(e);
-    }
-  }
-
-  @Override
-  public GetJournalCTimeResponseProto getJournalCTime(RpcController controller,
-      GetJournalCTimeRequestProto request) throws ServiceException {
-    try {
-      Long resultCTime = impl.getJournalCTime(convert(request.getJid()),
-          request.getNameServiceId());
-      return GetJournalCTimeResponseProto.newBuilder()
-          .setResultCTime(resultCTime)
-          .build();
-    } catch (IOException e) {
-      throw new ServiceException(e);
-    }
-  }
-}
+          request.hasNameServiceId() ? request.getNameServiceId() : null

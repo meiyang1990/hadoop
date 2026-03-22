@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,53 +23,62 @@ import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 
 /** 
- * This represents block replicas which are stored in DataNode.
+ * 数据节点存储的块副本抽象接口，定义了所有块副本类型必须实现的基础方法
+ * 该接口为DataNode提供统一的副本操作契约，支持不同状态和类型副本的统一管理
  */
 @InterfaceAudience.Private
 public interface Replica {
-  /** Get the block ID  */
+  /**
+   * 获取该副本对应的块ID
+   * @return 块ID
+   */
   public long getBlockId();
 
-  /** Get the generation stamp */
+  /**
+   * 获取该副本的生成时间戳，用于版本识别
+   * @return 生成时间戳
+   */
   public long getGenerationStamp();
 
   /**
-   * Get the replica state
-   * @return the replica state
+   * 获取该副本当前所处的状态
+   * @return 副本状态枚举值
    */
   public ReplicaState getState();
 
   /**
-   * Get the number of bytes received
-   * @return the number of bytes that have been received
+   * 获取已经接收到的字节数，用于写入过程中统计进度
+   * @return 已经接收到的字节数
    */
   public long getNumBytes();
   
   /**
-   * Get the number of bytes that have written to disk
-   * @return the number of bytes that have written to disk
+   * 获取已经写入磁盘的字节数
+   * @return 已经落盘的字节数
    */
   public long getBytesOnDisk();
 
   /**
-   * Get the number of bytes that are visible to readers
-   * @return the number of bytes that are visible to readers
+   * 获取对读者可见的字节长度，部分写入完成的副本仅可读取已完成部分
+   * @return 对读者可见的字节长度
    */
   public long getVisibleLength();
 
   /**
-   * Return the storageUuid of the volume that stores this replica.
+   * 获取存储该副本的卷存储UUID
+   * @return 卷存储UUID
    */
   public String getStorageUuid();
 
   /**
-   * Return true if the target volume is backed by RAM.
+   * 判断该副本所在存储是否为内存临时存储
+   * @return 如果是RAM-backed存储返回true，否则返回false
    */
   public boolean isOnTransientStorage();
 
   /**
-   * Get the volume of replica.
-   * @return the volume of replica
+   * 获取存储该副本的文件卷对象
+   * @return 存储该副本的FsVolumeSpi实例
    */
   public FsVolumeSpi getVolume();
 }

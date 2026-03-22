@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,13 +22,22 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Base class for data-node command.
- * Issued by the name-node to notify data-nodes what should be done.
+ * 文件级注释：HDFS节点间通信协议中，DataNode命令的抽象基类。
+ * 所有NameNode下发给DataNode的操作命令都继承自此类，封装了命令的通用结构，
+ * 用于NameNode向DataNode下达执行指令，指示DataNode完成指定操作。
+ */
+/**
+ * DataNode命令抽象基类，所有NameNode下发给DataNode的命令都继承此类。
+ * 由NameNode发起，通知DataNode执行对应操作，是HDFS节点间控制指令的基础抽象。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public abstract class DatanodeCommand extends ServerCommand {
 
+  /**
+   * 构造DataNode命令对象，指定命令动作类型
+   * @param action 命令动作类型标识
+   */
   DatanodeCommand(int action) {
     super(action);
   }

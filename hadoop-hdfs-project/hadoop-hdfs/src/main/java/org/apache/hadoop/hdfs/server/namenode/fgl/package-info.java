@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,5 +15,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * HDFS NameNode  fine-grained locking（细粒度锁）模块包，提供基于目录树节点的细粒度锁机制实现。
+ * 该机制通过对目录树的单个节点分别加锁，替代NameNode全局根节点锁，提升高并发场景下
+ * 文件元数据操作的并发性能，同时保证元数据修改的一致性。
  */
 package org.apache.hadoop.hdfs.server.namenode.fgl;

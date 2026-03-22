@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,13 +36,15 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 /**
+ * 文件级：磁盘均衡器取消命令实现类，负责取消指定DataNode上正在运行的磁盘均衡计划。
+ * 提供两种取消方式：通过计划文件读取信息取消，或直接通过节点地址和计划哈希取消。
  * Cancels a running plan.
  */
 public class CancelCommand extends Command {
   /**
-   * Contructs a cancel Command.
+   * 构造取消命令对象，注册命令参数和描述信息。
    *
-   * @param conf - Conf
+   * @param conf Hadoop配置对象
    */
   public CancelCommand(Configuration conf) {
     super(conf);
@@ -52,9 +55,10 @@ public class CancelCommand extends Command {
   }
 
   /**
-   * Executes the Client Calls.
+   * 执行取消命令，根据输入参数选择取消方式。
    *
-   * @param cmd - CommandLine
+   * @param cmd 命令行参数对象
+   * @throws Exception 执行过程中的异常
    */
   @Override
   public void execute(CommandLine cmd) throws Exception {
@@ -65,6 +69,7 @@ public class CancelCommand extends Command {
     // We can cancel a plan using datanode address and plan ID
     // that you can read from a datanode using queryStatus
     if(cmd.hasOption(DiskBalancerCLI.NODE)) {
+      // 节点地址参数存在，直接使用节点地址和计划哈希取消
       String nodeAddress = cmd.getOptionValue(DiskBalancerCLI.NODE);
       String planHash = cmd.getOptionValue(DiskBalancerCLI.CANCEL);
       cancelPlanUsingHash(nodeAddress, planHash);
@@ -72,6 +77,7 @@ public class CancelCommand extends Command {
       // Or you can cancel a plan using the plan file. If the user
       // points us to the plan file, we can compute the hash as well as read
       // the address of the datanode from the plan file.
+      // 节点地址参数不存在，通过计划文件读取信息后取消
       String planFile = cmd.getOptionValue(DiskBalancerCLI.CANCEL);
       Preconditions.checkArgument(planFile != null && !planFile.isEmpty(),
           "Invalid plan file specified.");
@@ -84,19 +90,24 @@ public class CancelCommand extends Command {
   }
 
   /**
-   * Cancels a running plan.
+   * 根据计划JSON数据解析信息，向目标DataNode发起取消请求。
    *
-   * @param planData - Plan data.
-   * @throws IOException
+   * @param planData 计划JSON字符串数据
+   * @throws IOException 读取计划或RPC调用异常
    */
   private void cancelPlan(String planData) throws IOException {
     Preconditions.checkNotNull(planData);
+    // 解析JSON格式的计划数据
     NodePlan plan = NodePlan.parseJson(planData);
+    // 从计划中拼接DataNode地址
     String dataNodeAddress = plan.getNodeName() + ":" + plan.getPort();
     Preconditions.checkNotNull(dataNodeAddress);
+    // 获取DataNode的RPC代理
     ClientDatanodeProtocol dataNode = getDataNodeProxy(dataNodeAddress);
+    // 计算计划数据的SHA-1哈希作为计划ID
     String planHash = DigestUtils.sha1Hex(planData);
     try {
+      // 发起RPC调用取消计划
       dataNode.cancelDiskBalancePlan(planHash);
     } catch (DiskBalancerException ex) {
       LOG.error("Cancelling plan on  {} failed. Result: {}, Message: {}",
@@ -106,18 +117,19 @@ public class CancelCommand extends Command {
   }
 
   /**
-   * Cancels a running plan.
-   * @param nodeAddress - Address of the data node.
-   * @param hash - Sha512 hash of the plan, which can be read from datanode
-   *             using query status command.
-   * @throws IOException
+   * 使用节点地址和计划哈希直接向DataNode发起取消请求。
+   * @param nodeAddress 目标DataNode地址，格式为节点:端口
+   * @param hash 计划的SHA哈希，可通过查询状态命令从DataNode获取
+   * @throws IOException RPC调用异常
    */
   private void cancelPlanUsingHash(String nodeAddress, String hash) throws
       IOException {
     Preconditions.checkNotNull(nodeAddress);
     Preconditions.checkNotNull(hash);
+    // 获取DataNode的RPC代理
     ClientDatanodeProtocol dataNode = getDataNodeProxy(nodeAddress);
     try {
+      // 发起RPC调用取消计划
       dataNode.cancelDiskBalancePlan(hash);
     } catch (DiskBalancerException ex) {
       LOG.error("Cancelling plan on  {} failed. Result: {}, Message: {}",
@@ -128,7 +140,7 @@ public class CancelCommand extends Command {
 
 
   /**
-   * Gets extended help for this command.
+   * 打印取消命令的帮助信息，包含使用说明和示例。
    */
   @Override
   public void printHelp() {

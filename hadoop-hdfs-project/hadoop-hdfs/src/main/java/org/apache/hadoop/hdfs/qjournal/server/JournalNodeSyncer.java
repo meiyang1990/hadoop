@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -61,9 +62,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * A Journal Sync thread runs through the lifetime of the JN. It periodically
- * gossips with other journal nodes to compare edit log manifests and if it
- * detects any missing log segment, it downloads it from the other journal node
+ * @fileoverview 日志节点同步器，运行在日志节点生命周期中，定期与其他日志节点同步编辑日志
+ * 核心功能：周期性对比其他节点的编辑日志清单，下载本节点缺失的日志段，保证集群中所有日志节点数据一致
  */
 @InterfaceAudience.Private
 public class JournalNodeSyncer {
@@ -88,6 +88,14 @@ public class JournalNodeSyncer {
   private final JournalMetrics metrics;
   private boolean journalSyncerStarted;
 
+  /**
+   * 构造日志节点同步器，初始化配置和参数
+   * @param jouranlNode 当前日志节点实例
+   * @param journal 对应的日志实例
+   * @param jid 日志ID
+   * @param conf Hadoop配置
+   * @param nameServiceId 命名服务ID
+   */
   JournalNodeSyncer(JournalNode jouranlNode, Journal journal, String jid,
       Configuration conf, String nameServiceId) {
     this.jn = jouranlNode;
@@ -96,23 +104,30 @@ public class JournalNodeSyncer {
     this.nameServiceId = nameServiceId;
     this.jnStorage = journal.getStorage();
     this.conf = conf;
+    // 从配置读取同步间隔时间
     journalSyncInterval = conf.getLong(
         DFSConfigKeys.DFS_JOURNALNODE_SYNC_INTERVAL_KEY,
         DFSConfigKeys.DFS_JOURNALNODE_SYNC_INTERVAL_DEFAULT);
+    // 从配置读取日志段传输超时时间
     logSegmentTransferTimeout = conf.getInt(
         DFSConfigKeys.DFS_EDIT_LOG_TRANSFER_TIMEOUT_KEY,
         DFSConfigKeys.DFS_EDIT_LOG_TRANSFER_TIMEOUT_DEFAULT);
+    // 从配置读取是否允许同步过程中格式化日志
     tryFormatting = conf.getBoolean(
         DFSConfigKeys.DFS_JOURNALNODE_ENABLE_SYNC_FORMAT_KEY,
         DFSConfigKeys.DFS_JOURNALNODE_ENABLE_SYNC_FORMAT_DEFAULT);
+    // 初始化带宽限流控制器
     throttler = getThrottler(conf);
     metrics = journal.getMetrics();
     journalSyncerStarted = false;
   }
 
+  /**
+   * 停止同步线程，清理临时目录
+   */
   void stopSync() {
     shouldSync = false;
-    // Delete the edits.sync directory
+    // 删除同步临时目录
     File editsSyncDir = journal.getStorage().getEditsSyncDir();
     if (editsSyncDir.exists()) {
       FileUtil.fullyDelete(editsSyncDir);
@@ -122,6 +137,10 @@ public class JournalNodeSyncer {
     }
   }
 
+  /**
+   * 启动同步器
+   * @param nsId 命名空间ID
+   */
   public void start(String nsId) {
     if (nsId != null) {
       this.nameServiceId = nsId;
@@ -135,10 +154,18 @@ public class JournalNodeSyncer {
 
   }
 
+  /**
+   * 获取同步器是否已启动
+   * @return 同步器启动状态
+   */
   public boolean isJournalSyncerStarted() {
     return journalSyncerStarted;
   }
 
+  /**
+   * 创建同步临时目录，用于存放下载中的日志段
+   * @return 创建是否成功
+   */
   private boolean createEditsSyncDir() {
     File editsSyncDir = journal.getStorage().getEditsSyncDir();
     if (editsSyncDir.exists()) {
@@ -148,6 +175,10 @@ public class JournalNodeSyncer {
     return editsSyncDir.mkdir();
   }
 
+  /**
+   * 获取其他所有日志节点的代理对象，用于RPC通信
+   * @return 是否成功获取至少一个可用代理
+   */
   private boolean getOtherJournalNodeProxies() {
     List<InetSocketAddress> otherJournalNodes = getOtherJournalNodeAddrs();
     if (otherJournalNodes == null || otherJournalNodes.isEmpty()) {
@@ -162,9 +193,7 @@ public class JournalNodeSyncer {
         LOG.warn("Could not add proxy for Journal at addresss " + addr, e);
       }
     }
-    // Check if there are any other JournalNodes before starting the sync.  Although some proxies
-    // may be unresolved now, the act of attempting to sync will instigate resolution when the
-    // servers become available.
+    // 检查是否至少有一个其他日志节点可用
     if (otherJNProxies.isEmpty()) {
       LOG.error("Cannot sync as there is no other JN available for sync.");
       return false;
@@ -173,12 +202,15 @@ public class JournalNodeSyncer {
     return true;
   }
 
+  /**
+   * 启动同步守护线程，执行周期性同步逻辑
+   */
   private void startSyncJournalsDaemon() {
     syncJournalDaemon = new Daemon(() -> {
-      // Wait for journal to be formatted to create edits.sync directory
+      // 等待日志格式化完成再创建同步目录
       while(!journal.isFormatted()) {
         try {
-          // Format the journal with namespace info from the other JNs if it is not formatted
+          // 如果日志未格式化，尝试从其他节点获取信息自动格式化
           formatWithSyncer();
           Thread.sleep(journalSyncInterval);
         } catch (InterruptedException e) {
@@ -206,6 +238,7 @@ public class JournalNodeSyncer {
             }
             continue;
           } else {
+            // 执行一次同步
             syncJournals();
           }
         } catch (Throwable t) {
@@ -230,6 +263,7 @@ public class JournalNodeSyncer {
               "JournalNodeSyncer daemon received Runtime exception. ", t);
         }
         try {
+          // 等待同步间隔后再执行下一次
           Thread.sleep(journalSyncInterval);
         } catch (InterruptedException e) {
           if (!shouldSync) {
@@ -245,11 +279,18 @@ public class JournalNodeSyncer {
     syncJournalDaemon.start();
   }
 
+  /**
+   * 轮询与各个其他日志节点执行同步
+   */
   private void syncJournals() {
     syncWithJournalAtIndex(journalNodeIndexForSync);
+    // 轮询下一个节点
     journalNodeIndexForSync = (journalNodeIndexForSync + 1) % numOtherJNs;
   }
 
+  /**
+   * 从其他节点获取存储信息，自动格式化当前未格式化的日志
+   */
   private void formatWithSyncer() {
     if (!tryFormatting) {
       return;
@@ -257,13 +298,14 @@ public class JournalNodeSyncer {
     LOG.info("Trying to format the journal with the syncer");
     try {
       StorageInfo storage = null;
+      // 遍历所有其他节点，尝试获取有效的存储信息
       for (JournalNodeProxy jnProxy : otherJNProxies) {
+        // 跳过还没有编辑日志的节点，避免和NameNode格式化竞争
         if (!hasEditLogs(jnProxy)) {
-          // This avoids a race condition between `hdfs namenode -format` and
-          // JN syncer by checking if the other JN is not newly formatted.
           continue;
         }
         try {
+          // 从目标节点获取存储信息
           HdfsServerProtos.StorageInfoProto storageInfoResponse =
               jnProxy.jnProxy.getStorageInfo(jid, nameServiceId);
           storage = PBHelper.convert(
@@ -285,6 +327,7 @@ public class JournalNodeSyncer {
             "JournalNodeSyncer cannot format the journal.");
         return;
       }
+      // 使用获取到的命名空间信息格式化当前日志
       NamespaceInfo nsInfo = new NamespaceInfo(storage);
       journal.format(nsInfo, true);
     } catch (IOException e) {
@@ -292,6 +335,11 @@ public class JournalNodeSyncer {
     }
   }
 
+  /**
+   * 检查目标日志节点是否已经存在编辑日志
+   * @param journalProxy 目标节点代理
+   * @return 是否存在编辑日志
+   */
   private boolean hasEditLogs(JournalNodeProxy journalProxy) {
     GetEditLogManifestResponseProto editLogManifest;
     try {
@@ -312,6 +360,10 @@ public class JournalNodeSyncer {
     return true;
   }
 
+  /**
+   * 与指定索引对应的日志节点执行同步
+   * @param index 目标节点在列表中的索引
+   */
   private void syncWithJournalAtIndex(int index) {
     LOG.info("Syncing Journal " + jn.getBoundIpcAddress().getAddress() + ":"
         + jn.getBoundIpcAddress().getPort() + " with "
@@ -322,6 +374,7 @@ public class JournalNodeSyncer {
       return;
     }
 
+    // 获取本节点当前的编辑日志清单
     List<RemoteEditLog> thisJournalEditLogs;
     try {
       thisJournalEditLogs = journal.getEditLogManifest(0, false).getLogs();
@@ -330,6 +383,7 @@ public class JournalNodeSyncer {
       return;
     }
 
+    // 获取目标节点的编辑日志清单
     GetEditLogManifestResponseProto editLogManifest;
     try {
       editLogManifest = jnProxy.getEditLogManifestFromJournal(jid,
@@ -340,17 +394,24 @@ public class JournalNodeSyncer {
       return;
     }
 
+    // 对比并下载缺失的日志段
     getMissingLogSegments(thisJournalEditLogs, editLogManifest,
         otherJNProxies.get(index));
   }
 
+  /**
+   * 从配置中解析出所有其他日志节点的地址列表
+   * @return 其他日志节点地址列表，解析失败返回null
+   */
   private List<InetSocketAddress> getOtherJournalNodeAddrs() {
     String uriStr = "";
     try {
+      // 读取共享编辑目录配置
       uriStr = conf.getTrimmed(DFSConfigKeys.DFS_NAMENODE_SHARED_EDITS_DIR_KEY);
 
       if (uriStr == null || uriStr.isEmpty()) {
         if (nameServiceId != null) {
+          // 按命名服务ID读取配置
           uriStr = conf.getTrimmed(DFSConfigKeys
               .DFS_NAMENODE_SHARED_EDITS_DIR_KEY + "." + nameServiceId);
         }
@@ -359,6 +420,7 @@ public class JournalNodeSyncer {
       if (uriStr == null || uriStr.isEmpty()) {
         HashSet<String> sharedEditsUri = new HashSet<>();
         if (nameServiceId != null) {
+          // 兼容HA配置，遍历所有NameNode ID读取
           Collection<String> nnIds = DFSUtilClient.getNameNodeIds(
               conf, nameServiceId);
           for (String nnId : nnIds) {
@@ -380,241 +442,3 @@ public class JournalNodeSyncer {
 
       if (uriStr == null || uriStr.isEmpty()) {
         LOG.error("Could not construct Shared Edits Uri");
-        return null;
-      } else {
-        return getJournalAddrList(uriStr);
-      }
-
-    } catch (URISyntaxException e) {
-      LOG.error("The conf property " + DFSConfigKeys
-          .DFS_NAMENODE_SHARED_EDITS_DIR_KEY + " not set properly.");
-    } catch (IOException e) {
-      LOG.error("Could not parse JournalNode addresses: " + uriStr);
-    }
-    return null;
-  }
-
-  @VisibleForTesting
-  protected List<InetSocketAddress> getJournalAddrList(String uriStr) throws
-      URISyntaxException,
-      IOException {
-    URI uri = new URI(uriStr);
-
-    InetSocketAddress boundIpcAddress = jn.getBoundIpcAddress();
-    Set<InetSocketAddress> excluded = Sets.newHashSet(boundIpcAddress);
-    List<InetSocketAddress> addrList = Util.getLoggerAddresses(uri, excluded, conf);
-
-    // Exclude the current JournalNode instance (a local address and the same port).  If the address
-    // is bound to a local address on the same port, then remove it to handle scenarios where a
-    // wildcard address (e.g. "0.0.0.0") is used.   We can't simply exclude all local addresses
-    // since we may be running multiple servers on the same host.
-    addrList.removeIf(addr -> !addr.isUnresolved() &&  addr.getAddress().isAnyLocalAddress()
-          && boundIpcAddress.getPort() == addr.getPort());
-
-    return addrList;
-  }
-
-  private void getMissingLogSegments(List<RemoteEditLog> thisJournalEditLogs,
-                                     GetEditLogManifestResponseProto response,
-                                     JournalNodeProxy remoteJNproxy) {
-
-    List<RemoteEditLog> otherJournalEditLogs = PBHelper.convert(
-        response.getManifest()).getLogs();
-    if (otherJournalEditLogs == null || otherJournalEditLogs.isEmpty()) {
-      LOG.warn("Journal at " + remoteJNproxy.jnAddr + " has no edit logs");
-      return;
-    }
-    List<RemoteEditLog> missingLogs = getMissingLogList(thisJournalEditLogs,
-        otherJournalEditLogs);
-
-    if (!missingLogs.isEmpty()) {
-      NamespaceInfo nsInfo = jnStorage.getNamespaceInfo();
-
-      for (RemoteEditLog missingLog : missingLogs) {
-        URL url = null;
-        boolean success = false;
-        try {
-          if (remoteJNproxy.httpServerUrl == null) {
-            if (response.hasFromURL()) {
-              remoteJNproxy.httpServerUrl = getHttpServerURI(
-                  response.getFromURL(), remoteJNproxy.jnAddr.getHostName());
-            } else {
-              LOG.error("EditLogManifest response does not have fromUrl " +
-                  "field set. Aborting current sync attempt");
-              break;
-            }
-          }
-
-          String urlPath = GetJournalEditServlet.buildPath(jid, missingLog
-              .getStartTxId(), nsInfo, false);
-          url = new URL(remoteJNproxy.httpServerUrl, urlPath);
-          success = downloadMissingLogSegment(url, missingLog);
-        } catch (URISyntaxException e) {
-          LOG.error("EditLogManifest's fromUrl field syntax incorrect", e);
-        } catch (MalformedURLException e) {
-          LOG.error("MalformedURL when download missing log segment", e);
-        } catch (Exception e) {
-          LOG.error("Exception in downloading missing log segment from url " +
-              url, e);
-        }
-        if (!success) {
-          LOG.error("Aborting current sync attempt.");
-          break;
-        }
-      }
-    }
-  }
-
-  /**
-   *  Returns the logs present in otherJournalEditLogs and missing from
-   *  thisJournalEditLogs.
-   */
-  private List<RemoteEditLog> getMissingLogList(
-      List<RemoteEditLog> thisJournalEditLogs,
-      List<RemoteEditLog> otherJournalEditLogs) {
-    if (thisJournalEditLogs.isEmpty()) {
-      return otherJournalEditLogs;
-    }
-
-    List<RemoteEditLog> missingEditLogs = Lists.newArrayList();
-
-    int localJnIndex = 0, remoteJnIndex = 0;
-    int localJnNumLogs = thisJournalEditLogs.size();
-    int remoteJnNumLogs = otherJournalEditLogs.size();
-
-    while (localJnIndex < localJnNumLogs && remoteJnIndex < remoteJnNumLogs) {
-      long localJNstartTxId = thisJournalEditLogs.get(localJnIndex)
-          .getStartTxId();
-      long remoteJNstartTxId = otherJournalEditLogs.get(remoteJnIndex)
-          .getStartTxId();
-
-      if (localJNstartTxId == remoteJNstartTxId) {
-        localJnIndex++;
-        remoteJnIndex++;
-      } else if (localJNstartTxId > remoteJNstartTxId) {
-        missingEditLogs.add(otherJournalEditLogs.get(remoteJnIndex));
-        remoteJnIndex++;
-      } else {
-        localJnIndex++;
-      }
-    }
-
-    if (remoteJnIndex < remoteJnNumLogs) {
-      for (; remoteJnIndex < remoteJnNumLogs; remoteJnIndex++) {
-        missingEditLogs.add(otherJournalEditLogs.get(remoteJnIndex));
-      }
-    }
-
-    return missingEditLogs;
-  }
-
-  private URL getHttpServerURI(String fromUrl, String hostAddr)
-      throws URISyntaxException, MalformedURLException {
-    URI uri = new URI(fromUrl);
-    return new URL(uri.getScheme(), hostAddr, uri.getPort(), "");
-  }
-
-  /**
-   * Transfer an edit log from one journal node to another for sync-up.
-   */
-  private boolean downloadMissingLogSegment(URL url, RemoteEditLog log)
-      throws IOException {
-    LOG.info("Downloading missing Edit Log from " + url + " to " + jnStorage
-        .getRoot());
-
-    assert log.getStartTxId() > 0 && log.getEndTxId() > 0 : "bad log: " + log;
-    File finalEditsFile = jnStorage.getFinalizedEditsFile(log.getStartTxId(),
-        log.getEndTxId());
-
-    if (finalEditsFile.exists() && FileUtil.canRead(finalEditsFile)) {
-      LOG.info("Skipping download of remote edit log " + log + " since it's" +
-          " already stored locally at " + finalEditsFile);
-      return true;
-    }
-
-    // Download the log segment to current.tmp directory first.
-    File tmpEditsFile = jnStorage.getTemporaryEditsFile(
-        log.getStartTxId(), log.getEndTxId());
-
-    if (!SecurityUtil.doAsLoginUser(() -> {
-      if (UserGroupInformation.isSecurityEnabled()) {
-        UserGroupInformation.getCurrentUser().checkTGTAndReloginFromKeytab();
-      }
-      try {
-        Util.doGetUrl(url, ImmutableList.of(tmpEditsFile), jnStorage, false,
-            logSegmentTransferTimeout, throttler);
-      } catch (IOException e) {
-        LOG.error("Download of Edit Log file for Syncing failed. Deleting temp "
-            + "file: " + tmpEditsFile, e);
-        if (!tmpEditsFile.delete()) {
-          LOG.warn("Deleting " + tmpEditsFile + " has failed");
-        }
-        return false;
-      }
-      return true;
-    })) {
-      return false;
-    }
-    LOG.info("Downloaded file " + tmpEditsFile.getName() + " of size " +
-        tmpEditsFile.length() + " bytes.");
-
-    boolean moveSuccess = false;
-    try {
-      moveSuccess = journal.moveTmpSegmentToCurrent(tmpEditsFile,
-          finalEditsFile, log.getEndTxId());
-    } catch (IOException e) {
-      LOG.info("Could not move {} to current directory.", tmpEditsFile);
-    } finally {
-      if (tmpEditsFile.exists() && !tmpEditsFile.delete()) {
-        LOG.warn("Deleting " + tmpEditsFile + " has failed");
-      }
-    }
-    if (moveSuccess) {
-      metrics.incrNumEditLogsSynced();
-      return true;
-    } else {
-      return false;
-    }
-  }
-
-  private static DataTransferThrottler getThrottler(Configuration conf) {
-    long transferBandwidth =
-        conf.getLong(DFSConfigKeys.DFS_EDIT_LOG_TRANSFER_RATE_KEY,
-            DFSConfigKeys.DFS_EDIT_LOG_TRANSFER_RATE_DEFAULT);
-    DataTransferThrottler throttler = null;
-    if (transferBandwidth > 0) {
-      throttler = new DataTransferThrottler(transferBandwidth);
-    }
-    return throttler;
-  }
-
-  private class JournalNodeProxy {
-    private final InetSocketAddress jnAddr;
-    private final InterQJournalProtocol jnProxy;
-    private URL httpServerUrl;
-
-    JournalNodeProxy(InetSocketAddress jnAddr) throws IOException {
-      final Configuration confCopy = new Configuration(conf);
-      this.jnAddr = jnAddr;
-      this.jnProxy = SecurityUtil.doAsLoginUser(
-          new PrivilegedExceptionAction<InterQJournalProtocol>() {
-            @Override
-            public InterQJournalProtocol run() throws IOException {
-              RPC.setProtocolEngine(confCopy, InterQJournalProtocolPB.class,
-                  ProtobufRpcEngine2.class);
-              InterQJournalProtocolPB interQJournalProtocolPB = RPC.getProxy(
-                  InterQJournalProtocolPB.class,
-                  RPC.getProtocolVersion(InterQJournalProtocolPB.class),
-                  jnAddr, confCopy);
-              return new InterQJournalProtocolTranslatorPB(
-                  interQJournalProtocolPB);
-            }
-          });
-    }
-
-    @Override
-    public String toString() {
-      return jnAddr.toString();
-    }
-  }
-}

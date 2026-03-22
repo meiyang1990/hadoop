@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,16 +21,22 @@ package org.apache.hadoop.hdfs.server.namenode;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+/**
+ * NameNode版本信息MXBean接口，提供JMX方式访问NameNode版本编译信息
+ * 用于监控系统通过JMX接口获取当前NameNode实例的版本和编译元数据
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface VersionInfoMXBean {
   /**
-   * @return the compilation information which contains date, user and branch
+   * 获取编译信息，包含编译日期、编译用户、分支信息
+   * @return 编译信息字符串
    */
   public String getCompileInfo();
 
   /**
-   * @return the software version
+   * 获取Hadoop软件版本号
+   * @return Hadoop版本号字符串
    */
   public String getSoftwareVersion();
 }

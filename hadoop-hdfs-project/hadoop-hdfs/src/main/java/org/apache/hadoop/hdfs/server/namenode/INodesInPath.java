@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,19 +34,27 @@ import static org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot.CURRENT_S
 import static org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot.ID_INTEGER_COMPARATOR;
 
 /**
- * Contains INodes information resolved from a given path.
+ * 文件路径解析得到的INode集合容器，存储从根目录到目标路径每一层的INode信息，
+ * 同时支持快照路径解析，保存快照相关元数据信息，是NameNode路径查找的核心结果载体。
  */
 public class INodesInPath {
   public static final Logger LOG = LoggerFactory.getLogger(INodesInPath.class);
 
   /**
-   * @return true if path component is {@link HdfsConstants#DOT_SNAPSHOT_DIR}
+   * 判断路径组件是否为快照目录(.snapshot)
+   * @param pathComponent 待判断的路径组件字节数组
+   * @return 是快照目录返回true，否则返回false
    */
   private static boolean isDotSnapshotDir(byte[] pathComponent) {
     return pathComponent != null &&
         Arrays.equals(HdfsServerConstants.DOT_SNAPSHOT_DIR_BYTES, pathComponent);
   }
 
+  /**
+   * 从给定INode向上遍历父节点，收集从根到该INode的所有INode数组
+   * @param inode 目标INode
+   * @return 从根到目标INode顺序排列的INode数组
+   */
   private static INode[] getINodes(final INode inode) {
     int depth = 0, index;
     INode tmp = inode;
@@ -64,6 +73,11 @@ public class INodesInPath {
     return inodes;
   }
 
+  /**
+   * 从INode数组提取各节点的名称字节数组，生成路径组件数组
+   * @param inodes INode数组
+   * @return 对应路径组件数组
+   */
   private static byte[][] getPaths(final INode[] inodes) {
     byte[][] paths = new byte[inodes.length][];
     for (int i = 0; i < inodes.length; i++) {
@@ -73,10 +87,9 @@ public class INodesInPath {
   }
 
   /**
-   * Construct {@link INodesInPath} from {@link INode}.
-   *
-   * @param inode to construct from
-   * @return INodesInPath
+   * 从单个INode构造完整的INodesInPath对象，自动向上遍历收集全路径INode
+   * @param inode 目标INode
+   * @return 构造完成的INodesInPath对象
    */
   static INodesInPath fromINode(INode inode) {
     INode[] inodes = getINodes(inode);
@@ -85,56 +98,46 @@ public class INodesInPath {
   }
 
   /**
-   * Construct {@link INodesInPath} from {@link INode} and its root
-   * {@link INodeDirectory}. INodesInPath constructed this way will
-   * each have its snapshot and latest snapshot id filled in.
-   *
-   * This routine is specifically for
-   * {@link LeaseManager#getINodeWithLeases(INodeDirectory)} to get
-   * open files along with their snapshot details which is used during
-   * new snapshot creation to capture their meta data.
-   *
-   * @param rootDir the root {@link INodeDirectory} under which inode
-   *                needs to be resolved
-   * @param inode the {@link INode} to be resolved
-   * @return INodesInPath
+   * 从指定根目录和目标INode构造INodesInPath，会正确解析快照信息，
+   * 专门用于 LeaseManager 获取带有租约的打开文件，用于新建快照时捕获元数据。
+   * @param rootDir 起始根目录
+   * @param inode 需要解析的目标INode
+   * @return 构造完成的INodesInPath对象，包含完整快照信息
    */
   static INodesInPath fromINode(final INodeDirectory rootDir, INode inode) {
     byte[][] paths = getPaths(getINodes(inode));
     return resolve(rootDir, paths);
   }
 
+  /**
+   * 从路径组件数组构造空INodesInPath对象
+   * @param components 路径组件数组
+   * @return 构造完成的空INodesInPath对象
+   */
   static INodesInPath fromComponents(byte[][] components) {
     return new INodesInPath(new INode[components.length], components);
   }
 
   /**
-   * Retrieve existing INodes from a path.  The number of INodes is equal
-   * to the number of path components.  For a snapshot path
-   * (e.g. /foo/.snapshot/s1/bar), the ".snapshot/s1" will be represented in
-   * one path component corresponding to its Snapshot.Root inode.  This 1-1
-   * mapping ensures the path can always be properly reconstructed.
-   *
-   * <p>
-   * Example: <br>
-   * Given the path /c1/c2/c3 where only /c1/c2 exists, resulting in the
-   * following path components: ["","c1","c2","c3"]
-   * 
-   * <p>
-   * <code>getExistingPathINodes(["","c1","c2"])</code> should fill
-   * the array with [rootINode,c1,c2], <br>
-   * <code>getExistingPathINodes(["","c1","c2","c3"])</code> should
-   * fill the array with [rootINode,c1,c2,null]
-   * 
-   * @param startingDir the starting directory
-   * @param components array of path component name
-   * @return the specified number of existing INodes in the path
+   * 从起始目录开始，按路径组件逐级解析得到全路径INode集合，
+   * 自动处理快照路径，将/.snapshot/快照名合并为单个组件，保证INode和路径组件一一对应。
+   * @param startingDir 起始目录
+   * @param components 路径组件数组
+   * @return 解析完成的INodesInPath对象
    */
   static INodesInPath resolve(final INodeDirectory startingDir,
       final byte[][] components) {
     return resolve(startingDir, components, false);
   }
 
+  /**
+   * 从起始目录开始，按路径组件逐级解析得到全路径INode集合，支持指定是否为/.reserved/raw路径，
+   * 自动处理快照路径，将/.snapshot/快照名合并为单个组件，保证INode和路径组件一一对应。
+   * @param startingDir 起始目录
+   * @param components 路径组件数组
+   * @param isRaw 是否为/.reserved/raw加密路径
+   * @return 解析完成的INodesInPath对象
+   */
   static INodesInPath resolve(final INodeDirectory startingDir,
       byte[][] components, final boolean isRaw) {
     Preconditions.checkArgument(startingDir.compareTo(components[0]) == 0);
@@ -148,33 +151,27 @@ public class INodesInPath {
 
     while (count < components.length && curNode != null) {
       final boolean lastComp = (count == components.length - 1);
+      // 将当前节点加入结果数组
       inodes[inodeNum++] = curNode;
       final boolean isRef = curNode.isReference();
       final boolean isDir = curNode.isDirectory();
       final INodeDirectory dir = isDir? curNode.asDirectory(): null;
+      // 当前目录非引用且已启用快照功能，更新路径上的最新快照ID
       if (!isRef && isDir && dir.isWithSnapshot()) {
-        //if the path is a non-snapshot path, update the latest snapshot.
+        // 非快照路径，更新为最新快照ID
         if (!isSnapshot && shouldUpdateLatestId(
             dir.getDirectoryWithSnapshotFeature().getLastSnapshotId(),
             snapshotId)) {
           snapshotId = dir.getDirectoryWithSnapshotFeature().getLastSnapshotId();
         }
       } else if (isRef && isDir && !lastComp) {
-        // If the curNode is a reference node, need to check its dstSnapshot:
-        // 1. if the existing snapshot is no later than the dstSnapshot (which
-        // is the latest snapshot in dst before the rename), the changes 
-        // should be recorded in previous snapshots (belonging to src).
-        // 2. however, if the ref node is already the last component, we still 
-        // need to know the latest snapshot among the ref node's ancestors, 
-        // in case of processing a deletion operation. Thus we do not overwrite
-        // the latest snapshot if lastComp is true. In case of the operation is
-        // a modification operation, we do a similar check in corresponding 
-        // recordModification method.
+        // 处理引用节点（重命名快照场景），更新正确的目标快照ID
+        // 如果是引用节点且不是最后一个组件，处理快照ID逻辑
         if (!isSnapshot) {
           int dstSnapshotId = curNode.asReference().getDstSnapshotId();
-          if (snapshotId == CURRENT_STATE_ID || // no snapshot in dst tree of rename
+          if (snapshotId == CURRENT_STATE_ID || // 重命名目标树无快照
               (dstSnapshotId != CURRENT_STATE_ID &&
-               dstSnapshotId >= snapshotId)) { // the above scenario
+               dstSnapshotId >= snapshotId)) { // 目标快照不早于当前路径快照
             int lastSnapshot = CURRENT_STATE_ID;
             DirectoryWithSnapshotFeature sf;
             if (curNode.isDirectory() && 
@@ -185,42 +182,42 @@ public class INodesInPath {
           }
         }
       }
+      // 当前是最后一个组件，或当前节点不是目录，终止遍历
       if (lastComp || !isDir) {
         break;
       }
 
+      // 获取下一个路径组件
       final byte[] childName = components[++count];
-      // check if the next byte[] in components is for ".snapshot"
+      // 检查下一个组件是否是.snapshot目录，且当前目录支持快照
       if (isDotSnapshotDir(childName) && dir.isSnapshottable()) {
         isSnapshot = true;
-        // check if ".snapshot" is the last element of components
+        // 如果.snapshot是最后一个组件，终止遍历
         if (count == components.length - 1) {
           break;
         }
-        // Resolve snapshot root
+        // 解析获取指定快照对象
         final Snapshot s = dir.getSnapshot(components[count + 1]);
         if (s == null) {
-          curNode = null; // snapshot not found
+          curNode = null; // 快照不存在，结果设为null终止遍历
         } else {
           curNode = s.getRoot();
           snapshotId = s.getId();
         }
-        // combine .snapshot & name into 1 component element to ensure
-        // 1-to-1 correspondence between components and inodes arrays is
-        // preserved so a path can be reconstructed.
+        // 合并.snapshot和快照名为一个路径组件，保证INode和路径组件一一对应
         byte[][] componentsCopy =
             Arrays.copyOf(components, components.length - 1);
         componentsCopy[count] = DFSUtil.string2Bytes(
             DFSUtil.byteArray2PathString(components, count, 2));
-        // shift the remaining components after snapshot name
+        // 移动后续路径组件到新数组
         int start = count + 2;
         System.arraycopy(components, start, componentsCopy, count + 1,
             components.length - start);
         components = componentsCopy;
-        // reduce the inodes array to compensate for reduction in components
+        // 调整INode数组长度适配新的组件数
         inodes = Arrays.copyOf(inodes, components.length);
       } else {
-        // normal case, and also for resolving file/dir under snapshot root
+        // 普通子节点查找，快照路径使用已解析的快照ID
         curNode = dir.getChild(childName,
             isSnapshot ? snapshotId : CURRENT_STATE_ID);
       }
@@ -228,17 +225,23 @@ public class INodesInPath {
     return new INodesInPath(inodes, components, isRaw, isSnapshot, snapshotId);
   }
 
+  /**
+   * 判断是否需要更新路径最新快照ID：当前无快照或新快照ID更早
+   * @param sid 待更新的新快照ID
+   * @param snapshotId 当前已保存的快照ID
+   * @return 需要更新返回true，否则返回false
+   */
   private static boolean shouldUpdateLatestId(int sid, int snapshotId) {
     return snapshotId == CURRENT_STATE_ID || (sid != CURRENT_STATE_ID &&
         ID_INTEGER_COMPARATOR.compare(snapshotId, sid) < 0);
   }
 
   /**
-   * Replace an inode of the given INodesInPath in the given position. We do a
-   * deep copy of the INode array.
-   * @param pos the position of the replacement
-   * @param inode the new inode
-   * @return a new INodesInPath instance
+   * 替换指定位置的INode，生成新的INodesInPath对象，会深拷贝INode数组
+   * @param iip 原INodesInPath对象
+   * @param pos 待替换的位置
+   * @param inode 新的INode对象
+   * @return 替换后新的INodesInPath对象
    */
   public static INodesInPath replace(INodesInPath iip, int pos, INode inode) {
     Preconditions.checkArgument(iip.length() > 0 && pos > 0 // no for root
@@ -254,8 +257,11 @@ public class INodesInPath {
   }
 
   /**
-   * Extend a given INodesInPath with a child INode. The child INode will be
-   * appended to the end of the new INodesInPath.
+   * 在现有INodesInPath末尾追加一个子INode，生成新的INodesInPath对象
+   * @param iip 原INodesInPath对象
+   * @param child 待追加的子INode
+   * @param childName 子节点名称字节数组
+   * @return 追加后新的INodesInPath对象
    */
   public static INodesInPath append(INodesInPath iip, INode child,
       byte[] childName) {
@@ -272,30 +278,20 @@ public class INodesInPath {
         iip.isSnapshot, iip.snapshotId);
   }
 
+  /** 路径组件字节数组，每个元素对应一层目录名称 */
   private final byte[][] path;
+  /** 缓存路径字符串，延迟初始化 */
   private volatile String pathname;
 
-  /**
-   * Array with the specified number of INodes resolved for a given path.
-   */
+  /** 解析得到的INode数组，顺序为从根目录到目标路径 */
   private final INode[] inodes;
-  /**
-   * true if this path corresponds to a snapshot
-   */
+  /** 标记当前路径是否为快照路径 */
   private final boolean isSnapshot;
 
-  /**
-   * true if this is a /.reserved/raw path.  path component resolution strips
-   * it from the path so need to track it separately.
-   */
+  /** 标记当前路径是否为/.reserved/raw加密路径，原始路径会去除该前缀单独标记 */
   private final boolean isRaw;
 
-  /**
-   * For snapshot paths, it is the id of the snapshot; or 
-   * {@link Snapshot#CURRENT_STATE_ID} if the snapshot does not exist. For 
-   * non-snapshot paths, it is the id of the latest snapshot found in the path;
-   * or {@link Snapshot#CURRENT_STATE_ID} if no snapshot is found.
-   */
+  /** 快照ID：快照路径为对应快照ID；非快照路径为路径上找到的最新快照ID；无快照为CURRENT_STATE_ID */
   private final int snapshotId;
 
   private INodesInPath(INode[] inodes, byte[][] path, boolean isRaw,
@@ -313,7 +309,8 @@ public class INodesInPath {
   }
 
   /**
-   * For non-snapshot paths, return the latest snapshot id found in the path.
+   * 获取非快照路径上找到的最新快照ID，仅对非快照路径有效
+   * @return 最新快照ID
    */
   public int getLatestSnapshotId() {
     Preconditions.checkState(!isSnapshot);
@@ -321,39 +318,59 @@ public class INodesInPath {
   }
   
   /**
-   * For snapshot paths, return the id of the snapshot specified in the path.
-   * For non-snapshot paths, return {@link Snapshot#CURRENT_STATE_ID}.
+   * 获取路径对应的快照ID：快照路径返回对应快照ID，非快照路径返回CURRENT_STATE_ID
+   * @return 路径快照ID
    */
   public int getPathSnapshotId() {
     return isSnapshot ? snapshotId : CURRENT_STATE_ID;
   }
 
   /**
-   * @return the i-th inode if i {@literal >=} 0;
-   *         otherwise, i {@literal <} 0, return the (length + i)-th inode.
+   * 获取指定位置的INode，支持负索引：负索引从末尾向前计数
+   * @param i 索引位置，负索引表示从末尾向前
+   * @return 指定位置的INode
    */
   public INode getINode(int i) {
     return inodes[(i < 0) ? inodes.length + i : i];
   }
 
-  /** @return the last inode. */
+  /**
+   * 获取路径最后一个INode
+   * @return 最后一个INode
+   */
   public INode getLastINode() {
     return getINode(-1);
   }
 
+  /**
+   * 获取最后一个路径组件的名称字节数组
+   * @return 最后一个路径组件名称
+   */
   byte[] getLastLocalName() {
     return path[path.length - 1];
   }
 
+  /**
+   * 获取所有路径组件数组
+   * @return 路径组件字节数组
+   */
   public byte[][] getPathComponents() {
     return path;
   }
 
+  /**
+   * 获取指定位置的路径组件
+   * @param i 位置索引
+   * @return 对应路径组件字节数组
+   */
   public byte[] getPathComponent(int i) {
     return path[i];
   }
 
-  /** @return the full path in string form */
+  /**
+   * 获取完整路径字符串，延迟缓存结果
+   * @return 完整路径字符串
+   */
   public String getPath() {
     if (pathname == null) {
       pathname = DFSUtil.byteArray2PathString(path);
@@ -361,168 +378,36 @@ public class INodesInPath {
     return pathname;
   }
 
+  /**
+   * 获取父目录路径字符串
+   * @return 父目录路径字符串
+   */
   public String getParentPath() {
     return getPath(path.length - 2);
   }
 
+  /**
+   * 获取到指定位置为止的路径字符串
+   * @param pos 结束位置索引
+   * @return 对应路径字符串
+   */
   public String getPath(int pos) {
     return DFSUtil.byteArray2PathString(path, 0, pos + 1); // it's a length...
   }
 
+  /**
+   * 获取INode数组长度，即路径的层级深度
+   * @return INode数组长度
+   */
   public int length() {
     return inodes.length;
   }
 
+  /**
+   * 获取INode数组的深拷贝
+   * @return INode数组拷贝
+   */
   public INode[] getINodesArray() {
     INode[] retArr = new INode[inodes.length];
     System.arraycopy(inodes, 0, retArr, 0, inodes.length);
     return retArr;
-  }
-
-  /**
-   * @param length number of ancestral INodes in the returned INodesInPath
-   *               instance
-   * @return the INodesInPath instance containing ancestral INodes. Note that
-   * this method only handles non-snapshot paths.
-   */
-  private INodesInPath getAncestorINodesInPath(int length) {
-    Preconditions.checkArgument(length >= 0 && length < inodes.length);
-    Preconditions.checkState(isDotSnapshotDir() || !isSnapshot());
-    final INode[] anodes = new INode[length];
-    final byte[][] apath = new byte[length][];
-    System.arraycopy(this.inodes, 0, anodes, 0, length);
-    System.arraycopy(this.path, 0, apath, 0, length);
-    return new INodesInPath(anodes, apath, isRaw, false, snapshotId);
-  }
-
-  /**
-   * @return an INodesInPath instance containing all the INodes in the parent
-   *         path. We do a deep copy here.
-   */
-  public INodesInPath getParentINodesInPath() {
-    return inodes.length > 1 ? getAncestorINodesInPath(inodes.length - 1) :
-        null;
-  }
-
-  /**
-   * Verify if this {@link INodesInPath} is a descendant of the
-   * requested {@link INodeDirectory}.
-   *
-   * @param inodeDirectory the ancestor directory
-   * @return true if this INodesInPath is a descendant of inodeDirectory
-   */
-  public boolean isDescendant(final INodeDirectory inodeDirectory) {
-    final INodesInPath dirIIP = fromINode(inodeDirectory);
-    return isDescendant(dirIIP);
-  }
-
-  private boolean isDescendant(final INodesInPath ancestorDirIIP) {
-    int ancestorDirINodesLength = ancestorDirIIP.length();
-    int myParentINodesLength = length() - 1;
-    if (myParentINodesLength < ancestorDirINodesLength) {
-      return false;
-    }
-
-    int index = 0;
-    while (index < ancestorDirINodesLength) {
-      if (inodes[index] != ancestorDirIIP.getINode(index)) {
-        return false;
-      }
-      index++;
-    }
-    return true;
-  }
-
-
-  /**
-   * @return a new INodesInPath instance that only contains existing INodes.
-   * Note that this method only handles non-snapshot paths.
-   */
-  public INodesInPath getExistingINodes() {
-    Preconditions.checkState(!isSnapshot());
-    for (int i = inodes.length; i > 0; i--) {
-      if (inodes[i - 1] != null) {
-        return (i == inodes.length) ? this : getAncestorINodesInPath(i);
-      }
-    }
-    return null;
-  }
-
-  /**
-   * @return isSnapshot true for a snapshot path
-   */
-  boolean isSnapshot() {
-    return this.isSnapshot;
-  }
-
-  /**
-   * @return if .snapshot is the last path component.
-   */
-  boolean isDotSnapshotDir() {
-    return isDotSnapshotDir(getLastLocalName());
-  }
-
-  /**
-   * @return if this is a /.reserved/raw path.
-   */
-  public boolean isRaw() {
-    return isRaw;
-  }
-
-  private static String toString(INode inode) {
-    return inode == null? null: inode.getLocalName();
-  }
-
-  @Override
-  public String toString() {
-    return toString(true);
-  }
-
-  private String toString(boolean vaildateObject) {
-    if (vaildateObject) {
-      validate();
-    }
-
-    final StringBuilder b = new StringBuilder(getClass().getSimpleName())
-        .append(": path = ").append(getPath())
-        .append("\n  inodes = ");
-    if (inodes == null) {
-      b.append("null");
-    } else if (inodes.length == 0) {
-      b.append("[]");
-    } else {
-      b.append("[").append(toString(inodes[0]));
-      for(int i = 1; i < inodes.length; i++) {
-        b.append(", ").append(toString(inodes[i]));
-      }
-      b.append("], length=").append(inodes.length);
-    }
-    b.append("\n  isSnapshot        = ").append(isSnapshot)
-     .append("\n  snapshotId        = ").append(snapshotId);
-    return b.toString();
-  }
-
-  void validate() {
-    // check parent up to snapshotRootIndex if this is a snapshot path
-    int i = 0;
-    if (inodes[i] != null) {
-      for(i++; i < inodes.length && inodes[i] != null; i++) {
-        final INodeDirectory parent_i = inodes[i].getParent();
-        final INodeDirectory parent_i_1 = inodes[i-1].getParent();
-        if (parent_i != inodes[i-1] &&
-            (parent_i_1 == null || !parent_i_1.isSnapshottable()
-                || parent_i != parent_i_1)) {
-          throw new AssertionError(
-              "inodes[" + i + "].getParent() != inodes[" + (i-1)
-              + "]\n  inodes[" + i + "]=" + inodes[i].toDetailString()
-              + "\n  inodes[" + (i-1) + "]=" + inodes[i-1].toDetailString()
-              + "\n this=" + toString(false));
-        }
-      }
-    }
-    if (i != inodes.length) {
-      throw new AssertionError("i = " + i + " != " + inodes.length
-          + ", this=" + toString(false));
-    }
-  }
-}

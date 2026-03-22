@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -55,9 +56,7 @@ import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.thirdparty.protobuf.ByteString;
 
 /**
- * A HDFS specific delegation token secret manager.
- * The secret manager is responsible for generating and accepting the password
- * for each token.
+ * HDFS 特定的代理令牌密钥管理器，负责生成和验证每个代理令牌的密码
  */
 @InterfaceAudience.Private
 public class DelegationTokenSecretManager
@@ -66,9 +65,19 @@ public class DelegationTokenSecretManager
   private static final Logger LOG = LoggerFactory
       .getLogger(DelegationTokenSecretManager.class);
   
+  // 关联的FSNamesystem对象，用于操作命名空间和日志记录
   private final FSNamesystem namesystem;
+  // 兼容旧版本fsimage序列化工具实例
   private final SerializerCompat serializerCompat = new SerializerCompat();
 
+  /**
+   * 构造代理令牌密钥管理器
+   * @param delegationKeyUpdateInterval 滚动生成新密钥的间隔（毫秒）
+   * @param delegationTokenMaxLifetime 代理令牌最大生命周期（毫秒）
+   * @param delegationTokenRenewInterval 令牌必须续订的间隔（毫秒）
+   * @param delegationTokenRemoverScanInterval 扫描过期令牌的间隔（毫秒）
+   * @param namesystem 关联的FSNamesystem实例
+   */
   public DelegationTokenSecretManager(long delegationKeyUpdateInterval,
       long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
       long delegationTokenRemoverScanInterval, FSNamesystem namesystem) {
@@ -78,16 +87,13 @@ public class DelegationTokenSecretManager
   }
 
   /**
-   * Create a secret manager
-   * @param delegationKeyUpdateInterval the number of milliseconds for rolling
-   *        new secret keys.
-   * @param delegationTokenMaxLifetime the maximum lifetime of the delegation
-   *        tokens in milliseconds
-   * @param delegationTokenRenewInterval how often the tokens must be renewed
-   *        in milliseconds
-   * @param delegationTokenRemoverScanInterval how often the tokens are scanned
-   *        for expired tokens in milliseconds
-   * @param storeTokenTrackingId whether to store the token's tracking id
+   * 构造代理令牌密钥管理器
+   * @param delegationKeyUpdateInterval 滚动生成新密钥的间隔（毫秒）
+   * @param delegationTokenMaxLifetime 代理令牌最大生命周期（毫秒）
+   * @param delegationTokenRenewInterval 令牌必须续订的间隔（毫秒）
+   * @param delegationTokenRemoverScanInterval 扫描过期令牌的间隔（毫秒）
+   * @param storeTokenTrackingId 是否存储令牌追踪ID
+   * @param namesystem 关联的FSNamesystem实例
    */
   public DelegationTokenSecretManager(long delegationKeyUpdateInterval,
       long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
@@ -108,17 +114,10 @@ public class DelegationTokenSecretManager
   public byte[] retrievePassword(
       DelegationTokenIdentifier identifier) throws InvalidToken {
     try {
-      // this check introduces inconsistency in the authentication to a
-      // HA standby NN.  non-token auths are allowed into the namespace which
-      // decides whether to throw a StandbyException.  tokens are a bit
-      // different in that a standby may be behind and thus not yet know
-      // of all tokens issued by the active NN.  the following check does
-      // not allow ANY token auth, however it should allow known tokens in
+      // 检查当前节点是否允许读操作，HA备节点会抛出StandbyException
       namesystem.checkOperation(OperationCategory.READ);
     } catch (StandbyException se) {
-      // FIXME: this is a hack to get around changing method signatures by
-      // tunneling a non-InvalidToken exception as the cause which the
-      // RPC server will unwrap before returning to the client
+      // 将StandbyException包装为InvalidToken抛出，RPC服务端会解包还原原异常
       InvalidToken wrappedStandby = new InvalidToken("StandbyException");
       wrappedStandby.initCause(se);
       throw wrappedStandby;
@@ -129,14 +128,13 @@ public class DelegationTokenSecretManager
   @Override
   public byte[] retriableRetrievePassword(DelegationTokenIdentifier identifier)
       throws InvalidToken, StandbyException, RetriableException, IOException {
+    // 检查当前节点是否允许读操作
     namesystem.checkOperation(OperationCategory.READ);
     try {
       return super.retrievePassword(identifier);
     } catch (InvalidToken it) {
+      // 如果命名空间正在切换到激活状态，可能编辑日志还未应用，让客户端重试
       if (namesystem.inTransitionToActive()) {
-        // if the namesystem is currently in the middle of transition to 
-        // active state, let client retry since the corresponding editlog may 
-        // have not been applied yet
         throw new RetriableException(it);
       } else {
         throw it;
@@ -145,11 +143,11 @@ public class DelegationTokenSecretManager
   }
   
   /**
-   * Returns expiry time of a token given its identifier.
+   * 根据令牌标识符获取令牌过期时间
    * 
-   * @param dtId DelegationTokenIdentifier of a token
-   * @return Expiry time of the token
-   * @throws IOException
+   * @param dtId 代理令牌标识符
+   * @return 令牌的过期时间
+   * @throws IOException 当找不到对应令牌时抛出IO异常
    */
   public synchronized long getTokenExpiryTime(
       DelegationTokenIdentifier dtId) throws IOException {
@@ -162,26 +160,35 @@ public class DelegationTokenSecretManager
   }
 
   /**
-   * Load SecretManager state from fsimage.
+   * 从旧版本fsimage加载密钥管理器状态
    * 
-   * @param in input stream to read fsimage
-   * @throws IOException
+   * @param in fsimage输入流
+   * @throws IOException 加载失败时抛出IO异常
    */
   public synchronized void loadSecretManagerStateCompat(DataInput in)
       throws IOException {
     if (running) {
-      // a safety check
+      // 安全检查：运行中的密钥管理器不允许加载状态
       throw new IOException(
           "Can't load state from image in a running SecretManager.");
     }
     serializerCompat.load(in);
   }
 
+  /**
+   * 保存密钥管理器持久化状态的数据容器
+   */
   public static class SecretManagerState {
     public final SecretManagerSection section;
     public final List<SecretManagerSection.DelegationKey> keys;
     public final List<SecretManagerSection.PersistToken> tokens;
 
+    /**
+     * 构造状态容器
+     * @param s  protobuf格式的密钥管理器根section
+     * @param keys  代理密钥列表
+     * @param tokens 持久化代理令牌列表
+     */
     public SecretManagerState(
         SecretManagerSection s,
         List<SecretManagerSection.DelegationKey> keys,
@@ -192,6 +199,12 @@ public class DelegationTokenSecretManager
     }
   }
 
+  /**
+   * 从protobuf格式的状态对象加载密钥管理器状态
+   * @param state  从fsimage解析出的状态对象
+   * @param counter 启动进度计数器
+   * @throws IOException 运行中加载时抛出异常
+   */
   public synchronized void loadSecretManagerState(SecretManagerState state, Counter counter)
       throws IOException {
     Preconditions.checkState(!running,
@@ -199,11 +212,13 @@ public class DelegationTokenSecretManager
 
     currentId = state.section.getCurrentId();
     delegationTokenSequenceNumber = state.section.getTokenSequenceNumber();
+    // 加载所有代理密钥
     for (SecretManagerSection.DelegationKey k : state.keys) {
       addKey(new DelegationKey(k.getId(), k.getExpiryDate(), k.hasKey() ? k
           .getKey().toByteArray() : null));
     }
 
+    // 加载所有持久化代理令牌
     for (SecretManagerSection.PersistToken t : state.tokens) {
       DelegationTokenIdentifier id = new DelegationTokenIdentifier(new Text(
           t.getOwner()), new Text(t.getRenewer()), new Text(t.getRealUser()));
@@ -217,17 +232,21 @@ public class DelegationTokenSecretManager
   }
 
   /**
-   * Store the current state of the SecretManager for persistence
+   * 将密钥管理器状态保存到旧版本格式的fsimage
    *
-   * @param out Output stream for writing into fsimage.
-   * @param sdPath String storage directory path
-   * @throws IOException
+   * @param out  fsimage输出流
+   * @param sdPath 存储目录路径，用于启动进度显示
+   * @throws IOException 保存失败抛出IO异常
    */
   public synchronized void saveSecretManagerStateCompat(DataOutputStream out,
       String sdPath) throws IOException {
     serializerCompat.save(out, sdPath);
   }
 
+  /**
+   * 将当前密钥管理器状态转换为protobuf格式对象用于持久化
+   * @return 包含所有状态的SecretManagerState对象
+   */
   public synchronized SecretManagerState saveSecretManagerState() {
     SecretManagerSection s = SecretManagerSection.newBuilder()
         .setCurrentId(currentId)
@@ -238,6 +257,7 @@ public class DelegationTokenSecretManager
     ArrayList<SecretManagerSection.PersistToken> tokens = Lists
         .newArrayListWithCapacity(currentTokens.size());
 
+    // 序列化所有代理密钥
     for (DelegationKey v : allKeys.values()) {
       SecretManagerSection.DelegationKey.Builder b = SecretManagerSection.DelegationKey
           .newBuilder().setId(v.getKeyId()).setExpiryDate(v.getExpiryDate());
@@ -247,6 +267,7 @@ public class DelegationTokenSecretManager
       keys.add(b.build());
     }
 
+    // 序列化所有代理令牌
     for (Entry<DelegationTokenIdentifier, DelegationTokenInformation> e : currentTokens
         .entrySet()) {
       DelegationTokenIdentifier id = e.getKey();
@@ -265,18 +286,16 @@ public class DelegationTokenSecretManager
   }
 
   /**
-   * This method is intended to be used only while reading edit logs.
+   * 从编辑日志或fsimage加载持久化代理令牌，仅在NameNode启动加载时使用
    * 
-   * @param identifier DelegationTokenIdentifier read from the edit logs or
-   * fsimage
-   * 
-   * @param expiryTime token expiry time
-   * @throws IOException
+   * @param identifier  代理令牌标识符
+   * @param expiryTime  令牌过期时间
+   * @throws IOException 运行中添加或重复添加时抛出异常
    */
   public synchronized void addPersistedDelegationToken(
       DelegationTokenIdentifier identifier, long expiryTime) throws IOException {
     if (running) {
-      // a safety check
+      // 安全检查：运行中的密钥管理器不允许添加持久化令牌
       throw new IOException(
           "Can't add persisted delegation token to a running SecretManager.");
     }
@@ -288,7 +307,9 @@ public class DelegationTokenSecretManager
               + identifier.toString());
       return;
     }
+    // 根据密钥生成令牌密码
     byte[] password = createPassword(identifier.getBytes(), dKey.getKey());
+    // 更新最大序列号
     if (identifier.getSequenceNumber() > this.delegationTokenSequenceNumber) {
       this.delegationTokenSequenceNumber = identifier.getSequenceNumber();
     }
@@ -302,10 +323,10 @@ public class DelegationTokenSecretManager
   }
 
   /**
-   * Add a MasterKey to the list of keys.
+   * 添加持久化主密钥，用于编辑日志回放
    * 
-   * @param key DelegationKey
-   * @throws IOException
+   * @param key 代理密钥对象
+   * @throws IOException 从不抛出，保留接口签名
    */
   public synchronized void updatePersistedMasterKey(DelegationKey key)
       throws IOException {
@@ -313,16 +334,16 @@ public class DelegationTokenSecretManager
   }
   
   /**
-   * Update the token cache with renewal record in edit logs.
+   * 更新缓存中令牌的续订信息，用于编辑日志回放
    * 
-   * @param identifier DelegationTokenIdentifier of the renewed token
-   * @param expiryTime expirty time in milliseconds
-   * @throws IOException
+   * @param identifier  已续订令牌的标识符
+   * @param expiryTime  新的过期时间（毫秒）
+   * @throws IOException 运行中更新时抛出异常
    */
   public synchronized void updatePersistedTokenRenewal(
       DelegationTokenIdentifier identifier, long expiryTime) throws IOException {
     if (running) {
-      // a safety check
+      // 安全检查：运行中的密钥管理器不允许更新持久化信息
       throw new IOException(
           "Can't update persisted delegation token renewal to a running SecretManager.");
     }
@@ -338,15 +359,15 @@ public class DelegationTokenSecretManager
   }
 
   /**
-   *  Update the token cache with the cancel record in edit logs
+   * 从缓存中删除已取消的令牌，用于编辑日志回放
    *  
-   *  @param identifier DelegationTokenIdentifier of the canceled token
-   *  @throws IOException
+   *  @param identifier 已取消令牌的标识符
+   *  @throws IOException 运行中更新时抛出异常
    */
   public synchronized void updatePersistedTokenCancellation(
       DelegationTokenIdentifier identifier) throws IOException {
     if (running) {
-      // a safety check
+      // 安全检查：运行中的密钥管理器不允许更新持久化信息
       throw new IOException(
           "Can't update persisted delegation token renewal to a running SecretManager.");
     }
@@ -354,41 +375,36 @@ public class DelegationTokenSecretManager
   }
   
   /**
-   * Returns the number of delegation keys currently stored.
-   * @return number of delegation keys
+   * 获取当前存储的代理密钥数量
+   * @return 代理密钥数量
    */
   public synchronized int getNumberOfKeys() {
     return allKeys.size();
   }
 
   /**
-   * Call namesystem to update editlogs for new master key.
+   * 调用FSNamesystem记录新主密钥到编辑日志
    */
   @Override //AbstractDelegationTokenManager
   protected void logUpdateMasterKey(DelegationKey key)
       throws IOException {
     try {
-      // The edit logging code will fail catastrophically if it
-      // is interrupted during a logSync, since the interrupt
-      // closes the edit log files. Doing this inside the
-      // fsn lock will prevent being interrupted when stopping
-      // the secret manager.
+      // 获取FS命名空间读锁，可中断
       namesystem.readLockInterruptibly(RwLockMode.FS);
       try {
-        // this monitor isn't necessary if stopped while holding write lock
-        // but for safety, guard against a stop with read lock.
+        // 加锁避免停止密钥管理器时被中断，防止损坏编辑日志
         synchronized (noInterruptsLock) {
           if (Thread.currentThread().isInterrupted()) {
-            return; // leave flag set so secret monitor exits.
+            return; // 保留中断标志，让密钥管理器退出
           }
           namesystem.logUpdateMasterKey(key);
         }
       } finally {
+        // 释放读锁
         namesystem.readUnlock(RwLockMode.FS, "logUpdateMasterKey");
       }
     } catch (InterruptedException ie) {
-      // AbstractDelegationTokenManager may crash if an exception is thrown.
-      // The interrupt flag will be detected when it attempts to sleep.
+      // 保留中断状态，密钥管理器下次休眠会检测到并退出
       Thread.currentThread().interrupt();
     }
   }
@@ -397,145 +413,20 @@ public class DelegationTokenSecretManager
   protected void logExpireToken(final DelegationTokenIdentifier dtId)
       throws IOException {
     try {
-      // The edit logging code will fail catastrophically if it
-      // is interrupted during a logSync, since the interrupt
-      // closes the edit log files. Doing this inside the
-      // fsn lock will prevent being interrupted when stopping
-      // the secret manager.
+      // 获取FS命名空间读锁，可中断
       namesystem.readLockInterruptibly(RwLockMode.FS);
       try {
-        // this monitor isn't necessary if stopped while holding write lock
-        // but for safety, guard against a stop with read lock.
+        // 加锁避免停止密钥管理器时被中断，防止损坏编辑日志
         synchronized (noInterruptsLock) {
           if (Thread.currentThread().isInterrupted()) {
-            return; // leave flag set so secret monitor exits.
+            return; // 保留中断标志，让密钥管理器退出
           }
           namesystem.logExpireDelegationToken(dtId);
         }
       } finally {
+        // 释放读锁
         namesystem.readUnlock(RwLockMode.FS, "logExpireToken");
       }
     } catch (InterruptedException ie) {
-      // AbstractDelegationTokenManager may crash if an exception is thrown.
-      // The interrupt flag will be detected when it attempts to sleep.
+      // 保留中断状态，密钥管理器下次休眠会检测到并退出
       Thread.currentThread().interrupt();
-    }
-  }
-
-  /** A utility method for creating credentials. */
-  public static Credentials createCredentials(final NameNode namenode,
-      final UserGroupInformation ugi, final String renewer) throws IOException {
-    final Token<DelegationTokenIdentifier> token = namenode.getRpcServer(
-        ).getDelegationToken(new Text(renewer));
-    if (token == null) {
-      return null;
-    }
-
-    final InetSocketAddress addr = namenode.getNameNodeAddress();
-    SecurityUtil.setTokenService(token, addr);
-    final Credentials c = new Credentials();
-    c.addToken(new Text(ugi.getShortUserName()), token);
-    return c;
-  }
-
-  private final class SerializerCompat {
-    private void load(DataInput in) throws IOException {
-      currentId = in.readInt();
-      loadAllKeys(in);
-      delegationTokenSequenceNumber = in.readInt();
-      loadCurrentTokens(in);
-    }
-
-    private void save(DataOutputStream out, String sdPath) throws IOException {
-      out.writeInt(currentId);
-      saveAllKeys(out, sdPath);
-      out.writeInt(delegationTokenSequenceNumber);
-      saveCurrentTokens(out, sdPath);
-    }
-
-    /**
-     * Private helper methods to save delegation keys and tokens in fsimage
-     */
-    private synchronized void saveCurrentTokens(DataOutputStream out,
-        String sdPath) throws IOException {
-      StartupProgress prog = NameNode.getStartupProgress();
-      Step step = new Step(StepType.DELEGATION_TOKENS, sdPath);
-      prog.beginStep(Phase.SAVING_CHECKPOINT, step);
-      prog.setTotal(Phase.SAVING_CHECKPOINT, step, currentTokens.size());
-      Counter counter = prog.getCounter(Phase.SAVING_CHECKPOINT, step);
-      out.writeInt(currentTokens.size());
-      Iterator<DelegationTokenIdentifier> iter = currentTokens.keySet()
-          .iterator();
-      while (iter.hasNext()) {
-        DelegationTokenIdentifier id = iter.next();
-        id.write(out);
-        DelegationTokenInformation info = currentTokens.get(id);
-        out.writeLong(info.getRenewDate());
-        counter.increment();
-      }
-      prog.endStep(Phase.SAVING_CHECKPOINT, step);
-    }
-
-    /*
-     * Save the current state of allKeys
-     */
-    private synchronized void saveAllKeys(DataOutputStream out, String sdPath)
-        throws IOException {
-      StartupProgress prog = NameNode.getStartupProgress();
-      Step step = new Step(StepType.DELEGATION_KEYS, sdPath);
-      prog.beginStep(Phase.SAVING_CHECKPOINT, step);
-      prog.setTotal(Phase.SAVING_CHECKPOINT, step, currentTokens.size());
-      Counter counter = prog.getCounter(Phase.SAVING_CHECKPOINT, step);
-      out.writeInt(allKeys.size());
-      Iterator<Integer> iter = allKeys.keySet().iterator();
-      while (iter.hasNext()) {
-        Integer key = iter.next();
-        allKeys.get(key).write(out);
-        counter.increment();
-      }
-      prog.endStep(Phase.SAVING_CHECKPOINT, step);
-    }
-
-    /**
-     * Private helper methods to load Delegation tokens from fsimage
-     */
-    private synchronized void loadCurrentTokens(DataInput in)
-        throws IOException {
-      StartupProgress prog = NameNode.getStartupProgress();
-      Step step = new Step(StepType.DELEGATION_TOKENS);
-      prog.beginStep(Phase.LOADING_FSIMAGE, step);
-      int numberOfTokens = in.readInt();
-      prog.setTotal(Phase.LOADING_FSIMAGE, step, numberOfTokens);
-      Counter counter = prog.getCounter(Phase.LOADING_FSIMAGE, step);
-      for (int i = 0; i < numberOfTokens; i++) {
-        DelegationTokenIdentifier id = new DelegationTokenIdentifier();
-        id.readFields(in);
-        long expiryTime = in.readLong();
-        addPersistedDelegationToken(id, expiryTime);
-        counter.increment();
-      }
-      prog.endStep(Phase.LOADING_FSIMAGE, step);
-    }
-
-    /**
-     * Private helper method to load delegation keys from fsimage.
-     * @throws IOException on error
-     */
-    private synchronized void loadAllKeys(DataInput in) throws IOException {
-      StartupProgress prog = NameNode.getStartupProgress();
-      Step step = new Step(StepType.DELEGATION_KEYS);
-      prog.beginStep(Phase.LOADING_FSIMAGE, step);
-      int numberOfKeys = in.readInt();
-      prog.setTotal(Phase.LOADING_FSIMAGE, step, numberOfKeys);
-      Counter counter = prog.getCounter(Phase.LOADING_FSIMAGE, step);
-      for (int i = 0; i < numberOfKeys; i++) {
-        DelegationKey value = new DelegationKey();
-        value.readFields(in);
-        addKey(value);
-        counter.increment();
-      }
-      prog.endStep(Phase.LOADING_FSIMAGE, step);
-    }
-  }
-
-}

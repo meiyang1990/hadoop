@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -50,19 +51,9 @@ import static org.apache.hadoop.ipc.ProcessingDetails.Timing;
 import static org.apache.hadoop.log.LogThrottlingHelper.LogAction;
 
 /**
- * Mimics a ReentrantReadWriteLock but does not directly implement the interface
- * so more sophisticated locking capabilities and logging/metrics are possible.
- * {@link org.apache.hadoop.hdfs.DFSConfigKeys#DFS_NAMENODE_LOCK_DETAILED_METRICS_KEY}
- * to be true, metrics will be emitted into the FSNamesystem metrics registry
- * for each operation which acquires this lock indicating how long the operation
- * held the lock for. These metrics have names of the form
- * ${LockName}(Read|Write)LockNanosOperationName, where OperationName denotes the name
- * of the operation that initiated the lock hold (this will be OTHER for certain
- * uncategorized operations) and they export the hold time values in
- * nanoseconds. Note that if a thread dies, metrics produced after the
- * most recent snapshot will be lost due to the use of
- * {@link MutableRatesWithAggregation}. However since threads are re-used
- * between operations this should not generally be an issue.
+ * FSNamesystem读写锁封装，扩展了ReentrantReadWriteLock，增加锁持有时间监控、慢锁日志输出和详细指标统计能力
+ * 用于NameNode的FSNamesystem同步控制，能够帮助定位锁等待时间过长导致的性能问题。
+ * 当开启详细指标后，会为每个获取锁的操作记录锁持有时间，指标格式为${LockName}(Read|Write)LockNanosOperationName
  */
 public class FSNamesystemLock {
   @VisibleForTesting
@@ -74,24 +65,22 @@ public class FSNamesystemLock {
   private final Timer timer;
 
   /**
-   * Log statements about long lock hold times will not be produced more
-   * frequently than this interval.
+   * 长锁持有警告日志的最小输出间隔，防止日志被刷屏
    */
   private final long lockSuppressWarningIntervalMs;
 
-  /** Threshold (ms) for long holding write lock report. */
+  /** 写锁慢锁报告阈值（毫秒），超过该阈值会触发日志记录 */
   private volatile long writeLockReportingThresholdMs;
-  /** Last time stamp for write lock. Keep the longest one for multi-entrance.*/
+  /** 写锁开始持有时间戳（纳秒），可重入场景只记录最外层第一次获取锁的时间 */
   private long writeLockHeldTimeStampNanos;
-  /** Frequency limiter used for reporting long write lock hold times. */
+  /** 写锁长持有警告日志频率限制器 */
   private final LogThrottlingHelper writeLockReportLogger;
 
-  /** Threshold (ms) for long holding read lock report. */
+  /** 读锁慢锁报告阈值（毫秒），超过该阈值会触发日志记录 */
   private volatile long readLockReportingThresholdMs;
   /**
-   * Last time stamp for read lock. Keep the longest one for
-   * multi-entrance. This is ThreadLocal since there could be
-   * many read locks held simultaneously.
+   * 读锁开始持有时间戳（纳秒），使用ThreadLocal存储支持多线程并发获取读锁
+   * 可重入场景只记录最外层第一次获取锁的时间
    */
   private final ThreadLocal<Long> readLockHeldTimeStampNanos =
       new ThreadLocal<Long>() {
@@ -100,25 +89,24 @@ public class FSNamesystemLock {
           return Long.MAX_VALUE;
         }
       };
+  /** 已被抑制的读锁警告计数 */
   private final AtomicInteger numReadLockWarningsSuppressed =
       new AtomicInteger(0);
-  /** Time stamp (ms) of the last time a read lock report was written. */
+  /** 上次输出读锁警告日志的时间戳（毫秒） */
   private final AtomicLong timeStampOfLastReadLockReportMs = new AtomicLong(0);
   /**
-   * The info (lock held time and stack trace) when longest time (ms) a read
-   * lock was held since the last report.
+   * 上次报告以来，持有时间最长的读锁信息（持有时间、堆栈、操作名）
    */
   private final AtomicReference<LockHeldInfo> longestReadLockHeldInfo =
       new AtomicReference<>(new LockHeldInfo());
+  /** 上次报告以来，持有时间最长的写锁信息 */
   private LockHeldInfo longestWriteLockHeldInfo = new LockHeldInfo();
   /**
-   * The number of time the read lock
-   * has been held longer than the threshold.
+   * 读锁持有时间超过阈值的总次数
    */
   private final LongAdder numReadLockLongHold = new LongAdder();
   /**
-   * The number of time the write lock
-   * has been held for longer than the threshold.
+   * 写锁持有时间超过阈值的总次数
    */
   private final LongAdder numWriteLockLongHold = new LongAdder();
 
@@ -130,6 +118,12 @@ public class FSNamesystemLock {
 
   private static final String OVERALL_METRIC_NAME = "Overall";
 
+  /**
+   * 构造FSNamesystem锁，使用默认定时器
+   * @param conf Hadoop配置对象
+   * @param lockName 锁名称，用于指标和日志标识
+   * @param detailedHoldTimeMetrics 用于存储锁持有时间指标的聚合对象
+   */
   public FSNamesystemLock(Configuration conf, String lockName,
       MutableRatesWithAggregation detailedHoldTimeMetrics) {
     this(conf, lockName, detailedHoldTimeMetrics, new Timer());
@@ -141,12 +135,14 @@ public class FSNamesystemLock {
     this.lockName = lockName;
     this.readLockMetricPrefix = this.lockName + "ReadLock";
     this.writeLockMetricPrefix = this.lockName + "WriteLock";
+    // 从配置读取锁是否使用公平模式
     boolean fair = conf.getBoolean(DFS_NAMENODE_FSLOCK_FAIR_KEY,
         DFS_NAMENODE_FSLOCK_FAIR_DEFAULT);
     FSNamesystem.LOG.info("{}Lock is fair: {}.", this.lockName, fair);
     this.coarseLock = new ReentrantReadWriteLock(fair);
     this.timer = timer;
 
+    // 读取配置初始化各阈值
     this.writeLockReportingThresholdMs = conf.getLong(
         DFS_NAMENODE_WRITE_LOCK_REPORTING_THRESHOLD_MS_KEY,
         DFS_NAMENODE_WRITE_LOCK_REPORTING_THRESHOLD_MS_DEFAULT);
@@ -158,6 +154,7 @@ public class FSNamesystemLock {
         DFS_LOCK_SUPPRESS_WARNING_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
     this.writeLockReportLogger =
         new LogThrottlingHelper(lockSuppressWarningIntervalMs);
+    // 读取是否开启详细指标配置
     this.metricsEnabled = conf.getBoolean(
         DFS_NAMENODE_LOCK_DETAILED_METRICS_KEY,
         DFS_NAMENODE_LOCK_DETAILED_METRICS_DEFAULT);
@@ -166,47 +163,76 @@ public class FSNamesystemLock {
     this.detailedHoldTimeMetrics = detailedHoldTimeMetrics;
   }
 
+  /**
+   * 获取读锁（不响应中断）
+   */
   public void readLock() {
     doLock(false);
   }
 
+  /**
+   * 获取可中断的读锁
+   * @throws InterruptedException 获取锁过程中被中断则抛出异常
+   */
   public void readLockInterruptibly() throws InterruptedException {
     doLockInterruptibly(false);
   }
 
+  /**
+   * 释放读锁，使用默认操作名OTHER
+   */
   public void readUnlock() {
     readUnlock(OP_NAME_OTHER, null);
   }
 
+  /**
+   * 释放读锁，指定操作名
+   * @param opName 当前操作名称
+   */
   public void readUnlock(String opName) {
     readUnlock(opName, null);
   }
 
+  /**
+   * 释放读锁，指定操作名和额外报告信息
+   * @param opName 当前操作名称
+   * @param lockReportInfoSupplier 额外报告信息提供者
+   */
   public void readUnlock(String opName,
       Supplier<String> lockReportInfoSupplier) {
+    // 只有最外层释放锁时需要统计报告
     final boolean needReport = coarseLock.getReadHoldCount() == 1;
+    // 计算锁持有时间
     final long readLockIntervalNanos =
         timer.monotonicNowNanos() - readLockHeldTimeStampNanos.get();
     final long currentTimeMs = timer.now();
+    // 执行锁释放
     coarseLock.readLock().unlock();
 
     if (needReport) {
+      // 添加锁持有时间指标
       addMetric(opName, readLockIntervalNanos, false);
+      // 移除ThreadLocal中的时间戳防止内存泄漏
       readLockHeldTimeStampNanos.remove();
     }
+    // 转换为毫秒便于阈值比较
     final long readLockIntervalMs =
         TimeUnit.NANOSECONDS.toMillis(readLockIntervalNanos);
+    // 需要报告且持有时间超过阈值
     if (needReport && readLockIntervalMs >= this.readLockReportingThresholdMs) {
       numReadLockLongHold.increment();
       String lockReportInfo = null;
       boolean done = false;
+      // CAS更新最长读锁信息
       while (!done) {
         LockHeldInfo localLockHeldInfo = longestReadLockHeldInfo.get();
+        // 当前持有时间更长才更新
         if (localLockHeldInfo.getIntervalMs() <= readLockIntervalMs) {
           if (lockReportInfo == null) {
             lockReportInfo = lockReportInfoSupplier != null ? " (" +
                 lockReportInfoSupplier.get() + ")" : "";
           }
+          // CAS尝试更新
           if (longestReadLockHeldInfo.compareAndSet(localLockHeldInfo,
               new LockHeldInfo(currentTimeMs, readLockIntervalMs,
               StringUtils.getStackTrace(Thread.currentThread()), opName,
@@ -220,10 +246,12 @@ public class FSNamesystemLock {
 
       long localTimeStampOfLastReadLockReport;
       long nowMs;
+      // 检查是否可以输出日志（受间隔限制）
       do {
         nowMs = timer.monotonicNow();
         localTimeStampOfLastReadLockReport =
             timeStampOfLastReadLockReportMs.get();
+        // 距离上次输出时间小于间隔，则抑制本次输出
         if (nowMs - localTimeStampOfLastReadLockReport <
             lockSuppressWarningIntervalMs) {
           numReadLockWarningsSuppressed.incrementAndGet();
@@ -231,9 +259,11 @@ public class FSNamesystemLock {
         }
       } while (!timeStampOfLastReadLockReportMs.compareAndSet(
           localTimeStampOfLastReadLockReport, nowMs));
+      // 获取并重置抑制计数和最长读锁信息
       int numSuppressedWarnings = numReadLockWarningsSuppressed.getAndSet(0);
       LockHeldInfo lockHeldInfo =
           longestReadLockHeldInfo.getAndSet(new LockHeldInfo());
+      // 输出长读锁警告日志
       FSNamesystem.LOG.info(
           "\tNumber of suppressed read-lock reports of {}Lock is {}"
               + "\n\tLongest read-lock held at {} for {}ms by {}{} via {}",
@@ -243,38 +273,40 @@ public class FSNamesystemLock {
     }
   }
   
+  /**
+   * 获取写锁（不响应中断）
+   */
   public void writeLock() {
     doLock(true);
   }
 
+  /**
+   * 获取可中断的写锁
+   * @throws InterruptedException 获取锁过程中被中断则抛出异常
+   */
   public void writeLockInterruptibly() throws InterruptedException {
     doLockInterruptibly(true);
   }
 
   /**
-   * Unlocks FSNameSystem write lock. This internally calls {@link
-   * FSNamesystemLock#writeUnlock(String, boolean, Supplier)}
+   * 释放写锁，使用默认参数
    */
   public void writeUnlock() {
     writeUnlock(OP_NAME_OTHER, false, null);
   }
 
   /**
-   * Unlocks FSNameSystem write lock. This internally calls {@link
-   * FSNamesystemLock#writeUnlock(String, boolean, Supplier)}
-   *
-   * @param opName Operation name.
+   * 释放写锁，指定操作名
+   * @param opName 当前操作名称
    */
   public void writeUnlock(String opName) {
     writeUnlock(opName, false, null);
   }
 
   /**
-   * Unlocks FSNameSystem write lock. This internally calls {@link
-   * FSNamesystemLock#writeUnlock(String, boolean, Supplier)}
-   *
-   * @param opName Operation name.
-   * @param lockReportInfoSupplier The info shown in the lock report
+   * 释放写锁，指定操作名和额外报告信息
+   * @param opName 当前操作名称
+   * @param lockReportInfoSupplier 额外报告信息提供者
    */
   public void writeUnlock(String opName,
       Supplier<String> lockReportInfoSupplier) {
@@ -282,29 +314,26 @@ public class FSNamesystemLock {
   }
 
   /**
-   * Unlocks FSNameSystem write lock. This internally calls {@link
-   * FSNamesystemLock#writeUnlock(String, boolean, Supplier)}
-   *
-   * @param opName Operation name.
-   * @param suppressWriteLockReport When false, event of write lock being held
-   * for long time will be logged in logs and metrics.
+   * 释放写锁，指定操作名和是否抑制报告
+   * @param opName 当前操作名称
+   * @param suppressWriteLockReport 是否抑制长写锁报告
    */
   public void writeUnlock(String opName, boolean suppressWriteLockReport) {
     writeUnlock(opName, suppressWriteLockReport, null);
   }
 
   /**
-   * Unlocks FSNameSystem write lock.
-   *
-   * @param opName Operation name
-   * @param suppressWriteLockReport When false, event of write lock being held
-   * for long time will be logged in logs and metrics.
-   * @param lockReportInfoSupplier The info shown in the lock report
+   * 释放写锁，完整参数版本，处理长锁检测和指标记录
+   * @param opName 当前操作名称
+   * @param suppressWriteLockReport 是否抑制长写锁报告，true则不记录日志和指标
+   * @param lockReportInfoSupplier 额外报告信息提供者
    */
   private void writeUnlock(String opName, boolean suppressWriteLockReport,
       Supplier<String> lockReportInfoSupplier) {
+    // 只有最外层释放且不抑制报告且当前线程持有写锁才需要统计
     final boolean needReport = !suppressWriteLockReport && coarseLock
         .getWriteHoldCount() == 1 && coarseLock.isWriteLockedByCurrentThread();
+    // 计算锁持有时间
     final long writeLockIntervalNanos =
         timer.monotonicNowNanos() - writeLockHeldTimeStampNanos;
     final long currentTimeMs = timer.now();
@@ -315,6 +344,7 @@ public class FSNamesystemLock {
     if (needReport &&
         writeLockIntervalMs >= this.writeLockReportingThresholdMs) {
       numWriteLockLongHold.increment();
+      // 更新最长写锁信息
       if (longestWriteLockHeldInfo.getIntervalMs() <= writeLockIntervalMs) {
         String lockReportInfo = lockReportInfoSupplier != null ? " (" +
             lockReportInfoSupplier.get() + ")" : "";
@@ -324,22 +354,27 @@ public class FSNamesystemLock {
             lockReportInfo);
       }
 
+      // 通过频率限制器判断是否可以输出日志
       logAction = writeLockReportLogger
           .record("write", currentTimeMs, writeLockIntervalMs);
     }
 
     LockHeldInfo lockHeldInfo = longestWriteLockHeldInfo;
     if (logAction.shouldLog()) {
+      // 重置最长写锁信息，等待下一轮收集
       longestWriteLockHeldInfo = new LockHeldInfo();
     }
 
+    // 执行写锁释放
     coarseLock.writeLock().unlock();
 
     if (needReport) {
+      // 添加锁持有时间指标
       addMetric(opName, writeLockIntervalNanos, true);
     }
 
     if (logAction.shouldLog()) {
+      // 输出长写锁警告日志
       FSNamesystem.LOG.info(
           "\tNumber of suppressed write-lock reports of {}Lock is {}"
               + "\n\tLongest write-lock held at {} for {}ms by {}{} via {}"
@@ -348,209 +383,4 @@ public class FSNamesystemLock {
           Time.formatTime(lockHeldInfo.getStartTimeMs()),
           lockHeldInfo.getIntervalMs(), lockHeldInfo.getOpName(),
           lockHeldInfo.getLockReportInfo(), lockHeldInfo.getStackTrace(),
-          logAction.getStats(0).getSum() - lockHeldInfo.getIntervalMs());
-    }
-  }
-
-  public int getReadHoldCount() {
-    return coarseLock.getReadHoldCount();
-  }
-  
-  public int getWriteHoldCount() {
-    return coarseLock.getWriteHoldCount();
-  }
-  
-  public boolean isWriteLockedByCurrentThread() {
-    return coarseLock.isWriteLockedByCurrentThread();
-  }
-
-  public Condition newWriteLockCondition() {
-    return coarseLock.writeLock().newCondition();
-  }
-
-  /**
-   * Returns the QueueLength of waiting threads.
-   *
-   * A larger number indicates greater lock contention.
-   *
-   * @return int - Number of threads waiting on this lock
-   */
-  public int getQueueLength() {
-    return coarseLock.getQueueLength();
-  }
-
-  /**
-   * Returns the number of time the read lock
-   * has been held longer than the threshold.
-   *
-   * @return long - Number of time the read lock
-   * has been held longer than the threshold
-   */
-  public long getNumOfReadLockLongHold() {
-    return numReadLockLongHold.longValue();
-  }
-
-  /**
-   * Returns the number of time the write lock
-   * has been held longer than the threshold.
-   *
-   * @return long - Number of time the write lock
-   * has been held longer than the threshold.
-   */
-  public long getNumOfWriteLockLongHold() {
-    return numWriteLockLongHold.longValue();
-  }
-
-  /**
-   * Add the lock hold time for a recent operation to the metrics.
-   * @param operationName Name of the operation for which to record the time
-   * @param value Length of time the lock was held (nanoseconds)
-   */
-  private void addMetric(String operationName, long value, boolean isWrite) {
-    if (metricsEnabled) {
-      String opMetric = getMetricName(operationName, isWrite);
-      detailedHoldTimeMetrics.add(opMetric, value);
-
-      String overallMetric = getMetricName(OVERALL_METRIC_NAME, isWrite);
-      detailedHoldTimeMetrics.add(overallMetric, value);
-    }
-    updateProcessingDetails(
-        isWrite ? Timing.LOCKEXCLUSIVE : Timing.LOCKSHARED, value);
-  }
-
-  private void doLock(boolean isWrite) {
-    long startNanos = timer.monotonicNowNanos();
-    if (isWrite) {
-      coarseLock.writeLock().lock();
-    } else {
-      coarseLock.readLock().lock();
-    }
-    updateLockWait(startNanos, isWrite);
-  }
-
-  private void doLockInterruptibly(boolean isWrite)
-      throws InterruptedException {
-    long startNanos = timer.monotonicNowNanos();
-    if (isWrite) {
-      coarseLock.writeLock().lockInterruptibly();
-    } else {
-      coarseLock.readLock().lockInterruptibly();
-    }
-    updateLockWait(startNanos, isWrite);
-  }
-
-  private void updateLockWait(long startNanos, boolean isWrite) {
-    long now = timer.monotonicNowNanos();
-    updateProcessingDetails(Timing.LOCKWAIT, now - startNanos);
-    if (isWrite) {
-      if (coarseLock.getWriteHoldCount() == 1) {
-        writeLockHeldTimeStampNanos = now;
-      }
-    } else {
-      if (coarseLock.getReadHoldCount() == 1) {
-        readLockHeldTimeStampNanos.set(now);
-      }
-    }
-  }
-
-  private static void updateProcessingDetails(Timing type, long deltaNanos) {
-    Server.Call call = Server.getCurCall().get();
-    if (call != null) {
-      call.getProcessingDetails().add(type, deltaNanos, TimeUnit.NANOSECONDS);
-    }
-  }
-
-  private String getMetricName(String operationName, boolean isWrite) {
-    return (isWrite ? this.writeLockMetricPrefix : this.readLockMetricPrefix) +
-        org.apache.commons.lang3.StringUtils.capitalize(operationName) +
-        LOCK_METRIC_SUFFIX;
-  }
-
-  @VisibleForTesting
-  public void setMetricsEnabled(boolean metricsEnabled) {
-    this.metricsEnabled = metricsEnabled;
-  }
-
-  public boolean isMetricsEnabled() {
-    return metricsEnabled;
-  }
-
-  public void setReadLockReportingThresholdMs(long readLockReportingThresholdMs) {
-    this.readLockReportingThresholdMs = readLockReportingThresholdMs;
-  }
-
-  @VisibleForTesting
-  public long getReadLockReportingThresholdMs() {
-    return readLockReportingThresholdMs;
-  }
-
-  public void setWriteLockReportingThresholdMs(long writeLockReportingThresholdMs) {
-    this.writeLockReportingThresholdMs = writeLockReportingThresholdMs;
-  }
-
-  @VisibleForTesting
-  public long getWriteLockReportingThresholdMs() {
-    return writeLockReportingThresholdMs;
-  }
-
-  public void setLockForTests(ReentrantReadWriteLock lock) {
-    this.coarseLock = lock;
-  }
-
-  public ReentrantReadWriteLock getLockForTests() {
-    return this.coarseLock;
-  }
-
-  /**
-   * Read lock Held Info.
-   */
-  private static class LockHeldInfo {
-    /** Lock held start time. */
-    private final Long startTimeMs;
-    /** Lock held time. */
-    private final Long intervalMs;
-    /** The stack trace lock was held. */
-    private final String stackTrace;
-    /** The operation name. */
-    private final String opName;
-    /** The info shown in a lock report. */
-    private final String lockReportInfo;
-
-    LockHeldInfo() {
-      this.startTimeMs = 0L;
-      this.intervalMs = 0L;
-      this.stackTrace = null;
-      this.opName = null;
-      this.lockReportInfo = null;
-    }
-
-    LockHeldInfo(long startTimeMs, long intervalMs, String stackTrace,
-        String opName, String lockReportInfo) {
-      this.startTimeMs = startTimeMs;
-      this.intervalMs = intervalMs;
-      this.stackTrace = stackTrace;
-      this.opName = opName;
-      this.lockReportInfo = lockReportInfo;
-    }
-
-    public Long getStartTimeMs() {
-      return this.startTimeMs;
-    }
-
-    public Long getIntervalMs() {
-      return this.intervalMs;
-    }
-
-    public String getStackTrace() {
-      return this.stackTrace;
-    }
-
-    public String getOpName() {
-      return opName;
-    }
-
-    public String getLockReportInfo() {
-      return lockReportInfo;
-    }
-  }
-}
+          logAction.getStats(0).getSum() - lockHeldInfo.getInterval

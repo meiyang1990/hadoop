@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,23 +19,24 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 /**
- * The content types such as file, directory and symlink to be computed.
+ * HDFS命名空间内容统计类型枚举，定义了名称节点空间统计需要计算的不同统计维度。
+ * 用于目录容量、文件数量等空间统计场景，支持对不同类型的对象分别计数。
  */
 public enum Content {
-  /** The number of files. */
+  /** 文件数量统计 */
   FILE,
-  /** The number of directories. */
+  /** 目录数量统计 */
   DIRECTORY,
-  /** The number of symlinks. */
+  /** 符号链接数量统计 */
   SYMLINK,
 
-  /** The total of file length in bytes. */
+  /** 文件总长度统计，单位：字节 */
   LENGTH,
-  /** The total of disk space usage in bytes including replication. */
+  /** 磁盘空间总使用量统计，包含副本占用空间，单位：字节 */
   DISKSPACE,
 
-  /** The number of snapshots. */
+  /** 快照数量统计 */
   SNAPSHOT,
-  /** The number of snapshottable directories. */
+  /** 可快照目录数量统计 */
   SNAPSHOTTABLE_DIRECTORY;
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -32,11 +33,10 @@ import java.util.List;
 import java.util.TreeSet;
 
 /**
- * Greedy Planner is a simple planner that computes the largest possible move at
- * any point of time given a volumeSet.
- * <p>
- * This is done by choosing the disks with largest  amount of data above and
- * below the idealStorage and then a move is scheduled between them.
+ * 文件说明：磁盘均衡器贪心规划器实现，基于贪心策略生成磁盘数据迁移计划
+ * 
+ * 贪心规划器是一种简单规划算法，在每一步都计算当前能移动的最大数据块，
+ * 通过在超出理想存储和低于理想存储的磁盘之间调度数据移动实现磁盘均衡。
  */
 public class GreedyPlanner implements Planner {
   public static final long MB = 1024L * 1024L;
@@ -47,34 +47,40 @@ public class GreedyPlanner implements Planner {
   private final double threshold;
 
   /**
-   * Constructs a greedy planner.
+   * 构造贪心规划器实例
    *
-   * @param threshold - Disk tolerance that we are ok with
-   * @param node      - node on which this planner is operating upon
+   * @param threshold 磁盘不均衡容忍阈值，当磁盘使用率偏离理想值超过该阈值时需要均衡
+   * @param node      当前要进行均衡规划的数据节点
    */
   public GreedyPlanner(double threshold, DiskBalancerDataNode node) {
     this.threshold = threshold;
   }
 
   /**
-   * Computes a node plan for the given node.
+   * 为指定数据节点生成磁盘均衡执行计划
    *
-   * @return NodePlan
-   * @throws Exception
+   * @param node 待均衡的数据节点
+   * @return 生成的均衡节点计划，包含所有数据迁移步骤
+   * @throws Exception 规划过程中抛出的异常
    */
   @Override
   public NodePlan plan(DiskBalancerDataNode node) throws Exception {
+    // 记录规划开始时间，用于统计耗时
     final long startTime = Time.monotonicNow();
+    // 创建空的节点计划，用于保存后续生成的迁移步骤
     NodePlan plan = new NodePlan(node.getDataNodeName(),
         node.getDataNodePort());
     LOG.info("Starting plan for Node : {}:{}",
         node.getDataNodeName(), node.getDataNodePort());
+    // 循环规划直到数据节点满足均衡要求
     while (node.isBalancingNeeded(this.threshold)) {
+      // 对数据节点上每一组存储类型相同的卷集分别进行均衡规划
       for (DiskBalancerVolumeSet vSet : node.getVolumeSets().values()) {
         balanceVolumeSet(node, vSet, plan);
       }
     }
 
+    // 计算规划耗时并输出日志
     final long endTime = Time.monotonicNow();
     LOG.info("Compute Plan for Node : {}:{} took {} ms",
         node.getDataNodeName(), node.getDataNodePort(), endTime - startTime);
@@ -83,29 +89,33 @@ public class GreedyPlanner implements Planner {
   }
 
   /**
-   * Computes Steps to make a DiskBalancerVolumeSet Balanced.
+   * 对指定卷集生成均衡步骤，添加到节点计划中
    *
-   * @param node
-   * @param vSet - DiskBalancerVolumeSet
-   * @param plan - NodePlan
+   * @param node  当前数据节点
+   * @param vSet  待均衡的卷集（同一存储类型的一组磁盘）
+   * @param plan  节点计划，用于存放生成的迁移步骤
    */
   public void balanceVolumeSet(DiskBalancerDataNode node,
                                DiskBalancerVolumeSet vSet, NodePlan plan)
       throws Exception {
+    // 参数非空检查
     Preconditions.checkNotNull(vSet);
     Preconditions.checkNotNull(plan);
     Preconditions.checkNotNull(node);
+    // 创建卷集副本，在副本上进行规划计算，不修改原始数据
     DiskBalancerVolumeSet currentSet = new DiskBalancerVolumeSet(vSet);
 
+    // 循环规划直到当前卷集满足均衡要求
     while (currentSet.isBalancingNeeded(this.threshold)) {
+      // 移除已经标记为跳过/失败的卷，不参与后续规划
       removeSkipVolumes(currentSet);
 
+      // 按数据密度排序后，取出最空闲和最繁忙的两个磁盘
       DiskBalancerVolume lowVolume = currentSet.getSortedQueue().first();
       DiskBalancerVolume highVolume = currentSet.getSortedQueue().last();
 
       Step nextStep = null;
-      // ok both volumes bytes used are in the range that we expect
-      // Then we create a move request.
+      // 两个卷都可参与均衡时，计算本次需要迁移的数据量
       if (!lowVolume.isSkip() && !highVolume.isSkip()) {
         nextStep = computeMove(currentSet, lowVolume, highVolume);
       } else {
@@ -113,7 +123,9 @@ public class GreedyPlanner implements Planner {
             lowVolume.getPath(), highVolume.getPath());
       }
 
+      // 将计算出的迁移步骤应用到当前卷集，更新各卷已使用空间，用于下一步计算
       applyStep(nextStep, currentSet, lowVolume, highVolume);
+      // 如果生成了有效迁移步骤，添加到最终节点计划中
       if (nextStep != null) {
         LOG.debug("Step : {} ", nextStep);
         plan.addStep(nextStep);
@@ -124,6 +136,7 @@ public class GreedyPlanner implements Planner {
         currentSet.getSetID(),
         currentSet.getVolumes().get(0).getStorageType());
 
+    // 填充节点计划的元信息
     plan.setNodeName(node.getDataNodeName());
     plan.setNodeUUID(node.getDataNodeUUID());
     plan.setTimeStamp(Time.now());
@@ -131,13 +144,12 @@ public class GreedyPlanner implements Planner {
   }
 
   /**
-   * Apply steps applies the current step on to a volumeSet so that we can
-   * compute next steps until we reach the desired goals.
+   * 将生成的迁移步骤应用到当前卷集，更新卷的使用量并重新计算数据密度，为下一步规划做准备
    *
-   * @param nextStep   - nextStep or Null
-   * @param currentSet - Current Disk BalancerVolume Set we are operating upon
-   * @param lowVolume  - volume
-   * @param highVolume - volume
+   * @param nextStep   本次迁移步骤，可为null表示无迁移
+   * @param currentSet 当前操作的卷集
+   * @param lowVolume  目标卷（接收数据）
+   * @param highVolume 源卷（迁出数据）
    */
   private void applyStep(Step nextStep, DiskBalancerVolumeSet currentSet,
                          DiskBalancerVolume lowVolume,
@@ -145,50 +157,48 @@ public class GreedyPlanner implements Planner {
 
     long used;
     if (nextStep != null) {
+      // 增加目标卷已使用空间
       used = lowVolume.getUsed() + nextStep.getBytesToMove();
       lowVolume.setUsed(used);
 
+      // 减少源卷已使用空间
       used = highVolume.getUsed() - nextStep.getBytesToMove();
       highVolume.setUsed(used);
     }
 
-    // since the volume data changed , we need to recompute the DataDensity.
+    // 卷数据变更后重新计算所有卷的数据密度
     currentSet.computeVolumeDataDensity();
     printQueue(currentSet.getSortedQueue());
   }
 
   /**
-   * Computes a data move from the largest disk we have to smallest disk.
+   * 计算从最繁忙磁盘到最空闲磁盘可迁移的最大数据量
    *
-   * @param currentSet - Current Disk Set we are working with
-   * @param lowVolume  - Low Data Capacity Volume
-   * @param highVolume - High Data Capacity Volume
-   * @return Step
+   * @param currentSet 当前操作的卷集
+   * @param lowVolume  低数据密度卷（目标卷，接收数据）
+   * @param highVolume 高数据密度卷（源卷，迁出数据）
+   * @return 生成的迁移步骤，若无法迁移则返回null
    */
   private Step computeMove(DiskBalancerVolumeSet currentSet,
                            DiskBalancerVolume lowVolume,
                            DiskBalancerVolume highVolume) {
-    // Compute how many bytes we can move. First Compute the maximum that
-    // low Volume Can receive, then compute maximum high volume can give
-    // Then take the minimum of those two numbers that is the bytesToMove.
-
+    // 计算目标卷最多还能接收多少数据：理想值 - 当前已用
     long maxLowVolumeCanReceive = (long) (
         (currentSet.getIdealUsed() * lowVolume.computeEffectiveCapacity()) -
             lowVolume.getUsed());
 
-    // This disk cannot take any more data from any disk.
-    // Remove it from our computation matrix.
+    // 如果目标卷已经达到或超过理想值，无法再接收数据，标记为跳过
     if (maxLowVolumeCanReceive <= 0) {
       LOG.debug("{} Skipping disk from computation. Maximum data size " +
           "achieved.", lowVolume.getPath());
       skipVolume(currentSet, lowVolume);
     }
 
+    // 计算源卷最多能迁出多少数据：当前已用 - 理想值
     long maxHighVolumeCanGive = highVolume.getUsed() -
         (long) (currentSet.getIdealUsed() *
             highVolume.computeEffectiveCapacity());
-    // This volume cannot give any more data, remove it from the
-    // computation matrix
+    // 如果源卷已经低于等于理想值，无法再迁出数据，标记为跳过
     if (maxHighVolumeCanGive <= 0) {
       LOG.debug(" {} Skipping disk from computation. Minimum data size " +
           "achieved.", highVolume.getPath());
@@ -196,11 +206,12 @@ public class GreedyPlanner implements Planner {
     }
 
 
+    // 本次能迁移的数据量为源卷可出 和 目标卷可入 的较小值
     long bytesToMove = Math.min(maxLowVolumeCanReceive, maxHighVolumeCanGive);
     Step nextStep = null;
 
+    // 如果有数据需要迁移，创建迁移步骤实例
     if (bytesToMove > 0) {
-      // Create a new step
       nextStep = new MoveStep(highVolume, currentSet.getIdealUsed(), lowVolume,
           bytesToMove, currentSet.getSetID());
       LOG.debug("Next Step: {}", nextStep);
@@ -209,10 +220,10 @@ public class GreedyPlanner implements Planner {
   }
 
   /**
-   * Skips this volume if needed.
+   * 将指定卷标记为跳过，不再参与后续均衡计算
    *
-   * @param currentSet - Current Disk set
-   * @param volume     - Volume
+   * @param currentSet 当前卷集
+   * @param volume     需要跳过的卷
    */
   private void skipVolume(DiskBalancerVolumeSet currentSet,
                           DiskBalancerVolume volume) {
@@ -231,25 +242,30 @@ public class GreedyPlanner implements Planner {
     volume.setSkip(true);
   }
 
-  // Removes all volumes which are part of the volumeSet but skip flag is set.
+  /**
+   * 从当前卷集中移除所有标记为跳过或失败的卷，更新排序队列
+   *
+   * @param currentSet 当前操作的卷集
+   */
   private void removeSkipVolumes(DiskBalancerVolumeSet currentSet) {
     List<DiskBalancerVolume> volumeList = currentSet.getVolumes();
     Iterator<DiskBalancerVolume> volumeIterator = volumeList.iterator();
+    // 遍历迭代器删除已跳过或失败的卷
     while (volumeIterator.hasNext()) {
       DiskBalancerVolume vol = volumeIterator.next();
       if (vol.isSkip() || vol.isFailed()) {
         currentSet.removeVolume(vol);
       }
     }
+    // 重新计算数据密度并排序
     currentSet.computeVolumeDataDensity();
     printQueue(currentSet.getSortedQueue());
   }
 
   /**
-   * This function is used only for debugging purposes to ensure queue looks
-   * correct.
+   * 调试用函数，打印排序队列中第一个和最后一个卷的数据密度，验证排序是否正确
    *
-   * @param queue - Queue
+   * @param queue 排序后的卷队列
    */
   private void printQueue(TreeSet<DiskBalancerVolume> queue) {
     if (LOG.isDebugEnabled()) {

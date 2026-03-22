@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,18 +21,23 @@ package org.apache.hadoop.hdfs.server.protocol;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-/****************************************************
- * A BlockIdCommand is an instruction to a datanode 
- * regarding some blocks under its control.
- ****************************************************/
+/**
+ * 基于块ID的DataNode指令，用于NameNode向DataNode下发针对特定数据块的操作指令
+ * 是HDFS NameNode与DataNode之间节点通信协议的核心消息类
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class BlockIdCommand extends DatanodeCommand {
+  /** 块池ID，标识该指令所属的块池 */
   final String poolId;
+  /** 指令操作目标的数据块ID数组 */
   final long blockIds[];
 
   /**
-   * Create BlockCommand for the given action
+   * 构造携带块ID列表的DataNode指令
+   * @param action 指令操作类型
+   * @param poolId 目标块池ID
+   * @param blockIds 目标数据块ID数组
    */
   public BlockIdCommand(int action, String poolId, long[] blockIds) {
     super(action);
@@ -39,10 +45,18 @@ public class BlockIdCommand extends DatanodeCommand {
     this.blockIds= blockIds;
   }
   
+  /**
+   * 获取目标块池ID
+   * @return 块池ID
+   */
   public String getBlockPoolId() {
     return poolId;
   }
   
+  /**
+   * 获取操作目标的数据块ID数组
+   * @return 数据块ID数组
+   */
   public long[] getBlockIds() {
     return blockIds;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,26 +24,26 @@ import org.apache.commons.lang3.ArrayUtils;
 import java.util.Arrays;
 
 /**
- * Counters for an enum type.
- * 
- * For example, suppose there is an enum type
+ * 文件级注释：基于枚举类型的通用计数器工具类，为每个枚举常量维护一个独立的长整型计数，
+ * 支持增删改查、批量重置、数值比较等操作，常用于HDFS中按枚举分类的统计场景。
+ *
+ * 示例使用说明：若存在枚举类型
  * <pre>
  * enum Fruit { APPLE, ORANGE, GRAPE }
  * </pre>
- * An {@link EnumCounters} object can be created for counting the numbers of
- * APPLE, ORANGE and GRAPE.
+ * 可创建{@link EnumCounters}对象分别对APPLE、ORANGE和GRAPE进行计数统计。
  *
- * @param <E> the enum type
+ * @param <E> 要统计的枚举类型
  */
 public class EnumCounters<E extends Enum<E>> {
-  /** The class of the enum. */
+  /** 枚举的Class对象 */
   private final Class<E> enumClass;
-  /** An array of longs corresponding to the enum type. */
+  /** 对应枚举每个常量的计数数组，下标使用枚举的ordinal值 */
   private final long[] counters;
 
   /**
-   * Construct counters for the given enum constants.
-   * @param enumClass the enum class of the counters.
+   * 构造方法：使用指定枚举类型创建计数器，所有计数器初始化为0。
+   * @param enumClass 要统计的枚举Class对象
    */
   public EnumCounters(final Class<E> enumClass) {
     final E[] enumConstants = enumClass.getEnumConstants();
@@ -51,6 +52,11 @@ public class EnumCounters<E extends Enum<E>> {
     this.counters = new long[enumConstants.length];
   }
 
+  /**
+   * 构造方法：使用指定枚举类型创建计数器，所有计数器初始化为指定默认值。
+   * @param enumClass 要统计的枚举Class对象
+   * @param defaultVal 所有计数器的初始值
+   */
   public EnumCounters(final Class<E> enumClass, long defaultVal) {
     final E[] enumConstants = enumClass.getEnumConstants();
     Preconditions.checkNotNull(enumConstants);
@@ -59,65 +65,100 @@ public class EnumCounters<E extends Enum<E>> {
     reset(defaultVal);
   }
   
-  /** @return the value of counter e. */
+  /**
+   * 获取指定枚举项的计数值。
+   * @param e 目标枚举项
+   * @return 指定枚举项当前的计数值
+   */
   public final long get(final E e) {
     return counters[e.ordinal()];
   }
 
-  /** @return the values of counter as a shadow copy of array*/
+  /**
+   * 获取所有计数值的数组快照（深拷贝）。
+   * @return 所有计数器当前值的拷贝数组
+   */
   public long[] asArray() {
     return ArrayUtils.clone(counters);
   }
 
-  /** Negate all counters. */
+  /**
+   * 对所有计数器执行取反操作（所有计数值变为自身的负值）。
+   */
   public void negation() {
     for(int i = 0; i < counters.length; i++) {
       counters[i] = -counters[i];
     }
   }
   
-  /** Set counter e to the given value. */
+  /**
+   * 将指定枚举项的计数设置为给定值。
+   * @param e 目标枚举项
+   * @param value 要设置的目标值
+   */
   public void set(final E e, final long value) {
     counters[e.ordinal()] = value;
   }
 
-  /** Set this counters to that counters. */
+  /**
+   * 将当前所有计数器的值设置为另一个EnumCounters的对应值。
+   * @param that 要复制的源计数器对象
+   */
   public void set(final EnumCounters<E> that) {
     for(int i = 0; i < counters.length; i++) {
       this.counters[i] = that.counters[i];
     }
   }
 
-  /** Reset all counters to zero. */
+  /**
+   * 将所有计数器重置为0。
+   */
   public void reset() {
     reset(0L);
   }
 
-  /** Add the given value to counter e. */
+  /**
+   * 给指定枚举项的计数加上给定增量值。
+   * @param e 目标枚举项
+   * @param value 要增加的数值（可为负数）
+   */
   public void add(final E e, final long value) {
     counters[e.ordinal()] += value;
   }
 
-  /** Add that counters to this counters. */
+  /**
+   * 将另一个计数器的所有值对应加到当前计数器中。
+   * @param that 要相加的源计数器对象
+   */
   public void add(final EnumCounters<E> that) {
     for(int i = 0; i < counters.length; i++) {
       this.counters[i] += that.counters[i];
     }
   }
 
-  /** Subtract the given value from counter e. */
+  /**
+   * 给指定枚举项的计数减去给定值。
+   * @param e 目标枚举项
+   * @param value 要减去的数值
+   */
   public void subtract(final E e, final long value) {
     counters[e.ordinal()] -= value;
   }
 
-  /** Subtract this counters from that counters. */
+  /**
+   * 将当前计数器的所有值减去另一个计数器的对应值。
+   * @param that 要减去的源计数器对象
+   */
   public void subtract(final EnumCounters<E> that) {
     for(int i = 0; i < counters.length; i++) {
       this.counters[i] -= that.counters[i];
     }
   }
   
-  /** @return the sum of all counters. */
+  /**
+   * 计算所有计数器的总和。
+   * @return 所有计数值相加得到的总和
+   */
   public long sum() {
     long sum = 0;
     for(int i = 0; i < counters.length; i++) {
@@ -139,7 +180,8 @@ public class EnumCounters<E extends Enum<E>> {
   }
 
   /**
-   * Return a deep copy of EnumCounter.
+   * 创建当前计数器对象的深拷贝。
+   * @return 当前EnumCounters对象的深度拷贝
    */
   public EnumCounters<E> deepCopyEnumCounter() {
     EnumCounters<E> newCounter = new EnumCounters<>(enumClass);
@@ -163,12 +205,21 @@ public class EnumCounters<E extends Enum<E>> {
     return b.substring(0, b.length() - 2);
   }
 
+  /**
+   * 将所有计数器重置为指定值。
+   * @param val 重置后的目标值
+   */
   public void reset(long val) {
     for(int i = 0; i < counters.length; i++) {
       this.counters[i] = val;
     }
   }
 
+  /**
+   * 检查所有计数器的值是否都小于等于给定值。
+   * @param val 待比较的目标值
+   * @return 若所有计数器都<=val返回true，否则返回false
+   */
   public boolean allLessOrEqual(long val) {
     for (long c : counters) {
       if (c > val) {
@@ -178,6 +229,11 @@ public class EnumCounters<E extends Enum<E>> {
     return true;
   }
 
+  /**
+   * 检查是否存在任意计数器的值大于等于给定值。
+   * @param val 待比较的目标值
+   * @return 若至少有一个计数器>=val返回true，否则返回false
+   */
   public boolean anyGreaterOrEqual(long val) {
     for (long c: counters) {
       if (c >= val) {

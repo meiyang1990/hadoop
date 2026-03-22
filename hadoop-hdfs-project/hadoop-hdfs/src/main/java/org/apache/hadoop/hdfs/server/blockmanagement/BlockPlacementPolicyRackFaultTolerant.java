@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,57 +27,59 @@ import org.apache.hadoop.net.NodeBase;
 import java.util.*;
 
 /**
- * The class is responsible for choosing the desired number of targets
- * for placing block replicas.
- * The strategy is that it tries its best to place the replicas to most racks.
+ * @file BlockPlacementPolicyRackFaultTolerant.java
+ * @brief 机架容错感知的块放置策略实现，核心目标是将副本尽可能分布到更多不同的机架上，提升故障容错能力
+ * 
+ * 该策略继承默认块放置策略，通过优先将副本分散到不同机架来最大化提升机架级故障容错能力，
+ * 当机架数量足够时，每个机架只放一个副本；当副本数量超过机架数量时，会尽可能均匀分布副本。
  */
 @InterfaceAudience.Private
 public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyDefault {
 
+  /**
+   * 计算每个机架最多可放置的副本数量，用于指导块放置
+   * @param numOfChosen 已选择的数据节点数量
+   * @param numOfReplicas 还需要选择的副本数量
+   * @return 长度为2的数组，第一个元素是剩余需要选择的副本数，第二个元素是每个机架允许的最大节点数
+   */
   @Override
   protected int[] getMaxNodesPerRack(int numOfChosen, int numOfReplicas) {
+    // 获取集群总数据节点数量
     int clusterSize = clusterMap.getNumOfLeaves();
     int totalNumOfReplicas = numOfChosen + numOfReplicas;
+    // 如果总副本数超过集群节点总数，调整为最大可用节点数
     if (totalNumOfReplicas > clusterSize) {
       numOfReplicas -= (totalNumOfReplicas-clusterSize);
       totalNumOfReplicas = clusterSize;
     }
-    // No calculation needed when there is only one rack or picking one node.
+    // 获取集群中非空机架数量
     int numOfRacks = clusterMap.getNumOfNonEmptyRacks();
-    // HDFS-14527 return default when numOfRacks = 0 to avoid
-    // ArithmeticException when calc maxNodesPerRack at following logic.
+    // 当机架数量<=1或只需要选1个节点时，使用默认配置，避免算术异常
     if (numOfRacks <= 1 || totalNumOfReplicas <= 1) {
       return new int[] {numOfReplicas, totalNumOfReplicas};
     }
-    // If more racks than replicas, put one replica per rack.
+    // 如果机架数量比总副本数多，每个机架放1个副本
     if (totalNumOfReplicas < numOfRacks) {
       return new int[] {numOfReplicas, 1};
     }
-    // If more replicas than racks, evenly spread the replicas.
-    // This calculation rounds up.
+    // 如果副本数多于机架数，向上取整计算每个机架最多放置的副本数
     int maxNodesPerRack = (totalNumOfReplicas - 1) / numOfRacks + 1;
     return new int[] {numOfReplicas, maxNodesPerRack};
   }
 
   /**
-   * Choose numOfReplicas in order:
-   * 1. If total replica expected is less than numOfRacks in cluster, it choose
-   * randomly.
-   * 2. If total replica expected is bigger than numOfRacks, it choose:
-   *  2a. Fill each rack exactly (maxNodesPerRack-1) replicas.
-   *  2b. For some random racks, place one more replica to each one of them,
-   *  until numOfReplicas have been chosen. <br>
-   * 3. If after step 2, there are still replicas not placed (due to some
-   * racks have fewer datanodes than maxNodesPerRack), the rest of the replicas
-   * is placed evenly on the rest of the racks who have Datanodes that have
-   * not been placed a replica.
-   * 4. If after step 3, there are still replicas not placed. A
-   * {@link NotEnoughReplicasException} is thrown.
-   * <p>
-   * For normal setups, step 2 would suffice. So in the end, the difference
-   * of the numbers of replicas for each two racks is no more than 1.
-   * Either way it always prefer local storage.
-   * @return local node of writer
+   * 按优先级顺序选择数据节点放置副本，尽可能将副本均匀分布到不同机架
+   * @param numOfReplicas 需要选择的副本数量
+   * @param writer 写入节点（客户端所在节点）
+   * @param excludedNodes 需要排除的节点列表
+   * @param blocksize 块大小
+   * @param maxNodesPerRack 每个机架允许的最大节点数
+   * @param results 存储选择结果的列表
+   * @param avoidStaleNodes 是否避免选择 stale 节点
+   * @param newBlock 是否是新建块
+   * @param storageTypes 存储类型需求
+   * @return 写入节点本地节点
+   * @throws NotEnoughReplicasException 当无法选到足够节点时抛出异常
    */
   @Override
   protected Node chooseTargetInOrder(int numOfReplicas,
@@ -93,6 +96,7 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
     int numOfRacks = clusterMap.getNumOfNonEmptyRacks();
 
     try {
+      // 当总期望副本数小于机架数，或刚好被机架数整除时，直接一次选择完成
       if (totalReplicaExpected < numOfRacks ||
           totalReplicaExpected % numOfRacks == 0) {
         writer = chooseOnce(numOfReplicas, writer, excludedNodes, blocksize,
@@ -102,8 +106,7 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
 
       assert totalReplicaExpected > (maxNodesPerRack -1) * numOfRacks;
 
-      // Calculate numOfReplicas for filling each rack exactly (maxNodesPerRack-1)
-      // replicas.
+      // 统计每个已选副本所在机架的节点计数
       HashMap<String, Integer> rackCounts = new HashMap<>();
       for (DatanodeStorageInfo dsInfo : results) {
         String rack = dsInfo.getDatanodeDescriptor().getNetworkLocation();
@@ -114,23 +117,23 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
           rackCounts.put(rack, 1);
         }
       }
-      int excess = 0; // Sum of the above (maxNodesPerRack-1) part of nodes in results
+      // 计算已选结果中超过(maxNodesPerRack-1)限制的超额节点总数
+      int excess = 0;
       for (int count : rackCounts.values()) {
         if (count > maxNodesPerRack -1) {
           excess += count - (maxNodesPerRack -1);
         }
       }
+      // 计算本轮需要选择的副本数，保证每个机架最多放(maxNodesPerRack-1)个
       numOfReplicas = Math.min(totalReplicaExpected - results.size(),
           (maxNodesPerRack -1) * numOfRacks - (results.size() - excess));
 
-      // Try to spread the replicas as evenly as possible across racks.
-      // This is done by first placing with (maxNodesPerRack-1), then spreading
-      // the remainder by calling again with maxNodesPerRack.
+      // 第一阶段：选择节点，每个机架最多放(maxNodesPerRack-1)个
       writer = chooseOnce(numOfReplicas, writer, new HashSet<>(excludedNodes),
           blocksize, maxNodesPerRack - 1, results, avoidStaleNodes,
           storageTypes);
 
-      // Exclude the chosen nodes
+      // 将已选节点加入排除列表，避免重复选择
       for (DatanodeStorageInfo resultStorage : results) {
         addToExcludedNodes(resultStorage.getDatanodeDescriptor(),
             excludedNodes);
@@ -138,10 +141,12 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
       LOG.trace("Chosen nodes: {}", results);
       LOG.trace("Excluded nodes: {}", excludedNodes);
 
+      // 第二阶段：选择剩余需要的副本，每个机架可以放最多maxNodesPerRack个
       numOfReplicas = totalReplicaExpected - results.size();
       chooseOnce(numOfReplicas, writer, excludedNodes, blocksize,
           maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     } catch (NotEnoughReplicasException e) {
+      // 均匀放置失败，降级到从剩余机架尽力而为放置
       LOG.warn("Only able to place {} of total expected {}"
               + " (maxNodesPerRack={}, numOfReplicas={}) nodes "
               + "evenly across racks, falling back to evenly place on the "
@@ -159,7 +164,17 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
   }
 
   /**
-   * Choose as evenly as possible from the racks which have available datanodes.
+   * 当均匀放置失败时，从剩余可用机架尽力而为均匀选择节点
+   * @param writer 写入节点
+   * @param excludedNodes 需要排除的节点列表
+   * @param blocksize 块大小
+   * @param maxNodesPerRack 每个机架允许的最大节点数
+   * @param results 存储选择结果的列表
+   * @param avoidStaleNodes 是否避免选择 stale 节点
+   * @param storageTypes 存储类型需求
+   * @param totalReplicaExpected 总共需要的副本数
+   * @param e 原始异常
+   * @throws NotEnoughReplicasException 尽力后仍无法满足需求时抛出异常
    */
   private void chooseEvenlyFromRemainingRacks(Node writer,
       Set<Node> excludedNodes, long blocksize, int maxNodesPerRack,
@@ -169,9 +184,10 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
     int numResultsOflastChoose = 0;
     NotEnoughReplicasException lastException = e;
     int bestEffortMaxNodesPerRack = maxNodesPerRack;
+    // 逐步放宽每个机架最大节点数限制，直到选够副本或无法继续
     while (results.size() != totalReplicaExpected &&
         bestEffortMaxNodesPerRack < totalReplicaExpected) {
-      // Exclude the chosen nodes
+      // 构造新的排除列表，包含所有已选节点
       final Set<Node> newExcludeNodes = new HashSet<>();
       for (DatanodeStorageInfo resultStorage : results) {
         addToExcludedNodes(resultStorage.getDatanodeDescriptor(),
@@ -184,6 +200,7 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
       final int numOfReplicas = totalReplicaExpected - results.size();
       numResultsOflastChoose = results.size();
       try {
+        // 尝试放宽限制后选择节点
         chooseOnce(numOfReplicas, writer, newExcludeNodes, blocksize,
             ++bestEffortMaxNodesPerRack, results, avoidStaleNodes,
             storageTypes);
@@ -192,8 +209,7 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
       } finally {
         excludedNodes.addAll(newExcludeNodes);
       }
-      // To improve performance, the maximum value of 'bestEffortMaxNodesPerRack'
-      // is calculated only when it is not possible to select a node.
+      // 如果本轮没有选到新节点，重新计算最大每个机架节点数
       if (numResultsOflastChoose == results.size()) {
         Map<String, Integer> nodesPerRack = new HashMap<>();
         for (DatanodeStorageInfo dsInfo : results) {
@@ -205,6 +221,7 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
       }
     }
 
+    // 仍然没选够副本，抛出异常
     if (results.size() != totalReplicaExpected) {
       LOG.debug("Best effort placement failed: expecting {} replicas, only "
           + "chose {}.", totalReplicaExpected, results.size());
@@ -213,9 +230,17 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
   }
 
   /**
-   * Randomly choose <i>numOfReplicas</i> targets from the given <i>scope</i>.
-   * Except that 1st replica prefer local storage.
-   * @return local node of writer.
+   * 单次选择指定数量的副本，第一个副本优先选择本地节点，剩余副本随机选择
+   * @param numOfReplicas 需要选择的副本数量
+   * @param writer 写入节点
+   * @param excludedNodes 需要排除的节点列表
+   * @param blocksize 块大小
+   * @param maxNodesPerRack 每个机架允许的最大节点数
+   * @param results 存储选择结果的列表
+   * @param avoidStaleNodes 是否避免选择 stale 节点
+   * @param storageTypes 存储类型需求
+   * @return 写入节点本地节点
+   * @throws NotEnoughReplicasException 无法选到足够节点时抛出异常
    */
   private Node chooseOnce(int numOfReplicas,
                             Node writer,
@@ -229,27 +254,35 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
     if (numOfReplicas == 0) {
       return writer;
     }
+    // 优先选择写入节点本地存储放置第一个副本
     writer = chooseLocalStorage(writer, excludedNodes, blocksize,
         maxNodesPerRack, results, avoidStaleNodes, storageTypes, true)
         .getDatanodeDescriptor();
     if (--numOfReplicas == 0) {
       return writer;
     }
+    // 剩余副本随机选择
     chooseRandom(numOfReplicas, NodeBase.ROOT, excludedNodes, blocksize,
         maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     return writer;
   }
 
+  /**
+   * 验证块放置是否满足当前策略的要求，统计副本分布的机架数量
+   * @param locs 已放置的数据节点位置数组
+   * @param numberOfReplicas 副本总数
+   * @return 块放置状态对象，包含当前分布的机架数等信息
+   */
   @Override
   public BlockPlacementStatus verifyBlockPlacement(DatanodeInfo[] locs,
       int numberOfReplicas) {
     if (locs == null)
       locs = DatanodeDescriptor.EMPTY_ARRAY;
     if (!clusterMap.hasClusterEverBeenMultiRack()) {
-      // only one rack
+      // 集群只有一个机架
       return new BlockPlacementStatusDefault(1, 1, 1);
     }
-    // Count locations on different racks.
+    // 统计不同机架的数量
     Set<String> racks = new HashSet<>();
     for (DatanodeInfo dn : locs) {
       racks.add(dn.getNetworkLocation());
@@ -258,6 +291,13 @@ public class BlockPlacementPolicyRackFaultTolerant extends BlockPlacementPolicyD
         clusterMap.getNumOfNonEmptyRacks());
   }
 
+  /**
+   * 从候选副本集中选择合适的副本集，本策略优先选择超过一个候选的集合
+   * @param moreThanOne 每个机架有超过一个节点的候选集合
+   * @param exactlyOne 每个机架正好有一个节点的候选集合
+   * @param rackMap 按机架分组的候选节点映射
+   * @return 选中的候选集合
+   */
   @Override
   protected Collection<DatanodeStorageInfo> pickupReplicaSet(
       Collection<DatanodeStorageInfo> moreThanOne,

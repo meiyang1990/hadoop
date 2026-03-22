@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,9 +29,10 @@ import org.apache.hadoop.security.KerberosInfo;
 import java.io.IOException;
 
 /**
- * Protocol used to communicate between {@link JournalNode} for journalsync.
- *
- * This is responsible for sending edit log manifest.
+ * 文件说明：QJournal Journal节点间同步协议接口定义
+ * 
+ * 该接口定义了HA架构下多个JournalNode之间进行日志同步时使用的RPC协议，
+ * 负责在Journal节点之间交换编辑日志元数据和存储信息，保证多Journal节点间的数据一致性。
  */
 
 @KerberosInfo(
@@ -39,24 +41,30 @@ import java.io.IOException;
 @InterfaceAudience.Private
 public interface InterQJournalProtocol {
 
+  /** 协议版本ID */
   long versionID = 1L;
 
   /**
-   * @param jid the journal from which to enumerate edits
-   * @param sinceTxId the first transaction which the client cares about
-   * @param inProgressOk whether or not to check the in-progress edit log
-   *        segment
-   * @return a list of edit log segments since the given transaction ID.
+   * 从指定Journal节点获取编辑日志分段清单
+   * 
+   * @param jid 日志节点ID，指定要查询的日志
+   * @param nameServiceId 名称服务ID，区分不同的命名空间
+   * @param sinceTxId 起始事务ID，只返回该事务ID之后的日志分段
+   * @param inProgressOk 是否包含未完成的正在写入的编辑日志分段
+   * @return 指定事务ID之后的所有编辑日志分段信息响应
+   * @throws IOException RPC调用或IO操作异常
    */
   GetEditLogManifestResponseProto getEditLogManifestFromJournal(
       String jid, String nameServiceId, long sinceTxId, boolean inProgressOk)
       throws IOException;
 
   /**
-   * Get the storage info for the specified journal.
-   * @param jid the journal identifier
-   * @param nameServiceId the name service id
-   * @return the storage info object
+   * 获取指定日志的存储信息
+   * 
+   * @param jid 日志节点ID
+   * @param nameServiceId 名称服务ID
+   * @return 存储信息 proto 对象，包含存储版本、布局等信息
+   * @throws IOException RPC调用或IO操作异常
    */
   StorageInfoProto getStorageInfo(String jid, String nameServiceId)
       throws IOException;

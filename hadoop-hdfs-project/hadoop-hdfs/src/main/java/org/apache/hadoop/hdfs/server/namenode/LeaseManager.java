@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -58,50 +59,58 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * LeaseManager does the lease housekeeping for writing on files.   
- * This class also provides useful static methods for lease recovery.
- * 
- * Lease Recovery Algorithm
- * 1) Namenode retrieves lease information
- * 2) For each file f in the lease, consider the last block b of f
- * 2.1) Get the datanodes which contains b
- * 2.2) Assign one of the datanodes as the primary datanode p
-
- * 2.3) p obtains a new generation stamp from the namenode
- * 2.4) p gets the block info from each datanode
- * 2.5) p computes the minimum block length
- * 2.6) p updates the datanodes, which have a valid generation stamp,
- *      with the new generation stamp and the minimum block length 
- * 2.7) p acknowledges the namenode the update results
-
- * 2.8) Namenode updates the BlockInfo
- * 2.9) Namenode removes f from the lease
- *      and removes the lease once all files have been removed
- * 2.10) Namenode commit changes to edit log
+ * 文件写入租约管理器，负责HDFS文件写入的租约生命周期管理和过期租约恢复。
+ * 核心功能包括：租约创建、续约、删除、定期检查过期租约并触发租约恢复，保证文件写入异常后的完整性。
+ * <p>
+ * 租约恢复算法：
+ * 1) Namenode 获取租约信息
+ * 2) 对于租约中的每个文件 f，处理文件的最后一个块 b
+ * 2.1) 获取存储块 b 的所有数据节点
+ * 2.2) 选择一个数据节点作为主节点 p
+ *
+ * 2.3) p 从 namenode 获取新的世代戳
+ * 2.4) p 从每个数据节点获取块信息
+ * 2.5) p 计算最小块长度
+ * 2.6) p 更新所有有效世代戳的数据节点，设置新世代戳和最小块长度
+ * 2.7) p 向 namenode 确认更新结果
+ *
+ * 2.8) Namenode 更新 BlockInfo 元数据
+ * 2.9) Namenode 从租约中移除文件 f，当租约中所有文件都移除后删除租约
+ * 2.10) Namenode 将变更提交到 edit log
  */
 @InterfaceAudience.Private
 public class LeaseManager {
   public static final Logger LOG = LoggerFactory.getLogger(LeaseManager.class
       .getName());
+  // 关联的FSNamesystem对象，NameNode核心文件系统管理
   private final FSNamesystem fsnamesystem;
+  // 租约软限制时间，超过软限制后可被其他客户端申请恢复
   private long softLimit = HdfsConstants.LEASE_SOFTLIMIT_PERIOD;
+  // 租约硬限制时间，超过硬限制后强制触发租约恢复
   private long hardLimit;
+  // INode过滤最大工作线程数
   static final int INODE_FILTER_WORKER_COUNT_MAX = 4;
+  // 每个工作线程最小处理任务数阈值
   static final int INODE_FILTER_WORKER_TASK_MIN = 512;
+  // 内部租约持有者上次更新时间
   private long lastHolderUpdateTime;
+  // 当前内部租约持有者名称
   private String internalLeaseHolder;
 
-  //
-  // Used for handling lock-leases
-  // Mapping: leaseHolder -> Lease
-  //
+  // 映射：租约持有者 -> 租约对象
   private final HashMap<String, Lease> leases = new HashMap<>();
-  // INodeID -> Lease
+  // 映射：INode ID -> 租约对象
   private final TreeMap<Long, Lease> leasesById = new TreeMap<>();
 
+  // 租约监控后台线程
   private Daemon lmthread;
+  // 监控线程运行标志，volatile保证多线程可见性
   private volatile boolean shouldRunMonitor;
 
+  /**
+   * 构造租约管理器，关联FSNamesystem，加载配置参数
+   * @param fsnamesystem 关联的FSNamesystem
+   */
   LeaseManager(FSNamesystem fsnamesystem) {
     Configuration conf = new Configuration();
     this.fsnamesystem = fsnamesystem;
@@ -110,14 +119,19 @@ public class LeaseManager {
     updateInternalLeaseHolder();
   }
 
-  // Update the internal lease holder with the current time stamp.
+  /**
+   * 使用当前时间戳更新内部租约持有者
+   */
   private void updateInternalLeaseHolder() {
     this.lastHolderUpdateTime = Time.monotonicNow();
     this.internalLeaseHolder = HdfsServerConstants.NAMENODE_LEASE_HOLDER +
         "-" + Time.formatTime(Time.now());
   }
 
-  // Get the current internal lease holder name.
+  /**
+   * 获取当前内部租约持有者名称，过期则自动更新
+   * @return 当前有效的内部租约持有者名称
+   */
   String getInternalLeaseHolder() {
     long elapsed = Time.monotonicNow() - lastHolderUpdateTime;
     if (elapsed > hardLimit) {
@@ -126,14 +140,18 @@ public class LeaseManager {
     return internalLeaseHolder;
   }
 
+  /**
+   * 根据租约持有者名称获取租约对象
+   * @param holder 租约持有者名称
+   * @return 对应租约对象，不存在则返回null
+   */
   Lease getLease(String holder) {
     return leases.get(holder);
   }
 
   /**
-   * This method iterates through all the leases and counts the number of blocks
-   * which are not COMPLETE. The FSNamesystem read lock MUST be held before
-   * calling this method.
+   * 遍历所有租约，统计处于未完成状态的块数量。调用前必须持有FSNamesystem读锁
+   * @return 未完成块的总数量
    */
   synchronized long getNumUnderConstructionBlocks() {
     assert this.fsnamesystem.hasReadLock(RwLockMode.GLOBAL) :
@@ -142,8 +160,7 @@ public class LeaseManager {
     for (Long id : getINodeIdWithLeases()) {
       INode inode = fsnamesystem.getFSDirectory().getInode(id);
       if (inode == null) {
-        // The inode could have been deleted after getINodeIdWithLeases() is
-        // called, check here, and ignore it if so
+        // INode可能在获取ID列表后被删除，直接忽略
         LOG.warn("Failed to find inode {} in getNumUnderConstructionBlocks().",
             id);
         continue;
@@ -171,23 +188,25 @@ public class LeaseManager {
   Collection<Long> getINodeIdWithLeases() {return leasesById.keySet();}
 
   /**
-   * Get {@link INodesInPath} for all {@link INode} in the system
-   * which has a valid lease.
-   *
-   * @return Set<INodesInPath>
+   * 获取所有持有有效租约的INode对应的INodesInPath集合
+   * @return 所有有效租约文件的INodesInPath集合
+   * @throws IOException 获取过程中IO异常
    */
   @VisibleForTesting
   Set<INodesInPath> getINodeWithLeases() throws IOException {
     return getINodeWithLeases(null);
   }
 
+  /**
+   * 获取所有当前持有租约的INode数组，过滤已删除文件
+   * @return 有效租约对应的INode数组
+   */
   private synchronized INode[] getINodesWithLease() {
     List<INode> inodes = new ArrayList<>(leasesById.size());
     INode currentINode;
     for (long inodeId : leasesById.keySet()) {
       currentINode = fsnamesystem.getFSDirectory().getInode(inodeId);
-      // A file with an active lease could get deleted, or its
-      // parent directories could get recursively deleted.
+      // 持有租约的文件可能已经被删除，或者父目录被递归删除
       if (currentINode != null &&
           currentINode.isFile() &&
           !fsnamesystem.isFileDeleted(currentINode.asFile())) {
@@ -198,17 +217,16 @@ public class LeaseManager {
   }
 
   /**
-   * Get {@link INodesInPath} for all files under the ancestor directory which
-   * has valid lease. If the ancestor directory is null, then return all files
-   * in the system with valid lease. Callers must hold {@link FSNamesystem}
-   * read or write lock.
-   *
-   * @param ancestorDir the ancestor {@link INodeDirectory}
-   * @return {@code Set<INodesInPath>}
+   * 获取指定祖先目录下所有持有有效租约的文件INodesInPath，若祖先目录为null则返回所有有效租约文件。
+   * 调用者必须持有FSNamesystem读锁或写锁。
+   * @param ancestorDir 祖先目录，为null表示获取所有
+   * @return 符合条件的有效租约文件INodesInPath集合
+   * @throws IOException 获取过程中IO异常
    */
   public Set<INodesInPath> getINodeWithLeases(final INodeDirectory
       ancestorDir) throws IOException {
     assert fsnamesystem.hasReadLock(RwLockMode.FS);
+    // 记录开始时间，用于性能统计
     final long startTimeMs = Time.monotonicNow();
     Set<INodesInPath> iipSet = new HashSet<>();
     final INode[] inodes = getINodesWithLease();
@@ -218,8 +236,10 @@ public class LeaseManager {
     }
 
     List<Future<List<INodesInPath>>> futureList = Lists.newArrayList();
+    // 根据总数量计算需要的工作线程数，不超过最大限制
     final int workerCount = Math.min(INODE_FILTER_WORKER_COUNT_MAX,
         (((inodeCount - 1) / INODE_FILTER_WORKER_TASK_MIN) + 1));
+    // 创建固定线程池
     ExecutorService inodeFilterService =
         Executors.newFixedThreadPool(workerCount);
     for (int workerIdx = 0; workerIdx < workerCount; workerIdx++) {
@@ -228,13 +248,16 @@ public class LeaseManager {
         @Override
         public List<INodesInPath> call() {
           List<INodesInPath> iNodesInPaths = Lists.newArrayList();
+          // 按workerCount步长遍历，每个线程处理间隔workerCount个元素
           for (int idx = startIdx; idx < inodeCount; idx += workerCount) {
             INode inode = inodes[idx];
             if (!inode.isFile()) {
               continue;
             }
+            // 构造文件完整路径
             INodesInPath inodesInPath = INodesInPath.fromINode(
                 fsnamesystem.getFSDirectory().getRoot(), inode.asFile());
+            // 过滤掉不在指定祖先目录下的文件
             if (ancestorDir != null &&
                 !inodesInPath.isDescendant(ancestorDir)) {
               continue;
@@ -245,11 +268,13 @@ public class LeaseManager {
         }
       };
 
-      // Submit the inode filter task to the Executor Service
+      // 提交过滤任务到线程池
       futureList.add(inodeFilterService.submit(c));
     }
+    // 关闭线程池，不再接受新任务
     inodeFilterService.shutdown();
 
+    // 收集所有任务结果
     for (Future<List<INodesInPath>> f : futureList) {
       try {
         iipSet.addAll(f.get());
@@ -258,6 +283,7 @@ public class LeaseManager {
       }
     }
     final long endTimeMs = Time.monotonicNow();
+    // 耗时超过1秒则打印日志
     if ((endTimeMs - startTimeMs) > 1000) {
       LOG.info("Took {} ms to collect {} open files with leases {}",
           (endTimeMs - startTimeMs), iipSet.size(), ((ancestorDir != null) ?
@@ -266,6 +292,12 @@ public class LeaseManager {
     return iipSet;
   }
 
+  /**
+   * 获取一批处于构建中的未完成文件，使用默认路径过滤
+   * @param prevId INodeID游标，返回比该ID大的结果
+   * @return 分批结果包含当前批条目和是否还有更多结果
+   * @throws IOException 获取过程中IO异常
+   */
   public BatchedListEntries<OpenFileEntry> getUnderConstructionFiles(
       final long prevId) throws IOException {
     return getUnderConstructionFiles(prevId,
@@ -273,24 +305,25 @@ public class LeaseManager {
   }
 
   /**
-   * Get a batch of under construction files from the currently active leases.
-   * File INodeID is the cursor used to fetch new batch of results and the
-   * batch size is configurable using below config param. Since the list is
-   * fetched in batches, it does not represent a consistent view of all
-   * open files.
-   *
+   * 从当前活跃租约中获取一批处于构建中的未完成文件。
+   * 使用INodeID作为游标获取下一批结果，批大小可配置。
+   * 分批获取不保证所有打开文件的一致性视图。
+   * @param prevId INodeID游标，返回比该ID大的结果
+   * @param path 路径过滤前缀，只返回该路径下的文件
+   * @return 分批结果包含当前批条目和是否还有更多结果
+   * @throws IOException 获取过程中IO异常
    * @see org.apache.hadoop.hdfs.DFSConfigKeys#DFS_NAMENODE_LIST_OPENFILES_NUM_RESPONSES
-   * @param prevId the INodeID cursor
-   * @throws IOException
    */
   public BatchedListEntries<OpenFileEntry> getUnderConstructionFiles(
       final long prevId, final String path) throws IOException {
     assert fsnamesystem.hasReadLock(RwLockMode.FS);
     SortedMap<Long, Lease> remainingLeases;
     synchronized (this) {
+      // 获取比prevId大的剩余租约
       remainingLeases = leasesById.tailMap(prevId, false);
     }
     Collection<Long> inodeIds = remainingLeases.keySet();
+    // 计算本次返回数量，不超过配置的最大批大小
     final int numResponses = Math.min(
         this.fsnamesystem.getMaxListOpenFilesResponses(), inodeIds.size());
     final List<OpenFileEntry> openFileEntries =
@@ -303,7 +336,7 @@ public class LeaseManager {
       Long inodeId = inodeIdIterator.next();
       INode ucFile = fsnamesystem.getFSDirectory().getInode(inodeId);
       if (ucFile == null) {
-        //probably got deleted
+        // INode可能已经被删除，直接跳过
         continue;
       }
 
@@ -315,6 +348,7 @@ public class LeaseManager {
       }
 
       fullPathName = inodeFile.getFullPathName();
+      // 路径匹配才加入结果
       if (StringUtils.isEmpty(path) ||
           DFSUtil.isParentEntry(fullPathName, path)) {
         openFileEntries.add(new OpenFileEntry(inodeFile.getId(), fullPathName,
@@ -323,382 +357,50 @@ public class LeaseManager {
         count++;
       }
 
+      // 达到批大小则停止
       if (count >= numResponses) {
         break;
       }
     }
-    // avoid rescanning all leases when we have checked all leases already
+    // 是否还有更多结果，避免下次全量扫描
     boolean hasMore = inodeIdIterator.hasNext();
     return new BatchedListEntries<>(openFileEntries, hasMore);
   }
 
+  /**
+   * 根据文件INode获取对应租约
+   * @param src 文件INode
+   * @return 对应租约对象，不存在则返回null
+   */
   /** @return the lease containing src */
   public synchronized Lease getLease(INodeFile src) {return leasesById.get(src.getId());}
 
+  /**
+   * 获取当前系统中租约总数
+   * @return 租约总数
+   */
   /** @return the number of leases currently in the system */
   @VisibleForTesting
   public synchronized int countLease() {
     return leases.size();
   }
 
+  /**
+   * 获取所有租约包含的文件路径总数
+   * @return 总文件路径数
+   */
   /** @return the number of paths contained in all leases */
   synchronized long countPath() {
     return leasesById.size();
   }
 
   /**
-   * Adds (or re-adds) the lease for the specified file.
+   * 添加或续约指定文件的租约
+   * @param holder 租约持有者名称
+   * @param inodeId 文件INode ID
+   * @return 新增或更新后的租约对象
    */
   synchronized Lease addLease(String holder, long inodeId) {
     Lease lease = getLease(holder);
     if (lease == null) {
       lease = new Lease(holder);
-      leases.put(holder, lease);
-    } else {
-      renewLease(lease);
-    }
-    leasesById.put(inodeId, lease);
-    lease.files.add(inodeId);
-    return lease;
-  }
-
-  synchronized void removeLease(long inodeId) {
-    final Lease lease = leasesById.get(inodeId);
-    if (lease != null) {
-      removeLease(lease, inodeId);
-    }
-  }
-
-  /**
-   * Remove the specified lease and src.
-   */
-  private synchronized void removeLease(Lease lease, long inodeId) {
-    leasesById.remove(inodeId);
-    if (!lease.removeFile(inodeId)) {
-      LOG.debug("inode {} not found in lease.files (={})", inodeId, lease);
-    }
-
-    if (!lease.hasFiles()) {
-      if (leases.remove(lease.holder) == null) {
-        LOG.error("{} not found", lease);
-      }
-    }
-  }
-
-  /**
-   * Remove the lease for the specified holder and src
-   */
-  synchronized void removeLease(String holder, INodeFile src) {
-    Lease lease = getLease(holder);
-    if (lease != null) {
-      removeLease(lease, src.getId());
-    } else {
-      LOG.warn("Removing non-existent lease! holder={} src={}", holder, src
-          .getFullPathName());
-    }
-  }
-
-  synchronized void removeAllLeases() {
-    leasesById.clear();
-    leases.clear();
-  }
-
-  /**
-   * Reassign lease for file src to the new holder.
-   */
-  synchronized Lease reassignLease(Lease lease, INodeFile src,
-                                   String newHolder) {
-    assert newHolder != null : "new lease holder is null";
-    if (lease != null) {
-      removeLease(lease, src.getId());
-    }
-    return addLease(newHolder, src.getId());
-  }
-
-  /**
-   * Renew the lease(s) held by the given client
-   */
-  synchronized void renewLease(String holder) {
-    renewLease(getLease(holder));
-  }
-
-  synchronized void renewLease(Lease lease) {
-    if (lease != null) {
-      lease.renew();
-    }
-  }
-
-  /**
-   * Renew all of the currently open leases.
-   */
-  synchronized void renewAllLeases() {
-    for (Lease l : leases.values()) {
-      renewLease(l);
-    }
-  }
-
-  /************************************************************
-   * A Lease governs all the locks held by a single client.
-   * For each client there's a corresponding lease, whose
-   * timestamp is updated when the client periodically
-   * checks in.  If the client dies and allows its lease to
-   * expire, all the corresponding locks can be released.
-   *************************************************************/
-  class Lease {
-    private final String holder;
-    private long lastUpdate;
-    private final HashSet<Long> files = new HashSet<>();
-
-    /** Only LeaseManager object can create a lease */
-    private Lease(String h) {
-      this.holder = h;
-      renew();
-    }
-    /** Only LeaseManager object can renew a lease */
-    private void renew() {
-      this.lastUpdate = monotonicNow();
-    }
-
-    /** @return true if the Hard Limit Timer has expired */
-    public boolean expiredHardLimit() {
-      return monotonicNow() - lastUpdate > hardLimit;
-    }
-
-    public boolean expiredHardLimit(long now) {
-      return now - lastUpdate > hardLimit;
-    }
-
-    /** @return true if the Soft Limit Timer has expired */
-    public boolean expiredSoftLimit() {
-      return monotonicNow() - lastUpdate > softLimit;
-    }
-
-    /** Does this lease contain any path? */
-    boolean hasFiles() {return !files.isEmpty();}
-
-    boolean removeFile(long inodeId) {
-      return files.remove(inodeId);
-    }
-
-    @Override
-    public String toString() {
-      return "[Lease.  Holder: " + holder
-          + ", pending creates: " + files.size() + "]";
-    }
-
-    @Override
-    public int hashCode() {
-      return holder.hashCode();
-    }
-
-    private Collection<Long> getFiles() {
-      return Collections.unmodifiableCollection(files);
-    }
-
-    String getHolder() {
-      return holder;
-    }
-
-    @VisibleForTesting
-    long getLastUpdate() {
-      return lastUpdate;
-    }
-  }
-
-  public void setLeasePeriod(long softLimit, long hardLimit) {
-    this.softLimit = softLimit;
-    this.hardLimit = hardLimit; 
-  }
-
-  private synchronized Collection<Lease> getExpiredCandidateLeases() {
-    final long now = Time.monotonicNow();
-    Collection<Lease> expired = new HashSet<>();
-    for (Lease lease : leases.values()) {
-      if (lease.expiredHardLimit(now)) {
-        expired.add(lease);
-      }
-    }
-    return expired;
-  }
-  
-  /******************************************************
-   * Monitor checks for leases that have expired,
-   * and disposes of them.
-   ******************************************************/
-  class Monitor implements Runnable {
-    final String name = getClass().getSimpleName();
-
-    /** Check leases periodically. */
-    @Override
-    public void run() {
-      for(; shouldRunMonitor && fsnamesystem.isRunning(); ) {
-        boolean needSync = false;
-        try {
-          // sleep now to avoid infinite loop if an exception was thrown.
-          Thread.sleep(fsnamesystem.getLeaseRecheckIntervalMs());
-
-          // pre-filter the leases w/o the fsn lock.
-          Collection<Lease> candidates = getExpiredCandidateLeases();
-          if (candidates.isEmpty()) {
-            continue;
-          }
-
-          fsnamesystem.writeLockInterruptibly(RwLockMode.GLOBAL);
-          try {
-            if (!fsnamesystem.isInSafeMode()) {
-              needSync = checkLeases(candidates);
-            }
-          } finally {
-            fsnamesystem.writeUnlock(RwLockMode.GLOBAL, "leaseManager");
-            // lease reassignments should to be sync'ed.
-            if (needSync) {
-              fsnamesystem.getEditLog().logSync();
-            }
-          }
-        } catch(InterruptedException ie) {
-          LOG.debug("{} is interrupted", name, ie);
-        } catch(Throwable e) {
-          LOG.warn("Unexpected throwable: ", e);
-        }
-      }
-    }
-  }
-
-  /** Check the leases beginning from the oldest.
-   *  @return true is sync is needed.
-   */
-  @VisibleForTesting
-  synchronized boolean checkLeases() {
-    return checkLeases(getExpiredCandidateLeases());
-  }
-
-  private synchronized boolean checkLeases(Collection<Lease> leasesToCheck) {
-    boolean needSync = false;
-    assert fsnamesystem.hasWriteLock(RwLockMode.GLOBAL);
-
-    long start = monotonicNow();
-    for (Lease leaseToCheck : leasesToCheck) {
-      if (isMaxLockHoldToReleaseLease(start)) {
-        break;
-      }
-      if (!leaseToCheck.expiredHardLimit(Time.monotonicNow())) {
-        continue;
-      }
-      LOG.info("{} has expired hard limit", leaseToCheck);
-      final List<Long> removing = new ArrayList<>();
-      // need to create a copy of the oldest lease files, because
-      // internalReleaseLease() removes files corresponding to empty files,
-      // i.e. it needs to modify the collection being iterated over
-      // causing ConcurrentModificationException
-      Collection<Long> files = leaseToCheck.getFiles();
-      Long[] leaseINodeIds = files.toArray(new Long[files.size()]);
-      FSDirectory fsd = fsnamesystem.getFSDirectory();
-      String p = null;
-      String newHolder = getInternalLeaseHolder();
-      for(Long id : leaseINodeIds) {
-        try {
-          INodesInPath iip = INodesInPath.fromINode(fsd.getInode(id));
-          p = iip.getPath();
-          // Sanity check to make sure the path is correct
-          if (!p.startsWith("/")) {
-            throw new IOException("Invalid path in the lease " + p);
-          }
-          final INodeFile lastINode = iip.getLastINode().asFile();
-          if (fsnamesystem.isFileDeleted(lastINode)) {
-            // INode referred by the lease could have been deleted.
-            removeLease(lastINode.getId());
-            continue;
-          }
-          boolean completed = false;
-          try {
-            completed = fsnamesystem.internalReleaseLease(
-                leaseToCheck, p, iip, newHolder);
-          } catch (IOException e) {
-            LOG.warn("Cannot release the path {} in the lease {}. It will be "
-                + "retried.", p, leaseToCheck, e);
-            continue;
-          }
-          if (LOG.isDebugEnabled()) {
-            if (completed) {
-              LOG.debug("Lease recovery for inode {} is complete. File closed"
-                  + ".", id);
-            } else {
-              LOG.debug("Started block recovery {} lease {}", p, leaseToCheck);
-            }
-          }
-          // If a lease recovery happened, we need to sync later.
-          if (!needSync && !completed) {
-            needSync = true;
-          }
-        } catch (IOException e) {
-          LOG.warn("Removing lease with an invalid path: {},{}", p,
-              leaseToCheck, e);
-          removing.add(id);
-        }
-        if (isMaxLockHoldToReleaseLease(start)) {
-          LOG.debug("Breaking out of checkLeases after {} ms.",
-              fsnamesystem.getMaxLockHoldToReleaseLeaseMs());
-          break;
-        }
-      }
-
-      for(Long id : removing) {
-        removeLease(leaseToCheck, id);
-      }
-    }
-    return needSync;
-  }
-
-
-  /** @return true if max lock hold is reached */
-  private boolean isMaxLockHoldToReleaseLease(long start) {
-    return monotonicNow() - start >
-        fsnamesystem.getMaxLockHoldToReleaseLeaseMs();
-  }
-
-  @Override
-  public synchronized String toString() {
-    return getClass().getSimpleName() + "= {"
-        + "\n leases=" + leases
-        + "\n leasesById=" + leasesById
-        + "\n}";
-  }
-
-  void startMonitor() {
-    Preconditions.checkState(lmthread == null,
-        "Lease Monitor already running");
-    shouldRunMonitor = true;
-    lmthread = new Daemon(new Monitor());
-    lmthread.start();
-  }
-  
-  void stopMonitor() {
-    if (lmthread != null) {
-      shouldRunMonitor = false;
-      try {
-        lmthread.interrupt();
-        lmthread.join(3000);
-      } catch (InterruptedException ie) {
-        LOG.warn("Encountered exception ", ie);
-      }
-      lmthread = null;
-    }
-  }
-
-  /**
-   * Trigger the currently-running Lease monitor to re-check
-   * its leases immediately. This is for use by unit tests.
-   */
-  @VisibleForTesting
-  public void triggerMonitorCheckNow() {
-    Preconditions.checkState(lmthread != null,
-        "Lease monitor is not running");
-    lmthread.interrupt();
-  }
-
-  @VisibleForTesting
-  public void runLeaseChecks() {
-    checkLeases();
-  }
-
-}

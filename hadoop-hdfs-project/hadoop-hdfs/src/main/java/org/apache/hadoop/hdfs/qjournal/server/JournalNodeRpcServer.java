@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -60,7 +61,10 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_JOURNALNODE_HANDLER_COUNT
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_JOURNALNODE_HANDLER_COUNT_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_JOURNALNODE_RPC_BIND_HOST_KEY;
 
-
+/**
+ * JournalNode的RPC服务端实现，处理来自NameNode和其他JournalNode的所有QJournal协议请求
+ * 实现了QJournalProtocol和InterQJournalProtocol两个接口，分别处理NameNode-JN和JN-JN之间的RPC通信
+ */
 @InterfaceAudience.Private
 @VisibleForTesting
 public class JournalNodeRpcServer implements QJournalProtocol,
@@ -70,12 +74,18 @@ public class JournalNodeRpcServer implements QJournalProtocol,
   private Server server;
   private final int handlerCount;
 
+  /**
+   * 构造JournalNode RPC服务端，初始化RPC服务并注册协议
+   * @param conf Hadoop配置对象
+   * @param jn JournalNode实例引用
+   * @throws IOException 如果RPC服务创建失败抛出异常
+   */
   JournalNodeRpcServer(Configuration conf, JournalNode jn) throws IOException {
     this.jn = jn;
 
     Configuration confCopy = new Configuration(conf);
 
-    // Ensure that nagling doesn't kick in, which could cause latency issues.
+    // 开启TCP_NODELAY禁用Nagle算法，降低RPC请求延迟
     confCopy.setBoolean(
         CommonConfigurationKeysPublic.IPC_SERVER_TCPNODELAY_KEY,
         true);
@@ -87,12 +97,15 @@ public class JournalNodeRpcServer implements QJournalProtocol,
     }
     LOG.info("RPC server is binding to " + bindHost + ":" + addr.getPort());
 
+    // 设置QJournal协议的RPC引擎为ProtobufRpcEngine2
     RPC.setProtocolEngine(confCopy, QJournalProtocolPB.class,
         ProtobufRpcEngine2.class);
     QJournalProtocolServerSideTranslatorPB translator =
         new QJournalProtocolServerSideTranslatorPB(this);
+    // 创建基于反射的Protobuf阻塞服务
     BlockingService service = QJournalProtocolService
         .newReflectiveBlockingService(translator);
+    // 读取RPC处理器线程数配置
     int confHandlerCount = conf.getInt(DFS_JOURNALNODE_HANDLER_COUNT_KEY,
         DFS_JOURNALNODE_HANDLER_COUNT_DEFAULT);
     if (confHandlerCount <= 0) {
@@ -106,6 +119,7 @@ public class JournalNodeRpcServer implements QJournalProtocol,
     LOG.info("The number of JournalNodeRpcServer handlers is {}.",
         this.handlerCount);
 
+    // 通过RPC.Builder构建RPC服务端实例
     this.server = new RPC.Builder(confCopy)
         .setProtocol(QJournalProtocolPB.class)
         .setInstance(service)
@@ -115,10 +129,11 @@ public class JournalNodeRpcServer implements QJournalProtocol,
         .setVerbose(false)
         .build();
 
+    // 将指定异常标记为简洁异常，RPC返回时不包含完整栈信息减少网络开销
     this.server.addTerseExceptions(NewerTxnIdException.class);
     this.server.addTerseExceptions(JournaledEditsCache.CacheMissException.class);
 
-    //Adding InterQJournalProtocolPB to server
+    // 注册JournalNode之间通信的内部协议InterQJournalProtocolPB
     InterQJournalProtocolServerSideTranslatorPB
         qJournalProtocolServerSideTranslatorPB = new
         InterQJournalProtocolServerSideTranslatorPB(this);
@@ -130,35 +145,59 @@ public class JournalNodeRpcServer implements QJournalProtocol,
         interQJournalProtocolService, server);
 
 
-    // set service-level authorization security policy
+    // 如果开启服务级授权，刷新HDFS安全ACL策略
     if (confCopy.getBoolean(
       CommonConfigurationKeys.HADOOP_SECURITY_AUTHORIZATION, false)) {
           server.refreshServiceAcl(confCopy, new HDFSPolicyProvider());
     }
+    // 设置追踪器，用于链路追踪
     this.server.setTracer(jn.tracer);
   }
 
+  /**
+   * 获取RPC处理器线程数，仅用于测试
+   * @return RPC处理器线程数
+   */
   @VisibleForTesting
   protected int getHandlerCount() {
     return this.handlerCount;
   }
 
+  /**
+   * 启动RPC服务
+   */
   void start() {
     this.server.start();
   }
 
+  /**
+   * 获取RPC服务绑定的地址
+   * @return 绑定的InetSocketAddress
+   */
   public InetSocketAddress getAddress() {
     return server.getListenerAddress();
   }
 
+  /**
+   * 等待RPC服务线程终止
+   * @throws InterruptedException 如果等待被中断抛出异常
+   */
   void join() throws InterruptedException {
     this.server.join();
   }
 
+  /**
+   * 停止RPC服务
+   */
   void stop() {
     this.server.stop();
   }
 
+  /**
+   * 从配置中解析JournalNode RPC服务绑定地址
+   * @param conf Hadoop配置对象
+   * @return 解析后的InetSocketAddress
+   */
   static InetSocketAddress getAddress(Configuration conf) {
     String addr = conf.get(
         DFSConfigKeys.DFS_JOURNALNODE_RPC_ADDRESS_KEY,
@@ -283,7 +322,7 @@ public class JournalNodeRpcServer implements QJournalProtocol,
   public void acceptRecovery(RequestInfo reqInfo, SegmentStateProto log,
       URL fromUrl) throws IOException {
     jn.getOrCreateJournal(reqInfo.getJournalId(), reqInfo.getNameServiceId())
-        .acceptRecovery(reqInfo, log, fromUrl);
+      .acceptRecovery(reqInfo, log, fromUrl);
   }
 
   @Override

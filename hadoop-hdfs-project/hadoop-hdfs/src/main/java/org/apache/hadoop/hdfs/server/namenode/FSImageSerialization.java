@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,24 +57,19 @@ import org.xml.sax.SAXException;
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * Static utility functions for serializing various pieces of data in the correct
- * format for the FSImage file.
- *
- * Some members are currently public for the benefit of the Offline Image Viewer
- * which is located outside of this package. These members should be made
- * package-protected when the OIV is refactored.
+ * 文件级注释：FSImage文件序列化工具类，提供FSImage中各类数据结构的正确格式序列化能力，
+ * 供NameNode保存和加载文件系统元数据镜像时使用。部分成员当前为public供离线镜像查看器(OIV)使用，
+ * OIV重构后应改为包私有访问权限。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class FSImageSerialization {
 
-  // Static-only class
+  // 静态工具类，不允许实例化
   private FSImageSerialization() {}
   
   /**
-   * In order to reduce allocation, we reuse some static objects. However, the methods
-   * in this class should be thread-safe since image-saving is multithreaded, so 
-   * we need to keep the static objects in a thread-local.
+   * 为了减少对象分配，复用静态对象，但保存FSImage是多线程过程，因此使用ThreadLocal保证线程安全。
    */
   static private final ThreadLocal<TLData> TL_DATA =
     new ThreadLocal<TLData>() {
@@ -84,7 +80,7 @@ public class FSImageSerialization {
   };
 
   /**
-   * Simple container "struct" for threadlocal data.
+   * 线程局部数据容器，保存每个线程复用的可写对象，避免重复分配。
    */
   static private final class TLData {
     final DeprecatedUTF8 U_STR = new DeprecatedUTF8();
@@ -95,6 +91,12 @@ public class FSImageSerialization {
     final BooleanWritable U_BOOLEAN = new BooleanWritable();
   }
 
+  /**
+   * 写入INode的权限状态信息到输出流。
+   * @param inode 要写入权限的INode
+   * @param out 目标输出流
+   * @throws IOException 写入异常
+   */
   private static void writePermissionStatus(INodeAttributes inode,
       DataOutput out) throws IOException {
     final FsPermission p = TL_DATA.get().FILE_PERM;
@@ -102,6 +104,12 @@ public class FSImageSerialization {
     PermissionStatus.write(out, inode.getUserName(), inode.getGroupName(), p);
   }
 
+  /**
+   * 写入块数组到输出流。
+   * @param blocks 块数组
+   * @param out 目标输出流
+   * @throws IOException 写入异常
+   */
   private static void writeBlocks(final Block[] blocks,
       final DataOutput out) throws IOException {
     if (blocks == null) {
@@ -114,9 +122,14 @@ public class FSImageSerialization {
     }
   }
 
-  // Helper function that reads in an INodeUnderConstruction
-  // from the input stream
-  //
+  /**
+   * 从输入流读取一个正在构建中的INodeFile（未完成写入的文件）。
+   * @param in 输入流
+   * @param fsNamesys FSNamesystem实例
+   * @param imgVersion FSImage版本号
+   * @return 读取到的构建中INodeFile
+   * @throws IOException 读取异常
+   */
   static INodeFile readINodeUnderConstruction(
       DataInput in, FSNamesystem fsNamesys, int imgVersion)
       throws IOException {
@@ -138,7 +151,7 @@ public class FSImageSerialization {
       blk.readFields(in);
       blocksContiguous[i] = new BlockInfoContiguous(blk, blockReplication);
     }
-    // last block is UNDER_CONSTRUCTION
+    // 最后一个块处于构建中状态
     if(numBlocks > 0) {
       blk.readFields(in);
       blocksContiguous[i] = new BlockInfoContiguous(blk, blockReplication);
@@ -150,22 +163,24 @@ public class FSImageSerialization {
     String clientName = readString(in);
     String clientMachine = readString(in);
 
-    // We previously stored locations for the last block, now we
-    // just record that there are none
+    // 旧版本存储了最后一个块的位置信息，新版本不再存储，这里直接读取并忽略
     int numLocs = in.readInt();
     assert numLocs == 0 : "Unexpected block locations";
 
-    // Images in the pre-protobuf format will not have the lazyPersist flag,
-    // so it is safe to pass false always.
+    // 非protobuf格式的镜像不包含lazyPersist标记，默认传false
     INodeFile file = new INodeFile(inodeId, name, perm, modificationTime,
         modificationTime, blocksContiguous, blockReplication, preferredBlockSize);
     file.toUnderConstruction(clientName, clientMachine);
     return file;
   }
 
-  // Helper function that writes an INodeUnderConstruction
-  // into the output stream
-  //
+  /**
+   * 将正在构建中的INodeFile写入输出流。
+   * @param out 目标输出流
+   * @param cons 构建中的INodeFile
+   * @param path 文件路径
+   * @throws IOException 写入异常
+   */
   static void writeINodeUnderConstruction(DataOutputStream out, INodeFile cons,
       String path) throws IOException {
     writeString(path, out);
@@ -181,14 +196,15 @@ public class FSImageSerialization {
     writeString(uc.getClientName(), out);
     writeString(uc.getClientMachine(), out);
 
-    out.writeInt(0); //  do not store locations of last block
+    out.writeInt(0); // 不存储最后一个块的位置信息
   }
 
   /**
-   * Serialize a {@link INodeFile} node
-   * @param file The INodeFile to write
-   * @param out The {@link DataOutputStream} where the fields are written
-   * @param writeUnderConstruction Whether to write under construction information
+   * 序列化文件INode到FSImage输出流。
+   * @param file 要序列化的文件INode
+   * @param out 目标输出流
+   * @param writeUnderConstruction 是否写入构建中信息
+   * @throws IOException 序列化异常
    */
   public static void writeINodeFile(INodeFile file, DataOutput out,
       boolean writeUnderConstruction) throws IOException {
@@ -216,7 +232,12 @@ public class FSImageSerialization {
     writePermissionStatus(file, out);
   }
 
-  /** Serialize an {@link INodeFileAttributes}. */
+  /**
+   * 序列化文件INode属性到输出流。
+   * @param file 文件INode属性
+   * @param out 目标输出流
+   * @throws IOException 序列化异常
+   */
   public static void writeINodeFileAttributes(INodeFileAttributes file,
       DataOutput out) throws IOException {
     writeLocalName(file, out);
@@ -228,6 +249,12 @@ public class FSImageSerialization {
     out.writeLong(file.getPreferredBlockSize());
   }
 
+  /**
+   * 写入配额信息到输出流。
+   * @param quota 配额计数对象
+   * @param out 目标输出流
+   * @throws IOException 写入异常
+   */
   private static void writeQuota(QuotaCounts quota, DataOutput out)
       throws IOException {
     out.writeLong(quota.getNameSpace());
@@ -235,19 +262,20 @@ public class FSImageSerialization {
   }
 
   /**
-   * Serialize a {@link INodeDirectory}
-   * @param node The node to write
-   * @param out The {@link DataOutput} where the fields are written
+   * 序列化目录INode到FSImage输出流。
+   * @param node 要序列化的目录INode
+   * @param out 目标输出流
+   * @throws IOException 序列化异常
    */
   public static void writeINodeDirectory(INodeDirectory node, DataOutput out)
       throws IOException {
     writeLocalName(node, out);
     out.writeLong(node.getId());
-    out.writeShort(0);  // replication
+    out.writeShort(0);  // 目录不需要副本因子，占位
     out.writeLong(node.getModificationTime());
-    out.writeLong(0);   // access time
-    out.writeLong(0);   // preferred block size
-    out.writeInt(-1);   // # of blocks
+    out.writeLong(0);   // 目录不需要访问时间，占位
+    out.writeLong(0);   // 目录不需要块大小，占位
+    out.writeInt(-1);   // 目录没有数据块，特殊标记
 
     writeQuota(node.getQuotaCounts(), out);
 
@@ -262,9 +290,10 @@ public class FSImageSerialization {
   }
 
   /**
-   * Serialize a {@link INodeDirectory}
-   * @param a The node to write
-   * @param out The {@link DataOutput} where the fields are written
+   * 序列化目录INode属性到输出流。
+   * @param a 目录INode属性
+   * @param out 目标输出流
+   * @throws IOException 序列化异常
    */
   public static void writeINodeDirectoryAttributes(
       INodeDirectoryAttributes a, DataOutput out) throws IOException {
@@ -275,42 +304,50 @@ public class FSImageSerialization {
   }
 
   /**
-   * Serialize a {@link INodeSymlink} node
-   * @param node The node to write
-   * @param out The {@link DataOutput} where the fields are written
+   * 序列化符号链接INode到FSImage输出流。
+   * @param node 要序列化的符号链接INode
+   * @param out 目标输出流
+   * @throws IOException 序列化异常
    */
   private static void writeINodeSymlink(INodeSymlink node, DataOutput out)
       throws IOException {
     writeLocalName(node, out);
     out.writeLong(node.getId());
-    out.writeShort(0);  // replication
-    out.writeLong(0);   // modification time
-    out.writeLong(0);   // access time
-    out.writeLong(0);   // preferred block size
-    out.writeInt(-2);   // # of blocks
+    out.writeShort(0);  // 符号链接不需要副本因子，占位
+    out.writeLong(0);   // 符号链接不需要修改时间，占位
+    out.writeLong(0);   // 符号链接不需要访问时间，占位
+    out.writeLong(0);   // 符号链接不需要块大小，占位
+    out.writeInt(-2);   // 符号链接特殊标记
 
     Text.writeString(out, node.getSymlinkString());
     writePermissionStatus(node, out);
   }
 
-  /** Serialize a {@link INodeReference} node */
+  /**
+   * 序列化引用INode（快照功能使用，引用已存在的INode避免重复存储）到输出流。
+   * @param ref 引用INode
+   * @param out 目标输出流
+   * @param writeUnderConstruction 是否写入构建中信息
+   * @param referenceMap 引用映射表
+   * @throws IOException 序列化异常
+   */
   private static void writeINodeReference(INodeReference ref, DataOutput out,
       boolean writeUnderConstruction, ReferenceMap referenceMap
       ) throws IOException {
     writeLocalName(ref, out);
     out.writeLong(ref.getId());
-    out.writeShort(0);  // replication
-    out.writeLong(0);   // modification time
-    out.writeLong(0);   // access time
-    out.writeLong(0);   // preferred block size
-    out.writeInt(-3);   // # of blocks
+    out.writeShort(0);  // 引用不需要副本因子，占位
+    out.writeLong(0);   // 引用不需要修改时间，占位
+    out.writeLong(0);   // 引用不需要访问时间，占位
+    out.writeLong(0);   // 引用不需要块大小，占位
+    out.writeInt(-3);   // 引用INode特殊标记
 
     final boolean isWithName = ref instanceof INodeReference.WithName;
     out.writeBoolean(isWithName);
 
     if (!isWithName) {
       Preconditions.checkState(ref instanceof INodeReference.DstReference);
-      // dst snapshot id
+      // 目标快照ID
       out.writeInt(ref.getDstSnapshotId());
     } else {
       out.writeInt(((INodeReference.WithName) ref).getLastSnapshotId());
@@ -323,7 +360,12 @@ public class FSImageSerialization {
   }
 
   /**
-   * Save one inode's attributes to the image.
+   * 将一个INode保存到FSImage镜像，根据INode类型分发到对应序列化方法。
+   * @param node 要保存的INode
+   * @param out 目标输出流
+   * @param writeUnderConstruction 是否写入构建中信息
+   * @param referenceMap 快照引用映射表
+   * @throws IOException 保存异常
    */
   public static void saveINode2Image(INode node, DataOutput out,
       boolean writeUnderConstruction, ReferenceMap referenceMap)
@@ -340,9 +382,12 @@ public class FSImageSerialization {
     }
   }
 
-  // This should be reverted to package private once the ImageLoader
-  // code is moved into this package. This method should not be called
-  // by other code.
+  /**
+   * 从输入流读取字符串，公共方法供OIV使用，ImageLoader移入本包后应改为包私有。
+   * @param in 输入流
+   * @return 读取到的字符串
+   * @throws IOException 读取异常
+   */
   @SuppressWarnings("deprecation")
   public static String readString(DataInput in) throws IOException {
     DeprecatedUTF8 ustr = TL_DATA.get().U_STR;
@@ -350,11 +395,23 @@ public class FSImageSerialization {
     return ustr.toStringChecked();
   }
 
+  /**
+   * 从输入流读取字符串，空字符串返回null。
+   * @param in 输入流
+   * @return 读取到的字符串，空返回null
+   * @throws IOException 读取异常
+   */
   static String readString_EmptyAsNull(DataInput in) throws IOException {
     final String s = readString(in);
     return s.isEmpty()? null: s;
   }
 
+  /**
+   * 将字符串写入输出流。
+   * @param str 要写入的字符串
+   * @param out 目标输出流
+   * @throws IOException 写入异常
+   */
   @SuppressWarnings("deprecation")
   public static void writeString(String str, DataOutput out) throws IOException {
     DeprecatedUTF8 ustr = TL_DATA.get().U_STR;
@@ -363,436 +420,23 @@ public class FSImageSerialization {
   }
 
   
-  /** read the long value */
+  /**
+   * 从输入流读取长整型。
+   * @param in 输入流
+   * @return 读取到的长整型
+   * @throws IOException 读取异常
+   */
   static long readLong(DataInput in) throws IOException {
     LongWritable uLong = TL_DATA.get().U_LONG;
     uLong.readFields(in);
     return uLong.get();
   }
 
-  /** write the long value */
+  /**
+   * 将长整型写入输出流。
+   * @param value 要写入的值
+   * @param out 目标输出流
+   * @throws IOException 写入异常
+   */
   static void writeLong(long value, DataOutputStream out) throws IOException {
-    LongWritable uLong = TL_DATA.get().U_LONG;
-    uLong.set(value);
-    uLong.write(out);
-  }
-  
-  /** read the boolean value */
-  static boolean readBoolean(DataInput in) throws IOException {
-    BooleanWritable uBoolean = TL_DATA.get().U_BOOLEAN;
-    uBoolean.readFields(in);
-    return uBoolean.get();
-  }
-  
-  /** write the boolean value */
-  static void writeBoolean(boolean value, DataOutputStream out) 
-      throws IOException {
-    BooleanWritable uBoolean = TL_DATA.get().U_BOOLEAN;
-    uBoolean.set(value);
-    uBoolean.write(out);
-  }
-  
-  /** write the byte value */
-  static void writeByte(byte value, DataOutputStream out)
-      throws IOException {
-    out.write(value);
-  }
-
-  /** read the int value */
-  static int readInt(DataInput in) throws IOException {
-    IntWritable uInt = TL_DATA.get().U_INT;
-    uInt.readFields(in);
-    return uInt.get();
-  }
-  
-  /** write the int value */
-  static void writeInt(int value, DataOutputStream out) throws IOException {
-    IntWritable uInt = TL_DATA.get().U_INT;
-    uInt.set(value);
-    uInt.write(out);
-  }
-
-  /** read short value */
-  static short readShort(DataInput in) throws IOException {
-    ShortWritable uShort = TL_DATA.get().U_SHORT;
-    uShort.readFields(in);
-    return uShort.get();
-  }
-
-  /** write short value */
-  static void writeShort(short value, DataOutputStream out) throws IOException {
-    ShortWritable uShort = TL_DATA.get().U_SHORT;
-    uShort.set(value);
-    uShort.write(out);
-  }
-  
-  // Same comments apply for this method as for readString()
-  @SuppressWarnings("deprecation")
-  public static byte[] readBytes(DataInput in) throws IOException {
-    DeprecatedUTF8 ustr = TL_DATA.get().U_STR;
-    ustr.readFields(in);
-    int len = ustr.getLength();
-    byte[] bytes = new byte[len];
-    System.arraycopy(ustr.getBytes(), 0, bytes, 0, len);
-    return bytes;
-  }
-
-  public static byte readByte(DataInput in) throws IOException {
-    return in.readByte();
-  }
-
-  /**
-   * Reading the path from the image and converting it to byte[][] directly
-   * this saves us an array copy and conversions to and from String
-   * @param in input to read from
-   * @return the array each element of which is a byte[] representation 
-   *            of a path component
-   * @throws IOException
-   */
-  @SuppressWarnings("deprecation")
-  public static byte[][] readPathComponents(DataInput in)
-      throws IOException {
-    DeprecatedUTF8 ustr = TL_DATA.get().U_STR;
-    
-    ustr.readFields(in);
-    return DFSUtil.bytes2byteArray(ustr.getBytes(),
-      ustr.getLength(), (byte) Path.SEPARATOR_CHAR);
-  }
-  
-  public static byte[] readLocalName(DataInput in) throws IOException {
-    byte[] createdNodeName = new byte[in.readShort()];
-    in.readFully(createdNodeName);
-    return createdNodeName;
-  }
-
-  private static void writeLocalName(INodeAttributes inode, DataOutput out)
-      throws IOException {
-    final byte[] name = inode.getLocalNameBytes();
-    writeBytes(name, out);
-  }
-  
-  public static void writeBytes(byte[] data, DataOutput out)
-      throws IOException {
-    out.writeShort(data.length);
-    out.write(data);
-  }
-
-  /**
-   * Write an array of blocks as compactly as possible. This uses
-   * delta-encoding for the generation stamp and size, following
-   * the principle that genstamp increases relatively slowly,
-   * and size is equal for all but the last block of a file.
-   */
-  public static void writeCompactBlockArray(
-      Block[] blocks, DataOutputStream out) throws IOException {
-    WritableUtils.writeVInt(out, blocks.length);
-    Block prev = null;
-    for (Block b : blocks) {
-      long szDelta = b.getNumBytes() -
-          (prev != null ? prev.getNumBytes() : 0);
-      long gsDelta = b.getGenerationStamp() -
-          (prev != null ? prev.getGenerationStamp() : 0);
-      out.writeLong(b.getBlockId()); // blockid is random
-      WritableUtils.writeVLong(out, szDelta);
-      WritableUtils.writeVLong(out, gsDelta);
-      prev = b;
-    }
-  }
-  
-  public static Block[] readCompactBlockArray(
-      DataInput in, int logVersion) throws IOException {
-    int num = WritableUtils.readVInt(in);
-    if (num < 0) {
-      throw new IOException("Invalid block array length: " + num);
-    }
-    Block prev = null;
-    Block[] ret = new Block[num];
-    for (int i = 0; i < num; i++) {
-      long id = in.readLong();
-      long sz = WritableUtils.readVLong(in) +
-          ((prev != null) ? prev.getNumBytes() : 0);
-      long gs = WritableUtils.readVLong(in) +
-          ((prev != null) ? prev.getGenerationStamp() : 0);
-      ret[i] = new Block(id, sz, gs);
-      prev = ret[i];
-    }
-    return ret;
-  }
-
-  public static void writeCacheDirectiveInfo(DataOutputStream out,
-      CacheDirectiveInfo directive) throws IOException {
-    writeLong(directive.getId(), out);
-    int flags =
-        ((directive.getPath() != null) ? 0x1 : 0) |
-        ((directive.getReplication() != null) ? 0x2 : 0) |
-        ((directive.getPool() != null) ? 0x4 : 0) |
-        ((directive.getExpiration() != null) ? 0x8 : 0);
-    out.writeInt(flags);
-    if (directive.getPath() != null) {
-      writeString(directive.getPath().toUri().getPath(), out);
-    }
-    if (directive.getReplication() != null) {
-      writeShort(directive.getReplication(), out);
-    }
-    if (directive.getPool() != null) {
-      writeString(directive.getPool(), out);
-    }
-    if (directive.getExpiration() != null) {
-      writeLong(directive.getExpiration().getAbsoluteMillis(), out);
-    }
-  }
-
-  public static CacheDirectiveInfo readCacheDirectiveInfo(DataInput in)
-      throws IOException {
-    CacheDirectiveInfo.Builder builder =
-        new CacheDirectiveInfo.Builder();
-    builder.setId(readLong(in));
-    int flags = in.readInt();
-    if ((flags & 0x1) != 0) {
-      builder.setPath(new Path(readString(in)));
-    }
-    if ((flags & 0x2) != 0) {
-      builder.setReplication(readShort(in));
-    }
-    if ((flags & 0x4) != 0) {
-      builder.setPool(readString(in));
-    }
-    if ((flags & 0x8) != 0) {
-      builder.setExpiration(
-          CacheDirectiveInfo.Expiration.newAbsolute(readLong(in)));
-    }
-    if ((flags & ~0xF) != 0) {
-      throw new IOException("unknown flags set in " +
-          "ModifyCacheDirectiveInfoOp: " + flags);
-    }
-    return builder.build();
-  }
-
-  public static CacheDirectiveInfo readCacheDirectiveInfo(Stanza st)
-      throws InvalidXmlException {
-    CacheDirectiveInfo.Builder builder =
-        new CacheDirectiveInfo.Builder();
-    builder.setId(Long.parseLong(st.getValue("ID")));
-    String path = st.getValueOrNull("PATH");
-    if (path != null) {
-      builder.setPath(new Path(path));
-    }
-    String replicationString = st.getValueOrNull("REPLICATION");
-    if (replicationString != null) {
-      builder.setReplication(Short.parseShort(replicationString));
-    }
-    String pool = st.getValueOrNull("POOL");
-    if (pool != null) {
-      builder.setPool(pool);
-    }
-    String expiryTime = st.getValueOrNull("EXPIRATION");
-    if (expiryTime != null) {
-      builder.setExpiration(CacheDirectiveInfo.Expiration.newAbsolute(
-          Long.parseLong(expiryTime)));
-    }
-    return builder.build();
-  }
-
-  public static void writeCacheDirectiveInfo(ContentHandler contentHandler,
-      CacheDirectiveInfo directive) throws SAXException {
-    XMLUtils.addSaxString(contentHandler, "ID",
-        Long.toString(directive.getId()));
-    if (directive.getPath() != null) {
-      XMLUtils.addSaxString(contentHandler, "PATH",
-          directive.getPath().toUri().getPath());
-    }
-    if (directive.getReplication() != null) {
-      XMLUtils.addSaxString(contentHandler, "REPLICATION",
-          Short.toString(directive.getReplication()));
-    }
-    if (directive.getPool() != null) {
-      XMLUtils.addSaxString(contentHandler, "POOL", directive.getPool());
-    }
-    if (directive.getExpiration() != null) {
-      XMLUtils.addSaxString(contentHandler, "EXPIRATION",
-          "" + directive.getExpiration().getAbsoluteMillis());
-    }
-  }
-
-  public static void writeCachePoolInfo(DataOutputStream out, CachePoolInfo info)
-      throws IOException {
-    writeString(info.getPoolName(), out);
-
-    final String ownerName = info.getOwnerName();
-    final String groupName = info.getGroupName();
-    final Long limit = info.getLimit();
-    final FsPermission mode = info.getMode();
-    final Long maxRelativeExpiry = info.getMaxRelativeExpiryMs();
-    final Short defaultReplication = info.getDefaultReplication();
-
-    boolean hasOwner, hasGroup, hasMode, hasLimit,
-            hasMaxRelativeExpiry, hasDefaultReplication;
-    hasOwner = ownerName != null;
-    hasGroup = groupName != null;
-    hasMode = mode != null;
-    hasLimit = limit != null;
-    hasMaxRelativeExpiry = maxRelativeExpiry != null;
-    hasDefaultReplication = defaultReplication != null;
-
-    int flags =
-        (hasOwner ? 0x1 : 0) |
-        (hasGroup ? 0x2 : 0) |
-        (hasMode  ? 0x4 : 0) |
-        (hasLimit ? 0x8 : 0) |
-        (hasMaxRelativeExpiry ? 0x10 : 0) |
-        (hasDefaultReplication ? 0x20 : 0);
-
-    writeInt(flags, out);
-
-    if (hasOwner) {
-      writeString(ownerName, out);
-    }
-    if (hasGroup) {
-      writeString(groupName, out);
-    }
-    if (hasMode) {
-      mode.write(out);
-    }
-    if (hasLimit) {
-      writeLong(limit, out);
-    }
-    if (hasMaxRelativeExpiry) {
-      writeLong(maxRelativeExpiry, out);
-    }
-    if (hasDefaultReplication) {
-      writeShort(defaultReplication, out);
-    }
-  }
-
-  public static CachePoolInfo readCachePoolInfo(DataInput in)
-      throws IOException {
-    String poolName = readString(in);
-    CachePoolInfo info = new CachePoolInfo(poolName);
-    int flags = readInt(in);
-    if ((flags & 0x1) != 0) {
-      info.setOwnerName(readString(in));
-    }
-    if ((flags & 0x2) != 0)  {
-      info.setGroupName(readString(in));
-    }
-    if ((flags & 0x4) != 0) {
-      info.setMode(FsPermission.read(in));
-    }
-    if ((flags & 0x8) != 0) {
-      info.setLimit(readLong(in));
-    }
-    if ((flags & 0x10) != 0) {
-      info.setMaxRelativeExpiryMs(readLong(in));
-    }
-    if ((flags & 0x20) != 0) {
-      info.setDefaultReplication(readShort(in));
-    }
-    if ((flags & ~0x3F) != 0) {
-      throw new IOException("Unknown flag in CachePoolInfo: " + flags);
-    }
-    return info;
-  }
-
-  public static void writeCachePoolInfo(ContentHandler contentHandler,
-      CachePoolInfo info) throws SAXException {
-    XMLUtils.addSaxString(contentHandler, "POOLNAME", info.getPoolName());
-
-    final String ownerName = info.getOwnerName();
-    final String groupName = info.getGroupName();
-    final Long limit = info.getLimit();
-    final FsPermission mode = info.getMode();
-    final Long maxRelativeExpiry = info.getMaxRelativeExpiryMs();
-    final Short defaultReplication = info.getDefaultReplication();
-
-    if (ownerName != null) {
-      XMLUtils.addSaxString(contentHandler, "OWNERNAME", ownerName);
-    }
-    if (groupName != null) {
-      XMLUtils.addSaxString(contentHandler, "GROUPNAME", groupName);
-    }
-    if (mode != null) {
-      FSEditLogOp.fsPermissionToXml(contentHandler, mode);
-    }
-    if (limit != null) {
-      XMLUtils.addSaxString(contentHandler, "LIMIT",
-          Long.toString(limit));
-    }
-    if (maxRelativeExpiry != null) {
-      XMLUtils.addSaxString(contentHandler, "MAXRELATIVEEXPIRY",
-          Long.toString(maxRelativeExpiry));
-    }
-    if (defaultReplication != null) {
-      XMLUtils.addSaxString(contentHandler, "DEFAULTREPLICATION",
-          Short.toString(defaultReplication));
-    }
-  }
-
-  public static CachePoolInfo readCachePoolInfo(Stanza st)
-      throws InvalidXmlException {
-    String poolName = st.getValue("POOLNAME");
-    CachePoolInfo info = new CachePoolInfo(poolName);
-    if (st.hasChildren("OWNERNAME")) {
-      info.setOwnerName(st.getValue("OWNERNAME"));
-    }
-    if (st.hasChildren("GROUPNAME")) {
-      info.setGroupName(st.getValue("GROUPNAME"));
-    }
-    if (st.hasChildren("MODE")) {
-      info.setMode(FSEditLogOp.fsPermissionFromXml(st));
-    }
-    if (st.hasChildren("LIMIT")) {
-      info.setLimit(Long.parseLong(st.getValue("LIMIT")));
-    }
-    if (st.hasChildren("MAXRELATIVEEXPIRY")) {
-      info.setMaxRelativeExpiryMs(
-          Long.parseLong(st.getValue("MAXRELATIVEEXPIRY")));
-    }
-    if (st.hasChildren("DEFAULTREPLICATION")) {
-      info.setDefaultReplication(Short.parseShort(st
-          .getValue("DEFAULTREPLICATION")));
-    }
-    return info;
-  }
-
-  public static void writeErasureCodingPolicy(DataOutputStream out,
-      ErasureCodingPolicy ecPolicy) throws IOException {
-    writeString(ecPolicy.getSchema().getCodecName(), out);
-    writeInt(ecPolicy.getNumDataUnits(), out);
-    writeInt(ecPolicy.getNumParityUnits(), out);
-    writeInt(ecPolicy.getCellSize(), out);
-
-    Map<String, String> extraOptions = ecPolicy.getSchema().getExtraOptions();
-    if (extraOptions == null || extraOptions.isEmpty()) {
-      writeInt(0, out);
-      return;
-    }
-
-    writeInt(extraOptions.size(), out);
-    for (Map.Entry<String, String> entry : extraOptions.entrySet()) {
-      writeString(entry.getKey(), out);
-      writeString(entry.getValue(), out);
-    }
-  }
-
-  public static ErasureCodingPolicy readErasureCodingPolicy(DataInput in)
-      throws IOException {
-    String codecName = readString(in);
-    int numDataUnits = readInt(in);
-    int numParityUnits = readInt(in);
-    int cellSize = readInt(in);
-
-    int size = readInt(in);
-    Map<String, String> extraOptions = new HashMap<>(size);
-
-    if (size != 0) {
-      for (int i = 0; i < size; i++) {
-        String key = readString(in);
-        String value = readString(in);
-        extraOptions.put(key, value);
-      }
-    }
-    ECSchema ecSchema = new ECSchema(codecName, numDataUnits,
-        numParityUnits, extraOptions);
-    return new ErasureCodingPolicy(ecSchema, cellSize);
-  }
-}
+    LongWritable uLong =

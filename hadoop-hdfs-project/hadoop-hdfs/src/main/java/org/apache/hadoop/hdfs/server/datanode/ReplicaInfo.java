@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,27 +33,30 @@ import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 import org.apache.hadoop.util.LightWeightResizableGSet;
 
 /**
- * This class is used by datanodes to maintain meta data of its replicas.
- * It provides a general interface for meta information of a replica.
+ * 文件概要：HDFS DataNode节点存储副本元数据的抽象基类，定义了副本元数据的通用接口，
+ * 用于维护DataNode上所有数据块副本的元信息，支持不同类型副本的统一管理。
+ * <p>
+ * 本类是DataNode维护副本元数据的核心抽象，提供了副本基本属性、文件IO操作、恢复处理的统一接口，
+ * 具体实现由不同状态/类型的副本子类完成。
  */
 @InterfaceAudience.Private
 abstract public class ReplicaInfo extends Block
     implements Replica, LightWeightResizableGSet.LinkedElement {
 
-  /** For implementing {@link LightWeightResizableGSet.LinkedElement}. */
+  /** 用于LightWeightResizableGSet链表实现，维护链表下一个节点引用 */
   private LightWeightResizableGSet.LinkedElement next;
 
-  /** volume where the replica belongs. */
+  /** 此副本所在的存储卷 */
   private FsVolumeSpi volume;
 
-  /** This is used by some tests and FsDatasetUtil#computeChecksum. */
+  /** 默认文件IO提供者，用于测试场景和FsDatasetUtil计算校验和，当volume为null时使用 */
   private static final FileIoProvider DEFAULT_FILE_IO_PROVIDER =
       new FileIoProvider(null, null);
 
   /**
-   * Constructor.
-   * @param block a block
-   * @param vol volume where replica is located
+   * 构造方法，通过已有Block对象和存储卷创建副本信息
+   * @param block 块对象，包含块ID、长度、生成时间戳
+   * @param vol 副本所在存储卷
    */
   ReplicaInfo(Block block, FsVolumeSpi vol) {
     this(vol, block.getBlockId(), block.getNumBytes(),
@@ -60,52 +64,54 @@ abstract public class ReplicaInfo extends Block
   }
 
   /**
-  * Constructor
-  * @param vol volume where replica is located
-  * @param blockId block id
-  * @param len replica length
-  * @param genStamp replica generation stamp
-  */
+   * 构造方法，通过指定参数创建副本信息
+   * @param vol 副本所在存储卷
+   * @param blockId 块ID
+   * @param len 副本长度
+   * @param genStamp 副本生成时间戳
+   */
   ReplicaInfo(FsVolumeSpi vol, long blockId, long len, long genStamp) {
     super(blockId, len, genStamp);
     this.volume = vol;
   }
   
   /**
-   * Copy constructor.
-   * @param from where to copy from
+   * 拷贝构造方法，从已有副本信息创建新副本
+   * @param from 要拷贝的源副本信息
    */
   ReplicaInfo(ReplicaInfo from) {
     this(from, from.getVolume());
   }
 
   /**
-   * @return the volume where this replica is located on disk
+   * 获取此副本所在的存储卷
+   * @return 副本所在存储卷对象
    */
   public FsVolumeSpi getVolume() {
     return volume;
   }
 
   /**
-   * Get the {@link FileIoProvider} for disk IO operations.
+   * 获取用于磁盘IO操作的文件IO提供者
+   * @return 文件IO提供者对象
    */
   public FileIoProvider getFileIoProvider() {
-    // In tests and when invoked via FsDatasetUtil#computeChecksum, the
-    // target volume for this replica may be unknown and hence null.
-    // Use the DEFAULT_FILE_IO_PROVIDER with no-op hooks.
+    // 当volume未知（测试场景或computeChecksum调用）时，使用默认无钩子的IO提供者
     return (volume != null) ? volume.getFileIoProvider()
         : DEFAULT_FILE_IO_PROVIDER;
   }
 
   /**
-   * Set the volume where this replica is located on disk.
+   * 设置此副本所在的存储卷
+   * @param vol 要设置的存储卷对象
    */
   void setVolume(FsVolumeSpi vol) {
     this.volume = vol;
   }
 
   /**
-   * Get the storageUuid of the volume that stores this replica.
+   * 获取存储此副本的存储卷的UUID
+   * @return 存储卷UUID字符串
    */
   @Override
   public String getStorageUuid() {
@@ -113,183 +119,210 @@ abstract public class ReplicaInfo extends Block
   }
 
   /**
-   * Number of bytes reserved for this replica on disk.
+   * 获取此副本在磁盘上预留的字节数
+   * @return 预留字节数，默认实现返回0
    */
   public long getBytesReserved() {
     return 0;
   }
 
   /**
-   * Get the {@code URI} for where the data of this replica is stored.
-   * @return {@code URI} for the location of replica data.
+   * 获取此副本数据文件存储位置的URI
+   * @return 副本数据文件位置URI
    */
   abstract public URI getBlockURI();
 
   /**
-   * Returns an {@link InputStream} to the replica's data.
-   * @param seekOffset the offset at which the read is started from.
-   * @return the {@link InputStream} to read the replica data.
-   * @throws IOException if an error occurs in opening a stream to the data.
+   * 打开并获取副本数据文件的输入流，从指定偏移开始读取
+   * @param seekOffset 读取起始偏移量
+   * @return 用于读取副本数据的输入流
+   * @throws IOException 打开流失败时抛出IO异常
    */
   abstract public InputStream getDataInputStream(long seekOffset)
       throws IOException;
 
   /**
-   * Returns an {@link OutputStream} to the replica's data.
-   * @param append indicates if the block should be opened for append.
-   * @return the {@link OutputStream} to write to the replica.
-   * @throws IOException if an error occurs in creating an {@link OutputStream}.
+   * 打开并获取副本数据文件的输出流
+   * @param append 是否为追加模式打开
+   * @return 用于写入副本数据的输出流
+   * @throws IOException 创建输出流失败时抛出IO异常
    */
   abstract public OutputStream getDataOutputStream(boolean append)
       throws IOException;
 
   /**
-   * @return true if the replica's data exists.
+   * 检查副本数据文件是否存在
+   * @return 数据文件存在返回true，否则返回false
    */
   abstract public boolean blockDataExists();
 
   /**
-   * Used to deletes the replica's block data.
-   *
-   * @return true if the replica's data is successfully deleted.
+   * 删除副本数据文件
+   * @return 删除成功返回true，否则返回false
    */
   abstract public boolean deleteBlockData();
 
   /**
-   * @return the length of the block on storage.
+   * 获取存储设备上副本数据文件的实际长度
+   * @return 数据文件长度（字节）
    */
   abstract public long getBlockDataLength();
 
   /**
-   * Get the {@code URI} for where the metadata of this replica is stored.
-   *
-   * @return {@code URI} for the location of replica metadata.
+   * 获取此副本元数据文件存储位置的URI
+   * @return 副本元数据文件位置URI
    */
   abstract public URI getMetadataURI();
 
   /**
-   * Returns an {@link InputStream} to the replica's metadata.
-   * @param offset the offset at which the read is started from.
-   * @return the {@link LengthInputStream} to read the replica metadata.
-   * @throws IOException
+   * 打开并获取副本元数据文件的输入流，从指定偏移开始读取
+   * @param offset 读取起始偏移量
+   * @return 用于读取元数据的长度输入流
+   * @throws IOException 打开流失败时抛出IO异常
    */
   abstract public LengthInputStream getMetadataInputStream(long offset)
       throws IOException;
 
   /**
-   * Returns an {@link OutputStream} to the replica's metadata.
-   * @param append indicates if the block metadata should be opened for append.
-   * @return the {@link OutputStream} to write to the replica's metadata.
-   * @throws IOException if an error occurs in creating an {@link OutputStream}.
+   * 打开并获取副本元数据文件的输出流
+   * @param append 是否为追加模式打开
+   * @return 用于写入元数据的输出流
+   * @throws IOException 创建输出流失败时抛出IO异常
    */
   abstract public OutputStream getMetadataOutputStream(boolean append)
       throws IOException;
 
   /**
-   * @return true if the replica's metadata exists.
+   * 检查副本元数据文件是否存在
+   * @return 元数据文件存在返回true，否则返回false
    */
   abstract public boolean metadataExists();
 
   /**
-   * Used to deletes the replica's metadata.
-   *
-   * @return true if the replica's metadata is successfully deleted.
+   * 删除副本元数据文件
+   * @return 删除成功返回true，否则返回false
    */
   abstract public boolean deleteMetadata();
 
   /**
-   * @return the length of the metadata on storage.
+   * 获取存储设备上副本元数据文件的实际长度
+   * @return 元数据文件长度（字节）
    */
   abstract public long getMetadataLength();
 
   /**
-   * Rename the metadata {@link URI} to that referenced by {@code destURI}.
-   *
-   * @param destURI the target {@link URI}.
-   * @return true if the rename is successful.
-   * @throws IOException if an exception occurs in the rename.
+   * 将元数据文件重命名到目标URI
+   * @param destURI 目标URI
+   * @return 重命名成功返回true，否则返回false
+   * @throws IOException 重命名过程发生IO异常时抛出
    */
   abstract public boolean renameMeta(URI destURI) throws IOException;
 
   /**
-   * Rename the data {@link URI} to that referenced by {@code destURI}.
-   *
-   * @param destURI the target {@link URI}.
-   * @return true if the rename is successful.
-   * @throws IOException if an exception occurs in the rename.
+   * 将数据文件重命名到目标URI
+   * @param destURI 目标URI
+   * @return 重命名成功返回true，否则返回false
+   * @throws IOException 重命名过程发生IO异常时抛出
    */
   abstract public boolean renameData(URI destURI) throws IOException;
 
   /**
-   * Update this replica with the {@link StorageLocation} found.
-   * @param replicaLocation the {@link StorageLocation} found for this replica.
+   * 使用扫描到的存储位置更新当前副本信息
+   * @param replicaLocation 扫描发现的副本存储位置
    */
   abstract public void updateWithReplica(StorageLocation replicaLocation);
 
   /**
-   * Check whether the block was pinned.
-   * @param localFS the local filesystem to use.
-   * @return true if the block is pinned.
-   * @throws IOException
+   * 检查此块是否被固定（固定后不会被Balancer/Mover迁移）
+   * @param localFS 本地文件系统
+   * @return 块被固定返回true，否则返回false
+   * @throws IOException 读取固定标记发生IO异常时抛出
    */
   abstract public boolean getPinning(LocalFileSystem localFS)
       throws IOException;
 
   /**
-   * Set a block to be pinned on this datanode so that it cannot be moved
-   * by Balancer/Mover.
-   *
-   * @param localFS the local filesystem to use.
-   * @throws IOException if there is an exception in the pinning.
+   * 设置此块为固定状态，固定后不会被Balancer/Mover迁移
+   * @param localFS 本地文件系统
+   * @throws IOException 设置固定标记发生IO异常时抛出
    */
   abstract public void setPinning(LocalFileSystem localFS) throws IOException;
 
   /**
-   * Bump a replica's generation stamp to a new one.
-   * Its on-disk meta file name is renamed to be the new one too.
-   *
-   * @param newGS new generation stamp
-   * @throws IOException if the change fails
+   * 将副本生成时间戳更新为新值，同时重命名磁盘上的元数据文件
+   * @param newGS 新的生成时间戳
+   * @throws IOException 更新失败时抛出IO异常
    */
   abstract public void bumpReplicaGS(long newGS) throws IOException;
 
+  /**
+   * 获取此副本的原始副本对象（用于增量副本等场景）
+   * @return 原始副本对象
+   */
   abstract public ReplicaInfo getOriginalReplica();
 
   /**
-   * Get the recovery id.
-   * @return the generation stamp that the replica will be bumped to
+   * 获取恢复ID，即恢复后副本将更新到的生成时间戳
+   * @return 恢复ID（新生成时间戳）
    */
   abstract public long getRecoveryID();
 
   /**
-   * Set the recovery id.
-   * @param recoveryId the new recoveryId
+   * 设置恢复ID
+   * @param recoveryId 新的恢复ID
    */
   abstract public void setRecoveryID(long recoveryId);
 
+  /**
+   * 在需要时断开硬链接（用于副本恢复等场景）
+   * @return 操作成功返回true
+   * @throws IOException 操作发生IO异常时抛出
+   */
   abstract public boolean breakHardLinksIfNeeded() throws IOException;
 
+  /**
+   * 创建副本恢复信息对象，用于块恢复流程
+   * @return 副本恢复信息
+   */
   abstract public ReplicaRecoveryInfo createInfo();
 
+  /**
+   * 将当前副本信息与卷扫描得到的信息进行比对
+   * @param info 卷扫描得到的扫描信息
+   * @return 比对结果状态码
+   */
   abstract public int compareWith(ScanInfo info);
 
+  /**
+   * 将副本块截断到指定长度
+   * @param newLength 目标截断长度
+   * @throws IOException 截断操作失败时抛出IO异常
+   */
   abstract public void truncateBlock(long newLength) throws IOException;
 
+  /**
+   * 将元数据复制到目标URI位置
+   * @param destination 目标URI
+   * @throws IOException 复制过程发生IO异常时抛出
+   */
   abstract public void copyMetadata(URI destination) throws IOException;
 
+  /**
+   * 将数据复制到目标URI位置
+   * @param destination 目标URI
+   * @throws IOException 复制过程发生IO异常时抛出
+   */
   abstract public void copyBlockdata(URI destination) throws IOException;
 
   /**
-   * Number of bytes originally reserved for this replica. The actual
-   * reservation is adjusted as data is written to disk.
-   *
-   * @return the number of bytes originally reserved for this replica.
+   * 获取此副本最初预留的字节数，实际预留会随写入调整
+   * @return 最初预留字节数，默认实现返回0
    */
   public long getOriginalBytesReserved() {
     return 0;
   }
 
-  @Override  //Object
+  @Override
   public String toString() {
     return getClass().getSimpleName()
         + ", " + super.toString()

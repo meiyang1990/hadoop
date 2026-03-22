@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,6 +34,9 @@ import org.apache.hadoop.util.Time;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * RAM磁盘Replica追踪器抽象基类，定义延迟持久化场景下RamDisk上块副本的追踪管理接口，负责管理RamDisk中未持久化副本的生命周期、淘汰选择和持久化队列管理
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public abstract class RamDiskReplicaTracker {
@@ -41,6 +45,9 @@ public abstract class RamDiskReplicaTracker {
 
   FsDatasetImpl fsDataset;
 
+  /**
+   * 表示RamDisk上的一个块副本信息，记录副本位置、持久化状态等元数据，支持按块池ID和块ID排序比较
+   */
   static class RamDiskReplica implements Comparable<RamDiskReplica>  {
     private final String bpid;
     private final long blockId;
@@ -62,6 +69,13 @@ public abstract class RamDiskReplicaTracker {
      */
     FsVolumeImpl lazyPersistVolume;
 
+    /**
+     * 构造RamDisk副本对象，初始化副本元数据
+     * @param bpid 块池ID
+     * @param blockId 块ID
+     * @param ramDiskVolume 存储该副本的RamDisk卷
+     * @param lockedBytesReserved 该副本预留的锁定字节数
+     */
     RamDiskReplica(final String bpid, final long blockId,
                    final FsVolumeImpl ramDiskVolume,
                    long lockedBytesReserved) {
@@ -179,13 +193,10 @@ public abstract class RamDiskReplicaTracker {
   }
 
   /**
-   * Get an instance of the configured RamDiskReplicaTracker based on the
-   * the configuration property
-   * {@link org.apache.hadoop.hdfs.DFSConfigKeys#DFS_DATANODE_RAM_DISK_REPLICA_TRACKER_KEY}.
-   *
-   * @param conf the configuration to be used
-   * @param fsDataset the FsDataset object.
-   * @return an instance of RamDiskReplicaTracker
+   * 根据配置创建RamDiskReplicaTracker实例，从配置中读取实现类并反射实例化
+   * @param conf Hadoop配置对象
+   * @param fsDataset 数据节点文件数据集对象
+   * @return 初始化完成的RamDiskReplicaTracker实例
    */
   static RamDiskReplicaTracker getInstance(final Configuration conf,
                                            final FsDatasetImpl fsDataset) {
@@ -199,34 +210,41 @@ public abstract class RamDiskReplicaTracker {
     return tracker;
   }
 
+  /**
+   * 初始化追踪器，绑定对应数据集对象
+   * @param fsDataset 数据节点文件数据集对象
+   */
   void initialize(final FsDatasetImpl fsDataset) {
     this.fsDataset = fsDataset;
   }
 
   /**
-   * Start tracking a new finalized replica on RAM disk.
-   *
-   * @param transientVolume RAM disk volume that stores the replica.
+   * 添加一个新的已完成RamDisk副本到追踪器开始追踪
+   * @param bpid 块池ID
+   * @param blockId 块ID
+   * @param transientVolume 存储该副本的RamDisk卷
+   * @param lockedBytesReserved 该副本预留的锁定字节数
    */
   abstract void addReplica(final String bpid, final long blockId,
                            final FsVolumeImpl transientVolume,
                            long lockedBytesReserved);
 
   /**
-   * Invoked when a replica is opened by a client. This may be used as
-   * a heuristic by the eviction scheme.
+   * 当客户端打开该副本时触发，用于更新副本访问信息，作为淘汰策略的启发式依据
+   * @param bpid 块池ID
+   * @param blockId 块ID
    */
   abstract void touch(final String bpid, final long blockId);
 
   /**
-   * Get the next replica to write to persistent storage.
+   * 从待持久化队列中取出下一个需要持久化到磁盘的副本
+   * @return 待持久化的RamDisk副本对象
    */
   abstract RamDiskReplica dequeueNextReplicaToPersist();
 
   /**
-   * Invoked if a replica that was previously dequeued for persistence
-   * could not be successfully persisted. Add it back so it can be retried
-   * later.
+   * 将持久化失败的副本重新加入待持久化队列，供后续重试
+   * @param ramDiskReplica 持久化失败的副本对象
    */
   abstract void reenqueueReplicaNotPersisted(
       final RamDiskReplica ramDiskReplica);
@@ -247,28 +265,32 @@ public abstract class RamDiskReplicaTracker {
       final String bpid, final long blockId, final File[] savedFiles);
 
   /**
-   * Return a candidate replica to remove from RAM Disk. The exact replica
-   * to be returned may depend on the eviction scheme utilized.
-   *
-   * @return
+   * 根据淘汰策略获取下一个可以从RamDisk淘汰的候选副本
+   * @return 候选淘汰副本对象
    */
   abstract RamDiskReplica getNextCandidateForEviction();
 
   /**
-   * Return the number of replicas pending persistence to disk.
+   * 获取当前等待持久化到磁盘的副本数量
+   * @return 待持久化副本数量
    */
   abstract int numReplicasNotPersisted();
 
   /**
-   * Discard all state we are tracking for the given replica.
+   * 从追踪器中移除指定副本的所有追踪状态，可选择是否删除磁盘上的持久化副本
+   * @param bpid 块池ID
+   * @param blockId 块ID
+   * @param deleteSavedCopies 是否删除已持久化的副本文件
    */
   abstract void discardReplica(
       final String bpid, final long blockId,
       boolean deleteSavedCopies);
 
   /**
-   * Return RamDiskReplica info given block pool id and block id
-   * Return null if it does not exist in RamDisk
+   * 根据块池ID和块ID获取RamDisk中对应副本的追踪信息，不存在则返回null
+   * @param bpid 块池ID
+   * @param blockId 块ID
+   * @return RamDisk副本对象，不存在则返回null
    */
   abstract RamDiskReplica getReplica(
     final String bpid, final long blockId);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,8 +47,8 @@ import org.apache.hadoop.util.GenericOptionsParser;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Fetch a DelegationToken from the current Namenode and store it in the
- * specified file.
+ * DelegationTokenFetcher是HDFS提供的命令行工具，用于从NameNode获取委托令牌，
+ * 并支持对令牌进行获取、取消、续签、打印等管理操作，是HDFS安全认证的运维工具
  */
 @InterfaceAudience.Private
 public class DelegationTokenFetcher {
@@ -61,30 +62,26 @@ public class DelegationTokenFetcher {
   private static final String RENEW = "renew";
   private static final String RENEWER = "renewer";
   private static final String VERBOSE = "verbose";
+
   /**
-   * Command-line interface.
-   * @param args argument list.
-   * @throws Exception on a failure.
-   * @throws org.apache.hadoop.util.ExitUtil.ExitException if the command
-   * failed and exiting was disabled.
+   * 工具主入口，使用默认HDFS配置处理命令行参数
+   * @param args 命令行参数列表
+   * @throws Exception 执行失败时抛出异常
    */
   public static void main(final String[] args) throws Exception {
     main(new HdfsConfiguration(), args);
   }
 
   /**
-   * Command line interface with a specific configuration.
-   * Errors in this operation will call {@link ExitUtil#terminate(int)} to
-   * exit the process.
-   * @param conf configuration to create filesystems with.
-   * @param args argument list.
-   * @throws Exception on a failure.
-   * @throws org.apache.hadoop.util.ExitUtil.ExitException if the command
-   * failed and exiting was disabled.
+   * 支持传入自定义配置的主入口，处理命令行解析和业务分发
+   * @param conf 用于创建文件系统的配置对象
+   * @param args 命令行参数列表
+   * @throws Exception 执行失败时抛出异常
    */
   @VisibleForTesting
   public static void main(Configuration conf, final String[] args)
       throws Exception {
+    // 初始化命令行选项
     Options fetcherOptions = new Options();
     fetcherOptions
       .addOption(WEBSERVICE, true, "HTTP url to reach the NameNode at")
@@ -95,10 +92,12 @@ public class DelegationTokenFetcher {
       .addOption(VERBOSE, false, "print verbose output")
       .addOption(HELP_SHORT, HELP, false, "print out help information");
 
+    // 使用Hadoop通用选项解析器解析参数
     GenericOptionsParser parser = new GenericOptionsParser(conf,
             fetcherOptions, args);
     CommandLine cmd = parser.getCommandLine();
 
+    // 解析各个选项参数
     final String webUrl = cmd.hasOption(WEBSERVICE) ? cmd
             .getOptionValue(WEBSERVICE) : null;
     final String renewer = cmd.hasOption(RENEWER) ? cmd.getOptionValue
@@ -110,39 +109,44 @@ public class DelegationTokenFetcher {
     final boolean help = cmd.hasOption(HELP);
     String[] remaining = parser.getRemainingArgs();
 
-    // check option validity
+    // 处理帮助请求
     if (help) {
       printUsage(System.out);
       return;
     }
 
+    // 检查命令参数合法性：只能指定一个操作（取消/续签/打印）
     int commandCount = (cancel ? 1 : 0) + (renew ? 1 : 0) + (print ? 1 : 0);
     if (commandCount > 1) {
       System.err.println("ERROR: Only specify cancel, renew or print.");
       printUsage(System.err);
       return;
     }
+    // 检查必须指定一个令牌文件路径
     if (remaining.length != 1 || remaining[0].charAt(0) == '-') {
       System.err.println("ERROR: Must specify exactly one token file");
       printUsage(System.err);
       return;
     }
-    // default to using the local file system
+    // 获取本地文件系统，解析令牌文件路径
     FileSystem local = FileSystem.getLocal(conf);
     final Path tokenFile = new Path(local.getWorkingDirectory(), remaining[0]);
 
-    // Login the current user
+    // 以当前用户身份执行对应操作
     UserGroupInformation.getCurrentUser().doAs(new PrivilegedExceptionAction<Object>() {
       @Override
       public Object run() throws Exception {
         if (print) {
+          // 打印令牌信息
           printTokens(conf, tokenFile, verbose);
         } else if (cancel) {
+          // 取消令牌
           cancelTokens(conf, tokenFile);
         } else if (renew) {
+          // 续签令牌
           renewTokens(conf, tokenFile);
         } else {
-          // otherwise we are fetching
+          // 默认操作：获取新的委托令牌并保存
           FileSystem fs = getFileSystem(conf, webUrl);
           saveDelegationToken(conf, fs, renewer, tokenFile);
         }
@@ -151,13 +155,20 @@ public class DelegationTokenFetcher {
     });
   }
 
+  /**
+   * 根据配置和URL获取文件系统对象，支持WebHDFS兼容地址转换
+   * @param conf 配置对象
+   * @param url NameNode地址，可为空使用默认文件系统
+   * @return 对应文件系统实例
+   * @throws IOException 获取文件系统失败时抛出
+   */
   private static FileSystem getFileSystem(Configuration conf, String url)
           throws IOException {
     if (url == null) {
       return FileSystem.get(conf);
     }
 
-    // For backward compatibility
+    // 向后兼容：将http/https地址转换为WebHDFS模式URI
     URI fsUri = URI.create(
             url.replaceFirst("^http://", WebHdfsConstants.WEBHDFS_SCHEME + "://")
                .replaceFirst("^https://", WebHdfsConstants.SWEBHDFS_SCHEME + "://"));
@@ -165,6 +176,13 @@ public class DelegationTokenFetcher {
     return FileSystem.get(fsUri, conf);
   }
 
+  /**
+   * 取消令牌文件中所有可管理的委托令牌
+   * @param conf 配置对象
+   * @param tokenFile 存储令牌的文件路径
+   * @throws IOException 读取文件或取消令牌失败时抛出
+   * @throws InterruptedException 中断异常
+   */
   @VisibleForTesting
   static void cancelTokens(final Configuration conf, final Path tokenFile)
           throws IOException, InterruptedException {
@@ -178,6 +196,13 @@ public class DelegationTokenFetcher {
     }
   }
 
+  /**
+   * 续签令牌文件中所有可管理的委托令牌
+   * @param conf 配置对象
+   * @param tokenFile 存储令牌的文件路径
+   * @throws IOException 读取文件或续签令牌失败时抛出
+   * @throws InterruptedException 中断异常
+   */
   @VisibleForTesting
   static void renewTokens(final Configuration conf, final Path tokenFile)
           throws IOException, InterruptedException {
@@ -192,6 +217,14 @@ public class DelegationTokenFetcher {
     }
   }
 
+  /**
+   * 从指定文件系统获取委托令牌，并保存到本地令牌文件
+   * @param conf 配置对象
+   * @param fs 目标文件系统（HDFS）
+   * @param renewer 令牌续签者用户名
+   * @param tokenFile 保存令牌的本地文件路径
+   * @throws IOException 获取或保存令牌失败时抛出
+   */
   @VisibleForTesting
   static void saveDelegationToken(Configuration conf, FileSystem fs,
                                   final String renewer, final Path tokenFile)
@@ -200,7 +233,7 @@ public class DelegationTokenFetcher {
     if (null != token) {
       Credentials cred = new Credentials();
       cred.addToken(token.getService(), token);
-      // dtutil is replacing this tool; preserve legacy functionality
+      // 保持向后兼容性，使用旧的Writable格式存储令牌
       cred.writeTokenStorageFile(tokenFile, conf,
           Credentials.SerializedFormat.WRITABLE);
 
@@ -213,6 +246,14 @@ public class DelegationTokenFetcher {
     }
   }
 
+  /**
+   * 将令牌文件中的所有令牌信息格式化为字符串，用于输出
+   * @param conf 配置对象
+   * @param tokenFile 存储令牌的文件路径
+   * @param verbose 是否输出详细信息
+   * @return 格式化后的令牌信息字符串
+   * @throws IOException 读取令牌文件失败时抛出
+   */
   @VisibleForTesting
   public static String printTokensToString(
       final Configuration conf,
@@ -224,6 +265,7 @@ public class DelegationTokenFetcher {
       TokenIdentifier tokenId = token.decodeIdentifier();
 
       String idStr;
+      // 针对HDFS委托令牌提供差异化输出
       if (tokenId instanceof DelegationTokenIdentifier) {
         DelegationTokenIdentifier id = (DelegationTokenIdentifier) tokenId;
         idStr = (verbose? id.toString() : id.toStringStable());
@@ -237,7 +279,13 @@ public class DelegationTokenFetcher {
     return sbld.toString();
   }
 
-  // Be sure to call printTokensToString which is verified in unit test.
+  /**
+   * 将令牌文件中的所有令牌信息打印到标准输出
+   * @param conf 配置对象
+   * @param tokenFile 存储令牌的文件路径
+   * @param verbose 是否输出详细信息
+   * @throws IOException 读取令牌文件失败时抛出
+   */
   static void printTokens(final Configuration conf,
       final Path tokenFile,
       final boolean verbose) throws IOException {
@@ -245,10 +293,8 @@ public class DelegationTokenFetcher {
   }
 
   /**
-   * Print usage to the error stream, then
-   * call {@link ExitUtil#terminate(int)} with status code 1.
-   * This will exit or raise an exception if that's been disabled.
-   * @param err stream for the messages.
+   * 打印工具使用帮助信息，并退出进程
+   * @param err 输出帮助信息的流
    */
   private static void printUsage(PrintStream err) {
     err.println("fetchdt retrieves delegation tokens from the NameNode");
@@ -269,6 +315,13 @@ public class DelegationTokenFetcher {
     ExitUtil.terminate(1);
   }
 
+  /**
+   * 从本地文件读取所有令牌
+   * @param file 存储令牌的凭据文件
+   * @param conf 配置对象
+   * @return 读取到的所有令牌集合
+   * @throws IOException 读取文件失败时抛出
+   */
   private static Collection<Token<?>> readTokens(Path file, Configuration conf)
           throws IOException {
     Credentials creds = Credentials.readTokenStorageFile(file, conf);

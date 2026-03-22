@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -20,90 +21,93 @@ package org.apache.hadoop.hdfs.server.diskbalancer.planner;
 import org.apache.hadoop.hdfs.server.diskbalancer.datamodel.DiskBalancerVolume;
 
 /**
- * A step in the plan.
+ * 磁盘均衡计划中的单个数据移动步骤接口，定义了一次数据迁移操作需要暴露的核心属性和配置
  */
 public interface Step {
   /**
-   * Return the number of bytes to move.
+   * 获取本次步骤需要移动的数据字节数
    *
-   * @return bytes
+   * @return 需要移动的字节数
    */
   long getBytesToMove();
 
   /**
-   * Gets the destination volume.
+   * 获取数据移动的目标磁盘卷
    *
-   * @return - volume
+   * @return 目标磁盘卷对象
    */
   DiskBalancerVolume getDestinationVolume();
 
   /**
-   * Gets the IdealStorage.
+   * 获取移动后预期的理想存储使用率
    *
-   * @return idealStorage
+   * @return 理想存储使用率数值
    */
   double getIdealStorage();
 
   /**
-   * Gets Source Volume.
+   * 获取数据移动的源磁盘卷
    *
-   * @return -- Source Volume
+   * @return 源磁盘卷对象
    */
   DiskBalancerVolume getSourceVolume();
 
   /**
-   * Gets a volume Set ID.
+   * 获取当前步骤所属卷集的ID
    *
-   * @return String
+   * @return 卷集ID字符串
    */
   String getVolumeSetID();
 
   /**
-   * Returns a String representation of the Step Size.
+   * 将字节大小转换为人类可读的字符串表示
    *
-   * @return String
+   * @param size 字节大小
+   * @return 格式化后的大小字符串
    */
   String getSizeString(long size);
 
   /**
-   * Returns maximum number of disk errors tolerated.
-   * @return long.
+   * 获取当前步骤允许容忍的最大磁盘错误数，超过该值步骤失败
+   *
+   * @return 允许的最大磁盘错误数
    */
   long getMaxDiskErrors();
 
   /**
-   * Returns tolerance percentage, the good enough value
-   * when we move data from one to disk to another.
-   * @return long.
+   * 获取数据移动的容忍百分比，当实际存储使用率与理想值的差距小于该百分比时，认为达到平衡目标
+   *
+   * @return 容忍百分比
    */
   long getTolerancePercent();
 
   /**
-   * Returns max disk bandwidth that disk balancer will use.
-   * Expressed in MB/sec. For example, a value like 10
-   * indicates that disk balancer will only move 10 MB / sec
-   * while it is running.
-   * @return long.
+   * 获取磁盘均衡允许使用的最大磁盘带宽，单位为MB/秒
+   * 限制数据迁移过程中磁盘的带宽占用，避免影响集群正常业务
+   *
+   * @return 最大带宽，单位MB/秒
    */
   long getBandwidth();
 
   /**
-   * Sets Tolerance percent on a specific step.
-   * @param tolerancePercent - tolerance in percentage.
+   * 设置当前步骤的容忍百分比
+   *
+   * @param tolerancePercent 容忍百分比
    */
   void setTolerancePercent(long tolerancePercent);
 
   /**
-   * Set Bandwidth on a specific step.
-   * @param bandwidth - in MB/s
+   * 设置当前步骤允许使用的最大磁盘带宽
+   *
+   * @param bandwidth 最大带宽，单位MB/秒
    */
   void setBandwidth(long bandwidth);
 
   /**
-   * Set maximum errors to tolerate before disk balancer step fails.
-   * @param maxDiskErrors - error count.
+   * 设置当前步骤允许容忍的最大磁盘错误数
+   *
+   * @param maxDiskErrors 允许的最大磁盘错误数
    */
   void setMaxDiskErrors(long maxDiskErrors);
-
 
 }

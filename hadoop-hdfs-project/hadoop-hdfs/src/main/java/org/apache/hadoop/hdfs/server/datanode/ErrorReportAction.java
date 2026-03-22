@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,30 +26,45 @@ import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.ipc.RemoteException;
 
-
 /**
- * A ErrorReportAction is an instruction issued by BPOfferService to 
- * BPServiceActor about a particular block encapsulated in errorMessage.
+ * 文件级注释：错误上报动作类，封装需要向NameNode上报的错误信息，由BPOfferService生成并交给BPServiceActor执行上报操作
+ * <p>
+ * 该类实现了BPServiceActorAction接口，是DataNode向NameNode上报错误的可执行动作单元，
+ * 用于将数据节点本地检测到的块相关错误等异常信息上报给NameNode处理。
  */
 public class ErrorReportAction implements BPServiceActorAction {
 
   final int errorCode;
   final String errorMessage;
   
+  /**
+   * 构造错误上报动作对象，初始化错误码和错误信息
+   * @param errorCode 错误类型编码
+   * @param errorMessage 错误详情描述
+   */
   public ErrorReportAction(int errorCode, String errorMessage) {
     this.errorCode = errorCode;
     this.errorMessage = errorMessage;
   }
   
+  /**
+   * 执行错误上报动作，将封装的错误信息上报给NameNode
+   * @param bpNamenode NameNode协议客户端代理，用于向NameNode发起RPC调用
+   * @param bpRegistration 当前DataNode的注册信息
+   * @throws BPServiceActorActionException 上报失败时抛出异常
+   */
   @Override
   public void reportTo(DatanodeProtocolClientSideTranslatorPB bpNamenode, 
     DatanodeRegistration bpRegistration) throws BPServiceActorActionException {
     try {
+      // 调用NameNode RPC接口上报错误信息
       bpNamenode.errorReport(bpRegistration, errorCode, errorMessage);
     } catch (RemoteException re) {
+      // 捕获NameNode返回的远程异常，仅记录日志不中断流程
       DataNode.LOG.info("trySendErrorReport encountered RemoteException  "
           + "errorMessage: " + errorMessage + "  errorCode: " + errorCode, re);
     } catch(IOException e) {
+      // IO异常封装为动作执行异常抛出
       throw new BPServiceActorActionException("Error reporting "
           + "an error to namenode.", e);
     }

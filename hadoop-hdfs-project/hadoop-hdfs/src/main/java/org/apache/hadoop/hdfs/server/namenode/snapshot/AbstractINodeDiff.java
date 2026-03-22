@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,8 @@ import org.apache.hadoop.hdfs.server.namenode.snapshot.SnapshotFSImageFormat.Ref
 import org.apache.hadoop.util.Preconditions;
 
 /**
+ * 文件级概要说明：HDFS快照INode差异抽象基类，用于记录不同快照版本之间INode的变更信息
+ *
  * The difference of an inode between in two snapshots.
  * {@link AbstractINodeDiffList} maintains a list of snapshot diffs,
  * <pre>
@@ -43,6 +46,12 @@ import org.apache.hadoop.util.Preconditions;
  *   ...
  *   s_k     = s_{k+1} - d_k = (current state) - d_n - d_{n-1} - ... - d_k.
  * </pre>
+ *
+ * 类级注释：INode差异抽象基类，定义了快照间INode变更存储的公共结构和接口，
+ * 核心职责是记录对应快照的INode原始数据，维护diff链表结构，支持通过当前状态反向推导得到历史快照状态
+ * @param <N> INode类型
+ * @param <A> INode属性类型
+ * @param <D> INode差异类型
  */
 abstract class AbstractINodeDiff<N extends INode,
                                  A extends INodeAttributes,
@@ -61,6 +70,12 @@ abstract class AbstractINodeDiff<N extends INode,
    */
   private D posteriorDiff;
 
+  /**
+   * 构造函数，创建对应快照的INode差异对象
+   * @param snapshotId 对应快照的ID
+   * @param snapshotINode 快照保存的原始INode属性，无变更时为null
+   * @param posteriorDiff 当前diff之后发生的后续diff链表节点
+   */
   AbstractINodeDiff(int snapshotId, A snapshotINode, D posteriorDiff) {
     this.snapshotId = snapshotId;
     this.snapshotINode = snapshotINode;
@@ -99,8 +114,8 @@ abstract class AbstractINodeDiff<N extends INode,
 
   /** @return the inode corresponding to the snapshot. */
   A getSnapshotINode() {
-    // get from this diff, then the posterior diff
-    // and then null for the current inode
+    // 从当前diff开始向后查找，找到第一个保存了INode数据的diff并返回
+    // 如果遍历到最后都没有保存的数据，返回null表示使用当前INode状态
     for(AbstractINodeDiff<N, A, D> d = this; ; d = d.posteriorDiff) {
       if (d.snapshotINode != null) {
         return d.snapshotINode;
@@ -110,13 +125,18 @@ abstract class AbstractINodeDiff<N extends INode,
     }
   }
 
-  /** Combine the posterior diff and collect blocks for deletion. */
+  /** 
+   * 合并后续diff并收集待删除块的抽象方法，不同INode类型实现不同合并逻辑
+   * @param reclaimContext 回收上下文，用于收集需要回收的块和inode
+   * @param currentINode 当前INode对象
+   * @param posterior 待合并的后续diff
+   */
   abstract void combinePosteriorAndCollectBlocks(
       INode.ReclaimContext reclaimContext, final N currentINode,
       final D posterior);
   
   /**
-   * Delete and clear self.
+   * 销毁当前diff并收集需要回收的块和inode，用于清理过期快照
    * @param reclaimContext blocks and inodes that need to be reclaimed
    * @param currentINode The inode where the deletion happens.
    */
@@ -129,10 +149,21 @@ abstract class AbstractINodeDiff<N extends INode,
         + (posteriorDiff == null? null: posteriorDiff.getSnapshotId()) + ")";
   }
 
+  /**
+   * 将diff信息写入fsimage输出流，保存快照ID基础信息
+   * @param out 数据输出流
+   * @throws IOException IO写入异常
+   */
   void writeSnapshot(DataOutput out) throws IOException {
     out.writeInt(snapshotId);
   }
 
+  /**
+   * 将diff完整信息序列化写入输出流的抽象方法，供不同子类实现
+   * @param out 数据输出流
+   * @param referenceMap 引用映射表，用于处理重复引用序列化
+   * @throws IOException IO写入异常
+   */
   abstract void write(DataOutput out, ReferenceMap referenceMap
       ) throws IOException;
 }

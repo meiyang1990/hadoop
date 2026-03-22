@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,11 +23,17 @@ import org.apache.hadoop.hdfs.protocolPB.DatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 
 /**
- * Base class for BPServiceActor class
- * Issued by BPOfferSerivce class to tell BPServiceActor 
- * to take several actions.
+ * BPServiceActor执行动作的接口定义
+ * 该接口由BPOfferService发起，用于命令BPServiceActor向NameNode执行上报等操作，
+ * 是DataNode和NameNode块汇报心跳流程中可扩展动作的抽象基类。
  */
 public interface BPServiceActorAction {
+  /**
+   * 向NameNode执行指定上报动作
+   * @param bpNamenode 指向NameNode的Protocol Buffer客户端代理
+   * @param bpRegistration 当前DataNode的注册信息
+   * @throws BPServiceActorActionException 执行动作失败时抛出异常
+   */
   public void reportTo(DatanodeProtocolClientSideTranslatorPB bpNamenode,
     DatanodeRegistration bpRegistration) throws BPServiceActorActionException;
 }

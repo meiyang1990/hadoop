@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,27 +30,44 @@ import org.apache.hadoop.util.LightWeightGSet;
 import org.apache.hadoop.util.Preconditions;
 
 /**
+ * 文件级注释：HDFS NameNode中存储所有INode节点的全局映射表，维护INode ID到INode对象的映射关系
  * Storing all the {@link INode}s and maintaining the mapping between INode ID
  * and INode.  
  */
 public class INodeMap {
   
+  /**
+   * 创建并初始化INodeMap实例，将根目录INode加入映射表
+   * @param rootDir 根目录INode对象
+   * @return 初始化完成的INodeMap实例
+   */
   static INodeMap newInstance(INodeDirectory rootDir) {
-    // Compute the map capacity by allocating 1% of total memory
+    // 根据总内存的1%计算映射表初始容量
     int capacity = LightWeightGSet.computeCapacity(1, "INodeMap");
+    // 创建基于LightWeightGSet的存储结构
     GSet<INode, INodeWithAdditionalFields> map =
         new LightWeightGSet<>(capacity);
+    // 将根目录INode加入映射表
     map.put(rootDir);
     return new INodeMap(map);
   }
 
+  /** 存储结构，所有操作由外部锁保证线程安全 */
   /** Synchronized by external lock. */
   private final GSet<INode, INodeWithAdditionalFields> map;
   
+  /**
+   * 获取INode映射表的迭代器
+   * @return 所有带额外字段的INode对象迭代器
+   */
   public Iterator<INodeWithAdditionalFields> getMapIterator() {
     return map.iterator();
   }
 
+  /**
+   * 私有构造方法，使用指定GSet实例初始化INodeMap
+   * @param map 底层存储使用的GSet实例
+   */
   private INodeMap(GSet<INode, INodeWithAdditionalFields> map) {
     Preconditions.checkArgument(map != null);
     this.map = map;
@@ -88,6 +106,7 @@ public class INodeMap {
    *         such {@link INode} in the map.
    */
   public INode get(long id) {
+    // 根据给定ID构造临时INode对象，用于GSet查询匹配
     INode inode = new INodeWithAdditionalFields(id, null, new PermissionStatus(
         "", "", new FsPermission((short) 0)), 0, 0) {
       

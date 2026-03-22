@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,12 +27,9 @@ package org.apache.hadoop.hdfs.server.protocol;
  */
 
 /**
- * Balancer bandwidth command instructs each datanode to change its value for
- * the max amount of network bandwidth it may use during the block balancing
- * operation.
- * 
- * The Balancer Bandwidth Command contains the new bandwidth value as its
- * payload. The bandwidth value is in bytes per second.
+ * 数据节点均衡带宽调整命令，用于NameNode向DataNode下发动态调整均衡带宽的指令
+ * 该命令属于HDFS集群平衡协议的核心数据结构，承载新的均衡带宽值，支持管理员动态修改
+ * 每个DataNode在块平衡操作中可使用的最大网络带宽，无需重启节点即可生效
  */
 public class BalancerBandwidthCommand extends DatanodeCommand {
   private final static long BBC_DEFAULTBANDWIDTH = 0L;
@@ -39,16 +37,16 @@ public class BalancerBandwidthCommand extends DatanodeCommand {
   private final long bandwidth;
 
   /**
-   * Balancer Bandwidth Command constructor. Sets bandwidth to 0.
+   * 无参构造函数，使用默认带宽值0初始化命令
    */
   BalancerBandwidthCommand() {
     this(BBC_DEFAULTBANDWIDTH);
   }
 
   /**
-   * Balancer Bandwidth Command constructor.
+   * 全参构造函数，使用指定带宽值创建均衡带宽调整命令
    *
-   * @param bandwidth Blanacer bandwidth in bytes per second.
+   * @param bandwidth 新的均衡带宽值，单位为字节/秒
    */
   public BalancerBandwidthCommand(long bandwidth) {
     super(DatanodeProtocol.DNA_BALANCERBANDWIDTHUPDATE);
@@ -56,9 +54,9 @@ public class BalancerBandwidthCommand extends DatanodeCommand {
   }
 
   /**
-   * Get current value of the max balancer bandwidth in bytes per second.
+   * 获取命令中携带的目标均衡带宽值
    *
-   * @return bandwidth Blanacer bandwidth in bytes per second for this datanode.
+   * @return 目标均衡带宽值，单位为字节/秒
    */
   public long getBalancerBandwidthValue() {
     return this.bandwidth;

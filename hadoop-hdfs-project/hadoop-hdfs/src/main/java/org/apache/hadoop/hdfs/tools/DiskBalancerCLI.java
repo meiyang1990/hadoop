@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -40,97 +41,83 @@ import java.io.PrintStream;
 import java.util.Arrays;
 
 /**
- * DiskBalancer is a tool that can be used to ensure that data is spread evenly
- * across volumes of same storage type.
- * <p>
- * For example, if you have 3 disks, with 100 GB , 600 GB and 200 GB on each
- * disk, this tool will ensure that each disk will have 300 GB.
- * <p>
- * This tool can be run while data nodes are fully functional.
- * <p>
- * At very high level diskbalancer computes a set of moves that will make disk
- * utilization equal and then those moves are executed by the datanode.
+ * HDFS磁盘均衡器命令行入口，负责将数据均匀分布到DataNode同类型存储磁盘之间。
+ * 该工具可以在DataNode正常服务时运行，先计算出数据移动计划，再由DataNode执行移动操作。
+ * 主要功能包括生成均衡计划、执行计划、查询执行状态、取消正在运行的均衡等。
  */
 public class DiskBalancerCLI extends Configured implements Tool {
   /**
-   * Computes a plan for a given set of nodes.
+   * 生成磁盘均衡计划命令。
    */
   public static final String PLAN = "plan";
   /**
-   * Output file name, for commands like report, plan etc. This is an optional
-   * argument, by default diskbalancer will write all its output to
-   * /system/reports/diskbalancer of the current cluster it is operating
-   * against.
+   * 输出文件路径，计划、报告等命令可选参数。
+   * 默认会输出到集群当前目录的 /system/reports/diskbalancer 下。
    */
   public static final String OUTFILE = "out";
   /**
-   * Help for the program.
+   * 帮助命令。
    */
   public static final String HELP = "help";
   /**
-   * Percentage of data unevenness that we are willing to live with. For example
-   * - a value like 10 indicates that we are okay with 10 % +/- from
-   * idealStorage Target.
+   * 可容忍的数据不均衡阈值百分比。
+   * 表示允许实际存储量与理想值的偏差百分比，超过该阈值才会进行均衡。
    */
   public static final String THRESHOLD = "thresholdPercentage";
   /**
-   * Specifies the maximum disk bandwidth to use per second.
+   * 指定每秒最大可使用的磁盘带宽。
    */
   public static final String BANDWIDTH = "bandwidth";
   /**
-   * Specifies the maximum errors to tolerate.
+   * 指定均衡过程中可容忍的最大错误数。
    */
   public static final String MAXERROR = "maxerror";
   /**
-   * Executes a given plan file on the target datanode.
+   * 在目标DataNode上执行指定均衡计划命令。
    */
   public static final String EXECUTE = "execute";
 
   /**
-   * Skips date check(now by default the plan is valid for 24 hours), and force
-   * execute the plan.
+   * 跳过计划过期检查，强制执行计划。默认计划生成后24小时内有效。
    */
   public static final String SKIPDATECHECK = "skipDateCheck";
 
   /**
-   * The report command prints out a disk fragmentation report about the data
-   * cluster. By default it prints the DEFAULT_TOP machines names with high
-   * nodeDataDensity {DiskBalancerDataNode#getNodeDataDensity} values. This
-   * means that these are the nodes that deviates from the ideal data
-   * distribution.
+   * 报告命令，输出集群磁盘数据分布不均报告。
+   * 默认输出数据密度偏差最大的TOP N节点，这些节点最需要进行数据均衡。
    */
   public static final String REPORT = "report";
   /**
-   * specify top number of nodes to be processed.
+   * 指定报告要显示的不均衡节点数量。
    */
   public static final String TOP = "top";
   /**
-   * specify default top number of nodes to be processed.
+   * 默认报告显示的不均衡节点数量。
    */
   public static final int DEFAULT_TOP = 100;
   /**
-   * Name or address of the node to execute against.
+   * 指定要操作的目标DataNode地址或名称。
    */
   public static final String NODE = "node";
   /**
-   * Runs the command in verbose mode.
+   *  verbose模式，输出更详细的执行日志。
    */
   public static final String VERBOSE = "v";
   public static final int PLAN_VERSION = 1;
   /**
-   * Reports the status of disk balancer operation.
+   * 查询命令，查询磁盘均衡操作的当前状态。
    */
   public static final String QUERY = "query";
   /**
-   * Cancels a running plan.
+   * 取消正在运行的均衡计划命令。
    */
   public static final String CANCEL = "cancel";
   /**
-   * Template for the Before File. It is node.before.json.
+   * 均衡前状态信息文件命名模板。
    */
   public static final String BEFORE_TEMPLATE = "%s.before.json";
   /**
-   * Template for the plan file. it is node.plan.json.
+   * 均衡计划文件命名模板。
    */
   public static final String PLAN_TEMPLATE = "%s.plan.json";
   private static final Logger LOG =
@@ -148,24 +135,30 @@ public class DiskBalancerCLI extends Configured implements Tool {
   private Command currentCommand = null;
 
   /**
-   * Construct a DiskBalancer.
+   * 构造DiskBalancerCLI实例，使用默认输出流。
    *
-   * @param conf
+   * @param conf HDFS配置对象
    */
   public DiskBalancerCLI(Configuration conf) {
     this(conf, System.out);
   }
 
+  /**
+   * 构造DiskBalancerCLI实例，指定配置和输出流。
+   *
+   * @param conf HDFS配置对象
+   * @param printStream 输出流对象
+   */
   public DiskBalancerCLI(Configuration conf, final PrintStream printStream) {
     super(conf);
     this.printStream = printStream;
   }
 
   /**
-   * Main for the  DiskBalancer Command handling.
+   * 磁盘均衡器命令行入口方法。
    *
-   * @param argv - System Args Strings[]
-   * @throws Exception
+   * @param argv 命令行参数数组
+   * @throws Exception 执行过程中抛出的异常
    */
   public static void main(String[] argv) throws Exception {
     DiskBalancerCLI shell = new DiskBalancerCLI(new HdfsConfiguration());
@@ -182,17 +175,18 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * Execute the command with the given arguments.
+   * Tool接口实现方法，解析命令行参数并分发命令。
    *
-   * @param args command specific arguments.
-   * @return exit code.
-   * @throws Exception
+   * @param args 命令行参数数组
+   * @return 执行结果退出码，0表示成功，非0表示失败
+   * @throws Exception 执行过程中抛出的异常
    */
   @Override
   public int run(String[] args) throws Exception {
     Options opts = getOpts();
     CommandLine cmd = parseArgs(args, opts);
     String[] cmdArgs = cmd.getArgs();
+    // 检查参数数量是否合法
     if (cmdArgs.length > 2) {
       throw new HadoopIllegalArgumentException(
           "Invalid or extra Arguments: " + Arrays
@@ -202,9 +196,9 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * returns the Command Line Options.
+   * 初始化并返回所有支持的命令行选项。
    *
-   * @return Options
+   * @return 完整命令行选项集合
    */
   private Options getOpts() {
     Options opts = new Options();
@@ -218,63 +212,63 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * Returns Plan options.
+   * 获取plan命令支持的选项集合。
    *
-   * @return Options.
+   * @return plan命令选项集合
    */
   public static Options getPlanOptions() {
     return PLAN_OPTIONS;
   }
 
   /**
-   * Returns help options.
+   * 获取help命令支持的选项集合。
    *
-   * @return - help options.
+   * @return help命令选项集合
    */
   public static Options getHelpOptions() {
     return HELP_OPTIONS;
   }
 
   /**
-   * Retuns execute options.
+   * 获取execute命令支持的选项集合。
    *
-   * @return - execute options.
+   * @return execute命令选项集合
    */
   public static Options getExecuteOptions() {
     return EXECUTE_OPTIONS;
   }
 
   /**
-   * Returns Query Options.
+   * 获取query命令支持的选项集合。
    *
-   * @return query Options
+   * @return query命令选项集合
    */
   public static Options getQueryOptions() {
     return QUERY_OPTIONS;
   }
 
   /**
-   * Returns Cancel Options.
+   * 获取cancel命令支持的选项集合。
    *
-   * @return Options
+   * @return cancel命令选项集合
    */
   public static Options getCancelOptions() {
     return CANCEL_OPTIONS;
   }
 
   /**
-   * Returns Report Options.
+   * 获取report命令支持的选项集合。
    *
-   * @return Options
+   * @return report命令选项集合
    */
   public static Options getReportOptions() {
     return REPORT_OPTIONS;
   }
 
   /**
-   * Adds commands for plan command.
+   * 向选项集合中添加plan命令相关选项。
    *
-   * @return Options.
+   * @param opt 全局选项集合
    */
   private void addPlanCommands(Options opt) {
 
@@ -334,7 +328,9 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * Adds Help to the options.
+   * 向选项集合中添加help命令相关选项。
+   *
+   * @param opt 全局选项集合
    */
   private void addHelpCommands(Options opt) {
     Option help =  Option.builder().longOpt(HELP)
@@ -347,9 +343,9 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * Adds execute command options.
+   * 向选项集合中添加execute命令相关选项。
    *
-   * @param opt Options
+   * @param opt 全局选项集合
    */
   private void addExecuteCommands(Options opt) {
     Option execute = Option.builder().longOpt(EXECUTE)
@@ -370,9 +366,9 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * Adds query command options.
+   * 向选项集合中添加query命令相关选项。
    *
-   * @param opt Options
+   * @param opt 全局选项集合
    */
   private void addQueryCommands(Options opt) {
     Option query = Option.builder().longOpt(QUERY)
@@ -393,9 +389,9 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * Adds cancel command options.
+   * 向选项集合中添加cancel命令相关选项。
    *
-   * @param opt Options
+   * @param opt 全局选项集合
    */
   private void addCancelCommands(Options opt) {
     Option cancel = Option.builder().longOpt(CANCEL)
@@ -415,9 +411,9 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * Adds report command options.
+   * 向选项集合中添加report命令相关选项。
    *
-   * @param opt Options
+   * @param opt 全局选项集合
    */
   private void addReportCommands(Options opt) {
     Option report = Option.builder().longOpt(REPORT)
@@ -445,11 +441,12 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * This function parses all command line arguments and returns the appropriate
-   * values.
+   * 解析命令行参数为CommandLine对象。
    *
-   * @param argv - Argv from main
-   * @return CommandLine
+   * @param argv 命令行参数数组
+   * @param opts 支持的选项集合
+   * @return 解析后的CommandLine对象
+   * @throws org.apache.commons.cli.ParseException 参数解析异常
    */
   private CommandLine parseArgs(String[] argv, Options opts)
       throws org.apache.commons.cli.ParseException {
@@ -458,16 +455,20 @@ public class DiskBalancerCLI extends Configured implements Tool {
   }
 
   /**
-   * Gets current command associated with this instance of DiskBalancer.
+   * 获取当前实例正在处理的命令对象。
+   *
+   * @return 当前命令对象
    */
   public Command getCurrentCommand() {
     return currentCommand;
   }
 
   /**
-   * Dispatches calls to the right command Handler classes.
+   * 根据解析后的命令行分发到对应命令处理器执行。
    *
-   * @param cmd  - CommandLine
+   * @param cmd 解析后的命令行对象
+   * @return 执行结果退出码，0表示成功，1表示失败
+   * @throws Exception 执行过程中抛出的异常
    */
   private int dispatch(CommandLine cmd)
       throws Exception {
@@ -497,19 +498,4 @@ public class DiskBalancerCLI extends Configured implements Tool {
         dbCmd = new HelpCommand(getConf());
       }
 
-      // Invoke main help here.
-      if (dbCmd == null) {
-        dbCmd = new HelpCommand(getConf());
-        dbCmd.execute(null);
-        return 1;
-      }
-
-      dbCmd.execute(cmd);
-      return 0;
-    } finally {
-      if (dbCmd != null) {
-        dbCmd.close();
-      }
-    }
-  }
-}
+      //

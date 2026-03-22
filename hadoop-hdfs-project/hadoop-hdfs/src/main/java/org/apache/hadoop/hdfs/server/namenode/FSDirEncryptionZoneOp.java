@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -62,38 +63,35 @@ import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.CRYPTO_XA
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
- * Helper class to perform encryption zone operation.
+ * 文件系统加密区域操作工具类，提供HDFS加密区域的创建、查询、重加密等核心操作的封装
+ * 是NameNode处理加密区域相关请求的核心工具类，所有操作都围绕加密区域的生命周期管理展开
  */
 final class FSDirEncryptionZoneOp {
 
   /**
-   * Private constructor for preventing FSDirEncryptionZoneOp object creation.
-   * Static-only class.
+   * 私有构造方法，禁止实例化，该类为静态工具类
    */
   private FSDirEncryptionZoneOp() {}
 
   /**
-   * Invoke KeyProvider APIs to generate an encrypted data encryption key for
-   * an encryption zone. Should not be called with any locks held.
+   * 调用KeyProvider接口为加密区域生成加密的数据加密密钥(EDEK)
+   * 调用该方法时不能持有任何锁，避免长时间阻塞其他操作
    *
-   * @param fsd the namespace tree.
-   * @param ezKeyName key name of an encryption zone
-   * @return New EDEK, or null if ezKeyName is null
-   * @throws IOException
+   * @param fsd 文件目录命名空间对象
+   * @param ezKeyName 加密区域的密钥名称
+   * @return 生成的加密数据加密密钥，若密钥名称为空则返回null
+   * @throws IOException 生成过程中发生IO或密钥服务异常
    */
   private static EncryptedKeyVersion generateEncryptedDataEncryptionKey(
       final FSDirectory fsd, final String ezKeyName) throws IOException {
-    // must not be holding lock during this operation
+    // 必须在不持有锁的情况下执行该操作
     assert !fsd.getFSNamesystem().hasReadLock(RwLockMode.FS);
     assert !fsd.getFSNamesystem().hasWriteLock(RwLockMode.FS);
     if (ezKeyName == null) {
       return null;
     }
     long generateEDEKStartTime = monotonicNow();
-    // Generate EDEK with login user (hdfs) so that KMS does not need
-    // an extra proxy configuration allowing hdfs to proxy its clients and
-    // KMS does not need configuration to allow non-hdfs user GENERATE_EEK
-    // operation.
+    // 使用登录用户(hdfs)身份生成EDEK，避免KMS额外配置代理权限
     EncryptedKeyVersion edek = SecurityUtil.doAsLoginUser(
         new PrivilegedExceptionAction<EncryptedKeyVersion>() {
           @Override
@@ -111,6 +109,15 @@ final class FSDirEncryptionZoneOp {
     return edek;
   }
 
+  /**
+   * 确保创建加密区域使用的密钥已在KeyProvider中完成初始化，预热EDEK缓存
+   *
+   * @param fsd 文件目录命名空间对象
+   * @param keyName 待检查的密钥名称
+   * @param src 目标加密区域路径
+   * @return 密钥元数据
+   * @throws IOException 密钥不存在、KeyProvider不可用或初始化失败
+   */
   static KeyProvider.Metadata ensureKeyIsInitialized(final FSDirectory fsd,
       final String keyName, final String src) throws IOException {
     KeyProviderCryptoExtension provider = fsd.getProvider();
@@ -125,43 +132,31 @@ final class FSDirEncryptionZoneOp {
     EncryptionFaultInjector.getInstance().ensureKeyIsInitialized();
     KeyProvider.Metadata metadata = provider.getMetadata(keyName);
     if (metadata == null) {
-      /*
-       * It would be nice if we threw something more specific than
-       * IOException when the key is not found, but the KeyProvider API
-       * doesn't provide for that. If that API is ever changed to throw
-       * something more specific (e.g. UnknownKeyException) then we can
-       * update this to match it, or better yet, just rethrow the
-       * KeyProvider's exception.
-       */
       throw new IOException("Key " + keyName + " doesn't exist.");
     }
-    // If the provider supports pool for EDEKs, this will fill in the pool
+    // 如果KeyProvider支持EDEK缓存池，预热填充对应密钥的缓存池
     provider.warmUpEncryptedKeys(keyName);
     return metadata;
   }
 
   /**
-   * Create an encryption zone on directory path using the specified key.
+   * 在指定空目录上创建加密区域，绑定给定密钥
    *
-   * @param fsd the namespace tree.
-   * @param srcArg the path of a directory which will be the root of the
-   *               encryption zone. The directory must be empty
-   * @param pc permission checker to check fs permission
-   * @param cipher the name of the cipher suite, which will be used
-   *               when it is generated.
-   * @param keyName name of a key which must be present in the configured
-   *                KeyProvider
-   * @param logRetryCache whether to record RPC ids in editlog for retry cache
-   *                      rebuilding
-   * @return FileStatus
-   * @throws IOException
+   * @param fsd 文件目录命名空间对象
+   * @param srcArg 加密区域根目录路径，必须为空目录
+   * @param pc 权限检查器，用于检查访问权限
+   * @param cipher 加密算法套件名称
+   * @param keyName 加密区域使用的密钥名称，必须已存在于KeyProvider中
+   * @param logRetryCache 是否在编辑日志中记录RPC ID用于重试缓存重建
+   * @return 创建完成后加密区域根目录的文件状态
+   * @throws IOException 创建过程中发生权限、路径或存储异常
    */
   static FileStatus createEncryptionZone(final FSDirectory fsd,
       final String srcArg, final FSPermissionChecker pc, final String cipher,
       final String keyName, final boolean logRetryCache) throws IOException {
     final CipherSuite suite = CipherSuite.convert(cipher);
     List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
-    // For now this is hard coded, as we only support one method.
+    // 当前仅支持一种加密区域协议版本，硬编码处理
     final CryptoProtocolVersion version =
         CryptoProtocolVersion.ENCRYPTION_ZONES;
 
@@ -180,12 +175,13 @@ final class FSDirEncryptionZoneOp {
   }
 
   /**
-   * Get the encryption zone for the specified path.
+   * 根据指定路径获取所在的加密区域信息
    *
-   * @param fsd the namespace tree.
-   * @param srcArg the path of a file or directory to get the EZ for
-   * @param pc permission checker to check fs permission
-   * @return the EZ with file status.
+   * @param fsd 文件目录命名空间对象
+   * @param srcArg 待查询的文件或目录路径
+   * @param pc 权限检查器，用于检查访问权限
+   * @return 加密区域信息与对应路径文件状态的键值对，若不在加密区域则加密区域为null
+   * @throws IOException 路径解析或权限检查失败
    */
   static Map.Entry<EncryptionZone, FileStatus> getEZForPath(
       final FSDirectory fsd, final String srcArg, final FSPermissionChecker pc)
@@ -206,6 +202,14 @@ final class FSDirEncryptionZoneOp {
     return new AbstractMap.SimpleImmutableEntry<>(ret, auditStat);
   }
 
+  /**
+   * 根据已解析的路径节点获取所在加密区域信息
+   *
+   * @param fsd 文件目录命名空间对象
+   * @param iip 已解析的路径节点列表
+   * @return 对应加密区域信息，若不在加密区域则返回null
+   * @throws IOException 获取过程中发生异常
+   */
   static EncryptionZone getEZForPath(final FSDirectory fsd,
       final INodesInPath iip) throws IOException {
     fsd.readLock();
@@ -216,6 +220,14 @@ final class FSDirEncryptionZoneOp {
     }
   }
 
+  /**
+   * 分页列出集群中所有加密区域
+   *
+   * @param fsd 文件目录命名空间对象
+   * @param prevId 上一页最后一个加密区域的ID，用于分页，从头开始传0
+   * @return 当前页的加密区域列表
+   * @throws IOException 列出加密区域过程中发生异常
+   */
   static BatchedListEntries<EncryptionZone> listEncryptionZones(
       final FSDirectory fsd, final long prevId) throws IOException {
     fsd.readLock();
@@ -226,17 +238,42 @@ final class FSDirEncryptionZoneOp {
     }
   }
 
+  /**
+   * 发起加密区域的重加密操作，使用新密钥版本重新加密所有文件
+   *
+   * @param fsd 文件目录命名空间对象
+   * @param iip 加密区域根路径节点
+   * @param keyVersionName 目标新密钥版本名称
+   * @return 更新后的加密区域XAttr列表
+   * @throws IOException 发起重加密过程中发生异常
+   */
   static List<XAttr> reencryptEncryptionZone(final FSDirectory fsd,
       final INodesInPath iip, final String keyVersionName) throws IOException {
     assert keyVersionName != null;
     return fsd.ezManager.reencryptEncryptionZone(iip, keyVersionName);
   }
 
+  /**
+   * 取消加密区域正在进行的重加密操作
+   *
+   * @param fsd 文件目录命名空间对象
+   * @param iip 加密区域根路径节点
+   * @return 更新后的加密区域XAttr列表
+   * @throws IOException 取消重加密过程中发生异常
+   */
   static List<XAttr> cancelReencryptEncryptionZone(final FSDirectory fsd,
       final INodesInPath iip) throws IOException {
-    return fsd.ezManager.cancelReencryptEncryptionZone(iip);
+    return fsd.ezManager.cancelReencryptionEncryptionZone(iip);
   }
 
+  /**
+   * 分页列出所有加密区域的重加密状态
+   *
+   * @param fsd 文件目录命名空间对象
+   * @param prevId 上一页最后一个加密区域的ID，用于分页，从头开始传0
+   * @return 当前页的重加密状态列表
+   * @throws IOException 列出状态过程中发生异常
+   */
   static BatchedListEntries<ZoneReencryptionStatus> listReencryptionStatus(
       final FSDirectory fsd, final long prevId)
       throws IOException {
@@ -249,10 +286,14 @@ final class FSDirEncryptionZoneOp {
   }
 
   /**
-   * Update re-encryption progress (submitted). Caller should
-   * logSync after calling this, outside of the FSN lock.
-   * <p>
-   * The reencryption status is updated during SetXAttrs.
+   * 更新重加密任务已提交状态，修改加密区域的扩展属性
+   * 调用方需要在方法外、释放锁后执行logSync持久化日志
+   *
+   * @param fsd 文件目录命名空间对象
+   * @param iip 加密区域根路径节点
+   * @param ezKeyVersionName 提交的目标密钥版本名称
+   * @return 更新后的加密区域XAttr
+   * @throws IOException 更新过程中发生异常
    */
   static XAttr updateReencryptionSubmitted(final FSDirectory fsd,
       final INodesInPath iip, final String ezKeyVersionName)
@@ -279,12 +320,17 @@ final class FSDirEncryptionZoneOp {
   }
 
   /**
-   * Update re-encryption progress (start, checkpoint). Caller should
-   * logSync after calling this, outside of the FSN lock.
-   * <p>
-   * The reencryption status is updated during SetXAttrs.
-   * Original reencryption status is passed in to get existing information
-   * such as ezkeyVersionName and submissionTime.
+   * 更新重加密进度，包括开始执行和检查点进度更新
+   * 调用方需要在方法外、释放锁后执行logSync持久化日志
+   *
+   * @param fsd 文件目录命名空间对象
+   * @param zoneNode 加密区域根节点
+   * @param origStatus 原始重加密状态，用于保留已有信息
+   * @param lastFile 当前已处理到的最后一个文件路径
+   * @param numReencrypted 本次批次完成重加密的文件数量
+   * @param numFailures 本次批次重加密失败的文件数量
+   * @return 更新后的加密区域XAttr
+   * @throws IOException 更新过程中发生异常
    */
   static XAttr updateReencryptionProgress(final FSDirectory fsd,
       final INode zoneNode, final ZoneReencryptionStatus origStatus,
@@ -319,422 +365,13 @@ final class FSDirEncryptionZoneOp {
   }
 
   /**
-   * Log re-encrypt complete (cancel, or 100% re-encrypt) to edits.
-   * Caller should logSync after calling this, outside of the FSN lock.
-   * <p>
-   * Original reencryption status is passed in to get existing information,
-   * this should include whether it is finished due to cancellation.
-   * The reencryption status is updated during SetXAttrs for completion time.
+   * 更新重加密完成状态（正常完成或取消完成），持久化完成信息到编辑日志
+   * 调用方需要在方法外、释放锁后执行logSync持久化日志
+   *
+   * @param fsd 文件目录命名空间对象
+   * @param zoneIIP 加密区域根路径节点
+   * @param origStatus 原始重加密状态，包含完成原因等信息
+   * @return 更新后的加密区域XAttr列表
+   * @throws IOException 更新过程中发生异常
    */
   static List<XAttr> updateReencryptionFinish(final FSDirectory fsd,
-      final INodesInPath zoneIIP, final ZoneReencryptionStatus origStatus)
-      throws IOException {
-    assert origStatus != null;
-    assert fsd.hasWriteLock();
-    fsd.ezManager.getReencryptionStatus()
-        .markZoneCompleted(zoneIIP.getLastINode().getId());
-    final XAttr xattr =
-        generateNewXAttrForReencryptionFinish(zoneIIP, origStatus);
-    final List<XAttr> xattrs = Lists.newArrayListWithCapacity(1);
-    xattrs.add(xattr);
-    FSDirXAttrOp.unprotectedSetXAttrs(fsd, zoneIIP, xattrs,
-        EnumSet.of(XAttrSetFlag.REPLACE));
-    return xattrs;
-  }
-
-  static XAttr generateNewXAttrForReencryptionFinish(final INodesInPath iip,
-      final ZoneReencryptionStatus status) throws IOException {
-    final ZoneEncryptionInfoProto zoneProto = getZoneEncryptionInfoProto(iip);
-    final ReencryptionInfoProto newRiProto = PBHelperClient
-        .convert(status.getEzKeyVersionName(), status.getSubmissionTime(),
-            status.isCanceled(), status.getFilesReencrypted(),
-            status.getNumReencryptionFailures(), Time.now(), null);
-
-    final ZoneEncryptionInfoProto newZoneProto = PBHelperClient
-        .convert(PBHelperClient.convert(zoneProto.getSuite()),
-            PBHelperClient.convert(zoneProto.getCryptoProtocolVersion()),
-            zoneProto.getKeyName(), newRiProto);
-
-    final XAttr xattr = XAttrHelper
-        .buildXAttr(CRYPTO_XATTR_ENCRYPTION_ZONE, newZoneProto.toByteArray());
-    return xattr;
-  }
-
-  private static ZoneEncryptionInfoProto getZoneEncryptionInfoProto(
-      final INodesInPath iip) throws IOException {
-    final XAttr fileXAttr = FSDirXAttrOp.unprotectedGetXAttrByPrefixedName(
-        iip.getLastINode(), iip.getPathSnapshotId(),
-        CRYPTO_XATTR_ENCRYPTION_ZONE);
-    if (fileXAttr == null) {
-      throw new IOException(
-          "Could not find reencryption XAttr for file " + iip.getPath());
-    }
-    try {
-      return ZoneEncryptionInfoProto.parseFrom(fileXAttr.getValue());
-    } catch (InvalidProtocolBufferException e) {
-      throw new IOException(
-          "Could not parse file encryption info for " + "inode " + iip
-              .getPath(), e);
-    }
-  }
-
-  /**
-   * Save the batch's edeks to file xattrs.
-   */
-  static void saveFileXAttrsForBatch(FSDirectory fsd,
-      List<FileEdekInfo> batch) {
-    assert fsd.getFSNamesystem().hasWriteLock(RwLockMode.FS);
-    if (batch != null && !batch.isEmpty()) {
-      for (FileEdekInfo entry : batch) {
-        final INode inode = fsd.getInode(entry.getInodeId());
-        // no dir lock, so inode could be removed. no-op if so.
-        if (inode == null) {
-          NameNode.LOG.info("Cannot find inode {}, skip saving xattr for"
-              + " re-encryption", entry.getInodeId());
-          continue;
-        }
-        fsd.getEditLog().logSetXAttrs(inode.getFullPathName(),
-            inode.getXAttrFeature().getXAttrs(), false);
-      }
-    }
-  }
-
-  /**
-   * Set the FileEncryptionInfo for an INode.
-   *
-   * @param fsd the namespace tree.
-   * @param info file encryption information
-   * @param flag action when setting xattr. Either CREATE or REPLACE.
-   * @throws IOException
-   */
-  static void setFileEncryptionInfo(final FSDirectory fsd,
-      final INodesInPath iip, final FileEncryptionInfo info,
-      final XAttrSetFlag flag) throws IOException {
-    // Make the PB for the xattr
-    final HdfsProtos.PerFileEncryptionInfoProto proto =
-        PBHelperClient.convertPerFileEncInfo(info);
-    final byte[] protoBytes = proto.toByteArray();
-    final XAttr fileEncryptionAttr =
-        XAttrHelper.buildXAttr(CRYPTO_XATTR_FILE_ENCRYPTION_INFO, protoBytes);
-    final List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
-    xAttrs.add(fileEncryptionAttr);
-    fsd.writeLock();
-    try {
-      FSDirXAttrOp.unprotectedSetXAttrs(fsd, iip, xAttrs, EnumSet.of(flag));
-    } finally {
-      fsd.writeUnlock();
-    }
-  }
-
-  /**
-   * This function combines the per-file encryption info (obtained
-   * from the inode's XAttrs), and the encryption info from its zone, and
-   * returns a consolidated FileEncryptionInfo instance. Null is returned
-   * for non-encrypted or raw files.
-   *
-   * @param fsd the namespace tree.
-   * @param iip inodes in the path containing the file, passed in to
-   *            avoid obtaining the list of inodes again
-   * @return consolidated file encryption info; null for non-encrypted files
-   */
-  static FileEncryptionInfo getFileEncryptionInfo(final FSDirectory fsd,
-      final INodesInPath iip) throws IOException {
-    if (iip.isRaw() ||
-        !fsd.ezManager.hasCreatedEncryptionZone() ||
-        !iip.getLastINode().isFile()) {
-      return null;
-    }
-    fsd.readLock();
-    try {
-      EncryptionZone encryptionZone = getEZForPath(fsd, iip);
-      if (encryptionZone == null) {
-        // not an encrypted file
-        return null;
-      } else if(encryptionZone.getPath() == null
-          || encryptionZone.getPath().isEmpty()) {
-        if (NameNode.LOG.isDebugEnabled()) {
-          NameNode.LOG.debug("Encryption zone " +
-              encryptionZone.getPath() + " does not have a valid path.");
-        }
-      }
-
-      XAttr fileXAttr = FSDirXAttrOp.unprotectedGetXAttrByPrefixedName(
-          iip.getLastINode(), iip.getPathSnapshotId(),
-          CRYPTO_XATTR_FILE_ENCRYPTION_INFO);
-      if (fileXAttr == null) {
-        NameNode.LOG.warn("Could not find encryption XAttr for file " +
-            iip.getPath() + " in encryption zone " + encryptionZone.getPath());
-        return null;
-      }
-
-      final CryptoProtocolVersion version = encryptionZone.getVersion();
-      final CipherSuite suite = encryptionZone.getSuite();
-      final String keyName = encryptionZone.getKeyName();
-      try {
-        HdfsProtos.PerFileEncryptionInfoProto fileProto =
-            HdfsProtos.PerFileEncryptionInfoProto.parseFrom(
-                fileXAttr.getValue());
-        return PBHelperClient.convert(fileProto, suite, version, keyName);
-      } catch (InvalidProtocolBufferException e) {
-        throw new IOException("Could not parse file encryption info for " +
-            "inode " + iip.getPath(), e);
-      }
-    } finally {
-      fsd.readUnlock();
-    }
-  }
-
-  /**
-   * If the file and encryption key are valid, return the encryption info,
-   * else throw a retry exception.  The startFile method generates the EDEK
-   * outside of the lock so the zone must be reverified.
-   *
-   * @param dir the namespace tree.
-   * @param iip inodes in the file path
-   * @param ezInfo the encryption key
-   * @return FileEncryptionInfo for the file
-   * @throws RetryStartFileException if key is inconsistent with current zone
-   */
-  static FileEncryptionInfo getFileEncryptionInfo(FSDirectory dir,
-      INodesInPath iip, EncryptionKeyInfo ezInfo)
-          throws RetryStartFileException, IOException {
-    FileEncryptionInfo feInfo = null;
-    final EncryptionZone zone = getEZForPath(dir, iip);
-    if (zone != null) {
-      // The path is now within an EZ, but we're missing encryption parameters
-      if (ezInfo == null) {
-        throw new RetryStartFileException();
-      }
-      // Path is within an EZ and we have provided encryption parameters.
-      // Make sure that the generated EDEK matches the settings of the EZ.
-      final String ezKeyName = zone.getKeyName();
-      if (!ezKeyName.equals(ezInfo.edek.getEncryptionKeyName())) {
-        throw new RetryStartFileException();
-      }
-      feInfo = new FileEncryptionInfo(ezInfo.suite, ezInfo.protocolVersion,
-          ezInfo.edek.getEncryptedKeyVersion().getMaterial(),
-          ezInfo.edek.getEncryptedKeyIv(),
-          ezKeyName, ezInfo.edek.getEncryptionKeyVersionName());
-    }
-    return feInfo;
-  }
-
-  static boolean isInAnEZ(final FSDirectory fsd, final INodesInPath iip)
-      throws UnresolvedLinkException, SnapshotAccessControlException,
-      IOException {
-    if (!fsd.ezManager.hasCreatedEncryptionZone()) {
-      return false;
-    }
-    fsd.readLock();
-    try {
-      return fsd.ezManager.isInAnEZ(iip);
-    } finally {
-      fsd.readUnlock();
-    }
-  }
-
-  /**
-   * Best-effort attempt to proactively warm up the edek cache. We'll get all the edek key names,
-   * then launch up a separate thread to warm them up. Retries happen if any of keys fail to warm up.
-   */
-  static void warmUpEdekCache(final ExecutorService executor,
-      final FSDirectory fsd, final int delay, final int interval, final int maxRetries) {
-    fsd.readLock();
-    try {
-      String[] edeks  = fsd.ezManager.getKeyNames();
-      executor.execute(
-          new EDEKCacheLoader(edeks, fsd.getProvider(), delay, interval, maxRetries));
-    } finally {
-      fsd.readUnlock();
-    }
-  }
-
-  /**
-   * EDEKCacheLoader is being run in a separate thread to loop through all the
-   * EDEKs and warm them up in the KMS cache.
-   */
-  static class EDEKCacheLoader implements Runnable {
-    private final String[] keyNames;
-    private final KeyProviderCryptoExtension kp;
-    private int initialDelay;
-    private int retryInterval;
-    private int maxRetries;
-
-    EDEKCacheLoader(final String[] names, final KeyProviderCryptoExtension kp,
-        final int delay, final int interval, final int maxRetries) {
-      this.keyNames = names;
-      this.kp = kp;
-      this.initialDelay = delay;
-      this.retryInterval = interval;
-      this.maxRetries = maxRetries;
-    }
-
-    @Override
-    public void run() {
-      NameNode.LOG.info("Warming up {} EDEKs... (initialDelay={}, "
-              + "retryInterval={}, maxRetries={})", keyNames.length, initialDelay, retryInterval,
-          maxRetries);
-      try {
-        Thread.sleep(initialDelay);
-      } catch (InterruptedException ie) {
-        NameNode.LOG.info("EDEKCacheLoader interrupted before warming up.");
-        return;
-      }
-
-      boolean success = false;
-      int retryCount = 0;
-      IOException lastSeenIOE = null;
-      long warmUpEDEKStartTime = monotonicNow();
-
-      while (!success && retryCount < maxRetries) {
-        try {
-          kp.warmUpEncryptedKeys(keyNames);
-          NameNode.LOG.info("Successfully warmed up {} EDEKs.", keyNames.length);
-          success = true;
-        } catch (IOException ioe) {
-          lastSeenIOE = ioe;
-          NameNode.LOG.info("Failed to warm up EDEKs.", ioe);
-        } catch (Exception e) {
-          NameNode.LOG.error("Cannot warm up EDEKs.", e);
-          throw e;
-        }
-
-        if (!success) {
-          try {
-            Thread.sleep(retryInterval);
-          } catch (InterruptedException ie) {
-            NameNode.LOG.info("EDEKCacheLoader interrupted during retry.");
-            break;
-          }
-          retryCount++;
-        }
-      }
-
-      long warmUpEDEKTime = monotonicNow() - warmUpEDEKStartTime;
-      NameNode.getNameNodeMetrics().addWarmUpEDEKTime(warmUpEDEKTime);
-      if (!success) {
-        NameNode.LOG.warn("Max retry {} reached, unable to warm up EDEKs.", maxRetries);
-        if (lastSeenIOE != null) {
-          NameNode.LOG.warn("Last seen exception:", lastSeenIOE);
-        }
-      }
-    }
-  }
-
-  /**
-   * If the file is in an encryption zone, we optimistically create an
-   * EDEK for the file by calling out to the configured KeyProvider.
-   * Since this typically involves doing an RPC, the fsn lock is yielded.
-   *
-   * Since the path can flip-flop between being in an encryption zone and not
-   * in the meantime, the call MUST re-resolve the IIP and re-check
-   * preconditions if this method does not return null;
-   *
-   * @param fsn the namesystem.
-   * @param iip the inodes for the path
-   * @param supportedVersions client's supported versions
-   * @return EncryptionKeyInfo if the path is in an EZ, else null
-   */
-  static EncryptionKeyInfo getEncryptionKeyInfo(FSNamesystem fsn,
-      INodesInPath iip, CryptoProtocolVersion[] supportedVersions)
-      throws IOException {
-    FSDirectory fsd = fsn.getFSDirectory();
-    // Nothing to do if the path is not within an EZ
-    final EncryptionZone zone = getEZForPath(fsd, iip);
-    if (zone == null) {
-      EncryptionFaultInjector.getInstance().startFileNoKey();
-      return null;
-    }
-    CryptoProtocolVersion protocolVersion = fsn.chooseProtocolVersion(
-        zone, supportedVersions);
-    CipherSuite suite = zone.getSuite();
-    String ezKeyName = zone.getKeyName();
-
-    Preconditions.checkNotNull(protocolVersion);
-    Preconditions.checkNotNull(suite);
-    Preconditions.checkArgument(!suite.equals(CipherSuite.UNKNOWN),
-                                "Chose an UNKNOWN CipherSuite!");
-    Preconditions.checkNotNull(ezKeyName);
-
-    // Generate EDEK while not holding the fsn lock.
-    fsn.writeUnlock(RwLockMode.FS, "getEncryptionKeyInfo");
-    try {
-      EncryptionFaultInjector.getInstance().startFileBeforeGenerateKey();
-      return new EncryptionKeyInfo(protocolVersion, suite, ezKeyName,
-          generateEncryptedDataEncryptionKey(fsd, ezKeyName));
-    } finally {
-      fsn.writeLock(RwLockMode.FS);
-      EncryptionFaultInjector.getInstance().startFileAfterGenerateKey();
-    }
-  }
-
-  static class EncryptionKeyInfo {
-    final CryptoProtocolVersion protocolVersion;
-    final CipherSuite suite;
-    final String ezKeyName;
-    final KeyProviderCryptoExtension.EncryptedKeyVersion edek;
-
-    EncryptionKeyInfo(
-        CryptoProtocolVersion protocolVersion, CipherSuite suite,
-        String ezKeyName, KeyProviderCryptoExtension.EncryptedKeyVersion edek) {
-      this.protocolVersion = protocolVersion;
-      this.suite = suite;
-      this.ezKeyName = ezKeyName;
-      this.edek = edek;
-    }
-  }
-
-  /**
-   * Get the current key version name for the given EZ. This will first drain
-   * the provider's local cache, then generate a new edek.
-   * <p>
-   * The encryption key version of the newly generated edek will be used as
-   * the target key version of this re-encryption - meaning all edeks'
-   * keyVersion are compared with it, and only sent to the KMS for re-encryption
-   * when the version is different.
-   * <p>
-   * Note: KeyProvider has a getCurrentKey interface, but that is under
-   * a different ACL. HDFS should not try to operate on additional ACLs, but
-   * rather use the generate ACL it already has.
-   */
-  static String getCurrentKeyVersion(final FSDirectory dir,
-      final FSPermissionChecker pc, final String zone) throws IOException {
-    assert dir.getProvider() != null;
-    assert !dir.hasReadLock();
-    final String keyName = FSDirEncryptionZoneOp.getKeyNameForZone(dir,
-        pc, zone);
-    if (keyName == null) {
-      throw new IOException(zone + " is not an encryption zone.");
-    }
-    // drain the local cache of the key provider.
-    // Do not invalidateCache on the server, since that's the responsibility
-    // when rolling the key version.
-    dir.getProvider().drain(keyName);
-    final EncryptedKeyVersion edek;
-    try {
-      edek = dir.getProvider().generateEncryptedKey(keyName);
-    } catch (GeneralSecurityException gse) {
-      throw new IOException(gse);
-    }
-    Preconditions.checkNotNull(edek);
-    return edek.getEncryptionKeyVersionName();
-  }
-
-  /**
-   * Resolve the zone to an inode, find the encryption zone info associated with
-   * that inode, and return the key name. Does not contact the KMS.
-   */
-  static String getKeyNameForZone(final FSDirectory dir,
-      final FSPermissionChecker pc, final String zone) throws IOException {
-    assert dir.getProvider() != null;
-    final INodesInPath iip;
-    dir.getFSNamesystem().readLock(RwLockMode.FS);
-    try {
-      iip = dir.resolvePath(pc, zone, DirOp.READ);
-      dir.ezManager.checkEncryptionZoneRoot(iip.getLastINode(), zone);
-      return dir.ezManager.getKeyName(iip);
-    } finally {
-      dir.getFSNamesystem().readUnlock(RwLockMode.FS, "getKeyNameForZone");
-    }
-  }
-}

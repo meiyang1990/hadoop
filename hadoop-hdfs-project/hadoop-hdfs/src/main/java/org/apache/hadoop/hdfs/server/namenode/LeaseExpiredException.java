@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,13 +25,18 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * The lease that was being used to create this file has expired.
+ * 租约过期异常，当创建文件时使用的租约已经过期时抛出此异常
+ * 用于表示HDFS租约管理中，客户端持有的文件写租约超时失效
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class LeaseExpiredException extends IOException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造带有指定错误消息的租约过期异常
+   * @param msg 异常错误信息
+   */
   public LeaseExpiredException(String msg) {
     super(msg);
   }

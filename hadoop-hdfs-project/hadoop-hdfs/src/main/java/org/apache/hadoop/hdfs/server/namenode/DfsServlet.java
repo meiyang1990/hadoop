@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,7 +29,9 @@ import org.apache.hadoop.hdfs.server.common.JspHelper;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
- * A base class for the servlets in DFS.
+ * 文件所属模块：HDFS-NameNode服务端
+ * DFS所有Web Servlet的抽象基类，提供通用基础能力，封装了身份信息获取等公共逻辑，
+ * 供NameNode中各类具体业务Servlet继承实现，统一管理公共行为。
  */
 public abstract class DfsServlet extends HttpServlet {
   /** For java.io.Serializable */
@@ -37,6 +40,13 @@ public abstract class DfsServlet extends HttpServlet {
   static final Logger LOG =
       LoggerFactory.getLogger(DfsServlet.class.getCanonicalName());
 
+  /**
+   * 从HTTP请求中获取请求用户的用户组信息，用于HDFS Web接口的权限认证
+   * @param request HTTP请求对象
+   * @param conf Hadoop配置对象
+   * @return 请求对应用户的UserGroupInformation信息
+   * @throws IOException 获取用户信息过程中发生IO异常时抛出
+   */
   protected UserGroupInformation getUGI(HttpServletRequest request,
                                         Configuration conf) throws IOException {
     return JspHelper.getUGI(getServletContext(), request, conf);

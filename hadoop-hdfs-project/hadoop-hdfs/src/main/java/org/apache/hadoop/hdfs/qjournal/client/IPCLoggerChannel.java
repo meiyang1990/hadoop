@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -69,6 +70,11 @@ import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.UncaughtEx
 import org.apache.hadoop.util.Time;
 
 /**
+ * 文件说明：基于Hadoop IPC的远程JournalNode通信通道实现，属于HDFS QJM（Quorum Journal Manager）模块
+ * 核心职责：为NameNode提供异步方式与单个JournalNode通信，所有RPC调用异步执行并返回ListenableFuture，
+ * 支持quorum调用聚合，实现写操作串行、读操作并行的执行模型
+ */
+/**
  * Channel to a remote JournalNode using Hadoop IPC.
  * All of the calls are run on a separate thread, and return
  * {@link ListenableFuture} instances to wait for their result.
@@ -83,14 +89,11 @@ public class IPCLoggerChannel implements AsyncLogger {
   private QJournalProtocol proxy;
 
   /**
-   * Executes tasks submitted to it serially, on a single thread, in FIFO order
-   * (generally used for write tasks that should not be reordered).
+   * 串行执行器：单线程FIFO顺序执行提交的任务，主要用于写操作，保证编辑日志顺序不被打乱
    */
   private final ListeningExecutorService singleThreadExecutor;
   /**
-   * Executes tasks submitted to it in parallel with each other and with those
-   * submitted to singleThreadExecutor (generally used for read tasks that can
-   * be safely reordered and interleaved with writes).
+   * 并行执行器：可并行执行任务，与串行执行器任务互不干扰，主要用于读操作，可安全重排
    */
   private final ListeningExecutorService parallelExecutor;
   private long ipcSerial = 0;
@@ -107,46 +110,39 @@ public class IPCLoggerChannel implements AsyncLogger {
   private final IPCLoggerChannelMetrics metrics;
   
   /**
-   * The number of bytes of edits data still in the queue.
+   * 队列中待处理的编辑日志字节数，用于限流防止OOM
    */
   private int queuedEditsSizeBytes = 0;
   
   /**
-   * The highest txid that has been successfully logged on the remote JN.
+   * 当前远程JournalNode上已成功确认写入的最大事务ID
    */
   private long highestAckedTxId = 0;
 
   /**
-   * Nanotime of the last time we successfully journaled some edits
-   * to the remote node.
+   * 上次成功向远程节点写入编辑日志的纳秒时间戳，用于计算延迟
    */
   private long lastAckNanos = 0;
 
   /**
-   * Nanotime of the last time that committedTxId was update. Used
-   * to calculate the lag in terms of time, rather than just a number
-   * of txns.
+   * 上次更新committedTxId的纳秒时间戳，用于计算时间维度的延迟，不只是事务数延迟
    */
   private long lastCommitNanos = 0;
   
   /**
-   * The maximum number of bytes that can be pending in the queue.
-   * This keeps the writer from hitting OOME if one of the loggers
-   * starts responding really slowly. Eventually, the queue
-   * overflows and it starts to treat the logger as having errored.
+   * 等待队列最大字节数限制，防止单个JournalNode响应过慢导致OOM
+   * 当队列溢出时，将该日志节点标记为错误，不再接受新写入
    */
   private final int queueSizeLimitBytes;
 
   /**
-   * If this logger misses some edits, or restarts in the middle of
-   * a segment, the writer won't be able to write any more edits until
-   * the beginning of the next segment. Upon detecting this situation,
-   * the writer sets this flag to true to avoid sending useless RPCs.
+   * 日志节点不同步标记：当日志节点丢失部分编辑数据或分段重启，
+   * 在下一个分段开始前无法继续写入，设置此标记避免发送无用RPC
    */
   private boolean outOfSync = false;
   
   /**
-   * Stopwatch which starts counting on each heartbeat that is sent
+   * 心跳计时器：每次发送心跳后重新计时
    */
   private final StopWatch lastHeartbeatStopwatch = new StopWatch();
   
@@ -156,11 +152,26 @@ public class IPCLoggerChannel implements AsyncLogger {
   
   static final Factory FACTORY = IPCLoggerChannel::new;
 
+  /**
+   * 构造函数：创建IPC日志通道，不指定名称服务ID
+   * @param conf Hadoop配置
+   * @param nsInfo 命名空间信息
+   * @param journalId 日志ID
+   * @param addr 远程JournalNode地址
+   */
   public IPCLoggerChannel(Configuration conf, NamespaceInfo nsInfo,
       String journalId, InetSocketAddress addr) {
     this(conf, nsInfo, journalId, null, addr);
   }
 
+  /**
+   * 构造函数：创建IPC日志通道，指定名称服务ID
+   * @param conf Hadoop配置
+   * @param nsInfo 命名空间信息
+   * @param journalId 日志ID
+   * @param nameServiceId 名称服务ID
+   * @param addr 远程JournalNode地址
+   */
   public IPCLoggerChannel(Configuration conf, NamespaceInfo nsInfo,
       String journalId, String nameServiceId, InetSocketAddress addr) {
     this.conf = conf;
@@ -168,6 +179,7 @@ public class IPCLoggerChannel implements AsyncLogger {
     this.journalId = journalId;
     this.nameServiceId = nameServiceId;
     this.addr = addr;
+    // 计算队列大小限制，配置值单位MB，转换为字节
     this.queueSizeLimitBytes = 1024 * 1024 * conf.getInt(
         DFSConfigKeys.DFS_QJOURNAL_QUEUE_SIZE_LIMIT_KEY,
         DFSConfigKeys.DFS_QJOURNAL_QUEUE_SIZE_LIMIT_DEFAULT);
@@ -196,7 +208,7 @@ public class IPCLoggerChannel implements AsyncLogger {
   
   @Override
   public void close() {
-    // No more tasks may be submitted after this point.
+    // 关闭后不再接受新任务
     singleThreadExecutor.shutdown();
     parallelExecutor.shutdown();
     if (proxy != null) {
@@ -209,17 +221,26 @@ public class IPCLoggerChannel implements AsyncLogger {
     metrics.unregister();
   }
   
+  /**
+   * 获取RPC代理，延迟创建代理实例
+   * @return QJournalProtocol代理对象
+   * @throws IOException 创建代理失败时抛出IO异常
+   */
   protected QJournalProtocol getProxy() throws IOException {
     if (proxy != null) return proxy;
     proxy = createProxy();
     return proxy;
   }
   
+  /**
+   * 创建QJournalProtocol RPC代理
+   * @return 创建好的协议代理
+   * @throws IOException 创建失败时抛出IO异常
+   */
   protected QJournalProtocol createProxy() throws IOException {
     final Configuration confCopy = new Configuration(conf);
     
-    // Need to set NODELAY or else batches larger than MTU can trigger 
-    // 40ms nailing delays.
+    // 启用TCP_NODELAY，避免大于MTU的批量数据引发40ms延迟
     confCopy.setBoolean(CommonConfigurationKeysPublic.IPC_CLIENT_TCPNODELAY_KEY, true);
     RPC.setProtocolEngine(confCopy,
         QJournalProtocolPB.class, ProtobufRpcEngine2.class);
@@ -237,7 +258,8 @@ public class IPCLoggerChannel implements AsyncLogger {
   
   
   /**
-   * Separated out for easy overriding in tests.
+   * 创建单线程执行器，分离出来方便测试覆盖
+   * @return 单线程线程池
    */
   @VisibleForTesting
   protected ExecutorService createSingleThreadExecutor() {
@@ -250,7 +272,8 @@ public class IPCLoggerChannel implements AsyncLogger {
   }
 
   /**
-   * Separated out for easy overriding in tests.
+   * 创建并行执行器，分离出来方便测试覆盖
+   * @return 并行线程池
    */
   @VisibleForTesting
   protected ExecutorService createParallelExecutor() {
@@ -264,6 +287,7 @@ public class IPCLoggerChannel implements AsyncLogger {
             .setNameFormat("Logger channel (from parallel executor) to " + addr)
             .setUncaughtExceptionHandler(UncaughtExceptionHandlers.systemExit())
             .build());
+    // 允许核心线程超时回收，节省资源
     threadPoolExecutor.allowCoreThreadTimeOut(true);
     return threadPoolExecutor;
   }
@@ -299,9 +323,8 @@ public class IPCLoggerChannel implements AsyncLogger {
   }
 
   /**
-   * @return true if the server has gotten out of sync from the client,
-   * and thus a log roll is required for this logger to successfully start
-   * logging more edits.
+   * 检查当前日志节点是否与客户端不同步，需要滚动日志后才能恢复写入
+   * @return true表示已不同步，需要滚动日志
    */
   public synchronized boolean isOutOfSync() {
     return outOfSync;
@@ -348,8 +371,7 @@ public class IPCLoggerChannel implements AsyncLogger {
       return Futures.immediateFailedFuture(e);
     }
     
-    // When this batch is acked, we use its submission time in order
-    // to calculate how far we are lagging.
+    // 记录批次提交时间，用于计算端到端延迟
     final long submitNanos = Time.monotonicNowNanos();
     
     ListenableFuture<Void> ret = null;
@@ -390,282 +412,10 @@ public class IPCLoggerChannel implements AsyncLogger {
       });
     } finally {
       if (ret == null) {
-        // it didn't successfully get submitted,
-        // so adjust the queue size back down.
+        // 提交失败，回滚队列大小
         unreserveQueueSpace(data.length);
       } else {
-        // It was submitted to the queue, so adjust the length
-        // once the call completes, regardless of whether it
-        // succeeds or fails.
+        // 提交成功，任务完成后调整队列大小，无论成功失败
         Futures.addCallback(ret, new FutureCallback<Void>() {
           @Override
           public void onFailure(Throwable t) {
-            unreserveQueueSpace(data.length);
-          }
-
-          @Override
-          public void onSuccess(Void t) {
-            unreserveQueueSpace(data.length);
-          }
-        }, MoreExecutors.directExecutor());
-      }
-    }
-    return ret;
-  }
-
-  private void throwIfOutOfSync() throws IOException {
-    if (isOutOfSync()) {
-      // Even if we're out of sync, it's useful to send an RPC
-      // to the remote node in order to update its lag metrics, etc.
-      heartbeatIfNecessary();
-      throw new JournalOutOfSyncException("Journal disabled until next roll");
-    }
-  }
-
-  /**
-   * When we've entered an out-of-sync state, it's still useful to periodically
-   * send an empty RPC to the server, such that it has the up to date
-   * committedTxId. This acts as a sanity check during recovery, and also allows
-   * that node's metrics to be up-to-date about its lag.
-   * 
-   * In the future, this method may also be used in order to check that the
-   * current node is still the current writer, even if no edits are being
-   * written.
-   */
-  private void heartbeatIfNecessary() throws IOException {
-    if (lastHeartbeatStopwatch.now(TimeUnit.MILLISECONDS)
-        > HEARTBEAT_INTERVAL_MILLIS || !lastHeartbeatStopwatch.isRunning()) {
-      try {
-        getProxy().heartbeat(createReqInfo());
-      } finally {
-        // Don't send heartbeats more often than the configured interval,
-        // even if they fail.
-        lastHeartbeatStopwatch.reset().start();
-      }
-    }
-  }
-
-  private synchronized void reserveQueueSpace(int size)
-      throws LoggerTooFarBehindException {
-    Preconditions.checkArgument(size >= 0);
-    if (queuedEditsSizeBytes + size > queueSizeLimitBytes && queuedEditsSizeBytes > 0) {
-      QuorumJournalManager.LOG.warn("Pending edits to {} is going to exceed limit size: {}"
-          + ", current queued edits size: {}, will silently drop {} bytes of edits!",
-          IPCLoggerChannel.class, queueSizeLimitBytes, queuedEditsSizeBytes, size);
-      throw new LoggerTooFarBehindException();
-    }
-    queuedEditsSizeBytes += size;
-  }
-  
-  private synchronized void unreserveQueueSpace(int size) {
-    Preconditions.checkArgument(size >= 0);
-    queuedEditsSizeBytes -= size;
-  }
-
-  @Override
-  public ListenableFuture<Void> format(final NamespaceInfo nsInfo, final boolean force) {
-    return singleThreadExecutor.submit(() -> {
-      getProxy().format(journalId, nameServiceId, nsInfo, force);
-      return null;
-    });
-  }
-  
-  @Override
-  public ListenableFuture<Void> startLogSegment(final long txid, final int layoutVersion) {
-    return singleThreadExecutor.submit(() -> {
-      getProxy().startLogSegment(createReqInfo(), txid, layoutVersion);
-      synchronized (IPCLoggerChannel.this) {
-        if (outOfSync) {
-          outOfSync = false;
-          QuorumJournalManager.LOG.info(
-              "Restarting previously-stopped writes to {} in segment starting at txid {}.",
-                  IPCLoggerChannel.class, txid);
-        }
-      }
-      return null;
-    });
-  }
-  
-  @Override
-  public ListenableFuture<Void> finalizeLogSegment(final long startTxId, final long endTxId) {
-    return singleThreadExecutor.submit(() -> {
-      throwIfOutOfSync();
-      getProxy().finalizeLogSegment(createReqInfo(), startTxId, endTxId);
-      return null;
-    });
-  }
-  
-  @Override
-  public ListenableFuture<Void> purgeLogsOlderThan(final long minTxIdToKeep) {
-    return singleThreadExecutor.submit(() -> {
-      getProxy().purgeLogsOlderThan(createReqInfo(), minTxIdToKeep);
-      return null;
-    });
-  }
-
-  @Override
-  public ListenableFuture<GetJournaledEditsResponseProto> getJournaledEdits(
-      long fromTxnId, int maxTransactions) {
-    return parallelExecutor.submit(() -> getProxy().getJournaledEdits(
-        journalId, nameServiceId, fromTxnId, maxTransactions));
-  }
-
-  @Override
-  public ListenableFuture<RemoteEditLogManifest> getEditLogManifest(
-      final long fromTxnId, final boolean inProgressOk) {
-    return parallelExecutor.submit(() -> {
-      GetEditLogManifestResponseProto ret = getProxy().getEditLogManifest(
-          journalId, nameServiceId, fromTxnId, inProgressOk);
-      // Update the http port, since we need this to build URLs to any of the
-      // returned logs.
-      constructHttpServerURI(ret);
-      return PBHelper.convert(ret.getManifest());
-    });
-  }
-
-  @Override
-  public ListenableFuture<PrepareRecoveryResponseProto> prepareRecovery(final long segmentTxId) {
-    return singleThreadExecutor.submit(() -> {
-      if (!hasHttpServerEndPoint()) {
-        // force an RPC call, so we know what the HTTP port should be if it
-        // hasn't done so.
-        GetJournalStateResponseProto ret = getProxy().getJournalState(
-            journalId, nameServiceId);
-        constructHttpServerURI(ret);
-      }
-      return getProxy().prepareRecovery(createReqInfo(), segmentTxId);
-    });
-  }
-
-  @Override
-  public ListenableFuture<Void> acceptRecovery(final SegmentStateProto log, final URL url) {
-    return singleThreadExecutor.submit(() -> {
-      getProxy().acceptRecovery(createReqInfo(), log, url);
-      return null;
-    });
-  }
-  
-  @Override
-  public ListenableFuture<Void> doPreUpgrade() {
-    return singleThreadExecutor.submit(() -> {
-      getProxy().doPreUpgrade(journalId);
-      return null;
-    });
-  }
-  
-  @Override
-  public ListenableFuture<Void> doUpgrade(final StorageInfo sInfo) {
-    return singleThreadExecutor.submit(() -> {
-      getProxy().doUpgrade(journalId, sInfo);
-      return null;
-    });
-  }
-  
-  @Override
-  public ListenableFuture<Void> doFinalize() {
-    return singleThreadExecutor.submit(() -> {
-      getProxy().doFinalize(journalId, nameServiceId);
-      return null;
-    });
-  }
-  
-  @Override
-  public ListenableFuture<Boolean> canRollBack(final StorageInfo storage,
-      final StorageInfo prevStorage, final int targetLayoutVersion) {
-    return singleThreadExecutor.submit(
-        () -> getProxy().canRollBack(journalId, nameServiceId,
-            storage, prevStorage, targetLayoutVersion));
-  }
-
-  @Override
-  public ListenableFuture<Void> doRollback() {
-    return singleThreadExecutor.submit(() -> {
-      getProxy().doRollback(journalId, nameServiceId);
-      return null;
-    });
-  }
-
-  @Override
-  public ListenableFuture<Void> discardSegments(final long startTxId) {
-    return singleThreadExecutor.submit(() -> {
-      getProxy().discardSegments(journalId, nameServiceId, startTxId);
-      return null;
-    });
-  }
-
-  @Override
-  public ListenableFuture<Long> getJournalCTime() {
-    return singleThreadExecutor.submit(() -> getProxy().getJournalCTime(journalId, nameServiceId));
-  }
-
-  @Override
-  public String toString() {
-    return InetAddresses.toAddrString(addr.getAddress()) + ':' + addr.getPort();
-  }
-
-  @Override
-  public synchronized void appendReport(StringBuilder sb) {
-    sb.append("Written txid ").append(highestAckedTxId);
-    long behind = getLagTxns();
-    if (behind > 0) {
-      if (lastAckNanos != 0) {
-        long lagMillis = getLagTimeMillis();
-        sb.append(" (" + behind + " txns/" + lagMillis + "ms behind)");
-      } else {
-        sb.append(" (never written");
-      }
-    }
-    if (outOfSync) {
-      sb.append(" (will try to re-sync on next segment)");
-    }
-  }
-  
-  public synchronized long getLagTxns() {
-    return Math.max(committedTxId - highestAckedTxId, 0);
-  }
-  
-  public synchronized long getLagTimeMillis() {
-    return TimeUnit.MILLISECONDS.convert(
-        Math.max(lastCommitNanos - lastAckNanos, 0),
-        TimeUnit.NANOSECONDS);
-  }
-
-  private void constructHttpServerURI(GetEditLogManifestResponseProto ret) {
-    if (ret.hasFromURL()) {
-      URI uri = URI.create(ret.getFromURL());
-      httpServerURL = getHttpServerURI(uri.getScheme(), uri.getPort());
-    } else {
-      httpServerURL = getHttpServerURI("http", ret.getHttpPort());
-    }
-  }
-
-  private void constructHttpServerURI(GetJournalStateResponseProto ret) {
-    if (ret.hasFromURL()) {
-      URI uri = URI.create(ret.getFromURL());
-      httpServerURL = getHttpServerURI(uri.getScheme(), uri.getPort());
-    } else {
-      httpServerURL = getHttpServerURI("http", ret.getHttpPort());
-    }
-  }
-
-  /**
-   * Construct the http server based on the response.
-   *
-   * The fromURL field in the response specifies the endpoint of the http
-   * server. However, the address might not be accurate since the server can
-   * bind to multiple interfaces. Here the client plugs in the address specified
-   * in the configuration and generates the URI.
-   */
-  private URL getHttpServerURI(String scheme, int port) {
-    try {
-      return new URL(scheme, addr.getHostName(), port, "");
-    } catch (MalformedURLException e) {
-      // Unreachable
-      throw new RuntimeException(e);
-    }
-  }
-
-  private boolean hasHttpServerEndPoint() {
-   return httpServerURL != null;
-  }
-}

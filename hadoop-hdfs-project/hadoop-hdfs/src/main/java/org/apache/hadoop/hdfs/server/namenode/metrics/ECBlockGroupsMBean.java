@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,50 +21,53 @@ package org.apache.hadoop.hdfs.server.namenode.metrics;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * This interface defines the methods to get status pertaining to blocks of type
- * {@link org.apache.hadoop.hdfs.protocol.BlockType#STRIPED} in FSNamesystem
- * of a NameNode. It is also used for publishing via JMX.
+ * 纠删码块组相关监控指标MBean接口，用于通过JMX暴露NameNode中纠删码条带化块的统计信息
  * <p>
- * Aggregated status of all blocks is reported in
- * @see FSNamesystemMBean
- * Name Node runtime activity statistic info is reported in
- * @see org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics
- *
+ * 本接口定义了获取FSNamesystem中所有纠删码块组状态指标的方法，供JMX发布监控指标使用。
+ * 全块聚合状态在 {@link FSNamesystemMBean} 中报告，NameNode运行时统计在
+ * {@link org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics} 中报告。
  */
 @InterfaceAudience.Private
 public interface ECBlockGroupsMBean {
   /**
-   * Return count of erasure coded block groups with low redundancy.
+   * 获取冗余度不足的纠删码块组数量
+   * @return 冗余度低于要求的纠删码块组总数
    */
   long getLowRedundancyECBlockGroups();
 
   /**
-   * Return count of erasure coded block groups that are corrupt.
+   * 获取损坏的纠删码块组数量
+   * @return 已损坏的纠删码块组总数
    */
   long getCorruptECBlockGroups();
 
   /**
-   * Return count of erasure coded block groups that are missing.
+   * 获取丢失数据块的纠删码块组数量
+   * @return 数据块丢失的纠删码块组总数
    */
   long getMissingECBlockGroups();
 
   /**
-   * Return total bytes of erasure coded future block groups.
+   * 获取处于未来状态（即将完成写入）的纠删码块组总字节数
+   * @return 未来状态纠删码块组的总字节数
    */
   long getBytesInFutureECBlockGroups();
 
   /**
-   * Return count of erasure coded blocks that are pending deletion.
+   * 获取待删除的纠删码块数量
+   * @return 等待删除的纠删码块总数
    */
   long getPendingDeletionECBlocks();
 
   /**
-   * Return total number of erasure coded block groups.
+   * 获取集群中总的纠删码块组数量
+   * @return 所有纠删码块组的总数
    */
   long getTotalECBlockGroups();
 
   /**
-   * @return the enabled erasure coding policies separated with comma.
+   * 获取当前集群启用的所有纠删码策略，以逗号分隔
+   * @return 逗号分隔的已启用纠删码策略名称字符串
    */
   String getEnabledEcPolicies();
 }

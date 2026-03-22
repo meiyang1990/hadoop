@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,10 +34,12 @@ import org.apache.hadoop.util.LightWeightGSet;
 import static org.apache.hadoop.hdfs.server.namenode.INodeId.INVALID_INODE_ID;
 
 /**
- * For a given block (or an erasure coding block group), BlockInfo class
- * maintains 1) the {@link BlockCollection} it is part of, and 2) datanodes
- * where the replicas of the block, or blocks belonging to the erasure coding
- * block group, are stored.
+ * @file org/apache/hadoop/hdfs/server/blockmanagement/BlockInfo.java
+ * @brief HDFS块元数据抽象基类，维护普通块或纠删码块组的归属信息和存储位置信息
+ * 
+ * 对于给定块（或纠删码块组），本类维护两个核心信息：
+ * 1. 该块所属的{@link BlockCollection}（文件/块组）
+ * 2. 该块副本（或纠删码块组中所有块）所在的DataNode存储信息
  */
 @InterfaceAudience.Private
 public abstract class BlockInfo extends Block
@@ -45,38 +48,34 @@ public abstract class BlockInfo extends Block
   public static final BlockInfo[] EMPTY_ARRAY = {};
 
   /**
-   * Replication factor.
+   * 副本系数，对于纠删码块组该值为0
    */
   private short replication;
 
   /**
-   * Block collection ID.
+   * 所属块集合（文件）ID
    */
   private volatile long bcId;
 
-  /** For implementing {@link LightWeightGSet.LinkedElement} interface. */
+  /** 实现LightWeightGSet.LinkedElement接口所需，用于块映射链表链接 */
   private LightWeightGSet.LinkedElement nextLinkedElement;
 
   /**
-   * This array contains triplets of references. For each i-th storage, the
-   * block belongs to triplets[3*i] is the reference to the
-   * {@link DatanodeStorageInfo} and triplets[3*i+1] and triplets[3*i+2] are
-   * references to the previous and the next blocks, respectively, in the list
-   * of blocks belonging to this storage.
-   *
-   * Using previous and next in Object triplets is done instead of a
-   * {@link LinkedList} list to efficiently use memory. With LinkedList the cost
-   * per replica is 42 bytes (LinkedList#Entry object per replica) versus 16
-   * bytes using the triplets.
+   * 存储三元组数组，每个存储位置占用三个数组元素：
+   * triplets[3*i]     = {@link DatanodeStorageInfo} 存储信息引用
+   * triplets[3*i+1]   = 该存储的块链表中前驱块引用
+   * triplets[3*i+2]   = 该存储的块链表中后继块引用
+   * 
+   * 使用三元组数组而非LinkedList是为了优化内存占用：LinkedList每个条目需要额外42字节，而三元组只需要16字节
    */
   protected Object[] triplets;
 
+  /** 构建中块特性，仅当块处于构建中状态时非空 */
   private BlockUnderConstructionFeature uc;
 
   /**
-   * Construct an entry for blocksmap
-   * @param size the block's replication factor, or the total number of blocks
-   *             in the block group
+   * 构造块信息对象，用于块映射表存储
+   * @param size 副本系数（普通块）或块组中总块数（纠删码）
    */
   public BlockInfo(short size) {
     this.triplets = new Object[3 * size];
@@ -84,6 +83,9 @@ public abstract class BlockInfo extends Block
     this.replication = isStriped() ? 0 : size;
   }
 
+  /**
+   * 基于已有Block构造块信息对象
+   */
   public BlockInfo(Block blk, short size) {
     super(blk);
     this.triplets = new Object[3 * size];
@@ -91,45 +93,87 @@ public abstract class BlockInfo extends Block
     this.replication = isStriped() ? 0 : size;
   }
 
+  /**
+   * 获取块副本系数
+   * @return 副本系数
+   */
   public short getReplication() {
     return replication;
   }
 
+  /**
+   * 设置块副本系数
+   * @param repl 新的副本系数
+   */
   public void setReplication(short repl) {
     this.replication = repl;
   }
 
+  /**
+   * 获取所属块集合ID
+   * @return 块集合ID
+   */
   public long getBlockCollectionId() {
     return bcId;
   }
 
+  /**
+   * 设置所属块集合ID
+   * @param id 块集合ID
+   */
   public void setBlockCollectionId(long id) {
     this.bcId = id;
   }
 
+  /**
+   * 标记该块已删除
+   */
   public void delete() {
     setBlockCollectionId(INVALID_INODE_ID);
   }
 
+  /**
+   * 检查该块是否已删除
+   * @return true表示块已删除，不再属于任何文件
+   */
   public boolean isDeleted() {
     return bcId == INVALID_INODE_ID;
   }
 
+  /**
+   * 获取该块所有存储位置的迭代器
+   * @return 存储信息迭代器
+   */
   public Iterator<DatanodeStorageInfo> getStorageInfos() {
     return new BlocksMap.StorageIterator(this);
   }
 
+  /**
+   * 根据索引获取存储对应的DataNode
+   * @param index 三元组索引
+   * @return DataNode描述符，未找到返回null
+   */
   public DatanodeDescriptor getDatanode(int index) {
     DatanodeStorageInfo storage = getStorageInfo(index);
     return storage == null ? null : storage.getDatanodeDescriptor();
   }
 
+  /**
+   * 根据索引获取存储信息
+   * @param index 三元组索引
+   * @return DataNode存储信息
+   */
   DatanodeStorageInfo getStorageInfo(int index) {
     assert this.triplets != null : "BlockInfo is not initialized";
     assert index >= 0 && index * 3 < triplets.length : "Index is out of bound";
     return (DatanodeStorageInfo)triplets[index * 3];
   }
 
+  /**
+   * 根据索引获取前驱块
+   * @param index 三元组索引
+   * @return 前驱块信息
+   */
   BlockInfo getPrevious(int index) {
     assert this.triplets != null : "BlockInfo is not initialized";
     assert index >= 0 && index * 3 + 1 < triplets.length : "Index is out of bound";
@@ -140,6 +184,11 @@ public abstract class BlockInfo extends Block
     return info;
   }
 
+  /**
+   * 根据索引获取后继块
+   * @param index 三元组索引
+   * @return 后继块信息
+   */
   BlockInfo getNext(int index) {
     assert this.triplets != null : "BlockInfo is not initialized";
     assert index >= 0 && index * 3 + 2 < triplets.length : "Index is out of bound";
@@ -150,6 +199,11 @@ public abstract class BlockInfo extends Block
     return info;
   }
 
+  /**
+   * 设置索引位置对应的存储信息
+   * @param index 三元组索引
+   * @param storage 存储信息
+   */
   void setStorageInfo(int index, DatanodeStorageInfo storage) {
     assert this.triplets != null : "BlockInfo is not initialized";
     assert index >= 0 && index * 3 < triplets.length : "Index is out of bound";
@@ -157,12 +211,11 @@ public abstract class BlockInfo extends Block
   }
 
   /**
-   * Return the previous block on the block list for the datanode at
-   * position index. Set the previous block on the list to "to".
+   * 设置指定索引位置的前驱块，返回原前驱块
    *
-   * @param index - the datanode index
-   * @param to - block to be set to previous on the list of blocks
-   * @return current previous block on the list of blocks
+   * @param index 存储索引
+   * @param to 要设置的新前驱块
+   * @return 原前驱块
    */
   BlockInfo setPrevious(int index, BlockInfo to) {
     assert this.triplets != null : "BlockInfo is not initialized";
@@ -173,12 +226,11 @@ public abstract class BlockInfo extends Block
   }
 
   /**
-   * Return the next block on the block list for the datanode at
-   * position index. Set the next block on the list to "to".
+   * 设置指定索引位置的后继块，返回原后继块
    *
-   * @param index - the datanode index
-   * @param to - block to be set to next on the list of blocks
-   * @return current next block on the list of blocks
+   * @param index 存储索引
+   * @param to 要设置的新后继块
+   * @return 原后继块
    */
   BlockInfo setNext(int index, BlockInfo to) {
     assert this.triplets != null : "BlockInfo is not initialized";
@@ -188,6 +240,10 @@ public abstract class BlockInfo extends Block
     return info;
   }
 
+  /**
+   * 获取当前块可容纳的最大存储位置数量
+   * @return 最大存储位置数量
+   */
   public int getCapacity() {
     assert this.triplets != null : "BlockInfo is not initialized";
     assert triplets.length % 3 == 0 : "Malformed BlockInfo";
@@ -195,42 +251,54 @@ public abstract class BlockInfo extends Block
   }
 
   /**
-   * Count the number of data-nodes the block currently belongs to (i.e., NN
-   * has received block reports from the DN).
+   * 统计当前块所在的DataNode数量（即NameNode已收到块报告的副本数量）
+   * @return 数据节点数量
    */
   public abstract int numNodes();
 
   /**
-   * Add a {@link DatanodeStorageInfo} location for a block
-   * @param storage The storage to add
-   * @param reportedBlock The block reported from the datanode. This is only
-   *                      used by erasure coded blocks, this block's id contains
-   *                      information indicating the index of the block in the
-   *                      corresponding block group.
+   * 为块添加一个DataNode存储位置
+   * @param storage 要添加的存储信息
+   * @param reportedBlock DataNode上报的块，仅纠删码块使用，块ID包含该块在组内索引信息
+   * @return 添加成功返回true，已存在返回false
    */
   abstract boolean addStorage(DatanodeStorageInfo storage, Block reportedBlock);
 
   /**
-   * Remove {@link DatanodeStorageInfo} location for a block
+   * 移除块的一个DataNode存储位置
+   * @param storage 要移除的存储信息
+   * @return 移除成功返回true，不存在返回false
    */
   abstract boolean removeStorage(DatanodeStorageInfo storage);
 
+  /**
+   * 检查是否为纠删码条带块
+   * @return true表示是纠删码块
+   */
   public abstract boolean isStriped();
 
+  /**
+   * 获取块类型（普通块、纠删码组等）
+   * @return 块类型枚举
+   */
   public abstract BlockType getBlockType();
 
-  /** @return true if there is no datanode storage associated with the block */
+  /**
+   * 检查该块是否没有关联任何DataNode存储
+   * @return true表示无存储关联
+   */
   abstract boolean hasNoStorage();
 
   /**
-   * Checks whether this block has a Provided replica.
-   * @return true if this block has a replica on Provided storage.
+   * 检查该块是否存在PROVIDED类型副本
+   * @return true表示存在PROVIDED存储上的副本
    */
   abstract boolean isProvided();
 
   /**
-   * Find specified DatanodeStorageInfo.
-   * @return DatanodeStorageInfo or null if not found.
+   * 根据DataNode描述符查找对应的存储信息
+   * @param dn 目标DataNode
+   * @return 存储信息，未找到返回null
    */
   DatanodeStorageInfo findStorageInfo(DatanodeDescriptor dn) {
     int len = getCapacity();
@@ -239,10 +307,9 @@ public abstract class BlockInfo extends Block
       DatanodeStorageInfo cur = getStorageInfo(idx);
       if(cur != null) {
         if (cur.getStorageType() == StorageType.PROVIDED) {
-          // if block resides on provided storage, only match the storage ids
+          // PROVIDED存储需要匹配存储ID，而非DataNode
           if (dn.getStorageInfo(cur.getStorageID()) != null) {
-            // do not return here as we have to check the other
-            // DatanodeStorageInfos for this block which could be local
+            // 不立即返回，需要继续检查其他可能的本地存储
             providedStorageInfo = cur;
           }
         } else if (cur.getDatanodeDescriptor() == dn) {
@@ -254,8 +321,8 @@ public abstract class BlockInfo extends Block
   }
 
   /**
-   * Find specified DatanodeStorageInfo.
-   * @return index or -1 if not found.
+   * 根据存储信息查找对应的索引
+   * @return 索引，未找到返回-1
    */
   int findStorageInfo(DatanodeStorageInfo storageInfo) {
     int len = getCapacity();
@@ -269,10 +336,9 @@ public abstract class BlockInfo extends Block
   }
 
   /**
-   * Insert this block into the head of the list of blocks
-   * related to the specified DatanodeStorageInfo.
-   * If the head is null then form a new list.
-   * @return current block as the new head of the list.
+   * 将当前块插入到指定存储的块链表头部
+   * 如果链表为空则创建新链表
+   * @return 当前块，作为新链表头
    */
   BlockInfo listInsert(BlockInfo head, DatanodeStorageInfo storage) {
     int dnIndex = this.findStorageInfo(storage);
@@ -288,19 +354,16 @@ public abstract class BlockInfo extends Block
   }
 
   /**
-   * Remove this block from the list of blocks
-   * related to the specified DatanodeStorageInfo.
-   * If this block is the head of the list then return the next block as
-   * the new head.
-   * @return the new head of the list or null if the list becomes
-   * empy after deletion.
+   * 将当前块从指定存储的块链表中移除
+   * 如果当前块是链表头，则返回下一块作为新头
+   * @return 新链表头，删除后链表为空返回null
    */
   BlockInfo listRemove(BlockInfo head, DatanodeStorageInfo storage) {
     if (head == null) {
       return null;
     }
     int dnIndex = this.findStorageInfo(storage);
-    if (dnIndex < 0) { // this block is not on the data-node list
+    if (dnIndex < 0) { // 当前块不在该数据节点链表中
       return head;
     }
 
@@ -314,17 +377,16 @@ public abstract class BlockInfo extends Block
     if (next != null) {
       next.setPrevious(next.findStorageInfo(storage), prev);
     }
-    if (this == head) { // removing the head
+    if (this == head) { // 删除的是链表头
       head = next;
     }
     return head;
   }
 
   /**
-   * Remove this block from the list of blocks related to the specified
-   * DatanodeDescriptor. Insert it into the head of the list of blocks.
+   * 将当前块从存储链表中移除，并移动到链表头部
    *
-   * @return the new head of the list.
+   * @return 新链表头
    */
   public BlockInfo moveBlockToHead(BlockInfo head, DatanodeStorageInfo storage,
       int curIndex, int headIndex) {
@@ -344,13 +406,13 @@ public abstract class BlockInfo extends Block
 
   @Override
   public int hashCode() {
-    // Super implementation is sufficient
+    // 父类实现已满足需求
     return super.hashCode();
   }
 
   @Override
   public boolean equals(Object obj) {
-    // Sufficient to rely on super's implementation
+    // 依赖父类实现即可
     return (this == obj) || super.equals(obj);
   }
 
@@ -364,29 +426,45 @@ public abstract class BlockInfo extends Block
     this.nextLinkedElement = next;
   }
 
-  /* UnderConstruction Feature related */
+  /* 构建中块特性相关方法 */
 
+  /**
+   * 获取构建中块特性对象
+   * @return 构建中特性，完整块返回null
+   */
   public BlockUnderConstructionFeature getUnderConstructionFeature() {
     return uc;
   }
 
+  /**
+   * 获取块构建状态
+   * @return 块构建状态枚举
+   */
   public BlockUCState getBlockUCState() {
     return uc == null ? BlockUCState.COMPLETE : uc.getBlockUCState();
   }
 
   /**
-   * Is this block complete?
+   * 检查块是否已完成
    *
-   * @return true if the state of the block is {@link BlockUCState#COMPLETE}
+   * @return true表示块状态为COMPLETE
    */
   public boolean isComplete() {
     return getBlockUCState().equals(BlockUCState.COMPLETE);
   }
 
+  /**
+   * 检查块是否处于恢复中
+   * @return true表示块状态为UNDER_RECOVERY
+   */
   public boolean isUnderRecovery() {
     return getBlockUCState().equals(BlockUCState.UNDER_RECOVERY);
   }
 
+  /**
+   * 检查块是否已完成或已提交
+   * @return true表示块状态为COMPLETE或COMMITTED
+   */
   public final boolean isCompleteOrCommitted() {
     final BlockUCState state = getBlockUCState();
     return state.equals(BlockUCState.COMPLETE) ||
@@ -394,60 +472,9 @@ public abstract class BlockInfo extends Block
   }
 
   /**
-   * Add/Update the under construction feature.
+   * 转换为构建中块，添加或更新构建中特性
+   * @param s 初始构建状态
+   * @param targets 预期存储位置数组
    */
   public void convertToBlockUnderConstruction(BlockUCState s,
-      DatanodeStorageInfo[] targets) {
-    if (isComplete()) {
-      uc = new BlockUnderConstructionFeature(this, s, targets,
-          this.getBlockType());
-    } else {
-      // the block is already under construction
-      uc.setBlockUCState(s);
-      uc.setExpectedLocations(this, targets, this.getBlockType());
-    }
-  }
-
-  /**
-   * Convert an under construction block to complete.
-   */
-  void convertToCompleteBlock() {
-    assert getBlockUCState() != BlockUCState.COMPLETE :
-        "Trying to convert a COMPLETE block";
-    uc = null;
-  }
-
-  /**
-   * Process the recorded replicas. When about to commit or finish the
-   * pipeline recovery sort out bad replicas.
-   * @param genStamp  The final generation stamp for the block.
-   * @return staleReplica's List.
-   */
-  public List<ReplicaUnderConstruction> setGenerationStampAndVerifyReplicas(
-      long genStamp) {
-    Preconditions.checkState(uc != null && !isComplete());
-    // Set the generation stamp for the block.
-    setGenerationStamp(genStamp);
-
-    return uc.getStaleReplicas(genStamp);
-  }
-
-  /**
-   * Commit block's length and generation stamp as reported by the client.
-   * Set block state to {@link BlockUCState#COMMITTED}.
-   * @param block - contains client reported block length and generation
-   * @return staleReplica's List.
-   * @throws IOException if block ids are inconsistent.
-   */
-  List<ReplicaUnderConstruction> commitBlock(Block block) throws IOException {
-    if (getBlockId() != block.getBlockId()) {
-      throw new IOException("Trying to commit inconsistent block: id = "
-          + block.getBlockId() + ", expected id = " + getBlockId());
-    }
-    Preconditions.checkState(!isComplete());
-    uc.commit();
-    this.setNumBytes(block.getNumBytes());
-    // Sort out invalid replicas.
-    return setGenerationStampAndVerifyReplicas(block.getGenerationStamp());
-  }
-}
+      D

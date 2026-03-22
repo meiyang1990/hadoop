@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,14 +26,21 @@ import org.apache.hadoop.hdfs.web.WebHdfsConstants;
 import org.apache.hadoop.io.Text;
 
 /**
- *  DtFetcher for WebHdfsFileSystem using the base class HdfsDtFetcher impl.
+ * WebHDFS 委托令牌获取器，基于 HdfsDtFetcher 基础实现，为 WebHdfsFileSystem 提供认证令牌获取能力。
+ * 属于 HDFS 安全认证模块，用于获取 WebHDFS 访问所需的 delegation token。
  */
 public class WebHdfsDtFetcher extends HdfsDtFetcher {
+  // 日志记录器
   private static final Logger LOG =
       LoggerFactory.getLogger(WebHdfsDtFetcher.class);
 
+  // WebHDFS 服务名称，对应URL方案常量
   private static final String SERVICE_NAME = WebHdfsConstants.WEBHDFS_SCHEME;
 
+  /**
+   * 获取当前服务的名称，用于标识 WebHDFS 服务的令牌类型。
+   * @return WebHDFS 服务名称文本对象
+   */
   @Override
   public Text getServiceName() {
     return new Text(SERVICE_NAME);

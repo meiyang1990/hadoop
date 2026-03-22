@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,23 +26,21 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.protocol.ReplicaRecoveryInfo;
 
 /**
- * This class represents a replica that is waiting to be recovered.
- * After a datanode restart, any replica in "rbw" directory is loaded
- * as a replica waiting to be recovered.
- * A replica waiting to be recovered does not provision read nor
- * participates in any pipeline recovery. It will become outdated if its
- * client continues to write or be recovered as a result of
- * lease recovery.
+ * 文件概览：HDFS DataNode 节点上等待恢复的副本实现类，属于数据块恢复流程中的一个状态载体
+ * 核心职责：表示等待被恢复的未完成写入的数据块副本，承载该状态下副本的元数据与行为约束
+ * 
+ * 业务背景：DataNode重启后，所有原位于rbw（正在写入）目录的副本都会被加载为此类型；
+ * 等待恢复的副本既不提供读服务，也不参与管线恢复，会在租约恢复流程中被处理或过期淘汰。
  */
 public class ReplicaWaitingToBeRecovered extends LocalReplica {
 
   /**
-   * Constructor
-   * @param blockId block id
-   * @param len replica length
-   * @param genStamp replica generation stamp
-   * @param vol volume where replica is located
-   * @param dir directory path where block and meta files are located
+   * 构造等待恢复副本对象，通过参数直接指定各元数据属性
+   * @param blockId 数据块ID
+   * @param len 副本长度
+   * @param genStamp 副本生成时间戳
+   * @param vol 副本所在的存储卷
+   * @param dir 数据块和元数据文件所在的目录
    */
   public ReplicaWaitingToBeRecovered(long blockId, long len, long genStamp,
       FsVolumeSpi vol, File dir) {
@@ -49,28 +48,36 @@ public class ReplicaWaitingToBeRecovered extends LocalReplica {
   }
   
   /**
-   * Constructor
-   * @param block a block
-   * @param vol volume where replica is located
-   * @param dir directory path where block and meta files are located
+   * 构造等待恢复副本对象，通过Block对象传入块元数据
+   * @param block 数据块对象，包含块ID、长度、生成时间戳
+   * @param vol 副本所在的存储卷
+   * @param dir 数据块和元数据文件所在的目录
    */
   public ReplicaWaitingToBeRecovered(Block block, FsVolumeSpi vol, File dir) {
     super(block, vol, dir);
   }
   
   /**
-   * Copy constructor.
-   * @param from where to copy from
+   * 拷贝构造函数，基于已有等待恢复副本创建新对象
+   * @param from 源等待恢复副本对象
    */
   public ReplicaWaitingToBeRecovered(ReplicaWaitingToBeRecovered from) {
     super(from);
   }
 
+  /**
+   * 获取当前副本的状态枚举
+   * @return 返回RWR（等待恢复）状态
+   */
   @Override //ReplicaInfo
   public ReplicaState getState() {
     return ReplicaState.RWR;
   }
   
+  /**
+   * 获取当前副本对外可见的长度，等待恢复的副本不对外提供读服务
+   * @return 固定返回-1，表示无可见数据
+   */
   @Override //ReplicaInfo
   public long getVisibleLength() {
     return -1;  //no bytes are visible
@@ -96,24 +103,41 @@ public class ReplicaWaitingToBeRecovered extends LocalReplica {
     return super.toString();
   }
 
+  /**
+   * 获取原始副本，当前类型不支持该操作
+   * @return 永远抛出不支持操作异常
+   */
   @Override
   public ReplicaInfo getOriginalReplica() {
     throw new UnsupportedOperationException("Replica of type " + getState() +
         " does not support getOriginalReplica");
   }
 
+  /**
+   * 获取恢复ID，当前类型不支持该操作
+   * @return 永远抛出不支持操作异常
+   */
   @Override
   public long getRecoveryID() {
     throw new UnsupportedOperationException("Replica of type " + getState() +
         " does not support getRecoveryID");
   }
 
+  /**
+   * 设置恢复ID，当前类型不支持该操作
+   * @param recoveryId 恢复ID
+   * @return 永远抛出不支持操作异常
+   */
   @Override
   public void setRecoveryID(long recoveryId) {
     throw new UnsupportedOperationException("Replica of type " + getState() +
         " does not support getRecoveryID");
   }
 
+  /**
+   * 创建副本恢复信息，当前类型不支持该操作
+   * @return 永远抛出不支持操作异常
+   */
   @Override
   public ReplicaRecoveryInfo createInfo() {
     throw new UnsupportedOperationException("Replica of type " + getState() +

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,9 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * DiskBalancerDataNode represents a DataNode that exists in the cluster. It
- * also contains a metric called nodeDataDensity which allows us to compare
- * between a set of Nodes.
+ * HDFS磁盘均衡器的数据模型：代表集群中一个DataNode节点，保存节点磁盘信息并计算节点数据密度，用于判断节点是否需要均衡。
  */
 public class DiskBalancerDataNode implements Comparable<DiskBalancerDataNode> {
   private double nodeDataDensity;
@@ -37,15 +36,15 @@ public class DiskBalancerDataNode implements Comparable<DiskBalancerDataNode> {
   private int volumeCount;
 
   /**
-   * Constructs an Empty Data Node.
+   * 构造空的DataNode对象。
    */
   public DiskBalancerDataNode() {
   }
 
   /**
-   * Constructs a DataNode.
+   * 根据节点ID构造DataNode对象。
    *
-   * @param dataNodeID - Node ID
+   * @param dataNodeID DataNode的唯一ID
    */
   public DiskBalancerDataNode(String dataNodeID) {
     this.dataNodeUUID = dataNodeID;
@@ -53,86 +52,86 @@ public class DiskBalancerDataNode implements Comparable<DiskBalancerDataNode> {
   }
 
   /**
-   * Returns the IP address of this Node.
+   * 获取当前DataNode的IP地址。
    *
-   * @return IP Address string
+   * @return IP地址字符串
    */
   public String getDataNodeIP() {
     return dataNodeIP;
   }
 
   /**
-   * Sets the IP address of this Node.
+   * 设置当前DataNode的IP地址。
    *
-   * @param ipaddress - IP Address
+   * @param ipaddress IP地址字符串
    */
   public void setDataNodeIP(String ipaddress) {
     this.dataNodeIP = ipaddress;
   }
 
   /**
-   * Returns the Port of this DataNode.
+   * 获取当前DataNode的服务端口。
    *
-   * @return Port Number
+   * @return 端口号
    */
   public int getDataNodePort() {
     return dataNodePort;
   }
 
   /**
-   * Sets the DataNode Port number.
+   * 设置当前DataNode的服务端口。
    *
-   * @param port - Datanode Port Number
+   * @param port 端口号
    */
   public void setDataNodePort(int port) {
     this.dataNodePort = port;
   }
 
   /**
-   * Get DataNode DNS name.
+   * 获取当前DataNode的主机名。
    *
-   * @return name of the node
+   * @return 节点主机名
    */
   public String getDataNodeName() {
     return dataNodeName;
   }
 
   /**
-   * Sets node's DNS name.
+   * 设置当前DataNode的主机名。
    *
-   * @param name - Data node name
+   * @param name 节点主机名
    */
   public void setDataNodeName(String name) {
     this.dataNodeName = name;
   }
 
   /**
-   * Returns the Volume sets on this node.
+   * 获取当前节点所有存储类型对应的卷集合。
    *
-   * @return a Map of VolumeSets
+   * @return 存储类型 -> 卷集合 的映射
    */
   public Map<String, DiskBalancerVolumeSet> getVolumeSets() {
     return volumeSets;
   }
 
   /**
-   * Returns datanode ID.
+   * 获取当前DataNode的唯一UUID。
    **/
   public String getDataNodeUUID() {
     return dataNodeUUID;
   }
 
   /**
-   * Sets Datanode UUID.
+   * 设置当前DataNode的UUID。
    *
-   * @param nodeID - Node ID.
+   * @param nodeID DataNode唯一ID
    */
   public void setDataNodeUUID(String nodeID) {
     this.dataNodeUUID = nodeID;
   }
 
   /**
-   * Indicates whether some other object is "equal to" this one.
+   * 判断两个DataNode是否相等，基于UUID判断。
    */
   @Override
   public boolean equals(Object obj) {
@@ -144,16 +143,10 @@ public class DiskBalancerDataNode implements Comparable<DiskBalancerDataNode> {
   }
 
   /**
-   * Compares this object with the specified object for order.  Returns a
-   * negative integer, zero, or a positive integer as this object is less than,
-   * equal to, or greater than the specified object.
+   * 基于节点数据密度比较两个DataNode，用于节点排序。
    *
-   * @param that the object to be compared.
-   * @return a negative integer, zero, or a positive integer as this object is
-   * less than, equal to, or greater than the specified object.
-   * @throws NullPointerException if the specified object is null
-   * @throws ClassCastException   if the specified object's type prevents it
-   *                              from being compared to this object.
+   * @param that 待比较的DataNode对象
+   * @return 负数表示当前对象更小，0表示相等，正数表示当前对象更大
    */
   @Override
   public int compareTo(DiskBalancerDataNode that) {
@@ -177,8 +170,7 @@ public class DiskBalancerDataNode implements Comparable<DiskBalancerDataNode> {
   }
 
   /**
-   * Returns a hash code value for the object. This method is supported for the
-   * benefit of hash tables such as those provided by {@link HashMap}.
+   * 计算对象哈希码。
    */
   @Override
   public int hashCode() {
@@ -186,23 +178,22 @@ public class DiskBalancerDataNode implements Comparable<DiskBalancerDataNode> {
   }
 
   /**
-   * Returns NodeDataDensity Metric.
+   * 获取节点数据密度指标值。
    *
-   * @return float
+   * @return 节点数据密度值
    */
   public double getNodeDataDensity() {
     return nodeDataDensity;
   }
 
   /**
-   * Computes nodes data density.
-   *
-   * This metric allows us to compare different  nodes and how well the data is
-   * spread across a set of volumes inside the node.
+   * 计算当前节点整体数据密度，该指标反映节点内各磁盘数据分布的不均衡程度。
+   * 统计节点所有磁盘的密度偏差总和，用于不同节点之间的均衡优先级排序。
    */
   public void computeNodeDensity() {
     double sum = 0;
     int volcount = 0;
+    // 遍历所有存储类型的卷集合，累加各磁盘密度绝对值
     for (DiskBalancerVolumeSet vset : volumeSets.values()) {
       for (DiskBalancerVolume vol : vset.getVolumes()) {
         sum += Math.abs(vol.getVolumeDataDensity());
@@ -215,10 +206,11 @@ public class DiskBalancerDataNode implements Comparable<DiskBalancerDataNode> {
   }
 
   /**
-   * Computes if this node needs balancing at all.
+   * 判断当前节点是否需要进行磁盘均衡。
+   * 只要任意一个卷集合达到均衡阈值，就需要执行均衡。
    *
-   * @param threshold - Percentage
-   * @return true or false
+   * @param threshold 不均衡阈值百分比
+   * @return true表示需要均衡，false表示当前节点已经均衡
    */
   public boolean isBalancingNeeded(double threshold) {
     for (DiskBalancerVolumeSet vSet : getVolumeSets().values()) {
@@ -230,12 +222,10 @@ public class DiskBalancerDataNode implements Comparable<DiskBalancerDataNode> {
   }
 
   /**
-   * Adds a volume to the DataNode.
+   * 向当前DataNode添加一个磁盘卷，按存储类型分组管理。
+   * 该方法非线程安全，设计上每个节点由单线程处理，无需同步。
    *
-   * It is assumed that we have one thread per node hence this call is not
-   * synchronised neither is the map is protected.
-   *
-   * @param volume - volume
+   * @param volume 待添加的磁盘卷对象
    */
   public void addVolume(DiskBalancerVolume volume) throws Exception {
     Preconditions.checkNotNull(volume, "volume cannot be null");
@@ -243,24 +233,28 @@ public class DiskBalancerDataNode implements Comparable<DiskBalancerDataNode> {
     Preconditions
         .checkNotNull(volume.getStorageType(), "storage type cannot be null");
 
+    // 按存储类型作为卷集合的键
     String volumeSetKey = volume.getStorageType();
     DiskBalancerVolumeSet vSet;
+    // 如果对应存储类型已存在卷集合，直接添加到现有集合
     if (volumeSets.containsKey(volumeSetKey)) {
       vSet = volumeSets.get(volumeSetKey);
     } else {
+      // 否则创建新的卷集合
       vSet = new DiskBalancerVolumeSet(volume.isTransient());
       vSet.setStorageType(volumeSetKey);
       volumeSets.put(volumeSetKey, vSet);
     }
 
     vSet.addVolume(volume);
+    // 添加完成后重新计算节点数据密度
     computeNodeDensity();
   }
 
   /**
-   * Returns how many volumes are in the DataNode.
+   * 获取当前DataNode总的磁盘卷数量。
    *
-   * @return int
+   * @return 磁盘卷总数
    */
   public int getVolumeCount() {
     return volumeCount;

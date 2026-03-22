@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,8 @@
  */
 
 /**
- * This package contains classes related to hdfs data transfer protocol.
+ * HDFS数据传输协议包，包含HDFS客户端与DataNode之间、DataNode之间进行数据块传输
+ * 所使用的协议定义与核心数据结构，支撑HDFS的数据读写、块复制、数据恢复等核心流程。
  */
 @InterfaceStability.Evolving
 package org.apache.hadoop.hdfs.protocol.datatransfer;

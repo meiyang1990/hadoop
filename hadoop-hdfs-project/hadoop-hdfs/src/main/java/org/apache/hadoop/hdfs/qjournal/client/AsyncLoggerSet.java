@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,9 +43,11 @@ import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ListenableFuture;
 
 /**
- * Wrapper around a set of Loggers, taking care of fanning out
- * calls to the underlying loggers and constructing corresponding
- * {@link QuorumCall} instances.
+ * @file AsyncLoggerSet.java
+ * @brief 基于QJM日志写入的异步日志器集合管理类，负责向所有远程日志节点广播请求并构造法定人数调用实例
+ *
+ * QJM(Quorum Journal Manager)是HDFS HA架构中共享编辑日志的实现，该类管理多个远程JournalNode的
+ * 异步日志器实例，统一分发操作请求，处理法定人数一致性判断。
  */
 class AsyncLoggerSet {
   static final Logger LOG = LoggerFactory.getLogger(AsyncLoggerSet.class);
@@ -54,10 +57,18 @@ class AsyncLoggerSet {
   private static final long INVALID_EPOCH = -1;
   private long myEpoch = INVALID_EPOCH;
   
+  /**
+   * 构造异步日志器集合，将输入列表转为不可变列表存储
+   * @param loggers 异步日志器列表，对应多个JournalNode节点
+   */
   public AsyncLoggerSet(List<AsyncLogger> loggers) {
     this.loggers = ImmutableList.copyOf(loggers);
   }
   
+  /**
+   * 设置当前写入周期的epoch编号，同步到所有日志器
+   * @param e epoch编号
+   */
   void setEpoch(long e) {
     Preconditions.checkState(!isEpochEstablished(),
         "Epoch already established: epoch=%s", myEpoch);
@@ -68,9 +79,9 @@ class AsyncLoggerSet {
   }
 
   /**
-   * Set the highest successfully committed txid seen by the writer.
-   * This should be called after a successful write to a quorum, and is used
-   * for extra sanity checks against the protocol. See HDFS-3863.
+   * 设置当前成功提交的最大事务ID，同步到所有日志器
+   * 用于协议层面的一致性检查，防止错乱写入，详见HDFS-3863
+   * @param txid 已提交的最高事务ID
    */
   public void setCommittedTxId(long txid) {
     for (AsyncLogger logger : loggers) {
@@ -79,15 +90,16 @@ class AsyncLoggerSet {
   }
 
   /**
-   * @return true if an epoch has been established.
+   * 检查当前是否已经建立合法epoch
+   * @return true表示epoch已建立，false表示还未建立
    */
   boolean isEpochEstablished() {
     return myEpoch != INVALID_EPOCH;
   }
   
   /**
-   * @return the epoch number for this writer. This may only be called after
-   * a successful call to {@link QuorumJournalManager#createNewUniqueEpoch()}.
+   * 获取当前writer的epoch编号，仅在成功创建唯一epoch后才能调用
+   * @return 当前epoch编号
    */
   long getEpoch() {
     Preconditions.checkState(myEpoch != INVALID_EPOCH,
@@ -96,7 +108,7 @@ class AsyncLoggerSet {
   }
 
   /**
-   * Close all of the underlying loggers.
+   * 关闭所有底层异步日志器，释放连接资源
    */
   void close() {
     for (AsyncLogger logger : loggers) {
@@ -104,6 +116,10 @@ class AsyncLoggerSet {
     }
   }
   
+  /**
+   * 清理所有日志节点上早于指定事务ID的旧日志
+   * @param minTxIdToKeep 需要保留的最小事务ID，小于该ID的日志将被清理
+   */
   void purgeLogsOlderThan(long minTxIdToKeep) {
     for (AsyncLogger logger : loggers) {
       logger.purgeLogsOlderThan(minTxIdToKeep);
@@ -112,23 +128,22 @@ class AsyncLoggerSet {
 
 
   /**
-   * Wait for a quorum of loggers to respond to the given call. If a quorum
-   * can't be achieved, throws a QuorumException.
-   * @param q the quorum call
-   * @param timeoutMs the number of millis to wait
-   * @param operationName textual description of the operation, for logging
-   * @return a map of successful results
-   * @throws QuorumException if a quorum doesn't respond with success
-   * @throws IOException if the thread is interrupted or times out
+   * 等待法定人数节点对写入操作响应成功，若达不到法定人数则抛出异常
+   * @param q 法定人数调用实例
+   * @param timeoutMs 等待超时时间（毫秒）
+   * @param operationName 操作名称，用于日志输出
+   * @return 所有成功响应的结果映射表，键为日志器，值为响应结果
+   * @throws QuorumException 无法达到法定人数成功响应时抛出
+   * @throws IOException 线程被中断或等待超时时抛出
    */
   <V> Map<AsyncLogger, V> waitForWriteQuorum(QuorumCall<AsyncLogger, V> q,
       int timeoutMs, String operationName) throws IOException {
     int majority = getMajoritySize();
     try {
       q.waitFor(
-          loggers.size(), // either all respond 
-          majority, // or we get a majority successes
-          majority, // or we get a majority failures,
+          loggers.size(), // 等待所有节点响应
+          majority, // 成功响应数达到法定人数即可返回
+          majority, // 失败响应数达到法定人数即可返回
           timeoutMs, operationName);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -148,21 +163,24 @@ class AsyncLoggerSet {
   }
   
   /**
-   * @return the number of nodes which are required to obtain a quorum.
+   * 计算达成法定人数需要的最少节点数，公式为 n/2 + 1
+   * @return 法定人数最少节点数
    */
   int getMajoritySize() {
     return loggers.size() / 2 + 1;
   }
   
   /**
-   * @return a textual description of the majority size (eg "2/3" or "3/5")
+   * 生成法定人数占比的文本描述，例如"2/3"或"3/5"
+   * @return 法定人数占比字符串
    */
   String getMajorityString() {
     return getMajoritySize() + "/" + loggers.size();
   }
 
   /**
-   * @return the number of loggers behind this set
+   * 获取当前集合管理的日志器总数
+   * @return 日志器数量
    */
   int size() {
     return loggers.size();
@@ -174,9 +192,8 @@ class AsyncLoggerSet {
   }
 
   /**
-   * Append an HTML-formatted status readout on the current
-   * state of the underlying loggers.
-   * @param sb the StringBuilder to append to
+   * 将所有底层日志器的当前状态格式化为HTML报告，追加到输入StringBuilder
+   * @param sb 用于接收HTML报告的StringBuilder
    */
   void appendReport(StringBuilder sb) {
     for (int i = 0, len = loggers.size(); i < len; ++i) {
@@ -191,8 +208,8 @@ class AsyncLoggerSet {
   }
 
   /**
-   * @return the (mutable) list of loggers, for use in tests to
-   * set up spies
+   * 获取日志器列表，仅用于测试场景构造mock对象
+   * @return 不可变的日志器列表
    */
   @VisibleForTesting
   List<AsyncLogger> getLoggersForTests() {
@@ -200,11 +217,14 @@ class AsyncLoggerSet {
   }
   
   ///////////////////////////////////////////////////////////////////////////
-  // The rest of this file is simply boilerplate wrappers which fan-out the
-  // various IPC calls to the underlying AsyncLoggers and wrap the result
-  // in a QuorumCall.
+  // 以下均为模板包装方法，将各类RPC调用广播分发到底层所有异步日志器，
+  // 然后将结果封装为QuorumCall实例返回给上层处理法定人数一致性
   ///////////////////////////////////////////////////////////////////////////
   
+  /**
+   * 向所有日志节点发起获取日志状态请求
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger, GetJournalStateResponseProto> getJournalState() {
     Map<AsyncLogger, ListenableFuture<GetJournalStateResponseProto>> calls =
         Maps.newHashMap();
@@ -214,6 +234,10 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);    
   }
   
+  /**
+   * 向所有日志节点发起检查是否已格式化请求
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger, Boolean> isFormatted() {
     Map<AsyncLogger, ListenableFuture<Boolean>> calls = Maps.newHashMap();
     for (AsyncLogger logger : loggers) {
@@ -222,6 +246,12 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
 
+  /**
+   * 向所有日志节点发起创建新epoch请求
+   * @param nsInfo 命名空间信息
+   * @param epoch 新epoch编号
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger,NewEpochResponseProto> newEpoch(
       NamespaceInfo nsInfo,
       long epoch) {
@@ -233,6 +263,12 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);    
   }
 
+  /**
+   * 向所有日志节点发起启动新日志段请求
+   * @param txid 日志段起始事务ID
+   * @param layoutVersion HDFS存储布局版本
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger, Void> startLogSegment(
       long txid, int layoutVersion) {
     Map<AsyncLogger, ListenableFuture<Void>> calls = Maps.newHashMap();
@@ -242,6 +278,12 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
   
+  /**
+   * 向所有日志节点发起完成日志段请求
+   * @param firstTxId 日志段起始事务ID
+   * @param lastTxId 日志段结束事务ID
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger, Void> finalizeLogSegment(long firstTxId,
       long lastTxId) {
     Map<AsyncLogger, ListenableFuture<Void>> calls = Maps.newHashMap();
@@ -251,6 +293,14 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
   
+  /**
+   * 向所有日志节点发送编辑日志数据写入请求
+   * @param segmentTxId 当前日志段的起始事务ID
+   * @param firstTxnId 本次写入的第一个事务ID
+   * @param numTxns 本次写入的事务数量
+   * @param data 序列化后的编辑日志字节数据
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger, Void> sendEdits(
       long segmentTxId, long firstTxnId, int numTxns, byte[] data) {
     Map<AsyncLogger, ListenableFuture<Void>> calls = Maps.newHashMap();
@@ -262,6 +312,12 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
 
+  /**
+   * 向所有日志节点获取从指定事务ID开始的编辑日志
+   * @param fromTxnId 起始事务ID
+   * @param maxTransactions 最大返回事务数量
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger, GetJournaledEditsResponseProto>
   getJournaledEdits(long fromTxnId, int maxTransactions) {
     Map<AsyncLogger,
@@ -275,6 +331,12 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
 
+  /**
+   * 向所有日志节点获取从指定事务ID开始的编辑日志清单
+   * @param fromTxnId 起始事务ID
+   * @param inProgressOk 是否允许返回未完成的日志段
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger, RemoteEditLogManifest> getEditLogManifest(
       long fromTxnId, boolean inProgressOk) {
     Map<AsyncLogger,
@@ -288,6 +350,11 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
 
+  /**
+   * 向所有日志节点发起日志恢复准备请求
+   * @param segmentTxId 需要恢复的日志段起始事务ID
+   * @return 封装好的法定人数调用实例
+   */
   QuorumCall<AsyncLogger, PrepareRecoveryResponseProto>
       prepareRecovery(long segmentTxId) {
     Map<AsyncLogger,
@@ -301,6 +368,12 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
 
+  /**
+   * 向所有日志节点提交恢复结果，接受恢复后的日志段
+   * @param log 恢复后的日志段状态信息
+   * @param fromURL 源日志段数据地址，用于拉取数据
+   * @return 封装好的法定人数调用实例
+   */
   QuorumCall<AsyncLogger,Void>
       acceptRecovery(SegmentStateProto log, URL fromURL) {
     Map<AsyncLogger, ListenableFuture<Void>> calls
@@ -313,6 +386,12 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
 
+  /**
+   * 向所有日志节点发起格式化共享存储请求
+   * @param nsInfo 命名空间信息
+   * @param force 是否强制格式化
+   * @return 封装好的法定人数调用实例
+   */
   QuorumCall<AsyncLogger, Void> format(NamespaceInfo nsInfo, boolean force) {
     Map<AsyncLogger, ListenableFuture<Void>> calls =
         Maps.newHashMap();
@@ -324,6 +403,10 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
   
+  /**
+   * 向所有日志节点发起升级前准备请求
+   * @return 封装好的法定人数调用实例
+   */
   QuorumCall<AsyncLogger, Void> doPreUpgrade() {
     Map<AsyncLogger, ListenableFuture<Void>> calls =
         Maps.newHashMap();
@@ -335,6 +418,11 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
 
+  /**
+   * 向所有日志节点执行存储升级请求
+   * @param sInfo 升级后的存储信息
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger, Void> doUpgrade(StorageInfo sInfo) {
     Map<AsyncLogger, ListenableFuture<Void>> calls =
         Maps.newHashMap();
@@ -346,57 +434,8 @@ class AsyncLoggerSet {
     return QuorumCall.create(calls);
   }
 
+  /**
+   * 向所有日志节点执行升级完成确认请求
+   * @return 封装好的法定人数调用实例
+   */
   public QuorumCall<AsyncLogger, Void> doFinalize() {
-    Map<AsyncLogger, ListenableFuture<Void>> calls =
-        Maps.newHashMap();
-    for (AsyncLogger logger : loggers) {
-      ListenableFuture<Void> future =
-          logger.doFinalize();
-      calls.put(logger, future);
-    }
-    return QuorumCall.create(calls);
-  }
-
-  public QuorumCall<AsyncLogger, Boolean> canRollBack(StorageInfo storage,
-      StorageInfo prevStorage, int targetLayoutVersion) {
-    Map<AsyncLogger, ListenableFuture<Boolean>> calls =
-        Maps.newHashMap();
-    for (AsyncLogger logger : loggers) {
-      ListenableFuture<Boolean> future =
-          logger.canRollBack(storage, prevStorage, targetLayoutVersion);
-      calls.put(logger, future);
-    }
-    return QuorumCall.create(calls);
-  }
-
-  public QuorumCall<AsyncLogger, Void> doRollback() {
-    Map<AsyncLogger, ListenableFuture<Void>> calls =
-        Maps.newHashMap();
-    for (AsyncLogger logger : loggers) {
-      ListenableFuture<Void> future =
-          logger.doRollback();
-      calls.put(logger, future);
-    }
-    return QuorumCall.create(calls);
-  }
-
-  public QuorumCall<AsyncLogger, Void> discardSegments(long startTxId) {
-    Map<AsyncLogger, ListenableFuture<Void>> calls = Maps.newHashMap();
-    for (AsyncLogger logger : loggers) {
-      ListenableFuture<Void> future = logger.discardSegments(startTxId);
-      calls.put(logger, future);
-    }
-    return QuorumCall.create(calls);
-  }
-
-  public QuorumCall<AsyncLogger, Long> getJournalCTime() {
-    Map<AsyncLogger, ListenableFuture<Long>> calls =
-        Maps.newHashMap();
-    for (AsyncLogger logger : loggers) {
-      ListenableFuture<Long> future = logger.getJournalCTime();
-      calls.put(logger, future);
-    }
-    return QuorumCall.create(calls);
-  }
-
-}

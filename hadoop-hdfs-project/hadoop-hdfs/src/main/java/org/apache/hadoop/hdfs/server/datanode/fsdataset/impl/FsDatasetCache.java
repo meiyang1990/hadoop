@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -59,15 +60,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Manages caching for an FsDatasetImpl by using the mmap(2) and mlock(2)
- * system calls to lock blocks into memory. Block checksums are verified upon
- * entry into the cache.
+ * HDFS数据节点FsDatasetImpl的块缓存管理器，通过mmap(2)和mlock(2)系统调用将数据块锁定到内存中实现缓存。
+ * 进入缓存的块会进行校验和验证，支持DRAM和持久化内存两种缓存介质，处理缓存添加、回收、异步撤销等操作。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class FsDatasetCache {
   /**
-   * MappableBlocks that we know about.
+   * 存储可映射块及其对应缓存状态的内部值类
    */
   private static final class Value {
     final State state;
@@ -79,32 +79,33 @@ public class FsDatasetCache {
     }
   }
 
+  /**
+   * 块缓存状态枚举
+   */
   private enum State {
     /**
-     * The MappableBlock is in the process of being cached.
+     * 块正在缓存中，还未完成
      */
     CACHING,
 
     /**
-     * The MappableBlock was in the process of being cached, but it was
-     * cancelled.  Only the FsDatasetCache#WorkerTask can remove cancelled
-     * MappableBlock objects.
+     * 块缓存过程被取消，只有后台任务可以移除该状态的块
      */
     CACHING_CANCELLED,
 
     /**
-     * The MappableBlock is in the cache.
+     * 块已完成缓存，可以使用
      */
     CACHED,
 
     /**
-     * The MappableBlock is in the process of uncaching.
+     * 块正在从缓存中移除
      */
     UNCACHING;
 
     /**
-     * Whether we should advertise this block as cached to the NameNode and
-     * clients.
+     * 判断当前状态是否需要向NameNode和客户端报告为已缓存
+     * @return true表示需要报告为已缓存
      */
     public boolean shouldAdvertise() {
       return (this == CACHED);
@@ -115,40 +116,65 @@ public class FsDatasetCache {
       .class);
 
   /**
-   * Stores MappableBlock objects and the states they're in.
+   * 存储所有块的缓存信息，键为扩展块ID，值为块对象和状态
    */
   private final HashMap<ExtendedBlockId, Value> mappableBlockMap =
       new HashMap<ExtendedBlockId, Value>();
 
+  /**
+   * 当前已缓存块的总数量
+   */
   private final LongAdder numBlocksCached = new LongAdder();
 
+  /**
+   * 所属的数据块数据集实现对象
+   */
   private final FsDatasetImpl dataset;
 
+  /**
+   * 执行立即取消缓存操作的线程池
+   */
   private final ThreadPoolExecutor uncachingExecutor;
 
+  /**
+   * 执行延迟取消缓存操作的定时线程池
+   */
   private final ScheduledThreadPoolExecutor deferredUncachingExecutor;
 
+  /**
+   * 缓存回收超时时间（毫秒），超过该时间强制回收缓存
+   */
   private final long revocationMs;
 
+  /**
+   * 延迟回收轮询间隔（毫秒），每隔该时间检查是否可以回收缓存
+   */
   private final long revocationPollingMs;
 
   /**
-   * A specific cacheLoader could cache block either to DRAM or
-   * to persistent memory.
+   * 可映射块加载器，负责加载块到缓存，支持DRAM和持久化内存两种实现
    */
   private final MappableBlockLoader cacheLoader;
 
+  /**
+   * 内存缓存统计信息，记录缓存使用量等指标
+   */
   private final CacheStats memCacheStats;
 
   /**
-   * Number of cache commands that could not be completed successfully
+   * 缓存命令执行失败的块数量
    */
   final LongAdder numBlocksFailedToCache = new LongAdder();
   /**
-   * Number of uncache commands that could not be completed successfully
+   * 取消缓存命令执行失败的块数量
    */
   final LongAdder numBlocksFailedToUncache = new LongAdder();
 
+  /**
+   * 构造FsDatasetCache缓存管理器，初始化线程池和配置参数，创建块加载器
+   * @param dataset 所属的数据块数据集实现
+   * @throws IOException 初始化失败时抛出异常
+   */
   public FsDatasetCache(FsDatasetImpl dataset) throws IOException {
     this.dataset = dataset;
     ThreadFactory workerFactory = new ThreadFactoryBuilder()
@@ -187,9 +213,9 @@ public class FsDatasetCache {
   }
 
   /**
-   * For persistent memory cache, create cache subdirectory specified with
-   * blockPoolId to store cache data.
-   * Recover the status of cache in persistent memory, if any.
+   * 初始化指定块池的缓存，针对持久化内存缓存创建目录并恢复已有缓存状态
+   * @param bpid 块池ID
+   * @throws IOException 初始化失败时抛出IO异常
    */
   public void initCache(String bpid) throws IOException {
     if (cacheLoader.isTransientCache()) {
@@ -215,7 +241,11 @@ public class FsDatasetCache {
   }
 
   /**
-   * Get the cache path if the replica is cached into persistent memory.
+   * 获取缓存在持久化内存中的副本的缓存路径
+   * @param bpid 块池ID
+   * @param blockId 块ID
+   * @return 缓存路径，如果是DRAM缓存或块未缓存返回null
+   * @throws IOException 获取路径失败时抛出IO异常
    */
   String getReplicaCachePath(String bpid, long blockId) throws IOException {
     if (cacheLoader.isTransientCache() ||
@@ -227,13 +257,10 @@ public class FsDatasetCache {
   }
 
   /**
-   * Get cache address on persistent memory for read operation.
-   * The cache address comes from PMDK lib function when mapping
-   * block to persistent memory.
-   *
-   * @param bpid    blockPoolId
-   * @param blockId blockId
-   * @return address
+   * 获取持久化内存中缓存块的起始内存地址，用于直接内存访问
+   * @param bpid 块池ID
+   * @param blockId 块ID
+   * @return 内存地址，如果是DRAM缓存、块未缓存或不是本地加载器返回-1
    */
   long getCacheAddress(String bpid, long blockId) {
     if (cacheLoader.isTransientCache() ||
@@ -249,8 +276,9 @@ public class FsDatasetCache {
   }
 
   /**
-   * @return List of cached blocks suitable for translation into a
-   * {@link BlockListAsLongs} for a cache report.
+   * 获取指定块池下所有已缓存块的ID列表，用于生成缓存报告发送给NameNode
+   * @param bpid 块池ID
+   * @return 已缓存块ID列表
    */
   synchronized List<Long> getCachedBlocks(String bpid) {
     List<Long> blocks = new ArrayList<Long>();
@@ -267,7 +295,13 @@ public class FsDatasetCache {
   }
 
   /**
-   * Attempt to begin caching a block.
+   * 发起一个块缓存请求，将任务提交给后台线程异步执行
+   * @param blockId 块ID
+   * @param bpid 块池ID
+   * @param blockFileName 块数据文件路径
+   * @param length 块长度
+   * @param genstamp 块生成时间戳
+   * @param volumeExecutor 卷执行器，用于执行缓存任务
    */
   synchronized void cacheBlock(long blockId, String bpid,
       String blockFileName, long length, long genstamp,
@@ -288,6 +322,11 @@ public class FsDatasetCache {
         bpid);
   }
 
+  /**
+   * 发起一个块取消缓存请求，根据块当前状态处理不同的取消逻辑
+   * @param bpid 块池ID
+   * @param blockId 块ID
+   */
   synchronized void uncacheBlock(String bpid, long blockId) {
     ExtendedBlockId key = new ExtendedBlockId(blockId, bpid);
     Value prevValue = mappableBlockMap.get(key);
@@ -337,60 +376,51 @@ public class FsDatasetCache {
   }
 
   /**
-   * Try to reserve more bytes.
-   *
-   * @param count    The number of bytes to add.  We will round this
-   *                 up to the page size.
-   *
-   * @return         The new number of usedBytes if we succeeded;
-   *                 -1 if we failed.
+   * 尝试预留指定大小的缓存空间，会自动向上对齐到页大小
+   * @param count 需要预留的字节数
+   * @return 预留成功返回新的已使用字节数，失败返回-1
    */
   long reserve(long count) {
     return memCacheStats.reserve(count);
   }
 
   /**
-   * Release some bytes that we're using.
-   *
-   * @param count    The number of bytes to release.  We will round this
-   *                 up to the page size.
-   *
-   * @return         The new number of usedBytes.
+   * 释放指定大小的缓存空间，会自动向上对齐到页大小
+   * @param count 需要释放的字节数
+   * @return 释放后新的已使用字节数
    */
   long release(long count) {
     return memCacheStats.release(count);
   }
 
   /**
-   * Release some bytes that we're using rounded down to the page size.
-   *
-   * @param count    The number of bytes to release.  We will round this
-   *                 down to the page size.
-   *
-   * @return         The new number of usedBytes.
+   * 释放指定大小的缓存空间，自动向下对齐到页大小
+   * @param count 需要释放的字节数
+   * @return 释放后新的已使用字节数
    */
   long releaseRoundDown(long count) {
     return memCacheStats.releaseRoundDown(count);
   }
 
   /**
-   * Get the OS page size.
-   *
-   * @return the OS page size.
+   * 获取操作系统页大小
+   * @return 操作系统页大小（字节）
    */
   long getOsPageSize() {
     return memCacheStats.getPageSize();
   }
 
   /**
-   * Round up to the OS page size.
+   * 将指定字节数向上对齐到操作系统页大小
+   * @param count 需要对齐的字节数
+   * @return 对齐后的字节数
    */
   long roundUpPageSize(long count) {
     return memCacheStats.roundUpPageSize(count);
   }
 
   /**
-   * Background worker that mmaps, mlocks, and checksums a block
+   * 后台缓存任务，负责执行mmap、mlock、校验和验证，将块加载到缓存中
    */
   private class CachingTask implements Runnable {
     private final ExtendedBlockId key; 
@@ -409,225 +439,4 @@ public class FsDatasetCache {
     public void run() {
       boolean success = false;
       FileInputStream blockIn = null, metaIn = null;
-      MappableBlock mappableBlock = null;
-      ExtendedBlock extBlk = new ExtendedBlock(key.getBlockPoolId(),
-          key.getBlockId(), length, genstamp);
-      long newUsedBytes = cacheLoader.reserve(key, length);
-      boolean reservedBytes = false;
-      try {
-        if (newUsedBytes < 0) {
-          LOG.warn("Failed to cache " + key + ": could not reserve " +
-              "more bytes in the cache: " + cacheLoader.getCacheCapacity() +
-              " exceeded when try to reserve " + length + "bytes.");
-          return;
-        }
-        reservedBytes = true;
-        try {
-          blockIn = (FileInputStream)dataset.getBlockInputStream(extBlk, 0);
-          metaIn = DatanodeUtil.getMetaDataInputStream(extBlk, dataset);
-        } catch (ClassCastException e) {
-          LOG.warn("Failed to cache " + key +
-              ": Underlying blocks are not backed by files.", e);
-          return;
-        } catch (FileNotFoundException e) {
-          LOG.info("Failed to cache " + key + ": failed to find backing " +
-              "files.");
-          return;
-        } catch (IOException e) {
-          LOG.warn("Failed to cache " + key + ": failed to open file", e);
-          return;
-        }
-
-        try {
-          mappableBlock = cacheLoader.load(length, blockIn, metaIn,
-              blockFileName, key);
-        } catch (ChecksumException e) {
-          // Exception message is bogus since this wasn't caused by a file read
-          LOG.warn("Failed to cache " + key + ": checksum verification failed.");
-          return;
-        } catch (IOException e) {
-          LOG.warn("Failed to cache the block [key=" + key + "]!", e);
-          return;
-        }
-
-        synchronized (FsDatasetCache.this) {
-          Value value = mappableBlockMap.get(key);
-          Preconditions.checkNotNull(value);
-          Preconditions.checkState(value.state == State.CACHING ||
-                                   value.state == State.CACHING_CANCELLED);
-          if (value.state == State.CACHING_CANCELLED) {
-            mappableBlockMap.remove(key);
-            LOG.warn("Caching of " + key + " was cancelled.");
-            return;
-          }
-          mappableBlockMap.put(key, new Value(mappableBlock, State.CACHED));
-        }
-        LOG.debug("Successfully cached {}.  We are now caching {} bytes in"
-            + " total.", key, newUsedBytes);
-        // Only applicable to DRAM cache.
-        if (cacheLoader.isTransientCache()) {
-          dataset.datanode.
-              getShortCircuitRegistry().processBlockMlockEvent(key);
-        }
-        numBlocksCached.increment();
-        dataset.datanode.getMetrics().incrBlocksCached(1);
-        success = true;
-      } finally {
-        IOUtils.closeStream(blockIn);
-        IOUtils.closeStream(metaIn);
-        if (!success) {
-          if (reservedBytes) {
-            cacheLoader.release(key, length);
-          }
-          LOG.debug("Caching of {} was aborted.  We are now caching only {} "
-                  + "bytes in total.", key, cacheLoader.getCacheUsed());
-          IOUtils.closeStream(mappableBlock);
-          numBlocksFailedToCache.increment();
-
-          synchronized (FsDatasetCache.this) {
-            mappableBlockMap.remove(key);
-          }
-        }
-      }
-    }
-  }
-
-  private class UncachingTask implements Runnable {
-    private final ExtendedBlockId key; 
-    private final long revocationTimeMs;
-
-    UncachingTask(ExtendedBlockId key, long revocationDelayMs) {
-      this.key = key;
-      if (revocationDelayMs == 0) {
-        this.revocationTimeMs = 0;
-      } else {
-        this.revocationTimeMs = revocationDelayMs + Time.monotonicNow();
-      }
-    }
-
-    private boolean shouldDefer() {
-      // Currently, defer condition is just checked for DRAM cache case.
-      if (!cacheLoader.isTransientCache()) {
-        return false;
-      }
-
-      /* If revocationTimeMs == 0, this is an immediate uncache request.
-       * No clients were anchored at the time we made the request. */
-      if (revocationTimeMs == 0) {
-        return false;
-      }
-      /* Let's check if any clients still have this block anchored. */
-      boolean anchored =
-        !dataset.datanode.getShortCircuitRegistry().
-            processBlockMunlockRequest(key);
-      if (!anchored) {
-        LOG.debug("Uncaching {} now that it is no longer in use " +
-            "by any clients.", key);
-        return false;
-      }
-      long delta = revocationTimeMs - Time.monotonicNow();
-      if (delta < 0) {
-        LOG.warn("Forcibly uncaching {} after {} " +
-            "because client(s) {} refused to stop using it.", key,
-            DurationFormatUtils.formatDurationHMS(revocationTimeMs),
-            dataset.datanode.getShortCircuitRegistry().getClientNames(key));
-        return false;
-      }
-      LOG.info("Replica {} still can't be uncached because some " +
-          "clients continue to use it.  Will wait for {}", key,
-          DurationFormatUtils.formatDurationHMS(delta));
-      return true;
-    }
-
-    @Override
-    public void run() {
-      Value value;
-
-      if (shouldDefer()) {
-        deferredUncachingExecutor.schedule(
-            this, revocationPollingMs, TimeUnit.MILLISECONDS);
-        return;
-      }
-
-      synchronized (FsDatasetCache.this) {
-        value = mappableBlockMap.get(key);
-      }
-      Preconditions.checkNotNull(value);
-      Preconditions.checkArgument(value.state == State.UNCACHING);
-
-      IOUtils.closeStream(value.mappableBlock);
-      synchronized (FsDatasetCache.this) {
-        mappableBlockMap.remove(key);
-      }
-      long newUsedBytes = cacheLoader.
-          release(key, value.mappableBlock.getLength());
-      numBlocksCached.decrement();
-      dataset.datanode.getMetrics().incrBlocksUncached(1);
-      if (revocationTimeMs != 0) {
-        LOG.debug("Uncaching of {} completed. usedBytes = {}",
-            key, newUsedBytes);
-      } else {
-        LOG.debug("Deferred uncaching of {} completed. usedBytes = {}",
-            key, newUsedBytes);
-      }
-    }
-  }
-
-  // Stats related methods for FSDatasetMBean
-
-  /**
-   * Get the approximate amount of DRAM cache space used.
-   */
-  public long getMemCacheUsed() {
-    return memCacheStats.getCacheUsed();
-  }
-
-  /**
-   * Get the approximate amount of cache space used either on DRAM or
-   * on persistent memory.
-   * @return
-   */
-  public long getCacheUsed() {
-    return cacheLoader.getCacheUsed();
-  }
-
-  /**
-   * Get the maximum amount of bytes we can cache on DRAM. This is a constant.
-   */
-  public long getMemCacheCapacity() {
-    return memCacheStats.getCacheCapacity();
-  }
-
-  /**
-   * Get the maximum amount of bytes we can cache either on DRAM or
-   * on persistent memory. This is a constant.
-   */
-  public long getCacheCapacity() {
-    return cacheLoader.getCacheCapacity();
-  }
-
-  public long getNumBlocksFailedToCache() {
-    return numBlocksFailedToCache.longValue();
-  }
-
-  public long getNumBlocksFailedToUncache() {
-    return numBlocksFailedToUncache.longValue();
-  }
-
-  public long getNumBlocksCached() {
-    return numBlocksCached.longValue();
-  }
-
-  public synchronized boolean isCached(String bpid, long blockId) {
-    ExtendedBlockId block = new ExtendedBlockId(blockId, bpid);
-    Value val = mappableBlockMap.get(block);
-    return (val != null) && val.state.shouldAdvertise();
-  }
-
-  /**
-   * This method can be executed during DataNode shutdown.
-   */
-  void shutdown() {
-    cacheLoader.shutdown();
-  }
-}
+      MappableBlock

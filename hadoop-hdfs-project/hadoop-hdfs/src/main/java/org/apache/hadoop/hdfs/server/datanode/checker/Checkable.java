@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,29 +22,26 @@ package org.apache.hadoop.hdfs.server.datanode.checker;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-
 /**
- * A Checkable is an object whose health can be probed by invoking its
- * {@link #check} method.
- *
- * e.g. a {@link Checkable} instance may represent a single hardware
- * resource.
+ * 可检测对象接口，为DataNode健康检查体系定义可检测对象规范，
+ * 可通过调用check方法检测对象健康状态。
+ * 例如一个可检测对象可以代表一块硬件资源，用于后台周期检查其健康状态。
+ * 
+ * @param <K> 检测上下文参数类型
+ * @param <V> 检测结果类型
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface Checkable<K, V> {
 
   /**
-   * Query the health of this object. This method may hang
-   * indefinitely depending on the status of the target resource.
+   * 执行健康状态检查，本方法可能根据目标资源状态无限阻塞。
    *
-   * @param context for the probe operation. May be null depending
-   *                on the implementation.
+   * @param context 探测操作的上下文，具体实现可允许为null
    *
-   * @return result of the check operation.
+   * @return 检查操作的结果
    *
-   * @throws Exception encountered during the check operation. An
-   *                   exception indicates that the check failed.
+   * @throws Exception 检查过程中发生异常，代表本次检查失败
    */
   V check(K context) throws Exception;
 }

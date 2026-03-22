@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,41 +38,28 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
 
 /**
- * AclStorage contains utility methods that define how ACL data is stored in the
- * namespace.
- *
- * If an inode has an ACL, then the ACL bit is set in the inode's
- * {@link FsPermission} and the inode also contains an {@link AclFeature}.  For
- * the access ACL, the owner and other entries are identical to the owner and
- * other bits stored in FsPermission, so we reuse those.  The access mask entry
- * is stored into the group permission bits of FsPermission.  This is consistent
- * with other file systems' implementations of ACLs and eliminates the need for
- * special handling in various parts of the codebase.  For example, if a user
- * calls chmod to change group permission bits on a file with an ACL, then the
- * expected behavior is to change the ACL's mask entry.  By saving the mask entry
- * into the group permission bits, chmod continues to work correctly without
- * special handling.  All remaining access entries (named users and named groups)
- * are stored as explicit {@link AclEntry} instances in a list inside the
- * AclFeature.  Additionally, all default entries are stored in the AclFeature.
- *
- * The methods in this class encapsulate these rules for reading or writing the
- * ACL entries to the appropriate location.
- *
- * The methods in this class assume that input ACL entry lists have already been
- * validated and sorted according to the rules enforced by
- * {@link AclTransformation}.
+ * 文件系统ACL存储工具类，定义ACL数据在HDFS命名空间中的存储规则与读写方法
+ * 
+ * 如果一个inode开启了ACL，则会在inode的{@link FsPermission}中设置ACL标志位，同时inode包含一个{@link AclFeature}存储扩展ACL信息。
+ * 对于访问ACL，所有者和其他用户条目与FsPermission中存储的权限位一致，因此直接复用。访问掩码条目存储在FsPermission的组权限位中，
+ * 这与其他文件系统的ACL实现一致，避免了代码库中大量特殊处理逻辑。例如当用户对带有ACL的文件执行chmod修改组权限时，
+ * 实际上会修改ACL的掩码条目，通过将掩码存储在组权限位，chmod无需特殊修改即可正确工作。
+ * 其余访问条目（命名用户和命名组）和所有默认ACL条目都存储在AclFeature内部的列表中。
+ * 
+ * 本类封装了从正确位置读写ACL条目的所有规则，输入的ACL条目列表已经过{@link AclTransformation}验证和排序。
  */
 @InterfaceAudience.Private
 public final class AclStorage {
 
+  // 全局唯一ACL特征引用计数缓存，实现相同ACL特征复用，节省内存
   private final static ReferenceCountMap<AclFeature> UNIQUE_ACL_FEATURES =
       new ReferenceCountMap<AclFeature>();
 
   /**
-   * If a default ACL is defined on a parent directory, then copies that default
-   * ACL to a newly created child file or directory.
+   * 如果父目录定义了默认ACL，则将默认ACL复制到新创建的子文件或子目录
    *
-   * @param child INode newly created child
+   * @param child 新创建的子inode
+   * @return boolean 是否成功复制了ACL
    */
   public static boolean copyINodeDefaultAcl(INode child) {
     INodeDirectory parent = child.getParent();
@@ -80,24 +68,24 @@ public final class AclStorage {
       return false;
     }
 
-    // Split parent's entries into access vs. default.
+    // 拆分父ACL的访问条目和默认条目
     List<AclEntry> featureEntries = getEntriesFromAclFeature(parent
         .getAclFeature());
     ScopedAclEntries scopedEntries = new ScopedAclEntries(featureEntries);
     List<AclEntry> parentDefaultEntries = scopedEntries.getDefaultEntries();
 
-    // The parent may have an access ACL but no default ACL.  If so, exit.
+    // 父目录只有访问ACL没有默认ACL，无需复制
     if (parentDefaultEntries.isEmpty()) {
       return false;
     }
 
-    // Pre-allocate list size for access entries to copy from parent.
+    // 预分配访问条目列表容量
     List<AclEntry> accessEntries = Lists.newArrayListWithCapacity(
       parentDefaultEntries.size());
 
     FsPermission childPerm = child.getFsPermission();
 
-    // Copy each default ACL entry from parent to new child's access ACL.
+    // 逐个将父默认ACL条目转换为子节点的访问ACL条目
     boolean parentDefaultIsMinimal = AclUtil.isMinimalAcl(parentDefaultEntries);
     for (AclEntry entry: parentDefaultEntries) {
       AclEntryType type = entry.getType();
@@ -107,18 +95,15 @@ public final class AclStorage {
         .setType(type)
         .setName(name);
 
-      // The child's initial permission bits are treated as the mode parameter,
-      // which can filter copied permission values for owner, mask and other.
+      // 子节点初始权限位作为mode参数，过滤复制过来的owner、mask、other权限
       final FsAction permission;
       if (type == AclEntryType.USER && name == null) {
         permission = entry.getPermission().and(childPerm.getUserAction());
       } else if (type == AclEntryType.GROUP && parentDefaultIsMinimal) {
-        // This only happens if the default ACL is a minimal ACL: exactly 3
-        // entries corresponding to owner, group and other.  In this case,
-        // filter the group permissions.
+        // 默认ACL是最小ACL（仅包含owner、group、other三个条目）时，过滤组权限
         permission = entry.getPermission().and(childPerm.getGroupAction());
       } else if (type == AclEntryType.MASK) {
-        // Group bits from mode parameter filter permission of mask entry.
+        // 使用mode的组权限位过滤掩码权限
         permission = entry.getPermission().and(childPerm.getGroupAction());
       } else if (type == AclEntryType.OTHER) {
         permission = entry.getPermission().and(childPerm.getOtherAction());
@@ -130,17 +115,17 @@ public final class AclStorage {
       accessEntries.add(builder.build());
     }
 
-    // A new directory also receives a copy of the parent's default ACL.
+    // 如果子节点是目录，同时复制父默认ACL作为自身的默认ACL
     List<AclEntry> defaultEntries = child.isDirectory() ? parentDefaultEntries :
       Collections.<AclEntry>emptyList();
 
     final FsPermission newPerm;
     if (!AclUtil.isMinimalAcl(accessEntries) || !defaultEntries.isEmpty()) {
-      // Save the new ACL to the child.
+      // 需要保存扩展ACL到子节点
       child.addAclFeature(createAclFeature(accessEntries, defaultEntries));
       newPerm = createFsPermissionForExtendedAcl(accessEntries, childPerm);
     } else {
-      // The child is receiving a minimal ACL.
+      // 仅需要保存最小ACL
       newPerm = createFsPermissionForMinimalAcl(accessEntries, childPerm);
     }
 
@@ -149,14 +134,11 @@ public final class AclStorage {
   }
 
   /**
-   * Reads the existing extended ACL entries of an inode.  This method returns
-   * only the extended ACL entries stored in the AclFeature.  If the inode does
-   * not have an ACL, then this method returns an empty list.  This method
-   * supports querying by snapshot ID.
+   * 读取inode已有的扩展ACL条目，支持按快照ID读取指定快照的ACL，仅返回存储在AclFeature中的扩展条目
    *
-   * @param inode INode to read
-   * @param snapshotId int ID of snapshot to read
-   * @return {@literal List<AclEntry>} containing extended inode ACL entries
+   * @param inode 目标inode
+   * @param snapshotId 要读取的快照ID
+   * @return {@literal List<AclEntry>} 扩展ACL条目列表，无ACL则返回空列表
    */
   public static List<AclEntry> readINodeAcl(INode inode, int snapshotId) {
     AclFeature f = inode.getAclFeature(snapshotId);
@@ -164,10 +146,10 @@ public final class AclStorage {
   }
 
   /**
-   * Reads the existing extended ACL entries of an INodeAttribute object.
+   * 从INodeAttributes对象读取扩展ACL条目
    *
-   * @param inodeAttr INode to read
-   * @return {@code List<AclEntry>} containing extended inode ACL entries
+   * @param inodeAttr 目标inode属性对象
+   * @return {@code List<AclEntry>} 扩展ACL条目列表，无ACL则返回空列表
    */
   public static List<AclEntry> readINodeAcl(INodeAttributes inodeAttr) {
     AclFeature f = inodeAttr.getAclFeature();
@@ -175,9 +157,9 @@ public final class AclStorage {
   }
 
   /**
-   * Build list of AclEntries from the {@link AclFeature}
-   * @param aclFeature AclFeature
-   * @return List of entries
+   * 从{@link AclFeature}构建完整AclEntry列表
+   * @param aclFeature 目标AclFeature对象
+   * @return 完整AclEntry列表
    */
   @VisibleForTesting
   static ImmutableList<AclEntry> getEntriesFromAclFeature(AclFeature aclFeature) {
@@ -185,6 +167,7 @@ public final class AclStorage {
       return ImmutableList.<AclEntry> of();
     }
     ImmutableList.Builder<AclEntry> b = new ImmutableList.Builder<AclEntry>();
+    // 遍历存储的整数编码条目，转换为AclEntry对象
     for (int pos = 0, entry; pos < aclFeature.getEntriesSize(); pos++) {
       entry = aclFeature.getEntryAt(pos);
       b.add(AclEntryStatusFormat.toAclEntry(entry));
@@ -193,18 +176,12 @@ public final class AclStorage {
   }
 
   /**
-   * Reads the existing ACL of an inode.  This method always returns the full
-   * logical ACL of the inode after reading relevant data from the inode's
-   * {@link FsPermission} and {@link AclFeature}.  Note that every inode
-   * logically has an ACL, even if no ACL has been set explicitly.  If the inode
-   * does not have an extended ACL, then the result is a minimal ACL consising of
-   * exactly 3 entries that correspond to the owner, group and other permissions.
-   * This method always reads the inode's current state and does not support
-   * querying by snapshot ID.  This is because the method is intended to support
-   * ACL modification APIs, which always apply a delta on top of current state.
+   * 读取inode的完整逻辑ACL，合并FsPermission中的隐式条目和AclFeature中的扩展条目，返回完整ACL
+   * 每个inode逻辑上都存在ACL，未显式设置的也会返回包含owner、group、other三个条目的最小ACL。
+   * 本方法仅读取inode当前状态，不支持按快照ID读取，主要用于ACL修改API场景。
    *
-   * @param inode INode to read
-   * @return {@code List<AclEntry>} containing all logical inode ACL entries
+   * @param inode 目标inode
+   * @return {@code List<AclEntry>} 完整逻辑ACL条目列表
    */
   public static List<AclEntry> readINodeLogicalAcl(INode inode) {
     FsPermission perm = inode.getFsPermission();
@@ -214,58 +191,53 @@ public final class AclStorage {
     }
 
     final List<AclEntry> existingAcl;
-    // Split ACL entries stored in the feature into access vs. default.
+    // 拆分AclFeature中的访问条目和默认条目
     List<AclEntry> featureEntries = getEntriesFromAclFeature(f);
     ScopedAclEntries scoped = new ScopedAclEntries(featureEntries);
     List<AclEntry> accessEntries = scoped.getAccessEntries();
     List<AclEntry> defaultEntries = scoped.getDefaultEntries();
 
-    // Pre-allocate list size for the explicit entries stored in the feature
-    // plus the 3 implicit entries (owner, group and other) from the permission
-    // bits.
+    // 预分配容量：特征中的条目 + 3个隐式条目（owner、group、other）
     existingAcl = Lists.newArrayListWithCapacity(featureEntries.size() + 3);
 
     if (!accessEntries.isEmpty()) {
-      // Add owner entry implied from user permission bits.
+      // 从用户权限位添加隐式owner条目
       existingAcl.add(new AclEntry.Builder().setScope(AclEntryScope.ACCESS)
           .setType(AclEntryType.USER).setPermission(perm.getUserAction())
           .build());
 
-      // Next add all named user and group entries taken from the feature.
+      // 添加特征中存储的所有命名用户和组条目
       existingAcl.addAll(accessEntries);
 
-      // Add mask entry implied from group permission bits.
+      // 从组权限位添加隐式mask条目
       existingAcl.add(new AclEntry.Builder().setScope(AclEntryScope.ACCESS)
           .setType(AclEntryType.MASK).setPermission(perm.getGroupAction())
           .build());
 
-      // Add other entry implied from other permission bits.
+      // 从其他权限位添加隐式other条目
       existingAcl.add(new AclEntry.Builder().setScope(AclEntryScope.ACCESS)
           .setType(AclEntryType.OTHER).setPermission(perm.getOtherAction())
           .build());
     } else {
-      // It's possible that there is a default ACL but no access ACL. In this
-      // case, add the minimal access ACL implied by the permission bits.
+      // 仅有默认ACL无访问ACL，添加权限位生成的最小访问ACL
       existingAcl.addAll(AclUtil.getMinimalAcl(perm));
     }
 
-    // Add all default entries after the access entries.
+    // 在访问条目之后添加所有默认条目
     existingAcl.addAll(defaultEntries);
 
-    // The above adds entries in the correct order, so no need to sort here.
+    // 添加过程已经保证顺序，无需重新排序
     return existingAcl;
   }
 
   /**
-   * Updates an inode with a new ACL.  This method takes a full logical ACL and
-   * stores the entries to the inode's {@link FsPermission} and
-   * {@link AclFeature}.
+   * 更新inode的ACL，将完整逻辑ACL条目存储到inode的{@link FsPermission}和{@link AclFeature}
    *
-   * @param inode INode to update
-   * @param newAcl {@code List<AclEntry>} containing new ACL entries
-   * @param snapshotId int latest snapshot ID of inode
-   * @throws AclException if the ACL is invalid for the given inode
-   * @throws QuotaExceededException if quota limit is exceeded
+   * @param inode 要更新的inode
+   * @param newAcl 新的完整ACL条目列表
+   * @param snapshotId inode最新快照ID
+   * @throws AclException 如果ACL对当前inode无效
+   * @throws QuotaExceededException 如果超出配额限制
    */
   public static void updateINodeAcl(INode inode, List<AclEntry> newAcl,
       int snapshotId) throws AclException, QuotaExceededException {
@@ -273,19 +245,19 @@ public final class AclStorage {
     FsPermission perm = inode.getFsPermission();
     final FsPermission newPerm;
     if (!AclUtil.isMinimalAcl(newAcl)) {
-      // This is an extended ACL.  Split entries into access vs. default.
+      // 处理扩展ACL，拆分访问和默认条目
       ScopedAclEntries scoped = new ScopedAclEntries(newAcl);
       List<AclEntry> accessEntries = scoped.getAccessEntries();
       List<AclEntry> defaultEntries = scoped.getDefaultEntries();
 
-      // Only directories may have a default ACL.
+      // 仅目录可以拥有默认ACL
       if (!defaultEntries.isEmpty() && !inode.isDirectory()) {
         throw new AclException(
           "Invalid ACL: only directories may have a default ACL. "
             + "Path: " + inode.getFullPathName());
       }
 
-      // Attach entries to the feature.
+      // 移除旧ACL特征，添加新ACL特征
       if (inode.getAclFeature() != null) {
         inode.removeAclFeature(snapshotId);
       }
@@ -293,7 +265,7 @@ public final class AclStorage {
         snapshotId);
       newPerm = createFsPermissionForExtendedAcl(accessEntries, perm);
     } else {
-      // This is a minimal ACL.  Remove the ACL feature if it previously had one.
+      // 处理最小ACL，移除已有的ACL特征
       if (inode.getAclFeature() != null) {
         inode.removeAclFeature(snapshotId);
       }
@@ -304,52 +276,42 @@ public final class AclStorage {
   }
 
   /**
-   * There is no reason to instantiate this class.
+   * 工具类禁止实例化
    */
   private AclStorage() {
   }
 
   /**
-   * Creates an AclFeature from the given ACL entries.
+   * 根据访问ACL和默认ACL条目创建AclFeature对象
    *
-   * @param accessEntries {@code List<AclEntry>} access ACL entries
-   * @param defaultEntries {@code List<AclEntry>} default ACL entries
-   * @return AclFeature containing the required ACL entries
+   * @param accessEntries 访问ACL条目列表
+   * @param defaultEntries 默认ACL条目列表
+   * @return 创建好的AclFeature对象
    */
   private static AclFeature createAclFeature(List<AclEntry> accessEntries,
       List<AclEntry> defaultEntries) {
-    // Pre-allocate list size for the explicit entries stored in the feature,
-    // which is all entries minus the 3 entries implicitly stored in the
-    // permission bits.
+    // 预分配容量：所有条目减去存储在权限位的3个隐式条目，加上所有默认条目
     List<AclEntry> featureEntries = Lists.newArrayListWithCapacity(
       (accessEntries.size() - 3) + defaultEntries.size());
 
-    // For the access ACL, the feature only needs to hold the named user and
-    // group entries.  For a correctly sorted ACL, these will be in a
-    // predictable range.
+    // 访问ACL仅需要存储命名用户和命名组条目，这些条目在已排序ACL中位于固定区间
     if (!AclUtil.isMinimalAcl(accessEntries)) {
       featureEntries.addAll(
         accessEntries.subList(1, accessEntries.size() - 2));
     }
 
-    // Add all default entries to the feature.
+    // 添加所有默认条目到特征
     featureEntries.addAll(defaultEntries);
     return new AclFeature(AclEntryStatusFormat.toInt(featureEntries));
   }
 
   /**
-   * Creates the new FsPermission for an inode that is receiving an extended
-   * ACL, based on its access ACL entries.  For a correctly sorted ACL, the
-   * first entry is the owner and the last 2 entries are the mask and other
-   * entries respectively.  Also preserve sticky bit and toggle ACL bit on.
-   * Note that this method intentionally copies the permissions of the mask
-   * entry into the FsPermission group permissions.  This is consistent with the
-   * POSIX ACLs model, which presents the mask as the permissions of the group
-   * class.
+   * 为扩展ACL创建新的FsPermission，将掩码权限存入组权限位，保留粘滞位，开启ACL标志位
+   * 符合POSIX ACL模型，掩码以组权限形式对外呈现，保持chmod等命令兼容性
    *
-   * @param accessEntries {@code List<AclEntry>} access ACL entries
-   * @param existingPerm FsPermission existing permissions
-   * @return FsPermission new permissions
+   * @param accessEntries 访问ACL条目列表
+   * @param existingPerm 原有权限对象
+   * @return 新的权限对象
    */
   private static FsPermission createFsPermissionForExtendedAcl(
       List<AclEntry> accessEntries, FsPermission existingPerm) {
@@ -360,14 +322,11 @@ public final class AclStorage {
   }
 
   /**
-   * Creates the new FsPermission for an inode that is receiving a minimal ACL,
-   * based on its access ACL entries.  For a correctly sorted ACL, the owner,
-   * group and other permissions are in order.  Also preserve sticky bit and
-   * toggle ACL bit off.
+   * 为最小ACL创建新的FsPermission，直接使用ACL中三个条目的权限，保留粘滞位，关闭ACL标志位
    *
-   * @param accessEntries {@code List<AclEntry>} access ACL entries
-   * @param existingPerm FsPermission existing permissions
-   * @return FsPermission new permissions
+   * @param accessEntries 访问ACL条目列表
+   * @param existingPerm 原有权限对象
+   * @return 新的权限对象
    */
   private static FsPermission createFsPermissionForMinimalAcl(
       List<AclEntry> accessEntries, FsPermission existingPerm) {
@@ -383,19 +342,19 @@ public final class AclStorage {
   }
 
   /**
-   * Add reference for the said AclFeature
+   * 添加AclFeature引用，复用全局缓存中已有的相同ACL特征
    * 
-   * @param aclFeature
-   * @return Referenced AclFeature
+   * @param aclFeature 要添加引用的AclFeature
+   * @return 缓存中复用的AclFeature
    */
   public static AclFeature addAclFeature(AclFeature aclFeature) {
     return UNIQUE_ACL_FEATURES.put(aclFeature);
   }
 
   /**
-   * Remove reference to the AclFeature
+   * 移除AclFeature引用，引用计数为0时自动回收
    * 
-   * @param aclFeature
+   * @param aclFeature 要移除引用的AclFeature
    */
   public static void removeAclFeature(AclFeature aclFeature) {
     UNIQUE_ACL_FEATURES.remove(aclFeature);

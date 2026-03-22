@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,67 +35,59 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * This manages satisfy storage policy invoked path ids and expose methods to
- * process these path ids. It maintains sps mode(EXTERNAL/NONE)
- * configured by the administrator.
- *
- * <p>
- * If the configured mode is {@link StoragePolicySatisfierMode#EXTERNAL}, then
- * it won't do anything, just maintains the sps invoked path ids. Administrator
- * requires to start external sps service explicitly, to fetch the sps invoked
- * path ids from namenode, then do necessary computations and block movement in
- * order to satisfy the storage policy. Please refer
- * {@link ExternalStoragePolicySatisfier} class to understand more about the
- * external sps service functionality.
- *
- * <p>
- * If the configured mode is {@link StoragePolicySatisfierMode#NONE}, then it
- * will disable the sps feature completely by clearing all queued up sps path's
- * hint.
- *
- * This class is instantiated by the BlockManager.
+ * 文件级注释：存储策略满足管理器，负责管理等待满足存储策略的目录路径，根据配置的模式（内置/外置/禁用）处理路径移动任务
+ * 本类由BlockManager实例化，核心职责是维护待处理路径队列，根据管理员配置的SPS模式执行对应逻辑：
+ * <ul>
+ * <li>EXTERNAL模式：仅维护待处理路径队列，不执行实际块移动，由外部独立的SPS服务主动拉取路径并处理</li>
+ * <li>NONE模式：完全禁用SPS功能，清空所有待处理路径</li>
+ * </ul>
  */
 public class StoragePolicySatisfyManager {
   private static final Logger LOG = LoggerFactory
       .getLogger(StoragePolicySatisfyManager.class);
+  // 内置SPS服务实例
   private final StoragePolicySatisfier spsService;
+  // 存储策略功能是否全局启用
   private final boolean storagePolicyEnabled;
+  // 当前SPS运行模式，支持动态修改
   private volatile StoragePolicySatisfierMode mode;
+  // 待遍历处理的路径ID队列，存储需要满足存储策略的目录ID
   private final Queue<Long> pathsToBeTraversed;
+  // 队列中允许的最大待处理路径数量
   private final int outstandingPathsLimit;
+  // NameSystem引用，用于操作路径扩展属性
   private final Namesystem namesystem;
 
+  /**
+   * 构造方法，初始化存储策略满足管理器，加载配置参数创建SPS服务实例
+   * @param conf Hadoop配置对象
+   * @param namesystem NameSystem实例
+   */
   public StoragePolicySatisfyManager(Configuration conf,
       Namesystem namesystem) {
-    // StoragePolicySatisfier(SPS) configs
+    // 读取存储策略全局启用配置
     storagePolicyEnabled = conf.getBoolean(
         DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_KEY,
         DFSConfigKeys.DFS_STORAGE_POLICY_ENABLED_DEFAULT);
+    // 读取SPS运行模式配置
     String modeVal = conf.get(
         DFSConfigKeys.DFS_STORAGE_POLICY_SATISFIER_MODE_KEY,
         DFSConfigKeys.DFS_STORAGE_POLICY_SATISFIER_MODE_DEFAULT);
+    // 读取最大待处理路径数量限制
     outstandingPathsLimit = conf.getInt(
         DFSConfigKeys.DFS_SPS_MAX_OUTSTANDING_PATHS_KEY,
         DFSConfigKeys.DFS_SPS_MAX_OUTSTANDING_PATHS_DEFAULT);
+    // 解析运行模式
     mode = StoragePolicySatisfierMode.fromString(modeVal);
+    // 初始化待处理路径队列
     pathsToBeTraversed = new LinkedList<Long>();
     this.namesystem = namesystem;
-    // instantiate SPS service by just keeps config reference and not starting
-    // any supporting threads.
+    // 仅初始化SPS服务，不启动服务线程
     spsService = new StoragePolicySatisfier(conf);
   }
 
   /**
-   * This function will do following logic based on the configured sps mode:
-   *
-   * <p>
-   * If the configured mode is {@link StoragePolicySatisfierMode#EXTERNAL}, then
-   * it won't do anything. Administrator requires to start external sps service
-   * explicitly.
-   *
-   * <p>
-   * If the configured mode is {@link StoragePolicySatisfierMode#NONE}, then the
-   * service is disabled and won't do any action.
+   * 根据当前配置的SPS模式启动管理器，不同模式执行对应初始化逻辑
    */
   public void start() {
     if (!storagePolicyEnabled) {
@@ -118,16 +111,7 @@ public class StoragePolicySatisfyManager {
   }
 
   /**
-   * This function will do following logic based on the configured sps mode:
-   *
-   * <p>
-   * If the configured mode is {@link StoragePolicySatisfierMode#EXTERNAL}, then
-   * it won't do anything. Administrator requires to stop external sps service
-   * explicitly, if needed.
-   *
-   * <p>
-   * If the configured mode is {@link StoragePolicySatisfierMode#NONE}, then the
-   * service is disabled and won't do any action.
+   * 根据当前配置的SPS模式停止管理器，清理待处理队列资源
    */
   public void stop() {
     if (!storagePolicyEnabled) {
@@ -160,8 +144,8 @@ public class StoragePolicySatisfyManager {
   }
 
   /**
-   * Sets new sps mode. If the new mode is none, then it will disable the sps
-   * feature completely by clearing all queued up sps path's hint.
+   * 处理SPS运行模式变更事件，切换模式并清理原有状态，若切换为禁用模式则清空所有待处理路径
+   * @param newMode 新的运行模式
    */
   public void changeModeEvent(StoragePolicySatisfierMode newMode) {
     if (!storagePolicyEnabled) {
@@ -181,6 +165,7 @@ public class StoragePolicySatisfyManager {
             + " so ignoring change mode event.", newMode);
         return;
       }
+      // 停止内置SPS服务，切换为外置模式
       spsService.stopGracefully();
       break;
     case NONE:
@@ -200,13 +185,13 @@ public class StoragePolicySatisfyManager {
       break;
     }
 
-    // update sps mode
+    // 更新运行模式
     mode = newMode;
   }
 
   /**
-   * @return true if the internal storage policy satisfier daemon is running,
-   *         false otherwise.
+   * 检查内置SPS守护进程是否正在运行，仅用于测试
+   * @return 内置SPS正在运行返回true，否则返回false
    */
   @VisibleForTesting
   public boolean isSatisfierRunning() {
@@ -214,8 +199,8 @@ public class StoragePolicySatisfyManager {
   }
 
   /**
-   * @return the next SPS path id, on which path users has invoked to satisfy
-   *         storages.
+   * 从待处理队列弹出下一个需要满足存储策略的路径ID，供外部SPS服务拉取任务
+   * @return 下一个路径ID，队列为空时返回null
    */
   public Long getNextPathId() {
     synchronized (pathsToBeTraversed) {
@@ -224,12 +209,12 @@ public class StoragePolicySatisfyManager {
   }
 
   /**
-   * Verify that satisfier queue limit exceeds allowed outstanding limit.
-   * @throws IOException
+   * 检查待处理队列是否超过最大长度限制，超过则抛出异常拒绝新任务
+   * @throws IOException 队列超出限制时抛出IO异常
    */
   public void verifyOutstandingPathQLimit() throws IOException {
     long size = pathsToBeTraversed.size();
-    // Checking that the SPS call Q exceeds the allowed limit.
+    // 检查队列剩余容量是否小于等于0
     if (outstandingPathsLimit - size <= 0) {
       LOG.debug("Satisifer Q - outstanding limit:{}, current size:{}",
           outstandingPathsLimit, size);
@@ -239,9 +224,7 @@ public class StoragePolicySatisfyManager {
   }
 
   /**
-   * Removes the SPS path id from the list of sps paths.
-   *
-   * @throws IOException
+   * 清空所有待处理路径ID，并移除对应路径上的SPS扩展属性
    */
   private void clearPathIds(){
     synchronized (pathsToBeTraversed) {
@@ -249,6 +232,7 @@ public class StoragePolicySatisfyManager {
       while (iterator.hasNext()) {
         Long trackId = iterator.next();
         try {
+          // 移除路径上的SPS标记扩展属性
           namesystem.removeXattr(trackId,
               HdfsServerConstants.XATTR_SATISFY_STORAGE_POLICY);
         } catch (IOException e) {
@@ -260,7 +244,7 @@ public class StoragePolicySatisfyManager {
   }
 
   /**
-   * Clean up all sps path ids.
+   * 清空所有待处理路径ID队列，不移除扩展属性
    */
   public void removeAllPathIds() {
     synchronized (pathsToBeTraversed) {
@@ -269,8 +253,8 @@ public class StoragePolicySatisfyManager {
   }
 
   /**
-   * Adds the sps path to SPSPathIds list.
-   * @param id
+   * 添加新的需要处理的路径ID到队列
+   * @param id 待处理路径的文件ID
    */
   public void addPathId(long id) {
     synchronized (pathsToBeTraversed) {
@@ -279,22 +263,24 @@ public class StoragePolicySatisfyManager {
   }
 
   /**
-   * @return true if sps is configured as an external
-   *         service, false otherwise.
+   * 检查当前是否配置为外部SPS服务模式，即SPS功能是否启用
+   * @return 外部模式返回true，其他模式返回false
    */
   public boolean isEnabled() {
     return mode == StoragePolicySatisfierMode.EXTERNAL;
   }
 
   /**
-   * @return sps service mode.
+   * 获取当前SPS运行模式
+   * @return 当前SPS模式枚举值
    */
   public StoragePolicySatisfierMode getMode() {
     return mode;
   }
 
   /**
-   * @return the number of paths to be processed by storage policy satisfier.
+   * 获取当前待处理的路径数量
+   * @return 待处理路径总数
    */
   public int getPendingSPSPaths() {
     return pathsToBeTraversed.size();

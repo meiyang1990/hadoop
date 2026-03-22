@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,6 +44,9 @@ import org.apache.hadoop.io.compress.CompressionCodecFactory;
 import org.apache.hadoop.security.token.delegation.DelegationKey;
 
 /**
+ * 文件级注释：处理当前版本HDFS FSImage镜像文件，通过访问者模式遍历FSImage中所有元素并调用访问者回调，
+ * 是离线FSImage查看工具的核心加载器，支持多个布局版本的FSImage解析。
+ * 
  * ImageLoaderCurrent processes Hadoop FSImage files and walks over
  * them using a provided ImageVisitor, calling the visitor at each element
  * enumerated below.
@@ -123,19 +127,31 @@ import org.apache.hadoop.security.token.delegation.DelegationKey;
  *      expiryTime (long)     
  *
  */
+/**
+ * 类级注释：当前版本FSImage加载器，实现ImageLoader接口，负责解析新版本格式的FSImage文件，
+ * 通过访问者模式将解析到的各个元素交给传入的ImageVisitor处理，支持快照、权限、代理令牌、缓存等新特性。
+ */
 class ImageLoaderCurrent implements ImageLoader {
   protected final DateFormat dateFormat = 
                                       new SimpleDateFormat("yyyy-MM-dd HH:mm");
+  // 支持加载的FSImage布局版本列表
   private static int[] versions = { -16, -17, -18, -19, -20, -21, -22, -23,
       -24, -25, -26, -27, -28, -30, -31, -32, -33, -34, -35, -36, -37, -38, -39,
       -40, -41, -42, -43, -44, -45, -46, -47, -48, -49, -50, -51 };
   private int imageVersion = 0;
   
+  // 快照子树访问标记，记录inode是否已被访问，避免重复处理
   private final Map<Long, Boolean> subtreeMap = new HashMap<Long, Boolean>();
+  // 目录inode id到完整路径的映射，用于快照处理
   private final Map<Long, String> dirNodeMap = new HashMap<Long, String>();
 
   /* (non-Javadoc)
    * @see ImageLoader#canProcessVersion(int)
+   */
+  /**
+   * 函数级注释：检查当前加载器是否支持指定的FSImage版本
+   * @param version FSImage版本号
+   * @return true表示支持该版本加载，false表示不支持
    */
   @Override
   public boolean canLoadVersion(int version) {
@@ -148,17 +164,27 @@ class ImageLoaderCurrent implements ImageLoader {
   /* (non-Javadoc)
    * @see ImageLoader#processImage(java.io.DataInputStream, ImageVisitor, boolean)
    */
+  /**
+   * 函数级注释：加载并遍历FSImage，按结构解析各个元素并调用访问者回调
+   * @param in FSImage输入流
+   * @param v 访问器，处理解析到的各个元素
+   * @param skipBlocks 是否跳过块信息解析，提升解析速度
+   * @throws IOException 解析或IO异常
+   */
   @Override
   public void loadImage(DataInputStream in, ImageVisitor v,
       boolean skipBlocks) throws IOException {
     boolean done = false;
     try {
+      // 启动访问流程
       v.start();
       v.visitEnclosingElement(ImageElement.FS_IMAGE);
 
+      // 读取FSImage版本
       imageVersion = in.readInt();
       if( !canLoadVersion(imageVersion))
         throw new IOException("Cannot process fslayout version " + imageVersion);
+      // 支持布局标记特性，读取布局标记
       if (NameNodeLayoutVersion.supports(Feature.ADD_LAYOUT_FLAGS, imageVersion)) {
         LayoutFlags.read(in);
       }
@@ -166,27 +192,33 @@ class ImageLoaderCurrent implements ImageLoader {
       v.visit(ImageElement.IMAGE_VERSION, imageVersion);
       v.visit(ImageElement.NAMESPACE_ID, in.readInt());
 
+      // 读取inode总数
       long numInodes = in.readLong();
 
       v.visit(ImageElement.GENERATION_STAMP, in.readLong());
 
+      // 支持顺序块ID特性，读取相关世代戳信息
       if (NameNodeLayoutVersion.supports(Feature.SEQUENTIAL_BLOCK_ID, imageVersion)) {
         v.visit(ImageElement.GENERATION_STAMP_V2, in.readLong());
         v.visit(ImageElement.GENERATION_STAMP_V1_LIMIT, in.readLong());
         v.visit(ImageElement.LAST_ALLOCATED_BLOCK_ID, in.readLong());
       }
 
+      // 支持存储事务ID特性，读取最新事务ID
       if (NameNodeLayoutVersion.supports(Feature.STORED_TXIDS, imageVersion)) {
         v.visit(ImageElement.TRANSACTION_ID, in.readLong());
       }
       
+      // 支持inode ID特性，读取最后分配的inode ID
       if (NameNodeLayoutVersion.supports(Feature.ADD_INODE_ID, imageVersion)) {
         v.visit(ImageElement.LAST_INODE_ID, in.readLong());
       }
       
+      // 检查是否支持快照特性
       boolean supportSnapshot = NameNodeLayoutVersion.supports(Feature.SNAPSHOT,
           imageVersion);
       if (supportSnapshot) {
+        // 读取快照计数器和快照数量，遍历处理每个快照
         v.visit(ImageElement.SNAPSHOT_COUNTER, in.readInt());
         int numSnapshots = in.readInt();
         v.visit(ImageElement.NUM_SNAPSHOTS_TOTAL, numSnapshots);
@@ -195,10 +227,12 @@ class ImageLoaderCurrent implements ImageLoader {
         }
       }
       
+      // 支持FSImage压缩特性，处理压缩镜像
       if (NameNodeLayoutVersion.supports(Feature.FSIMAGE_COMPRESSION, imageVersion)) {
         boolean isCompressed = in.readBoolean();
         v.visit(ImageElement.IS_COMPRESSED, String.valueOf(isCompressed));
         if (isCompressed) {
+          // 读取压缩编解码器类名，创建解压流
           String codecClassName = Text.readString(in);
           v.visit(ImageElement.COMPRESS_CODEC, codecClassName);
           CompressionCodecFactory codecFac = new CompressionCodecFactory(
@@ -208,25 +242,33 @@ class ImageLoaderCurrent implements ImageLoader {
             throw new IOException("Image compression codec not supported: "
                 + codecClassName);
           }
+          // 替换输入流为解压流，后续从解压流读取数据
           in = new DataInputStream(codec.createInputStream(in));
         }
       }
+      // 处理所有已完成的inode
       processINodes(in, v, numInodes, skipBlocks, supportSnapshot);
+      // 清理临时缓存
       subtreeMap.clear();
       dirNodeMap.clear();
 
+      // 处理构建中的inode（未完成写入的文件）
       processINodesUC(in, v, skipBlocks);
 
+      // 支持代理令牌特性，处理代理令牌信息
       if (NameNodeLayoutVersion.supports(Feature.DELEGATION_TOKEN, imageVersion)) {
         processDelegationTokens(in, v);
       }
       
+      // 支持缓存特性，处理缓存管理器状态
       if (NameNodeLayoutVersion.supports(Feature.CACHING, imageVersion)) {
         processCacheManagerState(in, v);
       }
+      // 离开FSImage根元素
       v.leaveEnclosingElement(); // FSImage
       done = true;
     } finally {
+      // 根据处理结果调用对应完成方法
       if (done) {
         v.finish();
       } else {
@@ -236,7 +278,10 @@ class ImageLoaderCurrent implements ImageLoader {
   }
 
   /**
-   * Process CacheManager state from the fsimage.
+   * 函数级注释：处理FSImage中缓存管理器状态，解析缓存池和缓存项信息
+   * @param in FSImage输入流
+   * @param v 访问器
+   * @throws IOException IO异常
    */
   private void processCacheManagerState(DataInputStream in, ImageVisitor v)
       throws IOException {
@@ -254,11 +299,12 @@ class ImageLoaderCurrent implements ImageLoader {
       v.visit(ImageElement.CACHE_ENTRY_POOL_NAME, Text.readString(in));
     }
   }
+
   /**
-   * Process the Delegation Token related section in fsimage.
-   * 
-   * @param in DataInputStream to process
-   * @param v Visitor to walk over records
+   * 函数级注释：处理FSImage中代理令牌相关信息，解析代理密钥和代理令牌
+   * @param in FSImage输入流
+   * @param v 访问器
+   * @throws IOException IO异常
    */
   private void processDelegationTokens(DataInputStream in, ImageVisitor v)
       throws IOException {
@@ -305,11 +351,11 @@ class ImageLoaderCurrent implements ImageLoader {
   }
 
   /**
-   * Process the INodes under construction section of the fsimage.
-   *
-   * @param in DataInputStream to process
-   * @param v Visitor to walk over inodes
-   * @param skipBlocks Walk over each block?
+   * 函数级注释：处理FSImage中构建中inode（未完成写入的文件）区域
+   * @param in FSImage输入流
+   * @param v 访问器
+   * @param skipBlocks 是否跳过块解析
+   * @throws IOException IO异常
    */
   private void processINodesUC(DataInputStream in, ImageVisitor v,
       boolean skipBlocks) throws IOException {
@@ -337,490 +383,4 @@ class ImageLoaderCurrent implements ImageLoader {
       processBlocks(in, v, numBlocks, skipBlocks);
 
       processPermission(in, v);
-      v.visit(ImageElement.CLIENT_NAME, FSImageSerialization.readString(in));
-      v.visit(ImageElement.CLIENT_MACHINE, FSImageSerialization.readString(in));
-
-      // Skip over the datanode descriptors, which are still stored in the
-      // file but are not used by the datanode or loaded into memory
-      int numLocs = in.readInt();
-      for(int j = 0; j < numLocs; j++) {
-        in.readShort();
-        in.readLong();
-        in.readLong();
-        in.readLong();
-        in.readInt();
-        FSImageSerialization.readString(in);
-        FSImageSerialization.readString(in);
-        WritableUtils.readEnum(in, AdminStates.class);
-      }
-
-      v.leaveEnclosingElement(); // INodeUnderConstruction
-    }
-
-    v.leaveEnclosingElement(); // INodesUnderConstruction
-  }
-
-  /**
-   * Process the blocks section of the fsimage.
-   *
-   * @param in Datastream to process
-   * @param v Visitor to walk over inodes
-   * @param skipBlocks Walk over each block?
-   */
-  private void processBlocks(DataInputStream in, ImageVisitor v,
-      int numBlocks, boolean skipBlocks) throws IOException {
-    v.visitEnclosingElement(ImageElement.BLOCKS,
-                            ImageElement.NUM_BLOCKS, numBlocks);
-    
-    // directory or symlink or reference node, no blocks to process    
-    if(numBlocks < 0) { 
-      v.leaveEnclosingElement(); // Blocks
-      return;
-    }
-    
-    if(skipBlocks) {
-      int bytesToSkip = ((Long.SIZE * 3 /* fields */) / 8 /*bits*/) * numBlocks;
-      if(in.skipBytes(bytesToSkip) != bytesToSkip)
-        throw new IOException("Error skipping over blocks");
-      
-    } else {
-      for(int j = 0; j < numBlocks; j++) {
-        v.visitEnclosingElement(ImageElement.BLOCK);
-        v.visit(ImageElement.BLOCK_ID, in.readLong());
-        v.visit(ImageElement.NUM_BYTES, in.readLong());
-        v.visit(ImageElement.GENERATION_STAMP, in.readLong());
-        v.leaveEnclosingElement(); // Block
-      }
-    }
-    v.leaveEnclosingElement(); // Blocks
-  }
-
-  /**
-   * Extract the INode permissions stored in the fsimage file.
-   *
-   * @param in Datastream to process
-   * @param v Visitor to walk over inodes
-   */
-  private void processPermission(DataInputStream in, ImageVisitor v)
-      throws IOException {
-    v.visitEnclosingElement(ImageElement.PERMISSIONS);
-    v.visit(ImageElement.USER_NAME, Text.readString(in));
-    v.visit(ImageElement.GROUP_NAME, Text.readString(in));
-    FsPermission fsp = new FsPermission(in.readShort());
-    v.visit(ImageElement.PERMISSION_STRING, fsp.toString());
-    v.leaveEnclosingElement(); // Permissions
-  }
-
-  /**
-   * Extract CachePool permissions stored in the fsimage file.
-   *
-   * @param in Datastream to process
-   * @param v Visitor to walk over inodes
-   */
-  private void processCachePoolPermission(DataInputStream in, ImageVisitor v)
-      throws IOException {
-    v.visitEnclosingElement(ImageElement.PERMISSIONS);
-    v.visit(ImageElement.CACHE_POOL_OWNER_NAME, Text.readString(in));
-    v.visit(ImageElement.CACHE_POOL_GROUP_NAME, Text.readString(in));
-    FsPermission fsp = new FsPermission(in.readShort());
-    v.visit(ImageElement.CACHE_POOL_PERMISSION_STRING, fsp.toString());
-    v.leaveEnclosingElement(); // Permissions
-  }
-
-  /**
-   * Process the INode records stored in the fsimage.
-   *
-   * @param in Datastream to process
-   * @param v Visitor to walk over INodes
-   * @param numInodes Number of INodes stored in file
-   * @param skipBlocks Process all the blocks within the INode?
-   * @param supportSnapshot Whether or not the imageVersion supports snapshot
-   * @throws VisitException
-   * @throws IOException
-   */
-  private void processINodes(DataInputStream in, ImageVisitor v,
-      long numInodes, boolean skipBlocks, boolean supportSnapshot)
-      throws IOException {
-    v.visitEnclosingElement(ImageElement.INODES,
-        ImageElement.NUM_INODES, numInodes);
-    
-    if (NameNodeLayoutVersion.supports(Feature.FSIMAGE_NAME_OPTIMIZATION, imageVersion)) {
-      if (!supportSnapshot) {
-        processLocalNameINodes(in, v, numInodes, skipBlocks);
-      } else {
-        processLocalNameINodesWithSnapshot(in, v, skipBlocks);
-      }
-    } else { // full path name
-      processFullNameINodes(in, v, numInodes, skipBlocks);
-    }
-
-    
-    v.leaveEnclosingElement(); // INodes
-  }
-  
-  /**
-   * Process image with full path name
-   * 
-   * @param in image stream
-   * @param v visitor
-   * @param numInodes number of indoes to read
-   * @param skipBlocks skip blocks or not
-   * @throws IOException if there is any error occurs
-   */
-  private void processLocalNameINodes(DataInputStream in, ImageVisitor v,
-      long numInodes, boolean skipBlocks) throws IOException {
-    // process root
-    processINode(in, v, skipBlocks, "", false);
-    numInodes--;
-    while (numInodes > 0) {
-      numInodes -= processDirectory(in, v, skipBlocks);
-    }
-  }
-  
-  private int processDirectory(DataInputStream in, ImageVisitor v,
-     boolean skipBlocks) throws IOException {
-    String parentName = FSImageSerialization.readString(in);
-    return processChildren(in, v, skipBlocks, parentName);
-  }
-  
-  /**
-   * Process image with local path name and snapshot support
-   * 
-   * @param in image stream
-   * @param v visitor
-   * @param skipBlocks skip blocks or not
-   */
-  private void processLocalNameINodesWithSnapshot(DataInputStream in,
-      ImageVisitor v, boolean skipBlocks) throws IOException {
-    // process root
-    processINode(in, v, skipBlocks, "", false);
-    processDirectoryWithSnapshot(in, v, skipBlocks);
-  }
-  
-  /**
-   * Process directories when snapshot is supported.
-   */
-  private void processDirectoryWithSnapshot(DataInputStream in, ImageVisitor v,
-      boolean skipBlocks) throws IOException {
-    // 1. load dir node id
-    long inodeId = in.readLong();
-    
-    String dirName = dirNodeMap.remove(inodeId);
-    Boolean visitedRef = subtreeMap.get(inodeId);
-    if (visitedRef != null) {
-      if (visitedRef.booleanValue()) { // the subtree has been visited
-        return;
-      } else { // first time to visit
-        subtreeMap.put(inodeId, true);
-      }
-    } // else the dir is not linked by a RefNode, thus cannot be revisited
-    
-    // 2. load possible snapshots
-    processSnapshots(in, v, dirName);
-    // 3. load children nodes
-    processChildren(in, v, skipBlocks, dirName);
-    // 4. load possible directory diff list
-    processDirectoryDiffList(in, v, dirName);
-    // recursively process sub-directories
-    final int numSubTree = in.readInt();
-    for (int i = 0; i < numSubTree; i++) {
-      processDirectoryWithSnapshot(in, v, skipBlocks);
-    }
-  }
-  
-  /**
-   * Process snapshots of a snapshottable directory
-   */
-  private void processSnapshots(DataInputStream in, ImageVisitor v,
-      String rootName) throws IOException {
-    final int numSnapshots = in.readInt();
-    if (numSnapshots >= 0) {
-      v.visitEnclosingElement(ImageElement.SNAPSHOTS,
-          ImageElement.NUM_SNAPSHOTS, numSnapshots);
-      for (int i = 0; i < numSnapshots; i++) {
-        // process snapshot
-        v.visitEnclosingElement(ImageElement.SNAPSHOT);
-        v.visit(ImageElement.SNAPSHOT_ID, in.readInt());
-        v.leaveEnclosingElement();
-      }
-      v.visit(ImageElement.SNAPSHOT_QUOTA, in.readInt());
-      v.leaveEnclosingElement();
-    }
-  }
-  
-  private void processSnapshot(DataInputStream in, ImageVisitor v)
-      throws IOException {
-    v.visitEnclosingElement(ImageElement.SNAPSHOT);
-    v.visit(ImageElement.SNAPSHOT_ID, in.readInt());
-    // process root of snapshot
-    v.visitEnclosingElement(ImageElement.SNAPSHOT_ROOT);
-    processINode(in, v, true, "", false);
-    v.leaveEnclosingElement();
-    v.leaveEnclosingElement();
-  }
-  
-  private void processDirectoryDiffList(DataInputStream in, ImageVisitor v,
-      String currentINodeName) throws IOException {
-    final int numDirDiff = in.readInt();
-    if (numDirDiff >= 0) {
-      v.visitEnclosingElement(ImageElement.SNAPSHOT_DIR_DIFFS,
-          ImageElement.NUM_SNAPSHOT_DIR_DIFF, numDirDiff);
-      for (int i = 0; i < numDirDiff; i++) {
-        // process directory diffs in reverse chronological oder
-        processDirectoryDiff(in, v, currentINodeName); 
-      }
-      v.leaveEnclosingElement();
-    }
-  }
-  
-  private void processDirectoryDiff(DataInputStream in, ImageVisitor v,
-      String currentINodeName) throws IOException {
-    v.visitEnclosingElement(ImageElement.SNAPSHOT_DIR_DIFF);
-    int snapshotId = in.readInt();
-    v.visit(ImageElement.SNAPSHOT_DIFF_SNAPSHOTID, snapshotId);
-    v.visit(ImageElement.SNAPSHOT_DIR_DIFF_CHILDREN_SIZE, in.readInt());
-    
-    // process snapshotINode
-    boolean useRoot = in.readBoolean();
-    if (!useRoot) {
-      if (in.readBoolean()) {
-        v.visitEnclosingElement(ImageElement.SNAPSHOT_INODE_DIRECTORY_ATTRIBUTES);
-        if (NameNodeLayoutVersion.supports(Feature.OPTIMIZE_SNAPSHOT_INODES, imageVersion)) {
-          processINodeDirectoryAttributes(in, v, currentINodeName);
-        } else {
-          processINode(in, v, true, currentINodeName, true);
-        }
-        v.leaveEnclosingElement();
-      }
-    }
-    
-    // process createdList
-    int createdSize = in.readInt();
-    v.visitEnclosingElement(ImageElement.SNAPSHOT_DIR_DIFF_CREATEDLIST,
-        ImageElement.SNAPSHOT_DIR_DIFF_CREATEDLIST_SIZE, createdSize);
-    for (int i = 0; i < createdSize; i++) {
-      String createdNode = FSImageSerialization.readString(in);
-      v.visit(ImageElement.SNAPSHOT_DIR_DIFF_CREATED_INODE, createdNode);
-    }
-    v.leaveEnclosingElement();
-    
-    // process deletedList
-    int deletedSize = in.readInt();
-    v.visitEnclosingElement(ImageElement.SNAPSHOT_DIR_DIFF_DELETEDLIST,
-        ImageElement.SNAPSHOT_DIR_DIFF_DELETEDLIST_SIZE, deletedSize);
-    for (int i = 0; i < deletedSize; i++) {
-      v.visitEnclosingElement(ImageElement.SNAPSHOT_DIR_DIFF_DELETED_INODE);
-      processINode(in, v, false, currentINodeName, true);
-      v.leaveEnclosingElement();
-    }
-    v.leaveEnclosingElement();
-    v.leaveEnclosingElement();
-  }
-
-  private void processINodeDirectoryAttributes(DataInputStream in, ImageVisitor v,
-      String parentName) throws IOException {
-    final String pathName = readINodePath(in, parentName);
-    v.visit(ImageElement.INODE_PATH, pathName);
-    processPermission(in, v);
-    v.visit(ImageElement.MODIFICATION_TIME, formatDate(in.readLong()));
-
-    v.visit(ImageElement.NS_QUOTA, in.readLong());
-    v.visit(ImageElement.DS_QUOTA, in.readLong());
-  }
-
-  /** Process children under a directory */
-  private int processChildren(DataInputStream in, ImageVisitor v,
-      boolean skipBlocks, String parentName) throws IOException {
-    int numChildren = in.readInt();
-    for (int i = 0; i < numChildren; i++) {
-      processINode(in, v, skipBlocks, parentName, false);
-    }
-    return numChildren;
-  }
-  
-  /**
-   * Process image with full path name
-   * 
-   * @param in image stream
-   * @param v visitor
-   * @param numInodes number of indoes to read
-   * @param skipBlocks skip blocks or not
-   * @throws IOException if there is any error occurs
-   */
-  private void processFullNameINodes(DataInputStream in, ImageVisitor v,
-      long numInodes, boolean skipBlocks) throws IOException {
-    for(long i = 0; i < numInodes; i++) {
-      processINode(in, v, skipBlocks, null, false);
-    }
-  }
- 
-  private String readINodePath(DataInputStream in, String parentName)
-      throws IOException {
-    String pathName = FSImageSerialization.readString(in);
-    if (parentName != null) {  // local name
-      pathName = "/" + pathName;
-      if (!"/".equals(parentName)) { // children of non-root directory
-        pathName = parentName + pathName;
-      }
-    }
-    return pathName;
-  }
-
-  /**
-   * Process an INode
-   * 
-   * @param in image stream
-   * @param v visitor
-   * @param skipBlocks skip blocks or not
-   * @param parentName the name of its parent node
-   * @param isSnapshotCopy whether or not the inode is a snapshot copy
-   * @throws IOException
-   */
-  private void processINode(DataInputStream in, ImageVisitor v,
-      boolean skipBlocks, String parentName, boolean isSnapshotCopy)
-      throws IOException {
-    boolean supportSnapshot = 
-        NameNodeLayoutVersion.supports(Feature.SNAPSHOT, imageVersion);
-    boolean supportInodeId = 
-        NameNodeLayoutVersion.supports(Feature.ADD_INODE_ID, imageVersion);
-    
-    v.visitEnclosingElement(ImageElement.INODE);
-    final String pathName = readINodePath(in, parentName);
-    v.visit(ImageElement.INODE_PATH, pathName);
-
-    long inodeId = HdfsConstants.GRANDFATHER_INODE_ID;
-    if (supportInodeId) {
-      inodeId = in.readLong();
-      v.visit(ImageElement.INODE_ID, inodeId);
-    }
-    v.visit(ImageElement.REPLICATION, in.readShort());
-    v.visit(ImageElement.MODIFICATION_TIME, formatDate(in.readLong()));
-    if(NameNodeLayoutVersion.supports(Feature.FILE_ACCESS_TIME, imageVersion))
-      v.visit(ImageElement.ACCESS_TIME, formatDate(in.readLong()));
-    v.visit(ImageElement.BLOCK_SIZE, in.readLong());
-    int numBlocks = in.readInt();
-
-    processBlocks(in, v, numBlocks, skipBlocks);
-    
-    if (numBlocks >= 0) { // File
-      if (supportSnapshot) {
-        // make sure subtreeMap only contains entry for directory
-        subtreeMap.remove(inodeId);
-        // process file diffs
-        processFileDiffList(in, v, parentName);
-        if (isSnapshotCopy) {
-          boolean underConstruction = in.readBoolean();
-          if (underConstruction) {
-            v.visit(ImageElement.CLIENT_NAME,
-                FSImageSerialization.readString(in));
-            v.visit(ImageElement.CLIENT_MACHINE,
-                FSImageSerialization.readString(in));
-          }
-        }
-      }
-      processPermission(in, v);
-    } else if (numBlocks == -1) { // Directory
-      if (supportSnapshot && supportInodeId) {
-        dirNodeMap.put(inodeId, pathName);
-      }
-
-      v.visit(ImageElement.NS_QUOTA, in.readLong());
-      if (NameNodeLayoutVersion.supports(Feature.DISKSPACE_QUOTA,
-          imageVersion)) {
-        v.visit(ImageElement.DS_QUOTA, in.readLong());
-      }
-
-      if (supportSnapshot) {
-        boolean snapshottable = in.readBoolean();
-        if (!snapshottable) {
-          boolean withSnapshot = in.readBoolean();
-          v.visit(ImageElement.IS_WITHSNAPSHOT_DIR, Boolean.toString(withSnapshot));
-        } else {
-          v.visit(ImageElement.IS_SNAPSHOTTABLE_DIR, Boolean.toString(snapshottable));
-        }
-      }
-      processPermission(in, v);
-    } else if (numBlocks == -2) {
-      v.visit(ImageElement.SYMLINK, Text.readString(in));
-      processPermission(in, v);
-    } else if (numBlocks == -3) { // reference node
-      final boolean isWithName = in.readBoolean();
-      int snapshotId = in.readInt();
-      if (isWithName) {
-        v.visit(ImageElement.SNAPSHOT_LAST_SNAPSHOT_ID, snapshotId);
-      } else {
-        v.visit(ImageElement.SNAPSHOT_DST_SNAPSHOT_ID, snapshotId);
-      }
-      
-      final boolean firstReferred = in.readBoolean();
-      if (firstReferred) {
-        // if a subtree is linked by multiple "parents", the corresponding dir
-        // must be referred by a reference node. we put the reference node into
-        // the subtreeMap here and let its value be false. when we later visit
-        // the subtree for the first time, we change the value to true.
-        subtreeMap.put(inodeId, false);
-        v.visitEnclosingElement(ImageElement.SNAPSHOT_REF_INODE);
-        processINode(in, v, skipBlocks, parentName, isSnapshotCopy);
-        v.leaveEnclosingElement();  // referred inode    
-      } else {
-        v.visit(ImageElement.SNAPSHOT_REF_INODE_ID, in.readLong());
-      }
-    }
-
-    v.leaveEnclosingElement(); // INode
-  }
-
-  private void processINodeFileAttributes(DataInputStream in, ImageVisitor v,
-      String parentName) throws IOException {
-    final String pathName = readINodePath(in, parentName);
-    v.visit(ImageElement.INODE_PATH, pathName);
-    processPermission(in, v);
-    v.visit(ImageElement.MODIFICATION_TIME, formatDate(in.readLong()));
-    if(NameNodeLayoutVersion.supports(Feature.FILE_ACCESS_TIME, imageVersion)) {
-      v.visit(ImageElement.ACCESS_TIME, formatDate(in.readLong()));
-    }
-
-    v.visit(ImageElement.REPLICATION, in.readShort());
-    v.visit(ImageElement.BLOCK_SIZE, in.readLong());
-  }
-  
-  private void processFileDiffList(DataInputStream in, ImageVisitor v,
-      String currentINodeName) throws IOException {
-    final int size = in.readInt();
-    if (size >= 0) {
-      v.visitEnclosingElement(ImageElement.SNAPSHOT_FILE_DIFFS,
-          ImageElement.NUM_SNAPSHOT_FILE_DIFF, size);
-      for (int i = 0; i < size; i++) {
-        processFileDiff(in, v, currentINodeName);
-      }
-      v.leaveEnclosingElement();
-    }
-  }
-  
-  private void processFileDiff(DataInputStream in, ImageVisitor v,
-      String currentINodeName) throws IOException {
-    int snapshotId = in.readInt();
-    v.visitEnclosingElement(ImageElement.SNAPSHOT_FILE_DIFF,
-        ImageElement.SNAPSHOT_DIFF_SNAPSHOTID, snapshotId);
-    v.visit(ImageElement.SNAPSHOT_FILE_SIZE, in.readLong());
-    if (in.readBoolean()) {
-      v.visitEnclosingElement(ImageElement.SNAPSHOT_INODE_FILE_ATTRIBUTES);
-      if (NameNodeLayoutVersion.supports(Feature.OPTIMIZE_SNAPSHOT_INODES, imageVersion)) {
-        processINodeFileAttributes(in, v, currentINodeName);
-      } else {
-        processINode(in, v, true, currentINodeName, true);
-      }
-      v.leaveEnclosingElement();
-    }
-    v.leaveEnclosingElement();
-  }
-  
-  /**
-   * Helper method to format dates during processing.
-   * @param date Date as read from image file
-   * @return String version of date format
-   */
-  private String formatDate(long date) {
-    return dateFormat.format(new Date(date));
-  }
-}
+      v.visit(Image

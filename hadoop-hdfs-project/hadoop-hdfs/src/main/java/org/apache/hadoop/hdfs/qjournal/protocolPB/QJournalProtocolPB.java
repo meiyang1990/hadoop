@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,6 +16,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/**
+ * @file QJournalProtocolPB.java
+ * QJournal协议PB实现接口，定义NameNode与JournalNode之间基于Protobuf的通信协议
+ */
 package org.apache.hadoop.hdfs.qjournal.protocolPB;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -24,10 +29,11 @@ import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * Protocol used to journal edits to a JournalNode participating
- * in the quorum journal.
- * Note: This extends the protocolbuffer service based interface to
- * add annotations required for security.
+ * 仲裁日志节点的Protobuf通信协议接口
+ * <p>
+ * 核心职责：扩展基于Protobuf生成的服务接口，添加Hadoop RPC框架所需的安全注解和协议信息，
+ * 用于NameNode向集群中的JournalNode同步编辑日志（edits），支持HDFS高可用场景下的元数据共享。
+ * </p>
  */
 @KerberosInfo(
     serverPrincipal = DFSConfigKeys.DFS_JOURNALNODE_KERBEROS_PRINCIPAL_KEY,

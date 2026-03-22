@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,8 +48,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * This class aggregates information from {@link SlowDiskReports} received via
- * heartbeats.
+ * 慢磁盘追踪器，聚合DataNode心跳上报的慢磁盘检测信息，生成全局慢磁盘统计报告供监控使用
+ * 收集所有DataNode上报的慢磁盘延迟数据，定期清理过期数据并整理出延迟最高的慢磁盘列表
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -57,49 +58,54 @@ public class SlowDiskTracker {
       LoggerFactory.getLogger(SlowDiskTracker.class);
 
   /**
-   * Time duration after which a report is considered stale. This is
-   * set to DFS_DATANODE_OUTLIERS_REPORT_INTERVAL_KEY * 3 i.e.
-   * maintained for at least two successive reports.
+   * 慢磁盘报告的过期时间，超过该时间未更新的报告将被视为无效并清理
+   * 默认为数据节点异常报告间隔的3倍，保证至少保留连续两次上报的数据
    */
   private long reportValidityMs;
 
   /**
-   * Timer object for querying the current time. Separated out for
-   * unit testing.
+   * 时间计时器，用于获取当前时间戳，分离接口便于单元测试
    */
   private final Timer timer;
 
   /**
-   * ObjectWriter to convert JSON reports to String.
+   * JSON序列化对象写器，用于将慢磁盘报告转换为JSON字符串
    */
   private static final ObjectWriter WRITER = new ObjectMapper().writer();
 
   /**
-   * Number of disks to include in JSON report per operation. We will return
-   * disks with the highest latency.
+   * JSON报告中每个操作最多包含的慢磁盘数量，仅返回延迟最高的指定数量磁盘
    */
   private final int maxDisksToReport;
   private static final String DATANODE_DISK_SEPARATOR = ":";
+  /**
+   * 慢磁盘报告更新的时间间隔，控制多久重新生成一次报告
+   */
   private final long reportGenerationIntervalMs;
 
   private volatile long lastUpdateTime;
   private AtomicBoolean isUpdateInProgress = new AtomicBoolean(false);
 
   /**
-   * Information about disks that have been reported as being slow.
-   * It is map of (Slow Disk ID) -> (DiskLatency). The DiskLatency contains
-   * the disk ID, the latencies reported and the timestamp when the report
-   * was received.
+   * 存储所有上报的慢磁盘延迟信息，Key为慢磁盘唯一ID，Value为包含延迟和时间戳的信息对象
    */
   private final Map<String, DiskLatency> diskIDLatencyMap;
 
   /**
-   * Map of slow disk -> diskOperations it has been reported slow in.
+   * 当前生成的慢磁盘报告列表，存储延迟最高的慢磁盘信息
    */
   private volatile ArrayList<DiskLatency> slowDisksReport =
       Lists.newArrayList();
+  /**
+   * 待清理的过期慢磁盘列表，存储本次更新中检测到的过期报告
+   */
   private volatile ArrayList<DiskLatency> oldSlowDisksCheck;
 
+  /**
+   * 构造慢磁盘追踪器，从配置中初始化报告间隔、报告数量等参数
+   * @param conf Hadoop配置对象
+   * @param timer 时间计时器
+   */
   public SlowDiskTracker(Configuration conf, Timer timer) {
     this.timer = timer;
     this.lastUpdateTime = timer.monotonicNow();
@@ -114,12 +120,23 @@ public class SlowDiskTracker {
     this.reportValidityMs = reportGenerationIntervalMs * 3;
   }
 
+  /**
+   * 生成慢磁盘的全局唯一ID，格式为数据节点ID:磁盘ID
+   * @param datanodeID 数据节点ID
+   * @param slowDisk 磁盘ID
+   * @return 全局唯一慢磁盘ID
+   */
   @VisibleForTesting
   public static String getSlowDiskIDForReport(String datanodeID,
       String slowDisk) {
     return datanodeID + DATANODE_DISK_SEPARATOR + slowDisk;
   }
 
+  /**
+   * 添加来自数据节点的慢磁盘上报信息，将所有慢磁盘存入全局映射
+   * @param dataNodeID 上报数据的节点ID
+   * @param dnSlowDiskReport 数据节点上报的慢磁盘报告
+   */
   public void addSlowDiskReport(String dataNodeID,
       SlowDiskReports dnSlowDiskReport) {
     Map<String, Map<DiskOp, Double>> slowDisks =
@@ -141,6 +158,9 @@ public class SlowDiskTracker {
 
   }
 
+  /**
+   * 检查是否需要更新慢磁盘报告，如果达到更新间隔则异步更新
+   */
   public void checkAndUpdateReportIfNecessary() {
     // Check if it is time for update
     long now = timer.monotonicNow();
@@ -149,6 +169,10 @@ public class SlowDiskTracker {
     }
   }
 
+  /**
+   * 异步更新慢磁盘报告，启动独立线程处理避免阻塞主线程
+   * @param now 当前时间戳
+   */
   @VisibleForTesting
   public void updateSlowDiskReportAsync(long now) {
     if (isUpdateInProgress.compareAndSet(false, true)) {
@@ -168,7 +192,8 @@ public class SlowDiskTracker {
   }
 
   /**
-   * This structure is a thin wrapper over disk latencies.
+   * 存储单个慢磁盘的延迟信息，包含磁盘ID、各操作延迟和上报时间戳
+   * 支持JSON序列化，用于生成监控报告
    */
   public static class DiskLatency {
     @JsonProperty("SlowDiskID")
@@ -179,7 +204,7 @@ public class SlowDiskTracker {
     private long timestamp;
 
     /**
-     * Constructor needed by Jackson for Object mapping.
+     * Jackson JSON反序列化需要的空参构造对应的构造方法
      */
     public DiskLatency(
         @JsonProperty("SlowDiskID") String slowDiskID,
@@ -188,6 +213,12 @@ public class SlowDiskTracker {
       this.latencyMap = latencyMap;
     }
 
+    /**
+     * 构造磁盘延迟对象
+     * @param slowDiskID 慢磁盘唯一ID
+     * @param latencyMap 各磁盘操作对应的延迟映射
+     * @param timestamp 上报时间戳
+     */
     public DiskLatency(String slowDiskID, Map<DiskOp, Double> latencyMap,
         long timestamp) {
       this.slowDiskID = slowDiskID;
@@ -199,6 +230,10 @@ public class SlowDiskTracker {
       return this.slowDiskID;
     }
 
+    /**
+     * 获取该磁盘所有操作中的最大延迟值
+     * @return 最大延迟
+     */
     double getMaxLatency() {
       double maxLatency = 0;
       for (double latency : latencyMap.values()) {
@@ -215,9 +250,11 @@ public class SlowDiskTracker {
   }
 
   /**
-   * Retrieve a list of stop low disks i.e disks with the highest max latencies.
-   * @param numDisks number of disks to return. This is to limit the size of
-   *                 the generated JSON.
+   * 从所有上报中筛选出延迟最高的N个有效慢磁盘
+   * @param reports 所有上报的慢磁盘映射
+   * @param numDisks 需要返回的最大磁盘数量，限制JSON报告大小
+   * @param now 当前时间戳，用于判断报告是否过期
+   * @return 按延迟排序的top N慢磁盘列表
    */
   private ArrayList<DiskLatency> getSlowDisks(
       Map<String, DiskLatency> reports, int numDisks, long now) {
@@ -225,6 +262,7 @@ public class SlowDiskTracker {
       return new ArrayList(ImmutableList.of());
     }
 
+    // 使用优先队列维护top N延迟最高的磁盘
     final PriorityQueue<DiskLatency> topNReports = new PriorityQueue<>(
         reports.size(),
         new Comparator<DiskLatency>() {
@@ -237,8 +275,10 @@ public class SlowDiskTracker {
 
     ArrayList<DiskLatency> oldSlowDiskIDs = Lists.newArrayList();
 
+    // 遍历所有上报，筛选有效报告并找出top N
     for (Map.Entry<String, DiskLatency> entry : reports.entrySet()) {
       DiskLatency diskLatency = entry.getValue();
+      // 报告未过期，参与top N筛选
       if (now - diskLatency.timestamp < reportValidityMs) {
         if (topNReports.size() < numDisks) {
           topNReports.add(diskLatency);
@@ -248,6 +288,7 @@ public class SlowDiskTracker {
           topNReports.add(diskLatency);
         }
       } else {
+        // 报告已过期，加入待清理列表
         oldSlowDiskIDs.add(diskLatency);
       }
     }
@@ -258,9 +299,8 @@ public class SlowDiskTracker {
   }
 
   /**
-   * Retrieve all valid reports as a JSON string.
-   * @return serialized representation of valid reports. null if
-   *         serialization failed.
+   * 将当前有效的慢磁盘报告序列化为JSON字符串
+   * @return 序列化后的JSON字符串，无数据或序列化失败返回null
    */
   public String getSlowDiskReportAsJsonString() {
     try {
@@ -275,13 +315,16 @@ public class SlowDiskTracker {
     }
   }
 
+  /**
+   * 从全局映射中清理过期的慢磁盘报告
+   */
   private void cleanUpOldReports(long now) {
     if (oldSlowDisksCheck != null) {
       for (DiskLatency oldDiskLatency : oldSlowDisksCheck) {
         diskIDLatencyMap.remove(oldDiskLatency.getSlowDiskID(), oldDiskLatency);
       }
     }
-    // Replace oldSlowDiskIDsCheck with an empty ArrayList
+    // 清空待清理列表
     oldSlowDisksCheck = null;
   }
 

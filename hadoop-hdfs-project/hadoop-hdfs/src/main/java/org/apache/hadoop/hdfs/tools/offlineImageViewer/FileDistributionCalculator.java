@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,28 +37,9 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * This is the tool for analyzing file sizes in the namespace image. In order to
- * run the tool one should define a range of integers <code>[0, maxSize]</code> by
- * specifying <code>maxSize</code> and a <code>step</code>. The range of integers is
- * divided into segments of size <code>step</code>:
- * <code>[0, s<sub>1</sub>, ..., s<sub>n-1</sub>, maxSize]</code>, and the visitor
- * calculates how many files in the system fall into each segment
- * <code>[s<sub>i-1</sub>, s<sub>i</sub>)</code>. Note that files larger than
- * <code>maxSize</code> always fall into the very last segment.
- *
- * <h3>Input.</h3>
- * <ul>
- * <li><code>filename</code> specifies the location of the image file;</li>
- * <li><code>maxSize</code> determines the range <code>[0, maxSize]</code> of files
- * sizes considered by the visitor;</li>
- * <li><code>step</code> the range is divided into segments of size step.</li>
- * </ul>
- *
- * <h3>Output.</h3> The output file is formatted as a tab separated two column
- * table: Size and NumFiles. Where Size represents the start of the segment, and
- * numFiles is the number of files form the image which size falls in this
- * segment.
- *
+ * 文件大小分布统计工具，用于分析HDFS命名空间镜像中的文件大小分布情况。
+ * 通过指定最大文件大小和步长，将文件大小范围划分成多个区间，统计每个区间内的文件数量。
+ * 大于最大文件大小的文件统一计入最后一个区间，最终输出制表符分隔的统计结果。
  */
 final class FileDistributionCalculator {
   private final static long MAX_SIZE_DEFAULT = 0x2000000000L; // 1/8 TB = 2^37
@@ -78,6 +60,14 @@ final class FileDistributionCalculator {
 
   private boolean formatOutput = false;
 
+  /**
+   * 构造文件分布计算器，初始化参数和统计数组
+   * @param conf Hadoop配置对象
+   * @param maxSize 统计的最大文件大小，0则使用默认值
+   * @param steps 每个区间的步长，0则使用默认值
+   * @param formatOutput 是否格式化输出区间描述
+   * @param out 输出流用于输出统计结果
+   */
   FileDistributionCalculator(Configuration conf, long maxSize, int steps,
       boolean formatOutput, PrintStream out) {
     this.conf = conf;
@@ -86,13 +76,18 @@ final class FileDistributionCalculator {
     this.formatOutput = formatOutput;
     this.out = out;
     long numIntervals = this.maxSize / this.steps;
-    // avoid OutOfMemoryError when allocating an array
+    // 避免分配过大数组导致OOM，检查区间数量不超过上限
     Preconditions.checkState(numIntervals <= MAX_INTERVALS,
         "Too many distribution intervals (maxSize/step): " + numIntervals +
         ", should be less than " + (MAX_INTERVALS+1) + ".");
     this.distribution = new int[1 + (int) (numIntervals)];
   }
 
+  /**
+   * 从FSImage文件中读取INode信息，统计文件大小分布
+   * @param file 打开的FSImage随机访问文件
+   * @throws IOException 读取文件或解析错误时抛出
+   */
   void visit(RandomAccessFile file) throws IOException {
     if (!FSImageUtil.checkFileFormat(file)) {
       throw new IOException("Unrecognized FSImage");
@@ -100,62 +95,84 @@ final class FileDistributionCalculator {
 
     FileSummary summary = FSImageUtil.loadSummary(file);
     try (FileInputStream in = new FileInputStream(file.getFD())) {
+      // 遍历所有段，找到INode段进行处理
       for (FileSummary.Section s : summary.getSectionsList()) {
         if (SectionName.fromString(s.getName()) != SectionName.INODE) {
           continue;
         }
-
+        // 定位到INode段偏移
         in.getChannel().position(s.getOffset());
+        // 包装压缩输入流，限定位移不超过段长度
         InputStream is = FSImageUtil.wrapInputStreamForCompression(conf,
             summary.getCodec(), new BufferedInputStream(new LimitInputStream(
                 in, s.getLength())));
+        // 运行统计
         run(is);
+        // 输出结果
         output();
       }
     }
   }
 
+  /**
+   * 解析INode段输入流，统计文件大小分布
+   * @param in INode段输入流
+   * @throws IOException 解析错误时抛出
+   */
   private void run(InputStream in) throws IOException {
     INodeSection s = INodeSection.parseDelimitedFrom(in);
+    // 遍历所有INode
     for (int i = 0; i < s.getNumInodes(); ++i) {
       INodeSection.INode p = INodeSection.INode.parseDelimitedFrom(in);
       if (p.getType() == INodeSection.INode.Type.FILE) {
+        // 统计文件总数
         ++totalFiles;
         INodeSection.INodeFile f = p.getFile();
+        // 统计块总数
         totalBlocks += f.getBlocksCount();
+        // 累加计算文件总大小
         long fileSize = 0;
         for (BlockProto b : f.getBlocksList()) {
           fileSize += b.getNumBytes();
         }
+        // 更新最大文件大小
         maxFileSize = Math.max(fileSize, maxFileSize);
+        // 累加总空间占用（考虑副本数）
         totalSpace += fileSize * f.getReplication();
 
+        // 计算当前文件所属区间
         int bucket = fileSize > maxSize ? distribution.length - 1 : (int) Math
             .ceil((double)fileSize / steps);
-        // Compare the bucket value with distribution's length again,
-        // because sometimes the bucket value will be equal to
-        // the length when maxSize can't be divided completely by step.
+        // 边界检查：当maxSize无法被步长整除时，bucket可能等于数组长度，需要修正到最后一位
         if (bucket >= distribution.length) {
           bucket = distribution.length - 1;
         }
+        // 当前区间计数+1
         ++distribution[bucket];
 
       } else if (p.getType() == INodeSection.INode.Type.DIRECTORY) {
+        // 统计目录总数
         ++totalDirectories;
       }
 
+      // 每处理100万个INode输出进度提示
       if (i % (1 << 20) == 0) {
         out.println("Processed " + i + " inodes.");
       }
     }
   }
 
+  /**
+   * 输出文件大小分布统计结果和汇总信息
+   */
   private void output() {
-    // write the distribution into the output file
+    // 输出表头
     out.print((formatOutput ? "Size Range" : "Size") + "\tNumFiles\n");
+    // 遍历每个区间，输出非零区间的统计结果
     for (int i = 0; i < distribution.length; i++) {
       if (distribution[i] != 0) {
         if (formatOutput) {
+          // 格式化输出，显示区间范围
           out.print((i == 0 ? "[" : "(")
               + StringUtils.byteDesc(((long) (i == 0 ? 0 : i - 1) * steps))
               + ", "
@@ -163,12 +180,14 @@ final class FileDistributionCalculator {
                   (i == distribution.length - 1 ? maxFileSize :
                       (long) i * steps)) + "]\t" + distribution[i]);
         } else {
+          // 简单输出区间起始位置和文件数量
           out.print(((long) i * steps) + "\t" + distribution[i]);
         }
 
         out.print('\n');
       }
     }
+    // 输出汇总统计信息
     out.print("totalFiles = " + totalFiles + "\n");
     out.print("totalDirectories = " + totalDirectories + "\n");
     out.print("totalBlocks = " + totalBlocks + "\n");

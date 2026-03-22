@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,47 +44,39 @@ import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Ordering;
 
 /**
- * AclTransformation defines the operations that can modify an ACL.  All ACL
- * modifications take as input an existing ACL and apply logic to add new
- * entries, modify existing entries or remove old entries.  Some operations also
- * accept an ACL spec: a list of entries that further describes the requested
- * change.  Different operations interpret the ACL spec differently.  In the
- * case of adding an ACL to an inode that previously did not have one, the
- * existing ACL can be a "minimal ACL" containing exactly 3 entries for owner,
- * group and other, all derived from the {@link FsPermission} bits.
- *
- * The algorithms implemented here require sorted lists of ACL entries.  For any
- * existing ACL, it is assumed that the entries are sorted.  This is because all
- * ACL creation and modification is intended to go through these methods, and
- * they all guarantee correct sort order in their outputs.  However, an ACL spec
- * is considered untrusted user input, so all operations pre-sort the ACL spec as
- * the first step.
+ * @file Acl转换工具类，提供ACL修改操作的核心实现。
+ * 所有ACL修改操作都基于现有ACL进行处理，支持添加、修改、删除ACL条目，
+ * 自动处理mask条目计算和默认条目推导，修改后保证输出ACL保持正确排序。
+ * 本类在HDFS NameNode端负责处理用户提交的ACL变更请求，生成符合规范的新ACL。
  */
 @InterfaceAudience.Private
 final class AclTransformation {
+  // ACL单作用域允许的最大条目数
   private static final int MAX_ENTRIES = 32;
 
   /**
-   * Filters (discards) any existing ACL entries that have the same scope, type
-   * and name of any entry in the ACL spec.  If necessary, recalculates the mask
-   * entries.  If necessary, default entries may be inferred by copying the
-   * permissions of the corresponding access entries.  It is invalid to request
-   * removal of the mask entry from an ACL that would otherwise require a mask
-   * entry, due to existing named entries or an unnamed group entry.
-   *
-   * @param existingAcl List<AclEntry> existing ACL
-   * @param inAclSpec List<AclEntry> ACL spec describing entries to filter
-   * @return List<AclEntry> new ACL
-   * @throws AclException if validation fails
+   * 根据ACL规范删除现有ACL中与规范条目冲突（同作用域、类型、名称）的条目。
+   * 必要时重新计算mask，推导默认条目。不允许删除仍需要的mask条目。
+   * 
+   * @param existingAcl 现有ACL条目列表
+   * @param inAclSpec 需要删除的条目列表（作为ACL规范输入
+   * @return 处理后的新ACL
+   * @throws AclException 校验失败时抛出异常
    */
   public static List<AclEntry> filterAclEntriesByAclSpec(
       List<AclEntry> existingAcl, List<AclEntry> inAclSpec) throws AclException {
+    // 预处理输入ACL规范：排序和预校验
     ValidatedAclSpec aclSpec = new ValidatedAclSpec(inAclSpec);
+    // 新建列表存储处理后的ACL条目
     ArrayList<AclEntry> aclBuilder = Lists.newArrayListWithCapacity(MAX_ENTRIES);
+    // 存储用户指定的mask条目，按作用域分类
     EnumMap<AclEntryScope, AclEntry> providedMask =
       Maps.newEnumMap(AclEntryScope.class);
+    // 标记mask条目已修改的作用域
     EnumSet<AclEntryScope> maskDirty = EnumSet.noneOf(AclEntryScope.class);
+    // 标记有条目修改的作用域
     EnumSet<AclEntryScope> scopeDirty = EnumSet.noneOf(AclEntryScope.class);
+    // 遍历现有ACL，过滤掉待删除条目
     for (AclEntry existingEntry: existingAcl) {
       if (aclSpec.containsKey(existingEntry)) {
         scopeDirty.add(existingEntry.getScope());
@@ -98,25 +91,27 @@ final class AclTransformation {
         }
       }
     }
+    // 如果需要，从访问条目复制推导缺失的默认条目
     copyDefaultsIfNeeded(aclBuilder);
+    // 重新计算各作用域需要的mask条目
     calculateMasks(aclBuilder, providedMask, maskDirty, scopeDirty);
+    // 最终校验、排序后返回不可修改的ACL列表
     return buildAndValidateAcl(aclBuilder);
   }
 
   /**
-   * Filters (discards) any existing default ACL entries.  The new ACL retains
-   * only the access ACL entries.
+   * 删除现有ACL中所有默认条目，仅保留访问ACL条目。
    *
-   * @param existingAcl List<AclEntry> existing ACL
-   * @return List<AclEntry> new ACL
-   * @throws AclException if validation fails
+   * @param existingAcl 现有ACL条目列表
+   * @return 处理后仅保留访问条目的新ACL
+   * @throws AclException 校验失败时抛出异常
    */
   public static List<AclEntry> filterDefaultAclEntries(
       List<AclEntry> existingAcl) throws AclException {
     ArrayList<AclEntry> aclBuilder = Lists.newArrayListWithCapacity(MAX_ENTRIES);
     for (AclEntry existingEntry: existingAcl) {
+      // 默认条目排序在访问条目之后，找到第一个默认条目即可提前退出
       if (existingEntry.getScope() == DEFAULT) {
-        // Default entries sort after access entries, so we can exit early.
         break;
       }
       aclBuilder.add(existingEntry);
@@ -125,28 +120,30 @@ final class AclTransformation {
   }
 
   /**
-   * Merges the entries of the ACL spec into the existing ACL.  If necessary,
-   * recalculates the mask entries.  If necessary, default entries may be
-   * inferred by copying the permissions of the corresponding access entries.
+   * 将ACL规范中的条目合并到现有ACL。同键（作用域、类型、名称相同）的条目会被覆盖，
+   * 新条目会被添加。必要时重新计算mask，推导默认条目。
    *
-   * @param existingAcl List<AclEntry> existing ACL
-   * @param inAclSpec List<AclEntry> ACL spec containing entries to merge
-   * @return List<AclEntry> new ACL
-   * @throws AclException if validation fails
+   * @param existingAcl 现有ACL条目列表
+   * @param inAclSpec 待合并的ACL条目列表
+   * @return 合并后的新ACL
+   * @throws AclException 校验失败时抛出异常
    */
   public static List<AclEntry> mergeAclEntries(List<AclEntry> existingAcl,
       List<AclEntry> inAclSpec) throws AclException {
     ValidatedAclSpec aclSpec = new ValidatedAclSpec(inAclSpec);
     ArrayList<AclEntry> aclBuilder = Lists.newArrayListWithCapacity(MAX_ENTRIES);
+    // 存储已找到的替换条目，用于区分新增和替换
     List<AclEntry> foundAclSpecEntries =
       Lists.newArrayListWithCapacity(MAX_ENTRIES);
     EnumMap<AclEntryScope, AclEntry> providedMask =
       Maps.newEnumMap(AclEntryScope.class);
     EnumSet<AclEntryScope> maskDirty = EnumSet.noneOf(AclEntryScope.class);
     EnumSet<AclEntryScope> scopeDirty = EnumSet.noneOf(AclEntryScope.class);
+    // 遍历现有ACL，处理已存在条目
     for (AclEntry existingEntry: existingAcl) {
       AclEntry aclSpecEntry = aclSpec.findByKey(existingEntry);
       if (aclSpecEntry != null) {
+        // 找到同键条目，用规范条目替换现有条目
         foundAclSpecEntries.add(aclSpecEntry);
         scopeDirty.add(aclSpecEntry.getScope());
         if (aclSpecEntry.getType() == MASK) {
@@ -156,6 +153,7 @@ final class AclTransformation {
           aclBuilder.add(aclSpecEntry);
         }
       } else {
+        // 保留现有未匹配条目
         if (existingEntry.getType() == MASK) {
           providedMask.put(existingEntry.getScope(), existingEntry);
         } else {
@@ -163,7 +161,7 @@ final class AclTransformation {
         }
       }
     }
-    // ACL spec entries that were not replacements are new additions.
+    // 添加规范中不存在于现有ACL的新条目
     for (AclEntry newEntry: aclSpec) {
       if (Collections.binarySearch(foundAclSpecEntries, newEntry,
           ACL_ENTRY_COMPARATOR) < 0) {
@@ -182,29 +180,25 @@ final class AclTransformation {
   }
 
   /**
-   * Completely replaces the ACL with the entries of the ACL spec.  If
-   * necessary, recalculates the mask entries.  If necessary, default entries
-   * are inferred by copying the permissions of the corresponding access
-   * entries.  Replacement occurs separately for each of the access ACL and the
-   * default ACL.  If the ACL spec contains only access entries, then the
-   * existing default entries are retained.  If the ACL spec contains only
-   * default entries, then the existing access entries are retained.  If the ACL
-   * spec contains both access and default entries, then both are replaced.
+   * 使用ACL规范完全替换ACL，访问和默认作用域分别处理。
+   * 仅规范中存在的作用域会被替换，未提到的作用域保留原有条目。
+   * 必要时重新计算mask，推导默认条目。
    *
-   * @param existingAcl List<AclEntry> existing ACL
-   * @param inAclSpec List<AclEntry> ACL spec containing replacement entries
-   * @return List<AclEntry> new ACL
-   * @throws AclException if validation fails
+   * @param existingAcl 现有ACL条目列表
+   * @param inAclSpec 替换用的新ACL条目列表
+   * @return 替换后的新ACL
+   * @throws AclException 校验失败时抛出异常
    */
   public static List<AclEntry> replaceAclEntries(List<AclEntry> existingAcl,
       List<AclEntry> inAclSpec) throws AclException {
     ValidatedAclSpec aclSpec = new ValidatedAclSpec(inAclSpec);
     ArrayList<AclEntry> aclBuilder = Lists.newArrayListWithCapacity(MAX_ENTRIES);
-    // Replacement is done separately for each scope: access and default.
+    // 分别处理访问和默认两个作用域，仅替换规范中包含的作用域
     EnumMap<AclEntryScope, AclEntry> providedMask =
       Maps.newEnumMap(AclEntryScope.class);
     EnumSet<AclEntryScope> maskDirty = EnumSet.noneOf(AclEntryScope.class);
     EnumSet<AclEntryScope> scopeDirty = EnumSet.noneOf(AclEntryScope.class);
+    // 先添加规范提供的条目，替换对应作用域
     for (AclEntry aclSpecEntry: aclSpec) {
       scopeDirty.add(aclSpecEntry.getScope());
       if (aclSpecEntry.getType() == MASK) {
@@ -214,7 +208,7 @@ final class AclTransformation {
         aclBuilder.add(aclSpecEntry);
       }
     }
-    // Copy existing entries if the scope was not replaced.
+    // 保留未被替换的作用域中的原有条目
     for (AclEntry existingEntry: existingAcl) {
       if (!scopeDirty.contains(existingEntry.getScope())) {
         if (existingEntry.getType() == MASK) {
@@ -230,20 +224,16 @@ final class AclTransformation {
   }
 
   /**
-   * There is no reason to instantiate this class.
+   * 禁止实例化该工具类
    */
   private AclTransformation() {
   }
 
   /**
-   * Comparator that enforces required ordering for entries within an ACL:
-   * -owner entry (unnamed user)
-   * -all named user entries (internal ordering undefined)
-   * -owning group entry (unnamed group)
-   * -all named group entries (internal ordering undefined)
-   * -mask entry
-   * -other entry
-   * All access ACL entries sort ahead of all default ACL entries.
+   * ACL条目排序比较器，定义ACL条目必须遵循的排序规则：
+   * 1. 所有访问ACL条目排在默认ACL条目之前
+   * 2. 同作用域内按类型排序：所有者用户 -> 命名用户 -> 所属组 -> 命名组 -> 掩码 -> 其他
+   * 3. 同类型下按名称自然排序，无名称排在有名称之前
    */
   static final Comparator<AclEntry> ACL_ENTRY_COMPARATOR =
     new Comparator<AclEntry>() {
@@ -261,18 +251,18 @@ final class AclTransformation {
     };
 
   /**
-   * Builds the final list of ACL entries to return by trimming, sorting and
-   * validating the ACL entries that have been added.
+   * 对构建中的ACL条目进行修剪、排序、校验，生成最终不可修改的ACL列表。
+   * 检查重复条目、非法条目结构，保证基础条目（用户、组、其他）必须存在，限制条目数量。
    *
-   * @param aclBuilder ArrayList<AclEntry> containing entries to build
-   * @return List<AclEntry> unmodifiable, sorted list of ACL entries
-   * @throws AclException if validation fails
+   * @param aclBuilder 待构建的ACL条目列表
+   * @return 排序校验完成的不可修改ACL列表
+   * @throws AclException 校验失败抛出异常
    */
   private static List<AclEntry> buildAndValidateAcl(
       ArrayList<AclEntry> aclBuilder) throws AclException {
     aclBuilder.trimToSize();
     Collections.sort(aclBuilder, ACL_ENTRY_COMPARATOR);
-    // Full iteration to check for duplicates and invalid named entries.
+    // 遍历检查重复和非法命名条目
     AclEntry prevEntry = null;
     for (AclEntry entry: aclBuilder) {
       if (prevEntry != null &&
@@ -280,6 +270,7 @@ final class AclTransformation {
         throw new AclException(
           "Invalid ACL: multiple entries with same scope, type and name.");
       }
+      // MASK和OTHER类型不能带名称，非法配置
       if (entry.getName() != null && (entry.getType() == MASK ||
           entry.getType() == OTHER)) {
         throw new AclException(
@@ -289,10 +280,10 @@ final class AclTransformation {
     }
 
     ScopedAclEntries scopedEntries = new ScopedAclEntries(aclBuilder);
+    // 检查访问和默认作用域条目数都不超过最大值
     checkMaxEntries(scopedEntries);
 
-    // Search for the required base access entries.  If there is a default ACL,
-    // then do the same check on the default entries.
+    // 检查每个作用域都必须包含用户、组、其他三个基础条目
     for (AclEntryType type: EnumSet.of(USER, GROUP, OTHER)) {
       AclEntry accessEntryKey = new AclEntry.Builder().setScope(ACCESS)
         .setType(type).build();
@@ -301,6 +292,7 @@ final class AclTransformation {
         throw new AclException(
           "Invalid ACL: the user, group and other entries are required.");
       }
+      // 如果存在默认ACL，也需要检查默认ACL包含三个基础条目
       if (!scopedEntries.getDefaultEntries().isEmpty()) {
         AclEntry defaultEntryKey = new AclEntry.Builder().setScope(DEFAULT)
           .setType(type).build();
@@ -314,8 +306,12 @@ final class AclTransformation {
     return Collections.unmodifiableList(aclBuilder);
   }
 
-  // Check the max entries separately on access and default entries
-  // HDFS-7582
+  /**
+   * 分别检查访问和默认作用域的条目数不超过最大值
+   * 对应HDFS-7582问题修复，需要分别统计两个作用域的条目数
+   * @param scopedEntries 按作用域拆分后的ACL条目
+   * @throws AclException 任一作用域超出限制抛出异常
+   */
   private static void checkMaxEntries(ScopedAclEntries scopedEntries)
       throws AclException {
     List<AclEntry> accessEntries = scopedEntries.getAccessEntries();
@@ -331,26 +327,17 @@ final class AclTransformation {
   }
 
   /**
-   * Calculates mask entries required for the ACL.  Mask calculation is performed
-   * separately for each scope: access and default.  This method is responsible
-   * for handling the following cases of mask calculation:
-   * 1. Throws an exception if the caller attempts to remove the mask entry of an
-   *   existing ACL that requires it.  If the ACL has any named entries, then a
-   *   mask entry is required.
-   * 2. If the caller supplied a mask in the ACL spec, use it.
-   * 3. If the caller did not supply a mask, but there are ACL entry changes in
-   *   this scope, then automatically calculate a new mask.  The permissions of
-   *   the new mask are the union of the permissions on the group entry and all
-   *   named entries.
+   * 为ACL计算所需的mask条目，分别处理访问和默认两个作用域。
+   * 处理逻辑：
+   * 1. 如果需要mask但用户删除了mask，抛出异常
+   * 2. 用户指定了mask，使用用户提供的mask
+   * 3. 用户未指定但作用域有修改，自动计算新mask，权限为所有组类条目的权限并集
    *
-   * @param aclBuilder ArrayList<AclEntry> containing entries to build
-   * @param providedMask EnumMap<AclEntryScope, AclEntry> mapping each scope to
-   *   the mask entry that was provided for that scope (if provided)
-   * @param maskDirty EnumSet<AclEntryScope> which contains a scope if the mask
-   *   entry is dirty (added or deleted) in that scope
-   * @param scopeDirty EnumSet<AclEntryScope> which contains a scope if any entry
-   *   is dirty (added or deleted) in that scope
-   * @throws AclException if validation fails
+   * @param aclBuilder 存储处理后的ACL条目列表
+   * @param providedMask 用户提供的mask条目，按作用域索引
+   * @param maskDirty 标记mask被修改的作用域
+   * @param scopeDirty 标记有任意条目修改的作用域
+   * @throws AclException 非法删除mask时抛出异常
    */
   private static void calculateMasks(List<AclEntry> aclBuilder,
       EnumMap<AclEntryScope, AclEntry> providedMask,
@@ -360,140 +347,5 @@ final class AclTransformation {
     EnumMap<AclEntryScope, FsAction> unionPerms =
       Maps.newEnumMap(AclEntryScope.class);
     EnumSet<AclEntryScope> maskNeeded = EnumSet.noneOf(AclEntryScope.class);
-    // Determine which scopes are present, which scopes need a mask, and the
-    // union of group class permissions in each scope.
-    for (AclEntry entry: aclBuilder) {
-      scopeFound.add(entry.getScope());
-      if (entry.getType() == GROUP || entry.getName() != null) {
-        FsAction scopeUnionPerms = unionPerms.get(entry.getScope());
-        if (scopeUnionPerms == null) {
-          scopeUnionPerms = FsAction.NONE;
-        }
-        unionPerms.put(entry.getScope(),
-          scopeUnionPerms.or(entry.getPermission()));
-      }
-      if (entry.getName() != null) {
-        maskNeeded.add(entry.getScope());
-      }
-    }
-    // Add mask entry if needed in each scope.
-    for (AclEntryScope scope: scopeFound) {
-      if (!providedMask.containsKey(scope) && maskNeeded.contains(scope) &&
-          maskDirty.contains(scope)) {
-        // Caller explicitly removed mask entry, but it's required.
-        throw new AclException(
-          "Invalid ACL: mask is required and cannot be deleted.");
-      } else if (providedMask.containsKey(scope) &&
-          (!scopeDirty.contains(scope) || maskDirty.contains(scope))) {
-        // Caller explicitly provided new mask, or we are preserving the existing
-        // mask in an unchanged scope.
-        aclBuilder.add(providedMask.get(scope));
-      } else if (maskNeeded.contains(scope) || providedMask.containsKey(scope)) {
-        // Otherwise, if there are maskable entries present, or the ACL
-        // previously had a mask, then recalculate a mask automatically.
-        aclBuilder.add(new AclEntry.Builder()
-          .setScope(scope)
-          .setType(MASK)
-          .setPermission(unionPerms.get(scope))
-          .build());
-      }
-    }
-  }
-
-  /**
-   * Adds unspecified default entries by copying permissions from the
-   * corresponding access entries.
-   *
-   * @param aclBuilder ArrayList<AclEntry> containing entries to build
-   */
-  private static void copyDefaultsIfNeeded(List<AclEntry> aclBuilder) {
-    Collections.sort(aclBuilder, ACL_ENTRY_COMPARATOR);
-    ScopedAclEntries scopedEntries = new ScopedAclEntries(aclBuilder);
-    if (!scopedEntries.getDefaultEntries().isEmpty()) {
-      List<AclEntry> accessEntries = scopedEntries.getAccessEntries();
-      List<AclEntry> defaultEntries = scopedEntries.getDefaultEntries();
-      List<AclEntry> copiedEntries = Lists.newArrayListWithCapacity(3);
-      for (AclEntryType type: EnumSet.of(USER, GROUP, OTHER)) {
-        AclEntry defaultEntryKey = new AclEntry.Builder().setScope(DEFAULT)
-          .setType(type).build();
-        int defaultEntryIndex = Collections.binarySearch(defaultEntries,
-          defaultEntryKey, ACL_ENTRY_COMPARATOR);
-        if (defaultEntryIndex < 0) {
-          AclEntry accessEntryKey = new AclEntry.Builder().setScope(ACCESS)
-            .setType(type).build();
-          int accessEntryIndex = Collections.binarySearch(accessEntries,
-            accessEntryKey, ACL_ENTRY_COMPARATOR);
-          if (accessEntryIndex >= 0) {
-            copiedEntries.add(new AclEntry.Builder()
-              .setScope(DEFAULT)
-              .setType(type)
-              .setPermission(accessEntries.get(accessEntryIndex).getPermission())
-              .build());
-          }
-        }
-      }
-      // Add all copied entries when done to prevent potential issues with binary
-      // search on a modified aclBulider during the main loop.
-      aclBuilder.addAll(copiedEntries);
-    }
-  }
-
-  /**
-   * An ACL spec that has been pre-validated and sorted.
-   */
-  private static final class ValidatedAclSpec implements Iterable<AclEntry> {
-    private final List<AclEntry> aclSpec;
-
-    /**
-     * Creates a ValidatedAclSpec by pre-validating and sorting the given ACL
-     * entries.  Pre-validation checks that it does not exceed the maximum
-     * entries.  This check is performed before modifying the ACL, and it's
-     * actually insufficient for enforcing the maximum number of entries.
-     * Transformation logic can create additional entries automatically,such as
-     * the mask and some of the default entries, so we also need additional
-     * checks during transformation.  The up-front check is still valuable here
-     * so that we don't run a lot of expensive transformation logic while
-     * holding the namesystem lock for an attacker who intentionally sent a huge
-     * ACL spec.
-     *
-     * @param aclSpec List<AclEntry> containing unvalidated input ACL spec
-     * @throws AclException if validation fails
-     */
-    public ValidatedAclSpec(List<AclEntry> aclSpec) throws AclException {
-      Collections.sort(aclSpec, ACL_ENTRY_COMPARATOR);
-      checkMaxEntries(new ScopedAclEntries(aclSpec));
-      this.aclSpec = aclSpec;
-    }
-
-    /**
-     * Returns true if this contains an entry matching the given key.  An ACL
-     * entry's key consists of scope, type and name (but not permission).
-     *
-     * @param key AclEntry search key
-     * @return boolean true if found
-     */
-    public boolean containsKey(AclEntry key) {
-      return Collections.binarySearch(aclSpec, key, ACL_ENTRY_COMPARATOR) >= 0;
-    }
-
-    /**
-     * Returns the entry matching the given key or null if not found.  An ACL
-     * entry's key consists of scope, type and name (but not permission).
-     *
-     * @param key AclEntry search key
-     * @return AclEntry entry matching the given key or null if not found
-     */
-    public AclEntry findByKey(AclEntry key) {
-      int index = Collections.binarySearch(aclSpec, key, ACL_ENTRY_COMPARATOR);
-      if (index >= 0) {
-        return aclSpec.get(index);
-      }
-      return null;
-    }
-
-    @Override
-    public Iterator<AclEntry> iterator() {
-      return aclSpec.iterator();
-    }
-  }
-}
+    // 遍历确定每个作用域，统计是否需要mask，计算权限并集
+    for (

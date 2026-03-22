@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -61,12 +62,17 @@ import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.util.Lists;
 import org.slf4j.LoggerFactory;
 
+/**
+ * HDFS高可用(HA)功能工具类，提供HA相关配置检查、节点ID获取、代理创建、状态检查等通用工具能力。
+ * 支撑HDFS HA架构下各类核心操作的工具实现，为上层模块提供统一的HA相关工具方法。
+ */
 @InterfaceAudience.Private
 public class HAUtil {
 
   public static final org.slf4j.Logger LOG =
       LoggerFactory.getLogger(HAUtil.class.getName());
 
+  // HA模式下每个NameNode独立配置，不需要共享的特殊配置项列表
   private static final String[] HA_SPECIAL_INDEPENDENT_KEYS = new String[]{
     DFS_NAMENODE_RPC_ADDRESS_KEY,
     DFS_NAMENODE_RPC_BIND_HOST_KEY,
@@ -83,11 +89,10 @@ public class HAUtil {
   private HAUtil() { /* Hidden constructor */ }
 
   /**
-   * Returns true if HA for namenode is configured for the given nameservice
-   * 
-   * @param conf Configuration
-   * @param nsId nameservice, or null if no federated NS is configured
-   * @return true if HA is configured in the configuration; else false.
+   * 检查指定名称服务是否配置了NameNode高可用(HA)
+   * @param conf 配置对象
+   * @param nsId 名称服务ID，未配置联邦时传null
+   * @return 如果配置了HA返回true，否则返回false
    */
   public static boolean isHAEnabled(Configuration conf, String nsId) {
     Map<String, Map<String, InetSocketAddress>> addresses =
@@ -98,27 +103,20 @@ public class HAUtil {
   }
 
   /**
-   * Returns true if HA is using a shared edits directory.
-   *
-   * @param conf Configuration
-   * @return true if HA config is using a shared edits dir, false otherwise.
+   * 检查当前HA配置是否使用共享edits目录
+   * @param conf 配置对象
+   * @return 如果配置了共享edits目录返回true，否则返回false
    */
   public static boolean usesSharedEditsDir(Configuration conf) {
     return null != conf.get(DFS_NAMENODE_SHARED_EDITS_DIR_KEY);
   }
 
   /**
-   * Get the namenode Id by matching the {@code addressKey}
-   * with the the address of the local node.
-   * 
-   * If {@link DFSConfigKeys#DFS_HA_NAMENODE_ID_KEY} is not specifically
-   * configured, this method determines the namenode Id by matching the local
-   * node's address with the configured addresses. When a match is found, it
-   * returns the namenode Id from the corresponding configuration key.
-   * 
-   * @param conf Configuration
-   * @return namenode Id on success, null on failure.
-   * @throws HadoopIllegalArgumentException on error
+   * 获取当前节点的NameNode ID，如果配置未显式设置则通过本地地址匹配自动推导
+   * @param conf 配置对象
+   * @param nsId 名称服务ID
+   * @return 成功则返回NameNode ID，失败返回null
+   * @throws HadoopIllegalArgumentException 配置错误时抛出异常
    */
   public static String getNameNodeId(Configuration conf, String nsId) {
     String namenodeId = conf.getTrimmed(DFS_HA_NAMENODE_ID_KEY);
@@ -139,9 +137,11 @@ public class HAUtil {
   }
 
   /**
-   * Similar to
-   * {@link DFSUtil#getNameServiceIdFromAddress(Configuration, 
-   * InetSocketAddress, String...)}
+   * 根据地址从配置中推导对应NameNode的ID
+   * @param conf 配置对象
+   * @param address 目标NameNode地址
+   * @param keys 需要匹配的配置key列表
+   * @return 推导得到的NameNode ID，无法推导则返回null
    */
   public static String getNameNodeIdFromAddress(final Configuration conf, 
       final InetSocketAddress address, String... keys) {
@@ -154,10 +154,10 @@ public class HAUtil {
   }
   
   /**
-   * Get the NN ID of the other nodes in an HA setup.
-   * 
-   * @param conf the configuration of this node
-   * @return a list of NN IDs of other nodes in this nameservice
+   * 获取当前HA集群中，除本节点外其他所有NameNode的ID列表
+   * @param conf 当前节点配置
+   * @param nsId 名称服务ID
+   * @return 其他NameNode的ID列表
    */
   public static List<String> getNameNodeIdOfOtherNodes(Configuration conf, String nsId) {
     Preconditions.checkArgument(nsId != null,
@@ -170,7 +170,7 @@ public class HAUtil {
     Preconditions.checkArgument(nnIds != null,
         "Could not determine namenode ids in namespace '%s'. " +
         "Please configure " +
-        DFSUtil.addKeySuffixes(DFSConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX,
+        DFSUtil.addKeySuffixes(DFSConfigKeys.DFS_HA_NAMODES_KEY_PREFIX,
             nsId),
         nsId);
     Preconditions.checkArgument(nnIds.size() >= 2,
@@ -190,11 +190,9 @@ public class HAUtil {
   }
 
   /**
-   * Given the configuration for this node, return a list of configurations
-   * for the other nodes in an HA setup.
-   * 
-   * @param myConf the configuration of this node
-   * @return a list of configuration of other nodes in an HA setup
+   * 根据当前节点配置，生成HA集群中所有其他NameNode的配置对象列表
+   * @param myConf 当前节点配置
+   * @return 其他NameNode的配置对象列表
    */
   public static List<Configuration> getConfForOtherNodes(
       Configuration myConf) {
@@ -205,7 +203,7 @@ public class HAUtil {
     // Look up the address of the other NNs
     List<Configuration> confs = new ArrayList<Configuration>(otherNodes.size());
     myConf = new Configuration(myConf);
-    // unset independent properties
+    // 清除每个节点独立配置，后续会按节点ID重新初始化
     for (String idpKey : HA_SPECIAL_INDEPENDENT_KEYS) {
       myConf.unset(idpKey);
     }
@@ -218,26 +216,29 @@ public class HAUtil {
   }
 
   /**
-   * This is used only by tests at the moment.
-   * @return true if the NN should allow read operations while in standby mode.
+   * 检查配置是否允许Standby状态的NameNode处理读请求（ stale读）
+   * @return true允许Standby读，false不允许
    */
   public static boolean shouldAllowStandbyReads(Configuration conf) {
     return conf.getBoolean(DFS_HA_ALLOW_STALE_READ_KEY,
         DFS_HA_ALLOW_STALE_READ_DEFAULT);
   }
   
+  /**
+   * 设置是否允许Standby读配置
+   * @param conf 目标配置对象
+   * @param val 是否允许
+   */
   public static void setAllowStandbyReads(Configuration conf, boolean val) {
     conf.setBoolean(DFS_HA_ALLOW_STALE_READ_KEY, val);
   }
 
   /**
-   * Check whether logical URI is needed for the namenode and
-   * the corresponding failover proxy provider in the config.
-   *
-   * @param conf Configuration
-   * @param nameNodeUri The URI of namenode
-   * @return true if logical URI is needed. false, if not needed.
-   * @throws IOException most likely due to misconfiguration.
+   * 检查当前配置是否需要使用逻辑URI对接NameNode和故障转移代理
+   * @param conf 配置对象
+   * @param nameNodeUri NameNode URI
+   * @return true需要使用逻辑URI，false不需要
+   * @throws IOException 配置错误时抛出异常
    */
   public static boolean useLogicalUri(Configuration conf, URI nameNodeUri) 
       throws IOException {
@@ -255,14 +256,10 @@ public class HAUtil {
   }
 
   /**
-   * Get the internet address of the currently-active NN. This should rarely be
-   * used, since callers of this method who connect directly to the NN using the
-   * resulting InetSocketAddress will not be able to connect to the active NN if
-   * a failover were to occur after this method has been called.
-   * 
-   * @param fs the file system to get the active address of.
-   * @return the internet address of the currently-active NN.
-   * @throws IOException if an error occurs while resolving the active NN.
+   * 获取当前处于Active状态的NameNode地址，注意：该方法获取地址后，如果发生故障切换，地址会失效，因此不推荐频繁使用
+   * @param fs 目标文件系统对象
+   * @return 当前Active NameNode地址，未找到则返回null
+   * @throws IOException 解析过程发生IO错误抛出异常
    */
   public static InetSocketAddress getAddressOfActive(FileSystem fs)
       throws IOException {
@@ -270,7 +267,7 @@ public class HAUtil {
     if (!(fs instanceof DistributedFileSystem)) {
       throw new IllegalArgumentException("FileSystem " + fs + " is not a DFS.");
     }
-    // force client address resolution.
+    // 触发客户端地址解析，刷新代理信息
     fs.exists(new Path("/"));
     DistributedFileSystem dfs = (DistributedFileSystem) fs;
     Configuration dfsConf = dfs.getConf();
@@ -285,7 +282,7 @@ public class HAUtil {
             inAddr = RPC.getServerAddress(proxy);
           }
         } catch (Exception e) {
-          //Ignore the exception while connecting to a namenode.
+          //连接失败忽略该节点，继续尝试其他节点
           LOG.debug("Error while connecting to namenode", e);
         }
       }
@@ -297,13 +294,11 @@ public class HAUtil {
   }
   
   /**
-   * Get an RPC proxy for each NN in an HA nameservice. Used when a given RPC
-   * call should be made on every NN in an HA nameservice, not just the active.
-   * 
-   * @param conf configuration
-   * @param nsId the nameservice to get all of the proxies for.
-   * @return a list of RPC proxies for each NN in the nameservice.
-   * @throws IOException in the event of error.
+   * 为HA名称服务下所有NameNode创建RPC代理，用于需要向所有NN发起请求的场景
+   * @param conf 配置对象
+   * @param nsId 名称服务ID
+   * @return 所有NameNode的ClientProtocol代理列表
+   * @throws IOException 创建代理发生错误抛出异常
    */
   public static List<ClientProtocol> getProxiesForAllNameNodesInNameservice(
       Configuration conf, String nsId) throws IOException {
@@ -319,14 +314,12 @@ public class HAUtil {
   }
 
   /**
-   * Get an RPC proxy for each NN in an HA nameservice. Used when a given RPC
-   * call should be made on every NN in an HA nameservice, not just the active.
-   *
-   * @param conf configuration
-   * @param nsId the nameservice to get all of the proxies for.
-   * @param xface the protocol class.
-   * @return a list of RPC proxies for each NN in the nameservice.
-   * @throws IOException in the event of error.
+   * 为HA名称服务下所有NameNode创建指定协议的RPC代理，泛型版本支持自定义协议
+   * @param conf 配置对象
+   * @param nsId 名称服务ID
+   * @param xface 协议接口类
+   * @return 所有NameNode的代理信息列表，包含代理和额外信息
+   * @throws IOException 创建代理发生错误抛出异常
    */
   public static <T> List<ProxyAndInfo<T>> getProxiesForAllNameNodesInNameservice(
       Configuration conf, String nsId, Class<T> xface) throws IOException {
@@ -345,24 +338,23 @@ public class HAUtil {
   }
   
   /**
-   * Used to ensure that at least one of the given HA NNs is currently in the
-   * active state..
-   * 
-   * @param namenodes list of RPC proxies for each NN to check.
-   * @return true if at least one NN is active, false if all are in the standby state.
-   * @throws IOException in the event of error.
+   * 检查给定NameNode代理列表中是否至少有一个处于Active状态
+   * @param namenodes NameNode代理列表
+   * @return 至少一个Active返回true，全部Standby返回false
+   * @throws IOException 多个非Standby异常时抛出聚合异常
    */
   public static boolean isAtLeastOneActive(List<ClientProtocol> namenodes)
       throws IOException {
     List<IOException> exceptions = new ArrayList<>();
     for (ClientProtocol namenode : namenodes) {
       try {
+        // 尝试访问根目录文件信息验证是否可处理请求
         namenode.getFileInfo("/");
         return true;
       } catch (RemoteException re) {
         IOException cause = re.unwrapRemoteException();
         if (cause instanceof StandbyException) {
-          // This is expected to happen for a standby NN.
+          // Standby节点抛出异常是预期行为，直接忽略
         } else {
           exceptions.add(re);
         }

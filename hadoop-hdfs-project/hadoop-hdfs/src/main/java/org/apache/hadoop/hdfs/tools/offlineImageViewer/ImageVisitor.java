@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,14 +21,13 @@ package org.apache.hadoop.hdfs.tools.offlineImageViewer;
 import java.io.IOException;
 
 /**
- * An implementation of ImageVisitor can traverse the structure of an
- * Hadoop fsimage and respond to each of the structures within the file.
+ * 离线fsimage查看器的访问者抽象基类，定义了遍历HDFS fsimage结构的访问接口
+ * 具体实现类可以通过实现这些接口，对fsimage中的不同结构执行自定义处理逻辑
  */
 abstract class ImageVisitor {
 
   /**
-   * Structural elements of an FSImage that may be encountered within the
-   * file. ImageVisitors are able to handle processing any of these elements.
+   * fsimage文件中可被访问的结构元素枚举，定义了fsimage中所有可能出现的数据结构类型
    */
   public enum ImageElement {
     FS_IMAGE,
@@ -133,33 +133,32 @@ abstract class ImageVisitor {
   }
   
   /**
-   * Begin visiting the fsimage structure.  Opportunity to perform
-   * any initialization necessary for the implementing visitor.
+   * 开始遍历fsimage结构，供具体实现类完成初始化工作
+   * @throws IOException 初始化过程中可能出现IO异常
    */
   abstract void start() throws IOException;
 
   /**
-   * Finish visiting the fsimage structure.  Opportunity to perform any
-   * clean up necessary for the implementing visitor.
+   * 完成正常遍历fsimage结构，供具体实现类完成清理工作
+   * @throws IOException 清理过程中可能出现IO异常
    */
   abstract void finish() throws IOException;
 
   /**
-   * Finish visiting the fsimage structure after an error has occurred
-   * during the processing.  Opportunity to perform any clean up necessary
-   * for the implementing visitor.
+   * 遍历过程发生异常后结束访问，供具体实现类完成异常清理工作
+   * @throws IOException 清理过程中可能出现IO异常
    */
   abstract void finishAbnormally() throws IOException;
 
   /**
-   * Visit non enclosing element of fsimage with specified value.
-   *
-   * @param element FSImage element
-   * @param value Element's value
+   * 访问fsimage中不包含子元素的叶子节点元素
+   * @param element 要访问的fsimage元素类型
+   * @param value 元素的值，字符串形式
+   * @throws IOException 访问过程中可能出现IO异常
    */
   abstract void visit(ImageElement element, String value) throws IOException;
 
-  // Convenience methods to automatically convert numeric value types to strings
+  // 数值类型的便捷访问方法，自动转换为字符串后调用通用visit
   void visit(ImageElement element, int value) throws IOException {
     visit(element, Integer.toString(value));
   }
@@ -169,29 +168,24 @@ abstract class ImageVisitor {
   }
 
   /**
-   * Begin visiting an element that encloses another element, such as
-   * the beginning of the list of blocks that comprise a file.
-   *
-   * @param element Element being visited
+   * 开始访问包含子元素的容器元素（例如文件的块列表）
+   * @param element 要访问的容器元素类型
+   * @throws IOException 访问过程中可能出现IO异常
    */
   abstract void visitEnclosingElement(ImageElement element)
      throws IOException;
 
   /**
-   * Begin visiting an element that encloses another element, such as
-   * the beginning of the list of blocks that comprise a file.
-   *
-   * Also provide an additional key and value for the element, such as the
-   * number items within the element.
-   *
-   * @param element Element being visited
-   * @param key Key describing the element being visited
-   * @param value Value associated with element being visited
+   * 开始访问包含子元素的容器元素，并附带额外的键值对信息（例如容器内元素数量）
+   * @param element 要访问的容器元素类型
+   * @param key 附加信息的键
+   * @param value 附加信息的值，字符串形式
+   * @throws IOException 访问过程中可能出现IO异常
    */
   abstract void visitEnclosingElement(ImageElement element,
       ImageElement key, String value) throws IOException;
 
-  // Convenience methods to automatically convert value types to strings
+  // 数值类型的便捷容器访问方法，自动转换为字符串后调用通用方法
   void visitEnclosingElement(ImageElement element,
       ImageElement key, int value)
      throws IOException {
@@ -205,8 +199,8 @@ abstract class ImageVisitor {
   }
 
   /**
-   * Leave current enclosing element.  Called, for instance, at the end of
-   * processing the blocks that compromise a file.
+   * 离开当前容器元素，在完成容器内所有子元素处理后调用，例如处理完文件的所有块后调用
+   * @throws IOException 离开容器过程中可能出现IO异常
    */
   abstract void leaveEnclosingElement() throws IOException;
 }

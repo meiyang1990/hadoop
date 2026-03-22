@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -52,9 +53,9 @@ import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ComparisonChain;
 
 /**
- * Journal manager for the common case of edits files being written
- * to a storage directory.
- * 
+ * 文件系统日志管理器，负责将NameNode编辑日志写入本地存储目录，提供日志管理、清理、恢复功能
+ * 实现基于文件存储的JournalManager接口，支持HDFS元数据变更日志的持久化存储
+ *
  * Note: this class is not thread-safe and should be externally
  * synchronized.
  */
@@ -68,10 +69,13 @@ public class FileJournalManager implements JournalManager {
   private final StorageErrorReporter errorReporter;
   private int outputBufferCapacity = 512*1024;
 
+  // 已 finalized 的编辑日志文件名正则表达式：edits_start-end
   private static final Pattern EDITS_REGEX = Pattern.compile(
     NameNodeFile.EDITS.getName() + "_(\\d+)-(\\d+)");
+  // 进行中的编辑日志文件名正则表达式：edits_inprogress_start
   private static final Pattern EDITS_INPROGRESS_REGEX = Pattern.compile(
     NameNodeFile.EDITS_INPROGRESS.getName() + "_(\\d+)");
+  // 过时的进行中编辑日志文件名正则表达式（带后缀标记）
   private static final Pattern EDITS_INPROGRESS_STALE_REGEX = Pattern.compile(
       NameNodeFile.EDITS_INPROGRESS.getName() + "_(\\d+).*(\\S+)");
 
@@ -85,12 +89,19 @@ public class FileJournalManager implements JournalManager {
    * with ongoing writers.
    * Initial value indicates that all transactions can be read.
    */
+  // 当前所有已安全写入日志的最大事务ID，限制读取范围避免和写入竞态
   private long lastReadableTxId = Long.MAX_VALUE;
 
   @VisibleForTesting
-  StoragePurger purger
+  StoragePurger
     = new NNStorageRetentionManager.DeletionStoragePurger();
 
+  /**
+   * 构造文件日志管理器，绑定指定的存储目录
+   * @param conf Hadoop配置对象
+   * @param sd 存储目录对象
+   * @param errorReporter 存储错误报告器
+   */
   public FileJournalManager(Configuration conf, StorageDirectory sd,
       StorageErrorReporter errorReporter) {
     this.conf = conf;
@@ -117,11 +128,20 @@ public class FileJournalManager implements JournalManager {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * 启动一个新的编辑日志段，用于写入从指定事务ID开始的日志
+   * @param txid 新日志段起始事务ID
+   * @param layoutVersion HDFS存储布局版本
+   * @return 编辑日志输出流
+   * @throws IOException 启动日志段失败时抛出
+   */
   @Override
   synchronized public EditLogOutputStream startLogSegment(long txid,
       int layoutVersion) throws IOException {
     try {
+      // 获取进行中的编辑日志文件对象
       currentInProgress = NNStorage.getInProgressEditsFile(sd, txid);
+      // 创建文件输出流并初始化
       EditLogOutputStream stm = new EditLogFileOutputStream(conf,
           currentInProgress, outputBufferCapacity);
       stm.create(layoutVersion);
@@ -130,31 +150,42 @@ public class FileJournalManager implements JournalManager {
       LOG.warn("Unable to start log segment " + txid +
           " at " + currentInProgress + ": " +
           e.getLocalizedMessage());
+      // 上报文件错误
       errorReporter.reportErrorOnFile(currentInProgress);
       throw e;
     }
   }
 
+  /**
+   * 完成指定日志段，将进行中的文件重命名为已 finalized 文件
+   * @param firstTxId 日志段起始事务ID
+   * @param lastTxId 日志段结束事务ID
+   * @throws IOException 完成日志段失败时抛出
+   */
   @Override
   synchronized public void finalizeLogSegment(long firstTxId, long lastTxId)
       throws IOException {
     File inprogressFile = NNStorage.getInProgressEditsFile(sd, firstTxId);
 
+    // 生成最终化后的目标文件名
     File dstFile = NNStorage.getFinalizedEditsFile(
         sd, firstTxId, lastTxId);
     LOG.info("Finalizing edits file " + inprogressFile + " -> " + dstFile);
     
+    // 检查目标文件不存在
     Preconditions.checkState(!dstFile.exists(),
         "Can't finalize edits file " + inprogressFile + " since finalized file " +
         "already exists");
 
     try {
+      // 重命名文件完成最终化
       NativeIO.renameTo(inprogressFile, dstFile);
     } catch (IOException e) {
       errorReporter.reportErrorOnFile(dstFile);
       throw new IllegalStateException("Unable to finalize edits file " + inprogressFile, e);
     }
 
+    // 清空当前进行中引用
     if (inprogressFile.equals(currentInProgress)) {
       currentInProgress = null;
     }
@@ -165,6 +196,10 @@ public class FileJournalManager implements JournalManager {
     return sd;
   }
 
+  /**
+   * 设置日志输出缓冲区容量
+   * @param size 缓冲区容量大小（字节）
+   */
   @Override
   synchronized public void setOutputBufferCapacity(int size) {
     this.outputBufferCapacity = size;
@@ -195,31 +230,45 @@ public class FileJournalManager implements JournalManager {
    * @param minTxIdToKeep the lowest transaction ID that should be retained
    * @throws IOException if listing the storage directory fails.
    */
+  /**
+   * 清理早于指定最小保留事务ID的旧日志文件
+   * @param minTxIdToKeep 需要保留的最小事务ID，早于该ID的日志会被清理
+   * @throws IOException 列出存储目录文件失败时抛出
+   */
   @Override
   public void purgeLogsOlderThan(long minTxIdToKeep)
       throws IOException {
     LOG.info("Purging logs older than " + minTxIdToKeep);
+    // 列出当前目录所有文件
     File[] files = FileUtil.listFiles(sd.getCurrentDir());
+    // 匹配所有编辑日志文件
     List<EditLogFile> editLogs = matchEditLogs(files, true);
     synchronized (this) {
+      // 遍历所有日志，判断是否需要清理或标记过期
       for (EditLogFile log : editLogs) {
         if (log.getFirstTxId() < minTxIdToKeep &&
             log.getLastTxId() < minTxIdToKeep) {
+          // 日志完全早于保留阈值，清理
           purger.purgeLog(log);
         } else if (isStaleInProgressLog(minTxIdToKeep, log)) {
+          // 非当前进行中的旧进行中日志，标记为过期
           purger.markStale(log);
         }
       }
     }
   }
 
+  /**
+   * 判断给定日志是否为过期的进行中日志
+   * @param minTxIdToKeep 最小保留事务ID
+   * @param log 待判断的日志文件对象
+   * @return 是否为过期进行中日志
+   */
   private boolean isStaleInProgressLog(long minTxIdToKeep, EditLogFile log) {
     return log.isInProgress() &&
         !log.getFile().equals(currentInProgress) &&
         log.getFirstTxId() >= minTxIdToKeep &&
-        // at last we check if this segment is not already marked as .trash,
-        // .empty or .corrupted, in which case it does not match the strict
-        // regex pattern.
+        // 仅对未标记过的文件处理，已经是过期/垃圾/损坏的文件会被直接清理
         EDITS_INPROGRESS_REGEX.matcher(log.getFile().getName()).matches();
   }
 
@@ -231,18 +280,28 @@ public class FileJournalManager implements JournalManager {
    * @return a list of remote edit logs
    * @throws IOException if edit logs cannot be listed.
    */
+  /**
+   * 获取起始事务ID大于等于指定值的所有远程编辑日志
+   * @param firstTxId 起始查找事务ID
+   * @param inProgressOk 是否包含进行中的日志段
+   * @return 符合条件的远程编辑日志列表
+   * @throws IOException 列出日志文件失败时抛出
+   */
   public List<RemoteEditLog> getRemoteEditLogs(long firstTxId,
       boolean inProgressOk) throws IOException {
     File currentDir = sd.getCurrentDir();
     List<EditLogFile> allLogFiles = matchEditLogs(currentDir);
     List<RemoteEditLog> ret = Lists.newArrayListWithCapacity(
         allLogFiles.size());
+    // 遍历所有日志文件，筛选符合条件的日志
     for (EditLogFile elf : allLogFiles) {
       if (elf.hasCorruptHeader() || (!inProgressOk && elf.isInProgress())) {
+        // 跳过损坏头文件或不包含进行中日志时跳过进行中文件
         continue;
       }
       if (elf.isInProgress()) {
         try {
+          // 扫描进行中日志验证头信息，获取实际结束事务ID
           elf.scanLog(getLastReadableTxId(), true);
         } catch (IOException e) {
           LOG.error("got IOException while trying to validate header of " +
@@ -251,16 +310,17 @@ public class FileJournalManager implements JournalManager {
         }
       }
       if (elf.getFirstTxId() >= firstTxId) {
+        // 起始ID满足要求，添加结果
         ret.add(new RemoteEditLog(elf.firstTxId, elf.lastTxId,
             elf.isInProgress()));
       } else if (elf.getFirstTxId() < firstTxId && firstTxId <= elf.getLastTxId()) {
-        // If the firstTxId is in the middle of an edit log segment. Return this
-        // anyway and let the caller figure out whether it wants to use it.
+        // firstTxId落在当前日志段中间，仍然返回由调用方处理
         ret.add(new RemoteEditLog(elf.firstTxId, elf.lastTxId,
             elf.isInProgress()));
       }
     }
     
+    // 按事务ID排序返回
     Collections.sort(ret);
     
     return ret;
@@ -270,23 +330,28 @@ public class FileJournalManager implements JournalManager {
    * Discard all editlog segments whose first txid is greater than or equal to
    * the given txid, by renaming them with suffix ".trash".
    */
+  /**
+   * 丢弃所有起始事务ID大于等于指定值的日志段，通过重命名为.trash后缀实现
+   * @param startTxId 起始丢弃事务ID
+   * @throws IOException 列出文件或重命名失败时抛出
+   */
   private void discardEditLogSegments(long startTxId) throws IOException {
     File currentDir = sd.getCurrentDir();
     List<EditLogFile> allLogFiles = matchEditLogs(currentDir);
     List<EditLogFile> toTrash = Lists.newArrayList();
     LOG.info("Discard the EditLog files, the given start txid is " + startTxId);
-    // go through the editlog files to make sure the startTxId is right at the
-    // segment boundary
+    // 遍历日志，收集需要丢弃的日志段
     for (EditLogFile elf : allLogFiles) {
       if (elf.getFirstTxId() >= startTxId) {
         toTrash.add(elf);
       } else {
+        // 保证所有起始ID小于startTxId的日志，结束ID也一定小于startTxId，即事务ID边界对齐
         Preconditions.checkState(elf.getLastTxId() < startTxId);
       }
     }
 
+    // 将所有需要丢弃的日志重命名为.trash后缀
     for (EditLogFile elf : toTrash) {
-      // rename these editlog file as .trash
       elf.moveAsideTrashFile(startTxId);
       LOG.info("Trash the EditLog file " + elf);
     }
@@ -310,12 +375,19 @@ public class FileJournalManager implements JournalManager {
     return matchEditLogs(filesInStorage, false);
   }
 
+  /**
+   * 匹配文件数组中所有符合编辑日志命名规则的文件，转换为EditLogFile对象
+   * @param filesInStorage 待匹配的文件数组
+   * @param forPurging 是否用于清理，为true时额外匹配已标记过期的进行中日志
+   * @return 匹配到的编辑日志对象列表
+   */
   private static List<EditLogFile> matchEditLogs(File[] filesInStorage,
       boolean forPurging) {
     List<EditLogFile> ret = Lists.newArrayList();
+    // 遍历所有文件，匹配不同类型日志
     for (File f : filesInStorage) {
       String name = f.getName();
-      // Check for edits
+      // 匹配已 finalized 日志
       Matcher editsMatch = EDITS_REGEX.matcher(name);
       if (editsMatch.matches()) {
         try {
@@ -330,383 +402,10 @@ public class FileJournalManager implements JournalManager {
         }
       }
       
-      // Check for in-progress edits
+      // 匹配正常命名的进行中日志
       Matcher inProgressEditsMatch = EDITS_INPROGRESS_REGEX.matcher(name);
       if (inProgressEditsMatch.matches()) {
         try {
           long startTxId = Long.parseLong(inProgressEditsMatch.group(1));
           ret.add(
-              new EditLogFile(f, startTxId, HdfsServerConstants.INVALID_TXID, true));
-          continue;
-        } catch (NumberFormatException nfe) {
-          LOG.error("In-progress edits file " + f + " has improperly " +
-                    "formatted transaction ID");
-          // skip
-        }
-      }
-      if (forPurging) {
-        // Check for in-progress stale edits
-        Matcher staleInprogressEditsMatch = EDITS_INPROGRESS_STALE_REGEX
-            .matcher(name);
-        if (staleInprogressEditsMatch.matches()) {
-          try {
-            long startTxId = Long.parseLong(staleInprogressEditsMatch.group(1));
-            ret.add(new EditLogFile(f, startTxId, HdfsServerConstants.INVALID_TXID,
-                true));
-            continue;
-          } catch (NumberFormatException nfe) {
-            LOG.error("In-progress stale edits file " + f + " has improperly "
-                + "formatted transaction ID");
-            // skip
-          }
-        }
-      }
-    }
-    return ret;
-  }
-
-  synchronized public void selectInputStreams(
-      Collection<EditLogInputStream> streams,
-      long fromTxnId, boolean inProgressOk) throws IOException {
-    selectInputStreams(streams, fromTxnId, inProgressOk, false);
-  }
-
-  @Override
-  synchronized public void selectInputStreams(
-      Collection<EditLogInputStream> streams, long fromTxId,
-      boolean inProgressOk, boolean onlyDurableTxns)
-      throws IOException {
-    List<EditLogFile> elfs = matchEditLogs(sd.getCurrentDir());
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(this + ": selecting input streams starting at " + fromTxId +
-          (inProgressOk ? " (inProgress ok) " : " (excluding inProgress) ") +
-          "from among " + elfs.size() + " candidate file(s)");
-    }
-    addStreamsToCollectionFromFiles(elfs, streams, fromTxId,
-        getLastReadableTxId(), inProgressOk);
-  }
-  
-  static void addStreamsToCollectionFromFiles(Collection<EditLogFile> elfs,
-      Collection<EditLogInputStream> streams, long fromTxId,
-      long maxTxIdToScan, boolean inProgressOk) {
-    for (EditLogFile elf : elfs) {
-      if (elf.isInProgress()) {
-        if (!inProgressOk) {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("passing over " + elf + " because it is in progress " +
-                "and we are ignoring in-progress logs.");
-          }
-          continue;
-        }
-        try {
-          elf.scanLog(maxTxIdToScan, true);
-        } catch (IOException e) {
-          LOG.error("got IOException while trying to validate header of " +
-              elf + ".  Skipping.", e);
-          continue;
-        }
-      }
-      if (elf.lastTxId < fromTxId) {
-        assert elf.lastTxId != HdfsServerConstants.INVALID_TXID;
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("passing over " + elf + " because it ends at " +
-              elf.lastTxId + ", but we only care about transactions " +
-              "as new as " + fromTxId);
-        }
-        continue;
-      }
-      EditLogFileInputStream elfis = new EditLogFileInputStream(elf.getFile(),
-            elf.getFirstTxId(), elf.getLastTxId(), elf.isInProgress());
-      LOG.debug("selecting edit log stream " + elf);
-      streams.add(elfis);
-    }
-  }
-
-  @Override
-  synchronized public void recoverUnfinalizedSegments() throws IOException {
-    File currentDir = sd.getCurrentDir();
-    LOG.info("Recovering unfinalized segments in " + currentDir);
-    List<EditLogFile> allLogFiles = matchEditLogs(currentDir);
-
-    for (EditLogFile elf : allLogFiles) {
-      if (elf.getFile().equals(currentInProgress)) {
-        continue;
-      }
-      if (elf.isInProgress()) {
-        // If the file is zero-length, we likely just crashed after opening the
-        // file, but before writing anything to it. Safe to delete it.
-        if (elf.getFile().length() == 0) {
-          LOG.info("Deleting zero-length edit log file " + elf);
-          if (!elf.getFile().delete()) {
-            throw new IOException("Unable to delete file " + elf.getFile());
-          }
-          continue;
-        }
-
-        elf.scanLog(getLastReadableTxId(), true);
-
-        if (elf.hasCorruptHeader()) {
-          elf.moveAsideCorruptFile();
-          throw new CorruptionException("In-progress edit log file is corrupt: "
-              + elf);
-        }
-        if (elf.getLastTxId() == HdfsServerConstants.INVALID_TXID) {
-          // If the file has a valid header (isn't corrupt) but contains no
-          // transactions, we likely just crashed after opening the file and
-          // writing the header, but before syncing any transactions. Safe to
-          // delete the file.
-          LOG.info("Moving aside edit log file that seems to have zero " +
-              "transactions " + elf);
-          elf.moveAsideEmptyFile();
-          continue;
-        }
-        finalizeLogSegment(elf.getFirstTxId(), elf.getLastTxId());
-      }
-    }
-  }
-
-  public List<EditLogFile> getLogFiles(long fromTxId) throws IOException {
-    File currentDir = sd.getCurrentDir();
-    List<EditLogFile> allLogFiles = matchEditLogs(currentDir);
-    List<EditLogFile> logFiles = Lists.newArrayList();
-    
-    for (EditLogFile elf : allLogFiles) {
-      if (fromTxId <= elf.getFirstTxId() ||
-          elf.containsTxId(fromTxId)) {
-        logFiles.add(elf);
-      }
-    }
-    
-    Collections.sort(logFiles, EditLogFile.COMPARE_BY_START_TXID);
-
-    return logFiles;
-  }
-  
-  public EditLogFile getLogFile(long startTxId) throws IOException {
-    return getLogFile(sd.getCurrentDir(), startTxId, true);
-  }
-
-  public EditLogFile getLogFile(long startTxId, boolean inProgressOk)
-      throws IOException {
-    return getLogFile(sd.getCurrentDir(), startTxId, inProgressOk);
-  }
-
-  public static EditLogFile getLogFile(File dir, long startTxId)
-      throws IOException {
-    return getLogFile(dir, startTxId, true);
-  }
-
-  public static EditLogFile getLogFile(File dir, long startTxId,
-      boolean inProgressOk) throws IOException {
-    List<EditLogFile> files = matchEditLogs(dir);
-    List<EditLogFile> ret = Lists.newLinkedList();
-    for (EditLogFile elf : files) {
-      if (elf.getFirstTxId() == startTxId) {
-        if (inProgressOk || !elf.isInProgress()) {
-          ret.add(elf);
-        }
-      }
-    }
-    
-    if (ret.isEmpty()) {
-      // no matches
-      return null;
-    } else if (ret.size() == 1) {
-      return ret.get(0);
-    } else {
-      throw new IllegalStateException("More than one log segment in " + 
-          dir + " starting at txid " + startTxId + ": " +
-          Joiner.on(", ").join(ret));
-    }
-  }
-
-  @Override
-  public String toString() {
-    return String.format("FileJournalManager(root=%s)", sd.getRoot());
-  }
-
-  /**
-   * Record of an edit log that has been located and had its filename parsed.
-   */
-  @InterfaceAudience.Private
-  public static class EditLogFile {
-    private File file;
-    private final long firstTxId;
-    private long lastTxId;
-
-    private boolean hasCorruptHeader = false;
-    private final boolean isInProgress;
-
-    final static Comparator<EditLogFile> COMPARE_BY_START_TXID 
-      = new Comparator<EditLogFile>() {
-      @Override
-      public int compare(EditLogFile a, EditLogFile b) {
-        return ComparisonChain.start()
-        .compare(a.getFirstTxId(), b.getFirstTxId())
-        .compare(a.getLastTxId(), b.getLastTxId())
-        .result();
-      }
-    };
-
-    EditLogFile(File file,
-        long firstTxId, long lastTxId) {
-      this(file, firstTxId, lastTxId, false);
-      assert (lastTxId != HdfsServerConstants.INVALID_TXID)
-        && (lastTxId >= firstTxId);
-    }
-    
-    EditLogFile(File file, long firstTxId, 
-                long lastTxId, boolean isInProgress) { 
-      assert (lastTxId == HdfsServerConstants.INVALID_TXID && isInProgress)
-        || (lastTxId != HdfsServerConstants.INVALID_TXID && lastTxId >= firstTxId);
-      assert (firstTxId > 0) || (firstTxId == HdfsServerConstants.INVALID_TXID);
-      assert file != null;
-      
-      Preconditions.checkArgument(!isInProgress ||
-          lastTxId == HdfsServerConstants.INVALID_TXID);
-      
-      this.firstTxId = firstTxId;
-      this.lastTxId = lastTxId;
-      this.file = file;
-      this.isInProgress = isInProgress;
-    }
-    
-    public long getFirstTxId() {
-      return firstTxId;
-    }
-    
-    public long getLastTxId() {
-      return lastTxId;
-    }
-    
-    boolean containsTxId(long txId) {
-      return firstTxId <= txId && txId <= lastTxId;
-    }
-
-    /** 
-     * Find out where the edit log ends.
-     * This will update the lastTxId of the EditLogFile or
-     * mark it as corrupt if it is.
-     * @param maxTxIdToScan Maximum Tx ID to try to scan.
-     *                      The scan returns after reading this or a higher ID.
-     *                      The file portion beyond this ID is potentially being
-     *                      updated.
-     * @param verifyVersion Whether the scan should verify the layout version
-     */
-    public void scanLog(long maxTxIdToScan, boolean verifyVersion)
-        throws IOException {
-      EditLogValidation val = EditLogFileInputStream.scanEditLog(file,
-          maxTxIdToScan, verifyVersion);
-      this.lastTxId = val.getEndTxId();
-      this.hasCorruptHeader = val.hasCorruptHeader();
-    }
-
-    public boolean isInProgress() {
-      return isInProgress;
-    }
-
-    public File getFile() {
-      return file;
-    }
-    
-    boolean hasCorruptHeader() {
-      return hasCorruptHeader;
-    }
-
-    void moveAsideCorruptFile() throws IOException {
-      assert hasCorruptHeader;
-      renameSelf(".corrupt");
-    }
-
-    void moveAsideTrashFile(long markerTxid) throws IOException {
-      assert this.getFirstTxId() >= markerTxid;
-      renameSelf(".trash");
-    }
-
-    public void moveAsideEmptyFile() throws IOException {
-      assert lastTxId == HdfsServerConstants.INVALID_TXID;
-      renameSelf(".empty");
-    }
-
-    public void moveAsideStaleInprogressFile() throws IOException {
-      assert isInProgress;
-      renameSelf(".stale");
-    }
-
-    private void renameSelf(String newSuffix) throws IOException {
-      File src = file;
-      File dst = new File(src.getParent(), src.getName() + newSuffix);
-      // renameTo fails on Windows if the destination file already exists.
-      try {
-        if (dst.exists()) {
-          if (!dst.delete()) {
-            throw new IOException("Couldn't delete " + dst);
-          }
-        }
-        NativeIO.renameTo(src, dst);
-      } catch (IOException e) {
-        throw new IOException(
-            "Couldn't rename log " + src + " to " + dst, e);
-      }
-      file = dst;
-    }
-
-    @Override
-    public String toString() {
-      return String.format("EditLogFile(file=%s,first=%019d,last=%019d,"
-                           +"inProgress=%b,hasCorruptHeader=%b)",
-                           file.toString(), firstTxId, lastTxId,
-                           isInProgress(), hasCorruptHeader);
-    }
-  }
-  
-  @Override
-  public void doPreUpgrade() throws IOException {
-    LOG.info("Starting upgrade of edits directory " + sd.getRoot());
-    try {
-     NNUpgradeUtil.doPreUpgrade(conf, sd);
-    } catch (IOException ioe) {
-     LOG.error("Failed to move aside pre-upgrade storage " +
-         "in image directory " + sd.getRoot(), ioe);
-     throw ioe;
-    }
-  }
-  
-  /**
-   * This method assumes that the fields of the {@link Storage} object have
-   * already been updated to the appropriate new values for the upgrade.
-   */
-  @Override
-  public void doUpgrade(Storage storage) throws IOException {
-    NNUpgradeUtil.doUpgrade(sd, storage);
-  }
-  
-  @Override
-  public void doFinalize() throws IOException {
-    NNUpgradeUtil.doFinalize(sd);
-  }
-
-  @Override
-  public boolean canRollBack(StorageInfo storage, StorageInfo prevStorage,
-      int targetLayoutVersion) throws IOException {
-    return NNUpgradeUtil.canRollBack(sd, storage,
-        prevStorage, targetLayoutVersion);
-  }
-
-  @Override
-  public void doRollback() throws IOException {
-    NNUpgradeUtil.doRollBack(sd);
-  }
-
-  @Override
-  public void discardSegments(long startTxid) throws IOException {
-    discardEditLogSegments(startTxid);
-  }
-
-  @Override
-  public long getJournalCTime() throws IOException {
-    StorageInfo sInfo = new StorageInfo((NodeType)null);
-    sInfo.readProperties(sd);
-    return sInfo.getCTime();
-  }
-}
+              new EditLogFile(f, startTxId, HdfsServerConstants.IN

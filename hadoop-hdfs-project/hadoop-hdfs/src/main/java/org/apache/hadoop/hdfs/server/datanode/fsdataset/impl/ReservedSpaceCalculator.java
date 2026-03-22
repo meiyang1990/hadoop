@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,12 +33,14 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DU_RESERVED_CALC
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_DU_RESERVED_CALCULATOR_KEY;
 
 /**
- * Used for calculating file system space reserved for non-HDFS data.
+ * 文件系统预留空间计算器抽象基类，用于计算DataNode磁盘上为非HDFS数据预留的空间大小，
+ * 确保操作系统和其他应用有足够磁盘空间可用，避免HDFS占满整个磁盘。
  */
 public abstract class ReservedSpaceCalculator {
 
   /**
-   * Used for creating instances of ReservedSpaceCalculator.
+   * ReservedSpaceCalculator的构造器，用于根据配置反射创建具体计算器实例，
+   * 支持用户自定义预留空间计算策略。
    */
   public static class Builder {
 
@@ -70,14 +73,15 @@ public abstract class ReservedSpaceCalculator {
 
     ReservedSpaceCalculator build() {
       try {
+        // 从配置中获取计算器实现类，若无配置则使用默认实现
         Class<? extends ReservedSpaceCalculator> clazz = conf.getClass(
             DFS_DATANODE_DU_RESERVED_CALCULATOR_KEY,
             DFS_DATANODE_DU_RESERVED_CALCULATOR_DEFAULT,
             ReservedSpaceCalculator.class);
-
+        // 获取对应构造方法
         Constructor constructor = clazz.getConstructor(
             Configuration.class, DF.class, StorageType.class, String.class);
-
+        // 通过反射创建实例并返回
         return (ReservedSpaceCalculator) constructor.newInstance(
             conf, usage, storageType, dir);
       } catch (Exception e) {
@@ -109,6 +113,12 @@ public abstract class ReservedSpaceCalculator {
     return dir;
   }
 
+  /**
+   * 从配置中按优先级读取预留空间数值，优先级：目录+存储类型 > 目录 > 存储类型 > 全局默认。
+   * @param key 配置项键
+   * @param defaultValue 默认值
+   * @return 解析后的配置数值
+   */
   long getReservedFromConf(String key, long defaultValue) {
     return conf.getLong(
         key + "." + getDir() + "." + StringUtils.toLowerCase(storageType.toString()),
@@ -118,15 +128,15 @@ public abstract class ReservedSpaceCalculator {
   }
 
   /**
-   * Return the capacity of the file system space reserved for non-HDFS.
+   * 计算并返回为非HDFS数据预留的空间字节数。
    *
-   * @return the number of bytes reserved for non-HDFS.
+   * @return 预留空间字节数
    */
   abstract long getReserved();
 
 
   /**
-   * Based on absolute number of reserved bytes.
+   * 基于固定绝对字节数的预留空间计算器实现，预留空间大小为配置的固定值。
    */
   public static class ReservedSpaceCalculatorAbsolute extends
       ReservedSpaceCalculator {
@@ -147,7 +157,7 @@ public abstract class ReservedSpaceCalculator {
   }
 
   /**
-   * Based on percentage of total capacity in the storage.
+   * 基于磁盘总容量百分比的预留空间计算器实现，预留空间按总容量的百分比计算。
    */
   public static class ReservedSpaceCalculatorPercentage extends
       ReservedSpaceCalculator {
@@ -169,8 +179,8 @@ public abstract class ReservedSpaceCalculator {
   }
 
   /**
-   * Calculates absolute and percentage based reserved space and
-   * picks the one that will yield more reserved space.
+   * 保守策略预留空间计算器，同时计算绝对数值和百分比两种方式，取结果更大的值作为预留空间。
+   * 该策略会预留更多空间给非HDFS使用，HDFS可用空间更少，更加安全。
    */
   public static class ReservedSpaceCalculatorConservative extends
       ReservedSpaceCalculator {
@@ -204,8 +214,8 @@ public abstract class ReservedSpaceCalculator {
   }
 
   /**
-   * Calculates absolute and percentage based reserved space and
-   * picks the one that will yield less reserved space.
+   * 激进策略预留空间计算器，同时计算绝对数值和百分比两种方式，取结果更小的值作为预留空间。
+   * 该策略会预留更少空间给非HDFS使用，HDFS可用空间更多，适合对空间利用率要求高的场景。
    */
   public static class ReservedSpaceCalculatorAggressive extends
       ReservedSpaceCalculator {
@@ -238,6 +248,12 @@ public abstract class ReservedSpaceCalculator {
     }
   }
 
+  /**
+   * 计算总容量对应百分比的字节数。
+   * @param total 总容量字节数
+   * @param percentage 百分比数值（如10代表10%）
+   * @return 对应百分比的字节数
+   */
   private static long getPercentage(long total, long percentage) {
     return (total * percentage) / 100;
   }

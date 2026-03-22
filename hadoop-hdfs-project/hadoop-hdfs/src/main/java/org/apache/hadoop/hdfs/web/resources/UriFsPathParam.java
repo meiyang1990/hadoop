@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,16 +18,19 @@
  */
 package org.apache.hadoop.hdfs.web.resources;
 
-/** The FileSystem path parameter. */
+/**
+ * HDFS Web REST API中URI路径参数封装类
+ * 用于从REST请求URI中提取并解析HDFS文件系统路径参数
+ */
 public class UriFsPathParam extends StringParam {
-  /** Parameter name. */
+  /** 参数名称 */
   public static final String NAME = "path";
 
   private static final Domain DOMAIN = new Domain(NAME, null);
 
   /**
-   * Constructor.
-   * @param str a string representation of the parameter value.
+   * 构造方法，从字符串构建路径参数对象
+   * @param str 参数值的字符串表示
    */
   public UriFsPathParam(String str) {
     super(DOMAIN, str);
@@ -37,7 +41,11 @@ public class UriFsPathParam extends StringParam {
     return NAME;
   }
 
-  /** @return the absolute path. */
+  /**
+   * 获取拼接完成的绝对路径
+   * 因为原始URI中首斜杠会被去掉，此处需要补回
+   * @return 完整的绝对路径，如果原参数为空则返回null
+   */
   public final String getAbsolutePath() {
     final String path = getValue(); //The first / has been stripped out.
     return path == null? null: "/" + path;

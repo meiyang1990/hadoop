@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,7 @@
  */
 
 /**
- * Classes for data transfer SASL implementation.
+ * HDFS数据传输SASL认证实现包，提供HDFS数据传输通道加密与身份认证核心能力。
+ * 为HDFS客户端与数据节点之间的数据传输连接提供SASL协商、加密解密功能，保障数据传输安全。
  */
 package org.apache.hadoop.hdfs.protocol.datatransfer.sasl;

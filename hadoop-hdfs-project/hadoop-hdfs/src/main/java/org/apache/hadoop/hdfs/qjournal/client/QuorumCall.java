@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,34 +41,38 @@ import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 
 /**
- * Represents a set of calls for which a quorum of results is needed.
- * @param <KEY> a key used to identify each of the outgoing calls
- * @param <RESULT> the type of the call result
+ * HDFS QJM（日志仲裁）模式下，代表一组需要获取多数节点响应的远程调用集合
+ * 负责管理所有节点的调用结果、异常，并等待满足法定人数要求的响应
+ * @param <KEY> 用于标识每个远程调用的键类型，对应不同日志节点
+ * @param <RESULT> 远程调用返回结果的类型
  */
 class QuorumCall<KEY, RESULT> {
   private final Map<KEY, RESULT> successes = Maps.newHashMap();
   private final Map<KEY, Throwable> exceptions = Maps.newHashMap();
 
   /**
-   * Interval, in milliseconds, at which a log message will be made
-   * while waiting for a quorum call.
+   * 等待法定响应过程中，打印进度日志的时间间隔，单位毫秒
    */
   private static final int WAIT_PROGRESS_INTERVAL_MILLIS = 1000;
   
   /**
-   * Start logging messages at INFO level periodically after waiting for
-   * this fraction of the configured timeout for any call.
+   * 等待超过配置超时时间的该比例后，开始按INFO级别周期性打印进度日志
    */
   private static final float WAIT_PROGRESS_INFO_THRESHOLD = 0.3f;
   /**
-   * Start logging messages at WARN level after waiting for this
-   * fraction of the configured timeout for any call.
+   * 等待超过配置超时时间的该比例后，开始按WARN级别打印进度日志
    */
   private static final float WAIT_PROGRESS_WARN_THRESHOLD = 0.7f;
   private final StopWatch quorumStopWatch;
   private final Timer timer;
   private final List<ListenableFuture<RESULT>> allCalls;
   
+  /**
+   * 工厂方法，创建QuorumCall实例并为所有调用添加回调处理
+   * @param calls 所有节点的异步调用Future映射
+   * @param timer 计时器，用于统计等待时间
+   * @return 创建完成的QuorumCall实例
+   */
   static <KEY, RESULT> QuorumCall<KEY, RESULT> create(
       Map<KEY, ? extends ListenableFuture<RESULT>> calls, Timer timer) {
     final QuorumCall<KEY, RESULT> qr = new QuorumCall<KEY, RESULT>(timer);
@@ -90,13 +95,18 @@ class QuorumCall<KEY, RESULT> {
     return qr;
   }
 
+  /**
+   * 工厂方法，使用默认计时器创建QuorumCall实例
+   * @param calls 所有节点的异步调用Future映射
+   * @return 创建完成的QuorumCall实例
+   */
   static <KEY, RESULT> QuorumCall<KEY, RESULT> create(
       Map<KEY, ? extends ListenableFuture<RESULT>> calls) {
     return create(calls, new Timer());
   }
 
   /**
-   * Not intended for outside use.
+   * 不允许外部直接使用的私有构造
    */
   private QuorumCall() {
     this(new Timer());
@@ -114,21 +124,17 @@ class QuorumCall<KEY, RESULT> {
   }
 
   /**
-   * Used in conjunction with {@link #getQuorumTimeoutIncreaseMillis(long, int)}
-   * to check for pauses.
+   * 重启法定人数调用的计时器，用于检测系统暂停（如Full GC）
    */
   private void restartQuorumStopWatch() {
     quorumStopWatch.reset().start();
   }
 
   /**
-   * Check for a pause (e.g. GC) since the last time
-   * {@link #restartQuorumStopWatch()} was called. If detected, return the
-   * length of the pause; else, -1.
-   * @param offset Offset the elapsed time by this amount; use if some amount
-   *               of pause was expected
-   * @param millis Total length of timeout in milliseconds
-   * @return Length of pause, if detected, else -1
+   * 检测自上次重启计时器后是否发生系统暂停（如Full GC），如果发生则返回暂停时长用于调整超时
+   * @param offset 对已用时间的偏移量，用于处理预期内的暂停
+   * @param millis 配置的总超时时间，单位毫秒
+   * @return 如果检测到暂停返回暂停时长，否则返回-1
    */
   private long getQuorumTimeoutIncreaseMillis(long offset, int millis) {
     long elapsed = quorumStopWatch.now(TimeUnit.MILLISECONDS);
@@ -145,62 +151,71 @@ class QuorumCall<KEY, RESULT> {
 
   
   /**
-   * Wait for the quorum to achieve a certain number of responses.
+   * 等待满足法定人数的响应条件，阻塞直到条件满足或超时
    * 
-   * Note that, even after this returns, more responses may arrive,
-   * causing the return value of other methods in this class to change.
+   * 注意：方法返回后仍可能有后续响应到达，会改变本类其他方法的返回结果
    *
-   * @param minResponses return as soon as this many responses have been
-   * received, regardless of whether they are successes or exceptions
-   * @param minSuccesses return as soon as this many successful (non-exception)
-   * responses have been received
-   * @param maxExceptions return as soon as this many exception responses
-   * have been received. Pass 0 to return immediately if any exception is
-   * received.
-   * @param millis the number of milliseconds to wait for
-   * @throws InterruptedException if the thread is interrupted while waiting
-   * @throws TimeoutException if the specified timeout elapses before
-   * achieving the desired conditions
+   * @param minResponses 只要收到至少该数量的响应（不管成功失败）就返回
+   * @param minSuccesses 只要收到至少该数量的成功响应就返回
+   * @param maxExceptions 只要收到超过该数量的异常响应就返回；传0表示收到任何异常立即返回
+   * @param millis 最大等待超时时间，单位毫秒
+   * @param operationName 当前操作名称，用于日志打印
+   * @throws InterruptedException 等待过程中被中断抛出
+   * @throws TimeoutException 超时仍未满足条件抛出
    */
   public synchronized void waitFor(
       int minResponses, int minSuccesses, int maxExceptions,
       int millis, String operationName)
       throws InterruptedException, TimeoutException {
+    // 记录开始等待时间
     long st = timer.monotonicNow();
+    // 下一次打印日志的时间点
     long nextLogTime = st + (long)(millis * WAIT_PROGRESS_INFO_THRESHOLD);
+    // 超时截止时间
     long et = st + millis;
+    // 循环等待直到满足条件或超时
     while (true) {
       restartQuorumStopWatch();
+      // 检查是否有断言错误，有则立即抛出
       checkAssertionErrors();
+      // 检查是否满足退出条件，满足则直接返回
       if (minResponses > 0 && countResponses() >= minResponses) return;
       if (minSuccesses > 0 && countSuccesses() >= minSuccesses) return;
       if (maxExceptions >= 0 && countExceptions() > maxExceptions) return;
+      // 获取当前时间
       long now = timer.monotonicNow();
       
+      // 到达日志打印时间点，打印当前等待进度
       if (now > nextLogTime) {
         long waited = now - st;
         String msg = String.format(
             "Waited %s ms (timeout=%s ms) for a response for %s",
             waited, millis, operationName);
+        // 添加已成功节点信息
         if (!successes.isEmpty()) {
           msg += ". Succeeded so far: [" + Joiner.on(",").join(successes.keySet()) + "]";
         }
+        // 添加已异常节点信息
         if (!exceptions.isEmpty()) {
           msg += ". Exceptions so far: [" + getExceptionMapString() + "]";
         }
+        // 还没有任何响应的提示
         if (successes.isEmpty() && exceptions.isEmpty()) {
           msg += ". No responses yet.";
         }
+        // 根据等待时长选择日志级别
         if (waited > millis * WAIT_PROGRESS_WARN_THRESHOLD) {
           QuorumJournalManager.LOG.warn(msg);
         } else {
           QuorumJournalManager.LOG.info(msg);
         }
+        // 更新下一次打印日志的时间点
         nextLogTime = now + WAIT_PROGRESS_INTERVAL_MILLIS;
       }
+      // 计算剩余等待时间
       long rem = et - now;
       if (rem <= 0) {
-        // Increase timeout if a full GC occurred after restarting stopWatch
+        // 如果发生了GC暂停，则增加超时时间，否则抛出超时异常
         long timeoutIncrease = getQuorumTimeoutIncreaseMillis(0, millis);
         if (timeoutIncrease > 0) {
           et += timeoutIncrease;
@@ -209,10 +224,12 @@ class QuorumCall<KEY, RESULT> {
         }
       }
       restartQuorumStopWatch();
+      // 计算本次等待时长，不超过下一次日志打印时间，至少等待1ms
       rem = Math.min(rem, nextLogTime - now);
       rem = Math.max(rem, 1);
+      // 等待，释放锁让其他线程更新结果
       wait(rem);
-      // Increase timeout if a full GC occurred after restarting stopWatch
+      // 检查等待过程中是否发生GC暂停，发生则增加超时时间
       long timeoutIncrease = getQuorumTimeoutIncreaseMillis(-rem, millis);
       if (timeoutIncrease > 0) {
         et += timeoutIncrease;
@@ -221,7 +238,7 @@ class QuorumCall<KEY, RESULT> {
   }
 
   /**
-   * Cancel any outstanding calls.
+   * 取消所有未完成的远程调用
    */
   void cancelCalls() {
     for (ListenableFuture<RESULT> call : allCalls) {
@@ -230,15 +247,8 @@ class QuorumCall<KEY, RESULT> {
   }
 
   /**
-   * Check if any of the responses came back with an AssertionError.
-   * If so, it re-throws it, even if there was a quorum of responses.
-   * This code only runs if assertions are enabled for this class,
-   * otherwise it should JIT itself away.
-   * 
-   * This is done since AssertionError indicates programmer confusion
-   * rather than some kind of expected issue, and thus in the context
-   * of test cases we'd like to actually fail the test case instead of
-   * continuing through.
+   * 检查异常中是否包含AssertionError，如果存在则直接重新抛出
+   * 仅在断言开启时执行，目的是让测试用例可以快速失败，而不是忽略断言错误继续执行
    */
   private synchronized void checkAssertionErrors() {
     boolean assertsEnabled = false;
@@ -256,55 +266,65 @@ class QuorumCall<KEY, RESULT> {
     }
   }
 
+  /**
+   * 添加成功调用的结果，通知等待线程
+   */
   private synchronized void addResult(KEY k, RESULT res) {
     successes.put(k, res);
     notifyAll();
   }
   
+  /**
+   * 添加调用异常，通知等待线程
+   */
   private synchronized void addException(KEY k, Throwable t) {
     exceptions.put(k, t);
     notifyAll();
   }
   
   /**
-   * @return the total number of calls for which a response has been received,
-   * regardless of whether it threw an exception or returned a successful
-   * result.
+   * @return 总共收到的响应数量，无论成功还是失败
    */
   public synchronized int countResponses() {
     return successes.size() + exceptions.size();
   }
   
   /**
-   * @return the number of calls for which a non-exception response has been
-   * received.
+   * @return 收到的成功响应数量
    */
   public synchronized int countSuccesses() {
     return successes.size();
   }
   
   /**
-   * @return the number of calls for which an exception response has been
-   * received.
+   * @return 收到的异常响应数量
    */
   public synchronized int countExceptions() {
-    return exceptions.size();
+    return successes.size() > 0 ? exceptions.size() : exceptions.size();
   }
 
   /**
-   * @return the map of successful responses. A copy is made such that this
-   * map will not be further mutated, even if further results arrive for the
-   * quorum.
+   * @return 所有成功响应的拷贝，后续新结果不会影响返回的映射
    */
   public synchronized Map<KEY, RESULT> getResults() {
     return Maps.newHashMap(successes);
   }
 
+  /**
+   * 将收集到的异常封装为QuorumException并抛出
+   * @param msg 异常描述信息
+   * @throws QuorumException 封装后的仲裁异常
+   */
   public synchronized void rethrowException(String msg) throws QuorumException {
     Preconditions.checkState(!exceptions.isEmpty());
     throw QuorumException.create(msg, successes, exceptions);
   }
 
+  /**
+   * 将Protobuf消息映射转换为可打印的字符串，用于日志显示
+   * @param map 键到Protobuf消息的映射
+   * @return 格式化后的字符串
+   */
   public static <K> String mapToString(
       Map<K, ? extends Message> map) {
     StringBuilder sb = new StringBuilder();
@@ -321,8 +341,8 @@ class QuorumCall<KEY, RESULT> {
   }
 
   /**
-   * Return a string suitable for displaying to the user, containing
-   * any exceptions that have been received so far.
+   * 获取已接收异常的拼接字符串，用于日志显示
+   * @return 异常信息拼接后的字符串
    */
   private String getExceptionMapString() {
     StringBuilder sb = new StringBuilder();

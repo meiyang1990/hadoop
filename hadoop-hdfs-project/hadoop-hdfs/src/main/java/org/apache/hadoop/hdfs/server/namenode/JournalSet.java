@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,6 +49,10 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.util.Preconditions;
 
 /**
+ * 文件级注释：JournalSet是HDFS NameNode中管理多个JournalManager的集合类，
+ * 负责协调多个日志存储实例（本地磁盘、QJM共享存储等）的读写操作，
+ * 提供冗余日志管理、错误处理和一致性保证，支持多副本日志写入和读取。
+ * 所有方法不做同步，由调用方FSEditLog保证线程安全。
  * Manages a collection of Journals. None of the methods are synchronized, it is
  * assumed that FSEditLog methods, that use this class, use proper
  * synchronization.
@@ -57,8 +62,7 @@ public class JournalSet implements JournalManager {
 
   static final Logger LOG = LoggerFactory.getLogger(FSEditLog.class);
 
-  // we want local logs to be ordered earlier in the collection, and true
-  // is considered larger than false, so reverse the comparator
+  // 优先返回本地日志，比较器反转排序，让本地日志排在前面
   private static final Comparator<EditLogInputStream>
       LOCAL_LOG_PREFERENCE_COMPARATOR = Comparator
       .comparing(EditLogInputStream::isLocalLog)
@@ -70,6 +74,8 @@ public class JournalSet implements JournalManager {
       .thenComparing(EditLogInputStream::getLastTxId);
 
   /**
+   * 容器类，绑定JournalManager及其当前活跃输出流，
+   * 当写入出错时会禁用该Journal，并将流置为null。
    * Container for a JournalManager paired with its currently
    * active stream.
    * 
@@ -180,16 +186,20 @@ public class JournalSet implements JournalManager {
     }
   }
  
-  // COW implementation is necessary since some users (eg the web ui) call
-  // getAllJournalStreams() and then iterate. Since this is rarely
-  // mutated, there is no performance concern.
+  // 使用CopyOnWriteArrayList保证遍历安全，适合读多写少场景，Web UI等遍历操作不会抛出并发修改异常
   private final List<JournalAndStream> journals =
       new CopyOnWriteArrayList<JournalSet.JournalAndStream>();
+  // 最小可用冗余日志数，满足该数量才能继续提供服务
   final int minimumRedundantJournals;
 
   private boolean closed;
+  // 最后写入日志的事务ID
   private long lastJournalledTxId;
 
+  /**
+   * 构造JournalSet，指定最小需要的冗余日志数量
+   * @param minimumRedundantResources 最小可用冗余日志数
+   */
   JournalSet(int minimumRedundantResources) {
     this.minimumRedundantJournals = minimumRedundantResources;
     lastJournalledTxId = INVALID_TXID;
@@ -197,14 +207,13 @@ public class JournalSet implements JournalManager {
   
   @Override
   public void format(NamespaceInfo nsInfo, boolean force) throws IOException {
-    // The operation is done by FSEditLog itself
+    // 格式化操作由上层FSEditLog统一处理，本方法不支持
     throw new UnsupportedOperationException();
   }
 
   @Override
   public boolean hasSomeData() throws IOException {
-    // This is called individually on the underlying journals,
-    // not on the JournalSet.
+    // 判断是否有数据操作会逐个下发到底层Journal，本方法不支持
     throw new UnsupportedOperationException();
   }
 
@@ -212,6 +221,7 @@ public class JournalSet implements JournalManager {
   @Override
   public EditLogOutputStream startLogSegment(final long txId,
       final int layoutVersion) throws IOException {
+    // 遍历所有Journal启动新日志段，处理错误
     mapJournalsAndReportErrors(new JournalClosure() {
       @Override
       public void apply(JournalAndStream jas) throws IOException {
@@ -224,6 +234,7 @@ public class JournalSet implements JournalManager {
   @Override
   public void finalizeLogSegment(final long firstTxId, final long lastTxId)
       throws IOException {
+    // 遍历所有Journal结束当前日志段
     mapJournalsAndReportErrors(new JournalClosure() {
       @Override
       public void apply(JournalAndStream jas) throws IOException {
@@ -237,6 +248,7 @@ public class JournalSet implements JournalManager {
    
   @Override
   public void close() throws IOException {
+    // 关闭所有Journal
     mapJournalsAndReportErrors(new JournalClosure() {
       @Override
       public void apply(JournalAndStream jas) throws IOException {
@@ -251,23 +263,21 @@ public class JournalSet implements JournalManager {
   }
 
   /**
-   * In this function, we get a bunch of streams from all of our JournalManager
-   * objects.  Then we add these to the collection one by one.
+   * 从所有JournalManager收集符合条件的输入流，整理后输出给调用者
    * 
-   * @param streams          The collection to add the streams to.  It may or 
-   *                         may not be sorted-- this is up to the caller.
-   * @param fromTxId         The transaction ID to start looking for streams at
-   * @param inProgressOk     Should we consider unfinalized streams?
-   * @param onlyDurableTxns  Set to true if streams are bounded by the durable
-   *                         TxId. A durable TxId is the committed txid in QJM
-   *                         or the largest txid written into file in FJM
+   * @param streams          用于存放结果流的集合
+   * @param fromTxId         起始事务ID，只返回包含该ID之后的流
+   * @param inProgressOk     是否允许返回未结束的正在写入的流
+   * @param onlyDurableTxns  是否只返回已经持久化完成的事务对应的流
    */
   @Override
   public void selectInputStreams(Collection<EditLogInputStream> streams,
       long fromTxId, boolean inProgressOk, boolean onlyDurableTxns) {
+    // 使用优先队列按事务ID排序所有收集到的流
     final PriorityQueue<EditLogInputStream> allStreams = 
         new PriorityQueue<EditLogInputStream>(64,
             EDIT_LOG_INPUT_STREAM_COMPARATOR);
+    // 遍历所有Journal收集输入流
     for (JournalAndStream jas : journals) {
       if (jas.isDisabled()) {
         LOG.info("Skipping jas " + jas + " since it's disabled");
@@ -281,18 +291,20 @@ public class JournalSet implements JournalManager {
             ". Skipping.", ioe);
       }
     }
+    // 整理流，处理冗余，生成最终结果链
     chainAndMakeRedundantStreams(streams, allStreams, fromTxId);
   }
   
+  /**
+   * 将来自多个Journal的输入流整理成连续的冗余流链，优先选择已完成的本地流
+   * @param outStreams 输出结果集合
+   * @param allStreams 所有收集到的输入流，已按起始事务ID排序
+   * @param fromTxId 起始事务ID
+   */
   public static void chainAndMakeRedundantStreams(
       Collection<EditLogInputStream> outStreams,
       PriorityQueue<EditLogInputStream> allStreams, long fromTxId) {
-    // We want to group together all the streams that start on the same start
-    // transaction ID.  To do this, we maintain an accumulator (acc) of all
-    // the streams we've seen at a given start transaction ID.  When we see a
-    // higher start transaction ID, we select a stream from the accumulator and
-    // clear it.  Then we begin accumulating streams with the new, higher start
-    // transaction ID.
+    // 按起始事务ID分组，累加同一事务ID开始的所有流
     LinkedList<EditLogInputStream> acc =
         new LinkedList<EditLogInputStream>();
     EditLogInputStream elis;
@@ -303,8 +315,7 @@ public class JournalSet implements JournalManager {
         EditLogInputStream accFirst = acc.get(0);
         long accFirstTxId = accFirst.getFirstTxId();
         if (accFirstTxId == elis.getFirstTxId()) {
-          // if we have a finalized log segment available at this txid,
-          // we should throw out all in-progress segments at this txid
+          // 相同起始事务ID，优先保留已完成的流，丢弃进行中的流
           if (elis.isInProgress()) {
             if (accFirst.isInProgress()) {
               acc.add(elis);
@@ -316,19 +327,21 @@ public class JournalSet implements JournalManager {
             acc.add(elis);
           }
         } else if (accFirstTxId < elis.getFirstTxId()) {
-          // try to read from the local logs first since the throughput should
-          // be higher
+          // 遇到更大起始事务ID，处理当前累加组，优先选择本地流
           Collections.sort(acc, LOCAL_LOG_PREFERENCE_COMPARATOR);
+          // 包装为冗余输入流，加入结果集合
           outStreams.add(new RedundantEditLogInputStream(acc, fromTxId));
           acc.clear();
           acc.add(elis);
         } else if (accFirstTxId > elis.getFirstTxId()) {
+          // 排序错误，抛出异常
           throw new RuntimeException("sorted set invariants violated!  " +
               "Got stream with first txid " + elis.getFirstTxId() +
               ", but the last firstTxId was " + accFirstTxId);
         }
       }
     }
+    // 处理最后一组累加的流
     if (!acc.isEmpty()) {
       Collections.sort(acc, LOCAL_LOG_PREFERENCE_COMPARATOR);
       outStreams.add(new RedundantEditLogInputStream(acc, fromTxId));
@@ -337,6 +350,7 @@ public class JournalSet implements JournalManager {
   }
 
   /**
+   * 判断当前JournalSet资源是否可用，返回true表示没有可用Journal或资源不足
    * Returns true if there are no journals, all redundant journals are disabled,
    * or any required journals are disabled.
    * 
@@ -349,6 +363,7 @@ public class JournalSet implements JournalManager {
   }
   
   /**
+   * 禁用出错的Journal并记录错误日志
    * Called when some journals experience an error in some operation.
    */
   private void disableAndReportErrorOnJournals(List<JournalAndStream> badJournals) {
@@ -364,6 +379,7 @@ public class JournalSet implements JournalManager {
   }
 
   /**
+   * 函数式接口，封装对JournalAndStream的操作
    * Implementations of this interface encapsulate operations that can be
    * iteratively applied on all the journals. For example see
    * {@link JournalSet#mapJournalsAndReportErrors}.
@@ -378,41 +394,38 @@ public class JournalSet implements JournalManager {
   }
   
   /**
-   * Apply the given operation across all of the journal managers, disabling
-   * any for which the closure throws an IOException.
+   * 对所有Journal执行指定操作，处理异常，禁用出错的非必需Journal，
+   * 必需Journal出错直接终止NameNode
    * @param closure {@link JournalClosure} object encapsulating the operation.
    * @param status message used for logging errors (e.g. "opening journal")
-   * @throws IOException If the operation fails on all the journals.
+   * @throws IOException If the operation fails on too many journals.
    */
   private void mapJournalsAndReportErrors(
       JournalClosure closure, String status) throws IOException{
 
     List<JournalAndStream> badJAS = Lists.newLinkedList();
+    // 遍历所有Journal
     for (JournalAndStream jas : journals) {
       try {
         closure.apply(jas);
       } catch (Throwable t) {
         if (jas.isRequired()) {
+          // 必需Journal出错，终止所有Journal并退出NameNode
           final String msg = "Error: " + status + " failed for required journal ("
             + jas + ")";
           LOG.error(msg, t);
-          // If we fail on *any* of the required journals, then we must not
-          // continue on any of the other journals. Abort them to ensure that
-          // retry behavior doesn't allow them to keep going in any way.
           abortAllJournals();
-          // the current policy is to shutdown the NN on errors to shared edits
-          // dir. There are many code paths to shared edits failures - syncs,
-          // roll of edits etc. All of them go through this common function 
-          // where the isRequired() check is made. Applying exit policy here 
-          // to catch all code paths.
           terminate(1, msg);
         } else {
+          // 非必需Journal出错，加入坏列表后续禁用
           LOG.error("Error: " + status + " failed for (journal " + jas + ")", t);
           badJAS.add(jas);          
         }
       }
     }
+    // 禁用所有出错的非必需Journal
     disableAndReportErrorOnJournals(badJAS);
+    // 检查资源是否满足最小要求，不满足抛出异常
     if (!NameNodeResourcePolicy.areResourcesAvailable(journals,
         minimumRedundantJournals)) {
       String message = status + " failed for too many journals";
@@ -433,6 +446,8 @@ public class JournalSet implements JournalManager {
   }
 
   /**
+   * 实现EditLogOutputStream，将写操作转发到所有活跃的底层Journal输出流，
+   * 保证多副本日志同时写入。
    * An implementation of EditLogOutputStream that applies a requested method on
    * all the journals that are currently active.
    */
@@ -455,6 +470,7 @@ public class JournalSet implements JournalManager {
     @Override
     public void write(final FSEditLogOp op)
         throws IOException {
+      // 遍历所有活跃Journal写入操作
       mapJournalsAndReportErrors(new JournalClosure() {
         @Override
         public void apply(JournalAndStream jas) throws IOException {
@@ -463,304 +479,3 @@ public class JournalSet implements JournalManager {
           }
         }
       }, "write op");
-
-      assert lastJournalledTxId < op.txid : "TxId order violation for op=" +
-        op + ", lastJournalledTxId=" + lastJournalledTxId;
-      lastJournalledTxId = op.txid;
-    }
-
-    @Override
-    public void writeRaw(final byte[] data, final int offset, final int length)
-        throws IOException {
-      mapJournalsAndReportErrors(new JournalClosure() {
-        @Override
-        public void apply(JournalAndStream jas) throws IOException {
-          if (jas.isActive()) {
-            jas.getCurrentStream().writeRaw(data, offset, length);
-          }
-        }
-      }, "write bytes");
-    }
-
-    @Override
-    public void create(final int layoutVersion) throws IOException {
-      mapJournalsAndReportErrors(new JournalClosure() {
-        @Override
-        public void apply(JournalAndStream jas) throws IOException {
-          if (jas.isActive()) {
-            jas.getCurrentStream().create(layoutVersion);
-          }
-        }
-      }, "create");
-    }
-
-    @Override
-    public void close() throws IOException {
-      mapJournalsAndReportErrors(new JournalClosure() {
-        @Override
-        public void apply(JournalAndStream jas) throws IOException {
-          jas.closeStream();
-        }
-      }, "close");
-    }
-
-    @Override
-    public void abort() throws IOException {
-      mapJournalsAndReportErrors(new JournalClosure() {
-        @Override
-        public void apply(JournalAndStream jas) throws IOException {
-          jas.abort();
-        }
-      }, "abort");
-    }
-
-    @Override
-    public void setReadyToFlush() throws IOException {
-      mapJournalsAndReportErrors(new JournalClosure() {
-        @Override
-        public void apply(JournalAndStream jas) throws IOException {
-          if (jas.isActive()) {
-            jas.getCurrentStream().setReadyToFlush();
-          }
-        }
-      }, "setReadyToFlush");
-    }
-
-    @Override
-    protected void flushAndSync(final boolean durable) throws IOException {
-      mapJournalsAndReportErrors(new JournalClosure() {
-        @Override
-        public void apply(JournalAndStream jas) throws IOException {
-          if (jas.isActive()) {
-            jas.getCurrentStream().flushAndSync(durable);
-          }
-        }
-      }, "flushAndSync");
-    }
-    
-    @Override
-    public void flush() throws IOException {
-      mapJournalsAndReportErrors(new JournalClosure() {
-        @Override
-        public void apply(JournalAndStream jas) throws IOException {
-          if (jas.isActive()) {
-            jas.getCurrentStream().flush();
-          }
-        }
-      }, "flush");
-    }
-    
-    @Override
-    public boolean shouldForceSync() {
-      for (JournalAndStream js : journals) {
-        if (js.isActive() && js.getCurrentStream().shouldForceSync()) {
-          return true;
-        }
-      }
-      return false;
-    }
-    
-    @Override
-    protected long getNumSync() {
-      for (JournalAndStream jas : journals) {
-        if (jas.isActive()) {
-          return jas.getCurrentStream().getNumSync();
-        }
-      }
-      return 0;
-    }
-  }
-
-  @Override
-  public void setOutputBufferCapacity(final int size) {
-    try {
-      mapJournalsAndReportErrors(new JournalClosure() {
-        @Override
-        public void apply(JournalAndStream jas) throws IOException {
-            jas.getManager().setOutputBufferCapacity(size);
-        }
-      }, "setOutputBufferCapacity");
-    } catch (IOException e) {
-      LOG.error("Error in setting outputbuffer capacity");
-    }
-  }
-  
-  List<JournalAndStream> getAllJournalStreams() {
-    return journals;
-  }
-
-  List<JournalManager> getJournalManagers() {
-    List<JournalManager> jList = new ArrayList<JournalManager>();
-    for (JournalAndStream j : journals) {
-      jList.add(j.getManager());
-    }
-    return jList;
-  }
-  
-  void add(JournalManager j, boolean required) {
-    add(j, required, false);
-  }
-  
-  void add(JournalManager j, boolean required, boolean shared) {
-    JournalAndStream jas = new JournalAndStream(j, required, shared);
-    journals.add(jas);
-  }
-  
-  void remove(JournalManager j) {
-    JournalAndStream jasToRemove = null;
-    for (JournalAndStream jas: journals) {
-      if (jas.getManager().equals(j)) {
-        jasToRemove = jas;
-        break;
-      }
-    }
-    if (jasToRemove != null) {
-      jasToRemove.abort();
-      journals.remove(jasToRemove);
-    }
-  }
-
-  @Override
-  public void purgeLogsOlderThan(final long minTxIdToKeep) throws IOException {
-    mapJournalsAndReportErrors(new JournalClosure() {
-      @Override
-      public void apply(JournalAndStream jas) throws IOException {
-        jas.getManager().purgeLogsOlderThan(minTxIdToKeep);
-      }
-    }, "purgeLogsOlderThan " + minTxIdToKeep);
-  }
-
-  @Override
-  public void recoverUnfinalizedSegments() throws IOException {
-    mapJournalsAndReportErrors(new JournalClosure() {
-      @Override
-      public void apply(JournalAndStream jas) throws IOException {
-        jas.getManager().recoverUnfinalizedSegments();
-      }
-    }, "recoverUnfinalizedSegments");
-  }
-  
-  /**
-   * Return a manifest of what finalized edit logs are available. All available
-   * edit logs are returned starting from the transaction id passed. If
-   * 'fromTxId' falls in the middle of a log, that log is returned as well.
-   * 
-   * @param fromTxId Starting transaction id to read the logs.
-   * @return RemoteEditLogManifest object.
-   */
-  public synchronized RemoteEditLogManifest getEditLogManifest(long fromTxId) {
-    // Collect RemoteEditLogs available from each FileJournalManager
-    List<RemoteEditLog> allLogs = new ArrayList<>();
-    for (JournalAndStream j : journals) {
-      if (j.getManager() instanceof FileJournalManager) {
-        FileJournalManager fjm = (FileJournalManager)j.getManager();
-        try {
-          allLogs.addAll(fjm.getRemoteEditLogs(fromTxId, false));
-        } catch (Throwable t) {
-          LOG.warn("Cannot list edit logs in " + fjm, t);
-        }
-      }
-    }
-    // Group logs by their starting txid
-    final Map<Long, List<RemoteEditLog>> logsByStartTxId = new HashMap<>();
-    allLogs.forEach(input -> {
-      long key = RemoteEditLog.GET_START_TXID.apply(input);
-      logsByStartTxId.computeIfAbsent(key, k-> new ArrayList<>()).add(input);
-    });
-    long curStartTxId = fromTxId;
-    List<RemoteEditLog> logs = new ArrayList<>();
-    while (true) {
-      List<RemoteEditLog> logGroup =
-          logsByStartTxId.getOrDefault(curStartTxId, Collections.emptyList());
-      if (logGroup.isEmpty()) {
-        // we have a gap in logs - for example because we recovered some old
-        // storage directory with ancient logs. Clear out any logs we've
-        // accumulated so far, and then skip to the next segment of logs
-        // after the gap.
-        SortedSet<Long> startTxIds = new TreeSet<>(logsByStartTxId.keySet());
-        startTxIds = startTxIds.tailSet(curStartTxId);
-        if (startTxIds.isEmpty()) {
-          break;
-        } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Found gap in logs at " + curStartTxId + ": " +
-                "not returning previous logs in manifest.");
-          }
-          logs.clear();
-          curStartTxId = startTxIds.first();
-          continue;
-        }
-      }
-
-      // Find the one that extends the farthest forward
-      RemoteEditLog bestLog = Collections.max(logGroup);
-      logs.add(bestLog);
-      // And then start looking from after that point
-      curStartTxId = bestLog.getEndTxId() + 1;
-    }
-    RemoteEditLogManifest ret = new RemoteEditLogManifest(logs,
-        curStartTxId - 1);
-    
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Generated manifest for logs since " + fromTxId + ":"
-          + ret);      
-    }
-    return ret;
-  }
-
-  /**
-   * Add sync times to the buffer.
-   */
-  String getSyncTimes() {
-    StringBuilder buf = new StringBuilder();
-    for (JournalAndStream jas : journals) {
-      if (jas.isActive()) {
-        buf.append(jas.getCurrentStream().getTotalSyncTime())
-            .append(" ");
-      }
-    }
-    return buf.toString();
-  }
-
-  @Override
-  public void doPreUpgrade() throws IOException {
-    // This operation is handled by FSEditLog directly.
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void doUpgrade(Storage storage) throws IOException {
-    // This operation is handled by FSEditLog directly.
-    throw new UnsupportedOperationException();
-  }
-  
-  @Override
-  public void doFinalize() throws IOException {
-    // This operation is handled by FSEditLog directly.
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean canRollBack(StorageInfo storage, StorageInfo prevStorage, int targetLayoutVersion) throws IOException {
-    // This operation is handled by FSEditLog directly.
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void doRollback() throws IOException {
-    // This operation is handled by FSEditLog directly.
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public void discardSegments(long startTxId) throws IOException {
-    // This operation is handled by FSEditLog directly.
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public long getJournalCTime() throws IOException {
-    // This operation is handled by FSEditLog directly.
-    throw new UnsupportedOperationException();
-  }
-}

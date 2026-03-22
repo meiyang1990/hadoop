@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,7 @@
  */
 
 /**
- * This package provides commonly used classes for the block movement.
+ * HDFS数据块移动公共工具类包，提供SPS（存储策略满足器）模块处理数据块移动所需的通用基础类
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

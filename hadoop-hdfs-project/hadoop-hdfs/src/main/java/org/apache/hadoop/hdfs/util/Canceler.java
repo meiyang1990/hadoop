@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,31 +21,38 @@ package org.apache.hadoop.hdfs.util;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * Provides a simple interface where one thread can mark an operation
- * for cancellation, and another thread can poll for whether the
- * cancellation has occurred.
+ * HDFS跨线程取消操作工具类，提供线程安全的取消标记机制。
+ * 允许一个线程标记操作需要取消，另一个线程轮询检查取消状态，
+ * 常用于长时间运行的异步操作的中断处理。
  */
 @InterfaceAudience.Private
 public class Canceler {
   /**
-   * If the operation has been canceled, set to the reason why
-   * it has been canceled (eg standby moving to active)
+   * 存储取消原因，如果为null表示操作未被取消，非null表示操作已取消，值为取消原因
+   * 使用volatile保证多线程下的可见性
    */
   private volatile String cancelReason = null;
   
   /**
-   * Requests that the current operation be canceled if it is still running.
-   * This does not block until the cancellation is successful.
-   * @param reason the reason why cancellation is requested
+   * 请求取消当前正在运行的操作，非阻塞方法，不会等待取消完成。
+   * @param reason 请求取消的原因描述
    */
   public void cancel(String reason) {
     this.cancelReason = reason;
   }
 
+  /**
+   * 检查当前操作是否已经被请求取消
+   * @return true表示操作已被取消，false表示未取消
+   */
   public boolean isCancelled() {
     return cancelReason != null;
   }
   
+  /**
+   * 获取操作被取消的原因描述
+   * @return 取消原因字符串，未取消时返回null
+   */
   public String getCancellationReason() {
     return cancelReason;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,13 +24,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Exception related to rolling upgrade.
+ * HDFS滚动升级相关异常类，封装滚动升级过程中发生的错误信息
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class RollingUpgradeException extends IOException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造带有指定错误信息的滚动升级异常
+   * @param msg 异常错误信息
+   */
   public RollingUpgradeException(String msg) {
     super(msg);
   }

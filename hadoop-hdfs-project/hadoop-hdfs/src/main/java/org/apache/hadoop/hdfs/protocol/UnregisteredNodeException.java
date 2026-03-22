@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,28 +27,35 @@ import org.apache.hadoop.hdfs.server.protocol.JournalInfo;
 import org.apache.hadoop.hdfs.server.protocol.NodeRegistration;
 
 /**
- * This exception is thrown when a node that has not previously 
- * registered is trying to access the name node.
+ * HDFS未注册节点异常类，当未完成注册的节点尝试访问NameNode时抛出该异常
+ * 包括JournalNode、DataNode等各类集群节点未注册访问的场景
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class UnregisteredNodeException extends IOException {
   private static final long serialVersionUID = -5620209396945970810L;
 
+  /**
+   * 构造函数，基于Journal节点信息创建未注册异常
+   * @param info 未注册的Journal节点信息
+   */
   public UnregisteredNodeException(JournalInfo info) {
     super("Unregistered server: " + info.toString());
   }
   
+  /**
+   * 构造函数，基于节点注册信息创建未注册异常
+   * @param nodeReg 未注册节点的注册信息
+   */
   public UnregisteredNodeException(NodeRegistration nodeReg) {
     super("Unregistered server: " + nodeReg.toString());
   }
 
   /**
-   * The exception is thrown if a different data-node claims the same
-   * storage id as the existing one.
+   * 构造函数，用于存储ID冲突场景：当新DataNode声称使用了已存在节点的存储ID时抛出
    *  
-   * @param nodeID unregistered data-node
-   * @param storedNode data-node stored in the system with this storage id
+   * @param nodeID 未注册的DataNode标识
+   * @param storedNode 系统中已存在该存储ID对应DataNode信息
    */
   public UnregisteredNodeException(DatanodeID nodeID, DatanodeInfo storedNode) {
     super("Data node " + nodeID + " is attempting to report storage ID " 

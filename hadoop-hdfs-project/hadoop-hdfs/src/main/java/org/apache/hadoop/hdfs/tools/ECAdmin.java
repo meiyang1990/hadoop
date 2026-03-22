@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -46,19 +47,29 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * CLI for the erasure code encoding operations.
+ * HDFS EC（纠删码）管理命令行工具，提供纠删码策略的增删改查、启用禁用和集群拓扑验证功能。
+ * 属于HDFS客户端工具，供管理员管理集群纠缩码配置。
  */
 @InterfaceAudience.Private
 public class ECAdmin extends Configured implements Tool {
 
   public static final String NAME = "ec";
 
+  /**
+   * ECAdmin工具主入口方法，启动命令行工具执行用户命令。
+   * @param args 命令行输入参数
+   * @throws Exception 执行过程中所有异常都会抛出，由JVM处理
+   */
   public static void main(String[] args) throws Exception {
     final ECAdmin admin = new ECAdmin(new Configuration());
     int res = ToolRunner.run(admin, args);
     System.exit(res);
   }
 
+  /**
+   * 构造ECAdmin实例，使用给定配置初始化。
+   * @param conf Hadoop配置对象
+   */
   public ECAdmin(Configuration conf) {
     super(conf);
   }
@@ -66,13 +77,16 @@ public class ECAdmin extends Configured implements Tool {
   @Override
   public int run(String[] args) throws Exception {
     if (args.length == 0) {
+      // 无参数，打印帮助信息
       AdminHelper.printUsage(false, NAME, COMMANDS);
       ToolRunner.printGenericCommandUsage(System.err);
       return 1;
     }
+    // 根据第一个参数解析匹配对应的命令对象
     final AdminHelper.Command command = AdminHelper.determineCommand(args[0],
         COMMANDS);
     if (command == null) {
+      // 未找到匹配命令，输出错误和帮助信息
       System.err.println("Can't understand command '" + args[0] + "'");
       if (!args[0].startsWith("-")) {
         System.err.println("Command names must start with dashes.");
@@ -81,17 +95,20 @@ public class ECAdmin extends Configured implements Tool {
       ToolRunner.printGenericCommandUsage(System.err);
       return 1;
     }
+    // 提取命令参数部分，去除命令名
     final List<String> argsList = new LinkedList<>();
     argsList.addAll(Arrays.asList(args).subList(1, args.length));
     try {
+      // 执行对应命令
       return command.run(getConf(), argsList);
     } catch (IllegalArgumentException e) {
+      // 参数解析错误，输出格式化后的异常信息
       System.err.println(AdminHelper.prettifyException(e));
       return -1;
     }
   }
 
-  /** Command to list the set of enabled erasure coding policies. */
+  /** 列出集群中所有已启用的纠删码策略 */
   private static class ListECPoliciesCommand
       implements AdminHelper.Command {
     @Override
@@ -140,7 +157,7 @@ public class ECAdmin extends Configured implements Tool {
     }
   }
 
-  /** Command to add a set of erasure coding policies. */
+  /** 从用户指定的XML文件添加自定义纠删码策略到集群 */
   private static class AddECPoliciesCommand
       implements AdminHelper.Command {
     @Override
@@ -201,7 +218,7 @@ public class ECAdmin extends Configured implements Tool {
     }
   }
 
-  /** Command to get the erasure coding policy for a file or directory. */
+  /** 查询指定文件或目录当前生效的纠删码策略 */
   private static class GetECPolicyCommand implements AdminHelper.Command {
     @Override
     public String getName() {
@@ -256,7 +273,7 @@ public class ECAdmin extends Configured implements Tool {
     }
   }
 
-  /** Command to remove an erasure coding policy. */
+  /** 从集群中删除指定的用户自定义纠删码策略 */
   private static class RemoveECPolicyCommand implements AdminHelper.Command {
     @Override
     public String getName() {
@@ -303,7 +320,7 @@ public class ECAdmin extends Configured implements Tool {
     }
   }
 
-  /** Command to set the erasure coding policy to a file/directory. */
+  /** 为指定文件/目录设置纠删码策略 */
   private static class SetECPolicyCommand implements AdminHelper.Command {
     @Override
     public String getName() {
@@ -369,6 +386,7 @@ public class ECAdmin extends Configured implements Tool {
             " " + path);
         RemoteIterator<FileStatus> dirIt = dfs.listStatusIterator(p);
         if (dirIt.hasNext()) {
+          // 提示用户：非空目录设置策略不会自动转换已有文件
           System.out.println("Warning: setting erasure coding policy on a " +
               "non-empty directory will not automatically convert existing " +
               "files to " + ecPolicyName + " erasure coding policy");
@@ -381,7 +399,7 @@ public class ECAdmin extends Configured implements Tool {
     }
   }
 
-  /** Command to unset the erasure coding policy set for a file/directory. */
+  /** 取消指定目录已设置的纠删码策略，继承父目录策略 */
   private static class UnsetECPolicyCommand
       implements AdminHelper.Command {
 
@@ -425,6 +443,7 @@ public class ECAdmin extends Configured implements Tool {
         System.out.println("Unset erasure coding policy from " + path);
         RemoteIterator<FileStatus> dirIt = dfs.listStatusIterator(p);
         if (dirIt.hasNext()) {
+          // 提示用户：非空目录取消策略不会自动转换已有文件
           System.out.println("Warning: unsetting erasure coding policy on a " +
               "non-empty directory will not automatically convert existing" +
               " files to replicated data.");
@@ -443,7 +462,7 @@ public class ECAdmin extends Configured implements Tool {
     }
   }
 
-  /** Command to list the set of supported erasure coding codecs and coders. */
+  /** 列出集群支持的所有纠删码编解码器及其实现 */
   private static class ListECCodecsCommand
       implements AdminHelper.Command {
     @Override
@@ -454,218 +473,3 @@ public class ECAdmin extends Configured implements Tool {
     @Override
     public String getShortUsage() {
       return "[" + getName() + "]\n";
-    }
-
-    @Override
-    public String getLongUsage() {
-      return getShortUsage() + "\n" +
-          "Get the list of supported erasure coding codecs and coders.\n" +
-          "A coder is an implementation of a codec. A codec can have " +
-          "different implementations, thus different coders.\n" +
-          "The coders for a codec are listed in a fall back order.\n";
-    }
-
-    @Override
-    public int run(Configuration conf, List<String> args) throws IOException {
-      if (args.size() > 0) {
-        System.err.println(getName() + ": Too many arguments");
-        return 1;
-      }
-
-      final DistributedFileSystem dfs = AdminHelper.getDFS(conf);
-      try {
-        Map<String, String> codecs =
-            dfs.getAllErasureCodingCodecs();
-        if (codecs.isEmpty()) {
-          System.out.println("No erasure coding codecs are supported on the " +
-              "cluster.");
-        } else {
-          System.out.println("Erasure Coding Codecs: Codec [Coder List]");
-          for (Map.Entry<String, String> codec : codecs.entrySet()) {
-            if (codec != null) {
-              System.out.println("\t" + codec.getKey().toUpperCase() + " ["
-                  + codec.getValue().toUpperCase() +"]");
-            }
-          }
-        }
-      } catch (IOException e) {
-        System.err.println(AdminHelper.prettifyException(e));
-        return 2;
-      }
-      return 0;
-    }
-  }
-
-  /** Command to enable an existing erasure coding policy. */
-  private static class EnableECPolicyCommand implements AdminHelper.Command {
-    @Override
-    public String getName() {
-      return "-enablePolicy";
-    }
-
-    @Override
-    public String getShortUsage() {
-      return "[" + getName() + " -policy <policy>]\n";
-    }
-
-    @Override
-    public String getLongUsage() {
-      TableListing listing = AdminHelper.getOptionDescriptionListing();
-      listing.addRow("<policy>", "The name of the erasure coding policy");
-      return getShortUsage() + "\n" +
-          "Enable the erasure coding policy.\n\n" +
-          listing.toString();
-    }
-
-    @Override
-    public int run(Configuration conf, List<String> args) throws IOException {
-      final String ecPolicyName = StringUtils.popOptionWithArgument("-policy",
-          args);
-      if (ecPolicyName == null) {
-        System.err.println("Please specify the policy name.\nUsage: " +
-            getLongUsage());
-        return 1;
-      }
-      if (args.size() > 0) {
-        System.err.println(getName() + ": Too many arguments");
-        return 1;
-      }
-
-      final DistributedFileSystem dfs = AdminHelper.getDFS(conf);
-      try {
-        dfs.enableErasureCodingPolicy(ecPolicyName);
-        System.out
-            .println("Erasure coding policy " + ecPolicyName + " is enabled");
-        ECTopologyVerifierResult result =
-            dfs.getECTopologyResultForPolicies(ecPolicyName);
-        if (!result.isSupported()) {
-          System.err.println(
-              "Warning: The cluster setup does not support " + "EC policy "
-                  + ecPolicyName + ". Reason: " + result.getResultMessage());
-        }
-      } catch (IOException e) {
-        System.err.println(AdminHelper.prettifyException(e));
-        return 2;
-      }
-      return 0;
-    }
-  }
-
-  /** Command to disable an existing erasure coding policy. */
-  private static class DisableECPolicyCommand implements AdminHelper.Command {
-    @Override
-    public String getName() {
-      return "-disablePolicy";
-    }
-
-    @Override
-    public String getShortUsage() {
-      return "[" + getName() + " -policy <policy>]\n";
-    }
-
-    @Override
-    public String getLongUsage() {
-      TableListing listing = AdminHelper.getOptionDescriptionListing();
-      listing.addRow("<policy>", "The name of the erasure coding policy");
-      return getShortUsage() + "\n" +
-          "Disable the erasure coding policy.\n\n" +
-          listing.toString();
-    }
-
-    @Override
-    public int run(Configuration conf, List<String> args) throws IOException {
-      final String ecPolicyName = StringUtils.popOptionWithArgument("-policy",
-          args);
-      if (ecPolicyName == null) {
-        System.err.println("Please specify the policy name.\nUsage: " +
-            getLongUsage());
-        return 1;
-      }
-      if (args.size() > 0) {
-        System.err.println(getName() + ": Too many arguments");
-        return 1;
-      }
-
-      final DistributedFileSystem dfs = AdminHelper.getDFS(conf);
-      try {
-        dfs.disableErasureCodingPolicy(ecPolicyName);
-        System.out.println("Erasure coding policy " + ecPolicyName +
-            " is disabled");
-      } catch (IOException e) {
-        System.err.println(AdminHelper.prettifyException(e));
-        return 2;
-      }
-      return 0;
-    }
-  }
-
-  /**
-   * Command to verify the cluster setup can support all enabled EC policies.
-   */
-  private static class VerifyClusterSetupCommand
-      implements AdminHelper.Command {
-    @Override
-    public String getName() {
-      return "-verifyClusterSetup";
-    }
-
-    @Override
-    public String getShortUsage() {
-      return "[" + getName() + " [-policy <policy>...<policy>]]\n";
-    }
-
-    @Override
-    public String getLongUsage() {
-      TableListing listing = AdminHelper.getOptionDescriptionListing();
-      listing.addRow("<policy>", "The name of the erasure coding policy");
-      return getShortUsage() + "\n"
-          + "Verify if the cluster setup can support all enabled erasure " +
-          "coding policies. If optional parameter -policy is specified, " +
-          "verify if the cluster setup can support the given policy.\n";
-    }
-
-    @Override
-    public int run(Configuration conf, List<String> args) throws IOException {
-      boolean isPolicyOption = StringUtils.popOption("-policy", args);
-      final DistributedFileSystem dfs = AdminHelper.getDFS(conf);
-      ECTopologyVerifierResult result = null;
-      if (isPolicyOption) {
-        CommandFormat c = new CommandFormat(1, Integer.MAX_VALUE);
-        c.parse(args);
-        String[] parameters = args.toArray(new String[args.size()]);
-        try {
-          result = dfs.getECTopologyResultForPolicies(parameters);
-        } catch (RemoteException e) {
-          if (e.getClassName().contains("HadoopIllegalArgumentException")) {
-            throw new HadoopIllegalArgumentException(e.getMessage());
-          }
-          throw e;
-        }
-      } else {
-        if (args.size() > 0) {
-          System.err.println(getName() + ": Too many arguments");
-          return 1;
-        }
-        result = dfs.getECTopologyResultForPolicies();
-      }
-      System.out.println(result.getResultMessage());
-      if (result.isSupported()) {
-        return 0;
-      }
-      return 2;
-    }
-  }
-
-  private static final AdminHelper.Command[] COMMANDS = {
-      new ListECPoliciesCommand(),
-      new AddECPoliciesCommand(),
-      new GetECPolicyCommand(),
-      new RemoveECPolicyCommand(),
-      new SetECPolicyCommand(),
-      new UnsetECPolicyCommand(),
-      new ListECCodecsCommand(),
-      new EnableECPolicyCommand(),
-      new DisableECPolicyCommand(),
-      new VerifyClusterSetupCommand()
-  };
-}

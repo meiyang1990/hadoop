@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * This package provides a mechanism for satisfying the storage policy of a
- * path.
+ * HDFS 存储策略满足器包，提供满足路径存储策略要求的块迁移机制。
+ * 核心功能是自动将数据块移动到符合存储策略要求的存储类型，保证存储策略落地执行。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

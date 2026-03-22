@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -63,17 +64,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * FSImageLoader loads fsimage and provide methods to return JSON formatted
- * file status of the namespace of the fsimage.
+ * 文件系统镜像加载器，负责加载HDFS fsimage文件到内存，并提供JSON格式的文件系统元数据查询能力，用于离线fsimage查看工具
  */
 class FSImageLoader {
   public static final Logger LOG =
       LoggerFactory.getLogger(FSImageHandler.class);
 
   private final SerialNumberManager.StringTable stringTable;
-  // byte representation of inodes, sorted by id
+  // 按inode id排序的inode字节序列化数据数组
   private final byte[][] inodes;
+  // 目录inode id -> 目录下所有子inode id数组的映射
   private final Map<Long, long[]> dirmap;
+  // inode字节数据按id排序的比较器
   private static final Comparator<byte[]> INODE_BYTES_COMPARATOR = new
           Comparator<byte[]>() {
     @Override
@@ -104,10 +106,10 @@ class FSImageLoader {
   }
 
   /**
-   * Load fsimage into the memory.
-   * @param inputFile the filepath of the fsimage to load.
-   * @return FSImageLoader
-   * @throws IOException if failed to load fsimage.
+   * 从指定文件路径加载fsimage到内存，构建FSImageLoader实例
+   * @param inputFile 待加载的fsimage文件路径
+   * @return 加载完成的FSImageLoader实例
+   * @throws IOException 加载fsimage失败时抛出
    */
   static FSImageLoader load(String inputFile) throws IOException {
     Configuration conf = new Configuration();
@@ -120,14 +122,16 @@ class FSImageLoader {
 
 
     try (FileInputStream fin = new FileInputStream(file.getFD())) {
-      // Map to record INodeReference to the referred id
+      // 存储inode引用对应的被引用inode id列表
       ImmutableList<Long> refIdList = null;
       SerialNumberManager.StringTable stringTable = null;
       byte[][] inodes = null;
       Map<Long, long[]> dirmap = null;
 
+      // 从摘要中获取所有fsimage节
       ArrayList<FsImageProto.FileSummary.Section> sections =
           Lists.newArrayList(summary.getSectionsList());
+      // 按节类型序号排序节
       Collections.sort(sections,
           new Comparator<FsImageProto.FileSummary.Section>() {
             @Override
@@ -147,8 +151,11 @@ class FSImageLoader {
             }
           });
 
+      // 遍历处理每个节，加载对应数据
       for (FsImageProto.FileSummary.Section s : sections) {
+        // 将输入流定位到当前节的起始偏移
         fin.getChannel().position(s.getOffset());
+        // 包装输入流，处理压缩并限制读取长度为当前节长度
         InputStream is = FSImageUtil.wrapInputStreamForCompression(conf,
             summary.getCodec(), new BufferedInputStream(new LimitInputStream(
             fin, s.getLength())));
@@ -158,11 +165,13 @@ class FSImageLoader {
               ());
         }
 
+        // 获取节类型
         FSImageFormatProtobuf.SectionName sectionName
             = FSImageFormatProtobuf.SectionName.fromString(s.getName());
         if (sectionName == null) {
           throw new IOException("Unrecognized section " + s.getName());
         }
+        // 根据节类型加载对应数据
         switch (sectionName) {
           case STRING_TABLE:
             stringTable = loadStringTable(is);
@@ -184,6 +193,13 @@ class FSImageLoader {
     }
   }
 
+  /**
+   * 加载inode目录节，构建目录id到子inode id列表的映射
+   * @param in 目录节输入流
+   * @param refIdList inode引用id列表
+   * @return 目录映射表
+   * @throws IOException 加载失败时抛出
+   */
   private static Map<Long, long[]> loadINodeDirectorySection
           (InputStream in, List<Long> refIdList)
       throws IOException {
@@ -191,14 +207,16 @@ class FSImageLoader {
     Map<Long, long[]> dirs = Maps.newHashMap();
     long counter = 0;
     while (true) {
+      // 从流中解析一个目录条目
       FsImageProto.INodeDirectorySection.DirEntry e =
           FsImageProto.INodeDirectorySection.DirEntry.parseDelimitedFrom(in);
-      // note that in is a LimitedInputStream
+      // LimitedInputStream读到末尾会返回null，结束循环
       if (e == null) {
         break;
       }
       ++counter;
 
+      // 合并普通子inode和引用子inode的id
       long[] l = new long[e.getChildrenCount() + e.getRefChildrenCount()];
       for (int i = 0; i < e.getChildrenCount(); ++i) {
         l[i] = e.getChildren(i);
@@ -213,6 +231,12 @@ class FSImageLoader {
     return dirs;
   }
 
+  /**
+   * 加载inode引用节，获取所有引用指向的原始inode id
+   * @param in inode引用节输入流
+   * @return 不可变的被引用inode id列表
+   * @throws IOException 加载失败时抛出
+   */
   static ImmutableList<Long> loadINodeReferenceSection(InputStream in)
       throws IOException {
     LOG.info("Loading inode references");
@@ -232,6 +256,12 @@ class FSImageLoader {
     return builder.build();
   }
 
+  /**
+   * 加载inode节，读取所有inode的原始字节并按id排序
+   * @param in inode节输入流
+   * @return 按id排序的inode字节数组
+   * @throws IOException 加载失败时抛出
+   */
   private static byte[][] loadINodeSection(InputStream in)
           throws IOException {
     FsImageProto.INodeSection s = FsImageProto.INodeSection
@@ -239,6 +269,7 @@ class FSImageLoader {
     LOG.info("Loading " + s.getNumInodes() + " inodes.");
     final byte[][] inodes = new byte[(int) s.getNumInodes()][];
 
+    // 读取每个inode的原始字节，不解析，节省内存
     for (int i = 0; i < s.getNumInodes(); ++i) {
       int size = CodedInputStream.readRawVarint32(in.read(), in);
       byte[] bytes = new byte[size];
@@ -246,11 +277,18 @@ class FSImageLoader {
       inodes[i] = bytes;
     }
     LOG.debug("Sorting inodes");
+    // 按inode id排序，方便后续二分查找
     Arrays.sort(inodes, INODE_BYTES_COMPARATOR);
     LOG.debug("Finished sorting inodes");
     return inodes;
   }
 
+  /**
+   * 加载字符串表节，反序列化字符串序列号到字符串的映射表
+   * @param in 字符串表节输入流
+   * @return 字符串表实例
+   * @throws IOException 加载失败时抛出
+   */
   static SerialNumberManager.StringTable loadStringTable(InputStream in)
         throws IOException {
     FsImageProto.StringTableSection s = FsImageProto.StringTableSection
@@ -258,6 +296,7 @@ class FSImageLoader {
     LOG.info("Loading " + s.getNumEntry() + " strings");
     SerialNumberManager.StringTable stringTable =
         SerialNumberManager.newStringTable(s.getNumEntry(), s.getMaskBits());
+    // 将所有字符串存入字符串表
     for (int i = 0; i < s.getNumEntry(); ++i) {
       FsImageProto.StringTableSection.Entry e = FsImageProto
           .StringTableSection.Entry.parseDelimitedFrom(in);
@@ -267,10 +306,10 @@ class FSImageLoader {
   }
 
   /**
-   * Return the JSON formatted FileStatus of the specified file.
-   * @param path a path specifies a file
-   * @return JSON formatted FileStatus
-   * @throws IOException if failed to serialize fileStatus to JSON.
+   * 获取指定路径的文件状态，返回JSON格式字符串
+   * @param path 目标文件路径
+   * @return JSON格式的文件状态
+   * @throws IOException 序列化或查找失败时抛出
    */
   String getFileStatus(String path) throws IOException {
     FsImageProto.INodeSection.INode inode = fromINodeId(lookup(path));
@@ -279,10 +318,10 @@ class FSImageLoader {
   }
 
   /**
-   * Return the JSON formatted list of the files in the specified directory.
-   * @param path a path specifies a directory to list
-   * @return JSON formatted file list in the directory
-   * @throws IOException if failed to serialize fileStatus to JSON.
+   * 列出指定目录下所有文件的状态，返回JSON格式字符串
+   * @param path 目标目录路径
+   * @return JSON格式的文件状态列表
+   * @throws IOException 序列化或查找失败时抛出
    */
   String listStatus(String path) throws IOException {
     StringBuilder sb = new StringBuilder();
@@ -299,14 +338,21 @@ class FSImageLoader {
     return sb.toString();
   }
 
+  /**
+   * 获取指定路径下所有文件状态列表
+   * @param path 目标路径
+   * @return 文件状态map列表
+   * @throws IOException 查找失败时抛出
+   */
   private List<Map<String, Object>> getFileStatusList(String path)
           throws IOException {
     List<Map<String, Object>> list = new ArrayList<Map<String, Object>>();
     long id = lookup(path);
     FsImageProto.INodeSection.INode inode = fromINodeId(id);
+    // 如果是目录，遍历所有子节点添加到列表
     if (inode.getType() == FsImageProto.INodeSection.INode.Type.DIRECTORY) {
       if (!dirmap.containsKey(id)) {
-        // if the directory is empty, return empty list
+        // 空目录返回空列表
         return list;
       }
       long[] children = dirmap.get(id);
@@ -314,28 +360,36 @@ class FSImageLoader {
         list.add(getFileStatus(fromINodeId(cid), true));
       }
     } else {
+      // 非目录直接返回自身状态
       list.add(getFileStatus(inode, false));
     }
     return list;
   }
 
   /**
-   * Return the JSON formatted ContentSummary of the specified path.
-   * @param path a path specifies a file or directory
-   * @return JSON formatted ContentSummary
-   * @throws IOException if failed to serialize ContentSummary to JSON.
+   * 获取指定路径的内容摘要，返回JSON格式字符串
+   * @param path 目标路径
+   * @return JSON格式的内容摘要
+   * @throws IOException 序列化或查找失败时抛出
    */
   String getContentSummary(String path) throws IOException {
     return "{\"ContentSummary\":\n"
         + JsonUtil.toJsonString(getContentSummaryMap(path)) + "\n}\n";
   }
 
+  /**
+   * 计算指定路径的内容摘要，填充到map中
+   * @param path 目标路径
+   * @return 内容摘要map
+   * @throws IOException 查找失败时抛出
+   */
   private Map<String, Object> getContentSummaryMap(String path)
       throws IOException {
     long id = lookup(path);
     INode inode = fromINodeId(id);
     long spaceQuota = 0;
     long nsQuota = 0;
+    // 数据数组：[目录数, 文件数, 总大小, 总空间消耗]
     long[] data = new long[4];
     FsImageProto.INodeSection.INodeFile f = inode.getFile();
     switch (inode.getType()) {
@@ -366,322 +420,5 @@ class FSImageLoader {
 
   }
 
-  private Map<String, Object> fillSummaryMap(long spaceQuota,
-      long nsQuota, long[] data) {
-    Map<String, Object> map = Maps.newHashMap();
-    map.put("directoryCount", data[0]);
-    map.put("fileCount", data[1]);
-    map.put("length", data[2]);
-    map.put("quota", nsQuota);
-    map.put("spaceConsumed", data[3]);
-    map.put("spaceQuota", spaceQuota);
-    return map;
-  }
-
-  private void fillDirSummary(long id, long[] data) throws IOException {
-    data[0]++;
-    long[] children = dirmap.get(id);
-    if (children == null) {
-      return;
-    }
-
-    for (long cid : children) {
-      INode node = fromINodeId(cid);
-      switch (node.getType()) {
-      case DIRECTORY:
-        fillDirSummary(cid, data);
-        break;
-      case FILE:
-        FsImageProto.INodeSection.INodeFile f = node.getFile();
-        long curLength = getFileSize(f);
-        data[1]++;
-        data[2] += curLength;
-        data[3] += (curLength) * (f.getReplication());
-        break;
-      case SYMLINK:
-        data[1]++;
-        break;
-      default:
-        break;
-      }
-    }
-  }
-
   /**
-   * Return the JSON formatted XAttrNames of the specified file.
-   *
-   * @param path
-   *          a path specifies a file
-   * @return JSON formatted XAttrNames
-   * @throws IOException
-   *           if failed to serialize fileStatus to JSON.
-   */
-  String listXAttrs(String path) throws IOException {
-    return JsonUtil.toJsonString(getXAttrList(path));
-  }
-
-  /**
-   * Return the JSON formatted XAttrs of the specified file.
-   *
-   * @param path
-   *          a path specifies a file
-   * @return JSON formatted XAttrs
-   * @throws IOException
-   *           if failed to serialize fileStatus to JSON.
-   */
-  String getXAttrs(String path, List<String> names, String encoder)
-      throws IOException {
-
-    List<XAttr> xAttrs = getXAttrList(path);
-    List<XAttr> filtered;
-    if (names == null || names.size() == 0) {
-      filtered = xAttrs;
-    } else {
-      filtered = Lists.newArrayListWithCapacity(names.size());
-      for (String name : names) {
-        XAttr search = XAttrHelper.buildXAttr(name);
-
-        boolean found = false;
-        for (XAttr aXAttr : xAttrs) {
-          if (aXAttr.getNameSpace() == search.getNameSpace()
-              && aXAttr.getName().equals(search.getName())) {
-
-            filtered.add(aXAttr);
-            found = true;
-            break;
-          }
-        }
-
-        if (!found) {
-          throw new XAttrNotFoundException();
-        }
-      }
-
-    }
-    return JsonUtil.toJsonString(filtered,
-        new XAttrEncodingParam(encoder).getEncoding());
-  }
-
-  private List<XAttr> getXAttrList(String path) throws IOException {
-    long id = lookup(path);
-    FsImageProto.INodeSection.INode inode = fromINodeId(id);
-    switch (inode.getType()) {
-    case FILE:
-      return FSImageFormatPBINode.Loader.loadXAttrs(
-          inode.getFile().getXAttrs(), stringTable);
-    case DIRECTORY:
-      return FSImageFormatPBINode.Loader.loadXAttrs(inode.getDirectory()
-          .getXAttrs(), stringTable);
-    default:
-      return null;
-    }
-  }
-
-  /**
-   * Return the JSON formatted ACL status of the specified file.
-   * @param path a path specifies a file
-   * @return JSON formatted AclStatus
-   * @throws IOException if failed to serialize fileStatus to JSON.
-   */
-  String getAclStatus(String path) throws IOException {
-    PermissionStatus p = getPermissionStatus(path);
-    List<AclEntry> aclEntryList = getAclEntryList(path);
-    FsPermission permission = p.getPermission();
-    AclStatus.Builder builder = new AclStatus.Builder();
-    builder.owner(p.getUserName()).group(p.getGroupName())
-        .addEntries(aclEntryList).setPermission(permission)
-        .stickyBit(permission.getStickyBit());
-    AclStatus aclStatus = builder.build();
-    return JsonUtil.toJsonString(aclStatus);
-  }
-
-  private List<AclEntry> getAclEntryList(String path) throws IOException {
-    long id = lookup(path);
-    FsImageProto.INodeSection.INode inode = fromINodeId(id);
-    switch (inode.getType()) {
-      case FILE: {
-        FsImageProto.INodeSection.INodeFile f = inode.getFile();
-        return FSImageFormatPBINode.Loader.loadAclEntries(
-            f.getAcl(), stringTable);
-      }
-      case DIRECTORY: {
-        FsImageProto.INodeSection.INodeDirectory d = inode.getDirectory();
-        return FSImageFormatPBINode.Loader.loadAclEntries(
-            d.getAcl(), stringTable);
-      }
-      default: {
-        return new ArrayList<AclEntry>();
-      }
-    }
-  }
-
-  private PermissionStatus getPermissionStatus(String path) throws IOException {
-    long id = lookup(path);
-    FsImageProto.INodeSection.INode inode = fromINodeId(id);
-    switch (inode.getType()) {
-      case FILE: {
-        FsImageProto.INodeSection.INodeFile f = inode.getFile();
-        return FSImageFormatPBINode.Loader.loadPermission(
-            f.getPermission(), stringTable);
-      }
-      case DIRECTORY: {
-        FsImageProto.INodeSection.INodeDirectory d = inode.getDirectory();
-        return FSImageFormatPBINode.Loader.loadPermission(
-            d.getPermission(), stringTable);
-      }
-      case SYMLINK: {
-        FsImageProto.INodeSection.INodeSymlink s = inode.getSymlink();
-        return FSImageFormatPBINode.Loader.loadPermission(
-            s.getPermission(), stringTable);
-      }
-      default: {
-        return null;
-      }
-    }
-  }
-
-  /**
-   * Return the INodeId of the specified path.
-   */
-  private long lookup(String path) throws IOException {
-    Preconditions.checkArgument(path.startsWith("/"));
-    long id = INodeId.ROOT_INODE_ID;
-    for (int offset = 0, next; offset < path.length(); offset = next) {
-      next = path.indexOf('/', offset + 1);
-      if (next == -1) {
-        next = path.length();
-      }
-      if (offset + 1 > next) {
-        break;
-      }
-
-      final String component = path.substring(offset + 1, next);
-
-      if (component.isEmpty()) {
-        continue;
-      }
-
-      final long[] children = dirmap.get(id);
-      if (children == null) {
-        throw new FileNotFoundException(path);
-      }
-
-      boolean found = false;
-      for (long cid : children) {
-        FsImageProto.INodeSection.INode child = fromINodeId(cid);
-        if (component.equals(child.getName().toStringUtf8())) {
-          found = true;
-          id = child.getId();
-          break;
-        }
-      }
-      if (!found) {
-        throw new FileNotFoundException(path);
-      }
-    }
-    return id;
-  }
-
-  private Map<String, Object> getFileStatus
-      (FsImageProto.INodeSection.INode inode, boolean printSuffix){
-    Map<String, Object> map = Maps.newHashMap();
-    switch (inode.getType()) {
-      case FILE: {
-        FsImageProto.INodeSection.INodeFile f = inode.getFile();
-        PermissionStatus p = FSImageFormatPBINode.Loader.loadPermission(
-            f.getPermission(), stringTable);
-        map.put("accessTime", f.getAccessTime());
-        map.put("blockSize", f.getPreferredBlockSize());
-        map.put("group", p.getGroupName());
-        map.put("length", getFileSize(f));
-        map.put("modificationTime", f.getModificationTime());
-        map.put("owner", p.getUserName());
-        map.put("pathSuffix",
-            printSuffix ? inode.getName().toStringUtf8() : "");
-        map.put("permission", toString(p.getPermission()));
-        if (f.hasErasureCodingPolicyID()) {
-          map.put("replication", INodeFile.DEFAULT_REPL_FOR_STRIPED_BLOCKS);
-        } else {
-          map.put("replication", f.getReplication());
-        }
-        map.put("type", inode.getType());
-        map.put("fileId", inode.getId());
-        map.put("childrenNum", 0);
-        return map;
-      }
-      case DIRECTORY: {
-        FsImageProto.INodeSection.INodeDirectory d = inode.getDirectory();
-        PermissionStatus p = FSImageFormatPBINode.Loader.loadPermission(
-            d.getPermission(), stringTable);
-        map.put("accessTime", 0);
-        map.put("blockSize", 0);
-        map.put("group", p.getGroupName());
-        map.put("length", 0);
-        map.put("modificationTime", d.getModificationTime());
-        map.put("owner", p.getUserName());
-        map.put("pathSuffix",
-            printSuffix ? inode.getName().toStringUtf8() : "");
-        map.put("permission", toString(p.getPermission()));
-        map.put("replication", 0);
-        map.put("type", inode.getType());
-        map.put("fileId", inode.getId());
-        map.put("childrenNum", dirmap.containsKey(inode.getId()) ?
-            dirmap.get(inode.getId()).length : 0);
-        return map;
-      }
-      case SYMLINK: {
-        FsImageProto.INodeSection.INodeSymlink d = inode.getSymlink();
-        PermissionStatus p = FSImageFormatPBINode.Loader.loadPermission(
-            d.getPermission(), stringTable);
-        map.put("accessTime", d.getAccessTime());
-        map.put("blockSize", 0);
-        map.put("group", p.getGroupName());
-        map.put("length", 0);
-        map.put("modificationTime", d.getModificationTime());
-        map.put("owner", p.getUserName());
-        map.put("pathSuffix",
-            printSuffix ? inode.getName().toStringUtf8() : "");
-        map.put("permission", toString(p.getPermission()));
-        map.put("replication", 0);
-        map.put("type", inode.getType());
-        map.put("symlink", d.getTarget().toStringUtf8());
-        map.put("fileId", inode.getId());
-        map.put("childrenNum", 0);
-        return map;
-      }
-      default:
-        return null;
-    }
-  }
-
-  static long getFileSize(FsImageProto.INodeSection.INodeFile f) {
-    long size = 0;
-    for (HdfsProtos.BlockProto p : f.getBlocksList()) {
-      size += p.getNumBytes();
-    }
-    return size;
-  }
-
-  private String toString(FsPermission permission) {
-    return String.format("%o", permission.toShort());
-  }
-
-  private FsImageProto.INodeSection.INode fromINodeId(final long id)
-          throws IOException {
-    int l = 0, r = inodes.length;
-    while (l < r) {
-      int mid = l + (r - l) / 2;
-      FsImageProto.INodeSection.INode n = FsImageProto.INodeSection.INode
-              .parseFrom(inodes[mid]);
-      long nid = n.getId();
-      if (id > nid) {
-        l = mid + 1;
-      } else if (id < nid) {
-        r = mid;
-      } else {
-        return n;
-      }
-    }
-    return null;
-  }
-}
+   * 将内容摘要数据填充到

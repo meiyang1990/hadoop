@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,31 +34,22 @@ import java.util.Set;
 import java.util.TreeMap;
 
 /**
- * The PBImageCorruptionDetector detects corruptions in the image.
- * It produces a file with the found issues similar to the Delimited
- * processor. The default delimiter is tab, as this is an unlikely value
- * to be included in an inode path. The delimiter value can be changed
- * via the constructor.
- *
- * It looks for the following kinds of corruptions:
- *  - an INode id is mentioned in the INodeDirectorySection, but not present
- *    in the INodeSection (corrupt INode case)
- *  - an INode has children, but at least one of them is corrupted
- *    (missing children case)
- * If multiple layers of directory structure are damaged then it is possible
- * that an INode is corrupted and also having corrupted children.
- *
- * Note that the OIV DetectCorruption processor check is not exhaustive,
- * and only catches the corruptions like above. This processor may be up to
- * extension in the future when new aspects of corruption are found.
+ * PB格式FSImage文件损坏检测器，用于离线检查HDFS fsimage文件中的元数据损坏问题。
+ * 生成带分隔符的损坏问题报告，默认使用制表符作为分隔符（避免和inode路径字符冲突）。
+ * 核心检测两类损坏：
+ *  <ul>
+ *    <li>目录引用了不存在的INode id：INode目录节中存在某INode id，但INode节中没有对应记录</li>
+ *    <li>目录存在子节点损坏：INode存在，但至少有一个子节点找不到对应记录</li>
+ *  </ul>
+ * 多层目录损坏时，一个节点可能同时被标记为自身损坏和存在损坏子节点。
+ * 注意：当前检测并非覆盖所有损坏类型，仅处理上述常见场景，未来可扩展支持更多损坏类型检测。
  */
 public class PBImageCorruptionDetector extends PBImageTextWriter {
   private static final Logger LOG =
       LoggerFactory.getLogger(PBImageCorruptionDetector.class);
 
   /**
-   * Builder object for producing entries (lines) for
-   * PBImageCorruptionDetector. The isSnapshot field is mandatory.
+   * 损坏报告输出条目构建器，用于构造符合格式的输出行，isSnapshot为必填字段。
    */
   static class OutputEntryBuilder {
     private static final String MISSING = "Missing";
@@ -105,12 +97,18 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
       return this;
     }
 
+    /**
+     * 按格式拼接生成完整的损坏报告行。
+     * @return 格式化后的输出行字符串
+     */
     public String build() {
       StringBuffer buffer = new StringBuffer();
+      // 添加损坏类型
       buffer.append(corruption.getType());
       corrDetector.append(buffer, corruption.getId());
       corrDetector.append(buffer, String.valueOf(isSnapshot));
       corrDetector.append(buffer, parentPath);
+      // 父节点ID不存在则输出缺失标记
       if (parentId == -1) {
         corrDetector.append(buffer, MISSING);
       } else {
@@ -123,14 +121,17 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
     }
   }
 
+  /**
+   * INode存在性检查器，用于维护合法INode和INodeReference的ID集合，检查ID是否存在。
+   */
   private static class CorruptionChecker {
     private static final String NODE_TYPE = "Node";
     private static final String REF_TYPE = "Ref";
     private static final String UNKNOWN_TYPE = "Unknown";
 
-    /** Contains all existing INode IDs. */
+    /** 所有已存在的普通INode ID集合 */
     private Set<Long> nodeIds;
-    /** Contains all existing INodeReference IDs. */
+    /** 所有已存在的INodeReference ID集合 */
     private Set<Long> nodeRefIds;
 
     CorruptionChecker() {
@@ -138,7 +139,8 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
     }
 
     /**
-     * Collect a INode Id.
+     * 保存一个合法的普通INode ID。
+     * @param id INode ID
      */
     void saveNodeId(long id) {
       Preconditions.checkState(nodeIds != null && !nodeIds.contains(id));
@@ -146,26 +148,36 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
     }
 
     /**
-     * Returns whether the given INode id was saved previously.
+     * 检查给定INode ID是否存在于合法集合中。
+     * @param id 待检查的INode ID
+     * @return 是否存在
      */
     boolean isNodeIdExist(long id) {
       return nodeIds.contains(id);
     }
 
     /**
-     * Returns whether the given INodeReference id was saved previously.
+     * 检查给定INodeReference ID是否存在于合法集合中。
+     * @param id 待检查的INodeReference ID
+     * @return 是否存在
      */
     boolean isNodeRefIdExist(long id) {
       return nodeRefIds.contains(id);
     }
 
     /**
-     * Saves the INodeReference ids.
+     * 保存所有INodeReference ID列表。
+     * @param nodeRefIdList INodeReference ID列表
      */
     void saveNodeRefIds(List<Long> nodeRefIdList) {
       nodeRefIds = new HashSet<>(nodeRefIdList);
     }
 
+    /**
+     * 根据ID获取节点类型。
+     * @param id 节点ID
+     * @return 节点类型字符串：普通节点/引用节点/未知
+     */
     String getTypeOfId(long id) {
       if (isNodeIdExist(id)) {
         return NODE_TYPE;
@@ -177,11 +189,18 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
     }
   }
 
-  /** Delimiter string used while producing output. */
+  /** 损坏检查器实例 */
   private final CorruptionChecker corrChecker;
-  /** Id to corruption mapping. */
+  /** 损坏节点ID到损坏信息的映射表 */
   private final Map<Long, PBImageCorruption> corruptionsMap;
 
+  /**
+   * 构造PB格式fsimage损坏检测器实例。
+   * @param out 输出流
+   * @param delimiter 输出分隔符
+   * @param tempPath 临时文件路径
+   * @throws IOException IO异常
+   */
   PBImageCorruptionDetector(PrintStream out, String delimiter,
         String tempPath) throws IOException {
     super(out, delimiter, tempPath);
@@ -190,6 +209,10 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
   }
 
   @Override
+  /**
+   * 获取输出报告表头行。
+   * @return 格式化的表头字符串
+   */
   public String getHeader() {
     StringBuffer buffer = new StringBuffer();
     buffer.append("CorruptionType");
@@ -204,6 +227,12 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
   }
 
   @Override
+  /**
+   * 生成当前INode对应的损坏报告条目，如果该节点没有损坏则返回空字符串。
+   * @param parentPath 父节点路径
+   * @param inode 当前INode对象
+   * @return 格式化的损坏条目，无损坏则返回空
+   */
   public String getEntry(String parentPath,
       FsImageProto.INodeSection.INode inode) {
     long id = inode.getId();
@@ -230,12 +259,22 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
   }
 
   @Override
+  /**
+   * 处理单个INode节点，保存节点ID到合法集合。
+   * @param p INode对象
+   * @param numDirs 目录计数器
+   * @throws IOException IO异常
+   */
   protected void checkNode(FsImageProto.INodeSection.INode p,
         AtomicInteger numDirs) throws IOException {
     super.checkNode(p, numDirs);
     corrChecker.saveNodeId(p.getId());
   }
 
+  /**
+   * 添加一个损坏的INode记录到损坏映射表。
+   * @param childId 损坏节点的ID
+   */
   private void addCorruptedNode(long childId) {
     if (!corruptionsMap.containsKey(childId)) {
       PBImageCorruption c = new PBImageCorruption(childId, false, true, 0);
@@ -247,6 +286,11 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
     }
   }
 
+  /**
+   * 添加一个存在损坏子节点的父节点记录到损坏映射表。
+   * @param id 父节点ID
+   * @param numOfCorruption 损坏子节点数量
+   */
   private void addCorruptedParent(long id, int numOfCorruption) {
     if (!corruptionsMap.containsKey(id)) {
       PBImageCorruption c = new PBImageCorruption(id, true, false,
@@ -261,17 +305,23 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
   }
 
   /**
-   * Scan the INodeDirectory section to construct the namespace.
+   * 扫描INode目录节，构建命名空间并检查损坏。
+   * @param in 目录节输入流
+   * @param refIdList INodeReference ID列表
+   * @throws IOException IO异常
    */
   @Override
   protected void buildNamespace(InputStream in, List<Long> refIdList)
       throws IOException {
+    // 保存所有引用节点ID
     corrChecker.saveNodeRefIds(refIdList);
     LOG.debug("Saved INodeReference ids of size {}.", refIdList.size());
     int count = 0;
+    // 循环读取每个目录条目
     while (true) {
       FsImageProto.INodeDirectorySection.DirEntry e =
           FsImageProto.INodeDirectorySection.DirEntry.parseDelimitedFrom(in);
+      // 读取完毕退出循环
       if (e == null) {
         break;
       }
@@ -280,20 +330,25 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
         LOG.debug("Scanned {} directories.", count);
       }
       long parentId = e.getParent();
+      // 父节点不存在，标记为损坏
       if (!corrChecker.isNodeIdExist(parentId)) {
         LOG.debug("Corruption detected! Parent node is not contained " +
             "in the list of known ids!");
         addCorruptedNode(parentId);
       }
       int numOfCorruption = 0;
+      // 遍历所有普通子节点
       for (int i = 0; i < e.getChildrenCount(); i++) {
         long childId = e.getChildren(i);
+        // 将子节点关联到父节点元数据
         putDirChildToMetadataMap(parentId, childId);
+        // 子节点不存在，标记为损坏
         if (!corrChecker.isNodeIdExist(childId)) {
           addCorruptedNode(childId);
           numOfCorruption++;
         }
       }
+      // 当前父节点存在损坏子节点，标记父节点
       if (numOfCorruption > 0) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("{} corruption detected! Child nodes are missing.",
@@ -301,11 +356,11 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
         }
         addCorruptedParent(parentId, numOfCorruption);
       }
+      // 处理引用类型子节点
       for (int i = e.getChildrenCount();
            i < e.getChildrenCount() + e.getRefChildrenCount(); i++) {
         int refId = e.getRefChildren(i - e.getChildrenCount());
-        // In this case the refNode is referred directly (by its position),
-        // so we couldn't make sure of the correctness
+        // 引用节点通过索引获取实际ID，添加父节点关联，不做额外正确性检查
         putDirChildToMetadataMap(parentId, refIdList.get(refId));
       }
     }
@@ -313,9 +368,13 @@ public class PBImageCorruptionDetector extends PBImageTextWriter {
   }
 
   @Override
+  /**
+   * 所有可解析节点输出完成后，输出无法确定路径的损坏节点。
+   * @throws IOException IO异常
+   */
   public void afterOutput() throws IOException {
     if (!corruptionsMap.isEmpty()) {
-      // Also write out corruptions when the path could be not be decided
+      // 输出所有无法确定路径的损坏节点
       LOG.info("Outputting {} more corrupted nodes.", corruptionsMap.size());
       for (PBImageCorruption c : corruptionsMap.values()) {
         long id = c.getId();

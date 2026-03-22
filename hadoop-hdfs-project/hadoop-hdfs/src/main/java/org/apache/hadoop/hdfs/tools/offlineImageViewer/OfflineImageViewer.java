@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,6 +39,8 @@ import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.hdfs.server.namenode.FSEditLogLoader.PositionTrackingInputStream;
 
 /**
+ * 文件级注释：HDFS离线fsimage查看器主入口类，支持将HDFS命名空间镜像文件解析输出为多种格式，可用于离线分析fsimage结构和内容
+ * 
  * OfflineImageViewer to dump the contents of an Hadoop image file to XML
  * or the console.  Main entry point into utility, either via the
  * command line or programmatically.
@@ -109,6 +112,12 @@ public class OfflineImageViewer {
   private final String inputFile;
   private final ImageVisitor processor;
   
+  /**
+   * 构造离线fsimage查看器实例，初始化输入文件、访问器和块跳过配置
+   * @param inputFile 待处理的fsimage文件路径
+   * @param processor fsimage内容访问处理器，负责输出解析结果
+   * @param skipBlocks 是否跳过块信息解析以减少输出
+   */
   public OfflineImageViewer(String inputFile, ImageVisitor processor, 
              boolean skipBlocks) {
     this.inputFile = inputFile;
@@ -117,7 +126,8 @@ public class OfflineImageViewer {
   }
 
   /**
-   * Process image file.
+   * 开始解析处理fsimage文件，将结果输出到指定处理器
+   * @throws IOException 处理过程中发生IO错误
    */
   public void go() throws IOException  {
     DataInputStream in = null;
@@ -125,20 +135,25 @@ public class OfflineImageViewer {
     ImageLoader fsip = null;
     boolean done = false;
     try {
+      // 打开fsimage文件，包装为带位置跟踪的输入流
       tracker = new PositionTrackingInputStream(new BufferedInputStream(
           Files.newInputStream(Paths.get(inputFile))));
       in = new DataInputStream(tracker);
 
+      // 获取fsimage版本号
       int imageVersionFile = findImageVersion(in);
 
+      // 根据版本获取对应的fsimage加载器
       fsip = ImageLoader.LoaderFactory.getLoader(imageVersionFile);
 
       if(fsip == null) 
         throw new IOException("No image processor to read version " +
             imageVersionFile + " is available.");
+      // 加载并解析fsimage，触发处理器输出结果
       fsip.loadImage(in, processor, skipBlocks);
       done = true;
     } finally {
+      // 加载失败时记录当前处理偏移量，方便问题定位
       if (!done) {
         if (tracker != null) {
           LOG.error("image loading failed at offset " + tracker.getPos());
@@ -146,22 +161,23 @@ public class OfflineImageViewer {
           LOG.error("Failed to load image file.");
         }
       }
+      // 关闭输入流，释放资源
       IOUtils.cleanupWithLogger(LOG, in, tracker);
     }
   }
 
   /**
-   * Check an fsimage datainputstream's version number.
+   * 读取fsimage版本号，不改变输入流的读取指针位置
    *
    * The datainput stream is returned at the same point as it was passed in;
    * this method has no effect on the datainputstream's read pointer.
    *
-   * @param in Datainputstream of fsimage
-   * @return Filesystem layout version of fsimage represented by stream
-   * @throws IOException If problem reading from in
+   * @param in fsimage输入流
+   * @return fsimage对应的文件系统布局版本号
+   * @throws IOException 读取输入流出错
    */
   private int findImageVersion(DataInputStream in) throws IOException {
-    in.mark(42); // arbitrary amount, resetting immediately
+    in.mark(42); // 标记当前位置，读取版本后重置
 
     int version = in.readInt();
     in.reset();
@@ -170,7 +186,8 @@ public class OfflineImageViewer {
   }
   
   /**
-   * Build command-line options and descriptions
+   * 构建命令行选项定义
+   * @return 构建完成的命令行选项集合
    */
   public static Options buildOptions() {
     Options options = new Options();
@@ -194,13 +211,15 @@ public class OfflineImageViewer {
   }
   
   /**
+   * 命令行入口方法，解析参数并启动离线fsimage解析处理
+   *
    * Entry point to command-line-driven operation.  User may specify
    * options and start fsimage viewer from the command line.  Program
    * will process image file and exit cleanly or, if an error is
    * encountered, inform user and exit.
    *
-   * @param args Command line options
-   * @throws IOException 
+   * @param args 命令行参数
+   * @throws IOException 处理过程中IO错误
    */
   public static void main(String[] args) throws IOException {
     Options options = buildOptions();
@@ -225,6 +244,7 @@ public class OfflineImageViewer {
       return;
     }
 
+    // 解析命令行参数
     boolean skipBlocks = cmd.hasOption("skipBlocks");
     boolean printToScreen = cmd.hasOption("printToScreen");
     String inputFile = cmd.getOptionValue("i");
@@ -232,12 +252,14 @@ public class OfflineImageViewer {
     String outputFile = cmd.getOptionValue("o");
     String delimiter = cmd.getOptionValue("delimiter");
     
+    // 校验参数：delimiter只能配合Delimited处理器使用
     if( !(delimiter == null || processor.equals("Delimited")) ) {
       System.out.println("Can only specify -delimiter with Delimited processor");
       printUsage();
       return;
     }
     
+    // 根据处理器类型创建对应的访问器实例
     ImageVisitor v;
     if(processor.equals("Indented")) {
       v = new IndentedImageVisitor(outputFile, printToScreen);
@@ -261,6 +283,7 @@ public class OfflineImageViewer {
     }
     
     try {
+      // 创建查看器并启动处理
       OfflineImageViewer d = new OfflineImageViewer(inputFile, v, skipBlocks);
       d.go();
     } catch (EOFException e) {
@@ -271,7 +294,7 @@ public class OfflineImageViewer {
   }
 
   /**
-   * Print application usage instructions.
+   * 打印工具使用帮助信息
    */
   private static void printUsage() {
     System.out.println(usage);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,9 @@ import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * Indicates that SASL protocol negotiation expected to read a pre-defined magic
- * number, but the expected value was not seen.
+ * HDFS数据传输SASL握手协商魔数不匹配异常。
+ * 当SASL协议协商阶段，读取到的魔数值与预定义的SASL传输魔数不匹配时抛出该异常，
+ * 通常代表连接对端不是合法的HDFS服务或数据传输过程发生损坏。
  */
 @InterfaceAudience.Private
 public class InvalidMagicNumberException extends IOException {
@@ -34,9 +36,10 @@ public class InvalidMagicNumberException extends IOException {
   private final boolean handshake4Encryption;
 
   /**
-   * Creates a new InvalidMagicNumberException.
+   * 构造InvalidMagicNumberException实例。
    *
-   * @param magicNumber expected value
+   * @param magicNumber 实际接收到的错误魔数值
+   * @param handshake4Encryption 是否是加密握手阶段发生的错误
    */
   public InvalidMagicNumberException(final int magicNumber, 
       final boolean handshake4Encryption) {
@@ -46,9 +49,9 @@ public class InvalidMagicNumberException extends IOException {
   }
   
   /**
-   * Return true if it's handshake for encryption
-   * 
-   * @return boolean true if it's handshake for encryption
+   * 判断该错误是否发生在加密握手阶段。
+   *
+   * @return true表示错误发生在加密握手阶段，false表示发生在普通SASL握手阶段
    */
   public boolean isHandshake4Encryption() {
     return handshake4Encryption;

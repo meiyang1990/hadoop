@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,18 +19,18 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 /**
- * An object that allows you to set a limit on a stream.  This limit
- * represents the number of bytes that can be read without getting an
- * exception.
+ * 流读取字节数限制接口，用于对输入流的读取总量进行限制，防止读取过量数据
+ * 限制表示读取超过该字节数会抛出异常，用于NameNode防护恶意超大读取请求
  */
 interface StreamLimiter {
   /**
-   * Set a limit.  Calling this function clears any existing limit.
+   * 设置流读取字节数限制，调用此方法会清除之前已存在的限制
+   * @param limit 允许读取的最大字节数
    */
   public void setLimit(long limit);
   
   /**
-   * Disable limit.
+   * 清除流读取字节数限制，取消流量限制，允许无限制读取
    */
   public void clearLimit();
 }

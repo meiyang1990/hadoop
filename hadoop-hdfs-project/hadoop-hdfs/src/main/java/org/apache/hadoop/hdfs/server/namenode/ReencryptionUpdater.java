@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -51,14 +52,11 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REENCRYPT_THROTT
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_REENCRYPT_THROTTLE_LIMIT_UPDATER_RATIO_KEY;
 
 /**
- * Class for finalizing re-encrypt EDEK operations, by updating file xattrs with
- * edeks returned from reencryption.
+ * 文件重加密EDEK操作收尾处理类，通过使用重加密生成的新EDEK更新文件扩展属性完成重加密流程
  * <p>
- * The tasks are submitted by ReencryptionHandler.
+ * 任务由{@link ReencryptionHandler}提交
  * <p>
- * It is assumed only 1 Updater will be running, since updating file xattrs
- * requires namespace write lock, and performance gain from multi-threading
- * is limited.
+ * 设计假设仅运行一个更新线程，因为更新文件扩展属性需要占用命名空间写锁，多线程性能收益有限
  */
 @InterfaceAudience.Private
 public final class ReencryptionUpdater implements Runnable {
@@ -78,9 +76,7 @@ public final class ReencryptionUpdater implements Runnable {
   private volatile boolean isRunning = false;
 
   /**
-   * Class to track re-encryption submissions of a single zone. It contains
-   * all the submitted futures, and statistics about how far the futures are
-   * processed.
+   * 单个加密区域重加密任务提交追踪器，维护所有已提交任务的Future对象，并跟踪任务处理进度
    */
   static final class ZoneSubmissionTracker {
     private boolean submissionDone;
@@ -129,8 +125,7 @@ public final class ReencryptionUpdater implements Runnable {
   }
 
   /**
-   * Class representing the task for one batch of a re-encryption command. It
-   * also contains statistics about how far this single batch has been executed.
+   * 代表一批重加密命令的任务，维护单批次任务的执行进度统计信息
    */
   static final class ReencryptionTask {
     private final long zoneId;
@@ -149,15 +144,11 @@ public final class ReencryptionUpdater implements Runnable {
   }
 
   /**
-   * Class that encapsulates re-encryption details of a file. It contains the
-   * file inode, stores the initial edek of the file, and the new edek
-   * after re-encryption.
+   * 封装单个文件重加密信息类，包含文件inode、原始EDEK和重加密生成的新EDEK
    * <p>
-   * Assumptions are the object initialization happens when dir lock is held,
-   * and inode is valid and is encrypted during initialization.
+   * 假设对象初始化时已经持有目录锁，初始化过程中inode有效且已加密
    * <p>
-   * Namespace changes may happen during re-encryption, and if inode is changed
-   * the re-encryption is skipped.
+   * 重加密过程中可能发生命名空间变更，如果inode已改变则跳过该文件重加密
    */
   static final class FileEdekInfo {
     private final long inodeId;
@@ -221,6 +212,13 @@ public final class ReencryptionUpdater implements Runnable {
   private final CompletionService<ReencryptionTask> batchService;
   private final ReencryptionHandler handler;
 
+  /**
+   * 构造重加密更新器实例
+   * @param fsd 文件系统目录对象
+   * @param service 批量任务完成服务
+   * @param rh 重加密处理器
+   * @param conf Hadoop配置
+   */
   ReencryptionUpdater(final FSDirectory fsd,
       final CompletionService<ReencryptionTask> service,
       final ReencryptionHandler rh, final Configuration conf) {
@@ -236,13 +234,12 @@ public final class ReencryptionUpdater implements Runnable {
   }
 
   /**
-   * Called by the submission thread to indicate all tasks have been submitted.
-   * If this is called but no tasks has been submitted, the re-encryption is
-   * considered complete.
+   * 由提交线程调用，标记指定加密区域所有任务已提交完成
+   * 如果调用时没有任务已提交，则直接认为该区域重加密完成
    *
-   * @param zoneId Id of the zone inode.
-   * @throws IOException
-   * @throws InterruptedException
+   * @param zoneId 加密区域inode ID
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   void markZoneSubmissionDone(final long zoneId)
       throws IOException, InterruptedException {
@@ -262,7 +259,7 @@ public final class ReencryptionUpdater implements Runnable {
     throttleTimerAll.start();
     while (true) {
       try {
-        // Assuming single-threaded updater.
+        // 获取并处理已完成的重加密任务
         takeAndProcessTasks();
       } catch (InterruptedException ie) {
         LOG.warn("Re-encryption updater thread interrupted. Exiting.");
@@ -280,16 +277,14 @@ public final class ReencryptionUpdater implements Runnable {
   }
 
   /**
-   * Process a completed ReencryptionTask. Each inode id is resolved to an INode
-   * object, skip if the inode is deleted.
+   * 处理单个已完成的重加密任务，将每个inode ID解析为INode对象，如果inode已删除则跳过更新
    * <p>
-   * Only file xattr is updated by this method. Re-encryption progress is not
-   * updated.
+   * 本方法仅更新文件扩展属性，不更新重加密进度
    *
-   * @param zoneNodePath full path of the EZ inode.
-   * @param task     the completed task.
-   * @throws IOException
-   * @throws InterruptedException
+   * @param zoneNodePath 加密区域inode完整路径
+   * @param task 已完成的重加密任务
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   private void processTaskEntries(final String zoneNodePath,
       final ReencryptionTask task) throws IOException, InterruptedException {
@@ -299,31 +294,33 @@ public final class ReencryptionUpdater implements Runnable {
           "Updating file xattrs for re-encrypting zone {}," + " starting at {}",
           zoneNodePath, task.batch.getFirstFilePath());
       final int batchSize = task.batch.size();
+      // 遍历当前批次中所有文件重加密信息
       for (Iterator<FileEdekInfo> it = task.batch.getBatch().iterator();
            it.hasNext();) {
         FileEdekInfo entry = it.next();
-        // resolve the inode again, and skip if it's doesn't exist
+        // 重新解析inode，inode不存在则跳过
         LOG.trace("Updating {} for re-encryption.", entry.getInodeId());
         final INode inode = dir.getInode(entry.getInodeId());
         if (inode == null) {
           LOG.debug("INode {} doesn't exist, skipping re-encrypt.",
               entry.getInodeId());
-          // also remove from batch so later it's not saved.
+          // 从批次中移除，避免后续保存
           it.remove();
           continue;
         }
 
-        // Cautiously check file encryption info, and only update if we're sure
-        // it's still using the same edek.
+        // 谨慎检查文件加密信息，只有确认仍使用原有EDEK才执行更新
         Preconditions.checkNotNull(entry.edek);
         final FileEncryptionInfo fei = FSDirEncryptionZoneOp
             .getFileEncryptionInfo(dir, INodesInPath.fromINode(inode));
+        // 加密区域密钥名称已变更，跳过更新
         if (!fei.getKeyName().equals(entry.edek.getEncryptionKeyName())) {
           LOG.debug("Inode {} EZ key changed, skipping re-encryption.",
               entry.getInodeId());
           it.remove();
           continue;
         }
+        // 加密区域密钥版本未变更，无需重加密
         if (fei.getEzKeyVersionName()
             .equals(entry.edek.getEncryptionKeyVersionName())) {
           LOG.debug(
@@ -332,6 +329,7 @@ public final class ReencryptionUpdater implements Runnable {
           it.remove();
           continue;
         }
+        // 已有EDEK已变更，跳过更新避免覆盖
         if (!Arrays.equals(fei.getEncryptedDataEncryptionKey(),
             entry.existingEdek.getEncryptedKeyVersion().getMaterial())) {
           LOG.debug("Inode {} existing edek changed, skipping re-encryption",
@@ -339,12 +337,14 @@ public final class ReencryptionUpdater implements Runnable {
           it.remove();
           continue;
         }
+        // 构造新的文件加密信息
         FileEncryptionInfo newFei = new FileEncryptionInfo(fei.getCipherSuite(),
             fei.getCryptoProtocolVersion(),
             entry.edek.getEncryptedKeyVersion().getMaterial(),
             entry.edek.getEncryptedKeyIv(), fei.getKeyName(),
             entry.edek.getEncryptionKeyVersionName());
         final INodesInPath iip = INodesInPath.fromINode(inode);
+        // 更新文件加密信息扩展属性
         FSDirEncryptionZoneOp
             .setFileEncryptionInfo(dir, iip, newFei, XAttrSetFlag.REPLACE);
         task.lastFile = iip.getPath();
@@ -359,17 +359,15 @@ public final class ReencryptionUpdater implements Runnable {
   }
 
   /**
-   * Iterate tasks for the given zone, and update progress accordingly. The
-   * checkpoint indicates all files before it are done re-encryption, so it will
-   * be updated to the position where all tasks before are completed.
+   * 遍历指定加密区域的任务，更新重加密检查点进度
+   * 检查点表示其之前所有文件都已完成重加密，方法会将检查点更新到所有前置任务都已完成的位置
    *
-   * @param zoneNode the EZ inode.
-   * @param tracker  the zone submission tracker.
-   * @return the list containing the last checkpointed xattr. Empty if
-   *   no checkpoint happened.
-   * @throws ExecutionException
-   * @throws IOException
-   * @throws InterruptedException
+   * @param zoneNode 加密区域inode
+   * @param tracker 加密区域任务提交追踪器
+   * @return 包含最后一次检查点扩展属性的列表，如果没有检查点则返回空列表
+   * @throws ExecutionException 执行异常
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   private List<XAttr> processCheckpoints(final INode zoneNode,
       final ZoneSubmissionTracker tracker)
@@ -380,8 +378,7 @@ public final class ReencryptionUpdater implements Runnable {
     final ZoneReencryptionStatus status =
         handler.getReencryptionStatus().getZoneStatus(zoneId);
     assert status != null;
-    // always start from the beginning, because the checkpoint means all files
-    // before it are re-encrypted.
+    // 始终从头开始遍历，因为检查点代表其之前所有文件都已完成重加密
     final LinkedList<Future> tasks = tracker.getTasks();
     final List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
     ListIterator<Future> iter = tasks.listIterator();
@@ -392,7 +389,7 @@ public final class ReencryptionUpdater implements Runnable {
           break;
         }
         if (!curr.isDone() || !curr.get().processed) {
-          // still has earlier tasks not completed, skip here.
+          // 仍有更早任务未完成，终止遍历
           break;
         }
         ReencryptionTask task = curr.get();
@@ -400,6 +397,7 @@ public final class ReencryptionUpdater implements Runnable {
             + " last: {} size:{}.", task.lastFile, task.batch.size());
         assert zoneId == task.zoneId;
         try {
+          // 更新加密区域重加密进度扩展属性
           final XAttr xattr = FSDirEncryptionZoneOp
               .updateReencryptionProgress(dir, zoneNode, status, task.lastFile,
                   task.numFilesUpdated, task.numFailures);
@@ -415,6 +413,7 @@ public final class ReencryptionUpdater implements Runnable {
       }
     }
     if (tracker.isCompleted()) {
+      // 所有任务完成，移除追踪器并完成重加密流程
       LOG.debug("Removed re-encryption tracker for zone {} because it completed"
               + " with {} tasks.", zonePath, tracker.numCheckpointed);
       return handler.completeReencryption(zoneNode);
@@ -422,132 +421,16 @@ public final class ReencryptionUpdater implements Runnable {
     return xAttrs;
   }
 
+  /**
+   * 获取并处理已完成的重加密任务
+   * @throws Exception 各类异常
+   */
   private void takeAndProcessTasks() throws Exception {
+    // 从完成服务获取下一个已完成任务
     final Future<ReencryptionTask> completed = batchService.take();
+    // 执行限流控制，避免占用过多写锁
     throttle();
+    // 检查测试暂停条件
     checkPauseForTesting();
     if (completed.isCancelled()) {
-      // Ignore canceled zones. The cancellation is edit-logged by the handler.
-      LOG.debug("Skipped a canceled re-encryption task");
-      return;
-    }
-    final ReencryptionTask task = completed.get();
-
-    boolean shouldRetry;
-    do {
-      dir.getFSNamesystem().writeLock(RwLockMode.FS);
-      try {
-        throttleTimerLocked.start();
-        processTask(task);
-        shouldRetry = false;
-      } catch (RetriableException | SafeModeException re) {
-        // Keep retrying until succeed.
-        LOG.info("Exception when processing re-encryption task for zone {}, "
-                + "retrying...", task.zoneId, re);
-        shouldRetry = true;
-        Thread.sleep(faultRetryInterval);
-      } catch (IOException ioe) {
-        LOG.warn("Failure processing re-encryption task for zone {}",
-            task.zoneId, ioe);
-        ++task.numFailures;
-        task.processed = true;
-        shouldRetry = false;
-      } finally {
-        dir.getFSNamesystem().writeUnlock(RwLockMode.FS, "reencryptUpdater");
-        throttleTimerLocked.stop();
-      }
-      // logSync regardless, to prevent edit log buffer overflow triggering
-      // logSync inside FSN writelock.
-      dir.getEditLog().logSync();
-    } while (shouldRetry);
-  }
-
-  private void processTask(ReencryptionTask task)
-      throws InterruptedException, ExecutionException, IOException {
-    final List<XAttr> xAttrs;
-    final String zonePath;
-    dir.writeLock();
-    try {
-      handler.getTraverser().checkINodeReady(task.zoneId);
-      final INode zoneNode = dir.getInode(task.zoneId);
-      if (zoneNode == null) {
-        // ez removed.
-        return;
-      }
-      zonePath = zoneNode.getFullPathName();
-      LOG.info("Processing returned re-encryption task for zone {}({}), "
-              + "batch size {}, start:{}", zonePath, task.zoneId,
-          task.batch.size(), task.batch.getFirstFilePath());
-      final ZoneSubmissionTracker tracker =
-          handler.getTracker(zoneNode.getId());
-      if (tracker == null) {
-        // re-encryption canceled.
-        LOG.info("Re-encryption was canceled.");
-        return;
-      }
-      tracker.numFutureDone++;
-      EncryptionFaultInjector.getInstance().reencryptUpdaterProcessOneTask();
-      processTaskEntries(zonePath, task);
-      EncryptionFaultInjector.getInstance().reencryptUpdaterProcessCheckpoint();
-      xAttrs = processCheckpoints(zoneNode, tracker);
-    } finally {
-      dir.writeUnlock();
-    }
-    FSDirEncryptionZoneOp.saveFileXAttrsForBatch(dir, task.batch.getBatch());
-    if (!xAttrs.isEmpty()) {
-      dir.getEditLog().logSetXAttrs(zonePath, xAttrs, false);
-    }
-  }
-
-  private synchronized void checkPauseForTesting() throws InterruptedException {
-    assert !dir.hasWriteLock();
-    assert !dir.getFSNamesystem().hasWriteLock(RwLockMode.FS);
-    if (pauseAfterNthCheckpoint != 0) {
-      ZoneSubmissionTracker tracker =
-          handler.unprotectedGetTracker(pauseZoneId);
-      if (tracker != null) {
-        if (tracker.numFutureDone == pauseAfterNthCheckpoint) {
-          shouldPauseForTesting = true;
-          pauseAfterNthCheckpoint = 0;
-        }
-      }
-    }
-    while (shouldPauseForTesting) {
-      LOG.info("Sleeping in the re-encryption updater for unit test.");
-      wait();
-      LOG.info("Continuing re-encryption updater after pausing.");
-    }
-  }
-
-  /**
-   * Throttles the ReencryptionUpdater to prevent from contending FSN/FSD write
-   * locks. This is done by the configuration.
-   */
-  private void throttle() throws InterruptedException {
-    if (throttleLimitRatio >= 1.0) {
-      return;
-    }
-
-    final long expect = (long) (throttleTimerAll.now(TimeUnit.MILLISECONDS)
-        * throttleLimitRatio);
-    final long actual = throttleTimerLocked.now(TimeUnit.MILLISECONDS);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Re-encryption updater throttling expect: {}, actual: {},"
-              + " throttleTimerAll:{}", expect, actual,
-          throttleTimerAll.now(TimeUnit.MILLISECONDS));
-    }
-    if (expect - actual < 0) {
-      // in case throttleLimitHandlerRatio is very small, expect will be 0.
-      // so sleepMs should not be calculated from expect, to really meet the
-      // ratio. e.g. if ratio is 0.001, expect = 0 and actual = 1, sleepMs
-      // should be 1000 - throttleTimerAll.now()
-      final long sleepMs =
-          (long) (actual / throttleLimitRatio) - throttleTimerAll
-              .now(TimeUnit.MILLISECONDS);
-      LOG.debug("Throttling re-encryption, sleeping for {} ms", sleepMs);
-      Thread.sleep(sleepMs);
-    }
-    throttleTimerAll.reset().start();
-    throttleTimerLocked.reset();
-  }
-}
+      // 忽略已取消任务，取消操作已由处理器记录

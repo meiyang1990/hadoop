@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,16 +36,19 @@ import java.util.Collection;
 import java.util.Random;
 
 /**
- * The HDFS specific network topology class. The main purpose of doing this
- * subclassing is to add storage-type-aware chooseRandom method. All the
- * remaining parts should be the same.
- *
- * Currently a placeholder to test storage type info.
+ * 文件说明：HDFS专属网络拓扑实现类，继承自通用网络拓扑，核心扩展了按存储类型随机选择节点的能力
+ * 类说明：HDFS特定的网络拓扑实现，主要扩展支持感知存储类型的节点选择逻辑，其余逻辑与父类保持一致
+ * 当前作为存储类型感知节点选择的核心实现，用于数据块放置时按存储类型选择合适的数据节点
  */
 public class DFSNetworkTopology extends NetworkTopology {
 
   private static final Random RANDOM = new Random();
 
+  /**
+   * 根据配置创建DFS网络拓扑实例，支持自定义实现类配置
+   * @param conf Hadoop配置对象
+   * @return 初始化完成的DFSNetworkTopology实例
+   */
   public static DFSNetworkTopology getInstance(Configuration conf) {
 
     DFSNetworkTopology nt = ReflectionUtils.newInstance(conf.getClass(
@@ -55,16 +59,12 @@ public class DFSNetworkTopology extends NetworkTopology {
   }
 
   /**
-   * Randomly choose one node from <i>scope</i>, with specified storage type.
-   *
-   * If scope starts with ~, choose one from the all nodes except for the
-   * ones in <i>scope</i>; otherwise, choose one from <i>scope</i>.
-   * If excludedNodes is given, choose a node that's not in excludedNodes.
-   *
-   * @param scope range of nodes from which a node will be chosen
-   * @param excludedNodes nodes to be excluded from
-   * @param type the storage type we search for
-   * @return the chosen node
+   * 根据指定范围和存储类型，随机选择一个符合要求的数据节点
+   * 支持排除指定范围节点和排除节点列表，若范围前缀为~表示排除该范围选择
+   * @param scope 选择节点的范围，前缀~表示反向选择
+   * @param excludedNodes 需要排除的节点列表
+   * @param type 要求的存储类型
+   * @return 符合要求的随机节点，无符合节点则返回null
    */
   public Node chooseRandomWithStorageType(final String scope,
       final Collection<Node> excludedNodes, StorageType type) {
@@ -83,26 +83,13 @@ public class DFSNetworkTopology extends NetworkTopology {
   }
 
   /**
-   * Randomly choose one node from <i>scope</i> with the given storage type.
-   *
-   * If scope starts with ~, choose one from the all nodes except for the
-   * ones in <i>scope</i>; otherwise, choose one from <i>scope</i>.
-   * If excludedNodes is given, choose a node that's not in excludedNodes.
-   *
-   * This call would make up to two calls. It first tries to get a random node
-   * (with old method) and check if it satisfies. If yes, simply return it.
-   * Otherwise, it make a second call (with the new method) by passing in a
-   * storage type.
-   *
-   * This is for better performance reason. Put in short, the key note is that
-   * the old method is faster but may take several runs, while the new method
-   * is somewhat slower, and always succeed in one trial.
-   * See HDFS-11535 for more detail.
-   *
-   * @param scope range of nodes from which a node will be chosen
-   * @param excludedNodes nodes to be excluded from
-   * @param type the storage type we search for
-   * @return the chosen node
+   * 两次尝试按存储类型随机选择节点，兼顾性能和成功率
+   * 第一次尝试使用普通随机选择，若命中符合存储类型的节点直接返回；失败则进行第二次精确选择
+   * 该设计基于性能考量：普通随机选择更快，多数情况可命中，仅在失败时使用更精确但稍慢的算法
+   * @param scope 选择节点的范围，前缀~表示反向选择
+   * @param excludedNodes 需要排除的节点列表
+   * @param type 要求的存储类型
+   * @return 符合要求的随机节点，无符合节点则返回null
    */
   public Node chooseRandomWithStorageTypeTwoTrial(final String scope,
       final Collection<Node> excludedNodes, StorageType type) {
@@ -117,24 +104,23 @@ public class DFSNetworkTopology extends NetworkTopology {
         searchScope = scope;
         excludedScope = null;
       }
-      // next do a two-trial search
-      // first trial, call the old method, inherited from NetworkTopology
+      // 第一次尝试：调用父类普通随机选择方法
       Node n = chooseRandom(searchScope, excludedScope, excludedNodes);
       if (n == null) {
         if (LOG.isDebugEnabled()) {
           LOG.debug("No node to choose.");
         }
-        // this means there is simply no node to choose from
+        // 无可用节点，直接返回空
         return null;
       }
       Preconditions.checkArgument(n instanceof DatanodeDescriptor);
       DatanodeDescriptor dnDescriptor = (DatanodeDescriptor)n;
 
       if (dnDescriptor.hasStorageType(type)) {
-        // the first trial succeeded, just return
+        // 第一次尝试命中符合存储类型的节点，直接返回
         return dnDescriptor;
       } else {
-        // otherwise, make the second trial by calling the new method
+        // 第一次尝试失败，调用精确选择方法进行第二次尝试
         LOG.debug("First trial failed, node has no type {}, " +
             "making second trial carrying this type", type);
         return chooseRandomWithStorageType(searchScope, excludedScope,
@@ -146,35 +132,14 @@ public class DFSNetworkTopology extends NetworkTopology {
   }
 
   /**
-   * Choose a random node based on given scope, excludedScope and excludedNodes
-   * set. Although in general the topology has at most three layers, this class
-   * will not impose such assumption.
-   *
-   * At high level, the idea is like this, say:
-   *
-   * R has two children A and B, and storage type is X, say:
-   * A has X = 6 (rooted at A there are 6 datanodes with X) and B has X = 8.
-   *
-   * Then R will generate a random int between 1~14, if it's <= 6, recursively
-   * call into A, otherwise B. This will maintain a uniformed randomness of
-   * choosing datanodes.
-   *
-   * The tricky part is how to handle excludes.
-   *
-   * For excludedNodes, since this set is small: currently the main reason of
-   * being an excluded node is because it already has a replica. So randomly
-   * picking up this node again should be rare. Thus we only check that, if the
-   * chosen node is excluded, we do chooseRandom again.
-   *
-   * For excludedScope, we locate the root of the excluded scope. Subtracting
-   * all it's ancestors' storage counters accordingly, this way the excluded
-   * root is out of the picture.
-   *
-   * @param scope the scope where we look for node.
-   * @param excludedScope the scope where the node must NOT be from.
-   * @param excludedNodes the returned node must not be in this set
-   * @param type the storage type we search for
-   * @return a node with required storage type
+   * 按范围、排除范围、排除节点和存储类型精确随机选择节点
+   * 采用加权随机算法：根据子树中符合存储类型的节点数量加权，保证选择均匀性
+   * 处理排除逻辑：排除范围从计数中扣除对应存储节点数量，排除节点列表逐个扣除符合条件的计数
+   * @param scope 搜索节点的范围
+   * @param excludedScope 必须排除的范围
+   * @param excludedNodes 必须排除的节点列表
+   * @param type 要求的存储类型
+   * @return 符合所有条件的随机节点，无符合节点则返回null
    */
   @VisibleForTesting
   Node chooseRandomWithStorageType(final String scope,
@@ -194,20 +159,20 @@ public class DFSNetworkTopology extends NetworkTopology {
       return null;
     }
     if (!(node instanceof DFSTopologyNodeImpl)) {
-      // a node is either DFSTopologyNodeImpl, or a DatanodeDescriptor
-      // if a node is DatanodeDescriptor and excludedNodes contains it,
-      // return null;
+      // 当前节点已是数据节点，检查是否被排除
       if (excludedNodes != null && excludedNodes.contains(node)) {
         LOG.debug("{} in excludedNodes", node);
         return null;
       }
+      // 检查存储类型是否符合要求
       return ((DatanodeDescriptor) node).hasStorageType(type) ? node : null;
     }
     DFSTopologyNodeImpl root = (DFSTopologyNodeImpl)node;
     Node excludeRoot = excludedScope == null ? null : getNode(excludedScope);
 
-    // check to see if there are nodes satisfying the condition at all
+    // 计算当前范围中符合要求的可用节点总数
     int availableCount = root.getSubtreeStorageCount(type);
+    // 扣除排除范围内的符合节点数量
     if (excludeRoot != null && root.isAncestor(excludeRoot)) {
       if (excludeRoot instanceof DFSTopologyNodeImpl) {
         availableCount -= ((DFSTopologyNodeImpl)excludeRoot)
@@ -217,6 +182,7 @@ public class DFSNetworkTopology extends NetworkTopology {
             .hasStorageType(type) ? 1 : 0;
       }
     }
+    // 扣除排除节点列表中符合条件的节点数量
     if (excludedNodes != null) {
       for (Node excludedNode : excludedNodes) {
         if ((excludeRoot != null && isNodeInScope(excludedNode, excludedScope)) ||
@@ -230,10 +196,8 @@ public class DFSNetworkTopology extends NetworkTopology {
           availableCount -= ((DFSTopologyNodeImpl) excludedNode)
               .getSubtreeStorageCount(type);
         } else if (excludedNode instanceof DatanodeInfo) {
-          // find out the corresponding DatanodeDescriptor object, beacuse
-          // we need to get its storage type info.
-          // could be expensive operation, fortunately the size of excluded
-          // nodes set is supposed to be very small.
+          // DatanodeInfo需要从拓扑中获取对应DatanodeDescriptor获取存储类型信息
+          // 由于排除节点列表通常很小，该操作性能可接受
           String nodeLocation = excludedNode.getNetworkLocation()
               + "/" + excludedNode.getName();
           DatanodeDescriptor dn = (DatanodeDescriptor)getNode(nodeLocation);
@@ -247,11 +211,10 @@ public class DFSNetworkTopology extends NetworkTopology {
       }
     }
     if (availableCount <= 0) {
-      // should never be <0 in general, adding <0 check for safety purpose
+      // 无可用节点，返回空
       return null;
     }
-    // to this point, it is guaranteed that there is at least one node
-    // that satisfies the requirement.
+    // 递归加权随机选择符合要求的节点
     Node chosen =
         chooseRandomWithStorageTypeAndExcludeRoot(root, excludeRoot, type,
             excludedNodes);
@@ -260,22 +223,21 @@ public class DFSNetworkTopology extends NetworkTopology {
   }
 
   /**
-   * Choose a random node that has the required storage type, under the given
-   * root, with an excluded subtree root (could also just be a leaf node).
-   *
-   * @param root the root node where we start searching for a datanode
-   * @param excludeRoot the root of the subtree what should be excluded
-   * @param type the expected storage type
-   * @param excludedNodes the list of nodes to be excluded
-   * @return a random datanode, with the storage type, and is not in excluded
-   * scope
+   * 在指定根节点下，排除指定子树，按存储类型随机选择叶子数据节点
+   * 内部递归实现：若当前是机架节点，则直接从子节点中随机选择符合要求的数据节点；
+   * 若当前是内部节点，则按子树符合节点数量加权随机选择下一层级，递归搜索直到叶子节点
+   * @param root 当前搜索的根节点
+   * @param excludeRoot 需要排除的子树根节点
+   * @param type 要求的存储类型
+   * @param excludedNodes 需要排除的节点列表
+   * @return 符合要求的随机数据节点，无符合则返回null
    */
   private Node chooseRandomWithStorageTypeAndExcludeRoot(
       DFSTopologyNodeImpl root, Node excludeRoot, StorageType type,
       Collection<Node> excludedNodes) {
     Node chosenNode;
     if (root.isRack()) {
-      // children are datanode descriptor
+      // 当前是机架层，子节点均为数据节点，收集所有符合条件的候选节点
       ArrayList<Node> candidates = new ArrayList<>();
       for (Node node : root.getChildren()) {
         if (node.equals(excludeRoot) || (excludedNodes != null && excludedNodes
@@ -290,19 +252,16 @@ public class DFSNetworkTopology extends NetworkTopology {
       if (candidates.size() == 0) {
         return null;
       }
-      // to this point, all nodes in candidates are valid choices, and they are
-      // all datanodes, pick a random one.
+      // 从候选节点中随机选择一个
       chosenNode = candidates.get(RANDOM.nextInt(candidates.size()));
     } else {
-      // the children are inner nodes
+      // 当前是内部层级，收集所有符合条件的子节点
       ArrayList<DFSTopologyNodeImpl> candidates =
           getEligibleChildren(root, excludeRoot, type, excludedNodes);
       if (candidates.size() == 0) {
         return null;
       }
-      // again, all children are also inner nodes, we can do this cast.
-      // to maintain uniformality, the search needs to be based on the counts
-      // of valid datanodes. Below is a random weighted choose.
+      // 按子树符合节点数量计算总加权计数
       int totalCounts = 0;
       int[] countArray = new int[candidates.size()];
       for (int i = 0; i < candidates.size(); i++) {
@@ -311,11 +270,9 @@ public class DFSNetworkTopology extends NetworkTopology {
         totalCounts += subTreeCount;
         countArray[i] = subTreeCount;
       }
-      // generate a random val between [1, totalCounts]
+      // 生成[1, totalCounts]区间的随机数，按加权选择子节点
       int randomCounts = RANDOM.nextInt(totalCounts) + 1;
       int idxChosen = 0;
-      // searching for the idxChosen can potentially be done with binary
-      // search, but does not seem to worth it here.
       for (int i = 0; i < countArray.length; i++) {
         if (randomCounts <= countArray[i]) {
           idxChosen = i;
@@ -324,6 +281,7 @@ public class DFSNetworkTopology extends NetworkTopology {
         randomCounts -= countArray[i];
       }
       DFSTopologyNodeImpl nextRoot = candidates.get(idxChosen);
+      // 递归搜索下一层级
       chosenNode = chooseRandomWithStorageTypeAndExcludeRoot(
           nextRoot, excludeRoot, type, excludedNodes);
     }
@@ -331,16 +289,12 @@ public class DFSNetworkTopology extends NetworkTopology {
   }
 
   /**
-   * Given root, excluded root and storage type. Find all the children of the
-   * root, that has the storage type available. One check is that if the
-   * excluded root is under a children, this children must subtract the storage
-   * count of the excluded root.
-   * @param root the subtree root we check.
-   * @param excludeRoot the root of the subtree that should be excluded.
-   * @param type the storage type we look for.
-   * @param excludedNodes the list of excluded nodes.
-   * @return a list of possible nodes, each of them is eligible as the next
-   * level root we search.
+   * 获取当前根节点下所有符合存储类型要求的子节点，处理排除逻辑修正计数
+   * @param root 当前检查的子树根节点
+   * @param excludeRoot 需要排除的子树根节点
+   * @param type 要求的存储类型
+   * @param excludedNodes 需要排除的节点列表
+   * @return 所有符合条件（可用计数大于0）的子节点列表
    */
   private ArrayList<DFSTopologyNodeImpl> getEligibleChildren(
       DFSTopologyNodeImpl root, Node excludeRoot, StorageType type,
@@ -348,29 +302,26 @@ public class DFSNetworkTopology extends NetworkTopology {
     ArrayList<DFSTopologyNodeImpl> candidates = new ArrayList<>();
     int excludeCount = 0;
     if (excludeRoot != null && root.isAncestor(excludeRoot)) {
-      // the subtree to be excluded is under the given root,
-      // find out the number of nodes to be excluded.
+      // 计算排除子树中符合存储类型的节点总数
       if (excludeRoot instanceof DFSTopologyNodeImpl) {
-        // if excludedRoot is an inner node, get the counts of all nodes on
-        // this subtree of that storage type.
         excludeCount = ((DFSTopologyNodeImpl) excludeRoot)
             .getSubtreeStorageCount(type);
       } else {
-        // if excludedRoot is a datanode, simply ignore this one node
         if (((DatanodeDescriptor) excludeRoot).hasStorageType(type)) {
           excludeCount = 1;
         }
       }
     }
-    // have calculated the number of storage counts to be excluded.
-    // walk through all children to check eligibility.
+    // 遍历所有子节点检查 eligibility
     for (Node node : root.getChildren()) {
       DFSTopologyNodeImpl dfsNode = (DFSTopologyNodeImpl) node;
       int storageCount = dfsNode.getSubtreeStorageCount(type);
+      // 如果当前子节点包含排除根，扣除排除计数
       if (excludeRoot != null && excludeCount != 0 &&
           (dfsNode.isAncestor(excludeRoot) || dfsNode.equals(excludeRoot))) {
         storageCount -= excludeCount;
       }
+      // 扣除排除节点列表中在当前子树下的符合节点数量
       if (excludedNodes != null) {
         for (Node excludedNode : excludedNodes) {
           if (excludeRoot != null && isNodeInScope(excludedNode,
@@ -389,6 +340,7 @@ public class DFSNetworkTopology extends NetworkTopology {
           }
         }
       }
+      // 只有可用计数大于0的子节点才加入候选列表
       if (storageCount > 0) {
         candidates.add(dfsNode);
       }

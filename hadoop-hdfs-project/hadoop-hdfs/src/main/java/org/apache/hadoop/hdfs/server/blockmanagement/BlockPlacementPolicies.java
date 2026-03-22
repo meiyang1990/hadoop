@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,12 +25,23 @@ import org.apache.hadoop.hdfs.protocol.BlockType;
 import org.apache.hadoop.net.NetworkTopology;
 import org.apache.hadoop.util.ReflectionUtils;
 
+/**
+ * HDFS块放置策略管理器，负责管理不同类型块对应的放置策略实现，根据块类型分发策略选择请求。
+ * 核心职责是为连续复制块和EC纠删码条带块分别维护对应的块放置策略实例，提供统一的策略获取入口。
+ */
 @InterfaceAudience.Private
 public class BlockPlacementPolicies{
 
   private final BlockPlacementPolicy replicationPolicy;
   private final BlockPlacementPolicy ecPolicy;
 
+  /**
+   * 构造块放置策略管理器，从配置加载并初始化两种块类型对应的放置策略实例。
+   * @param conf HDFS配置对象，用于获取策略实现类配置
+   * @param stats 集群状态统计对象，提供集群负载信息给放置策略
+   * @param clusterMap 网络拓扑结构，用于感知节点网络位置
+   * @param host2datanodeMap 主机到数据节点映射，用于主机级别的放置判断
+   */
   public BlockPlacementPolicies(Configuration conf, FSClusterStats stats,
                                 NetworkTopology clusterMap,
                                 Host2NodesMap host2datanodeMap){
@@ -47,6 +59,11 @@ public class BlockPlacementPolicies{
     ecPolicy.initialize(conf, stats, clusterMap, host2datanodeMap);
   }
 
+  /**
+   * 根据块类型获取对应的块放置策略实例。
+   * @param blockType 块类型，CONTIGUOUS表示普通复制块，STRIPED表示EC纠删码条带块
+   * @return 对应类型的块放置策略实例
+   */
   public BlockPlacementPolicy getPolicy(BlockType blockType){
     switch (blockType) {
     case CONTIGUOUS: return replicationPolicy;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,15 +26,17 @@ import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants;
 
 /**
- * An implementation of the abstract class {@link EditLogInputStream},
- * which is used to updates HDFS meta-data state on a backup node.
+ * 文件级注释：HDFS元数据编辑日志备份输入流，为备份节点提供从主节点接收增量元数据更新的能力
+ * 
+ * 该类继承自EditLogInputStream抽象类，专门用于BackupNode场景，接收主Namenode推送的
+ * 编辑日志增量数据，用于同步更新备份节点的元数据状态。
  * 
  * @see org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol#journal
  * (org.apache.hadoop.hdfs.server.protocol.NamenodeRegistration,
  *  int, int, byte[])
  */
 class EditLogBackupInputStream extends EditLogInputStream {
-  final String address; // sender address
+  final String address; // 发送方地址（主Namenode地址）
   private final ByteBufferInputStream inner;
   private DataInputStream in;
   private FSEditLogOp.Reader reader = null;
@@ -41,13 +44,18 @@ class EditLogBackupInputStream extends EditLogInputStream {
   private int version = 0;
 
   /**
-   * A ByteArrayInputStream, which lets modify the underlying byte array.
+   * 内部类：支持动态修改底层字节数组的 ByteArrayInputStream 扩展实现
+   * 允许重复复用输入流对象，动态替换需要读取的字节数据，避免重复创建对象
    */
   private static class ByteBufferInputStream extends ByteArrayInputStream {
     ByteBufferInputStream() {
       super(new byte[0]);
     }
 
+    /**
+     * 更新输入流要读取的字节数据，重置流读取位置
+     * @param newBytes 新的字节数据数组
+     */
     void setData(byte[] newBytes) {
       super.buf = newBytes;
       super.count = newBytes == null ? 0 : newBytes.length;
@@ -56,13 +64,19 @@ class EditLogBackupInputStream extends EditLogInputStream {
     }
 
     /**
-     * Number of bytes read from the stream so far.
+     * 获取当前字节数据的总长度
+     * @return 字节数组总长度
      */
     int length() {
       return count;
     }
   }
 
+  /**
+   * 构造方法：初始化编辑日志备份输入流
+   * @param name 发送方（主Namenode）地址
+   * @throws IOException 初始化异常
+   */
   EditLogBackupInputStream(String name) throws IOException {
     address = name;
     inner = new ByteBufferInputStream();
@@ -77,6 +91,7 @@ class EditLogBackupInputStream extends EditLogInputStream {
 
   @Override
   protected FSEditLogOp nextOp() throws IOException {
+    // 检查必须先调用setBytes设置数据才能读取操作
     Preconditions.checkState(reader != null,
         "Must call setBytes() before readOp()");
     return reader.readOp(false);
@@ -108,10 +123,16 @@ class EditLogBackupInputStream extends EditLogInputStream {
 
   @Override
   public long length() throws IOException {
-    // file size + size of both buffers
+    // 返回当前存储的字节数据总长度
     return inner.length();
   }
 
+  /**
+   * 更新输入流中的字节数据和日志版本，重新初始化编辑日志读取器
+   * @param newBytes 新接收到的编辑日志字节数据
+   * @param version 编辑日志版本号
+   * @throws IOException 初始化读取器异常
+   */
   void setBytes(byte[] newBytes, int version) throws IOException {
     inner.setData(newBytes);
     tracker = new FSEditLogLoader.PositionTrackingInputStream(inner);
@@ -122,6 +143,10 @@ class EditLogBackupInputStream extends EditLogInputStream {
     reader = FSEditLogOp.Reader.create(in, tracker, version);
   }
 
+  /**
+   * 清空输入流中的数据，重置状态
+   * @throws IOException 清空过程异常
+   */
   void clear() throws IOException {
     setBytes(null, 0);
     reader = null;
@@ -140,6 +165,7 @@ class EditLogBackupInputStream extends EditLogInputStream {
 
   @Override
   public boolean isInProgress() {
+    // 备份流始终处于接收增量更新的进行中状态
     return true;
   }
 
@@ -150,6 +176,7 @@ class EditLogBackupInputStream extends EditLogInputStream {
 
   @Override
   public boolean isLocalLog() {
+    // 备份日志属于本地可读取日志
     return true;
   }
 }

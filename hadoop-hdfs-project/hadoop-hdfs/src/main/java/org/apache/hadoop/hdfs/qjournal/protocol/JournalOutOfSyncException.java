@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,10 +22,19 @@ import java.io.IOException;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * QJournal日志不同步异常类
+ * 当共享编辑日志节点的日志状态与请求要求的状态不一致时，抛出此异常
+ * 用于HDFS QJournal联邦协议中标识日志同步失败的错误场景
+ */
 @InterfaceAudience.Private
 public class JournalOutOfSyncException extends IOException {
   private static final long serialVersionUID = 1L;
   
+  /**
+   * 构造函数，创建带错误信息的异常实例
+   * @param msg 错误描述信息
+   */
   public JournalOutOfSyncException(String msg) {
     super(msg);
   }

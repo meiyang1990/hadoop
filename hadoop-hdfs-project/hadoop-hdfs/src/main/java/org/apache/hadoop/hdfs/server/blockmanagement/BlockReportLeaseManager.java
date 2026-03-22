@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,59 +29,51 @@ import java.util.HashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * The BlockReportLeaseManager manages block report leases.<p/>
- *
- * DataNodes request BR leases from the NameNode by sending a heartbeat with
- * the requestBlockReportLease field set.  The NameNode may choose to respond
- * with a non-zero lease ID.  If so, that DataNode can send a block report with
- * the given lease ID for the next few minutes.  The NameNode will accept
- * these full block reports.<p/>
- *
- * BR leases limit the number of incoming full block reports to the NameNode
- * at any given time.  For compatibility reasons, the NN will always accept
- * block reports sent with a lease ID of 0 and queue them for processing
- * immediately.  Full block reports which were manually triggered will also
- * have a lease ID of 0, bypassing the rate-limiting.<p/>
- *
- * Block report leases expire after a certain amount of time.  This mechanism
- * is in place so that a DN which dies while holding a lease does not
- * permanently decrease the number of concurrent block reports which the NN is
- * willing to accept.<p/>
- *
- * When considering which DNs to grant a BR lease, the NameNode gives priority
- * to the DNs which have gone the longest without sending a full block
- * report.<p/>
+ * 文件说明: 块报告租约管理器，用于限制NameNode同时处理的全量块报告数量，避免突发大量全量块报告导致NameNode压力过高
+ * 
+ * 核心机制：DataNode通过心跳向NameNode申请块报告租约，NameNode控制同时发放的租约数量，
+ * 只有获得租约的DataNode才能发送全量块报告并被NameNode接受处理。租约会在超时后自动过期回收，
+ * 避免死节点占用租约名额。优先级优先分配给长时间未发送全量块报告的DataNode。
+ * 租约ID为0表示跳过限流，直接接受块报告（手动触发块报告默认使用0租约）。
  */
 class BlockReportLeaseManager {
   static final Logger LOG =
       LoggerFactory.getLogger(BlockReportLeaseManager.class);
 
+  /**
+   * 存储单个DataNode的块报告租约信息，维护双向链表节点
+   */
   private static class NodeData {
     /**
-     * The UUID of the datanode.
+     * DataNode的唯一标识UUID
      */
     final String datanodeUuid;
 
     /**
-     * The lease ID, or 0 if there is no lease.
+     * 租约ID，0表示当前无有效租约
      */
     long leaseId;
 
     /**
-     * The time when the lease was issued, or 0 if there is no lease.
+     * 租约发放时间，单位毫秒，0表示当前无有效租约
      */
     long leaseTimeMs;
 
     /**
-     * Previous element in the list.
+     * 双向链表前驱节点
      */
     NodeData prev;
 
     /**
-     * Next element in the list.
+     * 双向链表后继节点
      */
     NodeData next;
 
+    /**
+     * 创建双向链表头节点
+     * @param name 链表名称
+     * @return 初始化完成的头节点
+     */
     static NodeData ListHead(String name) {
       NodeData node = new NodeData(name);
       node.next = node;
@@ -92,6 +85,9 @@ class BlockReportLeaseManager {
       this.datanodeUuid = datanodeUuid;
     }
 
+    /**
+     * 从当前所在双向链表中移除自身
+     */
     void removeSelf() {
       if (this.prev != null) {
         this.prev.next = this.next;
@@ -103,6 +99,10 @@ class BlockReportLeaseManager {
       this.prev = null;
     }
 
+    /**
+     * 将指定节点添加到当前节点之前（双向链表尾部插入）
+     * @param node 待插入节点
+     */
     void addToEnd(NodeData node) {
       Preconditions.checkState(node.next == null);
       Preconditions.checkState(node.prev == null);
@@ -112,6 +112,10 @@ class BlockReportLeaseManager {
       this.prev = node;
     }
 
+    /**
+     * 将指定节点添加到当前节点之后（双向链表头部插入）
+     * @param node 待插入节点
+     */
     void addToBeginning(NodeData node) {
       Preconditions.checkState(node.next == null);
       Preconditions.checkState(node.prev == null);
@@ -123,40 +127,44 @@ class BlockReportLeaseManager {
   }
 
   /**
-   * List of datanodes which don't currently have block report leases.
+   * 存储当前未获得块报告租约的DataNode双向链表头
    */
   private final NodeData deferredHead = NodeData.ListHead("deferredHead");
 
   /**
-   * List of datanodes which currently have block report leases.
+   * 存储当前已获得块报告租约的DataNode双向链表头
    */
   private final NodeData pendingHead = NodeData.ListHead("pendingHead");
 
   /**
-   * Maps datanode UUIDs to NodeData.
+   * DataNode UUID到节点租约信息的映射表
    */
   private final HashMap<String, NodeData> nodes = new HashMap<>();
 
   /**
-   * The current length of the pending list.
+   * 当前已发放的租约数量
    */
   private int numPending = 0;
 
   /**
-   * The maximum number of leases to hand out at any given time.
+   * 任意时刻最大可发放的租约数量上限
    */
   private final int maxPending;
 
   /**
-   * The number of milliseconds after which a lease will expire.
+   * 租约过期时间，单位毫秒
    */
   private final long leaseExpiryMs;
 
   /**
-   * The next ID we will use for a block report lease.
+   * 下一个待分配的租约ID基准值
    */
   private long nextId = ThreadLocalRandom.current().nextLong();
 
+  /**
+   * 从配置构造块报告租约管理器
+   * @param conf Hadoop配置对象
+   */
   BlockReportLeaseManager(Configuration conf) {
     this(conf.getInt(
           DFSConfigKeys.DFS_NAMENODE_MAX_FULL_BLOCK_REPORT_LEASES,
@@ -166,6 +174,11 @@ class BlockReportLeaseManager {
           DFSConfigKeys.DFS_NAMENODE_FULL_BLOCK_REPORT_LEASE_LENGTH_MS_DEFAULT));
   }
 
+  /**
+   * 构造块报告租约管理器，指定最大租约数和过期时间
+   * @param maxPending 最大同时发放租约数量
+   * @param leaseExpiryMs 租约过期毫秒数
+   */
   BlockReportLeaseManager(int maxPending, long leaseExpiryMs) {
     Preconditions.checkArgument(maxPending >= 1,
         "Cannot set the maximum number of block report leases to a " +
@@ -178,16 +191,26 @@ class BlockReportLeaseManager {
   }
 
   /**
-   * Get the next block report lease ID.  Any number is valid except 0.
+   * 获取下一个可用的非零租约ID
+   * @return 非零租约ID
    */
   private long getNextId() {
     return ++nextId == 0L ? ++nextId : nextId;
   }
 
+  /**
+   * 注册一个新的DataNode到租约管理器
+   * @param dn 待注册的DataNode描述信息
+   */
   public synchronized void register(DatanodeDescriptor dn) {
     registerNode(dn);
   }
 
+  /**
+   * 内部方法：注册DataNode到租约管理器
+   * @param dn 待注册的DataNode描述信息
+   * @return 注册生成的节点信息对象，注册失败返回null
+   */
   private synchronized NodeData registerNode(DatanodeDescriptor dn) {
     if (nodes.containsKey(dn.getDatanodeUuid())) {
       LOG.info("Can't register DN {} ({}) because it is already registered.",
@@ -201,6 +224,10 @@ class BlockReportLeaseManager {
     return node;
   }
 
+  /**
+   * 内部方法：移除指定节点的租约信息，并从链表中删除
+   * @param node 待移除节点信息
+   */
   private synchronized void remove(NodeData node) {
     if (node.leaseId != 0) {
       numPending--;
@@ -210,6 +237,10 @@ class BlockReportLeaseManager {
     node.removeSelf();
   }
 
+  /**
+   * 从租约管理器注销一个DataNode
+   * @param dn 待注销的DataNode描述信息
+   */
   public synchronized void unregister(DatanodeDescriptor dn) {
     NodeData node = nodes.remove(dn.getDatanodeUuid());
     if (node == null) {
@@ -220,6 +251,11 @@ class BlockReportLeaseManager {
     remove(node);
   }
 
+  /**
+   * 处理DataNode的块报告租约申请，尝试发放新租约
+   * @param dn 申请租约的DataNode
+   * @return 发放的租约ID，无法发放返回0
+   */
   public synchronized long requestLease(DatanodeDescriptor dn) {
     NodeData node = nodes.get(dn.getDatanodeUuid());
     if (node == null) {
@@ -229,17 +265,17 @@ class BlockReportLeaseManager {
       node = registerNode(dn);
     }
     if (node.leaseId != 0) {
-      // The DataNode wants a new lease, even though it already has one.
-      // This can happen if the DataNode is restarted in between requesting
-      // a lease and using it.
+      // DataNode已持有租约仍重新申请，通常是DataNode重启导致，移除原有租约
       LOG.debug("Removing existing BR lease 0x{} for DN {} ({}) in order to " +
                "issue a new one.", Long.toHexString(node.leaseId),
                dn.getDatanodeUuid(), dn.getXferAddr());
     }
     remove(node);
     long monotonicNowMs = Time.monotonicNow();
+    // 先清理已过期的租约，释放名额
     pruneExpiredPending(monotonicNowMs);
     if (numPending >= maxPending) {
+      // 已达到最大租约数量，无法发放新租约
       if (LOG.isDebugEnabled()) {
         StringBuilder allLeases = new StringBuilder();
         String prefix = "";
@@ -265,6 +301,12 @@ class BlockReportLeaseManager {
     return node.leaseId;
   }
 
+  /**
+   * 检查指定节点租约是否过期，过期则移除回收
+   * @param monotonicNowMs 当前时间戳
+   * @param node 待检查节点
+   * @return true表示租约已过期并移除，false表示租约仍有效
+   */
   private synchronized boolean pruneIfExpired(long monotonicNowMs,
                                               NodeData node) {
     if (monotonicNowMs - node.leaseTimeMs < leaseExpiryMs) {
@@ -278,6 +320,10 @@ class BlockReportLeaseManager {
     return true;
   }
 
+  /**
+   * 遍历清理pending链表中所有已过期的租约，从链表头部开始清理，遇到第一个未过期租约即停止
+   * @param monotonicNowMs 当前时间戳
+   */
   private synchronized void pruneExpiredPending(long monotonicNowMs) {
     NodeData cur = pendingHead.next;
     while (cur != pendingHead) {
@@ -290,9 +336,17 @@ class BlockReportLeaseManager {
     LOG.trace("No entries remaining in the pending list.");
   }
 
+  /**
+   * 验证DataNode发送块报告携带的租约是否有效
+   * @param dn 发送块报告的DataNode
+   * @param monotonicNowMs 当前时间戳
+   * @param id 块报告携带的租约ID
+   * @return true表示租约有效，接受块报告；false表示租约无效，拒绝块报告
+   */
   public synchronized boolean checkLease(DatanodeDescriptor dn,
                                          long monotonicNowMs, long id) {
     if (id == 0) {
+      // 租约ID为0，直接跳过限流，接受块报告
       LOG.debug("Datanode {} ({}) is using BR lease id 0x0 to bypass " +
           "rate-limiting.", dn.getDatanodeUuid(), dn.getXferAddr());
       return true;
@@ -327,6 +381,11 @@ class BlockReportLeaseManager {
     return true;
   }
 
+  /**
+   * 移除并回收DataNode已使用完的块报告租约
+   * @param dn 对应DataNode
+   * @return 被移除的租约ID，无租约返回0
+   */
   public synchronized long removeLease(DatanodeDescriptor dn) {
     NodeData node = nodes.get(dn.getDatanodeUuid());
     if (node == null) {
