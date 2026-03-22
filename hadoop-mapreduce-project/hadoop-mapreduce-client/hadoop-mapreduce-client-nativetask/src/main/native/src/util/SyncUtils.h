@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,12 @@
  * limitations under the License.
  */
 
+/**
+ * @file SyncUtils.h
+ * 本文件属于Hadoop MapReduce本地任务执行模块，提供多线程同步工具类
+ * 封装了POSIX线程锁和RAII风格的自动加锁解锁实现，用于本地任务的线程安全控制
+ */
+
 #ifndef SYNCUTILS_H_
 #define SYNCUTILS_H_
 
@@ -30,6 +37,10 @@ namespace NativeTask {
 
 class Condition;
 
+/**
+ * 互斥锁封装类，基于POSIX pthread_mutex实现线程互斥访问
+ * 禁止拷贝构造和赋值操作，仅提供基本的加锁解锁功能，供条件变量配合使用
+ */
 class Lock {
 public:
   Lock();
@@ -47,6 +58,11 @@ private:
   void operator=(const Lock&);
 };
 
+/**
+ * RAII风格作用域锁模板，在构造时自动加锁，析构时自动解锁
+ * 避免忘记手动解锁导致死锁问题，可适配任意提供lock/unlock方法的锁类型
+ * @tparam LockT 锁类型，需要具备lock()和unlock()方法
+ */
 template<typename LockT>
 class ScopeLock {
 public:

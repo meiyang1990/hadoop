@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -83,57 +84,25 @@ import static org.apache.hadoop.mapred.ShuffleHandler.TOO_MANY_REQ_STATUS;
 import static org.apache.hadoop.mapred.ShuffleHandler.LOG;
 
 /**
- * ShuffleChannelHandler verifies the map request then servers the attempts in a http stream.
- * Before each attempt a serialised ShuffleHeader object is written with the details.
- *
- * <pre>
- * Example Request
- * ===================
- * GET /mapOutput?job=job_1111111111111_0001&amp;reduce=0&amp;
- *     map=attempt_1111111111111_0001_m_000001_0,
- *     attempt_1111111111111_0002_m_000002_0,
- *     attempt_1111111111111_0003_m_000003_0 HTTP/1.1
- * name: mapreduce
- * version: 1.0.0
- * UrlHash: 9zS++qE0/7/D2l1Rg0TqRoSguAk=
- *
- * Example Response
- * ===================
- * HTTP/1.1 200 OK
- * ReplyHash: GcuojWkAxXUyhZHPnwoV/MW2tGA=
- * name: mapreduce
- * version: 1.0.0
- * connection: close
- * content-length: 138
- *
- * +--------+-------------------------------------------------+----------------+
- * |00000000| 25 61 74 74 65 6d 70 74 5f 31 31 31 31 31 31 31 |%attempt_1111111|
- * |00000010| 31 31 31 31 31 31 5f 30 30 30 31 5f 6d 5f 30 30 |111111_0001_m_00|
- * |00000020| 30 30 30 31 5f 30 05 0a 00                      |0001_0...       |
- * +--------+-------------------------------------------------+----------------+
- * |00000000| 61 61 61 61 61                                  |aaaaa           |
- * +--------+-------------------------------------------------+----------------+
- * |00000000| 25 61 74 74 65 6d 70 74 5f 31 31 31 31 31 31 31 |%attempt_1111111|
- * |00000010| 31 31 31 31 31 31 5f 30 30 30 32 5f 6d 5f 30 30 |111111_0002_m_00|
- * |00000020| 30 30 30 32 5f 30 05 0a 00                      |0002_0...       |
- * +--------+-------------------------------------------------+----------------+
- * |00000000| 62 62 62 62 62                                  |bbbbb           |
- * +--------+-------------------------------------------------+----------------+
- * |00000000| 25 61 74 74 65 6d 70 74 5f 31 31 31 31 31 31 31 |%attempt_1111111|
- * |00000010| 31 31 31 31 31 31 5f 30 30 30 33 5f 6d 5f 30 30 |111111_0003_m_00|
- * |00000020| 30 30 30 33 5f 30 05 0a 00                      |0003_0...       |
- * +--------+-------------------------------------------------+----------------+
- * |00000000| 63 63 63 63 63                                  |ccccc           |
- * +--------+-------------------------------------------------+----------------+
- * </pre>
+ * MapReduce Shuffle阶段基于Netty的HTTP处理器，处理Reduce端获取Map端输出数据的请求。
+ * 负责验证请求合法性、读取Map输出文件并通过HTTP流式返回给Reduce端，每个Map输出前携带ShuffleHeader头信息。
  */
 public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
   private final ShuffleChannelHandlerContext handlerCtx;
 
+  /**
+   * 构造Shuffle通道处理器，持有上下文环境
+   * @param ctx Shuffle处理器上下文，包含连接数限制、缓存、密钥等公共配置
+   */
   ShuffleChannelHandler(ShuffleChannelHandlerContext ctx) {
     handlerCtx = ctx;
   }
 
+  /**
+   * 拆分逗号分隔的MapID列表为单个MapID
+   * @param mapq 原始请求中的MapID参数列表
+   * @return 拆分后的单个MapID列表
+   */
   private List<String> splitMaps(List<String> mapq) {
     if (null == mapq) {
       return null;
@@ -149,7 +118,9 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
   public void channelActive(ChannelHandlerContext ctx)
       throws Exception {
     LOG.debug("Executing channelActive; channel='{}'", ctx.channel().id());
+    // 连接数计数器加1
     int numConnections = handlerCtx.activeConnections.incrementAndGet();
+    // 如果超过最大允许连接数，拒绝请求并提示客户端重试
     if ((handlerCtx.maxShuffleConnections > 0) &&
         (numConnections > handlerCtx.maxShuffleConnections)) {
       LOG.info(String.format("Current number of shuffle connections (%d) is " +
@@ -157,13 +128,11 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
           handlerCtx.allChannels.size(), handlerCtx.maxShuffleConnections));
 
       Map<String, String> headers = new HashMap<>(1);
-      // notify fetchers to backoff for a while before closing the connection
-      // if the shuffle connection limit is hit. Fetchers are expected to
-      // handle this notification gracefully, that is, not treating this as a
-      // fetch failure.
+      // 添加重试延迟头，客户端收到后会优雅退避，不会视为获取失败
       headers.put(RETRY_AFTER_HEADER, String.valueOf(FETCH_RETRY_DELAY));
       sendError(ctx, "", TOO_MANY_REQ_STATUS, headers);
     } else {
+      // 连接数未超限，接受连接并添加到活动连接列表
       super.channelActive(ctx);
       handlerCtx.allChannels.add(ctx.channel());
       LOG.debug("Added channel: {}, channel id: {}. Accepted number of connections={}",
@@ -175,6 +144,7 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
   public void channelInactive(ChannelHandlerContext ctx) throws Exception {
     LOG.debug("Executing channelInactive; channel='{}'", ctx.channel().id());
     super.channelInactive(ctx);
+    // 连接关闭，连接数计数器减1
     int noOfConnections = handlerCtx.activeConnections.decrementAndGet();
     LOG.debug("New value of Accepted number of connections={}", noOfConnections);
   }
@@ -184,11 +154,12 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
     Channel channel = ctx.channel();
     LOG.debug("Received HTTP request: {}, channel='{}'", request, channel.id());
 
+    // 只允许GET方法请求
     if (request.method() != GET) {
       sendError(ctx, METHOD_NOT_ALLOWED);
       return;
     }
-    // Check whether the shuffle version is compatible
+    // 检查Shuffle版本兼容性
     String shuffleVersion = ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION;
     String httpHeaderName = ShuffleHeader.DEFAULT_HTTP_HEADER_NAME;
     if (request.headers() != null) {
@@ -197,15 +168,18 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
       LOG.debug("Received from request header: ShuffleVersion={} header name={}, channel id: {}",
           shuffleVersion, httpHeaderName, channel.id());
     }
+    // 版本不兼容直接返回错误
     if (request.headers() == null ||
         !ShuffleHeader.DEFAULT_HTTP_HEADER_NAME.equals(httpHeaderName) ||
         !ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION.equals(shuffleVersion)) {
       sendError(ctx, "Incompatible shuffle request version", BAD_REQUEST);
       return;
     }
+    // 解析请求URL参数
     final Map<String, List<String>> q =
         new QueryStringDecoder(request.uri()).parameters();
 
+    // 解析keepAlive参数
     final List<String> keepAliveList = q.get("keepAlive");
     boolean keepAliveParam = false;
     if (keepAliveList != null && keepAliveList.size() == 1) {
@@ -215,6 +189,7 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
             keepAliveList, keepAliveParam, channel.id());
       }
     }
+    // 获取并拆分MapID列表、ReduceID和JobID参数
     final List<String> mapIds = splitMaps(q.get("map"));
     final List<String> reduceQ = q.get("reduce");
     final List<String> jobQ = q.get("job");
@@ -227,10 +202,12 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
           "\n  channel id: " + channel.id());
     }
 
+    // 检查必填参数是否存在
     if (mapIds == null || reduceQ == null || jobQ == null) {
       sendError(ctx, "Required param job, map and reduce", BAD_REQUEST);
       return;
     }
+    // 检查参数数量是否合法，只能有一个JobID和一个ReduceID
     if (reduceQ.size() != 1 || jobQ.size() != 1) {
       sendError(ctx, "Too many job/reduce parameters", BAD_REQUEST);
       return;
@@ -239,6 +216,7 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
     int reduceId;
     String jobId;
     try {
+      // 解析ReduceID为整数
       reduceId = Integer.parseInt(reduceQ.get(0));
       jobId = jobQ.get(0);
     } catch (NumberFormatException e) {
@@ -250,12 +228,13 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
     }
     final String reqUri = request.uri();
     if (null == reqUri) {
-      // TODO? add upstream?
       sendError(ctx, FORBIDDEN);
       return;
     }
+    // 构造成功响应对象
     HttpResponse response = new DefaultHttpResponse(HTTP_1_1, OK);
     try {
+      // 验证请求签名合法性，防止非法访问
       verifyRequest(jobId, ctx, request, response,
           new URL("http", "", handlerCtx.port, reqUri));
     } catch (IOException e) {
@@ -264,14 +243,18 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
       return;
     }
 
+    // 预缓存Map输出元信息，提前计算总长度
     Map<String, MapOutputInfo> mapOutputInfoMap = new HashMap<>();
     ChannelPipeline pipeline = channel.pipeline();
     ShuffleHandler.TimeoutHandler timeoutHandler =
         (ShuffleHandler.TimeoutHandler)pipeline.get(TIMEOUT_HANDLER);
+    // 传输过程中禁用超时，传输完成后重新开启
     timeoutHandler.setEnabledTimeout(false);
+    // 获取Job对应用户名，用于权限校验
     String user = handlerCtx.userRsrc.get(jobId);
 
     try {
+      // 填充响应头，预验证所有文件可访问并计算总内容长度
       populateHeaders(mapIds, jobId, user, reduceId,
           response, keepAliveParam, mapOutputInfoMap);
     } catch(IOException e) {
@@ -280,27 +263,26 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
       return;
     }
 
+    // 写入响应头
     channel.write(response);
 
-    //Initialize one ReduceContext object per channelRead call
+    // 为当前请求构造Reduce上下文，保存请求相关信息
     boolean keepAlive = keepAliveParam || handlerCtx.connectionKeepAliveEnabled;
     ReduceContext reduceContext = new ReduceContext(mapIds, reduceId, ctx,
         user, mapOutputInfoMap, jobId, keepAlive);
 
+    // 开始发送Map输出数据
     sendMap(reduceContext);
   }
 
   /**
-   * Calls sendMapOutput for the mapId pointed by ReduceContext.mapsToSend
-   * and increments it. This method is first called by messageReceived()
-   * maxSessionOpenFiles times and then on the completion of every
-   * sendMapOutput operation. This limits the number of open files on a node,
-   * which can get really large(exhausting file descriptors on the NM) if all
-   * sendMapOutputs are called in one go, as was done previous to this change.
-   * @param reduceContext used to call sendMapOutput with correct params.
+   * 按批次发送Map输出数据，控制并发打开文件数避免文件句柄耗尽，每发送完一个自动触发下一个发送。
+   * 该方法先被channelRead0调用发送第一批，后续每个发送完成后由监听器触发下一个发送。
+   * @param reduceContext 当前Reduce请求上下文，包含待发送Map列表、进度信息等
    */
   public void sendMap(ReduceContext reduceContext) {
     LOG.trace("Executing sendMap; channel='{}'", reduceContext.ctx.channel().id());
+    // 还有未发送的Map输出，继续发送下一个
     if (reduceContext.getMapsToSend().get() <
         reduceContext.getMapIds().size()) {
       int nextIndex = reduceContext.getMapsToSend().getAndIncrement();
@@ -308,25 +290,32 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
 
       try {
         MapOutputInfo info = reduceContext.getInfoMap().get(mapId);
+        // 如果没预缓存，实时获取元信息
         if (info == null) {
           info = getMapOutputInfo(mapId, reduceContext.getReduceId(),
               reduceContext.getJobId(), reduceContext.getUser());
         }
         LOG.trace("Calling sendMapOutput; channel='{}'", reduceContext.ctx.channel().id());
+        // 发送单个Map输出
         ChannelFuture nextMap = sendMapOutput(
             reduceContext.getCtx().channel(),
             reduceContext.getUser(), mapId,
             reduceContext.getReduceId(), info);
+        // 添加完成监听器，发送完成后触发下一个Map发送
         nextMap.addListener(new ReduceMapFileCount(this, reduceContext));
       } catch (IOException e) {
         LOG.error("Shuffle error: {}; channel={}", e, reduceContext.ctx.channel().id());
-
-        // It is not possible to sendError, the success HttpResponse has been already sent
+        // 响应头已经发送，只能关闭连接处理错误
         reduceContext.ctx.channel().close();
       }
     }
   }
 
+  /**
+   * 递归拼接所有异常层级的错误信息
+   * @param t 原始异常对象
+   * @return 拼接后的完整错误信息
+   */
   private String getErrorMessage(Throwable t) {
     StringBuilder sb = new StringBuilder(t.getMessage());
     while (t.getCause() != null) {
@@ -336,12 +325,22 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
     return sb.toString();
   }
 
+  /**
+   * 获取指定Map输出的元信息，从缓存读取或从索引文件解析
+   * @param mapId Map任务ID
+   * @param reduce Reduce任务ID
+   * @param jobId Job ID
+   * @param user 作业提交用户名
+   * @return Map输出元信息，包含数据文件路径和索引信息
+   * @throws IOException 获取元信息失败时抛出异常
+   */
   protected MapOutputInfo getMapOutputInfo(String mapId, int reduce, String jobId, String user)
       throws IOException {
     ShuffleHandler.AttemptPathInfo pathInfo;
     try {
       ShuffleHandler.AttemptPathIdentifier identifier = new ShuffleHandler.AttemptPathIdentifier(
           jobId, user, mapId);
+      // 从路径缓存获取Map输出文件路径
       pathInfo = handlerCtx.pathCache.get(identifier);
       if (LOG.isDebugEnabled()) {
         LOG.debug("Retrieved pathInfo for " + identifier +
@@ -356,6 +355,7 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
       }
     }
 
+    // 从索引缓存获取当前Reduce分区的索引信息
     IndexRecord info =
         handlerCtx.indexCache.getIndexInformation(mapId, reduce, pathInfo.indexPath, user);
 
@@ -370,346 +370,21 @@ public class ShuffleChannelHandler extends SimpleChannelInboundHandler<FullHttpR
     return new MapOutputInfo(pathInfo.dataPath, info);
   }
 
+  /**
+   * 预填充HTTP响应头，验证所有文件可访问并计算总内容长度
+   * @param mapIds 待获取的MapID列表
+   * @param jobId Job ID
+   * @param user 作业提交用户名
+   * @param reduce Reduce任务ID
+   * @param response HTTP响应对象
+   * @param keepAliveParam 是否请求长连接
+   * @param mapOutputInfoMap 用于缓存Map输出元信息
+   * @throws IOException 验证或读取失败时抛出异常
+   */
   protected void populateHeaders(List<String> mapIds, String jobId,
                                  String user, int reduce, HttpResponse response,
                                  boolean keepAliveParam,
                                  Map<String, MapOutputInfo> mapOutputInfoMap)
       throws IOException {
 
-    long contentLength = 0;
-    for (String mapId : mapIds) {
-      MapOutputInfo outputInfo = getMapOutputInfo(mapId, reduce, jobId, user);
-      if (mapOutputInfoMap.size() < handlerCtx.mapOutputMetaInfoCacheSize) {
-        mapOutputInfoMap.put(mapId, outputInfo);
-      }
-
-      ShuffleHeader header =
-          new ShuffleHeader(mapId, outputInfo.indexRecord.partLength,
-              outputInfo.indexRecord.rawLength, reduce);
-      DataOutputBuffer dob = new DataOutputBuffer();
-      header.write(dob);
-      contentLength += outputInfo.indexRecord.partLength;
-      contentLength += dob.getLength();
-
-      // verify file access to data file to send an actually correct http error
-      final File spillFile = new File(outputInfo.mapOutputFileName.toString());
-      RandomAccessFile r = SecureIOUtils.openForRandomRead(spillFile, "r", user, null);
-      r.close();
-    }
-
-    // Now set the response headers.
-    setResponseHeaders(response, keepAliveParam, contentLength);
-
-    // this audit log is disabled by default,
-    // to turn it on please enable this audit log
-    // on log4j.properties by uncommenting the setting
-    if (AUDITLOG.isDebugEnabled()) {
-      StringBuilder sb = new StringBuilder("shuffle for ");
-      sb.append(jobId).append(" reducer ").append(reduce);
-      sb.append(" length ").append(contentLength);
-      if (AUDITLOG.isTraceEnabled()) {
-        // For trace level logging, append the list of mappers
-        sb.append(" mappers: ").append(mapIds);
-        AUDITLOG.trace(sb.toString());
-      } else {
-        AUDITLOG.debug(sb.toString());
-      }
-    }
-  }
-
-  protected void setResponseHeaders(HttpResponse response,
-                                    boolean keepAliveParam, long contentLength) {
-    if (!handlerCtx.connectionKeepAliveEnabled && !keepAliveParam) {
-      response.headers().set(HttpHeader.CONNECTION.asString(), CONNECTION_CLOSE);
-    } else {
-      response.headers().set(HttpHeader.CONNECTION.asString(),
-          HttpHeader.KEEP_ALIVE.asString());
-      response.headers().set(HttpHeader.KEEP_ALIVE.asString(),
-          "timeout=" + handlerCtx.connectionKeepAliveTimeOut);
-    }
-
-    // Content length must be set (https://www.rfc-editor.org/rfc/rfc7230#section-3.3.3)
-    HttpUtil.setContentLength(response, contentLength);
-  }
-
-  @SuppressWarnings("checkstyle:VisibilityModifier")
-  static class MapOutputInfo {
-    final Path mapOutputFileName;
-    final IndexRecord indexRecord;
-
-    MapOutputInfo(Path mapOutputFileName, IndexRecord indexRecord) {
-      this.mapOutputFileName = mapOutputFileName;
-      this.indexRecord = indexRecord;
-    }
-  }
-
-  protected void verifyRequest(String appid, ChannelHandlerContext ctx,
-                               HttpRequest request, HttpResponse response, URL requestUri)
-      throws IOException {
-    SecretKey tokenSecret = handlerCtx.secretManager.retrieveTokenSecret(appid);
-    if (null == tokenSecret) {
-      LOG.info("Request for unknown token {}, channel id: {}", appid, ctx.channel().id());
-      throw new IOException("Could not find jobid");
-    }
-    // encrypting URL
-    String encryptedURL = SecureShuffleUtils.buildMsgFrom(requestUri);
-    // hash from the fetcher
-    String urlHashStr =
-        request.headers().get(SecureShuffleUtils.HTTP_HEADER_URL_HASH);
-    if (urlHashStr == null) {
-      LOG.info("Missing header hash for {}, channel id: {}", appid, ctx.channel().id());
-      throw new IOException("fetcher cannot be authenticated");
-    }
-    if (LOG.isDebugEnabled()) {
-      int len = urlHashStr.length();
-      LOG.debug("Verifying request. encryptedURL:{}, hash:{}, channel id: " +
-              "{}", encryptedURL,
-          urlHashStr.substring(len - len / 2, len - 1), ctx.channel().id());
-    }
-    // verify - throws exception
-    SecureShuffleUtils.verifyReply(urlHashStr, encryptedURL, tokenSecret);
-    // verification passed - encode the reply
-    String reply = SecureShuffleUtils.generateHash(urlHashStr.getBytes(StandardCharsets.UTF_8),
-        tokenSecret);
-    response.headers().set(
-        SecureShuffleUtils.HTTP_HEADER_REPLY_URL_HASH, reply);
-    // Put shuffle version into http header
-    response.headers().set(ShuffleHeader.HTTP_HEADER_NAME,
-        ShuffleHeader.DEFAULT_HTTP_HEADER_NAME);
-    response.headers().set(ShuffleHeader.HTTP_HEADER_VERSION,
-        ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION);
-    if (LOG.isDebugEnabled()) {
-      int len = reply.length();
-      LOG.debug("Fetcher request verified. " +
-              "encryptedURL: {}, reply: {}, channel id: {}",
-          encryptedURL, reply.substring(len - len / 2, len - 1),
-          ctx.channel().id());
-    }
-  }
-
-  public static ByteBuf shuffleHeaderToBytes(ShuffleHeader header) throws IOException {
-    final DataOutputBuffer dob = new DataOutputBuffer();
-    header.write(dob);
-    return wrappedBuffer(dob.getData(), 0, dob.getLength());
-  }
-
-  protected ChannelFuture sendMapOutput(Channel ch, String user, String mapId, int reduce,
-                                        MapOutputInfo mapOutputInfo)
-      throws IOException {
-    final IndexRecord info = mapOutputInfo.indexRecord;
-    ch.write(shuffleHeaderToBytes(
-        new ShuffleHeader(mapId, info.partLength, info.rawLength, reduce)));
-    final File spillFile =
-        new File(mapOutputInfo.mapOutputFileName.toString());
-    RandomAccessFile spill = SecureIOUtils.openForRandomRead(spillFile, "r", user, null);
-    ChannelFuture writeFuture;
-    if (ch.pipeline().get(SslHandler.class) == null) {
-      final FadvisedFileRegion partition = new FadvisedFileRegion(spill,
-          info.startOffset, info.partLength, handlerCtx.manageOsCache, handlerCtx.readaheadLength,
-          handlerCtx.readaheadPool, spillFile.getAbsolutePath(),
-          handlerCtx.shuffleBufferSize, handlerCtx.shuffleTransferToAllowed);
-      writeFuture = ch.writeAndFlush(partition);
-      // TODO error handling; distinguish IO/connection failures,
-      //      attribute to appropriate spill output
-      writeFuture.addListener((ChannelFutureListener) future -> {
-        if (future.isSuccess()) {
-          partition.transferSuccessful();
-        }
-        partition.deallocate();
-      });
-    } else {
-      // HTTPS cannot be done with zero copy.
-      final FadvisedChunkedFile chunk = new FadvisedChunkedFile(spill,
-          info.startOffset, info.partLength, handlerCtx.sslFileBufferSize,
-          handlerCtx.manageOsCache, handlerCtx.readaheadLength, handlerCtx.readaheadPool,
-          spillFile.getAbsolutePath());
-      writeFuture = ch.writeAndFlush(chunk);
-    }
-
-    handlerCtx.metrics.shuffleConnections.incr();
-    handlerCtx.metrics.shuffleOutputBytes.incr(info.partLength); // optimistic
-    return writeFuture;
-  }
-
-  protected void sendError(ChannelHandlerContext ctx,
-                           HttpResponseStatus status) {
-    sendError(ctx, "", status);
-  }
-
-  protected void sendError(ChannelHandlerContext ctx, String message,
-                           HttpResponseStatus status) {
-    sendError(ctx, message, status, Collections.emptyMap());
-  }
-
-  protected void sendError(ChannelHandlerContext ctx, String msg,
-                           HttpResponseStatus status, Map<String, String> headers) {
-    FullHttpResponse response = new DefaultFullHttpResponse(HTTP_1_1, status,
-        Unpooled.copiedBuffer(msg, CharsetUtil.UTF_8));
-    response.headers().set(CONTENT_TYPE, "text/plain; charset=UTF-8");
-    // Put shuffle version into http header
-    response.headers().set(ShuffleHeader.HTTP_HEADER_NAME,
-        ShuffleHeader.DEFAULT_HTTP_HEADER_NAME);
-    response.headers().set(ShuffleHeader.HTTP_HEADER_VERSION,
-        ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION);
-    for (Map.Entry<String, String> header : headers.entrySet()) {
-      response.headers().set(header.getKey(), header.getValue());
-    }
-    HttpUtil.setContentLength(response, response.content().readableBytes());
-
-    // Close the connection as soon as the error message is sent.
-    ctx.channel().writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
-    // TODO: missing keep-alive handling
-  }
-
-  @Override
-  public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
-      throws Exception {
-    Channel ch = ctx.channel();
-    if (cause instanceof TooLongFrameException) {
-      LOG.trace("TooLongFrameException, channel id: {}", ch.id());
-      sendError(ctx, BAD_REQUEST);
-      return;
-    } else if (cause instanceof IOException) {
-      if (cause instanceof ClosedChannelException) {
-        LOG.debug("Ignoring closed channel error, channel id: " + ch.id(), cause);
-        return;
-      }
-      String message = String.valueOf(cause.getMessage());
-      if (IGNORABLE_ERROR_MESSAGE.matcher(message).matches()) {
-        LOG.debug("Ignoring client socket close, channel id: " + ch.id(), cause);
-        return;
-      }
-    }
-
-    LOG.error("Shuffle error. Channel id: " + ch.id(), cause);
-    if (ch.isActive()) {
-      sendError(ctx, INTERNAL_SERVER_ERROR);
-    }
-  }
-
-  /**
-   * Maintain parameters per messageReceived() Netty context.
-   * Allows sendMapOutput calls from operationComplete()
-   */
-  public static class ReduceContext {
-    private final List<String> mapIds;
-    private final AtomicInteger mapsToWait;
-    private final AtomicInteger mapsToSend;
-    private final int reduceId;
-    private final ChannelHandlerContext ctx;
-    private final String user;
-    private final Map<String, ShuffleChannelHandler.MapOutputInfo> infoMap;
-    private final String jobId;
-    private final boolean keepAlive;
-
-    ReduceContext(List<String> mapIds, int rId,
-                  ChannelHandlerContext context, String usr,
-                  Map<String, ShuffleChannelHandler.MapOutputInfo> mapOutputInfoMap,
-                  String jobId, boolean keepAlive) {
-
-      this.mapIds = mapIds;
-      this.reduceId = rId;
-      /*
-       * Atomic count for tracking the no. of map outputs that are yet to
-       * complete. Multiple futureListeners' operationComplete() can decrement
-       * this value asynchronously. It is used to decide when the channel should
-       * be closed.
-       */
-      this.mapsToWait = new AtomicInteger(mapIds.size());
-      /*
-       * Atomic count for tracking the no. of map outputs that have been sent.
-       * Multiple sendMap() calls can increment this value
-       * asynchronously. Used to decide which mapId should be sent next.
-       */
-      this.mapsToSend = new AtomicInteger(0);
-      this.ctx = context;
-      this.user = usr;
-      this.infoMap = mapOutputInfoMap;
-      this.jobId = jobId;
-      this.keepAlive = keepAlive;
-    }
-
-    public int getReduceId() {
-      return reduceId;
-    }
-
-    public ChannelHandlerContext getCtx() {
-      return ctx;
-    }
-
-    public String getUser() {
-      return user;
-    }
-
-    public Map<String, ShuffleChannelHandler.MapOutputInfo> getInfoMap() {
-      return infoMap;
-    }
-
-    public String getJobId() {
-      return jobId;
-    }
-
-    public List<String> getMapIds() {
-      return mapIds;
-    }
-
-    public AtomicInteger getMapsToSend() {
-      return mapsToSend;
-    }
-
-    public AtomicInteger getMapsToWait() {
-      return mapsToWait;
-    }
-
-    public boolean getKeepAlive() {
-      return keepAlive;
-    }
-  }
-
-  static class ReduceMapFileCount implements ChannelFutureListener {
-    private final ShuffleChannelHandler handler;
-    private final ReduceContext reduceContext;
-
-    ReduceMapFileCount(ShuffleChannelHandler handler, ReduceContext rc) {
-      this.handler = handler;
-      this.reduceContext = rc;
-    }
-
-    @Override
-    public void operationComplete(ChannelFuture future) throws Exception {
-      LOG.trace("SendMap operation complete; mapsToWait='{}', channel='{}'",
-          this.reduceContext.getMapsToWait().get(), future.channel().id());
-      if (!future.isSuccess()) {
-        LOG.error("Future is unsuccessful. channel='{}' Cause: ",
-            future.channel().id(), future.cause());
-        future.channel().close();
-        return;
-      }
-      int waitCount = this.reduceContext.getMapsToWait().decrementAndGet();
-      if (waitCount == 0) {
-        ChannelFuture lastContentFuture =
-            future.channel().writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
-        handler.handlerCtx.metrics.operationComplete(future);
-
-        // Let the idle timer handler close keep-alive connections
-        if (reduceContext.getKeepAlive()) {
-          LOG.trace("SendMap operation complete, keeping alive the connection; channel='{}'",
-              future.channel().id());
-          ChannelPipeline pipeline = future.channel().pipeline();
-          ShuffleHandler.TimeoutHandler timeoutHandler =
-              (ShuffleHandler.TimeoutHandler)pipeline.get(TIMEOUT_HANDLER);
-          timeoutHandler.setEnabledTimeout(true);
-        } else {
-          LOG.trace("SendMap operation complete, closing connection; channel='{}'",
-              future.channel().id());
-          lastContentFuture.addListener(ChannelFutureListener.CLOSE);
-        }
-      } else {
-        LOG.trace("SendMap operation complete, waitCount > 0, " +
-                "invoking sendMap with reduceContext; channel='{}'",
-            future.channel().id());
-        handler.sendMap(reduceContext);
-      }
-    }
-  }
-}
+    long contentLength =

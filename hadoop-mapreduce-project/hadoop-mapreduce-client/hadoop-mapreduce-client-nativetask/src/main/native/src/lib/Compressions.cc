@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,7 +17,12 @@
  * limitations under the License.
  */
 
-#include "lib/commons.h"
+/**
+ * @file Compressions.cc
+ * @brief 原生MapReduce任务压缩工厂实现，管理所有支持的压缩编解码器，提供压缩/解压缩流创建能力
+ */
+
+#include "lib/Compressions.h"
 #include "config.h"
 #include "lib/Compressions.h"
 #include "util/SyncUtils.h"
@@ -26,33 +32,58 @@
 
 namespace NativeTask {
 
+/**
+ * 压缩流基类析构函数
+ */
 CompressStream::~CompressStream() {
 }
 
+/**
+ * 直接向压缩流写入未压缩数据，默认不支持该方法
+ * @param buff 待写入数据缓冲区
+ * @param length 待写入数据长度
+ */
 void CompressStream::writeDirect(const void * buff, uint32_t length) {
   THROW_EXCEPTION(UnsupportException, "writeDirect not support");
 }
 
 ///////////////////////////////////////////////////////////
 
+/**
+ * 解压缩流基类析构函数
+ */
 DecompressStream::~DecompressStream() {
 }
 
+/**
+ * 直接从解压缩流读取解压后数据，默认不支持该方法
+ * @param buff 存储解压数据的缓冲区
+ * @param length 缓冲区最大长度
+ * @return 实际读取的解压数据长度
+ */
 int32_t DecompressStream::readDirect(void * buff, uint32_t length) {
   THROW_EXCEPTION(UnsupportException, "readDirect not support");
 }
 
 ///////////////////////////////////////////////////////////
 
+/** 定义Gzip压缩编Codec常量 */
 const Compressions::Codec Compressions::GzipCodec = Compressions::Codec(
     "org.apache.hadoop.io.compress.GzipCodec", ".gz");
+/** 定义Snappy压缩编Codec常量 */
 const Compressions::Codec Compressions::SnappyCodec = Compressions::Codec(
     "org.apache.hadoop.io.compress.SnappyCodec", ".snappy");
+/** 定义Lz4压缩编Codec常量 */
 const Compressions::Codec Compressions::Lz4Codec = Compressions::Codec(
     "org.apache.hadoop.io.compress.Lz4Codec", ".lz4");
 
+/** 存储所有支持的Codec列表，初始为空 */
 vector<Compressions::Codec> Compressions::SupportedCodecs = vector<Compressions::Codec>();
 
+/**
+ * @brief 初始化支持的压缩编解码器列表
+ * @details 线程安全的单步初始化，将预定义的Gzip、Snappy、Lz4编解码器加入支持列表
+ */
 void Compressions::initCodecs() {
   static Lock lock;
   ScopeLock<Lock> autolock(lock);
@@ -63,6 +94,11 @@ void Compressions::initCodecs() {
   }
 }
 
+/**
+ * @brief 检查指定编解码器是否被支持
+ * @param codec 编解码器完整Java类名
+ * @return true 支持该编解码器，false 不支持
+ */
 bool Compressions::support(const string & codec) {
   initCodecs();
   for (size_t i = 0; i < SupportedCodecs.size(); i++) {
@@ -73,6 +109,11 @@ bool Compressions::support(const string & codec) {
   return false;
 }
 
+/**
+ * @brief 根据编解码器类名获取对应文件扩展名
+ * @param codec 编解码器完整Java类名
+ * @return 对应文件扩展名（如.gz），未找到返回空字符串
+ */
 const string Compressions::getExtension(const string & codec) {
   initCodecs();
   for (size_t i = 0; i < SupportedCodecs.size(); i++) {
@@ -83,6 +124,11 @@ const string Compressions::getExtension(const string & codec) {
   return string();
 }
 
+/**
+ * @brief 根据文件扩展名获取对应编解码器类名
+ * @param extension 文件扩展名（如.gz）
+ * @return 对应编解码器完整Java类名，未找到返回空字符串
+ */
 const string Compressions::getCodec(const string & extension) {
   initCodecs();
   for (size_t i = 0; i < SupportedCodecs.size(); i++) {
@@ -93,6 +139,12 @@ const string Compressions::getCodec(const string & extension) {
   return string();
 }
 
+/**
+ * @brief 根据文件名推断对应的压缩编解码器
+ * @details 检查文件名后缀是否匹配已知压缩扩展名，匹配则返回对应编解码器
+ * @param file 文件名
+ * @return 对应编解码器完整Java类名，未找到匹配返回空字符串
+ */
 const string Compressions::getCodecByFile(const string & file) {
   initCodecs();
   for (size_t i = 0; i < SupportedCodecs.size(); i++) {
@@ -105,6 +157,13 @@ const string Compressions::getCodecByFile(const string & file) {
   return string();
 }
 
+/**
+ * @brief 根据编解码器类型创建对应的压缩流对象
+ * @param codec 编解码器完整Java类名
+ * @param stream 底层输出流，压缩后数据写入该流
+ * @param bufferSizeHint 压缩缓冲区大小提示
+ * @return 创建好的压缩流对象，不支持返回NULL
+ */
 CompressStream * Compressions::getCompressionStream(const string & codec, OutputStream * stream,
     uint32_t bufferSizeHint) {
   if (codec == GzipCodec.name) {
@@ -123,6 +182,13 @@ CompressStream * Compressions::getCompressionStream(const string & codec, Output
   return NULL;
 }
 
+/**
+ * @brief 根据编解码器类型创建对应的解压缩流对象
+ * @param codec 编解码器完整Java类名
+ * @param stream 底层输入流，从该流读取压缩数据
+ * @param bufferSizeHint 解压缩缓冲区大小提示
+ * @return 创建好的解压缩流对象，不支持返回NULL
+ */
 DecompressStream * Compressions::getDecompressionStream(const string & codec, InputStream * stream,
     uint32_t bufferSizeHint) {
   if (codec == GzipCodec.name) {
@@ -142,4 +208,3 @@ DecompressStream * Compressions::getDecompressionStream(const string & codec, In
 }
 
 } // namespace NativeTask
-

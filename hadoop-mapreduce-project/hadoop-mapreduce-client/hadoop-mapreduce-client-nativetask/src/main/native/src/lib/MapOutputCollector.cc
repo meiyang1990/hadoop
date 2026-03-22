@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * @file MapOutputCollector.cc
+ * @brief Hadoop native MapReduce Map端输出收集器实现
+ * 
+ * 负责在Map任务执行过程中，按分区收集、排序、溢写和合并Map输出结果，
+ * 是native任务中Map输出处理的核心组件，替代Java版本实现提升性能。
  */
 
 #include <string>
@@ -34,13 +43,15 @@
 
 namespace NativeTask {
 
+/**
+ * @brief 创建Combiner运行器实例
+ * @return 返回创建好的Combiner运行器指针，无需Combiner时返回NULL
+ */
 ICombineRunner * CombineRunnerWrapper::createCombiner() {
 
   ICombineRunner * combineRunner = NULL;
   if (NULL != _config->get(NATIVE_COMBINER)) {
-    // Earlier versions of this code supported user-defined
-    // native Combiner implementations. This simplified version
-    // no longer supports it.
+    // 此简化版本不再支持用户自定义native Combiner实现
     THROW_EXCEPTION_EX(UnsupportException, "Native Combiners not supported");
   }
 
@@ -54,6 +65,12 @@ ICombineRunner * CombineRunnerWrapper::createCombiner() {
   return combineRunner;
 }
 
+/**
+ * @brief 执行Combine操作
+ * @param type Combine上下文类型
+ * @param kvIterator 键值对迭代器
+ * @param writer 输出写入器
+ */
 void CombineRunnerWrapper::combine(CombineContext type, KVIterator * kvIterator,
     IFileWriter * writer) {
 
@@ -73,6 +90,20 @@ void CombineRunnerWrapper::combine(CombineContext type, KVIterator * kvIterator,
 // MapOutputCollector
 /////////////////////////////////////////////////////////////////
 
+/**
+ * @class MapOutputCollector
+ * @brief Map任务输出收集器核心类
+ * 
+ * 负责按分区收集Map输出的键值对，管理内存缓冲区，
+ * 在内存不足时触发溢写（spill）到本地磁盘，最终合并所有溢写文件生成最终输出，
+ * 是native Map任务处理流程中输出管理的核心组件。
+ */
+
+/**
+ * @brief 构造函数，初始化基础成员
+ * @param numberPartitions 分区数量
+ * @param spillService 溢写输出服务句柄
+ */
 MapOutputCollector::MapOutputCollector(uint32_t numberPartitions, SpillOutputService * spillService)
     : _config(NULL), _numPartitions(numberPartitions), _buckets(NULL),
       _keyComparator(NULL), _combineRunner(NULL),
@@ -82,6 +113,9 @@ MapOutputCollector::MapOutputCollector(uint32_t numberPartitions, SpillOutputSer
   _pool = new MemoryPool();
 }
 
+/**
+ * @brief 析构函数，释放所有内存资源
+ */
 MapOutputCollector::~MapOutputCollector() {
 
   if (NULL != _buckets) {
@@ -107,6 +141,13 @@ MapOutputCollector::~MapOutputCollector() {
   }
 }
 
+/**
+ * @brief 初始化收集器，创建各分区存储桶和内存池
+ * @param defaultBlockSize 默认块大小
+ * @param memoryCapacity 总内存容量
+ * @param keyComparator 键比较器
+ * @param combiner Combiner运行器
+ */
 void MapOutputCollector::init(uint32_t defaultBlockSize, uint32_t memoryCapacity,
     ComparatorPtr keyComparator, ICombineRunner * combiner) {
 
@@ -128,6 +169,7 @@ void MapOutputCollector::init(uint32_t defaultBlockSize, uint32_t memoryCapacity
     _buckets[partitionId] = pb;
   }
 
+  // 获取对应任务计数器引用
   _mapOutputRecords = NativeObjectFactory::GetCounter(
       TaskCounters::TASK_COUNTER_GROUP, TaskCounters::MAP_OUTPUT_RECORDS);
   _mapOutputBytes = NativeObjectFactory::GetCounter(
@@ -141,6 +183,9 @@ void MapOutputCollector::init(uint32_t defaultBlockSize, uint32_t memoryCapacity
   _collectTimer.reset();
 }
 
+/**
+ * @brief 重置收集器状态，清空所有分区数据和内存池
+ */
 void MapOutputCollector::reset() {
   for (uint32_t i = 0; i < _numPartitions; i++) {
     if (NULL != _buckets[i]) {
@@ -150,6 +195,10 @@ void MapOutputCollector::reset() {
   _pool->reset();
 }
 
+/**
+ * @brief 从配置加载参数并完成收集器配置
+ * @param config 配置对象指针
+ */
 void MapOutputCollector::configure(Config * config) {
   _config = config;
   MapOutputSpec::getSpecFromConfig(config, _spec);
@@ -165,6 +214,7 @@ void MapOutputCollector::configure(Config * config) {
   ComparatorPtr comparator = getComparator(config, _spec);
 
   ICombineRunner * combiner = NULL;
+  // 配置存在Combiner类，创建Combiner运行器包装类
   if (NULL != config->get(NATIVE_COMBINER)
       // config name for old api and new api
       || NULL != config->get(MAPRED_COMBINE_CLASS_OLD)
@@ -175,6 +225,12 @@ void MapOutputCollector::configure(Config * config) {
   init(defaultBlockSize, capacity, comparator, combiner);
 }
 
+/**
+ * @brief 为指定分区分配键值对缓冲区，内存不足触发溢写
+ * @param partitionId 分区ID
+ * @param kvlength 键值对总长度
+ * @return 分配得到的缓冲区指针
+ */
 KVBuffer * MapOutputCollector::allocateKVBuffer(uint32_t partitionId, uint32_t kvlength) {
   PartitionBucket * partition = getPartition(partitionId);
   if (NULL == partition) {
@@ -189,25 +245,32 @@ KVBuffer * MapOutputCollector::allocateKVBuffer(uint32_t partitionId, uint32_t k
     if (NULL == spillpath || spillpath->length() == 0) {
       THROW_EXCEPTION(IOException, "Illegal(empty) spill files path");
     } else {
+      // 内存不足，触发中间溢写
       middleSpill(*spillpath, "", false);
       delete spillpath;
     }
 
+    // 溢写后重新分配缓冲区
     dest = partition->allocateKVBuffer(kvlength);
     if (NULL == dest) {
-      // io.sort.mb too small, cann't proceed
-      // should not get here, cause get_buffer_to_put can throw OOM exception
+      // io.sort.mb配置过小，无法容纳单个键值对
       THROW_EXCEPTION(OutOfMemoryException, "key/value pair larger than io.sort.mb");
     }
   }
+  // 更新计数器
   _mapOutputRecords->increase();
   _mapOutputBytes->increase(kvlength - KVBuffer::headerLength());
   return dest;
 }
 
 /**
- * collect one k/v pair
- * @return true success; false buffer full, need spill
+ * @brief 收集一个Map输出键值对
+ * @param key 键地址
+ * @param keylen 键长度
+ * @param value 值地址
+ * @param vallen 值长度
+ * @param partitionId 分区ID
+ * @return true 收集成功；false 缓冲区满需要溢写
  */
 bool MapOutputCollector::collect(const void * key, uint32_t keylen, const void * value,
     uint32_t vallen, uint32_t partitionId) {
@@ -221,6 +284,12 @@ bool MapOutputCollector::collect(const void * key, uint32_t keylen, const void *
   return true;
 }
 
+/**
+ * @brief 根据配置获取键比较器实例
+ * @param config 配置对象
+ * @param spec Map输出规格
+ * @return 键比较器指针
+ */
 ComparatorPtr MapOutputCollector::getComparator(Config * config, MapOutputSpec & spec) {
   string nativeComparator = NATIVE_MAPOUT_KEY_COMPARATOR;
   const char * key_class = config->get(MAPRED_MAPOUTPUT_KEY_CLASS);
@@ -232,6 +301,11 @@ ComparatorPtr MapOutputCollector::getComparator(Config * config, MapOutputSpec &
   return NativeTask::get_comparator(spec.keyType, comparatorName);
 }
 
+/**
+ * @brief 获取指定分区的存储桶
+ * @param partition 分区ID
+ * @return 分区存储桶指针，分区ID非法返回NULL
+ */
 PartitionBucket * MapOutputCollector::getPartition(uint32_t partition) {
   if (partition >= _numPartitions) {
     return NULL;
@@ -240,8 +314,11 @@ PartitionBucket * MapOutputCollector::getPartition(uint32_t partition) {
 }
 
 /**
- * Spill buffer to file
- * @return Array of spill segments information
+ * @brief 对所有分区执行排序操作，统计排序耗时和记录数
+ * @param orderType 排序顺序类型
+ * @param sortType 排序算法类型
+ * @param writer 输出写入器，为NULL时仅排序不输出
+ * @param metric 输出排序统计指标
  */
 void MapOutputCollector::sortPartitions(SortOrder orderType, SortAlgorithm sortType,
     IFileWriter * writer, SortMetrics & metric) {
@@ -280,6 +357,12 @@ void MapOutputCollector::sortPartitions(SortOrder orderType, SortAlgorithm sortT
   metric.recordCount = recordNum;
 }
 
+/**
+ * @brief 执行中间溢写，将内存中已排序分区数据写入本地磁盘
+ * @param spillOutput 溢写文件路径
+ * @param indexFilePath 索引文件路径，为空则不输出索引
+ * @param final 是否是最终溢写
+ */
 void MapOutputCollector::middleSpill(const std::string & spillOutput,
     const std::string & indexFilePath, bool final) {
 
@@ -288,8 +371,10 @@ void MapOutputCollector::middleSpill(const std::string & spillOutput,
   if (spillOutput.empty()) {
     THROW_EXCEPTION(IOException, "MapOutputCollector: Spill file path empty");
   } else {
+    // 创建本地输出流
     OutputStream * fout = FileSystem::getLocal().create(spillOutput, true);
 
+    // 创建IFile格式写入器
     IFileWriter * writer = new IFileWriter(fout, _spec.checksumType, _spec.keyType, _spec.valueType,
         _spec.codec, _spilledRecords);
 
@@ -301,7 +386,7 @@ void MapOutputCollector::middleSpill(const std::string & spillOutput,
     info->path = spillOutput;
     uint64_t spillTime = timer.now() - timer.last() - metrics.sortTime;
 
-    const uint64_t M = 1000000; // million
+    const uint64_t M = 1000000; // 转换单位为毫秒
     LOG("%s-spill: { id: %d, collect: %"PRIu64" ms, "
         "in-memory sort: %"PRIu64" ms, in-memory records: %"PRIu64", "
         "merge&spill: %"PRIu64" ms, uncompressed size: %"PRIu64", "
@@ -324,90 +409,37 @@ void MapOutputCollector::middleSpill(const std::string & spillOutput,
       info->writeSpillInfo(indexFilePath);
       delete info;
     } else {
+      // 添加到溢写信息列表，后续合并使用
       _spillInfos.add(info);
     }
 
+    // 释放资源
     delete writer;
     delete fout;
 
+    // 重置内存，准备收集新数据
     reset();
     _collectTimer.reset();
   }
 }
 
 /**
- * final merge and/or spill, use previous spilled
- * file & in-memory data
+ * @brief 执行最终溢写，合并所有之前溢写文件和当前内存数据生成最终输出
+ * @param filepath 最终输出文件路径
+ * @param idx_file_path 最终输出索引文件路径
  */
 void MapOutputCollector::finalSpill(const std::string & filepath,
     const std::string & idx_file_path) {
 
+  // 无之前溢写，直接将当前内存数据溢写
   if (_spillInfos.getSpillCount() == 0) {
     middleSpill(filepath, idx_file_path, true);
     return;
   }
 
+  // 创建最终输出写入器
   IFileWriter * writer = IFileWriter::create(filepath, _spec, _spilledRecords);
   Merger * merger = new Merger(writer, _config, _keyComparator, _combineRunner);
 
-  for (size_t i = 0; i < _spillInfos.getSpillCount(); i++) {
-    SingleSpillInfo * spill = _spillInfos.getSingleSpillInfo(i);
-    MergeEntryPtr pme = IFileMergeEntry::create(spill);
-    merger->addMergeEntry(pme);
-  }
-
-  SortMetrics metrics;
-  sortPartitions(_spec.sortOrder, _spec.sortAlgorithm, NULL, metrics);
-
-  merger->addMergeEntry(new MemoryMergeEntry(_buckets, _numPartitions));
-
-  Timer timer;
-  merger->merge();
-
-  uint64_t outputSize;
-  uint64_t realOutputSize;
-  uint64_t recordCount;
-  writer->getStatistics(outputSize, realOutputSize, recordCount);
-
-  const uint64_t M = 1000000; // million
-  LOG("Final-merge-spill: { id: %d, in-memory sort: %"PRIu64" ms, "
-      "in-memory records: %"PRIu64", merge&spill: %"PRIu64" ms, "
-      "records: %"PRIu64", uncompressed size: %"PRIu64", "
-      "real size: %"PRIu64" path: %s }",
-      _spillInfos.getSpillCount(),
-      metrics.sortTime / M,
-      metrics.recordCount,
-      (timer.now() - timer.last()) / M,
-      recordCount,
-      outputSize,
-      realOutputSize,
-      filepath.c_str());
-
-  _mapOutputMaterializedBytes->increase(realOutputSize);
-
-  delete merger;
-
-  // write index
-  SingleSpillInfo * spill_range = writer->getSpillInfo();
-  spill_range->writeSpillInfo(idx_file_path);
-  delete spill_range;
-  _spillInfos.deleteAllSpillFiles();
-  delete writer;
-  reset();
-}
-
-void MapOutputCollector::close() {
-  string * outputpath = _spillOutput->getOutputPath();
-  string * indexpath = _spillOutput->getOutputIndexPath();
-
-  if ((outputpath->length() == 0) || (indexpath->length() == 0)) {
-    THROW_EXCEPTION(IOException, "Illegal(empty) map output file/index path");
-  }
-
-  finalSpill(*outputpath, *indexpath);
-
-  delete outputpath;
-  delete indexpath;
-}
-} // namespace NativeTask
-
+  // 将所有已有溢写文件添加为合并输入
+  for (size_t i

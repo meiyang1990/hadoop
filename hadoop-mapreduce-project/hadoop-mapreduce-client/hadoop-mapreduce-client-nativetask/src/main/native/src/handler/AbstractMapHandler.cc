@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,14 @@
  * limitations under the License.
  */
 
+/**
+ * @file AbstractMapHandler.cc
+ * @brief  NativeTask Map任务处理抽象基类静态成员定义
+ * 
+ * 该文件属于Hadoop MapReduce本地任务模块，定义了AbstractMapHandler基类
+ * 的静态命令常量，用于和Java侧交互获取Map输出相关路径和组合处理器
+ */
+
 #include "lib/commons.h"
 #include "util/StringUtil.h"
 #include "MCollectorOutputHandler.h"
@@ -27,8 +36,29 @@ using std::string;
 using std::vector;
 
 namespace NativeTask {
+
+/**
+ * @brief 获取Map输出文件路径命令定义
+ * 命令ID: 100
+ */
 const Command AbstractMapHandler::GET_OUTPUT_PATH(100, "GET_OUTPUT_PATH");
+
+/**
+ * @brief 获取Map输出索引文件路径命令定义
+ * 命令ID: 101
+ */
 const Command AbstractMapHandler::GET_OUTPUT_INDEX_PATH(101, "GET_OUTPUT_INDEX_PATH");
+
+/**
+ * @brief 获取Spill溢出文件路径命令定义
+ * 命令ID: 102
+ */
 const Command AbstractMapHandler::GET_SPILL_PATH(102, "GET_SPILL_PATH");
+
+/**
+ * @brief 获取Combine处理器命令定义
+ * 命令ID: 103
+ */
 const Command AbstractMapHandler::GET_COMBINE_HANDLER(103, "GET_COMBINE_HANDLER");
+
 } // namespace NativeTask
