@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -24,13 +25,17 @@ import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The request to <code>Federation state store</code> to delete the mapping of
- * home subcluster of a submitted reservation.
+ * 联邦状态存储删除预约归属子集群映射的请求类，用于从联邦状态存储中删除已提交预约的归属子集群映射关系。
  */
 @Private
 @Unstable
 public abstract class DeleteReservationHomeSubClusterRequest {
 
+  /**
+   * 创建删除预约归属子集群映射请求实例。
+   * @param reservationId 待删除映射关系的预约ID
+   * @return 配置完成的删除请求实例
+   */
   @Private
   @Unstable
   public static DeleteReservationHomeSubClusterRequest newInstance(
@@ -42,22 +47,18 @@ public abstract class DeleteReservationHomeSubClusterRequest {
   }
 
   /**
-   * Get the identifier of the {@link ReservationId} to be removed from
-   * <code>Federation state store</code> .
+   * 获取待删除映射关系的预约ID。
    *
-   * @return the identifier of the Reservation to be removed from Federation
-   *         State Store.
+   * @return 待从联邦状态存储中删除映射关系的预约ID
    */
   @Public
   @Unstable
   public abstract ReservationId getReservationId();
 
   /**
-   * Set the identifier of the {@link ReservationId} to be removed from
-   * <code>Federation state store</code> .
+   * 设置待删除映射关系的预约ID。
    *
-   * @param reservationId the identifier of the Reservation to be removed from
-   *          Federation State Store.
+   * @param reservationId 待从联邦状态存储中删除映射关系的预约ID
    */
   @Private
   @Unstable

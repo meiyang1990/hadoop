@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,16 +33,16 @@ import java.util.Queue;
 import java.util.stream.Stream;
 
 /**
- * This abstract class provides some base methods which are inherited by
- * the DatanodeAdmin BackOff and Default Monitors, which control decommission
- * and maintenance mode.
+ * 文件级注释：数据节点下线/维护监控基类，为具体监控实现提供公共基础能力，支撑数据节点退役和维护模式的进度管理
+ *
+ * 抽象基类，提供数据节点管理监控的基础方法，被退避监控和默认监控继承，
+ * 用于控制数据节点退役和维护模式的执行流程。
  */
 public abstract class DatanodeAdminMonitorBase
     implements DatanodeAdminMonitorInterface, Configurable {
 
   /**
-   * Sort by lastUpdate time descending order, such that unhealthy
-   * nodes are de-prioritized given they cannot be decommissioned.
+   * 按最后更新时间降序排序，降低不健康节点的优先级，因为不健康节点无法完成退役。
    */
   static final Comparator<DatanodeDescriptor> PENDING_NODES_QUEUE_COMPARATOR =
       (dn1, dn2) -> Long.compare(dn2.getLastUpdate(), dn1.getLastUpdate());
@@ -51,18 +52,17 @@ public abstract class DatanodeAdminMonitorBase
   protected DatanodeAdminManager dnAdmin;
   protected Configuration conf;
 
+  // 待处理节点优先级队列，按规则排序等待处理
   private final PriorityQueue<DatanodeDescriptor> pendingNodes = new PriorityQueue<>(
       PENDING_NODES_QUEUE_COMPARATOR);
 
   /**
-   * Any nodes where decommission or maintenance has been cancelled are added
-   * to this queue for later processing.
+   * 已取消退役/维护的节点存入此队列，等待后续处理。
    */
   private final Queue<DatanodeDescriptor> cancelledNodes = new ArrayDeque<>();
 
   /**
-   * The maximum number of nodes to track in outOfServiceNodeBlocks.
-   * A value of 0 means no limit.
+   * 退役节点跟踪队列的最大并发跟踪节点数，0表示无限制。
    */
   protected int maxConcurrentTrackedNodes;
 
@@ -70,9 +70,9 @@ public abstract class DatanodeAdminMonitorBase
       LoggerFactory.getLogger(DatanodeAdminMonitorBase.class);
 
   /**
-   * Set the cluster namesystem.
+   * 设置集群命名系统实例，用于关联NameNode的核心元数据管理。
    *
-   * @param ns The namesystem for the cluster
+   * @param ns 集群命名系统实例
    */
   @Override
   public void setNameSystem(Namesystem ns) {
@@ -80,9 +80,9 @@ public abstract class DatanodeAdminMonitorBase
   }
 
   /**
-   * Set the blockmanager for the cluster.
+   * 设置集群块管理器实例，用于管理数据块副本分布。
    *
-   * @param bm The cluster BlockManager
+   * @param bm 集群块管理器实例
    */
   @Override
   public void setBlockManager(BlockManager bm) {
@@ -90,9 +90,9 @@ public abstract class DatanodeAdminMonitorBase
   }
 
   /**
-   * Set the DatanodeAdminManager instance in use in the namenode.
+   * 设置数据节点管理员实例，关联NameNode中的核心管理对象。
    *
-   * @param admin The current DatanodeAdminManager
+   * @param admin 数据节点管理员实例
    */
   @Override
   public void setDatanodeAdminManager(DatanodeAdminManager admin) {
@@ -100,19 +100,20 @@ public abstract class DatanodeAdminMonitorBase
   }
 
   /**
-   * Used by the Configurable interface, which is used by ReflectionUtils
-   * to create an instance of the monitor class. This method will be called to
-   * pass the Configuration to the new object.
+   * 配置设置方法，由反射工具类用于创建监控实例时传入配置，
+   * 读取最大并发跟踪节点数配置并完成初始化。
    *
-   * @param conf configuration to be used
+   * @param conf 要使用的配置对象
    */
   @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
+    // 从配置中读取最大并发跟踪节点数，使用默认值如果未配置
     this.maxConcurrentTrackedNodes = conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_MAX_CONCURRENT_TRACKED_NODES,
         DFSConfigKeys
             .DFS_NAMENODE_DECOMMISSION_MAX_CONCURRENT_TRACKED_NODES_DEFAULT);
+    // 配置校验：值不能为负数
     if (this.maxConcurrentTrackedNodes < 0) {
       LOG.error("{} is set to an invalid value, it must be zero or greater. "+
               "Defaulting to {}",
@@ -126,14 +127,14 @@ public abstract class DatanodeAdminMonitorBase
 
     LOG.debug("Activating DatanodeAdminMonitor with {} max concurrently tracked nodes.",
         maxConcurrentTrackedNodes);
-
+    // 调用子类实现处理额外配置
     processConf();
   }
 
   /**
-   * Get the current Configuration stored in this object.
+   * 获取当前对象存储的配置实例。
    *
-   * @return Configuration used when the object was created
+   * @return 对象创建时使用的配置
    */
   @Override
   public Configuration getConf() {
@@ -141,17 +142,15 @@ public abstract class DatanodeAdminMonitorBase
   }
 
   /**
-   * Abstract method which must be implemented by the sub-classes to process
-   * set various instance variables from the Configuration passed at object
-   * creation time.
+   * 抽象方法，必须由子类实现，用于从配置中加载子类特有的配置项，
+   * 初始化子类实例变量。
    */
   protected abstract void processConf();
 
   /**
-   * Start tracking a node for decommission or maintenance. The given Datanode
-   * will be queued for later processing in pendingNodes. This method must be
-   * called under the namenode write lock.
-   * @param dn The datanode to start tracking
+   * 开始跟踪一个待退役/维护的数据节点，将节点加入待处理队列，
+   * 必须在NameNode写锁下调用。
+   * @param dn 要开始跟踪的数据节点
    */
   @Override
   public void startTrackingNode(DatanodeDescriptor dn) {
@@ -159,10 +158,9 @@ public abstract class DatanodeAdminMonitorBase
   }
 
   /**
-   * Get the number of datanodes nodes in the pending queue. Ie the count of
-   * nodes waiting to decommission but have not yet started the process.
+   * 获取待处理队列中的节点数量，即等待开始退役但尚未开始处理的节点数。
    *
-   * @return The count of pending nodes
+   * @return 待处理节点数量
    */
   @Override
   public int getPendingNodeCount() {
@@ -180,19 +178,17 @@ public abstract class DatanodeAdminMonitorBase
   }
 
   /**
-   * If node "is dead while in Decommission In Progress", it cannot be decommissioned
-   * until it becomes healthy again. If there are more pendingNodes than can be tracked
-   * & some unhealthy tracked nodes, then re-queue the unhealthy tracked nodes
-   * to avoid blocking decommissioning of healthy nodes.
+   * 获取需要重新排队的不健康节点：当达到最大并发跟踪限制时，
+   * 将处于退役中但已死亡的不健康节点重新排队，避免阻塞健康节点的退役。
    *
-   * @param unhealthyDns The unhealthy datanodes which may be re-queued
-   * @param numDecommissioningNodes The total number of nodes being decommissioned
-   * @return Stream of unhealthy nodes to be re-queued
+   * @param unhealthyDns 所有不健康的数据节点列表
+   * @param numDecommissioningNodes 当前正在进行退役的节点总数
+   * @return 需要重新排队的不健康节点流
    */
   Stream<DatanodeDescriptor> getUnhealthyNodesToRequeue(
       final List<DatanodeDescriptor> unhealthyDns, int numDecommissioningNodes) {
     if (!unhealthyDns.isEmpty()) {
-      // Compute the number of unhealthy nodes to re-queue
+      // 计算需要重新排队的不健康节点数量
       final int numUnhealthyNodesToRequeue =
           Math.min(numDecommissioningNodes - maxConcurrentTrackedNodes, unhealthyDns.size());
 
@@ -201,24 +197,33 @@ public abstract class DatanodeAdminMonitorBase
           DFSConfigKeys.DFS_NAMENODE_DECOMMISSION_MAX_CONCURRENT_TRACKED_NODES,
           numUnhealthyNodesToRequeue);
 
-      // Order unhealthy nodes by lastUpdate descending such that nodes
-      // which have been unhealthy the longest are preferred to be re-queued
+      // 按最后更新时间升序排序，使不健康时间最长的节点优先被重新排队
       return unhealthyDns.stream().sorted(PENDING_NODES_QUEUE_COMPARATOR.reversed())
           .limit(numUnhealthyNodesToRequeue);
     }
     return Stream.empty();
   }
 
+  /**
+   * 当数据块不满足冗余要求时，将数据块添加到块重构队列进行恢复。
+   * 区分退役和维护模式分别判断是否需要重构。
+   * @param isDecommission 是否是退役模式
+   * @param block 待处理数据块
+   * @param num 副本数量统计
+   * @param liveReplicas 存活副本数量
+   */
   void addReconstructionBlockIfNeeded(boolean isDecommission, BlockInfo block,
       NumberReplicas num, int liveReplicas) {
+    // 根据模式判断是否需要块重构
     boolean neededReconstruction = isDecommission ?
         blockManager.isNeededReconstruction(block, num) :
         blockManager.isNeededReconstructionForMaintenance(block, num);
     if (neededReconstruction) {
+      // 仅当块不在重构队列、没有等待重构副本、且块队列已经完成初始化时添加
       if (!blockManager.neededReconstruction.contains(block) &&
           blockManager.pendingReconstruction.getNumReplicas(block) == 0 &&
           blockManager.isPopulatingReplQueues()) {
-        // Process these blocks only when active NN is out of safe mode.
+        // 仅在活动NameNode退出安全模式后处理这些块
         blockManager.neededReconstruction.add(block,
             liveReplicas, num.readOnlyReplicas(),
             num.outOfServiceReplicas(),

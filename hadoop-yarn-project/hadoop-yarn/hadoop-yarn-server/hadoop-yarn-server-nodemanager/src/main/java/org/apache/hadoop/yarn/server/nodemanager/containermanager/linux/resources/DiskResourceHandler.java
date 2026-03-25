@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +23,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Resource handler for disk resources.
+ * 磁盘资源处理器接口，定义YARN NodeManager上容器磁盘资源的管理规范。
+ * 负责为容器分配、限制磁盘IO资源，实现磁盘资源的隔离与管控。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

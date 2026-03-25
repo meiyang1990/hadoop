@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,17 +49,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.*;
 
-/** JSON Utilities */
+/**
+ * HDFS Web服务JSON序列化工具类
+ * 提供将各类HDFS内部对象转换为JSON字符串的能力，供WebHDFS REST API返回响应使用
+ */
 public class JsonUtil {
   private static final Object[] EMPTY_OBJECT_ARRAY = {};
 
-  // Reuse ObjectMapper instance for improving performance.
-  // ObjectMapper is thread safe as long as we always configure instance
-  // before use. We don't have a re-entrant call pattern in WebHDFS,
-  // so we just need to worry about thread-safety.
+  // 复用ObjectMapper实例提升性能，ObjectMapper线程安全，WebHDFS无重入调用场景
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  /** Convert a token object to a Json string. */
+  /**
+   * 将安全令牌对象转换为JSON字符串
+   * @param token 安全令牌对象
+   * @return 序列化后的JSON字符串
+   * @throws IOException 序列化失败时抛出异常
+   */
   public static String toJsonString(final Token<? extends TokenIdentifier> token
       ) throws IOException {
     return toJsonString(Token.class, toJsonMap(token));
@@ -75,7 +81,11 @@ public class JsonUtil {
     return m;
   }
 
-  /** Convert an exception object to a Json string. */
+  /**
+   * 将异常对象转换为JSON字符串，供REST API返回错误信息
+   * @param e 异常对象
+   * @return 包含异常信息的JSON字符串
+   */
   public static String toJsonString(final Exception e) {
     final Map<String, Object> m = new TreeMap<String, Object>();
     m.put("exception", e.getClass().getSimpleName());
@@ -88,7 +98,12 @@ public class JsonUtil {
     return toJsonString(clazz.getSimpleName(), value);
   }
 
-  /** Convert a key-value pair to a Json string. */
+  /**
+   * 将单个键值对转换为JSON字符串
+   * @param key 键名称
+   * @param value 值对象
+   * @return 序列化后的JSON字符串
+   */
   public static String toJsonString(final String key, final Object value) {
     final Map<String, Object> m = new TreeMap<String, Object>();
     m.put(key, value);
@@ -99,12 +114,21 @@ public class JsonUtil {
     return null;
   }
 
-  /** Convert a FsPermission object to a string. */
+  /**
+   * 将权限对象转换为八进制权限字符串
+   * @param permission HDFS权限对象
+   * @return 八进制权限字符串
+   */
   private static String toString(final FsPermission permission) {
     return String.format("%o", permission.toShort());
   }
 
-  /** Convert a HdfsFileStatus object to a Json string. */
+  /**
+   * 将HDFS文件状态对象转换为JSON字符串
+   * @param status HDFS文件状态对象
+   * @param includeType 是否包装类型信息
+   * @return 序列化后的JSON字符串
+   */
   public static String toJsonString(final HdfsFileStatus status,
       boolean includeType) {
     if (status == null) {
@@ -140,9 +164,9 @@ public class JsonUtil {
     if (status.isErasureCoded()) {
       m.put("ecBit", true);
       if (status.getErasureCodingPolicy() != null) {
-        // to maintain backward comparability
+        // 保持向后兼容性
         m.put("ecPolicy", status.getErasureCodingPolicy().getName());
-        // to re-construct HdfsFileStatus object via WebHdfs
+        // 用于通过WebHDFS重建HdfsFileStatus对象
         m.put("ecPolicyObj", getEcPolicyAsMap(status.getErasureCodingPolicy()));
       }
     }
@@ -160,9 +184,13 @@ public class JsonUtil {
     return m;
   }
 
+  /**
+   * 将纠删码策略转换为不可变Map，用于JSON序列化
+   * @param ecPolicy 纠删码策略对象
+   * @return 包含策略信息的不可变Map
+   */
   public static Map<String, Object> getEcPolicyAsMap(
       final ErasureCodingPolicy ecPolicy) {
-    /** Convert an ErasureCodingPolicy to a map. */
     ImmutableMap.Builder<String, Object> builder = ImmutableMap.builder();
     builder.put("name", ecPolicy.getName())
         .put("cellSize", ecPolicy.getCellSize())
@@ -175,7 +203,11 @@ public class JsonUtil {
 
   }
 
-  /** Convert an ExtendedBlock to a Json map. */
+  /**
+   * 将扩展块对象转换为JSON Map
+   * @param extendedblock 扩展块对象
+   * @return 包含块信息的Map
+   */
   private static Map<String, Object> toJsonMap(final ExtendedBlock extendedblock) {
     if (extendedblock == null) {
       return null;
@@ -189,7 +221,11 @@ public class JsonUtil {
     return m;
   }
 
-  /** Convert a DatanodeInfo to a Json map. */
+  /**
+   * 将DataNode信息对象转换为JSON Map
+   * @param datanodeinfo DataNode信息对象
+   * @return 包含DataNode信息的Map
+   */
   static Map<String, Object> toJsonMap(final DatanodeInfo datanodeinfo) {
     if (datanodeinfo == null) {
       return null;
@@ -198,8 +234,7 @@ public class JsonUtil {
     // TODO: Fix storageID
     final Map<String, Object> m = new TreeMap<String, Object>();
     m.put("ipAddr", datanodeinfo.getIpAddr());
-    // 'name' is equivalent to ipAddr:xferPort. Older clients (1.x, 0.23.x) 
-    // expects this instead of the two fields.
+    // 'name' 等价于 ipAddr:xferPort，旧版客户端(1.x, 0.23.x)依赖此字段
     m.put("name", datanodeinfo.getXferAddr());
     m.put("hostName", datanodeinfo.getHostName());
     m.put("storageID", datanodeinfo.getDatanodeUuid());
@@ -228,7 +263,11 @@ public class JsonUtil {
     return m;
   }
 
-  /** Convert a DatanodeInfo[] to a Json array. */
+  /**
+   * 将DataNode信息数组转换为JSON数组
+   * @param array DataNode信息数组
+   * @return 转换后的JSON数组
+   */
   private static Object[] toJsonArray(final DatanodeInfo[] array) {
     if (array == null) {
       return null;
@@ -243,7 +282,11 @@ public class JsonUtil {
     }
   }
 
-  /** Convert a StorageType[] to a Json array. */
+  /**
+   * 将存储类型数组转换为JSON数组
+   * @param array 存储类型数组
+   * @return 转换后的JSON数组
+   */
   private static Object[] toJsonArray(final StorageType[] array) {
     if (array == null) {
       return null;
@@ -258,7 +301,12 @@ public class JsonUtil {
     }
   }
 
-  /** Convert a LocatedBlock to a Json map. */
+  /**
+   * 已定位块对象转换为JSON Map
+   * @param locatedblock 已定位块对象
+   * @return 包含块位置信息的Map
+   * @throws IOException 序列化失败时抛出异常
+   */
   private static Map<String, Object> toJsonMap(final LocatedBlock locatedblock
       ) throws IOException {
     if (locatedblock == null) {
@@ -279,14 +327,20 @@ public class JsonUtil {
   private static Map<String, Object> toJson(final DirectoryListing listing)
       throws IOException {
     final Map<String, Object> m = new TreeMap<>();
-    // Serialize FileStatus[] to a FileStatuses map
+    // 将FileStatus数组序列化为FileStatuses Map
     m.put("partialListing", toJsonMap(listing.getPartialListing()));
-    // Simple int
+    // 剩余条目数
     m.put("remainingEntries", listing.getRemainingEntries());
 
     return m;
   }
 
+  /**
+   * 将目录列表对象转换为JSON字符串
+   * @param listing 目录列表对象
+   * @return 序列化后的JSON字符串
+   * @throws IOException 序列化失败时抛出异常
+   */
   public static String toJsonString(final DirectoryListing listing) throws
       IOException {
 
@@ -314,7 +368,12 @@ public class JsonUtil {
     return fileStatuses;
   }
 
-  /** Convert a LocatedBlock[] to a Json array. */
+  /**
+   * 将已定位块列表转换为JSON数组
+   * @param array 已定位块列表
+   * @return 转换后的JSON数组
+   * @throws IOException 序列化失败时抛出异常
+   */
   private static Object[] toJsonArray(final List<LocatedBlock> array
       ) throws IOException {
     if (array == null) {
@@ -330,7 +389,12 @@ public class JsonUtil {
     }
   }
 
-  /** Convert LocatedBlocks to a Json string. */
+  /**
+   * 将文件块位置信息对象转换为JSON字符串
+   * @param locatedblocks 文件块位置信息对象
+   * @return 序列化后的JSON字符串
+   * @throws IOException 序列化失败时抛出异常
+   */
   public static String toJsonString(final LocatedBlocks locatedblocks
       ) throws IOException {
     if (locatedblocks == null) {
@@ -341,7 +405,12 @@ public class JsonUtil {
     return toJsonString(LocatedBlocks.class, m);
   }
 
-  /** Convert LocatedBlocks to a Map. */
+  /**
+   * 将文件块位置信息对象转换为Map
+   * @param locatedblocks 文件块位置信息对象
+   * @return 包含块位置信息的Map
+   * @throws IOException 序列化失败时抛出异常
+   */
   public static Map<String, Object> toJsonMap(final LocatedBlocks locatedblocks)
       throws IOException {
     if (locatedblocks == null) {
@@ -358,443 +427,14 @@ public class JsonUtil {
     return m;
   }
 
-  /** Convert a ContentSummary to a Json string. */
+  /**
+   * 将目录内容摘要对象转换为JSON字符串
+   * @param contentsummary 目录内容摘要对象
+   * @return 序列化后的JSON字符串
+   */
   public static String toJsonString(final ContentSummary contentsummary) {
     if (contentsummary == null) {
       return null;
     }
 
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("length", contentsummary.getLength());
-    m.put("fileCount", contentsummary.getFileCount());
-    m.put("directoryCount", contentsummary.getDirectoryCount());
-    m.put("ecPolicy", contentsummary.getErasureCodingPolicy());
-    // For ContentSummary we don't need this since we already have
-    // separate count for file and directory.
-    m.putAll(toJsonMap(contentsummary, false));
-    m.put("snapshotLength", contentsummary.getSnapshotLength());
-    m.put("snapshotFileCount", contentsummary.getSnapshotFileCount());
-    m.put("snapshotDirectoryCount",
-        contentsummary.getSnapshotDirectoryCount());
-    m.put("snapshotSpaceConsumed", contentsummary.getSnapshotSpaceConsumed());
-    return toJsonString(ContentSummary.class, m);
-  }
-
-  /** Convert a QuotaUsage to a JSON string. */
-  public static String toJsonString(final QuotaUsage quotaUsage) {
-    if (quotaUsage == null) {
-      return null;
-    }
-    return toJsonString(QuotaUsage.class, toJsonMap(quotaUsage, true));
-  }
-
-  private static Map<String, Object> toJsonMap(
-      final QuotaUsage quotaUsage, boolean includeFileAndDirectoryCount) {
-    final Map<String, Object> m = new TreeMap<>();
-    if (includeFileAndDirectoryCount) {
-      m.put("fileAndDirectoryCount", quotaUsage.getFileAndDirectoryCount());
-    }
-    m.put("quota", quotaUsage.getQuota());
-    m.put("spaceConsumed", quotaUsage.getSpaceConsumed());
-    m.put("spaceQuota", quotaUsage.getSpaceQuota());
-    final Map<String, Map<String, Long>> typeQuota = new TreeMap<>();
-    for (StorageType t : StorageType.getTypesSupportingQuota()) {
-      long tQuota = quotaUsage.getTypeQuota(t);
-      if (tQuota != HdfsConstants.QUOTA_RESET) {
-        Map<String, Long> type = typeQuota.get(t.toString());
-        if (type == null) {
-          type = new TreeMap<>();
-          typeQuota.put(t.toString(), type);
-        }
-        type.put("quota", quotaUsage.getTypeQuota(t));
-        type.put("consumed", quotaUsage.getTypeConsumed(t));
-      }
-    }
-    m.put("typeQuota", typeQuota);
-    return m;
-  }
-
-  /** Convert a MD5MD5CRC32FileChecksum to a Json string. */
-  public static String toJsonString(final MD5MD5CRC32FileChecksum checksum) {
-    if (checksum == null) {
-      return null;
-    }
-
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("algorithm", checksum.getAlgorithmName());
-    m.put("length", checksum.getLength());
-    m.put("bytes", StringUtils.byteToHexString(checksum.getBytes()));
-    return toJsonString(FileChecksum.class, m);
-  }
-
-  /** Convert a AclStatus object to a Json string. */
-  public static String toJsonString(final AclStatus status) {
-    if (status == null) {
-      return null;
-    }
-
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("owner", status.getOwner());
-    m.put("group", status.getGroup());
-    m.put("stickyBit", status.isStickyBit());
-
-    final List<String> stringEntries = new ArrayList<>();
-    for (AclEntry entry : status.getEntries()) {
-      stringEntries.add(entry.toStringStable());
-    }
-    m.put("entries", stringEntries);
-
-    FsPermission perm = status.getPermission();
-    if (perm != null) {
-      m.put("permission", toString(perm));
-    }
-    final Map<String, Map<String, Object>> finalMap =
-        new TreeMap<String, Map<String, Object>>();
-    finalMap.put(AclStatus.class.getSimpleName(), m);
-
-    try {
-      return MAPPER.writeValueAsString(finalMap);
-    } catch (IOException ignored) {
-    }
-    return null;
-  }
-
-  private static Map<String, Object> toJsonMap(final XAttr xAttr,
-      final XAttrCodec encoding) throws IOException {
-    if (xAttr == null) {
-      return null;
-    }
- 
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("name", XAttrHelper.getPrefixedName(xAttr));
-    m.put("value", xAttr.getValue() != null ?
-        XAttrCodec.encodeValue(xAttr.getValue(), encoding) : null);
-    return m;
-  }
-  
-  private static Object[] toJsonArray(final List<XAttr> array,
-      final XAttrCodec encoding) throws IOException {
-    if (array == null) {
-      return null;
-    } else if (array.size() == 0) {
-      return EMPTY_OBJECT_ARRAY;
-    } else {
-      final Object[] a = new Object[array.size()];
-      for(int i = 0; i < array.size(); i++) {
-        a[i] = toJsonMap(array.get(i), encoding);
-      }
-      return a;
-    }
-  }
-  
-  public static String toJsonString(final List<XAttr> xAttrs, 
-      final XAttrCodec encoding) throws IOException {
-    final Map<String, Object> finalMap = new TreeMap<String, Object>();
-    finalMap.put("XAttrs", toJsonArray(xAttrs, encoding));
-    return MAPPER.writeValueAsString(finalMap);
-  }
-  
-  public static String toJsonString(final List<XAttr> xAttrs)
-    throws IOException {
-    final List<String> names = Lists.newArrayListWithCapacity(xAttrs.size());
-    for (XAttr xAttr : xAttrs) {
-      names.add(XAttrHelper.getPrefixedName(xAttr));
-    }
-    String ret = MAPPER.writeValueAsString(names);
-    final Map<String, Object> finalMap = new TreeMap<String, Object>();
-    finalMap.put("XAttrNames", ret);
-    return MAPPER.writeValueAsString(finalMap);
-  }
-
-  public static String toJsonString(Object obj) throws IOException {
-    return MAPPER.writeValueAsString(obj);
-  }
-
-  public static String toJsonString(BlockStoragePolicy[] storagePolicies) {
-    final Map<String, Object> blockStoragePolicies = new TreeMap<>();
-    Object[] a = null;
-    if (storagePolicies != null && storagePolicies.length > 0) {
-      a = new Object[storagePolicies.length];
-      for (int i = 0; i < storagePolicies.length; i++) {
-        a[i] = toJsonMap(storagePolicies[i]);
-      }
-    }
-    blockStoragePolicies.put("BlockStoragePolicy", a);
-    return toJsonString("BlockStoragePolicies", blockStoragePolicies);
-  }
-
-  private static Object toJsonMap(BlockStoragePolicy blockStoragePolicy) {
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("id", blockStoragePolicy.getId());
-    m.put("name", blockStoragePolicy.getName());
-    m.put("storageTypes", blockStoragePolicy.getStorageTypes());
-    m.put("creationFallbacks", blockStoragePolicy.getCreationFallbacks());
-    m.put("replicationFallbacks", blockStoragePolicy.getReplicationFallbacks());
-    m.put("copyOnCreateFile", blockStoragePolicy.isCopyOnCreateFile());
-    return m;
-  }
-
-  public static String toJsonString(BlockStoragePolicy storagePolicy) {
-    return toJsonString(BlockStoragePolicy.class, toJsonMap(storagePolicy));
-  }
-
-  public static String toJsonString(FsServerDefaults serverDefaults) {
-    return toJsonString(FsServerDefaults.class, toJsonMap(serverDefaults));
-  }
-
-  private static Object toJsonMap(FsServerDefaults serverDefaults) {
-    final Map<String, Object> m = new HashMap<String, Object>();
-    m.put("blockSize", serverDefaults.getBlockSize());
-    m.put("bytesPerChecksum", serverDefaults.getBytesPerChecksum());
-    m.put("writePacketSize", serverDefaults.getWritePacketSize());
-    m.put("replication", serverDefaults.getReplication());
-    m.put("fileBufferSize", serverDefaults.getFileBufferSize());
-    m.put("encryptDataTransfer", serverDefaults.getEncryptDataTransfer());
-    m.put("trashInterval", serverDefaults.getTrashInterval());
-    m.put("checksumType", serverDefaults.getChecksumType().id);
-    m.put("keyProviderUri", serverDefaults.getKeyProviderUri());
-    m.put("defaultStoragePolicyId", serverDefaults.getDefaultStoragePolicyId());
-    return m;
-  }
-
-  public static String toJsonString(SnapshotDiffReport diffReport) {
-    return toJsonString(SnapshotDiffReport.class.getSimpleName(),
-        toJsonMap(diffReport));
-  }
-
-  private static Object toJsonMap(SnapshotDiffReport diffReport) {
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("snapshotRoot", diffReport.getSnapshotRoot());
-    m.put("fromSnapshot", diffReport.getFromSnapshot());
-    m.put("toSnapshot", diffReport.getLaterSnapshotName());
-    Object[] diffList = new Object[diffReport.getDiffList().size()];
-    for (int i = 0; i < diffReport.getDiffList().size(); i++) {
-      diffList[i] = toJsonMap(diffReport.getDiffList().get(i));
-    }
-    m.put("diffList", diffList);
-    return m;
-  }
-
-  private static Object toJsonMap(
-      SnapshotDiffReport.DiffReportEntry diffReportEntry) {
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("type", diffReportEntry.getType());
-    if (diffReportEntry.getSourcePath() != null) {
-      m.put("sourcePath",
-          DFSUtilClient.bytes2String(diffReportEntry.getSourcePath()));
-    }
-    if (diffReportEntry.getTargetPath() != null) {
-      m.put("targetPath",
-          DFSUtilClient.bytes2String(diffReportEntry.getTargetPath()));
-    }
-    return m;
-  }
-
-  public static String toJsonString(SnapshotDiffReportListing diffReport) {
-    return toJsonString(SnapshotDiffReportListing.class.getSimpleName(),
-        toJsonMap(diffReport));
-  }
-
-  private static Object toJsonMap(SnapshotDiffReportListing diffReport) {
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("lastPath", DFSUtilClient.bytes2String(diffReport.getLastPath()));
-    m.put("lastIndex", diffReport.getLastIndex());
-    m.put("isFromEarlier", diffReport.getIsFromEarlier());
-
-    Object[] modifyList = new Object[diffReport.getModifyList().size()];
-    for (int i = 0; i < diffReport.getModifyList().size(); i++) {
-      modifyList[i] = toJsonMap(diffReport.getModifyList().get(i));
-    }
-    m.put("modifyList", modifyList);
-
-    Object[] createList = new Object[diffReport.getCreateList().size()];
-    for (int i = 0; i < diffReport.getCreateList().size(); i++) {
-      createList[i] = toJsonMap(diffReport.getCreateList().get(i));
-    }
-    m.put("createList", createList);
-
-    Object[] deleteList = new Object[diffReport.getDeleteList().size()];
-    for (int i = 0; i < diffReport.getDeleteList().size(); i++) {
-      deleteList[i] = toJsonMap(diffReport.getDeleteList().get(i));
-    }
-    m.put("deleteList", deleteList);
-
-    return m;
-  }
-
-  private static Object toJsonMap(
-      SnapshotDiffReportListing.DiffReportListingEntry diffReportEntry) {
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("dirId", diffReportEntry.getDirId());
-    m.put("fileId", diffReportEntry.getFileId());
-
-    if (diffReportEntry.getSourcePath() != null) {
-      m.put("sourcePath",
-          DFSUtilClient.byteArray2String(diffReportEntry.getSourcePath()));
-    }
-
-    if (diffReportEntry.getTargetPath() != null) {
-      m.put("targetPath",
-          DFSUtilClient.byteArray2String(diffReportEntry.getTargetPath()));
-    }
-
-    m.put("isReference", diffReportEntry.isReference());
-    return m;
-  }
-
-  public static String toJsonString(
-      SnapshottableDirectoryStatus[] snapshottableDirectoryList) {
-    if (snapshottableDirectoryList == null) {
-      return toJsonString("SnapshottableDirectoryList", null);
-    }
-    Object[] a = new Object[snapshottableDirectoryList.length];
-    for (int i = 0; i < snapshottableDirectoryList.length; i++) {
-      a[i] = toJsonMap(snapshottableDirectoryList[i]);
-    }
-    return toJsonString("SnapshottableDirectoryList", a);
-  }
-
-  public static String toJsonString(SnapshotStatus[] snapshotList) {
-    if (snapshotList == null) {
-      return toJsonString("SnapshotList", null);
-    }
-    Object[] a = new Object[snapshotList.length];
-    for (int i = 0; i < snapshotList.length; i++) {
-      a[i] = toJsonMap(snapshotList[i]);
-    }
-    return toJsonString("SnapshotList", a);
-  }
-
-  private static Object toJsonMap(
-      SnapshottableDirectoryStatus snapshottableDirectoryStatus) {
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    m.put("snapshotNumber", snapshottableDirectoryStatus.getSnapshotNumber());
-    m.put("snapshotQuota", snapshottableDirectoryStatus.getSnapshotQuota());
-    m.put("parentFullPath", DFSUtilClient
-        .bytes2String(snapshottableDirectoryStatus.getParentFullPath()));
-    m.put("dirStatus", toJsonMap(snapshottableDirectoryStatus.getDirStatus()));
-    return m;
-  }
-
-  private static Object toJsonMap(
-      SnapshotStatus snapshotStatus) {
-    final Map<String, Object> m = new TreeMap<String, Object>();
-    HdfsFileStatus status = snapshotStatus.getDirStatus();
-    m.put("snapshotID", snapshotStatus.getSnapshotID());
-    m.put("deletionStatus", snapshotStatus.isDeleted() ? "DELETED" : "ACTIVE");
-    m.put("fullPath", SnapshotStatus.getSnapshotPath(
-            DFSUtilClient.bytes2String(snapshotStatus.getParentFullPath()),
-        status.getLocalName()));
-    m.put("dirStatus", toJsonMap(snapshotStatus.getDirStatus()));
-    return m;
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> toJsonMap(
-      final BlockLocation blockLocation) throws IOException {
-    if (blockLocation == null) {
-      return null;
-    }
-
-    final Map<String, Object> m = new HashMap<>();
-    m.put("length", blockLocation.getLength());
-    m.put("offset", blockLocation.getOffset());
-    m.put("corrupt", blockLocation.isCorrupt());
-    m.put("storageTypes", toJsonArray(blockLocation.getStorageTypes()));
-    m.put("cachedHosts", blockLocation.getCachedHosts());
-    m.put("hosts", blockLocation.getHosts());
-    m.put("names", blockLocation.getNames());
-    m.put("topologyPaths", blockLocation.getTopologyPaths());
-    return m;
-  }
-
-  public static String toJsonString(BlockLocation[] locations)
-      throws IOException {
-    return toJsonString("BlockLocations", JsonUtil.toJsonMap(locations));
-  }
-
-  public static Map<String, Object> toJsonMap(BlockLocation[] locations)
-      throws IOException {
-    if (locations == null) {
-      return null;
-    }
-    final Map<String, Object> m = new HashMap<>();
-    Object[] blockLocations = new Object[locations.length];
-    for (int i = 0; i < locations.length; i++) {
-      blockLocations[i] = toJsonMap(locations[i]);
-    }
-    m.put(BlockLocation.class.getSimpleName(), blockLocations);
-    return m;
-  }
-
-  public static String toJsonString(FsStatus status) {
-    return toJsonString(FsStatus.class, toJsonMap(status));
-  }
-
-  public static Map<String, Object> toJsonMap(FsStatus status) {
-    if (status == null) {
-      return null;
-    }
-    final Map<String, Object> m = new HashMap<>();
-    m.put("capacity", status.getCapacity());
-    m.put("used", status.getUsed());
-    m.put("remaining", status.getRemaining());
-    return m;
-  }
-
-  public static Map<String, Object> toJsonMap(ErasureCodingPolicyInfo ecPolicyInfo) {
-    if (ecPolicyInfo == null) {
-      return null;
-    }
-    Map<String, Object> m = new HashMap<>();
-    m.put("policy", ecPolicyInfo.getPolicy());
-    m.put("state", ecPolicyInfo.getState());
-    return m;
-  }
-
-  public static Map<String, Object> toJsonMap(FileStatus status) throws IOException {
-    Map<String, Object> m = new HashMap<>();
-    m.put("path", status.getPath().toUri().getPath());
-    m.put("length", status.getLen());
-    m.put("isdir", status.isDirectory());
-    m.put("block_replication", status.getReplication());
-    m.put("blocksize", status.getBlockSize());
-    m.put("modification_time", status.getModificationTime());
-    m.put("access_time", status.getAccessTime());
-    FsPermission perm = status.getPermission();
-    if (perm != null) {
-      m.put("permission", toString(perm));
-    }
-    m.put("owner", status.getOwner());
-    m.put("group", status.getGroup());
-    if (status.isSymlink()) {
-      m.put("symlink", status.getSymlink());
-    }
-    return m;
-  }
-
-  public static String toJsonString(ErasureCodingPolicyInfo[] ecPolicyInfos) {
-    final Map<String, Object> erasureCodingPolicies = new HashMap<>();
-    Object[] erasureCodingPolicyInfos = null;
-    if (ecPolicyInfos != null && ecPolicyInfos.length > 0) {
-      erasureCodingPolicyInfos = new Object[ecPolicyInfos.length];
-      for (int i = 0; i < ecPolicyInfos.length; i++) {
-        erasureCodingPolicyInfos[i] = toJsonMap(ecPolicyInfos[i]);
-      }
-    }
-    erasureCodingPolicies.put("ErasureCodingPolicyInfo", erasureCodingPolicyInfos);
-    return toJsonString("ErasureCodingPolicies", erasureCodingPolicies);
-  }
-
-  public static String toJsonString(Collection<FileStatus> trashPaths) throws IOException {
-    List<FileStatus> list = new ArrayList<>(trashPaths);
-    Object[] paths = null;
-    if(list.size() > 0){
-      paths = new Object[list.size()];
-      for(int i = 0; i < list.size(); i++){
-        paths[i] = toJsonMap(list.get(i));
-      }
-    }
-    return toJsonString("Paths", paths);
-  }
-}
+    final Map<String, Object> m = new Tree

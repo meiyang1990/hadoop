@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -13,5 +14,9 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
+ */
+
+/**
+ * YARN联邦功能工具包，提供YARN联邦架构通用工具类，支撑联邦核心流程的公共操作。
  */
 package org.apache.hadoop.yarn.server.federation.utils;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,26 +28,45 @@ import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
+/**
+ * YARN Web REST API 容器列表信息数据访问对象，用于序列化/反序列化所有容器信息
+ */
 @Public
 @Evolving
 @XmlRootElement(name = "containers")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ContainersInfo {
 
+  // 存储单个容器信息的列表
   protected ArrayList<ContainerInfo> container = new ArrayList<ContainerInfo>();
 
+  /**
+   * 默认构造函数，供JAXB序列化使用
+   */
   public ContainersInfo() {
     // JAXB needs this
   }
 
+  /**
+   * 添加单个容器信息到列表
+   * @param containerInfo 单个容器信息对象
+   */
   public void add(ContainerInfo containerInfo) {
     container.add(containerInfo);
   }
 
+  /**
+   * 获取所有容器信息列表
+   * @return 容器信息对象列表
+   */
   public ArrayList<ContainerInfo> getContainers() {
     return container;
   }
 
+  /**
+   * 批量添加多个容器信息到列表
+   * @param containersInfo 多个容器信息集合
+   */
   public void addAll(Collection<ContainerInfo> containersInfo) {
     container.addAll(containersInfo);
   }

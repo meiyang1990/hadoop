@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,22 +22,34 @@ package org.apache.hadoop.yarn.server.federation.store.exception;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
- * Exception thrown by the {@code FederationStateStore}, if it is a retriable
- * exception.
+ * YARN联邦状态存储可重试异常，由FederationStateStore在抛出可重试操作失败时抛出。
  *
  */
 public class FederationStateStoreRetriableException extends YarnException {
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 使用异常原因构造可重试异常。
+   * @param cause 原始异常原因
+   */
   public FederationStateStoreRetriableException(Throwable cause) {
     super(cause);
   }
 
+  /**
+   * 使用错误信息构造可重试异常。
+   * @param message 错误描述信息
+   */
   public FederationStateStoreRetriableException(String message) {
     super(message);
   }
 
+  /**
+   * 使用错误信息和原始异常构造可重试异常。
+   * @param message 错误描述信息
+   * @param cause 原始异常原因
+   */
   public FederationStateStoreRetriableException(String message,
       Throwable cause) {
     super(message, cause);

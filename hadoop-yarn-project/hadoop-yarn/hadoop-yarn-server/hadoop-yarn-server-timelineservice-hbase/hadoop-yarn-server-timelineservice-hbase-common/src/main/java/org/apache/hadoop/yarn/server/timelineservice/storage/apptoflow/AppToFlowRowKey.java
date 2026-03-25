@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,13 +22,17 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.AppIdKeyConv
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.KeyConverter;
 
 /**
- * Represents a row key for the app_flow table, which is the app id.
+ * app_flow 表行键封装类，存储应用ID作为行键，用于HBase存储中应用到流关系的映射。
  */
 public class AppToFlowRowKey {
   private final String appId;
   private final KeyConverter<String> appIdKeyConverter =
       new AppIdKeyConverter();
 
+  /**
+   * 构造方法，根据应用ID创建行键对象。
+   * @param appId 应用ID
+   */
   public AppToFlowRowKey(String appId) {
     this.appId = appId;
   }
@@ -37,19 +42,19 @@ public class AppToFlowRowKey {
   }
 
   /**
-   * Constructs a row key prefix for the app_flow table.
+   * 构造 app_flow 表的完整行键字节数组。
    *
-   * @return byte array with the row key
+   * @return 序列化后的行键字节数组
    */
   public  byte[] getRowKey() {
     return appIdKeyConverter.encode(appId);
   }
 
   /**
-   * Given the raw row key as bytes, returns the row key as an object.
+   * 从字节数组反序列化解析出AppToFlowRowKey对象。
    *
-   * @param rowKey a rowkey represented as a byte array.
-   * @return an <cite>AppToFlowRowKey</cite> object.
+   * @param rowKey 行键字节数组
+   * @return 解析后的AppToFlowRowKey对象
    */
   public static AppToFlowRowKey parseRowKey(byte[] rowKey) {
     String appId = new AppIdKeyConverter().decode(rowKey);

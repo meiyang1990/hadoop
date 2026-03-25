@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,10 @@
 
 package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
+/**
+ * KillJob RPC响应接口，是MapReduce客户端向ApplicationMaster发送终止作业请求后的响应协议
+ * 定义了终止作业响应的协议结构，用于客户端和服务端之间的RPC通信
+ */
 public interface KillJobResponse {
 
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -18,8 +19,14 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.monitor;
 
+/**
+ * 容器监控事件类型枚举，定义了NodeManager容器监控模块支持的所有事件类型
+ */
 public enum ContainersMonitorEventType {
+  /** 开始监控指定容器 */
   START_MONITORING_CONTAINER,
+  /** 停止监控指定容器 */
   STOP_MONITORING_CONTAINER,
+  /** 更新容器监控的资源配置 */
   CHANGE_MONITORING_CONTAINER_RESOURCE
 }

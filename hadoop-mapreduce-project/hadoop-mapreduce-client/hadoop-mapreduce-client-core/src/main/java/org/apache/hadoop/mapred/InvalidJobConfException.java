@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This exception is thrown when jobconf misses some mendatory attributes
- * or value of some attributes is invalid. 
+ * 作业配置异常类，当作业配置缺少必填属性或属性值非法时抛出此异常
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -34,18 +34,34 @@ public class InvalidJobConfException
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造一个空的InvalidJobConfException异常对象
+   */
   public InvalidJobConfException() {
     super();
   }
 
+  /**
+   * 构造带指定错误消息的InvalidJobConfException异常对象
+   * @param msg 错误消息
+   */
   public InvalidJobConfException(String msg) {
     super(msg);
   }
   
+  /**
+   * 构造带指定错误消息和根异常的InvalidJobConfException异常对象
+   * @param msg 错误消息
+   * @param t 根异常
+   */
   public InvalidJobConfException(String msg, Throwable t) {
     super(msg, t);
   }
 
+  /**
+   * 构造包装指定根异常的InvalidJobConfException异常对象
+   * @param t 根异常
+   */
   public InvalidJobConfException(Throwable t) {
     super(t);
   }

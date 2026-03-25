@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,23 +25,24 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Collects the <code>&lt;key, value&gt;</code> pairs output by {@link Mapper}s
- * and {@link Reducer}s.
- *  
- * <p><code>OutputCollector</code> is the generalization of the facility 
- * provided by the Map-Reduce framework to collect data output by either the 
- * <code>Mapper</code> or the <code>Reducer</code> i.e. intermediate outputs 
- * or the output of the job.</p>  
+ * MapReduce旧版API中，用于收集Mapper和Reducer输出键值对的收集器接口
+ * 
+ * <p>OutputCollector封装了MapReduce框架提供的数据收集能力，可用于收集Mapper的中间输出
+ * 、Reducer的最终作业输出，是MapReduce任务输出数据的统一入口</p>
+ * 
+ * @param <K> 输出键的类型
+ * @param <V> 输出值的类型
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface OutputCollector<K, V> {
   
-  /** Adds a key/value pair to the output.
+  /**
+   * 将一个键值对添加到输出中
    *
-   * @param key the key to collect.
-   * @param value to value to collect.
-   * @throws IOException
+   * @param key 待收集的输出键
+   * @param value 待收集的输出值
+   * @throws IOException 输出过程中发生IO异常时抛出
    */
   void collect(K key, V value) throws IOException;
 }

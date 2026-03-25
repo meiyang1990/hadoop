@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,8 +39,8 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.apache.hadoop.util.StringInterner;
 
 /**
- * An {@link InputSplit} that tags another InputSplit with extra data for use
- * by {@link DelegatingInputFormat}s and {@link DelegatingMapper}s.
+ * 为DelegatingInputFormat和DelegatingMapper设计的包装类，给原始InputSplit添加额外标签信息
+ * 用于在多输入格式作业中，为每个分片绑定对应的输入格式和Mapper类
  */
 class TaggedInputSplit extends InputSplit implements Configurable, Writable {
 
@@ -55,17 +56,20 @@ class TaggedInputSplit extends InputSplit implements Configurable, Writable {
 
   private Configuration conf;
 
+  /**
+   * 默认构造方法，用于反序列化
+   */
   public TaggedInputSplit() {
     // Default constructor.
   }
 
   /**
-   * Creates a new TaggedInputSplit.
+   * 创建带标签的InputSplit包装对象
    * 
-   * @param inputSplit The InputSplit to be tagged
-   * @param conf The configuration to use
-   * @param inputFormatClass The InputFormat class to use for this job
-   * @param mapperClass The Mapper class to use for this job
+   * @param inputSplit 待包装的原始InputSplit
+   * @param conf 作业配置对象
+   * @param inputFormatClass 该分片对应的InputFormat类
+   * @param mapperClass 该分片对应的Mapper类
    */
   @SuppressWarnings("unchecked")
   public TaggedInputSplit(InputSplit inputSplit, Configuration conf,
@@ -79,18 +83,18 @@ class TaggedInputSplit extends InputSplit implements Configurable, Writable {
   }
 
   /**
-   * Retrieves the original InputSplit.
+   * 获取被包装的原始InputSplit
    * 
-   * @return The InputSplit that was tagged
+   * @return 原始未包装的InputSplit
    */
   public InputSplit getInputSplit() {
     return inputSplit;
   }
 
   /**
-   * Retrieves the InputFormat class to use for this split.
+   * 获取当前分片对应的InputFormat类
    * 
-   * @return The InputFormat class to use
+   * @return InputFormat类对象
    */
   @SuppressWarnings("unchecked")
   public Class<? extends InputFormat> getInputFormatClass() {
@@ -98,39 +102,58 @@ class TaggedInputSplit extends InputSplit implements Configurable, Writable {
   }
 
   /**
-   * Retrieves the Mapper class to use for this split.
+   * 获取当前分片对应的Mapper类
    * 
-   * @return The Mapper class to use
+   * @return Mapper类对象
    */
   @SuppressWarnings("unchecked")
   public Class<? extends Mapper> getMapperClass() {
     return mapperClass;
   }
 
+  @Override
   public long getLength() throws IOException, InterruptedException {
+    // 委托给原始InputSplit计算分片大小
     return inputSplit.getLength();
   }
 
+  @Override
   public String[] getLocations() throws IOException, InterruptedException {
+    // 委托给原始InputSplit获取分片所在节点位置
     return inputSplit.getLocations();
   }
 
   @SuppressWarnings("unchecked")
+  @Override
   public void readFields(DataInput in) throws IOException {
+    // 读取原始InputSplit类信息
     inputSplitClass = (Class<? extends InputSplit>) readClass(in);
+    // 读取InputFormat类信息
     inputFormatClass = (Class<? extends InputFormat<?, ?>>) readClass(in);
+    // 读取Mapper类信息
     mapperClass = (Class<? extends Mapper<?, ?, ?, ?>>) readClass(in);
+    // 通过反射实例化原始InputSplit对象
     inputSplit = (InputSplit) ReflectionUtils
        .newInstance(inputSplitClass, conf);
+    // 创建序列化工厂，获取对应反序列化器
     SerializationFactory factory = new SerializationFactory(conf);
     Deserializer deserializer = factory.getDeserializer(inputSplitClass);
+    // 打开输入流反序列化原始InputSplit
     deserializer.open((DataInputStream)in);
     inputSplit = (InputSplit)deserializer.deserialize(inputSplit);
   }
 
+  /**
+   * 从输入流中读取类名并加载类对象
+   * @param in 输入流
+   * @return 加载完成的类对象
+   * @throws IOException 读取IO异常或类找不到异常
+   */
   private Class<?> readClass(DataInput in) throws IOException {
+    // 读取类名字符串，使用弱引用驻留字符串减少内存占用
     String className = StringInterner.weakIntern(Text.readString(in));
     try {
+      // 从配置中加载对应类
       return conf.getClassByName(className);
     } catch (ClassNotFoundException e) {
       throw new RuntimeException("readObject can't find class", e);
@@ -138,27 +161,36 @@ class TaggedInputSplit extends InputSplit implements Configurable, Writable {
   }
 
   @SuppressWarnings("unchecked")
+  @Override
   public void write(DataOutput out) throws IOException {
+    // 写入原始InputSplit类名
     Text.writeString(out, inputSplitClass.getName());
+    // 写入InputFormat类名
     Text.writeString(out, inputFormatClass.getName());
+    // 写入Mapper类名
     Text.writeString(out, mapperClass.getName());
+    // 创建序列化工厂，获取对应序列化器
     SerializationFactory factory = new SerializationFactory(conf);
     Serializer serializer = 
           factory.getSerializer(inputSplitClass);
+    // 打开输出流序列化原始InputSplit
     serializer.open((DataOutputStream)out);
     serializer.serialize(inputSplit);
   }
 
+  @Override
   public Configuration getConf() {
     return conf;
   }
 
+  @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
   }
 
   @Override
   public String toString() {
+    // 直接返回原始InputSplit的字符串表示
     return inputSplit.toString();
   }
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,23 +38,35 @@ import org.slf4j.LoggerFactory;
  * This agent does not account for locality and only consider container
  * granularity for validation purposes (i.e., you can't exceed max-container
  * size).
+ * YARN资源预留贪心调度代理，采用贪心策略在集群上为预留任务分配资源
+ * 策略逻辑：从截止日期倒推开始时间分配资源，支持优先早时段或优先晚时段分配
+ * 不考虑数据位置亲和性，仅容器粒度做容量校验
  */
 
 public class GreedyReservationAgent implements ReservationAgent {
 
-  // Log
+  // 日志实例
   private static final Logger LOG = LoggerFactory
       .getLogger(GreedyReservationAgent.class);
 
-  // Greedy planner
+  // 实际执行规划的代理实例
   private ReservationAgent planner;
+  // 是否优先分配早时段资源
   private boolean allocateLeft;
 
+  /**
+   * 空构造函数
+   */
   public GreedyReservationAgent() {
   }
 
   @Override
+  /**
+   * 初始化贪心代理，读取配置并初始化底层规划器
+   * @param conf 配置对象
+   */
   public void init(Configuration conf) {
+    // 读取配置获取优先分配方向
     allocateLeft = conf.getBoolean(FAVOR_EARLY_ALLOCATION,
         DEFAULT_GREEDY_FAVOR_EARLY_ALLOCATION);
     if (allocateLeft) {
@@ -66,24 +79,41 @@ public class GreedyReservationAgent implements ReservationAgent {
           + FAVOR_EARLY_ALLOCATION + ")");
     }
 
+    // 初始化迭代规划器，使用贪心RLE分配算法，不约束执行区间
     planner =
         new IterativePlanner(new StageExecutionIntervalUnconstrained(),
             new StageAllocatorGreedyRLE(allocateLeft), allocateLeft);
   }
 
+  /**
+   * 获取是否优先分配早时段资源
+   * @return 优先早时段返回true，否则返回false
+   */
   public boolean isAllocateLeft(){
     return allocateLeft;
   }
+
   @Override
+  /**
+   * 创建新的资源预留
+   * @param reservationId 预留ID
+   * @param user 提交用户
+   * @param plan 资源规划对象
+   * @param contract 预留定义
+   * @return 创建成功返回true，失败返回false
+   * @throws PlanningException 规划过程异常
+   */
   public boolean createReservation(ReservationId reservationId, String user,
       Plan plan, ReservationDefinition contract) throws PlanningException {
 
     LOG.info("placing the following ReservationRequest: " + contract);
 
     try {
+      // 委托底层规划器执行创建
       boolean res =
           planner.createReservation(reservationId, user, plan, contract);
 
+      // 记录执行结果日志
       if (res) {
         LOG.info("OUTCOME: SUCCESS, Reservation ID: "
             + reservationId.toString() + ", Contract: " + contract.toString());
@@ -101,6 +131,15 @@ public class GreedyReservationAgent implements ReservationAgent {
   }
 
   @Override
+  /**
+   * 更新已有资源预留
+   * @param reservationId 预留ID
+   * @param user 提交用户
+   * @param plan 资源规划对象
+   * @param contract 更新后的预留定义
+   * @return 更新成功返回true，失败返回false
+   * @throws PlanningException 规划过程异常
+   */
   public boolean updateReservation(ReservationId reservationId, String user,
       Plan plan, ReservationDefinition contract) throws PlanningException {
 
@@ -111,6 +150,14 @@ public class GreedyReservationAgent implements ReservationAgent {
   }
 
   @Override
+  /**
+   * 删除已有资源预留
+   * @param reservationId 预留ID
+   * @param user 提交用户
+   * @param plan 资源规划对象
+   * @return 删除成功返回true，失败返回false
+   * @throws PlanningException 规划过程异常
+   */
   public boolean deleteReservation(ReservationId reservationId, String user,
       Plan plan) throws PlanningException {
 

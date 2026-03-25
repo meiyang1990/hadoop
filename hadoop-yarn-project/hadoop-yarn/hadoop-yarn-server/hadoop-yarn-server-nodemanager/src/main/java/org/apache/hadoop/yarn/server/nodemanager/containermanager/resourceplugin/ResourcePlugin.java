@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,78 +29,67 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.
 import org.apache.hadoop.yarn.server.nodemanager.webapp.dao.NMResourceInfo;
 
 /**
- * {@link ResourcePlugin} is an interface for node manager to easier support
- * discovery/manage/isolation for new resource types.
+ * ResourcePlugin 是NodeManager的扩展资源插件接口，
+ * 用于方便接入新资源类型，实现新资源的发现、管理和隔离能力。
  *
  * <p>
- * It has two major part: {@link ResourcePlugin#createResourceHandler(Context,
- * CGroupsHandler, PrivilegedOperationExecutor)} and
- * {@link ResourcePlugin#getNodeResourceHandlerInstance()}, see javadocs below
- * for more details.
+ * 插件主要包含两大核心部分：{@link ResourcePlugin#createResourceHandler(Context,
+ * CGroupsHandler, PrivilegedOperationExecutor)} 创建资源隔离处理器
+ * 和 {@link ResourcePlugin#getNodeResourceHandlerInstance()} 获取资源发现更新处理器，
+ * 详见各方法的javadoc说明。
  * </p>
  */
 public interface ResourcePlugin {
   /**
-   * Initialize the plugin, this will be invoked during NM startup.
-   * @param context NM Context
-   * @throws YarnException when any issue occurs
+   * 初始化插件，在NodeManager启动阶段调用。
+   * @param context NodeManager上下文对象
+   * @throws YarnException 初始化发生错误时抛出
    */
   void initialize(Context context) throws YarnException;
 
   /**
-   * Plugin needs to return {@link ResourceHandler} when any special isolation
-   * required for the resource type. This will be added to
-   * {@link ResourceHandlerChain} during NodeManager startup. When no special
-   * isolation need, return null.
+   * 创建资源隔离处理器，如果该资源类型需要特殊的资源隔离逻辑，需要返回实现了ResourceHandler的实例，
+   * 该处理器会被添加到ResourceHandlerChain中。如果不需要特殊隔离，返回null即可。
    *
-   * @param nmContext NodeManager context.
-   * @param cGroupsHandler CGroupsHandler
-   * @param privilegedOperationExecutor Privileged Operation Executor.
-   * @return ResourceHandler
+   * @param nmContext NodeManager上下文对象
+   * @param cGroupsHandler CGroups处理器
+   * @param privilegedOperationExecutor 特权操作执行器
+   * @return 资源隔离处理器实例，不需要则返回null
    */
   ResourceHandler createResourceHandler(Context nmContext,
       CGroupsHandler cGroupsHandler,
       PrivilegedOperationExecutor privilegedOperationExecutor);
 
   /**
-   * Plugin needs to return {@link NodeResourceUpdaterPlugin} when any discovery
-   * mechanism required for the resource type. For example, if we want to set
-   * resource-value during NM registration or send update during NM-RM heartbeat
-   * We can implement a {@link NodeResourceUpdaterPlugin} and update fields of
-   * {@link org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatRequest}
-   * or {@link org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequest}
+   * 获取节点资源更新插件，如果该资源类型需要动态发现资源量，并上报给ResourceManager，
+   * 需要返回NodeResourceUpdaterPlugin实例。比如在NodeManager注册时设置资源量、
+   * 或在心跳中更新资源量，都可以通过实现该接口来修改注册/心跳请求的资源字段。
    *
-   * This will be invoked during every node status update or node registration,
-   * please avoid creating new instance every time.
+   * 该方法会在每次节点状态更新或节点注册时调用，请不要每次调用都创建新实例。
    *
-   * @return NodeResourceUpdaterPlugin, could be null when no discovery needed.
+   * @return 节点资源更新插件实例，不需要资源发现则返回null
    */
   NodeResourceUpdaterPlugin getNodeResourceHandlerInstance();
 
   /**
-   * Do cleanup of the plugin, this will be invoked when
-   * {@link org.apache.hadoop.yarn.server.nodemanager.NodeManager} stops
-   * @throws YarnException if any issue occurs
+   * 清理插件资源，在NodeManager停止时调用。
+   * @throws YarnException 清理发生错误时抛出
    */
   void cleanup() throws YarnException;
 
   /**
-   * Plugin need to get {@link DockerCommandPlugin}. This will be invoked by
-   * {@link DockerLinuxContainerRuntime} when execute docker commands such as
-   * run/stop/pull, etc.
+   * 获取Docker命令扩展插件，DockerLinuxContainerRuntime在执行docker命令
+   *（如run、stop、pull等）时会调用该方法获取插件实例。
    *
-   * @return DockerCommandPlugin instance. return null if plugin doesn't
-   *         have requirement to update docker command.
+   * @return Docker命令扩展插件实例，如果不需要修改docker命令则返回null
    */
   DockerCommandPlugin getDockerCommandPluginInstance();
 
   /**
-   * Get resource information from this plugin.
+   * 获取当前插件的资源信息，用于Web UI展示。
    *
-   * @return NMResourceInfo, an example is
-   * {@link org.apache.hadoop.yarn.server.nodemanager.webapp.dao.gpu.GpuDeviceInformation}
-   *
-   * @throws YarnException when any issue occurs
+   * @return 资源信息对象，例如GPU设备信息实例
+   * @throws YarnException 获取信息发生错误时抛出
    */
   NMResourceInfo getNMResourceInfo() throws YarnException;
 }

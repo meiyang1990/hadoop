@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,13 +21,16 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
- * This exception is thrown when Application Data size exceeds limit RM state
- * store.
- *
+ * RM状态恢复存储异常，当应用数据大小超过RM状态存储限制时抛出该异常
+ * 用于保护状态存储不会因数据过大导致性能问题或存储溢出
  */
 public class StoreLimitException extends YarnException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造方法，使用指定错误信息创建异常
+   * @param message 错误描述信息
+   */
   public StoreLimitException(String message) {
     super(message);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,52 +31,46 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Keeps the Ranges sorted by startIndex.
- * The added ranges are always ensured to be non-overlapping.
- * Provides the SkipRangeIterator, which skips the Ranges 
- * stored in this object.
+ * 维护按起始索引排序的非重叠索引区间集合，提供跳过这些区间的迭代器，用于MapReduce任务处理中跳过已完成/失败的数据分片
  */
 class SortedRanges implements Writable{
   
   private static final Logger LOG =
       LoggerFactory.getLogger(SortedRanges.class);
   
+  // 使用TreeSet维护排序的区间集合，保证区间按起始索引有序
   private TreeSet<Range> ranges = new TreeSet<Range>();
+  // 所有区间包含的总索引数
   private long indicesCount;
   
   /**
-   * Get Iterator which skips the stored ranges.
-   * The Iterator.next() call return the index starting from 0.
-   * @return SkipRangeIterator
+   * 获取可跳过本集合中存储区间的迭代器，用于遍历非跳过范围的索引
+   * @return 跳过指定区间的迭代器实例
    */
   synchronized SkipRangeIterator skipRangeIterator(){
     return new SkipRangeIterator(ranges.iterator());
   }
   
   /**
-   * Get the no of indices stored in the ranges.
-   * @return indices count
+   * 获取所有区间包含的总索引数
+   * @return 总索引数
    */
   synchronized long getIndicesCount() {
     return indicesCount;
   }
   
   /**
-   * Get the sorted set of ranges.
-   * @return ranges
+   * 获取排序后的区间集合
+   * @return 排序后的区间集合
    */
   synchronized SortedSet<Range> getRanges() {
   	return ranges;
  	}
   
   /**
-   * Add the range indices. It is ensured that the added range 
-   * doesn't overlap the existing ranges. If it overlaps, the 
-   * existing overlapping ranges are removed and a single range 
-   * having the superset of all the removed ranges and this range 
-   * is added. 
-   * If the range is of 0 length, doesn't do anything.
-   * @param range Range to be added.
+   * 添加一个区间，自动合并重叠区间，保证集合中所有区间始终非重叠
+   * 如果区间长度为0则不执行任何操作
+   * @param range 要添加的区间
    */
   synchronized void add(Range range){
     if(range.isEmpty()) {
@@ -84,36 +79,36 @@ class SortedRanges implements Writable{
     
     long startIndex = range.getStartIndex();
     long endIndex = range.getEndIndex();
-    //make sure that there are no overlapping ranges
+    // 获取所有起始索引小于当前区间的子集
     SortedSet<Range> headSet = ranges.headSet(range);
     if(headSet.size()>0) {
+      // 获取最后一个（起始索引最大）的前置区间
       Range previousRange = headSet.last();
       LOG.debug("previousRange "+previousRange);
       if(startIndex<previousRange.getEndIndex()) {
-        //previousRange overlaps this range
-        //remove the previousRange
+        // 前置区间与当前区间重叠，移除前置区间并更新总计数
         if(ranges.remove(previousRange)) {
           indicesCount-=previousRange.getLength();
         }
-        //expand this range
+        // 扩展当前区间覆盖重叠部分
         startIndex = previousRange.getStartIndex();
         endIndex = endIndex>=previousRange.getEndIndex() ?
                           endIndex : previousRange.getEndIndex();
       }
     }
     
+    // 遍历所有起始索引大于等于当前区间的后续区间
     Iterator<Range> tailSetIt = ranges.tailSet(range).iterator();
     while(tailSetIt.hasNext()) {
       Range nextRange = tailSetIt.next();
       LOG.debug("nextRange "+nextRange +"   startIndex:"+startIndex+
           "  endIndex:"+endIndex);
       if(endIndex>=nextRange.getStartIndex()) {
-        //nextRange overlaps this range
-        //remove the nextRange
+        // 后续区间与当前区间重叠，移除后续区间并更新总计数
         tailSetIt.remove();
         indicesCount-=nextRange.getLength();
         if(endIndex<nextRange.getEndIndex()) {
-          //expand this range
+          // 扩展当前区间覆盖重叠部分
           endIndex = nextRange.getEndIndex();
           break;
         }
@@ -121,15 +116,14 @@ class SortedRanges implements Writable{
         break;
       }
     }
+    // 添加合并后的新区间
     add(startIndex,endIndex);
   }
   
   /**
-   * Remove the range indices. If this range is  
-   * found in existing ranges, the existing ranges 
-   * are shrunk.
-   * If range is of 0 length, doesn't do anything.
-   * @param range Range to be removed.
+   * 移除指定区间，分割原有重叠区间，保证集合中区间始终非重叠
+   * 如果区间长度为0则不执行任何操作
+   * @param range 要移除的区间
    */
   synchronized void remove(Range range) {
     if(range.isEmpty()) {
@@ -137,35 +131,37 @@ class SortedRanges implements Writable{
     }
     long startIndex = range.getStartIndex();
     long endIndex = range.getEndIndex();
-    //make sure that there are no overlapping ranges
+    // 获取所有起始索引小于当前区间的子集
     SortedSet<Range> headSet = ranges.headSet(range);
     if(headSet.size()>0) {
       Range previousRange = headSet.last();
       LOG.debug("previousRange "+previousRange);
       if(startIndex<previousRange.getEndIndex()) {
-        //previousRange overlaps this range
-        //narrow down the previousRange
+        // 前置区间与要移除的区间重叠
         if(ranges.remove(previousRange)) {
           indicesCount-=previousRange.getLength();
           LOG.debug("removed previousRange "+previousRange);
         }
+        // 添加移除区间前的剩余部分
         add(previousRange.getStartIndex(), startIndex);
+        // 添加移除区间后的剩余部分
         if(endIndex<=previousRange.getEndIndex()) {
           add(endIndex, previousRange.getEndIndex());
         }
       }
     }
     
+    // 遍历所有起始索引大于等于当前区间的后续区间
     Iterator<Range> tailSetIt = ranges.tailSet(range).iterator();
     while(tailSetIt.hasNext()) {
       Range nextRange = tailSetIt.next();
       LOG.debug("nextRange "+nextRange +"   startIndex:"+startIndex+
           "  endIndex:"+endIndex);
       if(endIndex>nextRange.getStartIndex()) {
-        //nextRange overlaps this range
-        //narrow down the nextRange
+        // 后续区间与要移除的区间重叠
         tailSetIt.remove();
         indicesCount-=nextRange.getLength();
+        // 添加移除区间后的剩余部分
         if(endIndex<nextRange.getEndIndex()) {
           add(endIndex, nextRange.getEndIndex());
           break;
@@ -176,6 +172,9 @@ class SortedRanges implements Writable{
     }
   }
   
+  /**
+   * 内部添加区间方法，维护总索引计数
+   */
   private void add(long start, long end) {
     if(end>start) {
       Range recRange = new Range(start, end-start);
@@ -185,6 +184,9 @@ class SortedRanges implements Writable{
     }
   }
   
+  /**
+   * 反序列化读取区间集合数据
+   */
   public synchronized void readFields(DataInput in) throws IOException {
     indicesCount = in.readLong();
     ranges = new TreeSet<Range>();
@@ -196,6 +198,9 @@ class SortedRanges implements Writable{
     }
   }
 
+  /**
+   * 序列化区间集合数据到输出流
+   */
   public synchronized void write(DataOutput out) throws IOException {
     out.writeLong(indicesCount);
     out.writeInt(ranges.size());
@@ -217,9 +222,8 @@ class SortedRanges implements Writable{
   }
   
   /**
-   * Index Range. Comprises of start index and length.
-   * A Range can be of 0 length also. The Range stores indices 
-   * of type long.
+   * 表示一个长整型索引区间，存储起始索引和长度，支持排序和序列化
+   * 区间遵循左闭右开规则：包含起始索引，不包含结束索引
    */
   static class Range implements Comparable<Range>, Writable{
     private long startIndex;
@@ -238,33 +242,32 @@ class SortedRanges implements Writable{
     }
     
     /**
-     * Get the start index. Start index in inclusive.
-     * @return startIndex. 
+     * 获取区间起始索引（包含）
+     * @return 起始索引
      */
     long getStartIndex() {
       return startIndex;
     }
     
     /**
-     * Get the end index. End index is exclusive.
-     * @return endIndex.
+     * 获取区间结束索引（不包含）
+     * @return 结束索引
      */
     long getEndIndex() {
       return startIndex + length;
     }
     
    /**
-    * Get Length.
-    * @return length
+    * 获取区间长度
+    * @return 区间长度
     */
     long getLength() {
       return length;
     }
     
     /**
-     * Range is empty if its length is zero.
-     * @return <code>true</code> if empty
-     *         <code>false</code> otherwise.
+     * 判断区间是否为空（长度为0）
+     * @return true表示区间为空
      */
     boolean isEmpty() {
       return length==0;
@@ -284,6 +287,9 @@ class SortedRanges implements Writable{
           Long.valueOf(length).hashCode();
     }
     
+    /**
+     * 按起始索引排序，起始索引相同则按长度排序
+     */
     public int compareTo(Range o) {
       // Ensure sgn(x.compareTo(y) == -sgn(y.compareTo(x))
       return this.startIndex < o.startIndex ? -1 :
@@ -308,16 +314,19 @@ class SortedRanges implements Writable{
   }
   
   /**
-   * Index Iterator which skips the stored ranges.
+   * 迭代器实现，遍历索引时自动跳过指定区间集合，用于跳过需要跳过的已处理/失败数据索引
    */
   static class SkipRangeIterator implements Iterator<Long> {
+    // 待跳过区间的迭代器
     Iterator<Range> rangeIterator;
+    // 当前处理的待跳过区间
     Range range = new Range();
+    // 下一个要返回的索引
     long next = -1;
     
     /**
-     * Constructor
-     * @param rangeIterator the iterator which gives the ranges.
+     * 构造跳过区间的迭代器
+     * @param rangeIterator 待跳过区间的迭代器
      */
     SkipRangeIterator(Iterator<Range> rangeIterator) {
       this.rangeIterator = rangeIterator;
@@ -325,17 +334,16 @@ class SortedRanges implements Writable{
     }
     
     /**
-     * Returns true till the index reaches Long.MAX_VALUE.
-     * @return <code>true</code> next index exists.
-     *         <code>false</code> otherwise.
+     * 判断是否还有下一个可用索引
+     * @return true存在下一个索引，false已到达最大索引值
      */
     public synchronized boolean hasNext() {
       return next<Long.MAX_VALUE;
     }
     
     /**
-     * Get the next available index. The index starts from 0.
-     * @return next index
+     * 获取下一个不落在跳过区间中的索引
+     * @return 下一个可用索引
      */
     public synchronized Long next() {
       long ci = next;
@@ -343,20 +351,28 @@ class SortedRanges implements Writable{
       return ci;
     }
     
+    /**
+     * 计算下一个可用索引，自动跳过当前落在跳过区间内的索引
+     */
     private void doNext() {
       next++;
       LOG.debug("currentIndex "+next +"   "+range);
+      // 如果当前索引在当前待跳过区间内，直接跳到区间结束位置
       skipIfInRange();
+      // 当前待跳过区间处理完后，移动到下一个待跳过区间继续处理
       while(next>=range.getEndIndex() && rangeIterator.hasNext()) {
         range = rangeIterator.next();
         skipIfInRange();
       }
     }
     
+    /**
+     * 如果当前索引落在当前待跳过区间内，直接跳到区间结束位置
+     */
     private void skipIfInRange() {
       if(next>=range.getStartIndex() && 
           next<range.getEndIndex()) {
-        //need to skip the range
+        // 需要跳过该区间内的所有索引
         LOG.warn("Skipping index " + next +"-" + range.getEndIndex());
         next = range.getEndIndex();
         
@@ -364,16 +380,15 @@ class SortedRanges implements Writable{
     }
     
     /**
-     * Get whether all the ranges have been skipped.
-     * @return <code>true</code> if all ranges have been skipped.
-     *         <code>false</code> otherwise.
+     * 判断是否已经跳过了所有待跳过区间
+     * @return true所有区间都已跳过，false还有未处理区间
      */
     synchronized boolean skippedAllRanges() {
       return !rangeIterator.hasNext() && next>range.getEndIndex();
     }
     
     /**
-     * Remove is not supported. Doesn't apply.
+     * 不支持移除操作
      */
     public void remove() {
       throw new UnsupportedOperationException("remove not supported.");

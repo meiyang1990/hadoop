@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -15,5 +16,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/** AMRMPRoxy policies. **/
+/**
+ * YARN联邦AMRMProxy路由策略包，提供应用Master到ResourceManager代理请求的路由策略实现。
+ */
 package org.apache.hadoop.yarn.server.federation.policies.amrmproxy;

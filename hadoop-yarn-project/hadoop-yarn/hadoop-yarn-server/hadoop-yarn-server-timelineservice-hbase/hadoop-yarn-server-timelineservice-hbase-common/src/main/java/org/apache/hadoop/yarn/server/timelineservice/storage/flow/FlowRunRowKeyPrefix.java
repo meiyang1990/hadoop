@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,34 +21,30 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.flow;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.RowKeyPrefix;
 
 /**
- * Represents a partial rowkey (without the flowRunId) for the flow run table.
+ * 流运行记录表的前缀行键（不包含流运行ID），用于HBase范围查询
+ * 表示不完整的流运行行键，仅包含前缀部分，用于根据集群、用户、流名称进行范围扫描
  */
 public class FlowRunRowKeyPrefix extends FlowRunRowKey implements
     RowKeyPrefix<FlowRunRowKey> {
 
   /**
-   * Constructs a row key prefix for the flow run table as follows:
-   * {@code clusterId!userI!flowName!}.
+   * 构造流运行表前缀行键，格式为：{@code clusterId!userId!flowName!}
    *
-   * @param clusterId identifying the cluster
-   * @param userId identifying the user
-   * @param flowName identifying the flow
+   * @param clusterId 集群标识
+   * @param userId 用户标识
+   * @param flowName 流名称
    */
   public FlowRunRowKeyPrefix(String clusterId, String userId,
       String flowName) {
     super(clusterId, userId, flowName, null);
   }
 
-  /*
-   * (non-Javadoc)
-   *
-   * @see
-   * org.apache.hadoop.yarn.server.timelineservice.storage.application.
-   * RowKeyPrefix#getRowKeyPrefix()
+  /**
+   * 获取序列化后的前缀行键字节数组
+   * @return 前缀行键字节数组
    */
   public byte[] getRowKeyPrefix() {
-    // We know we're a FlowRunRowKey with null florRunId, so we can simply
-    // delegate
+    // 由于当前实例流运行ID为null，父类生成的行键正好就是前缀，直接委托父类实现即可
     return super.getRowKey();
   }
 

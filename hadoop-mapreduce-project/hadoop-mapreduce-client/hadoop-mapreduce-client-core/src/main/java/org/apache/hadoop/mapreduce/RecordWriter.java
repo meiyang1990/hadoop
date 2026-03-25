@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,11 +26,9 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 
 /**
- * <code>RecordWriter</code> writes the output &lt;key, value&gt; pairs 
- * to an output file.
- 
- * <p><code>RecordWriter</code> implementations write the job outputs to the
- * {@link FileSystem}.
+ * RecordWriter 是MapReduce输出阶段写入<键, 值>对的抽象基类
+ * 
+ * <p>具体实现类负责将作业输出结果写入到文件系统中，是OutputFormat输出的核心执行组件
  * 
  * @see OutputFormat
  */
@@ -37,20 +36,22 @@ import org.apache.hadoop.fs.FileSystem;
 @InterfaceStability.Stable
 public abstract class RecordWriter<K, V> {
   /** 
-   * Writes a key/value pair.
+   * 写入一个键值对到输出
    *
-   * @param key the key to write.
-   * @param value the value to write.
-   * @throws IOException
+   * @param key 待写入的键
+   * @param value 待写入的值
+   * @throws IOException 写入IO异常
+   * @throws InterruptedException 中断异常
    */      
   public abstract void write(K key, V value
                              ) throws IOException, InterruptedException;
 
   /** 
-   * Close this <code>RecordWriter</code> to future operations.
+   * 关闭RecordWriter，释放资源，完成收尾操作
    * 
-   * @param context the context of the task
-   * @throws IOException
+   * @param context 任务尝试上下文对象
+   * @throws IOException 关闭IO异常
+   * @throws InterruptedException 中断异常
    */ 
   public abstract void close(TaskAttemptContext context
                              ) throws IOException, InterruptedException;

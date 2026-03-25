@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,8 +46,8 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.Man
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.ManifestCommitterSupport.maybeAddIOStatistics;
 
 /**
- * Stage to scan a directory tree and build a task manifest.
- * This is executed by the task committer.
+ * 扫描任务尝试输出目录树并构建任务清单文件的处理阶段。
+ * 该阶段由任务提交器在任务执行完成后执行，用于收集所有需要提交的文件和目录信息。
  */
 public final class TaskAttemptScanDirectoryStage
     extends AbstractJobOrTaskStage<Void, TaskManifest> {
@@ -54,30 +55,39 @@ public final class TaskAttemptScanDirectoryStage
   private static final Logger LOG = LoggerFactory.getLogger(
       TaskAttemptScanDirectoryStage.class);
 
+  /**
+   * 构造目录扫描处理阶段实例。
+   * @param stageConfig 阶段配置信息
+   */
   public TaskAttemptScanDirectoryStage(
       final StageConfig stageConfig) {
     super(true, stageConfig, OP_STAGE_TASK_SCAN_DIRECTORY, false);
   }
 
   /**
-   * Build the Manifest.
-   * @return the manifest
-   * @throws IOException failure.
+   * 执行目录扫描并构建任务清单文件。
+   * @param arguments 无输入参数
+   * @return 构建完成的任务清单文件，包含所有需要提交的文件和目录信息
+   * @throws IOException 扫描目录或IO操作失败时抛出
    */
   @Override
   protected TaskManifest executeStage(final Void arguments)
       throws IOException {
 
+    // 获取当前任务尝试的输出目录
     final Path taskAttemptDir = getRequiredTaskAttemptDir();
+    // 创建空任务清单对象
     final TaskManifest manifest = createTaskManifest(getStageConfig());
 
     LOG.info("{}: scanning directory {}",
         getName(), taskAttemptDir);
 
+    // 递归扫描整个目录树，收集文件和目录信息，返回目录最大深度
     final int depth = scanDirectoryTree(manifest,
         taskAttemptDir,
         getDestinationDir(),
         0, true);
+    // 统计已收集文件的基本信息
     List<FileEntry> filesToCommit = manifest.getFilesToCommit();
     LongSummaryStatistics fileSummary = filesToCommit.stream()
         .mapToLong(FileEntry::getSize)
@@ -94,8 +104,7 @@ public final class TaskAttemptScanDirectoryStage
         getName(),
         dirCount,
         depth);
-    // add statistics about the task output which, when aggregated, provides
-    // insight into structure of job, task skew, etc.
+    // 将当前任务输出结构统计信息存入IO统计，聚合后可用于分析作业结构和任务数据倾斜
     IOStatisticsStore iostats = getIOStatistics();
     iostats.addSample(COMMITTER_TASK_DIRECTORY_COUNT_MEAN, dirCount);
     iostats.addSample(COMMITTER_TASK_DIRECTORY_DEPTH_MEAN, depth);
@@ -106,22 +115,16 @@ public final class TaskAttemptScanDirectoryStage
   }
 
   /**
-   * Recursively scan a directory tree.
-   * The manifest will contain all files to rename
-   * (source and dest) and directories to create.
-   * All files are processed before any of the subdirs are.
-   * This helps in statistics gathering.
-   * There's some optimizations which could be done with async
-   * fetching of the iterators of those subdirs, but as this
-   * is generally off-critical path then that "enhancement"
-   * can be postponed until data suggests this needs improvement.
-   * @param manifest manifest to update
-   * @param srcDir dir to scan
-   * @param destDir destination directory
-   * @param depth depth from the task attempt dir.
-   * @param parentDirExists does the parent dir exist?
-   * @return the maximum depth of child directories
-   * @throws IOException IO failure.
+   * 递归扫描目录树，收集所有需要提交的文件和目录信息到任务清单。
+   * 先处理当前目录下的所有文件，再递归处理子目录，便于统计信息收集。
+   * 暂未实现异步迭代获取等优化，因为该阶段不在关键路径上。
+   * @param manifest 用于收集信息的任务清单对象
+   * @param srcDir 当前需要扫描的源目录（任务尝试输出下的目录）
+   * @param destDir 该目录对应的最终输出目标路径
+   * @param depth 当前目录相对于任务尝试根目录的深度
+   * @param parentDirExists 父目录在最终输出路径中是否存在
+   * @return 当前目录树的最大深度
+   * @throws IOException 目录列表或IO操作失败时抛出
    */
   private int scanDirectoryTree(
       TaskManifest manifest,
@@ -130,7 +133,7 @@ public final class TaskAttemptScanDirectoryStage
       int depth,
       boolean parentDirExists) throws IOException {
 
-    // generate some task progress in case directory scanning is very slow.
+    // 目录扫描可能很慢，更新任务进度避免超时
     progress();
 
     int maxDepth = 0;
@@ -141,60 +144,53 @@ public final class TaskAttemptScanDirectoryStage
         "Task Attempt %s source dir %s, dest dir %s",
         getTaskAttemptId(), srcDir, destDir)) {
 
-      // list the directory. This may block until the listing is complete,
-      // or, if the FS does incremental or asynchronous fetching,
-      // then the next()/hasNext() call will block for the results
-      // unless turned off, ABFS does to this async
+      // 获取目录的文件迭代器，不同文件系统可能同步或异步获取列表
       final RemoteIterator<FileStatus> listing = listStatusIterator(srcDir);
 
-      // when the FS (especially ABFS) does an asyn fetch of the listing,
-      // we can probe for the status of the destination dir while that
-      // page is being fetched.
-      // probe for and add the dest dir entry for all but
-      // the base dir
-
+      // 利用异步列表获取的间隙，提前探测目标目录状态
+      // 仅对根目录以外的目录添加目标目录条目
       if (depth > 0) {
         final EntryStatus status;
         if (parentDirExists) {
+          // 探测目标目录是否已存在
           final FileStatus destDirStatus = getFileStatusOrNull(destDir);
           status = EntryStatus.toEntryStatus(destDirStatus);
           dirExists = destDirStatus != null;
         } else {
-          // if there is no parent dir, then there is no need to look
-          // for this directory -report it as missing automatically.
+          // 父目录不存在，则当前目录必然不存在，无需探测直接标记
           status = EntryStatus.not_found;
         }
+        // 将目录信息添加到任务清单
         manifest.addDirectory(DirEntry.dirEntry(
             destDir,
             status,
             depth));
       }
 
-      // process the listing; this is where abfs will block
-      // to wait the result of the list call.
+      // 遍历目录条目，此时异步文件系统会阻塞等待列表获取完成
       while (listing.hasNext()) {
         final FileStatus st = listing.next();
         if (st.isFile()) {
-          // this is a file, so add to the list of files to commit.
+          // 普通文件，添加到待提交文件列表
           files++;
           final FileEntry entry = fileEntry(st, destDir);
           manifest.addFileToCommit(entry);
           LOG.debug("To rename: {}", entry);
         } else {
           if (st.isDirectory()) {
-            // will need to scan this directory too.
+            // 子目录，暂存后续递归处理
             subdirs.add(st);
           } else {
-            // some other object. ignoring
+            // 忽略其他类型的文件系统对象（例如符号链接）
             LOG.info("Ignoring FS object {}", st);
           }
         }
       }
-      // add any statistics provided by the listing.
+      // 合并目录列表操作产生的IO统计信息
       maybeAddIOStatistics(getIOStatistics(), listing);
     }
 
-    // now scan the subdirectories
+    // 递归处理所有子目录
     LOG.debug("{}: Number of subdirectories under {} found: {}; file count {}",
         getName(), srcDir, subdirs.size(), files);
 

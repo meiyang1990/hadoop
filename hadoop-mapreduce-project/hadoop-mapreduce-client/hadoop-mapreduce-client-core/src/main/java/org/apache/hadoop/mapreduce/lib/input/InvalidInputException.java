@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,9 +26,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class wraps a list of problems with the input, so that the user
- * can get a list of problems together instead of finding and fixing them one 
- * by one.
+ * MapReduce输入数据非法异常，用于批量收集所有输入错误后统一抛出，
+ * 让用户可以一次性获取所有输入问题，而不需要逐个发现修复。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -36,9 +36,8 @@ public class InvalidInputException extends IOException {
   private List<IOException> problems;
   
   /**
-   * Create the exception with the given list.
-   * The first element of the list is used as the init cause value.
-   * @param probs the list of problems to report. this list is not copied.
+   * 基于收集到的输入错误列表构造异常对象，使用列表第一个异常作为根异常。
+   * @param probs 收集到的输入问题列表，不进行拷贝直接持有
    */
   public InvalidInputException(List<IOException> probs) {
     problems = probs;
@@ -48,16 +47,16 @@ public class InvalidInputException extends IOException {
   }
   
   /**
-   * Get the complete list of the problems reported.
-   * @return the list of problems, which must not be modified
+   * 获取所有收集到的输入问题列表。
+   * @return 输入问题列表，禁止修改
    */
   public List<IOException> getProblems() {
     return problems;
   }
   
   /**
-   * Get a summary message of the problems found.
-   * @return the concatenated messages from all of the problems.
+   * 拼接所有输入问题的错误信息，生成汇总异常信息。
+   * @return 拼接所有异常信息后的汇总字符串
    */
   public String getMessage() {
     StringBuilder result = new StringBuilder();

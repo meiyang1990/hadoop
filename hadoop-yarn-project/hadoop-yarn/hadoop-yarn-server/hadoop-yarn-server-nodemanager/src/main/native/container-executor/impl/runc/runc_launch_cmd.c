@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+/**
+ * @file runc_launch_cmd.c
+ * @brief runC容器启动命令JSON解析与验证实现
+ * @details 负责解析NodeManager下发的runC容器启动命令JSON文件，
+ *          验证命令合法性，为后续启动容器提供结构化的配置数据
  */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -36,6 +43,9 @@
 
 #define SQUASHFS_MEDIA_TYPE     "application/vnd.squashfs"
 
+/**
+ * 释放镜像层描述符数组内存
+ */
 static void free_rlc_layers(rlc_layer_spec* layers, unsigned int num_layers) {
   for (unsigned int i = 0; i < num_layers; ++i) {
     free(layers[i].media_type);
@@ -45,7 +55,7 @@ static void free_rlc_layers(rlc_layer_spec* layers, unsigned int num_layers) {
 }
 
 /**
- * Free a NULL-terminated array of pointers
+ * 释放以NULL结尾的指针数组内存
  */
 static void free_ntarray(char** parray) {
   if (parray != NULL) {
@@ -57,7 +67,7 @@ static void free_ntarray(char** parray) {
 }
 
 /**
- * Free a runC launch command structure and all memory assruncated with it.
+ * 释放runC启动命令结构及其所有关联内存
  */
 void free_runc_launch_cmd(runc_launch_cmd* rlc) {
   if (rlc != NULL) {
@@ -81,6 +91,11 @@ void free_runc_launch_cmd(runc_launch_cmd* rlc) {
   }
 }
 
+/**
+ * 解析JSON文件为cJSON对象，以NodeManager用户权限读取
+ * @param filename JSON文件路径
+ * @return 解析成功返回cJSON指针，失败返回NULL
+ */
 static cJSON* parse_json_file(const char* filename) {
   char* data = read_file_to_string_as_nm_user(filename);
   if (data == NULL) {
@@ -99,6 +114,11 @@ static cJSON* parse_json_file(const char* filename) {
   return json;
 }
 
+/**
+ * 解析JSON数组为目录路径数组（以NULL结尾）
+ * @param dirs_json JSON数组对象
+ * @return 解析成功返回目录指针数组，失败返回NULL
+ */
 static char** parse_dir_list(const cJSON* dirs_json) {
   if (!cJSON_IsArray(dirs_json)) {
     return NULL;
@@ -109,7 +129,8 @@ static char** parse_dir_list(const cJSON* dirs_json) {
     return NULL;
   }
 
-  char** dirs = calloc(num_dirs + 1, sizeof(*dirs));  // +1 for terminating NULL
+  // 分配额外一个位置存放终止NULL
+  char** dirs = calloc(num_dirs + 1, sizeof(*dirs));
   int i = 0;
   const cJSON* e;
   cJSON_ArrayForEach(e, dirs_json) {
@@ -123,6 +144,12 @@ static char** parse_dir_list(const cJSON* dirs_json) {
   return dirs;
 }
 
+/**
+ * 解析单个镜像层JSON对象到输出结构
+ * @param layer_out 输出镜像层结构指针
+ * @param layer_json 输入JSON对象
+ * @return 解析成功返回true，失败返回false
+ */
 static bool parse_runc_launch_cmd_layer(rlc_layer_spec* layer_out,
     const cJSON* layer_json) {
   if (!cJSON_IsObject(layer_json)) {
@@ -148,6 +175,12 @@ static bool parse_runc_launch_cmd_layer(rlc_layer_spec* layer_out,
   return true;
 }
 
+/**
+ * 解析JSON数组为镜像层描述符数组
+ * @param num_layers_out 输出解析得到的镜像层数量
+ * @param layers_json 输入JSON数组
+ * @return 解析成功返回镜像层数组指针，失败返回NULL
+ */
 static rlc_layer_spec* parse_runc_launch_cmd_layers(unsigned int* num_layers_out,
     const cJSON* layers_json) {
   if (!cJSON_IsArray(layers_json)) {
@@ -188,6 +221,11 @@ static rlc_layer_spec* parse_runc_launch_cmd_layers(unsigned int* num_layers_out
   return layers;
 }
 
+/**
+ * 解析JSON节点为整数
+ * @param json JSON节点
+ * @return 解析成功返回整数值，失败返回-1
+ */
 static int parse_json_int(cJSON* json) {
   if (!cJSON_IsNumber(json)) {
     fputs("Bad/Missing runC int\n", ERRORFILE);
@@ -196,11 +234,18 @@ static int parse_json_int(cJSON* json) {
   return json->valueint;
 }
 
+/**
+ * 从JSON中分离并解析runC运行配置
+ * @param rc 输出runC配置结构指针
+ * @param rc_json 输入JSON对象
+ * @return 解析成功返回0，失败返回-1
+ */
 static int parse_runc_launch_cmd_runc_config(runc_config* rc, cJSON* rc_json) {
   if (!cJSON_IsObject(rc_json)) {
     fputs("Bad/Missing runC runtime config in launch command\n", ERRORFILE);
     return -1;
   }
+  // 从JSON中分离对应节点，避免重复释放
   rc->hostname = cJSON_DetachItemFromObjectCaseSensitive(rc_json, "hostname");
   rc->linux_config = cJSON_DetachItemFromObjectCaseSensitive(rc_json, "linux");
   rc->mounts = cJSON_DetachItemFromObjectCaseSensitive(rc_json, "mounts");
@@ -220,6 +265,11 @@ static int parse_runc_launch_cmd_runc_config(runc_config* rc, cJSON* rc_json) {
   return 0;
 }
 
+/**
+ * 验证镜像层媒体类型是否支持
+ * @param media_type 媒体类型字符串
+ * @return 合法返回true，否则返回false
+ */
 static bool is_valid_layer_media_type(char* media_type) {
   if (media_type == NULL) {
     return false;
@@ -233,6 +283,12 @@ static bool is_valid_layer_media_type(char* media_type) {
   return true;
 }
 
+/**
+ * 验证所有镜像层是否合法
+ * @param layers 镜像层数组
+ * @param num_layers 镜像层数量
+ * @return 全部合法返回true，否则返回false
+ */
 static bool is_valid_runc_launch_cmd_layers(rlc_layer_spec* layers,
     unsigned int num_layers) {
   if (layers == NULL) {
@@ -251,6 +307,11 @@ static bool is_valid_runc_launch_cmd_layers(rlc_layer_spec* layers,
   return true;
 }
 
+/**
+ * 验证runC Linux资源配置是否合法（只允许已知配置项）
+ * @param rclr 资源配置JSON对象
+ * @return 合法返回true，否则返回false
+ */
 static bool is_valid_runc_config_linux_resources(const cJSON* rclr) {
   if (!cJSON_IsObject(rclr)) {
     fputs("runC config linux resources missing or not an object\n", ERRORFILE);
@@ -261,9 +322,9 @@ static bool is_valid_runc_config_linux_resources(const cJSON* rclr) {
   const cJSON* e;
   cJSON_ArrayForEach(e, rclr) {
     if (strcmp("blockIO", e->string) == 0) {
-      // block I/O settings allowed
+      // 允许块IO配置
     } else if (strcmp("cpu", e->string) == 0) {
-      // cpu settings allowed
+      // 允许CPU配置
     } else {
       fprintf(ERRORFILE,
           "Unrecognized runC config linux resources element: %s\n", e->string);
@@ -274,6 +335,11 @@ static bool is_valid_runc_config_linux_resources(const cJSON* rclr) {
   return all_sections_ok;
 }
 
+/**
+ * 验证runC seccomp安全配置是否合法（只允许已知配置项）
+ * @param rcls seccomp配置JSON对象
+ * @return 合法返回true，否则返回false
+ */
 static bool is_valid_runc_config_linux_seccomp(const cJSON* rcls) {
   if (!cJSON_IsObject(rcls)) {
     fputs("runC config linux seccomp missing or not an object\n", ERRORFILE);
@@ -284,13 +350,13 @@ static bool is_valid_runc_config_linux_seccomp(const cJSON* rcls) {
   const cJSON* e;
   cJSON_ArrayForEach(e, rcls) {
     if (strcmp("defaultAction", e->string) == 0) {
-      // defaultAction allowed
+      // 允许defaultAction配置
     } else if (strcmp("architectures", e->string) == 0) {
-      // architecture settings allowed
+      // 允许架构配置
     } else if (strcmp("flags", e->string) == 0) {
-      // flags allowed
+      // 允许flags配置
     } else if (strcmp("syscalls", e->string) == 0) {
-      // syscalls allowed
+      // 允许系统调用配置
     } else {
       fprintf(ERRORFILE,
           "Unrecognized runC config linux seccomp element: %s\n", e->string);
@@ -302,6 +368,11 @@ static bool is_valid_runc_config_linux_seccomp(const cJSON* rcls) {
 
 }
 
+/**
+ * 验证runC Linux整体配置是否合法（只允许已知配置项）
+ * @param rcl Linux配置JSON对象
+ * @return 合法返回true，否则返回false
+ */
 static bool is_valid_runc_config_linux(const cJSON* rcl) {
   if (!cJSON_IsObject(rcl)) {
     fputs("runC config linux section missing or not an object\n", ERRORFILE);
@@ -329,6 +400,11 @@ static bool is_valid_runc_config_linux(const cJSON* rcl) {
   return all_sections_ok;
 }
 
+/**
+ * 验证挂载类型是否合法（只允许bind挂载）
+ * @param type 挂载类型字符串
+ * @return 合法返回true，否则返回false
+ */
 static bool is_valid_mount_type(const char *type) {
   if (strcmp("bind", type)) {
     fprintf(ERRORFILE, "Invalid runC mount type '%s'\n", type);
@@ -337,6 +413,11 @@ static bool is_valid_mount_type(const char *type) {
   return true;
 }
 
+/**
+ * 解析挂载选项数组，验证必填选项是否存在
+ * @param mo 挂载选项JSON数组
+ * @return 解析成功返回挂载选项结构，失败返回NULL
+ */
 static mount_options* get_mount_options(const cJSON* mo) {
   if (!cJSON_IsArray(mo)) {
     fputs("runC config mount options not an array\n", ERRORFILE);
@@ -351,6 +432,7 @@ static mount_options* get_mount_options(const cJSON* mo) {
   options->num_opts = num_options;
   options->opts = options_array;
 
+  // 标记必填选项是否存在
   bool has_rbind = false;
   bool has_rprivate = false;
   int i = 0;
@@ -376,390 +458,6 @@ static mount_options* get_mount_options(const cJSON* mo) {
   }
   options->opts[i] = NULL;
 
+  // 检查必填选项
   if (!has_rbind) {
-    fputs("runC config mount options missing rbind\n", ERRORFILE);
-    free_mount_options(options);
-    return NULL;
-  }
-  if (!has_rprivate) {
-    fputs("runC config mount options missing rprivate\n", ERRORFILE);
-    free_mount_options(options);
-    return NULL;
-  }
-
-  return options;
-}
-
-static int get_runc_mounts(mount* mounts, const cJSON* rcm) {
-  if (!cJSON_IsArray(rcm)) {
-    fputs("runC config mount entry is not an object\n", ERRORFILE);
-    return INVALID_MOUNT;
-  }
-
-  bool has_type = false;
-  const cJSON *e;
-  const cJSON *mount;
-  int i = 0;
-  int ret = 0;
-  cJSON_ArrayForEach(mount, rcm) {
-    cJSON_ArrayForEach(e, mount) {
-      if (strcmp("type", e->string) == 0) {
-        if (!cJSON_IsString(e) || !is_valid_mount_type(e->valuestring)) {
-          ret = INVALID_MOUNT;
-          goto free_and_exit;
-        }
-        has_type = true;
-      } else if (strcmp("source", e->string) == 0) {
-        if (!cJSON_IsString(e)) {
-          ret = INVALID_MOUNT;
-          goto free_and_exit;
-        }
-        mounts[i].src = strdup(e->valuestring);
-      } else if (strcmp("destination", e->string) == 0) {
-        if (!cJSON_IsString(e)) {
-          ret = INVALID_MOUNT;
-          goto free_and_exit;
-        }
-        mounts[i].dest = strdup(e->valuestring);
-      } else if (strcmp("options", e->string) == 0) {
-        if (!cJSON_IsArray(e)) {
-          ret = INVALID_MOUNT;
-          goto free_and_exit;
-        }
-        mounts[i].options = get_mount_options(e);
-      } else {
-        fprintf(ERRORFILE, "Unrecognized runC config mount parameter: %s\n",
-                e->string);
-        ret = INVALID_MOUNT;
-        goto free_and_exit;
-      }
-    }
-
-    if (!has_type) {
-      fputs("runC config mount missing mount type\n", ERRORFILE);
-      ret = INVALID_MOUNT;
-      goto free_and_exit;
-    }
-
-    if (mounts[i].src == NULL) {
-      fputs("runC config mount missing source\n", ERRORFILE);
-      ret = INVALID_MOUNT;
-      goto free_and_exit;
-    }
-
-    if (mounts[i].dest == NULL) {
-      fputs("runC config mount missing destination\n", ERRORFILE);
-      ret = INVALID_MOUNT;
-      goto free_and_exit;
-    }
-
-    if (mounts[i].options == NULL) {
-      fputs("runC config mount missing mount options\n", ERRORFILE);
-      ret = INVALID_MOUNT;
-      goto free_and_exit;
-    }
-
-    i++;
-  }
-
-free_and_exit:
-    return ret;
-}
-
-static bool is_valid_runc_config_mounts(const cJSON* rcm) {
-  mount *mounts = NULL;
-  unsigned int num_mounts = 0;
-  int ret = 0;
-  bool all_mounts_ok = true;
-  char **permitted_ro_mounts = NULL;
-  char **permitted_rw_mounts = NULL;
-
-  if (rcm == NULL) {
-    return true;  // OK to have no extra mounts
-  }
-  if (!cJSON_IsArray(rcm)) {
-    fputs("runC config mounts is not an array\n", ERRORFILE);
-    return false;
-  }
-
-  permitted_ro_mounts = get_configuration_values_delimiter("runc.allowed.ro-mounts",
-                                                           CONTAINER_EXECUTOR_CFG_RUNC_SECTION, get_cfg(), ",");
-  permitted_rw_mounts = get_configuration_values_delimiter("runc.allowed.rw-mounts",
-                                                           CONTAINER_EXECUTOR_CFG_RUNC_SECTION, get_cfg(), ",");
-
-  num_mounts = cJSON_GetArraySize(rcm);
-
-  mounts = (mount *) calloc(num_mounts, sizeof(*mounts));
-  if (mounts == NULL) {
-    fprintf(ERRORFILE, "Unable to allocate %ld bytes\n", num_mounts * sizeof(*mounts));
-    all_mounts_ok = false;
-    goto free_and_exit;
-  }
-
-  ret = get_runc_mounts(mounts, rcm);
-  if (ret != 0) {
-    all_mounts_ok = false;
-    goto free_and_exit;
-  }
-
-  ret = validate_mounts(permitted_ro_mounts, permitted_rw_mounts, mounts, num_mounts);
-  if (ret != 0) {
-    all_mounts_ok = false;
-    goto free_and_exit;
-  }
-
-free_and_exit:
-  free_values(permitted_ro_mounts);
-  free_values(permitted_rw_mounts);
-  free_mounts(mounts, num_mounts);
-  return all_mounts_ok;
-}
-
-static bool is_valid_runc_config_process(const runc_config_process* rcp) {
-  if (rcp == NULL) {
-    return false;
-  }
-
-  if (!cJSON_IsArray(rcp->args)) {
-    fputs("runC config process args is missing or not an array\n", ERRORFILE);
-    return false;
-  }
-
-  const cJSON* e;
-  cJSON_ArrayForEach(e, rcp->args) {
-    if (!cJSON_IsString(e)) {
-      fputs("runC config process args has a non-string in array\n", ERRORFILE);
-      return false;
-    }
-  }
-
-  if (!cJSON_IsString(rcp->cwd)) {
-    fputs("Bad/Missing runC config process cwd\n", ERRORFILE);
-    return false;
-  }
-
-  if (!cJSON_IsArray(rcp->env)) {
-    fputs("runC config process env is missing or not an array\n", ERRORFILE);
-    return false;
-  }
-  cJSON_ArrayForEach(e, rcp->env) {
-    if (!cJSON_IsString(e)) {
-      fputs("runC config process env has a non-string in array\n", ERRORFILE);
-      return false;
-    }
-  }
-
-  return true;
-}
-
-static bool is_valid_runc_config(const runc_config* rc) {
-  bool is_valid = true;
-  if (rc->hostname != NULL && !cJSON_IsString(rc->hostname)) {
-    fputs("runC config hostname is not a string\n", ERRORFILE);
-    is_valid = false;
-  }
-
-  is_valid &= is_valid_runc_config_linux(rc->linux_config);
-  is_valid &= is_valid_runc_config_mounts(rc->mounts);
-  is_valid &= is_valid_runc_config_process(&rc->process);
-  return is_valid;
-}
-
-bool is_valid_runc_launch_cmd(const runc_launch_cmd* rlc) {
-  if (rlc == NULL) {
-    return false;
-  }
-
-  if (rlc->run_as_user == NULL) {
-    fputs("runC command has bad/missing runAsUser\n", ERRORFILE);
-    return false;
-  }
-
-  if (rlc->username == NULL) {
-    fputs("runC command has bad/missing username\n", ERRORFILE);
-    return false;
-  }
-
-  if (rlc->app_id == NULL) {
-    fputs("runC command has bad/missing application ID\n", ERRORFILE);
-    return false;
-  }
-
-  if (rlc->container_id == NULL) {
-    fputs("runC command has bad/missing container ID\n", ERRORFILE);
-    return false;
-  }
-  if (!validate_container_id(rlc->container_id)) {
-    fprintf(ERRORFILE, "Bad container id in runC command: %s\n",
-        rlc->container_id);
-    return false;
-  }
-
-  if (rlc->pid_file == NULL) {
-    fputs("runC command has bad/missing pid file\n", ERRORFILE);
-    return false;
-  }
-  if (check_pidfile_as_nm(rlc->pid_file) != 0) {
-    fprintf(ERRORFILE, "Bad pidfile %s : %s\n", rlc->pid_file,
-        strerror(errno));
-    return false;
-  }
-
-  if (rlc->script_path == NULL) {
-    fputs("runC command has bad/missing container script path\n", ERRORFILE);
-    return false;
-  }
-
-  if (rlc->cred_path == NULL) {
-    fputs("runC command has bad/missing container credentials path\n",
-        ERRORFILE);
-    return false;
-  }
-
-  if (rlc->local_dirs == NULL) {
-    fputs("runC command has bad/missing local directories\n", ERRORFILE);
-    return false;
-  }
-
-  if (rlc->log_dirs == NULL) {
-    fputs("runC command has bad/missing log directories\n", ERRORFILE);
-    return false;
-  }
-
-  if (!is_valid_runc_launch_cmd_layers(rlc->layers, rlc->num_layers)) {
-    return false;
-  }
-
-  if (rlc->num_reap_layers_keep < 0) {
-    fprintf(ERRORFILE, "Bad number of layers to preserve: %d\n",
-        rlc->num_reap_layers_keep);
-    return false;
-  }
-
-  return is_valid_runc_config(&rlc->config);
-}
-
-/**
- * Read, parse, and validate a runC container launch command.
- *
- * Returns a pointer to the launch command or NULL on error.
- */
-runc_launch_cmd* parse_runc_launch_cmd(const char* command_filename) {
-  int ret = 0;
-  runc_launch_cmd* rlc = NULL;
-  cJSON* rlc_json = NULL;
-
-  rlc_json = parse_json_file(command_filename);
-  if (rlc_json == NULL) {
-    goto cleanup;
-  }
-
-  rlc = calloc(1, sizeof(*rlc));
-  if (rlc == NULL) {
-    fprintf(ERRORFILE, "Unable to allocate %ld bytes\n", sizeof(*rlc));
-    goto cleanup;
-  }
-
-  char* run_as_user = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(
-      rlc_json, "runAsUser"));
-  if (run_as_user== NULL) {
-    goto fail_and_exit;
-  }
-  rlc->run_as_user= strdup(run_as_user);
-
-  char* username = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(
-      rlc_json, "username"));
-  if (username == NULL) {
-    goto fail_and_exit;
-  }
-  rlc->username = strdup(username);
-
-  char* app_id = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(
-      rlc_json, "applicationId"));
-  if (app_id == NULL) {
-    goto fail_and_exit;
-  }
-  rlc->app_id = strdup(app_id);
-
-  char* container_id = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(
-      rlc_json, "containerId"));
-  if (container_id == NULL) {
-    goto fail_and_exit;
-  }
-  rlc->container_id = strdup(container_id);
-
-  char* pid_file = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(
-      rlc_json, "pidFile"));
-  if (pid_file == NULL) {
-    goto fail_and_exit;
-  }
-  rlc->pid_file = strdup(pid_file);
-
-  char* script_path = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(
-      rlc_json, "containerScriptPath"));
-  if (script_path == NULL) {
-    goto fail_and_exit;
-  }
-  rlc->script_path = strdup(script_path);
-
-  char* cred_path = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(
-     rlc_json, "containerCredentialsPath"));
-  if (cred_path == NULL) {
-    goto fail_and_exit;
-  }
-  rlc->cred_path = strdup(cred_path);
-
-  rlc->https = parse_json_int(cJSON_GetObjectItemCaseSensitive(rlc_json, "https"));
-
-  char* keystore_path = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(
-          rlc_json, "keystorePath"));
-  if (keystore_path != NULL) {
-    rlc->keystore_path = strdup(keystore_path);
-  }
-
-  char* truststore_path = cJSON_GetStringValue(cJSON_GetObjectItemCaseSensitive(
-          rlc_json, "truststorePath"));
-  if (truststore_path != NULL) {
-    rlc->truststore_path = strdup(truststore_path);
-  }
-
-  char **local_dirs = parse_dir_list(cJSON_GetObjectItemCaseSensitive(
-      rlc_json, "localDirs"));
-  if (local_dirs == NULL) {
-    goto fail_and_exit;
-  }
-  rlc->local_dirs = local_dirs;
-
-  char **log_dirs = parse_dir_list(cJSON_GetObjectItemCaseSensitive(
-      rlc_json, "logDirs"));
-  if (log_dirs == NULL) {
-    goto fail_and_exit;
-  }
-  rlc->log_dirs = log_dirs;
-
-  rlc_layer_spec* layers = parse_runc_launch_cmd_layers(&rlc->num_layers,
-      cJSON_GetObjectItemCaseSensitive(rlc_json,"layers"));
-  if (layers == NULL) {
-    goto fail_and_exit;
-  }
-  rlc->layers = layers;
-
-  rlc->num_reap_layers_keep = parse_json_int(
-      cJSON_GetObjectItemCaseSensitive(rlc_json, "reapLayerKeepCount"));
-
-  ret = parse_runc_launch_cmd_runc_config(&rlc->config,
-      cJSON_GetObjectItemCaseSensitive(rlc_json, "ociRuntimeConfig"));
-  if (ret < 0) {
-    goto fail_and_exit;
-  }
-
-cleanup:
-  cJSON_Delete(rlc_json);
-  return rlc;
-
-fail_and_exit:
-  cJSON_Delete(rlc_json);
-  free_runc_launch_cmd(rlc);
-  return NULL;
-}
-
+    fputs("runC config mount options missing rbind\n

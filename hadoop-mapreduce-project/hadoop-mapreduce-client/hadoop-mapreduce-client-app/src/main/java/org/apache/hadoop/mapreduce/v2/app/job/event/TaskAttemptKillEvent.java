@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,14 +21,24 @@ package org.apache.hadoop.mapreduce.v2.app.job.event;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
-
+/**
+ * Task尝试杀死事件，用于通知任务尝试组件需要终止指定任务尝试
+ * 携带杀死原因和是否需要重新调度尝试的标识，是MapReduce应用内部事件驱动模型的核心事件之一
+ */
 public class TaskAttemptKillEvent extends TaskAttemptEvent {
 
   private final String message;
   // Next map attempt will be rescheduled(i.e. updated in ask with higher
   // priority equivalent to that of a fast fail map)
+  // 是否需要重新调度该任务的新尝试
   private final boolean rescheduleAttempt;
 
+  /**
+   * 构造任务尝试杀死事件
+   * @param attemptID 目标任务尝试ID
+   * @param message 杀死原因描述信息
+   * @param rescheduleAttempt 是否需要重新调度新的任务尝试
+   */
   public TaskAttemptKillEvent(TaskAttemptId attemptID,
       String message, boolean rescheduleAttempt) {
     super(attemptID, TaskAttemptEventType.TA_KILL);
@@ -35,15 +46,28 @@ public class TaskAttemptKillEvent extends TaskAttemptEvent {
     this.rescheduleAttempt = rescheduleAttempt;
   }
 
+  /**
+   * 构造不需要重新调度的任务尝试杀死事件
+   * @param attemptID 目标任务尝试ID
+   * @param message 杀死原因描述信息
+   */
   public TaskAttemptKillEvent(TaskAttemptId attemptID,
       String message) {
     this(attemptID, message, false);
   }
 
+  /**
+   * 获取杀死原因描述信息
+   * @return 杀死原因文本
+   */
   public String getMessage() {
     return message;
   }
 
+  /**
+   * 获取是否需要重新调度新的任务尝试标识
+   * @return true表示需要重新调度，false表示不需要
+   */
   public boolean getRescheduleAttempt() {
     return rescheduleAttempt;
   }

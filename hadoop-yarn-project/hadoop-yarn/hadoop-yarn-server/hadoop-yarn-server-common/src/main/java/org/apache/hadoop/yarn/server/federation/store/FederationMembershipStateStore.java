@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -32,84 +33,62 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterRegister
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterRegisterResponse;
 
 /**
- * FederationMembershipStateStore maintains the state of all
- * <em>subcluster(s)</em> as encapsulated by {@code SubClusterInfo} for all the
- * subcluster(s) that are participating in federation.
+ * YARN联邦集群成员状态存储接口，负责维护所有加入联邦的子集群的状态信息，每个子集群状态由{@code SubClusterInfo}封装。
  */
 @Private
 @Unstable
 public interface FederationMembershipStateStore {
 
   /**
-   * Register a <em>subcluster</em> by publishing capabilities as represented by
-   * {@code SubClusterInfo} to indicate participation in federation. This is
-   * typically done during initialization or restart/failover of the
-   * subcluster's <code>ResourceManager</code>. Upon successful registration, an
-   * identifier for the <em>subcluster</em> which is unique across the federated
-   * cluster is returned. The identifier is static, i.e. preserved across
-   * restarts and failover.
+   * 注册子集群到联邦集群，发布子集群的资源能力信息，通常在子集群ResourceManager初始化、重启或故障转移时调用。
+   * 注册成功后返回全局唯一的子集群ID，该ID在重启和故障转移后保持不变。
    *
-   * @param registerSubClusterRequest the capabilities of the subcluster that
-   *          wants to participate in federation. The subcluster id is also
-   *          specified in case registration is triggered by restart/failover
-   * @return response empty on successfully if registration was successful
-   * @throws YarnException if the request is invalid/fails
+   * @param registerSubClusterRequest 注册请求，包含子集群资源能力信息，如果是重启/故障转移场景还会包含已有子集群ID
+   * @return 注册成功返回空响应
+   * @throws YarnException 请求无效或注册失败时抛出异常
    */
   SubClusterRegisterResponse registerSubCluster(
       SubClusterRegisterRequest registerSubClusterRequest) throws YarnException;
 
   /**
-   * Deregister a <em>subcluster</em> identified by {@code SubClusterId} to
-   * change state in federation. This can be done to mark the sub cluster lost,
-   * deregistered, or decommissioned.
+   * 注销指定子集群，修改其在联邦中的状态，可用于标记子集群失联、注销或退服。
    *
-   * @param subClusterDeregisterRequest - the request to deregister the
-   *          sub-cluster from federation.
-   * @return response empty on successfully deregistering the subcluster state
-   * @throws YarnException if the request is invalid/fails
+   * @param subClusterDeregisterRequest 注销请求，包含待注销子集群ID
+   * @return 注销成功返回空响应
+   * @throws YarnException 请求无效或注销失败时抛出异常
    */
   SubClusterDeregisterResponse deregisterSubCluster(
       SubClusterDeregisterRequest subClusterDeregisterRequest)
       throws YarnException;
 
   /**
-   * Periodic heartbeat from a <code>ResourceManager</code> participating in
-   * federation to indicate liveliness. The heartbeat publishes the current
-   * capabilities as represented by {@code SubClusterInfo} of the subcluster.
-   * Currently response is empty if the operation was successful, if not an
-   * exception reporting reason for a failure.
+   * 子集群ResourceManager定期发送心跳，维持子集群在线状态，同时更新当前子集群的资源能力信息。
+   * 操作成功时响应为空，失败则抛出异常说明原因。
    *
-   * @param subClusterHeartbeatRequest the capabilities of the subcluster that
-   *          wants to keep alive its participation in federation
-   * @return response currently empty on if heartbeat was successfully processed
-   * @throws YarnException if the request is invalid/fails
+   * @param subClusterHeartbeatRequest 心跳请求，包含子集群当前资源能力信息
+   * @return 心跳处理成功返回空响应
+   * @throws YarnException 请求无效或心跳处理失败时抛出异常
    */
   SubClusterHeartbeatResponse subClusterHeartbeat(
       SubClusterHeartbeatRequest subClusterHeartbeatRequest)
       throws YarnException;
 
   /**
-   * Get the membership information of <em>subcluster</em> as identified by
-   * {@code SubClusterId}. The membership information includes the cluster
-   * endpoint and current capabilities as represented by {@code SubClusterInfo}.
+   * 根据子集群ID查询指定子集群的成员信息，包含子集群访问地址和当前资源能力。
    *
-   * @param subClusterRequest the subcluster whose information is required
-   * @return the {@code SubClusterInfo}, or {@code null} if there is no mapping
-   *         for the subcluster
-   * @throws YarnException if the request is invalid/fails
+   * @param subClusterRequest 查询请求，包含目标子集群ID
+   * @return 查询到的子集群信息，如果子集群不存在则返回null
+   * @throws YarnException 请求无效或查询失败时抛出异常
    */
   GetSubClusterInfoResponse getSubCluster(
       GetSubClusterInfoRequest subClusterRequest) throws YarnException;
 
   /**
-   * Get the membership information of all the <em>subclusters</em> that are
-   * currently participating in federation. The membership information includes
-   * the cluster endpoint and current capabilities as represented by
-   * {@code SubClusterInfo}.
+   * 查询当前所有加入联邦的子集群成员信息，每个子集群信息包含访问地址和当前资源能力。
    *
-   * @param subClustersRequest request for sub-clusters information
-   * @return a map of {@code SubClusterInfo} keyed by the {@code SubClusterId}
-   * @throws YarnException if the request is invalid/fails
+   * @param subClustersRequest 查询所有子集群信息的请求
+   * @return 子集群信息映射，以子集群ID为键
+   * @throws YarnException 请求无效或查询失败时抛出异常
    */
   GetSubClustersInfoResponse getSubClusters(
       GetSubClustersInfoRequest subClustersRequest) throws YarnException;

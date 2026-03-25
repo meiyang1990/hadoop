@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,57 +22,19 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.flow;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
 
 /**
- * The flow run table has column family info
- * Stores per flow run information
- * aggregated across applications.
- *
- * Metrics are also stored in the info column family.
- *
- * Example flow run table record:
- *
- * <pre>
- * flow_run table
- * |-------------------------------------------|
- * |  Row key   | Column Family                |
- * |            | info                         |
- * |-------------------------------------------|
- * | clusterId! | flow_version:version7        |
- * | userName!  |                              |
- * | flowName!  | running_apps:1               |
- * | flowRunId  |                              |
- * |            | min_start_time:1392995080000 |
- * |            | #0:""                        |
- * |            |                              |
- * |            | min_start_time:1392995081012 |
- * |            | #0:appId2                    |
- * |            |                              |
- * |            | min_start_time:1392993083210 |
- * |            | #0:appId3                    |
- * |            |                              |
- * |            |                              |
- * |            | max_end_time:1392993084018   |
- * |            | #0:""                        |
- * |            |                              |
- * |            |                              |
- * |            | m!mapInputRecords:127        |
- * |            | #0:""                        |
- * |            |                              |
- * |            | m!mapInputRecords:31         |
- * |            | #2:appId2                    |
- * |            |                              |
- * |            | m!mapInputRecords:37         |
- * |            | #1:appId3                    |
- * |            |                              |
- * |            |                              |
- * |            | m!mapOutputRecords:181       |
- * |            | #0:""                        |
- * |            |                              |
- * |            | m!mapOutputRecords:37        |
- * |            | #1:appId3                    |
- * |            |                              |
- * |            |                              |
- * |-------------------------------------------|
- * </pre>
+ * 流程运行表(HBase)定义，用于存储聚合了多个应用的单个流程运行实例的元数据和指标信息
+ * <p>
+ * 核心存储内容：
+ * <ul>
+ *   <li>流程版本信息</li>
+ *   <li>当前运行的应用数量</li>
+ *   <li>流程的最早启动时间和最晚结束时间</li>
+ *   <li>关联的应用ID列表</li>
+ *   <li>全流程聚合后的指标数据</li>
+ * </ul>
+ * 行键格式为：clusterId!userName!flowName!flowRunId
+ * 仅使用info一个列族存储所有数据
+ * </p>
  */
 public final class FlowRunTable extends BaseTable<FlowRunTable> {
 }

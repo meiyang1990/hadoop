@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -19,7 +20,8 @@ package org.apache.hadoop.yarn.server.nodemanager.executor;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
 /**
- * Encapsulate the details needed to reap a container.
+ * 容器回收上下文，封装回收容器所需的全部参数信息。
+ * 用于NodeManager清理终止容器时传递上下文参数。
  */
 public final class ContainerReapContext {
 
@@ -27,7 +29,7 @@ public final class ContainerReapContext {
   private final String user;
 
   /**
-   * Builder for the ContainerReapContext.
+   * ContainerReapContext的构造器，采用Builder模式构造上下文对象。
    */
   public static final class Builder {
     private Container builderContainer;
@@ -37,10 +39,10 @@ public final class ContainerReapContext {
     }
 
     /**
-     * Set the container within the context.
+     * 设置待回收的容器对象。
      *
-     * @param container the {@link Container}.
-     * @return the Builder with the container set.
+     * @param container 待回收的容器
+     * @return 当前Builder实例
      */
     public Builder setContainer(Container container) {
       this.builderContainer = container;
@@ -48,10 +50,10 @@ public final class ContainerReapContext {
     }
 
     /**
-     * Set the set within the context.
+     * 设置容器对应用户。
      *
-     * @param user the user.
-     * @return the Builder with the user set.
+     * @param user 容器所属用户
+     * @return 当前Builder实例
      */
     public Builder setUser(String user) {
       this.builderUser = user;
@@ -59,9 +61,9 @@ public final class ContainerReapContext {
     }
 
     /**
-     * Builds the context with the attributes set.
+     * 构造最终的容器回收上下文对象。
      *
-     * @return the context.
+     * @return 构造完成的ContainerReapContext实例
      */
     public ContainerReapContext build() {
       return new ContainerReapContext(this);
@@ -74,18 +76,18 @@ public final class ContainerReapContext {
   }
 
   /**
-   * Get the container set for the context.
+   * 获取待回收的容器对象。
    *
-   * @return the {@link Container} set in the context.
+   * @return 待回收的容器
    */
   public Container getContainer() {
     return container;
   }
 
   /**
-   * Get the user set for the context.
+   * 获取容器所属用户。
    *
-   * @return the user set in the context.
+   * @return 容器所属用户名
    */
   public String getUser() {
     return user;

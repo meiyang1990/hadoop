@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,12 +33,12 @@ import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 
 /**
- * A context object that allows input and output from the task. It is only
- * supplied to the {@link Mapper} or {@link Reducer}.
- * @param <KEYIN> the input key type for the task
- * @param <VALUEIN> the input value type for the task
- * @param <KEYOUT> the output key type for the task
- * @param <VALUEOUT> the output value type for the task
+ * 任务输入输出上下文实现类，为MapReduce任务提供输入读取和输出写入能力
+ * 仅提供给{@link Mapper}和{@link Reducer}使用，封装任务的输入输出操作
+ * @param <KEYIN> 任务输入键类型
+ * @param <VALUEIN> 任务输入值类型
+ * @param <KEYOUT> 任务输出键类型
+ * @param <VALUEOUT> 任务输出值类型
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -47,6 +48,14 @@ public abstract class TaskInputOutputContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   private RecordWriter<KEYOUT,VALUEOUT> output;
   private OutputCommitter committer;
 
+  /**
+   * 构造任务输入输出上下文实例
+   * @param conf 任务配置对象
+   * @param taskid 任务尝试ID
+   * @param output 输出记录写入器
+   * @param committer 输出提交器
+   * @param reporter 状态上报器
+   */
   public TaskInputOutputContextImpl(Configuration conf, TaskAttemptID taskid,
                                     RecordWriter<KEYOUT,VALUEOUT> output,
                                     OutputCommitter committer,
@@ -57,38 +66,44 @@ public abstract class TaskInputOutputContextImpl<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   }
 
   /**
-   * Advance to the next key, value pair, returning null if at end.
-   * @return the key object that was read into, or null if no more
+   * 前进到下一个键值对，到达输入末尾时返回false
+   * @return 是否还有下一个键值对，存在返回true，无更多数据返回false
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public abstract 
   boolean nextKeyValue() throws IOException, InterruptedException;
  
   /**
-   * Get the current key.
-   * @return the current key object or null if there isn't one
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取当前输入键
+   * @return 当前输入键对象，无数据时返回null
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public abstract 
   KEYIN getCurrentKey() throws IOException, InterruptedException;
 
   /**
-   * Get the current value.
-   * @return the value object that was read into
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取当前输入值
+   * @return 当前输入值对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public abstract VALUEIN getCurrentValue() throws IOException, 
                                                    InterruptedException;
 
   /**
-   * Generate an output key/value pair.
+   * 写入输出键值对
    */
   public void write(KEYOUT key, VALUEOUT value
                     ) throws IOException, InterruptedException {
     output.write(key, value);
   }
 
+  /**
+   * 获取当前任务的输出提交器
+   * @return 输出提交器实例
+   */
   public OutputCommitter getOutputCommitter() {
     return committer;
   }

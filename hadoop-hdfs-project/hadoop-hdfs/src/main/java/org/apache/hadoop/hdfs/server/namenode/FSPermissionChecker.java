@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,31 +42,49 @@ import org.apache.hadoop.hdfs.protocol.UnresolvedPathException;
 import org.apache.hadoop.hdfs.server.namenode.INodeAttributeProvider.AccessControlEnforcer;
 import org.apache.hadoop.hdfs.server.namenode.INodeAttributeProvider.AuthorizationContext;
 import org.apache.hadoop.hdfs.util.ReadOnlyList;
-import org.apache.hadoop.hdfs.util.RwLockMode;
+import org.apache.hadoop.hdfs.util.RwLock;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /** 
- * Class that helps in checking file system permission.
- * The state of this class need not be synchronized as it has data structures that
- * are read-only.
- * 
- * Some of the helper methods are guarded by {@link FSNamesystem#readLock(RwLockMode)}.
+ * 文件系统权限检查器，负责HDFS文件系统所有访问权限的校验。
+ * 本类状态只读，无需同步，所有检查方法必须持有FSNamesystem的读锁才能调用。
+ * 支持自定义外部权限控制扩展，集成ACL权限检查和粘滞位权限规则。
  */
 public class FSPermissionChecker implements AccessControlEnforcer {
   static final Logger LOG = LoggerFactory.getLogger(UserGroupInformation.class);
 
+  /**
+   * 从路径字节数组构造完整路径字符串。
+   * @param components 路径各部分字节数组
+   * @param start 起始索引
+   * @param end 结束索引
+   * @return 完整路径字符串
+   */
   private static String getPath(byte[][] components, int start, int end) {
     return DFSUtil.byteArray2PathString(components, start, end - start + 1);
   }
 
-  /** @return a string for throwing {@link AccessControlException} */
+  /**
+   * 生成权限拒绝异常的错误信息字符串。
+   * @param inodeAttrib 被访问inode的属性
+   * @param path 被访问路径
+   * @param access 请求的访问权限
+   * @return 格式化后的异常信息字符串
+   */
   private String toAccessControlString(INodeAttributes inodeAttrib, String path,
       FsAction access) {
     return toAccessControlString(inodeAttrib, path, access, false);
   }
 
-  /** @return a string for throwing {@link AccessControlException} */
+  /**
+   * 生成权限拒绝异常的错误信息字符串，支持标识是否由ACL拒绝。
+   * @param inodeAttrib 被访问inode的属性
+   * @param path 被访问路径
+   * @param access 请求的访问权限
+   * @param deniedFromAcl 是否由ACL规则拒绝
+   * @return 格式化后的异常信息字符串
+   */
   private String toAccessControlString(INodeAttributes inodeAttrib,
       String path, FsAction access, boolean deniedFromAcl) {
     StringBuilder sb = new StringBuilder("Permission denied: ")
@@ -82,26 +101,53 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     return sb.toString();
   }
 
+  // 文件系统所有者用户名
   private final String fsOwner;
+  // 超级用户组名
   private final String supergroup;
+  // 调用者用户组信息
   private final UserGroupInformation callerUgi;
 
+  // 当前用户名
   private final String user;
+  // 当前用户所属组集合
   private final Collection<String> groups;
+  // 当前用户是否是超级用户
   private final boolean isSuper;
+  // inode属性提供者，支持外部扩展权限属性
   private final INodeAttributeProvider attributeProvider;
+  // 权限检查执行器，支持外部自定义实现
   private final AccessControlEnforcer accessControlEnforcer;
+  // 是否使用带上下文的授权API
   private final boolean authorizeWithContext;
+  // 权限检查慢操作告警阈值，单位毫秒
   private final long accessControlEnforcerReportingThresholdMs;
 
+  // 线程本地存储，保存当前操作类型，用于审计日志
   private static ThreadLocal<String> operationType = new ThreadLocal<>();
 
+  /**
+   * 构造权限检查器。
+   * @param fsOwner 文件系统所有者用户名
+   * @param supergroup 超级用户组名
+   * @param callerUgi 调用者用户组信息
+   * @param attributeProvider inode属性提供者
+   */
   protected FSPermissionChecker(String fsOwner, String supergroup,
       UserGroupInformation callerUgi,
       INodeAttributeProvider attributeProvider) {
     this(fsOwner, supergroup, callerUgi, attributeProvider, false, 0);
   }
 
+  /**
+   * 构造权限检查器，支持配置是否使用带上下文的授权API和慢操作阈值。
+   * @param fsOwner 文件系统所有者用户名
+   * @param supergroup 超级用户组名
+   * @param callerUgi 调用者用户组信息
+   * @param attributeProvider inode属性提供者
+   * @param useAuthorizationWithContextAPI 是否使用带上下文的授权API
+   * @param accessControlEnforcerReportingThresholdMs 慢操作告警阈值
+   */
   protected FSPermissionChecker(String fsOwner, String supergroup,
       UserGroupInformation callerUgi,
       INodeAttributeProvider attributeProvider,
@@ -117,8 +163,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     this.accessControlEnforcer = initAccessControlEnforcer();
 
     if (attributeProvider == null) {
-      // If attribute provider is null, use FSPermissionChecker default
-      // implementation to authorize, which supports authorization with context.
+      // 没有属性提供者时，使用默认实现，默认支持带上下文授权
       authorizeWithContext = true;
       LOG.debug("Default authorization provider supports the new authorization" +
           " provider API");
@@ -129,6 +174,14 @@ public class FSPermissionChecker implements AccessControlEnforcer {
         = accessControlEnforcerReportingThresholdMs;
   }
 
+  /**
+   * 检查外部权限执行器是否执行过慢，生成告警信息。
+   * @param elapsedMs 执行耗时
+   * @param ace 权限执行器实例
+   * @param checkSuperuser 是否检查超级用户权限
+   * @param context 授权上下文
+   * @return 慢操作告警信息，无则返回null
+   */
   private String checkAccessControlEnforcerSlowness(
       long elapsedMs, AccessControlEnforcer ace,
       boolean checkSuperuser, AuthorizationContext context) {
@@ -138,7 +191,17 @@ public class FSPermissionChecker implements AccessControlEnforcer {
         context.getCallerContext());
   }
 
-  /** @return the warning message if there is any. */
+  /**
+   * 静态工具方法，检查权限检查是否超时，超时则打告警日志。
+   * @param elapsedMs 执行耗时
+   * @param thresholdMs 告警阈值
+   * @param clazz 权限执行器类
+   * @param checkSuperuser 是否检查超级用户权限
+   * @param path 被访问路径
+   * @param op 操作类型
+   * @param caller 调用者信息
+   * @return 告警信息，无则返回null
+   */
   static String checkAccessControlEnforcerSlowness(
       long elapsedMs, long thresholdMs, Class<? extends AccessControlEnforcer> clazz,
       boolean checkSuperuser, String path, String op, Object caller) {
@@ -159,31 +222,62 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     return null;
   }
 
+  /**
+   * 设置当前线程的操作类型，用于权限审计。
+   * @param opType 操作类型名称
+   */
   public static void setOperationType(String opType) {
     operationType.set(opType);
   }
 
+  /**
+   * 检查当前用户是否属于指定组。
+   * @param group 待检查组名
+   * @return true表示属于该组，false反之
+   */
   public boolean isMemberOfGroup(String group) {
     return groups.contains(group);
   }
 
+  /**
+   * 获取当前检查器的用户名。
+   * @return 当前用户名
+   */
   public String getUser() {
     return user;
   }
 
+  /**
+   * 检查当前用户是否是超级用户。
+   * @return true表示超级用户，false反之
+   */
   public boolean isSuperUser() {
     return isSuper;
   }
 
+  /**
+   * 获取属性提供者。
+   * @return 属性提供者实例
+   */
   public INodeAttributeProvider getAttributesProvider() {
     return attributeProvider;
   }
 
+  /**
+   * 权限检查函数式接口，用于包装权限检查逻辑统计耗时。
+   */
   @FunctionalInterface
   interface CheckPermission {
     void run() throws AccessControlException;
   }
 
+  /**
+   * 执行权限检查并统计执行耗时，返回慢操作告警信息。
+   * @param checker 权限检查逻辑
+   * @param checkElapsedMs 耗时检查函数
+   * @return 慢操作告警信息，无则返回null
+   * @throws AccessControlException 权限检查失败抛出
+   */
   static String runCheckPermission(CheckPermission checker,
       LongFunction<String> checkElapsedMs) throws AccessControlException {
     final String message;
@@ -197,6 +291,10 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     return message;
   }
 
+  /**
+   * 初始化访问控制执行器，如果有外部提供者则包装并添加慢检查告警。
+   * @return 初始化后的访问控制执行器
+   */
   private AccessControlEnforcer initAccessControlEnforcer() {
     final AccessControlEnforcer e = Optional.ofNullable(attributeProvider)
         .map(p -> p.getExternalAccessControlEnforcer(this))
@@ -204,7 +302,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     if (e == this) {
       return this;
     }
-    // For an external AccessControlEnforcer, check for slowness.
+    // 对外部访问控制执行器添加慢检查告警包装
     return new AccessControlEnforcer() {
       @Override
       public void checkPermission(
@@ -245,6 +343,11 @@ public class FSPermissionChecker implements AccessControlEnforcer {
     };
   }
 
+  /**
+   * 构造超级用户权限检查的授权上下文。
+   * @param path 被访问路径
+   * @return 构造完成的授权上下文
+   */
   private AuthorizationContext getAuthorizationContextForSuperUser(
       String path) {
     String opType = operationType.get();
@@ -257,7 +360,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
         operationName(opType).
         callerContext(CallerContext.getCurrent());
 
-    // Add path to the context builder only if it is not null.
+    // 非空路径才添加到上下文
     if (path != null && !path.isEmpty()) {
       builder.path(path);
     }
@@ -266,22 +369,17 @@ public class FSPermissionChecker implements AccessControlEnforcer {
   }
 
   /**
-   * This method is retained to maintain backward compatibility.
-   * Please use the new method {@link #checkSuperuserPrivilege(String)} to make
-   * sure that the external enforcers have the correct context to audit.
-   *
-   * @throws AccessControlException if the caller is not a super user.
+   * 向后兼容的超级用户权限检查方法，不指定路径。
+   * @throws AccessControlException 非超级用户抛出
    */
   public void checkSuperuserPrivilege() throws AccessControlException {
     checkSuperuserPrivilege(null);
   }
 
   /**
-   * Checks if the caller has super user privileges.
-   * Throws {@link AccessControlException} for non super users.
-   *
-   * @param path The resource path for which permission is being requested.
-   * @throws AccessControlException if the caller is not a super user.
+   * 检查调用者是否拥有超级用户权限，无则抛出异常。
+   * @param path 请求访问的资源路径
+   * @throws AccessControlException 非超级用户抛出
    */
   public void checkSuperuserPrivilege(String path)
       throws AccessControlException {
@@ -295,12 +393,10 @@ public class FSPermissionChecker implements AccessControlEnforcer {
   }
 
   /**
-   * Calls the external enforcer to notify denial of access to the user with
-   * the given error message. Always throws an ACE with the given message.
-   *
-   * @param path The resource path for which permission is being requested.
-   * @param errorMessage message for the exception.
-   * @throws AccessControlException with the error message.
+   * 拒绝用户访问，调用外部执行器审计后抛出权限异常。
+   * @param path 请求访问的资源路径
+   * @param errorMessage 异常错误信息
+   * @throws AccessControlException 总是抛出该异常
    */
   public void denyUserAccess(String path, String errorMessage)
       throws AccessControlException {
@@ -314,36 +410,16 @@ public class FSPermissionChecker implements AccessControlEnforcer {
   }
 
   /**
-   * Check whether current user have permissions to access the path.
-   * Traverse is always checked.
-   *
-   * Parent path means the parent directory for the path.
-   * Ancestor path means the last (the closest) existing ancestor directory
-   * of the path.
-   * Note that if the parent path exists,
-   * then the parent path and the ancestor path are the same.
-   *
-   * For example, suppose the path is "/foo/bar/baz".
-   * No matter baz is a file or a directory,
-   * the parent path is "/foo/bar".
-   * If bar exists, then the ancestor path is also "/foo/bar".
-   * If bar does not exist and foo exists,
-   * then the ancestor path is "/foo".
-   * Further, if both foo and bar do not exist,
-   * then the ancestor path is "/".
-   *
-   * @param doCheckOwner Require user to be the owner of the path?
-   * @param ancestorAccess The access required by the ancestor of the path.
-   * @param parentAccess The access required by the parent of the path.
-   * @param access The access required by the path.
-   * @param subAccess If path is a directory,
-   * it is the access required of the path and all the sub-directories.
-   * If path is not a directory, there is no effect.
-   * @param ignoreEmptyDir Ignore permission checking for empty directory?
-   * @throws AccessControlException
-   * 
-   * Guarded by {@link FSNamesystem#readLock(RwLockMode)}
-   * Caller of this method must hold that lock.
+   * 检查当前用户对指定路径是否拥有所需访问权限，会逐级检查路径所有祖先的执行权限。
+   * 必须持有FSNamesystem的读锁才能调用本方法。
+   * @param inodesInPath 路径解析得到的inode数组
+   * @param doCheckOwner 是否要求用户必须是路径所有者
+   * @param ancestorAccess 路径最近现有祖先目录所需权限
+   * @param parentAccess 路径父目录所需权限
+   * @param access 路径本身所需权限
+   * @param subAccess 如果路径是目录，子目录所需权限
+   * @param ignoreEmptyDir 是否忽略空目录的权限检查
+   * @throws AccessControlException 权限检查不通过抛出
    */
   void checkPermission(INodesInPath inodesInPath, boolean doCheckOwner,
       FsAction ancestorAccess, FsAction parentAccess, FsAction access,
@@ -358,591 +434,7 @@ public class FSPermissionChecker implements AccessControlEnforcer {
           + ", subAccess=" + subAccess
           + ", ignoreEmptyDir=" + ignoreEmptyDir);
     }
-    // check if (parentAccess != null) && file exists, then check sb
-    // If resolveLink, the check is performed on the link target.
+    // 获取快照ID
     final int snapshotId = inodesInPath.getPathSnapshotId();
-    final INode[] inodes = inodesInPath.getINodesArray();
-    final INodeAttributes[] inodeAttrs = new INodeAttributes[inodes.length];
-    final byte[][] components = inodesInPath.getPathComponents();
-    for (int i = 0; i < inodes.length && inodes[i] != null; i++) {
-      inodeAttrs[i] = getINodeAttrs(components, i, inodes[i], snapshotId);
-    }
-
-    String path = inodesInPath.getPath();
-    int ancestorIndex = inodes.length - 2;
-
-
-    String opType = operationType.get();
-    try {
-      if (this.authorizeWithContext && opType != null) {
-        INodeAttributeProvider.AuthorizationContext.Builder builder =
-            new INodeAttributeProvider.AuthorizationContext.Builder();
-        builder.fsOwner(fsOwner).
-            supergroup(supergroup).
-            callerUgi(callerUgi).
-            inodeAttrs(inodeAttrs).
-            inodes(inodes).
-            pathByNameArr(components).
-            snapshotId(snapshotId).
-            path(path).
-            ancestorIndex(ancestorIndex).
-            doCheckOwner(doCheckOwner).
-            ancestorAccess(ancestorAccess).
-            parentAccess(parentAccess).
-            access(access).
-            subAccess(subAccess).
-            ignoreEmptyDir(ignoreEmptyDir).
-            operationName(opType).
-            callerContext(CallerContext.getCurrent());
-        accessControlEnforcer.checkPermissionWithContext(builder.build());
-      } else {
-        accessControlEnforcer.checkPermission(fsOwner, supergroup, callerUgi, inodeAttrs,
-            inodes, components, snapshotId, path, ancestorIndex, doCheckOwner,
-            ancestorAccess, parentAccess, access, subAccess, ignoreEmptyDir);
-      }
-    } catch (AccessControlException ace) {
-      Class<?> exceptionClass = ace.getClass();
-      if (exceptionClass.equals(AccessControlException.class)
-          || exceptionClass.equals(TraverseAccessControlException.class)) {
-        throw ace;
-      }
-      // Only form a new ACE for subclasses which come from external enforcers
-      throw new AccessControlException(ace);
-    }
-
-  }
-
-  /**
-   * Check permission only for the given inode (not checking the children's
-   * access).
-   *
-   * @param inode the inode to check.
-   * @param snapshotId the snapshot id.
-   * @param access the target access.
-   * @throws AccessControlException
-   */
-  void checkPermission(INode inode, int snapshotId, FsAction access)
-      throws AccessControlException {
-    byte[][] pathComponents = inode.getPathComponents();
-    INodeAttributes nodeAttributes = getINodeAttrs(pathComponents,
-        pathComponents.length - 1, inode, snapshotId);
-    try {
-      INodeAttributes[] iNodeAttr = {nodeAttributes};
-      String opType = operationType.get();
-      if (this.authorizeWithContext && opType != null) {
-        INodeAttributeProvider.AuthorizationContext.Builder builder =
-            new INodeAttributeProvider.AuthorizationContext.Builder();
-        builder.fsOwner(fsOwner)
-            .supergroup(supergroup)
-            .callerUgi(callerUgi)
-            .inodeAttrs(iNodeAttr) // single inode attr in the array
-            .inodes(new INode[] { inode }) // single inode attr in the array
-            .pathByNameArr(pathComponents)
-            .snapshotId(snapshotId)
-            .path(null)
-            .ancestorIndex(-1)     // this will skip checkTraverse()
-                                   // because not checking ancestor here
-            .doCheckOwner(false)
-            .ancestorAccess(null)
-            .parentAccess(null)
-            .access(access)        // the target access to be checked against
-                                   // the inode
-            .subAccess(null)       // passing null sub access avoids checking
-                                   // children
-            .ignoreEmptyDir(false)
-            .operationName(opType)
-            .callerContext(CallerContext.getCurrent());
-
-        accessControlEnforcer.checkPermissionWithContext(builder.build());
-      } else {
-        accessControlEnforcer.checkPermission(
-            fsOwner, supergroup, callerUgi,
-            iNodeAttr, // single inode attr in the array
-            new INode[]{inode}, // single inode in the array
-            pathComponents, snapshotId,
-            null, -1, // this will skip checkTraverse() because
-            // not checking ancestor here
-            false, null, null,
-            access, // the target access to be checked against the inode
-            null, // passing null sub access avoids checking children
-            false);
-      }
-    } catch (AccessControlException ace) {
-      LOG.debug("Error while checking permission: ", ace);
-      throw new AccessControlException(
-          toAccessControlString(nodeAttributes, inode.getFullPathName(),
-              access));
-    }
-  }
-
-  @Override
-  public void checkPermission(String fsOwner, String supergroup,
-      UserGroupInformation callerUgi, INodeAttributes[] inodeAttrs,
-      INode[] inodes, byte[][] components, int snapshotId, String path,
-      int ancestorIndex, boolean doCheckOwner, FsAction ancestorAccess,
-      FsAction parentAccess, FsAction access, FsAction subAccess,
-      boolean ignoreEmptyDir)
-      throws AccessControlException {
-    for(; ancestorIndex >= 0 && inodes[ancestorIndex] == null;
-        ancestorIndex--);
-
-    try {
-      checkTraverse(inodeAttrs, inodes, components, ancestorIndex);
-    } catch (UnresolvedPathException | ParentNotDirectoryException ex) {
-      // must tunnel these exceptions out to avoid breaking interface for
-      // external enforcer
-      throw new TraverseAccessControlException(ex);
-    }
-
-    final INodeAttributes last = inodeAttrs[inodeAttrs.length - 1];
-    if (parentAccess != null && parentAccess.implies(FsAction.WRITE)
-        && inodeAttrs.length > 1 && last != null) {
-      checkStickyBit(inodeAttrs, components, inodeAttrs.length - 2);
-    }
-    if (ancestorAccess != null && inodeAttrs.length > 1) {
-      check(inodeAttrs, components, ancestorIndex, ancestorAccess);
-    }
-    if (parentAccess != null && inodeAttrs.length > 1) {
-      check(inodeAttrs, components, inodeAttrs.length - 2, parentAccess);
-    }
-    if (access != null) {
-      check(inodeAttrs, components, inodeAttrs.length - 1, access);
-    }
-    if (subAccess != null) {
-      INode rawLast = inodes[inodeAttrs.length - 1];
-      checkSubAccess(components, inodeAttrs.length - 1, rawLast,
-          snapshotId, subAccess, ignoreEmptyDir);
-    }
-    if (doCheckOwner) {
-      checkOwner(inodeAttrs, components, inodeAttrs.length - 1);
-    }
-  }
-
-  @Override
-  public void checkPermissionWithContext(
-      INodeAttributeProvider.AuthorizationContext authzContext)
-      throws AccessControlException {
-    // The default authorization provider does not use the additional context
-    // parameters including operationName and callerContext.
-    this.checkPermission(authzContext.getFsOwner(),
-        authzContext.getSupergroup(), authzContext.getCallerUgi(),
-        authzContext.getInodeAttrs(), authzContext.getInodes(),
-        authzContext.getPathByNameArr(), authzContext.getSnapshotId(),
-        authzContext.getPath(), authzContext.getAncestorIndex(),
-        authzContext.isDoCheckOwner(), authzContext.getAncestorAccess(),
-        authzContext.getParentAccess(), authzContext.getAccess(),
-        authzContext.getSubAccess(), authzContext.isIgnoreEmptyDir());
-  }
-
-  private INodeAttributes getINodeAttrs(byte[][] pathByNameArr, int pathIdx,
-      INode inode, int snapshotId) {
-    INodeAttributes inodeAttrs = inode.getSnapshotINode(snapshotId);
-    if (getAttributesProvider() != null) {
-      String[] elements = new String[pathIdx + 1];
-      /**
-       * {@link INode#getPathComponents(String)} returns a null component
-       * for the root only path "/". Assign an empty string if so.
-       */
-      if (pathByNameArr.length == 1 && pathByNameArr[0] == null) {
-        elements[0] = "";
-      } else {
-        for (int i = 0; i < elements.length; i++) {
-          elements[i] = DFSUtil.bytes2String(pathByNameArr[i]);
-        }
-      }
-      inodeAttrs = getAttributesProvider().getAttributes(elements, inodeAttrs);
-    }
-    return inodeAttrs;
-  }
-
-  /** Guarded by {@link FSNamesystem#readLock(RwLockMode)}. */
-  private void checkOwner(INodeAttributes[] inodes, byte[][] components, int i)
-      throws AccessControlException {
-    if (getUser().equals(inodes[i].getUserName())) {
-      return;
-    }
-    throw new AccessControlException(
-        "Permission denied. user=" + getUser() +
-        " is not the owner of inode=" + getPath(components, 0, i));
-  }
-
-  /** Guarded by {@link FSNamesystem#readLock(RwLockMode)}.
-   * @throws AccessControlException
-   * @throws ParentNotDirectoryException
-   * @throws UnresolvedPathException
-   */
-  private void checkTraverse(INodeAttributes[] inodeAttrs, INode[] inodes,
-      byte[][] components, int last) throws AccessControlException,
-          UnresolvedPathException, ParentNotDirectoryException {
-    for (int i=0; i <= last; i++) {
-      checkIsDirectory(inodes[i], components, i);
-      check(inodeAttrs, components, i, FsAction.EXECUTE);
-    }
-  }
-
-  /** Guarded by {@link FSNamesystem#readLock(RwLockMode)}. */
-  private void checkSubAccess(byte[][] components, int pathIdx,
-      INode inode, int snapshotId, FsAction access, boolean ignoreEmptyDir)
-      throws AccessControlException {
-    if (inode == null || !inode.isDirectory()) {
-      return;
-    }
-
-    // Each inode in the subtree has a level. The root inode has level 0.
-    // List subINodePath tracks the inode path in the subtree during
-    // traversal. The root inode is not stored because it is already in array
-    // components. The list index is (level - 1).
-    ArrayList<INodeDirectory> subINodePath = new ArrayList<>();
-
-    // The stack of levels matches the stack of directory inodes.
-    Stack<Integer> levels = new Stack<>();
-    levels.push(0);    // Level 0 is the root
-
-    Stack<INodeDirectory> directories = new Stack<INodeDirectory>();
-    for(directories.push(inode.asDirectory()); !directories.isEmpty(); ) {
-      INodeDirectory d = directories.pop();
-      int level = levels.pop();
-      ReadOnlyList<INode> cList = d.getChildrenList(snapshotId);
-      if (!(cList.isEmpty() && ignoreEmptyDir)) {
-        //TODO have to figure this out with inodeattribute provider
-        INodeAttributes inodeAttr =
-            getINodeAttrs(components, pathIdx, d, snapshotId);
-        if (!hasPermission(inodeAttr, access)) {
-          throw new AccessControlException(
-              toAccessControlString(inodeAttr, d.getFullPathName(), access));
-        }
-
-        if (level > 0) {
-          if (level - 1 < subINodePath.size()) {
-            subINodePath.set(level - 1, d);
-          } else {
-            Preconditions.checkState(level - 1 == subINodePath.size());
-            subINodePath.add(d);
-          }
-        }
-
-        if (inodeAttr.getFsPermission().getStickyBit()) {
-          for (INode child : cList) {
-            INodeAttributes childInodeAttr =
-                getINodeAttrs(components, pathIdx, child, snapshotId);
-            if (isStickyBitViolated(inodeAttr, childInodeAttr)) {
-              List<byte[]> allComponentList = new ArrayList<>();
-              for (int i = 0; i <= pathIdx; ++i) {
-                allComponentList.add(components[i]);
-              }
-              for (int i = 0; i < level; ++i) {
-                allComponentList.add(subINodePath.get(i).getLocalNameBytes());
-              }
-              allComponentList.add(child.getLocalNameBytes());
-              int index = pathIdx + level;
-              byte[][] allComponents =
-                  allComponentList.toArray(new byte[][]{});
-              throwStickyBitException(
-                  getPath(allComponents, 0, index + 1), child,
-                  getPath(allComponents, 0, index), inode);
-            }
-          }
-        }
-      }
-
-      for(INode child : cList) {
-        if (child.isDirectory()) {
-          directories.push(child.asDirectory());
-          levels.push(level + 1);
-        }
-      }
-    }
-  }
-
-  /** Guarded by {@link FSNamesystem#readLock(RwLockMode)}. */
-  private void check(INodeAttributes[] inodes, byte[][] components, int i,
-      FsAction access) throws AccessControlException {
-    INodeAttributes inode = (i >= 0) ? inodes[i] : null;
-    if (inode != null && !hasPermission(inode, access)) {
-      throw new AccessControlException(
-          toAccessControlString(inode, getPath(components, 0, i), access));
-    }
-  }
-
-  // return whether access is permitted.  note it neither requires a path or
-  // throws so the caller can build the path only if required for an exception.
-  // very beneficial for subaccess checks!
-  private boolean hasPermission(INodeAttributes inode, FsAction access) {
-    if (inode == null) {
-      return true;
-    }
-    final FsPermission mode = inode.getFsPermission();
-    final AclFeature aclFeature = inode.getAclFeature();
-    if (aclFeature != null && aclFeature.getEntriesSize() > 0) {
-      // It's possible that the inode has a default ACL but no access ACL.
-      int firstEntry = aclFeature.getEntryAt(0);
-      if (AclEntryStatusFormat.getScope(firstEntry) == AclEntryScope.ACCESS) {
-        return hasAclPermission(inode, access, mode, aclFeature);
-      }
-    }
-    final FsAction checkAction;
-    if (getUser().equals(inode.getUserName())) { //user class
-      checkAction = mode.getUserAction();
-    } else if (isMemberOfGroup(inode.getGroupName())) { //group class
-      checkAction = mode.getGroupAction();
-    } else { //other class
-      checkAction = mode.getOtherAction();
-    }
-    return checkAction.implies(access);
-  }
-
-  /**
-   * Checks requested access against an Access Control List.  This method relies
-   * on finding the ACL data in the relevant portions of {@link FsPermission} and
-   * {@link AclFeature} as implemented in the logic of {@link AclStorage}.  This
-   * method also relies on receiving the ACL entries in sorted order.  This is
-   * assumed to be true, because the ACL modification methods in
-   * {@link AclTransformation} sort the resulting entries.
-   *
-   * More specifically, this method depends on these invariants in an ACL:
-   * - The list must be sorted.
-   * - Each entry in the list must be unique by scope + type + name.
-   * - There is exactly one each of the unnamed user/group/other entries.
-   * - The mask entry must not have a name.
-   * - The other entry must not have a name.
-   * - Default entries may be present, but they are ignored during enforcement.
-   *
-   * @param inode INodeAttributes accessed inode
-   * @param access FsAction requested permission
-   * @param mode FsPermission mode from inode
-   * @param aclFeature AclFeature of inode
-   * @throws AccessControlException if the ACL denies permission
-   */
-  private boolean hasAclPermission(INodeAttributes inode,
-      FsAction access, FsPermission mode, AclFeature aclFeature) {
-    boolean foundMatch = false;
-
-    // Use owner entry from permission bits if user is owner.
-    if (getUser().equals(inode.getUserName())) {
-      if (mode.getUserAction().implies(access)) {
-        return true;
-      }
-      foundMatch = true;
-    }
-
-    // Check named user and group entries if user was not denied by owner entry.
-    if (!foundMatch) {
-      for (int pos = 0, entry; pos < aclFeature.getEntriesSize(); pos++) {
-        entry = aclFeature.getEntryAt(pos);
-        if (AclEntryStatusFormat.getScope(entry) == AclEntryScope.DEFAULT) {
-          break;
-        }
-        AclEntryType type = AclEntryStatusFormat.getType(entry);
-        String name = AclEntryStatusFormat.getName(entry);
-        if (type == AclEntryType.USER) {
-          // Use named user entry with mask from permission bits applied if user
-          // matches name.
-          if (getUser().equals(name)) {
-            FsAction masked = AclEntryStatusFormat.getPermission(entry).and(
-                mode.getGroupAction());
-            if (masked.implies(access)) {
-              return true;
-            }
-            foundMatch = true;
-            break;
-          }
-        } else if (type == AclEntryType.GROUP) {
-          // Use group entry (unnamed or named) with mask from permission bits
-          // applied if user is a member and entry grants access.  If user is a
-          // member of multiple groups that have entries that grant access, then
-          // it doesn't matter which is chosen, so exit early after first match.
-          String group = name == null ? inode.getGroupName() : name;
-          if (isMemberOfGroup(group)) {
-            FsAction masked = AclEntryStatusFormat.getPermission(entry).and(
-                mode.getGroupAction());
-            if (masked.implies(access)) {
-              return true;
-            }
-            foundMatch = true;
-          }
-        }
-      }
-    }
-
-    // Use other entry if user was not denied by an earlier match.
-    return !foundMatch && mode.getOtherAction().implies(access);
-  }
-
-  /** Guarded by {@link FSNamesystem#readLock(RwLockMode)}. */
-  private void checkStickyBit(INodeAttributes[] inodes, byte[][] components,
-      int index) throws AccessControlException {
-    INodeAttributes parent = inodes[index];
-    if (!parent.getFsPermission().getStickyBit()) {
-      return;
-    }
-
-    INodeAttributes inode = inodes[index + 1];
-    if (!isStickyBitViolated(parent, inode)) {
-      return;
-    }
-
-    throwStickyBitException(getPath(components, 0, index + 1), inode,
-        getPath(components, 0, index), parent);
-  }
-
-  /** Return true when sticky bit is violated. */
-  private boolean isStickyBitViolated(INodeAttributes parent,
-                                      INodeAttributes inode) {
-    // If this user is the directory owner, return
-    if (parent.getUserName().equals(getUser())) {
-      return false;
-    }
-
-    // if this user is the file owner, return
-    if (inode.getUserName().equals(getUser())) {
-      return false;
-    }
-
-    return true;
-  }
-
-  private void throwStickyBitException(
-      String inodePath, INodeAttributes inode,
-      String parentPath, INodeAttributes parent)
-      throws AccessControlException {
-    throw new AccessControlException(String.format(
-        FSExceptionMessages.PERMISSION_DENIED_BY_STICKY_BIT +
-            ": user=%s, path=\"%s\":%s:%s:%s%s, " +
-            "parent=\"%s\":%s:%s:%s%s", user, inodePath, inode.getUserName(),
-        inode.getGroupName(), inode.isDirectory() ? "d" : "-",
-        inode.getFsPermission().toString(), parentPath, parent.getUserName(),
-        parent.getGroupName(), parent.isDirectory() ? "d" : "-",
-        parent.getFsPermission().toString()));
-  }
-
-  /**
-   * Whether a cache pool can be accessed by the current context
-   *
-   * @param pool CachePool being accessed
-   * @param access type of action being performed on the cache pool
-   * @throws AccessControlException if pool cannot be accessed
-   */
-  public void checkPermission(CachePool pool, FsAction access)
-      throws AccessControlException {
-    FsPermission mode = pool.getMode();
-    if (isSuperUser()) {
-      return;
-    }
-    if (getUser().equals(pool.getOwnerName())
-        && mode.getUserAction().implies(access)) {
-      return;
-    }
-    if (isMemberOfGroup(pool.getGroupName())
-        && mode.getGroupAction().implies(access)) {
-      return;
-    }
-    if (!getUser().equals(pool.getOwnerName())
-        && !isMemberOfGroup(pool.getGroupName())
-        && mode.getOtherAction().implies(access)) {
-      return;
-    }
-    throw new AccessControlException("Permission denied while accessing pool "
-        + pool.getPoolName() + ": user " + getUser() + " does not have "
-        + access.toString() + " permissions.");
-  }
-
-  /**
-   * Verifies that all existing ancestors are directories.  If a permission
-   * checker is provided then the user must have exec access.  Ancestor
-   * symlinks will throw an unresolved exception, and resolveLink determines
-   * if the last inode will throw an unresolved exception.  This method
-   * should always be called after a path is resolved into an IIP.
-   * @param pc for permission checker, null for no checking
-   * @param iip path to verify
-   * @param resolveLink whether last inode may be a symlink
-   * @throws AccessControlException
-   * @throws UnresolvedPathException
-   * @throws ParentNotDirectoryException
-   */
-  static void checkTraverse(FSPermissionChecker pc, INodesInPath iip,
-      boolean resolveLink) throws AccessControlException,
-          UnresolvedPathException, ParentNotDirectoryException {
-    try {
-      if (pc == null || pc.isSuperUser()) {
-        if (pc != null) {
-          // call the external enforcer for audit
-          pc.checkSuperuserPrivilege(iip.getPath());
-        }
-        checkSimpleTraverse(iip);
-      } else {
-        pc.checkPermission(iip, false, null, null, null, null, false);
-      }
-    } catch (TraverseAccessControlException tace) {
-      // unwrap the non-ACE (unresolved, parent not dir) exception
-      // tunneled out of checker.
-      tace.throwCause();
-    }
-    // maybe check that the last inode is a symlink
-    if (resolveLink) {
-      int last = iip.length() - 1;
-      checkNotSymlink(iip.getINode(last), iip.getPathComponents(), last);
-    }
-  }
-
-  // rudimentary permission-less directory check
-  private static void checkSimpleTraverse(INodesInPath iip)
-      throws UnresolvedPathException, ParentNotDirectoryException {
-    byte[][] components = iip.getPathComponents();
-    for (int i=0; i < iip.length() - 1; i++) {
-      INode inode = iip.getINode(i);
-      if (inode == null) {
-        break;
-      }
-      checkIsDirectory(inode, components, i);
-    }
-  }
-
-  private static void checkIsDirectory(INode inode, byte[][] components, int i)
-      throws UnresolvedPathException, ParentNotDirectoryException {
-    if (inode != null && !inode.isDirectory()) {
-      checkNotSymlink(inode, components, i);
-      throw new ParentNotDirectoryException(
-          getPath(components, 0, i) + " (is not a directory)");
-    }
-  }
-
-  private static void checkNotSymlink(INode inode, byte[][] components, int i)
-      throws UnresolvedPathException {
-    if (inode != null && inode.isSymlink()) {
-      final int last = components.length - 1;
-      final String path = getPath(components, 0, last);
-      final String preceding = getPath(components, 0, i - 1);
-      final String remainder = getPath(components, i + 1, last);
-      final String target = inode.asSymlink().getSymlinkString();
-      if (LOG.isDebugEnabled()) {
-        final String link = inode.getLocalName();
-        LOG.debug("UnresolvedPathException " +
-            " path: " + path + " preceding: " + preceding +
-            " count: " + i + " link: " + link + " target: " + target +
-            " remainder: " + remainder);
-      }
-      throw new UnresolvedPathException(path, preceding, remainder, target);
-    }
-  }
-
-  //used to tunnel non-ACE exceptions encountered during path traversal.
-  //ops that create inodes are expected to throw ParentNotDirectoryExceptions.
-  //the signature of other methods requires the PNDE to be thrown as an ACE.
-  @SuppressWarnings("serial")
-  static class TraverseAccessControlException extends AccessControlException {
-    TraverseAccessControlException(IOException ioe) {
-      super(ioe);
-    }
-    public void throwCause() throws UnresolvedPathException,
-        ParentNotDirectoryException, AccessControlException {
-      Throwable ioe = getCause();
-      if (ioe instanceof UnresolvedPathException) {
-        throw (UnresolvedPathException)ioe;
-      }
-      if (ioe instanceof ParentNotDirectoryException) {
-        throw (ParentNotDirectoryException)ioe;
-      }
-      throw this;
-    }
-  }
-}
+    // 获取解析后的inode数组
+    final IN

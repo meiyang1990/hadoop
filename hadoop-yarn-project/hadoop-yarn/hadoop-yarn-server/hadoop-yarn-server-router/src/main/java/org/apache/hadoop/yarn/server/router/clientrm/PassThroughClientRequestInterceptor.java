@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -93,8 +94,8 @@ import org.apache.hadoop.yarn.api.protocolrecords.UpdateApplicationTimeoutsRespo
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
- * Interceptor that does not do anything other than forwarding it to the next
- * Interceptor in the chain.
+ * YARN Router客户端请求透传拦截器，将所有客户端请求直接转发给责任链中的下一个拦截器处理。
+ * 作为责任链模式的默认基础实现，本身不做额外处理，仅完成请求转发。
  */
 public class PassThroughClientRequestInterceptor extends AbstractClientRequestInterceptor {
 

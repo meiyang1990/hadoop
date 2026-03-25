@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,9 +25,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that maintain the maximum of 
- * a sequence of long values.
- * 
+ * 长整型最大值聚合器，用于在MapReduce聚合计算中维护一组长整型数值的最大值
+ * 属于MapReduce聚合框架的内置实现，适用于需要计算分组最大值的场景
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -35,19 +35,15 @@ public class LongValueMax implements ValueAggregator<String> {
   long maxVal = Long.MIN_VALUE;
     
   /**
-   *  the default constructor
-   *
+   * 默认构造函数，初始化时重置最大值
    */
   public LongValueMax() {
     reset();
   }
 
   /**
-   * add a value to the aggregator
-   * 
-   * @param val
-   *          an object whose string representation represents a long value.
-   * 
+   * 添加一个新的数值到聚合器，更新当前最大值
+   * @param val 待添加的数值对象，其字符串表示对应一个长整型值
    */
   public void addNextValue(Object val) {
     long newVal = Long.parseLong(val.toString());
@@ -57,11 +53,8 @@ public class LongValueMax implements ValueAggregator<String> {
   }
     
   /**
-   * add a value to the aggregator
-   * 
-   * @param newVal
-   *          a long value.
-   * 
+   * 添加一个新的长整型值到聚合器，更新当前最大值
+   * @param newVal 待添加的长整型值
    */
   public void addNextValue(long newVal) {
     if (this.maxVal < newVal) {
@@ -70,30 +63,31 @@ public class LongValueMax implements ValueAggregator<String> {
   }
     
   /**
-   * @return the aggregated value
+   * 获取当前聚合得到的最大值
+   * @return 聚合后的最大值
    */
   public long getVal() {
     return this.maxVal;
   }
     
   /**
-   * @return the string representation of the aggregated value
+   * 获取聚合结果的字符串表示，用于输出报告
+   * @return 最大值的字符串形式
    */
   public String getReport() {
     return ""+maxVal;
   }
 
   /**
-   * reset the aggregator
+   * 重置聚合器，清空当前计算的最大值，恢复初始状态
    */
   public void reset() {
     maxVal = Long.MIN_VALUE;
   }
 
   /**
-   * @return return an array of one element. The element is a string
-   *         representation of the aggregated value. The return value is
-   *         expected to be used by the a combiner.
+   * 生成Combiner阶段的输出，供MapReduce聚合框架使用
+   * @return 包含一个元素的ArrayList，元素是当前聚合结果的字符串表示
    */
   public ArrayList<String> getCombinerOutput() {
     ArrayList<String> retv = new ArrayList<String>(1);

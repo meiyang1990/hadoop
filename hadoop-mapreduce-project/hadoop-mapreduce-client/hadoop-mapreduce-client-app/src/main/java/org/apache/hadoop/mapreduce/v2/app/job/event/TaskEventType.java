@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,21 +20,22 @@
 package org.apache.hadoop.mapreduce.v2.app.job.event;
 
 /**
- * Event types handled by Task.
+ * MapReduce Application 中Task模块处理的事件类型枚举
+ * 定义了所有Task可以接收的事件类型，以及事件的产生来源
  */
 public enum TaskEventType {
 
-  //Producer:Client, Job
+  // 事件产生方：客户端、Job
   T_KILL,
 
-  //Producer:Job
+  // 事件产生方：Job
   T_SCHEDULE,
   T_RECOVER,
 
-  //Producer:Speculator
+  // 事件产生方：推测执行器
   T_ADD_SPEC_ATTEMPT,
 
-  //Producer:TaskAttempt
+  // 事件产生方：TaskAttempt
   T_ATTEMPT_LAUNCHED,
   T_ATTEMPT_COMMIT_PENDING,
   T_ATTEMPT_FAILED,

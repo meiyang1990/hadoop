@@ -1,5 +1,5 @@
+// 这个文件已经全部加上中文注释
 /*
- * *
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
  *  distributed with this work for additional information
@@ -15,7 +15,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- * /
  */
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint;
@@ -23,16 +22,24 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
- * Exception when invalid parameter specified to do placement tags related
- * queries.
+ * 分配标签查询参数非法时抛出的异常，用于YARN调度约束处理流程
+ * 当用户或程序在执行容器放置标签相关查询时传入了无效参数，会抛出此异常
  */
 public class InvalidAllocationTagsQueryException extends YarnException {
   private static final long serialVersionUID = 12312831974894L;
 
+  /**
+   * 带错误消息的构造方法
+   * @param msg 错误描述信息
+   */
   public InvalidAllocationTagsQueryException(String msg) {
     super(msg);
   }
 
+  /**
+   * 包装原始YarnException的构造方法
+   * @param e 原始YARN异常
+   */
   public InvalidAllocationTagsQueryException(YarnException e) {
     super(e);
   }

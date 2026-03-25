@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,7 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.storage.common contains
- * a set of utility classes used across backend storage reader and writer.
+ * 时间线服务HBase存储层公共工具包，提供跨存储读写模块共享的通用工具类与基础抽象。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

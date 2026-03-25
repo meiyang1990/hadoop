@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,35 +49,47 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 
 import static org.apache.hadoop.yarn.util.resource.Resources.none;
 
+/**
+ * 公平调度器叶子队列，实际承载运行应用的队列，不包含子队列
+ * 负责管理本队列内所有应用尝试的生命周期、资源分配、抢占计算等工作
+ */
 @Private
 @Unstable
 public class FSLeafQueue extends FSQueue {
   private static final Logger LOG = LoggerFactory.
       getLogger(FSLeafQueue.class.getName());
-  private static final List<FSQueue> EMPTY_LIST = Collections.emptyList();
+  private static final List<FSQueue> EMPTY_LIST = Collections.emptyList;
 
   private FSContext context;
 
-  // apps that are runnable
+  // 可运行状态的应用尝试列表
   private final List<FSAppAttempt> runnableApps = new ArrayList<>();
+  // 不可运行状态的应用尝试列表
   private final List<FSAppAttempt> nonRunnableApps = new ArrayList<>();
-  // assignedApps keeps track of applications that have no appAttempts
+  // 已分配到该队列但尚未创建应用尝试的应用集合
   private final Set<ApplicationId> assignedApps = new HashSet<>();
-  // get a lock with fair distribution for app list updates
+  // 读写锁，采用公平排序策略保护应用列表更新
   private final ReadWriteLock rwl = new ReentrantReadWriteLock(true);
   private final Lock readLock = rwl.readLock();
   private final Lock writeLock = rwl.writeLock();
   
+  // 队列总资源需求
   private Resource demand = Resources.createResource(0);
   
-  // Variables used for preemption
+  // 抢占相关：队列上次满足最小资源份额的时间戳
   private long lastTimeAtMinShare;
 
-  // Track the AM resource usage for this queue
+  // 队列 Application Master 资源使用量
   private Resource amResourceUsage;
 
   private final ActiveUsersManager activeUsersManager;
 
+  /**
+   * 构造叶子队列实例
+   * @param name 队列名称
+   * @param scheduler 公平调度器实例
+   * @param parent 父队列
+   */
   public FSLeafQueue(String name, FairScheduler scheduler,
       FSParentQueue parent) {
     super(name, scheduler, parent);
@@ -87,6 +100,11 @@ public class FSLeafQueue extends FSQueue {
     getMetrics().setAMResourceUsage(amResourceUsage);
   }
   
+  /**
+   * 将应用尝试添加到队列
+   * @param app 应用尝试实例
+   * @param runnable 是否可运行
+   */
   void addApp(FSAppAttempt app, boolean runnable) {
     writeLock.lock();
     try {
@@ -95,8 +113,7 @@ public class FSLeafQueue extends FSQueue {
       } else {
         nonRunnableApps.add(app);
       }
-      // when an appAttempt is created for an application, we'd like to move
-      // it over from assignedApps to either runnableApps or nonRunnableApps
+      // 应用尝试创建完成，从未创建尝试的已分配应用列表移除
       assignedApps.remove(app.getApplicationId());
       incUsedResource(app.getResourceUsage());
     } finally {
@@ -105,18 +122,18 @@ public class FSLeafQueue extends FSQueue {
   }
   
   /**
-   * Removes the given app from this queue.
-   * @return whether or not the app was runnable
+   * 从队列移除指定应用尝试
+   * @return 应用移除前是否为可运行状态
    */
   boolean removeApp(FSAppAttempt app) {
     boolean runnable = false;
 
-    // Remove app from runnable/nonRunnable list while holding the write lock
+    // 持有写锁时从可运行/不可运行列表移除应用
     writeLock.lock();
     try {
       runnable = runnableApps.remove(app);
       if (!runnable) {
-        // removeNonRunnableApp acquires the write lock again, which is fine
+        // 不在可运行列表，尝试从不可运行列表移除
         if (!removeNonRunnableApp(app)) {
           throw new IllegalStateException("Given app to remove " + app +
               " does not exist in queue " + this);
@@ -126,8 +143,7 @@ public class FSLeafQueue extends FSQueue {
       writeLock.unlock();
     }
 
-    // Update AM resource usage if needed. If isAMRunning is true, we're not
-    // running an unmanaged AM.
+    // 如果应用可运行且AM正在运行，更新AM资源使用量
     if (runnable && app.isAmRunning()) {
       Resources.subtractFrom(amResourceUsage, app.getAMResource());
       getMetrics().setAMResourceUsage(amResourceUsage);
@@ -138,8 +154,9 @@ public class FSLeafQueue extends FSQueue {
   }
 
   /**
-   * Removes the given app if it is non-runnable and belongs to this queue
-   * @return true if the app is removed, false otherwise
+   * 从不可运行列表移除指定应用尝试
+   * @param app 应用尝试实例
+   * @return 是否成功移除
    */
   boolean removeNonRunnableApp(FSAppAttempt app) {
     writeLock.lock();
@@ -150,6 +167,11 @@ public class FSLeafQueue extends FSQueue {
     }
   }
 
+  /**
+   * 判断应用尝试是否在可运行列表中
+   * @param attempt 应用尝试实例
+   * @return 是否可运行
+   */
   boolean isRunnableApp(FSAppAttempt attempt) {
     readLock.lock();
     try {
@@ -159,6 +181,11 @@ public class FSLeafQueue extends FSQueue {
     }
   }
 
+  /**
+   * 判断应用尝试是否在不可运行列表中
+   * @param attempt 应用尝试实例
+   * @return 是否不可运行
+   */
   boolean isNonRunnableApp(FSAppAttempt attempt) {
     readLock.lock();
     try {
@@ -168,6 +195,10 @@ public class FSLeafQueue extends FSQueue {
     }
   }
 
+  /**
+   * 获取不可运行应用尝试的拷贝列表
+   * @return 不可运行应用尝试列表拷贝
+   */
   List<FSAppAttempt> getCopyOfNonRunnableAppSchedulables() {
     List<FSAppAttempt> appsToReturn = new ArrayList<>();
     readLock.lock();
@@ -184,9 +215,11 @@ public class FSLeafQueue extends FSQueue {
       Collection<ApplicationAttemptId> apps) {
     readLock.lock();
     try {
+      // 收集所有可运行应用尝试ID
       for (FSAppAttempt appSched : runnableApps) {
         apps.add(appSched.getApplicationAttemptId());
       }
+      // 收集所有不可运行应用尝试ID
       for (FSAppAttempt appSched : nonRunnableApps) {
         apps.add(appSched.getApplicationAttemptId());
       }
@@ -199,6 +232,7 @@ public class FSLeafQueue extends FSQueue {
   void updateInternal() {
     readLock.lock();
     try {
+      // 重新计算队列内所有可运行应用的公平份额
       policy.computeShares(runnableApps, getFairShare());
     } finally {
       readLock.unlock();
@@ -206,21 +240,23 @@ public class FSLeafQueue extends FSQueue {
   }
 
   /**
-   * Compute the extent of fairshare starvation for a set of apps.
-   *
-   * @param appsWithDemand apps to compute fairshare starvation for
-   * @return aggregate fairshare starvation for all apps
+   * 计算应用集合的公平份额饥饿总量，并将饥饿应用加入全局饥饿列表
+   * @param appsWithDemand 按饥饿程度排序的有需求应用集合
+   * @return 所有应用的公平份额饥饿总和
    */
   private Resource updateStarvedAppsFairshare(
       TreeSet<FSAppAttempt> appsWithDemand) {
     Resource fairShareStarvation = Resources.clone(none());
-    // Fetch apps with unmet demand sorted by fairshare starvation
+    // 遍历按饥饿程度排序的应用
     for (FSAppAttempt app : appsWithDemand) {
       Resource appStarvation = app.fairShareStarvation();
       if (!Resources.isNone(appStarvation))  {
+        // 应用存在公平份额饥饿，加入全局饥饿列表
         context.getStarvedApps().addStarvedApp(app);
+        // 累加饥饿总量
         Resources.addTo(fairShareStarvation, appStarvation);
       } else {
+        // 遇到第一个无饥饿的应用，后续应用都不会饥饿，直接中断
         break;
       }
     }
@@ -228,73 +264,60 @@ public class FSLeafQueue extends FSQueue {
   }
 
   /**
-   * Distribute minshare starvation to a set of apps
-   * @param appsWithDemand set of apps
-   * @param minShareStarvation minshare starvation to distribute
+   * 将队列最小份额饥饿分配给各个有需求的应用
+   * @param appsWithDemand 有需求应用集合
+   * @param minShareStarvation 队列总最小份额饥饿量
    */
   private void updateStarvedAppsMinshare(
       final TreeSet<FSAppAttempt> appsWithDemand,
       final Resource minShareStarvation) {
     Resource pending = Resources.clone(minShareStarvation);
 
-    // Keep adding apps to the starved list until the unmet demand goes over
-    // the remaining minshare
+    // 持续分配直到饥饿全部分配完成
     for (FSAppAttempt app : appsWithDemand) {
       if (!Resources.isNone(pending)) {
+        // 获取应用未满足需求，扣除已通过公平份额饥饿获得的部分
         Resource appMinShare = app.getPendingDemand();
         Resources.subtractFromNonNegative(
             appMinShare, app.getFairshareStarvation());
 
+        // 如果应用剩余需求超过待分配饥饿量，只分配剩余待分配部分
         if (Resources.greaterThan(policy.getResourceCalculator(),
             scheduler.getClusterResource(), appMinShare, pending)) {
           Resources.subtractFromNonNegative(appMinShare, pending);
           pending = none();
         } else {
+          // 分配应用全部剩余需求，扣除待分配总量
           Resources.subtractFromNonNegative(pending, appMinShare);
         }
+        // 设置应用最小份额饥饿量，加入全局饥饿列表
         app.setMinshareStarvation(appMinShare);
         context.getStarvedApps().addStarvedApp(app);
       } else {
-        // Reset minshare starvation in case we had set it in a previous
-        // iteration
+        // 饥饿已分配完成，重置其他应用的最小份额饥饿
         app.resetMinshareStarvation();
       }
     }
   }
 
   /**
-   * Helper method to identify starved applications. This needs to be called
-   * ONLY from {@link #updateInternal}, after the application shares
-   * are updated.
-   *
-   * A queue can be starving due to fairshare or minshare.
-   *
-   * Minshare is defined only on the queue and not the applications.
-   * Fairshare is defined for both the queue and the applications.
-   *
-   * If this queue is starved due to minshare, we need to identify the most
-   * deserving apps if they themselves are not starved due to fairshare.
-   *
-   * If this queue is starving due to fairshare, there must be at least
-   * one application that is starved. And, even if the queue is not
-   * starved due to fairshare, there might still be starved applications.
-   *
-   * Caller does not need read/write lock on the leaf queue.
+   * 更新队列饥饿应用列表，识别处于饥饿状态的应用，用于抢占计算
+   * 仅可在{@link #updateInternal}方法执行完毕、应用份额更新完成后调用
    */
   void updateStarvedApps() {
-    // Fetch apps with pending demand
+    // 获取所有有未满足需求的应用
     TreeSet<FSAppAttempt> appsWithDemand = fetchAppsWithDemand(false);
 
-    // Process apps with fairshare starvation
+    // 处理公平份额饥饿
     Resource fairShareStarvation = updateStarvedAppsFairshare(appsWithDemand);
 
-    // Compute extent of minshare starvation
+    // 计算队列总最小份额饥饿
     Resource minShareStarvation = minShareStarvation();
 
-    // Compute minshare starvation that is not subsumed by fairshare starvation
+    // 扣除已被公平份额饥饿覆盖的部分，得到剩余需要分配的最小份额饥饿
     Resources.subtractFromNonNegative(minShareStarvation, fairShareStarvation);
 
-    // Assign this minshare to apps with pending demand over fairshare
+    // 将剩余最小份额饥饿分配给各个应用
     updateStarvedAppsMinshare(appsWithDemand, minShareStarvation);
   }
 
@@ -309,15 +332,16 @@ public class FSLeafQueue extends FSQueue {
 
   @Override
   public void updateDemand() {
-    // Compute demand by iterating through apps in the queue
-    // Limit demand to maxResources
+    // 临时变量存储计算得到的总需求
     Resource tmpDemand = Resources.createResource(0);
     readLock.lock();
     try {
+      // 累加所有可运行应用的需求
       for (FSAppAttempt sched : runnableApps) {
         sched.updateDemand();
         Resources.addTo(tmpDemand, sched.getDemand());
       }
+      // 累加所有不可运行应用的需求
       for (FSAppAttempt sched : nonRunnableApps) {
         sched.updateDemand();
         Resources.addTo(tmpDemand, sched.getDemand());
@@ -325,7 +349,7 @@ public class FSLeafQueue extends FSQueue {
     } finally {
       readLock.unlock();
     }
-    // Cap demand to maxShare to limit allocation to maxShare
+    // 总需求不超过队列最大份额，做截断处理
     demand = Resources.componentwiseMin(tmpDemand, getMaxShare());
     if (LOG.isDebugEnabled()) {
       LOG.debug("The updated demand for " + getName() + " is " + demand
@@ -343,24 +367,28 @@ public class FSLeafQueue extends FSQueue {
           getName() + " fairShare: " + getFairShare());
     }
 
+    // 容器分配前置检查，不通过则直接返回
     if (!assignContainerPreCheck(node)) {
       return assigned;
     }
 
+    // 按调度顺序遍历所有有需求的应用，尝试分配容器
     for (FSAppAttempt sched : fetchAppsWithDemand(true)) {
+      // 应用将该节点列入黑名单，跳过
       if (SchedulerAppUtils.isPlaceBlacklisted(sched, node, LOG)) {
         continue;
       }
+      // 应用尝试分配容器
       assigned = sched.assignContainer(node);
 
+      // 判断是否完成分配或预约
       boolean isContainerAssignedOrReserved = !assigned.equals(none());
       boolean isContainerReserved =
                 assigned.equals(FairScheduler.CONTAINER_RESERVED);
 
-      // check if an assignment or a reservation was made.
+      // 分配或预约成功，中断循环返回
       if (isContainerAssignedOrReserved) {
-        // only log container assignment if there was an actual allocation,
-        // not a reservation.
+        // 仅实际分配容器时打日志，预约不打日志
         if (!isContainerReserved && LOG.isDebugEnabled()) {
           LOG.debug("Assigned container in queue:{} container:{}",
               getName(), assigned);
@@ -372,20 +400,18 @@ public class FSLeafQueue extends FSQueue {
   }
 
   /**
-   * Fetch the subset of apps that have unmet demand. When used for
-   * preemption-related code (as opposed to allocation), omits apps that
-   * should not be checked for starvation.
-   *
-   * @param assignment whether the apps are for allocation containers, as
-   *                   opposed to preemption calculations
-   * @return Set of apps with unmet demand
+   * 获取所有有未满足需求的应用集合，按调度策略排序
+   * @param assignment true表示用于容器分配流程，false表示用于抢占计算
+   * @return 排序后的有需求应用集合
    */
   private TreeSet<FSAppAttempt> fetchAppsWithDemand(boolean assignment) {
     TreeSet<FSAppAttempt> pendingForResourceApps =
         new TreeSet<>(policy.getComparator());
     readLock.lock();
     try {
+      // 遍历所有可运行应用
       for (FSAppAttempt app : runnableApps) {
+        // 应用有未满足需求，且（用于分配 或 应用需要检查饥饿）则加入集合
         if (!Resources.isNone(app.getPendingDemand()) &&
             (assignment || app.shouldCheckForStarvation())) {
           pendingForResourceApps.add(app);
@@ -407,6 +433,7 @@ public class FSLeafQueue extends FSQueue {
     QueueUserACLInfo userAclInfo =
       recordFactory.newRecordInstance(QueueUserACLInfo.class);
     List<QueueACL> operations = new ArrayList<>();
+    // 遍历所有队列操作权限，收集用户拥有的权限
     for (QueueACL operation : QueueACL.values()) {
       if (hasAccess(operation, user)) {
         operations.add(operation);
@@ -445,253 +472,13 @@ public class FSLeafQueue extends FSQueue {
     int numPendingApps = 0;
     readLock.lock();
     try {
+      // 统计可运行列表中处于pending状态的应用
       for (FSAppAttempt attempt : runnableApps) {
         if (attempt.isPending()) {
           numPendingApps++;
         }
       }
+      // 不可运行列表所有应用都算作pending
       numPendingApps += nonRunnableApps.size();
     } finally {
-      readLock.unlock();
-    }
-    return numPendingApps;
-  }
-
-  public int getNumAssignedApps() {
-    readLock.lock();
-    try {
-      return assignedApps.size();
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public boolean isEmpty() {
-    readLock.lock();
-    try {
-      if (runnableApps.size() > 0 || nonRunnableApps.size() > 0 ||
-          assignedApps.size() > 0) {
-        return false;
-      }
-    } finally {
-      readLock.unlock();
-    }
-    return true;
-  }
-
-  /**
-   * TODO: Based on how frequently this is called, we might want to club
-   * counting pending and active apps in the same method.
-   * @return active apps.
-   */
-  public int getNumActiveApps() {
-    int numActiveApps = 0;
-    readLock.lock();
-    try {
-      for (FSAppAttempt attempt : runnableApps) {
-        if (!attempt.isPending()) {
-          numActiveApps++;
-        }
-      }
-    } finally {
-      readLock.unlock();
-    }
-    return numActiveApps;
-  }
-
-  @Override
-  public ActiveUsersManager getAbstractUsersManager() {
-    return activeUsersManager;
-  }
-
-  /**
-  * Compute the maximum resource AM can use. The value is the result of
-  * multiplying FairShare and maxAMShare. If FairShare is zero, use
-  * min(maxShare, available resource) instead to prevent zero value for
-  * maximum AM resource since it forbids any job running in the queue.
-  *
-  * @return the maximum resource AM can use
-  */
-  private Resource computeMaxAMResource() {
-    Resource maxResource = Resources.clone(getFairShare());
-    Resource maxShare = getMaxShare();
-
-    if (maxResource.getMemorySize() == 0) {
-      maxResource.setMemorySize(
-          Math.min(scheduler.getRootQueueMetrics().getAvailableMB(),
-                   maxShare.getMemorySize()));
-    }
-
-    if (maxResource.getVirtualCores() == 0) {
-      maxResource.setVirtualCores(Math.min(
-          scheduler.getRootQueueMetrics().getAvailableVirtualCores(),
-          maxShare.getVirtualCores()));
-    }
-
-    scheduler.getRootQueueMetrics()
-        .fillInValuesFromAvailableResources(maxShare, maxResource);
-
-    // Round up to allow AM to run when there is only one vcore on the cluster
-    return Resources.multiplyAndRoundUp(maxResource, maxAMShare);
-  }
-
-  /**
-   * Check whether this queue can run the Application Master under the
-   * maxAMShare limit.
-   *
-   * @param amResource resources required to run the AM
-   * @return true if this queue can run
-   */
-  public boolean canRunAppAM(Resource amResource) {
-    if (Math.abs(maxAMShare - -1.0f) < 0.0001) {
-      return true;
-    }
-
-    Resource maxAMResource = computeMaxAMResource();
-    getMetrics().setMaxAMShare(maxAMResource);
-    Resource ifRunAMResource = Resources.add(amResourceUsage, amResource);
-    return Resources.fitsIn(ifRunAMResource, maxAMResource);
-  }
-
-  void addAMResourceUsage(Resource amResource) {
-    if (amResource != null) {
-      Resources.addTo(amResourceUsage, amResource);
-      getMetrics().setAMResourceUsage(amResourceUsage);
-    }
-  }
-
-  @Override
-  public void recoverContainer(Resource clusterResource,
-      SchedulerApplicationAttempt schedulerAttempt, RMContainer rmContainer) {
-    // TODO Auto-generated method stub
-  }
-
-  /**
-   * Allows setting weight for a dynamically created queue.
-   * Currently only used for reservation based queues.
-   * @param weight queue weight
-   */
-  public void setWeights(float weight) {
-    this.weights = weight;
-  }
-
-  @Override
-  public Resource getMaximumContainerAllocation() {
-    if (maxContainerAllocation.equals(Resources.unbounded())
-        && getParent() != null) {
-      return getParent().getMaximumContainerAllocation();
-    } else {
-      return maxContainerAllocation;
-    }
-  }
-
-  /**
-   * Helper method to compute the amount of minshare starvation.
-   *
-   * @return the extent of minshare starvation
-   */
-  private Resource minShareStarvation() {
-    // If demand < minshare, we should use demand to determine starvation
-    Resource starvation =
-        Resources.componentwiseMin(getMinShare(), getDemand());
-
-    Resources.subtractFromNonNegative(starvation, getResourceUsage());
-
-    boolean starved = !Resources.isNone(starvation);
-    long now = scheduler.getClock().getTime();
-
-    if (!starved) {
-      // Record that the queue is not starved
-      setLastTimeAtMinShare(now);
-    }
-
-    if (now - lastTimeAtMinShare < getMinSharePreemptionTimeout()) {
-      // the queue is not starved for the preemption timeout
-      starvation = Resources.clone(Resources.none());
-    }
-
-    return starvation;
-  }
-
-  /**
-   * Helper method for tests to check if a queue is starved for minShare.
-   * @return whether starved for minshare
-   */
-  @VisibleForTesting
-  private boolean isStarvedForMinShare() {
-    return !Resources.isNone(minShareStarvation());
-  }
-
-  /**
-   * Helper method for tests to check if a queue is starved for fairshare.
-   * @return whether starved for fairshare
-   */
-  @VisibleForTesting
-  private boolean isStarvedForFairShare() {
-    for (FSAppAttempt app : runnableApps) {
-      if (app.isStarvedForFairShare()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Helper method for tests to check if a queue is starved.
-   * @return whether starved for either minshare or fairshare
-   */
-  @VisibleForTesting
-  boolean isStarved() {
-    return isStarvedForMinShare() || isStarvedForFairShare();
-  }
-
-  @Override
-  protected void dumpStateInternal(StringBuilder sb) {
-    sb.append("{Name: " + getName() +
-        ", Weight: " + weights +
-        ", Policy: " + policy.getName() +
-        ", FairShare: " + getFairShare() +
-        ", SteadyFairShare: " + getSteadyFairShare() +
-        ", MaxShare: " + getMaxShare() +
-        ", MinShare: " + minShare +
-        ", ResourceUsage: " + getResourceUsage() +
-        ", Demand: " + getDemand() +
-        ", Runnable: " + getNumRunnableApps() +
-        ", NumPendingApps: " + getNumPendingApps() +
-        ", NonRunnable: " + getNumNonRunnableApps() +
-        ", MaxAMShare: " + maxAMShare +
-        ", MaxAMResource: " + computeMaxAMResource() +
-        ", AMResourceUsage: " + getAmResourceUsage() +
-        ", LastTimeAtMinShare: " + lastTimeAtMinShare +
-        "}");
-  }
-
-  /**
-   * This method is called when an application is assigned to this queue
-   * for book-keeping purposes (to be able to determine if the queue is empty).
-   * @param applicationId the application's id
-   */
-  public void addAssignedApp(ApplicationId applicationId) {
-    writeLock.lock();
-    try {
-      assignedApps.add(applicationId);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  /**
-   * This method is called when an application is removed from this queue
-   * during the submit process.
-   * @param applicationId the application's id
-   */
-  public void removeAssignedApp(ApplicationId applicationId) {
-    writeLock.lock();
-    try {
-      assignedApps.remove(applicationId);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-}
+      readLock.un

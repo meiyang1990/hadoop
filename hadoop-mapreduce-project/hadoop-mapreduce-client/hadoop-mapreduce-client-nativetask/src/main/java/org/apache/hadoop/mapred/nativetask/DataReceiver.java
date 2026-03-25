@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,15 +24,17 @@ import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * a DataReceiver pulls in arriving data, an example
- * is {@link org.apache.hadoop.mapred.nativetask.handlers.BufferPuller}
+ * 数据接收接口，用于拉取到达的新数据，在原生任务框架中处理跨进程/跨模块数据传输
+ * 典型实现为{@link org.apache.hadoop.mapred.nativetask.handlers.BufferPuller}
+ * 用于MapReduce原生任务的shuffle数据拉取场景
  */
 @InterfaceAudience.Private
 public interface DataReceiver {
 
   /**
-   * Send a signal to the receiver that the data arrives.
-   * The data is transferred in another band.
+   * 向接收端发送数据已到达的信号，实际数据通过其他通道传输
+   * @return 是否成功接收数据
+   * @throws IOException 传输过程中发生IO异常
    */
   public boolean receiveData() throws IOException;
 }

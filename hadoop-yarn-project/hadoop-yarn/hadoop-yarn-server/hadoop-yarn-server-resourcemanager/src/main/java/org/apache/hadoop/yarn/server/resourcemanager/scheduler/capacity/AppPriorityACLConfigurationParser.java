@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -31,15 +32,17 @@ import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.yarn.api.records.Priority;
 
 /**
- *
- * PriorityACLConfiguration class is used to parse Application Priority ACL
- * configuration from capcity-scheduler.xml
+ * 应用优先级ACL配置解析器，用于从容量调度器配置文件(capacity-scheduler.xml)
+ * 解析应用优先级访问控制列表配置。
  */
 public class AppPriorityACLConfigurationParser {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(AppPriorityACLConfigurationParser.class);
 
+  /**
+   * 优先级ACL配置项类型枚举，定义支持的配置键类型。
+   */
   public enum AppPriorityACLKeyType {
     USER(1), GROUP(2), MAX_PRIORITY(3), DEFAULT_PRIORITY(4);
 
@@ -54,6 +57,7 @@ public class AppPriorityACLConfigurationParser {
     }
   }
 
+  // 优先级ACL配置正则匹配模式，匹配[]包裹的ACL组
   public static final String PATTERN_FOR_PRIORITY_ACL = "\\[([^\\]]+)";
 
   @Private
@@ -62,6 +66,12 @@ public class AppPriorityACLConfigurationParser {
   @Private
   public static final String NONE_ACL = " ";
 
+  /**
+   * 解析优先级ACL配置字符串，生成解析后的优先级ACL组列表。
+   * @param clusterMaxPriority 集群允许的最大优先级
+   * @param aclString 原始ACL配置字符串
+   * @return 解析完成的优先级ACL组列表
+   */
   public List<AppPriorityACLGroup> getPriorityAcl(Priority clusterMaxPriority,
       String aclString) {
 
@@ -76,7 +86,7 @@ public class AppPriorityACLConfigurationParser {
      * is a2 and if the user has not specified any priority, then it is a1."
      */
     while (matcher.find()) {
-      // Get the first ACL sub-group.
+      // 提取当前匹配到的ACL子组内容
       String aclSubGroup = matcher.group(1);
       if (aclSubGroup.trim().isEmpty()) {
         continue;
@@ -90,25 +100,25 @@ public class AppPriorityACLConfigurationParser {
        */
       AppPriorityACLGroup userPriorityACL = new AppPriorityACLGroup();
 
-      // userAndGroupName will hold user acl and group acl as interim storage
-      // since both user/group acl comes with separate key value pairs.
+      // 临时存储用户和组ACL字符串，后续统一构建AccessControlList
       List<StringBuilder> userAndGroupName = new ArrayList<>();
 
+      // 按空格分割键值对
       for (String kvPair : aclSubGroup.trim().split(" +")) {
         /*
          * There are 3 possible options for key here: 1. user/group 2.
          * max-priority 3. default-priority
          */
+        // 按=分割键和值
         String[] splits = kvPair.split("=");
 
-        // Ensure that each ACL sub string is key value pair separated by '='.
+        // 确保是合法的键值对格式
         if (splits != null && splits.length > 1) {
           parsePriorityACLType(userPriorityACL, splits, userAndGroupName);
         }
       }
 
-      // If max_priority is higher to clusterMaxPriority, its better to
-      // handle here.
+      // 如果配置的最大优先级超过集群最大优先级，重置为集群最大优先级
       if (userPriorityACL.getMaxPriority().getPriority() > clusterMaxPriority
           .getPriority()) {
         LOG.warn("ACL configuration for '" + userPriorityACL.getMaxPriority()
@@ -118,6 +128,7 @@ public class AppPriorityACLConfigurationParser {
             Priority.newInstance(clusterMaxPriority.getPriority()));
       }
 
+      // 构建当前ACL组的访问控制列表
       AccessControlList acl = createACLStringForPriority(userAndGroupName);
       userPriorityACL.setACLList(acl);
       aclList.add(userPriorityACL);
@@ -130,24 +141,33 @@ public class AppPriorityACLConfigurationParser {
    * Parse different types of ACLs sub parts for on priority group and store in
    * a map for later processing.
    */
+  /**
+   * 解析单个优先级ACL配置项，根据配置键类型存储到对应位置。
+   * @param userPriorityACL 目标优先级ACL组对象
+   * @param splits 分割后的键值对数组
+   * @param userAndGroupName 临时存储用户/组ACL的列表
+   */
   private void parsePriorityACLType(AppPriorityACLGroup userPriorityACL,
       String[] splits, List<StringBuilder> userAndGroupName) {
-    // Here splits will have the key value pair at index 0 and 1 respectively.
-    // To parse all keys, its better to convert to PriorityACLConfig enum.
+    // 将配置键转换为枚举类型
     AppPriorityACLKeyType aclType = AppPriorityACLKeyType
         .valueOf(StringUtils.toUpperCase(splits[0].trim()));
     switch (aclType) {
     case MAX_PRIORITY :
+      // 解析并设置最大优先级
       userPriorityACL
           .setMaxPriority(Priority.newInstance(Integer.parseInt(splits[1])));
       break;
     case USER :
+      // 添加用户ACL到临时列表
       userAndGroupName.add(getUserOrGroupACLStringFromConfig(splits[1]));
       break;
     case GROUP :
+      // 添加组ACL到临时列表
       userAndGroupName.add(getUserOrGroupACLStringFromConfig(splits[1]));
       break;
     case DEFAULT_PRIORITY :
+      // 解析并设置默认优先级，负优先级重置为0
       int defaultPriority = Integer.parseInt(splits[1]);
       Priority priority = (defaultPriority < 0)
           ? Priority.newInstance(0)
@@ -163,13 +183,18 @@ public class AppPriorityACLConfigurationParser {
    * This method will help to append different types of ACLs keys against one
    * priority. For eg,USER will be appended with GROUP as "user2,user4 group1".
    */
+  /**
+   * 基于临时存储的用户和组ACL字符串，构建最终的AccessControlList对象。
+   * @param acls 存储用户和组ACL的列表
+   * @return 构建完成的访问控制列表对象
+   */
   private AccessControlList createACLStringForPriority(
       List<StringBuilder> acls) {
 
     String finalACL = "";
     String userACL = acls.get(0).toString();
 
-    // If any of user/group is *, consider it as acceptable for all.
+    // 如果用户ACL是通配符*，直接赋予所有用户访问权限
     // "user" is at index 0, and "group" is at index 1.
     if (userACL.trim().equals(ALL_ACL)) {
       finalACL = ALL_ACL;
@@ -177,13 +202,12 @@ public class AppPriorityACLConfigurationParser {
       finalACL = NONE_ACL;
     } else {
 
-      // Get USER segment
+      // 添加用户ACL部分
       if (!userACL.trim().isEmpty()) {
-        // skip last appended ","
         finalACL = acls.get(0).toString();
       }
 
-      // Get GROUP segment if any
+      // 如果存在组ACL，添加组ACL部分
       if (acls.size() > 1) {
         String groupACL = acls.get(1).toString();
         if (!groupACL.trim().isEmpty()) {
@@ -193,7 +217,6 @@ public class AppPriorityACLConfigurationParser {
       }
     }
 
-    // Here ACL will look like "user1,user2 group" in ideal cases.
     return new AccessControlList(finalACL.trim());
   }
 
@@ -201,18 +224,23 @@ public class AppPriorityACLConfigurationParser {
    * This method will help to append user/group acl string against given
    * priority. For example "user1,user2 group1,group2"
    */
+  /**
+   * 从配置中提取用户/组ACL字符串，处理通配符情况。
+   * @param value 配置中的值部分
+   * @return 构建好的ACL字符串Builder
+   */
   private StringBuilder getUserOrGroupACLStringFromConfig(String value) {
 
-    // ACL strings could be generate for USER or GRUOP.
-    // aclList in map contains two entries. 1. USER, 2. GROUP.
     StringBuilder aclTypeName = new StringBuilder();
 
+    // 如果是通配符，直接返回*
     if (value.trim().equals(ALL_ACL)) {
       aclTypeName.setLength(0);
       aclTypeName.append(ALL_ACL);
       return aclTypeName;
     }
 
+    // 否则直接返回修剪后的原值
     aclTypeName.append(value.trim());
     return aclTypeName;
   }

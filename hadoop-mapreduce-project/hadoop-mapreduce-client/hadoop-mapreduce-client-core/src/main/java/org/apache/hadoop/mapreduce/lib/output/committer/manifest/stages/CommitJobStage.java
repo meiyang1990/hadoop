@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,10 +47,10 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.Di
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.ManifestCommitterSupport.addHeapInformation;
 
 /**
- * Commit the Job.
- * Arguments (save manifest, validate output)
- * Inputs: saveMarker: boolean, validateOutput: boolean
- * Outputs: SuccessData
+ * 文件级注释：Manifest提交器作业提交主阶段，协调多个子阶段完成整个MapReduce作业输出提交流程，
+ * 核心流程包括：加载任务清单、创建目标目录、重命名任务输出到最终位置、保存成功标记、清理临时文件、输出校验。
+ * 
+ * 作业提交阶段，输入为提交参数（是否创建标记、是否校验输出等），输出为提交结果。
  */
 public class CommitJobStage extends
     AbstractJobOrTaskStage<
@@ -59,11 +60,21 @@ public class CommitJobStage extends
   private static final Logger LOG = LoggerFactory.getLogger(
       CommitJobStage.class);
 
+  /**
+   * 构造作业提交阶段实例。
+   * @param stageConfig 阶段配置信息
+   */
   public CommitJobStage(final StageConfig stageConfig) {
     super(false, stageConfig, OP_STAGE_JOB_COMMIT, true);
   }
 
   @Override
+  /**
+   * 执行作业提交全流程，协调各个子阶段按顺序完成输出提交。
+   * @param arguments 作业提交参数
+   * @return 作业提交结果
+   * @throws IOException 执行过程中的IO异常
+   */
   protected CommitJobStage.Result executeStage(
       final CommitJobStage.Arguments arguments) throws IOException {
 
@@ -72,15 +83,14 @@ public class CommitJobStage extends
         getJobId(),
         storeSupportsResilientCommit());
 
-    // once the manifest has been loaded, a temp file needs to be
-    // deleted; so track the value.
+    // 跟踪已加载的清单数据，用于finally块清理临时文件
     LoadedManifestData loadedManifestData = null;
 
     try {
       boolean createMarker = arguments.isCreateMarker();
       IOStatisticsSnapshot heapInfo = new IOStatisticsSnapshot();
       addHeapInformation(heapInfo, "setup");
-      // load the manifests
+      // 加载所有任务输出清单
       final StageConfig stageConfig = getStageConfig();
       LoadManifestsStage.Result result = new LoadManifestsStage(stageConfig).apply(
           new LoadManifestsStage.Arguments(
@@ -97,20 +107,17 @@ public class CommitJobStage extends
           String.format("%,d", loadedManifestSummary.getTotalFileSize()));
       addHeapInformation(heapInfo, OP_STAGE_JOB_LOAD_MANIFESTS);
 
-      // add in the manifest statistics to our local IOStatistics for
-      // reporting.
+      // 将加载清单阶段的IO统计信息聚合到全局统计中
       IOStatisticsStore iostats = getIOStatistics();
       iostats.aggregate(loadedManifestSummary.getIOStatistics());
 
-      // prepare destination directories.
+      // 创建所有需要的目标输出目录
       final CreateOutputDirectoriesStage.Result dirStageResults =
           new CreateOutputDirectoriesStage(stageConfig)
               .apply(loadedManifestData.getDirectories());
       addHeapInformation(heapInfo, OP_STAGE_JOB_CREATE_TARGET_DIRS);
 
-      // commit all the tasks.
-      // The success data includes a snapshot of the IO Statistics
-      // and hence all aggregate stats from the tasks.
+      // 批量重命名所有任务输出文件到最终输出路径
       ManifestSuccessData successData;
       successData = new RenameFilesStage(stageConfig).apply(
           Triple.of(loadedManifestData,
@@ -121,9 +128,7 @@ public class CommitJobStage extends
       }
       addHeapInformation(heapInfo, OP_STAGE_JOB_RENAME_FILES);
 
-      // update the counter of bytes committed and files.
-      // use setCounter so as to ignore any values accumulated when
-      // aggregating tasks.
+      // 更新已提交文件总数和总字节数统计，覆盖任务聚合结果
       iostats.setCounter(
           COMMITTER_FILES_COMMITTED_COUNT,
           loadedManifestSummary.getFileCount());
@@ -133,7 +138,7 @@ public class CommitJobStage extends
       successData.snapshotIOStatistics(iostats);
       successData.getIOStatistics().aggregate(heapInfo);
 
-      // rename manifests. Only warn on failure here.
+      // 若配置了清单重命名目录，将所有任务清单移动到指定目录归档
       final String manifestRenameDir = arguments.getManifestRenameDir();
       if (isNotBlank(manifestRenameDir)) {
         Path manifestRenamePath = new Path(
@@ -143,48 +148,44 @@ public class CommitJobStage extends
         try {
           renameDir(getTaskManifestDir(), manifestRenamePath);
 
-          // save this path in the summary diagnostics
+          // 将归档路径保存到诊断信息中
           successData.getDiagnostics().put(MANIFESTS, manifestRenamePath.toUri().toString());
         } catch (IOException | IllegalArgumentException e) {
-          // rename failure, including path for wrong filesystem
+          // 清单重命名失败仅记录警告，不中断整个提交流程
           LOG.warn("{}: Failed to rename manifests to {}", getName(), manifestRenamePath, e);
         }
       }
 
-      // save the _SUCCESS if the option is enabled.
+      // 若开启了成功标记选项，保存_SUCCESS文件
       Path successPath = null;
       if (createMarker) {
-        // save a snapshot of the IO Statistics
-
         successPath = new SaveSuccessFileStage(stageConfig)
             .apply(successData);
         LOG.debug("{}: Saving _SUCCESS file to {}", getName(), successPath);
       }
 
-      // optional cleanup
+      // 执行作业清理流程
       final CleanupJobStage.Arguments cleanupArguments = arguments.getCleanupArguments();
-      // determine the directory count
+      // 设置任务目录数量统计用于清理
       cleanupArguments.setDirectoryCount(iostats.counters()
           .getOrDefault(COMMITTER_TASK_DIRECTORY_COUNT_MEAN, 0L));
 
       new CleanupJobStage(stageConfig).apply(cleanupArguments);
 
-      // and then, after everything else: optionally validate.
+      // 若开启了输出校验，对所有已重命名文件进行校验
       if (arguments.isValidateOutput()) {
-        // cache and restore the active stage field
         LOG.info("{}: Validating output.", getName());
         new ValidateRenamedFilesStage(stageConfig)
             .apply(loadedManifestData.getEntrySequenceData());
       }
 
-      // restore the active stage so that when the report is saved
-      // it is declared as job commit, not cleanup or validate.
+      // 恢复当前阶段为作业提交，确保统计信息归属正确
       stageConfig.enterStage(getStageName(arguments));
 
-      // the result
+      // 返回提交结果
       return new Result(successPath, successData);
     } finally {
-      // cleanup; return code is ignored.
+      // 清理临时文件，忽略清理失败
       if (loadedManifestData != null) {
         loadedManifestData.deleteEntrySequenceFile();
       }
@@ -193,28 +194,28 @@ public class CommitJobStage extends
   }
 
   /**
-   * Arguments for job commit.
+   * 作业提交阶段参数类，封装整个作业提交流程的配置选项。
    */
   public static final class Arguments {
 
-    /** create the _SUCCESS marker? */
+    /** 是否创建_SUCCESS成功标记文件 */
     private final boolean createMarker;
 
-    /** perform validation checks on the files? */
+    /** 是否对输出文件执行完整性校验 */
     private final boolean validateOutput;
 
-    /** optional directory to rename the task manifests to. */
+    /** 任务清单归档目录，可为空表示不归档 */
     private final String manifestRenameDir;
 
-    /** cleanup arguments.. */
+    /** 作业清理阶段参数 */
     private final CleanupJobStage.Arguments cleanupArguments;
 
     /**
-     *
-     * @param createMarker create the _SUCCESS marker?
-     * @param validateOutput perform validation checks on the files?
-     * @param manifestRenameDir optional directory to rename the task manifests to
-     * @param cleanupArguments cleanup arguments.
+     * 构造作业提交参数实例。
+     * @param createMarker 是否创建_SUCCESS标记
+     * @param validateOutput 是否执行输出校验
+     * @param manifestRenameDir 清单归档目录，可为null
+     * @param cleanupArguments 清理阶段参数
      */
     public Arguments(
         boolean createMarker,
@@ -246,19 +247,20 @@ public class CommitJobStage extends
   }
 
   /**
-   * Result of the stage.
+   * 作业提交阶段结果类，封装提交结果信息。
    */
   public static final class Result {
-    /**
-     * Manifest success data.
-     */
+    /** 作业提交成功统计数据 */
     private final ManifestSuccessData jobSuccessData;
 
-    /**
-     * Success file path. null if not saved.
-     */
+    /** _SUCCESS文件路径，未保存则为null */
     private final Path successPath;
 
+    /**
+     * 构造提交结果实例。
+     * @param successPath _SUCCESS文件路径
+     * @param jobSuccessData 作业成功统计数据
+     */
     public Result(final Path successPath,
         ManifestSuccessData jobSuccessData) {
       this.successPath = successPath;

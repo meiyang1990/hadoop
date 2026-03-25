@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,13 @@
  * limitations under the License.
  */
 
+/**
+ * @file DatanodeProtocolPB.java
+ * @brief HDFS DataNode与NameNode之间PB序列化RPC协议接口定义
+ * 
+ * 该文件属于HDFS协议模块，定义了DataNode节点向NameNode节点发起RPC调用的
+ * Protobuf序列化版本协议接口，用于DataNode与NameNode之间的通信。
+ */
 package org.apache.hadoop.hdfs.protocolPB;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -24,6 +32,13 @@ import org.apache.hadoop.hdfs.protocol.proto.DatanodeProtocolProtos.DatanodeProt
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
+/**
+ * @brief DataNode协议Protobuf版本扩展接口
+ * 
+ * 继承自Protobuf生成的BlockingInterface，为DataNode和NameNode之间的RPC通信
+ * 提供Hadoop RPC框架所需的协议标注信息，指定了Kerberos认证主体、协议名称和版本。
+ * 该接口仅用于RPC框架层面的协议定义，实际业务逻辑由NameNode服务端实现。
+ */
 @KerberosInfo(
     serverPrincipal = DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY, 
     clientPrincipal = DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY)

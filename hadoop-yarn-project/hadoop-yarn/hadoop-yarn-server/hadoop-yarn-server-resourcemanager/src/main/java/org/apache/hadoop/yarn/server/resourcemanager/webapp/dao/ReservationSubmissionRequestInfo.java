@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,8 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * Simple class to allow users to send information required to create an
- * ReservationSubmissionContext which can then be used to submit a reservation.
+ * YARN ResourceManager Web DAO类，封装资源预留提交请求的请求信息，
+ * 用于接收REST API提交的资源预留请求，构造 ReservationSubmissionContext 后提交预留。
  */
 @XmlRootElement(name = "reservation-submission-context")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -40,9 +41,11 @@ public class ReservationSubmissionRequestInfo {
   @XmlElement(name = "reservation-id")
   private String reservationId;
 
+  /** 无参构造器，供JAXB序列化/反序列化使用 */
   public ReservationSubmissionRequestInfo() {
   }
 
+  /** 获取提交目标队列名称 */
   public String getQueue() {
     return queue;
   }
@@ -51,6 +54,7 @@ public class ReservationSubmissionRequestInfo {
     this.queue = queue;
   }
 
+  /** 获取预留ID */
   public String getReservationId() {
     return reservationId;
   }
@@ -59,6 +63,7 @@ public class ReservationSubmissionRequestInfo {
     this.reservationId = reservationId;
   }
 
+  /** 获取资源预留定义信息 */
   public ReservationDefinitionInfo getReservationDefinition() {
     return reservationDefinition;
   }

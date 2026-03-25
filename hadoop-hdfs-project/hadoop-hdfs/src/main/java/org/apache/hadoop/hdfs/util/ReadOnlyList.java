@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,64 +27,76 @@ import java.util.ListIterator;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * A {@link ReadOnlyList} is a unmodifiable list,
- * which supports read-only operations.
+ * 只读列表接口，仅支持读取操作，不允许修改列表内容
  * 
- * @param <E> The type of the list elements.
+ * @param <E> 列表元素类型
  */
 @InterfaceAudience.Private
 public interface ReadOnlyList<E> extends Iterable<E> {
   /**
-   * Is this an empty list?
+   * 判断列表是否为空
+   * @return 为空返回true，否则返回false
    */
   boolean isEmpty();
 
   /**
-   * @return the size of this list.
+   * 获取列表元素数量
+   * @return 列表大小
    */
   int size();
 
   /**
-   * @return the i-th element.
+   * 获取指定索引位置的元素
+   * @param i 索引位置
+   * @return 对应索引的元素
    */
   E get(int i);
   
   /**
-   * Utilities for {@link ReadOnlyList}
+   * 为ReadOnlyList提供工具方法的静态工具类
    */
   public static class Util {
-    /** @return an empty list. */
+    /**
+     * 获取一个空的只读列表
+     * @return 空只读列表
+     */
     public static <E> ReadOnlyList<E> emptyList() {
       return ReadOnlyList.Util.asReadOnlyList(Collections.<E>emptyList());
     }
 
     /**
-     * The same as {@link Collections#binarySearch(List, Object)}
-     * except that the list is a {@link ReadOnlyList}.
-     *
-     * @return the insertion point defined
-     *         in {@link Collections#binarySearch(List, Object)}.
+     * 对已排序的只读列表执行二分查找，逻辑同{@link Collections#binarySearch(List, Object)}
+     * @param list 已排序的只读列表
+     * @param key 待查找的键
+     * @return 查找结果，找到返回元素索引，没找到返回插入点，规则同{@link Collections#binarySearch(List, Object)}
      */
     public static <K, E extends Comparable<K>> int binarySearch(
         final ReadOnlyList<E> list, final K key) {
       int lower = 0;
       for(int upper = list.size() - 1; lower <= upper; ) {
+        // 计算中间点，使用无符号右移避免溢出
         final int mid = (upper + lower) >>> 1;
 
         final int d = list.get(mid).compareTo(key);
         if (d == 0) {
+          // 找到目标元素，返回索引
           return mid;
         } else if (d > 0) {
+          // 中间元素大于目标，收缩上边界
           upper = mid - 1;
         } else {
+          // 中间元素小于目标，收缩下边界
           lower = mid + 1;
         }
       }
+      // 未找到目标，返回插入点
       return -(lower + 1);
     }
 
     /**
-     * @return a {@link ReadOnlyList} view of the given list.
+     * 将普通List包装为ReadOnlyList视图
+     * @param list 原List
+     * @return 基于原List的只读视图
      */
     public static <E> ReadOnlyList<E> asReadOnlyList(final List<E> list) {
       return new ReadOnlyList<E>() {
@@ -115,7 +128,9 @@ public interface ReadOnlyList<E> extends Iterable<E> {
     }
 
     /**
-     * @return a {@link List} view of the given list.
+     * 将ReadOnlyList转换为List视图，所有修改操作都会抛出不支持异常
+     * @param list 原只读列表
+     * @return 仅支持读取的List视图
      */
     public static <E> List<E> asList(final ReadOnlyList<E> list) {
       return new List<E>() {

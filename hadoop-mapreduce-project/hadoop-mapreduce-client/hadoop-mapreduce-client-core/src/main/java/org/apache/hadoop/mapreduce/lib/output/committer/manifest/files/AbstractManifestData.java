@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,7 +37,8 @@ import org.apache.hadoop.util.JsonSerialization;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Class for single/multiple commit data structures.
+ * 文件提交清单数据的抽象基类，为单次/多次作业提交的数据结构提供公共能力，
+ * 提供路径序列化、数据验证和JSON序列化等通用能力。
  */
 @SuppressWarnings("serial")
 @InterfaceAudience.Private
@@ -47,9 +49,9 @@ public abstract class AbstractManifestData<T extends AbstractManifestData>
 
 
   /**
-   * Convert a path to a string which can be included in the JSON.
-   * @param path path
-   * @return a string value, or, if path==null, null.
+   * 将Path对象序列化为可存入JSON的字符串形式。
+   * @param path 待序列化的路径
+   * @return 序列化后的路径字符串，输入为null时返回null
    */
   public static String marshallPath(@Nullable Path path) {
     return path != null
@@ -58,10 +60,10 @@ public abstract class AbstractManifestData<T extends AbstractManifestData>
   }
 
   /**
-   * Convert a string path to Path type, by way of a URI.
-   * @param path path as a string
-   * @return path value
-   * @throws RuntimeException marshalling failure.
+   * 将JSON中的路径字符串反序列化为Path对象，通过URI转换实现。
+   * @param path 字符串形式的路径
+   * @return 反序列化后的Path对象
+   * @throws RuntimeException 反序列化失败时抛出
    */
   public static Path unmarshallPath(String path) {
     try {
@@ -74,41 +76,40 @@ public abstract class AbstractManifestData<T extends AbstractManifestData>
   }
 
   /**
-   * Validate the data: those fields which must be non empty, must be set.
-   * @return the validated instance.
-   * @throws IOException if the data is invalid
+   * 验证清单数据完整性，检查必填字段是否已正确设置。
+   * @return 验证通过后的实例本身
+   * @throws IOException 数据验证不通过时抛出
    */
   public abstract T validate() throws IOException;
 
   /**
-   * Serialize to JSON and then to a byte array, after performing a
-   * preflight validation of the data to be saved.
-   * @return the data in a persistable form.
-   * @throws IOException serialization problem or validation failure.
+   * 先验证数据，然后将清单数据序列化为JSON格式的字节数组。
+   * @return 序列化后的字节数组，可用于持久化存储
+   * @throws IOException 验证失败或序列化错误时抛出
    */
   public abstract byte[] toBytes() throws IOException;
 
   /**
-   * Save to a hadoop filesystem.
-   * @param fs filesystem
-   * @param path path
-   * @param overwrite should any existing file be overwritten
-   * @throws IOException IO exception
+   * 将清单数据保存到Hadoop文件系统的指定路径。
+   * @param fs 目标文件系统
+   * @param path 保存路径
+   * @param overwrite 是否覆盖已存在文件
+   * @throws IOException IO操作异常或验证失败时抛出
    */
   public abstract void save(FileSystem fs, Path path, boolean overwrite)
       throws IOException;
 
   /**
-   * Get a (usually shared) JSON serializer.
-   * @return a serializer. Call
+   * 获取当前类型对应的JSON序列化器实例。
+   * @return 当前清单数据类型对应的JSON序列化器
    */
   public abstract JsonSerialization<T> createSerializer();
 
   /**
-   * Verify that all instances in a collection are of the given class.
-   * @param it iterator
-   * @param classname classname to require
-   * @throws IOException on a failure
+   * 验证集合中所有元素都属于指定类型。
+   * @param it 集合迭代器
+   * @param classname 要求的元素类型
+   * @throws IOException 存在元素类型不匹配时抛出
    */
   void validateCollectionClass(Iterable it, Class classname)
       throws IOException {
@@ -119,11 +120,11 @@ public abstract class AbstractManifestData<T extends AbstractManifestData>
   }
 
   /**
-   * Verify that a condition holds.
-   * @param expression expression which must be true
-   * @param message message to raise on a failure
-   * @param args arguments for the message formatting
-   * @throws IOException on a failure
+   * 验证条件是否成立，不成立则抛出IO异常。
+   * @param expression 必须为true的验证条件
+   * @param message 验证失败时的错误消息
+   * @param args 错误消息格式化参数
+   * @throws IOException 条件不成立时抛出
    */
 
   static void verify(boolean expression,

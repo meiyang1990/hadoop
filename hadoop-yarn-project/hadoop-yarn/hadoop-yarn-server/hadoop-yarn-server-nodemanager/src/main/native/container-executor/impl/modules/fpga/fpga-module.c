@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * @file fpga-module.c
+ * @brief YARN NodeManager FPGA设备隔离模块，通过cgroups实现容器对FPGA设备的访问控制
+ *
+ * 核心功能：根据请求将指定FPGA设备加入cgroup黑名单，禁止容器访问未分配的FPGA设备
+ * 实现机制：利用Linux cgroups devices子系统控制容器对FPGA字符设备的访问权限
  */
 
 #include "configuration.h"
@@ -36,8 +45,17 @@
 #define DEFAULT_INTEL_MAJOR_NUMBER 246
 #define MAX_CONTAINER_ID_LEN 128
 
+/** FPGA模块配置节缓存 */
 static const struct section* cfg_section;
 
+/**
+ * @brief 内部处理FPGA设备黑名单请求，更新容器cgroups配置
+ * @param update_cgroups_parameters_func_p 更新cgroups参数的回调函数
+ * @param n_minor_devices_to_block 需要禁止访问的次设备号数量
+ * @param minor_devices 需要禁止访问的次设备号数组
+ * @param container_id 目标容器ID
+ * @return 0表示成功，非0表示失败
+ */
 static int internal_handle_fpga_request(
     update_cgroups_parameters_function update_cgroups_parameters_func_p,
     size_t n_minor_devices_to_block, int minor_devices[],
@@ -48,30 +66,29 @@ static int internal_handle_fpga_request(
   int return_code = 0;
 
   if (n_minor_devices_to_block == 0) {
-    // no device to block, just return;
+    // 没有需要禁止的设备，直接返回
     return 0;
   }
 
-  // Get major device number from cfg, if not set, major number of (Intel)
-  // will be the default value.
+  // 从配置中获取FPGA主设备号，未配置则使用默认Intel FPGA主设备号
   int major_device_number;
   char* major_number_str = get_section_value(FPGA_MAJOR_NUMBER_CONFIG_KEY,
      cfg_section);
   if (!major_number_str || 0 == major_number_str[0]) {
-    // Default major number of Intel devices
+    // Intel FPGA默认主设备号
     major_device_number = DEFAULT_INTEL_MAJOR_NUMBER;
   } else {
     major_device_number = strtol(major_number_str, NULL, 0);
   }
 
-  // Get allowed minor device numbers from cfg, if not set, means all minor
-  // devices can be used by YARN
+  // 从配置中获取允许YARN管理的FPGA次设备号列表，未配置表示全部允许
   allowed_minor_numbers_str = get_section_value(
       FPGA_ALLOWED_DEVICES_MINOR_NUMBERS,
       cfg_section);
   if (!allowed_minor_numbers_str || 0 == allowed_minor_numbers_str[0]) {
     allowed_minor_numbers = NULL;
   } else {
+    // 解析逗号分隔的次设备号列表
     int rc = get_numbers_split_by_comma(allowed_minor_numbers_str,
                                         &allowed_minor_numbers,
                                         &n_allowed_minor_numbers);
@@ -83,7 +100,7 @@ static int internal_handle_fpga_request(
       goto cleanup;
     }
 
-    // Make sure we're trying to black devices allowed in config
+    // 校验要禁止的设备都在允许管理列表内
     for (int i = 0; i < n_minor_devices_to_block; i++) {
       int found = 0;
       for (int j = 0; j < n_allowed_minor_numbers; j++) {
@@ -103,7 +120,7 @@ static int internal_handle_fpga_request(
     }
   }
 
-  // Use cgroup helpers to blacklist devices
+  // 调用cgroups接口将每个要禁止的设备加入黑名单
   for (int i = 0; i < n_minor_devices_to_block; i++) {
     char param_value[128];
     memset(param_value, 0, sizeof(param_value));
@@ -121,6 +138,7 @@ static int internal_handle_fpga_request(
   }
 
 cleanup:
+  // 释放分配的内存
   if (major_number_str) {
     free(major_number_str);
   }
@@ -134,27 +152,42 @@ cleanup:
   return return_code;
 }
 
+/**
+ * @brief 重新加载FPGA模块配置，从全局配置中读取FPGA模块配置节
+ */
 void reload_fpga_configuration() {
   cfg_section = get_configuration_section(FPGA_MODULE_SECTION_NAME, get_cfg());
 }
 
 /*
- * Format of FPGA request commandline:
+ * FPGA请求命令行格式:
  *
  * c-e --module-fpga --excluded_fpgas 0,1,3 --container_id container_x_y
  */
+
+/**
+ * @brief 处理FPGA设备隔离请求，解析命令行参数并调用内部处理逻辑
+ * @param func 更新cgroups参数的回调函数
+ * @param module_name 模块名称
+ * @param module_argc 模块参数个数
+ * @param module_argv 模块参数数组
+ * @return 0表示成功，非0表示失败
+ */
 int handle_fpga_request(update_cgroups_parameters_function func,
     const char* module_name, int module_argc, char** module_argv) {
+  // 如果配置未加载，先加载配置
   if (!cfg_section) {
     reload_fpga_configuration();
   }
 
+  // 检查模块是否启用
   if (!module_enabled(cfg_section, FPGA_MODULE_SECTION_NAME)) {
     fprintf(ERRORFILE,
       "Please make sure fpga module is enabled before using it.\n");
     return -1;
   }
 
+  // 定义长命令行参数
   static struct option long_options[] = {
     {EXCLUDED_FPGAS_OPTION, required_argument, 0, 'e' },
     {CONTAINER_ID_OPTION, required_argument, 0, 'c' },
@@ -171,11 +204,14 @@ int handle_fpga_request(update_cgroups_parameters_function func,
   size_t n_minor_devices_to_block = 0;
   int failed = 0;
 
+  // 重置getopt索引
   optind = 1;
+  // 解析命令行参数
   while((c = getopt_long(module_argc, module_argv, "e:c:",
                          long_options, &option_index)) != -1) {
     switch(c) {
       case 'e':
+        // 解析需要禁止的FPGA次设备号列表
         rc = get_numbers_split_by_comma(optarg, &minor_devices,
           &n_minor_devices_to_block);
         if (0 != rc) {
@@ -187,6 +223,7 @@ int handle_fpga_request(update_cgroups_parameters_function func,
         }
         break;
       case 'c':
+        // 校验并保存容器ID
         if (!validate_container_id(optarg)) {
           fprintf(ERRORFILE,
             "Specified container_id=%s is invalid\n", optarg);
@@ -204,6 +241,7 @@ int handle_fpga_request(update_cgroups_parameters_function func,
     }
   }
 
+  // 检查容器ID是否提供
   if (0 == container_id[0]) {
     fprintf(ERRORFILE,
       "[%s] --container_id must be specified.\n", __func__);
@@ -211,18 +249,21 @@ int handle_fpga_request(update_cgroups_parameters_function func,
     goto cleanup;
   }
 
+  // 检查排除设备列表是否提供
   if (!minor_devices) {
-     // Minor devices is null, skip following call.
+     // 没有需要排除的设备，跳过处理
      fprintf(ERRORFILE,
      "--excluded-fpgas is not specified, skip cgroups call.\n");
      goto cleanup;
   }
 
+  // 调用内部处理逻辑更新cgroups
   failed = internal_handle_fpga_request(func, n_minor_devices_to_block,
          minor_devices,
          container_id);
 
 cleanup:
+  // 释放分配的内存
   if (minor_devices) {
     free(minor_devices);
   }

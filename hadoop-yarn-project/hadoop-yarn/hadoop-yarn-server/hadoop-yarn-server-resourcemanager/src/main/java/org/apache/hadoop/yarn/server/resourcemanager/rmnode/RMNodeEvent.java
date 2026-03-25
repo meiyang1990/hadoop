@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,15 +22,29 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * YARN ResourceManager 节点事件基类，封装所有RM节点相关事件的公共属性
+ * 所有针对RM节点的不同类型事件都继承此类，用于RM内部状态机驱动节点状态流转
+ */
 public class RMNodeEvent extends AbstractEvent<RMNodeEventType> {
 
+  // 事件关联的节点ID
   private final NodeId nodeId;
 
+  /**
+   * 构造RM节点事件
+   * @param nodeId 事件关联的节点ID
+   * @param type 事件类型
+   */
   public RMNodeEvent(NodeId nodeId, RMNodeEventType type) {
     super(type);
     this.nodeId = nodeId;
   }
 
+  /**
+   * 获取事件关联的节点ID
+   * @return 关联节点的NodeId对象
+   */
   public NodeId getNodeId() {
     return this.nodeId;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,7 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 
 /**
- * Event to record the start of a task
+ * 任务启动事件类，用于在作业历史中记录任务启动的相关信息
  *
  */
 @InterfaceAudience.Private
@@ -39,11 +40,11 @@ public class TaskStartedEvent implements HistoryEvent {
   private TaskStarted datum = new TaskStarted();
 
   /**
-   * Create an event to record start of a task
-   * @param id Task Id
-   * @param startTime Start time of the task
-   * @param taskType Type of the task
-   * @param splitLocations Split locations, applicable for map tasks
+   * 构造任务启动事件，记录任务启动相关信息
+   * @param id 任务ID
+   * @param startTime 任务启动时间
+   * @param taskType 任务类型（Map/Reduce等）
+   * @param splitLocations 数据分片位置，仅对Map任务有效
    */
   public TaskStartedEvent(TaskID id, long startTime, 
       TaskType taskType, String splitLocations) {
@@ -55,29 +56,61 @@ public class TaskStartedEvent implements HistoryEvent {
 
   TaskStartedEvent() {}
 
+  /**
+   * 获取Avro序列化数据对象
+   * @return Avro序列化的任务启动数据对象
+   */
   public Object getDatum() { return datum; }
+
+  /**
+   * 设置Avro序列化数据对象
+   * @param datum Avro序列化的任务启动数据对象
+   */
   public void setDatum(Object datum) { this.datum = (TaskStarted)datum; }
 
-  /** Get the task id */
+  /**
+   * 获取任务ID
+   * @return 任务ID
+   */
   public TaskID getTaskId() {
     return TaskID.forName(datum.getTaskid().toString());
   }
-  /** Get the split locations, applicable for map tasks */
+
+  /**
+   * 获取数据分片位置，仅对Map任务有效
+   * @return 数据分片位置字符串
+   */
   public String getSplitLocations() {
     return datum.getSplitLocations().toString();
   }
-  /** Get the start time of the task */
+
+  /**
+   * 获取任务启动时间
+   * @return 任务启动时间戳
+   */
   public long getStartTime() { return datum.getStartTime(); }
-  /** Get the task type */
+
+  /**
+   * 获取任务类型
+   * @return 任务类型枚举
+   */
   public TaskType getTaskType() {
     return TaskType.valueOf(datum.getTaskType().toString());
   }
-  /** Get the event type */
+
+  /**
+   * 获取事件类型
+   * @return 事件类型，固定为TASK_STARTED
+   */
   public EventType getEventType() {
     return EventType.TASK_STARTED;
   }
 
   @Override
+  /**
+   * 将当前事件转换为YARN时间线服务事件，用于应用监控
+   * @return 转换后的YARN时间线事件
+   */
   public TimelineEvent toTimelineEvent() {
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
@@ -88,6 +121,10 @@ public class TaskStartedEvent implements HistoryEvent {
   }
 
   @Override
+  /**
+   * 获取当前事件对应的时间线指标集合，本事件无指标数据
+   * @return 固定返回null
+   */
   public Set<TimelineMetric> getTimelineMetrics() {
     return null;
   }

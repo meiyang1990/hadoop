@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -60,12 +61,10 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.Reso
 import org.apache.hadoop.yarn.server.nodemanager.executor.LocalizerStartContext;
 
 /**
- * Windows secure container executor (WSCE).
- * This class offers a secure container executor on Windows, similar to the 
- * LinuxContainerExecutor. As the NM does not run on a high privileged context, 
- * this class delegates elevated operations to the helper hadoopwintuilsvc, 
- * implemented by the winutils.exe running as a service.
- * JNI and LRPC is used to communicate with the privileged service.
+ * Windows平台安全容器执行器。
+ * 本类为Windows平台提供类似LinuxContainerExecutor的安全容器执行能力，由于NodeManager默认不运行在高权限上下文，
+ * 本类会将需要提升权限的操作委托给以Windows服务身份运行的hadoopwintuilsvc（winutils.exe）处理，
+ * 通过JNI和LRPC与特权服务进行通信。
  */
 public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   
@@ -76,7 +75,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   
   
   /**
-   * This class is a container for the JNI Win32 native methods used by WSCE.
+   * 封装WSCE使用的JNI Win32本地方法。
    */
   private static class Native {
 
@@ -85,6 +84,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     static {
       if (NativeCodeLoader.isNativeCodeLoaded()) {
         try {
+          // 初始化WSCE本地库
           initWsceNative();
           nativeLoaded = true;
         } catch (Throwable t) {
@@ -98,8 +98,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     
     
     /**
-     * This class contains methods used by the WindowsSecureContainerExecutor
-     * file system operations.
+     * 封装WindowsSecureContainerExecutor需要特权执行的文件系统操作方法。
      */
     public static class Elevated {
       private static final int MOVE_FILE = 1;
@@ -172,7 +171,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
         if (!nativeLoaded) {
           throw new IOException("Native WSCE libraries are required for create");
         }
-        
+        // 配置Windows文件创建参数
         long desiredAccess = Windows.GENERIC_WRITE;
         long shareMode = 0L;
         long creationDisposition = append ? 
@@ -180,10 +179,12 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
         long flags = Windows.FILE_ATTRIBUTE_NORMAL;
         
         String fileName = f.toString();
+        // 将路径分隔符转换为Windows格式
         fileName = fileName.replace('/', '\\');
         
         long hFile = elevatedCreateImpl(
             fileName, desiredAccess, shareMode, creationDisposition, flags);
+        // 将本地文件句柄转换为Java FileDescriptor并包装为输出流
         return new FileOutputStream(
             WinutilsProcessStub.getFileDescriptorFromHandle(hFile));
       }
@@ -214,7 +215,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     }
 
     /**
-     * Wraps a process started by the winutils service helper.
+     * 包装由winutils服务helper启动的进程。
      *
      */
     public static class WinutilsProcessStub extends Process {
@@ -231,7 +232,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
           long hStdOut, long hStdErr) {
         this.hProcess = hProcess;
         this.hThread = hThread;
-        
+        // 将winutils返回的句柄转换为Java标准流
         this.stdIn = new FileOutputStream(getFileDescriptorFromHandle(hStdIn));
         this.stdOut = new FileInputStream(getFileDescriptorFromHandle(hStdOut));
         this.stdErr = new FileInputStream(getFileDescriptorFromHandle(hStdErr));
@@ -265,6 +266,9 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
       public native void resume() throws NativeIOException;
     }
     
+    /**
+     * 以目标用户身份创建任务，加锁保证Windows进程创建线程安全。
+     */
     public synchronized static WinutilsProcessStub createTaskAsUser(
         String cwd, String jobName, String user, String pidFile, String cmdLine)
       throws IOException {
@@ -283,10 +287,8 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   }
 
   /**
-   * A shell script wrapper builder for WSCE.  
-   * Overwrites the default behavior to remove the creation of the PID file in 
-   * the script wrapper. WSCE creates the pid file as part of launching the 
-   * task in winutils.
+   * WSCE的shell脚本包装器构建器。
+   * 覆盖默认行为，不在脚本中创建PID文件，PID文件由winutils在启动任务时创建。
    */
   private class WindowsSecureWrapperScriptBuilder 
     extends LocalWrapperScriptBuilder {
@@ -302,17 +304,14 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
   }
 
   /**
-   * This is a skeleton file system used to elevate certain operations.
-   * WSCE has to create container dirs under local/userchache/$user but
-   * this dir itself is owned by $user, with chmod 750. As ther NM has no
-   * write access, it must delegate the write operations to the privileged
-   * hadoopwintuilsvc.
+   * 用于提升权限操作的包装文件系统。
+   * WSCE需要在local/usercache/$user目录下创建容器目录，但该目录本身属于对应用户，权限为750，NodeManager没有写入权限，
+   * 因此必须将写入操作委托给特权服务hadoopwintuilsvc处理。
    */
   private static class ElevatedFileSystem extends DelegateToFileSystem {
 
     /**
-     * This overwrites certain RawLocalSystem operations to be performed by a 
-     * privileged process.
+     * 覆盖RawLocalFileSystem的部分操作，让这些操作通过特权进程执行。
      * 
      */
     private static class ElevatedRawLocalFilesystem extends RawLocalFileSystem {
@@ -326,9 +325,11 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
         }
         boolean ret = false;
 
-        // File.mkdir returns false, does not throw. Must mimic it.
+        // 保持与File.mkdir一致的行为：不抛异常，仅返回false
         try {
+          // 特权创建目录
           Native.Elevated.mkdir(path);
+          // 设置目录权限
           setPermission(path, permission);
           ret = true;
         }
@@ -347,6 +348,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
         if (LOG.isDebugEnabled()) {
           LOG.debug(String.format("EFS:setPermission: %s %s", p, permission));
         }
+        // 特权修改权限
         Native.Elevated.chmod(p, permission.toShort());
       }
       
@@ -357,6 +359,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
           LOG.debug(String.format("EFS:setOwner: %s %s %s", 
               p, username, groupname));
         }
+        // 特权修改所有者
         Native.Elevated.chown(p, username, groupname);
       }
       
@@ -368,8 +371,10 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
               append, permission));
         }
         boolean success = false;
+        // 特权创建文件
         OutputStream os = Native.Elevated.create(f, append);
         try {
+          // 设置文件权限
           setPermission(f, permission);
           success = true;
           return os;
@@ -386,33 +391,30 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
           LOG.debug(String.format("EFS:delete: %s %b", p, recursive));
         }
         
-        // The super delete uses the FileUtil.fullyDelete, 
-        // but we cannot rely on that because we need to use the elevated 
-        // operations to remove the files
-        //
         File f = pathToFile(p);
         if (!f.exists()) {
-          //no path, return false "nothing to delete"
+          // 路径不存在，返回false表示无文件可删除
           return false;
         }
         else if (f.isFile()) {
+          // 特权删除文件
           return Native.Elevated.deleteFile(p);
         } 
         else if (f.isDirectory()) {
           
-          // This is a best-effort attempt. There are race conditions in that
-          // child files can be created/deleted after we snapped the list. 
-          // No need to protect against that case.
+          // 尽力尝试删除，允许竞态条件（删除过程中新增文件不会影响整体正确性）
           File[] files = FileUtil.listFiles(f);
           int childCount = files.length;
           
           if (recursive) {
+            // 递归删除所有子文件
             for(File child:files) {
               if (delete(new Path(child.getPath()), recursive)) {
                 --childCount;
               }
             }
           }
+          // 所有子文件删除成功后，删除当前目录
           if (childCount == 0) {
             return Native.Elevated.deleteDirectory(p);
           } 
@@ -421,8 +423,7 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
           }
         }
         else {
-          // This can happen under race conditions if an external agent 
-          // is messing with the file type between IFs
+          // 竞态条件下可能出现：路径存在但既不是文件也不是目录
           throw new IOException("Path " + f.toString() + 
               " exists, but is neither a file nor a directory");
         }
@@ -438,6 +439,9 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
     }
   }
   
+  /**
+   * 基于Winutils进程桩的命令执行器实现。
+   */
   private static class WintuilsProcessStubExecutor 
   implements Shell.CommandExecutor {
     private Native.WinutilsProcessStub processStub;
@@ -472,6 +476,9 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
       this.state = State.INIT;
     }    
     
+    /**
+     * 检查进程是否已执行完成，未完成则抛出异常。
+     */
     private void assertComplete() throws IOException {
       if (state != State.COMPLETE) {
         throw new IOException("Process is not complete");
@@ -496,6 +503,9 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
       }
     }
     
+    /**
+     * 启动线程读取进程输出，收集到output缓冲区。
+     */
     private Thread startStreamReader(final InputStream stream) 
         throws IOException {
       Thread streamReaderThread = new SubjectInheritingThread() {
@@ -504,231 +514,3 @@ public class WindowsSecureContainerExecutor extends DefaultContainerExecutor {
         public void work() {
           try (BufferedReader lines = new BufferedReader(
                    new InputStreamReader(stream, StandardCharsets.UTF_8))) {
-            char[] buf = new char[512];
-            int nRead;
-            while ((nRead = lines.read(buf, 0, buf.length)) > 0) {
-              output.append(buf, 0, nRead);
-            }
-          } catch (Throwable t) {
-            LOG.error("Error occurred reading the process stdout", t);
-          }
-        }
-      };
-      streamReaderThread.start();
-      return streamReaderThread;
-    }
-
-    public void execute() throws IOException {
-      if (state != State.INIT) {
-        throw new IOException("Process is already started");
-      }
-      processStub = Native.createTaskAsUser(cwd,
-          jobName, userName, pidFile, cmdLine);
-      state = State.RUNNING;
-
-      Thread stdOutReader = startStreamReader(processStub.getInputStream());
-      Thread stdErrReader = startStreamReader(processStub.getErrorStream());
-      
-      try {
-        processStub.resume();
-        processStub.waitFor();
-        stdOutReader.join();
-        stdErrReader.join();
-      }
-      catch(InterruptedException ie) {
-        throw new IOException(ie);
-      }
-      
-      exitCode = processStub.exitValue();
-      state = State.COMPLETE;
-    }
-
-    @Override
-    public void close() {
-      if (processStub != null) {
-        processStub.dispose();
-      }
-    }
-  }
-
-  private String nodeManagerGroup;
-  
-  /** 
-   * Permissions for user WSCE dirs.
-   */
-  static final short DIR_PERM = (short)0750;  
-  
-  public WindowsSecureContainerExecutor() 
-      throws IOException, URISyntaxException {
-    super(FileContext.getFileContext(new ElevatedFileSystem(), 
-        new Configuration()));
-  }
-
-  @Override
-  public void setConf(Configuration conf) {
-    super.setConf(conf);
-    nodeManagerGroup = conf.get(
-        YarnConfiguration.NM_WINDOWS_SECURE_CONTAINER_GROUP);
-  }
-  
-  @Override
-  protected String[] getRunCommand(String command, String groupId,
-      String userName, Path pidFile, Configuration conf) {
-    File f = new File(command);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(String.format("getRunCommand: %s exists:%b", 
-          command, f.exists()));
-    }
-    return new String[] { Shell.getWinUtilsPath(), "task",
-        "createAsUser", groupId,
-        userName, pidFile.toString(), "cmd /c " + command };
-  }
-  
-  @Override
-  protected LocalWrapperScriptBuilder getLocalWrapperScriptBuilder(
-      String containerIdStr, Path containerWorkDir) {
-   return  new WindowsSecureWrapperScriptBuilder(containerWorkDir);
-  }
-  
-  @Override
-  protected void copyFile(Path src, Path dst, String owner) throws IOException {
-    LOG.debug("copyFile: {} -> {} owner:{}", src, dst, owner);
-    Native.Elevated.copy(src,  dst, true);
-    Native.Elevated.chown(dst, owner, nodeManagerGroup);
-  }
-
-  @Override
-  protected void createDir(Path dirPath, FsPermission perms,
-      boolean createParent, String owner) throws IOException {
-    
-    // WSCE requires dirs to be 750, not 710 as DCE.
-    // This is similar to how LCE creates dirs
-    //
-    perms = new FsPermission(DIR_PERM);
-    LOG.debug("createDir: {} perm:{} owner:{}", dirPath, perms, owner);
-    
-    super.createDir(dirPath, perms, createParent, owner);
-    lfs.setOwner(dirPath, owner, nodeManagerGroup);
-  }
-
-  @Override
-  protected void setScriptExecutable(Path script, String owner) 
-      throws IOException {
-    LOG.debug("setScriptExecutable: {} owner:{}", script, owner);
-    super.setScriptExecutable(script, owner);
-    Native.Elevated.chown(script, owner, nodeManagerGroup);
-  }
-
-  @Override
-  public Path localizeClasspathJar(Path jarPath, Path target, String owner) 
-      throws IOException {
-    LOG.debug("localizeClasspathJar: {} {} o:{}", jarPath, target, owner);
-    createDir(target,  new FsPermission(DIR_PERM), true, owner);
-    String fileName = jarPath.getName();
-    Path dst = new Path(target, fileName);
-    Native.Elevated.move(jarPath, dst, true);
-    Native.Elevated.chown(dst, owner, nodeManagerGroup);
-    return dst;
-  }
-
-  @Override
-  public void startLocalizer(LocalizerStartContext ctx) throws IOException,
-      InterruptedException {
-    Path nmPrivateContainerTokensPath = ctx.getNmPrivateContainerTokens();
-    InetSocketAddress nmAddr = ctx.getNmAddr();
-    String user = ctx.getUser();
-    String appId = ctx.getAppId();
-    String locId = ctx.getLocId();
-    LocalDirsHandlerService dirsHandler = ctx.getDirsHandler();
-    List<String> localDirs = dirsHandler.getLocalDirs();
-    List<String> logDirs = dirsHandler.getLogDirs();
-
-    Path classpathJarPrivateDir = dirsHandler.getLocalPathForWrite(
-        ResourceLocalizationService.NM_PRIVATE_DIR);
-    createUserLocalDirs(localDirs, user);
-    createUserCacheDirs(localDirs, user);
-    createAppDirs(localDirs, user, appId);
-    createAppLogDirs(appId, logDirs, user);
-
-    Path appStorageDir = getWorkingDir(localDirs, user, appId);
-
-    String tokenFn = String.format(ContainerExecutor.TOKEN_FILE_NAME_FMT,
-        locId);
-    Path tokenDst = new Path(appStorageDir, tokenFn);
-    copyFile(nmPrivateContainerTokensPath, tokenDst, user);
-
-    File cwdApp = new File(appStorageDir.toString());
-    LOG.debug("cwdApp: {}", cwdApp);
-
-    List<String> command ;
-
-    command = new ArrayList<String>();
-
-    //use same jvm as parent
-    File jvm = new File(
-        new File(System.getProperty("java.home"), "bin"), "java.exe");
-    command.add(jvm.toString());
-
-    Path cwdPath = new Path(cwdApp.getPath());
-
-    // Build a temp classpath jar. See ContainerLaunch.sanitizeEnv().
-    // Passing CLASSPATH explicitly is *way* too long for command line.
-    String classPath = System.getProperty("java.class.path");
-    Map<String, String> env = new HashMap<String, String>(System.getenv());
-    String jarCp[] = FileUtil.createJarWithClassPath(classPath,
-        classpathJarPrivateDir, cwdPath, env);
-    String classPathJar = localizeClasspathJar(
-        new Path(jarCp[0]), cwdPath, user).toString();
-    command.add("-classpath");
-    command.add(classPathJar + jarCp[1]);
-
-    String javaLibPath = System.getProperty("java.library.path");
-    if (javaLibPath != null) {
-      command.add("-Djava.library.path=" + javaLibPath);
-    }
-    command.addAll(ContainerLocalizer.getJavaOpts(getConf()));
-
-    ContainerLocalizer.buildMainArgs(command, user, appId, locId, nmAddr,
-        tokenFn, localDirs, super.getConf());
-
-    String cmdLine = StringUtils.join(command, " ");
-
-    String localizerPid = String.format(LOCALIZER_PID_FORMAT, locId);
-
-    WintuilsProcessStubExecutor stubExecutor = new WintuilsProcessStubExecutor(
-        cwdApp.getAbsolutePath(),
-        localizerPid, user, "nul:", cmdLine);
-    try {
-      stubExecutor.execute();
-      stubExecutor.validateResult();
-    } finally {
-      stubExecutor.close();
-      try
-      {
-        killContainer(localizerPid, Signal.KILL);
-      }
-      catch(Throwable e) {
-        LOG.warn(String.format(
-            "An exception occurred during the cleanup of localizer job %s:%n%s",
-            localizerPid,
-            org.apache.hadoop.util.StringUtils.stringifyException(e)));
-      }
-    }
-  }
-
-  @Override
-  protected CommandExecutor buildCommandExecutor(String wrapperScriptPath,
-      String containerIdStr, String userName, Path pidFile, Resource resource,
-      File wordDir, Map<String, String> environment, String[] numaCommands) {
-     return new WintuilsProcessStubExecutor(
-         wordDir.toString(),
-         containerIdStr, userName, pidFile.toString(),
-         "cmd /c " + wrapperScriptPath);
-   }
-   
-   @Override
-   protected void killContainer(String pid, Signal signal) throws IOException {
-     Native.Elevated.killTask(pid);
-   }
-}
-

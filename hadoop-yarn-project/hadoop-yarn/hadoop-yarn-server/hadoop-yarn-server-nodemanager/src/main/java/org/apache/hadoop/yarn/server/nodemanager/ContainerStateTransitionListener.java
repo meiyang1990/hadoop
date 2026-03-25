@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,14 +26,10 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.state.StateTransitionListener;
 
 /**
- * Interface to be used by external cluster operators to implement a
- * State Transition listener that is notified before and after a container
- * state transition.
- * NOTE: The pre and post transition callbacks will be made in the synchronized
- *       block as the call to the instrumented transition - Serially, in the
- *       order: preTransition, transition and postTransition. The implementor
- *       must ensure that the callbacks return in a timely manner to avoid
- *       blocking the state-machine.
+ * 容器状态转换监听器接口，供外部集群开发者实现，用于在容器状态转换前后接收事件通知
+ * 
+ * 注意：前置和后置转换回调都会在同步块中串行执行，执行顺序为 preTransition -> 实际状态转换 -> postTransition
+ *       实现者必须保证回调方法尽快返回，避免阻塞容器状态机
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -40,9 +37,8 @@ public interface ContainerStateTransitionListener extends
     StateTransitionListener<ContainerImpl, ContainerEvent, ContainerState> {
 
   /**
-   * Init method which will be invoked by the Node Manager to inject the
-   * NM {@link Context}.
-   * @param context NM Context.
+   * 初始化方法，由NodeManager调用，注入NodeManager上下文对象
+   * @param context NodeManager上下文对象
    */
   void init(Context context);
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,37 +30,42 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 // 这个文件已经全部加上中文注释
 // 应用程序状态检查器抽象类，用于判断应用是否仍在运行，供清理服务决定是否可安全删除缓存条目
 /**
- * An interface for checking whether an app is running so that the cleaner
- * service may determine if it can safely remove a cached entry.
+ * YARN共享缓存应用状态检查抽象接口，供缓存清理服务判断缓存条目是否可以安全删除。
+ * 核心作用是提供应用运行状态查询能力，确保只清理没有活跃应用依赖的缓存资源。
  */
 @Private
 @Evolving
 public abstract class AppChecker extends CompositeService {
 
+  /** 构造函数，使用默认服务名称初始化AppChecker */
   public AppChecker() {
     super("AppChecker");
   }
 
+  /**
+   * 构造函数，使用自定义服务名称初始化AppChecker
+   * @param name 服务名称
+   */
   public AppChecker(String name) {
     super(name);
   }
 
   /**
-   * Returns whether the app is in an active state.
+   * 判断指定应用是否处于活跃运行状态
    * 
-   * @return true if the app is found and is not in one of the completed states;
-   *         false otherwise
-   * @throws YarnException if there is an error in determining the app state
+   * @param id 待检查的应用ID
+   * @return true 如果应用存在且未完成；false 如果应用不存在或已完成
+   * @throws YarnException 查询应用状态过程中发生错误时抛出
    */
   @Private
   public abstract boolean isApplicationActive(ApplicationId id)
       throws YarnException;
 
   /**
-   * Returns the list of all active apps at the given time.
+   * 获取当前集群中所有活跃运行的应用列表
    * 
-   * @return the list of active apps, or an empty list if there is none
-   * @throws YarnException if there is an error in obtaining the list
+   * @return 活跃应用ID集合，无活跃应用时返回空集合
+   * @throws YarnException 获取活跃应用列表过程中发生错误时抛出
    */
   @Private
   public abstract Collection<ApplicationId> getActiveApplications()

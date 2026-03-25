@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,8 +46,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Queue Management scheduling policy for managed parent queues which enable
- * auto child queue creation
+ * 容量调度器队列管理动态编辑策略，用于支持开启自动子队列创建的托管父队列动态调整
  */
 public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
 
@@ -55,7 +55,7 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
 
   private Clock clock;
 
-  // Pointer to other RM components
+  // 指向RM其他核心组件的引用
   private RMContext rmContext;
   private ResourceCalculator rc;
   private CapacityScheduler scheduler;
@@ -63,10 +63,11 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
 
   private long monitoringInterval;
 
+  // 存储所有开启自动创建子队列的托管父队列名称
   private Set<String> managedParentQueues = new HashSet<>();
 
   /**
-   * Instantiated by CapacitySchedulerConfiguration
+   * 空构造函数，由CapacitySchedulerConfiguration反射实例化
    */
   public QueueManagementDynamicEditPolicy() {
     clock = SystemClock.getInstance();
@@ -93,6 +94,7 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
     LOG.info("Queue Management Policy monitor: {}" + this.
         getClass().getCanonicalName());
     assert null == scheduler : "Unexpected duplicate call to init";
+    // 检查调度器是否为CapacityScheduler，不兼容其他调度器
     if (!(sched instanceof CapacityScheduler)) {
       throw new YarnRuntimeException("Class " +
           sched.getClass().getCanonicalName() + " not instance of " +
@@ -107,19 +109,21 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
 
     CapacitySchedulerConfiguration csConfig = scheduler.getConfiguration();
 
+    // 从配置加载队列管理监控间隔时间
     monitoringInterval = csConfig.getLong(
         CapacitySchedulerConfiguration.QUEUE_MANAGEMENT_MONITORING_INTERVAL,
         CapacitySchedulerConfiguration.
             DEFAULT_QUEUE_MANAGEMENT_MONITORING_INTERVAL);
 
+    // 初始化托管父队列列表
     initQueues();
   }
 
   /**
-   * Reinitializes queues(Called on scheduler.reinitialize)
-   * @param config Configuration
-   * @param context The resourceManager's context
-   * @param sched The scheduler
+   * 重新初始化队列（调度器重新初始化时调用）
+   * @param config 配置对象
+   * @param context ResourceManager上下文
+   * @param sched 调度器实例
    */
   public void reinitialize(final Configuration config, final RMContext context,
       final ResourceScheduler sched) {
@@ -127,6 +131,9 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
     initQueues();
   }
 
+  /**
+   * 扫描调度器所有队列，收集所有托管父队列
+   */
   private void initQueues() {
     managedParentQueues.clear();
     for (Map.Entry<String, CSQueue> queues : scheduler
@@ -146,7 +153,9 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
   public void editSchedule() {
     long startTs = clock.getTime();
 
+    // 重新扫描更新托管父队列列表
     initQueues();
+    // 处理自动创建的叶子队列，生成并应用变更
     manageAutoCreatedLeafQueues();
 
     if (LOG.isDebugEnabled()) {
@@ -159,15 +168,16 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
   {
 
     List<QueueManagementChange> queueManagementChanges = new ArrayList<>();
-    // All partitions to look at
 
-    //Proceed only if there are queues to process
+    // 只有存在待处理的托管父队列才执行处理
     if (managedParentQueues.size() > 0) {
       for (String parentQueueName : managedParentQueues) {
+        // 获取父队列实例
         ManagedParentQueue parentQueue =
             (ManagedParentQueue) scheduler.getCapacitySchedulerQueueManager().
                 getQueue(parentQueueName);
 
+        // 计算该父队列需要执行的队列变更，添加到总变更列表
         queueManagementChanges.addAll(
             computeQueueManagementChanges
             (parentQueue));
@@ -181,19 +191,23 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
   List<QueueManagementChange> computeQueueManagementChanges
       (ManagedParentQueue parentQueue) {
 
+    // 默认返回空变更列表
     List<QueueManagementChange> queueManagementChanges =
         Collections.emptyList();
+    // 仅当允许超出保障容量自动创建队列时才执行变更计算
     if (!parentQueue.shouldFailAutoCreationWhenGuaranteedCapacityExceeded()) {
 
+      // 获取父队列配置的自动队列管理策略实例
       AutoCreatedQueueManagementPolicy policyClazz =
           parentQueue.getAutoCreatedQueueManagementPolicy();
       long startTime = 0;
       try {
         startTime = clock.getTime();
 
+        // 调用策略计算需要执行的队列变更
         queueManagementChanges = policyClazz.computeQueueManagementChanges();
 
-        //Scheduler update is asynchronous
+        // 如果有变更，发送异步事件让调度器更新
         if (queueManagementChanges.size() > 0) {
           QueueManagementChangeEvent queueManagementChangeEvent =
               new QueueManagementChangeEvent(parentQueue,
@@ -202,6 +216,7 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
               queueManagementChangeEvent);
         }
 
+        // 调试日志记录处理耗时和变更信息
         if (LOG.isDebugEnabled()) {
           LOG.debug("{} uses {} millisecond" + " to run",
               policyClazz.getClass().getName(), clock.getTime() - startTime);
@@ -214,12 +229,14 @@ public class QueueManagementDynamicEditPolicy implements SchedulingEditPolicy {
           }
         }
       } catch (YarnException e) {
+        // 捕获计算异常，记录错误日志不中断整个流程
         LOG.error(
             "Could not compute child queue management updates for parent "
                 + "queue "
                 + parentQueue.getQueuePath(), e);
       }
     } else{
+      // 配置禁止超出容量创建，跳过该父队列处理
       LOG.debug("Skipping queue management updates for parent queue {} "
           + "since configuration for auto creating queues beyond "
           + "parent's guaranteed capacity is disabled",

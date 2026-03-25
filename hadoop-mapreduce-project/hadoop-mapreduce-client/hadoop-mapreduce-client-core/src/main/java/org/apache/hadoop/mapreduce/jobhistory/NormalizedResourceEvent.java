@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,10 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 
 /**
+ * 文件说明：MapReduce作业历史记录中归一化资源请求事件，记录归一化后的Map/Reduce任务资源需求
+ * 用于作业历史中存储资源调度相关的归一化资源请求信息，支持时间线服务指标导出
+ */
+/**
  * Event to record the normalized map/reduce requirements.
  * 
  */
@@ -37,9 +42,9 @@ public class NormalizedResourceEvent implements HistoryEvent {
   private TaskType taskType;
   
   /**
-   * Normalized request when sent to the Resource Manager.
-   * @param taskType the tasktype of the request.
-   * @param memory the normalized memory requirements.
+   * 构造归一化资源请求事件，保存提交到ResourceManager的归一化资源需求
+   * @param taskType 请求资源的任务类型（Map/Reduce）
+   * @param memory 归一化后的内存资源需求大小
    */
   public NormalizedResourceEvent(TaskType taskType, long memory) {
     this.memory = memory;
@@ -47,16 +52,16 @@ public class NormalizedResourceEvent implements HistoryEvent {
   }
   
   /**
-   * the tasktype for the event.
-   * @return the tasktype for the event.
+   * 获取事件对应的任务类型
+   * @return 任务类型（Map/Reduce）
    */
   public TaskType getTaskType() {
     return this.taskType;
   }
   
   /**
-   * the normalized memory
-   * @return the normalized memory
+   * 获取归一化后的内存资源需求
+   * @return 归一化后的内存大小
    */
   public long getMemory() {
     return this.memory;
@@ -79,9 +84,13 @@ public class NormalizedResourceEvent implements HistoryEvent {
 
   @Override
   public TimelineEvent toTimelineEvent() {
+    // 创建时间线事件对象
     TimelineEvent tEvent = new TimelineEvent();
+    // 设置事件ID为事件类型大写名称
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
+    // 添加归一化内存信息到事件
     tEvent.addInfo("MEMORY", "" + getMemory());
+    // 添加任务类型信息到事件
     tEvent.addInfo("TASK_TYPE", getTaskType());
     return tEvent;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,24 +22,25 @@ package org.apache.hadoop.hdfs.server.protocol;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * Generic class specifying information, which need to be sent to the name-node
- * during the registration process. 
+ * 节点注册信息接口，定义DataNode/JournalNode等节点向NameNode注册时需要提供的基础信息
  */
 @InterfaceAudience.Private
 public interface NodeRegistration {
   /**
-   * Get address of the server node.
-   * @return ipAddr:portNumber
+   * 获取节点的服务地址
+   * @return 节点地址，格式为ipAddr:portNumber
    */
   public String getAddress();
 
   /**
-   * Get registration ID of the server node.
+   * 获取节点的注册ID
+   * @return 节点注册ID，用于唯一标识该节点的本次注册
    */
   public String getRegistrationID();
 
   /**
-   * Get layout version of the server node.
+   * 获取节点存储系统布局版本号
+   * @return 节点布局版本号，用于兼容性检查
    */
   public int getVersion();
 

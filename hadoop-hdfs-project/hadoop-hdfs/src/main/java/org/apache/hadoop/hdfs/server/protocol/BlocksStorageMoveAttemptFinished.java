@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,19 +23,27 @@ import java.util.Arrays;
 import org.apache.hadoop.hdfs.protocol.Block;
 
 /**
- * This class represents, the blocks for which storage movements has done by
- * datanodes. The movementFinishedBlocks array contains all the blocks that are
- * attempted to do the movement and it could be finished with either success or
- * failure.
+ * HDFS数据节点存储块移动尝试完成消息
+ * 表示数据节点完成一批块存储移动尝试后，向NameNode上报的结果信息
+ * 包含所有已尝试移动的块（无论移动成功还是失败）
  */
 public class BlocksStorageMoveAttemptFinished {
 
+  /** 已完成移动尝试的块数组 */
   private final Block[] movementFinishedBlocks;
 
+  /**
+   * 构造块移动尝试完成消息
+   * @param moveAttemptFinishedBlocks 已完成移动尝试的块数组
+   */
   public BlocksStorageMoveAttemptFinished(Block[] moveAttemptFinishedBlocks) {
     this.movementFinishedBlocks = moveAttemptFinishedBlocks;
   }
 
+  /**
+   * 获取已完成移动尝试的所有块
+   * @return 已完成移动尝试的块数组
+   */
   public Block[] getBlocks() {
     return movementFinishedBlocks;
   }

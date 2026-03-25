@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -24,41 +25,53 @@ import org.slf4j.LoggerFactory;
 
 /**
  * <p>
- * State of a <code>SubCluster</code>.
+ * YARN联邦架构中子集群的状态枚举，定义子集群所有可能的运行状态。
  * </p>
  */
 @Private
 @Unstable
 public enum SubClusterState {
-  /** Newly registered subcluster, before the first heartbeat. */
+  /** 刚完成注册，还未发送第一次心跳的子集群。 */
   SC_NEW,
 
-  /** Subcluster is registered and the RM sent a heartbeat recently. */
+  /** 注册成功，并且最近按时发送了心跳的健康子集群。 */
   SC_RUNNING,
 
-  /** Subcluster is unhealthy. */
+  /** 子集群处于不健康状态。 */
   SC_UNHEALTHY,
 
-  /** Subcluster is in the process of being out of service. */
+  /** 子集群正在下线过程中。 */
   SC_DECOMMISSIONING,
 
-  /** Subcluster is out of service. */
+  /** 子集群已完成下线。 */
   SC_DECOMMISSIONED,
 
-  /** RM has not sent a heartbeat for some configured time threshold. */
+  /** 超过配置时间阈值未收到心跳，判定为丢失的子集群。 */
   SC_LOST,
 
-  /** Subcluster has unregistered. */
+  /** 子集群已主动注销。 */
   SC_UNREGISTERED;
 
+  /**
+   * 检查子集群是否可用于接收新任务调度。
+   * @return 是否可用于调度
+   */
   public boolean isUsable() {
     return (this == SC_RUNNING || this == SC_NEW);
   }
 
+  /**
+   * 检查子集群是否处于活跃运行状态。
+   * @return 是否活跃运行
+   */
   public boolean isActive() {
     return this == SC_RUNNING;
   }
 
+  /**
+   * 检查子集群是否处于不可变更的终态。
+   * @return 是否为终态
+   */
   public boolean isFinal() {
     return (this == SC_UNREGISTERED || this == SC_DECOMMISSIONED
         || this == SC_LOST);
@@ -68,10 +81,10 @@ public enum SubClusterState {
       LoggerFactory.getLogger(SubClusterState.class);
 
   /**
-   * Convert a string into {@code SubClusterState}.
+   * 将字符串解析为子集群状态枚举。
    *
-   * @param state the string to convert in SubClusterState
-   * @return the respective {@code SubClusterState}
+   * @param state 待解析的状态字符串
+   * @return 解析后的子集群状态，解析失败返回null
    */
   public static SubClusterState fromString(String state) {
     try {

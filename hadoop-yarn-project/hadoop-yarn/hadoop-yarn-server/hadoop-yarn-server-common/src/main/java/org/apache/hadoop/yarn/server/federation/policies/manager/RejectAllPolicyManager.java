@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -19,22 +20,21 @@ package org.apache.hadoop.yarn.server.federation.policies.manager;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.hadoop.yarn.server.federation.policies.amrmproxy.RejectAMRMProxyPolicy;
-import org.apache.hadoop.yarn.server.federation.policies.dao.WeightedPolicyInfo;
 import org.apache.hadoop.yarn.server.federation.policies.router.RejectRouterPolicy;
+import org.apache.hadoop.yarn.server.federation.policies.dao.WeightedPolicyInfo;
 
 /**
- * This class represents a simple implementation of a {@code
- * FederationPolicyManager}.
- *
- * This policy rejects all requests for both router and amrmproxy routing. This
- * is to be used to prevent applications in a specific queue (or if used as
- * default for non-configured queues) from accessing cluster resources.
+ * 拒绝所有请求的联邦策略管理器，实现了FederationPolicyManager接口
+ * 
+ * 该策略会拒绝所有来自Router和AMRMProxy的路由请求，用于禁止特定队列（或作为未配置队列的默认策略）的应用访问集群资源
  */
 public class RejectAllPolicyManager extends AbstractPolicyManager {
 
+  /**
+   * 构造函数，硬编码绑定拒绝策略
+   */
   public RejectAllPolicyManager() {
-    // this structurally hard-codes two compatible policies for Router and
-    // AMRMProxy.
+    // 硬编码绑定Router和AMRMProxy的拒绝策略
     routerFederationPolicy = RejectRouterPolicy.class;
     amrmProxyFederationPolicy = RejectAMRMProxyPolicy.class;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,20 +22,29 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
 /**
- * ContainerEvent for ContainerEventType.PAUSE_CONTAINER.
+ * 容器暂停事件，对应容器事件类型PAUSE_CONTAINER，用于通知容器管理器暂停指定容器
  */
 public class ContainerPauseEvent extends ContainerEvent {
 
+  // 暂停原因诊断信息
   private final String diagnostic;
 
+  /**
+   * 构造容器暂停事件
+   * @param cId 目标容器ID
+   * @param diagnostic 暂停原因诊断信息
+   */
   public ContainerPauseEvent(ContainerId cId,
       String diagnostic) {
     super(cId, ContainerEventType.PAUSE_CONTAINER);
     this.diagnostic = diagnostic;
   }
 
+  /**
+   * 获取暂停原因诊断信息
+   * @return 暂停诊断信息
+   */
   public String getDiagnostic() {
     return this.diagnostic;
   }
 }
-

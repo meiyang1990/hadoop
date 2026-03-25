@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * MapReduce V2 API 协议数据的 Protobuf 实现包。
+ * 该包包含所有 MapReduce 服务端与客户端之间交互数据结构的 Protobuf 序列化实现，
+ * 提供基于 Protobuf 的数据编解码能力，供 RPC 通信底层使用。
+ * 所有类均为Hadoop内部私有使用，不对外公开API。
  */
 @InterfaceAudience.Private
 package org.apache.hadoop.mapreduce.v2.api.records.impl.pb;

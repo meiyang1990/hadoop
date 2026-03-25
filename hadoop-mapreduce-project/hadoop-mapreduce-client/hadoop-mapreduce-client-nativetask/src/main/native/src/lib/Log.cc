@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,15 +17,18 @@
  * limitations under the License.
  */
 
+/**
+ * @file Log.cc
+ * @brief MapReduce本地任务日志输出配置，定义日志输出设备
+ */
+
 #include "lib/Log.h"
 
 namespace NativeTask {
 
 #ifdef PRINT_LOG
-
+// 开启日志输出时，将日志输出到标准错误流
 FILE * LOG_DEVICE = stderr;
-
 #endif
 
 } //namespace NativeTask
-

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,9 +37,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A RecordReader that reads records from a SQL table.
- * Emits LongWritables containing the record number as 
- * key and DBWritables as value.  
+ * 从关系型数据库SQL表中读取数据的RecordReader实现
+ * 输出键为包含行号的LongWritable，输出值为实现DBWritable接口的自定义数据对象
+ * 用于MapReduce作业从关系型数据库读取输入数据
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -75,8 +76,16 @@ public class DBRecordReader<T extends DBWritable> extends
   private String tableName;
 
   /**
-   * @param split The InputSplit to read data for
-   * @throws SQLException 
+   * 构造DBRecordReader，为指定输入分片读取数据
+   * @param split 要读取数据的输入分片
+   * @param inputClass 输出值对象的类型
+   * @param conf Hadoop配置对象
+   * @param conn 数据库连接
+   * @param dbConfig 数据库配置对象
+   * @param cond 查询条件
+   * @param fields 需要读取的字段名数组
+   * @param table 要读取的表名
+   * @throws SQLException 数据库异常
    */
   public DBRecordReader(DBInputFormat.DBInputSplit split, 
       Class<T> inputClass, Configuration conf, Connection conn, DBConfiguration dbConfig,
@@ -92,21 +101,30 @@ public class DBRecordReader<T extends DBWritable> extends
     this.tableName = table;
   }
 
+  /**
+   * 执行指定的SQL查询语句，获取结果集
+   * @param query 要执行的查询SQL
+   * @return 查询结果集
+   * @throws SQLException 数据库异常
+   */
   protected ResultSet executeQuery(String query) throws SQLException {
     this.statement = connection.prepareStatement(query,
         ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
     return statement.executeQuery();
   }
 
-  /** Returns the query for selecting the records, 
-   * subclasses can override this for custom behaviour.*/
+  /**
+   * 生成查询当前分片数据的SELECT语句，子类可覆盖实现自定义查询逻辑
+   * @return 可执行的SQL查询字符串
+   */
   protected String getSelectQuery() {
     StringBuilder query = new StringBuilder();
 
-    // Default codepath for MySQL, HSQLDB, etc. Relies on LIMIT/OFFSET for splits.
+    // 默认路径：适配MySQL、HSQLDB等，依赖LIMIT/OFFSET实现分片
     if(dbConf.getInputQuery() == null) {
       query.append("SELECT ");
   
+      // 拼接所有要查询的字段名
       for (int i = 0; i < fieldNames.length; i++) {
         query.append(fieldNames[i]);
         if (i != fieldNames.length -1) {
@@ -114,32 +132,40 @@ public class DBRecordReader<T extends DBWritable> extends
         }
       }
 
+      // 拼接表名，HSQLDB要求必须加表别名
       query.append(" FROM ").append(tableName);
-      query.append(" AS ").append(tableName); //in hsqldb this is necessary
+      query.append(" AS ").append(tableName);
+      // 拼接用户自定义查询条件
       if (conditions != null && conditions.length() > 0) {
         query.append(" WHERE (").append(conditions).append(")");
       }
 
+      // 拼接排序语句
       String orderBy = dbConf.getInputOrderBy();
       if (orderBy != null && orderBy.length() > 0) {
         query.append(" ORDER BY ").append(orderBy);
       }
     } else {
-      //PREBUILT QUERY
+      // 用户提供了完整自定义查询，直接使用
       query.append(dbConf.getInputQuery());
     }
         
+    // 拼接分片的LIMIT和OFFSET，实现只查询当前分片对应的数据
     try {
       query.append(" LIMIT ").append(split.getLength());
       query.append(" OFFSET ").append(split.getStart());
     } catch (IOException ex) {
-      // Ignore, will not throw.
+      // 不会抛出异常，忽略即可
     }		
 
     return query.toString();
   }
 
   /** {@inheritDoc} */
+  /**
+   * 关闭数据库资源，包括结果集、语句对象和连接
+   * @throws IOException 关闭失败时抛出IO异常
+   */
   public void close() throws IOException {
     try {
       if (null != results) {
@@ -157,6 +183,13 @@ public class DBRecordReader<T extends DBWritable> extends
     }
   }
 
+  /**
+   * 初始化RecordReader，此处无额外初始化逻辑
+   * @param split 输入分片
+   * @param context 任务尝试上下文
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public void initialize(InputSplit split, TaskAttemptContext context) 
       throws IOException, InterruptedException {
     //do nothing
@@ -173,7 +206,7 @@ public class DBRecordReader<T extends DBWritable> extends
   }
 
   /**
-   * @deprecated 
+   * @deprecated 已废弃，使用nextKeyValue()代替
    */
   @Deprecated
   public T createValue() {
@@ -181,7 +214,7 @@ public class DBRecordReader<T extends DBWritable> extends
   }
 
   /**
-   * @deprecated 
+   * @deprecated 已废弃
    */
   @Deprecated
   public long getPos() throws IOException {
@@ -189,7 +222,7 @@ public class DBRecordReader<T extends DBWritable> extends
   }
 
   /**
-   * @deprecated Use {@link #nextKeyValue()}
+   * @deprecated 已废弃，使用{@link #nextKeyValue()}代替
    */
   @Deprecated
   public boolean next(LongWritable key, T value) throws IOException {
@@ -206,24 +239,29 @@ public class DBRecordReader<T extends DBWritable> extends
   /** {@inheritDoc} */
   public boolean nextKeyValue() throws IOException {
     try {
+      // 延迟初始化键对象
       if (key == null) {
         key = new LongWritable();
       }
+      // 延迟初始化值对象
       if (value == null) {
         value = createValue();
       }
+      // 第一次调用，执行查询获取结果集
       if (null == this.results) {
-        // First time into this method, run the query.
         this.results = executeQuery(getSelectQuery());
       }
+      // 移动到下一行，没有更多数据则返回false
       if (!results.next())
         return false;
 
-      // Set the key field value as the output key value
+      // 设置行号键：基于分片起始位置计算全局行号
       key.set(pos + split.getStart());
 
+      // 从结果集读取当前行数据到值对象
       value.readFields(results);
 
+      // 已读取行数自增
       pos ++;
     } catch (SQLException e) {
       throw new IOException("SQLException in nextKeyValue", e);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,65 +20,51 @@
 package org.apache.hadoop.yarn.server.resourcemanager.placement.csmappingrule;
 
 /**
- * This class represents the outcome of an action.
+ * 容量调度器应用放置规则匹配结果封装类，用于表示一条映射规则执行后的结果
  */
 public final class MappingRuleResult {
   /**
-   * The name of the queue we should place our application into.
-   * Only valid if result == PLACE.
+   * 目标队列名称，仅当结果类型为PLACE时有效
    */
   private final String queue;
 
   /**
-   * This flag indicates whether the target queue can be created if it does not
-   * exist yet.
-   * Only valid if result == PLACE
+   * 标记如果目标队列不存在时是否允许自动创建，仅当结果类型为PLACE时有效
    */
   private boolean allowCreate = true;
 
   /**
-   * The normalized name of the queue, since CS allows users to reference queues
-   * by only their leaf name, we need to normalize those queues to have full
-   * reference.
+   * 标准化后的队列完整路径，容量调度器允许用户仅引用叶子节点名称，需要标准化为完整路径
    */
   private String normalizedQueue;
 
   /**
-   * The result of the action.
+   * 结果类型枚举
    */
   private MappingRuleResultType result;
 
   /**
-   * To the reject result has no variable field, so we don't have to create
-   * a new instance all the time.
-   * This is THE instance which will be used to represent REJECT
+   * 拒绝结果单例，重复使用该实例避免重复创建对象
    */
   private static final MappingRuleResult RESULT_REJECT
       = new MappingRuleResult(null, MappingRuleResultType.REJECT);
 
   /**
-   * To the skip result has no variable field, so we don't have to create
-   * a new instance all the time.
-   * This is THE instance which will be used to represent SKIP
+   * 跳过结果单例，重复使用该实例避免重复创建对象
    */
   private static final MappingRuleResult RESULT_SKIP
       = new MappingRuleResult(null, MappingRuleResultType.SKIP);
 
   /**
-   * To the default placement result has no variable field, so we don't have to
-   * create a new instance all the time.
-   * This is THE instance which will be used to represent default placement
+   * 默认放置结果单例，重复使用该实例避免重复创建对象
    */
   private static final MappingRuleResult RESULT_DEFAULT_PLACEMENT
       = new MappingRuleResult(null, MappingRuleResultType.PLACE_TO_DEFAULT);
 
   /**
-   * Constructor is private to force the user to use the predefined generator
-   * methods to create new instances in order to avoid inconsistent states.
-   * @param queue Name of the queue in which the application is supposed to be
-   *              placed, only valid if result == PLACE
-   *              otherwise it should be null
-   * @param result The type of the result
+   * 私有构造方法，强制使用工厂方法创建实例避免状态不一致
+   * @param queue 应用要放置到的队列名称，仅结果类型为PLACE时有效，否则为null
+   * @param result 结果类型
    */
   private MappingRuleResult(String queue, MappingRuleResultType result) {
     this.queue = queue;
@@ -86,14 +73,10 @@ public final class MappingRuleResult {
   }
 
   /**
-   * Constructor is private to force the user to use the predefined generator
-   * methods to create new instances in order to avoid inconsistent states.
-   * @param queue Name of the queue in which the application is supposed to be
-   *              placed, only valid if result == PLACE
-   *              otherwise it should be null
-   * @param result The type of the result
-   * @param allowCreate Determines if the target queue should be created if it
-   *                    does not exist
+   * 私有构造方法，强制使用工厂方法创建实例避免状态不一致
+   * @param queue 应用要放置到的队列名称，仅结果类型为PLACE时有效，否则为null
+   * @param result 结果类型
+   * @param allowCreate 标记不存在时是否允许创建目标队列
    */
   private MappingRuleResult(
       String queue, MappingRuleResultType result, boolean allowCreate) {
@@ -104,58 +87,51 @@ public final class MappingRuleResult {
   }
 
   /**
-   * This method returns the result queue. Currently only makes sense when
-   * result == PLACE.
-   * @return the queue this result is about
+   * 获取目标队列名称，仅结果类型为PLACE时有意义
+   * @return 目标队列名称
    */
   public String getQueue() {
     return queue;
   }
 
   /**
-   * The method returns true if the result queue should be created when it does
-   * not exist yet.
-   * @return true if non-existent queues should be created
+   * 获取是否允许创建不存在的目标队列
+   * @return true表示允许创建不存在的队列
    */
   public boolean isCreateAllowed() {
     return allowCreate;
   }
 
   /**
-   * External interface for setting the normalized version of the queue. This
-   * class cannot normalize on it's own, but provides a way to store the
-   * normalized name of the target queue.
-   * @param normalizedQueueName The normalized name of the queue
+   * 更新标准化后的队列完整路径，该类本身不负责标准化，仅提供存储能力
+   * @param normalizedQueueName 标准化后的队列完整路径
    */
   public void updateNormalizedQueue(String normalizedQueueName) {
     this.normalizedQueue = normalizedQueueName;
   }
 
   /**
-   * This method returns the normalized name of the result queue.
-   * Currently only makes sense when result == PLACE
-   * Normalized value must be set externally, this class cannot normalize
-   * it just provides a way to store the normalized name of a queue
-   * @return the queue name this result is about
+   * 获取标准化后的队列完整路径，仅结果类型为PLACE时有意义。
+   * 标准化名称需要外部设置，本类仅提供存储能力
+   * @return 标准化后的队列完整路径
    */
   public String getNormalizedQueue() {
     return normalizedQueue;
   }
 
   /**
-   * Returns the type of the result.
-   * @return the type of the result.
+   * 获取结果类型
+   * @return 结果类型枚举值
    */
   public MappingRuleResultType getResult() {
     return result;
   }
 
   /**
-   * Generator method for place results.
-   * @param queue The name of the queue in which we shall place the application
-   * @param allowCreate Flag to indicate if the placement rule is allowed to
-   *                    create a queue if possible.
-   * @return The generated MappingRuleResult
+   * 创建放置到指定队列的结果对象
+   * @param queue 目标队列名称
+   * @param allowCreate 是否允许创建不存在的目标队列
+   * @return 映射规则结果对象
    */
   public static MappingRuleResult createPlacementResult(
       String queue, boolean allowCreate) {
@@ -164,34 +140,29 @@ public final class MappingRuleResult {
   }
 
   /**
-   * Generator method for reject results.
-   * @return The generated MappingRuleResult
+   * 获取拒绝应用提交的结果单例
+   * @return 拒绝结果单例
    */
   public static MappingRuleResult createRejectResult() {
     return RESULT_REJECT;
   }
 
   /**
-   * Generator method for skip results.
-   * @return The generated MappingRuleResult
+   * 获取跳过当前规则的结果单例，继续匹配下一条规则
+   * @return 跳过结果单例
    */
   public static MappingRuleResult createSkipResult() {
     return RESULT_SKIP;
   }
 
   /**
-   * Generator method for default placement results. It is a specialized
-   * placement result which will only use the "%default" as a queue name.
-   * @return The generated MappingRuleResult
+   * 获取使用默认放置策略的结果单例，使用默认队列放置应用
+   * @return 默认放置结果单例
    */
   public static MappingRuleResult createDefaultPlacementResult() {
     return RESULT_DEFAULT_PLACEMENT;
   }
 
-  /**
-   * Returns the string representation of the object.
-   * @return the string representation of the object
-   */
   @Override
   public String toString() {
     if (result == MappingRuleResultType.PLACE) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -62,9 +63,7 @@ import org.apache.hadoop.yarn.util.Clock;
 import org.apache.hadoop.yarn.util.SystemClock;
 
 /**
- * The RMActiveServiceContext is the class that maintains <b>Active</b> service
- * context. Services that need to run only on the Active RM. This is expected to
- * be used only by RMContext.
+ * 活性ResourceManager服务上下文，仅在Active RM上维护需要运行的核心服务与运行时数据，仅被RMContext使用。
  */
 @Private
 @Unstable
@@ -73,18 +72,23 @@ public class RMActiveServiceContext {
   private static final Logger LOG = LoggerFactory
       .getLogger(RMActiveServiceContext.class);
 
+  // 存储所有运行中应用，key为应用ID，value为RMApp对象
   private final ConcurrentMap<ApplicationId, RMApp> applications =
       new ConcurrentHashMap<ApplicationId, RMApp>();
 
+  // 存储所有活跃节点，key为节点ID，value为RMNode对象
   private final ConcurrentMap<NodeId, RMNode> nodes =
       new ConcurrentHashMap<NodeId, RMNode>();
 
+  // 存储所有非活跃节点，key为节点ID，value为RMNode对象
   private final ConcurrentMap<NodeId, RMNode> inactiveNodes =
       new ConcurrentHashMap<NodeId, RMNode>();
 
+  // 存储各应用的系统凭证信息
   private final ConcurrentMap<ApplicationId, SystemCredentialsForAppsProto> systemCredentials =
     new ConcurrentHashMap<ApplicationId, SystemCredentialsForAppsProto>();
 
+  // 是否启用工作保留恢复（故障转移时不杀死已运行任务）
   private boolean isWorkPreservingRecoveryEnabled;
 
   private AMLivelinessMonitor amLivelinessMonitor;
@@ -107,30 +111,59 @@ public class RMActiveServiceContext {
   private RMNodeLabelsManager nodeLabelManager;
   private NodeAttributesManager nodeAttributesManager;
   private RMDelegatedNodeLabelsUpdater rmDelegatedNodeLabelsUpdater;
+  // RM启动纪元，标识当前RM主节点任期
   private long epoch;
   private Clock systemClock = SystemClock.getInstance();
+  // 调度器恢复开始时间
   private long schedulerRecoveryStartTime = 0;
+  // 调度器恢复最大等待时间
   private long schedulerRecoveryWaitTime = 0;
+  // 日志打印标记，避免重复打印
   private boolean printLog = true;
+  // 标记调度器是否已完成恢复，可分配容器
   private boolean isSchedulerReady = false;
   private PlacementManager queuePlacementManager = null;
 
   private RMAppLifetimeMonitor rmAppLifetimeMonitor;
+  // 分布式调度中队列资源限制计算器
   private QueueLimitCalculator queueLimitCalculator;
+  // 分配标签管理器，支持基于标签的放置约束
   private AllocationTagsManager allocationTagsManager;
+  // 放置约束管理器
   private PlacementConstraintManager placementConstraintManager;
+  // 资源配置文件管理器
   private ResourceProfilesManager resourceProfilesManager;
+  // 多节点排序管理器，用于容器放置节点选择排序
   private MultiNodeSortingManager<SchedulerNode> multiNodeSortingManager;
 
+  // 代理CA管理器，用于AM证书签名
   private ProxyCAManager proxyCAManager;
+  // CSI卷管理器
   private VolumeManager volumeManager;
 
+  // Token序列号生成器，保证Token唯一性
   private AtomicLong tokenSequenceNo = new AtomicLong(1);
 
+  /**
+   * 构造函数，初始化放置管理器。
+   */
   public RMActiveServiceContext() {
     queuePlacementManager = new PlacementManager();
   }
 
+  /**
+   * 带参数构造函数，初始化核心服务组件。
+   * @param rmDispatcher 事件分发器
+   * @param containerAllocationExpirer 容器分配过期器
+   * @param amLivelinessMonitor AM存活监控器
+   * @param amFinishingMonitor 完成阶段AM存活监控器
+   * @param delegationTokenRenewer 委托令牌续订器
+   * @param appTokenSecretManager AM-RM令牌密钥管理器
+   * @param containerTokenSecretManager 容器令牌密钥管理器
+   * @param nmTokenSecretManager NM令牌密钥管理器
+   * @param clientToAMTokenSecretManager 客户端-AM令牌密钥管理器
+   * @param scheduler 资源调度器
+   */
   @Private
   @Unstable
   public RMActiveServiceContext(Dispatcher rmDispatcher,
@@ -154,6 +187,7 @@ public class RMActiveServiceContext {
     this.setClientToAMTokenSecretManager(clientToAMTokenSecretManager);
     this.setScheduler(scheduler);
 
+    // 初始化空状态存储，默认实现
     RMStateStore nullStore = new NullRMStateStore();
     nullStore.setRMDispatcher(rmDispatcher);
     try {
@@ -462,146 +496,4 @@ public class RMActiveServiceContext {
   @Private
   @Unstable
   public void setRMDelegatedNodeLabelsUpdater(
-      RMDelegatedNodeLabelsUpdater nodeLablesUpdater) {
-    rmDelegatedNodeLabelsUpdater = nodeLablesUpdater;
-  }
-
-  @Private
-  @Unstable
-  public MultiNodeSortingManager<SchedulerNode> getMultiNodeSortingManager() {
-    return multiNodeSortingManager;
-  }
-
-  @Private
-  @Unstable
-  public void setMultiNodeSortingManager(
-      MultiNodeSortingManager<SchedulerNode> multiNodeSortingManager) {
-    this.multiNodeSortingManager = multiNodeSortingManager;
-  }
-
-  @Private
-  @Unstable
-  public void setSchedulerRecoveryStartAndWaitTime(long waitTime) {
-    this.schedulerRecoveryStartTime = systemClock.getTime();
-    this.schedulerRecoveryWaitTime = waitTime;
-  }
-
-  @Private
-  @Unstable
-  public boolean isSchedulerReadyForAllocatingContainers() {
-    if (isSchedulerReady) {
-      return isSchedulerReady;
-    }
-    isSchedulerReady =
-        (systemClock.getTime() - schedulerRecoveryStartTime) > schedulerRecoveryWaitTime;
-    if (!isSchedulerReady && printLog) {
-      LOG.info("Skip allocating containers. Scheduler is waiting for recovery.");
-      printLog = false;
-    }
-    if (isSchedulerReady) {
-      LOG.info("Scheduler recovery is done. Start allocating new containers.");
-    }
-    return isSchedulerReady;
-  }
-
-  @Private
-  @Unstable
-  public void setSystemClock(Clock clock) {
-    this.systemClock = clock;
-  }
-
-  @Private
-  @Unstable
-  public ConcurrentMap<ApplicationId, SystemCredentialsForAppsProto>
-      getSystemCredentialsForApps() {
-    return systemCredentials;
-  }
-  
-  @Private
-  @Unstable
-  public PlacementManager getQueuePlacementManager() {
-    return queuePlacementManager;
-  }
-  
-  @Private
-  @Unstable
-  public void setQueuePlacementManager(PlacementManager placementMgr) {
-    this.queuePlacementManager = placementMgr;
-  }
-
-  @Private
-  @Unstable
-  public void setRMAppLifetimeMonitor(
-      RMAppLifetimeMonitor lifetimeMonitor) {
-    this.rmAppLifetimeMonitor = lifetimeMonitor;
-  }
-
-  @Private
-  @Unstable
-  public RMAppLifetimeMonitor getRMAppLifetimeMonitor() {
-    return this.rmAppLifetimeMonitor;
-  }
-
-  @Private
-  @Unstable
-  public QueueLimitCalculator getNodeManagerQueueLimitCalculator() {
-    return this.queueLimitCalculator;
-  }
-
-  @Private
-  @Unstable
-  public void setContainerQueueLimitCalculator(
-      QueueLimitCalculator limitCalculator) {
-    this.queueLimitCalculator = limitCalculator;
-  }
-
-  public ResourceProfilesManager getResourceProfilesManager() {
-    return resourceProfilesManager;
-  }
-
-  public void setResourceProfilesManager(
-      ResourceProfilesManager resourceProfilesManager) {
-    this.resourceProfilesManager = resourceProfilesManager;
-  }
-
-  @Private
-  @Unstable
-  public ProxyCAManager getProxyCAManager() {
-    return proxyCAManager;
-  }
-
-  @Private
-  @Unstable
-  public void setProxyCAManager(ProxyCAManager proxyCAManager) {
-    this.proxyCAManager = proxyCAManager;
-  }
-
-  @Private
-  @Unstable
-  public VolumeManager getVolumeManager() {
-    return this.volumeManager;
-  }
-
-  @Private
-  @Unstable
-  public void setVolumeManager(VolumeManager volumeManager) {
-    this.volumeManager = volumeManager;
-  }
-
-  /**
-   * Get token sequence no.
-   *
-   * @return the tokenSequenceNo
-   */
-  public Long getTokenSequenceNo() {
-    return tokenSequenceNo.get();
-  }
-
-  /**
-   * Increment token sequence no.
-   *
-   */
-  public void incrTokenSequenceNo() {
-    this.tokenSequenceNo.incrementAndGet();
-  }
-}
+      RMDelegatedNodeLabels

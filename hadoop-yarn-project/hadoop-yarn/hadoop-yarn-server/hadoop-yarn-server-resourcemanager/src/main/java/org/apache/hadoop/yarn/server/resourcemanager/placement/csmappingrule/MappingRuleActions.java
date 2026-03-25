@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,41 +23,32 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.placement.VariableContext;
 
 /**
- * This class contains all the actions and some helper methods to generate them.
+ * YARN容量调度器队列映射规则动作工厂类，定义了所有映射规则支持的动作类型，并提供创建动作实例的工具方法。
+ * 该类属于YARN ResourceManager容量调度器应用 placement 模块，负责处理应用提交后队列映射的动作定义。
  */
 public final class MappingRuleActions {
+  /** 默认队列变量名，用于表示使用默认队列 */
   public static final String DEFAULT_QUEUE_VARIABLE = "%default";
 
   /**
-   * Utility class, hiding constructor.
+   * 工具类，隐藏构造方法。
    */
   private MappingRuleActions() {}
 
   /**
-   * PlaceToQueueAction represents a placement action, contains the pattern of
-   * the queue name or path in which the path variables will be substituted
-   * with the variable context's respective values.
+   * 放置到指定队列动作，将应用放置到匹配的目标队列，支持队列名称模式变量替换。
    */
   public static class PlaceToQueueAction extends MappingRuleActionBase {
-    /**
-     * We store the queue pattern in this variable, it may contain substitutable
-     * variables.
-     */
+    /** 目标队列名称模式，可包含需要替换的变量占位符 */
     private String queuePattern;
 
-    /**
-     * This flag indicates whether the target queue can be created if it does
-     * not exist yet.
-     */
+    /** 标识如果目标队列不存在，是否允许自动创建 */
     private boolean allowCreate;
 
     /**
-     * Constructor.
-     * @param queuePattern The queue pattern in which the application will be
-     *                     placed if this action is fired. The pattern may
-     *                     contain variables. eg. root.%primary_group.%user
-     * @param allowCreate Determines if the target queue should be created if it
-     *                    does not exist
+     * 构造方法。
+     * @param queuePattern 应用放置的目标队列模式，可包含变量，例如 root.%primary_group.%user
+     * @param allowCreate 是否允许在目标队列不存在时自动创建
      */
     PlaceToQueueAction(String queuePattern, boolean allowCreate) {
       this.allowCreate = allowCreate;
@@ -64,12 +56,10 @@ public final class MappingRuleActions {
     }
 
     /**
-     * This method is the main logic of the action, it will replace all the
-     * variables in the queuePattern with their respective values, then returns
-     * a placementResult with the final queue name.
+     * 执行放置动作：替换队列模式中的变量为上下文实际值，返回最终放置结果。
      *
-     * @param variables The variable context, which contains all the variables
-     * @return The result of the action
+     * @param variables 变量上下文，包含所有可替换的变量值
+     * @return 放置动作结果，包含最终队列名称
      */
     @Override
     public MappingRuleResult execute(VariableContext variables) {
@@ -79,16 +69,9 @@ public final class MappingRuleActions {
     }
 
     /**
-     * This method is responsible for config validation, we use the validation
-     * context's helper method to validate if our path is valid. From the
-     * point of the action all paths are valid, that is why we need to use
-     * an external component which is aware of the queue structure and know
-     * when a queue placement is valid in that context. This way this calass can
-     * stay independent of the capacity scheduler's internal queue placement
-     * logic, yet it is able to obey it's rules.
-     * @param ctx Validation context with all the necessary objects and helper
-     *            methods required during validation
-     * @throws YarnException is thrown on validation error
+     * 验证队列路径模式的合法性，委托验证上下文进行队列结构校验。
+     * @param ctx 验证上下文，包含队列结构信息和验证辅助方法
+     * @throws YarnException 验证失败时抛出异常
      */
     @Override
     public void validate(MappingRuleValidationContext ctx)
@@ -106,15 +89,13 @@ public final class MappingRuleActions {
   }
 
   /**
-   * RejectAction represents the action when the application is rejected, this
-   * simply will throw an error on the user's side letting it know the
-   * submission was rejected.
+   * 拒绝应用提交动作，当规则匹配时拒绝当前应用的提交。
    */
   public static class RejectAction extends MappingRuleActionBase {
     /**
-     * Reject action will unconditionally return a reject result.
-     * @param variables The variable context, which contains all the variables
-     * @return Always a REJECT MappingRuleResut
+     * 执行拒绝动作，无条件返回拒绝结果。
+     * @param variables 变量上下文
+     * @return 固定返回拒绝结果
      */
     @Override
     public MappingRuleResult execute(VariableContext variables) {
@@ -122,11 +103,9 @@ public final class MappingRuleActions {
     }
 
     /**
-     * Reject action is always valid, so it is just an empty implementation
-     * of the defined interface method.
-     * @param ctx Validation context with all the necessary objects and helper
-     *            methods required during validation
-     * @throws YarnException is thrown on validation error
+     * 拒绝动作本身总是合法，无需额外验证，提供空实现。
+     * @param ctx 验证上下文
+     * @throws YarnException 验证失败时抛出异常
      */
     @Override
     public void validate(MappingRuleValidationContext ctx) throws
@@ -139,27 +118,19 @@ public final class MappingRuleActions {
   }
 
   /**
-   * VariableUpdateAction represents the action which alters one of the
-   * mutable variables in the variable context, but doesn't do anything with
-   * the application. This can be used to change the default queue or define
-   * custom variables to be used later.
+   * 更新变量上下文动作，修改变量上下文中的可变变量值，不直接改变应用放置结果，
+   * 用于后续规则中使用修改后的变量，例如修改默认队列或定义自定义变量。
    */
   public static class VariableUpdateAction extends MappingRuleActionBase {
-    /**
-     * Name of the variable to be updated (in it's full form) eg. %custom
-     */
+    /** 需要更新的变量全名，例如 %custom */
     private final String variableName;
-    /**
-     * The variable's new value pattern, this may contain additional variables
-     * which will be evaluated on execution.
-     */
+    /** 变量的新值模式，可包含其他变量，执行时会先解析替换 */
     private final String variableValue;
 
     /**
-     * Constructor.
-     * @param variableName Name of the variable to be updated in the variable
-     *                     context
-     * @param variableValue
+     * 构造方法。
+     * @param variableName 需要更新的变量名称
+     * @param variableValue 变量的新值模式
      */
     VariableUpdateAction(String variableName, String variableValue) {
       this.variableName = variableName;
@@ -167,16 +138,10 @@ public final class MappingRuleActions {
     }
 
     /**
-     * This execute is a bit special, compared to other actions, since it does
-     * not affect the placement of the application, but changes the variable
-     * context. So it always returns a skip result in order to ensure the
-     * rule evalutaion continues after the variable update.
-     * The exectute method will do the update to the variable context the
-     * variable name stored in variableName will be updated with the value
-     * stored in variableValue, but all variables in the variableValue will
-     * gets resolved first, so this way dynamic updates are possible.
-     * @param variables The variable context, which contains all the variables
-     * @return Always a skip result.
+     * 执行变量更新：先解析替换值模式中的变量，然后更新变量上下文，
+     * 更新完成后返回跳过结果，让规则匹配继续执行后续规则。
+     * @param variables 变量上下文
+     * @return 固定返回跳过结果，继续后续规则匹配
      */
     @Override
     public MappingRuleResult execute(VariableContext variables) {
@@ -185,14 +150,9 @@ public final class MappingRuleActions {
     }
 
     /**
-     * During the validation process we add the variable set by this action
-     * to the known variables, to make sure the context is aware that we might
-     * introduce a new custom variable. All rules after this may use this
-     * variable. If the variable cannot be added (eg. it is already added as
-     * immutable), an exception will be thrown, and the validation will fail.
-     * @param ctx Validation context with all the necessary objects and helper
-     *            methods required during validation
-     * @throws YarnException If the variable cannot be added to the context
+     * 验证变量更新动作：将当前变量注册到验证上下文，如果变量不可修改则抛出异常。
+     * @param ctx 验证上下文
+     * @throws YarnException 变量无法添加时抛出异常（例如变量已被定义为不可变）
      */
     @Override
     public void validate(MappingRuleValidationContext ctx)
@@ -210,22 +170,19 @@ public final class MappingRuleActions {
   }
 
   /**
-   * Convenience method to create an action which changes the default queue.
-   * @param queue The new value of the default queue
-   * @return VariableUpdateAction which will change the default queue on execute
+   * 创建更新默认队列变量的动作，修改默认队列的值。
+   * @param queue 新的默认队列名称
+   * @return 变量更新动作实例，执行时会修改默认队列变量
    */
   public static MappingRuleAction createUpdateDefaultAction(String queue) {
     return new VariableUpdateAction(DEFAULT_QUEUE_VARIABLE, queue);
   }
 
   /**
-   * Convenience method to create an action which places the application to a
-   * queue.
-   * @param queue The name of the queue the application should be placed to
-   * @param allowCreate Determines if the target queue should be created if it
-   *                    does not exist
-   * @return PlaceToQueueAction which will place the application to the
-   * specified queue on execute
+   * 创建放置应用到指定队列的动作。
+   * @param queue 目标队列名称模式
+   * @param allowCreate 是否允许自动创建不存在的队列
+   * @return 放置到队列动作实例
    */
   public static MappingRuleAction createPlaceToQueueAction(
       String queue, boolean allowCreate) {
@@ -233,18 +190,16 @@ public final class MappingRuleActions {
   }
 
   /**
-   * Convenience method to create an action which places the application to the
-   * DEFAULT queue.
-   * @return PlaceToQueueAction which will place the application to the
-   * DEFAULT queue on execute
+   * 创建放置应用到默认队列的动作。
+   * @return 放置到默认队列动作实例
    */
   public static MappingRuleAction createPlaceToDefaultAction() {
     return createPlaceToQueueAction(DEFAULT_QUEUE_VARIABLE, false);
   }
 
   /**
-   * Convenience method to create an action rejects the application.
-   * @return RejectAction which will reject the application on execute
+   * 创建拒绝应用提交的动作。
+   * @return 拒绝动作实例，执行时会拒绝应用提交
    */
   public static MappingRuleAction createRejectAction() {
     return new RejectAction();

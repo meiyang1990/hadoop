@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,14 +20,21 @@
 package org.apache.hadoop.mapred;
 
 /**
- * <code>JobTracker</code> is no longer used since M/R 2.x. This is a dummy
- * JobTracker class, which is used to be compatible with M/R 1.x applications.
+ * 兼容MapReduce 1.x应用的空JobTracker占位类
+ * <p>
+ * 在MapReduce 2.x（YARN架构）中，原有的JobTracker核心职责已经被拆分
+ * 为ResourceManager和ApplicationMaster，本类仅作为向后兼容的占位存在，
+ * 不再承担实际的作业调度与集群管理功能，避免旧版应用编译运行报错。
+ * </p>
  */
 public class JobTracker {
 
   /**
-   * <code>State</code> is no longer used since M/R 2.x. It is kept in case
-   * that M/R 1.x applications may still use it.
+   * JobTracker状态枚举，仅为兼容旧版应用保留，不再实际使用
+   * <p>
+   * 保存原有的状态定义，供依赖该枚举的旧版MapReduce 1.x应用正常编译运行，
+   * YARN架构中不再使用该状态标识。
+   * </p>
    */
   public enum State {
     INITIALIZING, RUNNING

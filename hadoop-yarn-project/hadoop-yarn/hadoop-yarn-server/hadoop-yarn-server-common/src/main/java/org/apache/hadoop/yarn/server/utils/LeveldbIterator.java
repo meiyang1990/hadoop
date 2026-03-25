@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,8 +32,8 @@ import org.iq80.leveldb.DBIterator;
 import org.iq80.leveldb.ReadOptions;
 
 /**
- * A wrapper for a DBIterator to translate the raw RuntimeExceptions that
- * can be thrown into DBExceptions.
+ * LevelDB迭代器包装类，用于将原生LevelDB抛出的运行时异常统一转换为DBException。
+ * 封装了LevelDB DBIterator，统一异常处理，方便上层代码使用。
  */
 @Public
 @Evolving
@@ -41,39 +42,38 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   private DBIterator iter;
 
   /**
-   * Create an iterator for the specified database.
+   * 基于指定数据库创建迭代器。
    *
-   * @param db database.
+   * @param db LevelDB数据库实例
    */
   public LeveldbIterator(DB db) {
     iter = db.iterator();
   }
 
   /**
-   * Create an iterator for the specified database.
+   * 基于指定数据库和读选项创建迭代器。
    *
-   * @param db db.
-   * @param options ReadOptions.
+   * @param db LevelDB数据库实例
+   * @param options LevelDB读选项
    */
   public LeveldbIterator(DB db, ReadOptions options) {
     iter = db.iterator(options);
   }
 
   /**
-   * Create an iterator using the specified underlying DBIterator.
+   * 直接使用底层DBIterator构造包装迭代器。
    *
-   * @param iter DB Iterator.
+   * @param iter 底层LevelDB迭代器实例
    */
   public LeveldbIterator(DBIterator iter) {
     this.iter = iter;
   }
 
   /**
-   * Repositions the iterator so the key of the next BlockElement
-   * returned greater than or equal to the specified targetKey.
+   * 将迭代器定位到第一个键大于等于目标键的位置。
    *
-   * @param key key of the next BlockElement.
-   * @throws DBException db Exception.
+   * @param key 目标查找键
+   * @throws DBException 转换后的LevelDB异常
    */
   public void seek(byte[] key) throws DBException {
     try {
@@ -86,7 +86,8 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * Repositions the iterator so is is at the beginning of the Database.
+   * 将迭代器定位到数据库起始位置。
+   * @throws DBException 转换后的LevelDB异常
    */
   public void seekToFirst() throws DBException {
     try {
@@ -99,7 +100,8 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * Repositions the iterator so it is at the end of of the Database.
+   * 将迭代器定位到数据库末尾位置。
+   * @throws DBException 转换后的LevelDB异常
    */
   public void seekToLast() throws DBException {
     try {
@@ -112,7 +114,9 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * Returns <code>true</code> if the iteration has more elements.
+   * 检查迭代是否还有更多元素。
+   * @return true 存在下一个元素，false 遍历完成
+   * @throws DBException 转换后的LevelDB异常
    */
   public boolean hasNext() throws DBException {
     try {
@@ -125,10 +129,10 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * Returns the next element in the iteration.
+   * 获取迭代中下一个元素并前进迭代器。
    *
-   * @return the next element in the iteration.
-   * @throws DBException DB Exception.
+   * @return 键值对条目
+   * @throws DBException 转换后的LevelDB异常
    */
   @Override
   public Map.Entry<byte[], byte[]> next() throws DBException {
@@ -142,11 +146,10 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * Returns the next element in the iteration, without advancing the
-   * iteration.
+   * 获取下一个元素，不前进迭代器。
    *
-   * @return the next element in the iteration.
-   * @throws DBException db Exception.
+   * @return 下一个键值对条目
+   * @throws DBException 转换后的LevelDB异常
    */
   public Map.Entry<byte[], byte[]> peekNext() throws DBException {
     try {
@@ -159,7 +162,9 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * @return true if there is a previous entry in the iteration.
+   * 检查迭代是否还有前一个元素。
+   * @return true 存在前一个元素，false 已到起始位置
+   * @throws DBException 转换后的LevelDB异常
    */
   public boolean hasPrev() throws DBException {
     try {
@@ -172,7 +177,9 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * @return the previous element in the iteration and rewinds the iteration.
+   * 获取前一个元素并回退迭代器。
+   * @return 前一个键值对条目
+   * @throws DBException 转换后的LevelDB异常
    */
   public Map.Entry<byte[], byte[]> prev() throws DBException {
     try {
@@ -185,8 +192,9 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * @return the previous element in the iteration, without rewinding the
-   * iteration.
+   * 获取前一个元素，不回退迭代器。
+   * @return 前一个键值对条目
+   * @throws DBException 转换后的LevelDB异常
    */
   public Map.Entry<byte[], byte[]> peekPrev() throws DBException {
     try {
@@ -199,7 +207,8 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * Removes from the database the last element returned by the iterator.
+   * 从数据库中删除迭代器当前返回的元素。
+   * @throws DBException 转换后的LevelDB异常
    */
   @Override
   public void remove() throws DBException {
@@ -213,7 +222,8 @@ public class LeveldbIterator implements Iterator<Map.Entry<byte[], byte[]>>,
   }
 
   /**
-   * Closes the iterator.
+   * 关闭迭代器，释放底层资源。
+   * @throws IOException 关闭时发生IO异常
    */
   @Override
   public void close() throws IOException {

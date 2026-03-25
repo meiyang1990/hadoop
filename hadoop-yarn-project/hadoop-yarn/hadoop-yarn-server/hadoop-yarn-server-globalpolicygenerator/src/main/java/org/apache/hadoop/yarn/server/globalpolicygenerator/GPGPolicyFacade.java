@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -36,33 +37,23 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A utility class for the GPG Policy Generator to read and write policies
- * into the FederationStateStore. Policy specific logic is abstracted away in
- * this class, so the PolicyGenerator can avoid dealing with policy
- * construction, reinitialization, and serialization.
- *
- * There are only two exposed methods:
+ * 全局策略生成器(GPG)的策略门面工具类，负责将策略读写到联邦状态存储，封装了策略构造、初始化和序列化逻辑。
+ * 
+ * 仅对外暴露两个核心方法:
  *
  * {@link #getPolicyManager(String)}
- * Gets the PolicyManager via queue name. Null if there is no policy
- * configured for the specified queue. The PolicyManager can be used to
- * extract the {@link FederationRouterPolicy} and
- * {@link FederationAMRMProxyPolicy}, as well as any policy specific parameters
+ * 根据队列名获取对应的策略管理器。如果指定队列未配置策略则返回null。
+ * 获取到的策略管理器可用于提取{@link FederationRouterPolicy}和{@link FederationAMRMProxyPolicy}
+ * 以及其他策略相关参数。
  *
  * {@link #setPolicyManager(FederationPolicyManager)}
- * Sets the PolicyManager. If the policy configuration is the same, no change
- * occurs. Otherwise, the internal cache is updated and the new configuration
- * is written into the FederationStateStore
+ * 设置策略管理器。如果策略配置未发生变化则不执行写入，否则更新本地缓存并将新配置写入联邦状态存储。
  *
- * This class assumes that the GPG is the only service
- * writing policies. Thus, the only FederationStateStore reads occur the first
- * time a queue policy is retrieved - after that, the GPG only writes to the
- * FederationStateStore.
+ * 本类假设GPG是唯一写入策略的服务，因此仅在第一次获取队列策略时从联邦状态存储读取，
+ * 之后GPG仅向联邦状态存储写入策略。
  *
- * The class uses a PolicyManager cache and a SubClusterPolicyConfiguration
- * cache. The primary use for these caches are to serve reads, and to
- * identify when the PolicyGenerator has actually changed the policy
- * so unnecessary FederationStateStore policy writes can be avoided.
+ * 本类维护策略管理器缓存和子集群策略配置缓存，主要作用是提供读取缓存，
+ * 并识别策略是否发生变更，避免不必要的联邦状态存储写入操作。
  */
 
 public class GPGPolicyFacade {
@@ -70,13 +61,22 @@ public class GPGPolicyFacade {
   private static final Logger LOG =
       LoggerFactory.getLogger(GPGPolicyFacade.class);
 
+  // 联邦状态存储门面，用于读写策略配置
   private FederationStateStoreFacade stateStore;
 
+  // 队列名 -> 策略管理器 缓存
   private Map<String, FederationPolicyManager> policyManagerMap;
+  // 队列名 -> 子集群策略配置 缓存
   private Map<String, SubClusterPolicyConfiguration> policyConfMap;
 
+  // 是否为只读模式，只读模式下不会写入状态存储
   private boolean readOnly;
 
+  /**
+   * 构造GPG策略门面。
+   * @param stateStore 联邦状态存储门面
+   * @param conf Hadoop配置
+   */
   public GPGPolicyFacade(FederationStateStoreFacade stateStore,
       Configuration conf) {
     this.stateStore = stateStore;
@@ -88,47 +88,40 @@ public class GPGPolicyFacade {
   }
 
   /**
-   * Provides a utility for the policy generator to read the policy manager
-   * from the FederationStateStore. Because the policy generator should be the
-   * only component updating the policy, this implementation does not use the
-   * reinitialization feature.
+   * 从联邦状态存储读取指定队列的策略管理器。
+   * 由于GPG是唯一更新策略的组件，本实现不需要重复初始化策略。
    *
-   * @param queueName the name of the queue we want the policy manager for.
-   * @return the policy manager responsible for the queue policy.
-   * @throws YarnException exceptions from yarn servers.
+   * @param queueName 目标队列名称
+   * @return 对应队列的策略管理器，如果不存在则返回null
+   * @throws YarnException YARN服务异常
    */
   public FederationPolicyManager getPolicyManager(String queueName)
       throws YarnException {
     FederationPolicyManager policyManager = policyManagerMap.get(queueName);
 
-    // If we don't have the policy manager cached, pull configuration
-    // from the FederationStateStore to create and cache it
+    // 如果缓存中不存在策略管理器，从联邦状态存储拉取配置创建并缓存
     if (policyManager == null) {
       try {
 
-        // If we don't have the configuration cached, pull it
-        // from the stateStore
+        // 如果缓存中没有配置，从状态存储拉取
         SubClusterPolicyConfiguration conf = policyConfMap.get(queueName);
 
         if (conf == null) {
           conf = stateStore.getPolicyConfiguration(queueName);
         }
 
-        // If configuration is still null, it does not exist in the
-        // FederationStateStore
+        // 如果配置仍为null，说明联邦状态存储中不存在该队列策略
         if (conf == null) {
           LOG.info("Read null policy for queue {}.", queueName);
           return null;
         }
 
-        // Generate PolicyManager based on PolicyManagerType.
+        // 根据策略管理器类型实例化对象
         String policyManagerType = conf.getType();
         policyManager = FederationPolicyUtils.instantiatePolicyManager(policyManagerType);
         policyManager.setQueue(queueName);
 
-        // If PolicyManager supports Weighted PolicyInfo, it means that
-        // we need to use this parameter to determine which sub-cluster the router goes to
-        // or which sub-cluster the container goes to.
+        // 如果策略管理器支持权重策略信息，需要反序列化并设置参数，用于路由和容器分配
         if (policyManager.isSupportWeightedPolicyInfo()) {
           ByteBuffer weightedPolicyInfoParams = conf.getParams();
           if (weightedPolicyInfoParams == null) {
@@ -144,6 +137,7 @@ public class GPGPolicyFacade {
               "initialization may be incomplete.", policyManager.getClass());
         }
 
+        // 更新缓存
         policyManagerMap.put(queueName, policyManager);
         policyConfMap.put(queueName, conf);
       } catch (YarnException e) {
@@ -156,14 +150,10 @@ public class GPGPolicyFacade {
   }
 
   /**
-   * Provides a utility for the policy generator to write a policy manager
-   * into the FederationStateStore. The facade keeps a cache and will only write
-   * into the FederationStateStore if the policy configuration has changed.
+   * 将策略管理器写入联邦状态存储。门面会维护缓存，仅当策略配置变更时才写入。
    *
-   * @param policyManager The policy manager we want to update into the state
-   *                      store. It contains policy information as well as
-   *                      the queue name we will update for.
-   * @throws YarnException  exceptions from yarn servers.
+   * @param policyManager 要更新的策略管理器，包含策略信息和目标队列名
+   * @throws YarnException YARN服务异常
    */
   public void setPolicyManager(FederationPolicyManager policyManager)
       throws YarnException {
@@ -171,7 +161,7 @@ public class GPGPolicyFacade {
       LOG.warn("Attempting to set null policy manager");
       return;
     }
-    // Extract the configuration from the policy manager
+    // 从策略管理器中提取配置
     String queue = policyManager.getQueue();
     SubClusterPolicyConfiguration conf;
     try {
@@ -181,14 +171,12 @@ public class GPGPolicyFacade {
       throw e;
     }
     if (conf == null) {
-      // State store does not currently support setting a policy back to null
-      // because it reads the queue name to set from the policy!
+      // 状态存储当前不支持将策略设置为null，因为需要从策略中读取队列名
       LOG.warn("Skip setting policy to null for queue {} into state store",
           queue);
       return;
     }
-    // Compare with configuration cache, if different, write the conf into
-    // store and update our conf and manager cache
+    // 与缓存配置比较，如果不同则写入存储并更新缓存
     if (!confCacheEqual(queue, conf)) {
       try {
         if (readOnly) {
@@ -210,9 +198,10 @@ public class GPGPolicyFacade {
   }
 
   /**
-   * @param queue the queue to check the cached policy configuration for
-   * @param conf the new policy configuration
-   * @return whether or not the conf is equal to the cached conf
+   * 检查新配置与缓存配置是否一致。
+   * @param queue 目标队列名
+   * @param conf 新的策略配置
+   * @return 配置是否相等
    */
   private boolean confCacheEqual(String queue,
       SubClusterPolicyConfiguration conf) {

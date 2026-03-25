@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,9 +23,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * A general identifier, which internally stores the id
- * as an integer. This is the super class of {@link JobID}, 
- * {@link TaskID} and {@link TaskAttemptID}.
+ * 通用标识符抽象基类，内部使用整数存储ID值，是MapReduce旧API中JobID、TaskID和TaskAttemptID的父类
+ * 为MapReduce框架中各类实体提供统一的ID基础实现
  * 
  * @see JobID
  * @see TaskID
@@ -34,11 +34,17 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Stable
 public abstract class ID extends org.apache.hadoop.mapreduce.ID {
 
-  /** constructs an ID object from the given int */
+  /**
+   * 根据给定整数构造ID对象
+   * @param id 整数形式的ID值
+   */
   public ID(int id) {
     super(id);
   }
 
+  /**
+   * 空构造方法，供子类继承使用
+   */
   protected ID() {
   }
 

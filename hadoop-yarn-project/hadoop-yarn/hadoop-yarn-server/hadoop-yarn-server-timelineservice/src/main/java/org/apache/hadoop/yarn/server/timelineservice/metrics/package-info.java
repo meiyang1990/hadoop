@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.server.timelineservice contains classes to be used
- * across timeline reader and collector.
+ * 该包为YARN Timeline Service（时间线服务）提供指标相关的实现类，用于采集、处理Timeline服务自身运行指标，
+ * 支撑Timeline服务的监控与运维，主要服务于Timeline读取器和收集器组件。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

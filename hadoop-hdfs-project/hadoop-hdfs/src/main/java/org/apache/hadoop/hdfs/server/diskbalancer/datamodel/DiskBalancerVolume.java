@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -29,10 +30,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * DiskBalancerVolume represents a volume in the DataNode.
+ * 文件级注释：磁盘平衡器数据模型，描述DataNode上单个磁盘卷的元数据与使用信息
+ * 表示DataNode节点中的一个磁盘卷，存储磁盘的容量、使用量、存储类型等信息供磁盘平衡计算使用。
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class DiskBalancerVolume {
+  // Jackson JSON解析对象读取器，复用提高性能
   private static final ObjectReader READER =
       new ObjectMapper().readerFor(DiskBalancerVolume.class);
 
@@ -52,68 +55,64 @@ public class DiskBalancerVolume {
   private boolean isReadOnly;
 
   /**
-   * Constructs DiskBalancerVolume.
+   * 构造空的磁盘卷对象，供JSON反序列化使用。
    */
   public DiskBalancerVolume() {
   }
 
   /**
-   * Parses a Json string and converts to DiskBalancerVolume.
+   * 从JSON字符串解析出DiskBalancerVolume对象。
    *
-   * @param json - Json String
-   *
-   * @return DiskBalancerCluster
-   *
-   * @throws IOException
+   * @param json 待解析的JSON字符串
+   * @return 解析完成的DiskBalancerVolume对象
+   * @throws IOException 解析过程中发生IO错误抛出
    */
   public static DiskBalancerVolume parseJson(String json) throws IOException {
     return READER.readValue(json);
   }
 
   /**
-   * Get this volume Data Density
-   * Please see DiskBalancerVolumeSet#computeVolumeDataDensity to see how
-   * this is computed.
+   * 获取当前磁盘卷的数据密度值。
+   * 数据密度计算方式参见DiskBalancerVolumeSet#computeVolumeDataDensity。
    *
-   * @return float.
+   * @return 当前卷的数据密度
    */
   public double getVolumeDataDensity() {
     return volumeDataDensity;
   }
 
   /**
-   * Sets this volume's data density.
+   * 设置当前磁盘卷的数据密度值。
    *
-   * @param volDataDensity - density
+   * @param volDataDensity 数据密度值
    */
   public void setVolumeDataDensity(double volDataDensity) {
     this.volumeDataDensity = volDataDensity;
   }
 
   /**
-   * Indicates if the volume is Transient in nature.
+   * 获取当前卷是否为瞬时存储。
    *
-   * @return true or false.
+   * @return true表示是瞬时存储，false表示持久存储
    */
   public boolean isTransient() {
     return isTransient;
   }
 
   /**
-   * Sets volumes transient nature.
+   * 设置当前卷是否为瞬时存储。
    *
-   * @param aTransient - bool
+   * @param aTransient true表示瞬时存储，false表示持久存储
    */
   public void setTransient(boolean aTransient) {
     this.isTransient = aTransient;
   }
 
   /**
-   * Compares two volumes and decides if it is the same volume.
+   * 判断两个磁盘卷是否为同一个卷，基于UUID判断。
    *
-   * @param o Volume Object
-   *
-   * @return boolean
+   * @param o 待比较的对象
+   * @return 是同一个卷返回true，否则返回false
    */
   @Override
   public boolean equals(Object o) {
@@ -129,9 +128,9 @@ public class DiskBalancerVolume {
   }
 
   /**
-   * Computes hash code for a diskBalancerVolume.
+   * 基于UUID计算当前磁盘卷的哈希码。
    *
-   * @return int
+   * @return 当前卷的哈希码
    */
   @Override
   public int hashCode() {
@@ -139,18 +138,18 @@ public class DiskBalancerVolume {
   }
 
   /**
-   * Capacity of this volume.
+   * 获取当前磁盘卷的总容量。
    *
-   * @return long
+   * @return 总容量，单位字节
    */
   public long getCapacity() {
     return capacity;
   }
 
   /**
-   * Get free space of the volume.
+   * 计算并获取当前磁盘卷的可用空间。
    *
-   * @return long
+   * @return 可用空间，单位字节
    */
   @JsonIgnore
   public long getFreeSpace() {
@@ -158,9 +157,9 @@ public class DiskBalancerVolume {
   }
 
   /**
-   * Get ratio between used space and capacity.
+   * 计算当前磁盘卷已用空间占总容量的比例。
    *
-   * @return double
+   * @return 已用空间比例，范围[0, 1]
    */
   @JsonIgnore
   public double getUsedRatio() {
@@ -168,9 +167,9 @@ public class DiskBalancerVolume {
   }
 
   /**
-   * Get ratio between free space and capacity.
+   * 计算当前磁盘卷可用空间占总容量的比例。
    *
-   * @return double
+   * @return 可用空间比例，范围[0, 1]
    */
   @JsonIgnore
   public double getFreeRatio() {
@@ -178,102 +177,103 @@ public class DiskBalancerVolume {
   }
 
   /**
-   * Sets the capacity of this volume.
+   * 设置当前磁盘卷的总容量。
    *
-   * @param totalCapacity long
+   * @param totalCapacity 总容量，单位字节
    */
   public void setCapacity(long totalCapacity) {
     this.capacity = totalCapacity;
   }
 
   /**
-   * Indicates if this is a failed volume.
+   * 获取当前磁盘卷是否故障。
    *
-   * @return boolean
+   * @return true表示卷故障，false表示卷正常
    */
   public boolean isFailed() {
     return failed;
   }
 
   /**
-   * Sets the failed flag for this volume.
+   * 设置当前磁盘卷的故障状态。
    *
-   * @param fail boolean
+   * @param fail true表示故障，false表示正常
    */
   public void setFailed(boolean fail) {
     this.failed = fail;
   }
 
   /**
-   * Returns the path for this volume.
+   * 获取当前磁盘卷的挂载路径。
    *
-   * @return String
+   * @return 磁盘卷挂载路径字符串
    */
   public String getPath() {
     return path;
   }
 
   /**
-   * Sets the path for this volume.
+   * 设置当前磁盘卷的挂载路径。
    *
-   * @param volPath Path
+   * @param volPath 挂载路径字符串
    */
   public void setPath(String volPath) {
     this.path = volPath;
   }
 
   /**
-   * Gets the reserved size for this volume.
+   * 获取当前磁盘卷的预留空间大小。
    *
-   * @return Long - Reserved size.
+   * @return 预留空间大小，单位字节
    */
   public long getReserved() {
     return reserved;
   }
 
   /**
-   * Sets the reserved size.
+   * 设置当前磁盘卷的预留空间大小。
    *
-   * @param reservedSize -- Sets the reserved.
+   * @param reservedSize 预留空间大小，单位字节
    */
   public void setReserved(long reservedSize) {
     this.reserved = reservedSize;
   }
 
   /**
-   * Gets the StorageType.
+   * 获取当前磁盘卷的存储类型。
    *
-   * @return String StorageType.
+   * @return 存储类型字符串
    */
   public String getStorageType() {
     return storageType;
   }
 
   /**
-   * Sets the StorageType.
+   * 设置当前磁盘卷的存储类型。
    *
-   * @param typeOfStorage - Storage Type String.
+   * @param typeOfStorage 存储类型字符串
    */
   public void setStorageType(String typeOfStorage) {
     this.storageType = typeOfStorage;
   }
 
   /**
-   * Gets the dfsUsed Size.
+   * 获取当前磁盘卷已用空间大小。
    *
-   * @return - long - used space
+   * @return 已用空间大小，单位字节
    */
   public long getUsed() {
     return used;
   }
 
   /**
-   * Sets the used Space for Long.
+   * 设置当前磁盘卷已用空间大小，对异常值做校验修正。
    *
-   * @param dfsUsedSpace - dfsUsedSpace for this volume.
+   * @param dfsUsedSpace 已用空间大小，单位字节
    */
   public void setUsed(long dfsUsedSpace) {
     if (dfsUsedSpace > this.getCapacity()) {
+      // 已用空间超过总容量时，记录警告并修正为总容量
       LOG.warn("Volume usage ("+dfsUsedSpace+") is greater than capacity ("+
         this.getCapacity()+"). Setting volume usage to the capacity");
       this.used = this.getCapacity();
@@ -283,27 +283,27 @@ public class DiskBalancerVolume {
   }
 
   /**
-   * Gets the uuid for this volume.
+   * 获取当前磁盘卷的唯一标识UUID。
    *
-   * @return String - uuid of th volume
+   * @return 当前卷的UUID字符串
    */
   public String getUuid() {
     return uuid;
   }
 
   /**
-   * Sets the uuid for this volume.
+   * 设置当前磁盘卷的唯一标识UUID。
    *
-   * @param id - String
+   * @param id UUID字符串
    */
   public void setUuid(String id) {
     this.uuid = id;
   }
 
   /**
-   * Returns effective capacity of a volume.
+   * 计算当前磁盘卷的有效可用容量（总容量减去预留空间）。
    *
-   * @return float - fraction that represents used capacity.
+   * @return 有效容量，单位字节
    */
   @JsonIgnore
   public long computeEffectiveCapacity() {
@@ -311,60 +311,58 @@ public class DiskBalancerVolume {
   }
 
   /**
-   * returns a Json String.
+   * 将当前DiskBalancerVolume对象序列化为JSON字符串。
    *
-   * @return String
-   *
-   * @throws IOException
+   * @return 序列化后的JSON字符串
+   * @throws IOException 序列化过程中发生IO错误抛出
    */
   public String toJson() throws IOException {
     return JsonUtil.toJsonString(this);
   }
 
   /**
-   * returns if we should skip this volume.
-   * @return true / false
+   * 获取当前卷是否需要被磁盘平衡跳过。
+   * @return true表示跳过该卷，false表示参与平衡
    */
   public boolean isSkip() {
     return skip;
   }
 
   /**
-   * Sets the Skip value for this volume.
-   * @param skipValue bool
+   * 设置当前卷是否需要被磁盘平衡跳过。
+   * @param skipValue true表示跳过，false表示参与平衡
    */
   public void setSkip(boolean skipValue) {
     this.skip = skipValue;
   }
 
   /**
-   * Returns the usedPercentage of a disk.
-   * This is useful in debugging disk usage
-   * @return float
+   * 计算当前磁盘卷已用空间占总容量的百分比。
+   * @return 已用百分比，范围[0, 1]
    */
   public float computeUsedPercentage() {
     return (float) (getUsed()) / (float) (getCapacity());
   }
 
   /**
-   * Tells us if a volume is transient.
-   * @param transientValue
+   * 设置当前卷是否为瞬时存储。
+   * @param transientValue true表示瞬时存储，false表示持久存储
    */
   public void setIsTransient(boolean transientValue) {
     this.isTransient = transientValue;
   }
 
   /**
-   * Tells us if this volume is read-only.
-   * @return true / false
+   * 获取当前卷是否为只读。
+   * @return true表示只读，false表示可写
    */
   public boolean isReadOnly() {
     return isReadOnly;
   }
 
   /**
-   * Sets this volume as read only.
-   * @param readOnly - boolean
+   * 设置当前卷是否为只读。
+   * @param readOnly true表示只读，false表示可写
    */
   public void setReadOnly(boolean readOnly) {
     isReadOnly = readOnly;

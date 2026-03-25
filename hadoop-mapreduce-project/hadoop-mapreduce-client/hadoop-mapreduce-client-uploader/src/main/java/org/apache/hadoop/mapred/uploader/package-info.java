@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,9 @@
  */
 
 /**
- * Package org.apache.hadoop.mapred.uploader contains classes related to the
- * MapReduce framework upload tool.
+ * @package org.apache.hadoop.mapred.uploader
+ * 该包提供MapReduce框架上传工具相关实现，用于将MapReduce框架jar包上传到HDFS分布式缓存，
+ * 减少YARN容器启动时从本地磁盘下载框架依赖的开销，提升作业启动速度。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable

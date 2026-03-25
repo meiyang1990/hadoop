@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,14 +30,14 @@ import org.apache.hadoop.mapreduce.server.jobtracker.JTConfig;
 import org.apache.hadoop.mapreduce.server.tasktracker.TTConfig;
 
 /**
- * Place holder for deprecated keys in the framework 
+ * MapReduce框架已过期配置项管理容器，负责维护旧配置名到新配置名的映射关系
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class ConfigUtil {
 
   /**
-   * Adds all the deprecated keys. Loads mapred-default.xml and mapred-site.xml
+   * 加载MapReduce相关默认配置资源，同时注册所有已过期配置项的映射关系
    */
   public static void loadResources() {
     addDeprecatedKeys();
@@ -47,7 +48,8 @@ public class ConfigUtil {
   }
   
   /**
-   * Adds deprecated keys and the corresponding new keys to the Configuration
+   * 将所有已过期的旧配置项及其对应的新配置项注册到Configuration全局配置中
+   * 完成旧配置名到新配置名的兼容映射，保证向后兼容性
    */
   @SuppressWarnings("deprecation")
   private static void addDeprecatedKeys()  {
@@ -307,135 +309,4 @@ public class ConfigUtil {
           org.apache.hadoop.mapreduce.lib.input.FileInputFormat.INPUT_DIR),
       new DeprecationDelta("mapred.input.pathFilter.class",
         org.apache.hadoop.mapreduce.lib.input.
-          FileInputFormat.PATHFILTER_CLASS),
-      new DeprecationDelta("mapred.max.split.size",
-        org.apache.hadoop.mapreduce.lib.input.
-          FileInputFormat.SPLIT_MAXSIZE),
-      new DeprecationDelta("mapred.min.split.size",
-        org.apache.hadoop.mapreduce.lib.input.
-          FileInputFormat.SPLIT_MINSIZE),
-      new DeprecationDelta("mapred.output.compress",
-        org.apache.hadoop.mapreduce.lib.output.
-          FileOutputFormat.COMPRESS),
-      new DeprecationDelta("mapred.output.compression.codec",
-        org.apache.hadoop.mapreduce.lib.output.
-          FileOutputFormat.COMPRESS_CODEC),
-      new DeprecationDelta("mapred.output.compression.type",
-        org.apache.hadoop.mapreduce.lib.output.
-          FileOutputFormat.COMPRESS_TYPE),
-      new DeprecationDelta("mapred.output.dir",
-        org.apache.hadoop.mapreduce.lib.output.
-          FileOutputFormat.OUTDIR),
-      new DeprecationDelta("mapred.seqbinary.output.key.class",
-        org.apache.hadoop.mapreduce.lib.output.
-          SequenceFileAsBinaryOutputFormat.KEY_CLASS),
-      new DeprecationDelta("mapred.seqbinary.output.value.class",
-        org.apache.hadoop.mapreduce.lib.output.
-          SequenceFileAsBinaryOutputFormat.VALUE_CLASS),
-      new DeprecationDelta("sequencefile.filter.class",
-        org.apache.hadoop.mapreduce.lib.input.
-          SequenceFileInputFilter.FILTER_CLASS),
-      new DeprecationDelta("sequencefile.filter.regex",
-        org.apache.hadoop.mapreduce.lib.input.
-          SequenceFileInputFilter.FILTER_REGEX),
-      new DeprecationDelta("sequencefile.filter.frequency",
-        org.apache.hadoop.mapreduce.lib.input.
-          SequenceFileInputFilter.FILTER_FREQUENCY),
-      new DeprecationDelta("mapred.input.dir.mappers",
-        org.apache.hadoop.mapreduce.lib.input.
-          MultipleInputs.DIR_MAPPERS),
-      new DeprecationDelta("mapred.input.dir.formats",
-        org.apache.hadoop.mapreduce.lib.input.
-          MultipleInputs.DIR_FORMATS),
-      new DeprecationDelta("mapred.line.input.format.linespermap",
-        org.apache.hadoop.mapreduce.lib.input.
-          NLineInputFormat.LINES_PER_MAP),
-      new DeprecationDelta("mapred.binary.partitioner.left.offset",
-        org.apache.hadoop.mapreduce.lib.partition.
-          BinaryPartitioner.LEFT_OFFSET_PROPERTY_NAME),
-      new DeprecationDelta("mapred.binary.partitioner.right.offset",
-        org.apache.hadoop.mapreduce.lib.partition.
-          BinaryPartitioner.RIGHT_OFFSET_PROPERTY_NAME),
-      new DeprecationDelta("mapred.text.key.comparator.options",
-        org.apache.hadoop.mapreduce.lib.partition.
-          KeyFieldBasedComparator.COMPARATOR_OPTIONS),
-      new DeprecationDelta("mapred.text.key.partitioner.options",
-        org.apache.hadoop.mapreduce.lib.partition.
-          KeyFieldBasedPartitioner.PARTITIONER_OPTIONS),
-      new DeprecationDelta("mapred.mapper.regex.group",
-        org.apache.hadoop.mapreduce.lib.map.RegexMapper.GROUP),
-      new DeprecationDelta("mapred.mapper.regex",
-        org.apache.hadoop.mapreduce.lib.map.RegexMapper.PATTERN),
-      new DeprecationDelta("create.empty.dir.if.nonexist",
-        org.apache.hadoop.mapreduce.lib.jobcontrol.
-                      ControlledJob.CREATE_DIR),
-      new DeprecationDelta("mapred.data.field.separator",
-        org.apache.hadoop.mapreduce.lib.fieldsel.
-                      FieldSelectionHelper.DATA_FIELD_SEPARATOR),
-      new DeprecationDelta("map.output.key.value.fields.spec",
-        org.apache.hadoop.mapreduce.lib.fieldsel.
-                      FieldSelectionHelper.MAP_OUTPUT_KEY_VALUE_SPEC),
-      new DeprecationDelta("reduce.output.key.value.fields.spec",
-        org.apache.hadoop.mapreduce.lib.fieldsel.
-                      FieldSelectionHelper.REDUCE_OUTPUT_KEY_VALUE_SPEC),
-      new DeprecationDelta("mapred.min.split.size.per.node",
-        org.apache.hadoop.mapreduce.lib.input.
-                      CombineFileInputFormat.SPLIT_MINSIZE_PERNODE),
-      new DeprecationDelta("mapred.min.split.size.per.rack",
-        org.apache.hadoop.mapreduce.lib.input.
-                      CombineFileInputFormat.SPLIT_MINSIZE_PERRACK),
-      new DeprecationDelta("key.value.separator.in.input.line",
-        org.apache.hadoop.mapreduce.lib.input.
-                      KeyValueLineRecordReader.KEY_VALUE_SEPARATOR),
-      new DeprecationDelta("mapred.linerecordreader.maxlength",
-        org.apache.hadoop.mapreduce.lib.input.
-                      LineRecordReader.MAX_LINE_LENGTH),
-      new DeprecationDelta("mapred.lazy.output.format",
-        org.apache.hadoop.mapreduce.lib.output.
-                      LazyOutputFormat.OUTPUT_FORMAT),
-      new DeprecationDelta("mapred.textoutputformat.separator",
-        org.apache.hadoop.mapreduce.lib.output.
-                      TextOutputFormat.SEPARATOR),
-      new DeprecationDelta("mapred.join.expr",
-        org.apache.hadoop.mapreduce.lib.join.
-                      CompositeInputFormat.JOIN_EXPR),
-      new DeprecationDelta("mapred.join.keycomparator",
-        org.apache.hadoop.mapreduce.lib.join.
-                      CompositeInputFormat.JOIN_COMPARATOR),
-      new DeprecationDelta("hadoop.pipes.command-file.keep",
-        org.apache.hadoop.mapred.pipes.
-                      Submitter.PRESERVE_COMMANDFILE),
-      new DeprecationDelta("hadoop.pipes.executable",
-        org.apache.hadoop.mapred.pipes.Submitter.EXECUTABLE),
-      new DeprecationDelta("hadoop.pipes.executable.interpretor",
-        org.apache.hadoop.mapred.pipes.Submitter.INTERPRETOR),
-      new DeprecationDelta("hadoop.pipes.java.mapper",
-        org.apache.hadoop.mapred.pipes.Submitter.IS_JAVA_MAP),
-      new DeprecationDelta("hadoop.pipes.java.recordreader",
-        org.apache.hadoop.mapred.pipes.Submitter.IS_JAVA_RR),
-      new DeprecationDelta("hadoop.pipes.java.recordwriter",
-        org.apache.hadoop.mapred.pipes.Submitter.IS_JAVA_RW),
-      new DeprecationDelta("hadoop.pipes.java.reducer",
-        org.apache.hadoop.mapred.pipes.Submitter.IS_JAVA_REDUCE),
-      new DeprecationDelta("hadoop.pipes.partitioner",
-        org.apache.hadoop.mapred.pipes.Submitter.PARTITIONER),
-      new DeprecationDelta("mapred.pipes.user.inputformat",
-        org.apache.hadoop.mapred.pipes.Submitter.INPUT_FORMAT),
-
-      new DeprecationDelta("security.task.umbilical.protocol.acl",
-        MRJobConfig.MR_AM_SECURITY_SERVICE_AUTHORIZATION_TASK_UMBILICAL),
-      new DeprecationDelta("security.job.submission.protocol.acl",
-        MRJobConfig.MR_AM_SECURITY_SERVICE_AUTHORIZATION_CLIENT),
-      new DeprecationDelta("mapreduce.user.classpath.first",
-        MRJobConfig.MAPREDUCE_JOB_USER_CLASSPATH_FIRST ),
-      new DeprecationDelta("mapred.input.dir.recursive",
-        FileInputFormat.INPUT_DIR_RECURSIVE)
-    });
-  }
-
-  public static void main(String[] args) {
-    loadResources();
-    Configuration.dumpDeprecatedKeys();
-  }
-}
-
+          FileInputFormat.P

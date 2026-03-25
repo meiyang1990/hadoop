@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,17 +24,18 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container
     .Container;
 
 /**
- * Events consumed by the {@link ContainerScheduler}.
+ * 容器调度器事件基类，所有容器调度相关事件都继承此类，供{@link ContainerScheduler}消费处理
  */
 public class ContainerSchedulerEvent extends
     AbstractEvent<ContainerSchedulerEventType> {
 
+  // 该事件关联的目标容器
   private final Container container;
 
   /**
-   * Create instance of Event.
-   * @param container Container.
-   * @param eventType EventType.
+   * 构造容器调度事件实例
+   * @param container 关联的容器
+   * @param eventType 事件类型
    */
   public ContainerSchedulerEvent(Container container,
       ContainerSchedulerEventType eventType) {
@@ -42,8 +44,8 @@ public class ContainerSchedulerEvent extends
   }
 
   /**
-   * Get the container associated with the event.
-   * @return Container.
+   * 获取该事件关联的容器
+   * @return 关联的容器实例
    */
   public Container getContainer() {
     return container;

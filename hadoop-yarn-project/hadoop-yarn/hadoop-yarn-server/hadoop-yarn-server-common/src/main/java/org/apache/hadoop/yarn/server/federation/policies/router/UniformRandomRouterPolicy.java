@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -31,39 +32,49 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterInfo;
 
 /**
- * This simple policy picks at uniform random among any of the currently active
- * subclusters. This policy is easy to use and good for testing.
+ * YARN联邦路由均匀随机选择子集群策略实现类，从当前所有活跃子集群中均匀随机选择一个路由请求。
+ * 该策略实现简单，常用于测试场景。
  *
- * NOTE: this is "almost" subsumed by the {@code WeightedRandomRouterPolicy}.
- * Behavior only diverges when there are active sub-clusters that are not part
- * of the "weights", in which case the {@link UniformRandomRouterPolicy} send
- * load to them, while {@code WeightedRandomRouterPolicy} does not.
+ * 注：该策略的功能几乎可以被{@code WeightedRandomRouterPolicy}覆盖，唯一区别是：
+ * 当存在不在权重配置中的活跃子集群时，本策略会将流量分发到这些子集群，而加权随机策略不会。
  */
 public class UniformRandomRouterPolicy extends AbstractRouterPolicy {
 
+  /** 随机数生成器 */
   private Random rand;
 
+  /**
+   * 构造均匀随机路由策略实例，初始化随机数生成器。
+   */
   public UniformRandomRouterPolicy() {
     rand = new Random(System.currentTimeMillis());
   }
 
+  /**
+   * 重新初始化路由策略，验证上下文并忽略权重配置。
+   * @param policyContext 联邦策略初始化上下文
+   * @throws FederationPolicyInitializationException 初始化验证失败时抛出异常
+   */
   @Override
   public void reinitialize(FederationPolicyInitializationContext policyContext)
       throws FederationPolicyInitializationException {
     FederationPolicyInitializationContextValidator.validate(policyContext,
         this.getClass().getCanonicalName());
 
-    // note: this overrides AbstractRouterPolicy and ignores the weights
+    // 覆盖父类实现，忽略权重配置
     setPolicyContext(policyContext);
   }
 
   @Override
   protected SubClusterId chooseSubCluster(
       String queue, Map<SubClusterId, SubClusterInfo> preSelectSubclusters) throws YarnException {
+    // 检查候选子集群列表是否为空，为空则抛出异常
     if (preSelectSubclusters == null || preSelectSubclusters.isEmpty()) {
       throw new FederationPolicyException("No available subcluster to choose from.");
     }
+    // 将候选子集群ID转为列表，方便随机选取
     List<SubClusterId> list = new ArrayList<>(preSelectSubclusters.keySet());
+    // 均匀随机选择一个子集群返回
     return list.get(rand.nextInt(list.size()));
   }
 }

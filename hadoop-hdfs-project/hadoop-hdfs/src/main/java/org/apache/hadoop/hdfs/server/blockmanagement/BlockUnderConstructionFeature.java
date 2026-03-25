@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,8 +32,8 @@ import java.util.NoSuchElementException;
 import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.BlockUCState.COMPLETE;
 
 /**
- * Represents the under construction feature of a Block.
- * This is usually the last block of a file opened for write or append.
+ * 文件构建中正在构造块的特征类，存储未完成块的构造状态和副本信息。
+ * 通常用于保存正在写入或追加的文件的最后一个块，存储分配给该块的相关元数据。
  */
 public class BlockUnderConstructionFeature {
   private BlockUCState blockUCState;
@@ -40,28 +41,28 @@ public class BlockUnderConstructionFeature {
       new ReplicaUnderConstruction[0];
 
   /**
-   * Block replicas as assigned when the block was allocated.
-   */
+   * 块分配时确定的预期副本列表 */
   private ReplicaUnderConstruction[] replicas = NO_REPLICAS;
 
   /**
-   * Index of the primary data node doing the recovery. Useful for log
-   * messages.
-   */
+   * 块恢复过程中主DataNode的索引，用于日志追踪 */
   private int primaryNodeIndex = -1;
 
   /**
-   * The new generation stamp, which this block will have
-   * after the recovery succeeds. Also used as a recovery id to identify
-   * the right recovery if any of the abandoned recoveries re-appear.
-   */
+   * 块恢复成功后新块的生成时间戳，同时作为恢复ID标识，用于识别过期恢复 */
   private long blockRecoveryId = 0;
 
   /**
-   * The block source to use in the event of copy-on-write truncate.
-   */
+   * 写时复制截断场景下使用的源块信息 */
   private BlockInfo truncateBlock;
 
+  /**
+   * 构造正在构造块特征对象，初始化块状态和预期副本位置
+   * @param blk 正在构造的块
+   * @param state 块构造状态
+   * @param targets 分配的目标DataNode存储位置
+   * @param blockType 块类型（普通/纠删码条纹块
+   */
   public BlockUnderConstructionFeature(Block blk,
       BlockUCState state, DatanodeStorageInfo[] targets, BlockType blockType) {
     assert getBlockUCState() != COMPLETE :
@@ -70,12 +71,13 @@ public class BlockUnderConstructionFeature {
     setExpectedLocations(blk, targets, blockType);
   }
 
-  /** Set expected locations */
+  /** 设置预期副本位置 */
   public void setExpectedLocations(Block block, DatanodeStorageInfo[] targets,
       BlockType blockType) {
     if (targets == null) {
       return;
     }
+    // 统计非空目标位置数量
     int numLocations = 0;
     for (DatanodeStorageInfo target : targets) {
       if (target != null) {
@@ -87,8 +89,7 @@ public class BlockUnderConstructionFeature {
     int offset = 0;
     for(int i = 0; i < targets.length; i++) {
       if (targets[i] != null) {
-        // when creating a new striped block we simply sequentially assign block
-        // index to each storage
+        // 条纹块为每个存储分配唯一块ID，普通块复用原块ID
         Block replicaBlock = blockType == BlockType.STRIPED ?
             new Block(block.getBlockId() + i, 0, block.getGenerationStamp()) :
             block;
@@ -99,8 +100,8 @@ public class BlockUnderConstructionFeature {
   }
 
   /**
-   * Create array of expected replica locations
-   * (as has been assigned by chooseTargets()).
+   * 获取分配给该块的所有预期存储位置数组，由chooseTargets分配
+   * @return 预期存储位置数组
    */
   public DatanodeStorageInfo[] getExpectedStorageLocations() {
     int numLocations = getNumExpectedLocations();
@@ -112,8 +113,8 @@ public class BlockUnderConstructionFeature {
   }
 
   /**
-   * Note that this iterator doesn't guarantee thread-safe. It depends on
-   * external mechanisms such as the FSNamesystem lock for protection.
+   * 获取预期存储位置迭代器，不保证线程安全，依赖外部FSNamesystem锁保护
+   * @return 预期存储位置迭代器
    */
   public Iterator<DatanodeStorageInfo> getExpectedStorageLocationsIterator() {
     return new Iterator<DatanodeStorageInfo>() {
@@ -135,8 +136,8 @@ public class BlockUnderConstructionFeature {
   }
 
   /**
-   * @return the index array indicating the block index in each storage. Used
-   * only by striped blocks.
+   * 获取每个存储上对应的块索引数组，仅用于纠删码条纹块
+   * @return 块索引数组
    */
   public byte[] getBlockIndices() {
     int numLocations = getNumExpectedLocations();
@@ -147,6 +148,11 @@ public class BlockUnderConstructionFeature {
     return indices;
   }
 
+  /**
+   * 根据指定存储索引列表，获取对应块索引数组
+   * @param storageIdx 指定存储索引列表
+   * @return 对应块索引数组
+   */
   public byte[] getBlockIndicesForSpecifiedStorages(List<Integer> storageIdx) {
     byte[] indices = new byte[storageIdx.size()];
     for (int i = 0; i < indices.length; i++) {
@@ -160,9 +166,9 @@ public class BlockUnderConstructionFeature {
   }
 
   /**
-   * when committing a striped block whose size is less than a stripe, we need
-   * to decrease the scheduled block size of the DataNodes that do not store
-   * any internal block.
+   * 提交小于一个条纹大小的纠删码块时，更新未使用存储的调度块计数
+   * 减少未存储实际数据块的DataNode上的已调度块计数，修正资源统计
+   * @param storedBlock 已存储的条纹块信息
    */
   void updateStorageScheduledSize(BlockInfoStriped storedBlock) {
     assert storedBlock.getUnderConstructionFeature() == this;
@@ -171,8 +177,10 @@ public class BlockUnderConstructionFeature {
     }
     final int dataBlockNum = storedBlock.getDataBlockNum();
     final int realDataBlockNum = storedBlock.getRealDataBlockNum();
+    // 实际数据块少于总块数，需要清理多余存储
     if (realDataBlockNum < dataBlockNum) {
       for (ReplicaUnderConstruction replica : replicas) {
+      // 索引超出实际数据块范围的存储，需要减少已调度计数
         int index = BlockIdManager.getBlockIndex(replica);
         if (index >= realDataBlockNum && index < dataBlockNum) {
           final DatanodeStorageInfo storage =
@@ -185,8 +193,8 @@ public class BlockUnderConstructionFeature {
   }
 
   /**
-   * Return the state of the block under construction.
-   * @see BlockUCState
+   * 获取该块当前构造状态
+   * @return 块构造状态枚举
    */
   public BlockUCState getBlockUCState() {
     return blockUCState;
@@ -200,7 +208,7 @@ public class BlockUnderConstructionFeature {
     return blockRecoveryId;
   }
 
-  /** Get recover block */
+  /** 获取截断场景使用的源块 */
   public BlockInfo getTruncateBlock() {
     return truncateBlock;
   }
@@ -210,15 +218,19 @@ public class BlockUnderConstructionFeature {
   }
 
   /**
-   * Set {@link #blockUCState} to {@link BlockUCState#COMMITTED}.
-   */
+   * 将块构造状态设置为已提交 */
   void commit() {
     blockUCState = BlockUCState.COMMITTED;
   }
 
+  /**
+   * 获取所有生成时间戳不匹配的过时副本列表
+   * @param genStamp 当前正确的生成时间戳
+   * @return 过时副本列表
+   */
   List<ReplicaUnderConstruction> getStaleReplicas(long genStamp) {
     List<ReplicaUnderConstruction> staleReplicas = new ArrayList<>();
-    // Remove replicas with wrong gen stamp. The replica list is unchanged.
+    // 遍历副本收集生成时间戳不匹配的副本
     for (ReplicaUnderConstruction r : replicas) {
       if (genStamp != r.getGenerationStamp()) {
         staleReplicas.add(r);
@@ -228,12 +240,10 @@ public class BlockUnderConstructionFeature {
   }
 
   /**
-   * Initialize lease recovery for this block.
-   * Find the first alive data-node starting from the previous primary and
-   * make it primary.
-   * @param blockInfo Block to be recovered
-   * @param recoveryId Recovery ID (new gen stamp)
-   * @param startRecovery Issue recovery command to datanode if true.
+   * 初始化该块的租约恢复流程，选择最新上线的DataNode作为主恢复节点
+   * @param blockInfo 需要恢复的块信息
+   * @param recoveryId 恢复ID（新的生成时间戳
+   * @param startRecovery 是否需要向DataNode下发恢复命令
    */
   public void initializeBlockRecovery(BlockInfo blockInfo, long recoveryId,
       boolean startRecovery) {
@@ -246,20 +256,20 @@ public class BlockUnderConstructionFeature {
       NameNode.blockStateChangeLog.warn("BLOCK*" +
           " BlockUnderConstructionFeature.initializeBlockRecovery:" +
           " No blocks found, lease removed.");
-      // sets primary node index and return.
+      // 设置主节点索引为-1并返回
       primaryNodeIndex = -1;
       return;
     }
     boolean allLiveReplicasTriedAsPrimary = true;
+    // 检查所有存活副本是否都已经被选过为主节点
     for (ReplicaUnderConstruction replica : replicas) {
-      // Check if all replicas have been tried or not.
       if (replica.isAlive()) {
         allLiveReplicasTriedAsPrimary = allLiveReplicasTriedAsPrimary
             && replica.getChosenAsPrimary();
       }
     }
+    // 所有存活节点都尝试过一遍后，重置选择标记
     if (allLiveReplicasTriedAsPrimary) {
-      // Just set all the replicas to be chosen whether they are alive or not.
       for (ReplicaUnderConstruction replica : replicas) {
         replica.setChosenAsPrimary(false);
       }
@@ -267,8 +277,8 @@ public class BlockUnderConstructionFeature {
     long mostRecentLastUpdate = 0;
     ReplicaUnderConstruction primary = null;
     primaryNodeIndex = -1;
+    // 找到最近一次心跳更新存活且未被选过的节点，选择最新的作为主节点
     for (int i = 0; i < replicas.length; i++) {
-      // Skip alive replicas which have been chosen for recovery.
       if (!(replicas[i].isAlive() && !replicas[i].getChosenAsPrimary())) {
         continue;
       }
@@ -281,6 +291,7 @@ public class BlockUnderConstructionFeature {
         mostRecentLastUpdate = lastUpdate;
       }
     }
+    // 选中主节点后，将块添加到恢复队列，标记为主节点
     if (primary != null) {
       primary.getExpectedStorageLocation().getDatanodeDescriptor()
           .addBlockToBeRecovered(blockInfo);
@@ -290,31 +301,38 @@ public class BlockUnderConstructionFeature {
     }
   }
 
-  /** Add the reported replica if it is not already in the replica list. */
+  /**
+   * 如果报告的副本不在预期列表中，则添加进去，处理同一节点存储变更
+   * 如果同一DataNode不同存储的情况，更新存储信息
+   * @param storage 报告副本的存储位置
+   * @param reportedBlock 报告的块信息
+   * @param rState 副本状态
+   */
   void addReplicaIfNotPresent(DatanodeStorageInfo storage,
       Block reportedBlock, ReplicaState rState) {
+    // 当前副本为空，初始化第一个副本
     if (replicas.length == 0) {
       replicas = new ReplicaUnderConstruction[1];
       replicas[0] = new ReplicaUnderConstruction(reportedBlock, storage,
           rState);
     } else {
+      // 遍历现有副本查找是否已经存在
       for (int i = 0; i < replicas.length; i++) {
         DatanodeStorageInfo expected =
             replicas[i].getExpectedStorageLocation();
+        // 同一存储已经存在，更新生成时间戳
         if (expected == storage) {
           replicas[i].setGenerationStamp(reportedBlock.getGenerationStamp());
           return;
         } else if (expected != null && expected.getDatanodeDescriptor() ==
             storage.getDatanodeDescriptor()) {
-          // The Datanode reported that the block is on a different storage
-          // than the one chosen by BlockPlacementPolicy. This can occur as
-          // we allow Datanodes to choose the target storage. Update our
-          // state by removing the stale entry and adding a new one.
+          // 同一DataNode不同存储，允许DataNode选择目标存储，更新存储信息
           replicas[i] = new ReplicaUnderConstruction(reportedBlock, storage,
               rState);
           return;
         }
       }
+      // 不存在则扩容副本数组，添加新副本
       ReplicaUnderConstruction[] newReplicas =
           new ReplicaUnderConstruction[replicas.length + 1];
       System.arraycopy(replicas, 0, newReplicas, 0, replicas.length);
@@ -346,6 +364,10 @@ public class BlockUnderConstructionFeature {
     sb.append("]}");
   }
   
+  /**
+   * 拼接简洁格式的构造块副本信息到字符串生成器，用于日志输出
+   * @param sb 字符串生成器
+   */
   public void appendUCPartsConcise(StringBuilder sb) {
     sb.append("replicas=");
     int i = 0;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,21 +28,31 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.List;
 
 /**
- * Wrapper class of Device allocation for NMWebServices.
+ * 节点管理器Web服务中设备资源分配信息的包装类，用于REST API序列化返回设备资源信息
  * */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class NMDeviceResourceInfo extends NMResourceInfo {
 
+  // 当前节点上的全部设备列表
   private List<Device> totalDevices;
+  // 当前节点上已经分配出去的设备列表
   private List<AssignedDevice> assignedDevices;
 
+  /**
+   * 带参构造函数，初始化设备资源信息
+   * @param totalDevices 节点全部设备列表
+   * @param assignedDevices 已分配设备列表
+   */
   public NMDeviceResourceInfo(
       List<Device> totalDevices, List<AssignedDevice> assignedDevices) {
     this.assignedDevices = assignedDevices;
     this.totalDevices = totalDevices;
   }
 
+  /**
+   * 默认无参构造函数，用于XML/JSON序列化
+   */
   public NMDeviceResourceInfo() {
   }
 

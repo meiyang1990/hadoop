@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,19 +26,20 @@ import org.apache.hadoop.yarn.server.resourcemanager.reservation.RLESparseResour
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.ReservationInterval;
 
 /**
- * An auxiliary class used to compute the time interval in which the stage can
- * be allocated resources by {@link IterativePlanner}.
+ * 文件所属模块：YARN服务端 -> 资源调度器 -> 预约规划
+ * 核心职责：定义计算预约阶段可分配资源时间区间的接口，为IterativePlanner迭代规划器提供阶段执行区间计算能力
+ * 辅助工具类，用于计算{@link IterativePlanner}可以为阶段分配资源的时间区间。
  */
 public interface StageExecutionInterval {
   /**
-   * Computes the earliest allowed starting time for a given stage.
+   * 计算给定预约阶段允许的最早启动时间，得到该阶段可分配资源的时间区间。
    *
-   * @param plan the Plan to which the reservation must be fitted
-   * @param reservation the job contract
-   * @param currentReservationStage the stage
-   * @param allocateLeft is the job allocated from left to right
-   * @param allocations Existing resource assignments for the job
-   * @return the time interval in which the stage can get resources.
+   * @param plan 预约需要适配的资源计划
+   * @param reservation 作业预约契约定义
+   * @param currentReservationStage 当前处理的预约阶段
+   * @param allocateLeft 标记是否采用从左到右的分配顺序
+   * @param allocations 作业已分配的资源
+   * @return 该阶段可获取资源的时间区间
    */
   ReservationInterval computeExecutionInterval(Plan plan,
       ReservationDefinition reservation,

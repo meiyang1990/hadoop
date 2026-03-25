@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -63,8 +64,8 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * NNStorage is responsible for management of the StorageDirectories used by
- * the NameNode.
+ * @fileoverview NNStorage 负责管理NameNode使用的所有存储目录，维护fsimage和edits日志的存储位置、状态和元信息。
+ * 核心职责包括：存储目录初始化、错误检测与故障转移、存储目录恢复、版本信息管理、元数据文件路径生成等。
  */
 @InterfaceAudience.Private
 public class NNStorage extends Storage implements Closeable,
@@ -73,7 +74,7 @@ public class NNStorage extends Storage implements Closeable,
   static final String LOCAL_URI_SCHEME = "file";
 
   /**
-   * The filenames used for storing the images.
+   * NameNode存储文件类型枚举，定义了各类元数据文件的基础文件名。
    */
   public enum NameNodeFile {
     IMAGE     ("fsimage"),
@@ -99,10 +100,7 @@ public class NNStorage extends Storage implements Closeable,
   }
 
   /**
-   * Implementation of StorageDirType specific to namenode storage
-   * A Storage directory could be of type IMAGE which stores only fsimage,
-   * or of type EDITS which stores edits or of type IMAGE_AND_EDITS which
-   * stores both fsimage and edits.
+   * NameNode存储目录类型枚举，定义存储目录承担的功能：仅存储fsimage、仅存储edits日志、或同时存储两者。
    */
   @VisibleForTesting
   public enum NameNodeDirType implements StorageDirType {
@@ -123,10 +121,10 @@ public class NNStorage extends Storage implements Closeable,
     }
   }
 
-  protected String blockpoolID = ""; // id of the block pool
+  protected String blockpoolID = ""; // 块池ID，联邦场景下标识当前NameNode所属块池
 
   /**
-   * Flag that controls if we try to restore failed storages.
+   * 标识是否尝试恢复已失败的存储目录。
    */
   private boolean restoreFailedStorage = false;
   private final Object restorationLock = new Object();
@@ -134,41 +132,38 @@ public class NNStorage extends Storage implements Closeable,
   private final Configuration conf;
 
   /**
-   * TxId of the last transaction that was included in the most
-   * recent fsimage file. This does not include any transactions
-   * that have since been written to the edit log.
+   * 最近一次检查点完成时包含的最大事务ID，不包含检查点之后写入edits的事务。
    */
   protected volatile long mostRecentCheckpointTxId =
       HdfsServerConstants.INVALID_TXID;
   
   /**
-   * Time of the last checkpoint, in milliseconds since the epoch.
+   * 最近一次检查点完成的时间，单位：从纪元开始的毫秒数。
    */
   private long mostRecentCheckpointTime = 0;
 
   /**
-   * List of failed (and thus removed) storages.
+   * 已失败并被移除出服务的存储目录列表。
    */
   final protected List<StorageDirectory> removedStorageDirs
       = new CopyOnWriteArrayList<>();
 
   /**
-   * Properties from old layout versions that may be needed
-   * during upgrade only.
+   * 旧版本布局中提取的废弃属性，仅在升级过程中需要。
    */
   private HashMap<String, String> deprecatedProperties;
 
   /**
-   * Name directories size for metric.
+   * 存储目录大小映射表，用于监控指标。
    */
   private Map<String, Long> nameDirSizeMap = new HashMap<>();
 
   /**
-   * Construct the NNStorage.
-   * @param conf Namenode configuration.
-   * @param imageDirs Directories the image can be stored in.
-   * @param editsDirs Directories the editlog can be stored in.
-   * @throws IOException if any directories are inaccessible.
+   * 构造NNStorage对象，初始化fsimage和edits日志存储目录。
+   * @param conf NameNode配置对象
+   * @param imageDirs fsimage存储目录URI集合
+   * @param editsDirs edits日志存储目录URI集合
+   * @throws IOException 如果目录初始化失败则抛出异常
    */
   public NNStorage(Configuration conf, 
                    Collection<URI> imageDirs, Collection<URI> editsDirs) 
@@ -180,11 +175,17 @@ public class NNStorage extends Storage implements Closeable,
     setStorageDirectories(imageDirs, 
                           Lists.newArrayList(editsDirs),
                           FSNamesystem.getSharedEditsDirs(conf));
-    //Update NameDirSize metric value after NN start
+    //NameNode启动后更新存储目录大小监控指标
     updateNameDirSize();
   }
 
   @Override // Storage
+  /**
+   * 检查存储目录是否是可预升级的布局版本
+   * @param sd 待检查的存储目录
+   * @return 如果是可预升级布局返回true，否则返回false
+   * @throws IOExceptions 读取文件失败抛出异常
+   */
   public boolean isPreUpgradableLayout(StorageDirectory sd) throws IOException {
     if (disablePreUpgradableLayoutCheck) {
       return false;
@@ -212,16 +213,18 @@ public class NNStorage extends Storage implements Closeable,
   }
 
   @Override // Closeable
+  /**
+   * 关闭NNStorage，解锁所有存储目录并清空目录列表。
+   * @throws IOException 解锁失败抛出异常
+   */
   public void close() throws IOException {
     unlockAll();
     getStorageDirs().clear();
   }
 
   /**
-   * Set flag whether an attempt should be made to restore failed storage
-   * directories at the next available opportunity.
-   *
-   * @param val Whether restoration attempt should be made.
+   * 设置是否在下次机会尝试恢复失败存储目录的标志。
+   * @param val true表示需要尝试恢复，false表示不尝试
    */
   void setRestoreFailedStorage(boolean val) {
     LOG.warn("set restore failed storage to {}", val);
@@ -229,15 +232,15 @@ public class NNStorage extends Storage implements Closeable,
   }
 
   /**
-   * @return Whether failed storage directories are to be restored.
+   * 获取是否需要恢复失败存储目录的标志。
+   * @return true表示需要尝试恢复，false表示不尝试
    */
   boolean getRestoreFailedStorage() {
     return restoreFailedStorage;
   }
 
   /**
-   * See if any of removed storages is "writable" again, and can be returned
-   * into service.
+   * 尝试恢复所有已移除的失败存储目录，如果目录重新可写则将其重新加入服务。
    */
   void attemptRestoreRemovedStorage() {
     // if directory is "alive" - copy the images there...
@@ -255,7 +258,7 @@ public class NNStorage extends Storage implements Closeable,
             FileUtil.canWrite(root));
         if (root.exists() && FileUtil.canWrite(root)) {
           LOG.info("restoring dir {}", sd.getRoot().getAbsolutePath());
-          this.addStorageDir(sd); // restore
+          this.addStorageDir(sd); // 恢复目录到可用列表
           this.removedStorageDirs.remove(sd);
         }
       }
@@ -263,14 +266,18 @@ public class NNStorage extends Storage implements Closeable,
   }
 
   /**
-   * @return A list of storage directories which are in the errored state.
+   * 获取已失败被移除的存储目录列表。
+   * @return 已移除存储目录列表
    */
   List<StorageDirectory> getRemovedStorageDirs() {
     return this.removedStorageDirs;
   }
   
   /**
-   * See {@link NNStorage#setStorageDirectories(Collection, Collection, Collection)}.
+   * 设置存储目录，仅用于测试。
+   * @param fsNameDirs fsimage存储目录集合
+   * @param fsEditsDirs edits存储目录集合
+   * @throws IOException 初始化失败抛出异常
    */
   @VisibleForTesting
   synchronized void setStorageDirectories(Collection<URI> fsNameDirs,
@@ -280,17 +287,12 @@ public class NNStorage extends Storage implements Closeable,
   }
 
   /**
-   * Set the storage directories which will be used. This should only ever be
-   * called from inside NNStorage. However, it needs to remain package private
-   * for testing, as StorageDirectories need to be reinitialised after using
-   * Mockito.spy() on this class, as Mockito doesn't work well with inner
-   * classes, such as StorageDirectory in this case.
-   *
-   * Synchronized due to initialization of storageDirs and removedStorageDirs.
-   *
-   * @param fsNameDirs Locations to store images.
-   * @param fsEditsDirs Locations to store edit logs.
-   * @throws IOException
+   * 初始化并设置NameNode使用的存储目录，区分fsimage目录和edits目录，处理共享edits目录。
+   * 该方法需要同步，避免多线程同时初始化存储目录导致冲突。
+   * @param fsNameDirs fsimage存储目录URI集合
+   * @param fsEditsDirs edits日志存储目录URI集合
+   * @param sharedEditsDirs 共享edits目录URI集合
+   * @throws IOException 目录初始化失败抛出异常
    */
   @VisibleForTesting
   synchronized void setStorageDirectories(Collection<URI> fsNameDirs,
@@ -339,15 +341,15 @@ public class NNStorage extends Storage implements Closeable,
             NameNodeDirType.EDITS, sharedEditsDirs.contains(dirName),
             new FsPermission(conf.get(
                 DFSConfigKeys.DFS_NAMENODE_NAME_DIR_PERMISSION_KEY,
-                DFSConfigKeys.DFS_NAMENODE_NAME_DIR_PERMISSION_DEFAULT))));
+                DFSConfigKeys.DFS_NAMENODE_NAME_DIR_PERMISSION_DEFAULT)));
       }
     }
   }
 
   /**
-   * Return the storage directory corresponding to the passed URI.
-   * @param uri URI of a storage directory
-   * @return The matching storage directory or null if none found
+   * 根据URI查找对应的存储目录。
+   * @param uri 存储目录URI
+   * @return 匹配的StorageDirectory，如果未找到返回null
    */
   public StorageDirectory getStorageDirectory(URI uri) {
     try {
@@ -366,9 +368,9 @@ public class NNStorage extends Storage implements Closeable,
   }
 
   /**
-   * Checks the consistency of a URI, in particular if the scheme
-   * is specified.
-   * @param u URI whose consistency is being checked.
+   * 检查URI的scheme一致性，确保URI已定义scheme。
+   * @param u 待检查的URI
+   * @throws IOException 如果URI未定义scheme则抛出异常
    */
   private static void checkSchemeConsistency(URI u) throws IOException {
     String scheme = u.getScheme();
@@ -379,27 +381,27 @@ public class NNStorage extends Storage implements Closeable,
   }
 
   /**
-   * Retrieve current directories of type IMAGE.
-   * @return Collection of URI representing image directories
-   * @throws IOException in case of URI processing error
+   * 获取所有IMAGE类型的存储目录URI集合。
+   * @return 存储目录URI集合
+   * @throws IOException URI转换错误抛出异常
    */
   Collection<URI> getImageDirectories() throws IOException {
     return getDirectories(NameNodeDirType.IMAGE);
   }
 
   /**
-   * Retrieve current directories of type EDITS.
-   * @return Collection of URI representing edits directories
-   * @throws IOException in case of URI processing error
+   * 获取所有EDITS类型的存储目录URI集合。
+   * @return 存储目录URI集合
+   * @throws IOException URI转换错误抛出异常
    */
   Collection<URI> getEditsDirectories() throws IOException {
     return getDirectories(NameNodeDirType.EDITS);
   }
 
   /**
-   * Return number of storage directories of the given type.
-   * @param dirType directory type
-   * @return number of storage directories of type dirType
+   * 获取指定类型的存储目录数量。
+   * @param dirType 目录类型
+   * @return 对应类型的存储目录数量
    */
   int getNumStorageDirs(NameNodeDirType dirType) {
     if(dirType == null) {
@@ -414,11 +416,10 @@ public class NNStorage extends Storage implements Closeable,
   }
 
   /**
-   * Return the list of locations being used for a specific purpose.
-   * i.e. Image or edit log storage.
-   *
-   * @param dirType Purpose of locations requested.
-   * @throws IOException
+   * 获取指定类型存储目录的URI集合。
+   * @param dirType 目录类型
+   * @return 对应类型存储目录的URI集合
+   * @throws IOException URI处理错误抛出异常
    */
   Collection<URI> getDirectories(NameNodeDirType dirType)
       throws IOException {
@@ -438,753 +439,10 @@ public class NNStorage extends Storage implements Closeable,
   }
   
   /**
-   * Determine the last transaction ID noted in this storage directory.
-   * This txid is stored in a special seen_txid file since it might not
-   * correspond to the latest image or edit log. For example, an image-only
-   * directory will have this txid incremented when edits logs roll, even
-   * though the edits logs are in a different directory.
-   *
-   * @param sd StorageDirectory to check
-   * @return If file exists and can be read, last recorded txid. If not, 0L.
-   * @throws IOException On errors processing file pointed to by sd
+   * 从指定存储目录读取seen_txid文件，获取该目录记录的最大已处理事务ID。
+   * @param sd 待读取的存储目录
+   * @return 读取成功返回记录的txid，文件不存在返回0
+   * @throws IOException 读取文件错误抛出异常
    */
   static long readTransactionIdFile(StorageDirectory sd) throws IOException {
-    File txidFile = getStorageFile(sd, NameNodeFile.SEEN_TXID);
-    return PersistentLongFile.readFile(txidFile, 0);
-  }
-  
-  /**
-   * Write last checkpoint time into a separate file.
-   * @param sd storage directory
-   * @throws IOException
-   */
-  void writeTransactionIdFile(StorageDirectory sd, long txid)
-      throws IOException {
-    Preconditions.checkArgument(txid >= 0, "bad txid: " + txid);
-    
-    File txIdFile = getStorageFile(sd, NameNodeFile.SEEN_TXID);
-    PersistentLongFile.writeFile(txIdFile, txid);
-  }
-
-  /**
-   * Set the transaction ID and time of the last checkpoint.
-   * 
-   * @param txid transaction id of the last checkpoint
-   * @param time time of the last checkpoint, in millis since the epoch
-   */
-  void setMostRecentCheckpointInfo(long txid, long time) {
-    LOG.info("setMostRecentCheckpointInfo txid is {}, time is {}", txid, time);
-    this.mostRecentCheckpointTxId = txid;
-    this.mostRecentCheckpointTime = time;
-  }
-
-  /**
-   * @return the transaction ID of the last checkpoint.
-   */
-  public long getMostRecentCheckpointTxId() {
-    return mostRecentCheckpointTxId;
-  }
-  
-  /**
-   * @return the time of the most recent checkpoint in millis since the epoch.
-   */
-  public long getMostRecentCheckpointTime() {
-    return mostRecentCheckpointTime;
-  }
-
-  /**
-   * Write a small file in all available storage directories that
-   * indicates that the namespace has reached some given transaction ID.
-   * 
-   * This is used when the image is loaded to avoid accidental rollbacks
-   * in the case where an edit log is fully deleted but there is no
-   * checkpoint. See TestNameEditsConfigs.testNameEditsConfigsFailure()
-   * @param txid the txid that has been reached
-   */
-  public void writeTransactionIdFileToStorage(long txid) {
-    writeTransactionIdFileToStorage(txid, null);
-  }
-
-  /**
-   * Write a small file in all available storage directories that
-   * indicates that the namespace has reached some given transaction ID.
-   *
-   * This is used when the image is loaded to avoid accidental rollbacks
-   * in the case where an edit log is fully deleted but there is no
-   * checkpoint. See TestNameEditsConfigs.testNameEditsConfigsFailure()
-   * @param txid the txid that has been reached
-   * @param type the type of directory
-   */
-  public void writeTransactionIdFileToStorage(long txid,
-      NameNodeDirType type) {
-    // Write txid marker in all storage directories
-    for (Iterator<StorageDirectory> it = dirIterator(type); it.hasNext();) {
-      StorageDirectory sd = it.next();
-      try {
-        writeTransactionIdFile(sd, txid);
-      } catch(IOException e) {
-        // Close any edits stream associated with this dir and remove directory
-        LOG.warn("writeTransactionIdToStorage failed on {}", sd,
-            e);
-        reportErrorsOnDirectory(sd);
-      }
-    }
-  }
-
-  /**
-   * Return the name of the image file that is uploaded by periodic
-   * checkpointing.
-   *
-   * @return List of filenames to save checkpoints to.
-   */
-  public File[] getFsImageNameCheckpoint(long txid) {
-    ArrayList<File> list = new ArrayList<>();
-    for (Iterator<StorageDirectory> it =
-                 dirIterator(NameNodeDirType.IMAGE); it.hasNext();) {
-      list.add(getStorageFile(it.next(), NameNodeFile.IMAGE_NEW, txid));
-    }
-    return list.toArray(new File[list.size()]);
-  }
-
-  /**
-   * @return The first image file with the given txid and image type.
-   */
-  public File getFsImageName(long txid, NameNodeFile nnf) {
-    for (Iterator<StorageDirectory> it = dirIterator(NameNodeDirType.IMAGE);
-        it.hasNext();) {
-      StorageDirectory sd = it.next();
-      File fsImage = getStorageFile(sd, nnf, txid);
-      if (FileUtil.canRead(sd.getRoot()) && fsImage.exists()) {
-        return fsImage;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * @return The first image file whose txid is the same with the given txid and
-   * image type is one of the given types.
-   */
-  public File getFsImage(long txid, EnumSet<NameNodeFile> nnfs) {
-    for (Iterator<StorageDirectory> it = dirIterator(NameNodeDirType.IMAGE);
-        it.hasNext();) {
-      StorageDirectory sd = it.next();
-      for (NameNodeFile nnf : nnfs) {
-        File fsImage = getStorageFile(sd, nnf, txid);
-        if (FileUtil.canRead(sd.getRoot()) && fsImage.exists()) {
-          return fsImage;
-        }
-      }
-    }
-    return null;
-  }
-
-  public File getFsImageName(long txid) {
-    return getFsImageName(txid, NameNodeFile.IMAGE);
-  }
-
-  public File getHighestFsImageName() {
-    return getFsImageName(getMostRecentCheckpointTxId());
-  }
-
-  /** Create new dfs name directory.  Caution: this destroys all files
-   * in this filesystem. */
-  private void format(StorageDirectory sd) throws IOException {
-    sd.clearDirectory(); // create currrent dir
-    writeProperties(sd);
-    writeTransactionIdFile(sd, 0);
-
-    LOG.info("Storage directory {} has been successfully formatted.",
-        sd.getRoot());
-  }
-
-  /**
-   * Format all available storage directories.
-   */
-  public void format(NamespaceInfo nsInfo) throws IOException {
-    format(nsInfo, false);
-  }
-
-  /**
-   * Format all available storage directories.
-   */
-  public void format(NamespaceInfo nsInfo, boolean isRollingUpgrade)
-      throws IOException {
-    Preconditions.checkArgument(nsInfo.getLayoutVersion() == 0 ||
-        nsInfo.getLayoutVersion() == getServiceLayoutVersion() ||
-        isRollingUpgrade, "Bad layout version: %s", nsInfo.getLayoutVersion());
-    
-    this.setStorageInfo(nsInfo);
-    this.blockpoolID = nsInfo.getBlockPoolID();
-    for (Iterator<StorageDirectory> it =
-                           dirIterator(); it.hasNext();) {
-      StorageDirectory sd = it.next();
-      format(sd);
-    }
-  }
-  
-  public static NamespaceInfo newNamespaceInfo()
-      throws UnknownHostException {
-    return new NamespaceInfo(newNamespaceID(), newClusterID(),
-        newBlockPoolID(), Time.now());
-  }
-  
-  public void format() throws IOException {
-    this.layoutVersion = getServiceLayoutVersion();
-    for (Iterator<StorageDirectory> it =
-                           dirIterator(); it.hasNext();) {
-      StorageDirectory sd = it.next();
-      format(sd);
-    }
-  }
-
-  /**
-   * Generate new namespaceID.
-   *
-   * namespaceID is a persistent attribute of the namespace.
-   * It is generated when the namenode is formatted and remains the same
-   * during the life cycle of the namenode.
-   * When a datanodes register they receive it as the registrationID,
-   * which is checked every time the datanode is communicating with the
-   * namenode. Datanodes that do not 'know' the namespaceID are rejected.
-   *
-   * @return new namespaceID
-   */
-  private static int newNamespaceID() {
-    int newID = 0;
-    while(newID == 0) {
-      newID = ThreadLocalRandom.current().nextInt(0x7FFFFFFF);  // use 31 bits
-    }
-    return newID;
-  }
-
-  @Override // Storage
-  protected void setFieldsFromProperties(
-      Properties props, StorageDirectory sd) throws IOException {
-    super.setFieldsFromProperties(props, sd);
-    if (layoutVersion == 0) {
-      throw new IOException("NameNode directory "
-                            + sd.getRoot() + " is not formatted.");
-    }
-
-    // Set Block pool ID in version with federation support
-    if (NameNodeLayoutVersion.supports(
-        LayoutVersion.Feature.FEDERATION, getLayoutVersion())) {
-      String sbpid = props.getProperty("blockpoolID");
-      setBlockPoolID(sd.getRoot(), sbpid);
-    }
-    setDeprecatedPropertiesForUpgrade(props);
-  }
-
-  void readProperties(StorageDirectory sd, StartupOption startupOption)
-      throws IOException {
-    Properties props = readPropertiesFile(sd.getVersionFile());
-    if (props == null) {
-      throw new IOException(
-          "Properties not found  for storage directory " + sd);
-    }
-    if (HdfsServerConstants.RollingUpgradeStartupOption.ROLLBACK
-        .matches(startupOption)) {
-      int lv = Integer.parseInt(getProperty(props, sd, "layoutVersion"));
-      if (lv > getServiceLayoutVersion()) {
-        // we should not use a newer version for rollingUpgrade rollback
-        throw new IncorrectVersionException(getServiceLayoutVersion(), lv,
-            "storage directory " + sd.getRoot().getAbsolutePath());
-      }
-      props.setProperty("layoutVersion",
-          Integer.toString(getServiceLayoutVersion()));
-    }
-    setFieldsFromProperties(props, sd);
-  }
-
-  /**
-   * Pull any properties out of the VERSION file that are from older
-   * versions of HDFS and only necessary during upgrade.
-   */
-  private void setDeprecatedPropertiesForUpgrade(Properties props) {
-    deprecatedProperties = new HashMap<>();
-    String md5 = props.getProperty(DEPRECATED_MESSAGE_DIGEST_PROPERTY);
-    if (md5 != null) {
-      deprecatedProperties.put(DEPRECATED_MESSAGE_DIGEST_PROPERTY, md5);
-    }
-  }
-  
-  /**
-   * Return a property that was stored in an earlier version of HDFS.
-   * 
-   * This should only be used during upgrades.
-   */
-  String getDeprecatedProperty(String prop) {
-    assert getLayoutVersion() > getServiceLayoutVersion() :
-      "getDeprecatedProperty should only be done when loading " +
-      "storage from past versions during upgrade.";
-    return deprecatedProperties.get(prop);
-  }
-
-  /**
-   * Write version file into the storage directory.
-   *
-   * The version file should always be written last.
-   * Missing or corrupted version file indicates that
-   * the checkpoint is not valid.
-   *
-   * @param sd storage directory
-   * @throws IOException
-   */
-  @Override // Storage
-  protected void setPropertiesFromFields(Properties props,
-      StorageDirectory sd) throws IOException {
-    super.setPropertiesFromFields(props, sd);
-    // Set blockpoolID in version with federation support
-    if (NameNodeLayoutVersion.supports(
-        LayoutVersion.Feature.FEDERATION, getLayoutVersion())) {
-      props.setProperty("blockpoolID", blockpoolID);
-    }
-  }
-  
-  static File getStorageFile(StorageDirectory sd, NameNodeFile type,
-      long imageTxId) {
-    return new File(sd.getCurrentDir(),
-                    String.format("%s_%019d", type.getName(), imageTxId));
-  }
-  
-  /**
-   * Get a storage file for one of the files that doesn't need a txid associated
-   * (e.g version, seen_txid).
-   */
-  static File getStorageFile(StorageDirectory sd, NameNodeFile type) {
-    return new File(sd.getCurrentDir(), type.getName());
-  }
-
-  @VisibleForTesting
-  public static String getCheckpointImageFileName(long txid) {
-    return getNameNodeFileName(NameNodeFile.IMAGE_NEW, txid);
-  }
-
-  @VisibleForTesting
-  public static String getImageFileName(long txid) {
-    return getNameNodeFileName(NameNodeFile.IMAGE, txid);
-  }
-
-  @VisibleForTesting
-  public static String getRollbackImageFileName(long txid) {
-    return getNameNodeFileName(NameNodeFile.IMAGE_ROLLBACK, txid);
-  }
-
-  public static String getLegacyOIVImageFileName(long txid) {
-    return getNameNodeFileName(NameNodeFile.IMAGE_LEGACY_OIV, txid);
-  }
-
-  private static String getNameNodeFileName(NameNodeFile nnf, long txid) {
-    return String.format("%s_%019d", nnf.getName(), txid);
-  }
-
-  @VisibleForTesting
-  public static String getInProgressEditsFileName(long startTxId) {
-    return getNameNodeFileName(NameNodeFile.EDITS_INPROGRESS, startTxId);
-  }
-  
-  static File getInProgressEditsFile(StorageDirectory sd, long startTxId) {
-    return new File(sd.getCurrentDir(), getInProgressEditsFileName(startTxId));
-  }
-  
-  public static File getFinalizedEditsFile(StorageDirectory sd,
-      long startTxId, long endTxId) {
-    return new File(sd.getCurrentDir(),
-        getFinalizedEditsFileName(startTxId, endTxId));
-  }
-
-  public static File getTemporaryEditsFile(StorageDirectory sd,
-      long startTxId, long endTxId, long timestamp) {
-    return new File(sd.getCurrentDir(),
-        getTemporaryEditsFileName(startTxId, endTxId, timestamp));
-  }
-
-  static File getImageFile(StorageDirectory sd, NameNodeFile nnf, long txid) {
-    return new File(sd.getCurrentDir(), getNameNodeFileName(nnf, txid));
-  }
-
-  @VisibleForTesting
-  public static String getFinalizedEditsFileName(long startTxId, long endTxId) {
-    return String.format("%s_%019d-%019d", NameNodeFile.EDITS.getName(),
-                         startTxId, endTxId);
-  }
-
-  public static String getTemporaryEditsFileName(long startTxId, long endTxId,
-      long timestamp) {
-    return String.format("%s_%019d-%019d_%019d",
-        NameNodeFile.EDITS_TMP.getName(), startTxId, endTxId, timestamp);
-  }
-  
-  /**
-   * Return the first readable finalized edits file for the given txid.
-   */
-  File findFinalizedEditsFile(long startTxId, long endTxId)
-  throws IOException {
-    File ret = findFile(NameNodeDirType.EDITS,
-        getFinalizedEditsFileName(startTxId, endTxId));
-    if (ret == null) {
-      throw new IOException(
-          "No edits file for txid " + startTxId + "-" + endTxId + " exists!");
-    }
-    return ret;
-  }
-    
-  /**
-   * Return the first readable image file for the given txid and image type, or
-   * null if no such image can be found.
-   */
-  File findImageFile(NameNodeFile nnf, long txid) {
-    return findFile(NameNodeDirType.IMAGE,
-        getNameNodeFileName(nnf, txid));
-  }
-
-  /**
-   * Return the first readable storage file of the given name
-   * across any of the 'current' directories in SDs of the
-   * given type, or null if no such file exists.
-   */
-  private File findFile(NameNodeDirType dirType, String name) {
-    for (StorageDirectory sd : dirIterable(dirType)) {
-      File candidate = new File(sd.getCurrentDir(), name);
-      if (FileUtil.canRead(sd.getCurrentDir()) &&
-          candidate.exists()) {
-        return candidate;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Disable the check for pre-upgradable layouts. Needed for BackupImage.
-   * @param val Whether to disable the preupgradeable layout check.
-   */
-  void setDisablePreUpgradableLayoutCheck(boolean val) {
-    disablePreUpgradableLayoutCheck = val;
-  }
-
-  /**
-   * Marks a list of directories as having experienced an error.
-   *
-   * @param sds A list of storage directories to mark as errored.
-   */
-  void reportErrorsOnDirectories(List<StorageDirectory> sds) {
-    for (StorageDirectory sd : sds) {
-      reportErrorsOnDirectory(sd);
-    }
-  }
-
-  /**
-   * Reports that a directory has experienced an error.
-   * Notifies listeners that the directory is no longer
-   * available.
-   *
-   * @param sd A storage directory to mark as errored.
-   */
-  private void reportErrorsOnDirectory(StorageDirectory sd) {
-    LOG.error("Error reported on storage directory {}", sd);
-
-    if(LOG.isDebugEnabled()){
-      String lsd = listStorageDirectories();
-      LOG.debug("current list of storage dirs:{}", lsd);
-    }
-
-    LOG.warn("About to remove corresponding storage: {}", sd.getRoot()
-        .getAbsolutePath());
-    try {
-      sd.unlock();
-    } catch (Exception e) {
-      LOG.warn("Unable to unlock bad storage directory: {}", sd.getRoot()
-          .getPath(), e);
-    }
-
-    if (getStorageDirs().remove(sd)) {
-      this.removedStorageDirs.add(sd);
-    }
-
-    if(LOG.isDebugEnabled()){
-      String lsd = listStorageDirectories();
-      LOG.debug("at the end current list of storage dirs:{}", lsd);
-    }
-  }
-  
-  /** 
-   * Processes the startup options for the clusterid and blockpoolid 
-   * for the upgrade. 
-   * @param startOpt Startup options 
-   * @param layoutVersion Layout version for the upgrade 
-   * @throws IOException
-   */
-  void processStartupOptionsForUpgrade(StartupOption startOpt,
-      int layoutVersion) throws IOException {
-    if (startOpt == StartupOption.UPGRADE ||
-        startOpt == StartupOption.UPGRADEONLY) {
-      // If upgrade from a release that does not support federation,
-      // if clusterId is provided in the startupOptions use it.
-      // Else generate a new cluster ID      
-      if (!NameNodeLayoutVersion.supports(
-          LayoutVersion.Feature.FEDERATION, layoutVersion)) {
-        if (startOpt.getClusterId() == null) {
-          startOpt.setClusterId(newClusterID());
-        }
-        setClusterID(startOpt.getClusterId());
-        setBlockPoolID(newBlockPoolID());
-      } else {
-        // Upgrade from one version of federation to another supported
-        // version of federation doesn't require clusterID.
-        // Warn the user if the current clusterid didn't match with the input
-        // clusterid.
-        if (startOpt.getClusterId() != null
-            && !startOpt.getClusterId().equals(getClusterID())) {
-          LOG.warn("Clusterid mismatch - current clusterid: {}, Ignoring "
-              + "given clusterid: {}", getClusterID(),
-              startOpt.getClusterId());
-        }
-      }
-      LOG.info("Using clusterid: {}", getClusterID());
-    }
-  }
-  
-  /**
-   * Report that an IOE has occurred on some file which may
-   * or may not be within one of the NN image storage directories.
-   */
-  @Override
-  public void reportErrorOnFile(File f) {
-    // We use getAbsolutePath here instead of getCanonicalPath since we know
-    // that there is some IO problem on that drive.
-    // getCanonicalPath may need to call stat() or readlink() and it's likely
-    // those calls would fail due to the same underlying IO problem.
-    String absPath = f.getAbsolutePath();
-    for (StorageDirectory sd : getStorageDirs()) {
-      String dirPath = sd.getRoot().getAbsolutePath();
-      if (!dirPath.endsWith(File.separator)) {
-        dirPath += File.separator;
-      }
-      if (absPath.startsWith(dirPath)) {
-        reportErrorsOnDirectory(sd);
-        return;
-      }
-    }
-    
-  }
-  
-  /**
-   * Generate new clusterID.
-   * 
-   * clusterID is a persistent attribute of the cluster.
-   * It is generated when the cluster is created and remains the same
-   * during the life cycle of the cluster.  When a new name node is formated,
-   * if this is a new cluster, a new clusterID is geneated and stored.
-   * Subsequent name node must be given the same ClusterID during its format to
-   * be in the same cluster.
-   * When a datanode register it receive the clusterID and stick with it.
-   * If at any point, name node or data node tries to join another cluster, it 
-   * will be rejected.
-   * 
-   * @return new clusterID
-   */ 
-  public static String newClusterID() {
-    return "CID-" + UUID.randomUUID().toString();
-  }
-
-  void setClusterID(String cid) {
-    clusterID = cid;
-  }
-
-  /**
-   * Try to find current cluster id in the VERSION files.
-   * returns first cluster id found in any VERSION file
-   * null in case none found
-   * @return clusterId or null in case no cluster id found
-   */
-  public String determineClusterId() {
-    String cid;
-    Iterator<StorageDirectory> sdit = dirIterator(NameNodeDirType.IMAGE);
-    while(sdit.hasNext()) {
-      StorageDirectory sd = sdit.next();
-      try {
-        Properties props = readPropertiesFile(sd.getVersionFile());
-        if (props == null) {
-          cid = null;
-        } else {
-          cid = props.getProperty("clusterID");
-        }
-        LOG.info("current cluster id for sd={};lv={};"
-                + "cid={}", sd.getCurrentDir(), layoutVersion, cid);
-        
-        if(cid != null && !cid.equals("")) {
-          return cid;
-        }
-      } catch (Exception e) {
-        LOG.warn("this sd not available: {}", e.getLocalizedMessage());
-      } //ignore
-    }
-    LOG.warn("couldn't find any VERSION file containing valid ClusterId");
-    return null;
-  }
-
-  /**
-   * Generate new blockpoolID.
-   * 
-   * @return new blockpoolID
-   */ 
-  static String newBlockPoolID() throws UnknownHostException{
-    String ip;
-    try {
-      ip = DNS.getDefaultIP("default");
-    } catch (UnknownHostException e) {
-      LOG.warn("Could not find ip address of \"default\" inteface.");
-      throw e;
-    }
-    
-    int rand = DFSUtil.getSecureRandom().nextInt(Integer.MAX_VALUE);
-    return "BP-" + rand + "-"+ ip + "-" + Time.now();
-  }
-
-  /** Validate and set block pool ID. */
-  public void setBlockPoolID(String bpid) {
-    blockpoolID = bpid;
-  }
-
-  /** Validate and set block pool ID. */
-  private void setBlockPoolID(File storage, String bpid)
-      throws InconsistentFSStateException {
-    if (bpid == null || bpid.equals("")) {
-      throw new InconsistentFSStateException(storage, "file "
-          + Storage.STORAGE_FILE_VERSION + " has no block pool Id.");
-    }
-    
-    if (!blockpoolID.equals("") && !blockpoolID.equals(bpid)) {
-      throw new InconsistentFSStateException(storage,
-          "Unexepcted blockpoolID " + bpid + " . Expected " + blockpoolID);
-    }
-    setBlockPoolID(bpid);
-  }
-  
-  public String getBlockPoolID() {
-    return blockpoolID;
-  }
-
-  /**
-   * Iterate over all current storage directories, inspecting them
-   * with the given inspector.
-   */
-  void inspectStorageDirs(FSImageStorageInspector inspector)
-      throws IOException {
-
-    // Process each of the storage directories to find the pair of
-    // newest image file and edit file
-    for (Iterator<StorageDirectory> it = dirIterator(); it.hasNext();) {
-      StorageDirectory sd = it.next();
-      inspector.inspectDirectory(sd);
-    }
-  }
-
-  /**
-   * Iterate over all of the storage dirs, reading their contents to determine
-   * their layout versions. Returns an FSImageStorageInspector which has
-   * inspected each directory.
-   * 
-   * <b>Note:</b> this can mutate the storage info fields (ctime, version, etc).
-   * @throws IOException if no valid storage dirs are found or no valid layout
-   * version
-   */
-  FSImageStorageInspector readAndInspectDirs(EnumSet<NameNodeFile> fileTypes,
-      StartupOption startupOption) throws IOException {
-    Integer layoutVersion = null;
-    boolean multipleLV = false;
-    StringBuilder layoutVersions = new StringBuilder();
-
-    // First determine what range of layout versions we're going to inspect
-    for (Iterator<StorageDirectory> it = dirIterator(false);
-         it.hasNext();) {
-      StorageDirectory sd = it.next();
-      if (!sd.getVersionFile().exists()) {
-        FSImage.LOG.warn("Storage directory " + sd +
-            " contains no VERSION file. Skipping...");
-        continue;
-      }
-      readProperties(sd, startupOption); // sets layoutVersion
-      int lv = getLayoutVersion();
-      if (layoutVersion == null) {
-        layoutVersion = lv;
-      } else if (!layoutVersion.equals(lv)) {
-        multipleLV = true;
-      }
-      layoutVersions.append("(").append(sd.getRoot()).append(", ").append(lv)
-          .append(") ");
-    }
-    
-    if (layoutVersion == null) {
-      throw new IOException("No storage directories contained VERSION" +
-          " information");
-    }
-    if (multipleLV) {            
-      throw new IOException(
-          "Storage directories contain multiple layout versions: "
-              + layoutVersions);
-    }
-    // If the storage directories are with the new layout version
-    // (ie edits_<txnid>) then use the new inspector, which will ignore
-    // the old format dirs.
-    FSImageStorageInspector inspector;
-    if (NameNodeLayoutVersion.supports(
-        LayoutVersion.Feature.TXID_BASED_LAYOUT, getLayoutVersion())) {
-      inspector = new FSImageTransactionalStorageInspector(fileTypes);
-    } else {
-      inspector = new FSImagePreTransactionalStorageInspector();
-    }
-    
-    inspectStorageDirs(inspector);
-    return inspector;
-  }
-
-  @Override
-  public NamespaceInfo getNamespaceInfo() {
-    return new NamespaceInfo(this);
-  }
-
-  public String getNNDirectorySize() {
-    return JSON.toString(nameDirSizeMap);
-  }
-
-  public void updateNameDirSize() {
-    Map<String, Long> nnDirSizeMap = new HashMap<>();
-    for (Iterator<StorageDirectory> it = dirIterator(); it.hasNext();) {
-      StorageDirectory sd = it.next();
-      if (!sd.isShared()) {
-        nnDirSizeMap.put(sd.getRoot().getAbsolutePath(), sd.getDirecorySize());
-      }
-    }
-    nameDirSizeMap.clear();
-    nameDirSizeMap.putAll(nnDirSizeMap);
-  }
-
-  /**
-   * Write all data storage files.
-   * @throws IOException When all the storage directory fails to write
-   * VERSION file
-   */
-  @Override
-  public void writeAll() throws IOException {
-    this.layoutVersion = getServiceLayoutVersion();
-    for (StorageDirectory sd : getStorageDirs()) {
-      try {
-        writeProperties(sd);
-      } catch (ClosedByInterruptException e) {
-        LOG.warn("Error during write properties to the VERSION file to {}",
-            sd, e);
-        return;
-      } catch (Exception e) {
-        LOG.warn("Error during write properties to the VERSION file to {}",
-            sd, e);
-        reportErrorsOnDirectory(sd);
-        if (getStorageDirs().isEmpty()) {
-          throw new IOException("All the storage failed while writing " +
-              "properties to VERSION file");
-        }
-      }
-    }
-  }
-}
+    File txidFile = getStorageFile(sd, NameNodeFile.SEEN

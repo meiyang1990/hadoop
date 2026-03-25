@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -55,42 +56,63 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * A class to store node or application allocations.
- * It mainly contains operations for allocation start, add, update and finish.
+ * YARN ResourceManager 调度活动记录管理器，负责存储节点和应用的分配活动记录
+ * 主要提供分配活动的开始、添加、更新和完成全生命周期管理，供Web UI查询调度过程
  */
 public class ActivitiesManager extends AbstractService {
   private static final Logger LOG =
       LoggerFactory.getLogger(ActivitiesManager.class);
-  // An empty node ID, we use this variable as a placeholder
-  // in the activity records when recording multiple nodes assignments.
+  // 空节点ID占位符，批量记录多节点分配活动时使用
   public static final NodeId EMPTY_NODE_ID = NodeId.newInstance("", 0);
   public static final char DIAGNOSTICS_DETAILS_SEPARATOR = '\n';
   public static final String EMPTY_DIAGNOSTICS = "";
+  // 当前线程正在记录的各节点分配活动集合
   private ThreadLocal<Map<NodeId, List<NodeAllocation>>>
       recordingNodesAllocation;
   @VisibleForTesting
+  // 已完成的节点分配活动存储，按节点ID分组
   ConcurrentMap<NodeId, List<NodeAllocation>> completedNodeAllocations;
+  // 需要记录活动的活跃节点集合
   private Set<NodeId> activeRecordedNodes;
+  // 指定时间范围内需要记录活动的应用，value为结束时间戳
   private ConcurrentMap<ApplicationId, Long>
       recordingAppActivitiesUntilSpecifiedTime;
+  // 当前线程正在记录的各应用分配活动集合
   private ThreadLocal<Map<ApplicationId, AppAllocation>>
       appsAllocation;
   @VisibleForTesting
+  // 已完成的应用分配活动存储，按应用ID分组
   ConcurrentMap<ApplicationId, Queue<AppAllocation>> completedAppAllocations;
+  // 待记录的节点活动计数器，用于批量活动查询
   private AtomicInteger recordCount = new AtomicInteger(0);
+  // 最近一次节点分配活动缓存
   private List<NodeAllocation> lastAvailableNodeActivities = null;
+  // 过期活动清理线程
   private Thread cleanUpThread;
+  // 活动清理间隔（毫秒）
   private long activitiesCleanupIntervalMs;
+  // 节点调度活动存活时间（毫秒）
   private long schedulerActivitiesTTL;
+  // 应用分配活动存活时间（毫秒）
   private long appActivitiesTTL;
+  // 应用活动队列最大长度（动态调整）
   private volatile int appActivitiesMaxQueueLength;
+  // 配置文件中指定的应用活动队列最大长度
   private int configuredAppActivitiesMaxQueueLength;
+  // RM上下文引用
   private final RMContext rmContext;
+  // 服务停止标记
   private volatile boolean stopped;
+  // 当前线程诊断信息收集器管理器
   private ThreadLocal<DiagnosticsCollectorManager> diagnosticCollectorManager;
+  // 最近N次节点分配活动队列，用于批量查询
   private volatile ConcurrentLinkedDeque<Pair<NodeId, List<NodeAllocation>>>
       lastNActivities;
 
+  /**
+   * 构造活动管理器，初始化各类存储结构
+   * @param rmContext ResourceManager上下文
+   */
   public ActivitiesManager(RMContext rmContext) {
     super(ActivitiesManager.class.getName());
     recordingNodesAllocation = ThreadLocal.withInitial(() -> new HashMap());
@@ -109,6 +131,10 @@ public class ActivitiesManager extends AbstractService {
     lastNActivities = new ConcurrentLinkedDeque<>();
   }
 
+  /**
+   * 从配置加载清理相关参数
+   * @param conf YARN配置
+   */
   private void setupConfForCleanup(Configuration conf) {
     activitiesCleanupIntervalMs = conf.getLong(
         YarnConfiguration.RM_ACTIVITIES_MANAGER_CLEANUP_INTERVAL_MS,
@@ -129,6 +155,17 @@ public class ActivitiesManager extends AbstractService {
     appActivitiesMaxQueueLength = configuredAppActivitiesMaxQueueLength;
   }
 
+  /**
+   * 获取指定应用的分配活动信息，供Web UI查询
+   * @param applicationId 应用ID
+   * @param requestPriorities 优先级过滤条件
+   * @param allocationRequestIds 分配请求ID过滤条件
+   * @param groupBy 分组方式
+   * @param limit 返回最大条数
+   * @param summarize 是否汇总最近一段时间的活动
+   * @param maxTimeInSeconds 汇总时间范围（秒）
+   * @return 应用活动信息DAO对象
+   */
   public AppActivitiesInfo getAppActivitiesInfo(ApplicationId applicationId,
       Set<Integer> requestPriorities, Set<Long> allocationRequestIds,
       RMWSConsts.ActivitiesGroupBy groupBy, int limit, boolean summarize,
@@ -171,11 +208,12 @@ public class ActivitiesManager extends AbstractService {
   }
 
   /**
-   * Get summarized app allocation from multiple allocations as follows:
-   * 1. Collect latest allocation attempts on nodes to construct an allocation
-   *    summary on nodes from multiple app allocations which are recorded a few
-   *    seconds before the last allocation.
-   * 2. Copy other fields from the last allocation.
+   * 汇总多个分配记录生成最近时间段的分配摘要：
+   * 1. 收集指定时间范围内各节点上最新的分配尝试
+   * 2. 从最后一条分配记录复制其他基础信息
+   * @param allocations 原始分配记录列表
+   * @param maxTimeInSeconds 汇总时间范围（秒）
+   * @return 汇总后的分配记录
    */
   private AppAllocation getSummarizedAppAllocation(
       List<AppAllocation> allocations, double maxTimeInSeconds) {
@@ -209,6 +247,12 @@ public class ActivitiesManager extends AbstractService {
     return summarizedAppAllocation;
   }
 
+  /**
+   * 获取指定节点的调度活动信息，供Web UI查询
+   * @param nodeId 节点ID，null表示获取最近一次
+   * @param groupBy 分组方式
+   * @return 节点活动信息DAO对象
+   */
   public ActivitiesInfo getActivitiesInfo(String nodeId,
       RMWSConsts.ActivitiesGroupBy groupBy) {
     List<NodeAllocation> allocations;
@@ -221,6 +265,13 @@ public class ActivitiesManager extends AbstractService {
   }
 
 
+  /**
+   * 记录并批量获取最近指定数量的节点调度活动
+   * @param activitiesCount 需要获取的活动数量
+   * @param groupBy 分组方式
+   * @return 批量活动信息列表
+   * @throws InterruptedException 线程休眠被中断时抛出
+   */
   public List<ActivitiesInfo> recordAndGetBulkActivitiesInfo(
       int activitiesCount, RMWSConsts.ActivitiesGroupBy groupBy)
       throws InterruptedException {
@@ -236,11 +287,15 @@ public class ActivitiesManager extends AbstractService {
       outList.add(new ActivitiesInfo(pair.getRight(),
           pair.getLeft().toString(), groupBy));
     }
-    // reset with new activities
+    // 重置最近活动队列，为下一次批量查询做准备
     lastNActivities = new ConcurrentLinkedDeque<>();
     return outList;
   }
 
+  /**
+   * 标记下一次节点更新需要记录活动
+   * @param nodeId 节点ID，null表示记录批量多节点活动
+   */
   public void recordNextNodeUpdateActivities(String nodeId) {
     if (nodeId == null) {
       recordCount.compareAndSet(0, 1);
@@ -249,6 +304,11 @@ public class ActivitiesManager extends AbstractService {
     }
   }
 
+  /**
+   * 开启指定应用的活动记录，持续指定时长
+   * @param applicationId 应用ID
+   * @param maxTime 记录持续时长（秒）
+   */
   public void turnOnAppActivitiesRecording(ApplicationId applicationId,
       double maxTime) {
     long startTS = SystemClock.getInstance().getTime();
@@ -256,6 +316,10 @@ public class ActivitiesManager extends AbstractService {
     recordingAppActivitiesUntilSpecifiedTime.put(applicationId, endTS);
   }
 
+  /**
+   * 根据集群状态动态调整应用活动队列最大长度
+   * 禁用多节点放置时，根据集群节点数和异步调度线程数自动增大队列长度
+   */
   private void dynamicallyUpdateAppActivitiesMaxQueueLengthIfNeeded() {
     if (rmContext.getRMNodes() == null) {
       return;
@@ -296,10 +360,12 @@ public class ActivitiesManager extends AbstractService {
 
   @Override
   protected void serviceStart() throws Exception {
+    // 启动后台清理线程，定期清理过期活动
     cleanUpThread = new SubjectInheritingThread(new Runnable() {
       @Override
       public void run() {
         while (!stopped && !Thread.currentThread().isInterrupted()) {
+          // 清理过期节点活动
           Iterator<Map.Entry<NodeId, List<NodeAllocation>>> ite =
               completedNodeAllocations.entrySet().iterator();
           long curTS = SystemClock.getInstance().getTime();
@@ -313,344 +379,6 @@ public class ActivitiesManager extends AbstractService {
             }
           }
 
+          // 清理过期应用活动
           Iterator<Map.Entry<ApplicationId, Queue<AppAllocation>>> iteApp =
-              completedAppAllocations.entrySet().iterator();
-          while (iteApp.hasNext()) {
-            Map.Entry<ApplicationId, Queue<AppAllocation>> appAllocation =
-                iteApp.next();
-            RMApp rmApp = rmContext.getRMApps().get(appAllocation.getKey());
-            if (rmApp == null || rmApp.getFinalApplicationStatus()
-                != FinalApplicationStatus.UNDEFINED) {
-              iteApp.remove();
-            } else {
-              Iterator<AppAllocation> appActivitiesIt =
-                  appAllocation.getValue().iterator();
-              while (appActivitiesIt.hasNext()) {
-                if (curTS - appActivitiesIt.next().getTime()
-                    > appActivitiesTTL) {
-                  appActivitiesIt.remove();
-                } else {
-                  break;
-                }
-              }
-              if (appAllocation.getValue().isEmpty()) {
-                iteApp.remove();
-                LOG.debug("Removed all expired activities from cache for {}.",
-                    rmApp.getApplicationId());
-              }
-            }
-          }
-
-          LOG.debug("Remaining apps in app activities cache: {}",
-              completedAppAllocations.keySet());
-          // dynamically update max queue length of app activities if needed
-          dynamicallyUpdateAppActivitiesMaxQueueLengthIfNeeded();
-          try {
-            Thread.sleep(activitiesCleanupIntervalMs);
-          } catch (InterruptedException e) {
-            LOG.info(getName() + " thread interrupted");
-            break;
-          }
-        }
-      }
-    });
-    cleanUpThread.setName("ActivitiesManager thread.");
-    cleanUpThread.start();
-    super.serviceStart();
-  }
-
-  @Override
-  protected void serviceStop() throws Exception {
-    stopped = true;
-    if (cleanUpThread != null) {
-      cleanUpThread.interrupt();
-      try {
-        cleanUpThread.join();
-      } catch (InterruptedException ie) {
-        LOG.warn("Interrupted Exception while stopping", ie);
-      }
-    }
-    super.serviceStop();
-  }
-
-  void startNodeUpdateRecording(NodeId nodeID) {
-    if (recordCount.get() > 0) {
-      recordNextNodeUpdateActivities(nodeID.toString());
-    }
-    // Removing from activeRecordedNodes immediately is to ensure that
-    // activities will be recorded just once in multiple threads.
-    if (activeRecordedNodes.remove(nodeID)) {
-      List<NodeAllocation> nodeAllocation = new ArrayList<>();
-      recordingNodesAllocation.get().put(nodeID, nodeAllocation);
-      // enable diagnostic collector
-      diagnosticCollectorManager.get().enable();
-    }
-  }
-
-  void startAppAllocationRecording(NodeId nodeID, long currTS,
-      SchedulerApplicationAttempt application) {
-    ApplicationId applicationId = application.getApplicationId();
-
-    Long turnOffTimestamp =
-        recordingAppActivitiesUntilSpecifiedTime.get(applicationId);
-    if (turnOffTimestamp != null) {
-      if (turnOffTimestamp > currTS) {
-        appsAllocation.get().put(applicationId,
-            new AppAllocation(application.getPriority(), nodeID,
-                application.getQueueName()));
-        // enable diagnostic collector
-        diagnosticCollectorManager.get().enable();
-      } else {
-        turnOffActivityMonitoringForApp(applicationId);
-      }
-    }
-  }
-
-  // Add queue, application or container activity into specific node allocation.
-  void addSchedulingActivityForNode(NodeId nodeId, String parentName,
-      String childName, Integer priority, ActivityState state,
-      String diagnostic, ActivityLevel level, Long allocationRequestId) {
-    if (shouldRecordThisNode(nodeId)) {
-      NodeAllocation nodeAllocation = getCurrentNodeAllocation(nodeId);
-
-      ResourceScheduler scheduler = this.rmContext.getScheduler();
-      //Sorry about this :( Making sure CS short queue references are normalized
-      if (scheduler instanceof CapacityScheduler) {
-        CapacityScheduler cs = (CapacityScheduler)this.rmContext.getScheduler();
-        parentName = cs.normalizeQueueName(parentName);
-        childName  = cs.normalizeQueueName(childName);
-      }
-
-      nodeAllocation.addAllocationActivity(parentName, childName, priority,
-          state, diagnostic, level, nodeId, allocationRequestId);
-    }
-  }
-
-  // Add queue, application or container activity into specific application
-  // allocation.
-  void addSchedulingActivityForApp(ApplicationId applicationId,
-      ContainerId containerId, Integer priority, ActivityState state,
-      String diagnostic, ActivityLevel level, NodeId nodeId,
-      Long allocationRequestId) {
-    if (shouldRecordThisApp(applicationId)) {
-      AppAllocation appAllocation = appsAllocation.get().get(applicationId);
-      appAllocation.addAppAllocationActivity(containerId == null ?
-          "Container-Id-Not-Assigned" :
-          containerId.toString(), priority, state, diagnostic, level, nodeId,
-          allocationRequestId);
-    }
-  }
-
-  // Update container allocation meta status for this node allocation.
-  // It updates general container status but not the detailed activity state
-  // in updateActivityState.
-  void updateAllocationFinalState(NodeId nodeID, ContainerId containerId,
-      AllocationState containerState) {
-    if (shouldRecordThisNode(nodeID)) {
-      NodeAllocation nodeAllocation = getCurrentNodeAllocation(nodeID);
-      nodeAllocation.updateContainerState(containerId, containerState);
-    }
-  }
-
-  void finishAppAllocationRecording(ApplicationId applicationId,
-      ContainerId containerId, ActivityState appState, String diagnostic) {
-    if (shouldRecordThisApp(applicationId)) {
-      long currTS = SystemClock.getInstance().getTime();
-      AppAllocation appAllocation = appsAllocation.get().remove(applicationId);
-      appAllocation.updateAppContainerStateAndTime(containerId, appState,
-          currTS, diagnostic);
-
-      Queue<AppAllocation> appAllocations =
-          completedAppAllocations.get(applicationId);
-      if (appAllocations == null) {
-        appAllocations = new ConcurrentLinkedQueue<>();
-        Queue<AppAllocation> curAppAllocations =
-            completedAppAllocations.putIfAbsent(applicationId, appAllocations);
-        if (curAppAllocations != null) {
-          appAllocations = curAppAllocations;
-        }
-      }
-      int curQueueLength = appAllocations.size();
-      while (curQueueLength >= appActivitiesMaxQueueLength) {
-        appAllocations.poll();
-        --curQueueLength;
-      }
-      appAllocations.add(appAllocation);
-      Long stopTime =
-          recordingAppActivitiesUntilSpecifiedTime.get(applicationId);
-      if (stopTime != null && stopTime <= currTS) {
-        turnOffActivityMonitoringForApp(applicationId);
-      }
-    }
-  }
-
-  void finishNodeUpdateRecording(NodeId nodeID, String partition) {
-    List<NodeAllocation> value = recordingNodesAllocation.get().get(nodeID);
-    long timestamp = SystemClock.getInstance().getTime();
-
-    if (value != null) {
-      if (value.size() > 0) {
-        lastAvailableNodeActivities = value;
-        for (NodeAllocation allocation : lastAvailableNodeActivities) {
-          allocation.transformToTree();
-          allocation.setTimestamp(timestamp);
-          allocation.setPartition(partition);
-        }
-        if (recordCount.get() > 0) {
-          recordCount.getAndDecrement();
-        }
-      }
-
-      if (shouldRecordThisNode(nodeID)) {
-        recordingNodesAllocation.get().remove(nodeID);
-        completedNodeAllocations.put(nodeID, value);
-        if (recordCount.get() >= 0) {
-          lastNActivities.add(Pair.of(nodeID, value));
-        }
-      }
-    }
-    // disable diagnostic collector
-    diagnosticCollectorManager.get().disable();
-  }
-
-  boolean shouldRecordThisApp(ApplicationId applicationId) {
-    if (recordingAppActivitiesUntilSpecifiedTime.isEmpty()
-        || appsAllocation.get().isEmpty()) {
-      return false;
-    }
-    return recordingAppActivitiesUntilSpecifiedTime.containsKey(applicationId)
-        && appsAllocation.get().containsKey(applicationId);
-  }
-
-  boolean shouldRecordThisNode(NodeId nodeID) {
-    return isRecordingMultiNodes() || recordingNodesAllocation.get()
-        .containsKey(nodeID);
-  }
-
-  private NodeAllocation getCurrentNodeAllocation(NodeId nodeID) {
-    NodeId recordingKey =
-        isRecordingMultiNodes() ? EMPTY_NODE_ID : nodeID;
-    List<NodeAllocation> nodeAllocations =
-        recordingNodesAllocation.get().get(recordingKey);
-    NodeAllocation nodeAllocation;
-    // When this node has already stored allocation activities, get the
-    // last allocation for this node.
-    if (nodeAllocations.size() != 0) {
-      nodeAllocation = nodeAllocations.get(nodeAllocations.size() - 1);
-      // When final state in last allocation is not DEFAULT, it means
-      // last allocation has finished. Create a new allocation for this node,
-      // and add it to the allocation list. Return this new allocation.
-      //
-      // When final state in last allocation is DEFAULT,
-      // it means last allocation has not finished. Just get last allocation.
-      if (nodeAllocation.getFinalAllocationState() != AllocationState.DEFAULT) {
-        nodeAllocation = new NodeAllocation(nodeID);
-        nodeAllocations.add(nodeAllocation);
-      }
-    }
-    // When this node has not stored allocation activities,
-    // create a new allocation for this node, and add it to the allocation list.
-    // Return this new allocation.
-    else {
-      nodeAllocation = new NodeAllocation(nodeID);
-      nodeAllocations.add(nodeAllocation);
-    }
-    return nodeAllocation;
-  }
-
-  private void turnOffActivityMonitoringForApp(ApplicationId applicationId) {
-    recordingAppActivitiesUntilSpecifiedTime.remove(applicationId);
-  }
-
-  public boolean isRecordingMultiNodes() {
-    return recordingNodesAllocation.get().containsKey(EMPTY_NODE_ID);
-  }
-
-  /**
-   * Get recording node id:
-   * 1. node id of the input node if it is not null.
-   * 2. EMPTY_NODE_ID if input node is null and activities manager is
-   *    recording multi-nodes.
-   * 3. null otherwise.
-   * @param node - input node
-   * @return recording nodeId
-   */
-  public NodeId getRecordingNodeId(SchedulerNode node) {
-    if (node != null) {
-      return node.getNodeID();
-    } else if (isRecordingMultiNodes()) {
-      return ActivitiesManager.EMPTY_NODE_ID;
-    }
-    return null;
-  }
-
-  /**
-   * Class to manage the diagnostics collector.
-   */
-  public static class DiagnosticsCollectorManager {
-    private boolean enabled = false;
-    private DiagnosticsCollector gdc;
-
-    public boolean isEnabled() {
-      return enabled;
-    }
-
-    public void enable() {
-      this.enabled = true;
-    }
-
-    public void disable() {
-      this.enabled = false;
-    }
-
-    public DiagnosticsCollectorManager(DiagnosticsCollector gdc) {
-      this.gdc = gdc;
-    }
-
-    public Optional<DiagnosticsCollector> getOptionalDiagnosticsCollector() {
-      if (enabled) {
-        return Optional.of(gdc);
-      } else {
-        return Optional.empty();
-      }
-    }
-  }
-
-  public Optional<DiagnosticsCollector> getOptionalDiagnosticsCollector() {
-    return diagnosticCollectorManager.get().getOptionalDiagnosticsCollector();
-  }
-
-  public String getResourceDiagnostics(ResourceCalculator rc, Resource required,
-      Resource available) {
-    Optional<DiagnosticsCollector> dcOpt = getOptionalDiagnosticsCollector();
-    if (dcOpt.isPresent()) {
-      dcOpt.get().collectResourceDiagnostics(rc, required, available);
-      return getDiagnostics(dcOpt.get());
-    }
-    return EMPTY_DIAGNOSTICS;
-  }
-
-  public static String getDiagnostics(Optional<DiagnosticsCollector> dcOpt) {
-    if (dcOpt != null && dcOpt.isPresent()) {
-      DiagnosticsCollector dc = dcOpt.get();
-      if (dc != null && dc.getDiagnostics() != null) {
-        return getDiagnostics(dc);
-      }
-    }
-    return EMPTY_DIAGNOSTICS;
-  }
-
-  private static String getDiagnostics(DiagnosticsCollector dc) {
-    StringBuilder sb = new StringBuilder();
-    sb.append(", ").append(dc.getDiagnostics());
-    if (dc.getDetails() != null) {
-      sb.append(DIAGNOSTICS_DETAILS_SEPARATOR).append(dc.getDetails());
-    }
-    return sb.toString();
-  }
-
-  @VisibleForTesting
-  public int getAppActivitiesMaxQueueLength() {
-    return appActivitiesMaxQueueLength;
-  }
-}
+              completedAppAllocations

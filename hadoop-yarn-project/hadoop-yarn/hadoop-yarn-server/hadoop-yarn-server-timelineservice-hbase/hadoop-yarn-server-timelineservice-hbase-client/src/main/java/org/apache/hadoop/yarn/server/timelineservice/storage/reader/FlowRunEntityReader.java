@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -58,8 +59,7 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.flow.FlowRunTableRW
 import org.apache.hadoop.yarn.webapp.BadRequestException;
 
 /**
- * Timeline entity reader for flow run entities that are stored in the flow run
- * table.
+ * 存储在Flow Run表中的流程运行实体时间线读取器，负责从HBase Flow Run表查询并解析流程运行实体数据。
  */
 class FlowRunEntityReader extends TimelineEntityReader {
   private static final FlowRunTableRW FLOW_RUN_TABLE = new FlowRunTableRW();
@@ -75,7 +75,7 @@ class FlowRunEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Uses the {@link FlowRunTableRW}.
+   * 获取Flow Run表读写器实例。
    */
   @Override
   protected BaseTableRW<?> getTable() {
@@ -84,26 +84,33 @@ class FlowRunEntityReader extends TimelineEntityReader {
 
   @Override
   protected void validateParams() {
+    // 校验上下文对象非空
     if (getContext() == null) {
       throw new NullPointerException("context shouldn't be null");
     }
+    // 校验待获取数据描述对象非空
     if (getDataToRetrieve() == null) {
       throw new NullPointerException("data to retrieve shouldn't be null");
     }
+    // 校验集群ID非空
     if (getContext().getClusterId() == null) {
       throw new NullPointerException("clusterId shouldn't be null");
     }
+    // 校验用户ID非空
     if (getContext().getUserId() == null) {
       throw new NullPointerException("userId shouldn't be null");
     }
+    // 校验流程名称非空
     if (getContext().getFlowName() == null) {
       throw new NullPointerException("flowName shouldn't be null");
     }
+    // 单实体查询时，校验流程运行ID非空
     if (isSingleEntityRead()) {
       if (getContext().getFlowRunId() == null) {
         throw new NullPointerException("flowRunId shouldn't be null");
       }
     }
+    // 批量查询时校验字段合法性，批量查询只允许获取全部字段或指标
     EnumSet<Field> fieldsToRetrieve = getDataToRetrieve().getFieldsToRetrieve();
     if (!isSingleEntityRead() && fieldsToRetrieve != null) {
       for (Field field : fieldsToRetrieve) {
@@ -117,8 +124,9 @@ class FlowRunEntityReader extends TimelineEntityReader {
 
   @Override
   protected void augmentParams(Configuration hbaseConf, Connection conn) {
-    // Add metrics to fields to retrieve if metricsToRetrieve is specified.
+    // 根据配置和待获取指标列表，补充需要获取的字段
     getDataToRetrieve().addFieldsBasedOnConfsAndMetricsToRetrieve();
+    // 批量查询时初始化过滤器
     if (!isSingleEntityRead()) {
       createFiltersIfNull();
     }
@@ -126,7 +134,7 @@ class FlowRunEntityReader extends TimelineEntityReader {
 
   protected FilterList constructFilterListBasedOnFilters() throws IOException {
     FilterList listBasedOnFilters = new FilterList();
-    // Filter based on created time range.
+    // 根据创建时间范围添加过滤条件
     Long createdTimeBegin = getFilters().getCreatedTimeBegin();
     Long createdTimeEnd = getFilters().getCreatedTimeEnd();
     if (createdTimeBegin != 0 || createdTimeEnd != Long.MAX_VALUE) {
@@ -134,7 +142,7 @@ class FlowRunEntityReader extends TimelineEntityReader {
           .createSingleColValueFiltersByRange(FlowRunColumn.MIN_START_TIME,
               createdTimeBegin, createdTimeEnd));
     }
-    // Filter based on metric filters.
+    // 根据指标过滤器添加过滤条件
     TimelineFilterList metricFilters = getFilters().getMetricFilters();
     if (metricFilters != null && !metricFilters.getFilterList().isEmpty()) {
       listBasedOnFilters.addFilter(TimelineFilterUtils.createHBaseFilterList(
@@ -144,10 +152,9 @@ class FlowRunEntityReader extends TimelineEntityReader {
   }
 
   /**
-   * Add {@link QualifierFilter} filters to filter list for each column of flow
-   * run table.
+   * 为Flow Run表固定列添加Qualifier过滤条件，只保留预设的固定列。
    *
-   * @return filter list to which qualifier filters have been added.
+   * @return 添加了固定列过滤条件的过滤器列表
    */
   private FilterList updateFixedColumns() {
     FilterList columnsList = new FilterList(Operator.MUST_PASS_ONE);
@@ -162,14 +169,12 @@ class FlowRunEntityReader extends TimelineEntityReader {
   protected FilterList constructFilterListBasedOnFields(
       Set<String> cfsInFields) throws IOException {
     FilterList list = new FilterList(Operator.MUST_PASS_ONE);
-    // By default fetch everything in INFO column family.
+    // 构造INFO列簇过滤条件，默认只读取INFO列簇
     FamilyFilter infoColumnFamily =
         new FamilyFilter(CompareOp.EQUAL, new BinaryComparator(
             FlowRunColumnFamily.INFO.getBytes()));
     TimelineDataToRetrieve dataToRetrieve = getDataToRetrieve();
-    // If multiple entities have to be retrieved, check if metrics have to be
-    // retrieved and if not, add a filter so that metrics can be excluded.
-    // Metrics are always returned if we are reading a single entity.
+    // 批量查询且不需要获取指标时，过滤掉所有指标列
     if (!isSingleEntityRead()
         && !hasField(dataToRetrieve.getFieldsToRetrieve(), Field.METRICS)) {
       FilterList infoColFamilyList = new FilterList(Operator.MUST_PASS_ONE);
@@ -180,11 +185,7 @@ class FlowRunEntityReader extends TimelineEntityReader {
               .getColumnPrefixBytes(""))));
       list.addFilter(infoColFamilyList);
     } else {
-      // Check if metricsToRetrieve are specified and if they are, create a
-      // filter list for info column family by adding flow run tables columns
-      // and a list for metrics to retrieve. Pls note that fieldsToRetrieve
-      // will have METRICS added to it if metricsToRetrieve are specified
-      // (in augmentParams()).
+      // 需要获取指标时，根据指定的指标列表过滤
       TimelineFilterList metricsToRetrieve =
           dataToRetrieve.getMetricsToRetrieve();
       if (metricsToRetrieve != null
@@ -192,7 +193,9 @@ class FlowRunEntityReader extends TimelineEntityReader {
         FilterList infoColFamilyList = new FilterList();
         infoColFamilyList.addFilter(infoColumnFamily);
         cfsInFields.add(Bytes.toString(FlowRunColumnFamily.INFO.getBytes()));
+        // 添加固定列过滤条件
         FilterList columnsList = updateFixedColumns();
+        // 添加指定指标的过滤条件
         columnsList.addFilter(TimelineFilterUtils.createHBaseFilterList(
             FlowRunColumnPrefix.METRIC, metricsToRetrieve));
         infoColFamilyList.addFilter(columnsList);
@@ -206,15 +209,18 @@ class FlowRunEntityReader extends TimelineEntityReader {
   protected Result getResult(Configuration hbaseConf, Connection conn,
       FilterList filterList) throws IOException {
     TimelineReaderContext context = getContext();
+    // 构造单实体查询行键
     FlowRunRowKey flowRunRowKey =
         new FlowRunRowKey(context.getClusterId(), context.getUserId(),
             context.getFlowName(), context.getFlowRunId());
     byte[] rowKey = flowRunRowKey.getRowKey();
     Get get = new Get(rowKey);
+    // 获取所有版本的数据
     get.setMaxVersions(Integer.MAX_VALUE);
     if (filterList != null && !filterList.getFilters().isEmpty()) {
       get.setFilter(filterList);
     }
+    // 执行Get查询返回结果
     return getTable().getResult(hbaseConf, conn, get);
   }
 
@@ -224,11 +230,13 @@ class FlowRunEntityReader extends TimelineEntityReader {
     Scan scan = new Scan();
     TimelineReaderContext context = getContext();
     RowKeyPrefix<FlowRunRowKey> flowRunRowKeyPrefix = null;
+    // 未指定起始ID时，按行键前缀扫描所有符合条件的流程运行
     if (getFilters().getFromId() == null) {
       flowRunRowKeyPrefix = new FlowRunRowKeyPrefix(context.getClusterId(),
           context.getUserId(), context.getFlowName());
       scan.setRowPrefixFilter(flowRunRowKeyPrefix.getRowKeyPrefix());
     } else {
+      // 解析起始ID行键
       FlowRunRowKey flowRunRowKey = null;
       try {
         flowRunRowKey =
@@ -236,70 +244,74 @@ class FlowRunEntityReader extends TimelineEntityReader {
       } catch (IllegalArgumentException e) {
         throw new BadRequestException("Invalid filter fromid is provided.");
       }
+      // 校验起始ID所属集群与查询集群一致
       if (!context.getClusterId().equals(flowRunRowKey.getClusterId())) {
         throw new BadRequestException(
             "fromid doesn't belong to clusterId=" + context.getClusterId());
       }
-      // set start row
+      // 设置扫描起始行
       scan.withStartRow(flowRunRowKey.getRowKey());
 
-      // get the bytes for stop row
+      // 构造同前缀下的结束行键
       flowRunRowKeyPrefix = new FlowRunRowKeyPrefix(context.getClusterId(),
           context.getUserId(), context.getFlowName());
 
-      // set stop row
+      // 设置扫描结束行，保证只扫描当前前缀范围内的行
       scan.withStopRow(
           HBaseTimelineStorageUtils.calculateTheClosestNextRowKeyForPrefix(
               flowRunRowKeyPrefix.getRowKeyPrefix()));
     }
 
     FilterList newList = new FilterList();
+    // 添加分页过滤器，限制返回结果数量
     newList.addFilter(new PageFilter(getFilters().getLimit()));
     if (filterList != null && !filterList.getFilters().isEmpty()) {
       newList.addFilter(filterList);
     }
     scan.setFilter(newList);
+    // 获取所有版本的数据
     scan.setMaxVersions(Integer.MAX_VALUE);
+    // 执行Scan查询返回结果扫描器
     return getTable().getResultScanner(hbaseConf, conn, scan);
   }
 
   @Override
   protected TimelineEntity parseEntity(Result result) throws IOException {
     FlowRunEntity flowRun = new FlowRunEntity();
+    // 从结果行键解析Flow Run元数据
     FlowRunRowKey rowKey = FlowRunRowKey.parseRowKey(result.getRow());
     flowRun.setRunId(rowKey.getFlowRunId());
     flowRun.setUser(rowKey.getUserId());
     flowRun.setName(rowKey.getFlowName());
 
-    // read the start time
+    // 读取并设置流程启动时间
     Long startTime = (Long) ColumnRWHelper.readResult(result,
         FlowRunColumn.MIN_START_TIME);
     if (startTime != null) {
       flowRun.setStartTime(startTime.longValue());
     }
 
-    // read the end time if available
+    // 读取并设置流程最大结束时间
     Long endTime = (Long) ColumnRWHelper.readResult(result,
         FlowRunColumn.MAX_END_TIME);
     if (endTime != null) {
       flowRun.setMaxEndTime(endTime.longValue());
     }
 
-    // read the flow version
+    // 读取并设置流程版本
     String version = (String) ColumnRWHelper.readResult(result,
         FlowRunColumn.FLOW_VERSION);
     if (version != null) {
       flowRun.setVersion(version);
     }
 
-    // read metrics if its a single entity query or if METRICS are part of
-    // fieldsToRetrieve.
+    // 单实体查询或需要获取指标时，读取指标数据
     if (isSingleEntityRead()
         || hasField(getDataToRetrieve().getFieldsToRetrieve(), Field.METRICS)) {
       readMetrics(flowRun, result, FlowRunColumnPrefix.METRIC);
     }
 
-    // set the id
+    // 设置实体ID和分页起始键
     flowRun.setId(flowRun.getId());
     flowRun.getInfo().put(TimelineReaderUtils.FROMID_KEY,
         rowKey.getRowKeyAsString());

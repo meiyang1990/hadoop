@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -26,35 +27,52 @@ import org.apache.hadoop.yarn.server.federation.store.records.GetSubClusterPolic
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of
- * {@link GetSubClusterPolicyConfigurationRequest}.
+ * 文件说明: YARN联邦环境下，获取子集群策略配置请求的Protobuf序列化实现类
+ * 基于Protocol Buffer实现{@link GetSubClusterPolicyConfigurationRequest}接口。
  */
 @Private
 @Unstable
 public class GetSubClusterPolicyConfigurationRequestPBImpl
     extends GetSubClusterPolicyConfigurationRequest {
 
+  // Protobuf默认实例对象
   private GetSubClusterPolicyConfigurationRequestProto proto =
       GetSubClusterPolicyConfigurationRequestProto.getDefaultInstance();
+  // Protobuf构建器，用于修改请求内容
   private GetSubClusterPolicyConfigurationRequestProto.Builder builder = null;
+  // 当前是否使用已有proto实例标记
   private boolean viaProto = false;
 
+  /**
+   * 无参构造函数，初始化Protobuf构建器。
+   */
   public GetSubClusterPolicyConfigurationRequestPBImpl() {
     builder = GetSubClusterPolicyConfigurationRequestProto.newBuilder();
   }
 
+  /**
+   * 通过已有Protobuf对象构造请求实例。
+   * @param proto 已有的Protobuf请求对象
+   */
   public GetSubClusterPolicyConfigurationRequestPBImpl(
       GetSubClusterPolicyConfigurationRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求对应的Protobuf对象，转换完成后切换为只读模式。
+   * @return 序列化完成的Protobuf请求对象
+   */
   public GetSubClusterPolicyConfigurationRequestProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
   }
 
+  /**
+   * 初始化构建器，如果当前基于已有proto则复制proto内容到构建器，切换为可写模式。
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = GetSubClusterPolicyConfigurationRequestProto.newBuilder(proto);

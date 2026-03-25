@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,7 @@
  */
 
 /**
- * This package contains the web data access objects (DAO) for the RM.
+ * YARN ResourceManager Web UI 数据访问对象(DAO)包，提供Web页面所需的资源数据封装与访问能力
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

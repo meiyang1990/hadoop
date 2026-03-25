@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -51,9 +52,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The top-level server for the per-node timeline collector manager. Currently
- * it is defined as an auxiliary service to accommodate running within another
- * daemon (e.g. node manager).
+ * 每个节点上时间线采集器管理器的顶级服务，当前作为YARN NodeManager的辅助服务运行，
+ * 负责管理本节点上各个应用的时间线采集器生命周期。
  */
 @Private
 @Unstable
@@ -65,9 +65,11 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
   private final NodeTimelineCollectorManager collectorManager;
   private long collectorLingerPeriod;
   private ScheduledExecutorService scheduler;
+  /** 记录每个应用对应的AM容器集合，用于处理多尝试场景下延迟删除 */
   private Map<ApplicationId, Set<ContainerId>> appIdToContainerId =
       new ConcurrentHashMap<>();
 
+  /** 默认构造函数 */
   public PerNodeTimelineCollectorsAuxService() {
     this(new NodeTimelineCollectorManager(true));
   }
@@ -80,6 +82,7 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 检查V2时间线服务是否启用，未启用则抛出异常提示移除该辅助服务
     if (!YarnConfiguration.timelineServiceV2Enabled(conf)) {
       throw new YarnException(
           "Looks like timeline_collector is set as an auxillary service in "
@@ -88,9 +91,11 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
               + " so timeline_collector needs to be removed"
               + " from that list of auxillary services.");
     }
+    // 读取配置获取采集器延迟删除时间
     collectorLingerPeriod =
         conf.getLong(YarnConfiguration.ATS_APP_COLLECTOR_LINGER_PERIOD_IN_MS,
             YarnConfiguration.DEFAULT_ATS_APP_COLLECTOR_LINGER_PERIOD_IN_MS);
+    // 创建单线程定时调度器，用于延迟删除应用采集器
     scheduler = Executors.newSingleThreadScheduledExecutor();
     collectorManager.init(conf);
     super.serviceInit(conf);
@@ -104,6 +109,7 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
 
   @Override
   protected void serviceStop() throws Exception {
+    // 关闭调度器，等待延迟任务完成
     scheduler.shutdown();
     if (!scheduler.awaitTermination(collectorLingerPeriod,
         TimeUnit.MILLISECONDS)) {
@@ -117,13 +123,11 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
   // these methods can be used as the basis for future service methods if the
   // per-node collector runs separate from the node manager
   /**
-   * Creates and adds an app level collector for the specified application id.
-   * The collector is also initialized and started. If the service already
-   * exists, no new service is created.
+   * 添加应用级采集器，不存在才创建。初始化并启动采集器，已存在则不操作。
    *
-   * @param appId Application Id to be added.
-   * @param user Application Master container user.
-   * @return whether it was added successfully
+   * @param appId 应用ID
+   * @param user AM容器对应用户
+   * @return 是否成功添加
    */
   public boolean addApplicationIfAbsent(ApplicationId appId, String user) {
     AppLevelTimelineCollector collector =
@@ -133,26 +137,21 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
   }
 
   /**
-   * Removes the app level collector for the specified application id. The
-   * collector is also stopped as a result. If the collector does not exist, no
-   * change is made.
+   * 删除应用级采集器，停止采集器，不存在则不操作。
    *
-   * @param appId Application Id to be removed.
-   * @return whether it was removed successfully
+   * @param appId 待删除应用ID
+   * @return 是否成功删除
    */
   public boolean removeApplication(ApplicationId appId) {
     return collectorManager.remove(appId);
   }
 
   /**
-   * Creates and adds an app level collector for the specified application id.
-   * The collector is also initialized and started. If the collector already
-   * exists, no new collector is created.
+   * 容器初始化回调，拦截AM容器创建事件，初始化应用级采集器。
    */
   @Override
   public void initializeContainer(ContainerInitializationContext context) {
-    // intercept the event of the AM container being created and initialize the
-    // app level collector service
+    // 仅处理AM容器初始化事件
     if (context.getContainerType() == ContainerType.APPLICATION_MASTER) {
       ApplicationId appId = context.getContainerId().
           getApplicationAttemptId().getApplicationId();
@@ -162,23 +161,23 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
           masterContainers = new HashSet<>();
           appIdToContainerId.put(appId, masterContainers);
         }
+        // 将当前AM容器加入集合
         masterContainers.add(context.getContainerId());
       }
+      // 添加应用采集器
       addApplicationIfAbsent(appId, context.getUser());
     }
   }
 
   /**
-   * Removes the app level collector for the specified application id. The
-   * collector is also stopped as a result. If the collector does not exist, no
-   * change is made.
+   * 容器停止回调，拦截AM容器停止事件，延迟删除应用级采集器。
    */
   @Override
   public void stopContainer(ContainerTerminationContext context) {
-    // intercept the event of the AM container being stopped and remove the app
-    // level collector service
+    // 仅处理AM容器停止事件
     if (context.getContainerType() == ContainerType.APPLICATION_MASTER) {
       final ContainerId containerId = context.getContainerId();
+      // 触发应用采集器删除流程
       removeApplicationCollector(containerId);
     }
   }
@@ -187,6 +186,7 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
   protected Future removeApplicationCollector(final ContainerId containerId) {
     final ApplicationId appId =
         containerId.getApplicationAttemptId().getApplicationId();
+    // 延迟指定时间后执行删除，应对AM快速重启场景
     return scheduler.schedule(new Runnable() {
       public void run() {
         boolean shouldRemoveApplication = false;
@@ -197,9 +197,10 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
                 + " is called before initializing container.", containerId);
             return;
           }
+          // 移除已停止的容器
           masterContainers.remove(containerId);
+          // 当该应用没有剩余AM容器时，才删除整个应用采集器
           if (masterContainers.size() == 0) {
-            // remove only if it is last master container
             shouldRemoveApplication = true;
             appIdToContainerId.remove(appId);
           }
@@ -236,18 +237,23 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
   public static PerNodeTimelineCollectorsAuxService
       launchServer(String[] args, NodeTimelineCollectorManager collectorManager,
       Configuration conf) {
+    // 设置默认未捕获异常处理器
     Thread
       .setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
+    // 打印启动信息日志
     StringUtils.startupShutdownMessage(
         PerNodeTimelineCollectorsAuxService.class, args, LOG);
     PerNodeTimelineCollectorsAuxService auxService = null;
     try {
+      // 创建服务实例
       auxService = collectorManager == null ?
           new PerNodeTimelineCollectorsAuxService(
               new NodeTimelineCollectorManager(false)) :
           new PerNodeTimelineCollectorsAuxService(collectorManager);
+      // 注册关闭钩子
       ShutdownHookManager.get().addShutdownHook(new ShutdownHook(auxService),
           SHUTDOWN_HOOK_PRIORITY);
+      // 初始化并启动服务
       auxService.init(conf);
       auxService.start();
     } catch (Throwable t) {
@@ -257,6 +263,7 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
     return auxService;
   }
 
+  /** 服务关闭钩子，JVM退出时停止服务 */
   private static class ShutdownHook implements Runnable {
     private final PerNodeTimelineCollectorsAuxService auxService;
 
@@ -269,6 +276,7 @@ public class PerNodeTimelineCollectorsAuxService extends AuxiliaryService {
     }
   }
 
+  /** 独立启动服务入口 */
   public static void main(String[] args) {
     Configuration conf = new YarnConfiguration();
     conf.setBoolean(YarnConfiguration.TIMELINE_SERVICE_ENABLED, true);

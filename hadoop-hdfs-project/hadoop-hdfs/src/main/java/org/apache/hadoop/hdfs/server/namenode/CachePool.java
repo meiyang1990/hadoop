@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,13 +36,9 @@ import org.apache.hadoop.util.IntrusiveCollection;
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * A CachePool describes a set of cache resources being managed by the NameNode.
- * User caching requests are billed to the cache pool specified in the request.
- *
- * This is an internal class, only used on the NameNode.  For identifying or
- * describing a cache pool to clients, please use CachePoolInfo.
- * 
- * CachePools must be accessed under the FSNamesystem lock.
+ * HDFS缓存池，用于在NameNode端管理一组缓存资源，用户的缓存请求会被计费到请求指定的缓存池。
+ * 该类是NameNode内部使用类，对外暴露缓存池信息使用CachePoolInfo。
+ * 所有访问必须在FSNamesystem锁下进行。
  */
 @InterfaceAudience.Private
 public final class CachePool {
@@ -55,29 +52,26 @@ public final class CachePool {
   private String groupName;
   
   /**
-   * Cache pool permissions.
-   * 
-   * READ permission means that you can list the cache directives in this pool.
-   * WRITE permission means that you can add, remove, or modify cache directives
-   *       in this pool.
-   * EXECUTE permission is unused.
+   * 缓存池权限：
+   * READ权限：允许列出缓存池中的缓存指令
+   * WRITE权限：允许添加、删除、修改缓存池中的缓存指令
+   * EXECUTE权限：未使用
    */
   @Nonnull
   private FsPermission mode;
 
   /**
-   * Maximum number of bytes that can be cached in this pool.
+   * 缓存池最大可缓存字节数限制
    */
   private long limit;
 
   /**
-   * Default replication num for CacheDirective in this pool.
+   * 缓存池中缓存指令的默认副本数
    */
   private short defaultReplication;
 
   /**
-   * Maximum duration that a CacheDirective in this pool remains valid,
-   * in milliseconds.
+   * 缓存池中缓存指令的最大有效时长，单位毫秒
    */
   private long maxRelativeExpiryMs;
 
@@ -86,6 +80,9 @@ public final class CachePool {
   private long filesNeeded;
   private long filesCached;
 
+  /**
+   * 缓存指令集合，用于管理当前缓存池中的所有缓存指令
+   */
   public final static class DirectiveList
       extends IntrusiveCollection<CacheDirective> {
     private final CachePool cachePool;
@@ -103,9 +100,10 @@ public final class CachePool {
   private final DirectiveList directiveList = new DirectiveList(this);
 
   /**
-   * Create a new cache pool based on a CachePoolInfo object and the defaults.
-   * We will fill in information that was not supplied according to the
-   * defaults.
+   * 根据CachePoolInfo和默认值创建新缓存池，未填写的字段自动填充默认值
+   * @param info 缓存池信息
+   * @return 创建好的缓存池实例
+   * @throws IOException 获取当前用户信息失败时抛出
    */
   static CachePool createFromInfoAndDefaults(CachePoolInfo info)
       throws IOException {
@@ -138,8 +136,9 @@ public final class CachePool {
   }
 
   /**
-   * Create a new cache pool based on a CachePoolInfo object.
-   * No fields in the CachePoolInfo can be blank.
+   * 根据完整的CachePoolInfo创建新缓存池，要求所有字段都已填写
+   * @param info 完整的缓存池信息
+   * @return 创建好的缓存池实例
    */
   static CachePool createFromInfo(CachePoolInfo info) {
     return new CachePool(info.getPoolName(),
@@ -148,6 +147,16 @@ public final class CachePool {
         info.getDefaultReplication(), info.getMaxRelativeExpiryMs());
   }
 
+  /**
+   * 构造缓存池实例
+   * @param poolName 缓存池名称
+   * @param ownerName 所有者用户名
+   * @param groupName 所有者用户组
+   * @param mode 权限模式
+   * @param limit 缓存大小限制
+   * @param defaultReplication 默认缓存副本数
+   * @param maxRelativeExpiry 最大缓存有效时长
+   */
   CachePool(String poolName, String ownerName, String groupName,
       FsPermission mode, long limit,
       short defaultReplication, long maxRelativeExpiry) {
@@ -222,13 +231,9 @@ public final class CachePool {
   }
 
   /**
-   * Get either full or partial information about this CachePool.
-   *
-   * @param fullInfo
-   *          If true, only the name will be returned (i.e., what you 
-   *          would get if you didn't have read permission for this pool.)
-   * @return
-   *          Cache pool information.
+   * 获取缓存池信息，可选择返回完整信息或仅名称
+   * @param fullInfo 是否返回完整信息
+   * @return 缓存池信息对象
    */
   CachePoolInfo getInfo(boolean fullInfo) {
     CachePoolInfo info = new CachePoolInfo(poolName);
@@ -244,7 +249,7 @@ public final class CachePool {
   }
 
   /**
-   * Resets statistics related to this CachePool
+   * 重置缓存池的统计信息
    */
   public void resetStatistics() {
     bytesNeeded = 0;
@@ -290,9 +295,8 @@ public final class CachePool {
   }
 
   /**
-   * Get statistics about this CachePool.
-   *
-   * @return   Cache pool statistics.
+   * 获取缓存池的统计信息
+   * @return 缓存池统计对象
    */
   private CachePoolStats getStats() {
     return new CachePoolStats.Builder().
@@ -305,13 +309,9 @@ public final class CachePool {
   }
 
   /**
-   * Returns a CachePoolInfo describing this CachePool based on the permissions
-   * of the calling user. Unprivileged users will see only minimal descriptive
-   * information about the pool.
-   * 
-   * @param pc Permission checker to be used to validate the user's permissions,
-   *          or null
-   * @return CachePoolEntry describing this CachePool
+   * 根据调用用户权限获取缓存池条目，无权限用户只能看到基础信息
+   * @param pc 权限检查器，可为null
+   * @return 缓存池条目，包含信息和统计
    */
   public CachePoolEntry getEntry(FSPermissionChecker pc) {
     boolean hasPermission = true;

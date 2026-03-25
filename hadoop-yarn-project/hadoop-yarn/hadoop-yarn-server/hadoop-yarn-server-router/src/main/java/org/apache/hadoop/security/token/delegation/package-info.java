@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,5 +17,8 @@
  * limitations under the License.
  */
 
-/** Router security token delegation. **/
+/**
+ * YARN Router 委托令牌安全模块包。
+ * 提供YARN联邦场景下Router代理转发委托令牌的相关能力，支持跨RM的身份认证与权限校验。
+ */
 package org.apache.hadoop.security.token.delegation;

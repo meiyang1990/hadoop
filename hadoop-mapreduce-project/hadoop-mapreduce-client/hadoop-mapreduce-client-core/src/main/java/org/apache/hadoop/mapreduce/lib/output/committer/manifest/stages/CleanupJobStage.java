@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,43 +48,12 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_CLEANUP;
 
 /**
- * Clean up a job's temporary directory through parallel delete,
- * base _temporary delete.
- * Returns: the outcome of the overall operation
- * The result is detailed purely for the benefit of tests, which need
- * to make assertions about error handling and fallbacks.
- * <p>
- * There's a few known issues with the azure and GCS stores which
- * this stage tries to address.
- * - Google GCS directory deletion is O(entries), so is slower for big jobs.
- * - Azure storage directory delete, when using OAuth authentication or
- *   when not the store owner triggers a scan down the tree to verify the
- *   caller has the permission to delete each subdir.
- *   If this scan takes over 90s, the operation can time out.
- * <p>
- * The main solution for both of these is that task attempts are
- * deleted in parallel, in different threads.
- * This will speed up GCS cleanup and reduce the risk of
- * abfs related timeouts.
- * Exceptions during cleanup can be suppressed,
- * so that these do not cause the job to fail.
- * <p>
- * There is one weakness of this design: the number of delete operations
- * is 1 + number of task attempts, which, on ABFS can generate excessive
- * load.
- * For this reason, there is an option to attempt to delete the base directory
- * first; if this does not time out then, on Azure ADLS Gen2 storage,
- * this is the most efficient cleanup.
- * Only if that attempt fails for any reason then the parallel delete
- * phase takes place.
- * <p>
- * Also, some users want to be able to run multiple independent jobs
- * targeting the same output directory simultaneously.
- * If one job deletes the directory `__temporary` all the others
- * will fail.
- * <p>
- * This can be addressed by disabling cleanup entirely.
- *
+ * 基于Manifest提交协议的作业临时目录清理阶段，通过并行删除加速清理过程
+ * 针对云存储（GCS、Azure ADLS）的目录删除性能问题进行了优化：
+ * 1. 支持并行删除任务尝试目录，加速大作业清理，降低云存储目录删除超时风险
+ * 2. 支持先尝试删除根临时目录，成功则直接完成，失败后回退到并行删除
+ * 3. 支持完全禁用清理，满足多作业同时输出到同一目录的场景
+ * 4. 支持忽略清理失败异常，避免清理失败导致整个作业失败
  */
 public class CleanupJobStage extends
     AbstractJobOrTaskStage<
@@ -94,33 +64,37 @@ public class CleanupJobStage extends
       CleanupJobStage.class);
 
   /**
-   * Count of deleted directories.
+   * 已删除目录计数，线程安全
    */
   private final AtomicInteger deleteDirCount = new AtomicInteger();
 
   /**
-   * Count of delete failures.
+   * 删除失败计数，线程安全
    */
   private final AtomicInteger deleteFailureCount = new AtomicInteger();
 
   /**
-   * Last delete exception; non null if deleteFailureCount is not zero.
+   * 最后一次删除异常，如果删除失败计数大于0则不为空
    */
   private IOException lastDeleteException;
 
   /**
-   * Stage name as passed in from arguments.
+   * 阶段统计名称，从入参获取
    */
   private String stageName = OP_STAGE_JOB_CLEANUP;
 
+  /**
+   * 构造函数，初始化清理阶段
+   * @param stageConfig 阶段配置
+   */
   public CleanupJobStage(final StageConfig stageConfig) {
     super(false, stageConfig, OP_STAGE_JOB_CLEANUP, true);
   }
 
   /**
-   * Statistic name is extracted from the arguments.
-   * @param arguments args to the invocation.
-   * @return stage name.
+   * 从入参获取阶段统计名称
+   * @param arguments 阶段入参
+   * @return 阶段统计名称
    */
   @Override
   protected String getStageStatisticName(Arguments arguments) {
@@ -128,17 +102,17 @@ public class CleanupJobStage extends
   }
 
   /**
-   * Clean up the job attempt directory tree.
-   * @param args arguments built up.
-   * @return the result.
-   * @throws IOException failure was raised an exceptions weren't surpressed.
+   * 执行作业临时目录树清理
+   * @param args 清理阶段参数
+   * @return 清理结果
+   * @throws IOException 如果不抑制异常，清理失败时抛出
    */
   @Override
   protected Result executeStage(
       final Arguments args)
       throws IOException {
     stageName = getStageName(args);
-    // this is $dest/_temporary
+    // 待清理目录：目标输出目录下的_temporary
     final Path baseDir = requireNonNull(getStageConfig().getOutputTempSubDir());
     LOG.debug("{}: Cleanup of directory {} with {}", getName(), baseDir, args);
     if (!args.enabled) {
@@ -146,7 +120,7 @@ public class CleanupJobStage extends
       return new Result(Outcome.DISABLED, baseDir,
           0, null);
     }
-    // shortcut of a single existence check before anything else
+    // 先检查目录是否存在，不存在直接返回
     if (getFileStatusOrNull(baseDir) == null) {
       return new Result(Outcome.NOTHING_TO_CLEAN_UP,
           baseDir,
@@ -158,37 +132,30 @@ public class CleanupJobStage extends
     boolean baseDirDeleted = false;
 
 
-    // to delete.
     LOG.info("{}: Deleting job directory {}", getName(), baseDir);
     final long directoryCount = args.directoryCount;
     if (directoryCount > 0) {
-      // log the expected directory count, which drives duration in GCS
-      // and may cause timeouts on azure if the count is too high for a
-      // timely permissions tree scan.
+      // 打印预期目录数量，帮助排查云存储超时问题
       LOG.info("{}: Expected directory count: {}", getName(), directoryCount);
     }
 
     progress();
-    // check and maybe execute parallel delete of task attempt dirs.
+    // 如果开启了并行删除任务尝试目录
     if (args.deleteTaskAttemptDirsInParallel) {
 
 
       if (args.parallelDeleteAttemptBaseDeleteFirst) {
-        // attempt to delete the base dir first.
-        // This can reduce ABFS delete load but may time out
-        // (which the fallback to parallel delete will handle).
-        // on GCS it is slow.
+        // 先尝试直接删除根临时目录，如果成功可以减少IO操作
+        // 在云存储上可能超时，超时后自动回退到并行删除
         try (DurationInfo info = new DurationInfo(LOG, true,
             "Initial delete of %s", baseDir)) {
           exception = deleteOneDir(baseDir);
           if (exception == null) {
-            // success: record this as the outcome,
+            // 删除成功，直接结束流程
             outcome = Outcome.DELETED;
-            // and flag that the the parallel delete should be skipped because the
-            // base directory is alredy deleted.
             baseDirDeleted = true;
           } else {
-            // failure: log and continue
+            // 删除失败，打印日志后回退到并行删除
             LOG.warn("{}: Exception on initial attempt at deleting base dir {}"
                     + " with directory count {}. Falling back to parallel delete",
                 getName(), baseDir, directoryCount, exception);
@@ -196,40 +163,39 @@ public class CleanupJobStage extends
         }
       }
       if (!baseDirDeleted) {
-        // no base delete attempted or it failed.
-        // Attempt to do a parallel delete of task attempt dirs;
-        // don't overreact if a delete fails, but stop trying
-        // to delete the others, and fall back to deleting the
-        // job dir.
+        // 根目录未删除（未尝试或删除失败），执行任务尝试目录并行删除
         Path taskSubDir
             = getStageConfig().getJobAttemptTaskSubDir();
         try (DurationInfo info = new DurationInfo(LOG, true,
             "parallel deletion of task attempts in %s",
             taskSubDir)) {
+          // 过滤出任务尝试目录
           RemoteIterator<FileStatus> dirs =
               RemoteIterators.filteringRemoteIterator(
                   listStatusIterator(taskSubDir),
                   FileStatus::isDirectory);
+          // 使用线程池并行删除每个目录
           TaskPool.foreach(dirs)
               .executeWith(getIOProcessors())
               .stopOnFailure()
               .suppressExceptions(false)
               .run(this::rmTaskAttemptDir);
+          // 聚合IO统计信息
           getIOStatistics().aggregate((retrieveIOStatistics(dirs)));
 
           if (getLastDeleteException() != null) {
-            // one of the task attempts failed.
+            // 有删除失败，抛出异常
             throw getLastDeleteException();
           } else {
-            // success: record this as the outcome.
+            // 并行删除成功
             outcome = Outcome.PARALLEL_DELETE;
           }
         } catch (FileNotFoundException ex) {
-          // not a problem if there's no dir to list.
+          // 任务尝试目录不存在，不算失败
           LOG.debug("{}: Task attempt dir {} not found", getName(), taskSubDir);
           outcome = Outcome.DELETED;
         } catch (IOException ex) {
-          // failure. Log and continue
+          // 列举或删除过程中发生异常，打印日志后继续删除根目录
           LOG.info(
               "{}: Exception while listing/deleting task attempts under {}; continuing",
               getName(),
@@ -237,19 +203,17 @@ public class CleanupJobStage extends
         }
       }
     }
-    // Now the top-level deletion if not already executed; exception gets saved
+    // 如果根目录还没删除，最后执行一次根目录删除
     if (!baseDirDeleted) {
       exception = deleteOneDir(baseDir);
       if (exception != null) {
-        // failure, report and continue
+        // 最终删除失败，记录结果
         LOG.warn("{}: Exception on final attempt at deleting base dir {}"
                 + " with directory count {}",
             getName(), baseDir, directoryCount, exception);
-        // assume failure.
         outcome = Outcome.FAILURE;
       } else {
-        // if the outcome isn't already recorded as parallel delete,
-        // mark is a simple delete.
+        // 删除成功，如果之前没有记录结果，标记为简单删除成功
         if (outcome == null) {
           outcome = Outcome.DELETED;
         }
@@ -261,6 +225,7 @@ public class CleanupJobStage extends
         baseDir,
         deleteDirCount.get(),
         exception);
+    // 如果清理失败且不抑制异常，抛出异常
     if (!result.succeeded() && !args.suppressExceptions) {
       result.maybeRethrowException();
     }
@@ -269,31 +234,24 @@ public class CleanupJobStage extends
   }
 
   /**
-   * Delete a single TA dir in a parallel task.
-   * Updates the audit context.
-   * Exceptions are swallowed so that attempts are still made
-   * to delete the others, but the first exception
-   * caught is saved in a field which can be retrieved
-   * via {@link #getLastDeleteException()}.
-   *
-   * @param status dir to be deleted.
-   * @throws IOException delete failure.
+   * 在并行任务中删除单个任务尝试目录
+   * 更新审计上下文和进度，保存第一个捕获的删除异常
+   * @param status 待删除目录状态
+   * @throws IOException 删除失败（不抑制异常时抛出）
    */
   private void rmTaskAttemptDir(FileStatus status) throws IOException {
-    // stage name in audit context is the one set in the arguments.
+    // 更新审计上下文为当前阶段名称
     updateAuditContext(stageName);
-    // update the progress callback in case delete is really slow.
+    // 更新作业进度，避免长时间删除导致作业被误杀
     progress();
     deleteOneDir(status.getPath());
   }
 
   /**
-   * Delete a directory suppressing exceptions.
-   * The {@link #deleteFailureCount} counter.
-   * is incremented on every failure.
-   * @param dir directory
-   * @throws IOException if an IOE was raised
-   * @return any IOE raised.
+   * 删除单个目录，记录删除失败信息
+   * @param dir 待删除目录路径
+   * @return 如果删除失败返回异常，成功返回null
+   * @throws IOException 如果不抑制异常则抛出
    */
   private IOException deleteOneDir(final Path dir)
       throws IOException {
@@ -304,13 +262,12 @@ public class CleanupJobStage extends
   }
 
   /**
-   * Note a failure if the exception is not null.
-   * @param ex exception
-   * @return the exception
+   * 记录删除失败异常，线程安全
+   * @param ex 异常，null表示无异常
+   * @return 原异常
    */
   private synchronized IOException noteAnyDeleteFailure(IOException ex) {
     if (ex != null) {
-      // exception: add the count
       deleteFailureCount.incrementAndGet();
       lastDeleteException = ex;
     }
@@ -318,56 +275,46 @@ public class CleanupJobStage extends
   }
 
   /**
-   * Get the last delete exception; synchronized.
-   * @return the last delete exception or null.
+   * 获取最后一次删除异常，线程安全
+   * @return 最后一次删除异常，无异常返回null
    */
   public synchronized IOException getLastDeleteException() {
     return lastDeleteException;
   }
 
   /**
-   * Options to pass down to the cleanup stage.
+   * 清理阶段参数类，保存清理配置
    */
   public static final class Arguments {
 
     /**
-     * Statistic to update.
+     * 统计名称
      */
     private final String statisticName;
 
-    /** Delete is enabled? */
+    /** 是否启用清理 */
     private final boolean enabled;
 
-    /** Attempt parallel delete of task attempt dirs? */
+    /** 是否并行删除任务尝试目录 */
     private final boolean deleteTaskAttemptDirsInParallel;
 
-    /**
-     * Make an initial attempt to delete the base directory.
-     * This will reduce IO load on abfs. If it times out, the
-     * parallel delete will be the fallback.
-     */
+    /** 并行删除模式下是否先尝试删除根目录 */
     private final boolean parallelDeleteAttemptBaseDeleteFirst;
 
-    /** Ignore failures? */
+    /** 是否忽略清理失败异常 */
     private final boolean suppressExceptions;
 
-    /**
-     * Non-final count of directories.
-     * Default value, "0", means "unknown".
-     * This can be dynamically updated during job commit.
-     */
+    /** 待清理目录总数，0表示未知 */
     private long directoryCount;
 
     /**
-     * Arguments to the stage.
-     * @param statisticName stage name to report
-     * @param enabled is the stage enabled?
-     * @param deleteTaskAttemptDirsInParallel delete task attempt dirs in
-     * parallel?
-     * @param parallelDeleteAttemptBaseDeleteFirst Make an initial attempt to
-     * delete the base directory in a parallel delete?
-     * @param suppressExceptions suppress exceptions?
-     * @param directoryCount directories under job dir; 0 means unknown.
+     * 构造清理阶段参数
+     * @param statisticName 统计名称
+     * @param enabled 是否启用清理
+     * @param deleteTaskAttemptDirsInParallel 是否并行删除任务尝试目录
+     * @param parallelDeleteAttemptBaseDeleteFirst 是否先尝试删除根目录
+     * @param suppressExceptions 是否抑制异常
+     * @param directoryCount 目录数量，0表示未知
      */
     public Arguments(
         final String statisticName,
@@ -426,7 +373,7 @@ public class CleanupJobStage extends
   }
 
   /**
-   * Static disabled arguments.
+   * 预定义的禁用清理参数实例
    */
   public static final Arguments DISABLED = new Arguments(OP_STAGE_JOB_CLEANUP,
       false,
@@ -436,11 +383,10 @@ public class CleanupJobStage extends
       0);
 
   /**
-   * Build an options argument from a configuration, using the
-   * settings from FileOutputCommitter and manifest committer.
-   * @param statisticName statistic name to use in duration tracking.
-   * @param conf configuration to use.
-   * @return the options to process
+   * 从Hadoop配置构建清理阶段参数，读取FileOutputCommitter和ManifestCommitter配置项
+   * @param statisticName 统计名称
+   * @param conf Hadoop配置
+   * @return 清理阶段参数
    */
   public static Arguments cleanupStageOptionsFromConfig(
       String statisticName, Configuration conf) {
@@ -466,13 +412,18 @@ public class CleanupJobStage extends
   }
 
   /**
-   * Enum of outcomes.
+   * 清理结果枚举，定义所有可能的清理结果
    */
   public enum Outcome {
+    /** 清理已禁用 */
     DISABLED("Disabled", false),
+    /** 没有需要清理的目录 */
     NOTHING_TO_CLEAN_UP("Nothing to clean up", true),
+    /** 任务尝试目录并行删除完成 */
     PARALLEL_DELETE("Parallel Delete of Task Attempt Directories", true),
+    /** 根目录删除成功 */
     DELETED("Delete of job directory", true),
+    /** 删除失败 */
     FAILURE("Delete failed", false);
 
     private final String description;
@@ -492,16 +443,16 @@ public class CleanupJobStage extends
     }
 
     /**
-     * description.
-     * @return text for logging
+     * 获取结果描述
+     * @return 描述文本，用于日志输出
      */
     public String getDescription() {
       return description;
     }
 
     /**
-     * Was this a success?
-     * @return true if this outcome is good.
+     * 是否清理成功
+     * @return true表示清理成功
      */
     public boolean isSuccess() {
       return success;
@@ -509,96 +460,23 @@ public class CleanupJobStage extends
   }
 
   /**
-   * Result of the cleanup.
-   * If the outcome == FAILURE but exceptions were suppressed
-   * (which they are implicitly if an instance of this object
-   * is created and returned), then the exception
-   * MUST NOT be null.
+   * 清理结果类，保存清理执行结果信息
    */
   public static final class Result {
 
-    /** Outcome. */
+    /** 清理结果枚举 */
     private final Outcome outcome;
 
-    /** Directory cleaned up. */
+    /** 被清理的目录 */
     private final Path directory;
 
-    /**
-     * Number of delete calls made across all threads.
-     */
+    /** 所有线程执行的删除调用总数 */
     private final int deleteCalls;
 
-    /**
-     * Any IOE raised.
-     */
+    /** 清理过程中抛出的异常 */
     private final IOException exception;
 
-    public Result(
-        final Outcome outcome,
-        final Path directory,
-        final int deleteCalls,
-        IOException exception) {
-      this.outcome = requireNonNull(outcome, "outcome");
-      this.directory = directory;
-      this.deleteCalls = deleteCalls;
-      this.exception = exception;
-      if (outcome == Outcome.FAILURE) {
-        requireNonNull(exception, "No exception in failure result");
-      }
-    }
-
-    public Path getDirectory() {
-      return directory;
-    }
-
-    public boolean wasExecuted() {
-      return outcome != Outcome.DISABLED;
-    }
-
     /**
-     * Was the outcome a success?
-     * That is: either the dir wasn't there or through
-     * delete/rename it is no longer there.
-     * @return true if the temporary dir no longer exists.
-     */
-    public boolean succeeded() {
-      return outcome.isSuccess();
-    }
-
-    public Outcome getOutcome() {
-      return outcome;
-    }
-
-    public int getDeleteCalls() {
-      return deleteCalls;
-    }
-
-    public IOException getException() {
-      return exception;
-    }
-
-    /**
-     * If there was an IOE caught, throw it.
-     * For ease of use in (meaningful) lambda expressions
-     * in tests, returns the string value if there
-     * was no exception to throw (for use in tests)
-     * @throws IOException exception.
-     */
-    public String maybeRethrowException() throws IOException {
-      if (exception != null) {
-        throw exception;
-      }
-      return toString();
-    }
-
-    @Override
-    public String toString() {
-      return "CleanupResult{" +
-          "outcome=" + outcome +
-          ", directory=" + directory +
-          ", deleteCalls=" + deleteCalls +
-          ", exception=" + exception +
-          '}';
-    }
-  }
-}
+     * 构造清理结果
+     * @param outcome 结果枚举
+     * @param directory

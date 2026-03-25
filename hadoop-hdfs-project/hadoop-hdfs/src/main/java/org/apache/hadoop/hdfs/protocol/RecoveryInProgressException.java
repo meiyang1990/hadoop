@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,13 +24,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Exception indicating that a replica is already being recovery.
+ * 表示数据块副本恢复正在进行中的异常，用于HDFS数据块恢复流程中，当尝试对已处于恢复状态的副本再次发起恢复操作时抛出
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class RecoveryInProgressException extends IOException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造带有指定错误信息的异常实例
+   * @param msg 异常描述信息
+   */
   public RecoveryInProgressException(String msg) {
     super(msg);
   }

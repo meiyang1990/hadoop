@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * DAO for node an attribute record.
+ * 节点属性信息的数据访问对象，用于RM Web UI接口返回节点属性数据
  */
 @XmlRootElement(name = "nodeAttributeInfo")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -36,10 +37,17 @@ public class NodeAttributeInfo {
   private String type;
   private String value;
 
+  /**
+   * JAXB反序列化需要的无参构造函数
+   */
   public NodeAttributeInfo() {
     // JAXB needs this
   }
 
+  /**
+   * 根据NodeAttribute对象构造节点属性信息
+   * @param nodeAttribute 节点属性源对象
+   */
   public NodeAttributeInfo(NodeAttribute nodeAttribute) {
     this.prefix = nodeAttribute.getAttributeKey().getAttributePrefix();
     this.name = nodeAttribute.getAttributeKey().getAttributeName();
@@ -47,18 +55,22 @@ public class NodeAttributeInfo {
     this.value = nodeAttribute.getAttributeValue();
   }
 
+  /** 获取属性前缀 */
   public String getPrefix() {
     return prefix;
   }
 
+  /** 获取属性名称 */
   public String getName() {
     return name;
   }
 
+  /** 获取属性类型 */
   public String getType() {
     return type;
   }
 
+  /** 获取属性值 */
   public String getValue() {
     return value;
   }

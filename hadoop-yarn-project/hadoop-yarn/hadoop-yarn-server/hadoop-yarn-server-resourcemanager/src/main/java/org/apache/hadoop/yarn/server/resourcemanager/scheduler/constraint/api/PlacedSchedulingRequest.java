@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,46 +25,62 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Class to encapsulate a Placed scheduling Request.
- * It has the original Scheduling Request and a list of SchedulerNodes (one
- * for each 'numAllocation' field in the corresponding ResourceSizing object.
- *
- * NOTE: Clients of this class SHOULD NOT rely on the value of
- *       resourceSizing.numAllocations and instead should use the
- *       size of collection returned by getNodes() instead.
+ * YARN调度约束模块中，封装已完成位置分配的调度请求实体类。
+ * 保存原始调度请求和对应分配到的节点列表，一个分配容器对应一个节点。
+ * 
+ * 注意：此类调用者不应该依赖ResourceSizing中的numAllocations字段，
+ * 而应该直接使用getNodes()返回的集合大小来获取实际分配数量。
  */
 public class PlacedSchedulingRequest {
 
-  // The number of times the Algorithm tried to place the SchedulingRequest
-  // after it was rejected by the commit phase of the Scheduler (due to some
-  // transient state of the cluster. For eg: no space on Node / user limit etc.)
-  // The Algorithm can then try to probably place on a different node.
+  /**
+   * 调度请求分配重试次数，记录因集群瞬态状态（节点空间不足、用户限额超限等）
+   * 提交阶段被拒绝后，分配算法尝试重新分配的次数，允许算法尝试分配到其他节点。
+   */
   private int placementAttempt = 0;
+  // 原始调度请求
   private final SchedulingRequest request;
-  // One Node per numContainers in the SchedulingRequest;
+  /**
+   * 已分配节点列表，调度请求中每个容器对应一个节点。
+   */
   private final List<SchedulerNode> nodes = new ArrayList<>();
 
+  /**
+   * 构造方法，基于原始调度请求创建已分配对象。
+   * @param request 原始调度请求
+   */
   public PlacedSchedulingRequest(SchedulingRequest request) {
     this.request = request;
   }
 
+  /**
+   * 获取原始调度请求。
+   * @return 原始调度请求
+   */
   public SchedulingRequest getSchedulingRequest() {
     return request;
   }
 
   /**
-   * List of Node locations on which this Scheduling Request can be placed.
-   * The size of this list = schedulingRequest.resourceSizing.numAllocations.
-   * @return List of Scheduler nodes.
+   * 获取已分配节点列表，列表大小等于本次请求需要分配的容器数量。
+   * @return 已分配调度节点列表
    */
   public List<SchedulerNode> getNodes() {
     return nodes;
   }
 
+  /**
+   * 获取当前分配尝试次数。
+   * @return 分配尝试次数
+   */
   public int getPlacementAttempt() {
     return placementAttempt;
   }
 
+  /**
+   * 设置分配尝试次数。
+   * @param attempt 尝试次数
+   */
   public void setPlacementAttempt(int attempt) {
     this.placementAttempt = attempt;
   }

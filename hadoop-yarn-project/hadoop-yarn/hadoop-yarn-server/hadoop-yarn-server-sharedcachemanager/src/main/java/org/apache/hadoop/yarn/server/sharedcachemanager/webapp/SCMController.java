@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,21 +26,23 @@ import org.apache.hadoop.yarn.webapp.Controller;
 // 这个文件已经全部加上中文注释
 // 共享缓存管理器Web应用的控制器类
 /**
- * The controller class for the shared cache manager web app.
+ * 共享缓存管理器Web应用的请求控制器，负责处理Web页面请求并渲染对应页面
  */
 @Private
 @Unstable
 public class SCMController extends Controller {
   @Override
   public void index() {
+    // 设置页面标题
     setTitle("Shared Cache Manager");
   }
 
   /**
-   * It is referenced in SCMWebServer.SCMWebApp.setup()
+   * 概览页面请求处理方法，由SCMWebApp初始化时引用路由
    */
   @SuppressWarnings("unused")
   public void overview() {
+    // 渲染共享缓存管理器概览页面
     render(SCMOverviewPage.class);
   }
 }

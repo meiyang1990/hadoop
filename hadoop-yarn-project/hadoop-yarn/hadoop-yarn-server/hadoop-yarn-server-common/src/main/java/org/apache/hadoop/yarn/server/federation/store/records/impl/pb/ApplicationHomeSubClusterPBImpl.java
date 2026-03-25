@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -34,31 +35,49 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of {@link ApplicationHomeSubCluster}.
+ * 基于Protocol Buffer实现的{@link ApplicationHomeSubCluster}，用于在联邦状态存储中存储应用归属子集群信息
  */
 @Private
 @Unstable
 public class ApplicationHomeSubClusterPBImpl extends ApplicationHomeSubCluster {
 
+  // Protobuf消息对象，当通过proto读取时存储消息实例
   private ApplicationHomeSubClusterProto proto =
       ApplicationHomeSubClusterProto.getDefaultInstance();
+  // Protobuf消息构造器，当需要修改消息时使用builder构造
   private ApplicationHomeSubClusterProto.Builder builder = null;
+  // 标记当前数据是否已经同步到proto对象
   private boolean viaProto = false;
 
+  // 缓存应用ID对象，避免重复从proto解析
   private ApplicationId applicationId = null;
+  // 缓存应用归属子集群ID对象，避免重复从proto解析
   private SubClusterId homeSubCluster = null;
+  // 缓存应用创建时间
   private long createTime = 0L;
+  // 缓存应用提交上下文对象
   private ApplicationSubmissionContext applicationSubmissionContext;
 
+  /**
+   * 空构造函数，初始化Protobuf构造器
+   */
   public ApplicationHomeSubClusterPBImpl() {
     builder = ApplicationHomeSubClusterProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf消息构造对象
+   * @param proto 已有的ApplicationHomeSubClusterProto消息
+   */
   public ApplicationHomeSubClusterPBImpl(ApplicationHomeSubClusterProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的Protobuf消息，自动合并本地缓存修改
+   * @return 合并后的完整Protobuf消息
+   */
   public ApplicationHomeSubClusterProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -66,6 +85,9 @@ public class ApplicationHomeSubClusterPBImpl extends ApplicationHomeSubCluster {
     return proto;
   }
 
+  /**
+   * 将本地缓存的修改合并到Protobuf消息对象
+   */
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -75,6 +97,9 @@ public class ApplicationHomeSubClusterPBImpl extends ApplicationHomeSubCluster {
     viaProto = true;
   }
 
+  /**
+   * 如果当前是proto模式，初始化构造器以便修改
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = ApplicationHomeSubClusterProto.newBuilder(proto);
@@ -82,6 +107,9 @@ public class ApplicationHomeSubClusterPBImpl extends ApplicationHomeSubCluster {
     viaProto = false;
   }
 
+  /**
+   * 将本地缓存的Java对象合并到Protobuf构造器
+   */
   private void mergeLocalToBuilder() {
     if (this.applicationId != null) {
       builder.setApplicationId(convertToProtoFormat(this.applicationId));
@@ -201,30 +229,36 @@ public class ApplicationHomeSubClusterPBImpl extends ApplicationHomeSubCluster {
       return null;
     }
     this.applicationSubmissionContext = convertFromProtoFormat(p.getAppSubmitContext());
-    return this.applicationSubmissionContext;
+    return applicationSubmissionContext;
   }
 
+  /** 将Protobuf格式的SubClusterId转换为Java对象 */
   private SubClusterId convertFromProtoFormat(SubClusterIdProto subClusterId) {
     return new SubClusterIdPBImpl(subClusterId);
   }
 
+  /** 将Java格式的SubClusterId转换为Protobuf对象 */
   private SubClusterIdProto convertToProtoFormat(SubClusterId subClusterId) {
     return ((SubClusterIdPBImpl) subClusterId).getProto();
   }
 
+  /** 将Protobuf格式的ApplicationId转换为Java对象 */
   private ApplicationId convertFromProtoFormat(ApplicationIdProto appId) {
     return new ApplicationIdPBImpl(appId);
   }
 
+  /** 将Java格式的ApplicationId转换为Protobuf对象 */
   private ApplicationIdProto convertToProtoFormat(ApplicationId appId) {
     return ((ApplicationIdPBImpl) appId).getProto();
   }
 
+  /** 将Protobuf格式的ApplicationSubmissionContext转换为Java对象 */
   private ApplicationSubmissionContext convertFromProtoFormat(
       ApplicationSubmissionContextProto appSubmitContext) {
     return new ApplicationSubmissionContextPBImpl(appSubmitContext);
   }
 
+  /** 将Java格式的ApplicationSubmissionContext转换为Protobuf对象 */
   private ApplicationSubmissionContextProto convertToProtoFormat(
       ApplicationSubmissionContext appContext) {
     return ((ApplicationSubmissionContextPBImpl) appContext).getProto();

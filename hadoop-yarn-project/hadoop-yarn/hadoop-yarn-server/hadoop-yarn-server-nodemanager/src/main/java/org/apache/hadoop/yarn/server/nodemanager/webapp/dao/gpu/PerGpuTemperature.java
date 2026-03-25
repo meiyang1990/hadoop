@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,7 +27,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 /**
- * Temperature of GPU
+ * 单个GPU显卡的温度信息数据对象，用于NodeManager Web UI展示GPU温度信息，支持从NVIDIA nvidia-smi命令输出XML解析数据
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -37,8 +38,8 @@ public class PerGpuTemperature {
   private float slowThresholdGpuTemp = Float.MIN_VALUE;
 
   /**
-   * Get current celsius GPU temperature
-   * @return temperature
+   * 获取GPU当前温度，单位：摄氏度
+   * @return 当前GPU温度
    */
   @XmlJavaTypeAdapter(PerGpuDeviceInformation.StrToFloatBeforeSpaceAdapter.class)
   @XmlElement(name = "gpu_temp")
@@ -51,8 +52,8 @@ public class PerGpuTemperature {
   }
 
   /**
-   * Get max possible celsius GPU temperature
-   * @return temperature
+   * 获取GPU允许的最高温度阈值，单位：摄氏度
+   * @return GPU最高温度阈值
    */
   @XmlJavaTypeAdapter(PerGpuDeviceInformation.StrToFloatBeforeSpaceAdapter.class)
   @XmlElement(name = "gpu_temp_max_threshold")
@@ -65,8 +66,8 @@ public class PerGpuTemperature {
   }
 
   /**
-   * Get celsius GPU temperature which could make GPU runs slower
-   * @return temperature
+   * 获取GPU降频阈值温度，超过此温度GPU会降速运行，单位：摄氏度
+   * @return GPU降频温度阈值
    */
   @XmlJavaTypeAdapter(PerGpuDeviceInformation.StrToFloatBeforeSpaceAdapter.class)
   @XmlElement(name = "gpu_temp_slow_threshold")

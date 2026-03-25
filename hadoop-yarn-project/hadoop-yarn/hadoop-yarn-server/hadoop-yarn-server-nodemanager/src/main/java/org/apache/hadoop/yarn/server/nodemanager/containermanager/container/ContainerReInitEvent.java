@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,21 +24,24 @@ import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceSet;
 
 /**
- * ContainerEvent sent by ContainerManager to ContainerImpl to
- * re-initiate Container.
+ * 容器重新初始化事件，由容器管理器发送给容器实例，触发容器重新初始化
+ * 主要用于容器升级场景，在不重启容器的前提下更新容器配置和资源
  */
 public class ContainerReInitEvent extends ContainerEvent {
 
+  // 重新初始化使用的容器启动上下文，包含升级后的配置信息
   private final ContainerLaunchContext reInitLaunchContext;
+  // 重新初始化需要的本地化资源集合
   private final ResourceSet resourceSet;
+  // 是否自动提交本次重新初始化，无需后续确认
   private final boolean autoCommit;
 
   /**
-   * Container Re-Init Event.
-   * @param cID Container Id.
-   * @param upgradeContext Upgrade Context.
-   * @param resourceSet Resource Set.
-   * @param autoCommit Auto Commit.
+   * 构造容器重新初始化事件
+   * @param cID 目标容器ID
+   * @param upgradeContext 升级上下文，包含新的容器启动配置
+   * @param resourceSet 重新初始化需要的本地化资源集合
+   * @param autoCommit 是否自动提交本次重新初始化
    */
   public ContainerReInitEvent(ContainerId cID,
       ContainerLaunchContext upgradeContext,
@@ -49,24 +53,24 @@ public class ContainerReInitEvent extends ContainerEvent {
   }
 
   /**
-   * Get the Launch Context to be used for upgrade.
-   * @return ContainerLaunchContext
+   * 获取重新初始化使用的容器启动上下文（用于升级）
+   * @return 容器启动上下文
    */
   public ContainerLaunchContext getReInitLaunchContext() {
     return reInitLaunchContext;
   }
 
   /**
-   * Get the ResourceSet.
-   * @return ResourceSet.
+   * 获取重新初始化需要的本地化资源集合
+   * @return 资源集合
    */
   public ResourceSet getResourceSet() {
     return resourceSet;
   }
 
   /**
-   * Should this re-Initialization be auto-committed.
-   * @return AutoCommit.
+   * 判断本次重新初始化是否需要自动提交
+   * @return 自动提交标识，true表示无需额外确认直接完成重新初始化
    */
   public boolean isAutoCommit() {
     return autoCommit;

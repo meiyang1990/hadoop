@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -15,7 +16,7 @@
  * limitations under the License.
  */
 /**
- * Package containing DeletionTasks for use with the DeletionService.
+ * 该包包含供DeletionService删除服务使用的各类删除任务实现
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

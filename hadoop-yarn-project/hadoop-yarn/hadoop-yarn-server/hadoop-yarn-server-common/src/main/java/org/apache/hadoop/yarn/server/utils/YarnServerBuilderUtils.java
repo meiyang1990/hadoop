@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -36,14 +37,21 @@ import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.api.records.NodeAction;
 
 /**
- * Server Builder utilities to construct various objects.
+ * YARN服务端各类对象构建工具类，提供统一的常用服务端对象构建方法。
  *
  */
 public class YarnServerBuilderUtils {
 
+  // 记录工厂实例，用于创建YARN API记录对象
   private static final RecordFactory recordFactory = RecordFactoryProvider
       .getRecordFactory(null);
 
+  /**
+   * 构建仅包含节点动作和诊断信息的节点心跳响应。
+   * @param action 节点需要执行的动作
+   * @param diagnosticsMessage 诊断信息
+   * @return 节点心跳响应对象
+   */
   public static NodeHeartbeatResponse newNodeHeartbeatResponse(
       NodeAction action, String diagnosticsMessage) {
     NodeHeartbeatResponse response = recordFactory
@@ -53,6 +61,17 @@ public class YarnServerBuilderUtils {
     return response;
   }
 
+  /**
+   * 构建完整的节点心跳响应，包含所有需要返回给NodeManager的信息。
+   * @param responseId 响应ID
+   * @param action 节点需要执行的动作
+   * @param containersToCleanUp 需要清理的容器列表
+   * @param applicationsToCleanUp 需要清理的应用列表
+   * @param containerTokenMasterKey 容器令牌主密钥
+   * @param nmTokenMasterKey NodeManager令牌主密钥
+   * @param nextHeartbeatInterval 下一次心跳间隔
+   * @return 完整的节点心跳响应对象
+   */
   public static NodeHeartbeatResponse newNodeHeartbeatResponse(int responseId,
       NodeAction action, List<ContainerId> containersToCleanUp,
       List<ApplicationId> applicationsToCleanUp,

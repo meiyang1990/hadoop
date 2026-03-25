@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,9 +36,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Create UGI from the request for the WebHDFS requests for the DNs. Note that
- * the DN does not authenticate the UGI -- the NN will authenticate them in
- * subsequent operations.
+ * 为DataNode上的WebHDFS请求从请求参数中创建用户组信息(UGI)。
+ * 注意：DataNode本身不对UGI做认证，后续操作由NameNode负责认证。
+ * 核心职责是解析请求中的用户信息或代理token，缓存生成的UGI提升性能。
  */
 public class DataNodeUGIProvider {
   private final ParameterParser params;
@@ -45,10 +46,19 @@ public class DataNodeUGIProvider {
   static Cache<String, UserGroupInformation> ugiCache;
   public static final Logger LOG = LoggerFactory.getLogger(Client.class);
 
+  /**
+   * 构造UGI提供器，绑定请求参数解析器
+   * @param params Web请求参数解析器实例
+   */
   DataNodeUGIProvider(ParameterParser params) {
     this.params = params;
   }
 
+  /**
+   * 初始化UGI缓存，根据配置设置缓存过期时间
+   * 同步方法保证线程安全，避免重复初始化
+   * @param conf Hadoop配置对象
+   */
   public static synchronized void init(Configuration conf) {
     if (ugiCache == null) {
       ugiCache = CacheBuilder
@@ -61,6 +71,11 @@ public class DataNodeUGIProvider {
     }
   }
 
+  /**
+   * 清空UGI缓存中当前DelegationToken相关的缓存
+   * 仅用于测试场景
+   * @throws IOException 清空缓存时抛出IO异常
+   */
   @VisibleForTesting
   void clearCache() throws IOException {
     if (UserGroupInformation.isSecurityEnabled()) {
@@ -68,15 +83,20 @@ public class DataNodeUGIProvider {
     }
   }
 
+  /**
+   * 根据请求参数获取解析后的用户组信息UGI，优先从缓存获取
+   * 支持DelegationToken认证和用户名代理两种场景
+   * @return 解析完成的UGI对象
+   * @throws IOException 解析或缓存获取失败时抛出IO异常
+   */
   UserGroupInformation ugi() throws IOException {
     UserGroupInformation ugi;
 
     try {
       final Token<DelegationTokenIdentifier> token = params.delegationToken();
 
-      // Create nonTokenUGI when token is null regardless of security.
-      // This makes it possible to access the data stored in secure DataNode
-      // through insecure Namenode.
+      // 无论安全模式是否开启，token为空时都创建非token模式UGI
+      // 支持安全模式DataNode通过非安全模式NameNode访问数据的场景
       if (UserGroupInformation.isSecurityEnabled() && token != null) {
         ugi = ugiCache.get(buildTokenCacheKey(token),
             new Callable<UserGroupInformation>() {
@@ -89,7 +109,7 @@ public class DataNodeUGIProvider {
         final String usernameFromQuery = params.userName();
         final String doAsUserFromQuery = params.doAsUser();
         final String remoteUser = usernameFromQuery == null ? JspHelper
-            .getDefaultWebUserName(params.conf()) // not specified in request
+            .getDefaultWebUserName(params.conf()) // 请求中未指定用户名时使用默认值
             : usernameFromQuery;
 
         ugi = ugiCache.get(
@@ -114,10 +134,21 @@ public class DataNodeUGIProvider {
     return ugi;
   }
 
+  /**
+   * 基于DelegationToken构建缓存键
+   * @param token DelegationToken对象
+   * @return 缓存键字符串
+   */
   private String buildTokenCacheKey(Token<DelegationTokenIdentifier> token) {
     return token.buildCacheKey();
   }
 
+  /**
+   * 从DelegationToken解析并创建UGI对象
+   * @param token DelegationToken对象
+   * @return 包含token信息的UGI对象
+   * @throws IOException 解析token标识符失败时抛出IO异常
+   */
   private UserGroupInformation tokenUGI(Token<DelegationTokenIdentifier> token)
       throws IOException {
     ByteArrayInputStream buf =
@@ -130,6 +161,13 @@ public class DataNodeUGIProvider {
     return ugi;
   }
 
+  /**
+   * 为非token模式UGI构建缓存键，包含远程用户和代理用户信息
+   * @param doAsUserFromQuery 请求中的代理用户名
+   * @param remoteUser 原始远程用户名
+   * @return 缓存键字符串
+   * @throws IOException 构建键时抛出IO异常
+   */
   private String buildNonTokenCacheKey(String doAsUserFromQuery,
       String remoteUser) throws IOException {
     String key = doAsUserFromQuery == null ? String.format("{%s}", remoteUser)
@@ -137,6 +175,15 @@ public class DataNodeUGIProvider {
     return key;
   }
 
+  /**
+   * 创建非token模式的UGI对象，支持代理用户场景
+   * 仅用于测试场景
+   * @param usernameFromQuery 请求中的用户名
+   * @param doAsUserFromQuery 请求中的代理用户名
+   * @param remoteUser 原始远程用户名
+   * @return 创建完成的UGI对象
+   * @throws IOException 用户名校验失败时抛出IO异常
+   */
   @VisibleForTesting
   UserGroupInformation nonTokenUGI(String usernameFromQuery,
       String doAsUserFromQuery, String remoteUser) throws IOException {
@@ -145,7 +192,7 @@ public class DataNodeUGIProvider {
         .createRemoteUser(remoteUser);
     JspHelper.checkUsername(ugi.getShortUserName(), usernameFromQuery);
     if (doAsUserFromQuery != null) {
-      // create and attempt to authorize a proxy user
+      // 创建代理用户UGI并完成授权校验
       ugi = UserGroupInformation.createProxyUser(doAsUserFromQuery, ugi);
     }
     return ugi;

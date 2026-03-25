@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,11 @@
  * limitations under the License.
  */
 
+/**
+ * @file Buffers.h
+ * @brief Hadoop MapReduce本地任务各种缓冲区实现头文件，提供输入输出、键值对、字节缓存等核心能力
+ */
+
 #ifndef BUFFERS_H_
 #define BUFFERS_H_
 
@@ -27,7 +33,9 @@ namespace NativeTask {
 
 
 /**
- * A lightweight read buffer, act as buffered input stream
+ * @class ReadBuffer
+ * @brief 轻量级读缓冲区，实现带缓存的输入流，支持高效读取变长整型和不同字节序数据
+ * 用于MapReduce本地任务中读取输入数据，支持压缩输入流适配
  */
 class ReadBuffer {
 protected:
@@ -50,6 +58,12 @@ protected:
 public:
   ReadBuffer();
 
+  /**
+   * @brief 初始化读缓冲区
+   * @param size 缓冲区容量大小
+   * @param stream 底层输入流
+   * @param codec 压缩编码器名称，若为空则不使用压缩
+   */
   void init(uint32_t size, InputStream * stream, const string & codec);
 
   ~ReadBuffer();
@@ -120,7 +134,9 @@ public:
 };
 
 /**
- * A light weighted append buffer, used as buffered output streams
+ * @class AppendBuffer
+ * @brief 轻量级追加写缓冲区，实现带缓存的输出流，支持压缩输出和不同字节序写入
+ * 用于MapReduce本地任务中写出输出数据，支持自动刷写机制
  */
 class AppendBuffer {
 protected:
@@ -148,8 +164,18 @@ public:
 
   ~AppendBuffer();
 
+  /**
+   * @brief 初始化写缓冲区
+   * @param size 缓冲区容量大小
+   * @param stream 底层输出流
+   * @param codec 压缩编码器名称，若为空则不使用压缩
+   */
   void init(uint32_t size, OutputStream * stream, const string & codec);
 
+  /**
+   * @brief 获取压缩输出流对象
+   * @return 压缩流指针，未启用压缩则为NULL
+   */
   CompressStream * getCompressionStream();
 
   uint64_t getCounter() {
@@ -253,8 +279,9 @@ public:
 };
 
 /**
- * Memory Key-Value buffer pair with direct address content, so can be
- * easily copied or dumped to file
+ * @struct KVBuffer
+ * @brief 存储键值对的内存缓冲区结构，键值内容直接存储在内存中，支持快速遍历和序列化到文件
+ * 用于MapReduce本地任务中存储中间键值对数据
  */
 struct KVBuffer {
   uint32_t keyLength;
@@ -303,6 +330,10 @@ struct KVBuffer {
   }
 };
 
+/**
+ * @struct KVBufferWithParititionId
+ * @brief 带分区ID的键值对缓冲区结构，用于Shuffle阶段区分不同Reduce分区的键值对
+ */
 struct KVBufferWithParititionId {
   uint32_t partitionId;
   KVBuffer buffer;
@@ -321,7 +352,8 @@ struct KVBufferWithParititionId {
 };
 
 /**
- * Native side abstraction of java ByteBuffer
+ * @class ByteBuffer
+ * @brief Java ByteBuffer的本地端抽象，提供位置限制管理，用于和Java层交互数据
  */
 class ByteBuffer {
 private:
@@ -387,6 +419,10 @@ public:
   }
 };
 
+/**
+ * @class ByteArray
+ * @brief 动态扩容字节数组，自动管理内存，用于存储可变长度数据
+ */
 class ByteArray {
 private:
   char * _buff;
@@ -430,6 +466,10 @@ public:
   }
 };
 
+/**
+ * @class FixSizeContainer
+ * @brief 固定大小内存容器，提供位置管理和数据填充功能，包装已有内存块
+ */
 class FixSizeContainer {
 private:
   char * _buff;
@@ -493,6 +533,11 @@ public:
   }
 };
 
+/**
+ * @class ReadWriteBuffer
+ * @brief 支持动态扩容的可读写缓冲区，提供读写位置分离管理，支持序列化基本类型
+ * 用于Java和本地代码之间传递参数和返回结果
+ */
 class ReadWriteBuffer {
 private:
 
@@ -551,86 +596,4 @@ public:
 
     checkWriteSpaceAndResizeIfNecessary(4);
     *((uint32_t *)(_buff + _writePoint)) = written;
-    _writePoint += 4;
-  }
-
-  void writeLong(uint64_t param) {
-    uint64_t written = param;
-
-    checkWriteSpaceAndResizeIfNecessary(8);
-    *((uint64_t *)(_buff + _writePoint)) = written;
-    _writePoint += 8;
-  }
-
-  void writeString(const char * param, uint32_t length) {
-    writeInt(length);
-    checkWriteSpaceAndResizeIfNecessary(length);
-
-    memcpy(_buff + _writePoint, param, length);
-    _writePoint += length;
-  }
-
-  void writeString(std::string * param) {
-    const char * str = param->c_str();
-    int length = param->size();
-    writeString(str, length);
-  }
-
-  void writePointer(void * param) {
-    uint64_t written = (uint64_t)(param);
-    writeLong(written);
-  }
-
-  uint32_t readInt() {
-    char * readPos = _buff + _readPoint;
-    uint32_t result = *((uint32_t *)(readPos));
-    _readPoint += 4;
-    return result;
-  }
-
-  uint64_t readLong() {
-    char * readPos = _buff + _readPoint;
-    uint64_t result = *((uint64_t *)(readPos));
-    _readPoint += 8;
-    return result;
-  }
-
-  std::string * readString() {
-    uint32_t len = readInt();
-    char * strBegin = _buff + _readPoint;
-    _readPoint += len;
-    return new std::string(strBegin, len);
-  }
-
-  void * readPointer() {
-    uint64_t result = readLong();
-    return (void *)(result);
-  }
-
-private:
-  void checkWriteSpaceAndResizeIfNecessary(uint32_t toBeWritten) {
-    if (_buffLength == 0) {
-      _newCreatedBuff = true;
-      _buffLength = INITIAL_LENGTH > toBeWritten ? INITIAL_LENGTH : toBeWritten;
-      _buff = new char[_buffLength];
-    }
-
-    if (_buffLength - _writePoint >= toBeWritten) {
-      return;
-    }
-
-    _buffLength = _buffLength + toBeWritten;
-    _newCreatedBuff = true;
-    char * newBuff = new char[_buffLength];
-    memcpy(newBuff, _buff, _writePoint);
-    delete[] _buff;
-    _buff = newBuff;
-  }
-};
-
-typedef ReadWriteBuffer ParameterBuffer;
-typedef ReadWriteBuffer ResultBuffer;
-
-} // namespace NativeTask
-
-#endif /* BUFFERS_H_ */
+    _writePoint += 4

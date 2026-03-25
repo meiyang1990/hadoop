@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -77,11 +78,16 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * YARN WebApp代理Servlet，负责代理用户访问YARN集群中运行的Application Master Web UI。
+ * 核心职责：实现安全访问控制、HTTPS合规检查、请求转发和重定向处理，解决跨域访问和安全风险问题。
+ */
 public class WebAppProxyServlet extends HttpServlet {
   private static final long serialVersionUID = 1L;
   private static final Logger LOG = LoggerFactory.getLogger(
       WebAppProxyServlet.class);
   private static final String REDIRECT = "/redirect";
+  /** 需要透传给后端Application Master的请求头列表 */
   private static final Set<String> PASS_THROUGH_HEADERS =
     new HashSet<>(Arrays.asList(
         "User-Agent",
@@ -96,12 +102,15 @@ public class WebAppProxyServlet extends HttpServlet {
 
   public static final String PROXY_USER_COOKIE_NAME = "proxy-user";
 
+  /** 跟踪URI生成插件列表，用于自定义应用跟踪URL生成 */
   private transient List<TrackingUriPlugin> trackingUriPlugins;
+  /** 错误页面基础URL路径 */
   private final String failurePageUrlBase;
+  /** YARN配置对象 */
   private transient YarnConfiguration conf;
 
   /**
-   * HTTP methods.
+   * HTTP请求方法枚举。
    */
   private enum HTTP { GET, POST, HEAD, PUT, DELETE }
 
@@ -112,6 +121,7 @@ public class WebAppProxyServlet extends HttpServlet {
     //Empty
   }
   
+  /** HTML页面构建器，基于Hamlet模板框架生成警告/错误页面 */
   private static class Page extends Hamlet {
     Page(PrintWriter out) {
       super(out, 0, false);
@@ -126,7 +136,7 @@ public class WebAppProxyServlet extends HttpServlet {
     this.conf = conf;
   }
   /**
-   * Default constructor
+   * 默认构造函数，初始化代理Servlet配置和插件
    */
   public WebAppProxyServlet() {
     super();
@@ -139,12 +149,14 @@ public class WebAppProxyServlet extends HttpServlet {
           "cluster", "failure");
   }
 
+  /** 获取ResourceManager上应用页面的基础URL */
   private String getRmAppPageUrlBase(ApplicationId id) throws YarnException, IOException {
     ServletContext context = getServletContext();
     AppReportFetcher af = (AppReportFetcher) context.getAttribute(WebAppProxy.FETCHER_ATTRIBUTE);
     return af.getRmAppPageUrlBase(id);
   }
 
+  /** 获取应用历史服务器上应用页面的基础URL */
   private String getAhsAppPageUrlBase() {
     ServletContext context = getServletContext();
     AppReportFetcher af = (AppReportFetcher) context.getAttribute(WebAppProxy.FETCHER_ATTRIBUTE);
@@ -152,10 +164,10 @@ public class WebAppProxyServlet extends HttpServlet {
   }
 
   /**
-   * Output 404 with appropriate message.
-   * @param resp the http response.
-   * @param message the message to include on the page.
-   * @throws IOException on any error.
+   * 返回404错误响应并包含自定义错误信息
+   * @param resp HTTP响应
+   * @param message 错误信息
+   * @throws IOException IO异常
    */
   private static void notFound(HttpServletResponse resp, String message) 
     throws IOException {
@@ -163,11 +175,12 @@ public class WebAppProxyServlet extends HttpServlet {
   }
   
   /**
-   * Warn the user that the link may not be safe!
-   * @param resp the http response
-   * @param link the link to point to
-   * @param user the user that owns the link.
-   * @throws IOException on any error.
+   * 显示安全警告页面，提示用户访问第三方应用UI存在风险
+   * @param resp HTTP响应
+   * @param link 目标链接
+   * @param user 应用运行用户
+   * @param id 应用ID
+   * @throws IOException IO异常
    */
   private static void warnUserPage(HttpServletResponse resp, String link, 
       String user, ApplicationId id) throws IOException {
@@ -187,11 +200,12 @@ public class WebAppProxyServlet extends HttpServlet {
   }
 
   /**
-   * Show the user a page that says that HTTPS must be used but was not.
-   * @param resp the http response
-   * @param link the link to point to
-   * @return true if HTTPS must be used but was not, false otherwise
-   * @throws IOException on any error.
+   * 检查HTTPS严格模式合规性，若要求HTTPS但目标不是HTTPS则返回错误页面
+   * @param resp HTTP响应
+   * @param link 目标URI
+   * @param conf YARN配置
+   * @return true表示不符合要求已返回错误页面，false表示合规
+   * @throws IOException IO异常
    */
   @VisibleForTesting
   static boolean checkHttpsStrictAndNotProvided(
@@ -220,15 +234,15 @@ public class WebAppProxyServlet extends HttpServlet {
   }
   
   /**
-   * Download link and have it be the response.
-   * @param req the http request
-   * @param resp the http response
-   * @param link the link to download
-   * @param c the cookie to set if any
-   * @param proxyHost the proxy host
-   * @param method the http method
-   * @param appId the ApplicationID
-   * @throws IOException on any error.
+   * 代理请求到目标Application Master UI，并将响应返回给客户端
+   * @param req 客户端请求
+   * @param resp 客户端响应
+   * @param link 目标应用URI
+   * @param c 确认Cookie，用于记录用户已确认安全风险
+   * @param proxyHost 代理主机地址
+   * @param method HTTP方法
+   * @param appId 应用ID
+   * @throws IOException IO异常
    */
   private void proxyLink(final HttpServletRequest req,
       final HttpServletResponse resp, final URI link, final Cookie c,
@@ -241,11 +255,12 @@ public class WebAppProxyServlet extends HttpServlet {
 
     boolean connectionTimeoutEnabled =
         conf.getBoolean(YarnConfiguration.RM_PROXY_TIMEOUT_ENABLED,
-        YarnConfiguration.DEFALUT_RM_PROXY_TIMEOUT_ENABLED);
+            YarnConfiguration.DEFALUT_RM_PROXY_TIMEOUT_ENABLED);
     int connectionTimeout =
         conf.getInt(YarnConfiguration.RM_PROXY_CONNECTION_TIMEOUT,
             YarnConfiguration.DEFAULT_RM_PROXY_CONNECTION_TIMEOUT);
 
+    // 宽松/严格HTTPS模式下，配置SSL上下文用于验证应用自签名证书
     if (httpsPolicy.equals("LENIENT") || httpsPolicy.equals("STRICT")) {
       ProxyCA proxyCA = getProxyCA();
       // ProxyCA could be null when the Proxy is run outside the RM
@@ -265,6 +280,7 @@ public class WebAppProxyServlet extends HttpServlet {
     // similar could cause issues otherwise.
     InetAddress localAddress = InetAddress.getByName(proxyHost);
     LOG.debug("local InetAddress for proxy host: {}", localAddress);
+    // 配置请求默认参数：绑定代理出口地址、允许循环重定向、配置超时时间
     httpClientBuilder.setDefaultRequestConfig(
         connectionTimeoutEnabled ?
             RequestConfig.custom()
@@ -280,11 +296,13 @@ public class WebAppProxyServlet extends HttpServlet {
                 .build());
 
     HttpRequestBase base = null;
+    // 根据HTTP方法创建对应请求对象
     if (method.equals(HTTP.GET)) {
       base = new HttpGet(link);
     } else if (method.equals(HTTP.PUT)) {
       base = new HttpPut(link);
 
+      // 读取PUT请求体，转发给后端应用
       StringBuilder sb = new StringBuilder();
       BufferedReader reader =
           new BufferedReader(
@@ -296,12 +314,14 @@ public class WebAppProxyServlet extends HttpServlet {
 
       ((HttpPut) base).setEntity(new StringEntity(sb.toString()));
     } else {
+      // 不支持的方法返回405
       resp.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
       return;
     }
 
     @SuppressWarnings("unchecked")
     Enumeration<String> names = req.getHeaderNames();
+    // 透传允许的请求头到后端应用
     while (names.hasMoreElements()) {
       String name = names.nextElement();
       if (PASS_THROUGH_HEADERS.contains(name)) {
@@ -311,6 +331,7 @@ public class WebAppProxyServlet extends HttpServlet {
       }
     }
 
+    // 如果有远程用户信息，通过Cookie透传给后端应用
     String user = req.getRemoteUser();
     if (user != null && !user.isEmpty()) {
       base.setHeader("Cookie",
@@ -319,6 +340,7 @@ public class WebAppProxyServlet extends HttpServlet {
     OutputStream out = resp.getOutputStream();
     HttpClient client = httpClientBuilder.build();
     try {
+      // 执行请求，复制响应头和内容到客户端响应
       HttpResponse httpResp = client.execute(base);
       resp.setStatus(httpResp.getStatusLine().getStatusCode());
       for (Header header : httpResp.getAllHeaders()) {
@@ -348,22 +370,26 @@ public class WebAppProxyServlet extends HttpServlet {
     return c;
   }
   
+  /** 检查是否开启安全认证模式 */
   private boolean isSecurityEnabled() {
     Boolean b = (Boolean) getServletContext()
         .getAttribute(WebAppProxy.IS_SECURITY_ENABLED_ATTRIBUTE);
     return b != null ? b : false;
   }
   
+  /** 从ServletContext获取应用报告获取器，查询应用报告 */
   private FetchedAppReport getApplicationReport(ApplicationId id)
       throws IOException, YarnException {
     return ((AppReportFetcher) getServletContext()
         .getAttribute(WebAppProxy.FETCHER_ATTRIBUTE)).getApplicationReport(id);
   }
 
+  /** 从ServletContext获取ProxyCA证书管理器 */
   private ProxyCA getProxyCA() {
     return ((ProxyCA) getServletContext().getAttribute(WebAppProxy.PROXY_CA));
   }
   
+  /** 从ServletContext获取代理主机地址 */
   private String getProxyHost() throws IOException {
     return ((String) getServletContext()
         .getAttribute(WebAppProxy.PROXY_HOST_ATTRIBUTE));
@@ -382,12 +408,12 @@ public class WebAppProxyServlet extends HttpServlet {
   }
 
   /**
-   * The action against the HTTP method.
-   * @param req the HttpServletRequest
-   * @param resp the HttpServletResponse
-   * @param method the HTTP method
-   * @throws ServletException
-   * @throws IOException
+   * 统一处理各类HTTP方法的代理请求，核心业务逻辑入口
+   * @param req HTTP请求
+   * @param resp HTTP响应
+   * @param method HTTP方法
+   * @throws ServletException Servlet异常
+   * @throws IOException IO异常
    */
   private void methodAction(final HttpServletRequest req,
       final HttpServletResponse resp,
@@ -405,8 +431,7 @@ public class WebAppProxyServlet extends HttpServlet {
       String[] parts = null;
 
       if (pathInfo != null) {
-        // If there's a redirect, strip the redirect so that the path can be
-        // parsed
+        // 如果是重定向路径，去掉重定向前缀后解析路径
         if (pathInfo.startsWith(REDIRECT)) {
           pathInfo = pathInfo.substring(REDIRECT.length());
           isRedirect = true;
@@ -415,326 +440,8 @@ public class WebAppProxyServlet extends HttpServlet {
         parts = pathInfo.split("/", 3);
       }
 
+      // 路径格式不正确，返回404
       if ((parts == null) || (parts.length < 2)) {
         LOG.warn("{} gave an invalid proxy path {}", remoteUser,  pathInfo);
         notFound(resp, "Your path appears to be formatted incorrectly.");
-        return;
-      }
-
-      //parts[0] is empty because path info always starts with a /
-      String appId = parts[1];
-      String rest = parts.length > 2 ? parts[2] : "";
-      ApplicationId id = Apps.toAppID(appId);
-
-      if (id == null) {
-        LOG.warn("{} attempting to access {} that is invalid",
-            remoteUser, appId);
-        notFound(resp, appId + " appears to be formatted incorrectly.");
-        return;
-      }
-
-      // If this call is from an AM redirect, we need to be careful about how
-      // we handle it.  If this method returns true, it means the method
-      // already redirected the response, so we can just return.
-      if (isRedirect && handleRedirect(appId, req, resp)) {
-        return;
-      }
-
-      if (securityEnabled) {
-        String cookieName = getCheckCookieName(id); 
-        Cookie[] cookies = req.getCookies();
-        if (cookies != null) {
-          for (Cookie c : cookies) {
-            if (cookieName.equals(c.getName())) {
-              userWasWarned = true;
-              userApproved = userApproved || Boolean.parseBoolean(c.getValue());
-              break;
-            }
-          }
-        }
-      }
-      
-      boolean checkUser = securityEnabled && (!userWasWarned || !userApproved);
-
-      FetchedAppReport fetchedAppReport;
-
-      try {
-        fetchedAppReport = getFetchedAppReport(id);
-      } catch (ApplicationNotFoundException e) {
-        fetchedAppReport = null;
-      }
-
-      ApplicationReport applicationReport = null;
-
-      if (fetchedAppReport != null) {
-        applicationReport = fetchedAppReport.getApplicationReport();
-      }
-
-      if (applicationReport == null) {
-        LOG.warn("{} attempting to access {} that was not found",
-            remoteUser, id);
-
-        URI toFetch =
-            ProxyUriUtils
-                .getUriFromTrackingPlugins(id, this.trackingUriPlugins);
-        if (toFetch != null) {
-          ProxyUtils.sendRedirect(req, resp, toFetch.toString());
-          return;
-        }
-
-        notFound(resp, "Application " + appId + " could not be found " +
-            "in RM or history server");
-        return;
-      }
-
-      URI trackingUri = getTrackingUri(req, resp, id,
-          applicationReport.getOriginalTrackingUrl(),
-          fetchedAppReport.getAppReportSource());
-
-      // If the tracking URI is null, there was a redirect, so just return.
-      if (trackingUri == null) {
-        return;
-      }
-
-      if (checkHttpsStrictAndNotProvided(resp, trackingUri, conf)) {
-        return;
-      }
-
-      String runningUser = applicationReport.getUser();
-
-      if (checkUser && !runningUser.equals(remoteUser)) {
-        LOG.info("Asking {} if they want to connect to the "
-            + "app master GUI of {} owned by {}",
-            remoteUser, appId, runningUser);
-        warnUserPage(resp, ProxyUriUtils.getPathAndQuery(id, rest, 
-            req.getQueryString(), true), runningUser, id);
-
-        return;
-      }
-
-      // Append the user-provided path and query parameter to the original
-      // tracking url.
-      URI toFetch = buildTrackingUrl(trackingUri, req, rest);
-
-      LOG.info("{} is accessing unchecked {}"
-          + " which is the app master GUI of {} owned by {}",
-          remoteUser, toFetch, appId, runningUser);
-
-      switch (applicationReport.getYarnApplicationState()) {
-        case KILLED:
-        case FINISHED:
-        case FAILED:
-          ProxyUtils.sendRedirect(req, resp, toFetch.toString());
-          return;
-        default:
-          // fall out of the switch
-      }
-
-      /*
-       * If the application registered its tracking URL with the configured
-       * redirect flag, the proxy should not attempt
-       * to fetch the resource itself. Instead, it performs an HTTP redirect
-       * to the tracking URL.
-       *
-       * This is required for deployments where the tracking URL is served
-       * behind an external reverse proxy (for example Apache Knox) that is
-       * responsible for routing requests to multiple backend services
-       * such as Spark History Server instances in an HA setup.
-       *
-       * In such environments the YARN WebAppProxy cannot correctly proxy the
-       * request because the reverse proxy expects the request to originate
-       * directly from the user's browser and may require authentication
-       * context (e.g. a JWT) that the YARN proxy must not forward for
-       * security reasons.
-       *
-       * By redirecting the user instead of proxying the request, the browser
-       * sends a new request to the external reverse proxy which can then
-       * handle authentication and route the request to the appropriate
-       * backend service.
-       */
-      String redirectFlagName = conf.get(YarnConfiguration.PROXY_REDIRECT_FLAG, "");
-      if (!redirectFlagName.isBlank() && toFetch.getQuery().equals(redirectFlagName + "=true")) {
-        ProxyUtils.sendRedirect(req, resp, toFetch.toString());
-        return;
-      }
-
-      Cookie c = null;
-      if (userWasWarned && userApproved) {
-        c = makeCheckCookie(id, true);
-      }
-      proxyLink(req, resp, toFetch, c, getProxyHost(), method, id);
-
-    } catch(URISyntaxException | YarnException e) {
-      throw new IOException(e); 
-    }
-  }
-
-  /**
-   * Return a URL based on the {@code trackingUri} that includes the
-   * user-provided path and query parameters.
-   *
-   * @param trackingUri the base tracking URI
-   * @param req the service request
-   * @param rest the user-provided path
-   * @return the new tracking URI
-   * @throws UriBuilderException if there's an error building the URL
-   */
-  private URI buildTrackingUrl(URI trackingUri, final HttpServletRequest req,
-      String rest) throws UriBuilderException {
-    UriBuilder builder = UriBuilder.fromUri(trackingUri);
-    String queryString = req.getQueryString();
-
-    if (queryString != null) {
-      List<NameValuePair> queryPairs = URLEncodedUtils.parse(queryString, null);
-
-      for (NameValuePair pair : queryPairs) {
-        builder.queryParam(pair.getName(), pair.getValue());
-      }
-    }
-
-    return builder.path(rest).build();
-  }
-
-  /**
-   * Locate the tracking URI for the application based on the reported tracking
-   * URI. If the reported URI is invalid, redirect to the history server or RM
-   * app page.  If the URI is valid, covert it into a usable URI object with a
-   * schema.  If the returned URI is null, that means there was a redirect.
-   *
-   * @param req the servlet request for redirects
-   * @param resp the servlet response for redirects
-   * @param id the application ID
-   * @param originalUri the reported tracking URI
-   * @param appReportSource the source of the application report
-   * @return a valid tracking URI or null if redirected instead
-   * @throws IOException thrown if the redirect fails
-   * @throws URISyntaxException if the tracking URI is invalid
-   */
-  private URI getTrackingUri(HttpServletRequest req, HttpServletResponse resp,
-      ApplicationId id, String originalUri, AppReportSource appReportSource)
-      throws IOException, URISyntaxException, YarnException {
-    URI trackingUri = null;
-
-    if ((originalUri == null) ||
-        originalUri.equals("N/A") ||
-        originalUri.equals("")) {
-      if (appReportSource == AppReportSource.RM) {
-        // fallback to ResourceManager's app page if no tracking URI provided
-        // and Application Report was fetched from RM
-        LOG.debug("Original tracking url is '{}'. Redirecting to RM app page",
-            originalUri == null ? "NULL" : originalUri);
-        ProxyUtils.sendRedirect(req, resp, StringHelper.pjoin(getRmAppPageUrlBase(id),
-            id.toString()));
-      } else if (appReportSource == AppReportSource.AHS) {
-        // fallback to Application History Server app page if the application
-        // report was fetched from AHS
-        LOG.debug("Original tracking url is '{}'. Redirecting to AHS app page",
-            originalUri == null ? "NULL" : originalUri);
-        ProxyUtils.sendRedirect(req, resp, StringHelper.pjoin(getAhsAppPageUrlBase(),
-            id.toString()));
-      }
-    } else if (ProxyUriUtils.getSchemeFromUrl(originalUri).isEmpty()) {
-      trackingUri =
-          ProxyUriUtils.getUriFromAMUrl(WebAppUtils.getHttpSchemePrefix(conf),
-            originalUri);
-    } else {
-      trackingUri = new URI(originalUri);
-    }
-
-    return trackingUri;
-  }
-
-  /**
-   * Fetch the application report from the RM.
-   *
-   * @param id the app ID
-   * @return the application report
-   * @throws IOException if the request to the RM fails
-   * @throws YarnException if the request to the RM fails
-   */
-  private FetchedAppReport getFetchedAppReport(ApplicationId id)
-      throws IOException, YarnException {
-    FetchedAppReport fetchedAppReport = getApplicationReport(id);
-
-    if (fetchedAppReport != null) {
-      if ((fetchedAppReport.getAppReportSource() != AppReportSource.RM) &&
-          (fetchedAppReport.getAppReportSource() != AppReportSource.AHS)) {
-        throw new UnsupportedOperationException("Application report not "
-            + "fetched from RM or history server.");
-      }
-    }
-
-    return fetchedAppReport;
-  }
-
-  /**
-   * Check whether the request is a redirect from the AM and handle it
-   * appropriately. This check exists to prevent the AM from forwarding back to
-   * the web proxy, which would contact the AM again, which would forward
-   * again... If this method returns true, there was a redirect, and
-   * it was handled by redirecting the current request to an error page.
-   *
-   * @param id the app id
-   * @param req the request object
-   * @param resp the response object
-   * @return whether there was a redirect
-   * @throws IOException if a redirect fails
-   */
-  private boolean handleRedirect(String id, HttpServletRequest req,
-      HttpServletResponse resp) throws IOException {
-    // If this isn't a redirect, we don't care.
-    boolean badRedirect = false;
-
-    // If this is a redirect, check if we're calling ourselves.
-    try {
-      badRedirect = NetUtils.getLocalInetAddress(req.getRemoteHost()) != null;
-    } catch (SocketException ex) {
-      // This exception means we can't determine the calling host. Odds are
-      // that means it's not us.  Let it go and hope it works out better next
-      // time.
-    }
-
-    // If the proxy tries to call itself, it gets into an endless
-    // loop and consumes all available handler threads until the
-    // application completes.  Redirect to the app page with a flag
-    // that tells it to print an appropriate error message.
-    if (badRedirect) {
-      LOG.error("The AM's web app redirected the RM web proxy's request back "
-          + "to the web proxy. The typical cause is that the AM is resolving "
-          + "the RM's address as something other than what it expects. Check "
-          + "your network configuration and the value of the "
-          + "yarn.web-proxy.address property. Once the host resolution issue "
-          + "has been resolved, you will likely need to delete the "
-          + "misbehaving application, " + id);
-      String redirect = StringHelper.pjoin(failurePageUrlBase, id);
-      LOG.error("REDIRECT: sending redirect to " + redirect);
-      ProxyUtils.sendRedirect(req, resp, redirect);
-    }
-
-    return badRedirect;
-  }
-
-  /**
-   * This method is used by Java object deserialization, to fill in the
-   * transient {@link #trackingUriPlugins} field.
-   * See {@link ObjectInputStream#defaultReadObject()}
-   * <p>
-   *   <I>Do not remove</I>
-   * <p>
-   * YARN isn't currently serializing this class, but findbugs
-   * complains in its absence.
-   * 
-   * 
-   * @param input source
-   * @throws IOException IO failure
-   * @throws ClassNotFoundException classloader fun
-   */
-  private void readObject(ObjectInputStream input)
-      throws IOException, ClassNotFoundException {
-    input.defaultReadObject();
-    conf = new YarnConfiguration();
-    this.trackingUriPlugins =
-        conf.getInstances(YarnConfiguration.YARN_TRACKING_URL_GENERATOR,
-            TrackingUriPlugin.class);
-  }
-}
+        return

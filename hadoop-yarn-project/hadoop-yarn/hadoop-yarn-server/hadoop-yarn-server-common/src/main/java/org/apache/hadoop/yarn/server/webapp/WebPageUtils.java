@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,17 +25,34 @@ import org.apache.hadoop.yarn.webapp.hamlet2.Hamlet;
 
 import static org.apache.hadoop.yarn.webapp.view.JQueryUI.tableInit;
 
-
+/**
+ * YARN服务端Web页面工具类，提供DataTables表格初始化配置和工具区域生成功能。
+ */
 public class WebPageUtils {
 
+  /**
+   * 生成应用列表表格的初始化JavaScript配置，默认参数。
+   * @return DataTables初始化配置字符串
+   */
   public static String appsTableInit() {
     return appsTableInit(false, true);
   }
 
+  /**
+   * 生成应用列表表格的初始化JavaScript配置，指定是否为RM页面。
+   * @param isResourceManager 是否是ResourceManager页面
+   * @return DataTables初始化配置字符串
+   */
   public static String appsTableInit(boolean isResourceManager) {
     return appsTableInit(false, isResourceManager);
   }
 
+  /**
+   * 生成应用列表表格的初始化JavaScript配置，支持自定义页面类型。
+   * @param isFairSchedulerPage 是否是公平调度器页面
+   * @param isResourceManager 是否是ResourceManager页面
+   * @return DataTables初始化配置字符串
+   */
   public static String appsTableInit(
       boolean isFairSchedulerPage, boolean isResourceManager) {
     // id, user, name, app type, app tags, queue, priority,
@@ -51,6 +69,12 @@ public class WebPageUtils {
       .append(", aaSorting: [[0, 'desc']]}").toString();
   }
 
+  /**
+   * 根据页面类型生成应用列表表格的列定义配置。
+   * @param isFairSchedulerPage 是否是公平调度器页面
+   * @param isResourceManager 是否是ResourceManager页面
+   * @return DataTables列定义JSON字符串
+   */
   private static String getAppsTableColumnDefs(
       boolean isFairSchedulerPage, boolean isResourceManager) {
     // default progress column index is 11
@@ -80,6 +104,10 @@ public class WebPageUtils {
     return sb.toString();
   }
 
+  /**
+   * 生成尝试列表表格的初始化JavaScript配置。
+   * @return DataTables初始化配置字符串
+   */
   public static String attemptsTableInit() {
     return tableInit().append(", 'aaData': attemptsTableData")
       .append(", bDeferRender: true").append(", bProcessing: true")
@@ -88,6 +116,10 @@ public class WebPageUtils {
       .append(", aaSorting: [[0, 'desc']]}").toString();
   }
 
+  /**
+   * 生成尝试列表表格的列定义配置。
+   * @return DataTables列定义JSON字符串
+   */
   private static String getAttemptsTableColumnDefs() {
     StringBuilder sb = new StringBuilder();
     return sb.append("[\n").append("{'sType':'natural', 'aTargets': [0]")
@@ -96,6 +128,10 @@ public class WebPageUtils {
       .append(", 'mRender': renderHadoopDate }]").toString();
   }
 
+  /**
+   * 生成容器列表表格的初始化JavaScript配置。
+   * @return DataTables初始化配置字符串
+   */
   public static String containersTableInit() {
     return tableInit().append(", 'aaData': containersTableData")
       .append(", bDeferRender: true").append(", bProcessing: true")
@@ -104,12 +140,20 @@ public class WebPageUtils {
       .append(", aaSorting: [[0, 'desc']]}").toString();
   }
 
+  /**
+   * 生成容器列表表格的列定义配置。
+   * @return DataTables列定义JSON字符串
+   */
   private static String getContainersTableColumnDefs() {
     StringBuilder sb = new StringBuilder();
     return sb.append("[\n").append("{'sType':'natural', 'aTargets': [0]")
       .append(", 'mRender': parseHadoopID }]").toString();
   }
 
+  /**
+   * 生成资源请求列表表格的初始化JavaScript配置。
+   * @return DataTables初始化配置字符串
+   */
   public static String resourceRequestsTableInit() {
     return tableInit().append(", 'aaData': resourceRequestsTableData")
         .append(", bDeferRender: true").append(", bProcessing: true}")
@@ -117,11 +161,12 @@ public class WebPageUtils {
   }
 
   /**
-   * Creates the tool section after a closed section. If it is not enabled,
-   * the section is created without any links.
-   * @param section a closed HTML div section
-   * @param conf configuration object
-   * @return the tool section, if it is enabled, null otherwise
+   * 在现有HTML区块后添加工具链接区域，根据配置决定是否启用工具。
+   * 如果启用工具则添加配置、日志、栈信息、metrics等常用工具链接；
+   * 如果未启用则仅显示禁用提示。
+   * @param section 已关闭的HTML div区块
+   * @param conf YARN配置对象
+   * @return 启用时返回工具区域的无序列表对象，未启用时返回null
    */
   public static Hamlet.UL<Hamlet.DIV<Hamlet>> appendToolSection(
       Hamlet.DIV<Hamlet> section, Configuration conf) {

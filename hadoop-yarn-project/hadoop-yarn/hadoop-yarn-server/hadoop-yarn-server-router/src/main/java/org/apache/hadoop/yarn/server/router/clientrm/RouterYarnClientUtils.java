@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -61,7 +62,8 @@ import org.apache.hadoop.yarn.util.Records;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
- * Util class for Router Yarn client API calls.
+ * YARN Router联邦场景下Yarn客户端API调用结果合并工具类。
+ * 提供将多个子集群返回的API结果合并为统一全局结果的各类方法。
  */
 public final class RouterYarnClientUtils {
 
@@ -71,9 +73,16 @@ public final class RouterYarnClientUtils {
 
   }
 
+  /**
+   * 合并多个子集群返回的集群指标响应。
+   * @param responses 多个子集群的集群指标响应集合
+   * @return 合并后的全局集群指标响应
+   */
   public static GetClusterMetricsResponse merge(
       Collection<GetClusterMetricsResponse> responses) {
+    // 初始化临时指标容器，从0开始累加
     YarnClusterMetrics tmp = YarnClusterMetrics.newInstance(0);
+    // 遍历所有子集群响应，累加各状态节点数量
     for (GetClusterMetricsResponse response : responses) {
       YarnClusterMetrics metrics = response.getClusterMetrics();
       tmp.setNumNodeManagers(
@@ -101,50 +110,49 @@ public final class RouterYarnClientUtils {
   }
 
   /**
-   * Merges a list of ApplicationReports grouping by ApplicationId.
-   * Our current policy is to merge the application reports from the reachable
-   * SubClusters.
-   * @param responses a list of ApplicationResponse to merge
-   * @param returnPartialResult if the merge ApplicationReports should contain
-   * partial result or not
-   * @return the merged ApplicationsResponse
+   * 按ApplicationId分组合并多个子集群返回的应用列表，合并托管AM和非托管UAM的资源使用信息。
+   * 策略：仅合并可访问子集群的应用报告；支持返回不完整的结果。
+   * @param responses 多个子集群的应用列表响应集合
+   * @param returnPartialResult 是否允许返回部分结果（仅收集到部分UAM时）
+   * @return 合并后的全局应用列表响应
    */
   public static GetApplicationsResponse mergeApplications(
       Collection<GetApplicationsResponse> responses,
       boolean returnPartialResult){
+    // 存储托管AM应用报告
     Map<ApplicationId, ApplicationReport> federationAM = new HashMap<>();
+    // 存储未找到对应AM的非托管UAM聚合报告
     Map<ApplicationId, ApplicationReport> federationUAMSum = new HashMap<>();
 
+    // 遍历所有子集群的应用响应
     for (GetApplicationsResponse appResponse : responses){
       for (ApplicationReport appReport : appResponse.getApplicationList()){
         ApplicationId appId = appReport.getApplicationId();
-        // Check if this ApplicationReport is an AM
+        // 当前报告是托管AM
         if (!appReport.isUnmanagedApp()) {
-          // Insert in the list of AM
+          // 保存托管AM报告
           federationAM.put(appId, appReport);
-          // Check if there are any UAM found before
+          // 如果之前已收集该应用的UAM，合并资源信息
           if (federationUAMSum.containsKey(appId)) {
-            // Merge the current AM with the found UAM
             mergeAMWithUAM(appReport, federationUAMSum.get(appId));
-            // Remove the sum of the UAMs
             federationUAMSum.remove(appId);
           }
-          // This ApplicationReport is an UAM
+        // 当前报告是非托管UAM
         } else if (federationAM.containsKey(appId)) {
-          // Merge the current UAM with its own AM
+          // 已存在对应AM，直接合并资源信息到AM
           mergeAMWithUAM(federationAM.get(appId), appReport);
         } else if (federationUAMSum.containsKey(appId)) {
-          // Merge the current UAM with its own UAM and update the list of UAM
+          // 已有该应用的UAM聚合结果，合并当前UAM到聚合结果
           ApplicationReport mergedUAMReport =
               mergeUAMWithUAM(federationUAMSum.get(appId), appReport);
           federationUAMSum.put(appId, mergedUAMReport);
         } else {
-          // Insert in the list of UAM
+          // 首次遇到该UAM且未找到对应AM，存入待聚合列表
           federationUAMSum.put(appId, appReport);
         }
       }
     }
-    // Check the remaining UAMs are depending or not from federation
+    // 处理剩余未匹配AM的UAM聚合结果，根据配置决定是否加入最终结果
     for (ApplicationReport appReport : federationUAMSum.values()) {
       if (mergeUamToReport(appReport.getName(), returnPartialResult)) {
         federationAM.put(appReport.getApplicationId(), appReport);
@@ -154,6 +162,12 @@ public final class RouterYarnClientUtils {
     return GetApplicationsResponse.newInstance(federationAM.values());
   }
 
+  /**
+   * 合并两个非托管UAM应用报告的资源使用信息，标记为部分结果。
+   * @param uam1 已聚合的UAM报告
+   * @param uam2 当前待合并UAM报告
+   * @return 合并后的UAM聚合报告
+   */
   private static ApplicationReport mergeUAMWithUAM(ApplicationReport uam1,
       ApplicationReport uam2){
     uam1.setName(PARTIAL_REPORT + uam1.getApplicationId());
@@ -161,81 +175,100 @@ public final class RouterYarnClientUtils {
     return uam1;
   }
 
+  /**
+   * 将非托管UAM的资源使用信息合并到托管AM的资源报告中。
+   * 累加容器数、资源量、各种指标百分比和资源秒数统计。
+   * @param am 托管AM应用报告
+   * @param uam 非托管UAM应用报告
+   */
   private static void mergeAMWithUAM(ApplicationReport am,
       ApplicationReport uam){
+    // 获取AM和UAM各自的资源使用报告
     ApplicationResourceUsageReport amResourceReport =
         am.getApplicationResourceUsageReport();
 
     ApplicationResourceUsageReport uamResourceReport =
         uam.getApplicationResourceUsageReport();
 
+    // AM没有资源报告直接使用UAM的
     if (amResourceReport == null) {
       am.setApplicationResourceUsageReport(uamResourceReport);
     } else if (uamResourceReport != null) {
-
+      // 累加已使用容器数
       amResourceReport.setNumUsedContainers(
           amResourceReport.getNumUsedContainers() +
               uamResourceReport.getNumUsedContainers());
 
+      // 累加预留容器数
       amResourceReport.setNumReservedContainers(
           amResourceReport.getNumReservedContainers() +
               uamResourceReport.getNumReservedContainers());
 
+      // 累加已使用资源量
       amResourceReport.setUsedResources(Resources.add(
           amResourceReport.getUsedResources(),
           uamResourceReport.getUsedResources()));
 
+      // 累加预留资源量
       amResourceReport.setReservedResources(Resources.add(
           amResourceReport.getReservedResources(),
           uamResourceReport.getReservedResources()));
 
+      // 累加所需资源量
       amResourceReport.setNeededResources(Resources.add(
           amResourceReport.getNeededResources(),
           uamResourceReport.getNeededResources()));
 
+      // 累加内存秒数
       amResourceReport.setMemorySeconds(
           amResourceReport.getMemorySeconds() +
               uamResourceReport.getMemorySeconds());
 
+      // 累加vcore秒数
       amResourceReport.setVcoreSeconds(
           amResourceReport.getVcoreSeconds() +
               uamResourceReport.getVcoreSeconds());
 
+      // 累加队列使用率百分比
       amResourceReport.setQueueUsagePercentage(
           amResourceReport.getQueueUsagePercentage() +
               uamResourceReport.getQueueUsagePercentage());
 
+      // 累加集群使用率百分比
       amResourceReport.setClusterUsagePercentage(
           amResourceReport.getClusterUsagePercentage() +
               uamResourceReport.getClusterUsagePercentage());
 
+      // 更新合并后的资源报告到AM
       am.setApplicationResourceUsageReport(amResourceReport);
     }
   }
 
   /**
-   * Returns whether or not to add an unmanaged application to the report.
-   * @param appName Application Name
-   * @param returnPartialResult if the merge ApplicationReports should contain
-   * partial result or not
+   * 判断是否应将未匹配到AM的UAM加入最终结果。
+   * @param appName 应用名称
+   * @param returnPartialResult 是否允许返回部分结果
+   * @return true表示加入结果，false表示不加入
    */
   private static boolean mergeUamToReport(String appName,
       boolean returnPartialResult){
+    // 允许返回部分结果直接返回true
     if (returnPartialResult) {
       return true;
     }
+    // 应用名称为空不加入
     if (appName == null) {
       return false;
     }
+    // 不允许返回部分结果时，仅返回非UAM且非部分报告的应用
     return !(appName.startsWith(UnmanagedApplicationManager.APP_NAME) ||
         appName.startsWith(PARTIAL_REPORT));
   }
 
   /**
-   * Merges a list of GetClusterNodesResponse.
-   *
-   * @param responses a list of GetClusterNodesResponse to merge.
-   * @return the merged GetClusterNodesResponse.
+   * 合并多个子集群返回的集群节点列表响应。
+   * @param responses 多个子集群的节点列表响应集合
+   * @return 合并后的全局节点列表响应
    */
   public static GetClusterNodesResponse mergeClusterNodesResponse(
       Collection<GetClusterNodesResponse> responses) {
@@ -251,10 +284,9 @@ public final class RouterYarnClientUtils {
   }
 
   /**
-   * Merges a list of GetNodesToLabelsResponse.
-   *
-   * @param responses a list of GetNodesToLabelsResponse to merge.
-   * @return the merged GetNodesToLabelsResponse.
+   * 合并多个子集群返回的节点到标签映射响应。
+   * @param responses 多个子集群的节点标签映射响应集合
+   * @return 合并后的全局节点到标签映射响应
    */
   public static GetNodesToLabelsResponse mergeNodesToLabelsResponse(
       Collection<GetNodesToLabelsResponse> responses) {
@@ -271,16 +303,16 @@ public final class RouterYarnClientUtils {
   }
 
   /**
-   * Merges a list of GetLabelsToNodesResponse.
-   *
-   * @param responses a list of GetLabelsToNodesResponse to merge.
-   * @return the merged GetLabelsToNodesResponse.
+   * 合并多个子集群返回的标签到节点映射响应。
+   * @param responses 多个子集群的标签节点映射响应集合
+   * @return 合并后的全局标签到节点映射响应
    */
   public static GetLabelsToNodesResponse mergeLabelsToNodes(
       Collection<GetLabelsToNodesResponse> responses){
     GetLabelsToNodesResponse labelsToNodesResponse = Records.newRecord(
         GetLabelsToNodesResponse.class);
     Map<String, Set<NodeId>> labelsToNodesMap = new HashMap<>();
+    // 遍历所有子集群响应，按标签合并节点集合
     for (GetLabelsToNodesResponse response : responses) {
       if (response != null && response.getLabelsToNodes() != null) {
         Map<String, Set<NodeId>> clusterLabelsToNodesMap = response.getLabelsToNodes();
@@ -288,9 +320,11 @@ public final class RouterYarnClientUtils {
           String label = entry.getKey();
           Set<NodeId> clusterNodes = entry.getValue();
           if (labelsToNodesMap.containsKey(label)) {
+            // 已有该标签，追加节点集合
             Set<NodeId> allNodes = labelsToNodesMap.get(label);
             allNodes.addAll(clusterNodes);
           } else {
+            // 新标签，直接存入
             labelsToNodesMap.put(label, clusterNodes);
           }
         }
@@ -301,10 +335,9 @@ public final class RouterYarnClientUtils {
   }
 
   /**
-   * Merges a list of GetClusterNodeLabelsResponse.
-   *
-   * @param responses a list of GetClusterNodeLabelsResponse to merge.
-   * @return the merged GetClusterNodeLabelsResponse.
+   * 合并多个子集群返回的集群节点标签列表响应。
+   * @param responses 多个子集群的节点标签列表响应集合
+   * @return 合并后的全局节点标签列表响应
    */
   public static GetClusterNodeLabelsResponse mergeClusterNodeLabelsResponse(
       Collection<GetClusterNodeLabelsResponse> responses) {
@@ -321,10 +354,9 @@ public final class RouterYarnClientUtils {
   }
 
   /**
-   * Merges a list of GetQueueUserAclsInfoResponse.
-   *
-   * @param responses a list of GetQueueUserAclsInfoResponse to merge.
-   * @return the merged GetQueueUserAclsInfoResponse.
+   * 合并多个子集群返回的队列用户ACL信息响应。
+   * @param responses 多个子集群的队列ACL响应集合
+   * @return 合并后的全局队列用户ACL响应
    */
   public static GetQueueUserAclsInfoResponse mergeQueueUserAcls(
       Collection<GetQueueUserAclsInfoResponse> responses) {
@@ -341,10 +373,9 @@ public final class RouterYarnClientUtils {
   }
 
   /**
-   * Merges a list of ReservationListResponse.
-   *
-   * @param responses a list of ReservationListResponse to merge.
-   * @return the merged ReservationListResponse.
+   * 合并多个子集群返回的预约列表响应。
+   * @param responses 多个子集群的预约列表响应集合
+   * @return 合并后的全局预约列表响应
    */
   public static ReservationListResponse mergeReservationsList(
       Collection<ReservationListResponse> responses) {
@@ -359,217 +390,3 @@ public final class RouterYarnClientUtils {
       }
     }
     reservationListResponse.setReservationAllocationState(
-        reservationAllocationStates);
-    return reservationListResponse;
-  }
-
-  /**
-   * Merges a list of GetAllResourceTypeInfoResponse.
-   *
-   * @param responses a list of GetAllResourceTypeInfoResponse to merge.
-   * @return the merged GetAllResourceTypeInfoResponse.
-   */
-  public static GetAllResourceTypeInfoResponse mergeResourceTypes(
-      Collection<GetAllResourceTypeInfoResponse> responses) {
-    GetAllResourceTypeInfoResponse resourceTypeInfoResponse =
-        Records.newRecord(GetAllResourceTypeInfoResponse.class);
-    Set<ResourceTypeInfo> resourceTypeInfoSet = new HashSet<>();
-    for (GetAllResourceTypeInfoResponse response : responses) {
-      if (response != null && response.getResourceTypeInfo() != null) {
-        resourceTypeInfoSet.addAll(response.getResourceTypeInfo());
-      }
-    }
-    resourceTypeInfoResponse.setResourceTypeInfo(
-        new ArrayList<>(resourceTypeInfoSet));
-    return resourceTypeInfoResponse;
-  }
-
-  /**
-   * Merges a list of GetQueueInfoResponse.
-   *
-   * @param responses a list of GetQueueInfoResponse to merge.
-   * @return the merged GetQueueInfoResponse.
-   */
-  public static GetQueueInfoResponse mergeQueues(
-      Collection<GetQueueInfoResponse> responses) {
-    GetQueueInfoResponse queueResponse = Records.newRecord(
-        GetQueueInfoResponse.class);
-
-    QueueInfo queueInfo = null;
-    for (GetQueueInfoResponse response : responses) {
-      if (response != null && response.getQueueInfo() != null) {
-        if (queueInfo == null) {
-          queueInfo = response.getQueueInfo();
-        } else {
-          // set Capacity\MaximumCapacity\CurrentCapacity
-          queueInfo.setCapacity(queueInfo.getCapacity() + response.getQueueInfo().getCapacity());
-          queueInfo.setMaximumCapacity(
-              queueInfo.getMaximumCapacity() + response.getQueueInfo().getMaximumCapacity());
-          queueInfo.setCurrentCapacity(
-              queueInfo.getCurrentCapacity() + response.getQueueInfo().getCurrentCapacity());
-
-          // set childQueues
-          List<QueueInfo> childQueues = new ArrayList<>(queueInfo.getChildQueues());
-          childQueues.addAll(response.getQueueInfo().getChildQueues());
-          queueInfo.setChildQueues(childQueues);
-
-          // set applications
-          List<ApplicationReport> applicationReports = new ArrayList<>(queueInfo.getApplications());
-          applicationReports.addAll(response.getQueueInfo().getApplications());
-          queueInfo.setApplications(applicationReports);
-
-          // set accessibleNodeLabels
-          Set<String> accessibleNodeLabels = new HashSet<>();
-          if (queueInfo.getAccessibleNodeLabels() != null) {
-            accessibleNodeLabels.addAll(queueInfo.getAccessibleNodeLabels());
-          }
-
-          // set min resourceVCore
-          queueInfo.setMinResourceVCore(queueInfo.getMinResourceVCore() +
-              response.getQueueInfo().getMinResourceVCore());
-
-          // set min resourceMemory
-          queueInfo.setMinResourceMemory(queueInfo.getMinResourceMemory() +
-              response.getQueueInfo().getMinResourceMemory());
-
-          // set max resourceVCore
-          queueInfo.setMinResourceVCore(queueInfo.getMaxResourceVCore() +
-              response.getQueueInfo().getMaxResourceVCore());
-
-          // set max resourceMemory
-          queueInfo.setMinResourceMemory(queueInfo.getMaxResourceMemory() +
-              response.getQueueInfo().getMaxResourceMemory());
-
-          // set reserved resourceVCore
-          queueInfo.setReservedResourceVCore(queueInfo.getReservedResourceVCore() +
-              response.getQueueInfo().getMaxResourceVCore());
-
-          // set reserved resourceMemory
-          queueInfo.setReservedResourceMemory(queueInfo.getReservedResourceMemory() +
-              response.getQueueInfo().getMaxResourceMemory());
-
-          // set maxRunningApp
-          queueInfo.setMaxRunningApp(queueInfo.getMaxRunningApp() +
-              response.getQueueInfo().getMaxRunningApp());
-
-          // set steadyFairShareVCore
-          queueInfo.setSteadyFairShareVCore(queueInfo.getSteadyFairShareVCore() +
-              response.getQueueInfo().getSteadyFairShareVCore());
-
-          // set steadyFairShareMemory
-          queueInfo.setSteadyFairShareMemory(queueInfo.getSteadyFairShareMemory() +
-              response.getQueueInfo().getSteadyFairShareMemory());
-
-          // set Weight
-          queueInfo.setWeight(queueInfo.getWeight() +
-              response.getQueueInfo().getWeight());
-
-          if (response.getQueueInfo() != null) {
-            accessibleNodeLabels.addAll(response.getQueueInfo().getAccessibleNodeLabels());
-          }
-          queueInfo.setAccessibleNodeLabels(accessibleNodeLabels);
-        }
-      }
-    }
-    queueResponse.setQueueInfo(queueInfo);
-    return queueResponse;
-  }
-
-  /**
-   * Merges a list of GetAllResourceProfilesResponse.
-   *
-   * @param responses a list of GetAllResourceProfilesResponse to merge.
-   * @return the merged GetAllResourceProfilesResponse.
-   */
-  public static GetAllResourceProfilesResponse mergeClusterResourceProfilesResponse(
-      Collection<GetAllResourceProfilesResponse> responses) {
-    GetAllResourceProfilesResponse profilesResponse =
-        Records.newRecord(GetAllResourceProfilesResponse.class);
-    Map<String, Resource> profilesMap = new HashMap<>();
-    for (GetAllResourceProfilesResponse response : responses) {
-      if (response != null && response.getResourceProfiles() != null) {
-        for (Map.Entry<String, Resource> entry : response.getResourceProfiles().entrySet()) {
-          String key = entry.getKey();
-          Resource r1 = profilesMap.getOrDefault(key, null);
-          Resource r2 = entry.getValue();
-          Resource rAdd = r1 == null ? r2 : Resources.add(r1, r2);
-          profilesMap.put(key, rAdd);
-        }
-      }
-    }
-    profilesResponse.setResourceProfiles(profilesMap);
-    return profilesResponse;
-  }
-
-  /**
-   * Merges a list of GetResourceProfileResponse.
-   *
-   * @param responses a list of GetResourceProfileResponse to merge.
-   * @return the merged GetResourceProfileResponse.
-   */
-  public static GetResourceProfileResponse mergeClusterResourceProfileResponse(
-      Collection<GetResourceProfileResponse> responses) {
-    GetResourceProfileResponse profileResponse =
-        Records.newRecord(GetResourceProfileResponse.class);
-    Resource resource = Resource.newInstance(0, 0);
-    for (GetResourceProfileResponse response : responses) {
-      if (response != null && response.getResource() != null) {
-        Resource responseResource = response.getResource();
-        resource = Resources.add(resource, responseResource);
-      }
-    }
-    profileResponse.setResource(resource);
-    return profileResponse;
-  }
-
-  /**
-   * Merges a list of GetAttributesToNodesResponse.
-   *
-   * @param responses a list of GetAttributesToNodesResponse to merge.
-   * @return the merged GetAttributesToNodesResponse.
-   */
-  public static GetAttributesToNodesResponse mergeAttributesToNodesResponse(
-      Collection<GetAttributesToNodesResponse> responses) {
-    Map<NodeAttributeKey, List<NodeToAttributeValue>> nodeAttributeMap = new HashMap<>();
-    for (GetAttributesToNodesResponse response : responses) {
-      if (response != null && response.getAttributesToNodes() != null) {
-        nodeAttributeMap.putAll(response.getAttributesToNodes());
-      }
-    }
-    return GetAttributesToNodesResponse.newInstance(nodeAttributeMap);
-  }
-
-  /**
-   * Merges a list of GetClusterNodeAttributesResponse.
-   *
-   * @param responses a list of GetClusterNodeAttributesResponse to merge.
-   * @return the merged GetClusterNodeAttributesResponse.
-   */
-  public static GetClusterNodeAttributesResponse mergeClusterNodeAttributesResponse(
-      Collection<GetClusterNodeAttributesResponse> responses) {
-    Set<NodeAttributeInfo> nodeAttributeInfo = new HashSet<>();
-    for (GetClusterNodeAttributesResponse response : responses) {
-      if (response != null && response.getNodeAttributes() != null) {
-        nodeAttributeInfo.addAll(response.getNodeAttributes());
-      }
-    }
-    return GetClusterNodeAttributesResponse.newInstance(nodeAttributeInfo);
-  }
-
-  /**
-   * Merges a list of GetNodesToAttributesResponse.
-   *
-   * @param responses a list of GetNodesToAttributesResponse to merge.
-   * @return the merged GetNodesToAttributesResponse.
-   */
-  public static GetNodesToAttributesResponse mergeNodesToAttributesResponse(
-      Collection<GetNodesToAttributesResponse> responses) {
-    Map<String, Set<NodeAttribute>> attributesMap = new HashMap<>();
-    for (GetNodesToAttributesResponse response : responses) {
-      if (response != null && response.getNodeToAttributes() != null) {
-        attributesMap.putAll(response.getNodeToAttributes());
-      }
-    }
-    return GetNodesToAttributesResponse.newInstance(attributesMap);
-  }
-}

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,9 +22,14 @@ package org.apache.hadoop.yarn.server.api.protocolrecords;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Node Manager's unregister response.
+ * NodeManager向ResourceManager注销节点的响应封装类，
+ * 包含ResourceManager对NodeManager注销请求的处理结果。
  */
 public abstract class UnRegisterNodeManagerResponse {
+  /**
+   * 创建UnRegisterNodeManagerResponse实例工厂方法
+   * @return 新的注销响应实例
+   */
   public static UnRegisterNodeManagerResponse newInstance() {
     return Records.newRecord(UnRegisterNodeManagerResponse.class);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,15 +30,22 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * This class is used by
- * {@link TargetApplicationsNamespace#evaluate(TargetApplications)} to evaluate
- * a namespace.
+ * YARN调度约束处理中，存储目标应用集合及其标签信息，
+ * 供命名空间约束评估时查询匹配的应用列表。
+ * 该类由 {@link TargetApplicationsNamespace#evaluate(TargetApplications)} 使用，用于命名空间评估。
  */
 public class TargetApplications {
 
+  // 当前正在调度分配容器的应用ID
   private ApplicationId currentAppId;
+  // 所有目标应用及其标签集合，key为应用ID，value为该应用绑定的标签列表
   private Map<ApplicationId, Set<String>> allApps;
 
+  /**
+   * 构造函数，仅传入应用ID不携带标签信息。
+   * @param currentApplicationId 当前调度的应用ID
+   * @param allApplicationIds 所有目标应用ID集合
+   */
   public TargetApplications(ApplicationId currentApplicationId,
       Set<ApplicationId> allApplicationIds) {
     this.currentAppId = currentApplicationId;
@@ -48,21 +56,38 @@ public class TargetApplications {
     }
   }
 
+  /**
+   * 构造函数，传入当前应用和所有应用的标签信息。
+   * @param currentApplicationId 当前调度的应用ID
+   * @param allApplicationIds 所有目标应用及其标签集合
+   */
   public TargetApplications(ApplicationId currentApplicationId,
       Map<ApplicationId, Set<String>> allApplicationIds) {
     this.currentAppId = currentApplicationId;
     this.allApps = allApplicationIds;
   }
 
+  /**
+   * 获取当前正在调度的应用ID。
+   * @return 当前应用ID
+   */
   public ApplicationId getCurrentApplicationId() {
     return this.currentAppId;
   }
 
+  /**
+   * 获取所有目标应用的ID集合。
+   * @return 所有目标应用ID集合，为空时返回空集合
+   */
   public Set<ApplicationId> getAllApplicationIds() {
     return this.allApps == null ?
         ImmutableSet.of() : allApps.keySet();
   }
 
+  /**
+   * 获取除当前应用外的所有其他目标应用ID集合。
+   * @return 其他应用ID集合，无其他应用时返回空集合
+   */
   public Set<ApplicationId> getOtherApplicationIds() {
     if (getAllApplicationIds() == null
         || getAllApplicationIds().isEmpty()) {
@@ -74,6 +99,11 @@ public class TargetApplications {
         .collect(Collectors.toSet());
   }
 
+  /**
+   * 根据标签查询所有带有该标签的应用ID集合。
+   * @param applicationTag 应用标签
+   * @return 匹配该标签的所有应用ID集合，无匹配时返回空集合
+   */
   public Set<ApplicationId> getApplicationIdsByTag(String applicationTag) {
     Set<ApplicationId> result = new HashSet<>();
     if (Strings.isNullOrEmpty(applicationTag)

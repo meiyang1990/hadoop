@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,10 +21,18 @@ package org.apache.hadoop.hdfs.server.namenode;
 import java.io.IOException;
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 保存命名空间操作被取消时抛出的异常
+ * 当NameNode执行元数据持久化操作（保存命名空间到磁盘）中途被取消时，抛出此异常
+ */
 @InterfaceAudience.Private
 public class SaveNamespaceCancelledException extends IOException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造保存命名空间取消异常
+   * @param cancelReason 取消原因描述
+   */
   SaveNamespaceCancelledException(String cancelReason) {
     super(cancelReason);
   }

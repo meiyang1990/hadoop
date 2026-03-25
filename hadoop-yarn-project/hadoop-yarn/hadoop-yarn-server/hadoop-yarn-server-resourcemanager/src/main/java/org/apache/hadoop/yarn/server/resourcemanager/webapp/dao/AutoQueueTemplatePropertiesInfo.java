@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,6 +26,10 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 import java.util.ArrayList;
 
+/**
+ * 自动创建队列模板配置参数信息DAO，用于YARN ResourceManager Web UI返回自动队列模板配置信息
+ * 封装自动创建队列的模板配置属性列表，支持XML序列化输出
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AutoQueueTemplatePropertiesInfo {
@@ -35,10 +40,18 @@ public class AutoQueueTemplatePropertiesInfo {
   public AutoQueueTemplatePropertiesInfo() {
   }
 
+  /**
+   * 获取所有模板配置项列表
+   * @return 配置项列表
+   */
   public ArrayList<ConfItem> getProperty() {
     return property;
   }
 
+  /**
+   * 添加一个模板配置项
+   * @param confItem 要添加的配置项
+   */
   public void add(ConfItem confItem) {
     property.add(confItem);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,16 +24,20 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The version information for state get stored in YARN components,
- * i.e. RMState, NMState, etc., which include: majorVersion and 
- * minorVersion.
- * The major version update means incompatible changes happen while
- * minor version update indicates compatible changes.
+ * YARN服务组件状态存储的版本信息载体，用于RMState、NMState等状态数据
+ * 包含主版本号和次版本号两个部分：
+ * 主版本号变更代表不兼容的状态结构变更，次版本号变更代表兼容的结构变更
  */
 @LimitedPrivate({"YARN", "MapReduce"})
 @Unstable
 public abstract class Version {
 
+  /**
+   * 创建Version实例，设置指定的主版本号和次版本号
+   * @param majorVersion 主版本号
+   * @param minorVersion 次版本号
+   * @return 初始化完成的Version实例
+   */
   public static Version newInstance(int majorVersion, int minorVersion) {
     Version version = Records.newRecord(Version.class);
     version.setMajorVersion(majorVersion);
@@ -48,10 +53,16 @@ public abstract class Version {
 
   public abstract void setMinorVersion(int minorVersion);
 
+  @Override
   public String toString() {
     return getMajorVersion() + "." + getMinorVersion();
   }
 
+  /**
+   * 检查当前版本是否与目标版本兼容
+   * @param version 待检查的目标版本
+   * @return 主版本号相同则兼容，返回true；否则返回false
+   */
   public boolean isCompatibleTo(Version version) {
     return getMajorVersion() == version.getMajorVersion();
   }

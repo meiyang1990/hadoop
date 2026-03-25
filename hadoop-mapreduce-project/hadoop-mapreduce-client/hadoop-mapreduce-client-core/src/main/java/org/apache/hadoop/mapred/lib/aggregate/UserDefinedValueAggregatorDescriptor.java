@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,12 +24,11 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.JobConf;
 
 /**
- * This class implements a wrapper for a user defined value aggregator 
- * descriptor.
- * It serves two functions: One is to create an object of 
- * ValueAggregatorDescriptor from the name of a user defined class that may be 
- * dynamically loaded. The other is to delegate invocations of 
- * generateKeyValPairs function to the created object.
+ * @file UserDefinedValueAggregatorDescriptor.java
+ * @brief 用户自定义值聚合器描述器的包装类，适配旧版MapReduce API
+ *
+ * 为MapReduce聚合框架提供用户自定义聚合器描述器的动态加载能力，
+ * 负责动态加载用户自定义类，并将请求转发给加载后的实例处理。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -37,9 +37,9 @@ public class UserDefinedValueAggregatorDescriptor extends org.apache.hadoop.
     implements ValueAggregatorDescriptor {
 
   /**
-   * Create an instance of the given class
-   * @param className the name of the class
-   * @return a dynamically created instance of the given class 
+   * 根据类名动态加载并创建用户自定义类的实例
+   * @param className 要创建实例的类的全限定名
+   * @return 动态创建的类实例
    */
   public static Object createInstance(String className) {
     return org.apache.hadoop.mapreduce.lib.aggregate.
@@ -47,9 +47,9 @@ public class UserDefinedValueAggregatorDescriptor extends org.apache.hadoop.
   }
 
   /**
-   * 
-   * @param className the class name of the user defined descriptor class
-   * @param job a configure object used for decriptor configuration
+   * 构造方法，加载并初始化用户自定义聚合器描述器实例
+   * @param className 用户自定义描述器类的全限定名
+   * @param job 作业配置对象，用于配置描述器
    */
   public UserDefinedValueAggregatorDescriptor(String className, JobConf job) {
     super(className, job);
@@ -57,7 +57,8 @@ public class UserDefinedValueAggregatorDescriptor extends org.apache.hadoop.
   }
 
   /**
-   *  Do nothing.
+   * 配置方法，此处预留扩展点无实际逻辑
+   * @param job 作业配置对象
    */
   public void configure(JobConf job) {
 

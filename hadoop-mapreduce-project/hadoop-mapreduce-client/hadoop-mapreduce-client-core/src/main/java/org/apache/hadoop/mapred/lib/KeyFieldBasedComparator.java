@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,26 +26,36 @@ import org.apache.hadoop.mapred.JobConfigurable;
 import org.apache.hadoop.mapreduce.JobContext;
 
 /**
- * This comparator implementation provides a subset of the features provided
- * by the Unix/GNU Sort. In particular, the supported features are:
- * -n, (Sort numerically)
- * -r, (Reverse the result of comparison)
- * -k pos1[,pos2], where pos is of the form f[.c][opts], where f is the number
- *  of the field to use, and c is the number of the first character from the
- *  beginning of the field. Fields and character posns are numbered starting
- *  with 1; a character position of zero in pos2 indicates the field's last
- *  character. If '.c' is omitted from pos1, it defaults to 1 (the beginning
- *  of the field); if omitted from pos2, it defaults to 0 (the end of the
- *  field). opts are ordering options (any of 'nr' as described above). 
- * We assume that the fields in the key are separated by
- * {@link JobContext#MAP_OUTPUT_KEY_FIELD_SEPARATOR}
+ * 基于键字段规则的比较器，兼容旧版MapRed API，提供类似Unix/GNU Sort的排序能力
+ * 支持的排序特性包括：
+ * <ul>
+ * <li>-n：按数值排序</li>
+ * <li>-r：反转比较结果（降序排序）</li>
+ * <li>-k pos1[,pos2]：指定排序基于的键字段范围，格式为 f[.c][opts]
+ *   <ul>
+ *   <li>f：字段编号，从1开始计数</li>
+ *   <li>c：字段内起始/结束字符位置，从1开始计数；pos2中0表示字段最后一个字符</li>
+ *   <li>pos1省略.c时默认从1（字段开头）开始，pos2省略.c时默认到0（字段结尾）结束</li>
+ *   <li>opts：当前字段的排序选项，支持'n'和'r'</li>
+ *   </ul>
+ * </li>
+ * </ul>
+ * 键中字段的分隔符由 {@link JobContext#MAP_OUTPUT_KEY_FIELD_SEPARATOR} 配置指定
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
+/**
+ * 基于键字段范围的排序比较器，兼容旧版MapRed API
+ * 核心功能是根据用户指定的键中字段位置和排序规则，对Map输出键进行排序
+ */
 public class KeyFieldBasedComparator<K, V> extends 
     org.apache.hadoop.mapreduce.lib.partition.KeyFieldBasedComparator<K, V>
     implements JobConfigurable {
 
+  /**
+   * 从旧版JobConf配置比较器参数，调用父类完成初始化
+   * @param job 作业配置对象
+   */
   public void configure(JobConf job) {
     super.setConf(job);
   }

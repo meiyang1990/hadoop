@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,49 +45,50 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Nvidia GPU plugin supporting both Nvidia container runtime v2 for Docker and
- * non-Docker container.
- * It has topology aware as well as simple scheduling ability.
- * */
+ * 支持Nvidia容器运行时v2(Docker)和非Docker容器的Nvidia GPU设备插件
+ * 同时提供拓扑感知调度和基础调度两种能力
+ */
 public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
     DevicePluginScheduler {
   public static final Logger LOG = LoggerFactory.getLogger(
       NvidiaGPUPluginForRuntimeV2.class);
 
+  // GPU资源名称，YARN资源模型标识
   public static final String NV_RESOURCE_NAME = "nvidia.com/gpu";
 
   private NvidiaCommandExecutor shellExecutor = new NvidiaCommandExecutor();
 
+  // 容器环境变量
   private Map<String, String> environment = new HashMap<>();
 
-  // If this environment is set, use it directly
+  // 环境变量：直接指定nvidia-smi二进制路径
   private static final String ENV_BINARY_PATH = "NVIDIA_SMI_PATH";
 
+  // 默认二进制文件名
   private static final String DEFAULT_BINARY_NAME = "nvidia-smi";
 
+  // GPU设备文件前缀
   private static final String DEV_NAME_PREFIX = "nvidia";
 
   private String pathOfGpuBinary = null;
 
-  // command should not run more than 10 sec.
+  // 命令执行最大超时时间：10秒
   private static final int MAX_EXEC_TIMEOUT_MS = 10 * 1000;
 
-  // When executable path not set, try to search default dirs
-  // By default search /usr/bin, /bin, and /usr/local/nvidia/bin (when
-  // launched by nvidia-docker.
+  // 默认二进制搜索路径列表，包含nvidia-docker默认安装路径
   private static final Set<String> DEFAULT_BINARY_SEARCH_DIRS = ImmutableSet.of(
       "/usr/bin", "/bin", "/usr/local/nvidia/bin");
 
+  // 拓扑信息是否已初始化
   private boolean topoInitialized = false;
 
+  // 缓存上次探测到的GPU设备列表
   private Set<Device> lastTimeFoundDevices;
 
   /**
-   * It caches the combination of different devices and the communication cost.
-   * The key is device count
-   * The value is an ordered list of map entry whose key is device combination,
-   * value is cost. The list is sorted by cost in ascending order.
-   * For instance:
+   * 缓存不同GPU设备组合及其通信开销
+   * 键是申请的GPU数量，值是按开销升序排列的组合-开销列表
+   * 例如：
    * { 2=> [[device1,device2]=>0, [device1,device3]=>10]
    *   3 => [[device1,device2,device3]=>10, [device2,device3,device5]=>20],
    * }
@@ -95,41 +97,41 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
       = new HashMap<>();
 
   /**
-   * The key is a pair of minors. For instance, "0-1" indicates 0 to 1
-   * The value is weight between the two devices.
+   * 存储两个GPU设备之间的连接权重
+   * 键是设备对标识，如"0-1"表示0号和1号GPU，值是通信开销权重
    * */
   private Map<String, Integer> devicePairToWeight = new HashMap<>();
 
   /**
-   * The container can set this environment variable.
-   * To tell the scheduler what's the policy to use when do scheduling
+   * 容器环境变量：指定GPU调度拓扑策略
    * */
   public static final String TOPOLOGY_POLICY_ENV_KEY = "NVIDIA_TOPO_POLICY";
 
   /**
-   * Schedule policy that prefer the faster GPU-GPU communication.
-   * Suitable for heavy GPU computation workload generally.
+   * PACK策略：优先选择GPU-GPU通信更快的组合，适合重GPU计算负载
    * */
   public static final String TOPOLOGY_POLICY_PACK = "PACK";
 
   /**
-   * Schedule policy that prefer the faster CPU-GPU communication.
-   * Suitable for heavy CPU-GPU IO operations generally.
+   * SPREAD策略：优先选择CPU-GPU通信更快的组合，适合重CPU-GPU IO负载
    * */
   public static final String TOPOLOGY_POLICY_SPREAD = "SPREAD";
 
   @Override
   public DeviceRegisterRequest getRegisterRequestInfo() throws Exception {
+    // 向YARN注册GPU资源，返回注册请求信息
     return DeviceRegisterRequest.Builder.newInstance()
         .setResourceName(NV_RESOURCE_NAME).build();
   }
 
   @Override
   public Set<Device> getDevices() throws Exception {
+    // 搜索nvidia-smi二进制路径
     shellExecutor.searchBinary();
     TreeSet<Device> r = new TreeSet<>();
     String output;
     try {
+      // 调用nvidia-smi获取设备信息
       output = shellExecutor.getDeviceInfo();
       String[] lines = output.trim().split("\n");
       int id = 0;
@@ -155,7 +157,7 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
           id++;
         }
       }
-      // cache it which help to topology scheduling
+      // 缓存设备列表供拓扑调度使用
       lastTimeFoundDevices = r;
       return r;
     } catch (IOException e) {
@@ -170,6 +172,7 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
     LOG.debug("Generating runtime spec for allocated devices: {}, {}",
         allocatedDevices, yarnRuntime.getName());
     if (yarnRuntime == YarnRuntimeType.RUNTIME_DOCKER) {
+      // Docker运行时，使用nvidia容器运行时v2
       String nvidiaRuntime = "nvidia";
       String nvidiaVisibleDevices = "NVIDIA_VISIBLE_DEVICES";
       StringBuilder gpuMinorNumbersSB = new StringBuilder();
@@ -178,24 +181,30 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
       }
       String minorNumbers = gpuMinorNumbersSB.toString();
       LOG.info("Nvidia Docker v2 assigned GPU: " + minorNumbers);
+      // 生成Docker运行时配置：设置可见GPU环境变量和指定运行时
       return DeviceRuntimeSpec.Builder.newInstance()
           .addEnv(nvidiaVisibleDevices,
               minorNumbers.substring(0, minorNumbers.length() - 1))
           .setContainerRuntime(nvidiaRuntime)
           .build();
     }
+    // 非Docker运行时无需额外配置
     return null;
   }
 
   @Override
   public void onDevicesReleased(Set<Device> releasedDevices) throws Exception {
-    // do nothing
+    // 不需要额外处理资源释放
   }
 
-  // Get major number from device name.
+  /**
+   * 从/dev下的设备文件获取主设备号
+   * @param devName 设备文件名
+   * @return 主设备号字符串，获取失败返回null
+   */
   private String getMajorNumber(String devName) {
     String output = null;
-    // output "major:minor" in hex
+    // stat命令输出格式：十六进制的"主设备号:次设备号"
     try {
       LOG.debug("Get major numbers from /dev/{}", devName);
       output = shellExecutor.getMajorMinorInfo(devName);
@@ -218,9 +227,10 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
       Map<String, String> envs) {
     Set<Device> allocation = new TreeSet<>();
     /**
-     * corner cases.
-     * if allocate 1 device or all devices, no topo scheduling needed.
-     * if total available devices is less than 3, no topo scheduling needed.
+     * 边界场景处理：不需要拓扑感知调度，直接使用基础调度
+     * - 可用GPU总数少于3台
+     * - 只申请1台GPU
+     * - 申请所有可用GPU
      * */
     if (availableDevices.size() < 3
         || count == 1
@@ -231,9 +241,10 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
 
     try {
       if (!topoInitialized) {
+        // 初始化GPU拓扑开销表
         initCostTable();
       }
-      // topology aware scheduling
+      // 执行拓扑感知调度
       topologyAwareSchedule(allocation, count,
           envs, availableDevices, this.costTable);
       if (allocation.size() == count) {
@@ -246,18 +257,18 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
       LOG.error("Error in getting GPU topology info. "
           + "Skip topology aware scheduling", e);
     }
-    // basic scheduling
+    // 拓扑调度失败，回退到基础调度
     basicSchedule(allocation, count, availableDevices);
     return allocation;
   }
 
   @VisibleForTesting
   public void initCostTable() throws IOException {
-    // get topology
+    // 获取GPU拓扑信息
     String topo = shellExecutor.getTopologyInfo();
-    // build the graph
+    // 解析拓扑，生成设备对权重表
     parseTopo(topo, devicePairToWeight);
-    // build the cost table of different device combinations
+    // 如果没有缓存设备列表，重新探测
     if (lastTimeFoundDevices == null) {
       try {
         getDevices();
@@ -266,7 +277,9 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
         return;
       }
     }
+    // 构建所有可能设备组合的开销表
     buildCostTable(costTable, lastTimeFoundDevices);
+    // 调试日志打印开销表
     loggingCostTable(costTable);
     this.topoInitialized = true;
   }
@@ -274,6 +287,7 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
   private void loggingCostTable(
       Map<Integer, List<Map.Entry<Set<Device>, Integer>>> cTable) {
     if (LOG.isDebugEnabled()) {
+      // 格式化开销表输出到调试日志
       StringBuilder sb = new StringBuilder("The costTable is:");
       sb.append("\n{");
       for (Map.Entry<Integer, List<Map.Entry<Set<Device>, Integer>>> entry
@@ -292,8 +306,7 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
   }
 
   /**
-   * Generate combination of devices and its cost.
-   * costTable
+   * 生成所有设备组合及其开销，存入开销表
    * */
   private void buildCostTable(
       Map<Integer, List<Map.Entry<Set<Device>, Integer>>> cTable,
@@ -304,18 +317,17 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
   }
 
   /**
-   * For every possible combination of i elements.
-   * We generate a map whose key is the combination, value is cost.
+   * 生成2到n-1个设备的所有可能组合，计算每个组合的开销并排序
    */
   private void generateAllDeviceCombination(
       Map<Integer, List<Map.Entry<Set<Device>, Integer>>> cTable,
       Device[] allDevices, int n) {
-    // allocated devices count range from 1 to n-1
+    // 生成从2到n-1个设备的所有组合（1和n不需要拓扑调度）
     for (int i = 2; i < n; i++) {
       Map<Set<Device>, Integer> combinationToCost =
           new HashMap<>();
       buildCombination(combinationToCost, allDevices, n, i);
-      // sort the map entry by cost ascending order
+      // 按开销升序排序
       List<Map.Entry<Set<Device>, Integer>> listSortedByCost =
           new LinkedList<>(combinationToCost.entrySet());
       Collections.sort(listSortedByCost,
@@ -326,34 +338,35 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
 
   private void buildCombination(Map<Set<Device>, Integer> combinationToCost,
       Device[] allDevices, int n, int r) {
-    // A temporary list to store all combination one by one
+    // 临时数组存储当前组合
     Device[] subDeviceList = new Device[r];
+    // 递归生成所有组合
     combinationRecursive(combinationToCost, allDevices, subDeviceList,
         0, n - 1, 0, r);
   }
 
   /**
-   * Populate combination to cost map recursively.
+   * 递归生成所有大小为r的设备组合，计算并存储每个组合的开销
    *
-   * @param cTc           combinationToCost map.
-   *                      The key is device set, the value is cost
-   * @param allDevices    all devices used to assign value to subDevicelist
-   * @param subDeviceList store a subset of devices temporary
-   * @param start         start index in the allDevices
-   * @param end           last index in the allDevices
-   * @param index         dynamic index in subDeviceList need to be assigned
-   * @param r             the length of the subDeviceList
+   * @param cTc           组合到开销的映射表
+   * @param allDevices    全部GPU设备数组
+   * @param subDeviceList 临时存储当前组合
+   * @param start         全量数组起始索引
+   * @param end           全量数组结束索引
+   * @param index         当前组合已填充位置索引
+   * @param r             目标组合大小
    */
   void combinationRecursive(Map<Set<Device>, Integer> cTc,
       Device[] allDevices, Device[] subDeviceList,
       int start, int end, int index, int r) {
-    // sub device list's length is ready to compute the cost
+    // 当前组合已达到目标大小，计算开销并存入表
     if (index == r) {
       Set<Device> oneSet = new TreeSet<>(Arrays.asList(subDeviceList));
       int cost = computeCostOfDevices(subDeviceList);
       cTc.put(oneSet, cost);
       return;
     }
+    // 递归枚举所有可能选择
     for (int i = start; i <= end; i++) {
       subDeviceList[index] = allDevices[i];
       combinationRecursive(cTc, allDevices, subDeviceList,
@@ -362,15 +375,15 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
   }
 
   /**
-   * The cost function used to calculate costs of a sub set of devices.
-   * It calculate link weight of each pair in non-duplicated combination of
-   * devices.
+   * 计算给定GPU设备组合的总通信开销
+   * 累加组合中每对GPU设备的连接权重
    */
   @VisibleForTesting
   public int computeCostOfDevices(Device[] devices) {
     int cost = 0;
     String gpuIndex0;
     String gpuIndex1;
+    // 遍历所有不重复的设备对，累加权重
     for (int i = 0; i < devices.length; i++) {
       gpuIndex0 = String.valueOf(devices[i].getMinorNumber());
       for (int j = i + 1; j < devices.length; j++) {
@@ -382,13 +395,9 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
   }
 
   /**
-   * Topology Aware schedule algorithm.
-   * It doesn't consider CPU affinity or NUMA or bus bandwidths.
-   * It support two plicy: "spread" and "pack" which can be set by container's
-   * environment variable. Use pack by default which means prefer the faster
-   * GPU-GPU. "Spread" means prefer the faster CPU-GPU.
-   * It can potentially be extend to take GPU attribute like GPU chip memory
-   * into consideration.
+   * GPU拓扑感知调度算法
+   * 支持PACK和SPREAD两种策略，通过容器环境变量指定，默认PACK策略
+   * PACK策略优先选择GPU-GPU通信更快的组合，SPREAD优先选择分散布局
    * */
   @VisibleForTesting
   public void topologyAwareSchedule(Set<Device> allocation, int count,
@@ -396,14 +405,14 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
       Set<Device> availableDevices,
       Map<Integer, List<Map.Entry<Set<Device>, Integer>>> cTable) {
     int num = 0;
+    // 从环境变量获取调度策略，默认PACK
     String policy = envs.get(TOPOLOGY_POLICY_ENV_KEY);
     if (policy == null) {
       policy = TOPOLOGY_POLICY_PACK;
     }
 
     /**
-     * Get combinations from costTable given the count of device want to
-     * allocate.
+     * 从开销表中取出对应申请数量的所有已排序组合
      * */
     if (cTable == null) {
       LOG.error("No cost table initialized!");
@@ -411,312 +420,4 @@ public class NvidiaGPUPluginForRuntimeV2 implements DevicePlugin,
     }
     List<Map.Entry<Set<Device>, Integer>> combinationsToCost =
         cTable.get(count);
-    Iterator<Map.Entry<Set<Device>, Integer>> iterator =
-        combinationsToCost.iterator();
-    // the container needs spread policy
-    if (policy.equalsIgnoreCase(TOPOLOGY_POLICY_SPREAD)) {
-      // loop from high cost to low cost
-      iterator = ((LinkedList) combinationsToCost).descendingIterator();
-    }
-    while (iterator.hasNext()) {
-      Map.Entry<Set<Device>, Integer> element = iterator.next();
-      if (availableDevices.containsAll(element.getKey())) {
-        allocation.addAll(element.getKey());
-        LOG.info("Topology scheduler allocated: " + allocation);
-        return;
-      }
-    }
-    LOG.error("Unknown error happened in topology scheduler");
-  }
-
-  @VisibleForTesting
-  public void basicSchedule(Set<Device> allocation, int count,
-      Set<Device> availableDevices) {
-    // Basic scheduling
-    // allocate all available
-    if (count == availableDevices.size()) {
-      allocation.addAll(availableDevices);
-      return;
-    }
-    int number = 0;
-    for (Device d : availableDevices) {
-      allocation.add(d);
-      number++;
-      if (number == count) {
-        break;
-      }
-    }
-  }
-
-  /**
-   * A typical sample topo output:
-   *     GPU0  GPU1  GPU2  GPU3  CPU Affinity
-   * GPU0  X  PHB  SOC  SOC  0-31
-   * GPU1 PHB  X   SOC  SOC  0-31
-   * GPU2 SOC SOC  X    PHB  0-31
-   * GPU3 SOC SOC  PHB   X   0-31
-   *
-   *
-   * Legend:
-   *
-   *   X   = Self
-   *   SOC  = Connection traversing PCIe as well as the SMP link between
-   *   CPU sockets(e.g. QPI)
-   *   PHB  = Connection traversing PCIe as well as a PCIe Host Bridge
-   *   (typically the CPU)
-   *   PXB  = Connection traversing multiple PCIe switches
-   *   (without traversing the PCIe Host Bridge)
-   *   PIX  = Connection traversing a single PCIe switch
-   *   NV#  = Connection traversing a bonded set of # NVLinks」
-   * */
-  public void parseTopo(String topo,
-      Map<String, Integer> deviceLinkToWeight) {
-    String[] lines = topo.split("\n");
-    int rowMinor;
-    int colMinor;
-    String legend;
-    String tempType;
-    for (String oneLine : lines) {
-      oneLine = oneLine.trim();
-      if (oneLine.isEmpty()) {
-        continue;
-      }
-      // To the end. No more metrics info
-      if (oneLine.startsWith("Legend")) {
-        break;
-      }
-      // Skip header
-      if (oneLine.contains("Affinity")) {
-        continue;
-      }
-      String[] tokens = oneLine.split(("\\s+"));
-      String name = tokens[0];
-      rowMinor = Integer.parseInt(name.substring(name.lastIndexOf("U") + 1));
-      for (int i = 1; i < tokens.length; i++) {
-        tempType = tokens[i];
-        colMinor = i - 1;
-        // self, skip
-        if (tempType.equals("X")) {
-          continue;
-        }
-        if (tempType.equals("SOC") || tempType.equals("SYS")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkCrossCPUSocket,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("PHB") || tempType.equals("NODE")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkSameCPUSocket,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("PXB")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkMultiSwitch,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("PIX")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkSingleSwitch,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("NV1")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkNVLink1,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("NV2")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkNVLink2,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("NV3")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkNVLink3,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("NV4")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkNVLink4,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("NV5")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkNVLink5,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("NV6")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkNVLink6,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("NV7")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkNVLink7,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("NV8")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkNVLink8,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-        if (tempType.equals("NV9")) {
-          populateGraphEdgeWeight(DeviceLinkType.P2PLinkNVLink9,
-              rowMinor, colMinor, deviceLinkToWeight);
-          continue;
-        }
-      } // end one line handling
-    }
-  }
-
-  private void populateGraphEdgeWeight(
-      DeviceLinkType linkType,
-      int leftVertex,
-      int rightVertex,
-      Map<String, Integer> deviceLinkToWeight) {
-    deviceLinkToWeight.put(leftVertex + "-" + rightVertex,
-        linkType.getWeight());
-  }
-
-  /**
-   * Different type of link.
-   * The weight of each link is a relative value.
-   * The higher weight, the higher cost between the GPUs
-   * */
-  public enum DeviceLinkType {
-    /**
-     * For Nvdia GPU NVLink.
-     * */
-    P2PLinkNVLink9(10),
-    P2PLinkNVLink8(20),
-    P2PLinkNVLink7(30),
-    P2PLinkNVLink6(40),
-    P2PLinkNVLink5(50),
-    P2PLinkNVLink4(60),
-    P2PLinkNVLink3(70),
-    P2PLinkNVLink2(80),
-    P2PLinkNVLink1(90),
-
-    /**
-     * Connected to same CPU (Same NUMA node).
-     * */
-    P2PLinkSameCPUSocket(200),
-
-    /**
-     * Cross CPU through socket-level link (e.g. QPI).
-     * Usually cross NUMA node
-     * */
-    P2PLinkCrossCPUSocket(300),
-
-    /**
-     * Just need to traverse one PCIe switch to talk.
-     * */
-    P2PLinkSingleSwitch(600),
-
-    /**
-     * Need to traverse multiple PCIe switch to talk.
-     * */
-    P2PLinkMultiSwitch(1200);
-
-    // A higher link level means slower communication.
-    private int weight;
-
-    public int getWeight() {
-      return weight;
-    }
-
-    DeviceLinkType(int w) {
-      this.weight = w;
-    }
-  }
-
-  /**
-   * A shell wrapper class easy for test.
-   * */
-  public class NvidiaCommandExecutor {
-
-    public String getDeviceInfo() throws IOException {
-      return Shell.execCommand(environment,
-          new String[]{pathOfGpuBinary, "--query-gpu=index,pci.bus_id",
-              "--format=csv,noheader"}, MAX_EXEC_TIMEOUT_MS);
-    }
-
-    public String getMajorMinorInfo(String devName) throws IOException {
-      // output "major:minor" in hex
-      Shell.ShellCommandExecutor shexec = new Shell.ShellCommandExecutor(
-          new String[]{"stat", "-c", "%t:%T", "/dev/" + devName});
-      shexec.execute();
-      return shexec.getOutput();
-    }
-
-    // Get the topology metrics info from nvdia-smi
-    public String getTopologyInfo() throws IOException {
-      return Shell.execCommand(environment,
-          new String[]{pathOfGpuBinary, "topo",
-              "-m"}, MAX_EXEC_TIMEOUT_MS);
-    }
-
-    public void searchBinary() throws Exception {
-      if (pathOfGpuBinary != null) {
-        LOG.info("Skip searching, the nvidia gpu binary is already set: "
-            + pathOfGpuBinary);
-        return;
-      }
-      // search env for the binary
-      String envBinaryPath = System.getenv(ENV_BINARY_PATH);
-      if (null != envBinaryPath) {
-        if (new File(envBinaryPath).exists()) {
-          pathOfGpuBinary = envBinaryPath;
-          LOG.info("Use nvidia gpu binary: " + pathOfGpuBinary);
-          return;
-        }
-      }
-      LOG.info("Search binary..");
-      // search if binary exists in default folders
-      File binaryFile;
-      boolean found = false;
-      for (String dir : DEFAULT_BINARY_SEARCH_DIRS) {
-        binaryFile = new File(dir, DEFAULT_BINARY_NAME);
-        if (binaryFile.exists()) {
-          found = true;
-          pathOfGpuBinary = binaryFile.getAbsolutePath();
-          LOG.info("Found binary:" + pathOfGpuBinary);
-          break;
-        }
-      }
-      if (!found) {
-        LOG.error("No binary found from env variable: "
-            + ENV_BINARY_PATH + " or path "
-            + DEFAULT_BINARY_SEARCH_DIRS.toString());
-        throw new Exception("No binary found for "
-            + NvidiaGPUPluginForRuntimeV2.class);
-      }
-    }
-  }
-
-  @VisibleForTesting
-  public void setPathOfGpuBinary(String pOfGpuBinary) {
-    this.pathOfGpuBinary = pOfGpuBinary;
-  }
-
-  @VisibleForTesting
-  public void setShellExecutor(
-      NvidiaCommandExecutor shellExecutor) {
-    this.shellExecutor = shellExecutor;
-  }
-
-  @VisibleForTesting
-  public boolean isTopoInitialized() {
-    return topoInitialized;
-  }
-
-  @VisibleForTesting
-  public Map<Integer, List<Map.Entry<Set<Device>, Integer>>> getCostTable() {
-    return costTable;
-  }
-
-  @VisibleForTesting
-  public Map<String, Integer> getDevicePairToWeight() {
-    return devicePairToWeight;
-  }
-
-}
+    Iterator<

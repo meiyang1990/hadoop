@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,9 +19,16 @@
 
 package org.apache.hadoop.mapreduce.v2.app.commit;
 
+/**
+ * 作业提交器事件类型枚举，定义MapReduce应用提交过程中所有可能的事件类型
+ */
 public enum CommitterEventType {
+  /** 作业初始化设置事件 */
   JOB_SETUP,
+  /** 作业提交完成事件 */
   JOB_COMMIT,
+  /** 作业终止事件 */
   JOB_ABORT,
+  /** 任务终止事件 */
   TASK_ABORT
 }

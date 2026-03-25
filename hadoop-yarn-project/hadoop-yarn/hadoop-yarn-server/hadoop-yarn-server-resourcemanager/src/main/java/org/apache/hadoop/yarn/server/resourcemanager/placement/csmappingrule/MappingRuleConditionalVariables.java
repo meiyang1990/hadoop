@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,50 +22,41 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 
 import java.util.List;
 
+/**
+ * 容量调度器映射规则条件变量工厂类，存放各类条件变量实现，用于队列放置时动态解析路径变量
+ */
 public class MappingRuleConditionalVariables {
   /**
-   * Utility class, hiding constructor.
+   * 工具类，隐藏构造方法
    */
   private MappingRuleConditionalVariables() {}
 
   /**
-   * SecondaryGroupVariable represents a conditional variable which is supposed
-   * to evaluate path parts with "%secondary_group". The evaluation depends on
-   * if parent path is provided.
-   * If there was no parent path provided, the %secondary_group variable will be
-   * equal to the first non-primary group of the user which has a matching queue
-   * in the queue hierarchy. This means the queue name must be disambiguous as
-   * well.
-   * If there is a parent provided (the %secondary_group variable is not the
-   * first element in the path), the %secondary_group variable will be
-   * equal to the first non-primary group of the user which has a matching queue
-   * UNDER the parent path. The parent path must be a full path, to avoid
-   * ambiguity problems.
+   * 次级用户组变量，实现%secondary_group条件变量的解析逻辑，用于根据已存在队列匹配用户非主组
+   * 解析规则：
+   * 1. 变量是路径第一个元素时：在根队列下查找第一个匹配的用户非主组队列
+   * 2. 变量不是路径第一个元素时：在已解析的父级路径下查找第一个匹配的用户非主组队列
    */
   public static class SecondaryGroupVariable implements
       MappingRuleConditionalVariable {
     /**
-     * This is the name of the variable we are replacing.
+     * 条件变量名称，即占位符字符串%secondary_group
      */
     public final static String VARIABLE_NAME = "%secondary_group";
 
     /**
-     * We need an instance of queue manager in order to look for queues under
-     * the parent path.
+     * 队列管理器实例，用于检查队列是否存在
      */
     private CapacitySchedulerQueueManager queueManager;
     /**
-     * We store the potential secondary_groups candidates in this list, it must
-     * not contain the primary group.
+     * 待匹配的次级用户组候选列表，已排除主用户组
      */
     private List<String> potentialGroups;
 
     /**
-     * Constructor requires a queue manager instance and a list of potential
-     * secondary groups.
-     * @param qm The queue manager which will be used to check which potential
-     *           secondary group should be used.
-     * @param groups List of potential secondary groups.
+     * 构造方法，初始化队列管理器和候选用户组列表
+     * @param qm 用于检查队列存在性的队列管理器
+     * @param groups 待匹配的次级用户组候选列表
      */
     public SecondaryGroupVariable(CapacitySchedulerQueueManager qm,
         List<String> groups) {
@@ -73,41 +65,34 @@ public class MappingRuleConditionalVariables {
     }
 
     /**
-     * Method used to evaluate the variable when used in a path.
-     * @param parts Split representation of the path.
-     * @param currentIndex The index of the evaluation in the path. This shows
-     *                     which part is currently being evaluated.
-     * @return Substituted queue path part, this method will only return the
-     * value of the conditional variable, not the whole path.
+     * 在队列路径中计算当前变量的值，返回匹配到的次级用户组名称
+     * @param parts 拆分后的路径分段数组
+     * @param currentIndex 当前变量在路径中的索引位置
+     * @return 匹配到的次级用户组名称，无匹配返回空字符串
      */
     public String evaluateInPath(String[] parts, int currentIndex) {
-      //First we need to determine the parent path (if any)
+      // 拼接已解析的父级路径前缀
       StringBuilder parentBuilder = new StringBuilder();
-      //Building the parent prefix, if we don't have any parent path
-      //in case of currentIndex == 0 we will have an empty prefix.
+      // 遍历当前索引之前的所有路径分段，构建完整父路径
       for (int i = 0; i < currentIndex; i++) {
         parentBuilder.append(parts[i]);
-        //Generally this is not a good idea, we would need a condition, to not
-        //append a '.' after the last part, however we are generating parent
-        //prefix paths, so we need paths prefixes, like 'root.group.something.'
+        // 添加路径分隔符，最终父路径以分隔符结尾，方便拼接组名
         parentBuilder.append(".");
       }
 
-      //We'll use this prefix to lookup the groups, when we have a parent
-      //provided we need to find a queue under that parent, which matches the
-      //name of the secondaryGroup, if we don't have a parent the prefix is
-      //empty
+      // 获取用于查找队列的完整前缀路径
       String lookupPrefix = parentBuilder.toString();
 
-      //Going through the potential groups to check if there is a matching queue
+      // 遍历所有候选次级组，查找第一个已存在的匹配队列
       for (String group : potentialGroups) {
         String path = lookupPrefix + group;
+        // 队列存在则返回当前组名作为变量值
         if (queueManager.getQueue(path) != null) {
           return group;
         }
       }
 
-      //No valid group found
+      // 未找到任何匹配队列，返回空字符串
       return "";
     }
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,21 +36,14 @@ import org.apache.hadoop.mapreduce.MRJobConfig;
 import org.apache.hadoop.util.Progressable;
 
 /**
- * This abstract class extends the FileOutputFormat, allowing to write the
- * output data to different output files. There are three basic use cases for
- * this class.
- * 
- * Case one: This class is used for a map reduce job with at least one reducer.
- * The reducer wants to write data to different files depending on the actual
- * keys. It is assumed that a key (or value) encodes the actual key (value)
- * and the desired location for the actual key (value).
- * 
- * Case two: This class is used for a map only job. The job wants to use an
- * output file name that is either a part of the input file name of the input
- * data, or some derivation of it.
- * 
- * Case three: This class is used for a map only job. The job wants to use an
- * output file name that depends on both the keys and the input file name,
+ * 文件输入格式抽象扩展类，支持将MapReduce输出数据写入多个不同输出文件。
+ * 支持三种典型使用场景：
+ * <ol>
+ * <li>带Reducer的作业：Reducer根据Key/Value将数据输出到不同文件</li>
+ * <li>仅Map作业：输出文件名基于输入文件名生成或衍生</li>
+ * <li>仅Map作业：输出文件名同时依赖输入文件名和数据Key</li>
+ * </ol>
+ * 是旧MapReduce API的多输出实现，新API请参考org.apache.hadoop.mapreduce.lib.output.MultipleOutputs
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -57,19 +51,13 @@ public abstract class MultipleOutputFormat<K, V>
 extends FileOutputFormat<K, V> {
 
   /**
-   * Create a composite record writer that can write key/value data to different
-   * output files
-   * 
-   * @param fs
-   *          the file system to use
-   * @param job
-   *          the job conf for the job
-   * @param name
-   *          the leaf file name for the output file (such as part-00000")
-   * @param arg3
-   *          a progressable for reporting progress.
-   * @return a composite record writer
-   * @throws IOException
+   * 创建复合记录写入器，支持将不同键值对写入不同输出文件
+   * @param fs 文件系统对象
+   * @param job 作业配置对象
+   * @param name 基础输出文件名（如part-00000）
+   * @param arg3 进度报告对象
+   * @return 复合记录写入器实例
+   * @throws IOException 创建写入器出错时抛出
    */
   public RecordWriter<K, V> getRecordWriter(FileSystem fs, JobConf job,
       String name, Progressable arg3) throws IOException {
@@ -81,93 +69,83 @@ extends FileOutputFormat<K, V> {
 
     return new RecordWriter<K, V>() {
 
-      // a cache storing the record writers for different output files.
+      // 缓存不同输出路径对应的记录写入器
       TreeMap<String, RecordWriter<K, V>> recordWriters = new TreeMap<String, RecordWriter<K, V>>();
 
       public void write(K key, V value) throws IOException {
 
-        // get the file name based on the key
+        // 根据当前Key生成输出文件路径
         String keyBasedPath = generateFileNameForKeyValue(key, value, myName);
 
-        // get the file name based on the input file name
+        // 结合输入文件名生成最终输出路径
         String finalPath = getInputFileBasedOutputFileName(myJob, keyBasedPath);
 
-        // get the actual key
+        // 提取实际输出Key（原始Key中包含路径信息时使用）
         K actualKey = generateActualKey(key, value);
+        // 提取实际输出Value（原始Value中包含路径信息时使用）
         V actualValue = generateActualValue(key, value);
 
+        // 从缓存获取对应路径的写入器
         RecordWriter<K, V> rw = this.recordWriters.get(finalPath);
         if (rw == null) {
-          // if we don't have the record writer yet for the final path, create
-          // one
-          // and add it to the cache
+          // 缓存不存在则新建写入器并加入缓存
           rw = getBaseRecordWriter(myFS, myJob, finalPath, myProgressable);
           this.recordWriters.put(finalPath, rw);
         }
+        // 写入实际键值对
         rw.write(actualKey, actualValue);
       };
 
       public void close(Reporter reporter) throws IOException {
+        // 遍历关闭所有缓存的写入器
         Iterator<String> keys = this.recordWriters.keySet().iterator();
         while (keys.hasNext()) {
           RecordWriter<K, V> rw = this.recordWriters.get(keys.next());
           rw.close(reporter);
         }
+        // 清空缓存
         this.recordWriters.clear();
       };
     };
   }
 
   /**
-   * Generate the leaf name for the output file name. The default behavior does
-   * not change the leaf file name (such as part-00000)
-   * 
-   * @param name
-   *          the leaf file name for the output file
-   * @return the given leaf file name
+   * 生成输出文件的基础文件名，默认不修改原始基础文件名
+   * @param name 原始基础文件名（如part-00000）
+   * @return 处理后的基础文件名
    */
   protected String generateLeafFileName(String name) {
     return name;
   }
 
   /**
-   * Generate the file output file name based on the given key and the leaf file
-   * name. The default behavior is that the file name does not depend on the
-   * key.
-   * 
-   * @param key
-   *          the key of the output data
-   * @param name
-   *          the leaf file name
-   * @return generated file name
+   * 根据当前键值对生成输出文件名，默认不基于键值对修改文件名
+   * @param key 当前输出数据的Key
+   * @param value 当前输出数据的Value
+   * @param name 基础文件名
+   * @return 生成的输出文件名
    */
   protected String generateFileNameForKeyValue(K key, V value, String name) {
     return name;
   }
 
   /**
-   * Generate the actual key from the given key/value. The default behavior is that
-   * the actual key is equal to the given key
-   * 
-   * @param key
-   *          the key of the output data
-   * @param value
-   *          the value of the output data
-   * @return the actual key derived from the given key/value
+   * 从原始键值对中提取实际输出Key，默认直接返回原始Key
+   * 当原始Key中同时包含输出路径和实际Key时，子类可覆盖此方法提取实际Key
+   * @param key 原始输入Key
+   * @param value 原始输入Value
+   * @return 提取后的实际输出Key
    */
   protected K generateActualKey(K key, V value) {
     return key;
   }
   
   /**
-   * Generate the actual value from the given key and value. The default behavior is that
-   * the actual value is equal to the given value
-   * 
-   * @param key
-   *          the key of the output data
-   * @param value
-   *          the value of the output data
-   * @return the actual value derived from the given key/value
+   * 从原始键值对中提取实际输出Value，默认直接返回原始Value
+   * 当原始Value中同时包含输出路径和实际Value时，子类可覆盖此方法提取实际Value
+   * @param key 原始输入Key
+   * @param value 原始输入Value
+   * @return 提取后的实际输出Value
    */
   protected V generateActualValue(K key, V value) {
     return value;
@@ -175,31 +153,25 @@ extends FileOutputFormat<K, V> {
   
 
   /**
-   * Generate the outfile name based on a given name and the input file name. If
-   * the {@link JobContext#MAP_INPUT_FILE} does not exists (i.e. this is not for a map only job),
-   * the given name is returned unchanged. If the config value for
-   * "num.of.trailing.legs.to.use" is not set, or set 0 or negative, the given
-   * name is returned unchanged. Otherwise, return a file name consisting of the
-   * N trailing legs of the input file name where N is the config value for
-   * "num.of.trailing.legs.to.use".
-   * 
-   * @param job
-   *          the job config
-   * @param name
-   *          the output file name
-   * @return the outfile name based on a given name and the input file name.
+   * 结合输入文件路径生成最终输出文件名，支持提取输入路径的后N段组成输出文件名
+   * 仅当作业为仅Map作业且配置了需要保留的路径段数时才会修改文件名，否则返回原文件名
+   * @param job 作业配置对象
+   * @param name 当前生成的输出文件名
+   * @return 结合输入路径生成的最终输出文件名
    */
   protected String getInputFileBasedOutputFileName(JobConf job, String name) {
     String infilepath = job.get(MRJobConfig.MAP_INPUT_FILE);
     if (infilepath == null) {
-      // if the {@link JobContext#MAP_INPUT_FILE} does not exists,
-      // then return the given name
+      // 不存在输入文件信息（非仅Map作业），直接返回原文件名
       return name;
     }
+    // 获取配置的需要保留的输入路径尾段数量
     int numOfTrailingLegsToUse = job.getInt("mapred.outputformat.numOfTrailingLegs", 0);
     if (numOfTrailingLegsToUse <= 0) {
+      // 未配置或配置不合法，直接返回原文件名
       return name;
     }
+    // 从输入路径提取后N段拼接为输出文件名
     Path infile = new Path(infilepath);
     Path parent = infile.getParent();
     String midName = infile.getName();
@@ -215,18 +187,13 @@ extends FileOutputFormat<K, V> {
   }
 
   /**
-   * 
-   * @param fs
-   *          the file system to use
-   * @param job
-   *          a job conf object
-   * @param name
-   *          the name of the file over which a record writer object will be
-   *          constructed
-   * @param arg3
-   *          a progressable object
-   * @return A RecordWriter object over the given file
-   * @throws IOException
+   * 抽象方法，子类实现获取指定文件的基础记录写入器
+   * @param fs 文件系统对象
+   * @param job 作业配置对象
+   * @param name 输出文件名
+   * @param arg3 进度报告对象
+   * @return 指定文件的记录写入器
+   * @throws IOException 创建写入器出错时抛出
    */
   abstract protected RecordWriter<K, V> getBaseRecordWriter(FileSystem fs,
       JobConf job, String name, Progressable arg3) throws IOException;

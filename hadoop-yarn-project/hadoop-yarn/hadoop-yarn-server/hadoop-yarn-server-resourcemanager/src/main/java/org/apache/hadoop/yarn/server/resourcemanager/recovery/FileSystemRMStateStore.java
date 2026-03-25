@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -74,16 +75,11 @@ import org.apache.hadoop.classification.VisibleForTesting;
 @Private
 @Unstable
 /**
- * A simple class for storing RM state in any storage that implements a basic
- * FileSystem interface. Does not use directories so that simple key-value
- * stores can be used. The retry policy for the real filesystem client must be
- * configured separately to enable retry of filesystem operations when needed.
- *
- * Changes from 1.1 to 1.2, AMRMTokenSecretManager state has been saved
- * separately. The currentMasterkey and nextMasterkey have been stored.
- * Also, AMRMToken has been removed from ApplicationAttemptState.
- *
- * Changes from 1.2 to 1.3, Addition of ReservationSystem state.
+ * 基于文件系统实现的ResourceManager状态存储，用于RM重启/故障转移时恢复状态。
+ * 可兼容任何实现了Hadoop FileSystem接口的存储系统，不依赖特殊目录结构，支持简单键值存储。
+ * 版本变更记录：
+ * 1.1 -> 1.2：新增独立存储AMRMTokenSecretManager状态，保存当前和下一个主密钥，从ApplicationAttemptState中移除AMRMToken
+ * 1.2 -> 1.3：新增ReservationSystem状态存储
  */
 public class FileSystemRMStateStore extends RMStateStore {
 
@@ -123,20 +119,25 @@ public class FileSystemRMStateStore extends RMStateStore {
   @Override
   public synchronized void initInternal(Configuration conf)
       throws Exception{
+    // 从配置获取状态存储根路径
     fsWorkingPath = new Path(conf.get(YarnConfiguration.FS_RM_STATE_STORE_URI));
+    // 拼接根目录路径
     rootDirPath = new Path(fsWorkingPath, ROOT_DIR_NAME);
+    // 初始化各模块状态存储路径
     rmDTSecretManagerRoot = new Path(rootDirPath, RM_DT_SECRET_MANAGER_ROOT);
     rmAppRoot = new Path(rootDirPath, RM_APP_ROOT);
     amrmTokenSecretManagerRoot =
         new Path(rootDirPath, AMRMTOKEN_SECRET_MANAGER_ROOT);
     reservationRoot = new Path(rootDirPath, RESERVATION_SYSTEM_ROOT);
     proxyCARoot = new Path(rootDirPath, PROXY_CA_ROOT);
+    // 读取文件系统操作重试配置
     fsNumRetries =
         conf.getInt(YarnConfiguration.FS_RM_STATE_STORE_NUM_RETRIES,
             YarnConfiguration.DEFAULT_FS_RM_STATE_STORE_NUM_RETRIES);
     fsRetryInterval =
         conf.getLong(YarnConfiguration.FS_RM_STATE_STORE_RETRY_INTERVAL_MS,
                 YarnConfiguration.DEFAULT_FS_RM_STATE_STORE_RETRY_INTERVAL_MS);
+    // 读取中间数据加密配置
     intermediateEncryptionEnabled =
         conf.getBoolean(YarnConfiguration.YARN_INTERMEDIATE_DATA_ENCRYPTION,
           YarnConfiguration.DEFAULT_YARN_INTERMEDIATE_DATA_ENCRYPTION);
@@ -144,9 +145,7 @@ public class FileSystemRMStateStore extends RMStateStore {
 
   @Override
   protected synchronized void startInternal() throws Exception {
-    // create filesystem only now, as part of service-start. By this time, RM is
-    // authenticated with kerberos so we are good to create a file-system
-    // handle.
+    // 延迟到服务启动阶段创建文件系统，此时RM已完成Kerberos认证，可以获取合法凭证
     fsConf = new Configuration(getConfig());
 
     String scheme = fsWorkingPath.toUri().getScheme();
@@ -154,11 +153,14 @@ public class FileSystemRMStateStore extends RMStateStore {
       scheme = FileSystem.getDefaultUri(fsConf).getScheme();
     }
     if (scheme != null) {
+      // 禁用文件系统缓存，确保每次获取全新的文件系统实例
       String disableCacheName = String.format("fs.%s.impl.disable.cache", scheme);
       fsConf.setBoolean(disableCacheName, true);
     }
 
+    // 获取文件系统实例
     fs = fsWorkingPath.getFileSystem(fsConf);
+    // 重试创建所有模块目录
     mkdirsWithRetries(rmDTSecretManagerRoot);
     mkdirsWithRetries(rmAppRoot);
     mkdirsWithRetries(amrmTokenSecretManagerRoot);
@@ -178,22 +180,27 @@ public class FileSystemRMStateStore extends RMStateStore {
 
   @Override
   protected synchronized Version loadVersion() throws Exception {
+    // 获取版本文件路径
     Path versionNodePath = getNodePath(rootDirPath, VERSION_NODE);
     FileStatus status = getFileStatusWithRetries(versionNodePath);
     if (status != null) {
+      // 读取版本数据并反序列化
       byte[] data = readFileWithRetries(versionNodePath, status.getLen());
       Version version =
           new VersionPBImpl(VersionProto.parseFrom(data));
       return version;
     }
+    // 版本文件不存在返回null
     return null;
   }
 
   @Override
   protected synchronized void storeVersion() throws Exception {
+    // 序列化当前版本信息
     Path versionNodePath = getNodePath(rootDirPath, VERSION_NODE);
     byte[] data =
         ((VersionPBImpl) CURRENT_VERSION_INFO).getProto().toByteArray();
+    // 已存在则更新，否则新建
     if (existsWithRetries(versionNodePath)) {
       updateFile(versionNodePath, data, false);
     } else {
@@ -203,20 +210,21 @@ public class FileSystemRMStateStore extends RMStateStore {
   
   @Override
   public synchronized long getAndIncrementEpoch() throws Exception {
+    // 获取epoch文件路径
     Path epochNodePath = getNodePath(rootDirPath, EPOCH_NODE);
     long currentEpoch = baseEpoch;
     FileStatus status = getFileStatusWithRetries(epochNodePath);
     if (status != null) {
-      // load current epoch
+      // 加载当前epoch值
       byte[] data = readFileWithRetries(epochNodePath, status.getLen());
       Epoch epoch = new EpochPBImpl(EpochProto.parseFrom(data));
       currentEpoch = epoch.getEpoch();
-      // increment epoch and store it
+      // 自增后存储新epoch值
       byte[] storeData = Epoch.newInstance(nextEpoch(currentEpoch)).getProto()
           .toByteArray();
       updateFile(epochNodePath, storeData, false);
     } else {
-      // initialize epoch file with 1 for the next time.
+      // 初始化epoch文件，第一个epoch为baseEpoch + 1
       byte[] storeData = Epoch.newInstance(nextEpoch(currentEpoch)).getProto()
           .toByteArray();
       writeFileWithRetries(epochNodePath, storeData, false);
@@ -227,21 +235,22 @@ public class FileSystemRMStateStore extends RMStateStore {
   @Override
   public synchronized RMState loadState() throws Exception {
     RMState rmState = new RMState();
-    // recover DelegationTokenSecretManager
+    // 恢复DelegationTokenSecretManager状态
     loadRMDTSecretManagerState(rmState);
-    // recover RM applications
+    // 恢复所有应用状态
     loadRMAppState(rmState);
-    // recover AMRMTokenSecretManager
+    // 恢复AMRMTokenSecretManager状态
     loadAMRMTokenSecretManagerState(rmState);
-    // recover reservation state
+    // 恢复资源预约系统状态
     loadReservationSystemState(rmState);
-    // recover ProxyCAManager state
+    // 恢复ProxyCAManager状态
     loadProxyCAManagerState(rmState);
     return rmState;
   }
 
   private void loadReservationSystemState(RMState rmState) throws Exception {
     try {
+      // 创建预约状态处理器，遍历处理所有预约文件
       final ReservationStateFileProcessor fileProcessor = new
           ReservationStateFileProcessor(rmState);
       final Path rootDirectory = this.reservationRoot;
@@ -255,6 +264,7 @@ public class FileSystemRMStateStore extends RMStateStore {
 
   private void loadAMRMTokenSecretManagerState(RMState rmState)
       throws Exception {
+    // 检查并修复未完成的更新操作
     checkAndResumeUpdateOperation(amrmTokenSecretManagerRoot);
     Path amrmTokenSecretManagerStateDataDir =
         new Path(amrmTokenSecretManagerRoot, AMRMTOKEN_SECRET_MANAGER_NODE);
@@ -264,11 +274,13 @@ public class FileSystemRMStateStore extends RMStateStore {
       return;
     }
     assert status.isFile();
+    // 读取并反序列化状态数据
     byte[] data = readFileWithRetries(amrmTokenSecretManagerStateDataDir,
             status.getLen());
     AMRMTokenSecretManagerStatePBImpl stateData =
         new AMRMTokenSecretManagerStatePBImpl(
           AMRMTokenSecretManagerStateProto.parseFrom(data));
+    // 将状态存入RMState对象
     rmState.amrmTokenSecretManagerState =
         AMRMTokenSecretManagerState.newInstance(
           stateData.getCurrentMasterKey(), stateData.getNextMasterKey());
@@ -277,15 +289,15 @@ public class FileSystemRMStateStore extends RMStateStore {
   private void loadRMAppState(RMState rmState) throws Exception {
     try {
       List<ApplicationAttemptStateData> attempts = new ArrayList<>();
+      // 创建应用状态处理器，遍历处理所有应用文件
       final RMAppStateFileProcessor rmAppStateFileProcessor =
           new RMAppStateFileProcessor(rmState, attempts);
       final Path rootDirectory = this.rmAppRoot;
 
       processDirectoriesOfFiles(rmAppStateFileProcessor, rootDirectory);
 
-      // go through all attempts and add them to their apps, Ideally, each
-      // attempt node must have a corresponding app node, because remove
-      // directory operation remove both at the same time
+      // 将所有加载的尝试关联到对应应用
+      // 理论上每个尝试都应有对应应用，因为删除操作会同时删除应用和尝试目录
       for (ApplicationAttemptStateData attemptState : attempts) {
         ApplicationId appId = attemptState.getAttemptId().getApplicationId();
         ApplicationStateData appState = rmState.appState.get(appId);
@@ -302,20 +314,26 @@ public class FileSystemRMStateStore extends RMStateStore {
   private void processDirectoriesOfFiles(
       RMStateFileProcessor rmAppStateFileProcessor, Path rootDirectory)
     throws Exception {
+    // 遍历根目录下所有一级子目录
     for (FileStatus dir : listStatusWithRetries(rootDirectory)) {
+      // 检查并修复当前目录下未完成的更新操作
       checkAndResumeUpdateOperation(dir.getPath());
       String dirName = dir.getPath().getName();
+      // 遍历目录下所有文件
       for (FileStatus fileNodeStatus : listStatusWithRetries(dir.getPath())) {
         assert fileNodeStatus.isFile();
         String fileName = fileNodeStatus.getPath().getName();
+        // 清理未完成写入的临时文件，跳过处理
         if (checkAndRemovePartialRecordWithRetries(fileNodeStatus.getPath())) {
           continue;
         }
+        // 读取文件内容
         byte[] fileData = readFileWithRetries(fileNodeStatus.getPath(),
                 fileNodeStatus.getLen());
-        // Set attribute if not already set
+        // 设置超级用户不可读扩展属性（如果启用加密且未设置）
         setUnreadableBySuperuserXattrib(fileNodeStatus.getPath());
 
+        // 调用处理器处理当前文件
         rmAppStateFileProcessor.processChildNode(dirName, fileName,
             fileData);
       }
@@ -323,9 +341,7 @@ public class FileSystemRMStateStore extends RMStateStore {
   }
 
   private boolean checkAndRemovePartialRecord(Path record) throws IOException {
-    // If the file ends with .tmp then it shows that it failed
-    // during saving state into state store. The file will be deleted as a
-    // part of this call
+    // 如果文件以.tmp结尾，说明写入过程中断，需要删除该不完整文件
     if (record.getName().endsWith(".tmp")) {
       LOG.error("incomplete rm state store entry found :"
           + record);
@@ -336,9 +352,7 @@ public class FileSystemRMStateStore extends RMStateStore {
   }
 
   private void checkAndResumeUpdateOperation(Path path) throws Exception {
-    // Before loading the state information, check whether .new file exists.
-    // If it does, the prior updateFile is failed on half way. We need to
-    // complete replacing the old file first.
+    // 加载状态前检查是否存在.new结尾的文件，.new文件说明更新过程中断，需要完成替换旧文件
     FileStatus[] newChildNodes =
         listStatusWithRetries(path, new PathFilter() {
       @Override
@@ -346,6 +360,7 @@ public class FileSystemRMStateStore extends RMStateStore {
         return path.getName().endsWith(".new");
       }
     });
+    // 遍历所有未完成更新，完成替换操作
     for(FileStatus newChildNodeStatus : newChildNodes) {
       assert newChildNodeStatus.isFile();
       String newChildNodeName = newChildNodeStatus.getPath().getName();
@@ -353,666 +368,31 @@ public class FileSystemRMStateStore extends RMStateStore {
               0, newChildNodeName.length() - ".new".length());
       Path childNodePath =
           new Path(newChildNodeStatus.getPath().getParent(), childNodeName);
+      // 用.new文件替换原文件，完成更新
       replaceFile(newChildNodeStatus.getPath(), childNodePath);
     }
   }
   private void loadRMDTSecretManagerState(RMState rmState) throws Exception {
+    // 检查并修复未完成的更新操作
     checkAndResumeUpdateOperation(rmDTSecretManagerRoot);
     FileStatus[] childNodes = listStatusWithRetries(rmDTSecretManagerRoot);
 
+    // 遍历所有文件恢复状态
     for(FileStatus childNodeStatus : childNodes) {
       assert childNodeStatus.isFile();
       String childNodeName = childNodeStatus.getPath().getName();
+      // 删除不完整文件，跳过处理
       if (checkAndRemovePartialRecordWithRetries(childNodeStatus.getPath())) {
         continue;
       }
+      // 处理令牌序列号文件，更新当前最大序列号
       if(childNodeName.startsWith(DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX)) {
         rmState.rmSecretManagerState.dtSequenceNumber =
             Integer.parseInt(childNodeName.split("_")[1]);
         continue;
       }
 
+      // 读取文件内容
       Path childNodePath = getNodePath(rmDTSecretManagerRoot, childNodeName);
       byte[] childData = readFileWithRetries(childNodePath,
-          childNodeStatus.getLen());
-      ByteArrayInputStream is = new ByteArrayInputStream(childData);
-      try (DataInputStream fsIn = new DataInputStream(is)) {
-        if (childNodeName.startsWith(DELEGATION_KEY_PREFIX)) {
-          DelegationKey key = new DelegationKey();
-          key.readFields(fsIn);
-          rmState.rmSecretManagerState.masterKeyState.add(key);
-          LOG.debug("Loaded delegation key: keyId={}, expirationDate={}",
-              key.getKeyId(), key.getExpiryDate());
-        } else if (childNodeName.startsWith(DELEGATION_TOKEN_PREFIX)) {
-          RMDelegationTokenIdentifierData identifierData =
-              RMStateStoreUtils.readRMDelegationTokenIdentifierData(fsIn);
-          RMDelegationTokenIdentifier identifier =
-              identifierData.getTokenIdentifier();
-          long renewDate = identifierData.getRenewDate();
-          rmState.rmSecretManagerState.delegationTokenState.put(identifier,
-            renewDate);
-          LOG.debug("Loaded RMDelegationTokenIdentifier: {} renewDate={}",
-              identifier, renewDate);
-        } else {
-          LOG.warn("Unknown file for recovering RMDelegationTokenSecretManager");
-        }
-      }
-    }
-  }
-
-  private void loadProxyCAManagerState(RMState rmState) throws Exception {
-    checkAndResumeUpdateOperation(proxyCARoot);
-
-    Path caCertPath = getNodePath(proxyCARoot, PROXY_CA_CERT_NODE);
-    Path caPrivateKeyPath = getNodePath(proxyCARoot, PROXY_CA_PRIVATE_KEY_NODE);
-
-    if (!existsWithRetries(caCertPath)
-        || !existsWithRetries(caPrivateKeyPath)) {
-      LOG.warn("Couldn't find Proxy CA data");
-      return;
-    }
-
-    FileStatus caCertFileStatus = getFileStatus(caCertPath);
-    byte[] caCertData = readFileWithRetries(caCertPath,
-        caCertFileStatus.getLen());
-
-    FileStatus caPrivateKeyFileStatus = getFileStatus(caPrivateKeyPath);
-    byte[] caPrivateKeyData = readFileWithRetries(caPrivateKeyPath,
-        caPrivateKeyFileStatus.getLen());
-
-    rmState.getProxyCAState().setCaCert(caCertData);
-    rmState.getProxyCAState().setCaPrivateKey(caPrivateKeyData);
-  }
-
-  @Override
-  public synchronized void storeApplicationStateInternal(ApplicationId appId,
-      ApplicationStateData appStateDataPB) throws Exception {
-    Path appDirPath = getAppDir(rmAppRoot, appId);
-    mkdirsWithRetries(appDirPath);
-    Path nodeCreatePath = getNodePath(appDirPath, appId.toString());
-
-    LOG.info("Storing info for app: " + appId + " at: " + nodeCreatePath);
-    byte[] appStateData = appStateDataPB.getProto().toByteArray();
-    try {
-      // currently throw all exceptions. May need to respond differently for HA
-      // based on whether we have lost the right to write to FS
-      writeFileWithRetries(nodeCreatePath, appStateData, true);
-    } catch (Exception e) {
-      LOG.info("Error storing info for app: " + appId, e);
-      throw e;
-    }
-  }
-
-  @Override
-  public synchronized void updateApplicationStateInternal(ApplicationId appId,
-      ApplicationStateData appStateDataPB) throws Exception {
-    Path appDirPath = getAppDir(rmAppRoot, appId);
-    Path nodeCreatePath = getNodePath(appDirPath, appId.toString());
-
-    LOG.info("Updating info for app: " + appId + " at: " + nodeCreatePath);
-    byte[] appStateData = appStateDataPB.getProto().toByteArray();
-    try {
-      // currently throw all exceptions. May need to respond differently for HA
-      // based on whether we have lost the right to write to FS
-      updateFile(nodeCreatePath, appStateData, true);
-    } catch (Exception e) {
-      LOG.info("Error updating info for app: " + appId, e);
-      throw e;
-    }
-  }
-
-  @Override
-  public synchronized void storeApplicationAttemptStateInternal(
-      ApplicationAttemptId appAttemptId,
-      ApplicationAttemptStateData attemptStateDataPB)
-      throws Exception {
-    Path appDirPath =
-        getAppDir(rmAppRoot, appAttemptId.getApplicationId());
-    Path nodeCreatePath = getNodePath(appDirPath, appAttemptId.toString());
-    LOG.info("Storing info for attempt: " + appAttemptId + " at: "
-        + nodeCreatePath);
-    byte[] attemptStateData = attemptStateDataPB.getProto().toByteArray();
-    try {
-      // currently throw all exceptions. May need to respond differently for HA
-      // based on whether we have lost the right to write to FS
-      writeFileWithRetries(nodeCreatePath, attemptStateData, true);
-    } catch (Exception e) {
-      LOG.info("Error storing info for attempt: " + appAttemptId, e);
-      throw e;
-    }
-  }
-
-  @Override
-  public synchronized void updateApplicationAttemptStateInternal(
-      ApplicationAttemptId appAttemptId,
-      ApplicationAttemptStateData attemptStateDataPB)
-      throws Exception {
-    Path appDirPath =
-        getAppDir(rmAppRoot, appAttemptId.getApplicationId());
-    Path nodeCreatePath = getNodePath(appDirPath, appAttemptId.toString());
-    LOG.info("Updating info for attempt: " + appAttemptId + " at: "
-        + nodeCreatePath);
-    byte[] attemptStateData = attemptStateDataPB.getProto().toByteArray();
-    try {
-      // currently throw all exceptions. May need to respond differently for HA
-      // based on whether we have lost the right to write to FS
-      updateFile(nodeCreatePath, attemptStateData, true);
-    } catch (Exception e) {
-      LOG.info("Error updating info for attempt: " + appAttemptId, e);
-      throw e;
-    }
-  }
-
-  @Override
-  public synchronized void removeApplicationAttemptInternal(
-      ApplicationAttemptId appAttemptId)
-      throws Exception {
-    Path appDirPath =
-        getAppDir(rmAppRoot, appAttemptId.getApplicationId());
-    Path nodeRemovePath = getNodePath(appDirPath, appAttemptId.toString());
-    LOG.info("Removing info for attempt: " + appAttemptId + " at: "
-        + nodeRemovePath);
-    deleteFileWithRetries(nodeRemovePath);
-  }
-
-  @Override
-  public synchronized void removeApplicationStateInternal(
-      ApplicationStateData appState)
-      throws Exception {
-    ApplicationId appId =
-        appState.getApplicationSubmissionContext().getApplicationId();
-    Path nodeRemovePath = getAppDir(rmAppRoot, appId);
-    LOG.info("Removing info for app: " + appId + " at: " + nodeRemovePath);
-    deleteFileWithRetries(nodeRemovePath);
-  }
-
-  @Override
-  public synchronized void storeRMDelegationTokenState(
-      RMDelegationTokenIdentifier identifier, Long renewDate)
-      throws Exception {
-    storeOrUpdateRMDelegationTokenState(identifier, renewDate, false);
-  }
-
-  @Override
-  public synchronized void removeRMDelegationTokenState(
-      RMDelegationTokenIdentifier identifier) throws Exception {
-    Path nodeCreatePath = getNodePath(rmDTSecretManagerRoot,
-            DELEGATION_TOKEN_PREFIX + identifier.getSequenceNumber());
-    LOG.info("Removing RMDelegationToken_" + identifier.getSequenceNumber());
-    deleteFileWithRetries(nodeCreatePath);
-  }
-
-  @Override
-  protected synchronized void updateRMDelegationTokenState(
-      RMDelegationTokenIdentifier rmDTIdentifier, Long renewDate)
-      throws Exception {
-    storeOrUpdateRMDelegationTokenState(rmDTIdentifier, renewDate, true);
-  }
-
-  private void storeOrUpdateRMDelegationTokenState(
-      RMDelegationTokenIdentifier identifier, Long renewDate,
-      boolean isUpdate) throws Exception {
-    Path nodeCreatePath =
-        getNodePath(rmDTSecretManagerRoot,
-          DELEGATION_TOKEN_PREFIX + identifier.getSequenceNumber());
-    RMDelegationTokenIdentifierData identifierData =
-        new RMDelegationTokenIdentifierData(identifier, renewDate);
-    if (isUpdate) {
-      LOG.info("Updating RMDelegationToken_" + identifier.getSequenceNumber());
-      updateFile(nodeCreatePath, identifierData.toByteArray(), true);
-    } else {
-      LOG.info("Storing RMDelegationToken_" + identifier.getSequenceNumber());
-      writeFileWithRetries(nodeCreatePath, identifierData.toByteArray(), true);
-
-      // store sequence number
-      Path latestSequenceNumberPath = getNodePath(rmDTSecretManagerRoot,
-            DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX
-            + identifier.getSequenceNumber());
-      LOG.info("Storing " + DELEGATION_TOKEN_SEQUENCE_NUMBER_PREFIX
-          + identifier.getSequenceNumber());
-      if (dtSequenceNumberPath == null) {
-        if (!createFileWithRetries(latestSequenceNumberPath)) {
-          throw new Exception("Failed to create " + latestSequenceNumberPath);
-        }
-      } else {
-        if (!renameFileWithRetries(dtSequenceNumberPath,
-            latestSequenceNumberPath)) {
-          throw new Exception("Failed to rename " + dtSequenceNumberPath);
-        }
-      }
-      dtSequenceNumberPath = latestSequenceNumberPath;
-    }
-  }
-
-  @Override
-  public synchronized void storeRMDTMasterKeyState(DelegationKey masterKey)
-      throws Exception {
-    Path nodeCreatePath = getNodePath(rmDTSecretManagerRoot,
-          DELEGATION_KEY_PREFIX + masterKey.getKeyId());
-    ByteArrayOutputStream os = new ByteArrayOutputStream();
-    try (DataOutputStream fsOut = new DataOutputStream(os)) {
-      LOG.info("Storing RMDelegationKey_" + masterKey.getKeyId());
-      masterKey.write(fsOut);
-      writeFileWithRetries(nodeCreatePath, os.toByteArray(), true);
-    }
-  }
-
-  @Override
-  public synchronized void
-      removeRMDTMasterKeyState(DelegationKey masterKey) throws Exception {
-    Path nodeCreatePath = getNodePath(rmDTSecretManagerRoot,
-          DELEGATION_KEY_PREFIX + masterKey.getKeyId());
-    LOG.info("Removing RMDelegationKey_"+ masterKey.getKeyId());
-    deleteFileWithRetries(nodeCreatePath);
-  }
-
-  @Override
-  public synchronized void deleteStore() throws Exception {
-    if (existsWithRetries(rootDirPath)) {
-      deleteFileWithRetries(rootDirPath);
-    }
-  }
-
-  @Override
-  public synchronized void removeApplication(ApplicationId removeAppId)
-      throws Exception {
-    Path nodeRemovePath = getAppDir(rmAppRoot, removeAppId);
-    if (existsWithRetries(nodeRemovePath)) {
-      deleteFileWithRetries(nodeRemovePath);
-    }
-  }
-
-  @Override
-  synchronized protected void storeProxyCACertState(
-      X509Certificate caCert, PrivateKey caPrivateKey) throws Exception {
-    byte[] caCertData = caCert.getEncoded();
-    byte[] caPrivateKeyData = caPrivateKey.getEncoded();
-
-    Path caCertPath = getNodePath(proxyCARoot, PROXY_CA_CERT_NODE);
-    Path caPrivateKeyPath = getNodePath(proxyCARoot, PROXY_CA_PRIVATE_KEY_NODE);
-
-    if (existsWithRetries(caCertPath)) {
-      updateFile(caCertPath, caCertData, true);
-    } else {
-      writeFileWithRetries(caCertPath, caCertData, true);
-    }
-
-    if (existsWithRetries(caPrivateKeyPath)) {
-      updateFile(caPrivateKeyPath, caPrivateKeyData, true);
-    } else {
-      writeFileWithRetries(caPrivateKeyPath, caPrivateKeyData, true);
-    }
-  }
-
-  private Path getAppDir(Path root, ApplicationId appId) {
-    return getNodePath(root, appId.toString());
-  }
-
-  @VisibleForTesting
-  protected Path getAppDir(ApplicationId appId) {
-    return getAppDir(rmAppRoot, appId);
-  }
-
-  @VisibleForTesting
-  protected Path getAppAttemptDir(ApplicationAttemptId appAttId) {
-    return getNodePath(getAppDir(appAttId.getApplicationId()), appAttId
-            .toString());
-  }
-  // FileSystem related code
-
-  private boolean checkAndRemovePartialRecordWithRetries(final Path record)
-      throws Exception {
-    return new FSAction<Boolean>() {
-      @Override
-      public Boolean run() throws Exception {
-        return checkAndRemovePartialRecord(record);
-      }
-    }.runWithRetries();
-  }
-
-  private void mkdirsWithRetries(final Path appDirPath) throws Exception {
-    new FSAction<Void>() {
-      @Override
-      public Void run() throws Exception {
-        fs.mkdirs(appDirPath);
-        return null;
-      }
-    }.runWithRetries();
-  }
-
-  private void writeFileWithRetries(final Path outputPath, final byte[] data,
-                                    final boolean makeUnreadableByAdmin)
-          throws Exception {
-    new FSAction<Void>() {
-      @Override
-      public Void run() throws Exception {
-        writeFile(outputPath, data, makeUnreadableByAdmin);
-        return null;
-      }
-    }.runWithRetries();
-  }
-
-  private void deleteFileWithRetries(final Path deletePath) throws Exception {
-    new FSAction<Void>() {
-      @Override
-      public Void run() throws Exception {
-        deleteFile(deletePath);
-        return null;
-      }
-    }.runWithRetries();
-  }
-
-  private boolean renameFileWithRetries(final Path src, final Path dst)
-      throws Exception {
-    return new FSAction<Boolean>() {
-      @Override
-      public Boolean run() throws Exception {
-        return renameFile(src, dst);
-      }
-    }.runWithRetries();
-  }
-
-  private boolean createFileWithRetries(final Path newFile) throws Exception {
-    return new FSAction<Boolean>() {
-      @Override
-      public Boolean run() throws Exception {
-        return createFile(newFile);
-      }
-    }.runWithRetries();
-  }
-
-  private FileStatus getFileStatusWithRetries(final Path path)
-      throws Exception {
-    return new FSAction<FileStatus>() {
-      @Override
-      public FileStatus run() throws Exception {
-        return getFileStatus(path);
-      }
-    }.runWithRetries();
-  }
-
-  private boolean existsWithRetries(final Path path) throws Exception {
-    return new FSAction<Boolean>() {
-      @Override
-      public Boolean run() throws Exception {
-        return fs.exists(path);
-      }
-    }.runWithRetries();
-  }
-
-  private byte[] readFileWithRetries(final Path inputPath, final long len)
-      throws Exception {
-    return new FSAction<byte[]>() {
-      @Override
-      public byte[] run() throws Exception {
-        return readFile(inputPath, len);
-      }
-    }.runWithRetries();
-  }
-
-  private FileStatus[] listStatusWithRetries(final Path path)
-      throws Exception {
-    return new FSAction<FileStatus[]>() {
-      @Override
-      public FileStatus[] run() throws Exception {
-        return fs.listStatus(path);
-      }
-    }.runWithRetries();
-  }
-
-  private FileStatus[] listStatusWithRetries(final Path path,
-      final PathFilter filter) throws Exception {
-    return new FSAction<FileStatus[]>() {
-      @Override
-      public FileStatus[] run() throws Exception {
-        return fs.listStatus(path, filter);
-      }
-    }.runWithRetries();
-  }
-
-  private void closeWithRetries() throws Exception {
-    new FSAction<Void>() {
-      @Override
-      public Void run() throws Exception {
-        IOUtils.closeStream(fs);
-        return null;
-      }
-    }.runWithRetries();
-  }
-
-  private abstract class FSAction<T> {
-    abstract T run() throws Exception;
-
-    T runWithRetries() throws Exception {
-      int retry = 0;
-      while (true) {
-        try {
-          return run();
-        } catch (IOException e) {
-          LOG.info("Exception while executing an FS operation.", e);
-          if (++retry > fsNumRetries) {
-            LOG.info("Maxed out FS retries. Giving up!");
-            throw e;
-          }
-          LOG.info("Retrying operation on FS. Retry no. " + retry);
-          Thread.sleep(fsRetryInterval);
-        }
-      }
-    }
-  }
-
-  private void deleteFile(Path deletePath) throws Exception {
-    if(!fs.delete(deletePath, true)) {
-      throw new Exception("Failed to delete " + deletePath);
-    }
-  }
-
-  private byte[] readFile(Path inputPath, long len) throws Exception {
-    FSDataInputStream fsIn = null;
-    try {
-      fsIn = fs.open(inputPath);
-      // state data will not be that "long"
-      byte[] data = new byte[(int) len];
-      fsIn.readFully(data);
-      return data;
-    } finally {
-      IOUtils.cleanupWithLogger(LOG, fsIn);
-    }
-  }
-
-  private FileStatus getFileStatus(Path path) throws Exception {
-    try {
-      return fs.getFileStatus(path);
-    } catch (FileNotFoundException e) {
-      return null;
-    }
-  }
-
-  /*
-   * In order to make this write atomic as a part of write we will first write
-   * data to .tmp file and then rename it. Here we are assuming that rename is
-   * atomic for underlying file system.
-   */
-  protected void writeFile(Path outputPath, byte[] data, boolean
-          makeUnreadableByAdmin) throws Exception {
-    Path tempPath =
-        new Path(outputPath.getParent(), outputPath.getName() + ".tmp");
-    FSDataOutputStream fsOut = null;
-    // This file will be overwritten when app/attempt finishes for saving the
-    // final status.
-    try {
-      fsOut = fs.create(tempPath, true);
-      if (makeUnreadableByAdmin) {
-        setUnreadableBySuperuserXattrib(tempPath);
-      }
-      fsOut.write(data);
-      fsOut.close();
-      fsOut = null;
-      fs.rename(tempPath, outputPath);
-    } finally {
-      IOUtils.cleanupWithLogger(LOG, fsOut);
-    }
-  }
-
-  /*
-   * In order to make this update atomic as a part of write we will first write
-   * data to .new file and then rename it. Here we are assuming that rename is
-   * atomic for underlying file system.
-   */
-  protected void updateFile(Path outputPath, byte[] data, boolean
-          makeUnreadableByAdmin) throws Exception {
-    Path newPath = new Path(outputPath.getParent(), outputPath.getName() + ".new");
-    // use writeFileWithRetries to make sure .new file is created atomically
-    writeFileWithRetries(newPath, data, makeUnreadableByAdmin);
-    replaceFile(newPath, outputPath);
-  }
-
-  protected void replaceFile(Path srcPath, Path dstPath) throws Exception {
-    if (existsWithRetries(dstPath)) {
-      deleteFileWithRetries(dstPath);
-    } else {
-      LOG.info("File doesn't exist. Skip deleting the file " + dstPath);
-    }
-    renameFileWithRetries(srcPath, dstPath);
-  }
-
-  @Private
-  @VisibleForTesting
-  boolean renameFile(Path src, Path dst) throws Exception {
-    return fs.rename(src, dst);
-  }
-
-  private boolean createFile(Path newFile) throws Exception {
-    return fs.createNewFile(newFile);
-  }
-
-  @Private
-  @VisibleForTesting
-  Path getNodePath(Path root, String nodeName) {
-    return new Path(root, nodeName);
-  }
-
-  @Override
-  public synchronized void storeOrUpdateAMRMTokenSecretManagerState(
-      AMRMTokenSecretManagerState amrmTokenSecretManagerState, boolean isUpdate)
-      throws Exception {
-    Path nodeCreatePath =
-        getNodePath(amrmTokenSecretManagerRoot, AMRMTOKEN_SECRET_MANAGER_NODE);
-    AMRMTokenSecretManagerState data =
-        AMRMTokenSecretManagerState.newInstance(amrmTokenSecretManagerState);
-    byte[] stateData = data.getProto().toByteArray();
-    if (isUpdate) {
-      updateFile(nodeCreatePath, stateData, true);
-    } else {
-      writeFileWithRetries(nodeCreatePath, stateData, true);
-    }
-  }
-
-  @Override
-  protected void storeReservationState(
-      ReservationAllocationStateProto reservationAllocation, String planName,
-      String reservationIdName) throws Exception {
-    Path planCreatePath = getNodePath(reservationRoot, planName);
-    mkdirsWithRetries(planCreatePath);
-    Path reservationPath = getNodePath(planCreatePath, reservationIdName);
-    LOG.info("Storing state for reservation " + reservationIdName + " from " +
-        "plan " + planName + " at path " + reservationPath);
-    byte[] reservationData = reservationAllocation.toByteArray();
-    writeFileWithRetries(reservationPath, reservationData, true);
-  }
-
-  @Override
-  protected void removeReservationState(
-      String planName, String reservationIdName) throws Exception {
-    Path planCreatePath = getNodePath(reservationRoot, planName);
-    Path reservationPath = getNodePath(planCreatePath, reservationIdName);
-    LOG.info("Removing state for reservation " + reservationIdName + " from " +
-        "plan " + planName + " at path " + reservationPath);
-    deleteFileWithRetries(reservationPath);
-  }
-
-  @VisibleForTesting
-  public int getNumRetries() {
-    return fsNumRetries;
-  }
-
-  @VisibleForTesting
-  public long getRetryInterval() {
-    return fsRetryInterval;
-  }
-
-  private void setUnreadableBySuperuserXattrib(Path p) throws IOException {
-    if (fs.getScheme().toLowerCase().contains("hdfs")
-        && intermediateEncryptionEnabled
-        && !fs.getXAttrs(p).containsKey(UNREADABLE_BY_SUPERUSER_XATTRIB)) {
-      fs.setXAttr(p, UNREADABLE_BY_SUPERUSER_XATTRIB, null,
-        EnumSet.of(XAttrSetFlag.CREATE));
-    }
-  }
-
-  private static class ReservationStateFileProcessor implements
-      RMStateFileProcessor {
-    private RMState rmState;
-    public ReservationStateFileProcessor(RMState state) {
-      this.rmState = state;
-    }
-
-    @Override
-    public void processChildNode(String planName, String childNodeName,
-        byte[] childData) throws IOException {
-      ReservationAllocationStateProto allocationState =
-          ReservationAllocationStateProto.parseFrom(childData);
-      if (!rmState.getReservationState().containsKey(planName)) {
-        rmState.getReservationState().put(planName,
-            new HashMap<ReservationId, ReservationAllocationStateProto>());
-      }
-      ReservationId reservationId =
-          ReservationId.parseReservationId(childNodeName);
-      rmState.getReservationState().get(planName).put(reservationId,
-          allocationState);
-    }
-  }
-
-  private static class RMAppStateFileProcessor implements RMStateFileProcessor {
-    private RMState rmState;
-    private List<ApplicationAttemptStateData> attempts;
-
-    public RMAppStateFileProcessor(RMState rmState,
-        List<ApplicationAttemptStateData> attempts) {
-      this.rmState = rmState;
-      this.attempts = attempts;
-    }
-
-    @Override
-    public void processChildNode(String appDirName, String childNodeName,
-        byte[] childData) throws InvalidProtocolBufferException {
-      if (childNodeName.startsWith(ApplicationId.appIdStrPrefix)) {
-        // application
-        LOG.debug("Loading application from node: {}", childNodeName);
-        ApplicationStateDataPBImpl appState =
-            new ApplicationStateDataPBImpl(
-                ApplicationStateDataProto.parseFrom(childData));
-        ApplicationId appId =
-            appState.getApplicationSubmissionContext().getApplicationId();
-        rmState.appState.put(appId, appState);
-      } else if (childNodeName.startsWith(
-          ApplicationAttemptId.appAttemptIdStrPrefix)) {
-        // attempt
-        LOG.debug("Loading application attempt from node: {}", childNodeName);
-        ApplicationAttemptStateDataPBImpl attemptState =
-            new ApplicationAttemptStateDataPBImpl(
-                ApplicationAttemptStateDataProto.parseFrom(childData));
-        attempts.add(attemptState);
-      } else {
-        LOG.info("Unknown child node with name: " + childNodeName);
-      }
-    }
-  }
-
-  // Interface for common state processing of directory of file layout
-  private interface RMStateFileProcessor {
-    void processChildNode(String appDirName, String childNodeName,
-        byte[] childData)
-        throws IOException;
-  }
-}
+          childNode

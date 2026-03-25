@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,19 +33,33 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.Applicati
 
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
+/**
+ * ApplicationFinishData的Protobuf实现，基于PB序列化存储应用完成信息，用于应用历史服务
+ */
 public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
 
+  // PB协议对象，默认实例
   ApplicationFinishDataProto proto = ApplicationFinishDataProto
     .getDefaultInstance();
+  // PB构建器
   ApplicationFinishDataProto.Builder builder = null;
+  // 标记是否通过现有proto初始化
   boolean viaProto = false;
 
+  // 缓存的应用ID对象
   private ApplicationId applicationId;
 
+  /**
+   * 无参构造，初始化PB构建器
+   */
   public ApplicationFinishDataPBImpl() {
     builder = ApplicationFinishDataProto.newBuilder();
   }
 
+  /**
+   * 基于现有PB对象构造
+   * @param proto 已构造的ApplicationFinishDataProto
+   */
   public ApplicationFinishDataPBImpl(ApplicationFinishDataProto proto) {
     this.proto = proto;
     viaProto = true;
@@ -52,13 +67,17 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
 
   @Override
   public ApplicationId getApplicationId() {
+    // 已缓存直接返回
     if (this.applicationId != null) {
       return this.applicationId;
     }
+    // 根据初始化方式选择proto或builder
     ApplicationFinishDataProtoOrBuilder p = viaProto ? proto : builder;
+    // PB中没有该字段返回null
     if (!p.hasApplicationId()) {
       return null;
     }
+    // 从PB格式转换并缓存
     this.applicationId = convertFromProtoFormat(p.getApplicationId());
     return this.applicationId;
   }
@@ -66,9 +85,11 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
   @Override
   public void setApplicationId(ApplicationId applicationId) {
     maybeInitBuilder();
+    // 清空字段
     if (applicationId == null) {
       builder.clearApplicationId();
     }
+    // 缓存应用ID对象
     this.applicationId = applicationId;
   }
 
@@ -143,6 +164,10 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
     builder.setYarnApplicationState(convertToProtoFormat(state));
   }
 
+  /**
+   * 获取当前对象对应的PB proto，合并本地缓存数据到proto
+   * @return 完整的ApplicationFinishDataProto
+   */
   public ApplicationFinishDataProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -170,6 +195,9 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
     return TextFormat.shortDebugString(getProto());
   }
 
+  /**
+   * 将本地缓存的应用ID合并到PB构建器
+   */
   private void mergeLocalToBuilder() {
     if (this.applicationId != null
         && !((ApplicationIdPBImpl) this.applicationId).getProto().equals(
@@ -178,6 +206,9 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
     }
   }
 
+  /**
+   * 将本地缓存数据合并到proto
+   */
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -187,6 +218,9 @@ public class ApplicationFinishDataPBImpl extends ApplicationFinishData {
     viaProto = true;
   }
 
+  /**
+   * 按需初始化PB构建器，如果当前是只读proto模式则基于原proto创建构建器
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = ApplicationFinishDataProto.newBuilder(proto);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,7 +25,7 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.api.records.ResourceUtilization;
 
 /**
- * Node usage report.
+ * YARN调度器节点资源使用报告，封装了单个节点的资源分配与使用状态信息
  */
 @Private
 @Stable
@@ -34,6 +35,10 @@ public class SchedulerNodeReport {
   private final ResourceUtilization utilization;
   private final int num;
   
+  /**
+   * 根据调度节点信息构造节点资源使用报告
+   * @param node 调度器节点对象
+   */
   public SchedulerNodeReport(SchedulerNode node) {
     this.used = node.getAllocatedResource();
     this.avail = node.getUnallocatedResource();
@@ -42,21 +47,21 @@ public class SchedulerNodeReport {
   }
   
   /**
-   * @return the amount of resources currently used by the node.
+   * @return 节点当前已使用的资源总量
    */
   public Resource getUsedResource() {
     return used;
   }
 
   /**
-   * @return the amount of resources currently available on the node
+   * @return 节点当前可用的资源总量
    */
   public Resource getAvailableResource() {
     return avail;
   }
 
   /**
-   * @return the number of containers currently running on this node.
+   * @return 节点当前正在运行的容器数量
    */
   public int getNumContainers() {
     return num;
@@ -64,7 +69,7 @@ public class SchedulerNodeReport {
 
   /**
    *
-   * @return utilization of this node
+   * @return 节点当前资源利用率信息
    */
   public ResourceUtilization getUtilization() {
     return utilization;

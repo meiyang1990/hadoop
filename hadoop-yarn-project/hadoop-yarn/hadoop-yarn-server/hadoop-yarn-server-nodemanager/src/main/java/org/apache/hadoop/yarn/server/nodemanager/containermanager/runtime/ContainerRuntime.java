@@ -1,5 +1,5 @@
+// 这个文件已经全部加上中文注释
 /*
- * *
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
  *  distributed with this work for additional information
@@ -15,7 +15,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- * /
  */
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.runtime;
@@ -27,91 +26,83 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Cont
 import org.apache.hadoop.yarn.server.nodemanager.executor.ContainerExecContext;
 
 /**
- * An abstraction for various container runtime implementations. Examples
- * include Process Tree, Docker, Appc runtimes etc. These implementations
- * are meant for low-level OS container support - dependencies on
- * higher-level node manager constructs should be avoided.
+ * 容器运行时抽象接口，定义了多种容器运行时实现的统一规范。
+ * 支持原生进程树、Docker、Appc等不同底层容器运行实现，
+ * 专注于提供底层操作系统级容器支持，应避免依赖高层NodeManager核心组件。
  */
 
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface ContainerRuntime {
   /**
-   * Prepare a container to be ready for launch.
+   * 准备容器，完成启动前的初始化工作。
    *
-   * @param ctx the {@link ContainerRuntimeContext}
-   * @throws ContainerExecutionException if an error occurs while preparing
-   * the container
+   * @param ctx 容器运行时上下文，包含容器相关信息
+   * @throws ContainerExecutionException 准备容器过程中发生错误时抛出
    */
   void prepareContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException;
 
   /**
-   * Launch a container.
+   * 启动容器。
    *
-   * @param ctx the {@link ContainerRuntimeContext}
-   * @throws ContainerExecutionException if an error occurs while launching
-   * the container
+   * @param ctx 容器运行时上下文，包含容器相关信息
+   * @throws ContainerExecutionException 启动容器过程中发生错误时抛出
    */
   void launchContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException;
 
   /**
-   * Relaunch a container.
+   * 重新启动容器。
    *
-   * @param ctx the {@link ContainerRuntimeContext}
-   * @throws ContainerExecutionException if an error occurs while relaunching
-   * the container
+   * @param ctx 容器运行时上下文，包含容器相关信息
+   * @throws ContainerExecutionException 重新启动容器过程中发生错误时抛出
    */
   void relaunchContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException;
 
   /**
-   * Signal a container. Signals may be a request to terminate, a status check,
-   * etc.
+   * 向容器发送信号，支持终止请求、状态检查等操作。
    *
-   * @param ctx the {@link ContainerRuntimeContext}
-   * @throws ContainerExecutionException if an error occurs while signaling
-   * the container
+   * @param ctx 容器运行时上下文，包含容器相关信息
+   * @throws ContainerExecutionException 发送信号过程中发生错误时抛出
    */
   void signalContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException;
 
   /**
-   * Perform any container cleanup that may be required.
+   * 清理容器资源，回收容器退出后的残留资源。
    *
-   * @param ctx the {@link ContainerRuntimeContext}
-   * @throws ContainerExecutionException if an error occurs while reaping
-   * the container
+   * @param ctx 容器运行时上下文，包含容器相关信息
+   * @throws ContainerExecutionException 清理容器资源过程中发生错误时抛出
    */
   void reapContainer(ContainerRuntimeContext ctx)
       throws ContainerExecutionException;
 
   /**
-   * Run a program in container.
+   * 在容器内执行指定程序。
    *
-   * @param ctx the {@link ContainerExecContext}
-   * @return stdin and stdout of container exec
-   * @throws ContainerExecutionException
+   * @param ctx 容器执行上下文，包含执行参数
+   * @return 容器执行的标准输入和标准输出流对
+   * @throws ContainerExecutionException 在容器内执行程序发生错误时抛出
    */
   IOStreamPair execContainer(ContainerExecContext ctx)
       throws ContainerExecutionException;
 
   /**
-   * Return the host and ip of the container.
+   * 获取容器的IP地址和主机名信息。
    *
-   * @param container the {@link Container}
-   * @throws ContainerExecutionException if an error occurs while getting the ip
-   * and hostname
+   * @param container 目标容器对象
+   * @return 数组，第一个元素为IP，第二个元素为主机名
+   * @throws ContainerExecutionException 获取IP和主机名过程中发生错误时抛出
    */
   String[] getIpAndHost(Container container) throws ContainerExecutionException;
 
   /**
-   * Return the exposed ports of the container.
-   * @param container the {@link Container}
-   * @return List of exposed ports
-   * @throws ContainerExecutionException if an error occurs while getting
-   * the exposed ports
+   * 获取容器暴露的端口列表。
+   * @param container 目标容器对象
+   * @return 暴露端口列表字符串
+   * @throws ContainerExecutionException 获取暴露端口过程中发生错误时抛出
    */
   String getExposedPorts(Container container)
       throws ContainerExecutionException;

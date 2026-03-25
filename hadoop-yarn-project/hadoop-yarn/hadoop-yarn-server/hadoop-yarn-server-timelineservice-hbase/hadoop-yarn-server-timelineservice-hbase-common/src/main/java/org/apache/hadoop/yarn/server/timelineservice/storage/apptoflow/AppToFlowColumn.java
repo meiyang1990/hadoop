@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,22 +28,22 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ValueConvert
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * Identifies fully qualified columns for the {@link AppToFlowTable}.
+ * AppToFlow流表HBase列定义枚举，定义了应用到流映射表中所有列的完整元信息。
  */
 public enum AppToFlowColumn implements Column<AppToFlowTable> {
 
   /**
-   * The flow ID.
+   * 流ID列，存储应用所属流的唯一标识。
    */
   FLOW_ID(AppToFlowColumnFamily.MAPPING, "flow_id"),
 
   /**
-   * The flow run ID.
+   * 流运行ID列，存储应用所属流运行实例的标识。
    */
   FLOW_RUN_ID(AppToFlowColumnFamily.MAPPING, "flow_run_id"),
 
   /**
-   * The user.
+   * 用户ID列，存储提交应用的用户标识。
    */
   USER_ID(AppToFlowColumnFamily.MAPPING, "user_id");
 
@@ -51,18 +52,23 @@ public enum AppToFlowColumn implements Column<AppToFlowTable> {
   private final byte[] columnQualifierBytes;
   private final ValueConverter valueConverter;
 
+  /**
+   * 构造AppToFlow列枚举实例，初始化列元信息并编码列名字节数组。
+   * @param columnFamily 列所属列族
+   * @param columnQualifier 列限定符名称
+   */
   AppToFlowColumn(ColumnFamily<AppToFlowTable> columnFamily,
       String columnQualifier) {
     this.columnFamily = columnFamily;
     this.columnQualifier = columnQualifier;
-    // Future-proof by ensuring the right column prefix hygiene.
+    // 对列限定符进行编码，保证前缀格式合规，为未来扩展预留兼容性
     this.columnQualifierBytes =
         Bytes.toBytes(Separator.SPACE.encode(columnQualifier));
     this.valueConverter = GenericConverter.getInstance();
   }
 
   /**
-   * @return the column name value
+   * @return 列限定符字符串
    */
   private String getColumnQualifier() {
     return columnQualifier;
@@ -70,6 +76,7 @@ public enum AppToFlowColumn implements Column<AppToFlowTable> {
 
   @Override
   public byte[] getColumnQualifierBytes() {
+    // 返回克隆数组避免外部修改内部字节内容
     return columnQualifierBytes.clone();
   }
 

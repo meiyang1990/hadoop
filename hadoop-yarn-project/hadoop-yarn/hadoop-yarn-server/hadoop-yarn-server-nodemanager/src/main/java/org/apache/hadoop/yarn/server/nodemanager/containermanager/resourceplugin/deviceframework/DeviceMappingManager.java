@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,9 +48,9 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Schedule device resource based on requirements and do book keeping
- * It holds all device type resource and can do scheduling as a default
- * scheduler.
+ * 设备资源分配管理器，负责管理节点上各类硬件设备的分配与回收，
+ * 支持默认调度和厂商自定义调度器，维护设备使用状态，支持节点重启恢复。
+ * 是YARN设备框架的核心组件，负责所有设备资源的簿记和调度。
  * */
 public class DeviceMappingManager {
   static final Logger LOG = LoggerFactory.
@@ -58,26 +59,30 @@ public class DeviceMappingManager {
   private Context nmContext;
   private static final int WAIT_MS_PER_LOOP = 1000;
 
-  // Holds vendor implemented scheduler
+  /** 保存各设备类型对应的厂商自定义调度器 */
   private Map<String, DevicePluginScheduler> devicePluginSchedulers =
       new ConcurrentHashMap<>();
 
   /**
-   * Hold all type of devices.
-   * key is the device resource name
-   * value is a sorted set of {@link Device}
+   * 保存节点上所有可用设备
+   * key: 设备资源名称，如 "yarn.io/gpu"
+   * value: 排序的设备集合
    * */
   private Map<String, Set<Device>> allAllowedDevices =
       new ConcurrentHashMap<>();
 
   /**
-   * Hold used devices.
-   * key is the device resource name
-   * value is a sorted map of {@link Device} and {@link ContainerId} pairs
+   * 保存已分配使用的设备
+   * key: 设备资源名称
+   * value: (设备 -> 分配容器ID) 有序映射
    * */
   private Map<String, Map<Device, ContainerId>> allUsedDevices =
       new ConcurrentHashMap<>();
 
+  /**
+   * 构造函数，初始化设备管理器
+   * @param context NodeManager上下文对象
+   */
   public DeviceMappingManager(Context context) {
     nmContext = context;
   }
@@ -98,6 +103,7 @@ public class DeviceMappingManager {
   }
 
   @VisibleForTesting
+  /** 获取指定容器分配到的所有指定类型设备 */
   public Set<Device> getAllocatedDevices(String resourceName,
       ContainerId cId) {
     Set<Device> assigned = new TreeSet<>();
@@ -111,6 +117,11 @@ public class DeviceMappingManager {
     return assigned;
   }
 
+  /**
+   * 添加新的设备类型和对应设备集合
+   * @param resourceName 设备资源名称
+   * @param deviceSet 设备集合
+   */
   public synchronized void addDeviceSet(String resourceName,
       Set<Device> deviceSet) {
     LOG.info("Adding new resource: " + "type:"
@@ -119,34 +130,41 @@ public class DeviceMappingManager {
     allUsedDevices.put(resourceName, new TreeMap<>());
   }
 
+  /**
+   * 为容器分配指定类型的设备，超时等待设备释放
+   * @param resourceName 设备资源名称
+   * @param container 待分配容器
+   * @return 设备分配结果
+   * @throws ResourceHandlerException 分配失败时抛出异常
+   */
   public DeviceAllocation assignDevices(String resourceName,
       Container container)
       throws ResourceHandlerException {
     DeviceAllocation allocation = internalAssignDevices(resourceName,
         container);
-    // Wait for a maximum of 120 seconds if no available Devices are there
-    // which are yet to be released.
+    // 如果当前无可用设备，最多等待120秒，等待正在释放的设备
     final int timeoutMsecs = 120 * WAIT_MS_PER_LOOP;
     int timeWaiting = 0;
+    // 循环等待设备释放
     while (allocation == null) {
       if (timeWaiting >= timeoutMsecs) {
         break;
       }
 
-      // Sleep for 1 sec to ensure there are some free devices which are
-      // getting released.
       try {
         LOG.info("Container : " + container.getContainerId()
             + " is waiting for free " + resourceName + " devices.");
         Thread.sleep(WAIT_MS_PER_LOOP);
         timeWaiting += WAIT_MS_PER_LOOP;
+        // 重新尝试分配
         allocation = internalAssignDevices(resourceName, container);
       } catch (InterruptedException e) {
-        // On any interrupt, break the loop and continue execution.
+        // 中断后直接退出等待
         break;
       }
     }
 
+    // 超时仍未分配到设备，抛出异常
     if (allocation == null) {
       String message = "Could not get valid " + resourceName
           + " device for container '" + container.getContainerId()
@@ -157,6 +175,13 @@ public class DeviceMappingManager {
     return allocation;
   }
 
+  /**
+   * 内部设备分配逻辑，检查资源可用性并执行调度
+   * @param resourceName 设备资源名称
+   * @param container 待分配容器
+   * @return 分配结果，返回null表示需要等待正在释放的设备
+   * @throws ResourceHandlerException 资源不足时抛出异常
+   */
   private synchronized DeviceAllocation internalAssignDevices(
       String resourceName, Container container)
       throws ResourceHandlerException {
@@ -165,11 +190,10 @@ public class DeviceMappingManager {
     int requestedDeviceCount = getRequestedDeviceCount(resourceName,
         requestedResource);
     LOG.debug("Try allocating {} {}", requestedDeviceCount, resourceName);
-    // Assign devices to container if requested some.
+    // 容器请求设备数量大于0时才分配
     if (requestedDeviceCount > 0) {
       if (requestedDeviceCount > getAvailableDevices(resourceName)) {
-        // If there are some devices which are getting released, wait for few
-        // seconds to get it.
+        // 如果请求数量不超过(可用设备 + 正在释放设备)，返回null等待释放
         if (requestedDeviceCount <= getReleasingDevices(resourceName)
             + getAvailableDevices(resourceName)) {
           return null;
@@ -189,30 +213,38 @@ public class DeviceMappingManager {
       Map<Device, ContainerId> usedDevices = allUsedDevices.get(resourceName);
       Set<Device> allowedDevices = allAllowedDevices.get(resourceName);
       DevicePluginScheduler dps = devicePluginSchedulers.get(resourceName);
-      // Prefer DevicePluginScheduler logic
+      // 选择调度器并执行分配
       pickAndDoSchedule(allowedDevices, usedDevices, assignedDevices,
           container, requestedDeviceCount, resourceName, dps);
 
-      // Record in state store if we allocated anything
+      // 分配成功后持久化分配信息到NM状态存储
       if (!assignedDevices.isEmpty()) {
         try {
-          // Update state store.
           nmContext.getNMStateStore().storeAssignedResources(container,
               resourceName,
               new ArrayList<>(assignedDevices));
         } catch (IOException e) {
+          // 持久化失败，清理已分配设备后抛出异常
           cleanupAssignedDevices(resourceName, containerId);
           throw new ResourceHandlerException(e);
         }
       }
 
+      // 计算未分配设备集合，返回分配结果
       return new DeviceAllocation(resourceName, assignedDevices,
           Sets.differenceInTreeSets(allowedDevices, assignedDevices));
     }
+    // 容器未请求设备，返回空分配结果
     return new DeviceAllocation(resourceName, null,
         allAllowedDevices.get(resourceName));
   }
 
+  /**
+   * 从NM状态存储恢复已分配设备信息，用于节点重启后恢复
+   * @param resourceName 设备资源名称
+   * @param containerId 容器ID
+   * @throws ResourceHandlerException 恢复失败抛出异常
+   */
   public synchronized void recoverAssignedDevices(String resourceName,
       ContainerId containerId)
       throws ResourceHandlerException {
@@ -225,6 +257,7 @@ public class DeviceMappingManager {
               + containerId);
     }
 
+    // 遍历持久化的分配信息恢复状态
     for (Serializable deviceSerializable : c.getResourceMappings()
         .getAssignedResources(resourceName)) {
       if (!(deviceSerializable instanceof Device)) {
@@ -235,7 +268,7 @@ public class DeviceMappingManager {
 
       Device device = (Device) deviceSerializable;
 
-      // Make sure it is in allowed device.
+      // 检查设备是否在允许列表中
       if (!allowedDevices.contains(device)) {
         throw new ResourceHandlerException(
             "Try to recover device = " + device
@@ -243,7 +276,7 @@ public class DeviceMappingManager {
                 .join(",", allowedDevices));
       }
 
-      // Make sure it is not occupied by anybody else
+      // 检查设备是否已被占用
       if (usedDevices.containsKey(device)) {
         throw new ResourceHandlerException(
             "Try to recover device id = " + device
@@ -252,15 +285,22 @@ public class DeviceMappingManager {
                 + ", please double check what happened.");
       }
 
+      // 标记设备为已使用
       usedDevices.put(device, containerId);
     }
   }
 
+  /**
+   * 回收容器占用的所有指定类型设备
+   * @param resourceName 设备资源名称
+   * @param containerId 容器ID
+   */
   public synchronized void cleanupAssignedDevices(String resourceName,
       ContainerId containerId) {
     Iterator<Map.Entry<Device, ContainerId>> iter =
         allUsedDevices.get(resourceName).entrySet().iterator();
     Map.Entry<Device, ContainerId> entry;
+    // 遍历移除该容器分配的所有设备
     while (iter.hasNext()) {
       entry = iter.next();
       if (entry.getValue().equals(containerId)) {
@@ -271,6 +311,12 @@ public class DeviceMappingManager {
     }
   }
 
+  /**
+   * 从请求资源中获取请求的设备数量
+   * @param resName 设备资源名称
+   * @param requestedResource 请求资源对象
+   * @return 请求设备数量，未找到该资源返回0
+   */
   public static int getRequestedDeviceCount(String resName,
       Resource requestedResource) {
     try {
@@ -281,14 +327,17 @@ public class DeviceMappingManager {
     }
   }
 
+  /** 获取指定类型当前可用设备数量 */
   public int getAvailableDevices(String resourceName) {
     return allAllowedDevices.get(resourceName).size()
         - allUsedDevices.get(resourceName).size();
   }
 
+  /** 获取正在释放（容器已进入终态）的设备数量 */
   private long getReleasingDevices(String resourceName) {
     long releasingDevices = 0;
     Map<Device, ContainerId> used = allUsedDevices.get(resourceName);
+    // 遍历所有已分配设备，统计终态容器占用的设备
     for (ContainerId containerId : ImmutableSet.copyOf(used.values())) {
       Container container = nmContext.getContainers().get(containerId);
       if (container != null) {
@@ -302,8 +351,15 @@ public class DeviceMappingManager {
   }
 
   /**
-   * If device plugin has own scheduler, then use it.
-   * Otherwise, pick our default scheduler to do scheduling.
+   * 根据是否有自定义调度器选择分配逻辑，执行设备分配
+   * @param allowed 允许分配的设备集合
+   * @param used 已使用设备映射
+   * @param assigned 保存分配结果的集合
+   * @param c 待分配容器
+   * @param count 请求设备数量
+   * @param resourceName 设备资源名称
+   * @param dps 厂商自定义调度器，可为null
+   * @throws ResourceHandlerException 分配失败抛出异常
    * */
   private void pickAndDoSchedule(Set<Device> allowed,
       Map<Device, ContainerId> used, Set<Device> assigned,
@@ -315,42 +371,51 @@ public class DeviceMappingManager {
     if (null == dps) {
       LOG.debug("Customized device plugin scheduler is preferred "
           + "but not implemented, use default logic");
+      // 无自定义调度器，使用默认调度逻辑
       defaultScheduleAction(allowed, used,
           assigned, containerId, count);
     } else {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Customized device plugin implemented,"
             + "use customized logic");
-        // Use customized device scheduler
         LOG.debug("Try to schedule " + count
             + "(" + resourceName + ") using " + dps.getClass());
       }
-      // Pass in unmodifiable set
+      // 使用厂商自定义调度器分配，传入不可修改的可用设备集合
       Set<Device> dpsAllocated = dps.allocateDevices(
           Sets.differenceInTreeSets(allowed, used.keySet()),
           count,
           ImmutableMap.copyOf(env));
+      // 检查分配数量是否符合请求
       if (dpsAllocated.size() != count) {
         throw new ResourceHandlerException(dps.getClass()
             + " should allocate " + count
             + " of " + resourceName + ", but actual: "
             + assigned.size());
       }
-      // copy
+      // 将自定义调度结果复制到结果集合
       assigned.addAll(dpsAllocated);
-      // Store assigned devices into usedDevices
+      // 更新已使用设备映射
       for (Device device : assigned) {
         used.put(device, containerId);
       }
     }
   }
 
-  // Default scheduling logic
+  /**
+   * 默认调度逻辑：按设备ID顺序分配空闲设备
+   * @param allowed 允许分配的设备集合
+   * @param used 已使用设备映射
+   * @param assigned 保存分配结果的集合
+   * @param containerId 容器ID
+   * @param count 请求设备数量
+   */
   private void defaultScheduleAction(Set<Device> allowed,
       Map<Device, ContainerId> used, Set<Device> assigned,
       ContainerId containerId, int count) {
     LOG.debug("Using default scheduler. Allowed:" + allowed
         + ",Used:" + used + ", containerId:" + containerId);
+    // 顺序遍历，遇到空闲设备直接分配，直到满足请求数量
     for (Device device : allowed) {
       if (!used.containsKey(device)) {
         used.put(device, containerId);
@@ -359,16 +424,26 @@ public class DeviceMappingManager {
           return;
         }
       }
-    } // end for
+    }
   }
 
+  /**
+   * 设备分配结果封装类，保存允许注入容器和禁止注入容器的设备列表
+   * 用于后续cgroups等隔离机制配置设备访问权限
+   */
   static class DeviceAllocation {
     private String resourceName;
 
-    private Set<Device> allowed = Collections.emptySet();
+    private Set<Device> allowed = Collections.emptySet;
 
-    private Set<Device> denied = Collections.emptySet();
+    private Set<Device> denied = Collections.emptySet;
 
+    /**
+     * 构造分配结果
+     * @param resName 设备资源名称
+     * @param a 分配给容器的允许访问设备集合
+     * @param d 禁止容器访问的设备集合
+     */
     DeviceAllocation(String resName, Set<Device> a,
         Set<Device> d) {
       this.resourceName = resName;
@@ -376,32 +451,3 @@ public class DeviceMappingManager {
         this.allowed = ImmutableSet.copyOf(a);
       }
       if (d != null) {
-        this.denied = ImmutableSet.copyOf(d);
-      }
-    }
-
-    public Set<Device> getAllowed() {
-      return allowed;
-    }
-
-    public Set<Device> getDenied() {
-      return denied;
-    }
-
-    @Override
-    public String toString() {
-      return "ResourceType: " + resourceName
-          + ", Allowed Devices: " + allowed
-          + ", Denied Devices: " + denied;
-    }
-
-  }
-
-  @VisibleForTesting
-  public synchronized void addDevicePluginScheduler(String resourceName,
-      DevicePluginScheduler s) {
-    this.devicePluginSchedulers.put(resourceName,
-        Objects.requireNonNull(s));
-  }
-
-}

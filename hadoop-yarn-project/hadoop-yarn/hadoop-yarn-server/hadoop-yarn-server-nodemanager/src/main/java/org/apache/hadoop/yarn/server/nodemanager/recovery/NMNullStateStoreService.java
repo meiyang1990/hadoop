@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,14 +38,25 @@ import org.apache.hadoop.yarn.security.ContainerTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.records.MasterKey;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
+/**
+ * 空实现的NodeManager状态存储服务，用于不需要持久化恢复状态的场景
+ * 所有写操作均为空实现，恢复操作直接抛出不支持异常
+ */
 // The state store to use when state isn't being stored
 public class NMNullStateStoreService extends NMStateStoreService {
 
+  /**
+   * 构造空状态存储服务
+   */
   public NMNullStateStoreService() {
     super(NMNullStateStoreService.class.getName());
   }
 
   @Override
+  /**
+   * 检查是否支持状态恢复
+   * @return 始终返回false，不支持恢复
+   */
   public boolean canRecover() {
     return false;
   }

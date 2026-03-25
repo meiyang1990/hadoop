@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,6 +26,8 @@ import org.apache.hadoop.hdfs.ExtendedBlockId;
 import java.io.Closeable;
 
 /**
+ * 文件级注释：HDFS DataNode端已内存映射块的抽象接口，定义了内存缓存块需要提供的基础能力
+ *
  * Represents an HDFS block that is mapped by the DataNode.
  */
 @InterfaceAudience.Private
@@ -32,20 +35,20 @@ import java.io.Closeable;
 public interface MappableBlock extends Closeable {
 
   /**
-   * Get the number of bytes that have been cached.
-   * @return the number of bytes that have been cached.
+   * 获取已缓存到内存的块的字节长度
+   * @return 已缓存块的字节长度
    */
   long getLength();
 
   /**
-   * Get cache address if applicable.
-   * Return -1 if not applicable.
+   * 获取块在内存中的缓存地址，不支持时返回-1
+   * @return 内存缓存地址，不适用则返回-1
    */
   long getAddress();
 
   /**
-   * Get cached block's ExtendedBlockId.
-   * @return cached block's ExtendedBlockId..
+   * 获取当前缓存块的扩展块ID，用于唯一标识缓存块
+   * @return 当前缓存块的ExtendedBlockId标识
    */
   ExtendedBlockId getKey();
 }

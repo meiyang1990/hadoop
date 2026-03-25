@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,10 +20,15 @@
 package org.apache.hadoop.yarn.server.timelineservice.storage;
 
 /**
- * This interface is for creating Timeline Schema. The backend for Timeline
- * Service have to implement this.
+ * 时间线服务存储层Schema创建接口，定义了创建时间线服务底层存储Schema的统一规范。
+ * 不同存储后端的时间线服务实现都需要实现该接口，完成存储Schema的初始化。
  */
 public interface SchemaCreator {
 
+  /**
+   * 创建时间线服务存储Schema。
+   * @param args 创建Schema所需的命令行参数
+   * @throws Exception 创建Schema过程中抛出的异常
+   */
   void createTimelineSchema(String[] args) throws Exception;
 }

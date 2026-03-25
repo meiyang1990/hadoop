@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,13 +27,26 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * A RecordReader that reads records from a Oracle table via DataDrivenDBRecordReader
+ * Oracle数据库特定的DataDrivenDBRecordReader实现类，用于从Oracle数据库表中分片读取数据
+ * 继承通用DataDrivenDBRecordReader，添加Oracle特有的会话时区初始化逻辑
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class OracleDataDrivenDBRecordReader<T extends DBWritable>
     extends DataDrivenDBRecordReader<T> {
 
+  /**
+   * 构造Oracle数据驱动的DB记录读取器
+   * @param split 输入分片，表示当前Reader需要读取的数据范围
+   * @param inputClass 输出数据类型，必须实现DBWritable接口
+   * @param conf Hadoop作业配置
+   * @param conn 数据库连接对象
+   * @param dbConfig 数据库输入配置
+   * @param cond 查询条件语句
+   * @param fields 需要读取的字段数组
+   * @param table 要读取的表名
+   * @throws SQLException 数据库操作异常时抛出
+   */
   public OracleDataDrivenDBRecordReader(DBInputFormat.DBInputSplit split,
       Class<T> inputClass, Configuration conf, Connection conn,
       DBConfiguration dbConfig, String cond, String [] fields,
@@ -41,7 +55,7 @@ public class OracleDataDrivenDBRecordReader<T extends DBWritable>
     super(split, inputClass, conf, conn, dbConfig, cond, fields, table,
         "ORACLE");
 
-    // Must initialize the tz used by the connection for Oracle.
+    // 必须为Oracle连接初始化会话时区，保证时间类型数据处理一致性
     OracleDBRecordReader.setSessionTimeZone(conf, conn);
   }
 }

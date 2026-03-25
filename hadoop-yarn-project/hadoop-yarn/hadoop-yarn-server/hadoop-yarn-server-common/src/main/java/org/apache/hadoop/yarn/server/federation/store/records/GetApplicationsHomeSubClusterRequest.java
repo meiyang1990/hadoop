@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,13 +24,17 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Request class to obtain the home sub-cluster mapping of all active
- * applications.
+ * YARN联邦存储获取活跃应用归属子集群映射请求类，用于从联邦状态存储查询应用归属子集群信息。
  */
 @Private
 @Unstable
 public abstract class GetApplicationsHomeSubClusterRequest {
 
+  /**
+   * 创建不指定子集群的获取应用归属请求实例，查询所有活跃应用。
+   *
+   * @return 获取应用归属请求实例
+   */
   @Private
   @Unstable
   public static GetApplicationsHomeSubClusterRequest newInstance() {
@@ -38,6 +43,12 @@ public abstract class GetApplicationsHomeSubClusterRequest {
     return request;
   }
 
+  /**
+   * 创建指定子集群的获取应用归属请求实例，仅查询该子集群上的活跃应用。
+   *
+   * @param subClusterId 目标子集群标识
+   * @return 获取应用归属请求实例
+   */
   @Private
   @Unstable
   public static GetApplicationsHomeSubClusterRequest
@@ -49,20 +60,18 @@ public abstract class GetApplicationsHomeSubClusterRequest {
   }
 
   /**
-   * Get the {@link SubClusterId} representing the unique identifier of the
-   * subcluster.
+   * 获取请求查询的目标子集群标识。
    *
-   * @return the subcluster identifier
+   * @return 目标子集群标识，空表示查询所有子集群
    */
   @Public
   @Unstable
   public abstract SubClusterId getSubClusterId();
 
   /**
-   * Set the {@link SubClusterId} representing the unique identifier of the
-   * subcluster.
+   * 设置请求查询的目标子集群标识。
    *
-   * @param subClusterId the subcluster identifier
+   * @param subClusterId 目标子集群标识
    */
   @Public
   @Unstable

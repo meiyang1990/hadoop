@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,19 +23,29 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * Filter class which represents filter to be applied based on prefixes.
- * Prefixes can either match or not match.
+ * 时间线服务前缀匹配过滤器，基于字符串前缀对时间线实体/事件进行过滤，
+ * 支持匹配前缀或不匹配前缀两种匹配方式。
  */
 @Private
 @Unstable
 public class TimelinePrefixFilter extends TimelineFilter {
 
+  /** 比较操作符，仅支持EQUAL（匹配前缀）或NOT_EQUAL（不匹配前缀） */
   private TimelineCompareOp compareOp;
+  /** 待匹配的前缀字符串 */
   private String prefix;
 
+  /**
+   * 默认构造函数。
+   */
   public TimelinePrefixFilter() {
   }
 
+  /**
+   * 构造前缀过滤器，校验操作符合法性。
+   * @param op 比较操作符，仅允许EQUAL或NOT_EQUAL
+   * @param prefix 待匹配的前缀字符串
+   */
   public TimelinePrefixFilter(TimelineCompareOp op, String prefix) {
     this.prefix = prefix;
     if (op != TimelineCompareOp.EQUAL && op != TimelineCompareOp.NOT_EQUAL) {
@@ -49,10 +60,18 @@ public class TimelinePrefixFilter extends TimelineFilter {
     return TimelineFilterType.PREFIX;
   }
 
+  /**
+   * 获取待匹配的前缀字符串。
+   * @return 前缀字符串
+   */
   public String getPrefix() {
     return prefix;
   }
 
+  /**
+   * 获取比较操作符。
+   * @return 比较操作符
+   */
   public TimelineCompareOp getCompareOp() {
     return compareOp;
   }

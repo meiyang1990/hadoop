@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,7 +22,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * ItemInfo is a file info object for which need to satisfy the policy.
+ * 存储策略满足器(SPS)待处理文件信息类，用于记录需要满足存储策略要求的文件或目录信息
+ * 保存待处理项的ID信息和重试次数，用于SPS的调度队列管理
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -30,6 +32,11 @@ public class ItemInfo {
   private long fileId;
   private int retryCount;
 
+  /**
+   * 构造待处理项信息，默认初始重试次数为0
+   * @param startPathId 触发SPS处理的起始目录ID
+   * @param fileId 当前待处理文件/目录ID
+   */
   public ItemInfo(long startPathId, long fileId) {
     this.startPathId = startPathId;
     this.fileId = fileId;
@@ -37,6 +44,12 @@ public class ItemInfo {
     this.retryCount = 0;
   }
 
+  /**
+   * 构造待处理项信息，指定初始重试次数
+   * @param startPathId 触发SPS处理的起始目录ID
+   * @param fileId 当前待处理文件/目录ID
+   * @param retryCount 初始重试次数
+   */
   public ItemInfo(final long startPathId, final long fileId,
       final int retryCount) {
     this.startPathId = startPathId;
@@ -45,36 +58,39 @@ public class ItemInfo {
   }
 
   /**
-   * Returns the start path of the current file. This indicates that SPS
-   * was invoked on this path.
+   * 获取触发当前SPS处理的起始路径ID，标识SPS是从该路径发起处理
+   * @return 起始路径ID
    */
   public long getStartPath() {
     return startPathId;
   }
 
   /**
-   * Returns the file for which needs to satisfy the policy.
+   * 获取当前需要满足存储策略的文件ID
+   * @return 待处理文件ID
    */
   public long getFile() {
     return fileId;
   }
 
   /**
-   * Returns true if the tracking path is a directory, false otherwise.
+   * 判断当前跟踪处理的项是否是目录
+   * @return true如果是目录，false如果是文件
    */
   public boolean isDir() {
     return !(startPathId == fileId);
   }
 
   /**
-   * Get the attempted retry count of the block for satisfy the policy.
+   * 获取当前项已经尝试处理的重试次数
+   * @return 已重试次数
    */
   public int getRetryCount() {
     return retryCount;
   }
 
   /**
-   * Increments the retry count.
+   * 增加重试次数计数，处理失败后调用
    */
   public void increRetryCount() {
     this.retryCount++;

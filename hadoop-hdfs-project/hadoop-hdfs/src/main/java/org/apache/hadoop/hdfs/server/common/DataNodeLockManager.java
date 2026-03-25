@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,17 +20,17 @@
 package org.apache.hadoop.hdfs.server.common;
 
 /**
- * Use for manage a set of lock for datanode.
+ * 文件所属模块：HDFS服务端核心模块
+ * 核心职责：定义DataNode层级锁管理器的通用接口，规范DataNode多粒度锁的获取、添加、移除管理，保证DataNode上数据块操作的并发安全性
  */
 public interface DataNodeLockManager<T extends AutoCloseDataSetLock> {
 
   /**
-   * Acquire block pool level and volume level lock first if you want to acquire dir lock.
-   * Or only acquire block pool level lock.
-   * There are several locking sequential patterns as below:
-   * 1. block pool
-   * 2. block pool -&gt; volume
-   * 3. block pool level -&gt; volume -&gt; dir
+   * 锁层级枚举，定义了锁的粒度和加锁顺序，用于避免死锁，保证加锁顺序一致
+   * 支持三种加锁顺序模式：
+   * 1. 仅块池级加锁
+   * 2. 块池 -> 卷级加锁
+   * 3. 块池 -> 卷 -> 目录级加锁
    */
   enum LockLevel {
     BLOCK_POOl,
@@ -38,27 +39,37 @@ public interface DataNodeLockManager<T extends AutoCloseDataSetLock> {
   }
 
   /**
-   * Acquire readLock and then lock.
+   * 获取指定层级的读锁，按层级顺序加锁
+   * @param level 目标锁层级
+   * @param resources 需要加锁的资源名称列表
+   * @return 已加锁的数据集锁对象，可用于自动释放锁
    */
   T readLock(LockLevel level, String... resources);
 
   /**
-   * Acquire writeLock and then lock.
+   * 获取指定层级的写锁，按层级顺序加锁
+   * @param level 目标锁层级
+   * @param resources 需要加锁的资源名称列表
+   * @return 已加锁的数据集锁对象，可用于自动释放锁
    */
   T writeLock(LockLevel level, String... resources);
 
   /**
-   * Add a lock to LockManager.
+   * 向锁管理器添加指定层级的锁
+   * @param level 锁层级
+   * @param resources 对应资源名称列表
    */
   void addLock(LockLevel level, String... resources);
 
   /**
-   * Remove a lock from LockManager.
+   * 从锁管理器移除指定层级的锁
+   * @param level 锁层级
+   * @param resources 对应资源名称列表
    */
   void removeLock(LockLevel level, String... resources);
 
   /**
-   * LockManager may need to back hook.
+   * 锁管理器的钩子方法，用于锁管理器扩展后置处理逻辑
    */
   void hook();
 }

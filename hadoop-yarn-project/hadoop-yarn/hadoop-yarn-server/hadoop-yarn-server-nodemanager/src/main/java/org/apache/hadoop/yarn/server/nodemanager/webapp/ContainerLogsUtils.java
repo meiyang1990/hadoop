@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -43,14 +44,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Contains utilities for fetching a user's log file in a secure fashion.
+ * NodeManager Web界面获取容器日志的工具类，提供安全方式获取用户日志文件的能力。
+ * 包含权限检查、日志目录定位、安全打开日志文件等核心功能。
  */
 public class ContainerLogsUtils {
   public static final Logger LOG = LoggerFactory.getLogger(ContainerLogsUtils.class);
   
   /**
-   * Finds the local directories that logs for the given container are stored
-   * on.
+   * 获取指定容器的所有本地日志目录列表，会验证访问权限和容器状态。
+   * @param containerId 目标容器ID
+   * @param remoteUser 请求访问的远程用户
+   * @param context NodeManager上下文对象
+   * @return 容器日志所在的所有本地目录列表
+   * @throws YarnException 权限检查失败或容器不存在时抛出异常
    */
   public static List<File> getContainerLogDirs(ContainerId containerId,
       String remoteUser, Context context) throws YarnException {
@@ -71,10 +77,15 @@ public class ContainerLogsUtils {
     return getContainerLogDirs(containerId, context.getLocalDirsHandler());
   }
   
+  /**
+   * 根据本地目录处理器构造容器日志目录列表
+   */
   static List<File> getContainerLogDirs(ContainerId containerId,
       LocalDirsHandlerService dirsHandler) throws YarnException {
+    // 获取所有可读取的日志根目录
     List<String> logDirs = dirsHandler.getLogDirsForRead();
     List<File> containerLogDirs = new ArrayList<File>(logDirs.size());
+    // 遍历每个日志根目录，构造当前容器对应的日志子目录
     for (String logDir : logDirs) {
       logDir = new File(logDir).toURI().getPath();
       String appIdStr = containerId
@@ -86,7 +97,13 @@ public class ContainerLogsUtils {
   }
   
   /**
-   * Finds the log file with the given filename for the given container.
+   * 获取指定容器下指定名称的日志文件，会验证访问权限和容器状态。
+   * @param containerId 目标容器ID
+   * @param fileName 日志文件名
+   * @param remoteUser 请求访问的远程用户
+   * @param context NodeManager上下文对象
+   * @return 匹配的日志文件对象
+   * @throws YarnException 权限检查失败或容器不存在时抛出异常
    */
   public static File getContainerLogFile(ContainerId containerId,
       String fileName, String remoteUser, Context context) throws YarnException {
@@ -100,8 +117,10 @@ public class ContainerLogsUtils {
     
     try {
       LocalDirsHandlerService dirsHandler = context.getLocalDirsHandler();
+      // 构造容器日志目录的相对路径
       String relativeContainerLogDir = ContainerLaunch.getRelativeContainerLogDir(
           application.getAppId().toString(), containerId.toString());
+      // 获取完整日志文件路径
       Path logPath = dirsHandler.getLogPathToRead(
           relativeContainerLogDir + Path.SEPARATOR + fileName);
       URI logPathURI = new File(logPath.toString()).toURI();
@@ -113,6 +132,9 @@ public class ContainerLogsUtils {
     }
   }
   
+  /**
+   * 根据容器ID获取所属应用，不存在则抛出404异常
+   */
   private static Application getApplicationForContainer(ContainerId containerId,
       Context context) {
     ApplicationId applicationId = containerId.getApplicationAttemptId()
@@ -129,16 +151,21 @@ public class ContainerLogsUtils {
     return application;
   }
   
+  /**
+   * 检查用户是否有查看应用日志的权限，无权限则抛出异常
+   */
   private static void checkAccess(String remoteUser, Application application,
       Context context) throws YarnException {
     UserGroupInformation callerUGI = null;
     if (remoteUser != null) {
+      // 创建远程用户的UGI对象
       callerUGI = UserGroupInformation.createRemoteUser(remoteUser);
     }
     if (callerUGI != null
         && !context.getApplicationACLsManager().checkAccess(callerUGI,
             ApplicationAccessType.VIEW_APP, application.getUser(),
             application.getAppId())) {
+      // 权限检查不通过，抛出异常
       throw new YarnException(
           "User [" + remoteUser
               + "] is not authorized to view the logs for application "
@@ -146,6 +173,9 @@ public class ContainerLogsUtils {
     }
   }
   
+  /**
+   * 检查容器状态，未启动完成则抛出404异常
+   */
   private static void checkState(ContainerState state) {
     if (state == ContainerState.NEW || state == ContainerState.LOCALIZING ||
         state == ContainerState.SCHEDULED) {
@@ -157,17 +187,28 @@ public class ContainerLogsUtils {
     }
   }
   
+  /**
+   * 以安全权限校验方式打开日志文件进行读取，验证文件所有者匹配。
+   * @param containerIdStr 容器ID字符串
+   * @param logFile 要打开的日志文件
+   * @param context NodeManager上下文对象
+   * @return 日志文件输入流
+   * @throws IOException 打开失败或权限不匹配时抛出异常
+   */
   public static FileInputStream openLogFileForRead(String containerIdStr, File logFile,
       Context context) throws IOException {
     ContainerId containerId = ContainerId.fromString(containerIdStr);
     ApplicationId applicationId = containerId.getApplicationAttemptId()
         .getApplicationId();
+    // 获取提交应用的用户，用于权限校验
     String user = context.getApplications().get(
         applicationId).getUser();
     
     try {
+      // 使用安全IO工具打开文件，验证所有者
       return SecureIOUtils.openForRead(logFile, user, null);
     } catch (IOException e) {
+      // 处理所有者不匹配的情况，给出明确错误信息
       if (e.getMessage().contains(
         "did not match expected owner '" + user
             + "'")) {
@@ -178,6 +219,7 @@ public class ContainerLogsUtils {
             + "' doesn't own requested log file : "
             + logFile.getName(), e);
       } else {
+        // 其他IO异常，推测可能是日志已经被聚合清理
         throw new IOException("Exception reading log file. It might be because log "
             + "file was aggregated : " + logFile.getName(), e);
       }

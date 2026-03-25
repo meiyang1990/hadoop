@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,6 +29,11 @@ import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
 import org.apache.hadoop.ipc.GenericRefreshProtocol;
 import org.apache.hadoop.tools.GetUserMappingsProtocol;
 
+/**
+ * 文件所属模块: HDFS服务端核心实现
+ * 聚合NameNode需要提供的所有RPC服务接口，定义了NameNode对外暴露的完整RPC方法集合
+ * 所有访问NameNode的RPC调用都需要通过该接口定义的方法完成
+ */
 /** The full set of RPC methods implemented by the Namenode.  */
 @InterfaceAudience.Private
 public interface NamenodeProtocols

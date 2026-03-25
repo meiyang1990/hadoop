@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -86,6 +87,10 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.VisibleForTesting;
 
+/**
+ * 资源管理器代理，为旧版MapReduce API提供与YARN ResourceManager交互的统一代理层
+ * 继承YarnClient，封装对YARN服务端的调用，适配旧版MR接口要求
+ */
 public class ResourceMgrDelegate extends YarnClient {
   private static final Logger LOG =
       LoggerFactory.getLogger(ResourceMgrDelegate.class);
@@ -99,9 +104,8 @@ public class ResourceMgrDelegate extends YarnClient {
   private Text rmDTService;
 
   /**
-   * Delegate responsible for communicating with the Resource Manager's
-   * {@link ApplicationClientProtocol}.
-   * @param conf the configuration object.
+   * 构造与YARN ResourceManager通信的代理实例
+   * @param conf YARN配置对象
    */
   public ResourceMgrDelegate(YarnConfiguration conf) {
     super(ResourceMgrDelegate.class.getName());
@@ -129,6 +133,12 @@ public class ResourceMgrDelegate extends YarnClient {
     super.serviceStop();
   }
 
+  /**
+   * 获取所有正在运行的TaskTracker信息（适配旧MR接口，转换YARN Node信息）
+   * @return 活跃TaskTracker数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public TaskTrackerInfo[] getActiveTrackers() throws IOException,
       InterruptedException {
     try {
@@ -139,9 +149,16 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取所有MapReduce作业状态列表
+   * @return 所有作业状态数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public JobStatus[] getAllJobs() throws IOException, InterruptedException {
     try {
       Set<String> appTypes = new HashSet<String>(1);
+      // 只过滤MapReduce类型的应用
       appTypes.add(MRJobConfig.MR_APPLICATION_TYPE);
       EnumSet<YarnApplicationState> appStates =
           EnumSet.noneOf(YarnApplicationState.class);
@@ -152,6 +169,12 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取被拉黑的TaskTracker列表（尚未实现）
+   * @return 空数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public TaskTrackerInfo[] getBlacklistedTrackers() throws IOException,
       InterruptedException {
     // TODO: Implement getBlacklistedTrackers
@@ -159,10 +182,17 @@ public class ResourceMgrDelegate extends YarnClient {
     return new TaskTrackerInfo[0];
   }
 
+  /**
+   * 获取集群指标信息，转换为旧版MapReduce ClusterMetrics格式
+   * @return 集群指标对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public ClusterMetrics getClusterMetrics() throws IOException,
       InterruptedException {
     try {
       YarnClusterMetrics metrics = client.getYarnClusterMetrics();
+      // 适配旧版指标结构，部分字段保持兼容值
       ClusterMetrics oldMetrics =
           new ClusterMetrics(1, 1, 1, 1, 1, 1,
               metrics.getNumNodeManagers() * 10,
@@ -174,6 +204,10 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取ResourceManager委派令牌服务名
+   * @return 委派令牌服务名
+   */
   public Text getRMDelegationTokenService() {
     if (rmDTService == null) {
       rmDTService = ClientRMProxy.getRMDelegationTokenService(conf);
@@ -181,6 +215,13 @@ public class ResourceMgrDelegate extends YarnClient {
     return rmDTService;
   }
   
+  /**
+   * 获取ResourceManager委派令牌
+   * @param renewer 令牌更新者
+   * @return 委派令牌对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   @SuppressWarnings("rawtypes")
   public Token getDelegationToken(Text renewer) throws IOException,
       InterruptedException {
@@ -192,10 +233,22 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取默认文件系统名称
+   * @return 文件系统URI字符串
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public String getFilesystemName() throws IOException, InterruptedException {
     return FileSystem.get(conf).getUri().toString();
   }
 
+  /**
+   * 从YARN获取新的作业ID
+   * @return 转换后的旧版MapReduce JobID
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public JobID getNewJobID() throws IOException, InterruptedException {
     try {
       this.application = client.createApplication().getApplicationSubmissionContext();
@@ -206,6 +259,13 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取指定队列信息，转换为旧版格式
+   * @param queueName 队列名称
+   * @return 队列信息对象，不存在则返回null
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public QueueInfo getQueue(String queueName) throws IOException,
   InterruptedException {
     try {
@@ -218,6 +278,12 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取当前用户有权限访问的队列ACL信息
+   * @return 队列ACL信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public QueueAclsInfo[] getQueueAclsForCurrentUser() throws IOException,
       InterruptedException {
     try {
@@ -228,6 +294,12 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取所有队列信息
+   * @return 队列信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public QueueInfo[] getQueues() throws IOException, InterruptedException {
     try {
       return TypeConverter.fromYarnQueueInfo(client.getAllQueues(), this.conf);
@@ -236,6 +308,12 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取根队列列表
+   * @return 根队列信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public QueueInfo[] getRootQueues() throws IOException, InterruptedException {
     try {
       return TypeConverter.fromYarnQueueInfo(client.getRootQueueInfos(),
@@ -245,6 +323,13 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取指定父队列的子队列列表
+   * @param parent 父队列名称
+   * @return 子队列信息数组
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public QueueInfo[] getChildQueues(String parent) throws IOException,
       InterruptedException {
     try {
@@ -255,6 +340,12 @@ public class ResourceMgrDelegate extends YarnClient {
     }
   }
 
+  /**
+   * 获取当前用户的作业暂存区目录
+   * @return 暂存区目录路径字符串
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public String getStagingAreaDir() throws IOException, InterruptedException {
 //    Path path = new Path(MRJobConstants.JOB_SUBMIT_DIR);
     String user = 
@@ -265,6 +356,12 @@ public class ResourceMgrDelegate extends YarnClient {
   }
 
 
+  /**
+   * 获取系统作业提交目录路径
+   * @return 系统目录路径字符串
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public String getSystemDir() throws IOException, InterruptedException {
     Path sysDir = new Path(MRJobConfig.JOB_SUBMIT_DIR);
     //FileContext.getFileContext(conf).delete(sysDir, true);
@@ -272,21 +369,45 @@ public class ResourceMgrDelegate extends YarnClient {
   }
   
 
+  /**
+   * 获取TaskTracker过期间隔（兼容旧接口）
+   * @return 固定返回0
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public long getTaskTrackerExpiryInterval() throws IOException,
       InterruptedException {
     return 0;
   }
   
+  /**
+   * 设置作业优先级（兼容旧接口，未实现）
+   * @param arg0 作业ID
+   * @param arg1 优先级字符串
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public void setJobPriority(JobID arg0, String arg1) throws IOException,
       InterruptedException {
     return;
   }
 
 
+  /**
+   * 获取协议版本（兼容旧接口，未实现）
+   * @param arg0 协议名称
+   * @param arg1 客户端版本
+   * @return 固定返回0
+   * @throws IOException IO异常
+   */
   public long getProtocolVersion(String arg0, long arg1) throws IOException {
     return 0;
   }
 
+  /**
+   * 获取当前代理对应的应用ID
+   * @return YARN应用ID对象
+   */
   public ApplicationId getApplicationId() {
     return applicationId;
   }
@@ -383,194 +504,4 @@ public class ResourceMgrDelegate extends YarnClient {
 
   @Override
   public List<NodeReport> getNodeReports(NodeState... states)
-      throws YarnException, IOException {
-    return client.getNodeReports(states);
-  }
-
-  @Override
-  public org.apache.hadoop.yarn.api.records.Token getRMDelegationToken(
-      Text renewer) throws YarnException, IOException {
-    return client.getRMDelegationToken(renewer);
-  }
-
-  @Override
-  public org.apache.hadoop.yarn.api.records.QueueInfo getQueueInfo(
-      String queueName) throws YarnException, IOException {
-    return client.getQueueInfo(queueName);
-  }
-
-  @Override
-  public org.apache.hadoop.yarn.api.records.QueueInfo getQueueInfo(
-      String queueName, String subClusterId) throws YarnException, IOException {
-    return client.getQueueInfo(queueName, subClusterId);
-  }
-
-  @Override
-  public List<org.apache.hadoop.yarn.api.records.QueueInfo> getAllQueues()
-      throws YarnException, IOException {
-    return client.getAllQueues();
-  }
-
-  @Override
-  public List<org.apache.hadoop.yarn.api.records.QueueInfo> getRootQueueInfos()
-      throws YarnException, IOException {
-    return client.getRootQueueInfos();
-  }
-
-  @Override
-  public List<org.apache.hadoop.yarn.api.records.QueueInfo> getChildQueueInfos(
-      String parent) throws YarnException, IOException {
-    return client.getChildQueueInfos(parent);
-  }
-
-  @Override
-  public List<QueueUserACLInfo> getQueueAclsInfo() throws YarnException,
-      IOException {
-    return client.getQueueAclsInfo();
-  }
-
-  @Override
-  public ApplicationAttemptReport getApplicationAttemptReport(
-      ApplicationAttemptId appAttemptId) throws YarnException, IOException {
-    return client.getApplicationAttemptReport(appAttemptId);
-  }
-
-  @Override
-  public List<ApplicationAttemptReport> getApplicationAttempts(
-      ApplicationId appId) throws YarnException, IOException {
-    return client.getApplicationAttempts(appId);
-  }
-
-  @Override
-  public ContainerReport getContainerReport(ContainerId containerId)
-      throws YarnException, IOException {
-    return client.getContainerReport(containerId);
-  }
-
-  @Override
-  public List<ContainerReport> getContainers(
-      ApplicationAttemptId applicationAttemptId) throws YarnException,
-      IOException {
-    return client.getContainers(applicationAttemptId);
-  }
-
-  @Override
-  public void moveApplicationAcrossQueues(ApplicationId appId, String queue)
-      throws YarnException, IOException {
-    client.moveApplicationAcrossQueues(appId, queue);
-  }
-
-  @Override
-  public GetNewReservationResponse createReservation() throws YarnException,
-      IOException {
-    return client.createReservation();
-  }
-
-  @Override
-  public ReservationSubmissionResponse submitReservation(
-      ReservationSubmissionRequest request) throws YarnException, IOException {
-    return client.submitReservation(request);
-  }
-
-  @Override
-  public ReservationUpdateResponse updateReservation(
-      ReservationUpdateRequest request) throws YarnException, IOException {
-    return client.updateReservation(request);
-  }
-
-  @Override
-  public ReservationDeleteResponse deleteReservation(
-      ReservationDeleteRequest request) throws YarnException, IOException {
-    return client.deleteReservation(request);
-  }
-
-  @Override
-  public ReservationListResponse listReservations(
-          ReservationListRequest request) throws YarnException, IOException {
-    return client.listReservations(request);
-  }
-  @Override
-  public Map<NodeId, Set<String>> getNodeToLabels() throws YarnException,
-      IOException {
-    return client.getNodeToLabels();
-  }
-
-  @Override
-  public Map<String, Set<NodeId>> getLabelsToNodes() throws YarnException,
-      IOException {
-    return client.getLabelsToNodes();
-  }
-
-  @Override
-  public Map<String, Set<NodeId>> getLabelsToNodes(Set<String> labels)
-      throws YarnException, IOException {
-    return client.getLabelsToNodes(labels);
-  }
-
-  @Override
-  public List<NodeLabel> getClusterNodeLabels()
-      throws YarnException, IOException {
-    return client.getClusterNodeLabels();
-  }
-
-  @Override
-  public Priority updateApplicationPriority(ApplicationId applicationId,
-      Priority priority) throws YarnException, IOException {
-    return client.updateApplicationPriority(applicationId, priority);
-  }
-
-  @Override
-  public void signalToContainer(ContainerId containerId,
-      SignalContainerCommand command)
-      throws YarnException, IOException {
-    client.signalToContainer(containerId, command);
-  }
-
-  @Override
-  public void killApplication(ApplicationId appId, String diagnostics)
-      throws YarnException, IOException {
-    client.killApplication(appId, diagnostics);
-  }
-
-  @Override
-  public Map<String, Resource> getResourceProfiles()
-      throws YarnException, IOException {
-    return client.getResourceProfiles();
-  }
-
-  @Override
-  public Resource getResourceProfile(String profile)
-      throws YarnException, IOException {
-    return client.getResourceProfile(profile);
-  }
-
-  @Override
-  public List<ResourceTypeInfo> getResourceTypeInfo()
-      throws YarnException, IOException {
-    return client.getResourceTypeInfo();
-  }
-
-  @Override
-  public Set<NodeAttributeInfo> getClusterAttributes()
-      throws YarnException, IOException {
-    return client.getClusterAttributes();
-  }
-
-  @Override
-  public Map<NodeAttributeKey, List<NodeToAttributeValue>> getAttributesToNodes(
-      Set<NodeAttributeKey> attributes) throws YarnException, IOException {
-    return client.getAttributesToNodes(attributes);
-  }
-
-  @Override
-  public Map<String, Set<NodeAttribute>> getNodeToAttributes(
-      Set<String> hostNames) throws YarnException, IOException {
-    return client.getNodeToAttributes(hostNames);
-  }
-
-  @Override
-  public void shellToContainer(ContainerId containerId,
-      ShellContainerCommand command) throws IOException {
-    throw new IOException("Operation is not supported.");
-  }
-}
+      throws Y

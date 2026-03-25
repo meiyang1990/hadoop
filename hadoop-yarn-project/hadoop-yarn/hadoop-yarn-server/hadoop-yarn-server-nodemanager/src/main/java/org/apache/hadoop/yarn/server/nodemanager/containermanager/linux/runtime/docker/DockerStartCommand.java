@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,11 +18,16 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker;
 
 /**
- * Encapsulates the docker start command and its command line arguments.
+ * 封装Docker start命令及其命令行参数，用于在YARN NodeManager上启动已创建的Docker容器
  */
 public class DockerStartCommand extends DockerCommand {
+  // Docker start命令固定名称
   private static final String START_COMMAND = "start";
 
+  /**
+   * 构造Docker start命令对象，添加指定容器名称参数
+   * @param containerName 要启动的Docker容器名称
+   */
   public DockerStartCommand(String containerName) {
     super(START_COMMAND);
     super.addCommandArguments("name", containerName);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -25,34 +26,31 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 
 /**
- * An utility that helps to determine the sub-cluster that a specified node or
- * rack belongs to. All implementing classes should be thread-safe.
+ * YARN联邦环境下的子集群解析器接口，用于查询指定节点或机架所属的子集群。
+ * 所有实现类必须保证线程安全。
  */
 public interface SubClusterResolver extends Configurable {
 
   /**
-   * Obtain the sub-cluster that a specified node belongs to.
+   * 获取指定节点所属的子集群ID。
    *
-   * @param nodename the node whose sub-cluster is to be determined
-   * @return the sub-cluster as identified by the {@link SubClusterId} that the
-   *         node belongs to
-   * @throws YarnException if the node's sub-cluster cannot be resolved
+   * @param nodename 待查询的节点名称
+   * @return 节点所属子集群的ID
+   * @throws YarnException 当无法解析节点所属子集群时抛出异常
    */
   SubClusterId getSubClusterForNode(String nodename) throws YarnException;
 
   /**
-   * Obtain the sub-clusters that have nodes on a specified rack.
+   * 获取指定机架上所有节点所属的子集群集合。
    *
-   * @param rackname the name of the rack
-   * @return the sub-clusters as identified by the {@link SubClusterId} that
-   *         have nodes on the given rack
-   * @throws YarnException if the sub-cluster of any node on the rack cannot be
-   *           resolved, or if the rack name is not recognized
+   * @param rackname 待查询的机架名称
+   * @return 该机架上存在节点的所有子集群ID集合
+   * @throws YarnException 当机架名称不合法或无法解析机架上任意节点的子集群信息时抛出异常
    */
   Set<SubClusterId> getSubClustersForRack(String rackname) throws YarnException;
 
   /**
-   * Load the nodes to subCluster mapping from the file.
+   * 从配置文件加载节点与子集群的映射关系。
    */
   void load();
 }

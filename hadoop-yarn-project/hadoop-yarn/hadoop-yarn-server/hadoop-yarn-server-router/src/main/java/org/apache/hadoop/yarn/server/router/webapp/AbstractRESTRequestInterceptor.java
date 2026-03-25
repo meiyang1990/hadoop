@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,19 +26,23 @@ import org.apache.hadoop.yarn.server.router.clientrm.RouterClientRMService;
 import org.apache.hadoop.yarn.server.router.RouterServerUtil;
 
 /**
- * Extends the RequestInterceptor class and provides common functionality which
- * can be used and/or extended by other concrete interceptor classes.
+ * YARN Router REST请求拦截器抽象基类，提供责任链模式的基础实现，
+ * 具体拦截器可以继承此类扩展，复用通用的链路处理逻辑。
  */
 public abstract class AbstractRESTRequestInterceptor
     implements RESTRequestInterceptor {
 
+  // Hadoop配置对象
   private Configuration conf;
+  // 责任链中下一个拦截器
   private RESTRequestInterceptor nextInterceptor;
+  // 当前请求操作用户信息
   private UserGroupInformation user = null;
+  // Router客户端RM服务引用
   private RouterClientRMService routerClientRMService = null;
 
   /**
-   * Sets the {@link RESTRequestInterceptor} in the chain.
+   * 设置责任链中的下一个拦截器。
    */
   @Override
   public void setNextInterceptor(RESTRequestInterceptor nextInterceptor) {
@@ -45,7 +50,7 @@ public abstract class AbstractRESTRequestInterceptor
   }
 
   /**
-   * Sets the {@link Configuration}.
+   * 设置配置对象，并传递给下一个拦截器。
    */
 
   @Override
@@ -57,7 +62,7 @@ public abstract class AbstractRESTRequestInterceptor
   }
 
   /**
-   * Gets the {@link Configuration}.
+   * 获取当前配置对象。
    */
   @Override
   public Configuration getConf() {
@@ -65,7 +70,7 @@ public abstract class AbstractRESTRequestInterceptor
   }
 
   /**
-   * Initializes the {@link RESTRequestInterceptor}.
+   * 初始化拦截器，根据用户名创建用户信息，并初始化下一个拦截器。
    */
   @Override
   public void init(String userName) {
@@ -76,7 +81,7 @@ public abstract class AbstractRESTRequestInterceptor
   }
 
   /**
-   * Disposes the {@link RESTRequestInterceptor}.
+   * 关闭拦截器，级联关闭责任链上后续拦截器。
    */
   @Override
   public void shutdown() {
@@ -86,13 +91,16 @@ public abstract class AbstractRESTRequestInterceptor
   }
 
   /**
-   * Gets the next {@link RESTRequestInterceptor} in the chain.
+   * 获取责任链中的下一个拦截器。
    */
   @Override
   public RESTRequestInterceptor getNextInterceptor() {
     return this.nextInterceptor;
   }
 
+  /**
+   * 获取当前请求操作用户信息。
+   */
   public UserGroupInformation getUser() {
     return user;
   }

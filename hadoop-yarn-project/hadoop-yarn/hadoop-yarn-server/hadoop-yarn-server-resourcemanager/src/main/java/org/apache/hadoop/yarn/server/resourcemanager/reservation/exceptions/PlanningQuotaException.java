@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * This exception is thrown if the user quota is exceed while accepting or
- * updating a reservation.
+ * 预约配额规划异常，当预约创建/更新操作超过用户配额限制时抛出
  */
 @Public
 @Unstable
@@ -31,14 +31,27 @@ public class PlanningQuotaException extends PlanningException {
 
   private static final long serialVersionUID = 8206629288380246166L;
 
+  /**
+   * 使用指定错误信息构造异常
+   * @param message 错误描述信息
+   */
   public PlanningQuotaException(String message) {
     super(message);
   }
 
+  /**
+   * 使用指定根异常构造异常
+   * @param cause 根异常
+   */
   public PlanningQuotaException(Throwable cause) {
     super(cause);
   }
 
+  /**
+   * 使用指定错误信息和根异常构造异常
+   * @param message 错误描述信息
+   * @param cause 根异常
+   */
   public PlanningQuotaException(String message, Throwable cause) {
     super(message, cause);
   }

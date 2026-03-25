@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,7 +27,7 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.UnRegisterNode
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerRequest;
 
 /**
- * PBImpl class for UnRegisterNodeManagerRequest.
+ * 取消NodeManager注册请求的Protobuf实现类
  */
 public class UnRegisterNodeManagerRequestPBImpl extends
     UnRegisterNodeManagerRequest {
@@ -37,16 +38,27 @@ public class UnRegisterNodeManagerRequestPBImpl extends
 
   private NodeId nodeId = null;
 
+  /**
+   * 构造空的取消NodeManager注册请求
+   */
   public UnRegisterNodeManagerRequestPBImpl() {
     builder = UnRegisterNodeManagerRequestProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造取消NodeManager注册请求
+   * @param proto Protobuf序列化后的请求对象
+   */
   public UnRegisterNodeManagerRequestPBImpl(
       UnRegisterNodeManagerRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求对应的Protobuf对象
+   * @return 序列化后的Protobuf请求对象
+   */
   public UnRegisterNodeManagerRequestProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -54,12 +66,18 @@ public class UnRegisterNodeManagerRequestPBImpl extends
     return proto;
   }
 
+  /**
+   * 将本地缓存的节点ID合并到Protobuf Builder中
+   */
   private void mergeLocalToBuilder() {
     if (this.nodeId != null) {
       builder.setNodeId(convertToProtoFormat(this.nodeId));
     }
   }
 
+  /**
+   * 将本地缓存的字段合并到Protobuf对象
+   */
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -69,6 +87,9 @@ public class UnRegisterNodeManagerRequestPBImpl extends
     viaProto = true;
   }
 
+  /**
+   * 如果需要，初始化Protobuf Builder
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = UnRegisterNodeManagerRequestProto.newBuilder(proto);
@@ -98,10 +119,20 @@ public class UnRegisterNodeManagerRequestPBImpl extends
     this.nodeId = updatedNodeId;
   }
 
+  /**
+   * 将Protobuf格式的NodeId转换为API层对象
+   * @param p Protobuf格式NodeId
+   * @return API层NodeId对象
+   */
   private NodeIdPBImpl convertFromProtoFormat(NodeIdProto p) {
     return new NodeIdPBImpl(p);
   }
 
+  /**
+   * 将API层NodeId对象转换为Protobuf格式
+   * @param t API层NodeId对象
+   * @return Protobuf格式NodeId
+   */
   private NodeIdProto convertToProtoFormat(NodeId t) {
     return ((NodeIdPBImpl) t).getProto();
   }

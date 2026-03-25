@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.resourcemanager.timelineservice
- * contains classes related to handling of app level collectors.
+ * 该包包含YARN资源管理器中应用级别时间线数据收集器的相关实现类
+ * 负责管理时间线服务在ResourceManager侧的应用级别收集逻辑
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

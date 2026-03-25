@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,12 +22,21 @@ package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ApplicationStartData;
 
+/**
+ * 代表应用启动事件，用于写入应用历史服务器。
+ * 封装了应用启动所需的全部元数据信息。
+ */
 public class WritingApplicationStartEvent extends
     WritingApplicationHistoryEvent {
 
   private ApplicationId appId;
   private ApplicationStartData appStart;
 
+  /**
+   * 构造应用启动写入事件。
+   * @param appId 应用ID
+   * @param appStart 应用启动数据
+   */
   public WritingApplicationStartEvent(ApplicationId appId,
       ApplicationStartData appStart) {
     super(WritingHistoryEventType.APP_START);
@@ -39,10 +49,18 @@ public class WritingApplicationStartEvent extends
     return appId.hashCode();
   }
 
+  /**
+   * 获取当前事件对应的应用ID。
+   * @return 应用ID
+   */
   public ApplicationId getApplicationId() {
     return appId;
   }
 
+  /**
+   * 获取应用启动元数据。
+   * @return 应用启动数据
+   */
   public ApplicationStartData getApplicationStartData() {
     return appStart;
   }

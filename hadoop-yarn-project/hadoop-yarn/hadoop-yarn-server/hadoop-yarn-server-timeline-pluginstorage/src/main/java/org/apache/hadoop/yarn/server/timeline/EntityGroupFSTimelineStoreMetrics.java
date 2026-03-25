@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,22 +28,20 @@ import org.apache.hadoop.metrics2.lib.MutableStat;
 // 这个文件已经全部加上中文注释
 // 跟踪EntityGroupFSTimelineStore指标的度量类，记录时间线服务器v1.5的读写指标，作为TimelineDataManagerMetrics的补充
 /**
- * This class tracks metrics for the EntityGroupFSTimelineStore. It tracks
- * the read and write metrics for timeline server v1.5. It serves as a
- * complement to {@link TimelineDataManagerMetrics}.
+ * 管理EntityGroupFSTimelineStore的运行指标，收集时间线服务v1.5版本的读写操作统计，作为TimelineDataManagerMetrics的补充。
  */
 @Metrics(about="Metrics for EntityGroupFSTimelineStore", context="yarn")
 public class EntityGroupFSTimelineStoreMetrics {
   private static final String DEFAULT_VALUE_WITH_SCALE = "TimeMs";
 
-  // General read related metrics
+  // 常规读操作相关指标
   @Metric("getEntity calls to summary storage")
   private MutableCounterLong getEntityToSummaryOps;
 
   @Metric("getEntity calls to detail storage")
   private MutableCounterLong getEntityToDetailOps;
 
-  // Summary data related metrics
+  // 摘要数据相关指标
   @Metric(value = "summary log read ops and time",
       valueName = DEFAULT_VALUE_WITH_SCALE)
   private MutableStat summaryLogRead;
@@ -50,7 +49,7 @@ public class EntityGroupFSTimelineStoreMetrics {
   @Metric("entities read into the summary storage")
   private MutableCounterLong entitiesReadToSummary;
 
-  // Detail data cache related metrics
+  // 详情数据缓存相关指标
   @Metric("cache storage read that does not require a refresh")
   private MutableCounterLong noRefreshCacheRead;
 
@@ -64,7 +63,7 @@ public class EntityGroupFSTimelineStoreMetrics {
       valueName = DEFAULT_VALUE_WITH_SCALE)
   private MutableStat cacheRefresh;
 
-  // Log scanner and cleaner related metrics
+  // 日志扫描器和清理器相关指标
   @Metric(value = "active log scan ops and time",
       valueName = DEFAULT_VALUE_WITH_SCALE)
   private MutableStat activeLogDirScan;
@@ -81,6 +80,10 @@ public class EntityGroupFSTimelineStoreMetrics {
   EntityGroupFSTimelineStoreMetrics() {
   }
 
+  /**
+   * 单例模式创建并获取指标实例，注册到默认指标系统。
+   * @return EntityGroupFSTimelineStoreMetrics单例实例
+   */
   public static synchronized EntityGroupFSTimelineStoreMetrics create() {
     if (instance == null) {
       MetricsSystem ms = DefaultMetricsSystem.instance();
@@ -89,8 +92,8 @@ public class EntityGroupFSTimelineStoreMetrics {
     return instance;
   }
 
-  // Setters
-  // General read related
+  // 指标更新方法
+  // 常规读操作相关
   public void incrGetEntityToSummaryOps() {
     getEntityToSummaryOps.incr();
   }
@@ -99,7 +102,7 @@ public class EntityGroupFSTimelineStoreMetrics {
     getEntityToDetailOps.incr();
   }
 
-  // Summary data related
+  // 摘要数据相关
   public void addSummaryLogReadTime(long msec) {
     summaryLogRead.add(msec);
   }
@@ -108,7 +111,7 @@ public class EntityGroupFSTimelineStoreMetrics {
     entitiesReadToSummary.incr(delta);
   }
 
-  // Cache related
+  // 缓存相关
   public void incrNoRefreshCacheRead() {
     noRefreshCacheRead.incr();
   }
@@ -125,7 +128,7 @@ public class EntityGroupFSTimelineStoreMetrics {
     cacheRefresh.add(msec);
   }
 
-  // Log scanner and cleaner related
+  // 日志扫描器和清理器相关
   public void addActiveLogDirScanTime(long msec) {
     activeLogDirScan.add(msec);
   }
@@ -138,7 +141,7 @@ public class EntityGroupFSTimelineStoreMetrics {
     logsDirsCleaned.incr();
   }
 
-  // Getters
+  // 指标获取方法
   MutableCounterLong getEntitiesReadToSummary() {
     return entitiesReadToSummary;
   }
@@ -159,4 +162,3 @@ public class EntityGroupFSTimelineStoreMetrics {
     return cacheRefresh;
   }
 }
-

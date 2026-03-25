@@ -1,4 +1,4 @@
-
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,17 +44,19 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 
 /**
- * ContextFactory to reuse JAXBContextImpl for DAO Classes.
+ * 应用历史服务Web端JAXB上下文工厂，复用预创建的JAXB上下文提升XML序列化性能
+ * 为DAO类缓存复用JAXBContext实例，避免重复创建的性能开销
  */
 public final class ContextFactory {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContextFactory.class);
 
+  // 缓存全局复用的JAXB上下文实例
   private static JAXBContext cacheContext;
 
-  // All the dao classes from TimelineWebService and AHSWebService
-  // added except TimelineEntity and TimelineEntities
+  // 存储所有支持JAXB序列化的DAO和时间线实体类
+  // 排除了TimelineEntity和TimelineEntities，因为它们存在JAXB兼容性问题
   private static final Class[] CTYPES = {AppInfo.class, AppsInfo.class,
       AppAttemptInfo.class, AppAttemptsInfo.class, ContainerInfo.class,
       ContainersInfo.class, RemoteExceptionData.class, TimelineDomain.class,
@@ -62,24 +64,33 @@ public final class ContextFactory {
   private static final Set<Class> CLASS_SET =
       new HashSet<>(Arrays.asList(CTYPES));
 
-  // TimelineEntity has java.util.Set interface which JAXB
-  // can't handle and throws IllegalAnnotationExceptions
+  // 需要忽略的类型：TimelineEntity包含Set接口，JAXB无法处理会抛出注解异常
   private static final Class[] IGNORE_TYPES = {TimelineEntity.class,
       TimelineEntities.class};
   private static final Set<Class> IGNORE_SET =
       new HashSet<>(Arrays.asList(IGNORE_TYPES));
 
+  // 预创建忽略类型对应的异常实例，用于快速抛出
   private static JAXBException je =
       new JAXBException("TimelineEntity and TimelineEntities has " +
       "IllegalAnnotation");
 
+  // 预定义栈追踪信息，标识异常来源于本工厂类
   private static StackTraceElement[] stackTrace = new StackTraceElement[]{
       new StackTraceElement(ContextFactory.class.getName(),
       "createContext", "ContextFactory.java", -1)};
 
+  // 工具类不允许实例化
   private ContextFactory() {
   }
 
+  /**
+   * 通过反射调用JAXB RI原生工厂创建JAXB上下文
+   * @param classes 需要绑定的类数组
+   * @param properties JAXB配置属性
+   * @return 创建好的JAXB上下文实例
+   * @throws Exception 反射调用或创建上下文失败时抛出
+   */
   public static JAXBContext newContext(Class[] classes,
       Map<String, Object> properties) throws Exception {
     Class spFactory = Class.forName(
@@ -88,14 +99,25 @@ public final class ContextFactory {
     return (JAXBContext) m.invoke(null, classes, properties);
   }
 
+  /**
+   * 创建并缓存JAXB上下文，由WebComponent.service方法调用
+   * 对预定义类复用缓存上下文，忽略不兼容类型，处理未缓存类的动态创建
+   * @param classes 需要绑定的类数组
+   * @param properties JAXB配置属性
+   * @return 创建或缓存的JAXB上下文实例
+   * @throws Exception 遇到不兼容类型、创建上下文失败时抛出
+   */
   // Called from WebComponent.service
   public static JAXBContext createContext(Class[] classes,
       Map<String, Object> properties) throws Exception {
+    // 遍历检查每个需要绑定的类
     for (Class c : classes) {
+      // 如果是需要忽略的不兼容类型，直接抛出预定义异常
       if (IGNORE_SET.contains(c)) {
         je.setStackTrace(stackTrace);
         throw je;
       }
+      // 如果不在预定义缓存类集合中，动态创建新上下文
       if (!CLASS_SET.contains(c)) {
         try {
           return newContext(classes, properties);
@@ -106,6 +128,7 @@ public final class ContextFactory {
       }
     }
 
+    // 所有类都在预定义集合中，懒加载创建缓存上下文
     try {
       synchronized (ContextFactory.class) {
         if (cacheContext == null) {
@@ -119,6 +142,15 @@ public final class ContextFactory {
     return cacheContext;
   }
 
+  /**
+   * 根据上下文路径创建JAXB上下文，由WebComponent.init方法调用
+   * 通过反射调用JAXB RI原生工厂实现
+   * @param contextPath JAXB上下文路径
+   * @param classLoader 类加载器
+   * @param properties JAXB配置属性
+   * @return 创建好的JAXB上下文实例
+   * @throws Exception 反射调用或创建上下文失败时抛出
+   */
   // Called from WebComponent.init
   public static JAXBContext createContext(String contextPath, ClassLoader
       classLoader, Map<String, Object> properties) throws Exception {

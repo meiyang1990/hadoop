@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,12 +18,15 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.converter;
 
 /**
- * Thrown by the FS-&gt;CS converter if it encounters an
- * unsupported property.
+ * 公平调度器(FS)转容量调度器(CS)过程中遇到不支持的配置属性时抛出的异常。
  */
 public class UnsupportedPropertyException extends RuntimeException {
   private static final long serialVersionUID = 5468104026818355871L;
 
+  /**
+   * 使用指定错误信息构造异常实例。
+   * @param message 错误描述信息
+   */
   public UnsupportedPropertyException(String message) {
     super(message);
   }

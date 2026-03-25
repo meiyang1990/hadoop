@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,13 +26,22 @@ import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The class contains the fields that can be determined when
- * <code>RMContainer</code> finishes, and that need to be stored persistently.
+ * 容器结束数据记录，保存RM容器结束时可确定的所有信息，供应用历史服务持久化存储。
+ * 包含容器结束时间、退出状态、诊断信息等结束相关元数据。
  */
 @Public
 @Unstable
 public abstract class ContainerFinishData {
 
+  /**
+   * 创建并初始化容器结束数据实例，填充所有必填字段。
+   * @param containerId 容器ID
+   * @param finishTime 容器结束时间
+   * @param diagnosticsInfo 容器诊断信息
+   * @param containerExitCode 容器退出码
+   * @param containerState 容器结束状态
+   * @return 初始化完成的容器结束数据实例
+   */
   @Public
   @Unstable
   public static ContainerFinishData newInstance(ContainerId containerId,

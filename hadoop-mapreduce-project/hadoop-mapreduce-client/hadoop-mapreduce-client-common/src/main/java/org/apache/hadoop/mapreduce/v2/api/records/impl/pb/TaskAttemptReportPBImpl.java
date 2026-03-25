@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,27 +37,44 @@ import org.apache.hadoop.yarn.api.records.impl.pb.ContainerIdPBImpl;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 import org.apache.hadoop.yarn.proto.YarnProtos.ContainerIdProto;
 
-
-    
+/**
+ * TaskAttemptReport的Protobuf实现类，基于Protobuf序列化协议，
+ * 封装MapReduce任务尝试的运行状态报告，在客户端和服务端之间传输任务尝试信息。
+ */
 public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> implements TaskAttemptReport {
+  // 存储序列化后的Protobuf对象
   TaskAttemptReportProto proto = TaskAttemptReportProto.getDefaultInstance();
+  // 用于构建Protobuf对象的Builder
   TaskAttemptReportProto.Builder builder = null;
+  // 标记当前是否通过Protobuf对象直接读取数据
   boolean viaProto = false;
 
+  // 缓存反序列化后的任务尝试ID对象
   private TaskAttemptId taskAttemptId = null;
+  // 缓存反序列化后的计数器对象
   private Counters counters = null;
+  // 缓存旧版本API的计数器对象
   private org.apache.hadoop.mapreduce.Counters rawCounters = null;
+  // 缓存反序列化后的容器ID对象
   private ContainerId containerId = null;
 
+  /**
+   * 构造函数，初始化空的Builder用于构建任务尝试报告
+   */
   public TaskAttemptReportPBImpl() {
     builder = TaskAttemptReportProto.newBuilder();
   }
 
+  /**
+   * 基于已有的Protobuf对象构造任务尝试报告
+   * @param proto 已序列化的任务尝试报告Protobuf对象
+   */
   public TaskAttemptReportPBImpl(TaskAttemptReportProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
+  @Override
   public TaskAttemptReportProto getProto() {
       mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -64,6 +82,9 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     return proto;
   }
 
+  /**
+   * 将本地缓存的Java对象合并到Protobuf Builder中
+   */
   private void mergeLocalToBuilder() {
     if (this.taskAttemptId != null) {
       builder.setTaskAttemptId(convertToProtoFormat(this.taskAttemptId));
@@ -77,6 +98,9 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     }
   }
 
+  /**
+   * 将本地修改合并到Protobuf对象中，完成序列化
+   */
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -85,6 +109,9 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     viaProto = true;
   }
 
+  /**
+   * 如果当前使用Protobuf对象存储，初始化Builder用于修改
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = TaskAttemptReportProto.newBuilder(proto);
@@ -129,6 +156,9 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     this.rawCounters = rCounters;
   }
 
+  /**
+   * 将旧版本API的原始计数器转换为YARN版本的计数器对象
+   */
   private void convertRawCountersToCounters() {
     if (this.counters == null && this.rawCounters != null) {
       this.counters = TypeConverter.toYarn(rawCounters);
@@ -147,6 +177,7 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     maybeInitBuilder();
     builder.setStartTime((startTime));
   }
+
   @Override
   public long getFinishTime() {
     TaskAttemptReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -203,6 +234,7 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
       builder.clearTaskAttemptId();
     this.taskAttemptId = taskAttemptId;
   }
+
   @Override
   public TaskAttemptState getTaskAttemptState() {
     TaskAttemptReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -221,6 +253,7 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     }
     builder.setTaskAttemptState(convertToProtoFormat(taskAttemptState));
   }
+
   @Override
   public float getProgress() {
     TaskAttemptReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -232,6 +265,7 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     maybeInitBuilder();
     builder.setProgress((progress));
   }
+
   @Override
   public String getDiagnosticInfo() {
     TaskAttemptReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -250,6 +284,7 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     }
     builder.setDiagnosticInfo((diagnosticInfo));
   }
+
   @Override
   public String getStateString() {
     TaskAttemptReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -268,6 +303,7 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     }
     builder.setStateString((stateString));
   }
+
   @Override
   public Phase getPhase() {
     TaskAttemptReportProtoOrBuilder p = viaProto ? proto : builder;
@@ -352,43 +388,93 @@ public class TaskAttemptReportPBImpl extends ProtoBase<TaskAttemptReportProto> i
     this.containerId = containerId;
   }
 
+  /**
+   * 将ContainerId对象转换为Protobuf格式
+   * @param t 容器ID对象
+   * @return Protobuf格式的容器ID
+   */
   private ContainerIdProto convertToProtoFormat(ContainerId t) {
     return ((ContainerIdPBImpl)t).getProto();
   }
   
+  /**
+   * 将Protobuf格式的容器ID转换为Java对象
+   * @param p Protobuf格式的容器ID
+   * @return Java容器ID对象
+   */
   private ContainerIdPBImpl convertFromProtoFormat(ContainerIdProto p) {
     return new ContainerIdPBImpl(p);
   }
   
+  /**
+   * 将Protobuf格式的计数器转换为Java对象
+   * @param p Protobuf格式的计数器
+   * @return Java计数器对象
+   */
   private CountersPBImpl convertFromProtoFormat(CountersProto p) {
     return new CountersPBImpl(p);
   }
 
+  /**
+   * 将Java计数器对象转换为Protobuf格式
+   * @param t Java计数器对象
+   * @return Protobuf格式的计数器
+   */
   private CountersProto convertToProtoFormat(Counters t) {
     return ((CountersPBImpl)t).getProto();
   }
 
+  /**
+   * 将Protobuf格式的任务尝试ID转换为Java对象
+   * @param p Protobuf格式的任务尝试ID
+   * @return Java任务尝试ID对象
+   */
   private TaskAttemptIdPBImpl convertFromProtoFormat(TaskAttemptIdProto p) {
     return new TaskAttemptIdPBImpl(p);
   }
 
+  /**
+   * 将Java任务尝试ID对象转换为Protobuf格式
+   * @param t Java任务尝试ID对象
+   * @return Protobuf格式的任务尝试ID
+   */
   private TaskAttemptIdProto convertToProtoFormat(TaskAttemptId t) {
     return ((TaskAttemptIdPBImpl)t).getProto();
   }
 
+  /**
+   * 将任务尝试状态枚举转换为Protobuf格式
+   * @param e 任务尝试状态枚举
+   * @return Protobuf格式的任务尝试状态
+   */
   private TaskAttemptStateProto convertToProtoFormat(TaskAttemptState e) {
     return MRProtoUtils.convertToProtoFormat(e);
   }
 
+  /**
+   * 将Protobuf格式的任务尝试状态转换为枚举
+   * @param e Protobuf格式的任务尝试状态
+   * @return 任务尝试状态枚举
+   */
   private TaskAttemptState convertFromProtoFormat(TaskAttemptStateProto e) {
     return MRProtoUtils.convertFromProtoFormat(e);
   }
 
+  /**
+   * 将任务阶段枚举转换为Protobuf格式
+   * @param e 任务阶段枚举
+   * @return Protobuf格式的任务阶段
+   */
   private PhaseProto convertToProtoFormat(Phase e) {
     return MRProtoUtils.convertToProtoFormat(e);
   }
 
+  /**
+   * 将Protobuf格式的任务阶段转换为枚举
+   * @param e Protobuf格式的任务阶段
+   * @return 任务阶段枚举
+   */
   private Phase convertFromProtoFormat(PhaseProto e) {
     return MRProtoUtils.convertFromProtoFormat(e);
   }
-}  
+}

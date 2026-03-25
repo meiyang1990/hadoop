@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that maintain the smallest of 
- * a sequence of strings.
+ * 文件说明：MapReduce旧API兼容类，为字符串最小值聚合计算提供适配
+ * 
+ * 该类实现了值聚合器接口，维护字符串序列中的字典序最小值，是新版mapreduce包中同类实现的兼容包装
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable

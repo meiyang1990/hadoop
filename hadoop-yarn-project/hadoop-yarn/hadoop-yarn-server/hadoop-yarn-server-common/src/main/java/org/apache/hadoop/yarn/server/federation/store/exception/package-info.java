@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -13,5 +14,9 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
+ */
+
+/**
+ * YARN联邦状态存储异常类包，定义了联邦元数据存储操作过程中可能抛出的各类异常。
  */
 package org.apache.hadoop.yarn.server.federation.store.exception;

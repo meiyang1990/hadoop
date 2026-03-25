@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,18 +26,26 @@ import org.apache.hadoop.yarn.server.timelineservice.reader.filter.TimelineExist
 import org.apache.hadoop.yarn.server.timelineservice.reader.filter.TimelineFilter;
 
 /**
- * Used for parsing existence filters such as event filters. These filters
- * check for existence of a value. For example, in case of event filters, they
- * check if an event exists or not and accordingly return an entity.
+ * 存在性过滤器解析器，用于解析如事件过滤器这类需要检查值是否存在的过滤表达式。
+ * 这类过滤器会检查指定值是否存在，例如事件过滤器会检查事件是否存在，仅返回匹配的实体。
  */
 @Private
 @Unstable
 class TimelineParserForExistFilters extends TimelineParserForEqualityExpr {
 
+  /**
+   * 构造存在性过滤器解析器
+   * @param expression 待解析的过滤表达式
+   * @param delimiter 分隔符
+   */
   public TimelineParserForExistFilters(String expression, char delimiter) {
     super(expression, "Event Filter", delimiter);
   }
 
+  /**
+   * 创建存在性过滤对象
+   * @return 存在性过滤器实例
+   */
   protected TimelineFilter createFilter() {
     return new TimelineExistsFilter();
   }

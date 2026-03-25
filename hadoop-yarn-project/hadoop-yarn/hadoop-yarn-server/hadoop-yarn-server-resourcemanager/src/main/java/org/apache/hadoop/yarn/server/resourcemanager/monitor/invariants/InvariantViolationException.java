@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,14 +22,24 @@ package org.apache.hadoop.yarn.server.resourcemanager.monitor.invariants;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
 /**
- * This exception represents the violation of an internal invariant.
+ * YARN ResourceManager 不变量检查异常，表示内部系统不变量被违反。
+ * 用于资源监控模块中，当检测到不符合集群资源约束的非法状态时抛出。
  */
 public class InvariantViolationException extends YarnRuntimeException {
 
+  /**
+   * 构造带错误信息的异常实例
+   * @param s 错误描述信息
+   */
   public InvariantViolationException(String s) {
     super(s);
   }
 
+  /**
+   * 构造带错误信息和根因异常的异常实例
+   * @param s 错误描述信息
+   * @param e 根因异常
+   */
   public InvariantViolationException(String s, Exception e) {
     super(s, e);
   }

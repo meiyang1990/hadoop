@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,9 +28,8 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
- * This is UpdateContainerRequest in scheduler side, it contains some
- * pointers to runtime objects like RMContainer, SchedulerNode, etc. This will
- * be easier for scheduler making decision.
+ * 资源调度器侧的容器资源变更请求封装类，持有指向运行时对象的引用，方便调度器决策。
+ * 封装了用户提交的UpdateContainerRequest，并关联了调度器运行时需要的各类对象。
  */
 public class SchedContainerChangeRequest implements
     Comparable<SchedContainerChangeRequest> {
@@ -39,6 +39,13 @@ public class SchedContainerChangeRequest implements
   private SchedulerNode schedulerNode;
   private Resource deltaCapacity;
 
+  /**
+   * 构造调度器侧容器资源变更请求
+   * @param rmContext RM上下文对象
+   * @param schedulerNode 容器所在调度节点
+   * @param rmContainer 待变更的容器运行时对象
+   * @param targetCapacity 目标资源容量
+   */
   public SchedContainerChangeRequest(
       RMContext rmContext, SchedulerNode schedulerNode,
       RMContainer rmContainer, Resource targetCapacity) {
@@ -48,28 +55,32 @@ public class SchedContainerChangeRequest implements
     this.schedulerNode = schedulerNode;
   }
   
+  /** 获取容器所在节点ID */
   public NodeId getNodeId() {
     return this.rmContainer.getAllocatedNode();
   }
 
+  /** 获取待变更容器的运行时对象 */
   public RMContainer getRMContainer() {
     return this.rmContainer;
   }
 
+  /** 获取变更后的目标资源容量 */
   public Resource getTargetCapacity() {
     return this.targetCapacity;
   }
 
+  /** 获取RM上下文对象 */
   public RMContext getRmContext() {
     return this.rmContext;
   }
+
   /**
-   * Delta capacity = target - before, so if it is a decrease request, delta
-   * capacity will be negative.
-   * @return delta Capacity.
+   * 获取资源变更量（目标资源 - 当前分配资源），缩容时为负值
+   * @return 资源变更量
    */
   public synchronized Resource getDeltaCapacity() {
-    // Only calculate deltaCapacity once
+    // 增量只计算一次，延迟初始化
     if (deltaCapacity == null) {
       deltaCapacity = Resources.subtract(
           targetCapacity, rmContainer.getAllocatedResource());
@@ -77,18 +88,22 @@ public class SchedContainerChangeRequest implements
     return deltaCapacity;
   }
   
+  /** 获取容器优先级 */
   public Priority getPriority() {
     return rmContainer.getContainer().getPriority();
   }
   
+  /** 获取容器ID */
   public ContainerId getContainerId() {
     return rmContainer.getContainerId();
   }
   
+  /** 获取节点所在分区 */
   public String getNodePartition() {
     return schedulerNode.getPartition();
   }
   
+  /** 获取容器所在调度节点对象 */
   public SchedulerNode getSchedulerNode() {
     return schedulerNode;
   }
@@ -111,12 +126,12 @@ public class SchedContainerChangeRequest implements
     if (other == null) {
       return -1;
     }
-    
+    // 先按优先级排序
     int rc = getPriority().compareTo(other.getPriority());
     if (0 != rc) {
       return rc;
     }
-    
+    // 同优先级按容器ID排序
     return getContainerId().compareTo(other.getContainerId());
   }
   

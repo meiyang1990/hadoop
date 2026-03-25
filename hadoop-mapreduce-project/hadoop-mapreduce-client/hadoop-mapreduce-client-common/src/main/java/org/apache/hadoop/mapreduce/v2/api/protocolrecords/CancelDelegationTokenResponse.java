@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,8 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 /**
- * The response from the {@code ResourceManager} to a cancelDelegationToken
- * request.
+ * 取消代理令牌请求的ResourceManager响应接口，属于MapReduce与YARN之间的RPC协议记录
+ * 对应cancelDelegationToken方法调用的返回值承载
  */
 @Public
 @Evolving

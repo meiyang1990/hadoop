@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,25 +19,26 @@
 package org.apache.hadoop.yarn.server.resourcemanager;
 
 /**
- * Interface for RMInfo class.
+ * ResourceManager运行状态信息的JMX MXBean接口，
+ * 提供RM核心信息的监控指标暴露，供JMX监控系统采集。
  */
 public interface RMInfoMXBean {
 
   /**
-   * Gets the ResourceManager state.
-   * @return the ResourceManager state.
+   * 获取ResourceManager当前运行状态。
+   * @return ResourceManager当前状态字符串
    */
   String getState();
 
   /**
-   * Gets the host and port colon separated.
-   * @return host and port colon separated.
+   * 获取ResourceManager服务地址，格式为主机名:端口。
+   * @return 冒号分隔的主机名和端口
    */
   String getHostAndPort();
 
   /**
-   * Gets if security is enabled.
-   * @return true, if security is enabled.
+   * 获取安全认证是否启用。
+   * @return true表示安全认证已启用，false表示未启用
    */
   boolean isSecurityEnabled();
 }

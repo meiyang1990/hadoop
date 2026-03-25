@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,12 +21,18 @@ package org.apache.hadoop.yarn.server.nodemanager.nodelabels;
 import org.apache.hadoop.yarn.api.records.NodeAttribute;
 
 /**
- * Abstract class which will be responsible for fetching the node attributes.
- *
+ * 文件: NodeAttributesProvider.java
+ * 所属模块: YARN NodeManager 节点标签模块
+ * 核心职责: 定义节点属性提供者的抽象基类，负责获取节点属性，为不同来源的节点属性提供统一扩展接口
+ * 用于YARN节点标签功能，支持从不同数据源获取节点属性并提供给调度器使用
  */
 public abstract class NodeAttributesProvider
     extends AbstractNodeDescriptorsProvider<NodeAttribute> {
 
+  /**
+   * 构造函数，初始化节点属性提供者
+   * @param name 提供者名称标识
+   */
   public NodeAttributesProvider(String name) {
     super(name);
   }

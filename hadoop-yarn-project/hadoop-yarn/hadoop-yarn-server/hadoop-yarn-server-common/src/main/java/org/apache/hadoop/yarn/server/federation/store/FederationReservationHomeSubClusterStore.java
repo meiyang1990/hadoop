@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -32,15 +33,12 @@ import org.apache.hadoop.yarn.server.federation.store.records.DeleteReservationH
 import org.apache.hadoop.yarn.server.federation.store.records.DeleteReservationHomeSubClusterResponse;
 
 /**
- * FederationReservationHomeSubClusterStore maintains the state of all
- * <em>Reservations</em> that have been submitted to the federated cluster.
- *
- * *
+ * YARN联邦预留资源归属子集群存储接口，维护联邦集群中所有已提交预留资源的归属状态。
  * <p>
- * The mapping details contains:
+ * 存储的映射信息包含：
  * <ul>
- * <li>{@code ReservationId}</li>
- * <li>{@code SubClusterId}</li>
+ * <li>预留ID {@code ReservationId}</li>
+ * <li>归属子集群ID {@code SubClusterId}</li>
  * </ul>
  *
  */
@@ -49,70 +47,55 @@ import org.apache.hadoop.yarn.server.federation.store.records.DeleteReservationH
 public interface FederationReservationHomeSubClusterStore {
 
   /**
-   * Register the home {@code SubClusterId} of the newly submitted
-   * {@code ReservationId}. Currently response is empty if the operation was
-   * successful, if not an exception reporting reason for a failure. If a
-   * mapping for the Reservation already existed, the {@code SubClusterId} in
-   * this response will return the existing mapping which might be different
-   * from that in the {@code AddReservationHomeSubClusterRequest}.
+   * 注册新提交预留的归属子集群。
+   * 操作成功则返回响应（若预留已存在则返回原有映射关系，可能与请求中不同），失败则抛出异常。
    *
-   * @param request the request to register a new Reservation with its home
-   *          sub-cluster
-   * @return upon successful registration of the Reservation in the StateStore,
-   *         {@code AddReservationHomeSubClusterRequest} containing the home
-   *         sub-cluster of the Reservation. Otherwise, an exception reporting
-   *         reason for a failure
-   * @throws YarnException if the request is invalid/fails
+   * @param request 注册新预留及其归属子集群的请求
+   * @return 注册成功后返回包含预留归属子集群的响应，失败抛出异常
+   * @throws YarnException 请求无效或操作失败时抛出
    */
   AddReservationHomeSubClusterResponse addReservationHomeSubCluster(
       AddReservationHomeSubClusterRequest request) throws YarnException;
 
   /**
-   * Get information about the Reservation identified by the input
-   * {@code ReservationId}.
+   * 根据预留ID查询该预留的归属子集群信息。
    *
-   * @param request contains the Reservation queried
-   * @return {@code ReservationHomeSubCluster} containing the Reservation's home
-   *         subcluster
-   * @throws YarnException if the request is invalid/fails
+   * @param request 包含待查询预留ID的请求
+   * @return 包含预留归属子集群信息的响应
+   * @throws YarnException 请求无效或操作失败时抛出
    */
   GetReservationHomeSubClusterResponse getReservationHomeSubCluster(
       GetReservationHomeSubClusterRequest request) throws YarnException;
 
   /**
-   * Get the {@code ReservationHomeSubCluster} list representing the mapping of
-   * all submitted Reservations to it's home sub-cluster.
+   * 获取所有已提交预留与其归属子集群的完整映射列表。
    *
-   * @param request empty representing all Reservations
-   * @return the mapping of all submitted Reservation to it's home sub-cluster
-   * @throws YarnException if the request is invalid/fails
+   * @param request 空请求，表示查询所有预留
+   * @return 所有已提交预留与其归属子集群的映射列表
+   * @throws YarnException 请求无效或操作失败时抛出
    */
   GetReservationsHomeSubClusterResponse getReservationsHomeSubCluster(
       GetReservationsHomeSubClusterRequest request) throws YarnException;
 
   /**
-   * Update the home {@code SubClusterId} of a previously submitted
-   * {@code ReservationId}. Currently response is empty if the operation was
-   * successful, if not an exception reporting reason for a failure.
+   * 更新已有预留的归属子集群信息。
+   * 操作成功返回空响应，失败抛出异常。
    *
-   * @param request the request to update the home sub-cluster of a reservation.
-   * @return empty on successful update of the Reservation in the StateStore, if
-   *         not an exception reporting reason for a failure
-   * @throws YarnException if the request is invalid/fails
+   * @param request 更新预留归属子集群的请求
+   * @return 更新成功返回空响应，失败抛出异常
+   * @throws YarnException 请求无效或操作失败时抛出
    */
   UpdateReservationHomeSubClusterResponse updateReservationHomeSubCluster(
       UpdateReservationHomeSubClusterRequest request) throws YarnException;
 
 
   /**
-   * Delete the mapping of home {@code SubClusterId} of a previously submitted
-   * {@code ReservationId}. Currently response is empty if the operation was
-   * successful, if not an exception reporting reason for a failure.
+   * 删除已有预留的归属子集群映射。
+   * 操作成功返回空响应，失败抛出异常。
    *
-   * @param request the request to delete the home sub-cluster of a reservation.
-   * @return empty on successful update of the Reservation in the StateStore, if
-   *         not an exception reporting reason for a failure
-   * @throws YarnException if the request is invalid/fails
+   * @param request 删除预留归属子集群映射的请求
+   * @return 删除成功返回空响应，失败抛出异常
+   * @throws YarnException 请求无效或操作失败时抛出
    */
   DeleteReservationHomeSubClusterResponse deleteReservationHomeSubCluster(
       DeleteReservationHomeSubClusterRequest request) throws YarnException;

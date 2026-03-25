@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,12 +27,16 @@ import org.apache.hadoop.security.authorize.PolicyProvider;
 import org.apache.hadoop.security.authorize.Service;
 
 /**
- * {@link PolicyProvider} for YARN MapReduce protocols.
+ * 文件：MRAMPolicyProvider.java
+ * 所属模块：MapReduce客户端 -> 应用Master -> 安全授权
+ * 核心职责：为MapReduce ApplicationMaster的RPC服务提供安全授权策略定义
+ * 功能说明：注册MR AM需要进行权限校验的所有RPC服务，供Hadoop安全框架进行访问控制检查
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class MRAMPolicyProvider extends PolicyProvider {
   
+  // 预定义MR ApplicationMaster需要授权保护的所有RPC服务列表
   private static final Service[] mapReduceApplicationMasterServices = 
       new Service[] {
     new Service(
@@ -42,6 +47,10 @@ public class MRAMPolicyProvider extends PolicyProvider {
         MRClientProtocolPB.class)
   };
 
+  /**
+   * 获取当前MR AM需要授权保护的所有服务列表
+   * @return 预定义的需要权限校验的服务数组
+   */
   @Override
   public Service[] getServices() {
     return mapReduceApplicationMasterServices;

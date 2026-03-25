@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,9 +27,18 @@ import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.server.api.records.AppCollectorData;
 import org.apache.hadoop.yarn.util.Records;
 
+/**
+ * 上报新的应用时间线采集器信息的请求类
+ * 用于向ResourceManager注册新增的应用采集器，让集群能够感知采集器地址和认证信息
+ */
 @Private
 public abstract class ReportNewCollectorInfoRequest {
 
+  /**
+   * 创建上报新采集器信息请求实例
+   * @param appCollectorsList 应用采集器信息列表
+   * @return 新的请求对象
+   */
   public static ReportNewCollectorInfoRequest newInstance(
       List<AppCollectorData> appCollectorsList) {
     ReportNewCollectorInfoRequest request =
@@ -37,6 +47,13 @@ public abstract class ReportNewCollectorInfoRequest {
     return request;
   }
 
+  /**
+   * 创建单应用采集器上报请求实例
+   * @param id 应用ID
+   * @param collectorAddr 采集器服务地址
+   * @param token 采集器访问认证令牌
+   * @return 新的请求对象
+   */
   public static ReportNewCollectorInfoRequest newInstance(
       ApplicationId id, String collectorAddr, Token token) {
     ReportNewCollectorInfoRequest request =
@@ -46,8 +63,16 @@ public abstract class ReportNewCollectorInfoRequest {
     return request;
   }
 
+  /**
+   * 获取需要上报的应用采集器信息列表
+   * @return 应用采集器信息列表
+   */
   public abstract List<AppCollectorData> getAppCollectorsList();
 
+  /**
+   * 设置需要上报的应用采集器信息列表
+   * @param appCollectorsList 应用采集器信息列表
+   */
   public abstract void setAppCollectorsList(
       List<AppCollectorData> appCollectorsList);
 

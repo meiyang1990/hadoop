@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,24 +32,32 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.fs.StorageType;
 
 /**
- * Manages a {@link BlockTokenSecretManager} per block pool. Routes the requests
- * given a block pool Id to corresponding {@link BlockTokenSecretManager}
+ * 文件级注释：块池级块令牌密钥管理器，为每个块池维护独立的块令牌密钥管理器，
+ * 将请求路由到对应块池的密钥管理器实例，支持HDFS联邦多块池场景下的块令牌管理。
+ * 
+ * 为每个块池维护独立的{@link BlockTokenSecretManager}实例，根据块池ID将请求路由到对应实例。
  */
 public class BlockPoolTokenSecretManager extends
     SecretManager<BlockTokenIdentifier> {
   
+  // 存储块池ID到对应块令牌密钥管理器的映射
   private final Map<String, BlockTokenSecretManager> map =
       new ConcurrentHashMap<>();
 
   /**
-   * Add a block pool Id and corresponding {@link BlockTokenSecretManager} to map
-   * @param bpid block pool Id
-   * @param secretMgr {@link BlockTokenSecretManager}
+   * 添加一个块池及其对应的块令牌密钥管理器到映射表
+   * @param bpid 块池ID
+   * @param secretMgr 对应块池的块令牌密钥管理器
    */
   public void addBlockPool(String bpid, BlockTokenSecretManager secretMgr) {
     map.put(bpid, secretMgr);
   }
 
+  /**
+   * 根据块池ID获取对应的块令牌密钥管理器，仅用于测试
+   * @param bpid 块池ID
+   * @return 对应块池的块令牌密钥管理器
+   */
   @VisibleForTesting
   public BlockTokenSecretManager get(String bpid) {
     BlockTokenSecretManager secretMgr = map.get(bpid);
@@ -59,11 +68,19 @@ public class BlockPoolTokenSecretManager extends
     return secretMgr;
   }
   
+  /**
+   * 检查指定块池是否已注册到管理器
+   * @param bpid 块池ID
+   * @return 如果块池已注册返回true，否则返回false
+   */
   public boolean isBlockPoolRegistered(String bpid) {
     return map.containsKey(bpid);
   }
 
-  /** Return an empty BlockTokenIdentifer */
+  /**
+   * 创建空的块令牌标识符实例
+   * @return 空的BlockTokenIdentifier实例
+   */
   @Override
   public BlockTokenIdentifier createIdentifier() {
     return new BlockTokenIdentifier();
@@ -71,17 +88,20 @@ public class BlockPoolTokenSecretManager extends
 
   @Override
   public byte[] createPassword(BlockTokenIdentifier identifier) {
+    // 路由到对应块池的密钥管理器生成密码
     return get(identifier.getBlockPoolId()).createPassword(identifier);
   }
 
   @Override
   public byte[] retrievePassword(BlockTokenIdentifier identifier)
       throws InvalidToken {
+    // 路由到对应块池的密钥管理器获取密码
     return get(identifier.getBlockPoolId()).retrievePassword(identifier);
   }
 
   /**
-   * See {@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier,
+   * 检查块令牌访问权限，路由到对应块池的权限检查逻辑
+   * 详情见{@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier,
    *                String, ExtendedBlock, BlockTokenIdentifier.AccessMode,
    *                StorageType[], String[])}
    */
@@ -94,7 +114,8 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
-   * See {@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier,
+   * 检查块令牌访问权限，路由到对应块池的权限检查逻辑
+   * 详情见{@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier,
    * String, ExtendedBlock, BlockTokenIdentifier.AccessMode,
    * StorageType[])}
    */
@@ -106,7 +127,8 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
-   * See {@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier,
+   * 检查块令牌访问权限，路由到对应块池的权限检查逻辑
+   * 详情见{@link BlockTokenSecretManager#checkAccess(BlockTokenIdentifier,
    * String, ExtendedBlock, BlockTokenIdentifier.AccessMode)}.
    */
   public void checkAccess(BlockTokenIdentifier id, String userId,
@@ -116,7 +138,8 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
-   * See {@link BlockTokenSecretManager#checkAccess(Token, String,
+   * 检查块令牌访问权限，路由到对应块池的权限检查逻辑
+   * 详情见{@link BlockTokenSecretManager#checkAccess(Token, String,
    *                ExtendedBlock, BlockTokenIdentifier.AccessMode)}.
    */
   public void checkAccess(Token<BlockTokenIdentifier> token,
@@ -126,7 +149,8 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
-   * See {@link BlockTokenSecretManager#checkAccess(Token, String,
+   * 检查块令牌访问权限，路由到对应块池的权限检查逻辑
+   * 详情见{@link BlockTokenSecretManager#checkAccess(Token, String,
    *                ExtendedBlock, BlockTokenIdentifier.AccessMode,
    *                StorageType[], String[])}
    */
@@ -139,7 +163,8 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
-   * See {@link BlockTokenSecretManager#addKeys(ExportedBlockKeys)}.
+   * 添加导出的块密钥到对应块池的密钥管理器
+   * 详情见{@link BlockTokenSecretManager#addKeys(ExportedBlockKeys)}.
    */
   public void addKeys(String bpid, ExportedBlockKeys exportedKeys,
       boolean updateCurrentKey) throws IOException {
@@ -147,7 +172,8 @@ public class BlockPoolTokenSecretManager extends
   }
 
   /**
-   * See {@link BlockTokenSecretManager#generateToken(ExtendedBlock, EnumSet,
+   * 为指定块生成块令牌，路由到对应块池的生成逻辑
+   * 详情见{@link BlockTokenSecretManager#generateToken(ExtendedBlock, EnumSet,
    *  StorageType[], String[])}.
    */
   public Token<BlockTokenIdentifier> generateToken(ExtendedBlock b,
@@ -157,6 +183,9 @@ public class BlockPoolTokenSecretManager extends
         storageIds);
   }
   
+  /**
+   * 清空所有块池的所有密钥，仅用于测试
+   */
   @VisibleForTesting
   public void clearAllKeysForTesting() {
     for (BlockTokenSecretManager btsm : map.values()) {
@@ -164,10 +193,23 @@ public class BlockPoolTokenSecretManager extends
     }
   }
 
+  /**
+   * 为指定块池生成数据加密密钥
+   * @param blockPoolId 目标块池ID
+   * @return 生成的数据加密密钥
+   */
   public DataEncryptionKey generateDataEncryptionKey(String blockPoolId) {
     return get(blockPoolId).generateDataEncryptionKey();
   }
   
+  /**
+   * 根据密钥ID获取对应块池的数据加密密钥
+   * @param keyId 加密密钥ID
+   * @param blockPoolId 块池ID
+   * @param nonce 随机数用于验证
+   * @return 加密密钥字节数组
+   * @throws IOException 获取密钥失败或验证失败时抛出
+   */
   public byte[] retrieveDataEncryptionKey(int keyId, String blockPoolId,
       byte[] nonce) throws IOException {
     return get(blockPoolId).retrieveDataEncryptionKey(keyId, nonce);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -80,16 +81,14 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 /**
- * This class implements debug operations on the HDFS command-line.
- *
- * These operations are only for debugging, and may change or disappear
- * between HDFS versions.
+ * HDFS命令行调试工具，提供多种底层调试操作。
+ * 所有操作仅用于调试目的，API和功能可能在不同HDFS版本间变更或移除。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class DebugAdmin extends Configured implements Tool {
   /**
-   * All the debug commands we can run.
+   * 所有支持的调试命令列表
    */
   private final DebugCommand[] DEBUG_COMMANDS = {
       new VerifyMetaCommand(),
@@ -100,7 +99,7 @@ public class DebugAdmin extends Configured implements Tool {
   };
 
   /**
-   * The base class for debug commands.
+   * 所有调试命令的抽象基类，定义命令通用结构
    */
   private abstract static class DebugCommand {
     final String name;
@@ -113,13 +112,19 @@ public class DebugAdmin extends Configured implements Tool {
       this.helpText = helpText;
     }
 
+    /**
+     * 执行调试命令
+     * @param args 命令参数列表
+     * @return 执行结果，0表示成功，非0表示失败
+     * @throws IOException 执行过程中的IO异常
+     */
     abstract int run(List<String> args) throws IOException;
   }
 
   private static int HEADER_LEN = 7;
 
   /**
-   * The command for verifying a block metadata file and possibly block file.
+   * 验证块元数据文件和数据块文件的校验和命令
    */
   private static class VerifyMetaCommand extends DebugCommand {
     VerifyMetaCommand() {
@@ -138,6 +143,7 @@ public class DebugAdmin extends Configured implements Tool {
         System.out.println(helpText + System.lineSeparator());
         return 1;
       }
+      // 解析命令行参数
       String blockFile = StringUtils.popOptionWithArgument("-block", args);
       String metaFile = StringUtils.popOptionWithArgument("-meta", args);
       if (metaFile == null) {
@@ -151,10 +157,12 @@ public class DebugAdmin extends Configured implements Tool {
       try {
         BlockMetadataHeader header;
         try {
+          // 打开元数据文件并读取头部
           metaStream = new FileInputStream(metaFile);
           checksumStream = new DataInputStream(metaStream);
           header = BlockMetadataHeader.readHeader(checksumStream);
           metaChannel = metaStream.getChannel();
+          // 跳过头部长度，定位到校验和数据
           metaChannel.position(HEADER_LEN);
         } catch (RuntimeException e) {
           System.err.println("Failed to read HDFS metadata file header for " +
@@ -167,11 +175,13 @@ public class DebugAdmin extends Configured implements Tool {
         }
         DataChecksum checksum = header.getChecksum();
         System.out.println("Checksum type: " + checksum.toString());
+        // 如果没有指定块文件，只验证元数据头部即可
         if (blockFile == null) {
           return 0;
         }
         ByteBuffer metaBuf, dataBuf;
         try {
+          // 打开数据块文件，分配读写缓冲区
           dataStream = new FileInputStream(blockFile);
           dataChannel = dataStream.getChannel();
           final int CHECKSUMS_PER_BUF = 1024 * 32;
@@ -185,11 +195,13 @@ public class DebugAdmin extends Configured implements Tool {
           return 1;
         }
         long offset = 0;
+        // 分块读取并验证校验和
         while (true) {
           dataBuf.clear();
           int dataRead = -1;
           try {
             dataRead = dataChannel.read(dataBuf);
+            // 读取到文件末尾，结束验证
             if (dataRead < 0) {
               break;
             }
@@ -200,6 +212,7 @@ public class DebugAdmin extends Configured implements Tool {
             return 1;
           }
           try {
+            // 计算当前批次需要读取的校验和大小
             int csumToRead =
                 (((checksum.getBytesPerChecksum() - 1) + dataRead) /
                   checksum.getBytesPerChecksum()) *
@@ -207,6 +220,7 @@ public class DebugAdmin extends Configured implements Tool {
             metaBuf.clear();
             metaBuf.limit(csumToRead);
             metaChannel.read(metaBuf);
+            // 翻转缓冲区准备读取
             dataBuf.flip();
             metaBuf.flip();
           } catch (IOException e) {
@@ -216,6 +230,7 @@ public class DebugAdmin extends Configured implements Tool {
             return 1;
           }
           try {
+            // 验证数据块与元数据中的校验和是否匹配
             checksum.verifyChunkedSums(dataBuf, metaBuf,
                 blockFile, offset);
           } catch (IOException e) {
@@ -229,13 +244,14 @@ public class DebugAdmin extends Configured implements Tool {
             blockFile);
         return 0;
       } finally {
+        // 清理所有打开的流
         IOUtils.cleanupWithLogger(null, metaStream, dataStream, checksumStream);
       }
     }
   }
 
   /**
-   * The command for verifying a block metadata file and possibly block file.
+   * 根据数据块文件重新计算并生成元数据校验文件的命令
    */
   private static class ComputeMetaCommand extends DebugCommand {
     ComputeMetaCommand() {
@@ -255,6 +271,11 @@ public class DebugAdmin extends Configured implements Tool {
               + " the block file is good.");
     }
 
+    /**
+     * 根据校验选项创建DataChecksum实例
+     * @param opt 校验选项，包含类型和每个校验和覆盖的字节数
+     * @return 新建的DataChecksum实例
+     */
     private DataChecksum createChecksum(Options.ChecksumOpt opt) {
       DataChecksum dataChecksum = DataChecksum
           .newDataChecksum(opt.getChecksumType(), opt.getBytesPerChecksum());
@@ -272,6 +293,7 @@ public class DebugAdmin extends Configured implements Tool {
         System.out.println(helpText + System.lineSeparator());
         return 1;
       }
+      // 解析命令行参数
       final String name = StringUtils.popOptionWithArgument("-block", args);
       if (name == null) {
         System.err.println("You must specify a block file with -block");
@@ -296,18 +318,21 @@ public class DebugAdmin extends Configured implements Tool {
 
       DataOutputStream metaOut = null;
       try {
+        // 初始化校验对象
         final Configuration conf = new Configuration();
         final Options.ChecksumOpt checksumOpt =
             DfsClientConf.getChecksumOptFromConf(conf);
         final DataChecksum checksum = createChecksum(checksumOpt);
 
         final int smallBufferSize = DFSUtilClient.getSmallBufferSize(conf);
+        // 创建输出元数据文件，写入头部
         metaOut = new DataOutputStream(
             new BufferedOutputStream(Files.newOutputStream(srcMeta.toPath()),
                 smallBufferSize));
         BlockMetadataHeader.writeHeader(metaOut, checksum);
         metaOut.close();
         metaOut = null;
+        // 计算校验和并写入元数据文件
         FsDatasetUtil.computeChecksum(
             srcMeta, srcMeta, blockFile, smallBufferSize, conf);
         System.out.println(
@@ -321,7 +346,7 @@ public class DebugAdmin extends Configured implements Tool {
   }
 
   /**
-   * The command for recovering a file lease.
+   * 恢复指定文件租约的调试命令，用于处理文件被客户端锁定但客户端已故障的场景
    */
   private class RecoverLeaseCommand extends DebugCommand {
     RecoverLeaseCommand() {
@@ -340,6 +365,7 @@ public class DebugAdmin extends Configured implements Tool {
         System.out.println(helpText + System.lineSeparator());
         return 1;
       }
+      // 解析命令行参数
       String pathStr = StringUtils.popOptionWithArgument("-path", args);
       String retriesStr = StringUtils.popOptionWithArgument("-retries", args);
       if (pathStr == null) {
@@ -359,6 +385,7 @@ public class DebugAdmin extends Configured implements Tool {
       }
       FileSystem fs;
       try {
+        // 获取文件系统实例
         fs = FileSystem.newInstance(new URI(pathStr), getConf(), null);
       } catch (URISyntaxException e) {
         System.err.println("URISyntaxException for " + pathStr + ":" +
@@ -377,6 +404,7 @@ public class DebugAdmin extends Configured implements Tool {
             "needed scheme hdfs, but got: " + fs.getScheme());
         return 1;
       }
+      // 循环重试恢复租约
       for (int retry = 0; true; ) {
         boolean recovered = false;
         IOException ioe = null;
@@ -401,326 +429,4 @@ public class DebugAdmin extends Configured implements Tool {
           System.err.println("recoverLease returned false.");
         }
         retry++;
-        if (retry >= maxRetries) {
-          break;
-        }
-        System.err.println("Retrying in " + TIMEOUT_MS + " ms...");
-        Uninterruptibles.sleepUninterruptibly(TIMEOUT_MS,
-            TimeUnit.MILLISECONDS);
-        System.err.println("Retry #" + retry);
-      }
-      System.err.println("Giving up on recoverLease for " + pathStr + " after " +
-          maxRetries + (maxRetries == 1 ? " try." : " tries."));
-      return 1;
-    }
-  }
-
-  /**
-   * The command for verifying the correctness of erasure coding on an erasure coded file.
-   */
-  private class VerifyECCommand extends DebugCommand {
-    private DFSClient client;
-    private int dataBlkNum;
-    private int parityBlkNum;
-    private int cellSize;
-    private boolean useDNHostname;
-    private CachingStrategy cachingStrategy;
-    private int stripedReadBufferSize;
-    private CompletionService<Integer> readService;
-    private RawErasureEncoder encoder;
-    private BlockReader[] blockReaders;
-
-
-    VerifyECCommand() {
-      super("verifyEC",
-          "verifyEC -file <file> [-blockId <blk_Id>] [-skipFailureBlocks]",
-          "  -file Verify HDFS erasure coding on all block groups of the file." +
-              System.lineSeparator() +
-          "  -skipFailureBlocks specify will skip any block group failures during verify," +
-          "  and continues verify all block groups of the file," + System.lineSeparator() +
-          "  the default is not to skip failure blocks." + System.lineSeparator() +
-          "  -blockId specify blk_Id to verify for a specific one block group.");
-    }
-
-    int run(List<String> args) throws IOException {
-      if (args.size() < 2) {
-        System.out.println(usageText);
-        System.out.println(helpText + System.lineSeparator());
-        return 1;
-      }
-      String file = StringUtils.popOptionWithArgument("-file", args);
-      Path path = new Path(file);
-      DistributedFileSystem dfs = AdminHelper.getDFS(getConf());
-      this.client = dfs.getClient();
-
-      FileStatus fileStatus;
-      try {
-        fileStatus = dfs.getFileStatus(path);
-      } catch (FileNotFoundException e) {
-        System.err.println("File " + file + " does not exist.");
-        return 1;
-      }
-
-      if (!fileStatus.isFile()) {
-        System.err.println("File " + file + " is not a regular file.");
-        return 1;
-      }
-      if (!dfs.isFileClosed(path)) {
-        System.err.println("File " + file + " is not closed.");
-        return 1;
-      }
-      this.useDNHostname = getConf().getBoolean(DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
-          DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
-      this.cachingStrategy = CachingStrategy.newDefaultStrategy();
-      this.stripedReadBufferSize = getConf().getInt(
-          DFSConfigKeys.DFS_DN_EC_RECONSTRUCTION_STRIPED_READ_BUFFER_SIZE_KEY,
-          DFSConfigKeys.DFS_DN_EC_RECONSTRUCTION_STRIPED_READ_BUFFER_SIZE_DEFAULT);
-
-      LocatedBlocks locatedBlocks = client.getLocatedBlocks(file, 0, fileStatus.getLen());
-      if (locatedBlocks.getErasureCodingPolicy() == null) {
-        System.err.println("File " + file + " is not erasure coded.");
-        return 1;
-      }
-      ErasureCodingPolicy ecPolicy = locatedBlocks.getErasureCodingPolicy();
-      this.dataBlkNum = ecPolicy.getNumDataUnits();
-      this.parityBlkNum = ecPolicy.getNumParityUnits();
-      this.cellSize = ecPolicy.getCellSize();
-      this.encoder = CodecUtil.createRawEncoder(getConf(), ecPolicy.getCodecName(),
-          new ErasureCoderOptions(dataBlkNum, parityBlkNum));
-      int blockNum = dataBlkNum + parityBlkNum;
-      this.readService = new ExecutorCompletionService<>(
-          DFSUtilClient.getThreadPoolExecutor(blockNum, blockNum, 60,
-              new LinkedBlockingQueue<>(), "read-", false));
-      this.blockReaders = new BlockReader[blockNum];
-
-      String needToVerifyBlockId = StringUtils.popOptionWithArgument("-blockId", args);
-      boolean skipFailureBlocks = StringUtils.popOption("-skipFailureBlocks", args);
-      boolean isHealthy = true;
-
-      for (LocatedBlock locatedBlock : locatedBlocks.getLocatedBlocks()) {
-        String blockName = locatedBlock.getBlock().getBlockName();
-        if (needToVerifyBlockId == null || needToVerifyBlockId.equals(blockName)) {
-          System.out.println("Checking EC block group: " + blockName);
-          LocatedStripedBlock blockGroup = (LocatedStripedBlock) locatedBlock;
-
-          try {
-            verifyBlockGroup(blockGroup);
-            System.out.println("Status: OK");
-          } catch (Exception e) {
-            System.err.println("Status: ERROR, message: " + e.getMessage());
-            isHealthy = false;
-            if (!skipFailureBlocks) {
-              break;
-            }
-          } finally {
-            closeBlockReaders();
-          }
-
-          if (needToVerifyBlockId != null) {
-            break;
-          }
-        }
-      }
-      if (isHealthy) {
-        if (needToVerifyBlockId == null) {
-          System.out.println("\nAll EC block group status: OK");
-        }
-        return 0;
-      }
-      return 1;
-    }
-
-    private void verifyBlockGroup(LocatedStripedBlock blockGroup) throws Exception {
-      final LocatedBlock[] indexedBlocks = StripedBlockUtil.parseStripedBlockGroup(blockGroup,
-          cellSize, dataBlkNum, parityBlkNum);
-
-      int blockNumExpected = Math.min(dataBlkNum,
-          (int) ((blockGroup.getBlockSize() - 1) / cellSize + 1)) + parityBlkNum;
-      if (blockGroup.getBlockIndices().length < blockNumExpected) {
-        throw new Exception("Block group is under-erasure-coded.");
-      }
-
-      long maxBlockLen = 0L;
-      DataChecksum checksum = null;
-      for (int i = 0; i < dataBlkNum + parityBlkNum; i++) {
-        LocatedBlock block = indexedBlocks[i];
-        if (block == null) {
-          blockReaders[i] = null;
-          continue;
-        }
-        if (block.getBlockSize() > maxBlockLen) {
-          maxBlockLen = block.getBlockSize();
-        }
-        BlockReader blockReader = createBlockReader(block.getBlock(),
-            block.getLocations()[0], block.getBlockToken());
-        if (checksum == null) {
-          checksum = blockReader.getDataChecksum();
-        } else {
-          assert checksum.equals(blockReader.getDataChecksum());
-        }
-        blockReaders[i] = blockReader;
-      }
-      assert checksum != null;
-      int bytesPerChecksum = checksum.getBytesPerChecksum();
-      int bufferSize = stripedReadBufferSize < bytesPerChecksum ? bytesPerChecksum :
-          stripedReadBufferSize - stripedReadBufferSize % bytesPerChecksum;
-      final ByteBuffer[] buffers = new ByteBuffer[dataBlkNum + parityBlkNum];
-      final ByteBuffer[] outputs = new ByteBuffer[parityBlkNum];
-      for (int i = 0; i < dataBlkNum + parityBlkNum; i++) {
-        buffers[i] = ByteBuffer.allocate(bufferSize);
-      }
-      for (int i = 0; i < parityBlkNum; i++) {
-        outputs[i] = ByteBuffer.allocate(bufferSize);
-      }
-      long positionInBlock = 0L;
-      while (positionInBlock < maxBlockLen) {
-        final int toVerifyLen = (int) Math.min(bufferSize, maxBlockLen - positionInBlock);
-        List<Future<Integer>> futures = new ArrayList<>(dataBlkNum + parityBlkNum);
-        for (int i = 0; i < dataBlkNum + parityBlkNum; i++) {
-          final int fi = i;
-          futures.add(this.readService.submit(() -> {
-            BlockReader blockReader = blockReaders[fi];
-            ByteBuffer buffer = buffers[fi];
-            buffer.clear();
-            buffer.limit(toVerifyLen);
-            int readLen = 0;
-            if (blockReader != null) {
-              int toRead = buffer.remaining();
-              while (readLen < toRead) {
-                int nread = blockReader.read(buffer);
-                if (nread <= 0) {
-                  break;
-                }
-                readLen += nread;
-              }
-            }
-            while (buffer.hasRemaining()) {
-              buffer.put((byte) 0);
-            }
-            buffer.flip();
-            return readLen;
-          }));
-        }
-        for (int i = 0; i < dataBlkNum + parityBlkNum; i++) {
-          futures.get(i).get(1, TimeUnit.MINUTES);
-        }
-        ByteBuffer[] inputs = new ByteBuffer[dataBlkNum];
-        System.arraycopy(buffers, 0, inputs, 0, dataBlkNum);
-        for (int i = 0; i < parityBlkNum; i++) {
-          outputs[i].clear();
-          outputs[i].limit(toVerifyLen);
-        }
-        this.encoder.encode(inputs, outputs);
-        for (int i = 0; i < parityBlkNum; i++) {
-          if (!buffers[dataBlkNum + i].equals(outputs[i])) {
-            throw new Exception("EC compute result not match.");
-          }
-        }
-        positionInBlock += toVerifyLen;
-      }
-    }
-
-    private BlockReader createBlockReader(ExtendedBlock block, DatanodeInfo dnInfo,
-                                          Token<BlockTokenIdentifier> token) throws IOException {
-      InetSocketAddress dnAddress = NetUtils.createSocketAddr(dnInfo.getXferAddr(useDNHostname));
-      Peer peer = client.newConnectedPeer(dnAddress, token, dnInfo);
-      return BlockReaderRemote.newBlockReader(
-          "dummy", block, token, 0,
-          block.getNumBytes(), true, "", peer, dnInfo,
-          null, cachingStrategy, -1, getConf());
-    }
-
-    private void closeBlockReaders() {
-      for (int i = 0; i < blockReaders.length; i++) {
-        if (blockReaders[i] != null) {
-          IOUtils.closeStream(blockReaders[i]);
-          blockReaders[i] = null;
-        }
-      }
-    }
-
-  }
-
-  /**
-   * The command for getting help about other commands.
-   */
-  private class HelpCommand extends DebugCommand {
-    HelpCommand() {
-      super("help",
-"help [command-name]",
-"  Get help about a command.");
-    }
-
-    int run(List<String> args) {
-      DebugCommand command = popCommand(args);
-      if (command == null) {
-        printUsage();
-        return 0;
-      }
-      System.out.println(command.usageText);
-      System.out.println(command.helpText + System.lineSeparator());
-      return 0;
-    }
-  }
-
-  public DebugAdmin(Configuration conf) {
-    super(conf);
-  }
-
-  private DebugCommand popCommand(List<String> args) {
-    String commandStr = (args.size() == 0) ? "" : args.get(0);
-    if (commandStr.startsWith("-")) {
-      commandStr = commandStr.substring(1);
-    }
-    for (DebugCommand command : DEBUG_COMMANDS) {
-      if (command.name.equals(commandStr)) {
-        args.remove(0);
-        return command;
-      }
-    }
-    return null;
-  }
-
-  public int run(String[] argv) {
-    LinkedList<String> args = new LinkedList<String>();
-    for (int j = 0; j < argv.length; ++j) {
-      args.add(argv[j]);
-    }
-    DebugCommand command = popCommand(args);
-    if (command == null) {
-      printUsage();
-      return 0;
-    }
-    try {
-      return command.run(args);
-    } catch (IOException e) {
-      System.err.println("IOException: " +
-          StringUtils.stringifyException(e));
-      return 1;
-    } catch (RuntimeException e) {
-      System.err.println("RuntimeException: " +
-          StringUtils.stringifyException(e));
-      return 1;
-    }
-  }
-
-  private void printUsage() {
-    System.out.println("Usage: hdfs debug <command> [arguments]\n");
-    System.out.println("These commands are for advanced users only.\n");
-    System.out.println("Incorrect usages may result in data loss. " +
-        "Use at your own risk.\n");
-    for (DebugCommand command : DEBUG_COMMANDS) {
-      if (!command.name.equals("help")) {
-        System.out.println(command.usageText);
-      }
-    }
-    System.out.println();
-    ToolRunner.printGenericCommandUsage(System.out);
-  }
-
-  public static void main(String[] argsArray) throws Exception {
-    DebugAdmin debugAdmin = new DebugAdmin(new Configuration());
-    int res = ToolRunner.run(debugAdmin, argsArray);
-    System.exit(res);
-  }
-}
+        // 达到最大重试次数

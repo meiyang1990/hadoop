@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,9 +24,9 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenSecretManager;
 
 /**
- * A MapReduce specific delegation token secret manager.
- * The secret manager is responsible for generating and accepting the password
- * for each token.
+ * MapReduce 场景专属的代理令牌密钥管理器，负责为每个代理令牌生成和验证密码。
+ * 继承抽象密钥管理器，提供MapReduce专属的代理令牌标识符创建能力，用于保障MapReduce作业
+ * 跨服务访问的身份认证安全，是MapReduce安全认证体系的核心组件。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -33,15 +34,11 @@ public class DelegationTokenSecretManager
     extends AbstractDelegationTokenSecretManager<DelegationTokenIdentifier> {
 
   /**
-   * Create a secret manager
-   * @param delegationKeyUpdateInterval the number of milliseconds for rolling
-   *        new secret keys.
-   * @param delegationTokenMaxLifetime the maximum lifetime of the delegation
-   *        tokens in milliseconds
-   * @param delegationTokenRenewInterval how often the tokens must be renewed
-   *        in milliseconds
-   * @param delegationTokenRemoverScanInterval how often the tokens are scanned
-   *        for expired tokens in milliseconds
+   * 构造MapReduce代理令牌密钥管理器，初始化密钥轮换、令牌生命周期等参数。
+   * @param delegationKeyUpdateInterval 密钥轮换间隔，单位毫秒
+   * @param delegationTokenMaxLifetime 代理令牌最大生命周期，单位毫秒
+   * @param delegationTokenRenewInterval 令牌必须更新的间隔，单位毫秒
+   * @param delegationTokenRemoverScanInterval 过期令牌扫描间隔，单位毫秒
    */
   public DelegationTokenSecretManager(long delegationKeyUpdateInterval,
                                       long delegationTokenMaxLifetime, 
@@ -51,6 +48,10 @@ public class DelegationTokenSecretManager
           delegationTokenRenewInterval, delegationTokenRemoverScanInterval);
   }
 
+  /**
+   * 创建MapReduce专属的代理令牌标识符实例。
+   * @return 新建的空MapReduce代理令牌标识符
+   */
   @Override
   public DelegationTokenIdentifier createIdentifier() {
     return new DelegationTokenIdentifier();

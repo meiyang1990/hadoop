@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,20 +23,19 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * AddApplicationHomeSubClusterResponse contains the answer from the
- * {@code FederationApplicationHomeSubClusterStore} to a request to insert a
- * newly generated applicationId and its owner.
- *
- * The response contains application's home sub-cluster as it is stored in the
- * {@code FederationApplicationHomeSubClusterStore}. If a mapping for the
- * application already existed, the {@code SubClusterId} in this response will
- * return the existing mapping which might be different from that in the
- * {@code AddApplicationHomeSubClusterRequest}.
+ * 添加应用归属子集群到联邦状态存储的响应类。
+ * 封装FederationApplicationHomeSubClusterStore对添加应用归属子集群请求的返回结果，
+ * 如果应用已经存在映射关系，返回存储中已有的归属子集群信息，可能和请求中的不一致。
  */
 @Private
 @Unstable
 public abstract class AddApplicationHomeSubClusterResponse {
 
+  /**
+   * 创建添加应用归属子集群响应的新实例。
+   * @param homeSubCluster 应用归属子集群ID
+   * @return 初始化完成的响应对象
+   */
   @Private
   @Unstable
   public static AddApplicationHomeSubClusterResponse newInstance(
@@ -47,19 +47,17 @@ public abstract class AddApplicationHomeSubClusterResponse {
   }
 
   /**
-   * Set the home sub-cluster that this application has been assigned to.
+   * 设置应用分配的归属子集群ID。
    *
-   * @param homeSubCluster the {@link SubClusterId} of this application's home
-   *          sub-cluster
+   * @param homeSubCluster 应用归属子集群的{@link SubClusterId}
    */
   public abstract void setHomeSubCluster(SubClusterId homeSubCluster);
 
   /**
-   * Get the home sub-cluster that this application has been assigned to. This
-   * may not match the {@link SubClusterId} in the corresponding response, if
-   * the mapping for the request's application already existed.
+   * 获取应用分配的归属子集群ID。
+   * 如果请求的应用已经存在映射关系，返回存储中已有的子集群ID，可能和请求中的不一致。
    *
-   * @return the {@link SubClusterId} of this application's home sub-cluster
+   * @return 应用归属子集群的{@link SubClusterId}
    */
   public abstract SubClusterId getHomeSubCluster();
 }

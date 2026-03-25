@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,13 +25,18 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
+ * 文件级注释：该接口定义了HDFS快照功能中存储和管理INode差异列表的通用规范，
+ * 为不同实现方式的差异列表提供统一访问接口，支撑快照差异的高效查找与合并操作。
+ *
  * This interface defines the methods used to store and manage InodeDiffs.
  * @param <T> Type of the object in this list.
  */
 public interface DiffList<T extends Comparable<Integer>> extends Iterable<T> {
+  /** 空差异列表单例实例 */
   DiffList EMPTY_LIST = new DiffListByArrayList(Collections.emptyList());
 
   /**
+   * 获取一个空的DiffList实例
    * Returns an empty DiffList.
    */
   static <T extends Comparable<Integer>> DiffList<T> emptyList() {
@@ -38,10 +44,11 @@ public interface DiffList<T extends Comparable<Integer>> extends Iterable<T> {
   }
 
   /**
+   * 将给定DiffList包装为不可修改的视图，防止外部修改内部状态
    * Returns an unmodifiable diffList.
-   * @param diffs DiffList
-   * @param <T> Type of the object in the the diffList
-   * @return Unmodifiable diffList
+   * @param diffs 原始可修改的DiffList
+   * @param <T> 列表中元素的类型
+   * @return 不可修改的DiffList视图
    */
   static <T extends Comparable<Integer>> DiffList<T> unmodifiableList(
       DiffList<T> diffs) {
@@ -95,63 +102,62 @@ public interface DiffList<T extends Comparable<Integer>> extends Iterable<T> {
   }
 
   /**
-   * Returns the element at the specified position in this list.
+   * 获取列表中指定位置的元素
    *
-   * @param index index of the element to return
-   * @return the element at the specified position in this list
-   * @throws IndexOutOfBoundsException if the index is out of range
+   * @param index 待返回元素的索引
+   * @return 列表中指定位置的元素
+   * @throws IndexOutOfBoundsException 如果索引超出范围
    *         (<code>index &lt; 0 || index &gt;= size()</code>)
    */
   T get(int index);
 
   /**
-   * Returns true if this list contains no elements.
+   * 判断列表是否不包含任何元素
    *
-   * @return true if this list contains no elements
+   * @return 如果列表为空返回true，否则返回false
    */
   boolean isEmpty();
 
   /**
-   * Returns the number of elements in this list.
-   * @return the number of elements in this list.
+   * 获取列表中元素的数量
+   * @return 列表中元素的数量
    */
   int size();
 
   /**
-   * Removes the element at the specified position in this list.
-   * @param index the index of the element to be removed
-   * @return the element previously at the specified position
+   * 删除列表中指定位置的元素
+   * @param index 待删除元素的索引
+   * @return 被删除的元素
    */
   T remove(int index);
 
   /**
-   * Adds an element at the end of the list.
-   * @param t element to be appended to this list
-   * @return true, if insertion is successful
+   * 在列表末尾添加一个元素
+   * @param t 待添加的元素
+   * @return 插入成功返回true
    */
   boolean addLast(T t);
 
   /**
-   * Adds an element at the beginning of the list.
-   * @param t element to be added to this list
+   * 在列表开头添加一个元素
+   * @param t 待添加的元素
    */
   void addFirst(T t);
 
   /**
-   * Searches the list for the specified object using the binary
-   * search algorithm.
-   * @param key key to be searched for
-   * @return the index of the search key, if it is contained in the list
-   *         otherwise, (-insertion point - 1).
+   * 使用二分查找算法搜索指定快照ID对应的位置
+   * @param key 待搜索的快照ID键
+   * @return 如果找到则返回元素索引，否则返回(-插入点 - 1)
    */
   int binarySearch(int key);
 
   /**
-   * Returns the list of minimal list of elements need to combine to generate
-   * cumulative sum from startIndex to endIndex.
-   * @param startIndex
-   * @param endIndex
-   * @return list of T
+   * 获取在指定索引范围[startIndex, endIndex]内合并差异所需的最少元素列表，
+   * 用于快速计算该范围内的累计差异，减少不必要的合并操作
+   * @param startIndex 起始差异索引
+   * @param endIndex 结束差异索引
+   * @param dir 对应的目录INode节点
+   * @return 合并指定范围差异所需的最少元素列表
    */
   List<T> getMinListForRange(int startIndex, int endIndex, INodeDirectory dir);
 

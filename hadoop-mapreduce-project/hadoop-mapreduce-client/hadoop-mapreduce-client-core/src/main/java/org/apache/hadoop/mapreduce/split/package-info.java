@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * MapReduce 输入分片模块，提供作业输入数据分片相关的核心实现。
+ * 负责将输入数据集切分为多个分片，每个分片分配给一个Map任务处理，
+ * 是MapReduce并行计算的数据划分基础。该模块为MapReduce客户端内部私有模块。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

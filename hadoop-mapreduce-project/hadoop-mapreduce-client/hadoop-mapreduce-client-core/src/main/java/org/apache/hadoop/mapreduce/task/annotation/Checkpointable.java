@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,12 +28,11 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Contract representing to the framework that the task can be safely preempted
- * and restarted between invocations of the user-defined function.
- *
- * This is often true when the result of a function does not rely on state
- * derived from previous elements in the record stream, but the guarantee is
- * left as an exercise to the implementor.
+ * 标记可检查点重启的任务类注解，告知MapReduce框架该任务可以在用户函数调用间隙
+ * 被安全抢占中断和重启，支持YARN的抢占式调度和检查点恢复。
+ * 
+ * 当处理函数的结果不依赖于记录流中之前元素的累积状态时，通常满足可检查点要求；
+ * 具体的可重启保证由具体实现类自行保证，框架仅基于该注解执行调度优化。
  */
 @Documented
 @Target(ElementType.TYPE)

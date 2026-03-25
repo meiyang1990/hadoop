@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,9 +29,8 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 
 /**
- * Represents the basic information that is saved per a job when the 
- * JobTracker receives a submitJob request. The information is saved
- * so that the JobTracker can recover incomplete jobs upon restart.
+ * 作业基础信息存储类，用于JobTracker接收到作业提交请求时，保存作业元信息
+ * 核心作用是在JobTracker重启后，能够恢复未完成的作业，实现故障恢复
  */
 class JobInfo implements Writable {
   private org.apache.hadoop.mapreduce.JobID id;
@@ -38,6 +38,12 @@ class JobInfo implements Writable {
   private Path jobSubmitDir;
   public JobInfo() {}
   
+  /**
+   * 构造JobInfo对象，封装作业基础元信息
+   * @param id 作业ID
+   * @param user 提交作业的用户名
+   * @param jobSubmitDir 作业提交目录路径
+   */
   public JobInfo(org.apache.hadoop.mapreduce.JobID id, 
       Text user,
       Path jobSubmitDir) {
@@ -47,26 +53,34 @@ class JobInfo implements Writable {
   }
   
   /**
-   * Get the job id.
+   * 获取作业ID
+   * @return 作业ID对象
    */
   public org.apache.hadoop.mapreduce.JobID getJobID() {
     return id;
   }
   
   /**
-   * Get the configured job's user-name.
+   * 获取提交作业的用户名
+   * @return 提交用户的用户名
    */
   public Text getUser() {
     return user;
   }
       
   /**
-   * Get the job submission directory
+   * 获取作业提交目录路径
+   * @return 作业提交目录路径
    */
   public Path getJobSubmitDir() {
     return this.jobSubmitDir;
   }
   
+  /**
+   * 从二进制输入流反序列化JobInfo对象
+   * @param in 二进制输入流
+   * @throws IOException 反序列化过程中发生IO异常
+   */
   public void readFields(DataInput in) throws IOException {
     id = new org.apache.hadoop.mapreduce.JobID();
     id.readFields(in);
@@ -75,6 +89,11 @@ class JobInfo implements Writable {
     jobSubmitDir = new Path(WritableUtils.readString(in));
   }
 
+  /**
+   * 将JobInfo对象序列化到二进制输出流
+   * @param out 二进制输出流
+   * @throws IOException 序列化过程中发生IO异常
+   */
   public void write(DataOutput out) throws IOException {
     id.write(out);
     user.write(out);

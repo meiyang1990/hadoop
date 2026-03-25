@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,14 +17,22 @@
  * limitations under the License.
  */
 
+/**
+ * @file constants.h
+ * YARN NodeManager 容器执行器模块通用常量定义头文件
+ * 定义模块系统使用的全局通用常量配置
+ */
+
 /* FreeBSD protects the getline() prototype. See getline(3) for more */
 #ifdef __FreeBSD__
+// FreeBSD系统需要开启该宏才能暴露getline函数原型
 #define _WITH_GETLINE
 #endif
 
 #ifndef _MODULES_COMMON_CONSTANTS_H_
 #define _MODULES_COMMON_CONSTANTS_H_
 
+/** 容器执行器模块配置项在YARN配置中的统一前缀 */
 #define CONFIGS_MODULES_PREFIX "yarn.container-executor.modules."
 
 #endif

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,10 +18,13 @@
  */
 
 /**
- * This package contains the implementations of different types of
- * map-reduce counters.
+ * @file package-info.java
+ * @brief MapReduce计数器功能包，提供不同类型MapReduce作业计数器的核心实现
  *
- * cf. MAPREDUCE-901 for rationales.
+ * 核心职责：
+ * 定义并实现MapReduce作业运行过程中的各类统计计数器，用于对作业、任务的运行指标进行统计，
+ * 支持用户自定义计数器，方便开发者对作业运行状态进行监控和分析，为作业调优提供数据支撑。
+ * 设计背景请参考JIRA问题: MAPREDUCE-901。
  */
 @InterfaceStability.Evolving
 package org.apache.hadoop.mapreduce.counters;

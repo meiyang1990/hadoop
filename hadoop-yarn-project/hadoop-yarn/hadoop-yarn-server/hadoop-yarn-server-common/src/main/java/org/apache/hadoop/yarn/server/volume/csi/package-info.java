@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,8 @@
  */
 
 /**
- * This package contains common volume related classes.
+ * YARN CSI 存储卷支持公共包，提供CSI存储卷相关的通用基础类，实现YARN对容器存储卷的CSI标准接入支持。
+ * CSI（Container Storage Interface）是容器存储接口标准，用于接入第三方外部存储系统。
  */
 @Private
 @Unstable

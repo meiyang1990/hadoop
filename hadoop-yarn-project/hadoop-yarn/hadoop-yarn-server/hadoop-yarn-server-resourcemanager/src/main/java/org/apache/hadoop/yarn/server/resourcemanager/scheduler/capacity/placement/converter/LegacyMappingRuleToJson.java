@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,53 +28,54 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueuePat
 import java.util.ArrayList;
 import java.util.Collection;
 
+/**
+ * 将容量调度器旧版（配置文件格式）的应用放置映射规则转换为新版JSON格式的转换器
+ * 支持用户映射规则、用户组映射规则和应用名称映射规则的格式转换
+ */
 public class LegacyMappingRuleToJson {
-  //Legacy rule parse helper constants
+  // 旧版规则解析辅助常量
   public static final String RULE_PART_DELIMITER = ":";
   public static final String PREFIX_USER_MAPPING = "u";
   public static final String PREFIX_GROUP_MAPPING = "g";
 
-  //Legacy rule matcher variables
+  // 旧版规则匹配器变量名
   public static final String MATCHER_APPLICATION = "%application";
   public static final String MATCHER_USER = "%user";
 
-  //Legacy rule mapping variables, which can be used in target queues
+  // 旧版规则目标队列映射变量，可用于目标路径中动态替换
   public static final String MAPPING_PRIMARY_GROUP = "%primary_group";
   public static final String MAPPING_SECONDARY_GROUP = "%secondary_group";
   public static final String MAPPING_USER = MATCHER_USER;
 
-  //JSON Format match all token (actually only used for users)
+  // JSON格式匹配全部用户的通配符
   public static final String JSON_MATCH_ALL = "*";
 
-  //Frequently used JSON node names for rule definitions
+  // JSON规则定义中常用的节点名称常量
   public static final String JSON_NODE_POLICY = "policy";
   public static final String JSON_NODE_PARENT_QUEUE = "parentQueue";
   public static final String JSON_NODE_CUSTOM_PLACEMENT = "customPlacement";
   public static final String JSON_NODE_MATCHES = "matches";
 
   /**
-   * Our internal object mapper, used to create JSON nodes.
+   * 内部使用的Jackson ObjectMapper实例，用于创建JSON节点
    */
   private ObjectMapper objectMapper = new ObjectMapper();
 
   /**
-   * Collection to store the legacy group mapping rule strings.
+   * 存储待转换的旧版用户/用户组映射规则列表
    */
   private Collection<String> userGroupMappingRules = new ArrayList<>();
   /**
-   * Collection to store the legacy application name mapping rule strings.
+   * 存储待转换的旧版应用名称映射规则列表
    */
   private Collection<String> applicationNameMappingRules = new ArrayList<>();
 
   /**
-   * This setter method is used to set the raw string format of the legacy
-   * user group mapping rules. This method expect a string formatted just like
-   * in the configuration file of the Capacity Scheduler.
-   * eg. u:bob:root.groups.%primary_group,u:%user:root.default
+   * 设置旧版格式的用户用户组映射规则，格式与容量调度器配置文件中一致
+   * 例如: u:bob:root.groups.%primary_group,u:%user:root.default
    *
-   * @param rules The string containing ALL the UserGroup mapping rules in
-   *              legacy format
-   * @return This object for daisy chain support
+   * @param rules 包含全部用户用户组映射规则的逗号分隔字符串
+   * @return 当前对象，支持链式调用
    */
   public LegacyMappingRuleToJson setUserGroupMappingRules(String rules) {
     setUserGroupMappingRules(StringUtils.getTrimmedStringCollection(rules));
@@ -81,11 +83,10 @@ public class LegacyMappingRuleToJson {
   }
 
   /**
-   * This setter method is used to set the the user group mapping rules as a
-   * string collection, where each entry is one rule.
+   * 设置用户用户组映射规则，集合中每个元素为一条规则
    *
-   * @param rules One rule per entry
-   * @return This object for daisy chain support
+   * @param rules 规则集合，每条一个条目
+   * @return 当前对象，支持链式调用
    */
   public LegacyMappingRuleToJson setUserGroupMappingRules(
       Collection<String> rules) {
@@ -98,14 +99,11 @@ public class LegacyMappingRuleToJson {
   }
 
   /**
-   * This setter method is used to set the raw string format of the legacy
-   * application name mapping rules. This method expect a string formatted
-   * just like in the configuration file of the Capacity Scheduler.
-   * eg. mapreduce:root.apps.%application,%application:root.default
+   * 设置旧版格式的应用名称映射规则，格式与容量调度器配置文件中一致
+   * 例如: mapreduce:root.apps.%application,%application:root.default
    *
-   * @param rules The string containing ALL the application name mapping rules
-   *              in legacy format
-   * @return This object for daisy chain support
+   * @param rules 包含全部应用名称映射规则的逗号分隔字符串
+   * @return 当前对象，支持链式调用
    */
   public LegacyMappingRuleToJson setAppNameMappingRules(String rules) {
     setAppNameMappingRules(StringUtils.getTrimmedStringCollection(rules));
@@ -113,11 +111,10 @@ public class LegacyMappingRuleToJson {
   }
 
   /**
-   * This setter method is used to set the the application name mapping rules as
-   * a string collection, where each entry is one rule.
+   * 设置应用名称映射规则，集合中每个元素为一条规则
    *
-   * @param rules One rule per entry
-   * @return This object for daisy chain support
+   * @param rules 规则集合，每条一个条目
+   * @return 当前对象，支持链式调用
    */
   public LegacyMappingRuleToJson setAppNameMappingRules(
       Collection<String> rules) {
@@ -131,33 +128,33 @@ public class LegacyMappingRuleToJson {
   }
 
   /**
-   * This method will do the conversion based on the already set mapping rules.
-   * First the rules to be converted must be set via setAppNameMappingRules and
-   * setUserGroupMappingRules methods.
-   * @return JSON Format of the provided mapping rules, null if no rules are set
+   * 执行转换，基于已设置的映射规则生成新版JSON格式配置
+   * 需要先通过setAppNameMappingRules和setUserGroupMappingRules设置待转换规则
+   * @return 转换后的JSON格式规则字符串，无规则时返回null
    */
   public String convert() {
-    //creating the basic JSON config structure
+    // 创建基础JSON配置结构
     ObjectNode rootNode = objectMapper.createObjectNode();
     ArrayNode rulesNode = objectMapper.createArrayNode();
     rootNode.set("rules", rulesNode);
 
-    //Processing and adding all the user group mapping rules
+    // 处理并添加所有用户用户组映射规则
     for (String rule : userGroupMappingRules) {
       rulesNode.add(convertUserGroupMappingRule(rule));
     }
 
-    //Processing and adding all the application name mapping rules
+    // 处理并添加所有应用名称映射规则
     for (String rule : applicationNameMappingRules) {
       rulesNode.add(convertAppNameMappingRule(rule));
     }
 
-    //If there are no converted rules we return null
+    // 无转换规则时返回null
     if (rulesNode.size() == 0) {
       return null;
     }
 
     try {
+      // 格式化输出带缩进的JSON字符串
       return objectMapper
           .writerWithDefaultPrettyPrinter()
           .writeValueAsString(rootNode);
@@ -169,22 +166,24 @@ public class LegacyMappingRuleToJson {
   }
 
   /**
-   * This intermediate helper method is used to process User Group mapping rules
-   * and invoke the proper mapping rule creation method.
-   * @param rule The legacy format of the single rule to be converted.
-   * @return The ObjectNode which can be added to the rules part of the config.
+   * 处理单条用户/用户组映射规则，分发到对应创建方法生成JSON节点
+   * @param rule 待转换的单条旧版格式规则
+   * @return 转换后的规则JSON节点
    */
   ObjectNode convertUserGroupMappingRule(String rule) {
+    // 按冒号分割规则，预期得到3个部分：类型、匹配值、目标队列
     String[] mapping = splitRule(rule, 3);
     String ruleType = mapping[0];
     String ruleMatch = mapping[1];
     String ruleTarget = mapping[2];
 
     if (ruleType.equals(PREFIX_USER_MAPPING)) {
+      // 类型为用户映射，调用用户规则创建方法
       return createUserMappingRule(ruleMatch, ruleTarget);
     }
 
     if (ruleType.equals(PREFIX_GROUP_MAPPING)) {
+      // 类型为用户组映射，调用用户组规则创建方法
       return createGroupMappingRule(ruleMatch, ruleTarget);
     }
 
@@ -194,41 +193,40 @@ public class LegacyMappingRuleToJson {
   }
 
   /**
-   * This intermediate helper method is used to process Application name mapping
-   * rules and invoke the proper mapping rule creation method.
-   * @param rule The legacy format of the single rule to be converted.
-   * @return The ObjectNode which can be added to the rules part of the config.
+   * 处理单条应用名称映射规则，生成对应JSON节点
+   * @param rule 待转换的单条旧版格式规则
+   * @return 转换后的规则JSON节点
    */
   ObjectNode convertAppNameMappingRule(String rule) {
+    // 按冒号分割规则，预期得到2个部分：匹配值、目标队列
     String[] mapping = splitRule(rule, 2);
     String ruleMatch = mapping[0];
     String ruleTarget = mapping[1];
 
     return createApplicationNameMappingRule(ruleMatch, ruleTarget);
   }
+
   /**
-   * Helper method which splits the rules into parts, and checks if it has
-   * exactly the required amount of parts, and none of them is empty!
-   * @param rule The mapping rule to be split
-   * @param expectedParts The number of expected parts
-   * @return The split String[] of the parts
-   * @throws IllegalArgumentException if the number of parts don't match or any
-   *  of them is empty.
+   * 拆分规则字符串并校验格式，确保拆分后部分数量正确且无空值
+   * @param rule 待拆分的映射规则
+   * @param expectedParts 预期拆分后的部分数量
+   * @return 拆分后的字符串数组
+   * @throws IllegalArgumentException 当部分数量不匹配或存在空部分时抛出
    */
   private String[] splitRule(String rule, int expectedParts) {
-    //Splitting
+    // 按分隔符拆分并修剪每个部分的空格
     String[] mapping = StringUtils
         .getTrimmedStringCollection(rule, RULE_PART_DELIMITER)
         .toArray(new String[] {});
 
-    //Checking for part count
+    // 校验拆分后部分数量是否符合预期
     if (mapping.length != expectedParts) {
       throw new IllegalArgumentException("Invalid rule '" + rule +
           "' expected parts: " + expectedParts +
           " actual parts: " + mapping.length);
     }
 
-    //Checking for empty parts
+    // 校验所有部分都不为空
     for (int i = 0; i < mapping.length; i++) {
       if (mapping[i].length() == 0) {
         throw new IllegalArgumentException("Invalid rule '" + rule +
@@ -240,89 +238,82 @@ public class LegacyMappingRuleToJson {
   }
 
   /**
-   * This helper method is to create a default rule node for the converter,
-   * setting fields which are common in all rules.
-   * @param type The type of the rule can be user/group/application
-   * @return The object node with the preset fields
+   * 创建所有规则类型通用的默认规则节点，设置公共默认字段
+   * @param type 规则类型，可选user/group/application
+   * @return 已设置公共默认字段的JSON节点
    */
   private ObjectNode createDefaultRuleNode(String type) {
     return objectMapper
         .createObjectNode()
         .put("type", type)
-        //All legacy rule fallback to place to default
+        // 所有旧版规则默认降级策略为放置到默认队列
         .put("fallbackResult", "placeDefault")
-        //All legacy rules allow creation
+        // 所有旧版规则默认允许自动创建队列
         .put("create", true);
   }
 
   /**
-   * This method will create the JSON node for a single User Mapping Rule.
-   * @param match The match part of the rule it can be either an actual user
-   *              name or '%user' to match all users
-   * @param target The queue to place to user into, some queue path variables
-   *               are supported (%user, %primary_group, %secondary_group).
-   * @return The ObjectNode which represents the rule
+   * 创建单条用户映射规则的JSON节点
+   * @param match 规则匹配部分，可以是具体用户名或%user匹配所有用户
+   * @param target 目标队列路径，支持动态变量%user、%primary_group、%secondary_group
+   * @return 表示该规则的JSON节点
    */
   private ObjectNode createUserMappingRule(String match, String target) {
     ObjectNode ruleNode = createDefaultRuleNode("user");
     QueuePath targetPath = new QueuePath(target);
 
-    //We have a special token in the JSON format to match all user, replacing
-    //matcher
+    // 旧版%user匹配全部用户替换为新版JSON格式的*通配符
     if (match.equals(MATCHER_USER)) {
       match = JSON_MATCH_ALL;
     }
     ruleNode.put(JSON_NODE_MATCHES, match);
 
+    // 根据叶子节点名称判断放置策略
     switch (targetPath.getLeafName()) {
     case MAPPING_USER:
+      // 叶子为%user，策略为直接放置到对应用户名的队列
       ruleNode.put(JSON_NODE_POLICY, "user");
       if (targetPath.hasParent()) {
-        //Parsing parent path, to be able to determine the short name of parent
+        // 解析父队列路径，获取父路径的叶子节点
         QueuePath targetParentPath =
             new QueuePath(targetPath.getParent());
         String parentShortName = targetParentPath.getLeafName();
 
         if (parentShortName.equals(MAPPING_PRIMARY_GROUP)) {
-          //%primary_group.%user mapping
+          // 父节点叶子为%primary_group，对应策略为primaryGroupUser（主用户组+用户名）
           ruleNode.put(JSON_NODE_POLICY, "primaryGroupUser");
 
-          //Yep, this is confusing. The policy primaryGroupUser actually
-          // appends the %primary_group.%user to the parent path, so we need to
-          // remove it from the parent path to avoid duplication.
+          // 移除路径中已经被策略处理的%primary_group，避免重复拼接
           targetPath = new QueuePath(targetParentPath.getParent(),
               targetPath.getLeafName());
         } else if (parentShortName.equals(MAPPING_SECONDARY_GROUP)) {
-          //%secondary_group.%user mapping
+          // 父节点叶子为%secondary_group，对应策略为secondaryGroupUser（次用户组+用户名）
           ruleNode.put(JSON_NODE_POLICY, "secondaryGroupUser");
 
-          //Yep, this is confusing. The policy secondaryGroupUser actually
-          // appends the %secondary_group.%user to the parent path, so we need
-          // to remove it from the parent path to avoid duplication.
+          // 移除路径中已经被策略处理的%secondary_group，避免重复拼接
           targetPath = new QueuePath(targetParentPath.getParent(),
               targetPath.getLeafName());
         }
 
-        //[parent].%user mapping
+        // 此处对应[parent].%user映射模式
       }
       break;
     case MAPPING_PRIMARY_GROUP:
-      //[parent].%primary_group mapping
+      // 叶子为%primary_group，对应策略为primaryGroup（放置到主用户组同名队列）
       ruleNode.put(JSON_NODE_POLICY, "primaryGroup");
       break;
     case MAPPING_SECONDARY_GROUP:
-      //[parent].%secondary_group mapping
+      // 叶子为%secondary_group，对应策略为secondaryGroup（放置到次用户组同名队列）
       ruleNode.put(JSON_NODE_POLICY, "secondaryGroup");
       break;
     default:
-      //static path mapping
+      // 静态固定路径，使用custom策略直接指定完整路径
       ruleNode.put(JSON_NODE_POLICY, "custom");
       ruleNode.put(JSON_NODE_CUSTOM_PLACEMENT, targetPath.getFullPath());
       break;
     }
 
-    //if the target queue has a parent part, and the rule can have a parent
-    //we add it to the node
+    // 如果目标路径存在父队列，添加parentQueue字段
     if (targetPath.hasParent()) {
       ruleNode.put(JSON_NODE_PARENT_QUEUE, targetPath.getParent());
     }
@@ -331,30 +322,28 @@ public class LegacyMappingRuleToJson {
   }
 
   /**
-   * This method will create the JSON node for a single Group Mapping Rule.
-   * @param match The name of the group to match for
-   * @param target The queue to place to user into, some queue path variables
-   *               are supported (%user).
-   * @return The ObjectNode which represents the rule
+   * 创建单条用户组映射规则的JSON节点
+   * @param match 待匹配的用户组名称
+   * @param target 目标队列路径，支持动态变量%user
+   * @return 表示该规则的JSON节点
    */
   private ObjectNode createGroupMappingRule(String match, String target) {
     ObjectNode ruleNode = createDefaultRuleNode("group");
     QueuePath targetPath = new QueuePath(target);
 
-    //we simply used the source match part all valid legacy matchers are valid
-    //matchers for the JSON format as well
+    // 直接复用原匹配值，格式兼容新版JSON
     ruleNode.put(JSON_NODE_MATCHES, match);
 
     if (targetPath.getLeafName().matches(MATCHER_USER)) {
-      //g:group:[parent].%user mapping
+      // 叶子为%user，对应策略user（放置到用户名同名队列）
       ruleNode.put(JSON_NODE_POLICY, "user");
 
-      //if the target queue has a parent part we add it to the node
+      // 如果存在父队列，添加parentQueue字段
       if (targetPath.hasParent()) {
         ruleNode.put(JSON_NODE_PARENT_QUEUE, targetPath.getParent());
       }
     } else {
-      //static path mapping
+      // 静态固定路径，使用custom策略直接指定完整路径
       ruleNode.put(JSON_NODE_POLICY, "custom");
       ruleNode.put(JSON_NODE_CUSTOM_PLACEMENT, targetPath.getFullPath());
     }
@@ -364,33 +353,29 @@ public class LegacyMappingRuleToJson {
 
 
   /**
-   * This method will create the JSON node for a single Application Name
-   * Mapping Rule.
-   * @param match The name of the application to match for or %application to
-   *              match all applications
-   * @param target The queue to place to user into, some queue path variables
-   *               are supported (%application).
-   * @return The ObjectNode which represents the rule
+   * 创建单条应用名称映射规则的JSON节点
+   * @param match 待匹配的应用名称，或%application匹配所有应用
+   * @param target 目标队列路径，支持动态变量%application
+   * @return 表示该规则的JSON节点
    */
   private ObjectNode createApplicationNameMappingRule(
       String match, String target) {
     ObjectNode ruleNode = createDefaultRuleNode("application");
     QueuePath targetPath = new QueuePath(target);
 
-    //we simply used the source match part all valid legacy matchers are valid
-    //matchers for the JSON format as well
+    // 直接复用原匹配值，格式兼容新版JSON
     ruleNode.put(JSON_NODE_MATCHES, match);
 
     if (targetPath.getLeafName().matches(MATCHER_APPLICATION)) {
-      //[parent].%application mapping
+      // 叶子为%application，对应策略applicationName（放置到应用名同名队列）
       ruleNode.put(JSON_NODE_POLICY, "applicationName");
 
-      //if the target queue has a parent part we add it to the node
+      // 如果存在父队列，添加parentQueue字段
       if (targetPath.hasParent()) {
         ruleNode.put(JSON_NODE_PARENT_QUEUE, targetPath.getParent());
       }
     } else {
-      //static path mapping
+      // 静态固定路径，使用custom策略直接指定完整路径
       ruleNode.put(JSON_NODE_POLICY, "custom");
       ruleNode.put(JSON_NODE_CUSTOM_PLACEMENT, targetPath.getFullPath());
     }

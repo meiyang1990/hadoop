@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,17 +25,20 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Request class to obtain information about all sub-clusters that are
- * participating in federation.
+ * 获取联邦中所有参与子集群信息的请求类。
  *
- * If filterInactiveSubClusters is set to true, only active sub-clusters will be
- * returned; otherwise, all sub-clusters will be returned regardless of state.
- * By default, filterInactiveSubClusters is true.
+ * 如果filterInactiveSubClusters设为true，仅返回活跃子集群；否则返回所有子集群，忽略其状态。
+ * 默认情况下filterInactiveSubClusters为true。
  */
 @Private
 @Unstable
 public abstract class GetSubClustersInfoRequest {
 
+  /**
+   * 创建新的获取子集群信息请求实例。
+   * @param filterInactiveSubClusters 是否过滤不活跃子集群
+   * @return 新建的请求实例
+   */
   @Public
   @Unstable
   public static GetSubClustersInfoRequest newInstance(
@@ -46,21 +50,18 @@ public abstract class GetSubClustersInfoRequest {
   }
 
   /**
-   * Get the flag that indicates whether only active sub-clusters should be
-   * returned.
+   * 获取是否仅返回活跃子集群的过滤标记。
    *
-   * @return whether to filter out inactive sub-clusters
+   * @return 是否过滤不活跃子集群
    */
   @Public
   @Unstable
   public abstract boolean getFilterInactiveSubClusters();
 
   /**
-   * Set the flag that indicates whether only active sub-clusters should be
-   * returned.
+   * 设置是否仅返回活跃子集群的过滤标记。
    *
-   * @param filterInactiveSubClusters whether to filter out inactive
-   *          sub-clusters
+   * @param filterInactiveSubClusters 是否过滤不活跃子集群
    */
   @Public
   @Unstable

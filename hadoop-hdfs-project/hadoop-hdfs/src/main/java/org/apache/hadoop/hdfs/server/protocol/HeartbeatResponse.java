@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,27 +25,46 @@ import org.apache.hadoop.hdfs.protocol.RollingUpgradeStatus;
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 /**
- * Response to {@link DatanodeProtocol#sendHeartbeat}
+ * 数据节点心跳请求的响应类，封装NameNode返回给DataNode的响应信息
+ * 用于DatanodeProtocol#sendHeartbeat调用的返回结果
  */
 public class HeartbeatResponse {
-  /** Commands returned from the namenode to the datanode */
+  /** NameNode返回给DataNode的执行命令数组 */
   private final DatanodeCommand[] commands;
   
-  /** Information about the current HA-related state of the NN */
+  /** NameNode当前的HA状态信息 */
   private final NNHAStatusHeartbeat haStatus;
 
+  /** 滚动升级状态信息 */
   private final RollingUpgradeStatus rollingUpdateStatus;
 
+  /** 全量块报告租约ID，用于限流全量块报告 */
   private final long fullBlockReportLeaseId;
 
+  /** 标识该节点是否被标记为慢节点 */
   private final boolean isSlownode;
 
+  /**
+   * 构造心跳响应对象（默认非慢节点）
+   * @param cmds NameNode下发给DataNode的命令数组
+   * @param haStatus NameNode HA状态
+   * @param rollingUpdateStatus 滚动升级状态
+   * @param fullBlockReportLeaseId 全量块报告租约ID
+   */
   public HeartbeatResponse(DatanodeCommand[] cmds,
       NNHAStatusHeartbeat haStatus, RollingUpgradeStatus rollingUpdateStatus,
       long fullBlockReportLeaseId) {
     this(cmds, haStatus, rollingUpdateStatus, fullBlockReportLeaseId, false);
   }
 
+  /**
+   * 完整构造心跳响应对象
+   * @param cmds NameNode下发给DataNode的命令数组
+   * @param haStatus NameNode HA状态
+   * @param rollingUpdateStatus 滚动升级状态
+   * @param fullBlockReportLeaseId 全量块报告租约ID
+   * @param isSlownode 是否标记该节点为慢节点
+   */
   public HeartbeatResponse(DatanodeCommand[] cmds,
       NNHAStatusHeartbeat haStatus, RollingUpgradeStatus rollingUpdateStatus,
       long fullBlockReportLeaseId, boolean isSlownode) {
@@ -55,22 +75,42 @@ public class HeartbeatResponse {
     this.isSlownode = isSlownode;
   }
   
+  /**
+   * 获取NameNode下发的命令数组
+   * @return DataNode命令数组
+   */
   public DatanodeCommand[] getCommands() {
     return commands;
   }
   
+  /**
+   * 获取NameNode的HA状态信息
+   * @return HA状态对象
+   */
   public NNHAStatusHeartbeat getNameNodeHaState() {
     return haStatus;
   }
 
+  /**
+   * 获取滚动升级状态信息
+   * @return 滚动升级状态对象
+   */
   public RollingUpgradeStatus getRollingUpdateStatus() {
     return rollingUpdateStatus;
   }
 
+  /**
+   * 获取全量块报告租约ID
+   * @return 全量块报告租约ID
+   */
   public long getFullBlockReportLeaseId() {
     return fullBlockReportLeaseId;
   }
 
+  /**
+   * 获取该节点是否被标记为慢节点
+   * @return true表示该节点是慢节点，false表示正常节点
+   */
   public boolean getIsSlownode() {
     return isSlownode;
   }

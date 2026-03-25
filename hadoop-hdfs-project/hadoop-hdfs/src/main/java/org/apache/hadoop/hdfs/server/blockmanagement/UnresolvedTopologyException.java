@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,13 +22,17 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 import java.io.IOException;
 
 /**
- * This exception is thrown if resolving topology path 
- * for a node fails. 
+ * HDFS块管理模块中，节点网络拓扑路径解析失败时抛出的异常
+ * 当无法根据节点地址解析出对应的网络拓扑位置时抛出此异常
  */
 public class UnresolvedTopologyException extends IOException {
-  /** for java.io.Serializable */
+  /** 序列化版本ID，用于Java序列化机制 */
   private static final long serialVersionUID = 1L;
   
+  /**
+   * 构造一个包含指定错误信息的UnresolvedTopologyException异常
+   * @param text 异常的错误描述信息
+   */
   public UnresolvedTopologyException(String text) {
     super(text);
   }

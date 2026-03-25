@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,9 @@
  */
 
 /**
- * Implementation classes for the manifest committer.
- * Nothing outside this module should be using these classes,
- * except where explicitly stated.
+ * Manifest输出提交器的内部实现包，提供核心业务逻辑的具体实现类。
+ * 除非明确说明，否则本模块之外的任何代码都不应该直接依赖使用该包下的类。
+ * 作为内部实现包，API不保证兼容性，可能会在不预告的情况下变更。
  */
 
 @InterfaceAudience.Private

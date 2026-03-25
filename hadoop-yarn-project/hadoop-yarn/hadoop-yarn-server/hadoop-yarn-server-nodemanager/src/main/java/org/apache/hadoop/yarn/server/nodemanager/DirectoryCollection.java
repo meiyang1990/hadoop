@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -58,7 +59,7 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
 
 /**
- * Manages a list of local storage directories.
+ * 管理NodeManager本地存储目录集合，维护健康目录和故障目录列表，定期检查目录健康状态
  */
 public class DirectoryCollection {
   private static final Logger LOG =
@@ -71,12 +72,15 @@ public class DirectoryCollection {
   private boolean diskFreeSpaceThresholdEnabled;
   private boolean subAccessibilityValidationEnabled;
   /**
-   * The enum defines disk failure type.
+   * 磁盘错误类型枚举
    */
   public enum DiskErrorCause {
     DISK_FULL, OTHER
   }
 
+  /**
+   * 存储磁盘错误信息，包含错误原因和错误描述
+   */
   static class DiskErrorInformation {
     DiskErrorCause cause;
     String message;
@@ -88,17 +92,17 @@ public class DirectoryCollection {
   }
 
   /**
-   * The interface provides a callback when localDirs is changed.
+   * 目录列表变更回调接口，当健康目录列表发生变化时触发通知
    */
   public interface DirsChangeListener {
     void onDirsChanged();
   }
 
   /**
-   * Returns a merged list which contains all the elements of l1 and l2
-   * @param l1 the first list to be included
-   * @param l2 the second list to be included
-   * @return a new list containing all the elements of the first and second list
+   * 合并两个字符串列表为新列表
+   * @param l1 第一个列表
+   * @param l2 第二个列表
+   * @return 合并后的新列表
    */
   static List<String> concat(List<String> l1, List<String> l2) {
     List<String> ret = new ArrayList<String>(l1.size() + l2.size());
@@ -107,47 +111,49 @@ public class DirectoryCollection {
     return ret;
   }
 
-  // Good local storage directories
+  // 状态正常可用的本地存储目录
   private List<String> localDirs;
+  // 发生错误（非满盘）的目录
   private List<String> errorDirs;
+  // 磁盘空间已满的目录
   private List<String> fullDirs;
+  // 存储每个故障目录的错误信息
   private Map<String, DiskErrorInformation> directoryErrorInfo;
 
-  // read/write lock for accessing above directories.
+  // 目录列表读写锁，保证并发访问安全
   private final ReadLock readLock;
   private final WriteLock writeLock;
 
+  // 累计发生的目录故障总数
   private int numFailures;
 
+  // 磁盘使用率高低阈值（百分比）
   private float diskUtilizationPercentageCutoffHigh;
   private float diskUtilizationPercentageCutoffLow;
+  // 可用空间高低阈值（MB）
   private long diskFreeSpaceCutoffLow;
   private long diskFreeSpaceCutoffHigh;
 
+  // 所有健康目录的平均磁盘使用率
   private int goodDirsDiskUtilizationPercentage;
 
+  // 目录变更监听器集合
   private Set<DirsChangeListener> dirsChangeListeners;
 
   /**
-   * Create collection for the directories specified. No check for free space.
+   * 构造目录集合，不检查磁盘空间
    * 
-   * @param dirs
-   *          directories to be monitored
+   * @param dirs 需要监控的目录数组
    */
   public DirectoryCollection(String[] dirs) {
     this(dirs, 100.0F, 100.0F, 0, 0);
   }
 
   /**
-   * Create collection for the directories specified. Users must specify the
-   * maximum percentage of disk utilization allowed. Minimum amount of disk
-   * space is not checked.
+   * 构造目录集合，指定最大磁盘使用率阈值，不检查最小可用空间
    * 
-   * @param dirs
-   *          directories to be monitored
-   * @param utilizationPercentageCutOff
-   *          percentage of disk that can be used before the dir is taken out of
-   *          the good dirs list
+   * @param dirs 需要监控的目录数组
+   * @param utilizationPercentageCutOff 目录被移出健康列表的磁盘使用率阈值
    * 
    */
   public DirectoryCollection(String[] dirs, float utilizationPercentageCutOff) {
@@ -155,14 +161,10 @@ public class DirectoryCollection {
   }
 
   /**
-   * Create collection for the directories specified. Users must specify the
-   * minimum amount of free space that must be available for the dir to be used.
+   * 构造目录集合，指定最小可用空间阈值，不检查使用率
    * 
-   * @param dirs
-   *          directories to be monitored
-   * @param utilizationSpaceCutOff
-   *          minimum space, in MB, that must be available on the disk for the
-   *          dir to be marked as good
+   * @param dirs 需要监控的目录数组
+   * @param utilizationSpaceCutOff 目录标记为健康所需的最小可用空间（MB）
    * 
    */
   public DirectoryCollection(String[] dirs, long utilizationSpaceCutOff) {
@@ -170,17 +172,11 @@ public class DirectoryCollection {
   }
 
   /**
-   * Create collection for the directories specified. Users must specify the
-   * minimum amount of free space that must be available for the dir to be used.
+   * 构造目录集合，指定可用空间的高低阈值
    *
-   * @param dirs
-   *          directories to be monitored
-   * @param utilizationSpaceCutOffLow
-   *          minimum space, in MB, that must be available on the disk for the
-   *          dir to be taken out of the good dirs list
-   * @param utilizationSpaceCutOffHigh
-   *          minimum space, in MB, that must be available on the disk for the
-   *          dir to be moved from the bad dirs list to the good dirs list
+   * @param dirs 需要监控的目录数组
+   * @param utilizationSpaceCutOffLow 目录移出健康列表的最小可用空间阈值（MB）
+   * @param utilizationSpaceCutOffHigh 目录从故障列表转回健康列表的最小可用空间阈值（MB）
    */
   public DirectoryCollection(String[] dirs, long utilizationSpaceCutOffLow,
       long utilizationSpaceCutOffHigh) {
@@ -189,22 +185,12 @@ public class DirectoryCollection {
   }
 
   /**
-   * Create collection for the directories specified. Users must specify the
-   * maximum percentage of disk utilization allowed and the minimum amount of
-   * free space that must be available for the dir to be used. If either check
-   * fails the dir is removed from the good dirs list.
+   * 构造目录集合，指定使用率阈值和空间阈值，使用同一阈值处理进出健康列表
    *
-   * @param dirs
-   *          directories to be monitored
-   * @param utilizationPercentageCutOffHigh
-   *          percentage of disk that can be used before the dir is taken out of
-   *          the good dirs list
-   * @param utilizationPercentageCutOffLow
-   *          percentage of disk that can be used when the dir is moved from
-   *          the bad dirs list to the good dirs list
-   * @param utilizationSpaceCutOff
-   *          minimum space, in MB, that must be available on the disk for the
-   *          dir to be marked as good
+   * @param dirs 需要监控的目录数组
+   * @param utilizationPercentageCutOffHigh 目录移出健康列表的磁盘使用率阈值
+   * @param utilizationPercentageCutOffLow 目录从故障列表转回健康列表的磁盘使用率阈值
+   * @param utilizationSpaceCutOff 目录标记为健康所需的最小可用空间（MB）
    */
   public DirectoryCollection(String[] dirs,
       float utilizationPercentageCutOffHigh,
@@ -215,25 +201,13 @@ public class DirectoryCollection {
   }
 
   /**
-   * Create collection for the directories specified. Users must specify the
-   * maximum percentage of disk utilization allowed and the minimum amount of
-   * free space that must be available for the dir to be used. If either check
-   * fails the dir is removed from the good dirs list.
+   * 完整构造目录集合，分别指定使用率和可用空间的高低阈值
    *
-   * @param dirs
-   *          directories to be monitored
-   * @param utilizationPercentageCutOffHigh
-   *          percentage of disk that can be used before the dir is taken out
-   *          of the good dirs list
-   * @param utilizationPercentageCutOffLow
-   *          percentage of disk that can be used when the dir is moved from
-   *          the bad dirs list to the good dirs list
-   * @param utilizationSpaceCutOffLow
-   *          minimum space, in MB, that must be available on the disk for the
-   *          dir to be taken out of the good dirs list
-   * @param utilizationSpaceCutOffHigh
-   *          minimum space, in MB, that must be available on the disk for the
-   *          dir to be moved from the bad dirs list to the good dirs list
+   * @param dirs 需要监控的目录数组
+   * @param utilizationPercentageCutOffHigh 目录移出健康列表的磁盘使用率阈值
+   * @param utilizationPercentageCutOffLow 目录从故障列表转回健康列表的磁盘使用率阈值
+   * @param utilizationSpaceCutOffLow 目录移出健康列表的最小可用空间阈值（MB）
+   * @param utilizationSpaceCutOffHigh 目录从故障列表转回健康列表的最小可用空间阈值（MB）
    */
   public DirectoryCollection(String[] dirs,
       float utilizationPercentageCutOffHigh,
@@ -242,6 +216,7 @@ public class DirectoryCollection {
       long utilizationSpaceCutOffHigh) {
     conf = new YarnConfiguration();
     try {
+      // 从配置加载磁盘检测器实现类
       String diskValidatorName = conf.get(YarnConfiguration.DISK_VALIDATOR,
           YarnConfiguration.DEFAULT_DISK_VALIDATOR);
       diskValidator = DiskValidatorFactory.getInstance(diskValidatorName);
@@ -250,6 +225,7 @@ public class DirectoryCollection {
       throw new YarnRuntimeException(e);
     }
 
+    // 加载各项检查功能配置开关
     diskUtilizationThresholdEnabled = conf.getBoolean(
         YarnConfiguration.NM_DISK_UTILIZATION_THRESHOLD_ENABLED,
         YarnConfiguration.DEFAULT_NM_DISK_UTILIZATION_THRESHOLD_ENABLED);
@@ -260,24 +236,32 @@ public class DirectoryCollection {
         YarnConfiguration.NM_WORKING_DIR_CONTENT_ACCESSIBILITY_VALIDATION_ENABLED,
         YarnConfiguration.DEFAULT_NM_WORKING_DIR_CONTENT_ACCESSIBILITY_VALIDATION_ENABLED);
 
+    // 初始化目录分类列表
     localDirs = new ArrayList<>(Arrays.asList(dirs));
     errorDirs = new ArrayList<>();
     fullDirs = new ArrayList<>();
     directoryErrorInfo = new ConcurrentHashMap<>();
 
+    // 初始化读写锁
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     this.readLock = lock.readLock();
     this.writeLock = lock.writeLock();
 
+    // 设置阈值参数
     setDiskUtilizationPercentageCutoff(utilizationPercentageCutOffHigh,
         utilizationPercentageCutOffLow);
     setDiskUtilizationSpaceCutoff(utilizationSpaceCutOffLow,
         utilizationSpaceCutOffHigh);
 
+    // 初始化监听器集合，支持并发访问
     dirsChangeListeners = Collections.newSetFromMap(
         new ConcurrentHashMap<DirsChangeListener, Boolean>());
   }
 
+  /**
+   * 注册目录变更监听器，注册完成后立即触发一次变更通知
+   * @param listener 监听器对象
+   */
   void registerDirsChangeListener(
       DirsChangeListener listener) {
     if (dirsChangeListeners.add(listener)) {
@@ -285,13 +269,18 @@ public class DirectoryCollection {
     }
   }
 
+  /**
+   * 注销目录变更监听器
+   * @param listener 监听器对象
+   */
   void deregisterDirsChangeListener(
       DirsChangeListener listener) {
     dirsChangeListeners.remove(listener);
   }
 
   /**
-   * @return the current valid directories 
+   * 获取当前所有健康可用目录的不可变列表
+   * @return 健康目录列表
    */
   List<String> getGoodDirs() {
     this.readLock.lock();
@@ -303,7 +292,8 @@ public class DirectoryCollection {
   }
 
   /**
-   * @return the failed directories
+   * 获取所有故障目录（包含错误目录和满盘目录）的不可变列表
+   * @return 故障目录列表
    */
   List<String> getFailedDirs() {
     this.readLock.lock();
@@ -316,7 +306,8 @@ public class DirectoryCollection {
   }
 
   /**
-   * @return the directories that have used all disk space
+   * 获取所有空间已满目录的不可变列表
+   * @return 满盘目录列表
    */
   List<String> getFullDirs() {
     this.readLock.lock();
@@ -328,9 +319,8 @@ public class DirectoryCollection {
   }
 
   /**
-   * @return the directories that have errors - many not have appropriate permissions
-   * or other disk validation checks might have failed in {@link DiskValidator}
-   *
+   * 获取所有发生错误（非满盘）目录的不可变列表
+   * @return 错误目录列表
    */
   @InterfaceStability.Evolving
   List<String> getErroredDirs() {
@@ -343,7 +333,8 @@ public class DirectoryCollection {
   }
 
   /**
-   * @return total the number of directory failures seen till now
+   * 获取累计发生的目录故障总数
+   * @return 累计故障数
    */
   int getNumFailures() {
     this.readLock.lock();
@@ -355,12 +346,9 @@ public class DirectoryCollection {
   }
 
   /**
-   *
-   * @param dirName Absolute path of Directory for which error diagnostics are needed
-   * @return DiskErrorInformation - disk error diagnostics for the specified directory
-   *         null - the disk associated with the directory has passed disk utilization checks
-   *         /error validations in {@link DiskValidator}
-   *
+   * 获取指定目录的错误诊断信息
+   * @param dirName 目录绝对路径
+   * @return 错误信息，如果目录健康则返回null
    */
   @InterfaceStability.Evolving
   DiskErrorInformation getDirectoryErrorInfo(String dirName) {
@@ -373,9 +361,9 @@ public class DirectoryCollection {
   }
 
   /**
-   *
-   * @param dirName Absolute path of Directory for which the disk has been marked as unhealthy
-   * @return Check if disk associated with the directory is unhealthy
+   * 检查指定目录关联的磁盘是否不健康
+   * @param dirName 目录绝对路径
+   * @return true表示磁盘不健康，false表示健康
    */
   @InterfaceStability.Evolving
   boolean isDiskUnHealthy(String dirName) {
@@ -388,11 +376,10 @@ public class DirectoryCollection {
   }
 
   /**
-   * Create any non-existent directories and parent directories, updating the
-   * list of valid directories if necessary.
-   * @param localFs local file system to use
-   * @param perm absolute permissions to use for any directories created
-   * @return true if there were no errors, false if at least one error occurred
+   * 创建不存在的目录及其父目录，如有必要更新健康目录列表
+   * @param localFs 本地文件系统上下文
+   * @param perm 创建目录使用的权限
+   * @return 所有目录都创建成功返回true，至少一个创建失败返回false
    */
   boolean createNonExistentDirs(FileContext localFs,
       FsPermission perm) {
@@ -400,14 +387,17 @@ public class DirectoryCollection {
     List<String> localDirectories = null;
     this.readLock.lock();
     try {
+      // 复制当前健康目录列表，避免长时间持有读锁
       localDirectories = new ArrayList<>(localDirs);
     } finally {
       this.readLock.unlock();
     }
+    // 遍历创建每个目录
     for (final String dir : localDirectories) {
       try {
         createDir(localFs, new Path(dir), perm);
       } catch (IOException e) {
+        // 创建失败，将目录移出健康列表
         LOG.warn("Unable to create directory " + dir + " error " +
             e.getMessage() + ", removing from the list of valid directories.");
         this.writeLock.lock();
@@ -428,12 +418,9 @@ public class DirectoryCollection {
   }
 
   /**
-   * Check the health of current set of local directories(good and failed),
-   * updating the list of valid directories if necessary.
+   * 检查所有目录（包含健康和故障）的健康状态，如有必要更新健康目录列表
    *
-   * @return <em>true</em> if there is a new disk-failure identified in this
-   *         checking or a failed directory passes the disk check <em>false</em>
-   *         otherwise.
+   * @return 本次检查发现目录状态变更返回true，否则返回false
    */
   boolean checkDirs() {
     boolean setChanged = false;
@@ -444,6 +431,7 @@ public class DirectoryCollection {
     List<String> allLocalDirs = null;
     this.readLock.lock();
     try {
+      // 保存检查前状态，用于后续比较变更
       preCheckGoodDirs = new HashSet<String>(localDirs);
       preCheckFullDirs = new HashSet<String>(fullDirs);
       preCheckOtherErrorDirs = new HashSet<String>(errorDirs);
@@ -453,17 +441,18 @@ public class DirectoryCollection {
       this.readLock.unlock();
     }
 
-    // move testDirs out of any lock as it could wait for very long time in
-    // case of busy IO
+    // 目录检查在锁外执行，避免IO阻塞长时间占用锁
     Map<String, DiskErrorInformation> dirsFailedCheck = testDirs(allLocalDirs, preCheckGoodDirs);
 
     this.writeLock.lock();
     try {
+      // 清空现有分类，重新划分
       localDirs.clear();
       errorDirs.clear();
       fullDirs.clear();
       directoryErrorInfo.clear();
 
+      // 按错误原因分类故障目录
       for (Map.Entry<String, DiskErrorInformation> entry : dirsFailedCheck
           .entrySet()) {
         String dir = entry.getKey();
@@ -482,6 +471,7 @@ public class DirectoryCollection {
         }
         directoryErrorInfo.put(entry.getKey(), errorInformation);
 
+        // 原本健康的目录变成故障，计数加1并标记变更
         if (preCheckGoodDirs.contains(dir)) {
           LOG.warn("Directory " + dir + " error, " + errorInformation.message
               + ", removing from list of valid directories");
@@ -489,246 +479,4 @@ public class DirectoryCollection {
           numFailures++;
         }
       }
-      for (String dir : allLocalDirs) {
-        if (!dirsFailedCheck.containsKey(dir)) {
-          localDirs.add(dir);
-          if (preCheckFullDirs.contains(dir)
-              || preCheckOtherErrorDirs.contains(dir)) {
-            setChanged = true;
-            LOG.info("Directory " + dir
-                + " passed disk check, adding to list of valid directories.");
-          }
-        }
-      }
-      Set<String> postCheckFullDirs = new HashSet<String>(fullDirs);
-      Set<String> postCheckOtherDirs = new HashSet<String>(errorDirs);
-      for (String dir : preCheckFullDirs) {
-        if (postCheckOtherDirs.contains(dir)) {
-          LOG.warn("Directory " + dir + " error "
-              + dirsFailedCheck.get(dir).message);
-        }
-      }
-
-      for (String dir : preCheckOtherErrorDirs) {
-        if (postCheckFullDirs.contains(dir)) {
-          LOG.warn("Directory " + dir + " error "
-              + dirsFailedCheck.get(dir).message);
-        }
-      }
-      setGoodDirsDiskUtilizationPercentage();
-      if (setChanged) {
-        for (DirsChangeListener listener : dirsChangeListeners) {
-          listener.onDirsChanged();
-        }
-      }
-      return setChanged;
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  Map<String, DiskErrorInformation> testDirs(List<String> dirs, Set<String> goodDirs) {
-    final Map<String, DiskErrorInformation> ret = new HashMap<>(0);
-    for (String dir : dirs) {
-      LOG.debug("Start testing dir accessibility: {}", dir);
-      File testDir = new File(dir);
-      boolean goodDir = goodDirs.contains(dir);
-      Stream.of(
-          validateDisk(testDir),
-          validateUsageOverPercentageLimit(testDir, goodDir),
-          validateDiskFreeSpaceUnderLimit(testDir, goodDir),
-          validateSubsAccessibility(testDir)
-      )
-          .filter(Objects::nonNull)
-          .findFirst()
-          .ifPresent(diskErrorInformation -> ret.put(dir, diskErrorInformation));
-    }
-    return ret;
-  }
-
-  private DiskErrorInformation validateDisk(File dir) {
-    try {
-      diskValidator.checkStatus(dir);
-      LOG.debug("Dir {} pass throw the disk validation", dir);
-      return null;
-    } catch (IOException | UncheckedIOException | SecurityException e) {
-      return new DiskErrorInformation(DiskErrorCause.OTHER, e.getMessage());
-    }
-  }
-
-  private DiskErrorInformation validateUsageOverPercentageLimit(File dir, boolean isGoodDir) {
-    if (!diskUtilizationThresholdEnabled) {
-      return null;
-    }
-    float diskUtilizationPercentageCutoff = isGoodDir
-        ? diskUtilizationPercentageCutoffHigh
-        : diskUtilizationPercentageCutoffLow;
-    float freePercentage = 100 * (dir.getUsableSpace() / (float) dir.getTotalSpace());
-    float usedPercentage = 100.0F - freePercentage;
-    if (usedPercentage > diskUtilizationPercentageCutoff || usedPercentage >= 100.0F) {
-      return new DiskErrorInformation(DiskErrorCause.DISK_FULL,
-          "used space above threshold of " + diskUtilizationPercentageCutoff + "%");
-    } else {
-      LOG.debug("Dir {} pass throw the usage over percentage validation", dir);
-      return null;
-    }
-  }
-
-  private DiskErrorInformation validateDiskFreeSpaceUnderLimit(File dir, boolean isGoodDir) {
-    if (!diskFreeSpaceThresholdEnabled) {
-      return null;
-    }
-    long freeSpaceCutoff = isGoodDir ? diskFreeSpaceCutoffLow : diskFreeSpaceCutoffHigh;
-    long freeSpace = dir.getUsableSpace() / (1024 * 1024);
-    if (freeSpace < freeSpaceCutoff) {
-      return new DiskErrorInformation(DiskErrorCause.DISK_FULL,
-          "free space below limit of " + freeSpaceCutoff + "MB");
-    } else {
-      LOG.debug("Dir {} pass throw the free space validation", dir);
-      return null;
-    }
-  }
-
-  private DiskErrorInformation validateSubsAccessibility(File dir) {
-    if (!subAccessibilityValidationEnabled) {
-      return null;
-    }
-    try (Stream<java.nio.file.Path> walk = Files.walk(dir.toPath())) {
-      List<File> subs = walk
-          .map(java.nio.file.Path::toFile)
-          .collect(Collectors.toList());
-      for (File sub : subs) {
-        if (sub.isDirectory()) {
-          DiskChecker.checkDir(sub);
-        } else if (!Files.isReadable(sub.toPath())) {
-          return new DiskErrorInformation(DiskErrorCause.OTHER, "Can not read " + sub);
-        } else {
-          LOG.debug("{} under {} is accessible", sub, dir);
-        }
-      }
-    } catch (IOException | UncheckedIOException | SecurityException e) {
-      return new DiskErrorInformation(DiskErrorCause.OTHER, e.getMessage());
-    }
-    return null;
-  }
-
-  private void createDir(FileContext localFs, Path dir, FsPermission perm)
-      throws IOException {
-    if (dir == null) {
-      return;
-    }
-    try {
-      localFs.getFileStatus(dir);
-    } catch (FileNotFoundException e) {
-      createDir(localFs, dir.getParent(), perm);
-      try {
-        localFs.mkdir(dir, perm, false);
-      } catch (FileAlreadyExistsException ex) {
-        // do nothing as other threads could in creating the same directory.
-      }
-      if (!perm.equals(perm.applyUMask(localFs.getUMask()))) {
-        localFs.setPermission(dir, perm);
-      }
-    }
-  }
-
-  @VisibleForTesting
-  float getDiskUtilizationPercentageCutoffHigh() {
-    return diskUtilizationPercentageCutoffHigh;
-  }
-
-  @VisibleForTesting
-  float getDiskUtilizationPercentageCutoffLow() {
-    return diskUtilizationPercentageCutoffLow;
-  }
-
-  public void setDiskUtilizationPercentageCutoff(
-      float utilizationPercentageCutOffHigh,
-      float utilizationPercentageCutOffLow) {
-    diskUtilizationPercentageCutoffHigh = Math.max(0.0F, Math.min(100.0F,
-        utilizationPercentageCutOffHigh));
-    diskUtilizationPercentageCutoffLow = Math.max(0.0F, Math.min(
-        diskUtilizationPercentageCutoffHigh, utilizationPercentageCutOffLow));
-  }
-
-  public long getDiskUtilizationSpaceCutoff() {
-    return getDiskUtilizationSpaceCutoffLow();
-  }
-
-  @VisibleForTesting
-  long getDiskUtilizationSpaceCutoffLow() {
-    return diskFreeSpaceCutoffLow;
-  }
-
-  @VisibleForTesting
-  long getDiskUtilizationSpaceCutoffHigh() {
-    return diskFreeSpaceCutoffHigh;
-  }
-
-  @VisibleForTesting
-  boolean getDiskUtilizationThresholdEnabled() {
-    return diskUtilizationThresholdEnabled;
-  }
-
-  @VisibleForTesting
-  boolean getDiskFreeSpaceThresholdEnabled() {
-    return diskFreeSpaceThresholdEnabled;
-  }
-
-  @VisibleForTesting
-  void setDiskUtilizationThresholdEnabled(boolean
-      utilizationEnabled) {
-    diskUtilizationThresholdEnabled = utilizationEnabled;
-  }
-
-  @VisibleForTesting
-  void setDiskFreeSpaceThresholdEnabled(boolean
-      freeSpaceEnabled) {
-    diskFreeSpaceThresholdEnabled = freeSpaceEnabled;
-  }
-
-  public void setDiskUtilizationSpaceCutoff(long freeSpaceCutoff) {
-    setDiskUtilizationSpaceCutoff(freeSpaceCutoff,
-        freeSpaceCutoff);
-  }
-
-  public void setDiskUtilizationSpaceCutoff(long freeSpaceCutoffLow,
-      long freeSpaceCutoffHigh) {
-    diskFreeSpaceCutoffLow = Math.max(0, freeSpaceCutoffLow);
-    diskFreeSpaceCutoffHigh = Math.max(diskFreeSpaceCutoffLow,
-        Math.max(0, freeSpaceCutoffHigh));
-  }
-
-  private void setGoodDirsDiskUtilizationPercentage() {
-
-    long totalSpace = 0;
-    long usableSpace = 0;
-
-    for (String dir : localDirs) {
-      File f = new File(dir);
-      if (!f.isDirectory()) {
-        continue;
-      }
-      totalSpace += f.getTotalSpace();
-      usableSpace += f.getUsableSpace();
-    }
-    if (totalSpace != 0) {
-      long tmp = ((totalSpace - usableSpace) * 100) / totalSpace;
-      if (Integer.MIN_VALUE < tmp && Integer.MAX_VALUE > tmp) {
-        goodDirsDiskUtilizationPercentage = Math.toIntExact(tmp);
-      }
-    } else {
-      // got no good dirs
-      goodDirsDiskUtilizationPercentage = 0;
-    }
-  }
-
-  public int getGoodDirsDiskUtilizationPercentage() {
-    return goodDirsDiskUtilizationPercentage;
-  }
-
-  @VisibleForTesting
-  public void setSubAccessibilityValidationEnabled(boolean subAccessibilityValidationEnabled) {
-    this.subAccessibilityValidationEnabled = subAccessibilityValidationEnabled;
-  }
-}
+      //

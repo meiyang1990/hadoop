@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,11 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.storage.apptoflow
- * contains classes related to implementation for app to flow table.
+ * <p>
+ * YARN Timeline Service HBase存储层的应用到流映射表实现包。
+ * 该包包含了应用ID与流信息映射关系在HBase中的存储管理实现，
+ * 用于支持Timeline Service中根据应用快速查询对应流信息的功能。
+ * </p>
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

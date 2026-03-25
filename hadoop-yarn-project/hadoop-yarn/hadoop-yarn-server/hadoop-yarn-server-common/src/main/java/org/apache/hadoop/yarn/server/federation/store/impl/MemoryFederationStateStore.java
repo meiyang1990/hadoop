@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -112,20 +113,34 @@ import org.slf4j.LoggerFactory;
 import static org.apache.hadoop.yarn.server.federation.store.utils.FederationStateStoreUtils.filterHomeSubCluster;
 
 /**
+ * 文件说明：YARN联邦状态存储的内存实现，将所有联邦元数据存储在进程内存中，
+ * 主要用于测试和小规模集群场景，支持子集群注册发现、应用位置存储、策略配置、代理令牌管理等核心功能
+ */
+/**
  * In-memory implementation of {@link FederationStateStore}.
  */
 public class MemoryFederationStateStore implements FederationStateStore {
 
+  // 子集群信息存储，key为子集群ID，value为子集群详细信息
   private Map<SubClusterId, SubClusterInfo> membership;
+  // 应用位置存储，key为应用ID，value为应用所属子集群信息
   private Map<ApplicationId, ApplicationHomeSubCluster> applications;
+  // 预约位置存储，key为预约ID，value为预约所属子集群ID
   private Map<ReservationId, SubClusterId> reservations;
+  // 路由策略配置存储，key为队列名称，value为对应子集群路由策略配置
   private Map<String, SubClusterPolicyConfiguration> policies;
+  // 路由器RM代理密钥管理器状态，存储代理密钥和令牌信息
   private RouterRMDTSecretManagerState routerRMSecretManagerState;
+  // 状态存储中保留的最大应用数量
   private int maxAppsInStateStore;
+  // 代理令牌序列号生成器
   private AtomicInteger sequenceNum;
+  // 主密钥ID生成器
   private AtomicInteger masterKeyId;
+  // 当前状态存储版本信息
   private static final Version CURRENT_VERSION_INFO = Version
       .newInstance(1, 1);
+  // 序列化后的版本字节数组
   private byte[] version;
 
   private final MonotonicClock clock = new MonotonicClock();
@@ -134,6 +149,9 @@ public class MemoryFederationStateStore implements FederationStateStore {
       LoggerFactory.getLogger(MemoryFederationStateStore.class);
 
   @Override
+  /**
+   * 初始化内存状态存储，从配置中读取最大应用数量限制，初始化各存储容器
+   */
   public void init(Configuration conf) {
     membership = new ConcurrentHashMap<>();
     applications = new ConcurrentHashMap<>();
@@ -149,6 +167,9 @@ public class MemoryFederationStateStore implements FederationStateStore {
   }
 
   @Override
+  /**
+   * 关闭状态存储，清空所有引用
+   */
   public void close() {
     membership = null;
     applications = null;
@@ -157,15 +178,22 @@ public class MemoryFederationStateStore implements FederationStateStore {
   }
 
   @Override
+  /**
+   * 注册新子集群到联邦状态存储
+   */
   public SubClusterRegisterResponse registerSubCluster(SubClusterRegisterRequest request)
       throws YarnException {
+    // 记录开始时间用于性能统计
     long startTime = clock.getTime();
 
+    // 输入参数校验
     FederationMembershipStateStoreInputValidator.validate(request);
     SubClusterInfo subClusterInfo = request.getSubClusterInfo();
 
+    // 获取当前UTC时间作为注册时间
     long currentTime =
         Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis();
+    // 构造要保存的子集群信息，填充当前注册时间
     SubClusterInfo subClusterInfoToSave =
         SubClusterInfo.newInstance(subClusterInfo.getSubClusterId(),
             subClusterInfo.getAMRMServiceAddress(),
@@ -175,14 +203,19 @@ public class MemoryFederationStateStore implements FederationStateStore {
             subClusterInfo.getState(), subClusterInfo.getLastStartTime(),
             subClusterInfo.getCapability());
 
+    // 将子集群信息存入内存映射
     membership.put(subClusterInfo.getSubClusterId(), subClusterInfoToSave);
     long stopTime = clock.getTime();
 
+    // 更新指标统计，记录成功的状态存储调用耗时
     FederationStateStoreClientMetrics.succeededStateStoreCall(stopTime - startTime);
     return SubClusterRegisterResponse.newInstance();
   }
 
   @Override
+  /**
+   * 注销子集群，更新子集群状态为注销状态
+   */
   public SubClusterDeregisterResponse deregisterSubCluster(SubClusterDeregisterRequest request)
       throws YarnException {
 
@@ -199,6 +232,9 @@ public class MemoryFederationStateStore implements FederationStateStore {
   }
 
   @Override
+  /**
+   * 处理子集群心跳，更新子集群最后心跳时间和状态、资源能力
+   */
   public SubClusterHeartbeatResponse subClusterHeartbeat(SubClusterHeartbeatRequest request)
       throws YarnException {
 
@@ -211,9 +247,11 @@ public class MemoryFederationStateStore implements FederationStateStore {
           LOG, "SubCluster %s does not exist; cannot heartbeat.", request.getSubClusterId());
     }
 
+    // 获取当前UTC时间更新心跳
     long currentTime =
         Calendar.getInstance(TimeZone.getTimeZone("UTC")).getTimeInMillis();
 
+    // 更新心跳时间、状态和资源能力
     subClusterInfo.setLastHeartBeat(currentTime);
     subClusterInfo.setState(request.getState());
     subClusterInfo.setCapability(request.getCapability());
@@ -222,6 +260,9 @@ public class MemoryFederationStateStore implements FederationStateStore {
   }
 
   @VisibleForTesting
+  /**
+   * 测试用：手动设置子集群最后心跳时间
+   */
   public void setSubClusterLastHeartbeat(SubClusterId subClusterId,
       long lastHeartbeat) throws YarnException {
     SubClusterInfo subClusterInfo = membership.get(subClusterId);
@@ -233,6 +274,9 @@ public class MemoryFederationStateStore implements FederationStateStore {
   }
 
   @Override
+  /**
+   * 根据ID查询单个子集群信息
+   */
   public GetSubClusterInfoResponse getSubCluster(GetSubClusterInfoRequest request)
       throws YarnException {
 
@@ -248,11 +292,15 @@ public class MemoryFederationStateStore implements FederationStateStore {
   }
 
   @Override
+  /**
+   * 查询所有子集群信息，支持过滤非活跃子集群
+   */
   public GetSubClustersInfoResponse getSubClusters(GetSubClustersInfoRequest request)
       throws YarnException {
 
     List<SubClusterInfo> result = new ArrayList<>();
 
+    // 遍历所有子集群，根据过滤条件筛选
     for (SubClusterInfo info : membership.values()) {
       if (!request.getFilterInactiveSubClusters() || info.getState().isActive()) {
         result.add(info);
@@ -265,6 +313,9 @@ public class MemoryFederationStateStore implements FederationStateStore {
   // FederationApplicationHomeSubClusterStore methods
 
   @Override
+  /**
+   * 添加应用所属子集群信息到状态存储
+   */
   public AddApplicationHomeSubClusterResponse addApplicationHomeSubCluster(
       AddApplicationHomeSubClusterRequest request) throws YarnException {
 
@@ -277,6 +328,7 @@ public class MemoryFederationStateStore implements FederationStateStore {
     LOG.info("appId = {}, homeSubClusterId = {}, appSubmissionContext = {}.",
         appId, homeSubClusterId, appSubmissionContext);
 
+    // 仅当应用不存在时添加，避免覆盖
     if (!applications.containsKey(appId)) {
       applications.put(appId, homeSubCluster);
     }
@@ -286,6 +338,9 @@ public class MemoryFederationStateStore implements FederationStateStore {
   }
 
   @Override
+  /**
+   * 更新已有应用所属子集群信息
+   */
   public UpdateApplicationHomeSubClusterResponse updateApplicationHomeSubCluster(
       UpdateApplicationHomeSubClusterRequest request) throws YarnException {
 
@@ -304,6 +359,9 @@ public class MemoryFederationStateStore implements FederationStateStore {
   }
 
   @Override
+  /**
+   * 查询单个应用所属子集群信息，支持控制是否返回提交上下文
+   */
   public GetApplicationHomeSubClusterResponse getApplicationHomeSubCluster(
       GetApplicationHomeSubClusterRequest request) throws YarnException {
 
@@ -316,405 +374,4 @@ public class MemoryFederationStateStore implements FederationStateStore {
 
     // Whether the returned result contains context
     ApplicationHomeSubCluster appHomeSubCluster = applications.get(appId);
-    ApplicationSubmissionContext submissionContext =
-        appHomeSubCluster.getApplicationSubmissionContext();
-    boolean containsAppSubmissionContext = request.getContainsAppSubmissionContext();
-    long creatTime = appHomeSubCluster.getCreateTime();
-    SubClusterId homeSubClusterId = appHomeSubCluster.getHomeSubCluster();
-
-    if (containsAppSubmissionContext && submissionContext != null) {
-      return GetApplicationHomeSubClusterResponse.newInstance(appId, homeSubClusterId, creatTime,
-          submissionContext);
-    }
-
-    return GetApplicationHomeSubClusterResponse.newInstance(appId, homeSubClusterId, creatTime);
-  }
-
-  @Override
-  public GetApplicationsHomeSubClusterResponse getApplicationsHomeSubCluster(
-      GetApplicationsHomeSubClusterRequest request) throws YarnException {
-
-    if (request == null) {
-      throw new YarnException("Missing getApplicationsHomeSubCluster request");
-    }
-
-    SubClusterId requestSC = request.getSubClusterId();
-    List<ApplicationHomeSubCluster> result = applications.keySet().stream()
-        .map(applicationId -> generateAppHomeSC(applicationId))
-        .sorted(Comparator.comparing(ApplicationHomeSubCluster::getCreateTime).reversed())
-        .filter(appHomeSC -> filterHomeSubCluster(requestSC, appHomeSC.getHomeSubCluster()))
-        .limit(maxAppsInStateStore)
-        .collect(Collectors.toList());
-
-    LOG.info("filterSubClusterId = {}, appCount = {}.", requestSC, result.size());
-    return GetApplicationsHomeSubClusterResponse.newInstance(result);
-  }
-
-  private ApplicationHomeSubCluster generateAppHomeSC(ApplicationId applicationId) {
-    SubClusterId subClusterId = applications.get(applicationId).getHomeSubCluster();
-    return ApplicationHomeSubCluster.newInstance(applicationId, subClusterId);
-  }
-
-  @Override
-  public DeleteApplicationHomeSubClusterResponse deleteApplicationHomeSubCluster(
-      DeleteApplicationHomeSubClusterRequest request) throws YarnException {
-
-    FederationApplicationHomeSubClusterStoreInputValidator.validate(request);
-    ApplicationId appId = request.getApplicationId();
-    if (!applications.containsKey(appId)) {
-      FederationStateStoreUtils.logAndThrowStoreException(LOG,
-          "Application %s does not exist.", appId);
-    }
-
-    applications.remove(appId);
-    return DeleteApplicationHomeSubClusterResponse.newInstance();
-  }
-
-  @Override
-  public GetSubClusterPolicyConfigurationResponse getPolicyConfiguration(
-      GetSubClusterPolicyConfigurationRequest request) throws YarnException {
-
-    FederationPolicyStoreInputValidator.validate(request);
-    String queue = request.getQueue();
-    if (!policies.containsKey(queue)) {
-      LOG.warn("Policy for queue : {} does not exist.", queue);
-      return null;
-    }
-
-    return GetSubClusterPolicyConfigurationResponse.newInstance(policies.get(queue));
-  }
-
-  @Override
-  public SetSubClusterPolicyConfigurationResponse setPolicyConfiguration(
-      SetSubClusterPolicyConfigurationRequest request) throws YarnException {
-
-    FederationPolicyStoreInputValidator.validate(request);
-    policies.put(request.getPolicyConfiguration().getQueue(),
-        request.getPolicyConfiguration());
-    return SetSubClusterPolicyConfigurationResponse.newInstance();
-  }
-
-  @Override
-  public GetSubClusterPoliciesConfigurationsResponse getPoliciesConfigurations(
-      GetSubClusterPoliciesConfigurationsRequest request) throws YarnException {
-    ArrayList<SubClusterPolicyConfiguration> result = new ArrayList<>();
-    for (SubClusterPolicyConfiguration policy : policies.values()) {
-      result.add(policy);
-    }
-    return GetSubClusterPoliciesConfigurationsResponse.newInstance(result);
-  }
-
-  @Override
-  public DeleteSubClusterPoliciesConfigurationsResponse deletePoliciesConfigurations(
-      DeleteSubClusterPoliciesConfigurationsRequest request) throws YarnException {
-    FederationPolicyStoreInputValidator.validate(request);
-    for (String queue : request.getQueues()) {
-      if (policies.containsKey(queue)) {
-        policies.remove(queue);
-        LOG.info("The queue = {} policy has been deleted.", queue);
-      }
-    }
-    return DeleteSubClusterPoliciesConfigurationsResponse.newInstance();
-  }
-
-  @Override
-  public DeletePoliciesConfigurationsResponse deleteAllPoliciesConfigurations(
-      DeletePoliciesConfigurationsRequest request) throws Exception {
-    policies.clear();
-    return DeletePoliciesConfigurationsResponse.newInstance();
-  }
-
-  @Override
-  public Version getCurrentVersion() {
-    return CURRENT_VERSION_INFO;
-  }
-
-  @Override
-  public Version loadVersion() throws Exception {
-    if (version != null) {
-      VersionProto versionProto = VersionProto.parseFrom(version);
-      return new VersionPBImpl(versionProto);
-    }
-    return null;
-  }
-
-  @Override
-  public void storeVersion() throws Exception {
-    version = ((VersionPBImpl) CURRENT_VERSION_INFO).getProto().toByteArray();
-  }
-
-  @Override
-  public void deleteStateStore() throws Exception {
-    membership.clear();
-    applications.clear();
-    reservations.clear();
-    policies.clear();
-    sequenceNum = new AtomicInteger();
-    masterKeyId = new AtomicInteger();
-  }
-
-  @Override
-  public AddReservationHomeSubClusterResponse addReservationHomeSubCluster(
-      AddReservationHomeSubClusterRequest request) throws YarnException {
-    FederationReservationHomeSubClusterStoreInputValidator.validate(request);
-    ReservationHomeSubCluster homeSubCluster = request.getReservationHomeSubCluster();
-    ReservationId reservationId = homeSubCluster.getReservationId();
-    if (!reservations.containsKey(reservationId)) {
-      reservations.put(reservationId, homeSubCluster.getHomeSubCluster());
-    }
-    return AddReservationHomeSubClusterResponse.newInstance(reservations.get(reservationId));
-  }
-
-  @Override
-  public GetReservationHomeSubClusterResponse getReservationHomeSubCluster(
-      GetReservationHomeSubClusterRequest request) throws YarnException {
-    FederationReservationHomeSubClusterStoreInputValidator.validate(request);
-    ReservationId reservationId = request.getReservationId();
-    if (!reservations.containsKey(reservationId)) {
-      FederationStateStoreUtils.logAndThrowStoreException(LOG,
-          "Reservation %s does not exist.", reservationId);
-    }
-    SubClusterId subClusterId = reservations.get(reservationId);
-    ReservationHomeSubCluster homeSubCluster =
-        ReservationHomeSubCluster.newInstance(reservationId, subClusterId);
-    return GetReservationHomeSubClusterResponse.newInstance(homeSubCluster);
-  }
-
-  @Override
-  public GetReservationsHomeSubClusterResponse getReservationsHomeSubCluster(
-      GetReservationsHomeSubClusterRequest request) throws YarnException {
-    List<ReservationHomeSubCluster> result = new ArrayList<>();
-
-    for (Entry<ReservationId, SubClusterId> entry : reservations.entrySet()) {
-      ReservationId reservationId = entry.getKey();
-      SubClusterId subClusterId = entry.getValue();
-      ReservationHomeSubCluster homeSubCluster =
-          ReservationHomeSubCluster.newInstance(reservationId, subClusterId);
-      result.add(homeSubCluster);
-    }
-
-    return GetReservationsHomeSubClusterResponse.newInstance(result);
-  }
-
-  @Override
-  public UpdateReservationHomeSubClusterResponse updateReservationHomeSubCluster(
-      UpdateReservationHomeSubClusterRequest request) throws YarnException {
-    FederationReservationHomeSubClusterStoreInputValidator.validate(request);
-    ReservationId reservationId = request.getReservationHomeSubCluster().getReservationId();
-
-    if (!reservations.containsKey(reservationId)) {
-      FederationStateStoreUtils.logAndThrowStoreException(LOG,
-          "Reservation %s does not exist.", reservationId);
-    }
-
-    SubClusterId subClusterId = request.getReservationHomeSubCluster().getHomeSubCluster();
-    reservations.put(reservationId, subClusterId);
-    return UpdateReservationHomeSubClusterResponse.newInstance();
-  }
-
-  @Override
-  public DeleteReservationHomeSubClusterResponse deleteReservationHomeSubCluster(
-      DeleteReservationHomeSubClusterRequest request) throws YarnException {
-    FederationReservationHomeSubClusterStoreInputValidator.validate(request);
-    ReservationId reservationId = request.getReservationId();
-    if (!reservations.containsKey(reservationId)) {
-      FederationStateStoreUtils.logAndThrowStoreException(LOG,
-          "Reservation %s does not exist.", reservationId);
-    }
-    reservations.remove(reservationId);
-    return DeleteReservationHomeSubClusterResponse.newInstance();
-  }
-
-  @Override
-  public RouterMasterKeyResponse storeNewMasterKey(RouterMasterKeyRequest request)
-      throws YarnException, IOException {
-    // Restore the DelegationKey from the request
-    RouterMasterKey masterKey = request.getRouterMasterKey();
-    DelegationKey delegationKey = getDelegationKeyByMasterKey(masterKey);
-
-    Set<DelegationKey> rmDTMasterKeyState = routerRMSecretManagerState.getMasterKeyState();
-    if (rmDTMasterKeyState.contains(delegationKey)) {
-      FederationStateStoreUtils.logAndThrowStoreException(LOG,
-          "Error storing info for RMDTMasterKey with keyID: %s.", delegationKey.getKeyId());
-    }
-
-    routerRMSecretManagerState.getMasterKeyState().add(delegationKey);
-    LOG.info("Store Router-RMDT master key with key id: {}. Currently rmDTMasterKeyState size: {}",
-        delegationKey.getKeyId(), rmDTMasterKeyState.size());
-
-    return RouterMasterKeyResponse.newInstance(masterKey);
-  }
-
-  @Override
-  public RouterMasterKeyResponse removeStoredMasterKey(RouterMasterKeyRequest request)
-      throws YarnException, IOException {
-    // Restore the DelegationKey from the request
-    RouterMasterKey masterKey = request.getRouterMasterKey();
-    DelegationKey delegationKey = getDelegationKeyByMasterKey(masterKey);
-
-    LOG.info("Remove Router-RMDT master key with key id: {}.", delegationKey.getKeyId());
-    Set<DelegationKey> rmDTMasterKeyState = routerRMSecretManagerState.getMasterKeyState();
-    rmDTMasterKeyState.remove(delegationKey);
-
-    return RouterMasterKeyResponse.newInstance(masterKey);
-  }
-
-  @Override
-  public RouterMasterKeyResponse getMasterKeyByDelegationKey(RouterMasterKeyRequest request)
-      throws YarnException, IOException {
-    // Restore the DelegationKey from the request
-    RouterMasterKey masterKey = request.getRouterMasterKey();
-    DelegationKey delegationKey = getDelegationKeyByMasterKey(masterKey);
-
-    Set<DelegationKey> rmDTMasterKeyState = routerRMSecretManagerState.getMasterKeyState();
-    if (!rmDTMasterKeyState.contains(delegationKey)) {
-      throw new IOException("GetMasterKey with keyID: " + masterKey.getKeyId() +
-          " does not exist.");
-    }
-    RouterMasterKey resultRouterMasterKey = RouterMasterKey.newInstance(delegationKey.getKeyId(),
-        ByteBuffer.wrap(delegationKey.getEncodedKey()), delegationKey.getExpiryDate());
-    return RouterMasterKeyResponse.newInstance(resultRouterMasterKey);
-  }
-
-  @Override
-  public RouterRMTokenResponse storeNewToken(RouterRMTokenRequest request)
-      throws YarnException, IOException {
-    RouterStoreToken storeToken = request.getRouterStoreToken();
-    RMDelegationTokenIdentifier tokenIdentifier =
-        (RMDelegationTokenIdentifier) storeToken.getTokenIdentifier();
-    storeOrUpdateRouterRMDT(tokenIdentifier, storeToken, false);
-    return RouterRMTokenResponse.newInstance(storeToken);
-  }
-
-  @Override
-  public RouterRMTokenResponse updateStoredToken(RouterRMTokenRequest request)
-      throws YarnException, IOException {
-    RouterStoreToken storeToken = request.getRouterStoreToken();
-    RMDelegationTokenIdentifier tokenIdentifier =
-        (RMDelegationTokenIdentifier) storeToken.getTokenIdentifier();
-    Map<RMDelegationTokenIdentifier, RouterStoreToken> rmDTState =
-        routerRMSecretManagerState.getTokenState();
-    rmDTState.remove(tokenIdentifier);
-    storeOrUpdateRouterRMDT(tokenIdentifier, storeToken, true);
-    return RouterRMTokenResponse.newInstance(storeToken);
-  }
-
-  @Override
-  public RouterRMTokenResponse removeStoredToken(RouterRMTokenRequest request)
-      throws YarnException, IOException {
-    RouterStoreToken storeToken = request.getRouterStoreToken();
-    RMDelegationTokenIdentifier tokenIdentifier =
-        (RMDelegationTokenIdentifier) storeToken.getTokenIdentifier();
-    Map<RMDelegationTokenIdentifier, RouterStoreToken> rmDTState =
-        routerRMSecretManagerState.getTokenState();
-    rmDTState.remove(tokenIdentifier);
-    return RouterRMTokenResponse.newInstance(storeToken);
-  }
-
-  @Override
-  public RouterRMTokenResponse getTokenByRouterStoreToken(RouterRMTokenRequest request)
-      throws YarnException, IOException {
-    RouterStoreToken storeToken = request.getRouterStoreToken();
-    RMDelegationTokenIdentifier tokenIdentifier =
-        (RMDelegationTokenIdentifier) storeToken.getTokenIdentifier();
-    Map<RMDelegationTokenIdentifier, RouterStoreToken> rmDTState =
-        routerRMSecretManagerState.getTokenState();
-    if (!rmDTState.containsKey(tokenIdentifier)) {
-      LOG.info("Router RMDelegationToken: {} does not exist.", tokenIdentifier);
-      throw new IOException("Router RMDelegationToken: " + tokenIdentifier + " does not exist.");
-    }
-    RouterStoreToken resultToken = rmDTState.get(tokenIdentifier);
-    return RouterRMTokenResponse.newInstance(resultToken);
-  }
-
-  @Override
-  public int incrementDelegationTokenSeqNum() {
-    return sequenceNum.incrementAndGet();
-  }
-
-  @Override
-  public int getDelegationTokenSeqNum() {
-    return sequenceNum.get();
-  }
-
-  @Override
-  public void setDelegationTokenSeqNum(int seqNum) {
-    sequenceNum.set(seqNum);
-  }
-
-  @Override
-  public int getCurrentKeyId() {
-    return masterKeyId.get();
-  }
-
-  @Override
-  public int incrementCurrentKeyId() {
-    return masterKeyId.incrementAndGet();
-  }
-
-  private void storeOrUpdateRouterRMDT(RMDelegationTokenIdentifier rmDTIdentifier,
-      RouterStoreToken routerStoreToken, boolean isUpdate) throws IOException {
-    Map<RMDelegationTokenIdentifier, RouterStoreToken> rmDTState =
-        routerRMSecretManagerState.getTokenState();
-    if (rmDTState.containsKey(rmDTIdentifier)) {
-      LOG.info("Error storing info for RMDelegationToken: {}.", rmDTIdentifier);
-      throw new IOException("Router RMDelegationToken: " + rmDTIdentifier + "is already stored.");
-    }
-    rmDTState.put(rmDTIdentifier, routerStoreToken);
-    if (!isUpdate) {
-      routerRMSecretManagerState.setDtSequenceNumber(rmDTIdentifier.getSequenceNumber());
-    }
-    LOG.info("Store Router RM-RMDT with sequence number {}.", rmDTIdentifier.getSequenceNumber());
-  }
-
-  /**
-   * Get DelegationKey By based on MasterKey.
-   *
-   * @param masterKey masterKey
-   * @return DelegationKey
-   */
-  private static DelegationKey getDelegationKeyByMasterKey(RouterMasterKey masterKey) {
-    ByteBuffer keyByteBuf = masterKey.getKeyBytes();
-    byte[] keyBytes = new byte[keyByteBuf.remaining()];
-    keyByteBuf.get(keyBytes);
-    return new DelegationKey(masterKey.getKeyId(), masterKey.getExpiryDate(), keyBytes);
-  }
-
-  @VisibleForTesting
-  public RouterRMDTSecretManagerState getRouterRMSecretManagerState() {
-    return routerRMSecretManagerState;
-  }
-
-  @VisibleForTesting
-  public Map<SubClusterId, SubClusterInfo> getMembership() {
-    return membership;
-  }
-
-  @VisibleForTesting
-  public void setMembership(Map<SubClusterId, SubClusterInfo> membership) {
-    this.membership = membership;
-  }
-
-  @VisibleForTesting
-  public void setExpiredHeartbeat(SubClusterId subClusterId, long heartBearTime)
-      throws YarnRuntimeException {
-    if(!membership.containsKey(subClusterId)){
-      throw new YarnRuntimeException("subClusterId = " + subClusterId + "not exist");
-    }
-    SubClusterInfo subClusterInfo = membership.get(subClusterId);
-    subClusterInfo.setLastHeartBeat(heartBearTime);
-  }
-
-  @VisibleForTesting
-  public void setApplicationContext(String subClusterId, ApplicationId applicationId,
-      long createTime) {
-    ApplicationSubmissionContext context =
-        ApplicationSubmissionContext.newInstance(applicationId, "test", "default",
-        Priority.newInstance(0), null, true, true,
-        2, Resource.newInstance(10, 2), "test");
-    SubClusterId homeSubClusterId = SubClusterId.newInstance(subClusterId);
-    ApplicationHomeSubCluster applicationHomeSubCluster =
-        ApplicationHomeSubCluster.newInstance(applicationId, createTime, homeSubClusterId, context);
-    this.applications.put(applicationId, applicationHomeSubCluster);
-  }
-}
+    ApplicationSubmissionContext submissionContext

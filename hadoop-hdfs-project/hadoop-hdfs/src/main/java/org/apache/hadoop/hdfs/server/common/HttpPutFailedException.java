@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,31 @@ import org.apache.hadoop.classification.InterfaceAudience;
 
 import java.io.IOException;
 
+/**
+ * HTTP PUT请求失败异常
+ * HDFS服务端内部发起HTTP PUT请求失败时抛出该异常，保存HTTP响应码便于问题定位
+ */
 @InterfaceAudience.Private
 public class HttpPutFailedException extends IOException {
   private static final long serialVersionUID = 1L;
+  // HTTP响应状态码
   private final int responseCode;
 
+  /**
+   * 构造HTTP PUT失败异常
+   * @param msg 异常错误信息
+   * @param responseCode HTTP响应状态码
+   * @throws IOException IO异常基类
+   */
   public HttpPutFailedException(String msg, int responseCode) throws IOException {
     super(msg);
     this.responseCode = responseCode;
   }
 
+  /**
+   * 获取HTTP响应状态码
+   * @return HTTP响应状态码
+   */
   public int getResponseCode() {
     return responseCode;
   }

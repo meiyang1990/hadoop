@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,17 +22,24 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 /**
- * A TeeOutputStream writes its output to multiple output streams.
+ * 多路输出流，支持将写入的数据同时转发到多个目标输出流，类似Unix的tee命令功能。
+ * 用于离线edits日志查看器中同时输出到多个目的地（如文件和控制台）。
  */
 public class TeeOutputStream extends OutputStream {
+  // 存储所有需要输出的目标流数组
   private final OutputStream[] outs;
 
+  /**
+   * 构造多路输出流，指定多个目标输出流
+   * @param outs 目标输出流数组
+   */
   public TeeOutputStream(OutputStream outs[]) {
     this.outs = outs;
   }
 
   @Override
   public void write(int c) throws IOException {
+    // 遍历所有目标流，写入单个字节
     for (OutputStream o : outs) {
      o.write(c);
     }
@@ -39,6 +47,7 @@ public class TeeOutputStream extends OutputStream {
 
   @Override
   public void write(byte[] b) throws IOException {
+    // 遍历所有目标流，写入字节数组
     for (OutputStream o : outs) {
      o.write(b);
     }
@@ -46,6 +55,7 @@ public class TeeOutputStream extends OutputStream {
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
+    // 遍历所有目标流，写入字节数组指定范围
     for (OutputStream o : outs) {
      o.write(b, off, len);
     }
@@ -53,6 +63,7 @@ public class TeeOutputStream extends OutputStream {
 
   @Override
   public void close() throws IOException {
+    // 遍历所有目标流，关闭流
     for (OutputStream o : outs) {
      o.close();
     }
@@ -60,6 +71,7 @@ public class TeeOutputStream extends OutputStream {
 
   @Override
   public void flush() throws IOException {
+    // 遍历所有目标流，刷新缓冲区
     for (OutputStream o : outs) {
      o.flush();
     }

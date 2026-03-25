@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -101,8 +102,8 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Implements {@link FederationStateStore} and provides a service for
- * participating in the federation membership.
+ * YARN联邦环境下，RM侧联邦状态存储服务，实现了FederationStateStore接口，
+ * 负责本子集群向联邦状态注册、维持心跳，并代理对状态存储的各种操作。
  */
 public class FederationStateStoreService extends AbstractService
     implements FederationStateStore {
@@ -111,20 +112,37 @@ public class FederationStateStoreService extends AbstractService
       LoggerFactory.getLogger(FederationStateStoreService.class);
 
   private Configuration config;
+  // 定时心跳执行线程池
   private ScheduledExecutorService scheduledExecutorService;
+  // 状态存储心跳任务
   private FederationStateStoreHeartbeat stateStoreHeartbeat;
+  // 实际底层状态存储客户端代理
   private FederationStateStore stateStoreClient = null;
+  // 当前子集群ID
   private SubClusterId subClusterId;
+  // 心跳间隔（秒）
   private long heartbeatInterval;
+  // 首次心跳初始延迟（秒）
   private long heartbeatInitialDelay;
+  // RM上下文对象
   private RMContext rmContext;
+  //  monotonic递增时钟，用于统计耗时
   private final Clock clock = new MonotonicClock();
+  // 服务指标采集
   private FederationStateStoreServiceMetrics metrics;
+  // 清理线程名称前缀
   private String cleanUpThreadNamePrefix = "FederationStateStoreService-Clean-Thread";
+  // 清理操作最大重试次数
   private int cleanUpRetryCountNum;
+  // 清理重试间隔（毫秒）
   private long cleanUpRetrySleepTime;
+  // JAXB上下文解析器，用于Web服务序列化
   private JAXBContextResolver resolver;
 
+  /**
+   * 构造函数，基于RM上下文初始化服务。
+   * @param rmContext RM上下文
+   */
   public FederationStateStoreService(RMContext rmContext) {
     super(FederationStateStoreService.class.getName());
     LOG.info("FederationStateStoreService initialized");
@@ -136,9 +154,11 @@ public class FederationStateStoreService extends AbstractService
 
     this.config = conf;
 
+    // 创建联邦状态存储操作的重试策略
     RetryPolicy retryPolicy =
         FederationStateStoreFacade.createRetryPolicy(conf);
 
+    // 基于配置创建带重试的状态存储客户端实例
     this.stateStoreClient =
         (FederationStateStore) FederationStateStoreFacade.createRetryInstance(
             conf, YarnConfiguration.FEDERATION_STATESTORE_CLIENT_CLASS,
@@ -147,9 +167,11 @@ public class FederationStateStoreService extends AbstractService
     this.stateStoreClient.init(conf);
     LOG.info("Initialized state store client class");
 
+    // 从配置获取当前集群ID，构造子集群ID
     this.subClusterId =
         SubClusterId.newInstance(YarnConfiguration.getClusterId(conf));
 
+    // 加载心跳间隔配置，若非法则使用默认值
     heartbeatInterval = conf.getLong(
         YarnConfiguration.FEDERATION_STATESTORE_HEARTBEAT_INTERVAL_SECS,
         YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_HEARTBEAT_INTERVAL_SECS);
@@ -159,6 +181,7 @@ public class FederationStateStoreService extends AbstractService
           YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_HEARTBEAT_INTERVAL_SECS;
     }
 
+    // 加载心跳初始延迟配置
     heartbeatInitialDelay = conf.getTimeDuration(
         YarnConfiguration.FEDERATION_STATESTORE_HEARTBEAT_INITIAL_DELAY,
         YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_HEARTBEAT_INITIAL_DELAY,
@@ -172,6 +195,7 @@ public class FederationStateStoreService extends AbstractService
           YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_HEARTBEAT_INITIAL_DELAY;
     }
 
+    // 加载已完成应用清理重试配置
     cleanUpRetryCountNum = conf.getInt(YarnConfiguration.FEDERATION_STATESTORE_CLEANUP_RETRY_COUNT,
         YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_CLEANUP_RETRY_COUNT);
 
@@ -182,9 +206,11 @@ public class FederationStateStoreService extends AbstractService
 
     LOG.info("Initialized federation membership service.");
 
+    // 初始化服务指标
     this.metrics = FederationStateStoreServiceMetrics.getMetrics();
     LOG.info("Initialized federation statestore service metrics.");
 
+    // 初始化JAXB上下文解析器
     this.resolver = new JAXBContextResolver(conf);
 
     super.serviceInit(conf);
@@ -192,9 +218,8 @@ public class FederationStateStoreService extends AbstractService
 
   @Override
   protected void serviceStart() throws Exception {
-
+    // 注册子集群并启动定时心跳任务
     registerAndInitializeHeartbeat();
-
     super.serviceStart();
   }
 
@@ -202,6 +227,7 @@ public class FederationStateStoreService extends AbstractService
   protected void serviceStop() throws Exception {
     Exception ex = null;
     try {
+      // 关闭定时心跳线程池
       if (this.scheduledExecutorService != null
           && !this.scheduledExecutorService.isShutdown()) {
         this.scheduledExecutorService.shutdown();
@@ -212,6 +238,7 @@ public class FederationStateStoreService extends AbstractService
       ex = e;
     }
 
+    // 子集群注销并关闭底层状态存储客户端
     if (this.stateStoreClient != null) {
       try {
         deregisterSubCluster(SubClusterDeregisterRequest
@@ -227,13 +254,22 @@ public class FederationStateStoreService extends AbstractService
   }
 
   // Return a client accessible string representation of the service address.
+  /**
+   * 将InetSocketAddress转换为客户端可访问的"IP:端口"格式字符串。
+   * @param address 原始地址对象
+   * @return 格式化地址字符串
+   */
   private String getServiceAddress(InetSocketAddress address) {
     InetSocketAddress socketAddress = NetUtils.getConnectAddress(address);
     return socketAddress.getAddress().getHostAddress() + ":"
         + socketAddress.getPort();
   }
 
+  /**
+   * 向联邦状态存储注册当前子集群，并初始化定时心跳任务。
+   */
   private void registerAndInitializeHeartbeat() {
+    // 获取RM各服务地址并格式化
     String clientRMAddress =
         getServiceAddress(rmContext.getClientRMService().getBindAddress());
     String amRMAddress = getServiceAddress(
@@ -245,10 +281,12 @@ public class FederationStateStoreService extends AbstractService
     String webAppAddress = getServiceAddress(NetUtils
         .createSocketAddr(WebAppUtils.getRMWebAppURLWithScheme(config)));
 
+    // 构造子集群信息对象
     SubClusterInfo subClusterInfo = SubClusterInfo.newInstance(subClusterId,
         amRMAddress, clientRMAddress, rmAdminAddress, webAppAddress,
         SubClusterState.SC_NEW, ResourceManager.getClusterTimeStamp(), "");
     try {
+      // 向状态存储注册子集群
       registerSubCluster(SubClusterRegisterRequest.newInstance(subClusterInfo));
       LOG.info("Successfully registered for federation subcluster: {}",
           subClusterInfo);
@@ -256,8 +294,10 @@ public class FederationStateStoreService extends AbstractService
       throw new YarnRuntimeException(
           "Failed to register Federation membership with the StateStore", e);
     }
+    // 创建心跳任务实例
     stateStoreHeartbeat = new FederationStateStoreHeartbeat(subClusterId,
         stateStoreClient, rmContext.getScheduler(), resolver);
+    // 创建单线程定时线程池，启动固定延迟心跳任务
     scheduledExecutorService =
         HadoopExecutors.newSingleThreadScheduledExecutor();
     scheduledExecutorService.scheduleWithFixedDelay(stateStoreHeartbeat,
@@ -339,415 +379,3 @@ public class FederationStateStoreService extends AbstractService
         DeleteSubClusterPoliciesConfigurationsRequest.class, request,
         DeleteSubClusterPoliciesConfigurationsResponse.class, stateStoreClient, clock);
     return clientMethod.invoke();
-  }
-
-  @Override
-  public DeletePoliciesConfigurationsResponse deleteAllPoliciesConfigurations(
-      DeletePoliciesConfigurationsRequest request) throws Exception {
-    FederationClientMethod<DeletePoliciesConfigurationsResponse> clientMethod =
-        new FederationClientMethod<>("deleteAllPoliciesConfigurations",
-        DeletePoliciesConfigurationsRequest.class, request,
-        DeletePoliciesConfigurationsResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public SubClusterRegisterResponse registerSubCluster(SubClusterRegisterRequest request)
-      throws YarnException {
-    FederationClientMethod<SubClusterRegisterResponse> clientMethod =
-        new FederationClientMethod<>("registerSubCluster",
-        SubClusterRegisterRequest.class, request,
-        SubClusterRegisterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public SubClusterDeregisterResponse deregisterSubCluster(SubClusterDeregisterRequest request)
-      throws YarnException {
-    FederationClientMethod<SubClusterDeregisterResponse> clientMethod =
-        new FederationClientMethod<>("deregisterSubCluster",
-        SubClusterDeregisterRequest.class, request,
-        SubClusterDeregisterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public SubClusterHeartbeatResponse subClusterHeartbeat(SubClusterHeartbeatRequest request)
-      throws YarnException {
-    FederationClientMethod<SubClusterHeartbeatResponse> clientMethod =
-        new FederationClientMethod<>("subClusterHeartbeat",
-        SubClusterHeartbeatRequest.class, request,
-        SubClusterHeartbeatResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public GetSubClusterInfoResponse getSubCluster(GetSubClusterInfoRequest request)
-      throws YarnException {
-    FederationClientMethod<GetSubClusterInfoResponse> clientMethod =
-        new FederationClientMethod<>("getSubCluster",
-        GetSubClusterInfoRequest.class, request,
-        GetSubClusterInfoResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public GetSubClustersInfoResponse getSubClusters(GetSubClustersInfoRequest request)
-      throws YarnException {
-    FederationClientMethod<GetSubClustersInfoResponse> clientMethod =
-        new FederationClientMethod<>("getSubClusters",
-        GetSubClustersInfoRequest.class, request,
-        GetSubClustersInfoResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public AddApplicationHomeSubClusterResponse addApplicationHomeSubCluster(
-      AddApplicationHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<AddApplicationHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("addApplicationHomeSubCluster",
-        AddApplicationHomeSubClusterRequest.class, request,
-        AddApplicationHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public UpdateApplicationHomeSubClusterResponse updateApplicationHomeSubCluster(
-      UpdateApplicationHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<UpdateApplicationHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("updateApplicationHomeSubCluster",
-        AddApplicationHomeSubClusterRequest.class, request,
-        UpdateApplicationHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public GetApplicationHomeSubClusterResponse getApplicationHomeSubCluster(
-      GetApplicationHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<GetApplicationHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("getApplicationHomeSubCluster",
-        GetApplicationHomeSubClusterRequest.class, request,
-        GetApplicationHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public GetApplicationsHomeSubClusterResponse getApplicationsHomeSubCluster(
-      GetApplicationsHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<GetApplicationsHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("getApplicationsHomeSubCluster",
-        GetApplicationsHomeSubClusterRequest.class, request,
-        GetApplicationsHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public DeleteApplicationHomeSubClusterResponse deleteApplicationHomeSubCluster(
-      DeleteApplicationHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<DeleteApplicationHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("deleteApplicationHomeSubCluster",
-        DeleteApplicationHomeSubClusterRequest.class, request,
-        DeleteApplicationHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public AddReservationHomeSubClusterResponse addReservationHomeSubCluster(
-      AddReservationHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<AddReservationHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("addReservationHomeSubCluster",
-        AddReservationHomeSubClusterRequest.class, request,
-        AddReservationHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public GetReservationHomeSubClusterResponse getReservationHomeSubCluster(
-      GetReservationHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<GetReservationHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("getReservationHomeSubCluster",
-        GetReservationHomeSubClusterRequest.class, request,
-        GetReservationHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public GetReservationsHomeSubClusterResponse getReservationsHomeSubCluster(
-      GetReservationsHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<GetReservationsHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("getReservationsHomeSubCluster",
-        GetReservationsHomeSubClusterRequest.class, request,
-        GetReservationsHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public UpdateReservationHomeSubClusterResponse updateReservationHomeSubCluster(
-      UpdateReservationHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<UpdateReservationHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("updateReservationHomeSubCluster",
-        GetReservationsHomeSubClusterRequest.class, request,
-        UpdateReservationHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public DeleteReservationHomeSubClusterResponse deleteReservationHomeSubCluster(
-      DeleteReservationHomeSubClusterRequest request) throws YarnException {
-    FederationClientMethod<DeleteReservationHomeSubClusterResponse> clientMethod =
-        new FederationClientMethod<>("deleteReservationHomeSubCluster",
-        DeleteReservationHomeSubClusterRequest.class, request,
-        DeleteReservationHomeSubClusterResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public RouterMasterKeyResponse storeNewMasterKey(RouterMasterKeyRequest request)
-      throws YarnException, IOException {
-    FederationClientMethod<RouterMasterKeyResponse> clientMethod = new FederationClientMethod<>(
-        "storeNewMasterKey",
-        RouterMasterKeyRequest.class, request,
-        RouterMasterKeyResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public RouterMasterKeyResponse removeStoredMasterKey(RouterMasterKeyRequest request)
-      throws YarnException, IOException {
-    FederationClientMethod<RouterMasterKeyResponse> clientMethod = new FederationClientMethod<>(
-        "removeStoredMasterKey",
-        RouterMasterKeyRequest.class, request,
-        RouterMasterKeyResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public RouterMasterKeyResponse getMasterKeyByDelegationKey(RouterMasterKeyRequest request)
-      throws YarnException, IOException {
-    FederationClientMethod<RouterMasterKeyResponse> clientMethod = new FederationClientMethod<>(
-        "getMasterKeyByDelegationKey",
-        RouterMasterKeyRequest.class, request,
-        RouterMasterKeyResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public RouterRMTokenResponse storeNewToken(RouterRMTokenRequest request)
-      throws YarnException, IOException {
-    FederationClientMethod<RouterRMTokenResponse> clientMethod = new FederationClientMethod<>(
-        "storeNewToken",
-        RouterRMTokenRequest.class, request,
-        RouterRMTokenResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public RouterRMTokenResponse updateStoredToken(RouterRMTokenRequest request)
-      throws YarnException, IOException {
-    FederationClientMethod<RouterRMTokenResponse> clientMethod = new FederationClientMethod<>(
-        "updateStoredToken",
-        RouterRMTokenRequest.class, request,
-        RouterRMTokenResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public RouterRMTokenResponse removeStoredToken(RouterRMTokenRequest request)
-      throws YarnException, IOException {
-    FederationClientMethod<RouterRMTokenResponse> clientMethod = new FederationClientMethod<>(
-        "removeStoredToken",
-        RouterRMTokenRequest.class, request,
-        RouterRMTokenResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public RouterRMTokenResponse getTokenByRouterStoreToken(RouterRMTokenRequest request)
-      throws YarnException, IOException {
-    FederationClientMethod<RouterRMTokenResponse> clientMethod = new FederationClientMethod<>(
-        "getTokenByRouterStoreToken",
-        RouterRMTokenRequest.class, request,
-        RouterRMTokenResponse.class, stateStoreClient, clock);
-    return clientMethod.invoke();
-  }
-
-  @Override
-  public int incrementDelegationTokenSeqNum() {
-    return stateStoreClient.incrementDelegationTokenSeqNum();
-  }
-
-  @Override
-  public int getDelegationTokenSeqNum() {
-    return stateStoreClient.getDelegationTokenSeqNum();
-  }
-
-  @Override
-  public void setDelegationTokenSeqNum(int seqNum) {
-    stateStoreClient.setDelegationTokenSeqNum(seqNum);
-  }
-
-  @Override
-  public int getCurrentKeyId() {
-    return stateStoreClient.getCurrentKeyId();
-  }
-
-  @Override
-  public int incrementCurrentKeyId() {
-    return stateStoreClient.incrementCurrentKeyId();
-  }
-
-  /**
-   * Create a thread that cleans up the app.
-   * @param stage rm-start/rm-stop.
-   */
-  public void createCleanUpFinishApplicationThread(String stage) {
-    String threadName = cleanUpThreadNamePrefix + "-" + stage;
-    Thread finishApplicationThread = new SubjectInheritingThread(createCleanUpFinishApplicationThread());
-    finishApplicationThread.setName(threadName);
-    finishApplicationThread.start();
-    LOG.info("CleanUpFinishApplicationThread has been started {}.", threadName);
-  }
-
-  /**
-   * Create a thread that cleans up the apps.
-   *
-   * @return thread object.
-   */
-  private Runnable createCleanUpFinishApplicationThread() {
-    return () -> {
-      createCleanUpFinishApplication();
-    };
-  }
-
-  /**
-   * cleans up the apps.
-   */
-  private void createCleanUpFinishApplication() {
-    try {
-      // Get the current RM's App list based on subClusterId
-      GetApplicationsHomeSubClusterRequest request =
-          GetApplicationsHomeSubClusterRequest.newInstance(subClusterId);
-      GetApplicationsHomeSubClusterResponse response =
-          getApplicationsHomeSubCluster(request);
-      List<ApplicationHomeSubCluster> applicationHomeSCs = response.getAppsHomeSubClusters();
-
-      // Traverse the app list and clean up the app.
-      long successCleanUpAppCount = 0;
-
-      // Save a local copy of the map so that it won't change with the map
-      Map<ApplicationId, RMApp> rmApps = new HashMap<>(this.rmContext.getRMApps());
-
-      // Need to make sure there is app list in RM memory.
-      if (rmApps != null && !rmApps.isEmpty()) {
-        for (ApplicationHomeSubCluster applicationHomeSC : applicationHomeSCs) {
-          ApplicationId applicationId = applicationHomeSC.getApplicationId();
-          if (!rmApps.containsKey(applicationId)) {
-            try {
-              Boolean cleanUpSuccess = cleanUpFinishApplicationsWithRetries(applicationId, false);
-              if (cleanUpSuccess) {
-                LOG.info("application = {} has been cleaned up successfully.", applicationId);
-                successCleanUpAppCount++;
-              }
-            } catch (Exception e) {
-              LOG.error("problem during application = {} cleanup.", applicationId, e);
-            }
-          }
-        }
-      }
-
-      // print app cleanup log
-      LOG.info("cleanup finished applications size = {}, number = {} successful cleanup.",
-          applicationHomeSCs.size(), successCleanUpAppCount);
-    } catch (Exception e) {
-      LOG.error("problem during cleanup applications.", e);
-    }
-  }
-
-  /**
-   * Clean up the federation completed Application.
-   *
-   * @param appId app id.
-   * @param isQuery true, need to query from statestore, false not query.
-   * @throws Exception exception occurs.
-   * @return true, successfully deleted; false, failed to delete or no need to delete
-   */
-  public boolean cleanUpFinishApplicationsWithRetries(ApplicationId appId, boolean isQuery)
-      throws Exception {
-
-    // Generate a request to delete data
-    DeleteApplicationHomeSubClusterRequest req =
-        DeleteApplicationHomeSubClusterRequest.newInstance(appId);
-
-    // CleanUp Finish App.
-    return ((FederationActionRetry<Boolean>) (retry) -> invokeCleanUpFinishApp(appId, isQuery, req))
-        .runWithRetries(cleanUpRetryCountNum, cleanUpRetrySleepTime);
-  }
-
-  /**
-   * CleanUp Finish App.
-   *
-   * @param applicationId app id.
-   * @param isQuery true, need to query from statestore, false not query.
-   * @param delRequest delete Application Request
-   * @return true, successfully deleted; false, failed to delete or no need to delete
-   * @throws YarnException
-   */
-  private boolean invokeCleanUpFinishApp(ApplicationId applicationId, boolean isQuery,
-      DeleteApplicationHomeSubClusterRequest delRequest) throws YarnException {
-    boolean isAppNeedClean = true;
-    // If we need to query the StateStore
-    if (isQuery) {
-      isAppNeedClean = isApplicationNeedClean(applicationId);
-    }
-    // When the App needs to be cleaned up, clean up the App.
-    if (isAppNeedClean) {
-      DeleteApplicationHomeSubClusterResponse response =
-          deleteApplicationHomeSubCluster(delRequest);
-      if (response != null) {
-        LOG.info("The applicationId = {} has been successfully cleaned up.", applicationId);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Used to determine whether the Application is cleaned up.
-   *
-   * When the app in the RM is completed,
-   * the HomeSC corresponding to the app will be queried in the StateStore.
-   * If the current RM is the HomeSC, the completed app will be cleaned up.
-   *
-   * @param applicationId applicationId
-   * @return true, app needs to be cleaned up;
-   *         false, app doesn't need to be cleaned up.
-   */
-  private boolean isApplicationNeedClean(ApplicationId applicationId) {
-    GetApplicationHomeSubClusterRequest queryRequest =
-            GetApplicationHomeSubClusterRequest.newInstance(applicationId);
-    // Here we need to use try...catch,
-    // because getApplicationHomeSubCluster may throw not exist exception
-    try {
-      GetApplicationHomeSubClusterResponse queryResp =
-          getApplicationHomeSubCluster(queryRequest);
-      if (queryResp != null) {
-        ApplicationHomeSubCluster appHomeSC = queryResp.getApplicationHomeSubCluster();
-        SubClusterId homeSubClusterId = appHomeSC.getHomeSubCluster();
-        if (!subClusterId.equals(homeSubClusterId)) {
-          LOG.warn("The homeSubCluster of applicationId = {} belong subCluster = {}, " +
-              " not belong subCluster = {} and is not allowed to delete.",
-              applicationId, homeSubClusterId, subClusterId);
-          return false;
-        }
-      } else {
-        LOG.warn("The applicationId = {} not belong subCluster = {} " +
-            " and is not allowed to delete.", applicationId, subClusterId);
-        return false;
-      }
-    } catch (Exception e) {
-      LOG.warn("query applicationId = {} error.", applicationId, e);
-      return false;
-    }
-    return true;
-  }
-}

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,26 +30,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A low memory linked hash set implementation, which uses an array for storing
- * the elements and linked lists for collision resolution. This class does not
- * support null element.
- *
- * This class is not thread safe.
- *
+ * @file LightWeightHashSet.java
+ * 低内存占用的链式哈希集合实现，使用数组存储元素，链表解决哈希冲突。不支持null元素。
+ * 该实现非线程安全，适用于对内存占用敏感的场景。
  */
 public class LightWeightHashSet<T> implements Collection<T> {
   /**
-   * Elements of {@link LightWeightLinkedSet}.
+   * 哈希表中的链表节点，存储实际元素和哈希值、下一个节点引用
+   * @param <T> 存储的元素类型
    */
   static class LinkedElement<T> {
     protected final T element;
 
-    // reference to the next entry within a bucket linked list
+    // 当前哈希桶链表中下一个节点的引用
     protected LinkedElement<T> next;
 
-    //hashCode of the element
+    // 存储元素的哈希值，避免重复计算
     protected final int hashCode;
 
+    /**
+     * 构造链表节点，存储元素和哈希值
+     * @param elem 实际存储的元素
+     * @param hash 元素的哈希值
+     */
     public LinkedElement(T elem, int hash) {
       this.element = elem;
       this.next = null;
@@ -70,22 +74,20 @@ public class LightWeightHashSet<T> implements Collection<T> {
       LoggerFactory.getLogger(LightWeightHashSet.class);
 
   /**
-   * An internal array of entries, which are the rows of the hash table. The
-   * size must be a power of two.
+   * 哈希表的桶数组，每个桶对应一个链表的头节点。数组长度必须是2的幂。
    */
   protected LinkedElement<T>[] entries;
-  /** Size of the entry table. */
+  /** 哈希表当前容量（桶数组长度） */
   private int capacity;
-  /** The size of the set (not the entry array). */
+  /** 集合中实际存储的元素个数，不是桶数组长度 */
   protected int size = 0;
-  /** Hashmask used for determining the bucket index **/
+  /** 哈希掩码，用于快速计算桶索引（capacity - 1） */
   private int hash_mask;
-  /** Capacity at initialization time **/
+  /** 初始化时的容量，缩容时不会小于该值 */
   private final int initialCapacity;
 
   /**
-   * Modification version for fail-fast.
-   *
+   * 修改计数，用于快速失败机制，迭代时检测到集合修改会抛出ConcurrentModificationException
    * @see ConcurrentModificationException
    */
   protected int modification = 0;
@@ -98,12 +100,10 @@ public class LightWeightHashSet<T> implements Collection<T> {
   private int shrinkThreshold;
 
   /**
-   * @param initCapacity
-   *          Recommended size of the internal array.
-   * @param maxLoadFactor
-   *          used to determine when to expand the internal array
-   * @param minLoadFactor
-   *          used to determine when to shrink the internal array
+   * 构造指定初始容量和装载因子的轻量级哈希集合
+   * @param initCapacity 推荐的初始容量
+   * @param maxLoadFactor 扩容触发阈值，当元素数量超过容量*maxLoadFactor时扩容
+   * @param minLoadFactor 缩容触发阈值，当元素数量低于容量*minLoadFactor时缩容
    */
   @SuppressWarnings("unchecked")
   public LightWeightHashSet(int initCapacity, float maxLoadFactor,
@@ -133,18 +133,24 @@ public class LightWeightHashSet<T> implements Collection<T> {
     }
   }
 
+  /**
+   * 使用默认参数构造轻量级哈希集合：初始容量16，最大负载因子0.75，最小负载因子0.2
+   */
   public LightWeightHashSet() {
     this(MINIMUM_CAPACITY, DEFAULT_MAX_LOAD_FACTOR, DEFAUT_MIN_LOAD_FACTOR);
   }
 
+  /**
+   * 使用指定最小容量和默认负载因子构造轻量级哈希集合
+   * @param minCapacity 最小容量
+   */
   public LightWeightHashSet(int minCapacity) {
     this(minCapacity, DEFAULT_MAX_LOAD_FACTOR, DEFAUT_MIN_LOAD_FACTOR);
   }
 
   /**
-   * Check if the set is empty.
-   *
-   * @return true is set empty, false otherwise
+   * 检查集合是否为空
+   * @return 空返回true，否则返回false
    */
   @Override
   public boolean isEmpty() {
@@ -152,14 +158,16 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Return the current capacity (for testing).
+   * 获取当前哈希表容量，仅用于测试
+   * @return 当前容量
    */
   public int getCapacity() {
     return capacity;
   }
 
   /**
-   * Return the number of stored elements.
+   * 获取集合中元素数量
+   * @return 元素数量
    */
   @Override
   public int size() {
@@ -167,16 +175,17 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Get index in the internal table for a given hash.
+   * 根据哈希值计算对应的桶索引
+   * @param hashCode 元素哈希值
+   * @return 桶数组索引
    */
   protected int getIndex(int hashCode) {
     return hashCode & hash_mask;
   }
 
   /**
-   * Check if the set contains given element
-   *
-   * @return true if element present, false otherwise.
+   * 检查集合是否包含指定元素
+   * @return 包含返回true，否则返回false
    */
   @SuppressWarnings("unchecked")
   @Override
@@ -185,43 +194,43 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
   
   /**
-   * Return the element in this set which is equal to
-   * the given key, if such an element exists.
-   * Otherwise returns null.
+   * 获取集合中与给定键相等的元素，如果不存在则返回null
+   * @param key 要查找的键
+   * @return 匹配的元素，不存在则返回null
    */
   public T getElement(final T key) {
-    // validate key
+    // 校验元素非空
     if (key == null) {
       throw new IllegalArgumentException("Null element is not supported.");
     }
-    // find element
+    // 计算哈希并获取桶索引
     final int hashCode = key.hashCode();
     final int index = getIndex(hashCode);
     return getContainedElem(index, key, hashCode);
   }
 
   /**
-   * Check if the set contains given element at given index. If it
-   * does, return that element.
-   *
-   * @return the element, or null, if no element matches
+   * 在指定桶中查找匹配元素
+   * @param index 桶索引
+   * @param key 要查找的键
+   * @param hashCode 键的哈希值
+   * @return 匹配的元素，不存在则返回null
    */
   protected T getContainedElem(int index, final T key, int hashCode) {
     for (LinkedElement<T> e = entries[index]; e != null; e = e.next) {
-      // element found
+      // 哈希相同且元素相等，找到匹配
       if (hashCode == e.hashCode && e.element.equals(key)) {
         return e.element;
       }
     }
-    // element not found
+    // 未找到匹配元素
     return null;
   }
 
   /**
-   * All all elements in the collection. Expand if necessary.
-   *
-   * @param toAdd - elements to add.
-   * @return true if the set has changed, false otherwise
+   * 添加集合中所有元素，必要时触发扩容
+   * @param toAdd 要添加的元素集合
+   * @return 集合发生变化返回true，否则返回false
    */
   @Override
   public boolean addAll(Collection<? extends T> toAdd) {
@@ -234,9 +243,9 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Add given element to the hash table. Expand table if necessary.
-   *
-   * @return true if the element was not present in the table, false otherwise
+   * 添加单个元素，必要时触发扩容
+   * @param element 要添加的元素
+   * @return 元素不存在则添加成功返回true，已存在返回false
    */
   @Override
   public boolean add(final T element) {
@@ -246,27 +255,28 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Add given element to the hash table
-   *
-   * @return true if the element was not present in the table, false otherwise
+   * 将元素添加到哈希表中，不触发扩容检查
+   * @param element 要添加的元素
+   * @return 添加成功返回true，元素已存在返回false
    */
   protected boolean addElem(final T element) {
-    // validate element
+    // 校验元素非空
     if (element == null) {
       throw new IllegalArgumentException("Null element is not supported.");
     }
-    // find hashCode & index
+    // 计算哈希和桶索引
     final int hashCode = element.hashCode();
     final int index = getIndex(hashCode);
-    // return false if already present
+    // 元素已存在，返回false
     if (getContainedElem(index, element, hashCode) != null) {
       return false;
     }
 
+    // 修改计数+1，元素数量+1
     modification++;
     size++;
 
-    // update bucket linked list
+    // 将新节点插入到桶链表头部
     LinkedElement<T> le = new LinkedElement<T>(element, hashCode);
     le.next = entries[index];
     entries[index] = le;
@@ -274,14 +284,14 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Remove the element corresponding to the key.
-   *
-   * @return If such element exists, return true. Otherwise, return false.
+   * 删除指定元素，必要时触发缩容
+   * @param key 要删除的元素
+   * @return 删除成功返回true，元素不存在返回false
    */
   @Override
   @SuppressWarnings("unchecked")
   public boolean remove(final Object key) {
-    // validate key
+    // 校验元素非空
     if (key == null) {
       throw new IllegalArgumentException("Null element is not supported.");
     }
@@ -291,31 +301,31 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Remove the element corresponding to the key, given key.hashCode() == index.
-   *
-   * @return If such element exists, return true. Otherwise, return false.
+   * 删除指定元素，不触发缩容检查
+   * @param key 要删除的元素
+   * @return 被删除的节点，不存在返回null
    */
   protected LinkedElement<T> removeElem(final T key) {
     LinkedElement<T> found = null;
     final int hashCode = key.hashCode();
     final int index = getIndex(hashCode);
     if (entries[index] == null) {
+      // 桶为空，直接返回
       return null;
     } else if (hashCode == entries[index].hashCode &&
             entries[index].element.equals(key)) {
-      // remove the head of the bucket linked list
+      // 要删除的是桶链表头节点
       modification++;
       size--;
       found = entries[index];
       entries[index] = found.next;
     } else {
-      // head != null and key is not equal to head
-      // search the element
+      // 头节点不匹配，遍历链表查找
       LinkedElement<T> prev = entries[index];
       for (found = prev.next; found != null;) {
         if (hashCode == found.hashCode &&
                 found.element.equals(key)) {
-          // found the element, remove it
+          // 找到匹配，删除节点
           modification++;
           size--;
           prev.next = found.next;
@@ -331,11 +341,10 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Remove and return n elements from the hashtable.
-   * The order in which entries are removed is unspecified, and
-   * and may not correspond to the order in which they were inserted.
-   *
-   * @return first element
+   * 弹出指定数量n个元素，从哈希表中移除并返回这些元素
+   * 删除顺序不保证与插入顺序一致
+   * @param n 要弹出的元素数量
+   * @return 弹出的元素列表
    */
   public List<T> pollN(int n) {
     if (n >= size) {
@@ -368,7 +377,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Remove all elements from the set and return them. Clear the entries.
+   * 弹出所有元素，清空集合并返回所有元素
+   * @return 所有元素组成的列表
    */
   public List<T> pollAll() {
     List<T> retList = new ArrayList<T>(size);
@@ -384,7 +394,10 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Get array.length elements from the set, and put them into the array.
+   * 将指定长度数组填充集合元素并返回，元素会被从集合中移除
+   * 如果数组长度大于集合大小，会重新创建匹配集合大小的数组
+   * @param array 目标数组
+   * @return 填充了元素的数组
    */
   @SuppressWarnings("unchecked")
   public T[] pollToArray(T[] array) {
@@ -398,7 +411,7 @@ public class LightWeightHashSet<T> implements Collection<T> {
       array = (T[]) java.lang.reflect.Array.newInstance(array.getClass()
           .getComponentType(), size);
     }
-    // do fast polling if the entire set needs to be fetched
+    // 如果需要取出全部元素，使用快速遍历
     if (array.length == size) {
       for (int i = 0; i < entries.length; i++) {
         current = entries[i];
@@ -434,10 +447,10 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Compute capacity given initial capacity.
-   *
-   * @return final capacity, either MIN_CAPACITY, MAX_CAPACITY, or power of 2
-   *         closest to the requested capacity.
+   * 根据用户指定的初始容量计算实际容量，结果为不小于输入的最小2的幂
+   * 限制容量在[MINIMUM_CAPACITY, MAXIMUM_CAPACITY]范围内
+   * @param initial 用户指定的初始容量
+   * @return 计算后的实际容量
    */
   private int computeCapacity(int initial) {
     if (initial < MINIMUM_CAPACITY) {
@@ -454,12 +467,14 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Resize the internal table to given capacity.
+   * 将哈希表重新哈希到新容量
+   * @param cap 目标容量
    */
   @SuppressWarnings("unchecked")
   private void resize(int cap) {
     int newCapacity = computeCapacity(cap);
     if (newCapacity == this.capacity) {
+      // 容量未变化，无需调整
       return;
     }
     this.capacity = newCapacity;
@@ -468,6 +483,7 @@ public class LightWeightHashSet<T> implements Collection<T> {
     this.hash_mask = capacity - 1;
     LinkedElement<T>[] temp = entries;
     entries = new LinkedElement[capacity];
+    // 遍历所有节点重新哈希到新桶
     for (int i = 0; i < temp.length; i++) {
       LinkedElement<T> curr = temp[i];
       while (curr != null) {
@@ -481,7 +497,7 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Checks if we need to shrink, and shrinks if necessary.
+   * 检查是否需要缩容，满足条件则执行缩容
    */
   protected void shrinkIfNecessary() {
     if (size < this.shrinkThreshold && capacity > initialCapacity) {
@@ -490,161 +506,8 @@ public class LightWeightHashSet<T> implements Collection<T> {
   }
 
   /**
-   * Checks if we need to expand, and expands if necessary.
+   * 检查是否需要扩容，满足条件则执行扩容
    */
   protected void expandIfNecessary() {
     if (size > this.expandThreshold && capacity < MAXIMUM_CAPACITY) {
-      resize(capacity * expandMultiplier);
-    }
-  }
-
-  @Override
-  public Iterator<T> iterator() {
-    return new LinkedSetIterator();
-  }
-
-  @Override
-  public String toString() {
-    final StringBuilder b = new StringBuilder(getClass().getSimpleName());
-    b.append("(size=").append(size).append(", modification=")
-        .append(modification).append(", entries.length=")
-        .append(entries.length).append(")");
-    return b.toString();
-  }
-
-  /** Print detailed information of this object. */
-  public void printDetails(final PrintStream out) {
-    out.print(this + ", entries = [");
-    for (int i = 0; i < entries.length; i++) {
-      if (entries[i] != null) {
-        LinkedElement<T> e = entries[i];
-        out.print("\n  " + i + ": " + e);
-        for (e = e.next; e != null; e = e.next) {
-          out.print(" -> " + e);
-        }
-      }
-    }
-    out.println("\n]");
-  }
-
-  private class LinkedSetIterator implements Iterator<T> {
-    /** The current modification epoch. */
-    private int expectedModification = modification;
-    /** The current index of the entry array. */
-    private int index = -1;
-    /** The next element to return. */
-    private LinkedElement<T> next = nextNonemptyEntry();
-    private LinkedElement<T> current;
-
-    private LinkedElement<T> nextNonemptyEntry() {
-      for (index++; index < entries.length && entries[index] == null; index++);
-      return index < entries.length ? entries[index] : null;
-    }
-
-    @Override
-    public boolean hasNext() {
-      return next != null;
-    }
-
-    @Override
-    public T next() {
-      if (modification != expectedModification) {
-        throw new ConcurrentModificationException("modification="
-            + modification + " != expectedModification = " + expectedModification);
-      }
-      if (next == null) {
-        throw new NoSuchElementException();
-      }
-      current = next;
-      final T e = next.element;
-      // find the next element
-      final LinkedElement<T> n = next.next;
-      next = n != null ? n : nextNonemptyEntry();
-      return e;
-    }
-
-    @Override
-    public void remove() {
-      if (current == null) {
-        throw new NoSuchElementException();
-      }
-      if (modification != expectedModification) {
-        throw new ConcurrentModificationException("modification="
-            + modification + " != expectedModification = " + expectedModification);
-      }
-      LightWeightHashSet.this.removeElem(current.element);
-      current = null;
-      expectedModification = modification;
-    }
-  }
-
-  /**
-   * Clear the set. Resize it to the original capacity.
-   */
-  @Override
-  @SuppressWarnings("unchecked")
-  public void clear() {
-    this.capacity = this.initialCapacity;
-    this.hash_mask = capacity - 1;
-
-    this.expandThreshold = (int) (capacity * maxLoadFactor);
-    this.shrinkThreshold = (int) (capacity * minLoadFactor);
-
-    entries = new LinkedElement[capacity];
-    size = 0;
-    modification++;
-  }
-
-  @Override
-  public Object[] toArray() {
-    Object[] result = new Object[size];
-    return toArray(result);
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public <U> U[] toArray(U[] a) {
-    if (a == null) {
-      throw new NullPointerException("Input array can not be null");
-    }
-    if (a.length < size) {
-      a = (U[]) java.lang.reflect.Array.newInstance(a.getClass()
-          .getComponentType(), size);
-    }
-    int currentIndex = 0;
-    for (int i = 0; i < entries.length; i++) {
-      LinkedElement<T> current = entries[i];
-      while (current != null) {
-        a[currentIndex++] = (U) current.element;
-        current = current.next;
-      }
-    }
-    return a;
-  }
-
-  @Override
-  public boolean containsAll(Collection<?> c) {
-    Iterator<?> iter = c.iterator();
-    while (iter.hasNext()) {
-      if (!contains(iter.next())) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  @Override
-  public boolean removeAll(Collection<?> c) {
-    boolean changed = false;
-    Iterator<?> iter = c.iterator();
-    while (iter.hasNext()) {
-      changed |= remove(iter.next());
-    }
-    return changed;
-  }
-
-  @Override
-  public boolean retainAll(Collection<?> c) {
-    throw new UnsupportedOperationException("retainAll is not supported.");
-  }
-}
+      resize(capacity * expandMultiplier

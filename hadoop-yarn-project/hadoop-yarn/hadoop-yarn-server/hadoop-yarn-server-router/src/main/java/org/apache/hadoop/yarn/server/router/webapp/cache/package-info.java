@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,5 +15,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * YARN Router Web界面缓存模块包，提供Federation联邦场景下YARN Router
+ * Web服务端请求所需的缓存能力，用于提升页面响应速度，减少重复查询操作。
  */
 package org.apache.hadoop.yarn.server.router.webapp.cache;

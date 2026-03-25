@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -25,19 +26,51 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
+/**
+ * NodeManager上应用实例的抽象接口，定义应用在本节点的核心操作
+ * 负责管理本节点上该应用所属的所有容器，处理应用生命周期相关事件
+ */
 public interface Application extends EventHandler<ApplicationEvent> {
 
+  /**
+   * 获取提交该应用的用户名
+   * @return 提交应用的用户名称
+   */
   String getUser();
 
+  /**
+   * 获取该应用在本节点上运行的所有容器集合
+   * @return 容器ID到容器实例的映射表
+   */
   Map<ContainerId, Container> getContainers();
 
+  /**
+   * 获取该应用的全局唯一ID
+   * @return 应用ID实例
+   */
   ApplicationId getAppId();
 
+  /**
+   * 获取该应用当前的生命周期状态
+   * @return 应用状态枚举实例
+   */
   ApplicationState getApplicationState();
 
+  /**
+   * 获取应用所属的流名称，用于流级别的监控追踪
+   * @return 流名称
+   */
   String getFlowName();
 
+  /**
+   * 获取应用所属的流版本，用于流级别的监控追踪
+   * @return 流版本
+   */
   String getFlowVersion();
 
+  /**
+   * 获取当前流运行的唯一标识ID，用于流级别的监控追踪
+   * @return 流运行ID
+   */
   long getFlowRunId();
 }

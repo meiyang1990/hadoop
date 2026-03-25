@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -55,12 +56,10 @@ import static org.apache.hadoop.yarn.server.resourcemanager.scheduler
     .capacity.CSQueueUtils.EPSILON;
 
 /**
- * Capacity Management policy for auto created leaf queues
+ * 自动创建叶子队列的容量管理策略
  * <p>
- * Assigns capacity if available to leaf queues based on application
- * submission order i.e leaf queues are assigned capacity in FCFS order based
- * on application submission time.  Updates leaf queue capacities to 0 when
- * there are no pending or running apps under that queue.
+ * 按照应用提交顺序为叶子队列分配可用容量，即基于应用提交时间以FCFS顺序为叶子队列分配容量。
+ * 当叶子队列下没有待处理或运行中的应用时，将该队列容量更新为0。
  */
 public class GuaranteedOrZeroCapacityOverTimePolicy
     implements AutoCreatedQueueManagementPolicy {
@@ -87,9 +86,12 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
 
   private Clock clock = new MonotonicClock();
 
+  /**
+   * 存储所有叶子队列按分区划分的状态信息
+   */
   private class LeafQueueState {
 
-    //map of partition-> queueName->{leaf queue's state}
+    // 分区 -> 队列名 -> 叶子队列状态 的映射
     private Map<String, Map<String, LeafQueueStatePerPartition>>
         leafQueueStateMap = new HashMap<>();
 
@@ -143,6 +145,9 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
     }
   }
 
+  /**
+   * 单个叶子队列单个分区的状态信息
+   */
   private class LeafQueueStatePerPartition {
 
     private AtomicBoolean isActive = new AtomicBoolean(false);
@@ -160,9 +165,9 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
     }
 
     /**
-     * Is the queue currently active or deactivated?
+     * 队列当前是否处于激活状态？
      *
-     * @return true if Active else false
+     * @return true 表示激活，否则表示未激活
      */
     public boolean isActive() {
       return isActive.get();
@@ -181,6 +186,9 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
     }
   }
 
+  /**
+   * 父队列的状态信息，按节点标签统计已激活子队列总容量
+   */
   private class ParentQueueState {
 
     private Map<String, Float> totalAbsoluteActivatedChildQueueCapacityByLabel =
@@ -230,7 +238,7 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
               activatedChildCapacity - childQueueCapacity);
         } else{
           setAbsActivatedChildQueueCapacityByLabel(nodeLabel,
-              childQueueCapacity);
+              childQueue);
         }
       } finally {
         writeLock.unlock();
@@ -270,6 +278,9 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
             + leafQueueTemplate.getQueueCapacities() + "]");
   }
 
+  /**
+   * 初始化叶子队列模板，验证节点标签合法性
+   */
   private void initializeLeafQueueTemplate(ManagedParentQueue parentQueue)
       throws IOException {
     leafQueueTemplate = parentQueue.getLeafQueueTemplate();
@@ -277,9 +288,10 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
     leafQueueTemplateCapacities = leafQueueTemplate.getQueueCapacities();
 
     Set<String> parentQueueLabels = parentQueue.getNodeLabelsForQueue();
+    // 遍历模板配置的所有节点标签
     for (String nodeLabel : leafQueueTemplateCapacities
         .getExistingNodeLabels()) {
-
+      // 检查父队列是否包含该标签，不包含则抛出异常
       if (!parentQueueLabels.contains(nodeLabel)) {
         LOG.error("Invalid node label " + nodeLabel
             + " on configured leaf template on parent" + " queue " + parentQueue
@@ -296,45 +308,42 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
   }
 
   /**
-   * Computes / adjusts child queue capacities for auto created leaf queues.
-   * This method computes queue entitlements but does not update LeafQueueState or
-   * queue capacities.
-   * Scheduler calls commitQueueManagementChanges after validation after applying queue changes
-   * and commits to LeafQueueState are done in commitQueueManagementChanges.
+   * 计算自动创建叶子队列的容量调整。本方法只计算队列权益，不更新叶子队列状态或队列容量。
+   * 调度器会在验证通过后调用commitQueueManagementChanges提交变更，状态更新在commitQueueManagementChanges中完成。
    *
-   * @return List of Queue Management change suggestions which could potentially
-   * be committed/rejected by the scheduler due to validation failures
-   * @throws SchedulerDynamicEditException when compute queueManagement changes fails.
+   * @return 队列管理变更建议列表，调度器可能因验证失败拒绝或回滚这些变更
+   * @throws SchedulerDynamicEditException 当计算队列管理变更失败时抛出
    */
   @Override
   public List<QueueManagementChange> computeQueueManagementChanges()
       throws SchedulerDynamicEditException {
 
-    // Update template absolute capacities as the capacities could have changed
-    // in weight mode
+    // 更新模板绝对容量，因为权重模式下容量可能已发生变化
     updateTemplateAbsoluteCapacities(managedParentQueue.getQueueCapacities(),
         (GuaranteedOrZeroCapacityOverTimePolicy)
             managedParentQueue.getAutoCreatedQueueManagementPolicy());
 
     //TODO : Add support for node labels on leaf queue template configurations
-    //sync / add missing leaf queue(s) if any TO state
+    // 同步状态，添加缺失的叶子队列到状态中
     updateLeafQueueState();
 
     readLock.lock();
     try {
       LeafQueueEntitlements leafQueueEntitlements = new LeafQueueEntitlements();
+      // 遍历所有节点标签分区
       for (String nodeLabel : leafQueueTemplateNodeLabels) {
+        // 对当前分区，停用不需要的叶子队列
         DeactivatedLeafQueuesByLabel deactivatedLeafQueues =
             deactivateLeafQueues(nodeLabel, leafQueueEntitlements);
         deactivatedLeafQueues.printToDebug(LOG);
 
-        //Check if we need to activate anything at all?
+        // 检查是否还有空间可以激活新队列
         if (deactivatedLeafQueues.canActivateLeafQueues()) {
           activateLeafQueues(leafQueueEntitlements, nodeLabel, deactivatedLeafQueues);
         }
       }
 
-      //Populate new entitlements
+      // 将计算好的权益转换为队列管理变更列表返回
       return leafQueueEntitlements.mapToQueueManagementChanges((leafQueueName, capacities) -> {
         AutoCreatedLeafQueue leafQueue =
             (AutoCreatedLeafQueue) managedParentQueue.getQueueContext().getQueueManager()
@@ -347,11 +356,15 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
     }
   }
 
+  /**
+   * 激活等待的叶子队列，按应用提交顺序激活，直到父队列容量用尽
+   */
   private void activateLeafQueues(LeafQueueEntitlements leafQueueEntitlements, String nodeLabel,
       DeactivatedLeafQueuesByLabel deactivatedLeafQueues) throws SchedulerDynamicEditException {
-    //sort applications across leaf queues by submit time
+    // 按提交时间对所有待处理应用排序
     List<FiCaSchedulerApp> pendingApps = getSortedPendingApplications();
     if (pendingApps.size() > 0) {
+      // 计算还能激活多少个队列
       int maxLeafQueuesTobeActivated = deactivatedLeafQueues.
           getMaxLeavesToBeActivated(pendingApps.size());
 
@@ -360,12 +373,12 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
             managedParentQueue.getQueuePath(), maxLeafQueuesTobeActivated, pendingApps.size());
       }
 
+      // 获取按提交时间排序的需要激活的叶子队列列表
       Set<String> leafQueuesToBeActivated = getSortedLeafQueues(
           nodeLabel, pendingApps, maxLeafQueuesTobeActivated,
           deactivatedLeafQueues.getQueues());
 
-      // Compute entitlement changes for the identified leaf queues
-      // which is appended to the List of computedEntitlements
+      // 为选中的叶子队列更新容量，添加到变更结果中
       updateLeafQueueCapacitiesByLabel(nodeLabel, leafQueuesToBeActivated, leafQueueEntitlements);
 
       if (LOG.isDebugEnabled() && leafQueuesToBeActivated.size() > 0) {
@@ -385,13 +398,18 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
         deactivatedLeafQueues.size() : deactivatedLeafQueues;
   }
 
+  /**
+   * 停用当前分区中不需要激活的叶子队列
+   */
   private DeactivatedLeafQueuesByLabel deactivateLeafQueues(String nodeLabel,
       LeafQueueEntitlements leafQueueEntitlements) throws SchedulerDynamicEditException {
-    // check if any leaf queues need to be deactivated based on pending applications
+    // 获取父队列当前分区的绝对容量
     float parentAbsoluteCapacity =
         managedParentQueue.getQueueCapacities().getAbsoluteCapacity(nodeLabel);
+    // 获取叶子模板当前分区的绝对容量
     float leafQueueTemplateAbsoluteCapacity =
         leafQueueTemplateCapacities.getAbsoluteCapacity(nodeLabel);
+    // 遍历检查所有叶子队列，停用无待处理应用的队列
     Map<String, QueueCapacities> deactivatedLeafQueues =
         deactivateLeafQueuesIfInActive(managedParentQueue, nodeLabel, leafQueueEntitlements);
 
@@ -401,6 +419,7 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
           getMapUpToLimit(deactivatedLeafQueues));
     }
 
+    // 封装停用结果，包含剩余可用容量信息
     return new DeactivatedLeafQueuesByLabel(deactivatedLeafQueues,
         managedParentQueue.getQueuePath(),
         nodeLabel,
@@ -413,6 +432,7 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
                                                 GuaranteedOrZeroCapacityOverTimePolicy policy) {
     writeLock.lock();
     try {
+      // 根据父队列容量重新计算叶子模板的绝对容量
       CSQueueUtils.updateAbsoluteCapacitiesByNodeLabels(
           policy.leafQueueTemplate.getQueueCapacities(),
           parentQueueCapacities, policy.leafQueueTemplateNodeLabels,
@@ -424,370 +444,4 @@ public class GuaranteedOrZeroCapacityOverTimePolicy
     }
   }
 
-  public void updateTemplateAbsoluteCapacities(QueueCapacities queueCapacities) {
-    updateTemplateAbsoluteCapacities(queueCapacities, this);
-  }
-
-  @VisibleForTesting
-  void updateLeafQueueState() {
-    writeLock.lock();
-    try {
-      Set<String> newPartitions = new HashSet<>();
-      Set<String> newQueues = new HashSet<>();
-
-      for (CSQueue newQueue : managedParentQueue.getChildQueues()) {
-        if (newQueue instanceof AbstractLeafQueue) {
-          for (String nodeLabel : leafQueueTemplateNodeLabels) {
-            leafQueueState.createLeafQueueStateIfNotExists((AbstractLeafQueue) newQueue,
-                nodeLabel);
-            newPartitions.add(nodeLabel);
-          }
-          newQueues.add(newQueue.getQueuePath());
-        }
-      }
-
-      for (Iterator<Map.Entry<String, Map<String, LeafQueueStatePerPartition>>>
-           itr = leafQueueState.getLeafQueueStateMap().entrySet().iterator();
-           itr.hasNext(); ) {
-        Map.Entry<String, Map<String, LeafQueueStatePerPartition>> e =
-            itr.next();
-        String partition = e.getKey();
-        if (!newPartitions.contains(partition)) {
-          itr.remove();
-          LOG.info(managedParentQueue.getQueuePath()  +
-              " : Removed partition " + partition + " from leaf queue " +
-              "state");
-        } else{
-          Map<String, LeafQueueStatePerPartition> queues = e.getValue();
-          for (
-              Iterator<Map.Entry<String, LeafQueueStatePerPartition>> queueItr =
-              queues.entrySet().iterator(); queueItr.hasNext(); ) {
-            String queue = queueItr.next().getKey();
-            if (!newQueues.contains(queue)) {
-              queueItr.remove();
-              LOG.info(managedParentQueue.getQueuePath() + " : Removed queue"
-                  + queue + " from "
-                  + "leaf queue "
-                  + "state from partition " + partition);
-            }
-          }
-        }
-      }
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  private LinkedHashSet<String> getSortedLeafQueues(String nodeLabel,
-      final List<FiCaSchedulerApp> pendingApps, int leafQueuesNeeded,
-      Set<String> deactivatedQueues) throws SchedulerDynamicEditException {
-
-    LinkedHashSet<String> leafQueues = new LinkedHashSet<>(leafQueuesNeeded);
-    int ctr = 0;
-    for (FiCaSchedulerApp app : pendingApps) {
-      AutoCreatedLeafQueue leafQueue =
-          (AutoCreatedLeafQueue) app.getCSLeafQueue();
-      String leafQueueName = leafQueue.getQueuePath();
-
-      //Check if leafQueue is not active already and has any pending apps
-      if (ctr < leafQueuesNeeded) {
-        if (!isActive(leafQueue, nodeLabel)) {
-          if (!deactivatedQueues.contains(leafQueueName)) {
-            if (addLeafQueueIfNotExists(leafQueues, leafQueueName)) {
-              ctr++;
-            }
-          }
-        }
-      } else{
-        break;
-      }
-    }
-    return leafQueues;
-  }
-
-  private boolean addLeafQueueIfNotExists(Set<String> leafQueues,
-      String leafQueueName) {
-    boolean ret = false;
-    if (!leafQueues.contains(leafQueueName)) {
-      ret = leafQueues.add(leafQueueName);
-    }
-    return ret;
-  }
-
-  @VisibleForTesting
-  public boolean isActive(final AutoCreatedLeafQueue leafQueue,
-      String nodeLabel) throws SchedulerDynamicEditException {
-    readLock.lock();
-    try {
-      LeafQueueStatePerPartition leafQueueStatus = getLeafQueueState(leafQueue,
-          nodeLabel);
-      return leafQueueStatus.isActive();
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /**
-   * Map of LeafQueue -> QueueCapacities - keep adding the computed
-   * entitlements to this map and finally
-   * build the leaf queue configuration Template for all identified leaf
-   * queues
-   */
-  private Map<String, QueueCapacities> deactivateLeafQueuesIfInActive(
-      AbstractParentQueue parentQueue, String nodeLabel,
-      LeafQueueEntitlements leafQueueEntitlements)
-      throws SchedulerDynamicEditException {
-    Map<String, QueueCapacities> deactivatedQueues = new HashMap<>();
-
-    for (CSQueue childQueue : parentQueue.getChildQueues()) {
-      AutoCreatedLeafQueue leafQueue = (AutoCreatedLeafQueue) childQueue;
-      if (leafQueue != null) {
-        if (isActive(leafQueue, nodeLabel) && !hasPendingApps(leafQueue)) {
-          QueueCapacities capacities = leafQueueEntitlements.getCapacityOfQueue(leafQueue);
-          updateToZeroCapacity(capacities, nodeLabel, (AbstractLeafQueue) childQueue);
-          deactivatedQueues.put(leafQueue.getQueuePath(), leafQueueTemplateCapacities);
-        }
-      } else {
-        LOG.warn("Could not find queue in scheduler while trying" + " to "
-            + "deactivate for " + parentQueue);
-      }
-    }
-
-    return deactivatedQueues;
-  }
-
-  private void updateLeafQueueCapacitiesByLabel(String nodeLabel,
-      Set<String> leafQueuesToBeActivated,
-      LeafQueueEntitlements leafQueueEntitlements) {
-    for (String leafQueue : leafQueuesToBeActivated) {
-      QueueCapacities capacities = leafQueueEntitlements.getCapacityOfQueueByPath(leafQueue);
-      updateCapacityFromTemplate(capacities, nodeLabel);
-    }
-  }
-
-  /**
-   * Commit queue management changes - which involves updating required state
-   * on parent/underlying leaf queues.
-   *
-   * @param queueManagementChanges Queue Management changes to commit
-   * @throws SchedulerDynamicEditException when validation fails
-   */
-  @Override
-  public void commitQueueManagementChanges(
-      List<QueueManagementChange> queueManagementChanges)
-      throws SchedulerDynamicEditException {
-    writeLock.lock();
-    try {
-      for (QueueManagementChange queueManagementChange :
-          queueManagementChanges) {
-        AutoCreatedLeafQueueConfig updatedQueueTemplate =
-            queueManagementChange.getUpdatedQueueTemplate();
-        CSQueue queue = queueManagementChange.getQueue();
-        if (!(queue instanceof AutoCreatedLeafQueue)) {
-          throw new SchedulerDynamicEditException(
-              "Expected queue management change for AutoCreatedLeafQueue. "
-                  + "Found " + queue.getClass().getName());
-        }
-
-        AutoCreatedLeafQueue leafQueue = (AutoCreatedLeafQueue) queue;
-
-        for (String nodeLabel : updatedQueueTemplate.getQueueCapacities()
-            .getExistingNodeLabels()) {
-          if (updatedQueueTemplate.getQueueCapacities().getCapacity(nodeLabel) > 0) {
-            if (isActive(leafQueue, nodeLabel)) {
-              LOG.debug("Queue is already active. Skipping activation : {}",
-                  leafQueue.getQueuePath());
-            } else{
-              activate(leafQueue, nodeLabel);
-            }
-          } else {
-            if (!isActive(leafQueue, nodeLabel)) {
-              LOG.debug("Queue is already de-activated. Skipping "
-                  + "de-activation : {}", leafQueue.getQueuePath());
-            } else {
-              /**
-               * While deactivating queues of type ABSOLUTE_RESOURCE, configured
-               * min resource has to be set based on updated capacity (which is
-               * again based on updated queue entitlements). Otherwise,
-               * ParentQueue#calculateEffectiveResourcesAndCapacity calculations
-               * leads to incorrect results.
-               */
-              leafQueue
-                  .mergeCapacities(updatedQueueTemplate.getQueueCapacities(), leafQueueTemplate.getResourceQuotas());
-              leafQueue.getQueueResourceQuotas()
-                  .setConfiguredMinResource(Resources.multiply(
-                      managedParentQueue.getQueueContext().getClusterResource(),
-                      updatedQueueTemplate
-                          .getQueueCapacities().getCapacity(nodeLabel)));
-              deactivate(leafQueue, nodeLabel);
-            }
-          }
-        }
-      }
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  private void activate(final AbstractAutoCreatedLeafQueue leafQueue,
-      String nodeLabel) throws SchedulerDynamicEditException {
-    writeLock.lock();
-    try {
-      getLeafQueueState(leafQueue, nodeLabel).activate();
-      parentQueueState.incAbsoluteActivatedChildCapacity(nodeLabel,
-          leafQueueTemplateCapacities.getAbsoluteCapacity(nodeLabel));
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  private void deactivate(final AbstractAutoCreatedLeafQueue leafQueue,
-      String nodeLabel) throws SchedulerDynamicEditException {
-    writeLock.lock();
-    try {
-      getLeafQueueState(leafQueue, nodeLabel).deactivate();
-
-      parentQueueState.decAbsoluteActivatedChildCapacity(nodeLabel,
-          leafQueueTemplateCapacities.getAbsoluteCapacity(nodeLabel));
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  public boolean hasPendingApps(final AutoCreatedLeafQueue leafQueue) {
-    return leafQueue.getNumApplications() > 0;
-  }
-
-  @Override
-  public void reinitialize(final AbstractParentQueue parentQueue) throws IOException {
-    if (!(parentQueue instanceof ManagedParentQueue)) {
-      throw new IllegalStateException(
-          "Expected instance of type " + ManagedParentQueue.class + " found  "
-              + " : " + parentQueue.getClass());
-    }
-
-    if (this.managedParentQueue != null && !parentQueue.getQueuePath().equals(
-        this.managedParentQueue.getQueuePath())) {
-      throw new IllegalStateException(
-          "Expected parent queue path to match " + this.managedParentQueue
-              .getQueuePath() + " found : " + parentQueue.getQueuePath());
-    }
-
-    this.managedParentQueue = (ManagedParentQueue) parentQueue;
-
-    initializeLeafQueueTemplate(this.managedParentQueue);
-
-    //clear state
-    parentQueueState.clear();
-    leafQueueState.clear();
-
-    LOG.info(
-        "Reinitialized queue management policy for parent queue " + parentQueue
-            .getQueuePath() + " with leaf queue template " + "capacities : ["
-            + leafQueueTemplate.getQueueCapacities() + "]");
-  }
-
-  @Override
-  public AutoCreatedLeafQueueConfig getInitialLeafQueueConfiguration(
-      AbstractAutoCreatedLeafQueue leafQueue)
-      throws SchedulerDynamicEditException {
-
-    AutoCreatedLeafQueueConfig template;
-
-    if (!(leafQueue instanceof AutoCreatedLeafQueue)) {
-      throw new SchedulerDynamicEditException(
-          "Not an instance of " + "AutoCreatedLeafQueue : " + leafQueue
-              .getClass());
-    }
-
-    writeLock.lock();
-    try {
-      QueueCapacities capacities = new QueueCapacities(false);
-      for (String nodeLabel : leafQueueTemplateNodeLabels) {
-        if (!leafQueueState.createLeafQueueStateIfNotExists(leafQueue,
-            nodeLabel)) {
-          String message =
-              "Leaf queue already exists in state : " + getLeafQueueState(
-                  leafQueue, nodeLabel);
-          LOG.error(message);
-        }
-
-        float availableCapacity = managedParentQueue.getQueueCapacities().
-            getAbsoluteCapacity(nodeLabel) - parentQueueState.
-            getAbsoluteActivatedChildQueueCapacity(nodeLabel) + EPSILON;
-
-        if (availableCapacity >= leafQueueTemplateCapacities
-            .getAbsoluteCapacity(nodeLabel)) {
-          updateCapacityFromTemplate(capacities, nodeLabel);
-          activate(leafQueue, nodeLabel);
-        } else{
-          updateToZeroCapacity(capacities, nodeLabel, leafQueue);
-        }
-      }
-
-      template = buildTemplate(capacities);
-    } finally {
-      writeLock.unlock();
-    }
-    return template;
-  }
-
-  private void updateToZeroCapacity(QueueCapacities capacities,
-      String nodeLabel, AbstractLeafQueue leafQueue) {
-    capacities.setCapacity(nodeLabel, 0.0f);
-    capacities.setMaximumCapacity(nodeLabel,
-        leafQueueTemplateCapacities.getMaximumCapacity(nodeLabel));
-    leafQueue.getQueueResourceQuotas().
-        setConfiguredMinResource(nodeLabel, Resource.newInstance(0, 0));
-  }
-
-  private void updateCapacityFromTemplate(QueueCapacities capacities,
-      String nodeLabel) {
-    capacities.setCapacity(nodeLabel,
-        leafQueueTemplateCapacities.getCapacity(nodeLabel));
-    capacities.setMaximumCapacity(nodeLabel,
-        leafQueueTemplateCapacities.getMaximumCapacity(nodeLabel));
-    capacities.setAbsoluteCapacity(nodeLabel,
-        leafQueueTemplateCapacities.getAbsoluteCapacity(nodeLabel));
-    capacities.setAbsoluteMaximumCapacity(nodeLabel,
-        leafQueueTemplateCapacities.getAbsoluteMaximumCapacity(nodeLabel));
-  }
-
-  @VisibleForTesting
-  LeafQueueStatePerPartition getLeafQueueState(AbstractLeafQueue queue,
-      String partition) throws SchedulerDynamicEditException {
-    readLock.lock();
-    try {
-      String queuePath = queue.getQueuePath();
-      if (!leafQueueState.containsLeafQueue(queuePath, partition)) {
-        throw new SchedulerDynamicEditException(
-            "Could not find leaf queue in " + "state " + queuePath);
-      } else{
-        return leafQueueState.
-            getLeafQueueStatePerPartition(queuePath, partition);
-      }
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @VisibleForTesting
-  public float getAbsoluteActivatedChildQueueCapacity(String nodeLabel) {
-    return parentQueueState.getAbsoluteActivatedChildQueueCapacity(nodeLabel);
-  }
-
-  private List<FiCaSchedulerApp> getSortedPendingApplications() {
-    List<FiCaSchedulerApp> apps = new ArrayList<>(
-        managedParentQueue.getAllApplications());
-    apps.sort(managedParentQueue.getQueueContext().getApplicationComparator());
-    return apps;
-  }
-
-  private AutoCreatedLeafQueueConfig buildTemplate(QueueCapacities capacities) {
-    AutoCreatedLeafQueueConfig.Builder templateBuilder =
-        new AutoCreatedLeafQueueConfig.Builder();
-    templateBuilder.capacities(capacities);
-    templateBuilder.resourceQuotas(managedParentQueue.getLeafQueueTemplate().getResourceQuotas());
-    return new AutoCreatedLeafQueueConfig(templateBuilder);
-  }
-}
+  public void updateTemplateAbsolute

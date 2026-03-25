@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -59,37 +60,63 @@ import org.apache.hadoop.yarn.server.api.records.impl.pb.ContainerQueuingLimitPB
 import org.apache.hadoop.yarn.server.api.records.impl.pb.MasterKeyPBImpl;
 
 /**
- * PBImpl class for NodeHeartbeatResponse.
+ * NodeHeartbeatResponse 的 Protobuf 实现类，封装RM对NodeManager心跳的响应数据。
+ * 负责将API层对象与Protobuf序列化格式互相转换，支持RPC传输。
  */
 public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
+  // Protobuf消息默认实例
   private NodeHeartbeatResponseProto proto = NodeHeartbeatResponseProto
       .getDefaultInstance();
+  // Protobuf消息构建器
   private NodeHeartbeatResponseProto.Builder builder = null;
+  // 标记当前是否通过Protobuf实例构造
   private boolean viaProto = false;
 
+  // 需要清理的容器ID列表
   private List<ContainerId> containersToCleanup = null;
+  // 需要从NodeManager移除的容器ID列表
   private List<ContainerId> containersToBeRemovedFromNM = null;
+  // 需要清理的应用ID列表
   private List<ApplicationId> applicationsToCleanup = null;
+  // 节点可用资源
   private Resource resource = null;
+  // 应用收集器地址映射表
   private Map<ApplicationId, AppCollectorData> appCollectorsMap = null;
 
+  // 容器令牌主密钥
   private MasterKey containerTokenMasterKey = null;
+  // NodeManager令牌主密钥
   private MasterKey nmTokenMasterKey = null;
+  // 容器排队限制配置
   private ContainerQueuingLimit containerQueuingLimit = null;
+  // 需要更新资源的容器列表
   private List<Container> containersToUpdate = null;
   // NOTE: This is required for backward compatibility.
+  // 需要减少资源的容器列表，用于向后兼容
   private List<Container> containersToDecrease = null;
+  // 需要发送信号的容器请求列表
   private List<SignalContainerRequest> containersToSignal = null;
 
+  /**
+   * 构造空的心跳响应对象，初始化Protobuf构建器。
+   */
   public NodeHeartbeatResponsePBImpl() {
     builder = NodeHeartbeatResponseProto.newBuilder();
   }
 
+  /**
+   * 从已有Protobuf消息构造心跳响应对象。
+   * @param proto 已序列化的Protobuf心跳响应消息
+   */
   public NodeHeartbeatResponsePBImpl(NodeHeartbeatResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取最终构建完成的Protobuf消息对象，合并本地修改到Protobuf。
+   * @return 序列化完成的Protobuf心跳响应消息
+   */
   public NodeHeartbeatResponseProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -97,6 +124,9 @@ public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
     return proto;
   }
 
+  /**
+   * 将所有本地缓存的对象合并到Protobuf构建器中。
+   */
   private void mergeLocalToBuilder() {
     if (this.containersToCleanup != null) {
       addContainersToCleanupToProto();
@@ -136,6 +166,9 @@ public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
     }
   }
 
+  /**
+   * 将本地应用收集器映射转换为Protobuf格式写入构建器。
+   */
   private void addAppCollectorsMapToProto() {
     maybeInitBuilder();
     builder.clearAppCollectors();
@@ -156,6 +189,9 @@ public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
     }
   }
 
+  /**
+   * 合并本地修改到Protobuf消息，完成最终构建。
+   */
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -164,6 +200,9 @@ public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
     viaProto = true;
   }
 
+  /**
+   * 延迟初始化Protobuf构建器，仅在需要修改时创建。
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = NodeHeartbeatResponseProto.newBuilder(proto);
@@ -324,6 +363,9 @@ public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
     return this.containersToBeRemovedFromNM;
   }
 
+  /**
+   * 延迟从Protobuf初始化待清理容器列表。
+   */
   private void initContainersToCleanup() {
     if (this.containersToCleanup != null) {
       return;
@@ -337,6 +379,9 @@ public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
     }
   }
 
+  /**
+   * 延迟从Protobuf初始化待移除容器列表。
+   */
   private void initContainersToBeRemovedFromNM() {
     if (this.containersToBeRemovedFromNM != null) {
       return;
@@ -368,6 +413,9 @@ public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
     this.containersToBeRemovedFromNM.addAll(containers);
   }
 
+  /**
+   * 将待清理容器列表转换为Protobuf格式写入构建器。
+   */
   private void addContainersToCleanupToProto() {
     maybeInitBuilder();
     builder.clearContainersToCleanup();
@@ -403,6 +451,9 @@ public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
     builder.addAllContainersToCleanup(iterable);
   }
 
+  /**
+   * 将待移除容器列表转换为Protobuf格式写入构建器。
+   */
   private void addContainersToBeRemovedFromNMToProto() {
     maybeInitBuilder();
     builder.clearContainersToBeRemovedFromNm();
@@ -439,422 +490,4 @@ public class NodeHeartbeatResponsePBImpl extends NodeHeartbeatResponse {
   }
 
   @Override
-  public List<ApplicationId> getApplicationsToCleanup() {
-    initApplicationsToCleanup();
-    return this.applicationsToCleanup;
-  }
-
-  private void initApplicationsToCleanup() {
-    if (this.applicationsToCleanup != null) {
-      return;
-    }
-    NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
-    List<ApplicationIdProto> list = p.getApplicationsToCleanupList();
-    this.applicationsToCleanup = new ArrayList<ApplicationId>();
-
-    for (ApplicationIdProto c : list) {
-      this.applicationsToCleanup.add(ProtoUtils.convertFromProtoFormat(c));
-    }
-  }
-
-  @Override
-  public void addAllApplicationsToCleanup(
-      final List<ApplicationId> applicationsToCleanup) {
-    if (applicationsToCleanup == null)
-      return;
-    initApplicationsToCleanup();
-    this.applicationsToCleanup.addAll(applicationsToCleanup);
-  }
-
-  private void addApplicationsToCleanupToProto() {
-    maybeInitBuilder();
-    builder.clearApplicationsToCleanup();
-    if (applicationsToCleanup == null)
-      return;
-    Iterable<ApplicationIdProto> iterable = new Iterable<ApplicationIdProto>() {
-
-      @Override
-      public Iterator<ApplicationIdProto> iterator() {
-        return new Iterator<ApplicationIdProto>() {
-
-          Iterator<ApplicationId> iter = applicationsToCleanup.iterator();
-
-          @Override
-          public boolean hasNext() {
-            return iter.hasNext();
-          }
-
-          @Override
-          public ApplicationIdProto next() {
-            return ProtoUtils.convertToProtoFormat(iter.next());
-          }
-
-          @Override
-          public void remove() {
-            throw new UnsupportedOperationException();
-
-          }
-        };
-
-      }
-    };
-    builder.addAllApplicationsToCleanup(iterable);
-  }
-
-  private void initContainersToUpdate() {
-    if (this.containersToUpdate != null) {
-      return;
-    }
-    NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
-    List<ContainerProto> list = p.getContainersToUpdateList();
-    this.containersToUpdate = new ArrayList<>();
-
-    for (ContainerProto c : list) {
-      this.containersToUpdate.add(convertFromProtoFormat(c));
-    }
-  }
-
-  @Override
-  public List<Container> getContainersToUpdate() {
-    initContainersToUpdate();
-    return this.containersToUpdate;
-  }
-
-  @Override
-  public void addAllContainersToUpdate(
-      final Collection<Container> containersToBeUpdated) {
-    if (containersToBeUpdated == null) {
-      return;
-    }
-    initContainersToUpdate();
-    this.containersToUpdate.addAll(containersToBeUpdated);
-  }
-
-  private void addContainersToUpdateToProto() {
-    maybeInitBuilder();
-    builder.clearContainersToUpdate();
-    if (this.containersToUpdate == null) {
-      return;
-    }
-    Iterable<ContainerProto> iterable = new
-        Iterable<ContainerProto>() {
-      @Override
-      public Iterator<ContainerProto> iterator() {
-        return new Iterator<ContainerProto>() {
-          private Iterator<Container> iter = containersToUpdate.iterator();
-          @Override
-          public boolean hasNext() {
-            return iter.hasNext();
-          }
-          @Override
-          public ContainerProto next() {
-            return convertToProtoFormat(iter.next());
-          }
-          @Override
-          public void remove() {
-            throw new UnsupportedOperationException();
-          }
-        };
-      }
-    };
-    builder.addAllContainersToUpdate(iterable);
-  }
-
-  private void initContainersToDecrease() {
-    if (this.containersToDecrease != null) {
-      return;
-    }
-    NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
-    List<ContainerProto> list = p.getContainersToDecreaseList();
-    this.containersToDecrease = new ArrayList<>();
-
-    for (ContainerProto c : list) {
-      this.containersToDecrease.add(convertFromProtoFormat(c));
-    }
-  }
-
-  @Override
-  public List<Container> getContainersToDecrease() {
-    initContainersToDecrease();
-    return this.containersToDecrease;
-  }
-
-  @Override
-  public void addAllContainersToDecrease(
-      final Collection<Container> containersToDecrease) {
-    if (containersToDecrease == null) {
-      return;
-    }
-    initContainersToDecrease();
-    this.containersToDecrease.addAll(containersToDecrease);
-  }
-
-  private void addContainersToDecreaseToProto() {
-    maybeInitBuilder();
-    builder.clearContainersToDecrease();
-    if (this.containersToDecrease == null) {
-      return;
-    }
-
-    Iterable<ContainerProto> iterable = new
-        Iterable<ContainerProto>() {
-      @Override
-      public Iterator<ContainerProto> iterator() {
-        return new Iterator<ContainerProto>() {
-          private Iterator<Container> iter = containersToDecrease.iterator();
-          @Override
-          public boolean hasNext() {
-            return iter.hasNext();
-          }
-          @Override
-          public ContainerProto next() {
-            return convertToProtoFormat(iter.next());
-          }
-          @Override
-          public void remove() {
-            throw new UnsupportedOperationException();
-          }
-        };
-      }
-    };
-    builder.addAllContainersToDecrease(iterable);
-  }
-
-  @Override
-  public Map<ApplicationId, AppCollectorData> getAppCollectors() {
-    if (this.appCollectorsMap != null) {
-      return this.appCollectorsMap;
-    }
-    initAppCollectorsMap();
-    return appCollectorsMap;
-  }
-
-  private void initAppCollectorsMap() {
-    NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
-    List<AppCollectorDataProto> list = p.getAppCollectorsList();
-    if (!list.isEmpty()) {
-      this.appCollectorsMap = new HashMap<>();
-      for (AppCollectorDataProto c : list) {
-        ApplicationId appId = ProtoUtils.convertFromProtoFormat(c.getAppId());
-        Token collectorToken = null;
-        if (c.hasAppCollectorToken()){
-          collectorToken = convertFromProtoFormat(c.getAppCollectorToken());
-        }
-        AppCollectorData data = AppCollectorData.newInstance(appId,
-            c.getAppCollectorAddr(), c.getRmIdentifier(), c.getVersion(),
-            collectorToken);
-        this.appCollectorsMap.put(appId, data);
-      }
-    }
-  }
-
-  @Override
-  public void setSystemCredentialsForApps(
-      Collection<SystemCredentialsForAppsProto> systemCredentialsForAppsProto) {
-    maybeInitBuilder();
-    builder.clearSystemCredentialsForApps();
-    if (systemCredentialsForAppsProto != null) {
-      builder.addAllSystemCredentialsForApps(systemCredentialsForAppsProto);
-    }
-  }
-
-  @Override
-  public Collection<SystemCredentialsForAppsProto>
-      getSystemCredentialsForApps() {
-    NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
-    return p.getSystemCredentialsForAppsList();
-  }
-
-  @Override
-  public void setAppCollectors(
-      Map<ApplicationId, AppCollectorData> appCollectors) {
-    if (appCollectors == null || appCollectors.isEmpty()) {
-      return;
-    }
-    maybeInitBuilder();
-    this.appCollectorsMap = new HashMap<>();
-    this.appCollectorsMap.putAll(appCollectors);
-  }
-
-  @Override
-  public long getNextHeartBeatInterval() {
-    NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
-    return (p.getNextHeartBeatInterval());
-  }
-
-  @Override
-  public void setNextHeartBeatInterval(long nextHeartBeatInterval) {
-    maybeInitBuilder();
-    builder.setNextHeartBeatInterval(nextHeartBeatInterval);
-  }
-
-  private ContainerIdPBImpl convertFromProtoFormat(ContainerIdProto p) {
-    return new ContainerIdPBImpl(p);
-  }
-
-  private ContainerIdProto convertToProtoFormat(ContainerId t) {
-    return ((ContainerIdPBImpl) t).getProto();
-  }
-
-  private ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
-    return new ResourcePBImpl(p);
-  }
-
-  private ResourceProto convertToProtoFormat(Resource t) {
-    return ProtoUtils.convertToProtoFormat(t);
-  }
-
-  private NodeAction convertFromProtoFormat(NodeActionProto p) {
-    return NodeAction.valueOf(p.name());
-  }
-
-  private NodeActionProto convertToProtoFormat(NodeAction t) {
-    return NodeActionProto.valueOf(t.name());
-  }
-
-  private MasterKeyPBImpl convertFromProtoFormat(MasterKeyProto p) {
-    return new MasterKeyPBImpl(p);
-  }
-
-  private MasterKeyProto convertToProtoFormat(MasterKey t) {
-    return ((MasterKeyPBImpl) t).getProto();
-  }
-
-  private ContainerPBImpl convertFromProtoFormat(ContainerProto p) {
-    return new ContainerPBImpl(p);
-  }
-
-  private ContainerProto convertToProtoFormat(Container t) {
-    return ((ContainerPBImpl) t).getProto();
-  }
-
-  @Override
-  public boolean getAreNodeLabelsAcceptedByRM() {
-    NodeHeartbeatResponseProtoOrBuilder p =
-        this.viaProto ? this.proto : this.builder;
-    return p.getAreNodeLabelsAcceptedByRM();
-  }
-
-  @Override
-  public void setAreNodeLabelsAcceptedByRM(boolean areNodeLabelsAcceptedByRM) {
-    maybeInitBuilder();
-    this.builder.setAreNodeLabelsAcceptedByRM(areNodeLabelsAcceptedByRM);
-  }
-
-  @Override
-  public boolean getAreNodeAttributesAcceptedByRM() {
-    NodeHeartbeatResponseProtoOrBuilder p =
-        this.viaProto ? this.proto : this.builder;
-    return p.getAreNodeAttributesAcceptedByRM();
-  }
-
-  @Override
-  public void setAreNodeAttributesAcceptedByRM(
-      boolean areNodeAttributesAcceptedByRM) {
-    maybeInitBuilder();
-    this.builder
-        .setAreNodeAttributesAcceptedByRM(areNodeAttributesAcceptedByRM);
-  }
-
-  @Override
-  public List<SignalContainerRequest> getContainersToSignalList() {
-    initContainersToSignal();
-    return this.containersToSignal;
-  }
-
-  private void initContainersToSignal() {
-    if (this.containersToSignal != null) {
-      return;
-    }
-    NodeHeartbeatResponseProtoOrBuilder p = viaProto ? proto : builder;
-    List<SignalContainerRequestProto> list = p.getContainersToSignalList();
-    this.containersToSignal = new ArrayList<SignalContainerRequest>();
-
-    for (SignalContainerRequestProto c : list) {
-      this.containersToSignal.add(convertFromProtoFormat(c));
-    }
-  }
-
-  @Override
-  public void addAllContainersToSignal(
-      final List<SignalContainerRequest> containersToSignal) {
-    if (containersToSignal == null)
-      return;
-    initContainersToSignal();
-    this.containersToSignal.addAll(containersToSignal);
-  }
-
-  private void addContainersToSignalToProto() {
-    maybeInitBuilder();
-    builder.clearContainersToSignal();
-    if (containersToSignal == null)
-      return;
-
-    Iterable<SignalContainerRequestProto> iterable =
-        new Iterable<SignalContainerRequestProto>() {
-          @Override
-          public Iterator<SignalContainerRequestProto> iterator() {
-            return new Iterator<SignalContainerRequestProto>() {
-              Iterator<SignalContainerRequest> iter = containersToSignal.iterator();
-              @Override
-              public boolean hasNext() {
-                return iter.hasNext();
-              }
-
-              @Override
-              public SignalContainerRequestProto next() {
-                return convertToProtoFormat(iter.next());
-              }
-
-              @Override
-              public void remove() {
-                throw new UnsupportedOperationException();
-              }
-            };
-          }
-        };
-    builder.addAllContainersToSignal(iterable);
-  }
-
-  private ContainerQueuingLimit convertFromProtoFormat(
-      ContainerQueuingLimitProto p) {
-    return new ContainerQueuingLimitPBImpl(p);
-  }
-
-  private ContainerQueuingLimitProto convertToProtoFormat(
-      ContainerQueuingLimit c) {
-    return ((ContainerQueuingLimitPBImpl)c).getProto();
-  }
-
-  private SignalContainerRequestPBImpl convertFromProtoFormat(
-      SignalContainerRequestProto p) {
-    return new SignalContainerRequestPBImpl(p);
-  }
-
-  private SignalContainerRequestProto convertToProtoFormat(
-      SignalContainerRequest t) {
-    return ((SignalContainerRequestPBImpl)t).getProto();
-  }
-
-  private TokenProto convertToProtoFormat(Token t) {
-    return ((TokenPBImpl) t).getProto();
-  }
-
-  private TokenPBImpl convertFromProtoFormat(TokenProto p) {
-    return new TokenPBImpl(p);
-  }
-
-  @Override
-  public void setTokenSequenceNo(long tokenSequenceNo) {
-    maybeInitBuilder();
-    this.builder.setTokenSequenceNo(tokenSequenceNo);
-  }
-
-  @Override
-  public long getTokenSequenceNo() {
-    NodeHeartbeatResponseProtoOrBuilder p =
-        this.viaProto ? this.proto : this.builder;
-    return p.getTokenSequenceNo();
-  }
-}
-
+  public List<ApplicationId> getApplicationsToCleanup

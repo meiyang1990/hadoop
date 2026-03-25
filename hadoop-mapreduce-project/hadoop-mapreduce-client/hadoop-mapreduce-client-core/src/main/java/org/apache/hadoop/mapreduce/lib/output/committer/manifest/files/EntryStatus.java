@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,25 +26,29 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileStatus;
 
 /**
- * Status of a file or dir entry, designed to be marshalled as
- * an integer -the ordinal value of the enum is the
- * wire value.
+ * 文件/目录条目状态枚举，设计为可通过整数序列化传输，枚举的ordinal值即为序列化后的传输值。
+ * 用于Manifest提交协议中记录文件系统路径的状态信息。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public enum EntryStatus {
 
+  /** 未知状态 */
   unknown,
+  /** 路径不存在 */
   not_found,
+  /** 是普通文件 */
   file,
+  /** 是已存在目录 */
   dir,
+  /** 是本次任务创建的目录 */
   created_dir;
 
   /**
-   * Go from a marshalled type to a status value.
-   * Any out of range value is converted to unknown.
-   * @param type type
-   * @return the status value.
+   * 将序列化后的整数转换为对应的EntryStatus枚举值。
+   * 超出范围的数值统一转换为unknown未知状态。
+   * @param type 序列化后的整数类型值
+   * @return 对应的EntryStatus枚举值
    */
   public static EntryStatus toEntryStatus(int type) {
     switch (type) {
@@ -63,11 +68,10 @@ public enum EntryStatus {
 
 
   /**
-   * Go from the result of a getFileStatus call or
-   * listing entry to a status.
-   * A null argument is mapped to {@link #not_found}
-   * @param st file status
-   * @return the status enum.
+   * 根据getFileStatus查询结果或目录列表条目，推断路径对应的状态。
+   * null参数会被映射为not_found状态。
+   * @param st 文件系统查询得到的FileStatus，可为null
+   * @return 对应的状态枚举值
    */
   public static EntryStatus toEntryStatus(@Nullable FileStatus st) {
 

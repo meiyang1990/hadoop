@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,7 @@ import org.apache.hadoop.classification.InterfaceStability;
 @InterfaceStability.Evolving
 
 /**
- * Abstract class for deriving exceptions related to filesystem constraints
+ * 文件系统约束相关异常的抽象基类，所有HDFS文件系统限制违规异常都继承此类
  */
 public abstract class FSLimitException extends QuotaExceededException {
   protected static final long serialVersionUID = 1L;
@@ -41,7 +42,7 @@ public abstract class FSLimitException extends QuotaExceededException {
   }
 
   /**
-   * Path component length is too long
+   * 路径组件长度超过限制异常
    */
   public static final
   class PathComponentTooLongException extends FSLimitException {
@@ -55,6 +56,13 @@ public abstract class FSLimitException extends QuotaExceededException {
       super(msg);
     }
     
+    /**
+     * 构造路径组件过长异常
+     * @param quota 允许的最大长度限制
+     * @param count 实际长度
+     * @param parentPath 父目录路径
+     * @param childName 超长的子节点名称
+     */
     public PathComponentTooLongException(long quota, long count,
         String parentPath, String childName) {
       super(quota, count);
@@ -75,7 +83,7 @@ public abstract class FSLimitException extends QuotaExceededException {
   }
 
   /**
-   * Directory has too many items
+   * 目录下条目数量超过最大限制异常
    */
   public static final
   class MaxDirectoryItemsExceededException extends FSLimitException {
@@ -87,6 +95,12 @@ public abstract class FSLimitException extends QuotaExceededException {
       super(msg);
     }
     
+    /**
+     * 构造目录条目超限异常
+     * @param path 超限目录路径
+     * @param quota 允许的最大条目数量
+     * @param count 实际条目数量
+     */
     public MaxDirectoryItemsExceededException(String path, long quota,
         long count) {
       super(quota, count);

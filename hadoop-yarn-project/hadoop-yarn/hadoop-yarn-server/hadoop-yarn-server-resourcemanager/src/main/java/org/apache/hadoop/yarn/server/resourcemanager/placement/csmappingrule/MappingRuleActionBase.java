@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,32 +22,27 @@ package org.apache.hadoop.yarn.server.resourcemanager.placement.csmappingrule;
 import org.apache.hadoop.yarn.server.resourcemanager.placement.VariableContext;
 
 /**
- * This class implements the fallback logic for MappingRuleActions, this can
- * be extended to implement the actual logic of the actions, this should be
- * a base class for most actions.
+ * 容量调度器队列映射规则动作的抽象基类，提供了 fallback 失败回退逻辑的统一实现，
+ * 具体动作需要子类实现核心业务逻辑，是大多数映射规则动作的基础父类。
  */
 public abstract class MappingRuleActionBase implements MappingRuleAction {
   /**
-   * The default fallback method is reject, so if the action fails
-   * We will reject the application. However this behaviour can be overridden
-   * on a per rule basis
+   * 默认回退行为是拒绝提交，当主动作执行失败时会拒绝应用提交。该行为可按规则覆盖。
    */
   private MappingRuleResult fallback = MappingRuleResult.createRejectResult();
 
   /**
-   * Returns the fallback action to be taken if the main action (result returned
-   * by the execute method) fails.
-   * e.g. Target queue does not exist, or reference is ambiguous
-   * @return The fallback action to be taken if the main action fails
+   * 获取主动作执行失败时需要执行的回退动作结果。
+   * 例如：目标队列不存在、引用存在歧义时触发该回退。
+   * @return 主动作失败时要执行的回退动作结果
    */
   public MappingRuleResult getFallback() {
     return fallback;
   }
 
   /**
-   * Sets the fallback method to reject, if the action cannot be executed the
-   * application will get rejected.
-   * @return MappingRuleAction The same object for method chaining.
+   * 设置回退行为为拒绝提交，当动作无法执行时应用会被拒绝。
+   * @return 当前动作对象，支持方法链调用
    */
   public MappingRuleAction setFallbackReject() {
     fallback = MappingRuleResult.createRejectResult();
@@ -54,9 +50,8 @@ public abstract class MappingRuleActionBase implements MappingRuleAction {
   }
 
   /**
-   * Sets the fallback method to skip, if the action cannot be executed
-   * We move onto the next rule, ignoring this one.
-   * @return MappingRuleAction The same object for method chaining.
+   * 设置回退行为为跳过当前规则，当动作无法执行时会跳过本规则继续匹配下一条规则。
+   * @return 当前动作对象，支持方法链调用
    */
   public MappingRuleAction setFallbackSkip() {
     fallback = MappingRuleResult.createSkipResult();
@@ -64,10 +59,9 @@ public abstract class MappingRuleActionBase implements MappingRuleAction {
   }
 
   /**
-   * Sets the fallback method to place to default, if the action cannot be
-   * executed the application will be placed into the default queue, if the
-   * default queue does not exist the application will get rejected.
-   * @return MappingRuleAction The same object for method chaining.
+   * 设置回退行为为放置到默认队列，当动作无法执行时应用会被放入默认队列，
+   * 如果默认队列不存在则应用会被拒绝。
+   * @return 当前动作对象，支持方法链调用
    */
   public MappingRuleAction setFallbackDefaultPlacement() {
     fallback = MappingRuleResult.createDefaultPlacementResult();
@@ -75,10 +69,9 @@ public abstract class MappingRuleActionBase implements MappingRuleAction {
   }
 
   /**
-   * This method is the main logic of the action, it shall determine based on
-   * the mapping context, what should be the action's result.
-   * @param variables The variable context, which contains all the variables
-   * @return The result of the action
+   * 动作核心执行逻辑，根据映射上下文判断动作的执行结果。
+   * @param variables 变量上下文，包含所有可用于匹配的变量
+   * @return 动作执行结果
    */
   public abstract MappingRuleResult execute(VariableContext variables);
 }

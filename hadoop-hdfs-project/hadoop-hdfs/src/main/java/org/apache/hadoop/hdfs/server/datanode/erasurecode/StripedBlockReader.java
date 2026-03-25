@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,14 +47,9 @@ import java.util.EnumSet;
 import java.util.concurrent.Callable;
 
 /**
- * StripedBlockReader is used to read block data from one source DN, it contains
- * a block reader, read buffer and striped block index.
- * Only allocate StripedBlockReader once for one source, and the StripedReader
- * has the same array order with sources. Typically we only need to allocate
- * minimum number (minRequiredSources) of StripedReader, and allocate
- * new for new source DN if some existing DN invalid or slow.
- * If some source DN is corrupt, set the corresponding blockReader to
- * null and will never read from it again.
+ * 纠删码条带化块读取器，用于从单个源DataNode读取一个条带块数据
+ * 每个源DataNode对应一个实例，顺序与源列表保持一致，仅按需分配最少数量的实例
+ * 当源DataNode不可用或数据损坏时，会将对应块读取器置空，不再从该源读取
  */
 @InterfaceAudience.Private
 class StripedBlockReader {
@@ -63,13 +59,23 @@ class StripedBlockReader {
   private final DataNode datanode;
   private final Configuration conf;
 
-  private final short index; // internal block index
+  private final short index; // 条带块内部索引
   private final ExtendedBlock block;
   private final DatanodeInfo source;
   private BlockReader blockReader;
   private ByteBuffer buffer;
   private boolean isLocal;
 
+  /**
+   * 构造条带块读取器，尝试创建块读取连接
+   * @param stripedReader 父条带读取器
+   * @param datanode 当前DataNode实例
+   * @param conf Hadoop配置
+   * @param index 条带块索引
+   * @param block 要读取的扩展块
+   * @param source 源DataNode信息
+   * @param offsetInBlock 块内读取起始偏移
+   */
   StripedBlockReader(StripedReader stripedReader, DataNode datanode,
                      Configuration conf, short index, ExtendedBlock block,
                      DatanodeInfo source, long offsetInBlock) {
@@ -88,6 +94,10 @@ class StripedBlockReader {
     }
   }
 
+  /**
+   * 获取读取缓冲区，延迟分配缓冲区空间
+   * @return 读取缓冲区
+   */
   ByteBuffer getReadBuffer() {
     if (buffer == null) {
       this.buffer = stripedReader.allocateReadBuffer();
@@ -95,39 +105,53 @@ class StripedBlockReader {
     return buffer;
   }
 
+  /**
+   * 释放读取缓冲区
+   */
   void freeReadBuffer() {
     DataNodeFaultInjector.get().interceptFreeBlockReaderBuffer();
     buffer = null;
   }
 
+  /**
+   * 重置块读取器，从指定偏移重新创建读取连接
+   * @param offsetInBlock 块内新的读取起始偏移
+   */
   void resetBlockReader(long offsetInBlock) {
     this.blockReader = createBlockReader(offsetInBlock);
   }
 
+  /**
+   * 创建远程块读取器，建立与源DataNode的连接
+   * @param offsetInBlock 块内读取起始偏移
+   * @return 创建好的块读取器，创建失败返回null
+   */
   private BlockReader createBlockReader(long offsetInBlock) {
+    // 偏移超出块大小，无需读取
     if (offsetInBlock >= block.getNumBytes()) {
       return null;
     }
     Peer peer = null;
     try {
+      // 获取源DataNode数据传输地址
       InetSocketAddress dnAddr =
           stripedReader.getSocketAddress4Transfer(source);
+      // 获取块读取访问令牌
       Token<BlockTokenIdentifier> blockToken = datanode.getBlockAccessToken(
           block, EnumSet.of(BlockTokenIdentifier.AccessMode.READ),
           StorageType.EMPTY_ARRAY, new String[0]);
         /*
-         * This can be further improved if the replica is local, then we can
-         * read directly from DN and need to check the replica is FINALIZED
-         * state, notice we should not use short-circuit local read which
-         * requires config for domain-socket in UNIX or legacy config in
-         * Windows. The network distance value isn't used for this scenario.
-         *
-         * TODO: add proper tracer
+         * 对于本地副本可进一步优化直接读取，需要检查副本是否为FINALIZED状态
+         * 不使用短路本地读取，避免依赖域套接字或Windows特定配置
+         * TODO: 添加追踪支持
          */
+      // 创建与源DataNode的已连接对端
       peer = newConnectedPeer(block, dnAddr, blockToken, source);
+      // 标记是否为本地对端
       if (peer.isLocal()) {
         this.isLocal = true;
       }
+      // 创建远程块读取器并返回
       return BlockReaderRemote.newBlockReader(
           "dummy", block, blockToken, offsetInBlock,
           block.getNumBytes() - offsetInBlock, true, "", peer, source,
@@ -140,6 +164,15 @@ class StripedBlockReader {
     }
   }
 
+  /**
+   * 创建并连接到指定DataNode的对端，处理加密认证
+   * @param b 要读取的块
+   * @param addr 目标DataNode地址
+   * @param blockToken 块访问令牌
+   * @param datanodeId 目标DataNodeID
+   * @return 已连接的对端对象
+   * @throws IOException 连接或认证失败抛出异常
+   */
   private Peer newConnectedPeer(ExtendedBlock b, InetSocketAddress addr,
                                 Token<BlockTokenIdentifier> blockToken,
                                 DatanodeID datanodeId)
@@ -149,14 +182,17 @@ class StripedBlockReader {
     Socket sock = null;
     final int socketTimeout = datanode.getDnConf().getSocketTimeout();
     try {
+      // 创建套接字并连接到目标DataNode
       sock = NetUtils.getDefaultSocketFactory(conf).createSocket();
       NetUtils.connect(sock, addr, socketTimeout);
+      // 通过密钥和SASL创建对端，处理加密和认证
       peer = DFSUtilClient.peerFromSocketAndKey(datanode.getSaslClient(),
           sock, datanode.getDataEncryptionKeyFactoryForBlock(b),
           blockToken, datanodeId, socketTimeout);
       success = true;
       return peer;
     } finally {
+      // 连接失败清理资源
       if (!success) {
         IOUtils.cleanupWithLogger(null, peer);
         IOUtils.closeSocket(sock);
@@ -164,6 +200,12 @@ class StripedBlockReader {
     }
   }
 
+  /**
+   * 创建异步读取任务，用于并发从该块读取指定长度数据
+   * @param length 要读取的数据长度
+   * @param corruptedBlocks 损坏块记录容器
+   * @return 异步读取任务，返回读取统计信息
+   */
   Callable<BlockReadStats> readFromBlock(final int length,
                                final CorruptedBlocks corruptedBlocks) {
     return new Callable<BlockReadStats>() {
@@ -171,17 +213,22 @@ class StripedBlockReader {
       @Override
       public BlockReadStats call() throws Exception {
         try {
+          // 设置缓冲区读取长度限制
           getReadBuffer().limit(length);
+          // 执行实际读取
           return actualReadFromBlock();
         } catch (ChecksumException e) {
+          // 校验和错误，记录损坏块并抛出异常
           LOG.warn("Found Checksum error for {} from {} at {}", block,
               source, e.getPos());
           corruptedBlocks.addCorruptedBlock(block, source);
           throw e;
         } catch (IOException e) {
+          // IO错误，记录日志并抛出
           LOG.info(e.getMessage());
           throw e;
         } finally {
+          // 故障注入点
           DataNodeFaultInjector.get().interceptBlockReader();
         }
       }
@@ -189,34 +236,49 @@ class StripedBlockReader {
   }
 
   /**
-   * Perform actual reading of bytes from block.
+   * 实际执行从块读取数据到缓冲区的操作
+   * @return 读取统计信息，包含读取字节数、读取方式、网络距离等
+   * @throws IOException 读取失败抛出异常
    */
   private BlockReadStats actualReadFromBlock() throws IOException {
+    // 故障注入：延迟读取
     DataNodeFaultInjector.get().delayBlockReader();
     int len = buffer.remaining();
     int n = 0;
+    // 循环读取直到填满缓冲区或到达流末尾
     while (n < len) {
       int nread = blockReader.read(buffer);
       if (nread <= 0) {
         break;
       }
       n += nread;
+      // 累加到重建器的总读取字节统计
       stripedReader.getReconstructor().incrBytesRead(isLocal, nread);
     }
     return new BlockReadStats(n, blockReader.isShortCircuit(),
         blockReader.getNetworkDistance());
   }
 
-  // close block reader
+  /**
+   * 关闭块读取器并释放资源
+   */
   void closeBlockReader() {
     IOUtils.closeStream(blockReader);
     blockReader = null;
   }
 
+  /**
+   * 获取该条带块的索引
+   * @return 条带块索引
+   */
   short getIndex() {
     return index;
   }
 
+  /**
+   * 获取块读取器实例
+   * @return 块读取器，损坏或创建失败返回null
+   */
   BlockReader getBlockReader() {
     return blockReader;
   }

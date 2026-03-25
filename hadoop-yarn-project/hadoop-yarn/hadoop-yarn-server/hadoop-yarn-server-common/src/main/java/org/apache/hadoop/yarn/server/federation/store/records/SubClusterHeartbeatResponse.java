@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,18 +23,18 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * SubClusterHeartbeatResponse contains the response from the {@code
- * FederationMembershipStateStore} to a periodic heartbeat to indicate
- * liveliness from a <code>ResourceManager</code> participating in federation.
- * Currently response is empty if the operation was successful, if not an
- * exception reporting reason for a failure.
- * <p>
- * NOTE: This can be extended to push down policies in future
+ * 子集群心跳响应类，封装联邦集群成员状态存储层对ResourceManager周期性心跳的响应
+ * 目前操作成功时响应为空，失败则抛出异常说明失败原因
+ * 未来可扩展该类用于向下推送集群策略
  */
 @Private
 @Unstable
 public abstract class SubClusterHeartbeatResponse {
 
+  /**
+   * 创建一个新的子集群心跳响应实例
+   * @return 新建的空响应实例
+   */
   @Private
   @Unstable
   public static SubClusterHeartbeatResponse newInstance() {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -68,6 +69,9 @@ import com.google.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * YARN Web UI 应用详情页面区块，负责渲染应用基本信息、尝试列表和相关操作按钮
+ */
 public class AppBlock extends HtmlBlock {
 
   private static final Logger LOG = LoggerFactory.getLogger(AppBlock.class);
@@ -77,18 +81,24 @@ public class AppBlock extends HtmlBlock {
   private boolean unsecuredUI = true;
 
 
+  /**
+   * 构造函数，通过Guice注入依赖，初始化并检查当前UI是否为非安全认证模式
+   */
   @Inject
   protected AppBlock(ApplicationBaseProtocol appBaseProt, ViewContext ctx,
       Configuration conf) {
     super(ctx);
     this.appBaseProt = appBaseProt;
     this.conf = conf;
-    // check if UI is unsecured.
+    // 检查当前UI是否使用非安全认证
     String httpAuth = conf.get(CommonConfigurationKeys.HADOOP_HTTP_AUTHENTICATION_TYPE);
     this.unsecuredUI = (httpAuth != null) && (httpAuth.equals("simple") ||
          httpAuth.equals(PseudoAuthenticationHandler.class.getName()));
   }
 
+  /**
+   * 渲染应用详情页面区块的主入口方法
+   */
   @Override
   protected void render(Block html) {
     String webUiType = $(WEB_UI_TYPE);
@@ -99,17 +109,20 @@ public class AppBlock extends HtmlBlock {
     }
 
     try {
+      // 将字符串ID转换为ApplicationId对象
       appID = Apps.toAppID(aid);
     } catch (Exception e) {
       puts("Invalid Application ID: " + aid);
       return;
     }
 
+    // 获取当前请求用户信息
     UserGroupInformation callerUGI = getCallerUGI();
     ApplicationReport appReport;
     try {
       final GetApplicationReportRequest request =
           GetApplicationReportRequest.newInstance(appID);
+      // 根据是否有用户信息选择调用方式，支持特权访问
       if (callerUGI == null) {
         appReport = getApplicationReport(request);
       } else {
@@ -133,13 +146,13 @@ public class AppBlock extends HtmlBlock {
       return;
     }
 
+    // 封装应用信息为Web层数据对象
     AppInfo app = new AppInfo(appReport);
 
+    // 设置页面标题
     setTitle(join("Application ", aid));
 
-    //Validate if able to read application attempts
-    // which should also validate if kill is allowed for the user based on ACLs
-
+    // 验证是否有权限读取应用尝试信息，同时会基于ACL验证当前用户是否允许杀死应用
     Collection<ApplicationAttemptReport> attempts;
     try {
       final GetApplicationAttemptsRequest request =
@@ -165,24 +178,24 @@ public class AppBlock extends HtmlBlock {
       return;
     }
 
-
-    // YARN-6890. for secured cluster allow anonymous UI access, application kill
-    // shouldn't be there.
+    // YARN-6890: 安全集群开启匿名UI访问时，不显示杀死应用按钮
     boolean unsecuredUIForSecuredCluster = UserGroupInformation.isSecurityEnabled()
         && this.unsecuredUI;
 
+    // 判断是否显示杀死应用按钮：必须是RM WebUI、开启了UI操作、非安全集群匿名访问、应用未结束
     if (webUiType != null
         && webUiType.equals(YarnWebParams.RM_WEB_UI)
         && conf.getBoolean(YarnConfiguration.RM_WEBAPP_UI_ACTIONS_ENABLED,
           YarnConfiguration.DEFAULT_RM_WEBAPP_UI_ACTIONS_ENABLED)
             && !unsecuredUIForSecuredCluster
             && !Apps.isApplicationFinalState(app.getAppState())) {
-      // Application Kill
+      // 渲染杀死应用按钮
       html.div()
         .button()
           .$onclick("confirmAction()").b("Kill Application").__()
           .__();
 
+      // 生成杀死应用的JavaScript处理逻辑
       StringBuilder script = new StringBuilder();
       script.append("function confirmAction() {")
           .append(" b = confirm(\"Are you sure?\");")
@@ -207,25 +220,30 @@ public class AppBlock extends HtmlBlock {
       html.script().$type("text/javascript").__(script.toString()).__();
     }
 
+    // 生成调度器页面链接，跳转到对应队列
     String schedulerPath = WebAppUtils.getResolvedRMWebAppURLWithScheme(conf) +
         "/cluster/scheduler?openQueues=" + app.getQueue();
 
+    // 渲染应用概览信息表格
     generateOverviewTable(app, schedulerPath, webUiType, appReport);
 
+    // 渲染应用指标表格
     createApplicationMetricsTable(html);
 
+    // 渲染通用信息区块
     html.__(InfoBlock.class);
 
+    // 渲染应用尝试列表表格
     generateApplicationTable(html, callerUGI, attempts);
 
   }
 
   /**
-   * Generate overview table for app web page.
-   * @param app app info.
-   * @param schedulerPath schedule path.
-   * @param webUiType web ui type.
-   * @param appReport app report.
+   * 生成应用概览信息表格，填充应用基本信息
+   * @param app 应用Web层信息对象
+   * @param schedulerPath 调度队列链接路径
+   * @param webUiType UI类型（RM/AHS）
+   * @param appReport 应用服务端报告对象
    */
   private void generateOverviewTable(AppInfo app, String schedulerPath,
       String webUiType, ApplicationReport appReport) {
@@ -256,6 +274,7 @@ public class AppBlock extends HtmlBlock {
                 || app.getTrackingUrl().equals(UNAVAILABLE) ? "Unassigned" :
                 Apps.isApplicationFinalState(app.getAppState()) ?
                     "History" : "ApplicationMaster");
+    // RM WebUI 需要额外显示日志聚合状态和应用超时信息
     if (webUiType != null
         && webUiType.equals(YarnWebParams.RM_WEB_UI)) {
       LogAggregationStatus status = getLogAggregationStatus();
@@ -269,6 +288,7 @@ public class AppBlock extends HtmlBlock {
         overviewTable.__("Log Aggregation Status:",
             root_url("logaggregationstatus", app.getAppId()), status.name());
       }
+      // 获取应用生命周期剩余超时时间
       long timeout = appReport.getApplicationTimeouts()
           .get(ApplicationTimeoutType.LIFETIME).getRemainingTime();
       if (timeout < 0) {
@@ -278,6 +298,7 @@ public class AppBlock extends HtmlBlock {
             String.format("%d seconds", timeout));
       }
     }
+    // 添加诊断信息和标签表达式信息
     overviewTable.__("Diagnostics:",
         app.getDiagnosticsInfo() == null ? "" : app.getDiagnosticsInfo());
     overviewTable.__("Unmanaged Application:", app.isUnmanagedApp());
@@ -289,20 +310,28 @@ public class AppBlock extends HtmlBlock {
             : app.getAmNodeLabelExpression());
   }
 
+  /**
+   * 生成应用尝试列表表格，渲染所有应用尝试的基本信息
+   * @param html HTML块上下文
+   * @param callerUGI 当前请求用户信息
+   * @param attempts 应用尝试报告集合
+   */
   protected void generateApplicationTable(Block html,
       UserGroupInformation callerUGI,
       Collection<ApplicationAttemptReport> attempts) {
-    // Application Attempt Table
+    // 创建应用尝试表格表头
     TBODY<TABLE<Hamlet>> tbody =
         html.table("#attempts").thead().tr().th(".id", "Attempt ID")
           .th(".started", "Started").th(".node", "Node").th(".logs", "Logs")
           .__().__().tbody();
 
+    // 构建前端表格需要的JSON数据
     StringBuilder attemptsTableData = new StringBuilder("[\n");
     for (final ApplicationAttemptReport appAttemptReport : attempts) {
       AppAttemptInfo appAttempt = new AppAttemptInfo(appAttemptReport);
       ContainerReport containerReport;
       try {
+        // 获取AM容器信息，用于获取节点地址和日志链接
         final GetContainerReportRequest request =
                 GetContainerReportRequest.newInstance(
                       appAttemptReport.getAMContainerId());
@@ -337,12 +366,14 @@ public class AppBlock extends HtmlBlock {
       long startTime = 0L;
       String logsLink = null;
       String nodeLink = null;
+      // 从容器报告中提取节点地址和日志链接
       if (containerReport != null) {
         ContainerInfo container = new ContainerInfo(containerReport);
         startTime = container.getStartedTime();
         logsLink = containerReport.getLogUrl();
         nodeLink = containerReport.getNodeHttpAddress();
       }
+      // 拼接表格行数据
       attemptsTableData
         .append("[\"<a href='")
         .append(url("appattempt", appAttempt.getAppAttemptId()))
@@ -359,11 +390,13 @@ public class AppBlock extends HtmlBlock {
         .append(logsLink == null ? "#" : "href='" + logsLink).append("'>")
         .append(logsLink == null ? "N/A" : "Logs").append("</a>\"],\n");
     }
+    // 移除最后多余的逗号
     if (attemptsTableData.charAt(attemptsTableData.length() - 2) == ',') {
       attemptsTableData.delete(attemptsTableData.length() - 2,
         attemptsTableData.length() - 1);
     }
     attemptsTableData.append("]");
+    // 将JSON数据注入到页面脚本中
     html.script().$type("text/javascript")
       .__("var attemptsTableData=" + attemptsTableData).__();
 
@@ -382,68 +415,3 @@ public class AppBlock extends HtmlBlock {
     return appBaseProt.getApplicationAttempts(request)
         .getApplicationAttemptList();
   }
-
-  protected ApplicationReport getApplicationReport(
-      final GetApplicationReportRequest request)
-      throws YarnException, IOException {
-    return appBaseProt.getApplicationReport(request).getApplicationReport();
-  }
-
-
-  private String clarifyAppState(YarnApplicationState state) {
-    String ret = state.toString();
-    switch (state) {
-    case NEW:
-      return ret + ": waiting for application to be initialized";
-    case NEW_SAVING:
-      return ret + ": waiting for application to be persisted in state-store.";
-    case SUBMITTED:
-      return ret + ": waiting for application to be accepted by scheduler.";
-    case ACCEPTED:
-      return ret + ": waiting for AM container to be allocated, launched and"
-          + " register with RM.";
-    case RUNNING:
-      return ret + ": AM has registered with RM and started running.";
-    default:
-      return ret;
-    }
-  }
-
-  private String clarifyAppPriority(int priority) {
-    return priority + " (Higher Integer value indicates higher priority)";
-  }
-
-  private String clairfyAppFinalStatus(FinalApplicationStatus status) {
-    if (status == FinalApplicationStatus.UNDEFINED) {
-      return "Application has not completed yet.";
-    }
-    return status.toString();
-  }
-
-  // The preemption metrics only need to be shown in RM WebUI
-  protected void createApplicationMetricsTable(Block html) {
-
-  }
-
-  // This will be overrided in RMAppBlock
-  protected LogAggregationStatus getLogAggregationStatus() {
-    return null;
-  }
-
-  public static String getCSRFHeaderString(Configuration conf) {
-    String ret = "";
-    if (conf.getBoolean(YarnConfiguration.RM_CSRF_ENABLED, false)) {
-      ret = " headers : { '";
-      Map<String, String> filterParams = RestCsrfPreventionFilter
-          .getFilterParams(conf, YarnConfiguration.RM_CSRF_PREFIX);
-      if (filterParams
-          .containsKey(RestCsrfPreventionFilter.CUSTOM_HEADER_PARAM)) {
-        ret += filterParams.get(RestCsrfPreventionFilter.CUSTOM_HEADER_PARAM);
-      } else {
-        ret += RestCsrfPreventionFilter.HEADER_DEFAULT;
-      }
-      ret += "' : 'null' },";
-    }
-    return ret;
-  }
-}

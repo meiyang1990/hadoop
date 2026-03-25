@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,10 +27,21 @@ import org.apache.hadoop.yarn.util.Records;
 
 import java.nio.ByteBuffer;
 
+/**
+ * YARN联邦Router代理密钥存储记录，保存委派密钥的ID、密钥内容和过期时间，
+ * 用于联邦环境下跨RM的身份认证。
+ */
 @Private
 @Unstable
 public abstract class RouterMasterKey {
 
+  /**
+   * 创建新的RouterMasterKey实例。
+   * @param keyId 密钥ID
+   * @param keyBytes 密钥二进制内容
+   * @param expiryDate 密钥过期时间戳
+   * @return 新的RouterMasterKey实例
+   */
   @Private
   @Unstable
   public static RouterMasterKey newInstance(Integer keyId, ByteBuffer keyBytes, Long expiryDate) {
@@ -40,6 +52,11 @@ public abstract class RouterMasterKey {
     return policy;
   }
 
+  /**
+   * 通过现有实例创建新的RouterMasterKey副本。
+   * @param masterKey 源RouterMasterKey实例
+   * @return 新的RouterMasterKey副本
+   */
   @Private
   @Unstable
   public static RouterMasterKey newInstance(RouterMasterKey masterKey) {

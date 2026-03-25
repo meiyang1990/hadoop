@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,38 +28,55 @@ import org.apache.hadoop.mapreduce.v2.proto.MRServiceProtos.GetDiagnosticsRespon
 import org.apache.hadoop.mapreduce.v2.proto.MRServiceProtos.GetDiagnosticsResponseProtoOrBuilder;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 
-
-    
+/**
+ * 获取诊断信息响应的Protobuf实现，基于ProtoBase实现MapReduce服务协议中的响应对象
+ * 负责处理客户端查询作业/任务诊断信息时，服务端响应的PB序列化与反序列化
+ */    
 public class GetDiagnosticsResponsePBImpl extends ProtoBase<GetDiagnosticsResponseProto> implements GetDiagnosticsResponse {
+  // Protobuf消息对象，当通过proto构建时使用
   GetDiagnosticsResponseProto proto = GetDiagnosticsResponseProto.getDefaultInstance();
+  // Protobuf构建器，当本地修改数据时使用
   GetDiagnosticsResponseProto.Builder builder = null;
+  // 标识当前数据是否来自proto对象
   boolean viaProto = false;
   
+  // 本地缓存的诊断信息列表
   private List<String> diagnostics = null;
   
   
+  /**
+   * 构造空的获取诊断信息响应对象
+   */
   public GetDiagnosticsResponsePBImpl() {
     builder = GetDiagnosticsResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有的Protobuf消息构造响应对象
+   * @param proto 已构造好的GetDiagnosticsResponseProto对象
+   */
   public GetDiagnosticsResponsePBImpl(GetDiagnosticsResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
+  @Override
   public GetDiagnosticsResponseProto getProto() {
+      // 合并本地修改到proto
       mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
   }
 
+  // 合并本地缓存的诊断信息到Protobuf构建器
   private void mergeLocalToBuilder() {
     if (this.diagnostics != null) {
       addDiagnosticsToProto();
     }
   }
 
+  // 合并本地修改，生成最终的Protobuf消息对象
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -67,6 +85,7 @@ public class GetDiagnosticsResponsePBImpl extends ProtoBase<GetDiagnosticsRespon
     viaProto = true;
   }
 
+  // 如果当前从proto读取数据，初始化Protobuf构建器
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = GetDiagnosticsResponseProto.newBuilder(proto);
@@ -80,17 +99,20 @@ public class GetDiagnosticsResponsePBImpl extends ProtoBase<GetDiagnosticsRespon
     initDiagnostics();
     return this.diagnostics;
   }
+  
   @Override
   public String getDiagnostics(int index) {
     initDiagnostics();
     return this.diagnostics.get(index);
   }
+  
   @Override
   public int getDiagnosticsCount() {
     initDiagnostics();
     return this.diagnostics.size();
   }
   
+  // 从Protobuf消息初始化本地诊断信息列表
   private void initDiagnostics() {
     if (this.diagnostics != null) {
       return;
@@ -112,6 +134,7 @@ public class GetDiagnosticsResponsePBImpl extends ProtoBase<GetDiagnosticsRespon
     this.diagnostics.addAll(diagnostics);
   }
   
+  // 将本地诊断信息列表写入Protobuf构建器
   private void addDiagnosticsToProto() {
     maybeInitBuilder();
     builder.clearDiagnostics();
@@ -119,20 +142,23 @@ public class GetDiagnosticsResponsePBImpl extends ProtoBase<GetDiagnosticsRespon
       return;
     builder.addAllDiagnostics(diagnostics);
   }
+  
   @Override
   public void addDiagnostics(String diagnostics) {
     initDiagnostics();
     this.diagnostics.add(diagnostics);
   }
+  
   @Override
   public void removeDiagnostics(int index) {
     initDiagnostics();
     this.diagnostics.remove(index);
   }
+  
   @Override
   public void clearDiagnostics() {
     initDiagnostics();
     this.diagnostics.clear();
   }
 
-}  
+}

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -15,4 +16,8 @@
  * the License.
  */
 
+/**
+ * YARN服务端Web应用通用工具包，提供ResourceManager和NodeManager共用的Web界面基础能力，
+ * 包括通用过滤器、Servlet基类、Web页面工具、安全防护等核心支撑功能。
+ */
 package org.apache.hadoop.yarn.server.webapp;

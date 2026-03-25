@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -51,6 +52,10 @@ import org.apache.hadoop.thirdparty.com.google.common.collect.HashMultiset;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Multiset;
 
 /**
+ * 文件概述：HDFS数据块令牌密钥管理器，负责数据块访问令牌的生成、验证和密钥轮换。
+ * 支持主/工作两种模式：主模式用于NameNode生成和导出密钥，工作模式用于DataNode导入和使用密钥。
+ * 核心功能：生成数据块访问令牌、验证令牌权限、管理密钥生命周期、支持数据传输加密密钥生成。
+ * 
  * BlockTokenSecretManager can be instantiated in 2 modes, master mode
  * and worker mode. Master can generate new block keys and export block
  * keys to workers, while workers can only import and use block keys
@@ -95,12 +100,15 @@ public class BlockTokenSecretManager extends
    * unit testing.
    */
   private Timer timer;
+
   /**
-   * Constructor for workers.
+   * 工作模式构造函数，用于DataNode侧创建密钥管理器
    *
-   * @param keyUpdateInterval how often a new key will be generated
-   * @param tokenLifetime how long an individual token is valid
-   * @param useProto should we use new protobuf style tokens
+   * @param keyUpdateInterval 密钥更新间隔
+   * @param tokenLifetime 单个令牌的有效期
+   * @param blockPoolId 块池ID
+   * @param encryptionAlgorithm 加密算法名称
+   * @param useProto 是否使用protobuf格式令牌
    */
   public BlockTokenSecretManager(long keyUpdateInterval,
       long tokenLifetime, String blockPoolId, String encryptionAlgorithm,
@@ -109,6 +117,17 @@ public class BlockTokenSecretManager extends
         encryptionAlgorithm, 0, 1, useProto, false);
   }
 
+  /**
+   * 主模式构造函数，用于NameNode侧创建单NameNode场景的密钥管理器
+   * 
+   * @param keyUpdateInterval 密钥更新间隔
+   * @param tokenLifetime 单个令牌的有效期
+   * @param nnIndex 当前NameNode在HA集群中的索引
+   * @param numNNs HA集群中NameNode的总数量
+   * @param blockPoolId 块池ID
+   * @param encryptionAlgorithm 加密算法名称
+   * @param useProto 是否使用protobuf格式令牌
+   */
   public BlockTokenSecretManager(long keyUpdateInterval,
       long tokenLifetime, int nnIndex, int numNNs, String blockPoolId,
       String encryptionAlgorithm, boolean useProto) {
@@ -116,6 +135,18 @@ public class BlockTokenSecretManager extends
         blockPoolId, encryptionAlgorithm, useProto, false);
   }
 
+  /**
+   * 主模式构造函数，支持QOP封装配置，用于NameNode侧创建HA集群场景的密钥管理器
+   * 
+   * @param keyUpdateInterval 密钥更新间隔
+   * @param tokenLifetime 单个令牌的有效期
+   * @param nnIndex 当前NameNode在HA集群中的索引
+   * @param numNNs HA集群中NameNode的总数量
+   * @param blockPoolId 块池ID
+   * @param encryptionAlgorithm 加密算法名称
+   * @param useProto 是否使用protobuf格式令牌
+   * @param shouldWrapQOP 是否在块访问令牌中封装QOP信息
+   */
   public BlockTokenSecretManager(long keyUpdateInterval,
       long tokenLifetime, int nnIndex, int numNNs,  String blockPoolId,
       String encryptionAlgorithm, boolean useProto, boolean shouldWrapQOP) {
@@ -126,20 +157,22 @@ public class BlockTokenSecretManager extends
   }
 
   /**
-   * Constructor for masters.
+   * 通用私有构造函数，根据模式创建块令牌密钥管理器实例，分配密钥序列号范围避免HA场景冲突
    *
-   * @param keyUpdateInterval how often a new key will be generated
-   * @param tokenLifetime how long an individual token is valid
-   * @param nnIndex namenode index of the namenode for which we are creating the manager
-   * @param blockPoolId block pool ID
-   * @param encryptionAlgorithm encryption algorithm to use
-   * @param numNNs number of namenodes possible
-   * @param useProto should we use new protobuf style tokens
-   * @param shouldWrapQOP should wrap QOP in the block access token
+   * @param isMaster 是否为主模式
+   * @param keyUpdateInterval 密钥更新间隔
+   * @param tokenLifetime 单个令牌的有效期
+   * @param blockPoolId 块池ID
+   * @param encryptionAlgorithm 加密算法名称
+   * @param nnIndex 当前NameNode在HA集群中的索引
+   * @param numNNs HA集群中NameNode总数量
+   * @param useProto 是否使用protobuf格式令牌
+   * @param shouldWrapQOP 是否在块访问令牌中封装QOP信息
    */
   private BlockTokenSecretManager(boolean isMaster, long keyUpdateInterval,
       long tokenLifetime, String blockPoolId, String encryptionAlgorithm,
       int nnIndex, int numNNs, boolean useProto, boolean shouldWrapQOP) {
+    // 为每个NameNode划分独立的序列号区间，避免HA场景下序列号冲突
     this.intRange = Integer.MAX_VALUE / numNNs;
     this.nnRangeStart = intRange * nnIndex;
     this.isMaster = isMaster;
@@ -159,7 +192,7 @@ public class BlockTokenSecretManager extends
 
   @VisibleForTesting
   public synchronized void setSerialNo(int nextNo) {
-    // we mod the serial number by the range and then add that times the index
+    // 根据区间偏移计算最终序列号，保证落在当前NameNode分配的范围内
     this.serialNo = (nextNo % intRange) + (nnRangeStart);
     assert serialNo >= nnRangeStart && serialNo < (nnRangeStart + intRange) :
       "serialNo " + serialNo + " is not in the designated range: [" +
@@ -170,7 +203,7 @@ public class BlockTokenSecretManager extends
     this.blockPoolId = blockPoolId;
   }
 
-  /** Initialize block keys */
+  /** 初始化生成当前密钥和下一个密钥，仅主模式执行 */
   private synchronized void generateKeys() {
     if (!isMaster) {
       return;
@@ -187,17 +220,20 @@ public class BlockTokenSecretManager extends
      * Similarly, the estimated expiry date for nextKey is one keyUpdateInterval
      * more.
      */
+    // 生成当前密钥，预估计过期时间，保证NN重启后DN仍能正确过期旧密钥
     setSerialNo(serialNo + 1);
     currentKey = new BlockKey(serialNo, timer.now() + 2
         * keyUpdateInterval + tokenLifetime, generateSecret());
+    // 预先生成下一个密钥，用于密钥轮换
     setSerialNo(serialNo + 1);
     nextKey = new BlockKey(serialNo, timer.now() + 3
         * keyUpdateInterval + tokenLifetime, generateSecret());
+    // 将两个密钥添加到密钥集合
     allKeys.put(currentKey.getKeyId(), currentKey);
     allKeys.put(nextKey.getKeyId(), nextKey);
   }
 
-  /** Export block keys, only to be used in master mode */
+  /** 导出所有块密钥，仅主模式使用，供DN同步拉取 */
   public synchronized ExportedBlockKeys exportKeys() {
     if (!isMaster) {
       return null;
@@ -207,8 +243,10 @@ public class BlockTokenSecretManager extends
         currentKey, allKeys.values().toArray(new BlockKey[0]));
   }
 
+  /** 移除已过期的密钥，清理本地密钥集合 */
   private synchronized void removeExpiredKeys() {
     long now = timer.now();
+    // 遍历所有密钥，移除过期密钥
     for (Iterator<Map.Entry<Integer, BlockKey>> it = allKeys.entrySet()
         .iterator(); it.hasNext();) {
       Map.Entry<Integer, BlockKey> e = it.next();
@@ -223,7 +261,7 @@ public class BlockTokenSecretManager extends
   }
 
   /**
-   * Set block keys, only to be used in worker mode
+   * 导入从主节点获取的块密钥，仅工作模式使用
    */
   public synchronized void addKeys(ExportedBlockKeys exportedKeys,
       boolean updateCurrentKey) throws IOException {
@@ -231,10 +269,13 @@ public class BlockTokenSecretManager extends
       return;
     }
     LOG.info("Setting block keys. BlockPool = {} .", blockPoolId);
+    // 先清理本地已过期密钥
     removeExpiredKeys();
+    // 更新当前密钥
     if (updateCurrentKey || currentKey == null) {
       this.currentKey = exportedKeys.getCurrentKey();
     }
+    // 添加所有接收到的密钥到本地集合
     BlockKey[] receivedKeys = exportedKeys.getAllKeys();
     for (int i = 0; i < receivedKeys.length; i++) {
       if (receivedKeys[i] != null) {
@@ -244,8 +285,8 @@ public class BlockTokenSecretManager extends
   }
 
   /**
-   * Update block keys if update time {@literal >} update interval.
-   * @return true if the keys are updated.
+   * 如果更新时间超过间隔，触发密钥更新，仅主模式使用
+   * @return true 如果密钥成功更新
    */
   public synchronized boolean updateKeys(final long updateTime) throws IOException {
     if (updateTime > keyUpdateInterval) {
@@ -255,7 +296,7 @@ public class BlockTokenSecretManager extends
   }
 
   /**
-   * Update block keys, only to be used in master mode
+   * 执行密钥轮换更新，仅主模式使用
    */
   synchronized boolean updateKeys() throws IOException {
     if (!isMaster) {
@@ -263,16 +304,17 @@ public class BlockTokenSecretManager extends
     }
 
     LOG.info("Updating block keys");
+    // 清理过期密钥
     removeExpiredKeys();
-    // set final expiry date of retiring currentKey
+    // 更新即将退役的当前密钥的过期时间
     allKeys.put(currentKey.getKeyId(), new BlockKey(currentKey.getKeyId(),
         timer.now() + keyUpdateInterval + tokenLifetime,
         currentKey.getKey()));
-    // update the estimated expiry date of new currentKey
+    // 将预先生成的nextKey提升为当前密钥，更新其过期时间
     currentKey = new BlockKey(nextKey.getKeyId(), timer.now()
         + 2 * keyUpdateInterval + tokenLifetime, nextKey.getKey());
     allKeys.put(currentKey.getKeyId(), currentKey);
-    // generate a new nextKey
+    // 生成新的下一代密钥，为下一次轮换做准备
     setSerialNo(serialNo + 1);
     nextKey = new BlockKey(serialNo, timer.now() + 3
         * keyUpdateInterval + tokenLifetime, generateSecret());
@@ -280,7 +322,7 @@ public class BlockTokenSecretManager extends
     return true;
   }
 
-  /** Generate an block token for current user */
+  /** 为当前请求用户生成指定数据块的访问令牌 */
   public Token<BlockTokenIdentifier> generateToken(ExtendedBlock block,
       EnumSet<BlockTokenIdentifier.AccessMode> modes,
       StorageType[] storageTypes, String[] storageIds) throws IOException {
@@ -289,29 +331,36 @@ public class BlockTokenSecretManager extends
     return generateToken(userID, block, modes, storageTypes, storageIds);
   }
 
-  /** Generate a block token for a specified user */
+  /** 为指定用户生成指定数据块的访问令牌 */
   public Token<BlockTokenIdentifier> generateToken(String userId,
       ExtendedBlock block, EnumSet<BlockTokenIdentifier.AccessMode> modes,
       StorageType[] storageTypes, String[] storageIds) {
+    // 创建块令牌标识符，填充用户、块、访问权限、存储信息
     BlockTokenIdentifier id = new BlockTokenIdentifier(userId, block
         .getBlockPoolId(), block.getBlockId(), modes, storageTypes,
         storageIds, useProto);
+    // 如果需要封装QOP信息，从当前RPC连接获取QOP并写入令牌
     if (shouldWrapQOP) {
       String qop = Server.getAuxiliaryPortEstablishedQOP();
       if (qop != null) {
         id.setHandshakeMsg(qop.getBytes(StandardCharsets.UTF_8));
       }
     }
+    // 使用当前密钥生成令牌密码，返回完整令牌
     return new Token<BlockTokenIdentifier>(id, this);
   }
 
   /**
-   * Check if access should be allowed. userID is not checked if null. This
-   * method doesn't check if token password is correct. It should be used only
-   * when token password has already been verified (e.g., in the RPC layer).
+   * 检查访问是否允许，不验证令牌密码（密码已在RPC层验证），用户名如果为null则不检查。
+   * 验证用户、块ID、有效期、访问模式，并检查存储类型和存储ID是否匹配。
    *
-   * Some places need to check the access using StorageTypes and for other
-   * places the StorageTypes is not relevant.
+   * @param id 块令牌标识符
+   * @param userId 请求用户名
+   * @param block 请求访问的数据块
+   * @param mode 请求的访问模式
+   * @param storageTypes 请求使用的存储类型
+   * @param storageIds 请求使用的存储ID
+   * @throws InvalidToken 访问不被允许时抛出异常
    */
   public void checkAccess(BlockTokenIdentifier id, String userId,
       ExtendedBlock block, BlockTokenIdentifier.AccessMode mode,
@@ -326,267 +375,18 @@ public class BlockTokenSecretManager extends
   }
 
   /**
-   * Check if access should be allowed. userID is not checked if null. This
-   * method doesn't check if token password is correct. It should be used only
-   * when token password has already been verified (e.g., in the RPC layer).
+   * 检查访问是否允许，不验证令牌密码（密码已在RPC层验证），用户名如果为null则不检查。
+   * 验证用户、块ID、有效期、访问模式，并检查存储类型是否匹配。
    *
-   * Some places need to check the access using StorageTypes and for other
-   * places the StorageTypes is not relevant.
+   * @param id 块令牌标识符
+   * @param userId 请求用户名
+   * @param block 请求访问的数据块
+   * @param mode 请求的访问模式
+   * @param storageTypes 请求使用的存储类型
+   * @throws InvalidToken 访问不被允许时抛出异常
    */
   public void checkAccess(BlockTokenIdentifier id, String userId,
       ExtendedBlock block, BlockTokenIdentifier.AccessMode mode,
       StorageType[] storageTypes) throws InvalidToken {
     checkAccess(id, userId, block, mode);
-    if (ArrayUtils.isNotEmpty(storageTypes)) {
-      checkAccess(id.getStorageTypes(), storageTypes, "StorageTypes");
-    }
-  }
-
-  public void checkAccess(BlockTokenIdentifier id, String userId,
-      ExtendedBlock block, BlockTokenIdentifier.AccessMode mode)
-      throws InvalidToken {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Checking access for user=" + userId + ", block=" + block
-          + ", access mode=" + mode + " using " + id);
-    }
-    if (userId != null && !userId.equals(id.getUserId())) {
-      throw new InvalidToken("Block token with " + id
-          + " doesn't belong to user " + userId);
-    }
-    if (!id.getBlockPoolId().equals(block.getBlockPoolId())) {
-      throw new InvalidToken("Block token with " + id
-          + " doesn't apply to block " + block);
-    }
-    if (id.getBlockId() != block.getBlockId()) {
-      throw new InvalidToken("Block token with " + id
-          + " doesn't apply to block " + block);
-    }
-    if (isExpired(id.getExpiryDate())) {
-      throw new InvalidToken("Block token with " + id
-          + " is expired.");
-    }
-    if (!id.getAccessModes().contains(mode)) {
-      throw new InvalidToken("Block token with " + id
-          + " doesn't have " + mode + " permission");
-    }
-  }
-
-  /**
-   * Check if the requested values can be satisfied with the values in the
-   * BlockToken. This is intended for use with StorageTypes and StorageIDs.
-   *
-   * The current node can only verify that one of the storage [Type|ID] is
-   * available. The rest will be on different nodes.
-   */
-  public static <T> void checkAccess(T[] candidates, T[] requested, String msg)
-      throws InvalidToken {
-    if (ArrayUtils.isEmpty(requested)) {
-      throw new InvalidToken("The request has no " + msg + ". "
-          + "This is probably a configuration error.");
-    }
-    if (ArrayUtils.isEmpty(candidates)) {
-      return;
-    }
-
-    Multiset<T> c = HashMultiset.create(Arrays.asList(candidates));
-
-    for (T req : requested) {
-      if (!c.remove(req)) {
-        throw new InvalidToken("Block token with " + msg + " "
-            + Arrays.toString(candidates)
-            + " not valid for access with " + msg + " "
-            + Arrays.toString(requested));
-      }
-    }
-  }
-
-  /** Check if access should be allowed. userID is not checked if null */
-  public void checkAccess(Token<BlockTokenIdentifier> token, String userId,
-      ExtendedBlock block, BlockTokenIdentifier.AccessMode mode,
-      StorageType[] storageTypes, String[] storageIds) throws InvalidToken {
-    BlockTokenIdentifier id = new BlockTokenIdentifier();
-    try {
-      id.readFields(new DataInputStream(new ByteArrayInputStream(token
-          .getIdentifier())));
-    } catch (IOException e) {
-      throw new InvalidToken(
-          "Unable to de-serialize block token identifier for user=" + userId
-              + ", block=" + block + ", access mode=" + mode);
-    }
-    checkAccess(id, userId, block, mode, storageTypes, storageIds);
-    if (!MessageDigest.isEqual(retrievePassword(id), token.getPassword())) {
-      throw new InvalidToken("Block token with " + id
-          + " doesn't have the correct token password");
-    }
-  }
-
-  /** Check if access should be allowed. userID is not checked if null */
-  public void checkAccess(Token<BlockTokenIdentifier> token, String userId,
-      ExtendedBlock block, BlockTokenIdentifier.AccessMode mode)
-      throws InvalidToken {
-    BlockTokenIdentifier id = new BlockTokenIdentifier();
-    try {
-      id.readFields(new DataInputStream(new ByteArrayInputStream(token
-          .getIdentifier())));
-    } catch (IOException e) {
-      throw new InvalidToken(
-          "Unable to de-serialize block token identifier for user=" + userId
-              + ", block=" + block + ", access mode=" + mode);
-    }
-    checkAccess(id, userId, block, mode);
-    if (!MessageDigest.isEqual(retrievePassword(id), token.getPassword())) {
-      throw new InvalidToken("Block token with " + id
-          + " doesn't have the correct token password");
-    }
-  }
-
-  private static boolean isExpired(long expiryDate) {
-    return Time.now() > expiryDate;
-  }
-
-  /**
-   * check if a token is expired. for unit test only. return true when token is
-   * expired, false otherwise
-   */
-  static boolean isTokenExpired(Token<BlockTokenIdentifier> token)
-      throws IOException {
-    ByteArrayInputStream buf = new ByteArrayInputStream(token.getIdentifier());
-    DataInputStream in = new DataInputStream(buf);
-    long expiryDate = WritableUtils.readVLong(in);
-    return isExpired(expiryDate);
-  }
-
-  /** set token lifetime. */
-  public void setTokenLifetime(long tokenLifetime) {
-    this.tokenLifetime = tokenLifetime;
-  }
-
-  /**
-   * Create an empty block token identifier
-   *
-   * @return a newly created empty block token identifier
-   */
-  @Override
-  public BlockTokenIdentifier createIdentifier() {
-    return new BlockTokenIdentifier();
-  }
-
-  /**
-   * Create a new password/secret for the given block token identifier.
-   *
-   * @param identifier
-   *          the block token identifier
-   * @return token password/secret
-   */
-  @Override
-  protected byte[] createPassword(BlockTokenIdentifier identifier) {
-    BlockKey key = null;
-    synchronized (this) {
-      key = currentKey;
-    }
-    if (key == null) {
-      throw new IllegalStateException("currentKey hasn't been initialized.");
-    }
-    identifier.setExpiryDate(timer.now() + tokenLifetime);
-    identifier.setKeyId(key.getKeyId());
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Generating block token for " + identifier);
-    }
-    return createPassword(identifier.getBytes(), key.getKey());
-  }
-
-  /**
-   * Look up the token password/secret for the given block token identifier.
-   *
-   * @param identifier
-   *          the block token identifier to look up
-   * @return token password/secret as byte[]
-   * @throws InvalidToken
-   */
-  @Override
-  public byte[] retrievePassword(BlockTokenIdentifier identifier)
-      throws InvalidToken {
-    if (isExpired(identifier.getExpiryDate())) {
-      throw new InvalidToken("Block token with " + identifier
-          + " is expired.");
-    }
-    BlockKey key = null;
-    synchronized (this) {
-      key = allKeys.get(identifier.getKeyId());
-    }
-    if (key == null) {
-      throw new InvalidToken("Can't re-compute password for "
-          + identifier + ", since the required block key (keyID="
-          + identifier.getKeyId() + ") doesn't exist.");
-    }
-    return createPassword(identifier.getBytes(), key.getKey());
-  }
-
-  /**
-   * Generate a data encryption key for this block pool, using the current
-   * BlockKey.
-   *
-   * @return a data encryption key which may be used to encrypt traffic
-   *         over the DataTransferProtocol
-   */
-  public DataEncryptionKey generateDataEncryptionKey() {
-    byte[] nonce = new byte[8];
-    nonceGenerator.nextBytes(nonce);
-    BlockKey key = null;
-    synchronized (this) {
-      key = currentKey;
-    }
-    byte[] encryptionKey = createPassword(nonce, key.getKey());
-    return new DataEncryptionKey(key.getKeyId(), blockPoolId, nonce,
-        encryptionKey, timer.now() + tokenLifetime,
-        encryptionAlgorithm);
-  }
-
-  /**
-   * Recreate an encryption key based on the given key id and nonce.
-   *
-   * @param keyId identifier of the secret key used to generate the encryption key.
-   * @param nonce random value used to create the encryption key
-   * @return the encryption key which corresponds to this (keyId, blockPoolId, nonce)
-   * @throws InvalidEncryptionKeyException
-   */
-  public byte[] retrieveDataEncryptionKey(int keyId, byte[] nonce)
-      throws InvalidEncryptionKeyException {
-    BlockKey key = null;
-    synchronized (this) {
-      key = allKeys.get(keyId);
-      if (key == null) {
-        throw new InvalidEncryptionKeyException("Can't re-compute encryption key"
-            + " for nonce, since the required block key (keyID=" + keyId
-            + ") doesn't exist. Current key: " + currentKey.getKeyId());
-      }
-    }
-    return createPassword(nonce, key.getKey());
-  }
-
-  public BlockKey getCurrentKey() {
-    return currentKey;
-  }
-
-  @VisibleForTesting
-  public synchronized void setKeyUpdateIntervalForTesting(long millis) {
-    this.keyUpdateInterval = millis;
-  }
-
-  @VisibleForTesting
-  public void clearAllKeysForTesting() {
-    allKeys.clear();
-  }
-
-  @VisibleForTesting
-  public synchronized boolean hasKey(int keyId) {
-    BlockKey key = allKeys.get(keyId);
-    return key != null;
-  }
-
-  @VisibleForTesting
-  public synchronized int getSerialNoForTesting() {
-    return serialNo;
-  }
-
-}
+    if (ArrayUtils.is

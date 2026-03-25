@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,29 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmcontainer;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Resource;
 
+/**
+ * NodeManager已完成容器资源变更事件，用于通知ResourceManager节点侧已经完成资源调整。
+ */
 public class RMContainerNMDoneChangeResourceEvent extends RMContainerEvent {
 
+  // NodeManager调整完成后的容器最新资源配置
   private final Resource nmContainerResource;
 
+  /**
+   * 构造NodeManager容器资源变更完成事件。
+   * @param containerId 目标容器ID
+   * @param nmContainerResource NodeManager侧调整后的容器最新资源
+   */
   public RMContainerNMDoneChangeResourceEvent(
       ContainerId containerId, Resource nmContainerResource) {
     super(containerId, RMContainerEventType.NM_DONE_CHANGE_RESOURCE);
     this.nmContainerResource = nmContainerResource;
   }
 
+  /**
+   * 获取NodeManager侧调整完成后的容器最新资源配置。
+   * @return 调整后的容器资源
+   */
   public Resource getNMContainerResource() {
     return nmContainerResource;
   }

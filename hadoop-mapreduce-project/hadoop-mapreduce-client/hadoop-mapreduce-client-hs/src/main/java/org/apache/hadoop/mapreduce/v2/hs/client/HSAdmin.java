@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,6 +37,10 @@ import org.apache.hadoop.tools.GetUserMappingsProtocol;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
+/**
+ * History Server 管理命令行工具，提供对 MapReduce 历史服务器的各类管理操作。
+ * 实现了 Tool 接口，可通过 ToolRunner 执行命令行指令，支持用户组映射刷新、ACL刷新、缓存刷新等运维操作。
+ */
 @Private
 public class HSAdmin extends Configured implements Tool {
 
@@ -50,11 +55,17 @@ public class HSAdmin extends Configured implements Tool {
   @Override
   public void setConf(Configuration conf) {
     if (conf != null) {
+      // 添加安全认证相关配置
       conf = addSecurityConfiguration(conf);
     }
     super.setConf(conf);
   }
 
+  /**
+   * 添加安全认证配置，将历史服务器Kerberos主体设置到安全配置项中。
+   * @param conf 原始配置
+   * @return 添加安全配置后的新配置对象
+   */
   private Configuration addSecurityConfiguration(Configuration conf) {
     conf = new JobConf(conf);
     conf.set(CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_USER_NAME_KEY,
@@ -63,10 +74,8 @@ public class HSAdmin extends Configured implements Tool {
   }
 
   /**
-   * Displays format of commands.
-   * 
-   * @param cmd
-   *          The command that is being executed.
+   * 打印指定命令的使用格式说明。
+   * @param cmd 需要打印帮助的命令名称
    */
   private static void printUsage(String cmd) {
     if ("-refreshUserToGroupsMappings".equals(cmd)) {
@@ -102,6 +111,10 @@ public class HSAdmin extends Configured implements Tool {
     }
   }
 
+  /**
+   * 打印指定命令或所有命令的详细帮助说明。
+   * @param cmd 需要打印帮助的命令名称，为空则打印所有命令帮助
+   */
   private static void printHelp(String cmd) {
     String summary = "hsadmin is the command to execute Job History server administrative commands.\n"
         + "The full syntax is: \n\n"
@@ -164,24 +177,31 @@ public class HSAdmin extends Configured implements Tool {
     }
   }
 
+  /**
+   * 查询指定用户所属的用户组，通过RPC调用历史服务器获取结果并打印。
+   * @param usernames 待查询的用户名数组
+   * @return 执行结果退出码，0表示成功
+   * @throws IOException RPC调用或配置读取异常
+   */
   private int getGroups(String[] usernames) throws IOException {
-    // Get groups users belongs to
+    // 如果未指定用户名，使用当前登录用户
     if (usernames.length == 0) {
       usernames = new String[] { UserGroupInformation.getCurrentUser()
           .getUserName() };
     }
 
-    // Get the current configuration
     Configuration conf = getConf();
-
+    // 获取历史服务器管理服务地址
     InetSocketAddress address = conf.getSocketAddr(
         JHAdminConfig.JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_PORT);
 
+    // 创建用户映射查询协议代理
     GetUserMappingsProtocol getUserMappingProtocol = HSProxies.createProxy(
         conf, address, GetUserMappingsProtocol.class,
         UserGroupInformation.getCurrentUser());
+    // 遍历查询每个用户并打印结果
     for (String username : usernames) {
       StringBuilder sb = new StringBuilder();
       sb.append(username + " :");
@@ -195,106 +215,151 @@ public class HSAdmin extends Configured implements Tool {
     return 0;
   }
 
+  /**
+   * 通知历史服务器刷新用户到组的映射关系缓存。
+   * @return 执行结果退出码，0表示成功
+   * @throws IOException RPC调用或配置读取异常
+   */
   private int refreshUserToGroupsMappings() throws IOException {
-    // Get the current configuration
     Configuration conf = getConf();
-
+    // 获取历史服务器管理服务地址
     InetSocketAddress address = conf.getSocketAddr(
         JHAdminConfig.JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_PORT);
 
+    // 创建刷新协议代理
     RefreshUserMappingsProtocol refreshProtocol = HSProxies.createProxy(conf,
         address, RefreshUserMappingsProtocol.class,
         UserGroupInformation.getCurrentUser());
-    // Refresh the user-to-groups mappings
+    // 调用刷新接口
     refreshProtocol.refreshUserToGroupsMappings();
 
     return 0;
   }
 
+  /**
+   * 通知历史服务器刷新超级用户代理组配置。
+   * @return 执行结果退出码，0表示成功
+   * @throws IOException RPC调用或配置读取异常
+   */
   private int refreshSuperUserGroupsConfiguration() throws IOException {
-    // Refresh the super-user groups
     Configuration conf = getConf();
+    // 获取历史服务器管理服务地址
     InetSocketAddress address = conf.getSocketAddr(
         JHAdminConfig.JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_PORT);
 
+    // 创建刷新协议代理
     RefreshUserMappingsProtocol refreshProtocol = HSProxies.createProxy(conf,
         address, RefreshUserMappingsProtocol.class,
         UserGroupInformation.getCurrentUser());
-    // Refresh the super-user group mappings
+    // 调用刷新接口
     refreshProtocol.refreshSuperUserGroupsConfiguration();
 
     return 0;
   }
 
+  /**
+   * 通知历史服务器刷新管理员访问控制列表(ACL)。
+   * @return 执行结果退出码，0表示成功
+   * @throws IOException RPC调用或配置读取异常
+   */
   private int refreshAdminAcls() throws IOException {
-    // Refresh the admin acls
     Configuration conf = getConf();
+    // 获取历史服务器管理服务地址
     InetSocketAddress address = conf.getSocketAddr(
         JHAdminConfig.JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_PORT);
 
+    // 创建历史服务器管理刷新协议代理
     HSAdminRefreshProtocol refreshProtocol = HSProxies.createProxy(conf,
         address, HSAdminRefreshProtocol.class,
         UserGroupInformation.getCurrentUser());
 
+    // 调用刷新接口
     refreshProtocol.refreshAdminAcls();
     return 0;
   }
 
+  /**
+   * 通知历史服务器刷新已加载作业缓存。
+   * @return 执行结果退出码，0表示成功
+   * @throws IOException RPC调用或配置读取异常
+   */
   private int refreshLoadedJobCache() throws IOException {
-    // Refresh the loaded job cache
     Configuration conf = getConf();
+    // 获取历史服务器管理服务地址
     InetSocketAddress address = conf.getSocketAddr(
         JHAdminConfig.JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_PORT);
 
+    // 创建历史服务器管理刷新协议代理
     HSAdminRefreshProtocol refreshProtocol = HSProxies.createProxy(conf,
         address, HSAdminRefreshProtocol.class,
         UserGroupInformation.getCurrentUser());
 
+    // 调用刷新接口
     refreshProtocol.refreshLoadedJobCache();
     return 0;
   }
     
+  /**
+   * 通知历史服务器刷新作业历史保留配置。
+   * @return 执行结果退出码，0表示成功
+   * @throws IOException RPC调用或配置读取异常
+   */
   private int refreshJobRetentionSettings() throws IOException {
-    // Refresh job retention settings
     Configuration conf = getConf();
+    // 获取历史服务器管理服务地址
     InetSocketAddress address = conf.getSocketAddr(
         JHAdminConfig.JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_PORT);
 
+    // 创建历史服务器管理刷新协议代理
     HSAdminRefreshProtocol refreshProtocol = HSProxies.createProxy(conf,
         address, HSAdminRefreshProtocol.class,
         UserGroupInformation.getCurrentUser());
 
+    // 调用刷新接口
     refreshProtocol.refreshJobRetentionSettings();
     return 0;
   }
 
+  /**
+   * 通知历史服务器刷新日志保留配置。
+   * @return 执行结果退出码，0表示成功
+   * @throws IOException RPC调用或配置读取异常
+   */
   private int refreshLogRetentionSettings() throws IOException {
-    // Refresh log retention settings
     Configuration conf = getConf();
+    // 获取历史服务器管理服务地址
     InetSocketAddress address = conf.getSocketAddr(
         JHAdminConfig.JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_ADDRESS,
         JHAdminConfig.DEFAULT_JHS_ADMIN_PORT);
 
+    // 创建历史服务器管理刷新协议代理
     HSAdminRefreshProtocol refreshProtocol = HSProxies.createProxy(conf,
         address, HSAdminRefreshProtocol.class,
         UserGroupInformation.getCurrentUser());
 
+    // 调用刷新接口
     refreshProtocol.refreshLogRetentionSettings();
     return 0;
   }
 
   @Override
+  /**
+   * 解析命令行参数并分发执行对应管理命令。
+   * @param args 命令行参数数组
+   * @return 执行结果退出码，0表示成功，非0表示失败
+   * @throws Exception 执行过程中发生的各类异常
+   */
   public int run(String[] args) throws Exception {
     if (args.length < 1) {
       printUsage("");
@@ -305,6 +370,7 @@ public class HSAdmin extends Configured implements Tool {
     int i = 0;
     String cmd = args[i++];
 
+    // 检查无参数命令的参数个数是否正确
     if ("-refreshUserToGroupsMappings".equals(cmd)
         || "-refreshSuperUserGroupsConfiguration".equals(cmd)
         || "-refreshAdminAcls".equals(cmd)
@@ -318,6 +384,7 @@ public class HSAdmin extends Configured implements Tool {
     }
 
     exitCode = 0;
+    // 根据命令分发到对应处理方法
     if ("-refreshUserToGroupsMappings".equals(cmd)) {
       exitCode = refreshUserToGroupsMappings();
     } else if ("-refreshSuperUserGroupsConfiguration".equals(cmd)) {
@@ -331,15 +398,18 @@ public class HSAdmin extends Configured implements Tool {
     } else if ("-refreshLogRetentionSettings".equals(cmd)) {
       exitCode = refreshLogRetentionSettings();
     } else if ("-getGroups".equals(cmd)) {
+      // 提取用户名参数
       String[] usernames = Arrays.copyOfRange(args, i, args.length);
       exitCode = getGroups(usernames);
     } else if ("-help".equals(cmd)) {
+      // 打印帮助信息
       if (i < args.length) {
         printHelp(args[i]);
       } else {
         printHelp("");
       }
     } else {
+      // 未知命令处理
       exitCode = -1;
       System.err.println(cmd.substring(1) + ": Unknown command");
       printUsage("");
@@ -347,6 +417,11 @@ public class HSAdmin extends Configured implements Tool {
     return exitCode;
   }
 
+  /**
+   * HSAdmin命令行入口方法，初始化配置并启动命令执行。
+   * @param args 命令行参数
+   * @throws Exception 执行过程中发生的各类异常
+   */
   public static void main(String[] args) throws Exception {
     JobConf conf = new JobConf();
     int result = ToolRunner.run(new HSAdmin(conf), args);

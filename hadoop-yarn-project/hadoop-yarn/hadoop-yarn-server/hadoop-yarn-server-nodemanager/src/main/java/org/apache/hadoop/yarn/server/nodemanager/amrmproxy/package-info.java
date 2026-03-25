@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.nodemanager.amrmproxy contains
- * classes for handling federation amrm information.
+ * NodeManager上ApplicationMaster与ResourceManager之间的代理模块，
+ * 主要为YARN联邦场景提供AM-RM通信代理能力，处理联邦环境下的AM-RM路由与转发。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

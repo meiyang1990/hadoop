@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,6 +23,10 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 
+/**
+ * YARN资源调度器层面的应用抽象，封装应用的核心调度信息，持有应用的当前尝试实例
+ * @param <T> 具体的应用尝试类型，必须继承SchedulerApplicationAttempt
+ */
 @Private
 @Unstable
 public class SchedulerApplication<T extends SchedulerApplicationAttempt> {
@@ -32,6 +37,12 @@ public class SchedulerApplication<T extends SchedulerApplicationAttempt> {
   private volatile Priority priority;
   private boolean unmanagedAM;
 
+  /**
+   * 构造调度应用实例，不指定初始优先级
+   * @param queue 应用所属调度队列
+   * @param user 提交应用的用户
+   * @param unmanagedAM 是否为非托管ApplicationMaster
+   */
   public SchedulerApplication(Queue queue, String user, boolean unmanagedAM) {
     this.queue = queue;
     this.user = user;
@@ -39,6 +50,13 @@ public class SchedulerApplication<T extends SchedulerApplicationAttempt> {
     this.priority = null;
   }
 
+  /**
+   * 构造调度应用实例，指定初始优先级
+   * @param queue 应用所属调度队列
+   * @param user 提交应用的用户
+   * @param priority 应用优先级
+   * @param unmanagedAM 是否为非托管ApplicationMaster
+   */
   public SchedulerApplication(Queue queue, String user, Priority priority,
       boolean unmanagedAM) {
     this.queue = queue;
@@ -67,6 +85,10 @@ public class SchedulerApplication<T extends SchedulerApplicationAttempt> {
     this.currentAttempt = currentAttempt;
   }
 
+  /**
+   * 停止应用，更新调度队列指标统计
+   * @param rmAppFinalState 应用最终状态
+   */
   public void stop(RMAppState rmAppFinalState) {
     queue.getMetrics().finishApp(user, rmAppFinalState, isUnmanagedAM());
   }
@@ -75,10 +97,14 @@ public class SchedulerApplication<T extends SchedulerApplicationAttempt> {
     return priority;
   }
 
+  /**
+   * 更新应用优先级，并同步更新当前运行的应用尝试的优先级
+   * @param priority 新的应用优先级
+   */
   public void setPriority(Priority priority) {
     this.priority = priority;
 
-    // Also set priority in current running attempt
+    // 如果当前有运行的应用尝试，同步更新其优先级
     if (null != currentAttempt) {
       currentAttempt.setPriority(priority);
     }

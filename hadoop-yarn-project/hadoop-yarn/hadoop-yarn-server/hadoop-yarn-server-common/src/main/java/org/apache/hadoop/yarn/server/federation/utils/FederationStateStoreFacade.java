@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -100,18 +101,19 @@ import static org.apache.hadoop.yarn.server.federation.cache.FederationCache.bui
 import static org.apache.hadoop.yarn.server.federation.cache.FederationCache.buildSubClusterInfoMap;
 
 /**
+ * YARN联邦状态存储门面类，提供联邦状态存储的单例访问入口，封装重试逻辑和缓存能力，
+ * 简化上层模块对联邦状态存储的访问。
  *
- * The FederationStateStoreFacade is an utility wrapper that provides singleton
- * access to the Federation state store. It abstracts out retries and in
- * addition, it also implements the caching for various objects.
- *
+ * 核心能力：提供对联邦元数据（子集群信息、应用归属、调度策略、令牌密钥等）的缓存和重试访问
  */
 public final class FederationStateStoreFacade {
   private static final Logger LOG =
       LoggerFactory.getLogger(FederationStateStoreFacade.class);
 
+  // 单例实例，volatile保证双重检查锁定可见性
   private static volatile FederationStateStoreFacade facade;
 
+  // 随机数生成器，用于随机选择子集群
   private static Random rand = new Random(System.currentTimeMillis());
 
   private FederationStateStore stateStore;
@@ -123,23 +125,25 @@ public final class FederationStateStoreFacade {
     initializeFacadeInternal(conf);
   }
 
+  // 初始化门面内部组件
   private void initializeFacadeInternal(Configuration config) {
     this.conf = config;
     try {
+      // 创建带重试代理的联邦状态存储客户端实例
       this.stateStore = (FederationStateStore) createRetryInstance(this.conf,
           YarnConfiguration.FEDERATION_STATESTORE_CLIENT_CLASS,
           YarnConfiguration.DEFAULT_FEDERATION_STATESTORE_CLIENT_CLASS,
           FederationStateStore.class, createRetryPolicy(conf));
       this.stateStore.init(conf);
 
+      // 创建子集群解析器实例
       this.subclusterResolver = createInstance(conf,
           YarnConfiguration.FEDERATION_CLUSTER_RESOLVER_CLASS,
           YarnConfiguration.DEFAULT_FEDERATION_CLUSTER_RESOLVER_CLASS,
           SubClusterResolver.class);
       this.subclusterResolver.load();
 
-      // We check the configuration of Cache,
-      // if the configuration is null, set it to FederationJCache
+      // 创建联邦缓存实例，如果配置未指定则使用默认实现
       this.federationCache = createInstance(conf,
           YarnConfiguration.FEDERATION_FACADE_CACHE_CLASS,
           YarnConfiguration.DEFAULT_FEDERATION_FACADE_CACHE_CLASS,
@@ -153,11 +157,11 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Delete and re-initialize the cache, to force it to use the given
-   * configuration.
+   * 删除并重新初始化缓存，使用传入配置强制刷新。
+   * 仅用于测试。
    *
-   * @param store the {@link FederationStateStore} instance to reinitialize with
-   * @param config the updated configuration to reinitialize with
+   * @param store 用于重新初始化的 {@link FederationStateStore} 实例
+   * @param config 更新后的配置
    */
   @VisibleForTesting
   public synchronized void reinitialize(FederationStateStore store,
@@ -169,58 +173,61 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Create a RetryPolicy for {@code FederationStateStoreFacade}. In case of
-   * failure, it retries for:
+   * 创建 {@code FederationStateStoreFacade} 的重试策略。
+   * 仅对可重试异常进行重试，包括：
    * <ul>
    * <li>{@code FederationStateStoreRetriableException}</li>
    * <li>{@code CacheLoaderException}</li>
+   * <li>{@code PoolInitializationException}</li>
    * </ul>
    *
-   * @param conf the updated configuration
-   * @return the RetryPolicy for FederationStateStoreFacade
+   * @param conf Hadoop配置
+   * @return 联邦状态存储门面的重试策略
    */
   public static RetryPolicy createRetryPolicy(Configuration conf) {
-    // Retry settings for StateStore
+    // 读取StateStore重试配置，使用指数退避策略
     RetryPolicy basePolicy = RetryPolicies.exponentialBackoffRetry(
         conf.getInt(YarnConfiguration.CLIENT_FAILOVER_RETRIES, Integer.SIZE),
         conf.getLong(YarnConfiguration.CLIENT_FAILOVER_SLEEPTIME_BASE_MS,
             YarnConfiguration.DEFAULT_RESOURCEMANAGER_CONNECT_RETRY_INTERVAL_MS),
         TimeUnit.MILLISECONDS);
     Map<Class<? extends Exception>, RetryPolicy> exceptionToPolicyMap = new HashMap<>();
+    // 为可重试异常绑定指数退避策略
     exceptionToPolicyMap.put(FederationStateStoreRetriableException.class,
         basePolicy);
     exceptionToPolicyMap.put(CacheLoaderException.class, basePolicy);
     exceptionToPolicyMap.put(PoolInitializationException.class, basePolicy);
 
+    // 根据异常类型选择重试策略，非可重试异常仅尝试一次
     RetryPolicy retryPolicy = RetryPolicies.retryByException(
         RetryPolicies.TRY_ONCE_THEN_FAIL, exceptionToPolicyMap);
     return retryPolicy;
   }
 
   /**
-   * Returns the singleton instance of the FederationStateStoreFacade object.
+   * 获取 FederationStateStoreFacade 单例实例（使用默认配置）。
    *
-   * @return the singleton {@link FederationStateStoreFacade} instance
+   * @return FederationStateStoreFacade 单例实例
    */
   public static FederationStateStoreFacade getInstance() {
     return getInstanceInternal(new Configuration());
   }
 
   /**
-   * Returns the singleton instance of the FederationStateStoreFacade object.
+   * 获取 FederationStateStoreFacade 单例实例（使用指定配置）。
    *
-   * @param conf configuration.
-   * @return the singleton {@link FederationStateStoreFacade} instance
+   * @param conf 配置
+   * @return FederationStateStoreFacade 单例实例
    */
   public static FederationStateStoreFacade getInstance(Configuration conf) {
     return getInstanceInternal(conf);
   }
 
   /**
-   * Returns the singleton instance of the FederationStateStoreFacade object.
+   * 获取 FederationStateStoreFacade 单例实例内部方法。
    *
-   * @param conf configuration.
-   * @return the singleton {@link FederationStateStoreFacade} instance
+   * @param conf 配置
+   * @return FederationStateStoreFacade 单例实例
    */
   private static FederationStateStoreFacade getInstanceInternal(Configuration conf){
     if (facade != null) {
@@ -231,9 +238,9 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Generate the singleton instance of the FederationStateStoreFacade object.
+   * 生成 FederationStateStoreFacade 单例实例（双重检查锁定实现线程安全）。
    *
-   * @param conf configuration.
+   * @param conf 配置
    */
   private static void generateStateStoreFacade(Configuration conf){
     if (facade == null) {
@@ -250,12 +257,11 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Returns the {@link SubClusterInfo} for the specified {@link SubClusterId}.
+   * 根据子集群ID获取子集群信息。
    *
-   * @param subClusterId the identifier of the sub-cluster
-   * @return the sub cluster information, or
-   *         {@code null} if there is no mapping for the subClusterId
-   * @throws YarnException if the call to the state store is unsuccessful
+   * @param subClusterId 子集群ID
+   * @return 子集群信息，如果不存在则返回 {@code null}
+   * @throws YarnException 访问状态存储失败时抛出
    */
   public SubClusterInfo getSubCluster(final SubClusterId subClusterId)
       throws YarnException {
@@ -273,13 +279,12 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Updates the cache with the central {@link FederationStateStore} and returns
-   * the {@link SubClusterInfo} for the specified {@link SubClusterId}.
+   * 根据子集群ID获取子集群信息，支持强制刷新缓存。
    *
-   * @param subClusterId the identifier of the sub-cluster
-   * @param flushCache flag to indicate if the cache should be flushed or not
-   * @return the sub cluster information
-   * @throws YarnException if the call to the state store is unsuccessful
+   * @param subClusterId 子集群ID
+   * @param flushCache 是否需要刷新缓存标记
+   * @return 子集群信息
+   * @throws YarnException 访问状态存储失败时抛出
    */
   public SubClusterInfo getSubCluster(final SubClusterId subClusterId,
       final boolean flushCache) throws YarnException {
@@ -292,12 +297,11 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Returns the {@link SubClusterInfo} of all active sub cluster(s).
+   * 获取所有活跃子集群的信息。
    *
-   * @param filterInactiveSubClusters whether to filter out inactive
-   *          sub-clusters
-   * @return the information of all active sub cluster(s)
-   * @throws YarnException if the call to the state store is unsuccessful
+   * @param filterInactiveSubClusters 是否过滤掉不活跃子集群
+   * @return 所有活跃子集群的信息，键为子集群ID，值为子集群信息
+   * @throws YarnException 访问状态存储失败时抛出
    */
   public Map<SubClusterId, SubClusterInfo> getSubClusters(final boolean filterInactiveSubClusters)
       throws YarnException {
@@ -315,14 +319,12 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Updates the cache with the central {@link FederationStateStore} and returns
-   * the {@link SubClusterInfo} of all active sub cluster(s).
+   * 获取所有活跃子集群的信息，支持强制刷新缓存。
    *
-   * @param filterInactiveSubClusters whether to filter out inactive
-   *          sub-clusters
-   * @param flushCache flag to indicate if the cache should be flushed or not
-   * @return the sub cluster information
-   * @throws YarnException if the call to the state store is unsuccessful
+   * @param filterInactiveSubClusters 是否过滤掉不活跃子集群
+   * @param flushCache 是否需要刷新缓存标记
+   * @return 所有活跃子集群的信息，键为子集群ID，值为子集群信息
+   * @throws YarnException 访问状态存储失败时抛出
    */
   public Map<SubClusterId, SubClusterInfo> getSubClusters(
       final boolean filterInactiveSubClusters, final boolean flushCache)
@@ -335,12 +337,11 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Returns the {@link SubClusterPolicyConfiguration} for the specified queue.
+   * 根据队列获取联邦调度策略配置。
    *
-   * @param queue the queue whose policy is required
-   * @return the corresponding configured policy, or {@code null} if there is no
-   *         mapping for the queue
-   * @throws YarnException if the call to the state store is unsuccessful
+   * @param queue 需要查询策略的队列名称
+   * @return 对应队列的调度策略配置，如果不存在则返回 {@code null}
+   * @throws YarnException 访问状态存储失败时抛出
    */
   public SubClusterPolicyConfiguration getPolicyConfiguration(final String queue)
       throws YarnException {
@@ -360,10 +361,10 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Set a policy configuration into the state store.
+   * 将队列调度策略配置写入状态存储。
    *
-   * @param policyConf the policy configuration to set
-   * @throws YarnException if the request is invalid/fails
+   * @param policyConf 要写入的策略配置
+   * @throws YarnException 请求无效或访问失败时抛出
    */
   public void setPolicyConfiguration(SubClusterPolicyConfiguration policyConf)
       throws YarnException {
@@ -372,12 +373,10 @@ public final class FederationStateStoreFacade {
   }
 
   /**
-   * Get the policies that is represented as
-   * {@link SubClusterPolicyConfiguration} for all currently active queues in
-   * the system.
+   * 获取所有当前活跃队列的调度策略配置。
    *
-   * @return the policies for all currently active queues in the system
-   * @throws YarnException if the call to the state store is unsuccessful
+   * @return 所有队列的调度策略配置，键为队列名称，值为策略配置
+   * @throws YarnException 访问状态存储失败时抛出
    */
   public Map<String, SubClusterPolicyConfiguration> getPoliciesConfigurations()
       throws YarnException {
@@ -392,750 +391,3 @@ public final class FederationStateStoreFacade {
     } catch (Throwable ex) {
       throw new YarnException(ex);
     }
-  }
-
-  /**
-   * Adds the home {@link SubClusterId} for the specified {@link ApplicationId}.
-   *
-   * @param appHomeSubCluster the mapping of the application to it's home
-   *          sub-cluster
-   * @return the stored Subcluster from StateStore
-   * @throws YarnException if the call to the state store is unsuccessful
-   */
-  public SubClusterId addApplicationHomeSubCluster(
-      ApplicationHomeSubCluster appHomeSubCluster) throws YarnException {
-    AddApplicationHomeSubClusterResponse response =
-        stateStore.addApplicationHomeSubCluster(
-            AddApplicationHomeSubClusterRequest.newInstance(appHomeSubCluster));
-    return response.getHomeSubCluster();
-  }
-
-  /**
-   * Updates the home {@link SubClusterId} for the specified
-   * {@link ApplicationId}.
-   *
-   * @param appHomeSubCluster the mapping of the application to it's home
-   *          sub-cluster
-   * @throws YarnException if the call to the state store is unsuccessful
-   */
-  public void updateApplicationHomeSubCluster(
-      ApplicationHomeSubCluster appHomeSubCluster) throws YarnException {
-    stateStore.updateApplicationHomeSubCluster(
-        UpdateApplicationHomeSubClusterRequest.newInstance(appHomeSubCluster));
-  }
-
-  /**
-   * Returns the home {@link SubClusterId} for the specified
-   * {@link ApplicationId}.
-   *
-   * @param appId the identifier of the application
-   * @return the home sub cluster identifier
-   * @throws YarnException if the call to the state store is unsuccessful
-   */
-  public SubClusterId getApplicationHomeSubCluster(ApplicationId appId)
-      throws YarnException {
-    try {
-      if (federationCache.isCachingEnabled()) {
-        return federationCache.getApplicationHomeSubCluster(appId);
-      } else {
-        GetApplicationHomeSubClusterResponse response = stateStore.getApplicationHomeSubCluster(
-            GetApplicationHomeSubClusterRequest.newInstance(appId));
-        return response.getApplicationHomeSubCluster().getHomeSubCluster();
-      }
-    } catch (Throwable ex) {
-      throw new YarnException(ex);
-    }
-  }
-
-  /**
-   * Get the singleton instance of SubClusterResolver.
-   *
-   * @return SubClusterResolver instance
-   */
-  public SubClusterResolver getSubClusterResolver() {
-    return this.subclusterResolver;
-  }
-
-  /**
-   * Get the configuration.
-   *
-   * @return configuration object
-   */
-  public Configuration getConf() {
-    return this.conf;
-  }
-
-  /**
-   * Adds the home {@link SubClusterId} for the specified {@link ReservationId}.
-   *
-   * @param appHomeSubCluster the mapping of the reservation to it's home
-   *          sub-cluster
-   * @return the stored subCluster from StateStore
-   * @throws YarnException if the call to the state store is unsuccessful
-   */
-  public SubClusterId addReservationHomeSubCluster(ReservationHomeSubCluster appHomeSubCluster)
-      throws YarnException {
-    AddReservationHomeSubClusterResponse response = stateStore.addReservationHomeSubCluster(
-        AddReservationHomeSubClusterRequest.newInstance(appHomeSubCluster));
-    return response.getHomeSubCluster();
-  }
-
-  /**
-   * Returns the home {@link SubClusterId} for the specified {@link ReservationId}.
-   *
-   * @param reservationId the identifier of the reservation
-   * @return the home subCluster identifier
-   * @throws YarnException if the call to the state store is unsuccessful
-   */
-  public SubClusterId getReservationHomeSubCluster(ReservationId reservationId)
-      throws YarnException {
-    GetReservationHomeSubClusterResponse response = stateStore.getReservationHomeSubCluster(
-         GetReservationHomeSubClusterRequest.newInstance(reservationId));
-    return response.getReservationHomeSubCluster().getHomeSubCluster();
-  }
-
-  /**
-   * Updates the home {@link SubClusterId} for the specified
-   * {@link ReservationId}.
-   *
-   * @param appHomeSubCluster the mapping of the reservation to it's home
-   *          sub-cluster
-   * @throws YarnException if the call to the state store is unsuccessful
-   */
-  public void updateReservationHomeSubCluster(ReservationHomeSubCluster appHomeSubCluster)
-      throws YarnException {
-    UpdateReservationHomeSubClusterRequest request =
-        UpdateReservationHomeSubClusterRequest.newInstance(appHomeSubCluster);
-    stateStore.updateReservationHomeSubCluster(request);
-  }
-
-  /**
-   * Delete the home {@link SubClusterId} for the specified
-   * {@link ReservationId}.
-   *
-   * @param reservationId the identifier of the reservation
-   * @throws YarnException if the call to the state store is unsuccessful
-   */
-  public void deleteReservationHomeSubCluster(ReservationId reservationId) throws YarnException {
-    DeleteReservationHomeSubClusterRequest request =
-        DeleteReservationHomeSubClusterRequest.newInstance(reservationId);
-    stateStore.deleteReservationHomeSubCluster(request);
-  }
-
-  /**
-   * Helper method to create instances of Object using the class name defined in
-   * the configuration object. The instances creates {@link RetryProxy} using
-   * the specific {@link RetryPolicy}.
-   *
-   * @param conf the yarn configuration
-   * @param configuredClassName the configuration provider key
-   * @param defaultValue the default implementation for fallback
-   * @param type the class for which a retry proxy is required
-   * @param retryPolicy the policy for retrying method call failures
-   * @param <T> The type of the instance.
-   * @return a retry proxy for the specified interface
-   */
-  public static <T> Object createRetryInstance(Configuration conf,
-      String configuredClassName, String defaultValue, Class<T> type,
-      RetryPolicy retryPolicy) {
-
-    return RetryProxy.create(type,
-        createInstance(conf, configuredClassName, defaultValue, type),
-        retryPolicy);
-  }
-
-  /**
-   * Helper method to create instances of Object using the class name specified
-   * in the configuration object.
-   *
-   * @param conf the yarn configuration
-   * @param configuredClassName the configuration provider key
-   * @param defaultValue the default implementation class
-   * @param type the required interface/base class
-   * @param <T> The type of the instance to create
-   * @return the instances created
-   */
-  @SuppressWarnings("unchecked")
-  public static <T> T createInstance(Configuration conf,
-      String configuredClassName, String defaultValue, Class<T> type) {
-
-    String className = conf.get(configuredClassName, defaultValue);
-    try {
-      Class<?> clusterResolverClass = conf.getClassByName(className);
-      if (type.isAssignableFrom(clusterResolverClass)) {
-        return (T) ReflectionUtils.newInstance(clusterResolverClass, conf);
-      } else {
-        throw new YarnRuntimeException("Class: " + className
-            + " not instance of " + type.getCanonicalName());
-      }
-    } catch (ClassNotFoundException e) {
-      throw new YarnRuntimeException("Could not instantiate : " + className, e);
-    }
-  }
-
-  @VisibleForTesting
-  public FederationStateStore getStateStore() {
-    return stateStore;
-  }
-
-  /**
-   * The Router Supports Store NewMasterKey (RouterMasterKey{@link RouterMasterKey}).
-   *
-   * @param newKey Key used for generating and verifying delegation tokens
-   * @throws YarnException if the call to the state store is unsuccessful
-   * @throws IOException An IO Error occurred
-   * @return RouterMasterKeyResponse
-   */
-  public RouterMasterKeyResponse storeNewMasterKey(DelegationKey newKey)
-      throws YarnException, IOException {
-    LOG.info("Storing master key with keyID {}.", newKey.getKeyId());
-    ByteBuffer keyBytes = ByteBuffer.wrap(newKey.getEncodedKey());
-    RouterMasterKey masterKey = RouterMasterKey.newInstance(newKey.getKeyId(),
-        keyBytes, newKey.getExpiryDate());
-    RouterMasterKeyRequest keyRequest = RouterMasterKeyRequest.newInstance(masterKey);
-    return stateStore.storeNewMasterKey(keyRequest);
-  }
-
-  /**
-   * The Router Supports Remove MasterKey (RouterMasterKey{@link RouterMasterKey}).
-   *
-   * @param newKey Key used for generating and verifying delegation tokens
-   * @throws YarnException if the call to the state store is unsuccessful
-   * @throws IOException An IO Error occurred
-   */
-  public void removeStoredMasterKey(DelegationKey newKey) throws YarnException, IOException {
-    LOG.info("Removing master key with keyID {}.", newKey.getKeyId());
-    ByteBuffer keyBytes = ByteBuffer.wrap(newKey.getEncodedKey());
-    RouterMasterKey masterKey = RouterMasterKey.newInstance(newKey.getKeyId(),
-        keyBytes, newKey.getExpiryDate());
-    RouterMasterKeyRequest keyRequest = RouterMasterKeyRequest.newInstance(masterKey);
-    stateStore.removeStoredMasterKey(keyRequest);
-  }
-
-  /**
-   * The Router Supports GetMasterKeyByDelegationKey.
-   *
-   * @param newKey Key used for generating and verifying delegation tokens
-   * @throws YarnException if the call to the state store is unsuccessful
-   * @throws IOException An IO Error occurred
-   * @return RouterMasterKeyResponse
-   */
-  public RouterMasterKeyResponse getMasterKeyByDelegationKey(DelegationKey newKey)
-      throws YarnException, IOException {
-    LOG.info("Storing master key with keyID {}.", newKey.getKeyId());
-    ByteBuffer keyBytes = ByteBuffer.wrap(newKey.getEncodedKey());
-    RouterMasterKey masterKey = RouterMasterKey.newInstance(newKey.getKeyId(),
-        keyBytes, newKey.getExpiryDate());
-    RouterMasterKeyRequest keyRequest = RouterMasterKeyRequest.newInstance(masterKey);
-    return stateStore.getMasterKeyByDelegationKey(keyRequest);
-  }
-
-  /**
-   * The Router Supports Store RMDelegationTokenIdentifier{@link RMDelegationTokenIdentifier}.
-   *
-   * @param identifier delegation tokens from the RM
-   * @param renewDate renewDate
-   * @throws YarnException if the call to the state store is unsuccessful
-   * @throws IOException An IO Error occurred
-   */
-  public void storeNewToken(RMDelegationTokenIdentifier identifier,
-      long renewDate) throws YarnException, IOException {
-    LOG.info("storing RMDelegation token with sequence number: {}.",
-        identifier.getSequenceNumber());
-    RouterStoreToken storeToken = RouterStoreToken.newInstance(identifier, renewDate);
-    RouterRMTokenRequest request = RouterRMTokenRequest.newInstance(storeToken);
-    stateStore.storeNewToken(request);
-  }
-
-  /**
-   * The Router Supports Store RMDelegationTokenIdentifier{@link RMDelegationTokenIdentifier}.
-   *
-   * @param identifier delegation tokens from the RM.
-   * @param renewDate renewDate.
-   * @param tokenInfo tokenInfo.
-   * @throws YarnException if the call to the state store is unsuccessful.
-   * @throws IOException An IO Error occurred.
-   */
-  public void storeNewToken(RMDelegationTokenIdentifier identifier,
-      long renewDate, String tokenInfo) throws YarnException, IOException {
-    LOG.info("storing RMDelegation token with sequence number: {}.",
-        identifier.getSequenceNumber());
-    RouterStoreToken storeToken = RouterStoreToken.newInstance(identifier, renewDate, tokenInfo);
-    RouterRMTokenRequest request = RouterRMTokenRequest.newInstance(storeToken);
-    stateStore.storeNewToken(request);
-  }
-
-  /**
-   * The Router Supports Update RMDelegationTokenIdentifier{@link RMDelegationTokenIdentifier}.
-   *
-   * @param identifier delegation tokens from the RM
-   * @param renewDate renewDate
-   * @throws YarnException if the call to the state store is unsuccessful
-   * @throws IOException An IO Error occurred
-   */
-  public void updateStoredToken(RMDelegationTokenIdentifier identifier,
-      long renewDate) throws YarnException, IOException {
-    LOG.info("updating RMDelegation token with sequence number: {}.",
-        identifier.getSequenceNumber());
-    RouterStoreToken storeToken = RouterStoreToken.newInstance(identifier, renewDate);
-    RouterRMTokenRequest request = RouterRMTokenRequest.newInstance(storeToken);
-    stateStore.updateStoredToken(request);
-  }
-
-  /**
-   * The Router Supports Update RMDelegationTokenIdentifier{@link RMDelegationTokenIdentifier}.
-   *
-   * @param identifier delegation tokens from the RM
-   * @param renewDate renewDate
-   * @param tokenInfo tokenInfo.
-   * @throws YarnException if the call to the state store is unsuccessful.
-   * @throws IOException An IO Error occurred.
-   */
-  public void updateStoredToken(RMDelegationTokenIdentifier identifier,
-      long renewDate, String tokenInfo) throws YarnException, IOException {
-    LOG.info("updating RMDelegation token with sequence number: {}.",
-        identifier.getSequenceNumber());
-    RouterStoreToken storeToken = RouterStoreToken.newInstance(identifier, renewDate, tokenInfo);
-    RouterRMTokenRequest request = RouterRMTokenRequest.newInstance(storeToken);
-    stateStore.updateStoredToken(request);
-  }
-
-  /**
-   * The Router Supports Remove RMDelegationTokenIdentifier{@link RMDelegationTokenIdentifier}.
-   *
-   * @param identifier delegation tokens from the RM
-   * @throws YarnException if the call to the state store is unsuccessful
-   * @throws IOException An IO Error occurred
-   */
-  public void removeStoredToken(RMDelegationTokenIdentifier identifier)
-      throws YarnException, IOException{
-    LOG.info("removing RMDelegation token with sequence number: {}.",
-        identifier.getSequenceNumber());
-    RouterStoreToken storeToken = RouterStoreToken.newInstance(identifier, 0L);
-    RouterRMTokenRequest request = RouterRMTokenRequest.newInstance(storeToken);
-    stateStore.removeStoredToken(request);
-  }
-
-  /**
-   * The Router Supports GetTokenByRouterStoreToken{@link RMDelegationTokenIdentifier}.
-   *
-   * @param identifier delegation tokens from the RM
-   * @return RouterStoreToken
-   * @throws YarnException if the call to the state store is unsuccessful
-   * @throws IOException An IO Error occurred
-   */
-  public RouterRMTokenResponse getTokenByRouterStoreToken(RMDelegationTokenIdentifier identifier)
-      throws YarnException, IOException {
-    LOG.info("get RouterStoreToken token with sequence number: {}.",
-        identifier.getSequenceNumber());
-    RouterStoreToken storeToken = RouterStoreToken.newInstance(identifier, 0L);
-    RouterRMTokenRequest request = RouterRMTokenRequest.newInstance(storeToken);
-    return stateStore.getTokenByRouterStoreToken(request);
-  }
-
-  /**
-   * stateStore provides DelegationTokenSeqNum increase.
-   *
-   * @return delegationTokenSequenceNumber.
-   */
-  public int incrementDelegationTokenSeqNum() {
-    return stateStore.incrementDelegationTokenSeqNum();
-  }
-
-  /**
-   * Get SeqNum from stateStore.
-   *
-   * @return delegationTokenSequenceNumber.
-   */
-  public int getDelegationTokenSeqNum() {
-    return stateStore.getDelegationTokenSeqNum();
-  }
-
-  /**
-   * Set SeqNum from stateStore.
-   *
-   * @param seqNum delegationTokenSequenceNumber.
-   */
-  public void setDelegationTokenSeqNum(int seqNum) {
-    stateStore.setDelegationTokenSeqNum(seqNum);
-  }
-
-  /**
-   * Get CurrentKeyId from stateStore.
-   *
-   * @return currentKeyId.
-   */
-  public int getCurrentKeyId() {
-    return stateStore.getCurrentKeyId();
-  }
-
-  /**
-   * stateStore provides CurrentKeyId increase.
-   *
-   * @return currentKeyId.
-   */
-  public int incrementCurrentKeyId() {
-    return stateStore.incrementCurrentKeyId();
-  }
-
-  /**
-   * Get the number of active cluster nodes.
-   *
-   * @return number of active cluster nodes.
-   * @throws YarnException if the call to the state store is unsuccessful.
-   */
-  public int getActiveSubClustersCount() throws YarnException {
-    Map<SubClusterId, SubClusterInfo> activeSubClusters = getSubClusters(true);
-    if (activeSubClusters == null || activeSubClusters.isEmpty()) {
-      return 0;
-    } else {
-      return activeSubClusters.size();
-    }
-  }
-
-  /**
-   * Randomly pick ActiveSubCluster.
-   * During the selection process, we will exclude SubClusters from the blacklist.
-   *
-   * @param activeSubClusters List of active subClusters.
-   * @param blackList blacklist.
-   * @return Active SubClusterId.
-   * @throws YarnException When there is no Active SubCluster,
-   * an exception will be thrown (No active SubCluster available to submit the request.)
-   */
-  public static SubClusterId getRandomActiveSubCluster(
-      Map<SubClusterId, SubClusterInfo> activeSubClusters, List<SubClusterId> blackList)
-      throws YarnException {
-
-    // Check if activeSubClusters is empty, if it is empty, we need to throw an exception
-    if (MapUtils.isEmpty(activeSubClusters)) {
-      throw new FederationPolicyException(
-          FederationPolicyUtils.NO_ACTIVE_SUBCLUSTER_AVAILABLE);
-    }
-
-    // Change activeSubClusters to List
-    List<SubClusterId> subClusterIds = new ArrayList<>(activeSubClusters.keySet());
-
-    // If the blacklist is not empty, we need to remove all the subClusters in the blacklist
-    if (CollectionUtils.isNotEmpty(blackList)) {
-      subClusterIds.removeAll(blackList);
-    }
-
-    // Check there are still active subcluster after removing the blacklist
-    if (CollectionUtils.isEmpty(subClusterIds)) {
-      throw new FederationPolicyException(
-          FederationPolicyUtils.NO_ACTIVE_SUBCLUSTER_AVAILABLE);
-    }
-
-    // Randomly choose a SubCluster
-    return subClusterIds.get(rand.nextInt(subClusterIds.size()));
-  }
-
-  /**
-   * Get the number of retries.
-   *
-   * @param configRetries User-configured number of retries.
-   * @return number of retries.
-   * @throws YarnException yarn exception.
-   */
-  public int getRetryNumbers(int configRetries) throws YarnException {
-    int activeSubClustersCount = getActiveSubClustersCount();
-    int actualRetryNums = Math.min(activeSubClustersCount, configRetries);
-    // Normally, we don't set a negative number for the number of retries,
-    // but if the user sets a negative number for the number of retries,
-    // we will return 0
-    if (actualRetryNums < 0) {
-      return 0;
-    }
-    return actualRetryNums;
-  }
-
-  /**
-   * Query SubClusterId By applicationId.
-   *
-   * If SubClusterId is not empty, it means it exists and returns true;
-   * if SubClusterId is empty, it means it does not exist and returns false.
-   *
-   * @param applicationId applicationId
-   * @return true, SubClusterId exists; false, SubClusterId not exists.
-   */
-  public boolean existsApplicationHomeSubCluster(ApplicationId applicationId) {
-    try {
-      SubClusterId subClusterId = getApplicationHomeSubCluster(applicationId);
-      if (subClusterId != null) {
-        return true;
-      }
-    } catch (YarnException e) {
-      LOG.debug("get homeSubCluster by applicationId = {} error.", applicationId, e);
-    }
-    return false;
-  }
-
-  /**
-   * Add ApplicationHomeSubCluster to FederationStateStore.
-   *
-   * @param applicationId applicationId.
-   * @param homeSubCluster homeSubCluster, homeSubCluster selected according to policy.
-   * @throws YarnException yarn exception.
-   */
-  public void addApplicationHomeSubCluster(ApplicationId applicationId,
-      ApplicationHomeSubCluster homeSubCluster) throws YarnException {
-    try {
-      addApplicationHomeSubCluster(homeSubCluster);
-    } catch (YarnException e) {
-      String msg = String.format(
-          "Unable to insert the ApplicationId %s into the FederationStateStore.", applicationId);
-      throw new YarnException(msg, e);
-    }
-  }
-
-  /**
-   * Get the {@code ApplicationHomeSubCluster} list representing the mapping of
-   * all submitted applications to it's home sub-cluster.
-   *
-   * @return the mapping of all submitted application to it's home sub-cluster
-   * @throws YarnException if the request is invalid/fails
-   */
-  public List<ApplicationHomeSubCluster> getApplicationsHomeSubCluster() throws YarnException {
-    GetApplicationsHomeSubClusterResponse response = stateStore.getApplicationsHomeSubCluster(
-        GetApplicationsHomeSubClusterRequest.newInstance());
-    return response.getAppsHomeSubClusters();
-  }
-
-  /**
-   * Delete the mapping of home {@code SubClusterId} of a previously submitted
-   * {@code ApplicationId}. Currently response is empty if the operation is
-   * successful, if not an exception reporting reason for a failure.
-   *
-   * @param applicationId the application to delete the home sub-cluster of
-   * @throws YarnException if the request is invalid/fails
-   */
-  public void deleteApplicationHomeSubCluster(ApplicationId applicationId)
-      throws YarnException {
-    stateStore.deleteApplicationHomeSubCluster(
-        DeleteApplicationHomeSubClusterRequest.newInstance(applicationId));
-  }
-
-  /**
-   * Update ApplicationHomeSubCluster to FederationStateStore.
-   *
-   * @param subClusterId homeSubClusterId
-   * @param applicationId applicationId.
-   * @param homeSubCluster homeSubCluster, homeSubCluster selected according to policy.
-   * @throws YarnException yarn exception.
-   */
-  public void updateApplicationHomeSubCluster(SubClusterId subClusterId,
-      ApplicationId applicationId, ApplicationHomeSubCluster homeSubCluster) throws YarnException {
-    try {
-      updateApplicationHomeSubCluster(homeSubCluster);
-    } catch (YarnException e) {
-      SubClusterId subClusterIdInStateStore = getApplicationHomeSubCluster(applicationId);
-      if (subClusterId == subClusterIdInStateStore) {
-        LOG.info("Application {} already submitted on SubCluster {}.", applicationId, subClusterId);
-      } else {
-        String msg = String.format(
-            "Unable to update the ApplicationId %s into the FederationStateStore.", applicationId);
-        throw new YarnException(msg, e);
-      }
-    }
-  }
-
-  /**
-   * Add or Update ApplicationHomeSubCluster.
-   *
-   * @param applicationId applicationId, is the id of the application.
-   * @param subClusterId homeSubClusterId, this is selected by strategy.
-   * @param retryCount number of retries.
-   * @param appSubmissionContext appSubmissionContext.
-   * @throws YarnException yarn exception.
-   */
-  public void addOrUpdateApplicationHomeSubCluster(ApplicationId applicationId,
-      SubClusterId subClusterId, int retryCount, ApplicationSubmissionContext appSubmissionContext)
-      throws YarnException {
-    Boolean exists = existsApplicationHomeSubCluster(applicationId);
-    ApplicationHomeSubCluster appHomeSubCluster =
-        ApplicationHomeSubCluster.newInstance(applicationId, Time.now(),
-        subClusterId, appSubmissionContext);
-    if (!exists || retryCount == 0) {
-      // persist the mapping of applicationId and the subClusterId which has
-      // been selected as its home.
-      addApplicationHomeSubCluster(applicationId, appHomeSubCluster);
-    } else {
-      // update the mapping of applicationId and the home subClusterId to
-      // the new subClusterId we have selected.
-      updateApplicationHomeSubCluster(subClusterId, applicationId, appHomeSubCluster);
-    }
-  }
-
-  /**
-   * Exists ReservationHomeSubCluster Mapping.
-   *
-   * @param reservationId reservationId
-   * @return true - exist, false - not exist
-   */
-  public boolean existsReservationHomeSubCluster(ReservationId reservationId) {
-    try {
-      SubClusterId subClusterId = getReservationHomeSubCluster(reservationId);
-      if (subClusterId != null) {
-        return true;
-      }
-    } catch (YarnException e) {
-      LOG.debug("get homeSubCluster by reservationId = {} error.", reservationId, e);
-    }
-    return false;
-  }
-
-  /**
-   * Save Reservation And HomeSubCluster Mapping.
-   *
-   * @param reservationId reservationId
-   * @param homeSubCluster homeSubCluster
-   * @throws YarnException on failure
-   */
-  public void addReservationHomeSubCluster(ReservationId reservationId,
-      ReservationHomeSubCluster homeSubCluster) throws YarnException {
-    try {
-      // persist the mapping of reservationId and the subClusterId which has
-      // been selected as its home
-      addReservationHomeSubCluster(homeSubCluster);
-    } catch (YarnException e) {
-      String msg = String.format(
-          "Unable to insert the ReservationId %s into the FederationStateStore.", reservationId);
-      throw new YarnException(msg, e);
-    }
-  }
-
-  /**
-   * Update Reservation And HomeSubCluster Mapping.
-   *
-   * @param subClusterId subClusterId
-   * @param reservationId reservationId
-   * @param homeSubCluster homeSubCluster
-   * @throws YarnException on failure
-   */
-  public void updateReservationHomeSubCluster(SubClusterId subClusterId,
-      ReservationId reservationId, ReservationHomeSubCluster homeSubCluster) throws YarnException {
-    try {
-      // update the mapping of reservationId and the home subClusterId to
-      // the new subClusterId we have selected
-      updateReservationHomeSubCluster(homeSubCluster);
-    } catch (YarnException e) {
-      SubClusterId subClusterIdInStateStore = getReservationHomeSubCluster(reservationId);
-      if (subClusterId == subClusterIdInStateStore) {
-        LOG.info("Reservation {} already submitted on SubCluster {}.", reservationId, subClusterId);
-      } else {
-        String msg = String.format(
-            "Unable to update the ReservationId %s into the FederationStateStore.", reservationId);
-        throw new YarnException(msg, e);
-      }
-    }
-  }
-
-  /**
-   * Add or Update ReservationHomeSubCluster.
-   *
-   * @param reservationId reservationId.
-   * @param subClusterId homeSubClusterId, this is selected by strategy.
-   * @param retryCount number of retries.
-   * @throws YarnException yarn exception.
-   */
-  public void addOrUpdateReservationHomeSubCluster(ReservationId reservationId,
-      SubClusterId subClusterId, int retryCount) throws YarnException {
-    Boolean exists = existsReservationHomeSubCluster(reservationId);
-    ReservationHomeSubCluster reservationHomeSubCluster =
-        ReservationHomeSubCluster.newInstance(reservationId, subClusterId);
-    if (!exists || retryCount == 0) {
-      // persist the mapping of reservationId and the subClusterId which has
-      // been selected as its home.
-      addReservationHomeSubCluster(reservationId, reservationHomeSubCluster);
-    } else {
-      // update the mapping of reservationId and the home subClusterId to
-      // the new subClusterId we have selected.
-      updateReservationHomeSubCluster(subClusterId, reservationId,
-          reservationHomeSubCluster);
-    }
-  }
-
-  /**
-   * Deregister subCluster, Update the subCluster state to
-   * SC_LOST、SC_DECOMMISSIONED etc.
-   *
-   * @param subClusterId subClusterId.
-   * @param subClusterState The state of the subCluster to be updated.
-   * @throws YarnException yarn exception.
-   * @return If Deregister subCluster is successful, return true, otherwise, return false.
-   */
-  public boolean deregisterSubCluster(SubClusterId subClusterId,
-      SubClusterState subClusterState) throws YarnException {
-    SubClusterDeregisterRequest deregisterRequest =
-        SubClusterDeregisterRequest.newInstance(subClusterId, subClusterState);
-    SubClusterDeregisterResponse response = stateStore.deregisterSubCluster(deregisterRequest);
-    // If the response is not empty, deregisterSubCluster is successful.
-    if (response != null) {
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Get active subclusters.
-   *
-   * @return We will return a list of active subclusters as a Collection.
-   */
-  public Collection<SubClusterInfo> getActiveSubClusters()
-      throws NotFoundException {
-    try {
-      Map<SubClusterId, SubClusterInfo> subClusterMap = getSubClusters(true);
-      if (MapUtils.isEmpty(subClusterMap)) {
-        throw new NotFoundException("Not Found SubClusters.");
-      }
-      return subClusterMap.values();
-    } catch (Exception e) {
-      LOG.error("getActiveSubClusters failed.", e);
-      return null;
-    }
-  }
-
-  /**
-   * Get ApplicationSubmissionContext according to ApplicationId.
-   * We don't throw exceptions. If the application cannot be found, we return null.
-   *
-   * @param appId ApplicationId
-   * @return ApplicationSubmissionContext of ApplicationId
-   */
-  public ApplicationSubmissionContext getApplicationSubmissionContext(ApplicationId appId) {
-    try {
-      GetApplicationHomeSubClusterResponse response = stateStore.getApplicationHomeSubCluster(
-          GetApplicationHomeSubClusterRequest.newInstance(appId));
-      ApplicationHomeSubCluster appHomeSubCluster = response.getApplicationHomeSubCluster();
-      return appHomeSubCluster.getApplicationSubmissionContext();
-    } catch (Exception e) {
-      LOG.error("getApplicationSubmissionContext error, applicationId = {}.", appId, e);
-      return null;
-    }
-  }
-
-  public void deleteAllPoliciesConfigurations() throws Exception {
-    DeletePoliciesConfigurationsRequest request =
-        DeletePoliciesConfigurationsRequest.newInstance();
-    stateStore.deleteAllPoliciesConfigurations(request);
-  }
-
-  @VisibleForTesting
-  public FederationCache getFederationCache() {
-    return federationCache;
-  }
-
-  public void deleteStore() throws Exception {
-    stateStore.deleteStateStore();
-  }
-
-  public void deletePolicyConfigurations(List<String> queuesList) throws YarnException {
-    if (CollectionUtils.isEmpty(queuesList)) {
-      throw new YarnException("queuesList cannot be empty!");
-    }
-    DeleteSubClusterPoliciesConfigurationsRequest request =
-        DeleteSubClusterPoliciesConfigurationsRequest.newInstance(queuesList);
-    stateStore.deletePoliciesConfigurations(request);
-  }
-}

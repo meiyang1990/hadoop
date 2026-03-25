@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,9 +33,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Stub based implementation for TimelineReader. This implementation will
- * not provide a complete implementation of all the necessary features. This
- * implementation is provided solely for basic testing purposes.
+ * 时间线数据读取器的空实现桩，仅用于基础测试，不提供完整功能实现，所有读请求都返回空结果。
  */
 
 public class NoOpTimelineReaderImpl extends AbstractService
@@ -42,6 +41,9 @@ public class NoOpTimelineReaderImpl extends AbstractService
   private static final Logger LOG =
           LoggerFactory.getLogger(NoOpTimelineReaderImpl.class);
 
+  /**
+   * 构造空实现时间线读取器，服务启动时打印提示日志。
+   */
   public NoOpTimelineReaderImpl() {
     super(NoOpTimelineReaderImpl.class.getName());
     LOG.info("NoOpTimelineReader is configured. Response to all the read " +

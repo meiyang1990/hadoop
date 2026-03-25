@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,34 +34,32 @@ import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableUtils;
 
 /**
- * Writable type storing multiple {@link org.apache.hadoop.io.Writable}s.
- *
- * This is *not* a general-purpose tuple type. In almost all cases, users are
- * encouraged to implement their own serializable types, which can perform
- * better validation and provide more efficient encodings than this class is
- * capable. TupleWritable relies on the join framework for type safety and
- * assumes its instances will rarely be persisted, assumptions not only
- * incompatible with, but contrary to the general case.
- *
+ * MapReduce连接操作专用元组Writable实现，用于存储多个Writable类型元素。
+ * 本类并非通用元组类型，仅为连接框架设计：它假设实例很少被持久化，依赖连接框架保证类型安全，
+ * 性能和编码效率不如用户自定义的专用序列化类型，不推荐在连接框架之外使用。
+ * 
+ * 核心职责：为MapReduce的连接操作提供可变长度元组的序列化能力，支持稀疏存储（仅标记存在的元素）
  * @see org.apache.hadoop.io.Writable
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class TupleWritable implements Writable, Iterable<Writable> {
 
+  // 标记对应位置是否存在有效值
   protected BitSet written;
+  // 存储元组的所有元素
   private Writable[] values;
 
   /**
-   * Create an empty tuple with no allocated storage for writables.
+   * 创建空元组，不分配存储空间
    */
   public TupleWritable() {
     written = new BitSet(0);
   }
 
   /**
-   * Initialize tuple with storage; unknown whether any of them contain
-   * &quot;written&quot; values.
+   * 使用给定的Writable数组初始化元组，此时所有元素默认标记为未写入
+   * @param vals 元组元素数组
    */
   public TupleWritable(Writable[] vals) {
     written = new BitSet(vals.length);
@@ -68,27 +67,33 @@ public class TupleWritable implements Writable, Iterable<Writable> {
   }
 
   /**
-   * Return true if tuple has an element at the position provided.
+   * 判断指定位置是否存在有效值
+   * @param i 要检查的位置索引
+   * @return true表示该位置存在有效值，false表示不存在
    */
   public boolean has(int i) {
     return written.get(i);
   }
 
   /**
-   * Get ith Writable from Tuple.
+   * 获取元组指定位置的元素
+   * @param i 位置索引
+   * @return 对应位置的Writable元素
    */
   public Writable get(int i) {
     return values[i];
   }
 
   /**
-   * The number of children in this Tuple.
+   * 获取元组容量（可存储的最大元素数量）
+   * @return 元组容量
    */
   public int size() {
     return values.length;
   }
 
   /**
+   * 比较两个元组是否相等：需要标记位相等，且所有已存在元素都相等
    * {@inheritDoc}
    */
   public boolean equals(Object other) {
@@ -108,15 +113,18 @@ public class TupleWritable implements Writable, Iterable<Writable> {
     return false;
   }
 
+  /**
+   * 本类未设计哈希码实现，调用会触发断言失败，仅返回written的哈希码兜底
+   * @return 哈希码（实际上不会正常返回）
+   */
   public int hashCode() {
     assert false : "hashCode not designed";
     return written.hashCode();
   }
 
   /**
-   * Return an iterator over the elements in this tuple.
-   * Note that this doesn't flatten the tuple; one may receive tuples
-   * from this iterator.
+   * 返回仅包含已存在元素的迭代器，迭代过程会跳过不存在元素的位置
+   * @return 已存在元素的迭代器
    */
   public Iterator<Writable> iterator() {
     final TupleWritable t = this;
@@ -143,8 +151,8 @@ public class TupleWritable implements Writable, Iterable<Writable> {
   }
 
   /**
-   * Convert Tuple to String as in the following.
-   * <code>[&lt;child1&gt;,&lt;child2&gt;,...,&lt;childn&gt;]</code>
+   * 将元组转换为字符串表示，格式为[元素1,元素2,...]，不存在的元素留空
+   * @return 元组的字符串形式
    */
   public String toString() {
     StringBuilder buf = new StringBuilder("[");
@@ -161,18 +169,21 @@ public class TupleWritable implements Writable, Iterable<Writable> {
 
   // Writable
 
-  /** Writes each Writable to <code>out</code>.
-   * TupleWritable format:
-   * {@code
-   *  <count><type1><type2>...<typen><obj1><obj2>...<objn>
-   * }
+  /** 
+   * 将元组序列化到输出流，序列化格式：
+   * 元素数量 -> 存在标记位 -> 每个元素的类名 -> 每个存在元素的序列化内容
+   * {@inheritDoc}
    */
   public void write(DataOutput out) throws IOException {
+    // 写入元组容量
     WritableUtils.writeVInt(out, values.length);
+    // 写入存在标记位
     writeBitSet(out, values.length, written);
+    // 写入所有元素的类名
     for (int i = 0; i < values.length; ++i) {
       Text.writeString(out, values[i].getClass().getName());
     }
+    // 仅写入存在元素的序列化内容
     for (int i = 0; i < values.length; ++i) {
       if (has(i)) {
         values[i].write(out);
@@ -181,24 +192,33 @@ public class TupleWritable implements Writable, Iterable<Writable> {
   }
 
   /**
+   * 从输入流反序列化元组
    * {@inheritDoc}
    */
   @SuppressWarnings("unchecked") // No static typeinfo on Tuples
   public void readFields(DataInput in) throws IOException {
+    // 读取元组容量
     int card = WritableUtils.readVInt(in);
     values = new Writable[card];
+    // 读取存在标记位
     readBitSet(in, card, written);
+    // 存储每个元素的类对象
     Class<? extends Writable>[] cls = new Class[card];
     try {
+      // 读取每个元素的类名并加载类
       for (int i = 0; i < card; ++i) {
         cls[i] = Class.forName(Text.readString(in)).asSubclass(Writable.class);
       }
+      // 实例化每个元素
       for (int i = 0; i < card; ++i) {
+        // NullWritable使用单例
         if (cls[i].equals(NullWritable.class)) {
           values[i] = NullWritable.get();
         } else {
+          // 通过反射创建实例
           values[i] = cls[i].newInstance();
         }
+        // 仅对存在元素反序列化
         if (has(i)) {
           values[i].readFields(in);
         }
@@ -213,38 +233,41 @@ public class TupleWritable implements Writable, Iterable<Writable> {
   }
 
   /**
-   * Record that the tuple contains an element at the position provided.
+   * 标记指定位置存在有效值
+   * @param i 要标记的位置索引
    */
   void setWritten(int i) {
     written.set(i);
   }
 
   /**
-   * Record that the tuple does not contain an element at the position
-   * provided.
+   * 标记指定位置不存在有效值
+   * @param i 要清除标记的位置索引
    */
   void clearWritten(int i) {
     written.clear(i);
   }
 
   /**
-   * Clear any record of which writables have been written to, without
-   * releasing storage.
+   * 清除所有存在标记，不释放存储空间
    */
   void clearWritten() {
     written.clear();
   }
 
   /**
-   * Writes the bit set to the stream. The first 64 bit-positions of the bit
-   * set are written as a VLong for backwards-compatibility with older 
-   * versions of TupleWritable. All bit-positions >= 64 are encoded as a byte
-   * for every 8 bit-positions.
+   * 将存在标记位写入输出流，兼容旧版本格式：
+   * 前64位用VLong存储（兼容旧版本TupleWritable），超过64位的部分每8位用一个字节存储
+   * @param stream 输出流
+   * @param nbits 总位数
+   * @param bitSet 要写入的BitSet
+   * @throws IOException 写入失败抛出异常
    */
   private static final void writeBitSet(DataOutput stream, int nbits,
       BitSet bitSet) throws IOException {
     long bits = 0L;
         
+    // 处理前64位，存入VLong
     int bitSetIndex = bitSet.nextSetBit(0);
     for (;bitSetIndex >= 0 && bitSetIndex < Long.SIZE;
             bitSetIndex=bitSet.nextSetBit(bitSetIndex+1)) {
@@ -252,6 +275,7 @@ public class TupleWritable implements Writable, Iterable<Writable> {
     }
     WritableUtils.writeVLong(stream,bits);
     
+    // 处理超过64位的部分，每8位一个字节
     if (nbits > Long.SIZE) {
       bits = 0L;
       for (int lastWordWritten = 0; bitSetIndex >= 0 && bitSetIndex < nbits; 
@@ -272,20 +296,26 @@ public class TupleWritable implements Writable, Iterable<Writable> {
   }
 
   /**
-   * Reads a bitset from the stream that has been written with
-   * {@link #writeBitSet(DataOutput, int, BitSet)}.
+   * 从输入流读取存在标记位，读取与writeBitSet对应的格式
+   * @param stream 输入流
+   * @param nbits 总位数
+   * @param bitSet 存储结果的BitSet
+   * @throws IOException 读取失败抛出异常
    */
   private static final void readBitSet(DataInput stream, int nbits, 
       BitSet bitSet) throws IOException {
     bitSet.clear();
+    // 读取前64位
     long initialBits = WritableUtils.readVLong(stream);
     long last = 0L;
+    // 逐个提取置位位
     while (0L != initialBits) {
       last = Long.lowestOneBit(initialBits);
       initialBits ^= last;
       bitSet.set(Long.numberOfTrailingZeros(last));
     }
     
+    // 读取超过64位的部分，每字节8位
     for (int offset=Long.SIZE; offset < nbits; offset+=Byte.SIZE) {
       byte bits = stream.readByte();
       while (0 != bits) {

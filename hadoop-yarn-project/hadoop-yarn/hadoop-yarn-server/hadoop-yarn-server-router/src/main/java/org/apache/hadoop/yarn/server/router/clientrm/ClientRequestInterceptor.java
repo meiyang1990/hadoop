@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,58 +24,52 @@ import org.apache.hadoop.yarn.api.ApplicationClientProtocol;
 import org.apache.hadoop.yarn.server.router.security.RouterDelegationTokenSecretManager;
 
 /**
- * Defines the contract to be implemented by the request interceptor classes,
- * that can be used to intercept and inspect messages sent from the client to
- * the resource manager.
+ * YARN Router客户端到ResourceManager请求拦截器接口，定义了拦截器需要实现的契约。
+ * 用于拦截和检查客户端发送到资源管理器的请求消息，可实现自定义处理逻辑如认证、日志、限流等。
  */
 public interface ClientRequestInterceptor
     extends ApplicationClientProtocol, Configurable {
   /**
-   * This method is called for initializing the interceptor. This is guaranteed
-   * to be called only once in the lifetime of this instance.
+   * 初始化拦截器，在拦截器实例生命周期内保证只被调用一次。
    *
-   * @param user the name of the client
+   * @param user 客户端用户名
    */
   void init(String user);
 
   /**
-   * This method is called to release the resources held by the interceptor.
-   * This will be called when the application pipeline is being destroyed. The
-   * concrete implementations should dispose the resources and forward the
-   * request to the next interceptor, if any.
+   * 关闭拦截器，释放拦截器持有的资源。
+   * 在应用拦截器管道销毁时调用，实现类需要释放资源并将关闭请求转发给下一个拦截器。
    */
   void shutdown();
 
   /**
-   * Sets the next interceptor in the pipeline. The concrete implementation of
-   * this interface should always pass the request to the nextInterceptor after
-   * inspecting the message. The last interceptor in the chain is responsible to
-   * send the messages to the resource manager service and so the last
-   * interceptor will not receive this method call.
+   * 设置管道中的下一个拦截器。
+   * 接口实现类在检查完请求消息后，需要将请求转发给下一个拦截器处理。
+   * 链中的最后一个拦截器负责将请求发送给ResourceManager服务，因此不会收到该方法调用。
    *
-   * @param nextInterceptor the ClientRequestInterceptor to set in the pipeline
+   * @param nextInterceptor 管道中下一个要执行的请求拦截器
    */
   void setNextInterceptor(ClientRequestInterceptor nextInterceptor);
 
   /**
-   * Returns the next interceptor in the chain.
+   * 获取拦截器链中的下一个拦截器。
    *
-   * @return the next interceptor in the chain
+   * @return 拦截器链中的下一个拦截器
    */
   ClientRequestInterceptor getNextInterceptor();
 
   /**
-   * Set RouterDelegationTokenSecretManager for specific interceptor to support Token operations,
-   * including create Token, update Token, and delete Token.
+   * 为当前拦截器设置路由器委托令牌密钥管理器，支持令牌相关操作，
+   * 包括创建令牌、更新令牌和删除令牌。
    *
-   * @param tokenSecretManager Router DelegationTokenSecretManager
+   * @param tokenSecretManager 路由器委托令牌密钥管理器
    */
   void setTokenSecretManager(RouterDelegationTokenSecretManager tokenSecretManager);
 
   /**
-   * Get RouterDelegationTokenSecretManager.
+   * 获取路由器委托令牌密钥管理器。
    *
-   * @return Router DelegationTokenSecretManager.
+   * @return 路由器委托令牌密钥管理器
    */
   RouterDelegationTokenSecretManager getTokenSecretManager();
 }

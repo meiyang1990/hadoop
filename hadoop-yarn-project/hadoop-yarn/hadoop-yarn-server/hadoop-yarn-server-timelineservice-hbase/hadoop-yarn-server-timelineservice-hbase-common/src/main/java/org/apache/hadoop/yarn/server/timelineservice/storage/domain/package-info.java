@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.storage.domain
- * contains classes related to implementation for domain table.
+ * 时间线服务HBase存储层的domain表实现包，包含领域表相关的存储操作实现类。
+ * domain表用于存储时间线服务中的领域（租户/命名空间）元数据信息。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

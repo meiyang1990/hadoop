@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,27 +23,42 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.UnRegisterNode
 import org.apache.hadoop.yarn.server.api.protocolrecords.UnRegisterNodeManagerResponse;
 
 /**
- * PBImpl class for UnRegisterNodeManagerResponse.
+ * .NodeManager注销响应的Protobuf实现类，基于PB序列化协议实现协议记录
  */
 public class UnRegisterNodeManagerResponsePBImpl extends
     UnRegisterNodeManagerResponse {
+  // Protobuf消息对象，用于只读模式
   private UnRegisterNodeManagerResponseProto proto =
       UnRegisterNodeManagerResponseProto.getDefaultInstance();
+  // Protobuf构建器，用于可写模式
   private UnRegisterNodeManagerResponseProto.Builder builder = null;
+  // 当前是否使用只读proto对象标记
   private boolean viaProto = false;
 
+  // 是否需要重新构建proto对象标记
   private boolean rebuild = false;
 
+  /**
+   * 构造空的注销响应对象，初始化构建器.
+   */
   public UnRegisterNodeManagerResponsePBImpl() {
     builder = UnRegisterNodeManagerResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有proto对象构造注销响应对象.
+   * @param proto 已有的Protobuf消息对象
+   */
   public UnRegisterNodeManagerResponsePBImpl(
       UnRegisterNodeManagerResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前响应对应的Protobuf消息对象，处理构建逻辑.
+   * @return 构建完成的Protobuf消息对象
+   */
   public UnRegisterNodeManagerResponseProto getProto() {
     if (rebuild) {
       mergeLocalToProto();
@@ -52,6 +68,9 @@ public class UnRegisterNodeManagerResponsePBImpl extends
     return proto;
   }
 
+  /**
+   * 将本地构建器内容合并生成新的proto对象.
+   */
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -61,6 +80,9 @@ public class UnRegisterNodeManagerResponsePBImpl extends
     viaProto = true;
   }
 
+  /**
+   * 延迟初始化构建器：如果当前是proto只读模式，基于现有proto创建构建器.
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = UnRegisterNodeManagerResponseProto.newBuilder(proto);

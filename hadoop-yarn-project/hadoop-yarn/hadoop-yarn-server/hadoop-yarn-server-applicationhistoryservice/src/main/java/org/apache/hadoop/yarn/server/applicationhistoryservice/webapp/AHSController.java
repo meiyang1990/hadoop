@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,6 +23,10 @@ import org.apache.hadoop.yarn.webapp.Controller;
 
 import com.google.inject.Inject;
 
+/**
+ * 应用历史服务(AHS) Web UI控制器，处理各类页面请求路由
+ * 负责将不同URL请求映射到对应的页面渲染器
+ */
 public class AHSController extends Controller {
 
   @Inject
@@ -34,18 +39,30 @@ public class AHSController extends Controller {
     setTitle("Application History");
   }
 
+  /**
+   * 处理关于页面请求
+   */
   public void about() {
     render(AboutPage.class);
   }
 
+  /**
+   * 处理应用详情页面请求
+   */
   public void app() {
     render(AppPage.class);
   }
 
+  /**
+   * 处理应用尝试详情页面请求
+   */
   public void appattempt() {
     render(AppAttemptPage.class);
   }
 
+  /**
+   * 处理容器详情页面请求
+   */
   public void container() {
     render(ContainerPage.class);
   }
@@ -57,6 +74,9 @@ public class AHSController extends Controller {
     render(AHSLogsPage.class);
   }
 
+  /**
+   * 处理错误和警告页面请求
+   */
   public void errorsAndWarnings() {
     render(AHSErrorsAndWarningsPage.class);
   }

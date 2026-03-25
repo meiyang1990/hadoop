@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,131 +28,120 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * A ReservationAllocation represents a concrete allocation of resources over
- * time that satisfy a certain {@link ReservationDefinition}. This is used
- * internally by a {@link Plan} to store information about how each of the
- * accepted {@link ReservationDefinition} have been allocated.
+ * YARN资源预留分配接口，代表满足用户预留定义的具体资源时间分配结果。
+ * 由Plan内部使用，用于存储所有已接受预留请求的资源分配信息。
  */
 public interface ReservationAllocation
     extends Comparable<ReservationAllocation> {
 
   /**
-   * Returns the unique identifier {@link ReservationId} that represents the
-   * reservation
+   * 获取当前预留的唯一标识ID
    * 
-   * @return reservationId the unique identifier {@link ReservationId} that
-   *         represents the reservation
+   * @return 当前预留的ReservationId
    */
   ReservationId getReservationId();
 
   /**
-   * Returns the original {@link ReservationDefinition} submitted by the client
+   * 获取客户端提交的原始预留定义
    * 
-   * @return the {@link ReservationDefinition} submitted by the client
+   * @return 客户端提交的原始预留定义
    */
   ReservationDefinition getReservationDefinition();
 
   /**
-   * Returns the time at which the reservation is activated.
+   * 获取预留开始生效时间
    * 
-   * @return the time at which the reservation is activated
+   * @return 预留激活时间（毫秒时间戳）
    */
   long getStartTime();
 
   /**
-   * Returns the time at which the reservation terminates.
+   * 获取预留结束时间
    * 
-   * @return the time at which the reservation terminates
+   * @return 预留终止时间（毫秒时间戳）
    */
   long getEndTime();
 
   /**
-   * Returns the map of resources requested against the time interval for which
-   * they were.
+   * 获取每个时间区间对应的资源分配请求映射
    * 
-   * @return the allocationRequests the map of resources requested against the
-   *         time interval for which they were
+   * @return 时间区间到请求资源的映射表
    */
   Map<ReservationInterval, Resource> getAllocationRequests();
 
   /**
-   * Return a string identifying the plan to which the reservation belongs
+   * 获取当前预留所属计划的标识字符串
    * 
-   * @return the plan to which the reservation belongs
+   * @return 当前预留所属计划名称
    */
   String getPlanName();
 
   /**
-   * Returns the user who requested the reservation
+   * 获取提交预留请求的用户名
    * 
-   * @return the user who requested the reservation
+   * @return 请求预留的用户名
    */
   String getUser();
 
   /**
-   * Returns whether the reservation has gang semantics or not
+   * 判断当前预留是否包含同批任务（Gang）语义
    * 
-   * @return true if there is a gang request, false otherwise
+   * @return true表示是同批请求，false否则
    */
   boolean containsGangs();
 
   /**
-   * Sets the time at which the reservation was accepted by the system
+   * 设置预留被系统接受的时间戳
    * 
-   * @param acceptedAt the time at which the reservation was accepted by the
-   *          system
+   * @param acceptedAt 预留被系统接受的时间戳
    */
   void setAcceptanceTimestamp(long acceptedAt);
 
   /**
-   * Returns the time at which the reservation was accepted by the system
+   * 获取预留被系统接受的时间戳
    * 
-   * @return the time at which the reservation was accepted by the system
+   * @return 预留被系统接受的时间戳
    */
   long getAcceptanceTime();
 
   /**
-   * Returns the capacity represented by cumulative resources reserved by the
-   * reservation at the specified point of time
+   * 获取指定时间点上该预留占用的资源总量
    * 
-   * @param tick the time (UTC in ms) for which the reserved resources are
-   *          requested
-   * @return the resources reserved at the specified time
+   * @param tick 指定时间点（UTC毫秒时间戳）
+   * @return 指定时间点上该预留占用的资源
    */
   Resource getResourcesAtTime(long tick);
 
   /**
-   * Return a RLE representation of used resources.
+   * 获取使用游程编码（RLE）表示的全时段资源分配
    *
-   * @return a RLE encoding of resources allocated over time.
+   * @return 全时段资源分配的RLE稀疏表示
    */
   RLESparseResourceAllocation getResourcesOverTime();
 
 
   /**
-   * Return a RLE representation of used resources.
+   * 获取指定时间区间内使用游程编码（RLE）表示的资源分配
    *
-   * @param start start of the time interval.
-   * @param end end of the time interval.
-   * @return a RLE encoding of resources allocated over time.
+   * @param start 时间区间起始时间
+   * @param end 时间区间结束时间
+   * @return 指定区间内资源分配的RLE稀疏表示
    */
   RLESparseResourceAllocation getResourcesOverTime(long start, long end);
 
   /**
-   * Get the periodicity of this reservation representing the time period of the
-   * periodic job. Period is represented in milliseconds for periodic jobs.
-   * Period is 0 for non-periodic jobs.
+   * 获取当前预留的周期，代表周期性作业的重复间隔。
+   * 周期性作业单位为毫秒，非周期性作业周期为0。
    *
-   * @return periodicity of this reservation
+   * @return 当前预留的周期（毫秒）
    */
   long getPeriodicity();
 
   /**
-   * Set the periodicity of this reservation representing the time period of the
-   * periodic job. Period is represented in milliseconds for periodic jobs.
-   * Period is 0 for non-periodic jobs.
+   * 设置当前预留的周期，代表周期性作业的重复间隔。
+   * 周期性作业单位为毫秒，非周期性作业周期为0。
    *
-   * @param period periodicity of this reservation
+   * @param period 当前预留的周期（毫秒）
    */
   @VisibleForTesting
   void setPeriodicity(long period);

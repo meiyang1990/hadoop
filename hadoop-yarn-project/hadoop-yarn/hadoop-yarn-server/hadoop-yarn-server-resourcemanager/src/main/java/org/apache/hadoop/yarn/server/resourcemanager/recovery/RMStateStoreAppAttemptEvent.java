@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,14 +21,27 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.ApplicationAttemptStateData;
 
+/**
+ * RM状态存储中应用尝试状态存储事件，用于持久化应用尝试的状态信息。
+ * 是YARN ResourceManager恢复机制中用于存储应用尝试元数据的事件类。
+ */
 public class RMStateStoreAppAttemptEvent extends RMStateStoreEvent {
+  // 应用尝试状态数据
   ApplicationAttemptStateData attemptState;
   
+  /**
+   * 构造应用尝试状态存储事件。
+   * @param attemptState 待存储的应用尝试状态数据
+   */
   public RMStateStoreAppAttemptEvent(ApplicationAttemptStateData attemptState) {
     super(RMStateStoreEventType.STORE_APP_ATTEMPT);
     this.attemptState = attemptState;
   }
   
+  /**
+   * 获取待存储的应用尝试状态数据。
+   * @return 应用尝试状态数据
+   */
   public ApplicationAttemptStateData getAppAttemptState() {
     return attemptState;
   }

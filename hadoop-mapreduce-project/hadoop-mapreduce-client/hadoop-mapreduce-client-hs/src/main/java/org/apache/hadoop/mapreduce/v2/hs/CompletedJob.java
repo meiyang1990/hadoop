@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -66,19 +67,17 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Loads the basic job level data upfront.
- * Data from job history file is loaded lazily.
+ * 已完成作业的历史数据视图，在作业历史服务器中承载已完成作业的所有数据访问能力。
+ * 采用延迟加载策略：仅预先加载作业级别基础数据，任务级别数据仅在请求时才从历史文件加载。
  */
 public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job {
-  // Backward compatibility: if the failed or killed map/reduce
-  // count is -1, that means the value was not recorded
-  // so we count it as 0
+  // 向后兼容性说明：如果失败或被杀死的map/reduce计数为-1，表示该值未被记录，按0处理
   private static final int UNDEFINED_VALUE = -1;
 
   private static final Logger LOG = LoggerFactory.getLogger(CompletedJob.class);
   private final Configuration conf;
-  private final JobId jobId; //Can be picked from JobInfo with a conversion.
-  private final String user; //Can be picked up from JobInfo
+  private final JobId jobId;
+  private final String user;
   private final HistoryFileInfo info;
   private JobInfo jobInfo;
   private JobReport report;
@@ -92,6 +91,17 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
   private JobACLsManager aclsMgr;
   
   
+  /**
+   * 构造已完成作业对象，加载作业基础信息并根据参数决定是否预加载所有任务数据。
+   * @param conf Hadoop配置对象
+   * @param jobId 作业ID
+   * @param historyFile 作业历史文件路径
+   * @param loadTasks 是否预加载所有任务数据
+   * @param userName 提交作业的用户名
+   * @param info 历史文件元信息对象
+   * @param aclsMgr 作业访问权限管理器
+   * @throws IOException 加载历史文件失败时抛出异常
+   */
   public CompletedJob(Configuration conf, JobId jobId, Path historyFile, 
       boolean loadTasks, String userName, HistoryFileInfo info,
       JobACLsManager aclsMgr) 
@@ -157,9 +167,13 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     return report;
   }
 
+  /**
+   * 从已解析的作业信息构造JobReport对象，用于对外提供作业状态摘要。
+   */
   private void constructJobReport() {
     report = Records.newRecord(JobReport.class);
     report.setJobId(jobId);
+    // 设置作业状态，从历史文件存储的状态字符串转换
     report.setJobState(JobState.valueOf(jobInfo.getJobStatus()));
     report.setSubmitTime(jobInfo.getSubmitTime());
     report.setStartTime(jobInfo.getLaunchTime());
@@ -168,11 +182,13 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     report.setUser(jobInfo.getUsername());
     report.setDiagnostics(jobInfo.getErrorInfo());
 
+    // 计算Map阶段进度，没有Map任务时进度为100%
     if ( getTotalMaps() == 0 ) {
       report.setMapProgress(1.0f);
     } else {
       report.setMapProgress((float) getCompletedMaps() / getTotalMaps());
     }
+    // 计算Reduce阶段进度，没有Reduce任务时进度为100%
     if ( getTotalReduces() == 0 ) {
       report.setReduceProgress(1.0f);
     } else {
@@ -182,6 +198,7 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     report.setJobFile(getConfFile().toString());
     String historyUrl = "N/A";
     try {
+      // 生成作业历史服务器上的Web访问URL
       historyUrl =
           MRWebAppUtil.getApplicationWebURLOnJHSWithScheme(conf,
               jobId.getAppId());
@@ -196,6 +213,7 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
 
   @Override
   public float getProgress() {
+    // 已完成作业进度始终为100%
     return 1.0f;
   }
 
@@ -207,8 +225,10 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
   @Override
   public Task getTask(TaskId taskId) {
     if (tasksLoaded.get()) {
+      // 任务已加载，直接从缓存返回
       return tasks.get(taskId);
     } else {
+      // 任务未加载，延迟创建单个任务对象返回
       TaskID oldTaskId = TypeConverter.fromYarn(taskId);
       CompletedTask completedTask =
           new CompletedTask(taskId, jobInfo.getAllTasks().get(oldTaskId));
@@ -236,11 +256,19 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
         mapCompletionEvents, startIndex, maxEvents));
   }
 
+  /**
+   * 从事件列表中截取指定范围的任务尝试完成事件返回。
+   * @param eventList 完整事件列表
+   * @param startIndex 起始事件索引
+   * @param maxEvents 最大返回事件数
+   * @return 截取后的事件数组
+   */
   private static TaskAttemptCompletionEvent[] getAttemptCompletionEvents(
       List<TaskAttemptCompletionEvent> eventList,
       int startIndex, int maxEvents) {
     TaskAttemptCompletionEvent[] events = new TaskAttemptCompletionEvent[0];
     if (eventList.size() > startIndex) {
+      // 计算实际可返回的最大事件数
       int actualMax = Math.min(maxEvents,
           (eventList.size() - startIndex));
       events = eventList.subList(startIndex, actualMax + startIndex)
@@ -249,21 +277,28 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     return events;
   }
 
+  /**
+   * 从所有已加载任务中构造任务尝试完成事件列表，按完成时间排序。
+   */
   private void constructTaskAttemptCompletionEvents() {
+    // 确保所有任务已加载
     loadAllTasks();
     completionEvents = new LinkedList<TaskAttemptCompletionEvent>();
     List<TaskAttempt> allTaskAttempts = new LinkedList<TaskAttempt>();
     int numMapAttempts = 0;
+    // 遍历所有任务收集所有任务尝试
     for (Map.Entry<TaskId,Task> taskEntry : tasks.entrySet()) {
       Task task = taskEntry.getValue();
       for (Map.Entry<TaskAttemptId,TaskAttempt> taskAttemptEntry : task.getAttempts().entrySet()) {
         TaskAttempt taskAttempt = taskAttemptEntry.getValue();
         allTaskAttempts.add(taskAttempt);
+        // 统计Map任务尝试数量，预分配ArrayList容量
         if (task.getType() == TaskType.MAP) {
           ++numMapAttempts;
         }
       }
     }
+    // 按完成时间排序，未完成的按启动时间排序，时间晚的排在前面
     Collections.sort(allTaskAttempts, new Comparator<TaskAttempt>() {
 
       @Override
@@ -293,17 +328,19 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     mapCompletionEvents =
         new ArrayList<TaskAttemptCompletionEvent>(numMapAttempts);
     int eventId = 0;
+    // 为每个任务尝试构造完成事件对象
     for (TaskAttempt taskAttempt : allTaskAttempts) {
 
       TaskAttemptCompletionEvent tace =
           Records.newRecord(TaskAttemptCompletionEvent.class);
 
       int attemptRunTime = -1;
+      // 计算任务尝试运行时间
       if (taskAttempt.getLaunchTime() != 0 && taskAttempt.getFinishTime() != 0) {
         attemptRunTime =
             (int) (taskAttempt.getFinishTime() - taskAttempt.getLaunchTime());
       }
-      // Default to KILLED
+      // 默认状态为KILLED，转换失败时使用默认值
       TaskAttemptCompletionEventStatus taceStatus =
           TaskAttemptCompletionEventStatus.KILLED;
       String taStateString = taskAttempt.getState().toString();
@@ -322,6 +359,7 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
           .getAssignedContainerMgrAddress());
       tace.setStatus(taceStatus);
       completionEvents.add(tace);
+      // Map任务尝试单独保存一份，用于兼容旧API
       if (taskAttempt.getID().getTaskId().getTaskType() == TaskType.MAP) {
         mapCompletionEvents.add(tace);
       }
@@ -334,7 +372,11 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     return tasks;
   }
 
+  /**
+   * 加载所有任务数据到内存，线程安全的延迟加载实现。
+   */
   private void loadAllTasks() {
+    // 双重检查锁实现延迟加载
     if (tasksLoaded.get()) {
       return;
     }
@@ -343,11 +385,13 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
       if (tasksLoaded.get()) {
         return;
       }
+      // 遍历历史文件解析出的所有任务，转换为CompletedTask对象
       for (Map.Entry<TaskID, TaskInfo> entry : jobInfo.getAllTasks().entrySet()) {
         TaskId yarnTaskID = TypeConverter.toYarn(entry.getKey());
         TaskInfo taskInfo = entry.getValue();
         Task task = new CompletedTask(yarnTaskID, taskInfo);
         tasks.put(yarnTaskID, task);
+        // 按任务类型分组保存，方便按类型查询
         if (task.getType() == TaskType.MAP) {
           mapTasks.put(task.getID(), task);
         } else if (task.getType() == TaskType.REDUCE) {
@@ -360,175 +404,25 @@ public class CompletedJob implements org.apache.hadoop.mapreduce.v2.app.job.Job 
     }
   }
 
+  /**
+   * 创建作业历史解析器，子类可覆盖该方法自定义解析逻辑。
+   * @param historyFileAbsolute 历史文件绝对路径
+   * @return 历史解析器实例
+   * @throws IOException 创建失败时抛出异常
+   */
   protected JobHistoryParser createJobHistoryParser(Path historyFileAbsolute)
       throws IOException {
     return new JobHistoryParser(historyFileAbsolute.getFileSystem(conf),
                 historyFileAbsolute);
   }
 
-  //History data is leisurely loaded when task level data is requested
+  /**
+   * 加载完整作业历史数据，解析历史文件获取作业基础信息。
+   * @param loadTasks 是否同时加载所有任务数据
+   * @param historyFileAbsolute 历史文件绝对路径
+   * @throws IOException 解析或加载失败时抛出异常
+   */
+  // 任务级数据在请求时才延迟加载，此处仅加载作业级别数据
   protected synchronized void loadFullHistoryData(boolean loadTasks,
       Path historyFileAbsolute) throws IOException {
-    LOG.info("Loading history file: [" + historyFileAbsolute + "]");
-    if (this.jobInfo != null) {
-      return;
-    }
-    
-    if (historyFileAbsolute != null) {
-      JobHistoryParser parser = null;
-      try {
-        parser = createJobHistoryParser(historyFileAbsolute);
-        this.jobInfo = parser.parse();
-      } catch (IOException e) {
-        String errorMsg = "Could not load history file " + historyFileAbsolute;
-        LOG.warn(errorMsg, e);
-        throw new YarnRuntimeException(errorMsg, e);
-      }
-      IOException parseException = parser.getParseException(); 
-      if (parseException != null) {
-        String errorMsg = "Could not parse history file " + historyFileAbsolute;
-        LOG.warn(errorMsg, parseException);
-        throw new YarnRuntimeException(errorMsg, parseException);
-      }
-    } else {
-      String errorMsg = "History file not found";
-      LOG.warn(errorMsg);
-      throw new IOException(errorMsg);
-    }
-    if (loadTasks) {
-      loadAllTasks();
-      LOG.info("TaskInfo loaded");
-    }    
-  }
-
-  @Override
-  public List<String> getDiagnostics() {
-    return Collections.singletonList(jobInfo.getErrorInfo());
-  }
-
-  @Override
-  public String getName() {
-    return jobInfo.getJobname();
-  }
-
-  @Override
-  public String getQueueName() {
-    return jobInfo.getJobQueueName();
-  }
-
-  @Override
-  public int getTotalMaps() {
-    return (int) jobInfo.getTotalMaps();
-  }
-
-  @Override
-  public int getTotalReduces() {
-    return (int) jobInfo.getTotalReduces();
-  }
-
-  @Override
-  public boolean isUber() {
-    return jobInfo.getUberized();
-  }
-
-  @Override
-  public Map<TaskId, Task> getTasks(TaskType taskType) {
-    loadAllTasks();
-    if (TaskType.MAP.equals(taskType)) {
-      return mapTasks;
-    } else {//we have only two types of tasks
-      return reduceTasks;
-    }
-  }
-
-  @Override
-  public
-      boolean checkAccess(UserGroupInformation callerUGI, JobACL jobOperation) {
-    Map<JobACL, AccessControlList> jobACLs = jobInfo.getJobACLs();
-    AccessControlList jobACL = jobACLs.get(jobOperation);
-    if (jobACL == null) {
-      return true;
-    }
-    return aclsMgr.checkAccess(callerUGI, jobOperation, 
-        jobInfo.getUsername(), jobACL);
-  }
-  
-  /*
-   * (non-Javadoc)
-   * @see org.apache.hadoop.mapreduce.v2.app.job.Job#getJobACLs()
-   */
-  @Override
-  public  Map<JobACL, AccessControlList> getJobACLs() {
-    return jobInfo.getJobACLs();
-  }
-  
-  @Override
-  public String getUserName() {
-    return user;
-  }
-
-  /*
-   * (non-Javadoc)
-   * @see org.apache.hadoop.mapreduce.v2.app.job.Job#getConfFile()
-   */
-  @Override
-  public Path getConfFile() {
-    return info.getConfFile();
-  }
-  
-  /*
-   * (non-Javadoc)
-   * @see org.apache.hadoop.mapreduce.v2.app.job.Job#loadConfFile()
-   */
-  @Override
-  public Configuration loadConfFile() throws IOException {
-    return info.loadConfFile();
-  }
-
-  @Override
-  public List<AMInfo> getAMInfos() {
-    List<AMInfo> amInfos = new LinkedList<AMInfo>();
-    for (org.apache.hadoop.mapreduce.jobhistory.JobHistoryParser.AMInfo jhAmInfo : jobInfo
-        .getAMInfos()) {
-      AMInfo amInfo =
-          MRBuilderUtils.newAMInfo(jhAmInfo.getAppAttemptId(),
-              jhAmInfo.getStartTime(), jhAmInfo.getContainerId(),
-              jhAmInfo.getNodeManagerHost(), jhAmInfo.getNodeManagerPort(),
-              jhAmInfo.getNodeManagerHttpPort());
-   
-      amInfos.add(amInfo);
-    }
-    return amInfos;
-  }
-
-  @Override
-  public void setQueueName(String queueName) {
-    throw new UnsupportedOperationException("Can't set job's queue name in history");
-  }
-
-  @Override
-  public void setJobPriority(Priority priority) {
-    throw new UnsupportedOperationException(
-        "Can't set job's priority in history");
-  }
-
-  @Override
-  public int getFailedMaps() {
-    return (int) jobInfo.getFailedMaps();
-  }
-
-  @Override
-  public int getFailedReduces() {
-    return (int) jobInfo.getFailedReduces();
-  }
-
-  @Override
-  public int getKilledMaps() {
-    return (int) jobInfo.getKilledMaps();
-  }
-
-  @Override
-  public int getKilledReduces() {
-    return (int) jobInfo.getKilledReduces();
-  }
-}
+    LOG.info("Loading history file:

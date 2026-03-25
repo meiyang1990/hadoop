@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -62,11 +63,9 @@ import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.retrieveIOStat
 import static org.apache.hadoop.fs.statistics.IOStatisticsSupport.snapshotIOStatistics;
 
 /**
- * Utility class to fetch block locations for specified Input paths using a
- * configured number of threads.
- * The thread count is determined from the value of
- * "mapreduce.input.fileinputformat.list-status.num-threads" in the
- * configuration.
+ * 文件输入路径块位置信息获取工具类，使用多线程并发获取指定输入路径下所有文件的块位置信息
+ * 线程数量由配置参数"mapreduce.input.fileinputformat.list-status.num-threads"决定
+ * 用于MapReduce输入阶段并行列举输入文件，提升大输入量下的列表获取性能
  */
 @Private
 public class LocatedFileStatusFetcher implements IOStatisticsSource {
@@ -91,63 +90,66 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
 
   private final AtomicInteger runningTasks = new AtomicInteger(0);
 
-  private final ReentrantLock lock = new ReentrantLock();
-  private final Condition condition = lock.newCondition();
+  private final ReentrantLock lock;
+  private final Condition condition;
 
   private volatile Throwable unknownError;
 
   /**
-   * Demand created IO Statistics: only if the filesystem
-   * returns statistics does this fetch collect them.
+   * 按需创建的IO统计信息：仅当文件系统返回统计信息时才收集
    */
   private IOStatisticsSnapshot iostats;
 
   /**
-   * Instantiate.
-   * The newApi switch is only used to configure what exception is raised
-   * on failure of {@link #getFileStatuses()}, it does not change the algorithm.
-   * @param conf configuration for the job
-   * @param dirs the initial list of paths
-   * @param recursive whether to traverse the paths recursively
-   * @param inputFilter inputFilter to apply to the resulting paths
-   * @param newApi whether using the mapred or mapreduce API
-   * @throws InterruptedException
-   * @throws IOException
+   * 构造LocatedFileStatusFetcher实例
+   * newApi参数仅用于配置getFileStatuses()失败时抛出的异常类型，不改变算法逻辑
+   * @param conf 作业配置对象
+   * @param dirs 初始输入路径列表
+   * @param recursive 是否递归遍历子路径
+   * @param inputFilter 结果路径过滤器
+   * @param newApi 是否使用mapreduce新API（决定异常类型）
+   * @throws InterruptedException 线程中断异常
+   * @throws IOException IO异常
    */
   public LocatedFileStatusFetcher(Configuration conf, Path[] dirs,
       boolean recursive, PathFilter inputFilter, boolean newApi)
       throws InterruptedException, IOException {
+    // 从配置读取并行线程数，使用默认值兜底
     int numThreads = conf.getInt(FileInputFormat.LIST_STATUS_NUM_THREADS,
         FileInputFormat.DEFAULT_LIST_STATUS_NUM_THREADS);
     LOG.debug("Instantiated LocatedFileStatusFetcher with {} threads",
         numThreads);
+    // 创建固定大小线程池，使用守护线程
     rawExec = HadoopExecutors.newFixedThreadPool(
         numThreads,
         new ThreadFactoryBuilder().setDaemon(true)
             .setNameFormat("GetFileInfo #%d").build());
+    // 包装为支持ListenableFuture的执行器
     exec = MoreExecutors.listeningDecorator(rawExec);
     resultQueue = new LinkedBlockingQueue<>();
+    // 初始化成员变量
     this.conf = conf;
     this.inputDirs = dirs;
     this.recursive = recursive;
     this.inputFilter = inputFilter;
     this.newApi = newApi;
+    this.lock = new ReentrantLock();
+    this.condition = lock.newCondition();
   }
 
   /**
-   * Start executing and return FileStatuses based on the parameters specified.
-   * @return fetched file statuses
-   * @throws InterruptedException interruption waiting for results.
-   * @throws IOException IO failure or other error.
-   * @throws InvalidInputException on an invalid input and the old API
-   * @throws org.apache.hadoop.mapreduce.lib.input.InvalidInputException on an
-   *         invalid input and the new API.
+   * 启动获取流程并返回所有获取到的文件状态信息
+   * @return 所有输入文件的FileStatus可迭代对象
+   * @throws InterruptedException 等待结果时线程中断
+   * @throws IOException IO失败或其他错误
+   * @throws InvalidInputException 使用旧API时输入无效抛出
+   * @throws org.apache.hadoop.mapreduce.lib.input.InvalidInputException 使用新API时输入无效抛出
    */
   public Iterable<FileStatus> getFileStatuses() throws InterruptedException,
       IOException {
-    // Increment to make sure a race between the first thread completing and the
-    // rest being scheduled does not lead to a termination.
+    // 增加计数，避免第一个线程完成后其余线程尚未调度导致提前终止
     runningTasks.incrementAndGet();
+    // 提交所有初始输入路径处理任务
     for (Path p : inputDirs) {
       LOG.debug("Queuing scan of directory {}", p);
       runningTasks.incrementAndGet();
@@ -157,23 +159,25 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
           MoreExecutors.directExecutor());
     }
 
+    // 减去初始增加的计数
     runningTasks.decrementAndGet();
 
+    // 加锁等待所有任务完成
     lock.lock();
     try {
       LOG.debug("Waiting scan completion");
+      // 仍有任务在运行且未出现错误时持续等待
       while (runningTasks.get() != 0 && unknownError == null) {
         condition.await();
       }
     } finally {
       lock.unlock();
-      // either the scan completed or an error was raised.
-      // in the case of an error shutting down the executor will interrupt all
-      // active threads, which can add noise to the logs.
+      // 无论扫描完成还是出错，都关闭执行器
       LOG.debug("Scan complete: shutting down");
       this.exec.shutdownNow();
     }
 
+    // 如果出现未知错误，按类型抛出对应异常
     if (this.unknownError != null) {
       LOG.debug("Scan failed", this.unknownError);
       if (this.unknownError instanceof Error) {
@@ -188,6 +192,7 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
         throw new IOException(this.unknownError);
       }
     }
+    // 如果存在输入错误，按API版本抛出对应异常
     if (!this.invalidInputErrors.isEmpty()) {
       LOG.debug("Invalid Input Errors raised");
       for (IOException error : invalidInputErrors) {
@@ -200,12 +205,13 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
         throw new InvalidInputException(invalidInputErrors);
       }
     }
+    // 拼接所有结果返回
     return Iterables.concat(resultQueue);
   }
 
   /**
-   * Collect misconfigured Input errors. Errors while actually reading file info
-   * are reported immediately.
+   * 注册输入配置错误，仅收集不立即抛出，最后统一返回
+   * @param errors 输入错误列表
    */
   private void registerInvalidInputError(List<IOException> errors) {
     synchronized (this) {
@@ -214,8 +220,8 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
   }
 
   /**
-   * Register fatal errors - example an IOException while accessing a file or a
-   * full execution queue.
+   * 注册致命错误，如访问文件时的IOException、执行队列满等，会终止整个获取流程
+   * @param t 抛出的错误/异常对象
    */
   private void registerError(Throwable t) {
     LOG.debug("Error", t);
@@ -231,6 +237,9 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
     }
   }
 
+  /**
+   * 减少正在运行任务计数，并检查是否所有任务完成，完成则唤醒等待主线程
+   */
   private void decrementRunningAndCheckCompletion() {
     lock.lock();
     try {
@@ -243,8 +252,8 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
   }
 
   /**
-   * Return any IOStatistics collected during listing.
-   * @return IO stats accrued.
+   * 获取列举过程中收集的IO统计信息
+   * @return 收集到的IO统计信息
    */
   @Override
   public synchronized IOStatistics getIOStatistics() {
@@ -252,18 +261,19 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
   }
 
   /**
-   * Add the statistics of an individual thread's scan.
-   * @param stats possibly null statistics.
+   * 合并单个线程扫描得到的IO统计信息到整体统计
+   * @param stats 单个线程的IO统计信息，可为null
    */
   private void addResultStatistics(IOStatistics stats) {
     if (stats != null) {
-      // demand creation of IO statistics.
+      // 按需创建IO统计对象
       synchronized (this) {
         LOG.debug("Adding IOStatistics: {}", stats);
         if (iostats == null) {
-          // demand create the statistics
+          // 第一次添加时创建快照
           iostats = snapshotIOStatistics(stats);
         } else {
+          // 后续聚合统计信息
           iostats.aggregate(stats);
         }
       }
@@ -282,8 +292,7 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
   }
 
   /**
-   * Retrieves block locations for the given @link {@link FileStatus}, and adds
-   * additional paths to the process queue if required.
+   * 处理单个目录/文件的Callable任务，获取文件块位置信息，递归目录则添加新任务到队列
    */
   private static class ProcessInputDirCallable implements
       Callable<ProcessInputDirCallable.Result> {
@@ -307,31 +316,40 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
       result.fs = fs;
       LOG.debug("ProcessInputDirCallable {}", fileStatus);
       try {
+        // 当前是目录，遍历目录下所有文件
         if (fileStatus.isDirectory()) {
           RemoteIterator<LocatedFileStatus> iter = fs
               .listLocatedStatus(fileStatus.getPath());
           while (iter.hasNext()) {
             LocatedFileStatus stat = iter.next();
+            // 过滤路径
             if (inputFilter.accept(stat.getPath())) {
+              // 需要递归且当前是目录，添加到待递归目录列表
               if (recursive && stat.isDirectory()) {
                 result.dirsNeedingRecursiveCalls.add(stat);
               } else {
+                // 是文件，添加到结果列表，压缩状态节省空间
                 result.locatedFileStatuses.add(org.apache.hadoop.mapreduce.lib.
                     input.FileInputFormat.shrinkStatus(stat));
               }
             }
           }
-          // aggregate any stats
+          // 收集迭代器返回的IO统计信息
           result.stats = retrieveIOStatistics(iter);
         } else {
+          // 当前是文件，直接添加到结果
           result.locatedFileStatuses.add(fileStatus);
         }
       } catch (FileNotFoundException e) {
+        // 根据配置决定是否忽略不存在的目录，不忽略则抛出异常
         maybeIgnoreMissingDirectory(fs, fileStatus.getPath(), e);
       }
       return result;
     }
 
+    /**
+     * ProcessInputDirCallable处理结果容器
+     */
     private static class Result {
       private List<FileStatus> locatedFileStatuses = new LinkedList<>();
       private List<FileStatus> dirsNeedingRecursiveCalls = new LinkedList<>();
@@ -341,9 +359,7 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
   }
 
   /**
-   * The callback handler to handle results generated by
-   * {@link ProcessInputDirCallable}. This populates the final result set.
-   * 
+   * ProcessInputDirCallable任务结果回调处理器，将结果放入结果队列，并提交新的递归目录处理任务
    */
   private class ProcessInputDirCallback implements
       FutureCallback<ProcessInputDirCallable.Result> {
@@ -351,10 +367,13 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
     @Override
     public void onSuccess(ProcessInputDirCallable.Result result) {
       try {
+        // 合并IO统计信息
         addResultStatistics(result.stats);
+        // 将文件结果放入结果队列
         if (!result.locatedFileStatuses.isEmpty()) {
           resultQueue.add(result.locatedFileStatuses);
         }
+        // 提交待递归目录的处理任务
         if (!result.dirsNeedingRecursiveCalls.isEmpty()) {
           for (FileStatus fileStatus : result.dirsNeedingRecursiveCalls) {
             LOG.debug("Queueing directory scan {}", fileStatus.getPath());
@@ -366,23 +385,23 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
                 MoreExecutors.directExecutor());
           }
         }
+        // 减少任务计数，检查是否完成
         decrementRunningAndCheckCompletion();
-      } catch (Throwable t) { // Error within the callback itself.
+      } catch (Throwable t) { // 回调本身出现错误
         registerError(t);
       }
     }
 
     @Override
     public void onFailure(Throwable t) {
-      // Any generated exceptions. Leads to immediate termination.
+      // 任务执行失败，注册致命错误终止整个流程
       registerError(t);
     }
   }
 
 
   /**
-   * Processes an initial Input Path pattern through the globber and PathFilter
-   * to generate a list of files which need further processing.
+   * 处理初始输入路径的Callable任务，通过通配符匹配和路径过滤生成待处理文件列表
    */
   private static class ProcessInitialInputPathCallable implements
       Callable<ProcessInitialInputPathCallable.Result> {
@@ -401,21 +420,28 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
     @Override
     public Result call() throws Exception {
       Result result = new Result();
+      // 获取路径对应的文件系统
       FileSystem fs = path.getFileSystem(conf);
       result.fs = fs;
       LOG.debug("ProcessInitialInputPathCallable path {}", path);
+      // 通配符匹配得到符合条件的文件状态
       FileStatus[] matches = fs.globStatus(path, inputFilter);
+      // 匹配结果为空，添加输入错误
       if (matches == null) {
         result.addError(new IOException("Input path does not exist: " + path));
       } else if (matches.length == 0) {
         result.addError(new IOException("Input Pattern " + path
             + " matches 0 files"));
       } else {
+        // 保存匹配到的结果
         result.matchedFileStatuses = matches;
       }
       return result;
     }
 
+    /**
+     * ProcessInitialInputPathCallable处理结果容器
+     */
     private static class Result {
       private List<IOException> errors;
       private FileStatus[] matchedFileStatuses;
@@ -431,9 +457,7 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
   }
 
   /**
-   * The callback handler to handle results generated by
-   * {@link ProcessInitialInputPathCallable}.
-   * 
+   * ProcessInitialInputPathCallable任务结果回调处理器，处理初始路径匹配结果，提交后续文件处理任务
    */
   private class ProcessInitialInputPathCallback implements
       FutureCallback<ProcessInitialInputPathCallable.Result> {
@@ -441,35 +465,8 @@ public class LocatedFileStatusFetcher implements IOStatisticsSource {
     @Override
     public void onSuccess(ProcessInitialInputPathCallable.Result result) {
       try {
+        // 注册输入错误
         if (result.errors != null) {
           registerInvalidInputError(result.errors);
         }
-        if (result.matchedFileStatuses != null) {
-          for (FileStatus matched : result.matchedFileStatuses) {
-            runningTasks.incrementAndGet();
-            ListenableFuture<ProcessInputDirCallable.Result> future = exec
-                .submit(new ProcessInputDirCallable(result.fs, matched,
-                    recursive, inputFilter));
-            Futures.addCallback(future, processInputDirCallback,
-                MoreExecutors.directExecutor());
-          }
-        }
-        decrementRunningAndCheckCompletion();
-      } catch (Throwable t) { // Exception within the callback
-        registerError(t);
-      }
-    }
-
-    @Override
-    public void onFailure(Throwable t) {
-      // Any generated exceptions. Leads to immediate termination.
-      registerError(t);
-    }
-  }
-
-  @VisibleForTesting
-  ListeningExecutorService getListeningExecutorService() {
-    return exec;
-  }
-
-}
+        // 遍历匹配到的结果，提交每个文件/目录处理任务

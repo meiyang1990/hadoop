@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -52,82 +53,79 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * We keep an in-memory representation of the file/block hierarchy.
- * This is a base INode class containing common fields for file and 
- * directory inodes.
+ * 文件系统目录树节点的抽象基类，HDFS NameNode在内存中维护文件/块层级结构的核心数据结构，
+ * 封装了文件、目录、符号链接等不同类型节点共有的属性和操作。
  */
 @InterfaceAudience.Private
 public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
   public static final Logger LOG = LoggerFactory.getLogger(INode.class);
 
-  /** parent is either an {@link INodeDirectory} or an {@link INodeReference}.*/
+  /** 父节点，可以是普通目录INodeDirectory，也可以是引用节点INodeReference（用于快照重命名场景）*/
   private INode parent = null;
 
   INode(INode parent) {
     this.parent = parent;
   }
 
-  /** Get inode id */
+  /** 获取当前inode的唯一标识ID */
   public abstract long getId();
 
   /**
-   * Check whether this is the root inode.
+   * 检查当前节点是否是根目录节点
    */
   final boolean isRoot() {
     return getLocalNameBytes().length == 0;
   }
 
-  /** Get the {@link PermissionStatus} */
+  /** 获取指定快照版本下的权限状态 */
   public abstract PermissionStatus getPermissionStatus(int snapshotId);
 
-  /** The same as getPermissionStatus(null). */
+  /** 获取当前状态下的权限状态 */
   final PermissionStatus getPermissionStatus() {
     return getPermissionStatus(Snapshot.CURRENT_STATE_ID);
   }
 
   /**
-   * @param snapshotId
-   *          if it is not {@link Snapshot#CURRENT_STATE_ID}, get the result
-   *          from the given snapshot; otherwise, get the result from the
-   *          current inode.
-   * @return user name
+   * 获取指定快照版本下的用户名
+   * @param snapshotId 快照ID，如果不是CURRENT_STATE_ID则从指定快照获取，否则从当前节点获取
+   * @return 用户名
    */
   abstract String getUserName(int snapshotId);
 
-  /** The same as getUserName(Snapshot.CURRENT_STATE_ID). */
   @Override
   public final String getUserName() {
     return getUserName(Snapshot.CURRENT_STATE_ID);
   }
 
-  /** Set user */
+  /** 设置用户名 */
   abstract void setUser(String user);
 
-  /** Set user */
+  /**
+   * 支持快照版本的用户名设置，先记录修改到快照再更新
+   */
   final INode setUser(String user, int latestSnapshotId) {
     recordModification(latestSnapshotId);
     setUser(user);
     return this;
   }
   /**
-   * @param snapshotId
-   *          if it is not {@link Snapshot#CURRENT_STATE_ID}, get the result
-   *          from the given snapshot; otherwise, get the result from the
-   *          current inode.
-   * @return group name
+   * 获取指定快照版本下的用户组名
+   * @param snapshotId 快照ID，如果不是CURRENT_STATE_ID则从指定快照获取，否则从当前节点获取
+   * @return 用户组名
    */
   abstract String getGroupName(int snapshotId);
 
-  /** The same as getGroupName(Snapshot.CURRENT_STATE_ID). */
   @Override
   public final String getGroupName() {
     return getGroupName(Snapshot.CURRENT_STATE_ID);
   }
 
-  /** Set group */
+  /** 设置用户组 */
   abstract void setGroup(String group);
 
-  /** Set group */
+  /**
+   * 支持快照版本的用户组设置，先记录修改到快照再更新
+   */
   final INode setGroup(String group, int latestSnapshotId) {
     recordModification(latestSnapshotId);
     setGroup(group);
@@ -135,30 +133,30 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
   }
 
   /**
-   * @param snapshotId
-   *          if it is not {@link Snapshot#CURRENT_STATE_ID}, get the result
-   *          from the given snapshot; otherwise, get the result from the
-   *          current inode.
-   * @return permission.
+   * 获取指定快照版本下的权限
+   * @param snapshotId 快照ID，如果不是CURRENT_STATE_ID则从指定快照获取，否则从当前节点获取
+   * @return 权限对象
    */
   abstract FsPermission getFsPermission(int snapshotId);
   
-  /** The same as getFsPermission(Snapshot.CURRENT_STATE_ID). */
   @Override
   public final FsPermission getFsPermission() {
     return getFsPermission(Snapshot.CURRENT_STATE_ID);
   }
 
-  /** Set the {@link FsPermission} of this {@link INode} */
+  /** 设置当前节点权限 */
   abstract void setPermission(FsPermission permission);
 
-  /** Set the {@link FsPermission} of this {@link INode} */
+  /**
+   * 支持快照版本的权限设置，先记录修改到快照再更新
+   */
   INode setPermission(FsPermission permission, int latestSnapshotId) {
     recordModification(latestSnapshotId);
     setPermission(permission);
     return this;
   }
 
+  /** 获取指定快照版本下的ACL特性 */
   abstract AclFeature getAclFeature(int snapshotId);
 
   @Override
@@ -166,16 +164,24 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
     return getAclFeature(Snapshot.CURRENT_STATE_ID);
   }
 
+  /** 添加ACL特性 */
   abstract void addAclFeature(AclFeature aclFeature);
 
+  /**
+   * 支持快照版本的ACL特性添加，先记录修改到快照再添加
+   */
   final INode addAclFeature(AclFeature aclFeature, int latestSnapshotId) {
     recordModification(latestSnapshotId);
     addAclFeature(aclFeature);
     return this;
   }
 
+  /** 移除ACL特性 */
   abstract void removeAclFeature();
 
+  /**
+   * 支持快照版本的ACL特性移除，先记录修改到快照再移除
+   */
   final INode removeAclFeature(int latestSnapshotId) {
     recordModification(latestSnapshotId);
     removeAclFeature();
@@ -183,11 +189,9 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
   }
 
   /**
-   * @param snapshotId
-   *          if it is not {@link Snapshot#CURRENT_STATE_ID}, get the result
-   *          from the given snapshot; otherwise, get the result from the
-   *          current inode.
-   * @return XAttrFeature
+   * 获取指定快照版本下的XAttr扩展属性特性
+   * @param snapshotId 快照ID，如果不是CURRENT_STATE_ID则从指定快照获取，否则从当前节点获取
+   * @return XAttr特性对象
    */  
   abstract XAttrFeature getXAttrFeature(int snapshotId);
   
@@ -196,22 +200,24 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
     return getXAttrFeature(Snapshot.CURRENT_STATE_ID);
   }
   
-  /**
-   * Set <code>XAttrFeature</code> 
-   */
+  /** 添加XAttr扩展属性特性 */
   abstract void addXAttrFeature(XAttrFeature xAttrFeature);
   
+  /**
+   * 支持快照版本的XAttr特性添加，先记录修改到快照再添加
+   */
   final INode addXAttrFeature(XAttrFeature xAttrFeature, int latestSnapshotId) {
     recordModification(latestSnapshotId);
     addXAttrFeature(xAttrFeature);
     return this;
   }
   
-  /**
-   * Remove <code>XAttrFeature</code> 
-   */
+  /** 移除XAttr扩展属性特性 */
   abstract void removeXAttrFeature();
   
+  /**
+   * 支持快照版本的XAttr特性移除，先记录修改到快照再移除
+   */
   final INode removeXAttrFeature(int lastestSnapshotId) {
     recordModification(lastestSnapshotId);
     removeXAttrFeature();
@@ -219,21 +225,21 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
   }
   
   /**
-   * @return if the given snapshot id is {@link Snapshot#CURRENT_STATE_ID},
-   *         return this; otherwise return the corresponding snapshot inode.
+   * 获取指定快照ID对应的inode，如果是当前状态则返回自身，否则返回对应快照版本节点
+   * @return 对应版本的inode属性对象
    */
   public INodeAttributes getSnapshotINode(final int snapshotId) {
     return this;
   }
 
-  /** Is this inode in the current state? */
+  /** 检查当前节点是否存在于文件系统当前状态（未被删除） */
   public boolean isInCurrentState() {
     if (isRoot()) {
       return true;
     }
     final INodeDirectory parentDir = getParent();
     if (parentDir == null) {
-      return false; // this inode is only referenced in snapshots
+      return false; // 该节点仅存在于快照中，当前状态已被删除
     }
     if (!parentDir.isInCurrentState()) {
       return false;
@@ -247,14 +253,13 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
         this.equals(child.asReference().getReferredINode());
   }
 
-  /** Is this inode in the latest snapshot? */
+  /** 检查当前节点是否存在于指定最新快照中 */
   public final boolean isInLatestSnapshot(final int latestSnapshotId) {
     if (latestSnapshotId == Snapshot.CURRENT_STATE_ID ||
         latestSnapshotId == Snapshot.NO_SNAPSHOT_ID) {
       return false;
     }
-    // if parent is a reference node, parent must be a renamed node. We can 
-    // stop the check at the reference node.
+    // 如果父节点已经是引用节点，说明经过重命名，直接判定存在
     if (parent != null && parent.isReference()) {
       return true;
     }
@@ -273,7 +278,7 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
         this == child.asReference().getReferredINode();
   }
   
-  /** @return true if the given inode is an ancestor directory of this inode. */
+  /** 检查给定目录是否是当前节点的祖先目录 */
   public final boolean isAncestorDirectory(final INodeDirectory dir) {
     for(INodeDirectory p = getParent(); p != null; p = p.getParent()) {
       if (p == dir) {
@@ -284,16 +289,10 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
   }
 
   /**
-   * When {@link #recordModification} is called on a referred node,
-   * this method tells which snapshot the modification should be
-   * associated with: the snapshot that belongs to the SRC tree of the rename
-   * operation, or the snapshot belonging to the DST tree.
-   * 
-   * @param latestInDst
-   *          id of the latest snapshot in the DST tree above the reference node
-   * @return True: the modification should be recorded in the snapshot that
-   *         belongs to the SRC tree. False: the modification should be
-   *         recorded in the snapshot that belongs to the DST tree.
+   * 判断被引用节点的修改应该记录到源树快照还是目标树快照
+   * 用于重命名操作产生的引用节点场景下的快照修改记录规则
+   * @param latestInDst 引用节点上方目标树的最新快照ID
+   * @return true表示修改记录到源树快照，false表示记录到目标树快照
    */
   public final boolean shouldRecordInSrcSnapshot(final int latestInDst) {
     Preconditions.checkState(!isReference());
@@ -313,35 +312,31 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
   }
 
   /**
-   * This inode is being modified.  The previous version of the inode needs to
-   * be recorded in the latest snapshot.
-   *
-   * @param latestSnapshotId The id of the latest snapshot that has been taken.
-   *                         Note that it is {@link Snapshot#CURRENT_STATE_ID} 
-   *                         if no snapshots have been taken.
+   * 记录inode修改，将修改前版本保存到最新快照中，用于支持快照功能
+   * @param latestSnapshotId 最新快照ID，如果没有快照则为CURRENT_STATE_ID
    */
   abstract void recordModification(final int latestSnapshotId);
 
-  /** Check whether it's a reference. */
+  /** 检查当前节点是否是引用节点 */
   public boolean isReference() {
     return false;
   }
 
-  /** Cast this inode to an {@link INodeReference}.  */
+  /** 将当前节点转换为INodeReference类型，非引用节点调用会抛出异常 */
   public INodeReference asReference() {
     throw new IllegalStateException("Current inode is not a reference: "
         + this.toDetailString());
   }
 
   /**
-   * Check whether it's a file.
+   * 检查当前节点是否是文件节点
    */
   public boolean isFile() {
     return false;
   }
 
   /**
-   * Check if this inode itself has a storage policy set.
+   * 检查当前节点自身是否设置了存储策略
    */
   public boolean isSetStoragePolicy() {
     if (isSymlink()) {
@@ -350,108 +345,55 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
     return getLocalStoragePolicyID() != HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED;
   }
 
-  /** Cast this inode to an {@link INodeFile}.  */
+  /** 将当前节点转换为INodeFile类型，非文件节点调用会抛出异常 */
   public INodeFile asFile() {
     throw new IllegalStateException("Current inode is not a file: "
         + this.toDetailString());
   }
 
   /**
-   * Check whether it's a directory
+   * 检查当前节点是否是目录节点
    */
   public boolean isDirectory() {
     return false;
   }
 
-  /** Cast this inode to an {@link INodeDirectory}.  */
+  /** 将当前节点转换为INodeDirectory类型，非目录节点调用会抛出异常 */
   public INodeDirectory asDirectory() {
     throw new IllegalStateException("Current inode is not a directory: "
         + this.toDetailString());
   }
 
   /**
-   * Check whether it's a symlink
+   * 检查当前节点是否是符号链接节点
    */
   public boolean isSymlink() {
     return false;
   }
 
-  /** Cast this inode to an {@link INodeSymlink}.  */
+  /** 将当前节点转换为INodeSymlink类型，非符号链接节点调用会抛出异常 */
   public INodeSymlink asSymlink() {
     throw new IllegalStateException("Current inode is not a symlink: "
         + this.toDetailString());
   }
 
   /**
-   * Clean the subtree under this inode and collect the blocks from the descents
-   * for further block deletion/update. The current inode can either resides in
-   * the current tree or be stored as a snapshot copy.
-   * 
-   * <pre>
-   * In general, we have the following rules. 
-   * 1. When deleting a file/directory in the current tree, we have different 
-   * actions according to the type of the node to delete. 
-   * 
-   * 1.1 The current inode (this) is an {@link INodeFile}. 
-   * 1.1.1 If {@code prior} is null, there is no snapshot taken on ancestors 
-   * before. Thus we simply destroy (i.e., to delete completely, no need to save 
-   * snapshot copy) the current INode and collect its blocks for further 
-   * cleansing.
-   * 1.1.2 Else do nothing since the current INode will be stored as a snapshot
-   * copy.
-   * 
-   * 1.2 The current inode is an {@link INodeDirectory}.
-   * 1.2.1 If {@code prior} is null, there is no snapshot taken on ancestors 
-   * before. Similarly, we destroy the whole subtree and collect blocks.
-   * 1.2.2 Else do nothing with the current INode. Recursively clean its 
-   * children.
-   * 
-   * 1.3 The current inode is a file with snapshot.
-   * Call recordModification(..) to capture the current states.
-   * Mark the INode as deleted.
-   * 
-   * 1.4 The current inode is an {@link INodeDirectory} with snapshot feature.
-   * Call recordModification(..) to capture the current states. 
-   * Destroy files/directories created after the latest snapshot 
-   * (i.e., the inodes stored in the created list of the latest snapshot).
-   * Recursively clean remaining children. 
-   *
-   * 2. When deleting a snapshot.
-   * 2.1 To clean {@link INodeFile}: do nothing.
-   * 2.2 To clean {@link INodeDirectory}: recursively clean its children.
-   * 2.3 To clean INodeFile with snapshot: delete the corresponding snapshot in
-   * its diff list.
-   * 2.4 To clean {@link INodeDirectory} with snapshot: delete the corresponding 
-   * snapshot in its diff list. Recursively clean its children.
-   * </pre>
-   *
-   * @param reclaimContext
-   *        Record blocks and inodes that need to be reclaimed.
-   * @param snapshotId
-   *        The id of the snapshot to delete.
-   *        {@link Snapshot#CURRENT_STATE_ID} means to delete the current
-   *        file/directory.
-   * @param priorSnapshotId
-   *        The id of the latest snapshot before the to-be-deleted snapshot.
-   *        When deleting a current inode, this parameter captures the latest
-   *        snapshot.
+   * 清理当前节点下的子树，收集需要删除或更新的块，用于删除操作
+   * 不同类型节点和场景有不同的清理规则，处理当前树删除和快照删除两种场景
+   * @param reclaimContext 回收上下文，记录需要回收的块和inode
+   * @param snapshotId 要删除的快照ID，CURRENT_STATE_ID表示删除当前文件/目录
+   * @param priorSnapshotId 被删除快照之前的最新快照ID，删除当前节点时表示最新快照
    */
   public abstract void cleanSubtree(ReclaimContext reclaimContext,
       final int snapshotId, int priorSnapshotId);
 
   /**
-   * Destroy self and clear everything! If the INode is a file, this method
-   * collects its blocks for further block deletion. If the INode is a
-   * directory, the method goes down the subtree and collects blocks from the
-   * descents, and clears its parent/children references as well. The method
-   * also clears the diff list if the INode contains snapshot diff list.
-   *
-   * @param reclaimContext
-   *        Record blocks and inodes that need to be reclaimed.
+   * 销毁当前节点并收集所有需要删除的块，递归处理子树，清理所有引用和差异列表
+   * @param reclaimContext 回收上下文，记录需要回收的块和inode
    */
   public abstract void destroyAndCollectBlocks(ReclaimContext reclaimContext);
 
-  /** Compute {@link ContentSummary}. Blocking call */
+  /** 计算当前子树的内容摘要，阻塞调用 */
   public final ContentSummary computeContentSummary(
       BlockStoragePolicySuite bsps) throws AccessControlException {
     return computeAndConvertContentSummary(Snapshot.CURRENT_STATE_ID,
@@ -459,7 +401,7 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
   }
 
   /**
-   * Compute {@link ContentSummary}. 
+   * 计算完成后转换为ContentSummary对象返回
    */
   public final ContentSummary computeAndConvertContentSummary(int snapshotId,
       ContentSummaryComputationContext summary) throws AccessControlException {
@@ -485,15 +427,10 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
   }
 
   /**
-   * Count subtree content summary with a {@link ContentCounts}.
-   *
-   * @param snapshotId Specify the time range for the calculation. If this
-   *                   parameter equals to {@link Snapshot#CURRENT_STATE_ID},
-   *                   the result covers both the current states and all the
-   *                   snapshots. Otherwise the result only covers all the
-   *                   files/directories contained in the specific snapshot.
-   * @param summary the context object holding counts for the subtree.
-   * @return The same objects as summary.
+   * 计算指定快照范围内子树的内容摘要
+   * @param snapshotId 计算范围，CURRENT_STATE_ID表示包含当前状态和所有快照，否则仅包含指定快照
+   * @param summary 保存计算结果的上下文对象
+   * @return 计算上下文对象
    */
   public abstract ContentSummaryComputationContext computeContentSummary(
       int snapshotId, ContentSummaryComputationContext summary)
@@ -501,7 +438,7 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
 
 
   /**
-   * Check and add namespace/storagespace/storagetype consumed to itself and the ancestors.
+   * 将空间使用量增量添加到当前节点并向上传播到所有祖先节点
    */
   public void addSpaceConsumed(QuotaCounts counts) {
     if (parent != null) {
@@ -510,8 +447,8 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
   }
 
   /**
-   * Get the quota set for this inode
-   * @return the quota counts.  The count is -1 if it is not set.
+   * 获取当前节点设置的配额信息，未设置则配额值为-1
+   * @return 配额计数对象
    */
   public QuotaCounts getQuotaCounts() {
     return new QuotaCounts.Builder().
@@ -521,681 +458,13 @@ public abstract class INode implements INodeAttributes, Diff.Element<byte[]> {
         build();
   }
 
+  /** 检查当前节点是否设置了配额 */
   public final boolean isQuotaSet() {
     final QuotaCounts qc = getQuotaCounts();
     return qc.anyNsSsCountGreaterOrEqual(0) || qc.anyTypeSpaceCountGreaterOrEqual(0);
   }
 
   /**
-   * Count subtree {@link Quota#NAMESPACE} and {@link Quota#STORAGESPACE} usages.
-   * Entry point for FSDirectory where blockStoragePolicyId is given its initial
-   * value.
+   * 计算当前子树的命名空间和存储空间配额使用量入口方法，初始化存储策略ID
    */
-  public final QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps) {
-    final byte storagePolicyId = isSymlink() ?
-        HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED : getStoragePolicyID();
-    return computeQuotaUsage(bsps, storagePolicyId, true,
-        Snapshot.CURRENT_STATE_ID);
-  }
-
-  /**
-   * Count subtree {@link Quota#NAMESPACE} and {@link Quota#STORAGESPACE} usages.
-   * 
-   * With the existence of {@link INodeReference}, the same inode and its
-   * subtree may be referred by multiple {@link WithName} nodes and a
-   * {@link DstReference} node. To avoid circles while quota usage computation,
-   * we have the following rules:
-   * 
-   * <pre>
-   * 1. For a {@link DstReference} node, since the node must be in the current
-   * tree (or has been deleted as the end point of a series of rename 
-   * operations), we compute the quota usage of the referred node (and its 
-   * subtree) in the regular manner, i.e., including every inode in the current
-   * tree and in snapshot copies, as well as the size of diff list.
-   * 
-   * 2. For a {@link WithName} node, since the node must be in a snapshot, we 
-   * only count the quota usage for those nodes that still existed at the 
-   * creation time of the snapshot associated with the {@link WithName} node.
-   * We do not count in the size of the diff list.
-   * </pre>
-   *
-   * @param bsps Block storage policy suite to calculate intended storage type usage
-   * @param blockStoragePolicyId block storage policy id of the current INode
-   * @param useCache Whether to use cached quota usage. Note that 
-   *                 {@link WithName} node never uses cache for its subtree.
-   * @param lastSnapshotId {@link Snapshot#CURRENT_STATE_ID} indicates the 
-   *                       computation is in the current tree. Otherwise the id
-   *                       indicates the computation range for a 
-   *                       {@link WithName} node.
-   * @return The subtree quota counts.
-   */
-  public abstract QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
-      byte blockStoragePolicyId, boolean useCache, int lastSnapshotId);
-
-  public final QuotaCounts computeQuotaUsage(BlockStoragePolicySuite bsps,
-      boolean useCache) {
-    final byte storagePolicyId = isSymlink() ?
-        HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED : getStoragePolicyID();
-    return computeQuotaUsage(bsps, storagePolicyId, useCache,
-        Snapshot.CURRENT_STATE_ID);
-  }
-
-  /**
-   * @return null if the local name is null; otherwise, return the local name.
-   */
-  public final String getLocalName() {
-    final byte[] name = getLocalNameBytes();
-    return name == null? null: DFSUtil.bytes2String(name);
-  }
-
-  @Override
-  public final byte[] getKey() {
-    return getLocalNameBytes();
-  }
-
-  /**
-   * Set local file name
-   */
-  public abstract void setLocalName(byte[] name);
-
-  public String getFullPathName() {
-    // Get the full path name of this inode.
-    if (isRoot()) {
-      return Path.SEPARATOR;
-    }
-    // compute size of needed bytes for the path
-    int idx = 0;
-    for (INode inode = this; inode != null; inode = inode.getParent()) {
-      // add component + delimiter (if not tail component)
-      idx += inode.getLocalNameBytes().length + (inode != this ? 1 : 0);
-    }
-    byte[] path = new byte[idx];
-    for (INode inode = this; inode != null; inode = inode.getParent()) {
-      if (inode != this) {
-        path[--idx] = Path.SEPARATOR_CHAR;
-      }
-      byte[] name = inode.getLocalNameBytes();
-      idx -= name.length;
-      System.arraycopy(name, 0, path, idx, name.length);
-    }
-    return DFSUtil.bytes2String(path);
-  }
-
-  public boolean isDeleted() {
-    INode pInode = this;
-    while (pInode != null && !pInode.isRoot()) {
-      pInode = pInode.getParent();
-    }
-    if (pInode == null) {
-      return true;
-    } else {
-      return !pInode.isRoot();
-    }
-  }
-
-  public byte[][] getPathComponents() {
-    int n = 0;
-    for (INode inode = this; inode != null; inode = inode.getParent()) {
-      n++;
-    }
-    byte[][] components = new byte[n][];
-    for (INode inode = this; inode != null; inode = inode.getParent()) {
-      components[--n] = inode.getLocalNameBytes();
-    }
-    return components;
-  }
-
-  @Override
-  public String toString() {
-    return getLocalName();
-  }
-
-  @VisibleForTesting
-  public final String getObjectString() {
-    return getClass().getSimpleName() + "@"
-        + Integer.toHexString(super.hashCode());
-  }
-
-  /** @return a string description of the parent. */
-  @VisibleForTesting
-  public final String getParentString() {
-    final INodeReference parentRef = getParentReference();
-    if (parentRef != null) {
-      return "parentRef=" + parentRef.getLocalName() + "->";
-    } else {
-      final INodeDirectory parentDir = getParent();
-      if (parentDir != null) {
-        return "parentDir=" + parentDir.getLocalName() + "/";
-      } else {
-        return "parent=null";
-      }
-    }
-  }
-
-  @VisibleForTesting
-  public String getFullPathAndObjectString() {
-    return getFullPathName() + "(" + getId() + ", " + getObjectString() + ")";
-  }
-
-  @VisibleForTesting
-  public String toDetailString() {
-    return toString() + "(" + getId() + ", " + getObjectString()
-        + ", " + getParentString() + ")";
-  }
-
-  /** @return the parent directory */
-  public final INodeDirectory getParent() {
-    return parent == null? null
-        : parent.isReference()? getParentReference().getParent(): parent.asDirectory();
-  }
-
-  /**
-   * @return the parent as a reference if this is a referred inode;
-   *         otherwise, return null.
-   */
-  public INodeReference getParentReference() {
-    return parent == null || !parent.isReference()? null: (INodeReference)parent;
-  }
-
-  /**
-   * @return true if this is a reference and the reference count is 1;
-   *         otherwise, return false.
-   */
-  public boolean isLastReference() {
-    final INodeReference ref = getParentReference();
-    if (!(ref instanceof WithCount)) {
-      return false;
-    }
-    return ((WithCount)ref).getReferenceCount() == 1;
-  }
-
-  /** Set parent directory */
-  public final void setParent(INodeDirectory parent) {
-    this.parent = parent;
-  }
-
-  /** Set container. */
-  public final void setParentReference(INodeReference parent) {
-    this.parent = parent;
-  }
-
-  /** Clear references to other objects. */
-  public void clear() {
-    setParent(null);
-  }
-
-  /**
-   * @param snapshotId
-   *          if it is not {@link Snapshot#CURRENT_STATE_ID}, get the result
-   *          from the given snapshot; otherwise, get the result from the
-   *          current inode.
-   * @return modification time.
-   */
-  abstract long getModificationTime(int snapshotId);
-
-  /** The same as getModificationTime(Snapshot.CURRENT_STATE_ID). */
-  @Override
-  public final long getModificationTime() {
-    return getModificationTime(Snapshot.CURRENT_STATE_ID);
-  }
-
-  /** Update modification time if it is larger than the current value. */
-  public abstract INode updateModificationTime(long mtime, int latestSnapshotId);
-
-  /** Set the last modification time of inode. */
-  public abstract void setModificationTime(long modificationTime);
-
-  /** Set the last modification time of inode. */
-  public final INode setModificationTime(long modificationTime,
-      int latestSnapshotId) {
-    recordModification(latestSnapshotId);
-    setModificationTime(modificationTime);
-    return this;
-  }
-
-  /**
-   * @param snapshotId
-   *          if it is not {@link Snapshot#CURRENT_STATE_ID}, get the result
-   *          from the given snapshot; otherwise, get the result from the
-   *          current inode.
-   * @return access time
-   */
-  abstract long getAccessTime(int snapshotId);
-
-  /** The same as getAccessTime(Snapshot.CURRENT_STATE_ID). */
-  @Override
-  public final long getAccessTime() {
-    return getAccessTime(Snapshot.CURRENT_STATE_ID);
-  }
-
-  /**
-   * Set last access time of inode.
-   */
-  public abstract void setAccessTime(long accessTime);
-
-  /**
-   * Set last access time of inode.
-   */
-  public final INode setAccessTime(long accessTime, int latestSnapshotId,
-      boolean skipCaptureAccessTimeOnlyChangeInSnapshot) {
-    if (!skipCaptureAccessTimeOnlyChangeInSnapshot) {
-      recordModification(latestSnapshotId);
-    }
-    setAccessTime(accessTime);
-    return this;
-  }
-
-  /**
-   * @return the latest block storage policy id of the INode. Specifically,
-   * if a storage policy is directly specified on the INode then return the ID
-   * of that policy. Otherwise follow the latest parental path and return the
-   * ID of the first specified storage policy.
-   */
-  public abstract byte getStoragePolicyID();
-
-  /**
-   * @return the storage policy directly specified on the INode. Return
-   * {@link HdfsConstants#BLOCK_STORAGE_POLICY_ID_UNSPECIFIED} if no policy has
-   * been specified.
-   */
-  public abstract byte getLocalStoragePolicyID();
-
-  /**
-   * Get the storage policy ID while computing quota usage
-   * @param parentStoragePolicyId the storage policy ID of the parent directory
-   * @return the storage policy ID of this INode. Note that for an
-   * {@link INodeSymlink} we return {@link HdfsConstants#BLOCK_STORAGE_POLICY_ID_UNSPECIFIED}
-   * instead of throwing Exception
-   */
-  public byte getStoragePolicyIDForQuota(byte parentStoragePolicyId) {
-    byte localId = isSymlink() ?
-        HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED : getLocalStoragePolicyID();
-    return localId != HdfsConstants.BLOCK_STORAGE_POLICY_ID_UNSPECIFIED ?
-        localId : parentStoragePolicyId;
-  }
-
-  /**
-   * Breaks {@code path} into components.
-   * @return array of byte arrays each of which represents
-   * a single path component.
-   */
-  @VisibleForTesting
-  public static byte[][] getPathComponents(String path) {
-    checkAbsolutePath(path);
-    return DFSUtil.getPathComponents(path);
-  }
-
-  /**
-   * Splits an absolute {@code path} into an array of path components.
-   * @throws AssertionError if the given path is invalid.
-   * @return array of path components.
-   */
-  public static String[] getPathNames(String path) {
-    checkAbsolutePath(path);
-    return StringUtils.split(path, Path.SEPARATOR_CHAR);
-  }
-
-  /**
-   * Verifies if the path informed is a valid absolute path.
-   * @param path the absolute path to validate.
-   * @return true if the path is valid.
-   */
-  static boolean isValidAbsolutePath(final String path){
-    return path != null && path.startsWith(Path.SEPARATOR);
-  }
-
-  static void checkAbsolutePath(final String path) {
-    if (!isValidAbsolutePath(path)) {
-      throw new AssertionError("Absolute path required, but got '"
-          + path + "'");
-    }
-  }
-
-  @Override
-  public final int compareTo(byte[] bytes) {
-    return DFSUtilClient.compareBytes(getLocalNameBytes(), bytes);
-  }
-
-  @Override
-  public final boolean equals(Object that) {
-    if (this == that) {
-      return true;
-    }
-    if (!(that instanceof INode)) {
-      return false;
-    }
-    return getId() == ((INode) that).getId();
-  }
-
-  @Override
-  public final int hashCode() {
-    long id = getId();
-    return (int)(id^(id>>>32));  
-  }
-
-  @VisibleForTesting
-  public final StringBuilder dumpParentINodes() {
-    final StringBuilder b = parent == null? new StringBuilder()
-        : parent.dumpParentINodes().append("\n  ");
-    return b.append(toDetailString());
-  }
-
-  /**
-   * Dump the subtree starting from this inode.
-   * @return a text representation of the tree.
-   */
-  @VisibleForTesting
-  public final StringBuffer dumpTreeRecursively() {
-    final StringWriter out = new StringWriter(); 
-    dumpTreeRecursively(new PrintWriter(out, true), new StringBuilder(),
-        Snapshot.CURRENT_STATE_ID);
-    return out.getBuffer();
-  }
-
-  @VisibleForTesting
-  public final void dumpTreeRecursively(PrintStream out) {
-    out.println(dumpTreeRecursively().toString());
-  }
-
-  /**
-   * Dump tree recursively.
-   * @param prefix The prefix string that each line should print.
-   */
-  @VisibleForTesting
-  public void dumpTreeRecursively(PrintWriter out, StringBuilder prefix,
-      int snapshotId) {
-    dumpINode(out, prefix, snapshotId);
-  }
-
-  public void dumpINode(PrintWriter out, StringBuilder prefix,
-      int snapshotId) {
-    out.print(prefix);
-    out.print(" ");
-    final String name = getLocalName();
-    out.print(name != null && name.isEmpty()? "/": name);
-    out.print(", isInCurrentState? ");
-    out.print(isInCurrentState());
-    out.print("   (");
-    out.print(getObjectString());
-    out.print("), ");
-    out.print(getParentString());
-    out.print(", " + getPermissionStatus(snapshotId));
-  }
-
-  /**
-   * Information used to record quota usage delta. This data structure is
-   * usually passed along with an operation like {@link #cleanSubtree}. Note
-   * that after the operation the delta counts should be decremented from the
-   * ancestral directories' quota usage.
-   */
-  public static class QuotaDelta {
-    private final QuotaCounts counts;
-    /**
-     * The main usage of this map is to track the quota delta that should be
-     * applied to another path. This usually happens when we reclaim INodes and
-     * blocks while deleting snapshots, and hit an INodeReference. Because the
-     * quota usage for a renamed+snapshotted file/directory is counted in both
-     * the current and historical parents, any change of its quota usage may
-     * need to be propagated along its parent paths both before and after the
-     * rename.
-     */
-    private final Map<INode, QuotaCounts> updateMap;
-
-    /**
-     * When deleting a snapshot we may need to update the quota for directories
-     * with quota feature. This map is used to capture these directories and
-     * their quota usage updates.
-     */
-    private final Map<INodeDirectory, QuotaCounts> quotaDirMap;
-
-    public QuotaDelta() {
-      counts = new QuotaCounts.Builder().build();
-      updateMap = Maps.newHashMap();
-      quotaDirMap = Maps.newHashMap();
-    }
-
-    public void add(QuotaCounts update) {
-      counts.add(update);
-    }
-
-    public void addUpdatePath(INodeReference inode, QuotaCounts update) {
-      QuotaCounts c = updateMap.get(inode);
-      if (c == null) {
-        c = new QuotaCounts.Builder().build();
-        updateMap.put(inode, c);
-      }
-      c.add(update);
-    }
-
-    public void addQuotaDirUpdate(INodeDirectory dir, QuotaCounts update) {
-      Preconditions.checkState(dir.isQuotaSet());
-      QuotaCounts c = quotaDirMap.get(dir);
-      if (c == null) {
-        quotaDirMap.put(dir, update);
-      } else {
-        c.add(update);
-      }
-    }
-
-    public QuotaCounts getCountsCopy() {
-      final QuotaCounts copy = new QuotaCounts.Builder().build();
-      copy.add(counts);
-      return copy;
-    }
-
-    public void setCounts(QuotaCounts c) {
-      this.counts.setNameSpace(c.getNameSpace());
-      this.counts.setStorageSpace(c.getStorageSpace());
-      this.counts.setTypeSpaces(c.getTypeSpaces());
-    }
-
-    public long getNsDelta() {
-      long nsDelta = counts.getNameSpace();
-      for (Map.Entry<INode, QuotaCounts> entry : updateMap.entrySet()) {
-        nsDelta += entry.getValue().getNameSpace();
-      }
-      return nsDelta;
-    }
-
-    public Map<INode, QuotaCounts> getUpdateMap() {
-      return ImmutableMap.copyOf(updateMap);
-    }
-
-    public Map<INodeDirectory, QuotaCounts> getQuotaDirMap() {
-      return ImmutableMap.copyOf(quotaDirMap);
-    }
-  }
-
-  /**
-   * Context object to record blocks and inodes that need to be reclaimed
-   */
-  public static class ReclaimContext {
-    protected final BlockStoragePolicySuite bsps;
-    protected final BlocksMapUpdateInfo collectedBlocks;
-    protected final List<INode> removedINodes;
-    protected final List<Long> removedUCFiles;
-    /** Used to collect quota usage delta */
-    private final QuotaDelta quotaDelta;
-
-    private Snapshot snapshotToBeDeleted = null;
-
-    /**
-     * @param bsps
-     *      block storage policy suite to calculate intended storage type
-     *      usage
-     * @param collectedBlocks
-     *     blocks collected from the descents for further block
-     *     deletion/update will be added to the given map.
-     * @param removedINodes
-     *     INodes collected from the descents for further cleaning up of
-     * @param removedUCFiles INodes whose leases need to be released
-     */
-    public ReclaimContext(
-        BlockStoragePolicySuite bsps, BlocksMapUpdateInfo collectedBlocks,
-        List<INode> removedINodes, List<Long> removedUCFiles) {
-      this.bsps = bsps;
-      this.collectedBlocks = collectedBlocks;
-      this.removedINodes = removedINodes;
-      this.removedUCFiles = removedUCFiles;
-      this.quotaDelta = new QuotaDelta();
-    }
-
-    /**
-     * Set the snapshot to be deleted
-     * for {@link FSEditLogOpCodes#OP_DELETE_SNAPSHOT}.
-     *
-     * @param snapshot the snapshot to be deleted
-     */
-    public void setSnapshotToBeDeleted(Snapshot snapshot) {
-      this.snapshotToBeDeleted = Objects.requireNonNull(
-          snapshot, "snapshot == null");
-    }
-
-    /**
-     * For {@link FSEditLogOpCodes#OP_DELETE_SNAPSHOT},
-     * return the snapshot to be deleted.
-     * For other ops, return {@link Snapshot#CURRENT_STATE_ID}.
-     */
-    public int getSnapshotIdToBeDeleted() {
-      return Snapshot.getSnapshotId(snapshotToBeDeleted);
-    }
-
-    public int getSnapshotIdToBeDeleted(int snapshotId, INode inode) {
-      final int snapshotIdToBeDeleted = getSnapshotIdToBeDeleted();
-      if (snapshotId != snapshotIdToBeDeleted) {
-        LOG.warn("Snapshot changed: current = {}, original = {}, inode: {}",
-            Snapshot.getSnapshotString(snapshotId), snapshotToBeDeleted,
-            inode.toDetailString());
-      }
-      return snapshotIdToBeDeleted;
-    }
-
-    public BlockStoragePolicySuite storagePolicySuite() {
-      return bsps;
-    }
-
-    public BlocksMapUpdateInfo collectedBlocks() {
-      return collectedBlocks;
-    }
-
-    public QuotaDelta quotaDelta() {
-      return quotaDelta;
-    }
-
-    /**
-     * make a copy with the same collectedBlocks, removedINodes, and
-     * removedUCFiles but a new quotaDelta.
-     */
-    public ReclaimContext getCopy() {
-      final ReclaimContext that = new ReclaimContext(
-          bsps, collectedBlocks, removedINodes,
-          removedUCFiles);
-      that.snapshotToBeDeleted = this.snapshotToBeDeleted;
-      return that;
-    }
-  }
-
-  /**
-   * Information used for updating the blocksMap when deleting files.
-   */
-  public static class BlocksMapUpdateInfo {
-    /**
-     * The blocks whose replication factor need to be updated.
-     */
-    public static class UpdatedReplicationInfo {
-      /**
-       * the expected replication after the update.
-       */
-      private final short targetReplication;
-      /**
-       * The block whose replication needs to be updated.
-       */
-      private final BlockInfo block;
-
-      public UpdatedReplicationInfo(short targetReplication, BlockInfo block) {
-        this.targetReplication = targetReplication;
-        this.block = block;
-      }
-
-      public BlockInfo block() {
-        return block;
-      }
-
-      public short targetReplication() {
-        return targetReplication;
-      }
-    }
-    /**
-     * The list of blocks that need to be removed from blocksMap
-     */
-    private final List<BlockInfo> toDeleteList;
-    /**
-     * The list of blocks whose replication factor needs to be adjusted
-     */
-    private final List<UpdatedReplicationInfo> toUpdateReplicationInfo;
-
-    public BlocksMapUpdateInfo() {
-      toDeleteList = new ChunkedArrayList<>();
-      toUpdateReplicationInfo = new ChunkedArrayList<>();
-    }
-    
-    /**
-     * @return The list of blocks that need to be removed from blocksMap
-     */
-    public List<BlockInfo> getToDeleteList() {
-      return toDeleteList;
-    }
-
-    public List<UpdatedReplicationInfo> toUpdateReplicationInfo() {
-      return toUpdateReplicationInfo;
-    }
-
-    /**
-     * Add a to-be-deleted block into the
-     * {@link BlocksMapUpdateInfo#toDeleteList}
-     * @param toDelete the to-be-deleted block
-     */
-    public void addDeleteBlock(BlockInfo toDelete) {
-      assert toDelete != null : "toDelete is null";
-      toDelete.delete();
-      toDeleteList.add(toDelete);
-      // If the file is being truncated
-      // the copy-on-truncate block should also be collected for deletion
-      BlockUnderConstructionFeature uc = toDelete.getUnderConstructionFeature();
-      if(uc == null) {
-        return;
-      }
-      BlockInfo truncateBlock = uc.getTruncateBlock();
-      if(truncateBlock == null || truncateBlock.equals(toDelete)) {
-        return;
-      }
-      addDeleteBlock(truncateBlock);
-    }
-
-    public void addUpdateReplicationFactor(BlockInfo block, short targetRepl) {
-      toUpdateReplicationInfo.add(
-          new UpdatedReplicationInfo(targetRepl, block));
-    }
-    /**
-     * Clear {@link BlocksMapUpdateInfo#toDeleteList}
-     */
-    public void clear() {
-      toDeleteList.clear();
-    }
-  }
-
-  /** Accept a visitor to visit this {@link INode}. */
-  public void accept(NamespaceVisitor visitor, int snapshot) {
-    final Class<?> clazz = visitor != null? visitor.getClass()
-        : NamespaceVisitor.class;
-    throw new UnsupportedOperationException(getClass().getSimpleName()
-        + " does not support " + clazz.getSimpleName());
-  }
-
-  /** 
-   * INode feature such as {@link FileUnderConstructionFeature}
-   * and {@link DirectoryWithQuotaFeature}.
-   */
-  public interface Feature {
-  }
-}
+  public final QuotaCounts computeQuotaUsage(

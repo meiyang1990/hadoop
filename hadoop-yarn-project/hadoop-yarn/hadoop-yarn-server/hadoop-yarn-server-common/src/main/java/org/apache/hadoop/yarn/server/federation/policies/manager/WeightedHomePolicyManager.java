@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -27,15 +28,17 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterPolicyCo
 import java.nio.ByteBuffer;
 
 /**
- * Policy that allows operator to configure "weights" for routing. This picks a
- * {@link WeightedRandomRouterPolicy} for the router and a {@link
- * HomeAMRMProxyPolicy} for the amrmproxy as they are designed to
- * work together.
+ * 加权归属策略管理器，为YARN联邦路由和AMRMProxy阶段预配置加权随机路由策略和归属子集群AM转发策略
+ * 该策略允许集群管理员为不同子集群配置路由权重，将应用提交到应用归属子集群运行
+ * 路由层使用{@link WeightedRandomRouterPolicy}按权重选择子集群，AM转发层使用{@link HomeAMRMProxyPolicy}将请求转发到归属子集群
  */
 public class WeightedHomePolicyManager extends AbstractPolicyManager {
 
   private WeightedPolicyInfo weightedPolicyInfo;
 
+  /**
+   * 构造加权归属策略管理器，硬绑定路由和AMRMProxy使用的策略实现类
+   */
   public WeightedHomePolicyManager() {
     // this structurally hard-codes two compatible policies for Router and
     // AMRMProxy.
@@ -47,7 +50,9 @@ public class WeightedHomePolicyManager extends AbstractPolicyManager {
   @Override
   public SubClusterPolicyConfiguration serializeConf()
       throws FederationPolicyInitializationException {
+    // 将权重配置序列化为ByteBuffer
     ByteBuffer buf = weightedPolicyInfo.toByteBuffer();
+    // 构造并返回子集群策略配置对象
     return SubClusterPolicyConfiguration
         .newInstance(getQueue(), this.getClass().getCanonicalName(), buf);
   }

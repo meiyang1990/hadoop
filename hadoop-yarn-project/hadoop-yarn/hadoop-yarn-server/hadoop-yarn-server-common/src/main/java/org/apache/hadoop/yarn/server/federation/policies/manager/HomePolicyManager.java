@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -29,15 +30,17 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterIdInfo;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterPolicyConfiguration;
 
 /**
- * Policy manager which uses the {@link UniformRandomRouterPolicy} for the
- * Router and {@link HomeAMRMProxyPolicy} as the AMRMProxy policy to find the
- * RM.
+ * 联邦集群归属子集群策略管理器，为路由器使用{@link UniformRandomRouterPolicy}均匀随机路由策略，
+ * 为AMRMProxy使用{@link HomeAMRMProxyPolicy}归属子集群策略查找目标ResourceManager。
  */
 public class HomePolicyManager extends AbstractPolicyManager {
 
-  /** Imaginary configuration to fulfill the super class. */
+  /** 满足父类要求的占位权重策略信息对象 */
   private WeightedPolicyInfo weightedPolicyInfo;
 
+  /**
+   * 构造归属子集群策略管理器，硬编码预设路由和AMRMProxy策略类型
+   */
   public HomePolicyManager() {
 
     weightedPolicyInfo = new WeightedPolicyInfo();
@@ -46,16 +49,23 @@ public class HomePolicyManager extends AbstractPolicyManager {
     weightedPolicyInfo.setAMRMPolicyWeights(
         Collections.singletonMap(new SubClusterIdInfo(""), 1.0f));
 
-    // Hard-codes two compatible policies for Router and AMRMProxy.
+    // 硬编码兼容的路由器策略和AMRMProxy策略类型
     routerFederationPolicy = UniformRandomRouterPolicy.class;
     amrmProxyFederationPolicy = HomeAMRMProxyPolicy.class;
   }
 
   @Override
+  /**
+   * 将当前策略配置序列化为可持久化存储的对象
+   * @return 序列化后的子集群策略配置
+   * @throws FederationPolicyInitializationException 序列化失败时抛出
+   */
   public SubClusterPolicyConfiguration serializeConf()
       throws FederationPolicyInitializationException {
 
+    // 将权重信息序列化转为ByteBuffer
     ByteBuffer buf = weightedPolicyInfo.toByteBuffer();
+    // 构建并返回完整策略配置对象
     return SubClusterPolicyConfiguration.newInstance(
         getQueue(), this.getClass().getCanonicalName(), buf);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -21,21 +22,24 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.deletion.task.
 import java.util.List;
 
 /**
- * Encapsulates the recovery info needed to recover a DeletionTask from the NM
- * state store.
+ * YARN NodeManager删除任务恢复信息封装类，用于从NM状态存储中恢复DeletionTask。
+ * 封装了恢复删除任务所需的全部元数据，支持删除任务依赖关系和调度时间的恢复。
  */
 public class DeletionTaskRecoveryInfo {
 
+  // 待恢复的删除任务实例
   private DeletionTask task;
+  // 当前任务后续依赖任务ID列表，依赖任务需要在当前任务完成后执行
   private List<Integer> successorTaskIds;
+  // 任务计划删除的时间戳
   private long deletionTimestamp;
 
   /**
-   * Information needed for recovering the DeletionTask.
+   * 构造删除任务恢复信息对象，封装恢复所需全部参数。
    *
-   * @param task the DeletionTask
-   * @param successorTaskIds the dependent DeletionTasks.
-   * @param deletionTimestamp the scheduled times of deletion.
+   * @param task 待恢复的删除任务实例
+   * @param successorTaskIds 当前任务的后续依赖任务ID列表
+   * @param deletionTimestamp 任务计划删除的时间戳
    */
   public DeletionTaskRecoveryInfo(DeletionTask task,
       List<Integer> successorTaskIds, long deletionTimestamp) {
@@ -45,27 +49,27 @@ public class DeletionTaskRecoveryInfo {
   }
 
   /**
-   * Return the recovered DeletionTask.
+   * 获取恢复后的删除任务实例。
    *
-   * @return the recovered DeletionTask.
+   * @return 待恢复的删除任务实例
    */
   public DeletionTask getTask() {
     return task;
   }
 
   /**
-   * Return all of the dependent DeletionTasks.
+   * 获取当前任务的所有后续依赖任务ID列表。
    *
-   * @return the dependent DeletionTasks.
+   * @return 后续依赖任务ID列表
    */
   public List<Integer> getSuccessorTaskIds() {
     return successorTaskIds;
   }
 
   /**
-   * Return the deletion timestamp.
+   * 获取任务计划删除的时间戳。
    *
-   * @return the deletion timestamp.
+   * @return 删除时间戳
    */
   public long getDeletionTimestamp() {
     return deletionTimestamp;

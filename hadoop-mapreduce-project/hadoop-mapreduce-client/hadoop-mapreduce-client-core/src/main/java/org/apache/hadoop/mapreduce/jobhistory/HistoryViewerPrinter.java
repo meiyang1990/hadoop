@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,16 +25,20 @@ import java.io.IOException;
 import java.io.PrintStream;
 
 /**
- * Used by the {@link HistoryViewer} to print job history in different formats.
+ * 文件：HistoryViewerPrinter.java
+ * 所属模块：MapReduce 客户端核心模块
+ * 核心职责：定义作业历史记录打印器接口，为HistoryViewer提供不同格式输出作业历史的扩展点
+ * 
+ * 该接口被HistoryViewer使用，用于以不同格式输出作业历史信息，支持多种输出格式的扩展
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 interface HistoryViewerPrinter {
 
   /**
-   * Print out the Job History to the given {@link PrintStream}.
-   * @param ps the {@link PrintStream} to print to
-   * @throws IOException when a problem occurs while printing
+   * 将作业历史输出到指定的打印流
+   * @param ps 目标输出打印流
+   * @throws IOException 输出过程中发生IO异常时抛出
    */
   void print(PrintStream ps) throws IOException;
 }

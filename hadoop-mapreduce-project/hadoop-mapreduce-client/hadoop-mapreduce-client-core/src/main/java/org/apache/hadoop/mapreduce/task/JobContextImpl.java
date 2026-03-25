@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,8 +48,8 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.StringUtils;
 
 /**
- * A read-only view of the job that is provided to the tasks while they
- * are running.
+ * JobContext接口的实现类，为运行中的任务提供作业配置的只读视图。
+ * 任务执行过程中通过该类获取作业全局配置信息，不允许修改作业配置。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -57,11 +58,16 @@ public class JobContextImpl implements JobContext {
   protected final org.apache.hadoop.mapred.JobConf conf;
   private JobID jobId;
   /**
-   * The UserGroupInformation object that has a reference to the current user
+   * 当前提交作业用户的用户信息对象
    */
   protected UserGroupInformation ugi;
-  protected final Credentials credentials;
+  protected final Credentials;
   
+  /**
+   * 构造JobContextImpl实例，基于给定配置和作业ID初始化作业上下文。
+   * @param conf 作业配置对象
+   * @param jobId 作业唯一ID
+   */
   public JobContextImpl(Configuration conf, JobID jobId) {
     if (conf instanceof JobConf) {
       this.conf = (JobConf)conf;
@@ -78,97 +84,90 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Return the configuration for the job.
-   * @return the shared configuration object
+   * 获取作业的配置对象。
+   * @return 作业共享配置对象
    */
   public Configuration getConfiguration() {
     return conf;
   }
 
   /**
-   * Get the unique ID for the job.
-   * @return the object with the job id
+   * 获取作业的唯一ID。
+   * @return 作业ID对象
    */
   public JobID getJobID() {
     return jobId;
   }
   
   /**
-   * Set the JobID.
+   * 设置作业ID。
+   * @param jobId 要设置的作业ID
    */
   public void setJobID(JobID jobId) {
     this.jobId = jobId;
   }
   
   /**
-   * Get configured the number of reduce tasks for this job. Defaults to 
-   * <code>1</code>.
-   * @return the number of reduce tasks for this job.
+   * 获取作业配置的Reduce任务数量，默认值为1。
+   * @return Reduce任务数量
    */
   public int getNumReduceTasks() {
     return conf.getNumReduceTasks();
   }
   
   /**
-   * Get the current working directory for the default file system.
-   * 
-   * @return the directory name.
+   * 获取默认文件系统的当前工作目录。
+   * @return 工作目录路径
+   * @throws IOException 获取目录失败时抛出IO异常
    */
   public Path getWorkingDirectory() throws IOException {
     return conf.getWorkingDirectory();
   }
 
   /**
-   * Get the key class for the job output data.
-   * @return the key class for the job output data.
+   * 获取作业最终输出的Key类型Class。
+   * @return 输出Key类对象
    */
   public Class<?> getOutputKeyClass() {
     return conf.getOutputKeyClass();
   }
   
   /**
-   * Get the value class for job outputs.
-   * @return the value class for job outputs.
+   * 获取作业最终输出的Value类型Class。
+   * @return 输出Value类对象
    */
   public Class<?> getOutputValueClass() {
     return conf.getOutputValueClass();
   }
 
   /**
-   * Get the key class for the map output data. If it is not set, use the
-   * (final) output key class. This allows the map output key class to be
-   * different than the final output key class.
-   * @return the map output key class.
+   * 获取Map阶段输出的Key类型Class，如果未配置则使用最终输出Key类型。
+   * @return Map输出Key类对象
    */
   public Class<?> getMapOutputKeyClass() {
     return conf.getMapOutputKeyClass();
   }
 
   /**
-   * Get the value class for the map output data. If it is not set, use the
-   * (final) output value class This allows the map output value class to be
-   * different than the final output value class.
-   *  
-   * @return the map output value class.
+   * 获取Map阶段输出的Value类型Class，如果未配置则使用最终输出Value类型。
+   * @return Map输出Value类对象
    */
   public Class<?> getMapOutputValueClass() {
     return conf.getMapOutputValueClass();
   }
 
   /**
-   * Get the user-specified job name. This is only used to identify the 
-   * job to the user.
-   * 
-   * @return the job's name, defaulting to "".
+   * 获取用户指定的作业名称，仅用于展示标识。
+   * @return 作业名称，默认为空字符串
    */
   public String getJobName() {
     return conf.getJobName();
   }
 
   /**
-   * Get the {@link InputFormat} class for the job.
-   * 
-   * @return the {@link InputFormat} class for the job.
+   * 获取作业配置的InputFormat实现类。
+   * @return InputFormat类对象，默认返回TextInputFormat
+   * @throws ClassNotFoundException 类找不到时抛出异常
    */
   @SuppressWarnings("unchecked")
   public Class<? extends InputFormat<?,?>> getInputFormatClass() 
@@ -178,9 +177,9 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Get the {@link Mapper} class for the job.
-   * 
-   * @return the {@link Mapper} class for the job.
+   * 获取作业配置的Mapper实现类。
+   * @return Mapper类对象，默认返回Mapper基类
+   * @throws ClassNotFoundException 类找不到时抛出异常
    */
   @SuppressWarnings("unchecked")
   public Class<? extends Mapper<?,?,?,?>> getMapperClass() 
@@ -190,9 +189,9 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Get the combiner class for the job.
-   * 
-   * @return the combiner class for the job.
+   * 获取作业配置的Combiner实现类。
+   * @return Combiner类对象，未配置则返回null
+   * @throws ClassNotFoundException 类找不到时抛出异常
    */
   @SuppressWarnings("unchecked")
   public Class<? extends Reducer<?,?,?,?>> getCombinerClass() 
@@ -202,9 +201,9 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Get the {@link Reducer} class for the job.
-   * 
-   * @return the {@link Reducer} class for the job.
+   * 获取作业配置的Reducer实现类。
+   * @return Reducer类对象，默认返回Reducer基类
+   * @throws ClassNotFoundException 类找不到时抛出异常
    */
   @SuppressWarnings("unchecked")
   public Class<? extends Reducer<?,?,?,?>> getReducerClass() 
@@ -214,9 +213,9 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Get the {@link OutputFormat} class for the job.
-   * 
-   * @return the {@link OutputFormat} class for the job.
+   * 获取作业配置的OutputFormat实现类。
+   * @return OutputFormat类对象，默认返回TextOutputFormat
+   * @throws ClassNotFoundException 类找不到时抛出异常
    */
   @SuppressWarnings("unchecked")
   public Class<? extends OutputFormat<?,?>> getOutputFormatClass() 
@@ -226,9 +225,9 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Get the {@link Partitioner} class for the job.
-   * 
-   * @return the {@link Partitioner} class for the job.
+   * 获取作业配置的Partitioner实现类。
+   * @return Partitioner类对象，默认返回HashPartitioner
+   * @throws ClassNotFoundException 类找不到时抛出异常
    */
   @SuppressWarnings("unchecked")
   public Class<? extends Partitioner<?,?>> getPartitionerClass() 
@@ -238,84 +237,73 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Get the {@link RawComparator} comparator used to compare keys.
-   * 
-   * @return the {@link RawComparator} comparator used to compare keys.
+   * 获取用于排序Map输出Key的比较器。
+   * @return Key排序比较器
    */
   public RawComparator<?> getSortComparator() {
     return conf.getOutputKeyComparator();
   }
 
   /**
-   * Get the pathname of the job's jar.
-   * @return the pathname
+   * 获取作业Jar包的路径。
+   * @return Jar包路径字符串
    */
   public String getJar() {
     return conf.getJar();
   }
 
   /**
-   * Get the user defined {@link RawComparator} comparator for
-   * grouping keys of inputs to the combiner.
-   *
-   * @return comparator set by the user for grouping values.
-   * @see Job#setCombinerKeyGroupingComparatorClass(Class) for details.
+   * 获取用户定义的Combiner分组Key比较器，用于对输入到Combiner的Key进行分组。
+   * @return Combiner分组Key比较器
    */
   public RawComparator<?> getCombinerKeyGroupingComparator() {
     return conf.getCombinerKeyGroupingComparator();
   }
 
   /** 
-   * Get the user defined {@link RawComparator} comparator for 
-   * grouping keys of inputs to the reduce.
-   * 
-   * @return comparator set by the user for grouping values.
-   * @see Job#setGroupingComparatorClass(Class) for details.  
+   * 获取用户定义的Reduce分组Key比较器，用于对输入到Reduce的Key进行分组。
+   * @return Reduce分组Key比较器
    */
   public RawComparator<?> getGroupingComparator() {
     return conf.getOutputValueGroupingComparator();
   }
   
   /**
-   * Get whether job-setup and job-cleanup is needed for the job 
-   * 
-   * @return boolean 
+   * 获取作业是否需要执行作业级别的设置和清理。
+   * @return true表示需要执行，false表示不需要
    */
   public boolean getJobSetupCleanupNeeded() {
     return conf.getBoolean(MRJobConfig.SETUP_CLEANUP_NEEDED, true);
   }
   
   /**
-   * Get whether task-cleanup is needed for the job 
-   * 
-   * @return boolean 
+   * 获取作业是否需要执行任务级别的清理。
+   * @return true表示需要清理，false表示不需要
    */
   public boolean getTaskCleanupNeeded() {
     return conf.getBoolean(MRJobConfig.TASK_CLEANUP_NEEDED, true);
   }
 
   /**
-   * This method checks to see if symlinks are to be create for the 
-   * localized cache files in the current working directory 
-   * @return true if symlinks are to be created- else return false
+   * 检查是否需要为工作目录中的本地化缓存文件创建符号链接。
+   * @return true表示需要创建符号链接，false表示不需要
    */
   public boolean getSymlink() {
     return DistributedCache.getSymlink(conf);
   }
   
   /**
-   * Get the archive entries in classpath as an array of Path
+   * 获取类路径中归档条目对应的路径数组。
+   * @return 归档条目路径数组
    */
   public Path[] getArchiveClassPaths() {
     return getArchiveClassPaths(conf);
   }
 
   /**
-   * Get the archive entries in classpath as an array of Path.
-   * Used by internal DistributedCache code.
-   *
-   * @param conf Configuration that contains the classpath setting.
-   * @return An array of Path consisting of archive entries in classpath.
+   * 从给定配置中解析出类路径中的归档条目路径数组，供DistributedCache内部使用。
+   * @param conf 包含类路径配置的配置对象
+   * @return 类路径中归档条目组成的Path数组，无条目则返回null
    */
   public static Path[] getArchiveClassPaths(Configuration conf) {
     ArrayList<String> list = (ArrayList<String>)conf.getStringCollection(
@@ -331,50 +319,45 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Get cache archives set in the Configuration
-   * @return A URI array of the caches set in the Configuration
-   * @throws IOException
+   * 获取配置中设置的分布式缓存归档文件URI数组。
+   * @return 缓存归档文件URI数组
+   * @throws IOException 解析失败时抛出IO异常
    */
   public URI[] getCacheArchives() throws IOException {
     return getCacheArchives(conf);
   }
 
   /**
-   * Get cache archives set in the Configuration. Used by
-   * internal DistributedCache and JobContextImpl code.
-   *
-   * @param conf The configuration which contains the archives.
-   * @return A URI array of the caches set in the Configuration.
+   * 从给定配置中解析出分布式缓存归档文件URI数组，供内部代码使用。
+   * @param conf 包含缓存配置的配置对象
+   * @return 缓存归档文件URI数组
    */
   public static URI[] getCacheArchives(Configuration conf) {
     return StringUtils.stringToURI(conf.getStrings(MRJobConfig.CACHE_ARCHIVES));
   }
 
   /**
-   * Get cache files set in the Configuration
-   * @return A URI array of the files set in the Configuration
-   * @throws IOException
+   * 获取配置中设置的分布式缓存普通文件URI数组。
+   * @return 缓存普通文件URI数组
+   * @throws IOException 解析失败时抛出IO异常
    */
-
   public URI[] getCacheFiles() throws IOException {
     return getCacheFiles(conf);
   }
 
   /**
-   * Get cache files set in the Configuration. Used by internal
-   * DistributedCache and MapReduce code.
-   *
-   * @param conf The configuration which contains the files.
-   * @return A URI array of the files set in the Configuration.
+   * 从给定配置中解析出分布式缓存普通文件URI数组，供内部代码使用。
+   * @param conf 包含缓存配置的配置对象
+   * @return 缓存普通文件URI数组
    */
   public static URI[] getCacheFiles(Configuration conf) {
     return StringUtils.stringToURI(conf.getStrings(MRJobConfig.CACHE_FILES));
   }
 
   /**
-   * Return the path array of the localized caches
-   * @return A path array of localized caches
-   * @throws IOException
+   * 获取本地化后缓存归档文件的路径数组。
+   * @return 本地化归档文件路径数组
+   * @throws IOException 解析失败时抛出IO异常
    */
   public Path[] getLocalCacheArchives()
     throws IOException {
@@ -382,19 +365,18 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Return the path array of the localized caches.
-   *
-   * @param conf Configuration that contains the localized archives.
-   * @return A path array of localized caches.
+   * 从给定配置中解析出本地化后缓存归档文件的路径数组，供内部代码使用。
+   * @param conf 包含本地化缓存配置的配置对象
+   * @return 本地化归档文件路径数组
    */
   public static Path[] getLocalCacheArchives(Configuration conf) {
     return StringUtils.stringToPath(conf.getStrings(MRJobConfig.CACHE_LOCALARCHIVES));
   }
 
   /**
-   * Return the path array of the localized files
-   * @return A path array of localized files
-   * @throws IOException
+   * 获取本地化后缓存普通文件的路径数组。
+   * @return 本地化普通文件路径数组
+   * @throws IOException 解析失败时抛出IO异常
    */
   public Path[] getLocalCacheFiles()
     throws IOException {
@@ -402,19 +384,18 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Return the path array of the localized files.
-   *
-   * @param conf Configuration that contains the localized files.
-   * @return A path array of localized files.
+   * 从给定配置中解析出本地化后缓存普通文件的路径数组，供内部代码使用。
+   * @param conf 包含本地化缓存配置的配置对象
+   * @return 本地化普通文件路径数组
    */
   public static Path[] getLocalCacheFiles(Configuration conf) {
     return StringUtils.stringToPath(conf.getStrings(MRJobConfig.CACHE_LOCALFILES));
   }
 
   /**
-   * Parse a list of strings into longs.
-   * @param strs the list of strings to parse
-   * @return a list of longs that were parsed. same length as strs.
+   * 将字符串数组解析为时间戳long数组。
+   * @param strs 待解析的字符串数组
+   * @return 解析后的时间戳数组，长度与输入数组一致，输入为null则返回null
    */
   private static long[] parseTimestamps(String[] strs) {
     if (strs == null) {
@@ -428,40 +409,35 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Get the timestamps of the archives. Used by internal
-   * DistributedCache and MapReduce code.
-   *
-   * @param conf The configuration which stored the timestamps.
-   * @return a long array of timestamps.
+   * 从给定配置中获取缓存归档文件的时间戳数组，供内部代码使用。
+   * @param conf 存储时间戳配置的配置对象
+   * @return 归档文件时间戳数组
    */
   public static long[] getArchiveTimestamps(Configuration conf) {
     return parseTimestamps(conf.getStrings(MRJobConfig.CACHE_ARCHIVES_TIMESTAMPS));
   }
 
   /**
-   * Get the timestamps of the files. Used by internal
-   * DistributedCache and MapReduce code.
-   *
-   * @param conf The configuration which stored the timestamps.
-   * @return a long array of timestamps.
+   * 从给定配置中获取缓存普通文件的时间戳数组，供内部代码使用。
+   * @param conf 存储时间戳配置的配置对象
+   * @return 普通文件时间戳数组
    */
   public static long[] getFileTimestamps(Configuration conf) {
     return parseTimestamps(conf.getStrings(MRJobConfig.CACHE_FILE_TIMESTAMPS));
   }
 
   /**
-   * Get the file entries in classpath as an array of Path
+   * 获取类路径中普通文件条目对应的路径数组。
+   * @return 普通文件条目路径数组
    */
   public Path[] getFileClassPaths() {
     return getFileClassPaths(conf);
   }
 
   /**
-   * Get the file entries in classpath as an array of Path.
-   * Used by internal DistributedCache code.
-   *
-   * @param conf Configuration that contains the classpath setting.
-   * @return Array of Path consisting of file entries in the classpath.
+   * 从给定配置中解析出类路径中的普通文件条目路径数组，供DistributedCache内部使用。
+   * @param conf 包含类路径配置的配置对象
+   * @return 类路径中普通文件条目组成的Path数组，无条目则返回null
    */
   public static Path[] getFileClassPaths(Configuration conf) {
     ArrayList<String> list =
@@ -477,9 +453,9 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Parse a list of longs into strings.
-   * @param timestamps the list of longs to parse
-   * @return a list of string that were parsed. same length as timestamps.
+   * 将时间戳long数组转换为字符串数组。
+   * @param timestamps 待转换的时间戳long数组
+   * @return 转换后的字符串数组，长度与输入一致，输入为null则返回null
    */
   private static String[] toTimestampStrs(long[] timestamps) {
     if (timestamps == null) {
@@ -493,93 +469,20 @@ public class JobContextImpl implements JobContext {
   }
 
   /**
-   * Get the timestamps of the archives.  Used by internal
-   * DistributedCache and MapReduce code.
-   * @return a string array of timestamps 
+   * 获取缓存归档文件的时间戳字符串数组，供内部代码使用。
+   * @return 归档文件时间戳字符串数组
    */
   public String[] getArchiveTimestamps() {
     return toTimestampStrs(getArchiveTimestamps(conf));
   }
 
   /**
-   * Get the timestamps of the files.  Used by internal
-   * DistributedCache and MapReduce code.
-   * @return a string array of timestamps 
+   * 获取缓存普通文件的时间戳字符串数组，供内部代码使用。
+   * @return 普通文件时间戳字符串数组
    */
   public String[] getFileTimestamps() {
     return toTimestampStrs(getFileTimestamps(conf));
   }
 
   /** 
-   * Get the configured number of maximum attempts that will be made to run a
-   * map task, as specified by the <code>mapred.map.max.attempts</code>
-   * property. If this property is not already set, the default is 4 attempts.
-   *  
-   * @return the max number of attempts per map task.
-   */
-  public int getMaxMapAttempts() {
-    return conf.getMaxMapAttempts();
-  }
-
-  /** 
-   * Get the configured number of maximum attempts  that will be made to run a
-   * reduce task, as specified by the <code>mapred.reduce.max.attempts</code>
-   * property. If this property is not already set, the default is 4 attempts.
-   * 
-   * @return the max number of attempts per reduce task.
-   */
-  public int getMaxReduceAttempts() {
-    return conf.getMaxReduceAttempts();
-  }
-
-  /**
-   * Get whether the task profiling is enabled.
-   * @return true if some tasks will be profiled
-   */
-  public boolean getProfileEnabled() {
-    return conf.getProfileEnabled();
-  }
-
-  /**
-   * Get the profiler configuration arguments.
-   *
-   * The default value for this property is
-   * "-agentlib:hprof=cpu=samples,heap=sites,force=n,thread=y,verbose=n,file=%s"
-   * 
-   * @return the parameters to pass to the task child to configure profiling
-   */
-  public String getProfileParams() {
-    return conf.getProfileParams();
-  }
-
-  /**
-   * Get the range of maps or reduces to profile.
-   * @param isMap is the task a map?
-   * @return the task ranges
-   */
-  public IntegerRanges getProfileTaskRange(boolean isMap) {
-    return conf.getProfileTaskRange(isMap);
-  }
-
-  /**
-   * Get the reported username for this job.
-   * 
-   * @return the username
-   */
-  public String getUser() {
-    return conf.getUser();
-  }
-
-  public Credentials getCredentials() {
-    return credentials;
-  }
-
-  @Override
-  public String toString() {
-    final StringBuilder sb = new StringBuilder(
-        "JobContextImpl{");
-    sb.append("jobId=").append(jobId);
-    sb.append('}');
-    return sb.toString();
-  }
-}
+   * 获取

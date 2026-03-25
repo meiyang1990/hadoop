@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,19 +21,28 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.eve
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalResourceRequest;
 
 /**
- * This event is sent by the localizer in case resource localization fails for
- * the requested resource.
+ * 资源本地化失败事件，当本地化器处理请求资源时发生错误，会发送该事件通知上游模块。
  */
 public class ResourceFailedLocalizationEvent extends ResourceEvent {
 
+  // 本地化失败诊断信息
   private final String diagnosticMesage;
 
+  /**
+   * 构造资源本地化失败事件
+   * @param rsrc 本地化失败的资源请求
+   * @param diagnosticMesage 失败诊断信息
+   */
   public ResourceFailedLocalizationEvent(LocalResourceRequest rsrc,
       String diagnosticMesage) {
     super(rsrc, ResourceEventType.LOCALIZATION_FAILED);
     this.diagnosticMesage = diagnosticMesage;
   }
 
+  /**
+   * 获取本地化失败的诊断信息
+   * @return 失败诊断信息字符串
+   */
   public String getDiagnosticMessage() {
     return diagnosticMesage;
   }

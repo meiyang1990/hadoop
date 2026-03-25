@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,12 @@
  * limitations under the License.
  */
 
+/**
+ * @file jniutils.h
+ * Hadoop MapReduce本地任务Native层JNI工具函数头文件
+ * 提供Native代码与Java虚拟机交互的基础工具能力
+ */
+
 #ifndef JNIUTILS_H_
 #define JNIUTILS_H_
 
@@ -23,34 +30,43 @@
 #include <jni.h>
 
 /**
- * Get current JavaVM, if none then try to create one.
+ * 获取当前Java虚拟机实例，如果不存在则尝试创建新实例
+ * @return JavaVM实例指针
  */
 JavaVM * JNU_GetJVM(void);
 
 /**
- * Get JNIEnv for current thread.
+ * 获取当前线程对应的JNI环境对象
+ * @return 当前线程的JNIEnv环境指针
  */
 JNIEnv* JNU_GetJNIEnv(void);
 
 /**
- * Attach currentThread, same effect as JNU_GetJNIEnv.
+ * 将当前Native线程附着到Java虚拟机，效果等同于JNU_GetJNIEnv
+ * 用于把Native创建的线程关联到Java虚拟机，获取JNI环境
  */
 void JNU_AttachCurrentThread();
 
 /**
- * Detach current thread, call it if current thread
- * is created in native side and have called
- * JNU_AttachCurrentThread before
+ * 将当前线程从Java虚拟机分离
+ * 当Native侧创建的线程此前调用过JNU_AttachCurrentThread后，
+ * 需要在线程退出前调用本方法释放资源，避免内存泄漏
  */
 void JNU_DetachCurrentThread();
 
 /**
- * Throw a java exception.
+ * 抛出指定类型的Java异常
+ * @param jenv 当前线程的JNI环境指针
+ * @param name 要抛出的异常类全限定名
+ * @param msg 异常描述信息
  */
 void JNU_ThrowByName(JNIEnv *jenv, const char *name, const char *msg);
 
 /**
- * Convert a java byte array to c++ std::string
+ * 将Java字节数组转换为C++ std::string
+ * @param jenv 当前线程的JNI环境指针
+ * @param src Java侧输入字节数组
+ * @return 转换后的C++字符串
  */
 std::string JNU_ByteArrayToString(JNIEnv * jenv, jbyteArray src);
 

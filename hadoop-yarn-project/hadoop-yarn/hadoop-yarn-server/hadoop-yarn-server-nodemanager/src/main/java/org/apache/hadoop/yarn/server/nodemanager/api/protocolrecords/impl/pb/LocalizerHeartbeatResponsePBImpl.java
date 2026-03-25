@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -32,27 +33,43 @@ import org.apache.hadoop.yarn.server.nodemanager.api.impl.pb.ResourceLocalizatio
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerAction;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerHeartbeatResponse;
 
+/**
+ * Localizer心跳响应Protobuf实现类，NodeManager响应本地化器心跳的协议消息实现
+ * 基于Protobuf序列化，实现了LocalizerHeartbeatResponse接口
+ */
 public class LocalizerHeartbeatResponsePBImpl
         extends ProtoBase<LocalizerHeartbeatResponseProto>
         implements LocalizerHeartbeatResponse {
 
+  // Protobuf默认实例
   LocalizerHeartbeatResponseProto proto =
     LocalizerHeartbeatResponseProto.getDefaultInstance();
+  // Protobuf构建器
   LocalizerHeartbeatResponseProto.Builder builder = null;
+  // 标记是否通过Protobuf实例构造
   boolean viaProto = false;
 
+  // 缓存资源本地化规范列表
   private List<ResourceLocalizationSpec> resourceSpecs;
 
+  /**
+   * 空构造函数，初始化Protobuf构建器
+   */
   public LocalizerHeartbeatResponsePBImpl() {
     builder = LocalizerHeartbeatResponseProto.newBuilder();
   }
 
+  /**
+   * 通过已有Protobuf实例构造响应对象
+   * @param proto 已构造好的Protobuf响应对象
+   */
   public LocalizerHeartbeatResponsePBImpl(
       LocalizerHeartbeatResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  @Override
   public LocalizerHeartbeatResponseProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -60,12 +77,14 @@ public class LocalizerHeartbeatResponsePBImpl
     return proto;
   }
 
+  // 合并本地缓存数据到Protobuf构建器
   private void mergeLocalToBuilder() {
     if (resourceSpecs != null) {
       addResourcesToProto();
     }
   }
 
+  // 合并本地缓存数据到最终Protobuf实例
   private void mergeLocalToProto() {
     if (viaProto)
       maybeInitBuilder();
@@ -74,6 +93,7 @@ public class LocalizerHeartbeatResponsePBImpl
     viaProto = true;
   }
 
+  // 延迟初始化Protobuf构建器
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = LocalizerHeartbeatResponseProto.newBuilder(proto);
@@ -96,6 +116,7 @@ public class LocalizerHeartbeatResponsePBImpl
     return this.resourceSpecs;
   }
 
+  @Override
   public void setLocalizerAction(LocalizerAction action) {
     maybeInitBuilder();
     if (action == null) {
@@ -105,6 +126,7 @@ public class LocalizerHeartbeatResponsePBImpl
     builder.setAction(convertToProtoFormat(action));
   }
 
+  @Override
   public void setResourceSpecs(List<ResourceLocalizationSpec> rsrcs) {
     maybeInitBuilder();
     if (rsrcs == null) {
@@ -114,6 +136,7 @@ public class LocalizerHeartbeatResponsePBImpl
     this.resourceSpecs = rsrcs;
   }
 
+  // 延迟初始化资源本地化规范列表，从Protobuf解析数据
   private void initResources() {
     if (this.resourceSpecs != null) {
       return;
@@ -126,6 +149,7 @@ public class LocalizerHeartbeatResponsePBImpl
     }
   }
 
+  // 将本地缓存的资源规范写入Protobuf构建器
   private void addResourcesToProto() {
     maybeInitBuilder();
     builder.clearResources();
@@ -164,15 +188,18 @@ public class LocalizerHeartbeatResponsePBImpl
   }
 
 
+  // Protobuf格式转换为API对象
   private ResourceLocalizationSpec convertFromProtoFormat(
       ResourceLocalizationSpecProto p) {
     return new ResourceLocalizationSpecPBImpl(p);
   }
 
+  // API对象转换为Protobuf格式
   private LocalizerActionProto convertToProtoFormat(LocalizerAction a) {
     return LocalizerActionProto.valueOf(a.name());
   }
 
+  // Protobuf格式转换为API对象
   private LocalizerAction convertFromProtoFormat(LocalizerActionProto a) {
     return LocalizerAction.valueOf(a.name());
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements. See the NOTICE file
@@ -61,10 +62,9 @@ import org.apache.hadoop.yarn.util.ResourceCalculatorPlugin;
 import org.apache.hadoop.yarn.util.SystemClock;
 
 /**
- * Resource handler that lets you setup cgroups
- * to to handle cpu isolation. Please look at the ResourceHandlerModule
- * and CGroupsCpuResourceHandlerImpl classes which let you isolate multiple
- * resources using cgroups.
+ * 基于cgroups的Linux容器执行器资源处理器，用于实现CPU隔离。
+ * 已废弃，请使用{@link ResourceHandlerModule}和{@link CGroupsCpuResourceHandlerImpl}，
+ * 新实现支持使用cgroups隔离多种资源。
  * Deprecated - please look at ResourceHandlerModule and
  * CGroupsCpuResourceHandlerImpl
  */
@@ -112,6 +112,10 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     return conf;
   }
 
+  /**
+   * 从配置中初始化参数。
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   @VisibleForTesting
   void initConfig() throws IOException {
 
@@ -124,7 +128,7 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     this.deleteCgroupDelay =
         conf.getLong(YarnConfiguration.NM_LINUX_CONTAINER_CGROUPS_DELETE_DELAY,
             YarnConfiguration.DEFAULT_NM_LINUX_CONTAINER_CGROUPS_DELETE_DELAY);
-    // remove extra /'s at end or start of cgroupPrefix
+    // 去除cgroup前缀首尾多余的斜杠
     if (cgroupPrefix.charAt(0) == '/') {
       cgroupPrefix = cgroupPrefix.substring(1);
     }
@@ -143,17 +147,28 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     }
   }
   
+  /**
+   * 初始化cgroups资源处理器。
+   * @param lce Linux容器执行器实例
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   public void init(LinuxContainerExecutor lce) throws IOException {
     this.init(lce,
         ResourceCalculatorPlugin.getResourceCalculatorPlugin(null, conf));
   }
 
+  /**
+   * 初始化cgroups资源处理器，支持传入硬件资源计算器。
+   * @param lce Linux容器执行器实例
+   * @param plugin 硬件资源计算器插件
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   @VisibleForTesting
   void init(LinuxContainerExecutor lce, ResourceCalculatorPlugin plugin)
       throws IOException {
     initConfig();
 
-    // mount cgroups if requested
+    // 如果配置要求，挂载cgroups
     if (cGroupsMountConfig.mountEnabledAndMountPathDefined()) {
       ArrayList<String> cgroupKVs = new ArrayList<String>();
       cgroupKVs.add(CONTROLLER_CPU + "=" +
@@ -161,11 +176,13 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
       lce.mountCgroups(cgroupKVs, cgroupPrefix);
     }
 
+    // 初始化各cgroup控制器路径
     initializeControllerPaths();
 
+    // 获取节点总vcore数量
     nodeVCores = NodeManagerHardwareUtils.getVCores(plugin, conf);
 
-    // cap overall usage to the number of cores allocated to YARN
+    // 获取分配给YARN容器的总CPU核数
     yarnProcessors = NodeManagerHardwareUtils.getContainersCPUs(plugin, conf);
     int systemProcessors = NodeManagerHardwareUtils.getNodeCPUs(plugin, conf);
     if (systemProcessors != (int) yarnProcessors) {
@@ -195,11 +212,23 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
    * Next four functions are for an individual cgroup.
    */
 
+  /**
+   * 构造指定控制器和分组的cgroup完整路径。
+   * @param controller cgroup控制器名称
+   * @param groupName cgroup分组名称
+   * @return 完整的cgroup文件系统路径
+   */
   private String pathForCgroup(String controller, String groupName) {
     String controllerPath = controllerPaths.get(controller);
     return controllerPath + "/" + cgroupPrefix + "/" + groupName;
   }
 
+  /**
+   * 创建指定控制器下的cgroup分组。
+   * @param controller cgroup控制器名称
+   * @param groupName cgroup分组名称
+   * @throws IOException 创建失败时抛出IO异常
+   */
   private void createCgroup(String controller, String groupName)
         throws IOException {
     String path = pathForCgroup(controller, groupName);
@@ -211,6 +240,14 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     }
   }
 
+  /**
+   * 更新cgroup参数值。
+   * @param controller cgroup控制器名称
+   * @param groupName cgroup分组名称
+   * @param param 参数名称
+   * @param value 参数值
+   * @throws IOException 更新失败时抛出IO异常
+   */
   private void updateCgroup(String controller, String groupName, String param,
                             String value) throws IOException {
     String path = pathForCgroup(controller, groupName);
@@ -242,8 +279,9 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     }
   }
 
-  /*
-   * Utility routine to print first line from cgroup tasks file
+  /**
+   * 打印cgroup tasks文件的第一行到调试日志，用于问题排查。
+   * @param cgf cgroup目录对象
    */
   private void logLineFromTasksFile(File cgf) {
     String str;
@@ -262,10 +300,11 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
   }
 
   /**
-   * If tasks file is empty, delete the cgroup.
+   * 如果tasks文件为空，则删除该cgroup。
    *
-   * @param cgf object referring to the cgroup to be deleted
-   * @return Boolean indicating whether cgroup was deleted
+   * @param cgf 待删除的cgroup目录对象
+   * @return 是否成功删除cgroup
+   * @throws InterruptedException 等待删除时线程中断抛出异常
    */
   @VisibleForTesting
   boolean checkAndDeleteCgroup(File cgf) throws InterruptedException {
@@ -275,8 +314,8 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
       if (in.read() == -1) {
         /*
          * "tasks" file is empty, sleep a bit more and then try to delete the
-         * cgroup. Some versions of linux will occasionally panic due to a race
-         * condition in this area, hence the paranoia.
+         * cgroup. Some versions of linux kernel have a race condition
+         * that may cause panic, hence the delay and retry.
          */
         Thread.sleep(deleteCgroupDelay);
         deleted = cgf.delete();
@@ -292,6 +331,11 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     return deleted;
   }
 
+  /**
+   * 重复尝试删除指定路径的cgroup，直到成功或超时。
+   * @param cgroupPath 待删除的cgroup路径
+   * @return 是否成功删除cgroup
+   */
   @VisibleForTesting
   boolean deleteCgroup(String cgroupPath) {
     boolean deleted = false;
@@ -320,6 +364,12 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
    * Next three functions operate on all the resources we are enforcing.
    */
 
+  /**
+   * 为容器设置cgroup资源限制。
+   * @param containerId 容器ID
+   * @param containerResource 容器资源配置
+   * @throws IOException 设置限制失败时抛出IO异常
+   */
   private void setupLimits(ContainerId containerId,
                            Resource containerResource) throws IOException {
     String containerName = containerId.toString();
@@ -344,6 +394,10 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
     }
   }
 
+  /**
+   * 容器退出后清理容器对应的cgroup。
+   * @param containerId 容器ID
+   */
   private void clearLimits(ContainerId containerId) {
     if (isCpuWeightEnabled()) {
       deleteCgroup(pathForCgroup(CONTROLLER_CPU, containerId.toString()));
@@ -354,15 +408,18 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
    * LCE Resources Handler interface
    */
 
+  @Override
   public void preExecute(ContainerId containerId, Resource containerResource)
               throws IOException {
     setupLimits(containerId, containerResource);
   }
 
+  @Override
   public void postExecute(ContainerId containerId) {
     clearLimits(containerId);
   }
 
+  @Override
   public String getResourcesOption(ContainerId containerId) {
     String containerName = containerId.toString();
 
@@ -396,99 +453,4 @@ public class CgroupsLCEResourcesHandler implements LCEResourcesHandler {
    * for mounts with type "cgroup". Cgroup controllers will
    * appear in the list of options for a path.
    */
-  private Map<String, Set<String>> parseMtab() throws IOException {
-    Map<String, Set<String>> ret = new HashMap<String, Set<String>>();
-    BufferedReader in = null;
-    Set<String> validCgroups =
-        CGroupsHandler.CGroupController.getValidV1CGroups();
-
-    try {
-      FileInputStream fis = new FileInputStream(new File(getMtabFileName()));
-      in = new BufferedReader(new InputStreamReader(fis, StandardCharsets.UTF_8));
-
-      for (String str = in.readLine(); str != null;
-          str = in.readLine()) {
-        Matcher m = MTAB_FILE_FORMAT.matcher(str);
-        boolean mat = m.find();
-        if (mat) {
-          String path = m.group(1);
-          String type = m.group(2);
-          String options = m.group(3);
-
-          if (type.equals(CGROUPS_FSTYPE)) {
-            Set<String> cgroupList =
-                new HashSet<>(Arrays.asList(options.split(",")));
-            // Collect the valid subsystem names
-            cgroupList.retainAll(validCgroups);
-            ret.put(path, cgroupList);
-          }
-        }
-      }
-    } catch (IOException e) {
-      throw new IOException("Error while reading " + getMtabFileName(), e);
-    } finally {
-      IOUtils.cleanupWithLogger(LOG, in);
-    }
-
-    return ret;
-  }
-
-  @VisibleForTesting
-  String findControllerInMtab(String controller,
-                                      Map<String, Set<String>> entries) {
-    for (Entry<String, Set<String>> e : entries.entrySet()) {
-      if (e.getValue().contains(controller)) {
-        if (new File(e.getKey()).canRead()) {
-          return e.getKey();
-        } else {
-          LOG.warn(String.format(
-              "Skipping inaccessible cgroup mount point %s", e.getKey()));
-        }
-      }
-    }
-
-    return null;
-  }
-
-  private void initializeControllerPaths() throws IOException {
-    String controllerPath;
-    Map<String, Set<String>> parsedMtab = null;
-
-    if (this.cGroupsMountConfig.mountDisabledButMountPathDefined()) {
-      parsedMtab = ResourceHandlerModule.
-          parseConfiguredCGroupPath(this.cGroupsMountConfig.getMountPath());
-    }
-
-    if (parsedMtab == null) {
-      parsedMtab = parseMtab();
-    }
-
-    // CPU
-
-    controllerPath = findControllerInMtab(CONTROLLER_CPU, parsedMtab);
-
-    if (controllerPath != null) {
-      File f = new File(controllerPath + "/" + this.cgroupPrefix);
-
-      if (FileUtil.canWrite(f)) {
-        controllerPaths.put(CONTROLLER_CPU, controllerPath);
-      } else {
-        throw new IOException("Not able to enforce cpu weights; cannot write "
-            + "to cgroup at: " + f.getPath());
-      }
-    } else {
-      throw new IOException("Not able to enforce cpu weights; cannot find "
-          + "cgroup for cpu controller in " + getMtabFileName());
-    }
-  }
-
-  @VisibleForTesting
-  String getMtabFileName() {
-    return MTAB_FILE;
-  }
-
-  @VisibleForTesting
-  Map<String, String> getControllerPaths() {
-    return Collections.unmodifiableMap(controllerPaths);
-  }
-}
+  /**

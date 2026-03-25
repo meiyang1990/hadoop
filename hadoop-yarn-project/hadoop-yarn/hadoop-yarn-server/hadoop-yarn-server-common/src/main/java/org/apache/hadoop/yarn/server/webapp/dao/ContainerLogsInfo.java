@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,14 +32,14 @@ import org.apache.hadoop.yarn.logaggregation.ContainerLogAggregationType;
 import org.apache.hadoop.yarn.logaggregation.ContainerLogFileInfo;
 
 /**
- * {@code ContainerLogsInfo} includes the log meta-data of containers.
+ * YARN Web REST API 容器日志信息数据访问对象，封装容器日志元数据信息
  * <p>
- * The container log meta-data includes details such as:
+ * 包含的核心信息：
  * <ul>
- *   <li>A list of {@link ContainerLogFileInfo}.</li>
- *   <li>The container Id.</li>
- *   <li>The NodeManager Id.</li>
- *   <li>The logType: could be local or aggregated</li>
+ *   <li>容器日志文件信息列表</li>
+ *   <li>容器ID</li>
+ *   <li>容器所在NodeManager节点ID</li>
+ *   <li>日志聚合类型（本地日志/聚合日志）</li>
  * </ul>
  */
 
@@ -58,9 +59,14 @@ public class ContainerLogsInfo {
   @XmlElement(name = "nodeId")
   protected String nodeId;
 
-  //JAXB needs this
+  // JAXB需要无参构造函数用于XML/JSON反序列化
   public ContainerLogsInfo() {}
 
+  /**
+   * 从ContainerLogMeta构造容器日志信息对象
+   * @param logMeta 容器日志元数据
+   * @param logType 日志聚合类型
+   */
   public ContainerLogsInfo(ContainerLogMeta logMeta,
       ContainerLogAggregationType logType) {
     this.containerLogsInfo = new ArrayList<>(logMeta.getContainerLogMeta());
@@ -69,6 +75,11 @@ public class ContainerLogsInfo {
     this.nodeId = logMeta.getNodeId();
   }
 
+  /**
+   * 测试用构造函数，接受字符串类型的日志类型
+   * @param logMeta 容器日志元数据
+   * @param logType 字符串格式的日志类型
+   */
   @VisibleForTesting
   public ContainerLogsInfo(ContainerLogMeta logMeta, String logType) {
     this.containerLogsInfo = new ArrayList<>(logMeta.getContainerLogMeta());

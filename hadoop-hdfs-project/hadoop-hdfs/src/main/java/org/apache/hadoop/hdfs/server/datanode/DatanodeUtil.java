@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,20 +32,25 @@ import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsDatasetSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.FsVolumeSpi;
 import org.apache.hadoop.hdfs.server.datanode.fsdataset.LengthInputStream;
 
-/** Provide utility methods for Datanode. */
+/**
+ * 为数据节点提供通用工具方法的工具类，包含块文件路径生成、文件操作、磁盘错误处理等能力
+ */
 @InterfaceAudience.Private
 public class DatanodeUtil {
+  /** 已解除链接块文件的后缀名 */
   public static final String UNLINK_BLOCK_SUFFIX = ".unlinked";
 
+  /** 磁盘错误异常前缀标识 */
   public static final String DISK_ERROR = "Possible disk error: ";
 
   private static final String SEP = System.getProperty("file.separator");
+  /** 用于子目录掩码计算，限制子目录数量为32个 */
   private static final long MASK = 0x1F;
 
-  /** Get the cause of an I/O exception if caused by a possible disk error
-   * @param ioe an I/O exception
-   * @return cause if the I/O exception is caused by a possible disk error;
-   *         null otherwise.
+  /**
+   * 从IO异常中提取磁盘错误的根原因，如果异常是磁盘错误则返回根异常，否则返回null
+   * @param ioe 待检查的IO异常
+   * @return 磁盘错误的根异常，若不是磁盘错误则返回null
    */ 
   static IOException getCauseIfDiskError(IOException ioe) {
     if (ioe.getMessage()!=null && ioe.getMessage().startsWith(DISK_ERROR)) {
@@ -55,9 +61,13 @@ public class DatanodeUtil {
   }
 
   /**
-   * Create a new file.
-   * @throws IOException 
-   * if the file already exists or if the file cannot be created.
+   * 先检查文件是否存在，若不存在则创建新的临时块文件
+   * @param volume 文件所属存储卷
+   * @param b 当前操作的块对象
+   * @param f 待创建的文件对象
+   * @param fileIoProvider 文件操作提供者，封装不同存储实现的文件操作
+   * @return 创建成功的文件对象
+   * @throws IOException 文件已存在或创建失败时抛出异常
    */
   public static File createFileWithExistsCheck(
       FsVolumeSpi volume, Block b, File f,
@@ -81,22 +91,31 @@ public class DatanodeUtil {
   }
   
   /**
-   * @return the meta name given the block name and generation stamp.
+   * 根据块名称和生成时间戳生成块元数据文件名
+   * @param blockName 块名称
+   * @param generationStamp 块生成时间戳
+   * @return 完整的块元数据文件名
    */
   public static String getMetaName(String blockName, long generationStamp) {
     return blockName + "_" + generationStamp + Block.METADATA_EXTENSION; 
   }
 
-  /** @return the unlink file. */
+  /**
+   * 根据原始块文件生成对应的解除链接临时文件对象
+   * @param f 原始块文件
+   * @return 解除链接临时文件对象
+   */
   public static File getUnlinkTmpFile(File f) {
     return new File(f.getParentFile(), f.getName()+UNLINK_BLOCK_SUFFIX);
   }
 
   /**
-   * Checks whether there are any files anywhere in the directory tree rooted
-   * at dir (directories don't count as files). dir must exist
-   * @return true if there are no files
-   * @throws IOException if unable to list subdirectories
+   * 递归检查目录树中是否不存在任何文件（仅检查文件，目录本身不计入）
+   * @param volume 目录所属存储卷
+   * @param dir 待检查的根目录，必须已存在
+   * @param fileIoProvider 文件操作提供者
+   * @return 目录树中不存在任何文件返回true，否则返回false
+   * @throws IOException 无法列出目录内容时抛出异常
    */
   public static boolean dirNoFilesRecursive(
       FsVolumeSpi volume, File dir,
@@ -116,12 +135,9 @@ public class DatanodeUtil {
   }
 
   /**
-   * Take an example.
-   * We hava a block with blockid mapping to:
-   * "/data1/hadoop/hdfs/datanode/current/BP-xxxx/current/finalized/subdir0/subdir1"
-   * We return "subdir0/subdir0".
-   * @param blockId the block id.
-   * @return two-level subdir string where block will be stored.
+   * 根据块ID计算块存储的两级子目录后缀路径，HDFS通过哈希分散块文件到不同子目录避免单目录文件过多
+   * @param blockId 数据块ID
+   * @return 两级子目录路径字符串，格式为subdirX/subdirY
    */
   public static String idToBlockDirSuffix(long blockId) {
     int d1 = (int) ((blockId >> 16) & MASK);
@@ -131,17 +147,20 @@ public class DatanodeUtil {
   }
 
   /**
-   * Get the directory where a finalized block with this ID should be stored.
-   * Do not attempt to create the directory.
-   * @param root the root directory where finalized blocks are stored
-   * @param blockId
-   * @return
+   * 根据根目录和块ID计算最终化块的存储目录，不自动创建目录
+   * @param root 最终化块存储根目录
+   * @param blockId 数据块ID
+   * @return 块对应的存储目录对象
    */
   public static File idToBlockDir(File root, long blockId) {
     String path = idToBlockDirSuffix(blockId);
     return new File(root, path);
   }
 
+  /**
+   * 生成文件数据集锁需要扫描的所有两级子目录路径，用于遍历所有块存储目录
+   * @return 所有可能的两级子目录路径列表
+   */
   public static List<String> getAllSubDirNameForDataSetLock() {
     List<String> res = new ArrayList<>();
     for (int d1 = 0; d1 <= MASK; d1++) {
@@ -154,11 +173,12 @@ public class DatanodeUtil {
   }
 
   /**
-   * @return the FileInputStream for the meta data of the given block.
-   * @throws FileNotFoundException
-   *           if the file not found.
-   * @throws ClassCastException
-   *           if the underlying input stream is not a FileInputStream.
+   * 获取指定块元数据文件的文件输入流，用于读取块校验信息等元数据
+   * @param b 目标扩展块对象
+   * @param data 文件数据集实现
+   * @return 元数据文件的输入流
+   * @throws FileNotFoundException 元文件不存在抛出异常
+   * @throws ClassCastException 底层流不是FileInputStream抛出异常
    */
   public static FileInputStream getMetaDataInputStream(
       ExtendedBlock b, FsDatasetSpi<?> data) throws IOException {

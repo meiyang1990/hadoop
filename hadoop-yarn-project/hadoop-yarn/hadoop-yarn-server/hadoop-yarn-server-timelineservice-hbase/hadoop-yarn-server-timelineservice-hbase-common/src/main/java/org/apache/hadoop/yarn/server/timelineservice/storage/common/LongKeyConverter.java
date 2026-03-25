@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,12 +21,13 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 
 import java.io.IOException;
 /**
- * Encodes and decodes column names / row keys which are long.
+ * 将Long类型的HBase行键/列名编码为字节数组，或将字节数组解码为Long类型，
+ * 用于时间线服务存储层的主键转换。
  */
 public final class LongKeyConverter implements KeyConverter<Long> {
 
   /**
-   * To delegate the actual work to.
+   * 委托完成实际的Long类型编解码工作。
    */
   private final LongConverter longConverter = new LongConverter();
 

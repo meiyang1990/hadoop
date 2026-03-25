@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,6 +21,11 @@ package org.apache.hadoop.mapred.lib.db;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+/**
+ * 文件说明：Hadoop MapReduce旧API中数据库可写入对象接口，继承新版MapReduce DBWritable接口
+ * 核心职责：定义可读写关系型数据库的对象契约，供DBInputFormat/DBOutputFormat使用
+ * 用于MapReduce作业从数据库读取数据、将计算结果写入数据库场景
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface DBWritable 

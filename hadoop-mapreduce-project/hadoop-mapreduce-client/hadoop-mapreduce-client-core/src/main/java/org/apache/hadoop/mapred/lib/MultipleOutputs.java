@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -51,123 +52,45 @@ import org.apache.hadoop.mapreduce.MRConfig;
 import org.apache.hadoop.util.Progressable;
 
 /**
- * The MultipleOutputs class simplifies writing to additional outputs other
- * than the job default output via the <code>OutputCollector</code> passed to
- * the <code>map()</code> and <code>reduce()</code> methods of the
- * <code>Mapper</code> and <code>Reducer</code> implementations.
- * <p>
- * Each additional output, or named output, may be configured with its own
- * <code>OutputFormat</code>, with its own key class and with its own value
- * class.
- * <p>
- * A named output can be a single file or a multi file. The later is referred as
- * a multi named output.
- * <p>
- * A multi named output is an unbound set of files all sharing the same
- * <code>OutputFormat</code>, key class and value class configuration.
- * <p>
- * When named outputs are used within a <code>Mapper</code> implementation,
- * key/values written to a name output are not part of the reduce phase, only
- * key/values written to the job <code>OutputCollector</code> are part of the
- * reduce phase.
- * <p>
- * MultipleOutputs supports counters, by default the are disabled. The counters
- * group is the {@link MultipleOutputs} class name.
- * </p>
- * The names of the counters are the same as the named outputs. For multi
- * named outputs the name of the counter is the concatenation of the named
- * output, and underscore '_' and the multiname.
- * <p>
- * Job configuration usage pattern is:
- * <pre>
- *
- * JobConf conf = new JobConf();
- *
- * conf.setInputPath(inDir);
- * FileOutputFormat.setOutputPath(conf, outDir);
- *
- * conf.setMapperClass(MOMap.class);
- * conf.setReducerClass(MOReduce.class);
- * ...
- *
- * // Defines additional single text based output 'text' for the job
- * MultipleOutputs.addNamedOutput(conf, "text", TextOutputFormat.class,
- * LongWritable.class, Text.class);
- *
- * // Defines additional multi sequencefile based output 'sequence' for the
- * // job
- * MultipleOutputs.addMultiNamedOutput(conf, "seq",
- *   SequenceFileOutputFormat.class,
- *   LongWritable.class, Text.class);
- * ...
- *
- * JobClient jc = new JobClient();
- * RunningJob job = jc.submitJob(conf);
- *
- * ...
- * </pre>
- * <p>
- * Job configuration usage pattern is:
- * <pre>
- *
- * public class MOReduce implements
- *   Reducer&lt;WritableComparable, Writable&gt; {
- * private MultipleOutputs mos;
- *
- * public void configure(JobConf conf) {
- * ...
- * mos = new MultipleOutputs(conf);
- * }
- *
- * public void reduce(WritableComparable key, Iterator&lt;Writable&gt; values,
- * OutputCollector output, Reporter reporter)
- * throws IOException {
- * ...
- * mos.getCollector("text", reporter).collect(key, new Text("Hello"));
- * mos.getCollector("seq", "A", reporter).collect(key, new Text("Bye"));
- * mos.getCollector("seq", "B", reporter).collect(key, new Text("Chau"));
- * ...
- * }
- *
- * public void close() throws IOException {
- * mos.close();
- * ...
- * }
- *
- * }
- * </pre>
+ * 支持MapReduce作业向默认输出之外输出到多个命名输出文件，每个命名输出可配置独立的OutputFormat、键值类型
+ * 支持两种输出类型：单个输出（一个命名输出对应一个文件前缀）和多输出（一个命名输出可生成多个自定义命名的文件）
+ * 可开启计数器统计每个命名输出的记录条数，默认计数器关闭
+ * 在Mapper中使用时，写入MultipleOutputs的数据不会进入Reduce阶段，只有写入默认OutputCollector的数据会参与Shuffle和Reduce
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class MultipleOutputs {
 
+  // 配置项：存储所有命名输出名称，空格分隔
   private static final String NAMED_OUTPUTS = "mo.namedOutputs";
 
+  // 命名输出配置前缀
   private static final String MO_PREFIX = "mo.namedOutput.";
 
+  // 配置后缀：OutputFormat类
   private static final String FORMAT = ".format";
+  // 配置后缀：键类型
   private static final String KEY = ".key";
+  // 配置后缀：值类型
   private static final String VALUE = ".value";
+  // 配置后缀：是否为多输出
   private static final String MULTI = ".multi";
 
+  // 配置项：是否开启计数器
   private static final String COUNTERS_ENABLED = "mo.counters";
 
   /**
-   * Counters group used by the counters of MultipleOutputs.
+   * 多个输出计数器所属计数器组名，使用当前类全限定名
    */
   private static final String COUNTERS_GROUP = MultipleOutputs.class.getName();
   private static final Logger LOG = LoggerFactory.getLogger(MultipleOutputs.class);
 
   /**
-   * Checks if a named output is alreadyDefined or not.
-   *
-   * @param conf           job conf
-   * @param namedOutput    named output names
-   * @param alreadyDefined whether the existence/non-existence of
-   *                       the named output is to be checked
-   * @throws IllegalArgumentException if the output name is alreadyDefined or
-   *                                  not depending on the value of the
-   *                                  'alreadyDefined' parameter
+   * 检查命名输出是否已存在/不存在，不符合预期则抛出异常
+   * @param conf 作业配置
+   * @param namedOutput 要检查的命名输出名称
+   * @param alreadyDefined 预期是否已存在，true要求该输出已存在，false要求该输出不存在
+   * @throws IllegalArgumentException 检查不通过时抛出
    */
   private static void checkNamedOutput(JobConf conf, String namedOutput,
                                        boolean alreadyDefined) {
@@ -182,10 +105,9 @@ public class MultipleOutputs {
   }
 
   /**
-   * Checks if a named output name is valid token.
-   *
-   * @param namedOutput named output Name
-   * @throws IllegalArgumentException if the output name is not valid.
+   * 检查命名输出名称是否合法，仅允许字母数字
+   * @param namedOutput 要检查的命名输出名称
+   * @throws IllegalArgumentException 名称包含非法字符时抛出
    */
   private static void checkTokenName(String namedOutput) {
     if (namedOutput == null || namedOutput.length() == 0) {
@@ -208,10 +130,9 @@ public class MultipleOutputs {
   }
 
   /**
-   * Checks if a named output name is valid.
-   *
-   * @param namedOutput named output Name
-   * @throws IllegalArgumentException if the output name is not valid.
+   * 检查命名输出名称是否合法，不能为保留名称"part"
+   * @param namedOutput 要检查的命名输出名称
+   * @throws IllegalArgumentException 名称非法时抛出
    */
   private static void checkNamedOutputName(String namedOutput) {
     checkTokenName(namedOutput);
@@ -223,10 +144,9 @@ public class MultipleOutputs {
   }
 
   /**
-   * Returns list of channel names.
-   *
-   * @param conf job conf
-   * @return List of channel Names
+   * 从作业配置中解析所有已定义的命名输出名称列表
+   * @param conf 作业配置
+   * @return 命名输出名称列表
    */
   public static List<String> getNamedOutputsList(JobConf conf) {
     List<String> names = new ArrayList<String>();
@@ -239,13 +159,10 @@ public class MultipleOutputs {
 
 
   /**
-   * Returns if a named output is multiple.
-   *
-   * @param conf        job conf
-   * @param namedOutput named output
-   * @return <code>true</code> if the name output is multi, <code>false</code>
-   *         if it is single. If the name output is not defined it returns
-   *         <code>false</code>
+   * 判断指定命名输出是否为多输出类型
+   * @param conf 作业配置
+   * @param namedOutput 命名输出名称
+   * @return true表示是多输出，false表示是单输出，输出不存在则返回false
    */
   public static boolean isMultiNamedOutput(JobConf conf, String namedOutput) {
     checkNamedOutput(conf, namedOutput, false);
@@ -253,11 +170,10 @@ public class MultipleOutputs {
   }
 
   /**
-   * Returns the named output OutputFormat.
-   *
-   * @param conf        job conf
-   * @param namedOutput named output
-   * @return namedOutput OutputFormat
+   * 获取指定命名输出配置的OutputFormat类
+   * @param conf 作业配置
+   * @param namedOutput 命名输出名称
+   * @return 命名输出的OutputFormat类
    */
   public static Class<? extends OutputFormat> getNamedOutputFormatClass(
     JobConf conf, String namedOutput) {
@@ -267,11 +183,10 @@ public class MultipleOutputs {
   }
 
   /**
-   * Returns the key class for a named output.
-   *
-   * @param conf        job conf
-   * @param namedOutput named output
-   * @return class for the named output key
+   * 获取指定命名输出配置的键类型
+   * @param conf 作业配置
+   * @param namedOutput 命名输出名称
+   * @return 命名输出的键类
    */
   public static Class<?> getNamedOutputKeyClass(JobConf conf,
                                                 String namedOutput) {
@@ -281,11 +196,10 @@ public class MultipleOutputs {
   }
 
   /**
-   * Returns the value class for a named output.
-   *
-   * @param conf        job conf
-   * @param namedOutput named output
-   * @return class of named output value
+   * 获取指定命名输出配置的值类型
+   * @param conf 作业配置
+   * @param namedOutput 命名输出名称
+   * @return 命名输出的值类
    */
   public static Class<?> getNamedOutputValueClass(JobConf conf,
                                                   String namedOutput) {
@@ -295,16 +209,12 @@ public class MultipleOutputs {
   }
 
   /**
-   * Adds a named output for the job.
-   *
-   * @param conf              job conf to add the named output
-   * @param namedOutput       named output name, it has to be a word, letters
-   *                          and numbers only, cannot be the word 'part' as
-   *                          that is reserved for the
-   *                          default output.
-   * @param outputFormatClass OutputFormat class.
-   * @param keyClass          key class
-   * @param valueClass        value class
+   * 向作业配置添加一个单命名输出
+   * @param conf 作业配置对象
+   * @param namedOutput 命名输出名称，仅允许字母数字，不能是保留名part
+   * @param outputFormatClass 输出格式类
+   * @param keyClass 键类型
+   * @param valueClass 值类型
    */
   public static void addNamedOutput(JobConf conf, String namedOutput,
                                 Class<? extends OutputFormat> outputFormatClass,
@@ -314,16 +224,12 @@ public class MultipleOutputs {
   }
 
   /**
-   * Adds a multi named output for the job.
-   *
-   * @param conf              job conf to add the named output
-   * @param namedOutput       named output name, it has to be a word, letters
-   *                          and numbers only, cannot be the word 'part' as
-   *                          that is reserved for the
-   *                          default output.
-   * @param outputFormatClass OutputFormat class.
-   * @param keyClass          key class
-   * @param valueClass        value class
+   * 向作业配置添加一个多命名输出，允许一个命名输出生成多个自定义名称的文件
+   * @param conf 作业配置对象
+   * @param namedOutput 命名输出名称，仅允许字母数字，不能是保留名part
+   * @param outputFormatClass 输出格式类
+   * @param keyClass 键类型
+   * @param valueClass 值类型
    */
   public static void addMultiNamedOutput(JobConf conf, String namedOutput,
                                Class<? extends OutputFormat> outputFormatClass,
@@ -333,17 +239,13 @@ public class MultipleOutputs {
   }
 
   /**
-   * Adds a named output for the job.
-   *
-   * @param conf              job conf to add the named output
-   * @param namedOutput       named output name, it has to be a word, letters
-   *                          and numbers only, cannot be the word 'part' as
-   *                          that is reserved for the
-   *                          default output.
-   * @param multi             indicates if the named output is multi
-   * @param outputFormatClass OutputFormat class.
-   * @param keyClass          key class
-   * @param valueClass        value class
+   * 内部通用方法：向作业配置添加一个命名输出，区分单输出和多输出
+   * @param conf 作业配置对象
+   * @param namedOutput 命名输出名称
+   * @param multi 是否为多输出
+   * @param outputFormatClass 输出格式类
+   * @param keyClass 键类型
+   * @param valueClass 值类型
    */
   private static void addNamedOutput(JobConf conf, String namedOutput,
                                boolean multi,
@@ -360,39 +262,19 @@ public class MultipleOutputs {
   }
 
   /**
-   * Enables or disables counters for the named outputs.
-   * <p>
-   * By default these counters are disabled.
-   * <p>
-   * MultipleOutputs supports counters, by default the are disabled.
-   * The counters group is the {@link MultipleOutputs} class name.
-   * </p>
-   * The names of the counters are the same as the named outputs. For multi
-   * named outputs the name of the counter is the concatenation of the named
-   * output, and underscore '_' and the multiname.
-   *
-   * @param conf    job conf to enableadd the named output.
-   * @param enabled indicates if the counters will be enabled or not.
+   * 设置是否开启命名输出计数器，默认关闭
+   * 计数器命名规则：单输出直接使用输出名，多输出为 输出名_多文件名
+   * @param conf 作业配置
+   * @param enabled true开启，false关闭
    */
   public static void setCountersEnabled(JobConf conf, boolean enabled) {
     conf.setBoolean(COUNTERS_ENABLED, enabled);
   }
 
   /**
-   * Returns if the counters for the named outputs are enabled or not.
-   * <p>
-   * By default these counters are disabled.
-   * <p>
-   * MultipleOutputs supports counters, by default the are disabled.
-   * The counters group is the {@link MultipleOutputs} class name.
-   * </p>
-   * The names of the counters are the same as the named outputs. For multi
-   * named outputs the name of the counter is the concatenation of the named
-   * output, and underscore '_' and the multiname.
-   *
-   *
-   * @param conf    job conf to enableadd the named output.
-   * @return TRUE if the counters are enabled, FALSE if they are disabled.
+   * 获取命名输出计数器是否开启
+   * @param conf 作业配置
+   * @return true开启，false关闭，默认返回false
    */
   public static boolean getCountersEnabled(JobConf conf) {
     return conf.getBoolean(COUNTERS_ENABLED, false);
@@ -412,10 +294,8 @@ public class MultipleOutputs {
   }
 
   /**
-   * Creates and initializes multiple named outputs support, it should be
-   * instantiated in the Mapper/Reducer configure method.
-   *
-   * @param job the job configuration object
+   * 构造MultipleOutputs实例，初始化所有命名输出，需要在Mapper/Reducer的configure方法中调用
+   * @param job 作业配置对象
    */
   public MultipleOutputs(JobConf job) {
     this.conf = job;
@@ -427,9 +307,8 @@ public class MultipleOutputs {
   }
 
   /**
-   * Returns iterator with the defined name outputs.
-   *
-   * @return iterator with the defined named outputs
+   * 获取所有已定义命名输出名称的迭代器
+   * @return 命名输出名称迭代器
    */
   public Iterator<String> getNamedOutputs() {
     return namedOutputs.iterator();
@@ -438,6 +317,15 @@ public class MultipleOutputs {
 
   // by being synchronized MultipleOutputTask can be use with a
   // MultithreaderMapRunner.
+  /**
+   * 获取指定输出文件名对应的RecordWriter，不存在则创建并缓存
+   * 线程安全，支持多线程Mapper使用
+   * @param namedOutput 命名输出名称
+   * @param baseFileName 基础文件名
+   * @param reporter 报告器，用于计数器更新
+   * @return 对应RecordWriter实例
+   * @throws IOException 创建RecordWriter失败时抛出
+   */
   private synchronized RecordWriter getRecordWriter(String namedOutput,
                                                     String baseFileName,
                                                     final Reporter reporter)
@@ -448,6 +336,7 @@ public class MultipleOutputs {
         throw new IllegalArgumentException(
           "Counters are enabled, Reporter cannot be NULL");
       }
+      // 创建新配置，注入当前命名输出信息
       JobConf jobConf = new JobConf(conf);
       jobConf.set(InternalFileOutputFormat.CONFIG_NAMED_OUTPUT, namedOutput);
       FileSystem fs = FileSystem.get(conf);
@@ -459,6 +348,7 @@ public class MultipleOutputs {
           throw new IllegalArgumentException(
             "Counters are enabled, Reporter cannot be NULL");
         }
+        // 包装计数器，每次写入递增计数
         writer = new RecordWriterWithCounter(writer, baseFileName, reporter);
       }
 
@@ -467,6 +357,9 @@ public class MultipleOutputs {
     return writer;
   }
 
+  /**
+   * RecordWriter包装类，每次写入时递增对应计数器
+   */
   private static class RecordWriterWithCounter implements RecordWriter {
     private RecordWriter writer;
     private String counterName;
@@ -481,6 +374,7 @@ public class MultipleOutputs {
 
     @SuppressWarnings({"unchecked"})
     public void write(Object key, Object value) throws IOException {
+      // 递增计数器
       reporter.incrCounter(COUNTERS_GROUP, counterName, 1);
       writer.write(key, value);
     }
@@ -491,12 +385,11 @@ public class MultipleOutputs {
   }
 
   /**
-   * Gets the output collector for a named output.
-   *
-   * @param namedOutput the named output name
-   * @param reporter    the reporter
-   * @return the output collector for the given named output
-   * @throws IOException thrown if output collector could not be created
+   * 获取单命名输出对应的OutputCollector
+   * @param namedOutput 命名输出名称
+   * @param reporter 报告器
+   * @return 输出收集器
+   * @throws IOException 获取RecordWriter失败时抛出
    */
   @SuppressWarnings({"unchecked"})
   public OutputCollector getCollector(String namedOutput, Reporter reporter)
@@ -505,13 +398,12 @@ public class MultipleOutputs {
   }
 
   /**
-   * Gets the output collector for a multi named output.
-   *
-   * @param namedOutput the named output name
-   * @param multiName   the multi name part
-   * @param reporter    the reporter
-   * @return the output collector for the given named output
-   * @throws IOException thrown if output collector could not be created
+   * 获取命名输出对应的OutputCollector，支持多输出指定子名称
+   * @param namedOutput 命名输出名称
+   * @param multiName 多输出的子名称，单输出需传null
+   * @param reporter 报告器
+   * @return 输出收集器
+   * @throws IOException 参数非法或获取RecordWriter失败时抛出
    */
   @SuppressWarnings({"unchecked"})
   public OutputCollector getCollector(String namedOutput, String multiName,
@@ -525,19 +417,23 @@ public class MultipleOutputs {
     }
     boolean multi = isMultiNamedOutput(conf, namedOutput);
 
+    // 单输出不能指定子名称
     if (!multi && multiName != null) {
       throw new IllegalArgumentException("Name output '" + namedOutput +
         "' has not been defined as multi");
     }
+    // 多输出需要检查子名称合法性
     if (multi) {
       checkTokenName(multiName);
     }
 
+    // 生成基础文件名：多输出为 命名输出_子名称，单输出为命名输出
     String baseFileName = (multi) ? namedOutput + "_" + multiName : namedOutput;
 
     final RecordWriter writer =
       getRecordWriter(namedOutput, baseFileName, reporter);
 
+    // 返回匿名OutputCollector，直接委托给RecordWriter写入
     return new OutputCollector() {
 
       @SuppressWarnings({"unchecked"})
@@ -549,75 +445,10 @@ public class MultipleOutputs {
   }
 
   /**
-   * Closes all the opened named outputs.
-   * <p>
-   * If overriden subclasses must invoke <code>super.close()</code> at the
-   * end of their <code>close()</code>
-   *
-   * @throws java.io.IOException thrown if any of the MultipleOutput files
-   *                             could not be closed properly.
+   * 关闭所有已打开的RecordWriter，释放资源，需要在Mapper/Reducer的close方法中调用
+   * 使用多线程并行关闭提升大量输出时的关闭速度
+   * @throws IOException 任意一个关闭操作出现异常时抛出
    */
   public void close() throws IOException {
-    int nThreads = conf.getInt(MRConfig.MULTIPLE_OUTPUTS_CLOSE_THREAD_COUNT,
-        MRConfig.DEFAULT_MULTIPLE_OUTPUTS_CLOSE_THREAD_COUNT);
-    AtomicBoolean encounteredException = new AtomicBoolean(false);
-    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("MultipleOutputs-close")
-        .setUncaughtExceptionHandler(((t, e) -> {
-          LOG.error("Thread " + t + " failed unexpectedly", e);
-          encounteredException.set(true);
-        })).build();
-    ExecutorService executorService = Executors.newFixedThreadPool(nThreads, threadFactory);
-
-    List<Callable<Object>> callableList = new ArrayList<>(recordWriters.size());
-
-    for (RecordWriter writer : recordWriters.values()) {
-      callableList.add(() -> {
-        try {
-          writer.close(null);
-        } catch (IOException e) {
-          LOG.error("Error while closing MultipleOutput file", e);
-          encounteredException.set(true);
-        }
-        return null;
-      });
-    }
-    try {
-      executorService.invokeAll(callableList);
-    } catch (InterruptedException e) {
-      LOG.warn("Closing is Interrupted");
-      Thread.currentThread().interrupt();
-    } finally {
-      executorService.shutdown();
-    }
-
-    if (encounteredException.get()) {
-      throw new IOException(
-          "One or more threads encountered exception during close. See prior errors.");
-    }
-  }
-
-  private static class InternalFileOutputFormat extends
-    FileOutputFormat<Object, Object> {
-
-    public static final String CONFIG_NAMED_OUTPUT = "mo.config.namedOutput";
-
-    @SuppressWarnings({"unchecked"})
-    public RecordWriter<Object, Object> getRecordWriter(
-      FileSystem fs, JobConf job, String baseFileName, Progressable progress)
-      throws IOException {
-
-      String nameOutput = job.get(CONFIG_NAMED_OUTPUT, null);
-      String fileName = getUniqueName(job, baseFileName);
-
-      // The following trick leverages the instantiation of a record writer via
-      // the job conf thus supporting arbitrary output formats.
-      JobConf outputConf = new JobConf(job);
-      outputConf.setOutputFormat(getNamedOutputFormatClass(job, nameOutput));
-      outputConf.setOutputKeyClass(getNamedOutputKeyClass(job, nameOutput));
-      outputConf.setOutputValueClass(getNamedOutputValueClass(job, nameOutput));
-      OutputFormat outputFormat = outputConf.getOutputFormat();
-      return outputFormat.getRecordWriter(fs, outputConf, fileName, progress);
-    }
-  }
-
-}
+    // 从配置获取关闭线程数，默认使用配置默认值
+    int nThreads = conf.getInt(MRConfig

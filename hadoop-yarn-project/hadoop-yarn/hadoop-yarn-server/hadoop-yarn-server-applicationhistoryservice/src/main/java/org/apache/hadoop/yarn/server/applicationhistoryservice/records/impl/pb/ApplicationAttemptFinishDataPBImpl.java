@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,12 +33,18 @@ import org.apache.hadoop.yarn.server.applicationhistoryservice.records.Applicati
 
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
+/**
+ * 应用尝试完成数据的Protobuf实现，存储应用尝试结束相关信息，用于应用历史服务
+ */
 public class ApplicationAttemptFinishDataPBImpl extends
     ApplicationAttemptFinishData {
 
+  // Protobuf默认实例，用于只读场景
   ApplicationAttemptFinishDataProto proto = ApplicationAttemptFinishDataProto
     .getDefaultInstance();
+  // Protobuf构建器，用于可修改场景
   ApplicationAttemptFinishDataProto.Builder builder = null;
+  // 标记当前是否通过已有proto实例构造
   boolean viaProto = false;
 
   public ApplicationAttemptFinishDataPBImpl() {
@@ -50,17 +57,22 @@ public class ApplicationAttemptFinishDataPBImpl extends
     viaProto = true;
   }
 
+  // 缓存应用尝试ID对象
   private ApplicationAttemptId applicationAttemptId;
 
   @Override
   public ApplicationAttemptId getApplicationAttemptId() {
+    // 已缓存直接返回
     if (this.applicationAttemptId != null) {
       return this.applicationAttemptId;
     }
+    // 根据场景选择proto或builder
     ApplicationAttemptFinishDataProtoOrBuilder p = viaProto ? proto : builder;
+    // 无设置返回null
     if (!p.hasApplicationAttemptId()) {
       return null;
     }
+    // 从proto转换并缓存
     this.applicationAttemptId =
         convertFromProtoFormat(p.getApplicationAttemptId());
     return this.applicationAttemptId;
@@ -69,10 +81,13 @@ public class ApplicationAttemptFinishDataPBImpl extends
   @Override
   public void
       setApplicationAttemptId(ApplicationAttemptId applicationAttemptId) {
+    // 确保builder已初始化
     maybeInitBuilder();
+    // 清空字段
     if (applicationAttemptId == null) {
       builder.clearApplicationAttemptId();
     }
+    // 缓存对象
     this.applicationAttemptId = applicationAttemptId;
   }
 
@@ -154,6 +169,10 @@ public class ApplicationAttemptFinishDataPBImpl extends
     builder.setYarnApplicationAttemptState(convertToProtoFormat(state));
   }
 
+  /**
+   * 获取当前对象对应的Protobuf实例，合并本地修改到proto
+   * @return Protobuf实例
+   */
   public ApplicationAttemptFinishDataProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -181,6 +200,7 @@ public class ApplicationAttemptFinishDataPBImpl extends
     return TextFormat.shortDebugString(getProto());
   }
 
+  // 将本地缓存的应用尝试ID合并到builder
   private void mergeLocalToBuilder() {
     if (this.applicationAttemptId != null
         && !((ApplicationAttemptIdPBImpl) this.applicationAttemptId).getProto()
@@ -190,6 +210,7 @@ public class ApplicationAttemptFinishDataPBImpl extends
     }
   }
 
+  // 将本地修改合并到proto实例
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -199,6 +220,7 @@ public class ApplicationAttemptFinishDataPBImpl extends
     viaProto = true;
   }
 
+  // 初始化builder，确保可修改
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = ApplicationAttemptFinishDataProto.newBuilder(proto);
@@ -206,31 +228,37 @@ public class ApplicationAttemptFinishDataPBImpl extends
     viaProto = false;
   }
 
+  // 应用尝试ID从Protobuf格式转换
   private ApplicationAttemptIdPBImpl convertFromProtoFormat(
       ApplicationAttemptIdProto applicationAttemptId) {
     return new ApplicationAttemptIdPBImpl(applicationAttemptId);
   }
 
+  // 应用尝试ID转换为Protobuf格式
   private ApplicationAttemptIdProto convertToProtoFormat(
       ApplicationAttemptId applicationAttemptId) {
     return ((ApplicationAttemptIdPBImpl) applicationAttemptId).getProto();
   }
 
+  // 最终应用状态从Protobuf格式转换
   private FinalApplicationStatus convertFromProtoFormat(
       FinalApplicationStatusProto finalApplicationStatus) {
     return ProtoUtils.convertFromProtoFormat(finalApplicationStatus);
   }
 
+  // 最终应用状态转换为Protobuf格式
   private FinalApplicationStatusProto convertToProtoFormat(
       FinalApplicationStatus finalApplicationStatus) {
     return ProtoUtils.convertToProtoFormat(finalApplicationStatus);
   }
 
+  // YARN应用尝试状态转换为Protobuf格式
   private YarnApplicationAttemptStateProto convertToProtoFormat(
       YarnApplicationAttemptState state) {
     return ProtoUtils.convertToProtoFormat(state);
   }
 
+  // YARN应用尝试状态从Protobuf格式转换
   private YarnApplicationAttemptState convertFromProtoFormat(
       YarnApplicationAttemptStateProto yarnApplicationAttemptState) {
     return ProtoUtils.convertFromProtoFormat(yarnApplicationAttemptState);

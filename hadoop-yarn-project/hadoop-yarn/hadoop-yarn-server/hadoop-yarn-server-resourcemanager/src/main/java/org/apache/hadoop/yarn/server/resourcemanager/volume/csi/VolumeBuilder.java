@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,7 +29,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Helper class to build a {@link Volume}.
+ * YARN CSI卷构建工具类，使用Builder模式构造Volume对象，支持链式调用和默认值填充
  */
 public final class VolumeBuilder {
 
@@ -41,59 +42,106 @@ public final class VolumeBuilder {
   private String mount;
 
   private VolumeBuilder() {
-    // hide constructor
+    // 隐藏构造函数，强制使用newBuilder创建实例
   }
 
+  /**
+   * 创建新的VolumeBuilder实例
+   * @return VolumeBuilder实例
+   */
   public static VolumeBuilder newBuilder() {
     return new VolumeBuilder();
   }
 
+  /**
+   * 设置卷ID
+   * @param volumeId 卷ID
+   * @return 当前Builder实例
+   */
   public VolumeBuilder volumeId(String volumeId) {
     this.id = volumeId;
     return this;
   }
 
+  /**
+   * 设置卷名称
+   * @param volumeName 卷名称
+   * @return 当前Builder实例
+   */
   public VolumeBuilder volumeName(String volumeName) {
     this.name = volumeName;
     return this;
   }
 
+  /**
+   * 设置最小容量能力
+   * @param minCapability 最小容量
+   * @return 当前Builder实例
+   */
   public VolumeBuilder minCapability(long minCapability) {
     this.min = Long.valueOf(minCapability);
     return this;
   }
 
+  /**
+   * 设置最大容量能力
+   * @param maxCapability 最大容量
+   * @return 当前Builder实例
+   */
   public VolumeBuilder maxCapability(long maxCapability) {
     this.max = Long.valueOf(maxCapability);
     return this;
   }
 
+  /**
+   * 设置容量单位
+   * @param capUnit 容量单位
+   * @return 当前Builder实例
+   */
   public VolumeBuilder unit(String capUnit) {
     this.unit = capUnit;
     return this;
   }
 
+  /**
+   * 设置CSI驱动名称
+   * @param driverName CSI驱动名称
+   * @return 当前Builder实例
+   */
   public VolumeBuilder driverName(String driverName) {
     this.driver = driverName;
     return this;
   }
 
+  /**
+   * 设置挂载点路径
+   * @param mountPoint 挂载点路径
+   * @return 当前Builder实例
+   */
   public VolumeBuilder mountPoint(String mountPoint) {
     this.mount = mountPoint;
     return this;
   }
 
+  /**
+   * 构建Volume对象，未设置的属性使用默认值填充
+   * @return 构造完成的Volume对象
+   * @throws InvalidVolumeException 当卷信息无效时抛出异常
+   */
   public Volume build() throws InvalidVolumeException {
+    // 生成卷ID，未指定则使用随机UUID
     VolumeId vid = new VolumeId(
         Optional.ofNullable(id)
             .orElse(UUID.randomUUID().toString()));
 
+    // 构建容量范围，未指定的使用默认值：最小0、最大Long最大值、单位Gi
     VolumeCapabilityRange volumeCap = VolumeCapabilityRange.newBuilder()
         .minCapacity(Optional.ofNullable(min).orElse(0L))
         .maxCapacity(Optional.ofNullable(max).orElse(Long.MAX_VALUE))
         .unit(Optional.ofNullable(unit).orElse("Gi"))
         .build();
 
+    // 构建卷元数据，未指定的使用默认值：驱动test-driver、挂载点/mnt/data
     VolumeMetaData meta = VolumeMetaData.newBuilder()
         .capability(volumeCap)
         .driverName(Optional.ofNullable(driver).orElse("test-driver"))

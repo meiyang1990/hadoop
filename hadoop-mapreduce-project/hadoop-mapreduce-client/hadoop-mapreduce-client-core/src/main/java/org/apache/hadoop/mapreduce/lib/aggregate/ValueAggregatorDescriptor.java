@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,48 +28,39 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 
 /**
- * This interface defines the contract a value aggregator descriptor must
- * support. Such a descriptor can be configured with a {@link Configuration}
- * object. Its main function is to generate a list of aggregation-id/value 
- * pairs. An aggregation id encodes an aggregation type which is used to 
- * guide the way to aggregate the value in the reduce/combiner phrase of an
- * Aggregate based job. 
- * The mapper in an Aggregate based map/reduce job may create one or more of
- * ValueAggregatorDescriptor objects at configuration time. For each input
- * key/value pair, the mapper will use those objects to create aggregation
- * id/value pairs.
+ * 文件说明: 值聚合器描述符接口，定义了基于聚合的MapReduce作业中，Mapper端处理输入键值对、生成聚合键值对的约定
  * 
+ * 核心职责: 该接口定义了聚合描述符需要实现的规范，用于将原始输入键值对转换为带聚合类型标识的键值对，
+ * 供后续Reduce/Combiner阶段按照对应的聚合类型完成聚合计算。
+ * 在基于Aggregate框架的MapReduce作业中，Mapper会根据配置创建一个或多个该接口的实现，
+ * 对每个输入键值对生成对应的聚合id/值对，完成聚合任务的预处理。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface ValueAggregatorDescriptor {
 
+  // 聚合类型与自定义部分的分隔符
   public static final String TYPE_SEPARATOR = ":";
 
+  // 用于计数聚合的固定值1
   public static final Text ONE = new Text("1");
 
   /**
-   * Generate a list of aggregation-id/value pairs for 
-   * the given key/value pair.
-   * This function is usually called by the mapper of an Aggregate based job.
+   * 为输入键值对生成聚合id/值对列表
+   * 该方法由基于Aggregate框架作业的Mapper调用，将原始输入转换为带聚合类型标识的键值对，
+   * 供后续Reduce/Combiner阶段根据聚合类型执行对应的聚合计算
    * 
-   * @param key
-   *          input key
-   * @param val
-   *          input value
-   * @return a list of aggregation id/value pairs. An aggregation id encodes an
-   *         aggregation type which is used to guide the way to aggregate the
-   *         value in the reduce/combiner phrase of an Aggregate based job.
+   * @param key 输入原始键
+   * @param val 输入原始值
+   * @return 聚合id/值对列表，聚合id中编码了聚合类型，用于指导Reduce/Combiner阶段的聚合方式
    */
   public ArrayList<Entry<Text, Text>> generateKeyValPairs(Object key,
                                                           Object val);
 
   /**
-   * Configure the object
+   * 根据配置初始化聚合描述符对象
    * 
-   * @param conf
-   *          a Configuration object that may contain the information 
-   *          that can be used to configure the object.
+   * @param conf 作业配置对象，包含初始化该描述符所需的配置参数
    */
   public void configure(Configuration conf);
 }

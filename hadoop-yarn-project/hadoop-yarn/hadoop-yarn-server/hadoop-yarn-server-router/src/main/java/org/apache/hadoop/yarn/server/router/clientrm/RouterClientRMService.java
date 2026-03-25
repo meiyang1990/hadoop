@@ -121,14 +121,9 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * RouterClientRMService is a service that runs on each router that can be used
- * to intercept and inspect {@link ApplicationClientProtocol} messages from
- * client to the cluster resource manager. It listens
- * {@link ApplicationClientProtocol} messages from the client and creates a
- * request intercepting pipeline instance for each client. The pipeline is a
- * chain of {@link ClientRequestInterceptor} instances that can inspect and
- * modify the request/response as needed. The main difference with
- * AMRMProxyService is the protocol they implement.
+ * RouterClientRMService是运行在每个Router上的服务，负责拦截处理客户端发往ResourceManager的
+ * ApplicationClientProtocol请求，基于请求拦截器责任链模式处理请求，支持对请求/响应进行检查和修改。
+ * 在YARN联邦场景下，承担客户端请求代理和路由的核心功能。
  */
 public class RouterClientRMService extends AbstractService
     implements ApplicationClientProtocol {
@@ -136,15 +131,17 @@ public class RouterClientRMService extends AbstractService
   private static final Logger LOG =
       LoggerFactory.getLogger(RouterClientRMService.class);
 
+  /** RPC服务端实例 */
   private Server server;
+  /** 服务监听地址 */
   private InetSocketAddress listenerEndpoint;
 
-  // For each user we store an interceptors' pipeline.
-  // For performance issue we use LRU cache to keep in memory the newest ones
-  // and remove the oldest used ones.
+  // 按用户存储请求拦截器责任链，使用LRU缓存缓存最近使用的管道，淘汰最久未使用的提升性能
   private Map<String, RequestInterceptorChainWrapper> userPipelineMap;
 
+  /** Web代理重定向地址 */
   private URL redirectURL;
+  /** Router代理令牌管理服务 */
   private RouterDelegationTokenSecretManager routerDTSecretManager;
 
   public RouterClientRMService() {
@@ -155,43 +152,53 @@ public class RouterClientRMService extends AbstractService
   protected void serviceStart() throws Exception {
     LOG.info("Starting Router ClientRMService.");
     Configuration conf = getConfig();
+    // 创建YARN RPC实例
     YarnRPC rpc = YarnRPC.create(conf);
+    // 设置UGI配置
     UserGroupInformation.setConfiguration(conf);
 
+    // 从配置中获取服务绑定地址
     this.listenerEndpoint =
         conf.getSocketAddr(YarnConfiguration.ROUTER_BIND_HOST,
             YarnConfiguration.ROUTER_CLIENTRM_ADDRESS,
             YarnConfiguration.DEFAULT_ROUTER_CLIENTRM_ADDRESS,
             YarnConfiguration.DEFAULT_ROUTER_CLIENTRM_PORT);
 
+    // 如果开启了Router Web代理，初始化重定向地址
     if (RouterServerUtil.isRouterWebProxyEnable(conf)) {
       redirectURL = getRedirectURL();
     }
 
+    // 从配置获取管道缓存最大容量
     int maxCacheSize =
         conf.getInt(YarnConfiguration.ROUTER_PIPELINE_CACHE_MAX_SIZE,
             YarnConfiguration.DEFAULT_ROUTER_PIPELINE_CACHE_MAX_SIZE);
+    // 初始化线程安全的LRU缓存存储用户管道
     this.userPipelineMap = Collections.synchronizedMap(new LRUCacheHashMap<>(maxCacheSize, true));
 
+    // 创建服务端配置副本
     Configuration serverConf = new Configuration(conf);
 
+    // 获取RPC工作线程数配置
     int numWorkerThreads =
         serverConf.getInt(YarnConfiguration.RM_CLIENT_THREAD_COUNT,
             YarnConfiguration.DEFAULT_RM_CLIENT_THREAD_COUNT);
 
-    // Initialize RouterRMDelegationTokenSecretManager.
+    // 初始化Router代理令牌密钥管理器
     routerDTSecretManager = createRouterRMDelegationTokenSecretManager(conf);
     routerDTSecretManager.startThreads();
 
+    // 创建RPC服务端，绑定到监听地址
     this.server = rpc.getServer(ApplicationClientProtocol.class, this,
         listenerEndpoint, serverConf, routerDTSecretManager, numWorkerThreads);
 
-    // Enable service authorization?
+    // 如果开启了服务授权，刷新服务ACL
     if (conf.getBoolean(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, false)) {
       refreshServiceAcls(conf, RouterPolicyProvider.getInstance());
     }
 
+    // 启动RPC服务端
     this.server.start();
     LOG.info("Router ClientRMService listening on address: {}.", this.server.getListenerAddress());
     super.serviceStart();
@@ -200,9 +207,11 @@ public class RouterClientRMService extends AbstractService
   @Override
   protected void serviceStop() throws Exception {
     LOG.info("Stopping Router ClientRMService.");
+    // 停止RPC服务端
     if (this.server != null) {
       this.server.stop();
     }
+    // 清空管道缓存
     userPipelineMap.clear();
     super.serviceStop();
   }
@@ -331,9 +340,8 @@ public class RouterClientRMService extends AbstractService
     RequestInterceptorChainWrapper pipeline = getInterceptorChain();
     GetApplicationReportResponse response = pipeline.getRootInterceptor()
         .getApplicationReport(request);
+    // 如果开启Router Web代理，重定向应用跟踪URL到Router代理服务
     if (RouterServerUtil.isRouterWebProxyEnable(getConfig())) {
-      // After redirect url, tracking url in application report will
-      // redirect to embeded proxy server of router
       URL url = new URL(response.getApplicationReport().getTrackingUrl());
       String redirectUrl = new URL(redirectURL.getProtocol(),
           redirectURL.getHost(), redirectURL.getPort(), url.getFile())
@@ -342,6 +350,7 @@ public class RouterClientRMService extends AbstractService
         LOG.debug("The tracking url of application {} is redirect from {} to {}",
             response.getApplicationReport().getApplicationId(), url, redirectUrl);
       }
+      // 修改响应中的跟踪URL为Router代理地址
       response.getApplicationReport().setTrackingUrl(redirectUrl);
     }
     return response;
@@ -398,271 +407,4 @@ public class RouterClientRMService extends AbstractService
   }
 
   @Override
-  public CancelDelegationTokenResponse cancelDelegationToken(
-      CancelDelegationTokenRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().cancelDelegationToken(request);
-  }
-
-  @Override
-  public FailApplicationAttemptResponse failApplicationAttempt(
-      FailApplicationAttemptRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().failApplicationAttempt(request);
-  }
-
-  @Override
-  public UpdateApplicationPriorityResponse updateApplicationPriority(
-      UpdateApplicationPriorityRequest request)
-      throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().updateApplicationPriority(request);
-  }
-
-  @Override
-  public SignalContainerResponse signalToContainer(
-      SignalContainerRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().signalToContainer(request);
-  }
-
-  @Override
-  public UpdateApplicationTimeoutsResponse updateApplicationTimeouts(
-      UpdateApplicationTimeoutsRequest request)
-      throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().updateApplicationTimeouts(request);
-  }
-
-  @Override
-  public GetAllResourceProfilesResponse getResourceProfiles(
-      GetAllResourceProfilesRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().getResourceProfiles(request);
-  }
-
-  @Override
-  public GetResourceProfileResponse getResourceProfile(
-      GetResourceProfileRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().getResourceProfile(request);
-  }
-
-  @Override
-  public GetAllResourceTypeInfoResponse getResourceTypeInfo(
-      GetAllResourceTypeInfoRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().getResourceTypeInfo(request);
-  }
-
-  @Override
-  public GetAttributesToNodesResponse getAttributesToNodes(
-      GetAttributesToNodesRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().getAttributesToNodes(request);
-  }
-
-  @Override
-  public GetClusterNodeAttributesResponse getClusterNodeAttributes(
-      GetClusterNodeAttributesRequest request)
-      throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().getClusterNodeAttributes(request);
-  }
-
-  @Override
-  public GetNodesToAttributesResponse getNodesToAttributes(
-      GetNodesToAttributesRequest request) throws YarnException, IOException {
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain();
-    return pipeline.getRootInterceptor().getNodesToAttributes(request);
-  }
-
-  @VisibleForTesting
-  public RequestInterceptorChainWrapper getInterceptorChain()
-      throws IOException {
-    String user = UserGroupInformation.getCurrentUser().getUserName();
-    RequestInterceptorChainWrapper chain = userPipelineMap.get(user);
-    if (chain != null && chain.getRootInterceptor() != null) {
-      return chain;
-    }
-    return initializePipeline(user);
-  }
-
-  void refreshServiceAcls(Configuration configuration,
-      PolicyProvider policyProvider) {
-    this.server.refreshServiceAcl(configuration, policyProvider);
-  }
-
-  /**
-   * Gets the Request interceptor chains for all the users.
-   *
-   * @return the request interceptor chains.
-   */
-  @VisibleForTesting
-  protected Map<String, RequestInterceptorChainWrapper> getPipelines() {
-    return this.userPipelineMap;
-  }
-
-  /**
-   * This method creates and returns reference of the first interceptor in the
-   * chain of request interceptor instances.
-   *
-   * @return the reference of the first interceptor in the chain
-   */
-  @VisibleForTesting
-  protected ClientRequestInterceptor createRequestInterceptorChain() {
-    Configuration conf = getConfig();
-    return RouterServerUtil.createRequestInterceptorChain(conf,
-        YarnConfiguration.ROUTER_CLIENTRM_INTERCEPTOR_CLASS_PIPELINE,
-        YarnConfiguration.DEFAULT_ROUTER_CLIENTRM_INTERCEPTOR_CLASS,
-        ClientRequestInterceptor.class);
-  }
-
-  /**
-   * Initializes the request interceptor pipeline for the specified application.
-   *
-   * @param user
-   */
-  private RequestInterceptorChainWrapper initializePipeline(String user) {
-    synchronized (this.userPipelineMap) {
-      if (this.userPipelineMap.containsKey(user)) {
-        LOG.info("Request to start an already existing user: {}"
-            + " was received, so ignoring.", user);
-        return userPipelineMap.get(user);
-      }
-
-      RequestInterceptorChainWrapper chainWrapper =
-          new RequestInterceptorChainWrapper();
-      try {
-        // We should init the pipeline instance after it is created and then
-        // add to the map, to ensure thread safe.
-        LOG.info("Initializing request processing pipeline for application for the user: {}.",
-            user);
-
-        ClientRequestInterceptor interceptorChain =
-            this.createRequestInterceptorChain();
-        interceptorChain.init(user);
-
-        // We set the RouterDelegationTokenSecretManager instance to the interceptorChain
-        // and let the interceptor use it.
-        if (routerDTSecretManager != null) {
-          interceptorChain.setTokenSecretManager(routerDTSecretManager);
-        }
-
-        chainWrapper.init(interceptorChain);
-      } catch (Exception e) {
-        LOG.error("Init ClientRequestInterceptor error for user: {}.", user, e);
-        throw e;
-      }
-
-      this.userPipelineMap.put(user, chainWrapper);
-      return chainWrapper;
-    }
-  }
-
-  /**
-   * Private structure for encapsulating RequestInterceptor and user instances.
-   *
-   */
-  @Private
-  public static class RequestInterceptorChainWrapper {
-    private ClientRequestInterceptor rootInterceptor;
-
-    /**
-     * Initializes the wrapper with the specified parameters.
-     *
-     * @param interceptor the first interceptor in the pipeline
-     */
-    public synchronized void init(ClientRequestInterceptor interceptor) {
-      this.rootInterceptor = interceptor;
-    }
-
-    /**
-     * Gets the root request interceptor.
-     *
-     * @return the root request interceptor
-     */
-    public synchronized ClientRequestInterceptor getRootInterceptor() {
-      return rootInterceptor;
-    }
-
-    /**
-     * Shutdown the chain of interceptors when the object is destroyed.
-     */
-    @Override
-    protected void finalize() {
-      rootInterceptor.shutdown();
-    }
-  }
-
-  @VisibleForTesting
-  public Map<String, RequestInterceptorChainWrapper> getUserPipelineMap() {
-    return userPipelineMap;
-  }
-
-  /**
-   * Create RouterRMDelegationTokenSecretManager.
-   * In the YARN federation, the Router will replace the RM to
-   * manage the RMDelegationToken (generate, update, cancel),
-   * so the relevant configuration parameters still obtain the configuration parameters of the RM.
-   *
-   * @param conf Configuration
-   * @return RouterDelegationTokenSecretManager.
-   */
-  protected RouterDelegationTokenSecretManager createRouterRMDelegationTokenSecretManager(
-      Configuration conf) {
-
-    long secretKeyInterval = conf.getLong(
-        YarnConfiguration.RM_DELEGATION_KEY_UPDATE_INTERVAL_KEY,
-        YarnConfiguration.RM_DELEGATION_KEY_UPDATE_INTERVAL_DEFAULT);
-
-    long tokenMaxLifetime = conf.getLong(
-        YarnConfiguration.RM_DELEGATION_TOKEN_MAX_LIFETIME_KEY,
-        YarnConfiguration.RM_DELEGATION_TOKEN_MAX_LIFETIME_DEFAULT);
-
-    long tokenRenewInterval = conf.getLong(
-        YarnConfiguration.RM_DELEGATION_TOKEN_RENEW_INTERVAL_KEY,
-        YarnConfiguration.RM_DELEGATION_TOKEN_RENEW_INTERVAL_DEFAULT);
-
-    long removeScanInterval = conf.getTimeDuration(
-        YarnConfiguration.RM_DELEGATION_TOKEN_REMOVE_SCAN_INTERVAL_KEY,
-        YarnConfiguration.RM_DELEGATION_TOKEN_REMOVE_SCAN_INTERVAL_DEFAULT,
-        TimeUnit.MILLISECONDS);
-
-    return new RouterDelegationTokenSecretManager(secretKeyInterval,
-        tokenMaxLifetime, tokenRenewInterval, removeScanInterval, conf);
-  }
-
-  @VisibleForTesting
-  public RouterDelegationTokenSecretManager getRouterDTSecretManager() {
-    return routerDTSecretManager;
-  }
-
-  @VisibleForTesting
-  public void setRouterDTSecretManager(RouterDelegationTokenSecretManager routerDTSecretManager) {
-    this.routerDTSecretManager = routerDTSecretManager;
-  }
-
-  @VisibleForTesting
-  public void initUserPipelineMap(Configuration conf) {
-    int maxCacheSize = conf.getInt(YarnConfiguration.ROUTER_PIPELINE_CACHE_MAX_SIZE,
-        YarnConfiguration.DEFAULT_ROUTER_PIPELINE_CACHE_MAX_SIZE);
-    this.userPipelineMap = Collections.synchronizedMap(new LRUCacheHashMap<>(maxCacheSize, true));
-  }
-
-  private URL getRedirectURL() throws Exception {
-    Configuration conf = getConfig();
-    String webAppAddress = WebAppUtils.getWebAppBindURL(conf, YarnConfiguration.ROUTER_BIND_HOST,
-        WebAppUtils.getRouterWebAppURLWithoutScheme(conf));
-    String[] hostPort = StringUtils.split(webAppAddress, ':');
-    if (hostPort.length != 2) {
-      throw new YarnRuntimeException("Router can't get valid redirect proxy url");
-    }
-    String host = hostPort[0];
-    int port = Integer.parseInt(hostPort[1]);
-    if (StringUtils.isBlank(host) || host.equals("0.0.0.0")) {
-      host = InetAddress.getLocalHost().getCanonicalHostName();
-    }
-    return new URL(YarnConfiguration.useHttps(this.getConfig()) ? "https" : "http", host, port, "");
-  }
-}
+  public CancelDelegationTokenResponse cancelDeleg

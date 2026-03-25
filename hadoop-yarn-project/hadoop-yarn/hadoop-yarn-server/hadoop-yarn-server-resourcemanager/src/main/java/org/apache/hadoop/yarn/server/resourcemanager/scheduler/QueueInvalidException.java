@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,11 +22,18 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 
+/**
+ * 队列无效异常，YARN资源调度器检测到队列状态非法时抛出该异常
+ */
 @Private
 public class QueueInvalidException extends YarnRuntimeException {
 
   private static final long serialVersionUID = 187239430L;
 
+  /**
+   * 构造带有指定错误信息的队列无效异常
+   * @param message 错误描述信息
+   */
   public QueueInvalidException(String message) {
     super(message);
   }

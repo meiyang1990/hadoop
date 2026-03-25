@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,27 @@ package org.apache.hadoop.mapreduce.counters;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.mapred.Counters.CountersExceededException;
 
+/**
+ * 计数器数量超过上限异常
+ * 当MapReduce任务中计数器数量超出配置的最大限制时抛出该异常
+ */
 @InterfaceAudience.Private
 public class LimitExceededException extends CountersExceededException {
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造带错误信息的异常对象
+   * @param msg 异常错误信息
+   */
   public LimitExceededException(String msg) {
     super(msg);
   }
 
-  // Only allows chaining of related exceptions
+  /**
+   * 链式构造异常对象，仅用于包装关联的同类异常
+   * @param cause 原始的LimitExceededException异常
+   */
   public LimitExceededException(LimitExceededException cause) {
     super(cause);
   }

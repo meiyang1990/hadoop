@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,10 +33,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * The SubClusterCleaner thread is used to check whether the SubCluster
- * has exceeded the heartbeat time.
- * If the SubCluster heartbeat time exceeds 30 mins, set the SubCluster to LOST.
- * Check the thread every 1 mins, check once.
+ * YARN联邦Router子集群清理线程，用于定期检查子集群心跳超时情况，
+ * 将超过过期时间未上报心跳的子集群标记为LOST状态，默认每分钟检查一次。
  */
 public class SubClusterCleaner implements Runnable {
 
@@ -43,6 +42,10 @@ public class SubClusterCleaner implements Runnable {
   private FederationStateStoreFacade federationFacade;
   private long heartbeatExpirationMillis;
 
+  /**
+   * 构造子集群清理器，从配置中读取心跳过期时间并初始化联邦状态存储门面。
+   * @param conf YARN配置对象
+   */
   public SubClusterCleaner(Configuration conf) {
     federationFacade = FederationStateStoreFacade.getInstance(conf);
     this.heartbeatExpirationMillis =
@@ -53,24 +56,27 @@ public class SubClusterCleaner implements Runnable {
   @Override
   public void run() {
     try {
-      // Step1. Get Current Time.
+      // 获取当前检查时间
       Date now = new Date();
       LOG.info("SubClusterCleaner at {}.", now);
 
+      // 从联邦状态存储获取所有子集群信息
       Map<SubClusterId, SubClusterInfo> subClusters = federationFacade.getSubClusters(true);
 
+      // 遍历所有子集群逐个检查心跳状态
       for (Map.Entry<SubClusterId, SubClusterInfo> subCluster : subClusters.entrySet()) {
-        // Step2. Get information about subClusters.
+        // 获取当前子集群的ID、信息、状态和最后心跳时间
         SubClusterId subClusterId = subCluster.getKey();
         SubClusterInfo subClusterInfo = subCluster.getValue();
         SubClusterState subClusterState = subClusterInfo.getState();
         long lastHeartBeatTime = subClusterInfo.getLastHeartBeat();
 
-        // We Only Check SubClusters in NEW and RUNNING states
+        // 只检查可用状态(NEW/RUNNING)的子集群，非可用状态跳过检查
         if (subClusterState.isUsable()) {
+          // 计算距上次心跳的时间间隔
           long heartBeatInterval = now.getTime() - lastHeartBeatTime;
           try {
-            // HeartBeat Interval Exceeds Expiration Time
+            // 如果心跳间隔超过配置的过期时间，注销该子集群并标记为LOST
             if (heartBeatInterval > heartbeatExpirationMillis) {
               LOG.info("Deregister SubCluster {} in state {} last heartbeat at {}.",
                   subClusterId, subClusterState, new Date(lastHeartBeatTime));

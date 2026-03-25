@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,18 +20,26 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.converter;
 
 /**
- * Thrown when the FS-to-CS converter logic encounters a
- * condition from which it cannot recover (eg. unsupported
- * settings).
+ * 公平调度器(FS)配置转容量调度器(CS)配置过程中，遇到无法恢复错误时抛出的异常
+ * 例如遇到不支持的配置项等场景
  *
  */
 public class ConversionException extends RuntimeException {
   private static final long serialVersionUID = 4161836727287317835L;
 
+  /**
+   * 构造带错误信息的转换异常
+   * @param message 错误描述信息
+   */
   public ConversionException(String message) {
     super(message);
   }
 
+  /**
+   * 构造带错误信息和根因的转换异常
+   * @param message 错误描述信息
+   * @param cause 原始异常根因
+   */
   public ConversionException(String message, Throwable cause) {
     super(message, cause);
   }

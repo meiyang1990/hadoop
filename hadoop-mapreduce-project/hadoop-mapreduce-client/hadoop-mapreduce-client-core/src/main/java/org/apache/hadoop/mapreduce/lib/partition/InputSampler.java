@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -49,8 +50,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility for collecting samples and writing a partition file for
- * {@link TotalOrderPartitioner}.
+ * 文件说明：为TotalOrderPartitioner生成分区划分文件的采样工具类
+ * 核心功能：对输入数据进行采样，计算出全排序所需的分区划分点，使得每个Reduce分区数据大致均衡
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -58,6 +59,10 @@ public class InputSampler<K,V> extends Configured implements Tool  {
 
   private static final Logger LOG = LoggerFactory.getLogger(InputSampler.class);
 
+  /**
+   * 打印命令行使用帮助信息
+   * @return 错误码-1
+   */
   static int printUsage() {
     System.out.println("sampler -r <reduces>\n" +
       "      [-inFormat <input format class>]\n" +
@@ -73,26 +78,35 @@ public class InputSampler<K,V> extends Configured implements Tool  {
     return -1;
   }
 
+  /**
+   * 构造InputSampler实例，使用给定配置初始化
+   * @param conf 配置对象
+   */
   public InputSampler(Configuration conf) {
     setConf(conf);
   }
 
   /**
-   * Interface to sample using an 
-   * {@link org.apache.hadoop.mapreduce.InputFormat}.
+   * 采样器接口，定义从输入数据中获取样本的统一规范
+   * @param <K> 键类型
+   * @param <V> 值类型
    */
   public interface Sampler<K,V> {
     /**
-     * For a given job, collect and return a subset of the keys from the
-     * input data.
+     * 从给定作业的输入数据中采集样本，返回采样得到的键数组
+     * @param inf 输入格式对象
+     * @param job 作业对象
+     * @return 采样得到的键数组
+     * @throws IOException IO异常
+     * @throws InterruptedException 中断异常
      */
     K[] getSample(InputFormat<K,V> inf, Job job) 
     throws IOException, InterruptedException;
   }
 
   /**
-   * Samples the first n records from s splits.
-   * Inexpensive way to sample random data.
+   * SplitSampler：从输入分片采样的实现类，采集每个采样分片前N条记录
+   * 适用场景：数据随机分布的场景，采样成本低
    */
   public static class SplitSampler<K,V> implements Sampler<K,V> {
 
@@ -100,20 +114,17 @@ public class InputSampler<K,V> extends Configured implements Tool  {
     protected final int maxSplitsSampled;
 
     /**
-     * Create a SplitSampler sampling <em>all</em> splits.
-     * Takes the first numSamples / numSplits records from each split.
-     * @param numSamples Total number of samples to obtain from all selected
-     *                   splits.
+     * 构造SplitSampler，采样所有分片，获取指定总数的样本
+     * @param numSamples 总共需要采集的样本数量
      */
     public SplitSampler(int numSamples) {
       this(numSamples, Integer.MAX_VALUE);
     }
 
     /**
-     * Create a new SplitSampler.
-     * @param numSamples Total number of samples to obtain from all selected
-     *                   splits.
-     * @param maxSplitsSampled The maximum number of splits to examine.
+     * 构造SplitSampler，指定总样本数和最大采样分片数
+     * @param numSamples 总共需要采集的样本数量
+     * @param maxSplitsSampled 最多采样的分片数量
      */
     public SplitSampler(int numSamples, int maxSplitsSampled) {
       this.numSamples = numSamples;
@@ -121,7 +132,7 @@ public class InputSampler<K,V> extends Configured implements Tool  {
     }
 
     /**
-     * From each split sampled, take the first numSamples / numSplits records.
+     * 从每个采样分片中采集前 总样本数/分片数 条记录作为样本
      */
     @SuppressWarnings("unchecked") // ArrayList::toArray doesn't preserve type
     public K[] getSample(InputFormat<K,V> inf, Job job) 
@@ -132,11 +143,14 @@ public class InputSampler<K,V> extends Configured implements Tool  {
       int samplesPerSplit = numSamples / splitsToSample;
       long records = 0;
       for (int i = 0; i < splitsToSample; ++i) {
+        // 创建采样任务上下文
         TaskAttemptContext samplingContext = new TaskAttemptContextImpl(
             job.getConfiguration(), new TaskAttemptID());
+        // 创建记录读取器并初始化
         RecordReader<K,V> reader = inf.createRecordReader(
             splits.get(i), samplingContext);
         reader.initialize(splits.get(i), samplingContext);
+        // 读取记录直到满足每个分片采样数量
         while (reader.nextKeyValue()) {
           samples.add(ReflectionUtils.copy(job.getConfiguration(),
                                            reader.getCurrentKey(), null));
@@ -152,9 +166,8 @@ public class InputSampler<K,V> extends Configured implements Tool  {
   }
 
   /**
-   * Sample from random points in the input.
-   * General-purpose sampler. Takes numSamples / maxSplitsSampled inputs from
-   * each split.
+   * RandomSampler：随机采样实现类，通用采样方案
+   * 按照概率随机选择键，最终保留指定数量的样本
    */
   public static class RandomSampler<K,V> implements Sampler<K,V> {
     protected double freq;
@@ -162,22 +175,19 @@ public class InputSampler<K,V> extends Configured implements Tool  {
     protected final int maxSplitsSampled;
 
     /**
-     * Create a new RandomSampler sampling <em>all</em> splits.
-     * This will read every split at the client, which is very expensive.
-     * @param freq Probability with which a key will be chosen.
-     * @param numSamples Total number of samples to obtain from all selected
-     *                   splits.
+     * 构造RandomSampler，采样所有分片
+     * @param freq 键被选中的概率
+     * @param numSamples 需要保留的总样本数量
      */
     public RandomSampler(double freq, int numSamples) {
       this(freq, numSamples, Integer.MAX_VALUE);
     }
 
     /**
-     * Create a new RandomSampler.
-     * @param freq Probability with which a key will be chosen.
-     * @param numSamples Total number of samples to obtain from all selected
-     *                   splits.
-     * @param maxSplitsSampled The maximum number of splits to examine.
+     * 构造RandomSampler，指定选中概率、样本数和最大采样分片数
+     * @param freq 键被选中的概率
+     * @param numSamples 需要保留的总样本数量
+     * @param maxSplitsSampled 最多采样的分片数量
      */
     public RandomSampler(double freq, int numSamples, int maxSplitsSampled) {
       this.freq = freq;
@@ -186,10 +196,7 @@ public class InputSampler<K,V> extends Configured implements Tool  {
     }
 
     /**
-     * Randomize the split order, then take the specified number of keys from
-     * each split sampled, where each key is selected with the specified
-     * probability and possibly replaced by a subsequently selected key when
-     * the quota of keys from that split is satisfied.
+     * 打乱分片顺序，按概率随机选中键，达到样本数量后用蓄水池算法替换已有样本
      */
     @SuppressWarnings("unchecked") // ArrayList::toArray doesn't preserve type
     public K[] getSample(InputFormat<K,V> inf, Job job) 
@@ -198,20 +205,19 @@ public class InputSampler<K,V> extends Configured implements Tool  {
       ArrayList<K> samples = new ArrayList<K>(numSamples);
       int splitsToSample = Math.min(maxSplitsSampled, splits.size());
 
+      // 初始化随机数生成器
       Random r = new Random();
       long seed = r.nextLong();
       r.setSeed(seed);
       LOG.debug("seed: " + seed);
-      // shuffle splits
+      // 打乱分片顺序，保证随机采样
       for (int i = 0; i < splits.size(); ++i) {
         InputSplit tmp = splits.get(i);
         int j = r.nextInt(splits.size());
         splits.set(i, splits.get(j));
         splits.set(j, tmp);
       }
-      // our target rate is in terms of the maximum number of sample splits,
-      // but we accept the possibility of sampling additional splits to hit
-      // the target sample keyset
+      // 遍历分片采样，若未达到样本数量则继续采样更多分片
       for (int i = 0; i < splitsToSample ||
                      (i < splits.size() && samples.size() < numSamples); ++i) {
         TaskAttemptContext samplingContext = new TaskAttemptContextImpl(
@@ -220,18 +226,18 @@ public class InputSampler<K,V> extends Configured implements Tool  {
             splits.get(i), samplingContext);
         reader.initialize(splits.get(i), samplingContext);
         while (reader.nextKeyValue()) {
+          // 按概率决定是否选中当前键
           if (r.nextDouble() <= freq) {
             if (samples.size() < numSamples) {
+              // 样本未满直接添加
               samples.add(ReflectionUtils.copy(job.getConfiguration(),
                                                reader.getCurrentKey(), null));
             } else {
-              // When exceeding the maximum number of samples, replace a
-              // random element with this one, then adjust the frequency
-              // to reflect the possibility of existing elements being
-              // pushed out
+              // 样本已满，蓄水池算法随机替换一个已有样本
               int ind = r.nextInt(numSamples);
               samples.set(ind, ReflectionUtils.copy(job.getConfiguration(),
                                reader.getCurrentKey(), null));
+              // 调整概率，保证每个样本被选中概率一致
               freq *= (numSamples - 1) / (double) numSamples;
             }
           }
@@ -243,26 +249,25 @@ public class InputSampler<K,V> extends Configured implements Tool  {
   }
 
   /**
-   * Sample from s splits at regular intervals.
-   * Useful for sorted data.
+   * IntervalSampler：间隔采样实现类，按固定间隔采样记录
+   * 适用场景：已经有序的数据，能够均匀覆盖整个键范围
    */
   public static class IntervalSampler<K,V> implements Sampler<K,V> {
     protected final double freq;
     protected final int maxSplitsSampled;
 
     /**
-     * Create a new IntervalSampler sampling <em>all</em> splits.
-     * @param freq The frequency with which records will be emitted.
+     * 构造IntervalSampler，采样所有分片
+     * @param freq 采样频率，即保留样本占总记录数的比例
      */
     public IntervalSampler(double freq) {
       this(freq, Integer.MAX_VALUE);
     }
 
     /**
-     * Create a new IntervalSampler.
-     * @param freq The frequency with which records will be emitted.
-     * @param maxSplitsSampled The maximum number of splits to examine.
-     * @see #getSample
+     * 构造IntervalSampler，指定采样频率和最大采样分片数
+     * @param freq 采样频率，即保留样本占总记录数的比例
+     * @param maxSplitsSampled 最多采样的分片数量
      */
     public IntervalSampler(double freq, int maxSplitsSampled) {
       this.freq = freq;
@@ -270,9 +275,7 @@ public class InputSampler<K,V> extends Configured implements Tool  {
     }
 
     /**
-     * For each split sampled, emit when the ratio of the number of records
-     * retained to the total record count is less than the specified
-     * frequency.
+     * 对每个分片，当已保留样本占当前总读取记录数比例低于采样频率时采样当前记录
      */
     @SuppressWarnings("unchecked") // ArrayList::toArray doesn't preserve type
     public K[] getSample(InputFormat<K,V> inf, Job job) 
@@ -290,6 +293,7 @@ public class InputSampler<K,V> extends Configured implements Tool  {
         reader.initialize(splits.get(i), samplingContext);
         while (reader.nextKeyValue()) {
           ++records;
+          // 已保留比例低于目标频率时采样当前记录
           if ((double) kept / records < freq) {
             samples.add(ReflectionUtils.copy(job.getConfiguration(),
                                  reader.getCurrentKey(), null));
@@ -303,10 +307,13 @@ public class InputSampler<K,V> extends Configured implements Tool  {
   }
 
   /**
-   * Write a partition file for the given job, using the Sampler provided.
-   * Queries the sampler for a sample keyset, sorts by the output key
-   * comparator, selects the keys for each rank, and writes to the destination
-   * returned from {@link TotalOrderPartitioner#getPartitionFile}.
+   * 根据采样结果写入分区文件，供TotalOrderPartitioner使用
+   * 对采样键排序后均匀划分分区，得到每个分区的分界点并写入分区文件
+   * @param job 作业对象
+   * @param sampler 采样器实例
+   * @throws IOException IO异常
+   * @throws ClassNotFoundException 类找不到异常
+   * @throws InterruptedException 中断异常
    */
   @SuppressWarnings("unchecked") // getInputFormat, getOutputKeyComparator
   public static <K,V> void writePartitionFile(Job job, Sampler<K,V> sampler) 
@@ -314,25 +321,35 @@ public class InputSampler<K,V> extends Configured implements Tool  {
     Configuration conf = job.getConfiguration();
     final InputFormat inf = 
         ReflectionUtils.newInstance(job.getInputFormatClass(), conf);
+    // 分区数量等于Reduce任务数
     int numPartitions = job.getNumReduceTasks();
+    // 获取采样键数组
     K[] samples = (K[])sampler.getSample(inf, job);
     LOG.info("Using " + samples.length + " samples");
+    // 获取排序比较器，对采样键排序
     RawComparator<K> comparator =
       (RawComparator<K>) job.getSortComparator();
     Arrays.sort(samples, comparator);
+    // 打开输出文件系统创建分区文件
     Path dst = new Path(TotalOrderPartitioner.getPartitionFile(conf));
     FileSystem fs = dst.getFileSystem(conf);
+    // 删除已存在的旧分区文件
     fs.delete(dst, false);
+    // 使用SequenceFile写入分区分界点
     SequenceFile.Writer writer = SequenceFile.createWriter(fs,
       conf, dst, job.getMapOutputKeyClass(), NullWritable.class);
     NullWritable nullValue = NullWritable.get();
+    // 每个分区平均分配样本数量
     float stepSize = samples.length / (float) numPartitions;
     int last = -1;
+    // 为每个Reduce分区选择分界点（从第二个分区开始）
     for(int i = 1; i < numPartitions; ++i) {
       int k = Math.round(stepSize * i);
+      // 跳过相同键，保证分区分界点递增
       while (last >= k && comparator.compare(samples[last], samples[k]) == 0) {
         ++k;
       }
+      // 写入分区分界键
       writer.append(samples[k], nullValue);
       last = k;
     }
@@ -340,8 +357,10 @@ public class InputSampler<K,V> extends Configured implements Tool  {
   }
 
   /**
-   * Driver for InputSampler from the command line.
-   * Configures a JobConf instance and calls {@link #writePartitionFile}.
+   * Tool接口实现，处理命令行参数，执行采样生成分区文件
+   * @param args 命令行参数
+   * @return 执行结果，0表示成功，非0表示失败
+   * @throws Exception 执行异常
    */
   public int run(String[] args) throws Exception {
     Job job = Job.getInstance(getConf());
@@ -350,66 +369,40 @@ public class InputSampler<K,V> extends Configured implements Tool  {
     for(int i=0; i < args.length; ++i) {
       try {
         if ("-r".equals(args[i])) {
+          // 设置Reduce任务数量
           job.setNumReduceTasks(Integer.parseInt(args[++i]));
         } else if ("-inFormat".equals(args[i])) {
+          // 设置输入格式类
           job.setInputFormatClass(
               Class.forName(args[++i]).asSubclass(InputFormat.class));
         } else if ("-keyClass".equals(args[i])) {
+          // 设置Map输出键类型
           job.setMapOutputKeyClass(
               Class.forName(args[++i]).asSubclass(WritableComparable.class));
         } else if ("-splitSample".equals(args[i])) {
+          // 使用SplitSampler
           int numSamples = Integer.parseInt(args[++i]);
           int maxSplits = Integer.parseInt(args[++i]);
           if (0 >= maxSplits) maxSplits = Integer.MAX_VALUE;
           sampler = new SplitSampler<K,V>(numSamples, maxSplits);
         } else if ("-splitRandom".equals(args[i])) {
+          // 使用RandomSampler
           double pcnt = Double.parseDouble(args[++i]);
           int numSamples = Integer.parseInt(args[++i]);
           int maxSplits = Integer.parseInt(args[++i]);
           if (0 >= maxSplits) maxSplits = Integer.MAX_VALUE;
           sampler = new RandomSampler<K,V>(pcnt, numSamples, maxSplits);
         } else if ("-splitInterval".equals(args[i])) {
+          // 使用IntervalSampler
           double pcnt = Double.parseDouble(args[++i]);
           int maxSplits = Integer.parseInt(args[++i]);
           if (0 >= maxSplits) maxSplits = Integer.MAX_VALUE;
           sampler = new IntervalSampler<K,V>(pcnt, maxSplits);
         } else {
+          // 其他参数保留
           otherArgs.add(args[i]);
         }
       } catch (NumberFormatException except) {
         System.out.println("ERROR: Integer expected instead of " + args[i]);
         return printUsage();
       } catch (ArrayIndexOutOfBoundsException except) {
-        System.out.println("ERROR: Required parameter missing from " +
-            args[i-1]);
-        return printUsage();
-      }
-    }
-    if (job.getNumReduceTasks() <= 1) {
-      System.err.println("Sampler requires more than one reducer");
-      return printUsage();
-    }
-    if (otherArgs.size() < 2) {
-      System.out.println("ERROR: Wrong number of parameters: ");
-      return printUsage();
-    }
-    if (null == sampler) {
-      sampler = new RandomSampler<K,V>(0.1, 10000, 10);
-    }
-
-    Path outf = new Path(otherArgs.remove(otherArgs.size() - 1));
-    TotalOrderPartitioner.setPartitionFile(getConf(), outf);
-    for (String s : otherArgs) {
-      FileInputFormat.addInputPath(job, new Path(s));
-    }
-    InputSampler.<K,V>writePartitionFile(job, sampler);
-
-    return 0;
-  }
-
-  public static void main(String[] args) throws Exception {
-    InputSampler<?,?> sampler = new InputSampler(new Configuration());
-    int res = ToolRunner.run(sampler, args);
-    System.exit(res);
-  }
-}

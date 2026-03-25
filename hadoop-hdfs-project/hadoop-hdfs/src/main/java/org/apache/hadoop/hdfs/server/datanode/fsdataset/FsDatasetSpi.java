@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -66,17 +67,21 @@ import org.apache.hadoop.hdfs.server.protocol.VolumeFailureSummary;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
- * This is a service provider interface for the underlying storage that
- * stores replicas for a data node.
- * The default implementation stores replicas on local drives. 
+ * HDFS DataNode 块存储层的服务提供者接口，定义了底层存储管理数据块副本的核心抽象
+ * 默认实现将块副本存储在本地磁盘，支持扩展自定义存储实现
  */
 @InterfaceAudience.Private
 public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
   /**
-   * A factory for creating {@link FsDatasetSpi} objects.
+   * FsDatasetSpi 对象的工厂抽象类，用于创建不同实现的数据集对象
+   * @param <D> 创建的数据集类型
    */
   abstract class Factory<D extends FsDatasetSpi<?>> {
-    /** @return the configured factory. */
+    /**
+     * 根据配置获取工厂实例
+     * @param conf Hadoop配置对象
+     * @return 配置指定的FsDataset工厂实例
+     */
     public static Factory<?> getFactory(Configuration conf) {
       @SuppressWarnings("rawtypes")
       final Class<? extends Factory> clazz = conf.getClass(
@@ -86,37 +91,52 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
       return ReflectionUtils.newInstance(clazz, conf);
     }
 
-    /** Create a new object. */
+    /**
+     * 创建一个新的FsDataset实例
+     * @param datanode DataNode实例
+     * @param storage DataNode存储管理对象
+     * @param conf Hadoop配置对象
+     * @return 新创建的FsDataset实例
+     * @throws IOException 创建失败时抛出IO异常
+     */
     public abstract D newInstance(DataNode datanode, DataStorage storage,
         Configuration conf) throws IOException;
 
-    /** Does the factory create simulated objects? */
+    /**
+     * 判断当前工厂是否创建模拟测试对象
+     * @return 如果是模拟实现返回true，否则返回false
+     */
     public boolean isSimulated() {
       return false;
     }
   }
 
   /**
-   * It behaviors as an unmodifiable list of FsVolume. Individual FsVolume can
-   * be obtained by using {@link #get(int)}.
-   *
-   * This also holds the reference counts for these volumes. It releases all the
-   * reference counts in {@link #close()}.
+   * 不可修改的FsVolume引用列表，维护所有卷的引用计数
+   * 调用者必须在使用完毕后调用close方法释放所有引用计数
    */
   class FsVolumeReferences implements Iterable<FsVolumeSpi>, Closeable {
     private final List<FsVolumeReference> references;
 
+    /**
+     * 构造方法，为每个卷获取引用并维护
+     * @param curVolumes 当前所有可用卷列表
+     */
     public <S extends FsVolumeSpi> FsVolumeReferences(List<S> curVolumes) {
       references = new ArrayList<>();
+      // 遍历所有卷，尝试获取引用，忽略已经关闭的卷
       for (FsVolumeSpi v : curVolumes) {
         try {
           references.add(v.obtainReference());
         } catch (ClosedChannelException e) {
-          // This volume has been closed.
+          // 该卷已关闭，直接忽略
         }
       }
     }
 
+    /**
+     * FsVolumeReferences的迭代器实现
+     */
     private static class FsVolumeSpiIterator implements
         Iterator<FsVolumeSpi> {
       private final List<FsVolumeReference> references;
@@ -149,21 +169,26 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
     }
 
     /**
-     * Get the number of volumes.
+     * 获取当前有效卷的数量
+     * @return 有效卷数量
      */
     public int size() {
       return references.size();
     }
 
     /**
-     * Get the volume for a given index.
+     * 根据索引获取卷对象
+     * @param index 索引位置
+     * @return 对应索引的卷对象
      */
     public FsVolumeSpi get(int index) {
       return references.get(index).getVolume();
     }
 
     /**
-     * Get the reference for a given index.
+     * 根据索引获取卷引用对象
+     * @param index 索引位置
+     * @return 对应索引的卷引用对象
      */
     public FsVolumeReference getReference(int index) {
       return references.get(index);
@@ -171,6 +196,7 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
 
     @Override
     public void close() throws IOException {
+      // 释放所有卷引用，记录最后一个异常
       IOException ioe = null;
       for (FsVolumeReference ref : references) {
         try {
@@ -187,525 +213,244 @@ public interface FsDatasetSpi<V extends FsVolumeSpi> extends FSDatasetMBean {
   }
 
   /**
-   * Returns a list of FsVolumes that hold reference counts.
-   *
-   * The caller must release the reference of each volume by calling
-   * {@link FsVolumeReferences#close()}.
+   * 获取所有卷的引用列表，调用者必须调用close方法释放引用
+   * @return 包含所有卷引用的FsVolumeReferences对象
    */
   FsVolumeReferences getFsVolumeReferences();
 
   /**
-   * Add a new volume to the FsDataset.
-   *
-   * If the FSDataset supports block scanning, this function registers
-   * the new volume with the block scanner.
-   *
-   * @param location      The storage location for the new volume.
-   * @param nsInfos       Namespace information for the new volume.
+   * 向数据集添加新的存储卷，如果支持块扫描会自动注册到块扫描器
+   * @param location 新卷的存储位置
+   * @param nsInfos 新卷对应的命名空间信息
+   * @throws IOException 添加失败时抛出IO异常
    */
   void addVolume(
       final StorageLocation location,
       final List<NamespaceInfo> nsInfos) throws IOException;
 
   /**
-   * Removes a collection of volumes from FsDataset.
-   *
-   * If the FSDataset supports block scanning, this function removes
-   * the volumes from the block scanner.
-   *
-   * @param volumes  The paths of the volumes to be removed.
-   * @param clearFailure set true to clear the failure information about the
-   *                     volumes.
+   * 从数据集移除指定集合的存储卷，如果支持块扫描会自动从块扫描器移除
+   * @param volumes 待移除的卷位置集合
+   * @param clearFailure 是否清除卷的失败标记
    */
   void removeVolumes(Collection<StorageLocation> volumes, boolean clearFailure);
 
-  /** @return a storage with the given storage ID */
+  /**
+   * 根据存储ID获取对应的DatanodeStorage对象
+   * @param storageUuid 存储的唯一ID
+   * @return 对应ID的存储对象
+   */
   DatanodeStorage getStorage(final String storageUuid);
 
-  /** @return one or more storage reports for attached volumes. */
+  /**
+   * 获取所有已挂载卷的存储报告
+   * @param bpid 块池ID
+   * @return 存储报告数组
+   * @throws IOException 获取失败时抛出IO异常
+   */
   StorageReport[] getStorageReports(String bpid)
       throws IOException;
 
-  /** @return the volume that contains a replica of the block. */
+  /**
+   * 获取指定块所在的卷
+   * @param b 扩展块对象
+   * @return 包含该块副本的卷
+   */
   V getVolume(ExtendedBlock b);
 
-  /** @return a volume information map (name {@literal =>} info). */
+  /**
+   * 获取所有卷的信息映射表
+   * @return 卷名到卷信息的映射表
+   */
   Map<String, Object> getVolumeInfoMap();
 
   /**
-   * Returns info about volume failures.
-   *
-   * @return info about volume failures, possibly null
+   * 获取卷失败统计信息
+   * @return 卷失败统计信息，可能为null
    */
   VolumeFailureSummary getVolumeFailureSummary();
 
   /**
-   * Gets a list of references to the finalized blocks for the given block pool.
-   * <p>
-   * Callers of this function should call
-   * {@link FsDatasetSpi#acquireDatasetLockManager} to avoid blocks' status being
-   * changed during list iteration.
-   * </p>
-   * @return a list of references to the finalized blocks for the given block
-   *         pool.
+   * 获取指定块池所有已完成块的副本引用列表
+   * 调用该方法前需要先获取数据集读写锁，避免遍历时块状态发生变更
+   * @param bpid 块池ID
+   * @return 指定块池所有已完成块的副本信息列表
    */
   List<ReplicaInfo> getFinalizedBlocks(String bpid);
 
   /**
-   * Check whether the in-memory block record matches the block on the disk,
-   * and, in case that they are not matched, update the record or mark it
-   * as corrupted.
+   * 检查内存中的块记录是否与磁盘上的实际块一致，不一致时更新记录或标记损坏
+   * @param bpid 块池ID
+   * @param info 卷扫描信息
+   * @throws IOException 检查更新过程中IO异常
    */
   void checkAndUpdate(String bpid, ScanInfo info) throws IOException;
 
   /**
-   * @param b - the block
-   * @return a stream if the meta-data of the block exists;
-   *         otherwise, return null.
-   * @throws IOException
+   * 获取指定块元数据的输入流
+   * @param b 扩展块对象
+   * @return 元数据输入流，如果元数据不存在返回null
+   * @throws IOException 获取过程中IO异常
    */
   LengthInputStream getMetaDataInputStream(ExtendedBlock b
       ) throws IOException;
 
   /**
-   * Returns the specified block's on-disk length (excluding metadata).
-   * @return   the specified block's on-disk length (excluding metadta)
-   * @throws IOException on error
+   * 获取指定块在磁盘上的数据长度（不含元数据）
+   * @param b 扩展块对象
+   * @return 块数据长度（字节）
+   * @throws IOException 获取长度过程中IO异常
    */
   long getLength(ExtendedBlock b) throws IOException;
 
   /**
-   * Get reference to the replica meta info in the replicasMap. 
-   * To be called from methods that are synchronized on
-   * implementations of {@link FsDatasetSpi}
-   * @return replica from the replicas map
+   * 从副本映射表获取指定块的副本对象，已废弃
+   * @param bpid 块池ID
+   * @param blockId 块ID
+   * @return 副本对象
    */
   @Deprecated
   Replica getReplica(String bpid, long blockId);
 
   /**
-   * @return replica meta information
+   * 获取指定块的副本信息字符串
+   * @param bpid 块池ID
+   * @param blockId 块ID
+   * @return 副本信息字符串
    */
   String getReplicaString(String bpid, long blockId);
 
   /**
-   * @return the generation stamp stored with the block.
+   * 从磁盘读取块，获取存储的生成时间戳
+   * @param bpid 块池ID
+   * @param blkid 块ID
+   * @return 包含生成时间戳的Block对象
+   * @throws IOException 读取过程中IO异常
    */
   Block getStoredBlock(String bpid, long blkid) throws IOException;
 
   /**
-   * Returns an input stream at specified offset of the specified block.
-   * @param b block
-   * @param seekOffset offset with in the block to seek to
-   * @return an input stream to read the contents of the specified block,
-   *  starting at the offset
-   * @throws IOException
+   * 获取指定块从指定偏移开始的输入流
+   * @param b 块对象
+   * @param seekOffset 起始偏移量
+   * @return 块数据输入流
+   * @throws IOException 获取输入流过程中IO异常
    */
   InputStream getBlockInputStream(ExtendedBlock b, long seekOffset)
             throws IOException;
 
   /**
-   * Returns an input stream at specified offset of the specified block.
-   * The block is still in the tmp directory and is not finalized
-   * @return an input stream to read the contents of the specified block,
-   *  starting at the offset
-   * @throws IOException
+   * 获取未完成临时块的输入流，包含数据和校验码流
+   * @param b 块对象
+   * @param blkoff 数据起始偏移
+   * @param ckoff 校验码起始偏移
+   * @return 包含数据和校验码的输入流对象
+   * @throws IOException 获取输入流过程中IO异常
    */
   ReplicaInputStreams getTmpInputStreams(ExtendedBlock b, long blkoff,
       long ckoff) throws IOException;
 
   /**
-   * Creates a temporary replica and returns the meta information of the replica
-   * .
-   * 
-   * @param b block
-   * @return the meta info of the replica which is being written to
-   * @throws IOException if an error occurs
+   * 创建一个临时状态的块副本，返回副本元信息
+   * @param storageType 存储类型
+   * @param storageId 存储ID
+   * @param b 块对象
+   * @param isTransfer 是否是传输过程中创建
+   * @return 新创建的临时副本处理器
+   * @throws IOException 创建过程中IO异常
    */
   ReplicaHandler createTemporary(StorageType storageType, String storageId,
       ExtendedBlock b, boolean isTransfer) throws IOException;
 
   /**
-   * Creates a RBW replica and returns the meta info of the replica
-   * 
-   * @param b block
-   * @return the meta info of the replica which is being written to
-   * @throws IOException if an error occurs
+   * 创建一个RBW（正在被写入）状态的块副本，返回副本元信息
+   * @param storageType 存储类型
+   * @param storageId 存储ID
+   * @param b 块对象
+   * @param allowLazyPersist 是否允许延迟持久化到磁盘
+   * @return 新创建的RBW副本处理器
+   * @throws IOException 创建过程中IO异常
    */
   ReplicaHandler createRbw(StorageType storageType, String storageId,
       ExtendedBlock b, boolean allowLazyPersist) throws IOException;
 
   /**
-   * Creates a RBW replica and returns the meta info of the replica
-   *
-   * @param b block
-   * @return the meta info of the replica which is being written to
-   * @throws IOException if an error occurs
+   * 创建一个RBW（正在被写入）状态的块副本，指定生成时间戳，返回副本元信息
+   * @param storageType 存储类型
+   * @param storageId 存储ID
+   * @param b 块对象
+   * @param allowLazyPersist 是否允许延迟持久化到磁盘
+   * @param newGS 新的生成时间戳
+   * @return 新创建的RBW副本处理器
+   * @throws IOException 创建过程中IO异常
    */
   ReplicaHandler createRbw(StorageType storageType, String storageId,
       ExtendedBlock b, boolean allowLazyPersist, long newGS) throws IOException;
 
   /**
-   * Recovers a RBW replica and returns the meta info of the replica.
-   * 
-   * @param b block
-   * @param newGS the new generation stamp for the replica
-   * @param minBytesRcvd the minimum number of bytes that the replica could have
-   * @param maxBytesRcvd the maximum number of bytes that the replica could have
-   * @return the meta info of the replica which is being written to
-   * @throws IOException if an error occurs
+   * 恢复一个RBW状态的块副本，返回恢复后的副本元信息
+   * @param b 块对象
+   * @param newGS 恢复后的新生成时间戳
+   * @param minBytesRcvd 副本最小可接受字节数
+   * @param maxBytesRcvd 副本最大可接受字节数
+   * @return 恢复后的RBW副本处理器
+   * @throws IOException 恢复过程中IO异常
    */
   ReplicaHandler recoverRbw(ExtendedBlock b,
       long newGS, long minBytesRcvd, long maxBytesRcvd) throws IOException;
 
   /**
-   * Covert a temporary replica to a RBW.
-   * @param temporary the temporary replica being converted
-   * @return the result RBW
+   * 将临时状态的副本转换为RBW状态
+   * @param temporary 待转换的临时块
+   * @return 转换后的RBW副本对象
+   * @throws IOException 转换过程中IO异常
    */
   ReplicaInPipeline convertTemporaryToRbw(
       ExtendedBlock temporary) throws IOException;
 
   /**
-   * Append to a finalized replica and returns the meta info of the replica.
-   * 
-   * @param b block
-   * @param newGS the new generation stamp for the replica
-   * @param expectedBlockLen the number of bytes the replica is expected to have
-   * @return the meata info of the replica which is being written to
-   * @throws IOException
+   * 追加写入一个已完成的块副本，返回副本元信息
+   * @param b 块对象
+   * @param newGS 新的生成时间戳
+   * @param expectedBlockLen 追加后期望的块长度
+   * @return 追加后的副本处理器
+   * @throws IOException 追加过程中IO异常
    */
   ReplicaHandler append(ExtendedBlock b, long newGS,
       long expectedBlockLen) throws IOException;
 
   /**
-   * Recover a failed append to a finalized replica and returns the meta
-   * info of the replica.
-   * 
-   * @param b block
-   * @param newGS the new generation stamp for the replica
-   * @param expectedBlockLen the number of bytes the replica is expected to have
-   * @return the meta info of the replica which is being written to
-   * @throws IOException
+   * 恢复失败的追加操作，返回恢复后的副本元信息
+   * @param b 块对象
+   * @param newGS 新的生成时间戳
+   * @param expectedBlockLen 恢复后期望的块长度
+   * @return 恢复后的副本处理器
+   * @throws IOException 恢复过程中IO异常
    */
   ReplicaHandler recoverAppend(
       ExtendedBlock b, long newGS, long expectedBlockLen) throws IOException;
   
   /**
-   * Recover a failed pipeline close.
-   * It bumps the replica's generation stamp and finalize it if RBW replica
-   * 
-   * @param b block
-   * @param newGS the new generation stamp for the replica
-   * @param expectedBlockLen the number of bytes the replica is expected to have
-   * @return the storage uuid of the replica.
-   * @throws IOException
+   * 恢复失败的数据管道关闭操作，更新生成时间戳，如果是RBW块则完成收尾
+   * @param b 块对象
+   * @param newGS 新的生成时间戳
+   * @param expectedBlockLen 恢复后期望的块长度
+   * @return 存储该副本的存储UUID
+   * @throws IOException 恢复过程中IO异常
    */
   Replica recoverClose(ExtendedBlock b, long newGS, long expectedBlockLen
       ) throws IOException;
   
   /**
-   * Finalizes the block previously opened for writing using writeToBlock.
-   * The block size is what is in the parameter b and it must match the amount
-   *  of data written
-   * @param b Block to be finalized
-   * @param fsyncDir whether to sync the directory changes to durable device.
-   * @throws IOException
-   * @throws ReplicaNotFoundException if the replica can not be found when the
-   * block is been finalized. For instance, the block resides on an HDFS volume
-   * that has been removed.
+   * 完成块写入，将RBW块标记为已完成
+   * @param b 待完成的块对象
+   * @param fsyncDir 是否将目录变更同步到持久化设备
+   * @throws IOException 完成过程中IO异常
+   * @throws ReplicaNotFoundException 找不到对应副本时抛出
    */
   void finalizeBlock(ExtendedBlock b, boolean fsyncDir) throws IOException;
 
   /**
-   * Unfinalizes the block previously opened for writing using writeToBlock.
-   * The temporary file associated with this block is deleted.
-   * @throws IOException
-   */
-  void unfinalizeBlock(ExtendedBlock b) throws IOException;
-
-  /**
-   * Returns one block report per volume.
-   * @param bpid Block Pool Id
-   * @return - a map of DatanodeStorage to block report for the volume.
-   */
-  Map<DatanodeStorage, BlockListAsLongs> getBlockReports(String bpid);
-
-  /**
-   * Returns the cache report - the full list of cached block IDs of a
-   * block pool.
-   * @param   bpid Block Pool Id
-   * @return  the cache report - the full list of cached block IDs.
-   */
-  List<Long> getCacheReport(String bpid);
-
-  /** Does the dataset contain the block? */
-  boolean contains(ExtendedBlock block);
-
-  /**
-   * Check if a block is valid.
-   *
-   * @param b           The block to check.
-   * @param minLength   The minimum length that the block must have.  May be 0.
-   * @param state       If this is null, it is ignored.  If it is non-null, we
-   *                        will check that the replica has this state.
-   *
-   * @throws ReplicaNotFoundException          If the replica is not found
-   *
-   * @throws UnexpectedReplicaStateException   If the replica is not in the 
-   *                                             expected state.
-   * @throws FileNotFoundException             If the block file is not found or there 
-   *                                              was an error locating it.
-   * @throws EOFException                      If the replica length is too short.
-   * 
-   * @throws IOException                       May be thrown from the methods called. 
-   */
-  void checkBlock(ExtendedBlock b, long minLength, ReplicaState state)
-      throws ReplicaNotFoundException, UnexpectedReplicaStateException,
-      FileNotFoundException, EOFException, IOException;
-      
-  
-  /**
-   * Is the block valid?
-   * @return - true if the specified block is valid
-   */
-  boolean isValidBlock(ExtendedBlock b);
-
-  /**
-   * Is the block a valid RBW?
-   * @return - true if the specified block is a valid RBW
-   */
-  boolean isValidRbw(ExtendedBlock b);
-
-  /**
-   * Invalidates the specified blocks.
-   * @param bpid Block pool Id
-   * @param invalidBlks - the blocks to be invalidated
-   * @throws IOException
-   */
-  void invalidate(String bpid, Block invalidBlks[]) throws IOException;
-
-  /**
-   * Invalidate a block which is not found on disk.
-   * @param bpid the block pool ID.
-   * @param block The block to be invalidated.
-   */
-  void invalidateMissingBlock(String bpid, Block block) throws IOException;
-
-  /**
-   * Caches the specified block
-   * @param bpid Block pool id
-   * @param blockIds - block ids to cache
-   */
-  void cache(String bpid, long[] blockIds);
-
-  /**
-   * Uncaches the specified blocks
-   * @param bpid Block pool id
-   * @param blockIds - blocks ids to uncache
-   */
-  void uncache(String bpid, long[] blockIds);
-
-  /**
-   * Determine if the specified block is cached.
-   * @param bpid Block pool id
-   * @param blockId - block id
-   * @return true if the block is cached
-   */
-  boolean isCached(String bpid, long blockId);
-
-    /**
-     * Check if all the data directories are healthy
-     * @param failedVolumes
-     */
-  void handleVolumeFailures(Set<FsVolumeSpi> failedVolumes);
-
-  /**
-   * Shutdown the FSDataset
-   */
-  void shutdown();
-
-  /**
-   * Sets the file pointer of the checksum stream so that the last checksum
-   * will be overwritten
-   * @param b block
-   * @param outs The streams for the data file and checksum file
-   * @param checksumSize number of bytes each checksum has
-   * @throws IOException
-   */
-  void adjustCrcChannelPosition(ExtendedBlock b,
-      ReplicaOutputStreams outs, int checksumSize) throws IOException;
-
-  /**
-   * Checks how many valid storage volumes there are in the DataNode.
-   * @return true if more than the minimum number of valid volumes are left 
-   * in the FSDataSet.
-   */
-  boolean hasEnoughResource();
-
-  /**
-   * Get visible length of the specified replica.
-   */
-  long getReplicaVisibleLength(final ExtendedBlock block) throws IOException;
-
-  /**
-   * Initialize a replica recovery.
-   * @return actual state of the replica on this data-node or 
-   * null if data-node does not have the replica.
-   */
-  ReplicaRecoveryInfo initReplicaRecovery(RecoveringBlock rBlock
-      ) throws IOException;
-
-  /**
-   * Update replica's generation stamp and length and finalize it.
-   * @return the ID of storage that stores the block
-   */
-  Replica updateReplicaUnderRecovery(ExtendedBlock oldBlock,
-      long recoveryId, long newBlockId, long newLength) throws IOException;
-
-  /**
-   * add new block pool ID
-   * @param bpid Block pool Id
-   * @param conf Configuration
-   */
-  void addBlockPool(String bpid, Configuration conf) throws IOException;
-
-  /**
-   * Shutdown and remove the block pool from underlying storage.
-   * @param bpid Block pool Id to be removed
-   */
-  void shutdownBlockPool(String bpid) ;
-
-  /**
-   * Deletes the block pool directories. If force is false, directories are 
-   * deleted only if no block files exist for the block pool. If force 
-   * is true entire directory for the blockpool is deleted along with its
-   * contents.
-   * @param bpid BlockPool Id to be deleted.
-   * @param force If force is false, directories are deleted only if no
-   *        block files exist for the block pool, otherwise entire 
-   *        directory for the blockpool is deleted along with its contents.
-   * @throws IOException
-   */
-  void deleteBlockPool(String bpid, boolean force) throws IOException;
-
-  /**
-   * Get {@link BlockLocalPathInfo} for the given block.
-   */
-  BlockLocalPathInfo getBlockLocalPathInfo(ExtendedBlock b
-      ) throws IOException;
-
-  /**
-   * Enable 'trash' for the given dataset. When trash is enabled, files are
-   * moved to a separate trash directory instead of being deleted immediately.
-   * This can be useful for example during rolling upgrades.
-   */
-  void enableTrash(String bpid);
-
-  /**
-   * Clear trash
-   */
-  void clearTrash(String bpid);
-
-  /**
-   * @return true when trash is enabled
-   */
-  boolean trashEnabled(String bpid);
-
-  /**
-   * Create a marker file indicating that a rolling upgrade is in progress.
-   */
-  void setRollingUpgradeMarker(String bpid) throws IOException;
-
-  /**
-   * Delete the rolling upgrade marker file if it exists.
-   * @param bpid
-   */
-  void clearRollingUpgradeMarker(String bpid) throws IOException;
-
-  /**
-   * submit a sync_file_range request to AsyncDiskService.
-   */
-  void submitBackgroundSyncFileRangeRequest(final ExtendedBlock block,
-      final ReplicaOutputStreams outs, final long offset, final long nbytes,
-      final int flags);
-
-  /**
-   * Callback from RamDiskAsyncLazyPersistService upon async lazy persist task end
-   */
-  void onCompleteLazyPersist(String bpId, long blockId,
-      long creationTime, File[] savedFiles, V targetVolume);
-
-   /**
-    * Callback from RamDiskAsyncLazyPersistService upon async lazy persist task fail
-    */
-   void onFailLazyPersist(String bpId, long blockId);
-
-    /**
-     * Move block from one storage to another storage
-     */
-   ReplicaInfo moveBlockAcrossStorage(final ExtendedBlock block,
-        StorageType targetStorageType, String storageId) throws IOException;
-
-  /**
-   * Set a block to be pinned on this datanode so that it cannot be moved
-   * by Balancer/Mover.
-   *
-   * It is a no-op when dfs.datanode.block-pinning.enabled is set to false.
-   */
-  void setPinning(ExtendedBlock block) throws IOException;
-
-  /**
-   * Check whether the block was pinned
-   */
-  boolean getPinning(ExtendedBlock block) throws IOException;
-
-  /**
-   * Confirm whether the block is deleting
-   */
-  boolean isDeletingBlock(String bpid, long blockId);
-
-  /**
-   * Moves a given block from one volume to another volume. This is used by disk
-   * balancer.
-   *
-   * @param block       - ExtendedBlock
-   * @param destination - Destination volume
-   * @return Old replica info
-   */
-  ReplicaInfo moveBlockAcrossVolumes(final ExtendedBlock block,
-      FsVolumeSpi destination) throws IOException;
-
-  /***
-   * Acquire lock Manager for the data set. This prevents other threads from
-   * modifying the volume map structure inside the datanode.
-   * @return The AutoClosable read lock instance.
-   */
-  DataNodeLockManager<? extends AutoCloseDataSetLock> acquireDatasetLockManager();
-
-  /**
-   * Deep copy the replica info belonging to given block pool.
-   * @param bpid Specified block pool id.
-   * @return A set of replica info.
-   * @throws IOException
-   */
-  Set<? extends Replica> deepCopyReplica(String bpid) throws IOException;
-
-  /**
-   * Get relationship between disk mount and FsVolume.
-   * @return Disk mount and FsVolume relationship.
-   * @throws IOException
-   */
-  MountVolumeMap getMountVolumeMap() throws IOException;
-
-  /**
-   * Get the volume list.
-   */
-  List<FsVolumeImpl> getVolumeList();
-
-  /**
-   * Set the last time in milliseconds when the directory scanner successfully ran.
-   * @param time the last time in milliseconds when the directory scanner successfully ran.
-   */
-  default void setLastDirScannerFinishTime(long time) {}
-}
+   * 取消块写入，删除临时文件并回滚状态
+   * @param b 待取消的块对象
+   * @

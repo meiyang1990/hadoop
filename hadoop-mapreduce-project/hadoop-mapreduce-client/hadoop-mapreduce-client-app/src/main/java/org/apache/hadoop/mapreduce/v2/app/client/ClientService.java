@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,9 +23,22 @@ import java.net.InetSocketAddress;
 
 import org.apache.hadoop.service.Service;
 
+/**
+ * MapReduce ApplicationMaster客户端服务接口
+ * 定义了客户端服务需要提供的基础能力，用于对外暴露服务地址信息
+ * 供外部客户端连接访问ApplicationMaster，实现作业提交、状态查询等功能
+ */
 public interface ClientService extends Service {
 
+  /**
+   * 获取客户端服务绑定的网络地址
+   * @return 客户端RPC服务绑定的InetSocketAddress地址
+   */
   public abstract InetSocketAddress getBindAddress();
 
+  /**
+   * 获取客户端服务HTTP端口
+   * @return HTTP服务监听端口号
+   */
   public abstract int getHttpPort();
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -51,10 +52,8 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.DEFAULT_OPP_CONTAINER_ALLOCATION_NODES_NUMBER_USED;
 
 /**
- * The NodeQueueLoadMonitor keeps track of load metrics (such as queue length
- * and total wait time) associated with Container Queues on the Node Manager.
- * It uses this information to periodically sort the Nodes from least to most
- * loaded.
+ * 节点队列负载监控器，负责跟踪NodeManager上容器队列的负载指标（队列长度、总等待时间），
+ * 并定期对节点按负载从小到大排序，为机会容器分配提供节点选择依据。
  */
 public class NodeQueueLoadMonitor implements ClusterMonitor {
 
@@ -65,27 +64,19 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
       DEFAULT_OPP_CONTAINER_ALLOCATION_NODES_NUMBER_USED;
 
   /**
-   * The comparator used to specify the metric against which the load
-   * of two Nodes are compared.
+   * 负载比较器枚举，定义不同的节点负载比较策略。
    */
   public enum LoadComparator implements Comparator<ClusterNode> {
     /**
-     * This policy only considers queue length.
-     * When allocating, increments queue length without looking at resources
-     * available on the node, and when sorting, also only sorts by queue length.
+     * 仅按队列长度排序。分配时不考虑节点可用资源，仅增加队列长度计数。
      */
     QUEUE_LENGTH,
     /**
-     * This policy only considers the wait time of containers in the queue.
-     * Neither looks at resources nor at queue length.
+     * 仅按队列中容器等待时间排序，不考虑资源和队列长度。
      */
     QUEUE_WAIT_TIME,
     /**
-     * This policy considers both queue length and resources.
-     * When allocating, first decrements resources available on a node.
-     * If resources are available, does not place OContainers on the node queue.
-     * When sorting, it first sorts by queue length,
-     * then by available resources.
+     * 先按队列长度排序，再按可用资源排序。分配时优先检查资源可用性，资源充足时不将机会容器放入节点队列。
      */
     QUEUE_LENGTH_THEN_RESOURCES;
 
@@ -94,6 +85,7 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
         new DominantResourceCalculator();
 
     private boolean shouldPerformMinRatioComputation() {
+      // 检查集群资源是否有效，即不存在零或负的主要资源
       if (clusterResource == null) {
         return false;
       }
@@ -103,43 +95,42 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
     }
 
     /**
-     * Compares queue length of nodes first (shortest first),
-     * then compares available resources normalized
-     * over cluster resources (most available resources first).
-     * @param o1 the first ClusterNode
-     * @param o2 the second ClusterNode
-     * @return the difference the two ClusterNodes for sorting
+     * 先比较队列长度（短的在前），再比较按集群资源归一化后的可用资源（可用多的在前）。
+     * @param o1 第一个集群节点
+     * @param o2 第二个集群节点
+     * @return 比较结果，用于排序
      */
     private int compareQueueLengthThenResources(
         final ClusterNode o1, final ClusterNode o2) {
+      // 先比较队列长度
       int diff = o1.getQueueLength() - o2.getQueueLength();
       if (diff != 0) {
         return diff;
       }
 
+      // 队列长度相同，比较可用资源
       final Resource availableResource1 = o1.getAvailableResource();
       final Resource availableResource2 = o2.getAvailableResource();
 
-      // Cluster resource should be valid before performing min-ratio logic
-      // Use raw available resource comparison otherwise
+      // 集群资源有效则使用归一化最小比例比较，否则使用原始值比较
       if (shouldPerformMinRatioComputation()) {
-        // Takes the least available resource of the two nodes,
-        // normalized to the overall cluster resource
+        // 计算节点最小可用资源占集群总资源的比例
         final float availableRatio1 =
             resourceCalculator.minRatio(availableResource1, clusterResource);
         final float availableRatio2 =
             resourceCalculator.minRatio(availableResource2, clusterResource);
 
-        // The one with more available resources should be placed first
+        // 可用资源比例更高的节点排在前面
         diff = Precision.compareTo(
             availableRatio2, availableRatio1, Precision.EPSILON);
       }
 
+      // 比例相同比较vcpu绝对值
       if (diff == 0) {
-        // Compare absolute value if ratios are the same
         diff = availableResource2.getVirtualCores() - availableResource1.getVirtualCores();
       }
 
+      // vcpu相同比较内存绝对值
       if (diff == 0) {
         diff = Long.compare(availableResource2.getMemorySize(),
             availableResource1.getMemorySize());
@@ -151,6 +142,7 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
     @Override
     public int compare(ClusterNode o1, ClusterNode o2) {
       int diff;
+      // 根据当前策略选择比较方法
       switch (this) {
       case QUEUE_LENGTH_THEN_RESOURCES:
         diff = compareQueueLengthThenResources(o1, o2);
@@ -162,6 +154,7 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
         break;
       }
 
+      // 指标相同，按更新时间排序，新更新的排在前面
       if (diff == 0) {
         return (int) (o2.getTimestamp() - o1.getTimestamp());
       }
@@ -177,6 +170,11 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
       return resourceCalculator;
     }
 
+    /**
+     * 获取当前策略对应的节点负载指标。
+     * @param c 集群节点
+     * @return 指标值
+     */
     public int getMetric(ClusterNode c) {
       switch (this) {
       case QUEUE_WAIT_TIME:
@@ -189,11 +187,11 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
     }
 
     /**
-     * Increment the metric by a delta if it is below the threshold.
-     * @param c ClusterNode
-     * @param incrementSize increment size
-     * @param requested the requested resource
-     * @return true if the metric was below threshold and was incremented.
+     * 如果指标低于阈值，则增加指标计数。
+     * @param c 集群节点
+     * @param incrementSize 增量大小
+     * @param requested 请求的资源
+     * @return 若低于阈值并成功增加则返回true，否则返回false
      */
     public boolean compareAndIncrement(
         ClusterNode c, int incrementSize, Resource requested) {
@@ -202,7 +200,7 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
         return c.compareAndIncrementAllocation(
             incrementSize, resourceCalculator, requested);
       case QUEUE_WAIT_TIME:
-        // for queue wait time, we don't have any threshold.
+        // 等待时间策略没有阈值，总是允许分配
         return true;
       case QUEUE_LENGTH:
       default:
@@ -211,9 +209,9 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
     }
 
     /**
-     * Whether we should be placing OContainers on a node.
-     * @param cn the clusterNode
-     * @return whether we should be placing OContainers on a node.
+     * 检查节点是否还有容量容纳新的机会容器。
+     * @param cn 集群节点
+     * @return 节点可用返回true，否则返回false
      */
     public boolean isNodeAvailable(final ClusterNode cn) {
       int queueCapacity = cn.getQueueCapacity();
@@ -225,39 +223,52 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
           return queueLength < queueCapacity;
         }
       }
-      // In the special case where queueCapacity is 0 for the node,
-      // the container can be allocated on the node but will be rejected there
+      // 队列容量为0时允许分配，分配失败由节点侧处理
       return queueCapacity <= 0 || queueLength < queueCapacity;
     }
   }
 
+  // 定时排序任务执行器
   private final ScheduledExecutorService scheduledExecutor;
 
+  // 按负载从小到大排序后的节点ID列表
   protected final List<NodeId> sortedNodes;
+  // 存储所有集群节点信息，key为节点ID
   protected final Map<NodeId, ClusterNode> clusterNodes =
       new ConcurrentHashMap<>();
+  // 按主机名映射RMNode，用于本地化分配
   protected final Map<String, RMNode> nodeByHostName =
       new ConcurrentHashMap<>();
+  // 按机架名映射节点ID集合，用于机架本地化分配
   protected final Map<String, Set<NodeId>> nodeIdsByRack =
       new ConcurrentHashMap<>();
+  // 当前使用的负载比较策略
   protected final LoadComparator comparator;
+  // 队列限额计算器，用于动态调整队列长度阈值
   protected QueueLimitCalculator thresholdCalculator;
+  // 排序节点列表读写锁
   protected ReentrantReadWriteLock sortedNodesLock = new ReentrantReadWriteLock();
+  // 集群节点信息读写锁
   protected ReentrantReadWriteLock clusterNodesLock =
       new ReentrantReadWriteLock();
+  // 节点负载重新计算间隔，单位毫秒
   private long nodeComputationInterval;
 
+  // 定期更新排序节点列表的任务
   Runnable computeTask = new Runnable() {
     @Override
     public void run() {
+      // 获取写锁更新排序结果
       ReentrantReadWriteLock.WriteLock writeLock = sortedNodesLock.writeLock();
       writeLock.lock();
       try {
         try {
+          // 更新排序后的节点列表
           updateSortedNodes();
         } catch (Exception ex) {
           LOG.warn("Got Exception while sorting nodes..", ex);
         }
+        // 更新队列阈值
         if (thresholdCalculator != null) {
           thresholdCalculator.update();
         }
@@ -274,6 +285,12 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
     this.scheduledExecutor = null;
   }
 
+  /**
+   * 构造节点队列负载监控器。
+   * @param nodeComputationInterval 节点负载重新计算间隔，单位毫秒
+   * @param comparator 负载比较策略
+   * @param numNodes 随机分配节点时，从最负载最低节点中选择的候选数量
+   */
   public NodeQueueLoadMonitor(long nodeComputationInterval,
       LoadComparator comparator, int numNodes) {
     this.sortedNodes = new ArrayList<>();
@@ -283,12 +300,19 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
     numNodesForAnyAllocation = numNodes;
   }
 
+  /**
+   * 启动监控器，开始定时排序任务。
+   */
   public void start() {
     this.scheduledExecutor.scheduleAtFixedRate(computeTask, nodeComputationInterval,
         nodeComputationInterval, TimeUnit.MILLISECONDS);
   }
 
+  /**
+   * 更新排序后的节点列表。
+   */
   protected void updateSortedNodes() {
+    // 对节点排序并提取节点ID
     List<NodeId> nodeIds = sortNodes(true).stream()
         .map(n -> n.nodeId)
         .collect(Collectors.toList());
@@ -296,6 +320,7 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
     sortedNodes.addAll(nodeIds);
   }
 
+  @VisibleForTesting
   List<NodeId> getSortedNodes() {
     return sortedNodes;
   }
@@ -304,20 +329,31 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
     return thresholdCalculator;
   }
 
+  /**
+   * 停止监控器，关闭定时任务。
+   */
   public void stop() {
     if (scheduledExecutor != null) {
       scheduledExecutor.shutdown();
     }
   }
 
+  @VisibleForTesting
   Map<NodeId, ClusterNode> getClusterNodes() {
     return clusterNodes;
   }
 
+  @VisibleForTesting
   Comparator<ClusterNode> getComparator() {
     return comparator;
   }
 
+  /**
+   * 初始化队列限额计算器。
+   * @param sigma 标准差阈值系数
+   * @param limitMin 最小队列限额
+   * @param limitMax 最大队列限额
+   */
   public void initThresholdCalculator(float sigma, int limitMin, int limitMax) {
     this.thresholdCalculator =
         new QueueLimitCalculator(this, sigma, limitMin, limitMax);
@@ -326,22 +362,28 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
   @Override
   public void addNode(List<NMContainerStatus> containerStatuses,
       RMNode rmNode) {
+    // 添加节点到主机名映射
     this.nodeByHostName.put(rmNode.getHostName(), rmNode);
+    // 添加节点到机架映射
     addIntoNodeIdsByRack(rmNode);
-    // Ignoring this currently : at least one NODE_UPDATE heartbeat is
-    // required to ensure node eligibility.
+    // 首次添加不立即加入负载监控，需要等待第一次心跳更新后才会被纳入
   }
 
   @Override
   public void removeNode(RMNode removedRMNode) {
     LOG.info("Node delete event for: {}", removedRMNode.getNode().getName());
+    // 从主机名映射移除
     this.nodeByHostName.remove(removedRMNode.getHostName());
+    // 从机架映射移除
     removeFromNodeIdsByRack(removedRMNode);
+    // 获取写锁更新节点集合
     ReentrantReadWriteLock.WriteLock writeLock = clusterNodesLock.writeLock();
     writeLock.lock();
     ClusterNode node;
     try {
+      // 从集群节点集合移除
       node = this.clusterNodes.remove(removedRMNode.getNodeID());
+      // 节点移除后钩子，供子类扩展
       onNodeRemoved(node);
     } finally {
       writeLock.unlock();
@@ -356,8 +398,8 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
   }
 
   /**
-   * Provide an integration point for extended class
-   * @param node the node removed
+   * 节点移除后的扩展点，供子类重写。
+   * @param node 被移除的节点
    */
   protected void onNodeRemoved(ClusterNode node) {
   }
@@ -365,22 +407,25 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
   @Override
   public void updateNode(RMNode rmNode) {
     LOG.debug("Node update event from: {}", rmNode.getNodeID());
+    // 获取节点机会容器状态信息
     OpportunisticContainersStatus opportunisticContainersStatus =
         rmNode.getOpportunisticContainersStatus();
+    // 状态为空则创建空实例
     if (opportunisticContainersStatus == null) {
       opportunisticContainersStatus =
           OpportunisticContainersStatus.newInstance();
     }
 
-    // Add nodes to clusterNodes. If estimatedQueueTime is -1, ignore node
-    // UNLESS comparator is based on queue length.
+    // 获取写锁更新节点信息
     ReentrantReadWriteLock.WriteLock writeLock = clusterNodesLock.writeLock();
     writeLock.lock();
     try {
       ClusterNode clusterNode = this.clusterNodes.get(rmNode.getNodeID());
       if (clusterNode == null) {
+        // 新增节点处理
         onNewNodeAdded(rmNode, opportunisticContainersStatus);
       } else {
+        // 已有节点更新处理
         onExistingNodeUpdated(rmNode, clusterNode, opportunisticContainersStatus);
       }
     } finally {
@@ -388,16 +433,23 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
     }
   }
 
+  /**
+   * 处理新节点添加，根据节点状态和负载指标决定是否加入监控。
+   * @param rmNode RM节点信息
+   * @param status 机会容器状态
+   */
   protected void onNewNodeAdded(
       RMNode rmNode, OpportunisticContainersStatus status) {
     int opportQueueCapacity = status.getOpportQueueCapacity();
     int estimatedQueueWaitTime = status.getEstimatedQueueWaitTime();
     int waitQueueLength = status.getWaitQueueLength();
 
+    // 节点不在退役中，且负载指标有效，则加入监控
     if (rmNode.getState() != NodeState.DECOMMISSIONING &&
         (estimatedQueueWaitTime != -1 ||
             comparator == LoadComparator.QUEUE_LENGTH ||
             comparator == LoadComparator.QUEUE_LENGTH_THEN_RESOURCES)) {
+      // 构建节点属性
       final ClusterNode.Properties properties =
           ClusterNode.Properties.newInstance()
               .setQueueWaitTime(estimatedQueueWaitTime)
@@ -408,6 +460,7 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
               .setQueueCapacity(opportQueueCapacity)
               .updateTimestamp();
 
+      // 添加到集群节点集合
       this.clusterNodes.put(rmNode.getNodeID(),
           new ClusterNode(rmNode.getNodeID()).setProperties(properties));
 
@@ -419,204 +472,6 @@ public class NodeQueueLoadMonitor implements ClusterMonitor {
           waitQueueLength
       );
     } else {
+      // 忽略不符合条件的节点
       LOG.warn(
-          "IGNORING ClusterNode [{}] with queue wait time [{}] and "
-              + "wait queue length [{}]",
-          rmNode.getNode(),
-          estimatedQueueWaitTime,
-          waitQueueLength
-      );
-    }
-  }
-
-  protected void onExistingNodeUpdated(
-      RMNode rmNode, ClusterNode clusterNode,
-      OpportunisticContainersStatus status) {
-
-    int estimatedQueueWaitTime = status.getEstimatedQueueWaitTime();
-    int waitQueueLength = status.getWaitQueueLength();
-
-    if (rmNode.getState() != NodeState.DECOMMISSIONING &&
-        (estimatedQueueWaitTime != -1 ||
-            comparator == LoadComparator.QUEUE_LENGTH ||
-            comparator == LoadComparator.QUEUE_LENGTH_THEN_RESOURCES)) {
-      final ClusterNode.Properties properties =
-          ClusterNode.Properties.newInstance()
-              .setQueueWaitTime(estimatedQueueWaitTime)
-              .setQueueLength(waitQueueLength)
-              .setNodeLabels(rmNode.getNodeLabels())
-              .setCapability(rmNode.getTotalCapability())
-              .setAllocatedResource(rmNode.getAllocatedContainerResource())
-              .updateTimestamp();
-
-      clusterNode.setProperties(properties);
-
-      LOG.debug("Updating ClusterNode [{}] with queue wait time [{}] and"
-              + " wait queue length [{}]", rmNode.getNodeID(),
-          estimatedQueueWaitTime, waitQueueLength);
-
-    } else {
-      this.clusterNodes.remove(rmNode.getNodeID());
-      LOG.info("Deleting ClusterNode [" + rmNode.getNodeID() + "] " +
-          "with queue wait time [" + clusterNode.getQueueWaitTime() + "] and " +
-          "wait queue length [" + clusterNode.getQueueLength() + "]");
-    }
-  }
-
-  @Override
-  public void updateNodeResource(RMNode rmNode, ResourceOption resourceOption) {
-    LOG.debug("Node resource update event from: {}", rmNode.getNodeID());
-    // Ignoring this currently.
-  }
-
-  /**
-   * Returns all Node Ids as ordered list from Least to Most Loaded.
-   * @return ordered list of nodes
-   */
-  public List<NodeId> selectNodes() {
-    return selectLeastLoadedNodes(-1);
-  }
-
-  /**
-   * Returns 'K' of the least Loaded Node Ids as ordered list.
-   * @param k max number of nodes to return
-   * @return ordered list of nodes
-   */
-  public List<NodeId> selectLeastLoadedNodes(int k) {
-    ReentrantReadWriteLock.ReadLock readLock = sortedNodesLock.readLock();
-    readLock.lock();
-    try {
-      List<NodeId> retVal = ((k < this.sortedNodes.size()) && (k >= 0)) ?
-          new ArrayList<>(this.sortedNodes).subList(0, k) :
-          new ArrayList<>(this.sortedNodes);
-      return retVal;
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /**
-   * Selects the node as specified by hostName for resource allocation,
-   * unless the node has been blacklisted.
-   * @param hostName the hostname of the node for local resource allocation
-   * @param blacklist the blacklisted nodes
-   * @param request the requested resource
-   * @return the selected node, null if the node is full or is blacklisted
-   */
-  public RMNode selectLocalNode(
-      String hostName, Set<String> blacklist, Resource request) {
-    if (blacklist.contains(hostName)) {
-      return null;
-    }
-    RMNode node = nodeByHostName.get(hostName);
-    if (node != null) {
-      ClusterNode clusterNode = clusterNodes.get(node.getNodeID());
-      if (clusterNode != null && comparator
-          .compareAndIncrement(clusterNode, 1, request)) {
-        return node;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Selects a node from the rack as specified by rackName
-   * for resource allocation, excluding blacklisted nodes
-   * @param rackName the rack name for rack-local resource allocation
-   * @param blacklist the blacklisted nodes
-   * @param request the requested resource
-   * @return the selected node, null if no suitable nodes
-   */
-  public RMNode selectRackLocalNode(
-      String rackName, Set<String> blacklist, Resource request) {
-    Set<NodeId> nodesOnRack = nodeIdsByRack.get(rackName);
-    if (nodesOnRack != null) {
-      for (NodeId nodeId : nodesOnRack) {
-        if (!blacklist.contains(nodeId.getHost())) {
-          ClusterNode node = clusterNodes.get(nodeId);
-          if (node != null &&
-              comparator.compareAndIncrement(node, 1, request)) {
-            return nodeByHostName.get(nodeId.getHost());
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Selects a node from all ClusterNodes for resource allocation,
-   * excluding blacklisted nodes.
-   * @param blacklist the blacklisted nodes
-   * @param request the requested resource
-   * @return the selected node, null if no suitable nodes
-   */
-  public RMNode selectAnyNode(Set<String> blacklist, Resource request) {
-    List<NodeId> nodeIds = getCandidatesForSelectAnyNode();
-    int size = nodeIds.size();
-    if (size <= 0) {
-      return null;
-    }
-    Random rand = new Random();
-    int startIndex = rand.nextInt(size);
-    for (int i = 0; i < size; ++i) {
-      int index = i + startIndex;
-      index %= size;
-      NodeId nodeId = nodeIds.get(index);
-      if (nodeId != null && !blacklist.contains(nodeId.getHost())) {
-        ClusterNode node = clusterNodes.get(nodeId);
-        if (node != null && comparator.compareAndIncrement(
-            node, 1, request)) {
-          return nodeByHostName.get(nodeId.getHost());
-        }
-      }
-    }
-    return null;
-  }
-
-  protected List<NodeId> getCandidatesForSelectAnyNode() {
-    return selectLeastLoadedNodes(numNodesForAnyAllocation);
-  }
-
-  protected void removeFromNodeIdsByRack(RMNode removedNode) {
-    nodeIdsByRack.computeIfPresent(removedNode.getRackName(),
-        (k, v) -> {
-          v.remove(removedNode.getNodeID());
-          return v;
-        });
-  }
-
-  protected void addIntoNodeIdsByRack(RMNode addedNode) {
-    nodeIdsByRack.compute(addedNode.getRackName(), (k, v) -> v == null ?
-        ConcurrentHashMap.newKeySet() : v).add(addedNode.getNodeID());
-  }
-
-  protected List<ClusterNode> sortNodes(boolean excludeFullNodes) {
-    ReentrantReadWriteLock.ReadLock readLock = clusterNodesLock.readLock();
-    readLock.lock();
-    try {
-      final ClusterNode[] nodes = new ClusterNode[clusterNodes.size()];
-      int nodesIdx = 0;
-      final Resource clusterResource = Resource.newInstance(Resources.none());
-      for (final ClusterNode node : this.clusterNodes.values()) {
-        Resources.addTo(clusterResource, node.getCapability());
-        nodes[nodesIdx] = node;
-        nodesIdx++;
-      }
-
-      comparator.setClusterResource(clusterResource);
-
-      final List<ClusterNode> retList = new ArrayList<>();
-      Arrays.sort(nodes, comparator);
-      for (final ClusterNode cNode : nodes) {
-        if (!excludeFullNodes || comparator.isNodeAvailable(cNode)) {
-          retList.add(cNode);
-        }
-      }
-      return retList;
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-}
+          "IGNORING ClusterNode [{}

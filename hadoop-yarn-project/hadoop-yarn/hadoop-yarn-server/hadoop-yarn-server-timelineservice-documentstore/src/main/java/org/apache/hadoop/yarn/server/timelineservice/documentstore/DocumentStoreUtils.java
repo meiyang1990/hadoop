@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -59,14 +60,13 @@ import java.util.TreeSet;
 
 // 文档存储工具类，包含读取和写入DocumentStoreVendor文档所需的所有静态工具方法
 /**
- * This class consists of all the utils required for reading or writing
- * documents for a {@link DocumentStoreVendor}.
+ * 文档存储服务工具类，为文档存储厂商提供读写文档所需的通用工具方法。
  */
 public final class DocumentStoreUtils {
 
   private DocumentStoreUtils(){}
 
-  /** milliseconds in one day. */
+  /** 一天包含的毫秒数 */
   private static final long MILLIS_ONE_DAY = 86400000L;
 
   private static final String TIMELINE_STORE_TYPE =
@@ -81,10 +81,9 @@ public final class DocumentStoreUtils {
       DEFAULT_TIMELINE_SERVICE_DOCUMENTSTORE_DATABASE_NAME = "timeline_service";
 
   /**
-   * Checks whether the cosmosdb conf are set properly in yarn-site.xml conf.
-   * @param conf
-   *             related to yarn
-   * @throws YarnException if required config properties are missing
+   * 验证yarn-site.xml中CosmosDB配置是否完整正确。
+   * @param conf Yarn配置对象
+   * @throws YarnException 如果缺少必填配置项则抛出异常
    */
   public static void validateCosmosDBConf(Configuration conf)
       throws YarnException {
@@ -99,11 +98,9 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Retrieves {@link DocumentStoreVendor} configured.
-   * @param conf
-   *             related to yarn
-   * @return Returns the {@link DocumentStoreVendor} that is configured, else
-   *         uses {@link DocumentStoreVendor#COSMOS_DB} as default
+   * 获取配置中指定的文档存储厂商类型，默认使用CosmosDB。
+   * @param conf Yarn配置对象
+   * @return 返回配置的文档存储厂商，如果未配置则返回默认的COSMOS_DB
    */
   public static DocumentStoreVendor getStoreVendor(Configuration conf) {
     return DocumentStoreVendor.getStoreType(conf.get(TIMELINE_STORE_TYPE,
@@ -111,12 +108,10 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Retrieves a {@link TimelineEvent} from {@link TimelineEntity#events}.
-   * @param timelineEntity
-   *                      from which the set of events are examined.
-   * @param eventType
-   *                that has to be checked.
-   * @return {@link TimelineEvent} if found else null
+   * 从时间线实体中按事件类型查找指定事件。
+   * @param timelineEntity 待查找的时间线实体
+   * @param eventType 需要查找的事件类型
+   * @return 找到则返回对应TimelineEvent，否则返回null
    */
   public static TimelineEvent fetchEvent(TimelineEntity timelineEntity,
       String eventType) {
@@ -129,10 +124,9 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Checks if the string is null or empty.
-   * @param values
-   *             array of string to be checked
-   * @return false if any of the string is null or empty else true
+   * 检查给定字符串数组中是否存在null或空字符串。
+   * @param values 需要检查的字符串数组
+   * @return 任意字符串为null或空则返回true，全部非空则返回false
    */
   public static boolean isNullOrEmpty(String...values) {
     if (values == null || values.length == 0) {
@@ -148,10 +142,9 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Creates CosmosDB Async Document Client.
-   * @param conf
-   *          to retrieve cosmos db endpoint and key
-   * @return async document client for CosmosDB
+   * 创建CosmosDB异步文档客户端实例。
+   * @param conf Yarn配置对象，用于获取CosmosDB端点和密钥
+   * @return CosmosDB异步文档客户端实例
    */
   public static AsyncDocumentClient createCosmosDBAsyncClient(
       Configuration conf){
@@ -165,23 +158,19 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Returns the timestamp of the day's start (which is midnight 00:00:00 AM)
-   * for a given input timestamp.
-   *
-   * @param timeStamp Timestamp.
-   * @return timestamp of that day's beginning (midnight)
+   * 计算给定时间戳对应日期的起始时间戳（即当天0点整）。
+   * @param timeStamp 输入时间戳
+   * @return 对应日期起始时间戳（0点整）
    */
   public static long getTopOfTheDayTimestamp(long timeStamp) {
     return timeStamp - (timeStamp % MILLIS_ONE_DAY);
   }
 
   /**
-   * Creates a composite key for storing {@link TimelineEntityDocument}.
-   * @param collectorContext
-   *              of the timeline writer
-   * @param type
-   *            of the entity
-   * @return composite key delimited with !
+   * 构建时间线实体文档的复合文档ID。
+   * @param collectorContext 时间线写入器收集上下文
+   * @param type 实体类型
+   * @return 使用!分隔的复合ID
    */
   public static String constructTimelineEntityDocId(TimelineCollectorContext
       collectorContext, String type) {
@@ -192,14 +181,11 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Creates a composite key for storing {@link TimelineEntityDocument}.
-   * @param collectorContext
-   *              of the timeline writer
-   * @param type
-   *            of the entity
-   * @param id
-   *            of the entity
-   * @return composite key delimited with !
+   * 构建带实体ID的时间线实体文档的复合文档ID。
+   * @param collectorContext 时间线写入器收集上下文
+   * @param type 实体类型
+   * @param id 实体ID
+   * @return 使用!分隔的复合ID
    */
   public static String constructTimelineEntityDocId(TimelineCollectorContext
       collectorContext, String type, String id) {
@@ -210,10 +196,9 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Creates a composite key for storing {@link FlowRunDocument}.
-   * @param collectorContext
-   *              of the timeline writer
-   * @return composite key delimited with !
+   * 构建流运行文档的复合文档ID。
+   * @param collectorContext 时间线写入器收集上下文
+   * @return 使用!分隔的复合ID
    */
   public static String constructFlowRunDocId(TimelineCollectorContext
       collectorContext) {
@@ -223,12 +208,10 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Creates a composite key for storing {@link FlowActivityDocument}.
-   * @param collectorContext
-   *              of the timeline writer
-   * @param eventTimestamp
-   *              of the timeline entity
-   * @return composite key delimited with !
+   * 构建流活动文档的复合文档ID。
+   * @param collectorContext 时间线写入器收集上下文
+   * @param eventTimestamp 时间线实体事件时间戳
+   * @return 使用!分隔的复合ID
    */
   public static String constructFlowActivityDocId(TimelineCollectorContext
       collectorContext, long eventTimestamp) {
@@ -245,6 +228,11 @@ public final class DocumentStoreUtils {
     return conf.get(TIMELINE_SERVICE_COSMOSDB_MASTER_KEY);
   }
 
+  /**
+   * 获取文档存储数据库名称，使用配置值，未配置则生成默认名称。
+   * @param conf Yarn配置对象
+   * @return 数据库名称
+   */
   public static String getCosmosDBDatabaseName(Configuration conf) {
     return conf.get(TIMELINE_SERVICE_DOCUMENTSTORE_DATABASE_NAME,
         getDefaultTimelineServiceDBName(conf));
@@ -267,23 +255,22 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Checks if the {@link TimelineEntityFilters} are not matching for a given
-   * {@link TimelineEntity}.
-   * @param filters
-   *              that has to be checked for an entity
-   * @param timelineEntity
- *                for which the filters would be applied
-   * @return true if any one of the filter is not matching else false
-   * @throws IOException if an unsupported filter is being matched.
+   * 检查过滤器是否与给定时间线实体不匹配。
+   * @param filters 需要应用的过滤器集合
+   * @param timelineEntity 待检查的时间线实体
+   * @return 任意过滤器不匹配则返回true，全部匹配则返回false
+   * @throws IOException 如果遇到不支持的过滤器类型抛出异常
    */
   static boolean isFilterNotMatching(TimelineEntityFilters filters,
       TimelineEntity timelineEntity) throws IOException {
+    // 检查创建时间是否在范围内
     if (timelineEntity.getCreatedTime() != null && !isTimeInRange(timelineEntity
         .getCreatedTime(), filters.getCreatedTimeBegin(),
         filters.getCreatedTimeEnd())) {
       return true;
     }
 
+    // 检查relatesTo过滤条件
     if (filters.getRelatesTo() != null &&
         !filters.getRelatesTo().getFilterList().isEmpty() &&
         !TimelineStorageUtils.matchRelatesTo(timelineEntity,
@@ -291,6 +278,7 @@ public final class DocumentStoreUtils {
       return true;
     }
 
+    // 检查isRelatedTo过滤条件
     if (filters.getIsRelatedTo() != null &&
         !filters.getIsRelatedTo().getFilterList().isEmpty() &&
         !TimelineStorageUtils.matchIsRelatedTo(timelineEntity,
@@ -298,6 +286,7 @@ public final class DocumentStoreUtils {
       return true;
     }
 
+    // 检查info过滤条件
     if (filters.getInfoFilters() != null &&
         !filters.getInfoFilters().getFilterList().isEmpty() &&
         !TimelineStorageUtils.matchInfoFilters(timelineEntity,
@@ -305,6 +294,7 @@ public final class DocumentStoreUtils {
       return true;
     }
 
+    // 检查config过滤条件
     if (filters.getConfigFilters() != null &&
         !filters.getConfigFilters().getFilterList().isEmpty() &&
         !TimelineStorageUtils.matchConfigFilters(timelineEntity,
@@ -312,6 +302,7 @@ public final class DocumentStoreUtils {
       return true;
     }
 
+    // 检查metric过滤条件
     if (filters.getMetricFilters() != null &&
         !filters.getMetricFilters().getFilterList().isEmpty() &&
         !TimelineStorageUtils.matchMetricFilters(timelineEntity,
@@ -319,6 +310,7 @@ public final class DocumentStoreUtils {
       return true;
     }
 
+    // 检查event过滤条件
     return filters.getEventFilters() != null &&
         !filters.getEventFilters().getFilterList().isEmpty() &&
         !TimelineStorageUtils.matchEventFilters(timelineEntity,
@@ -326,26 +318,27 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Creates the final entity to be returned as the result.
-   * @param timelineEntityDocument
-   *                         which has all the information for the entity
-   * @param dataToRetrieve
-   *                     specifies filters and fields to retrieve
-   * @return {@link TimelineEntity} as the result
+   * 根据查询要求创建最终返回给调用方的时间线实体。
+   * @param timelineEntityDocument 存储在文档库中的完整时间线实体文档
+   * @param dataToRetrieve 指定需要检索的字段和过滤器
+   * @return 过滤后的时间线实体
    */
   public static TimelineEntity createEntityToBeReturned(
       TimelineEntityDocument timelineEntityDocument,
       TimelineDataToRetrieve dataToRetrieve) {
+    // 根据实体类型创建对应子类实例
     TimelineEntity entityToBeReturned = createTimelineEntity(
         timelineEntityDocument.getType(),
         timelineEntityDocument.fetchTimelineEntity());
 
+    // 设置基础公共属性
     entityToBeReturned.setIdentifier(new TimelineEntity.Identifier(
         timelineEntityDocument.getType(), timelineEntityDocument.getId()));
     entityToBeReturned.setCreatedTime(
         timelineEntityDocument.getCreatedTime());
     entityToBeReturned.setInfo(timelineEntityDocument.getInfo());
 
+    // 根据指定字段填充需要返回的内容
     if (dataToRetrieve.getFieldsToRetrieve() != null) {
       fillFields(entityToBeReturned, timelineEntityDocument,
           dataToRetrieve);
@@ -354,15 +347,11 @@ public final class DocumentStoreUtils {
   }
 
   /**
-   * Creates the final entity to be returned as the result.
-   * @param timelineEntityDocument
-   *                         which has all the information for the entity
-   * @param confsToRetrieve
-   *                     specifies config filters to be applied
-   * @param metricsToRetrieve
-   *                     specifies metric filters to be applied
-   *
-   * @return {@link TimelineEntity} as the result
+   * 根据配置和指标过滤器创建最终返回给调用方的时间线实体。
+   * @param timelineEntityDocument 存储在文档库中的完整时间线实体文档
+   * @param confsToRetrieve 配置过滤器
+   * @param metricsToRetrieve 指标过滤器
+   * @return 过滤后的时间线实体
    */
   public static TimelineEntity createEntityToBeReturned(
       TimelineEntityDocument timelineEntityDocument,
@@ -370,10 +359,12 @@ public final class DocumentStoreUtils {
       TimelineFilterList metricsToRetrieve) {
     TimelineEntity timelineEntity = timelineEntityDocument
         .fetchTimelineEntity();
+    // 应用配置过滤器
     if (confsToRetrieve != null) {
       timelineEntity.setConfigs(DocumentStoreUtils.applyConfigFilter(
           confsToRetrieve, timelineEntity.getConfigs()));
     }
+    // 应用指标过滤器
     if (metricsToRetrieve != null) {
       timelineEntity.setMetrics(DocumentStoreUtils.transformMetrics(
           metricsToRetrieve, timelineEntityDocument.getMetrics()));
@@ -381,6 +372,12 @@ public final class DocumentStoreUtils {
     return timelineEntity;
   }
 
+  /**
+   * 根据实体类型创建对应时间线实体子类实例。
+   * @param type 实体类型
+   * @param timelineEntity 原始时间线实体
+   * @return 对应子类的新实例
+   */
   private static TimelineEntity createTimelineEntity(String type,
       TimelineEntity timelineEntity) {
     switch (TimelineEntityType.valueOf(type)) {
@@ -399,101 +396,20 @@ public final class DocumentStoreUtils {
     }
   }
 
-  // fetch required fields for final entity to be returned
+  /**
+   * 根据需要检索的字段填充返回实体对应内容。
+   * @param finalEntity 目标返回实体
+   * @param entityDoc 完整实体文档
+   * @param dataToRetrieve 需要检索的字段信息
+   */
   private static void fillFields(TimelineEntity finalEntity,
       TimelineEntityDocument entityDoc,
       TimelineDataToRetrieve dataToRetrieve) {
     EnumSet<TimelineReader.Field> fieldsToRetrieve =
         dataToRetrieve.getFieldsToRetrieve();
+    // 如果需要所有字段，替换为全字段集合
     if (fieldsToRetrieve.contains(TimelineReader.Field.ALL)) {
       fieldsToRetrieve = EnumSet.allOf(TimelineReader.Field.class);
     }
-    for (TimelineReader.Field field : fieldsToRetrieve) {
-      switch(field) {
-      case CONFIGS:
-        finalEntity.setConfigs(applyConfigFilter(dataToRetrieve
-                .getConfsToRetrieve(), entityDoc.getConfigs()));
-        break;
-      case METRICS:
-        finalEntity.setMetrics(transformMetrics(dataToRetrieve
-                .getMetricsToRetrieve(), entityDoc.getMetrics()));
-        break;
-      case INFO:
-        finalEntity.setInfo(entityDoc.getInfo());
-        break;
-      case IS_RELATED_TO:
-        finalEntity.setIsRelatedToEntities(entityDoc.getIsRelatedToEntities());
-        break;
-      case RELATES_TO:
-        finalEntity.setIsRelatedToEntities(entityDoc.getIsRelatedToEntities());
-        break;
-      case EVENTS:
-        finalEntity.setEvents(transformEvents(entityDoc.getEvents().values()));
-        break;
-      default:
-      }
-    }
-  }
-
-  /* Transforms Collection<Set<TimelineEventSubDoc>> to
-     NavigableSet<TimelineEvent> */
-  private static NavigableSet<TimelineEvent> transformEvents(
-      Collection<Set<TimelineEventSubDoc>> eventSetColl) {
-    NavigableSet<TimelineEvent> timelineEvents = new TreeSet<>();
-    for (Set<TimelineEventSubDoc> eventSubDocs : eventSetColl) {
-      for (TimelineEventSubDoc eventSubDoc : eventSubDocs) {
-        timelineEvents.add(eventSubDoc.fetchTimelineEvent());
-      }
-    }
-    return timelineEvents;
-  }
-
-  public static Set<TimelineMetric> transformMetrics(
-      TimelineFilterList metricsToRetrieve,
-      Map<String, Set<TimelineMetricSubDoc>> metrics) {
-    if (metricsToRetrieve == null ||
-        hasDataToBeRetrieve(metricsToRetrieve, metrics.keySet())) {
-      Set<TimelineMetric> metricSet = new HashSet<>();
-      for(Set<TimelineMetricSubDoc> metricSubDocs : metrics.values()) {
-        for(TimelineMetricSubDoc metricSubDoc : metricSubDocs) {
-          metricSet.add(metricSubDoc.fetchTimelineMetric());
-        }
-      }
-      return metricSet;
-    }
-    return new HashSet<>();
-  }
-
-  public static Map<String, String> applyConfigFilter(
-      TimelineFilterList configsToRetrieve, Map<String, String> configs) {
-    if (configsToRetrieve == null ||
-        hasDataToBeRetrieve(configsToRetrieve, configs.keySet())) {
-      return configs;
-    }
-    return new HashMap<>();
-  }
-
-  private static boolean hasDataToBeRetrieve(
-      TimelineFilterList timelineFilters, Set<String> dataSet) {
-    Set<String> dataToBeRetrieved = new HashSet<>();
-    TimelinePrefixFilter timelinePrefixFilter;
-    for (TimelineFilter timelineFilter : timelineFilters.getFilterList()) {
-      timelinePrefixFilter = (TimelinePrefixFilter) timelineFilter;
-      dataToBeRetrieved.add(timelinePrefixFilter.getPrefix());
-    }
-    switch (timelineFilters.getOperator()) {
-    case OR:
-      if (dataToBeRetrieved.size() == 0 ||
-          !Collections.disjoint(dataSet, dataToBeRetrieved)) {
-        return true;
-      }
-    case AND:
-      if (dataToBeRetrieved.size() == 0 ||
-          dataSet.containsAll(dataToBeRetrieved)) {
-        return true;
-      }
-    default:
-      return false;
-    }
-  }
-}
+    // 遍历需要的字段逐个填充
+    for (

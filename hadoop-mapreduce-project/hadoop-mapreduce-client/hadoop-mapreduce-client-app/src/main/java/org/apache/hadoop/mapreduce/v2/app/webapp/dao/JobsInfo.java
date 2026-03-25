@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,19 +24,34 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * MapReduce WebUI 作业列表信息数据访问对象，用于序列化多个作业信息为JSON/XML格式
+ * 供Web接口返回批量作业的列表数据
+ */
 @XmlRootElement(name = "jobs")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class JobsInfo {
 
   protected ArrayList<JobInfo> job = new ArrayList<JobInfo>();
 
+  /**
+   * 无参构造函数，供JAXB序列化/反序列化使用
+   */
   public JobsInfo() {
   } // JAXB needs this
 
+  /**
+   * 添加单个作业信息到作业列表
+   * @param jobInfo 单个作业的详细信息对象
+   */
   public void add(JobInfo jobInfo) {
     job.add(jobInfo);
   }
 
+  /**
+   * 获取所有作业信息列表
+   * @return 包含所有作业信息的ArrayList
+   */
   public ArrayList<JobInfo> getJobs() {
     return job;
   }

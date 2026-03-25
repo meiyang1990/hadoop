@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,318 +25,305 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.RollingUpgradeInfo;
 
 /**
- * This is the JMX management interface for namenode information.
- * End users shouldn't be implementing these interfaces, and instead
- * access this information through the JMX APIs.
+ * NameNode的JMX管理接口，用于暴露NameNode运行状态指标供监控系统通过JMX获取。
+ * 终端用户不应直接实现此接口，应通过标准JMX API访问其中暴露的监控信息。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public interface NameNodeMXBean {
 
   /**
-   * Gets the version of Hadoop.
+   * 获取Hadoop版本号。
    * 
-   * @return the version.
+   * @return Hadoop版本字符串
    */
   String getVersion();
 
   /**
-   * Get the version of software running on the Namenode.
+   * 获取当前NameNode运行的软件版本号。
    *
-   * @return a string representing the version.
+   * @return 表示版本号的字符串
    */
   String getSoftwareVersion();
 
   /**
-   * Gets the used space by data nodes.
+   * 获取所有DataNode已使用的存储空间总和。
    * 
-   * @return the used space by data nodes.
+   * @return DataNode已使用空间（字节）
    */
   long getUsed();
   
   /**
-   * Gets total non-used raw bytes.
+   * 获取所有DataNode剩余可用存储空间总和。
    * 
-   * @return total non-used raw bytes.
+   * @return DataNode剩余空间（字节）
    */
   long getFree();
   
   /**
-   * Gets total raw bytes including non-dfs used space.
+   * 获取所有DataNode总存储空间（包含非DFS占用空间）。
    * 
-   * @return the total raw bytes including non-dfs used space.
+   * @return DataNode总原始空间（字节）
    */
   long getTotal();
 
   /**
-   * Gets capacity of the provided storage mounted, in bytes.
+   * 获取第三方提供存储的总容量（字节）。
    *
-   * @return the total raw bytes present in the provided storage.
+   * @return 提供存储的总容量（字节）
    */
   long getProvidedCapacity();
 
   /**
-   * Gets the safemode status.
+   * 获取当前安全模式状态。
    * 
-   * @return the safemode status.
+   * @return 安全模式状态描述
    */
   String getSafemode();
   
   /**
-   * Checks if upgrade is finalized.
+   * 检查系统升级是否已完成。
    * 
-   * @return true, if upgrade is finalized.
+   * @return true表示升级已完成，false表示升级未完成
    */
   boolean isUpgradeFinalized();
 
   /**
-   * Gets the RollingUpgrade information.
+   * 获取滚动升级信息。
    *
-   * @return Rolling upgrade information if an upgrade is in progress. Else
-   * (e.g. if there is no upgrade or the upgrade is finalized), returns null.
+   * @return 如果滚动升级正在进行则返回升级信息，否则（无升级或升级已完成）返回null
    */
   RollingUpgradeInfo.Bean getRollingUpgradeStatus();
 
   /**
-   * Gets total used space by data nodes for non DFS purposes such as storing
-   * temporary files on the local file system.
+   * 获取DataNode上非DFS用途（如本地临时文件）占用的存储空间总和。
    * 
-   * @return the non dfs space of the cluster.
+   * @return 集群非DFS占用空间（字节）
    */
   long getNonDfsUsedSpace();
   
   /**
-   * Gets the total used space by data nodes as percentage of total capacity.
+   * 获取已用空间占总容量的百分比。
    * 
-   * @return the percentage of used space on the cluster.
+   * @return 集群已用空间百分比
    */
   float getPercentUsed();
   
   /**
-   * Gets the total remaining space by data nodes as percentage of total 
-   * capacity.
+   * 获取剩余空间占总容量的百分比。
    * 
-   * @return the percentage of the remaining space on the cluster.
+   * @return 集群剩余空间百分比
    */
   float getPercentRemaining();
 
   /**
-   * Gets the amount of cache used by the datanode (in bytes).
+   * 获取DataNode已使用的缓存容量（字节）。
    *
-   * @return the amount of cache used by the datanode (in bytes).
+   * @return DataNode已使用缓存（字节）
    */
   long getCacheUsed();
 
   /**
-   * Gets the total cache capacity of the datanode (in bytes).
+   * 获取DataNode总缓存容量（字节）。
    *
-   * @return the total cache capacity of the datanode (in bytes).
+   * @return DataNode总缓存容量（字节）
    */
   long getCacheCapacity();
   
   /**
-   * Get the total space used by the block pools of this namenode.
+   * 获取当前NameNode所属块池已使用的总空间。
    *
-   * @return the total space used by the block pools of this namenode.
+   * @return 当前NameNode块池已使用空间（字节）
    */
   long getBlockPoolUsedSpace();
   
   /**
-   * Get the total space used by the block pool as percentage of total capacity.
+   * 获取块池已用空间占总容量的百分比。
    *
-   * @return the total space used by the block pool as percentage of total
-   * capacity.
+   * @return 块池已用空间占总容量的百分比
    */
   float getPercentBlockPoolUsed();
     
   /**
-   * Gets the total numbers of blocks on the cluster.
+   * 获取集群总块数量。
    * 
-   * @return the total number of blocks of the cluster.
+   * @return 集群所有块总数
    */
   long getTotalBlocks();
   
   /**
-   * Gets the total number of missing blocks on the cluster.
+   * 获取集群缺失块总数。
    * 
-   * @return the total number of missing blocks on the cluster.
+   * @return 集群缺失块总数
    */
   long getNumberOfMissingBlocks();
   
   /**
-   * Gets the total number of missing blocks on the cluster with
-   * replication factor 1.
+   * 获取集群中副本数为1的缺失块总数。
    *
-   * @return the total number of missing blocks on the cluster with
-   * replication factor 1.
+   * @return 集群中副本数为1的缺失块总数
    */
   long getNumberOfMissingBlocksWithReplicationFactorOne();
 
 
   /**
-   * Gets the total number of badly distributed blocks.
+   * 获取集群中分布不合理块总数。
    *
-   * @return the total number of badly distrubted blocks.
+   * @return 集群中分布不合理块总数
    */
   long getNumberOfBadlyDistributedBlocks();
 
   /**
-   * Gets the total number of replicated low redundancy blocks on the cluster
-   * with the highest risk of loss.
+   * 获取集群中最高丢失风险的低冗余副本块总数。
    *
-   * @return the total number of low redundancy blocks on the cluster
-   * with the highest risk of loss.
+   * @return 集群中最高丢失风险的低冗余副本块总数
    */
   long getHighestPriorityLowRedundancyReplicatedBlocks();
 
   /**
-   * Gets the total number of erasure coded low redundancy blocks on the cluster
-   * with the highest risk of loss.
+   * 获取集群中最高丢失风险的低冗余纠删码块总数。
    *
-   * @return the total number of low redundancy blocks on the cluster
-   * with the highest risk of loss.
+   * @return 集群中最高丢失风险的低冗余纠删码块总数
    */
   long getHighestPriorityLowRedundancyECBlocks();
 
   /**
-   * Gets the total number of snapshottable dirs in the system.
+   * 获取系统中支持快照的目录总数。
    *
-   * @return the total number of snapshottable dirs in the system.
+   * @return 系统中可快照目录总数
    */
   long getNumberOfSnapshottableDirs();
 
   /**
-   * Gets the number of threads.
+   * 获取NameNode当前线程数。
    * 
-   * @return the number of threads.
+   * @return NameNode线程数
    */
   int getThreads();
 
   /**
-   * Gets the live node information of the cluster.
+   * 获取集群中存活节点信息。
    * 
-   * @return the live node information.
+   * @return 存活节点信息字符串
    */
   String getLiveNodes();
   
   /**
-   * Gets the dead node information of the cluster.
+   * 获取集群中宕机节点信息。
    * 
-   * @return the dead node information.
+   * @return 宕机节点信息字符串
    */
   String getDeadNodes();
   
   /**
-   * Gets the decommissioning node information of the cluster.
+   * 获取集群中正在退役节点信息。
    * 
-   * @return the decommissioning node information.
+   * @return 正在退役节点信息字符串
    */
   String getDecomNodes();
 
   /**
-   * Gets the information on nodes entering maintenance.
+   * 获取正在进入维护状态节点信息。
    *
-   * @return the information on nodes entering maintenance.
+   * @return 进入维护状态节点信息字符串
    */
   String getEnteringMaintenanceNodes();
 
   /**
-   * Gets the cluster id.
+   * 获取集群ID。
    * 
-   * @return the cluster id.
+   * @return 集群ID字符串
    */
   String getClusterId();
   
   /**
-   * Gets the block pool id.
+   * 获取块池ID。
    * 
-   * @return the block pool id.
+   * @return 块池ID字符串
    */
   String getBlockPoolId();
 
   /**
-   * Get status information about the directories storing image and edits logs
-   * of the NN.
+   * 获取NameNode存储镜像和编辑日志目录的状态信息。
    * 
-   * @return the name dir status information, as a JSON string.
+   * @return 名称目录状态信息，JSON格式字符串
    */
   String getNameDirStatuses();
 
   /**
-   * Get Max, Median, Min and Standard Deviation of DataNodes usage.
+   * 获取DataNode磁盘使用率的最大值、中位数、最小值和标准差。
    *
-   * @return the DataNode usage information, as a JSON string.
+   * @return DataNode使用率信息，JSON格式字符串
    */
   String getNodeUsage();
 
   /**
-   * Get status information about the journals of the NN.
+   * 获取NameNode编辑日志Journal的状态信息。
    *
-   * @return the name journal status information, as a JSON string.
+   * @return NameNode Journal状态信息，JSON格式字符串
    */
   String getNameJournalStatus();
   
   /**
-   * Get information about the transaction ID, including the last applied 
-   * transaction ID and the most recent checkpoint's transaction ID.
+   * 获取Journal事务ID信息，包含最后应用的事务ID和最近一次检查点的事务ID。
    *
-   * @return information about the transaction ID.
+   * @return 事务ID信息字符串
    */
   String getJournalTransactionInfo();
 
   /**
-   * Gets the NN start time in milliseconds.
+   * 获取NameNode启动时间戳（毫秒）。
    *
-   * @return the NN start time in msec.
+   * @return NameNode启动时间（毫秒）
    */
   long getNNStartedTimeInMillis();
 
   /**
-   * Get the compilation information which contains date, user and branch.
+   * 获取编译信息，包含编译日期、编译用户、分支信息。
    *
-   * @return the compilation information, as a JSON string.
+   * @return 编译信息，JSON格式字符串
    */
   String getCompileInfo();
 
   /**
-   * Get the list of corrupt files.
+   * 获取损坏文件列表。
    *
-   * @return the list of corrupt files, as a JSON string.
+   * @return 损坏文件列表，JSON格式字符串
    */
   String getCorruptFiles();
 
   /**
-   * Get the length of the list of corrupt files.
+   * 获取损坏文件列表长度。
    *
-   * @return the length of the list of corrupt files.
+   * @return 损坏文件总数
    */
   int getCorruptFilesCount();
 
   /**
-   * Get the number of distinct versions of live datanodes.
+   * 获取存活DataNode的不同版本数量。
    * 
-   * @return the number of distinct versions of live datanodes.
+   * @return 存活DataNode不同版本的数量
    */
   int getDistinctVersionCount();
 
   /**
-   * Get the number of live datanodes for each distinct versions.
+   * 获取每个版本对应的存活DataNode数量。
    * 
-   * @return the number of live datanodes for each distinct versions.
+   * @return 版本号到存活节点数的映射表
    */
   Map<String, Integer> getDistinctVersions();
   
   /**
-   * Get namenode directory size.
+   * 获取NameNode目录总大小。
    *
-   * @return namenode directory size.
+   * @return NameNode目录大小信息字符串
    */
   String getNameDirSize();
 
   /**
-   * Verifies whether the cluster setup can support all enabled EC policies.
+   * 验证集群拓扑是否支持当前所有启用的纠删码策略。
    *
-   * @return the result of the verification.
+   * @return 验证结果字符串
    */
   String getVerifyECWithTopologyResult();
 

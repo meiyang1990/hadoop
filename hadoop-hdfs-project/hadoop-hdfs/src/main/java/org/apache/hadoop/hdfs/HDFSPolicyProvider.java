@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -39,10 +40,12 @@ import org.apache.hadoop.ipc.RefreshCallQueueProtocol;
 import org.apache.hadoop.ipc.GenericRefreshProtocol;
 
 /**
- * {@link PolicyProvider} for HDFS protocols.
+ * HDFS协议的安全ACL策略提供者，向Hadoop安全授权框架注册所有HDFS RPC协议对应的访问控制配置
+ * 为每个HDFS RPC协议绑定对应的ACL配置项，实现不同协议的独立访问权限控制
  */
 @InterfaceAudience.Private
 public class HDFSPolicyProvider extends PolicyProvider {
+  // 存储所有HDFS RPC协议与对应ACL配置的映射关系
   private static final Service[] hdfsServices =
     new Service[] {
     new Service(CommonConfigurationKeys.SECURITY_CLIENT_PROTOCOL_ACL,
@@ -87,6 +90,10 @@ public class HDFSPolicyProvider extends PolicyProvider {
           ReconfigurationProtocol.class)
   };
   
+  /**
+   * 获取所有已注册的HDFS服务协议与ACL配置映射
+   * @return HDFS所有RPC服务的ACL策略数组
+   */
   @Override
   public Service[] getServices() {
     return hdfsServices;

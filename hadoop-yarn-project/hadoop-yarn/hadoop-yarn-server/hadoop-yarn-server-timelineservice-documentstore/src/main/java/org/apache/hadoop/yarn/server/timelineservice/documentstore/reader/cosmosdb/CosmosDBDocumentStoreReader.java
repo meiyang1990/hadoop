@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,8 +45,8 @@ import java.util.concurrent.Executors;
 
 
 /**
- * This is the Document Store Reader implementation for
- * {@link DocumentStoreVendor#COSMOS_DB}.
+ * Azure CosmosDB 文档存储实现的时间线数据读取器，实现 DocumentStoreReader 接口。
+ * 负责从Azure CosmosDB查询读取时间线服务实体数据。
  */
 public class CosmosDBDocumentStoreReader<TimelineDoc extends TimelineDocument>
     implements DocumentStoreReader<TimelineDoc> {
@@ -71,20 +72,28 @@ public class CosmosDBDocumentStoreReader<TimelineDoc extends TimelineDocument>
       "\"%s\") ";
   private final static String ORDER_BY_CLAUSE = " ORDER BY c.createdTime";
 
-  // creating thread pool of size, half of the total available threads from JVM
+  // 创建线程池，线程数为JVM可用处理器数的一半，用于异步查询
   private static ExecutorService executorService = Executors.newFixedThreadPool(
       Runtime.getRuntime().availableProcessors() / 2);
   private static Scheduler schedulerForBlockingWork =
       Schedulers.from(executorService);
 
+  /**
+   * 构造函数，从配置中初始化CosmosDB读取器。
+   * @param conf Hadoop配置对象
+   */
   public CosmosDBDocumentStoreReader(Configuration conf) {
     LOG.info("Initializing Cosmos DB DocumentStoreReader...");
     databaseName = DocumentStoreUtils.getCosmosDBDatabaseName(conf);
     initCosmosDBClient(conf);
   }
 
+  /**
+   * 同步初始化CosmosDB异步客户端，保证单例模式。
+   * @param conf Hadoop配置对象
+   */
   private synchronized void initCosmosDBClient(Configuration conf) {
-    // making CosmosDB Async Client Singleton
+    // 保证CosmosDB异步客户端单例
     if (client == null) {
       LOG.info("Creating Cosmos DB Reader Async Client...");
       client = DocumentStoreUtils.createCosmosDBAsyncClient(conf);
@@ -108,18 +117,21 @@ public class CosmosDBDocumentStoreReader<TimelineDoc extends TimelineDocument>
   @Override
   public Set<String> fetchEntityTypes(String collectionName,
       TimelineReaderContext context) {
+    // 构建查询去重实体类型的SQL
     StringBuilder queryStrBuilder = new StringBuilder();
     queryStrBuilder.append(
         String.format(SELECT_DISTINCT_TYPES_FROM_COLLECTION, collectionName));
+    // 添加查询条件
     String sqlQuery = addPredicates(context, collectionName, queryStrBuilder);
 
     LOG.debug("Querying Collection : {} , with query {}", collectionName,
         sqlQuery);
 
+    // 执行查询并提取实体类型结果
     return Sets.newHashSet(client.queryDocuments(
         String.format(COLLECTION_LINK, databaseName, collectionName),
         sqlQuery, new FeedOptions())
-        .map(FeedResponse::getResults) // Map the page to the list of documents
+        .map(FeedResponse::getResults)
         .concatMap(Observable::from)
         .map(document -> String.valueOf(document.get(ENTITY_TYPE_COLUMN)))
         .toList()
@@ -141,20 +153,32 @@ public class CosmosDBDocumentStoreReader<TimelineDoc extends TimelineDocument>
         "querying Collection : " + collectionName);
   }
 
+  /**
+   * 根据查询上下文构建SQL并执行查询，返回文档列表。
+   * @param collectionName CosmosDB集合名称
+   * @param context 时间线读取上下文
+   * @param docClass 时间线文档类
+   * @param maxDocumentsSize 最大返回文档数
+   * @return 查询到的时间线文档列表
+   */
   private List<TimelineDoc> queryDocuments(String collectionName,
       TimelineReaderContext context, final Class<TimelineDoc> docClass,
       final long maxDocumentsSize) {
+    // 构建带查询条件的SQL语句
     final String sqlQuery = buildQueryWithPredicates(context, collectionName,
         maxDocumentsSize);
     LOG.debug("Querying Collection : {} , with query {}", collectionName,
         sqlQuery);
 
+    // 执行异步查询并转换结果为目标文档类型
     return client.queryDocuments(String.format(COLLECTION_LINK,
         databaseName, collectionName), sqlQuery, new FeedOptions())
-        .map(FeedResponse::getResults) // Map the page to the list of documents
+        .map(FeedResponse::getResults)
         .concatMap(Observable::from)
         .map(document -> {
+          // 将CosmosDB文档转换为时间线文档对象
           TimelineDoc resultDoc = document.toObject(docClass);
+          // 如果文档未设置创建时间，则从文档时间戳补全创建时间
           if (resultDoc.getCreatedTime() == 0 &&
               document.getTimestamp() != null) {
             resultDoc.setCreatedTime(document.getTimestamp().getTime());
@@ -167,9 +191,17 @@ public class CosmosDBDocumentStoreReader<TimelineDoc extends TimelineDocument>
         .single();
   }
 
+  /**
+   * 根据参数构建带查询条件的完整SQL语句。
+   * @param context 时间线读取上下文
+   * @param collectionName 集合名称
+   * @param size 最大返回文档数，-1表示返回全部
+   * @return 完整SQL语句字符串
+   */
   private String buildQueryWithPredicates(TimelineReaderContext context,
       String collectionName, long size) {
     StringBuilder queryStrBuilder = new StringBuilder();
+    // 根据是否限制大小选择查询全部或查询指定条数
     if (size == -1) {
       queryStrBuilder.append(String.format(SELECT_ALL_FROM_COLLECTION,
           collectionName));
@@ -178,16 +210,26 @@ public class CosmosDBDocumentStoreReader<TimelineDoc extends TimelineDocument>
           collectionName));
     }
 
+    // 添加查询条件
     return addPredicates(context, collectionName, queryStrBuilder);
   }
 
   @VisibleForTesting
+  /**
+   * 根据上下文向SQL中添加WHERE查询条件。
+   * @param context 时间线读取上下文，包含各类查询过滤条件
+   * @param collectionName 集合名称
+   * @param queryStrBuilder SQL构建器
+   * @return 添加完条件的完整SQL语句
+   */
   String addPredicates(TimelineReaderContext context,
       String collectionName, StringBuilder queryStrBuilder) {
     boolean hasPredicate = false;
 
+    // 先添加WHERE子句开头
     queryStrBuilder.append(WHERE_CLAUSE);
 
+    // 根据上下文非空字段依次添加匹配条件
     if (!DocumentStoreUtils.isNullOrEmpty(context.getClusterId())) {
       hasPredicate = true;
       queryStrBuilder.append(String.format(CONTAINS_FUNC_FOR_ID,
@@ -225,17 +267,22 @@ public class CosmosDBDocumentStoreReader<TimelineDoc extends TimelineDocument>
               context.getEntityType()));
     }
 
+    // 存在有效查询条件，则添加排序并返回结果
     if (hasPredicate) {
       queryStrBuilder.append(ORDER_BY_CLAUSE);
       LOG.debug("CosmosDB Sql Query with predicates : {}", queryStrBuilder);
       return queryStrBuilder.toString();
     }
+    // 没有任何有效查询条件则抛出异常
     throw new IllegalArgumentException("The TimelineReaderContext does not " +
         "have enough information to query documents for Collection : " +
         collectionName);
   }
 
   @Override
+  /**
+   * 关闭CosmosDB客户端，释放资源。
+   */
   public synchronized void close() {
     if (client != null) {
       LOG.info("Closing Cosmos DB Reader Async Client...");
@@ -244,6 +291,9 @@ public class CosmosDBDocumentStoreReader<TimelineDoc extends TimelineDocument>
     }
   }
 
+  /**
+   * 添加JVM关闭钩子，在进程退出时关闭线程池释放资源。
+   */
   private void addShutdownHook() {
     Runtime.getRuntime().addShutdownHook(new SubjectInheritingThread(() -> {
       if (executorService != null) {

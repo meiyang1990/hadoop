@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,21 +26,25 @@ import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.webapp.dao.SchedConfUpdateInfo;
 
 /**
- * Default configuration mutation ACL policy. Checks if user is YARN admin.
+ * 文件：调度配置修改访问控制默认策略实现
+ * 功能：为YARN资源管理器调度器配置在线修改提供默认的ACL权限检查，仅允许YARN管理员修改配置
  */
 public class DefaultConfigurationMutationACLPolicy implements
     ConfigurationMutationACLPolicy {
 
+  // YARN权限验证器实例
   private YarnAuthorizationProvider authorizer;
 
   @Override
   public void init(Configuration conf, RMContext rmContext) {
+    // 从配置初始化权限验证器实例
     authorizer = YarnAuthorizationProvider.getInstance(conf);
   }
 
   @Override
   public boolean isMutationAllowed(UserGroupInformation user,
       SchedConfUpdateInfo confUpdate) {
+    // 仅当用户是YARN管理员时才允许修改配置
     return authorizer.isAdmin(user);
   }
 }

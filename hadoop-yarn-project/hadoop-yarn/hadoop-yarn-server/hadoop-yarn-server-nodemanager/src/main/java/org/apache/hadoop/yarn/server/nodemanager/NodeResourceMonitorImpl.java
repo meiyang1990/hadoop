@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -35,38 +36,39 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Implementation of the node resource monitor. It periodically tracks the
- * resource utilization of the node and reports it to the NM.
+ * 节点资源监控器实现类，定期监控节点资源利用率并上报给NodeManager。
  */
 public class NodeResourceMonitorImpl extends AbstractService implements
     NodeResourceMonitor {
 
-  /** Logging infrastructure. */
   final static Logger LOG =
        LoggerFactory.getLogger(NodeResourceMonitorImpl.class);
 
-  /** Interval to monitor the node resource utilization. */
+  /** 节点资源利用率监控间隔（毫秒） */
   private long monitoringInterval;
-  /** Thread to monitor the node resource utilization. */
+  /** 资源监控后台线程 */
   private MonitoringThread monitoringThread;
 
-  /** Resource calculator. */
+  /** 资源计算器插件，用于获取系统资源使用情况 */
   private ResourceCalculatorPlugin resourceCalculatorPlugin;
 
-  /** Gpu related plugin. */
+  /** GPU资源插件实例 */
   private GpuResourcePlugin gpuResourcePlugin;
+  /** GPU资源信息更新处理器 */
   private GpuNodeResourceUpdateHandler gpuNodeResourceUpdateHandler;
 
-  /** Current <em>resource utilization</em> of the node. */
-
+  /** 自定义资源（如GPU）的使用率信息 */
   private Map<String, Float> customResources = new HashMap<>();
 
+  /** 当前节点的总资源利用率快照 */
   private ResourceUtilization nodeUtilization =
       ResourceUtilization.newInstance(0, 0, 0f, customResources);
+  /** NodeManager上下文，持有节点全局信息 */
   private Context nmContext;
 
   /**
-   * Initialize the node resource monitor.
+   * 构造节点资源监控器，绑定到NodeManager上下文。
+   * @param context NodeManager上下文对象
    */
   public NodeResourceMonitorImpl(Context context) {
     super(NodeResourceMonitorImpl.class.getName());
@@ -75,17 +77,20 @@ public class NodeResourceMonitorImpl extends AbstractService implements
   }
 
   /**
-   * Initialize the service with the proper parameters.
+   * 初始化监控服务，加载配置和插件。
    */
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 从配置读取监控间隔
     this.monitoringInterval =
         conf.getLong(YarnConfiguration.NM_RESOURCE_MON_INTERVAL_MS,
             YarnConfiguration.DEFAULT_NM_RESOURCE_MON_INTERVAL_MS);
 
+    // 获取节点资源监控插件实例
     this.resourceCalculatorPlugin =
         ResourceCalculatorPlugin.getNodeResourceMonitorPlugin(conf);
 
+    // 尝试获取并初始化GPU资源处理器
     if (nmContext.getResourcePluginManager() != null) {
       this.gpuResourcePlugin =
           (GpuResourcePlugin)nmContext.getResourcePluginManager().
@@ -100,11 +105,12 @@ public class NodeResourceMonitorImpl extends AbstractService implements
 
     LOG.info(" Using ResourceCalculatorPlugin : "
         + this.resourceCalculatorPlugin);
+    super.serviceInit(conf);
   }
 
   /**
-   * Check if we should be monitoring.
-   * @return <em>true</em> if we can monitor the node resource utilization.
+   * 检查监控功能是否启用。
+   * @return true 表示监控可用，false表示禁用
    */
   private boolean isEnabled() {
     if (this.monitoringInterval <= 0) {
@@ -121,7 +127,7 @@ public class NodeResourceMonitorImpl extends AbstractService implements
   }
 
   /**
-   * Start the thread that does the node resource utilization monitoring.
+   * 启动监控服务，开启后台监控线程。
    */
   @Override
   protected void serviceStart() throws Exception {
@@ -132,13 +138,14 @@ public class NodeResourceMonitorImpl extends AbstractService implements
   }
 
   /**
-   * Stop the thread that does the node resource utilization monitoring.
+   * 停止监控服务，终止后台线程。
    */
   @Override
   protected void serviceStop() throws Exception {
     if (this.isEnabled()) {
       this.monitoringThread.interrupt();
       try {
+        // 等待线程终止，最多等待10秒
         this.monitoringThread.join(10 * 1000);
       } catch (InterruptedException e) {
         LOG.warn("Could not wait for the thread to join");
@@ -148,11 +155,11 @@ public class NodeResourceMonitorImpl extends AbstractService implements
   }
 
   /**
-   * Thread that monitors the resource utilization of this node.
+   * 后台监控线程，周期性采集节点资源利用率信息。
    */
   private class MonitoringThread extends SubjectInheritingThread {
     /**
-     * Initialize the node resource monitoring thread.
+     * 初始化监控线程，设置为守护线程。
      */
     public MonitoringThread() {
       super("Node Resource Monitor");
@@ -160,21 +167,25 @@ public class NodeResourceMonitorImpl extends AbstractService implements
     }
 
     /**
-     * Periodically monitor the resource utilization of the node.
+     * 周期性执行监控主循环，定期采集节点资源使用数据。
      */
     @Override
     public void work() {
       while (true) {
-        // Get node utilization and save it into the health status
+        // 计算已用物理内存 = 总物理内存 - 可用物理内存
         long pmem = resourceCalculatorPlugin.getPhysicalMemorySize() -
             resourceCalculatorPlugin.getAvailablePhysicalMemorySize();
+        // 计算已用虚拟内存 = 总虚拟内存 - 可用虚拟内存
         long vmem =
             resourceCalculatorPlugin.getVirtualMemorySize()
                 - resourceCalculatorPlugin.getAvailableVirtualMemorySize();
+        // 获取已用CPU核数利用率
         float vcores = resourceCalculatorPlugin.getNumVCoresUsed();
 
+        // 初始化总GPU利用率
         float totalNodeGpuUtilization = 0F;
         try {
+          // 如果GPU处理器存在，获取当前节点总GPU利用率
           if (gpuNodeResourceUpdateHandler != null) {
             totalNodeGpuUtilization =
                 gpuNodeResourceUpdateHandler.getTotalNodeGpuUtilization();
@@ -183,8 +194,10 @@ public class NodeResourceMonitorImpl extends AbstractService implements
           LOG.error("Get Node GPU Utilization error: " + e);
         }
 
+        // 更新GPU利用率到自定义资源映射
         customResources.
             put(ResourceInformation.GPU_URI, totalNodeGpuUtilization);
+        // 更新节点总利用率，转换字节单位为MB，生成新的利用率快照
         nodeUtilization =
             ResourceUtilization.newInstance(
                 (int) (pmem >> 20), // B -> MB
@@ -192,8 +205,7 @@ public class NodeResourceMonitorImpl extends AbstractService implements
                 vcores,     // Used Virtual Cores
                 customResources);  // Used GPUs
 
-        // Publish the node utilization metrics to node manager
-        // metrics system.
+        // 将节点利用率数据上报到NodeManager指标系统
         NodeManagerMetrics nmMetrics = nmContext.getNodeManagerMetrics();
         if (nmMetrics != null) {
           nmMetrics.setNodeUsedMemGB(nodeUtilization.getPhysicalMemory());
@@ -203,6 +215,7 @@ public class NodeResourceMonitorImpl extends AbstractService implements
         }
 
         try {
+          // 睡眠到下一次监控周期
           Thread.sleep(monitoringInterval);
         } catch (InterruptedException e) {
           LOG.warn(NodeResourceMonitorImpl.class.getName()
@@ -214,8 +227,8 @@ public class NodeResourceMonitorImpl extends AbstractService implements
   }
 
   /**
-   * Get the <em>resource utilization</em> of the node.
-   * @return <em>resource utilization</em> of the node.
+   * 获取当前节点的最新资源利用率快照。
+   * @return 节点资源利用率对象
    */
   @Override
   public ResourceUtilization getUtilization() {

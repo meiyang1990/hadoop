@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,9 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility class to validate the inputs to
- * {@code FederationReservationHomeSubClusterStore}, allows a fail fast
- * mechanism for invalid user inputs.
+ * 联邦存储预留信息归属子集群输入验证工具类，为 {@code FederationReservationHomeSubClusterStore} 提供快速失败的输入合法性检查。
+ * 对用户输入进行提前校验，避免非法请求流入存储层。
  *
  */
 public final class FederationReservationHomeSubClusterStoreInputValidator {
@@ -39,16 +39,17 @@ public final class FederationReservationHomeSubClusterStoreInputValidator {
   private static final Logger LOG = LoggerFactory
       .getLogger(FederationReservationHomeSubClusterStoreInputValidator.class);
 
+  /**
+   * 工具类不允许实例化。
+   */
   private FederationReservationHomeSubClusterStoreInputValidator() {
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link AddReservationHomeSubClusterRequest}
-   * for adding a new reservation is valid or not.
+   * 校验添加预留归属子集群请求的输入合法性，提前检查明显错误实现快速失败。
    *
-   * @param request the {@link AddReservationHomeSubClusterRequest} to validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 待校验的添加请求
+   * @throws FederationStateStoreInvalidInputException 如果请求非法抛出异常
    */
   public static void validate(AddReservationHomeSubClusterRequest request)
       throws FederationStateStoreInvalidInputException {
@@ -60,17 +61,15 @@ public final class FederationReservationHomeSubClusterStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate ReservationHomeSubCluster info
+    // 校验预留归属子集群信息
     checkReservationHomeSubCluster(request.getReservationHomeSubCluster());
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link GetReservationHomeSubClusterRequest}
-   * for querying reservation's information is valid or not.
+   * 校验查询预留归属子集群请求的输入合法性，提前检查明显错误实现快速失败。
    *
-   * @param request the {@link GetReservationHomeSubClusterRequest} to validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 待校验的查询请求
+   * @throws FederationStateStoreInvalidInputException 如果请求非法抛出异常
    */
   public static void validate(GetReservationHomeSubClusterRequest request)
       throws FederationStateStoreInvalidInputException {
@@ -81,15 +80,15 @@ public final class FederationReservationHomeSubClusterStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate Reservation Id
+    // 校验预留ID合法性
     checkReservationId(request.getReservationId());
   }
 
   /**
-   * Validate if the ReservationHomeSubCluster info are present or not.
+   * 校验预留归属子集群信息是否完整合法。
    *
-   * @param reservationHomeSubCluster the information of the Reservation to be verified
-   * @throws FederationStateStoreInvalidInputException if the SubCluster Info are invalid
+   * @param reservationHomeSubCluster 待校验的预留归属信息
+   * @throws FederationStateStoreInvalidInputException 如果信息非法抛出异常
    */
   private static void checkReservationHomeSubCluster(
       ReservationHomeSubCluster reservationHomeSubCluster)
@@ -102,19 +101,19 @@ public final class FederationReservationHomeSubClusterStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate Reservation Id
+    // 校验预留ID合法性
     checkReservationId(reservationHomeSubCluster.getReservationId());
 
-    // validate subcluster Id
+    // 校验子集群ID合法性，复用通用验证逻辑
     FederationMembershipStateStoreInputValidator
         .checkSubClusterId(reservationHomeSubCluster.getHomeSubCluster());
   }
 
   /**
-   * Validate if the Reservation id is present or not.
+   * 校验预留ID是否存在。
    *
-   * @param reservationId the id of the Reservation to be verified
-   * @throws FederationStateStoreInvalidInputException if the Reservation Id is invalid
+   * @param reservationId 待校验的预留ID
+   * @throws FederationStateStoreInvalidInputException 如果预留ID为空抛出异常
    */
   private static void checkReservationId(ReservationId reservationId)
       throws FederationStateStoreInvalidInputException {
@@ -126,13 +125,10 @@ public final class FederationReservationHomeSubClusterStoreInputValidator {
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link UpdateReservationHomeSubClusterRequest}
-   * for updating an reservation is valid or not.
+   * 校验更新预留归属子集群请求的输入合法性，提前检查明显错误实现快速失败。
    *
-   * @param request the {@link UpdateReservationHomeSubClusterRequest} to
-   *          validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 待校验的更新请求
+   * @throws FederationStateStoreInvalidInputException 如果请求非法抛出异常
    */
   public static void validate(UpdateReservationHomeSubClusterRequest request)
       throws FederationStateStoreInvalidInputException {
@@ -143,18 +139,15 @@ public final class FederationReservationHomeSubClusterStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate ReservationHomeSubCluster info
+    // 校验预留归属子集群信息
     checkReservationHomeSubCluster(request.getReservationHomeSubCluster());
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link DeleteReservationHomeSubClusterRequest}
-   * for deleting an Reservation is valid or not.
+   * 校验删除预留归属子集群请求的输入合法性，提前检查明显错误实现快速失败。
    *
-   * @param request the {@link DeleteReservationHomeSubClusterRequest} to
-   *          validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 待校验的删除请求
+   * @throws FederationStateStoreInvalidInputException 如果请求非法抛出异常
    */
   public static void validate(DeleteReservationHomeSubClusterRequest request)
       throws FederationStateStoreInvalidInputException {
@@ -165,7 +158,7 @@ public final class FederationReservationHomeSubClusterStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate Reservation Id
+    // 校验预留ID合法性
     checkReservationId(request.getReservationId());
   }
 }

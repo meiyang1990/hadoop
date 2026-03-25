@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,44 +24,40 @@ import org.apache.hadoop.yarn.api.records.ResourceUtilization;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
 /**
- * This interface abstracts out how a container contributes to
- * Resource Utilization of the node.
- * It is used by the {@link ContainerScheduler} to determine which
- * OPPORTUNISTIC containers to be killed to make room for a GUARANTEED
- * container.
+ * 资源利用率追踪器接口，抽象定义容器对节点资源利用率的贡献计算逻辑。
+ * 被{@link ContainerScheduler}用于决策是否需要杀死空闲容器，为保证型容器腾出资源空间。
  */
 public interface ResourceUtilizationTracker {
 
   /**
-   * Get the current total utilization of all the Containers running on
-   * the node.
-   * @return ResourceUtilization Resource Utilization.
+   * 获取当前节点上所有运行容器的总资源利用率。
+   * @return 节点总资源利用率
    */
   ResourceUtilization getCurrentUtilization();
 
   /**
-   * Add Container's resources to Node Utilization.
-   * @param container Container.
+   * 将指定容器的资源占用计入节点资源利用率。
+   * @param container 目标容器
    */
   void addContainerResources(Container container);
 
   /**
-   * Subtract Container's resources to Node Utilization.
-   * @param container Container.
+   * 从节点资源利用率中扣除指定容器的资源占用。
+   * @param container 目标容器
    */
   void subtractContainerResource(Container container);
 
   /**
-   * Check if NM has resources available currently to run the container.
-   * @param container Container.
-   * @return True, if NM has resources available currently to run the container.
+   * 检查节点当前是否有足够可用资源运行指定容器。
+   * @param container 目标容器
+   * @return 有足够可用资源返回true，否则返回false
    */
   boolean hasResourcesAvailable(Container container);
 
   /**
-   * Check if NM has resources available currently to run requested resources.
-   * @param resource the resources.
-   * @return True, if NM has enough available resources.
+   * 检查节点当前是否有足够可用资源满足指定资源请求。
+   * @param resource 请求的资源量
+   * @return 有足够可用资源返回true，否则返回false
    */
   boolean hasResourcesAvailable(Resource resource);
 }

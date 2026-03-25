@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -67,6 +68,9 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.Int
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.InternalConstants.DURATION_STATISTICS;
 
 /**
+ * 文件级注释：Manifest提交器的通用工具支持类，提供IO统计、路径构建、对象创建等公共工具方法，
+ * 被Manifest提交器各个阶段和组件调用，是整个Manifest提交器模块的底层工具支撑。
+ * 
  * Class for manifest committer support util methods.
  */
 
@@ -77,9 +81,8 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Create an IOStatistics Store with the standard statistics
-   * set up.
-   * @return a store builder preconfigured with the standard stats.
+   * 创建预配置了标准统计项的IO统计存储构建器，用于统一收集提交过程中的计数和耗时统计。
+   * @return 预配置了标准统计项的存储构建器
    */
   public static IOStatisticsStoreBuilder createIOStatisticsStore() {
 
@@ -92,9 +95,9 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * If the object is an IOStatisticsSource, get and add
-   * its IOStatistics.
-   * @param o source object.
+   * 如果传入对象是IO统计源，则将其统计信息聚合到 aggregator 中，适配不同来源的统计数据。
+   * @param ios IO统计聚合器
+   * @param o 待检查的源对象
    */
   public static void maybeAddIOStatistics(IOStatisticsAggregator ios,
       Object o) {
@@ -104,12 +107,10 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Build a Job UUID from the job conf (if it is
-   * {@link ManifestCommitterConstants#SPARK_WRITE_UUID}
-   * or the MR job ID.
-   * @param conf job/task configuration
-   * @param jobId job ID from YARN or spark.
-   * @return (a job ID, source)
+   * 从作业配置中构建Job UUID，优先从配置中获取Spark写入UUID，不存在则使用MapReduce JobID，用于唯一标识当前作业。
+   * @param conf 作业/任务配置
+   * @param jobId MapReduce作业ID
+   * @return (Job UUID, 来源标识)对
    */
   public static Pair<String, String> buildJobUUID(Configuration conf,
       JobID jobId) {
@@ -123,31 +124,27 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Get the location of pending job attempts.
-   * @param out the base output directory.
-   * @return the location of pending job attempts.
+   * 获取作业待提交目录的根路径，所有暂未提交的作业尝试文件都存放在此路径下。
+   * @param out 输出根目录
+   * @return 待提交作业尝试根路径
    */
   public static Path getPendingJobAttemptsPath(Path out) {
     return new Path(out, PENDING_DIR_NAME);
   }
 
   /**
-   * Get the Application Attempt Id for this job.
-   * @param context the context to look in
-   * @return the Application Attempt Id for a given job.
+   * 从作业上下文中获取当前应用尝试ID。
+   * @param context 作业上下文
+   * @return 当前应用尝试ID
    */
   public static int getAppAttemptId(JobContext context) {
     return getAppAttemptId(context.getConfiguration());
   }
 
   /**
-   * Get the Application Attempt Id for this job
-   * by looking for {@link MRJobConfig#APPLICATION_ATTEMPT_ID}
-   * in the configuration, falling back to 0 if unset.
-   * For spark it will always be 0, for MR it will be set in the AM
-   * to the {@code ApplicationAttemptId} the AM is launched with.
-   * @param conf job configuration.
-   * @return the Application Attempt Id for the job.
+   * 从配置中获取当前应用尝试ID，未配置时返回初始值0，支持MapReduce和Spark两种场景：MapReduce会设置实际尝试ID，Spark始终为0。
+   * @param conf 作业配置
+   * @return 当前应用尝试ID
    */
   public static int getAppAttemptId(Configuration conf) {
     return conf.getInt(MRJobConfig.APPLICATION_ATTEMPT_ID,
@@ -155,10 +152,10 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Get the path in the job attempt dir for a manifest for a task.
-   * @param manifestDir manifest directory
-   * @param taskId taskID.
-   * @return the final path to rename the manifest file to
+   * 构造任务完成后清单文件的最终路径。
+   * @param manifestDir 清单文件根目录
+   * @param taskId 任务ID
+   * @return 任务清单最终路径
    */
   public static Path manifestPathForTask(Path manifestDir, String taskId) {
 
@@ -166,12 +163,10 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Get the path in the  manifest subdir for the temp path to save a
-   * task attempt's manifest before renaming it to the
-   * path defined by {@link #manifestPathForTask(Path, String)}.
-   * @param manifestDir manifest directory
-   * @param taskAttemptId task attempt ID.
-   * @return the path to save/load the manifest.
+   * 构造任务尝试写入过程中临时清单文件的路径，避免重命名失败导致数据损坏，写入完成后再重命名到最终路径。
+   * @param manifestDir 清单文件根目录
+   * @param taskAttemptId 任务尝试ID
+   * @return 临时清单文件路径
    */
   public static Path manifestTempPathForTaskAttempt(Path manifestDir,
       String taskAttemptId) {
@@ -180,9 +175,9 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Create a task attempt dir; stage config must be for a task attempt.
-   * @param stageConfig state config.
-   * @return a manifest with job and task attempt info set up.
+   * 根据任务尝试阶段配置，创建并初始化一个新的任务清单对象，填充任务和作业基础信息。
+   * @param stageConfig 阶段配置，必须是任务尝试级配置
+   * @return 初始化完成的任务清单对象
    */
   public static TaskManifest createTaskManifest(StageConfig stageConfig) {
     final TaskManifest manifest = new TaskManifest();
@@ -196,10 +191,10 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Create success/outcome data.
-   * @param stageConfig configuration.
-   * @param stage
-   * @return a _SUCCESS object with some diagnostics.
+   * 创建作业提交结果清单，填充基本诊断信息：时间戳、主机名、当前用户名、当前阶段等，用于作业成功后标记结果。
+   * @param stageConfig 阶段配置
+   * @param stage 当前执行阶段名称
+   * @return 初始化完成的结果清单对象
    */
   public static ManifestSuccessData createManifestOutcome(
       StageConfig stageConfig, String stage) {
@@ -207,28 +202,27 @@ public final class ManifestCommitterSupport {
     outcome.setJobId(stageConfig.getJobId());
     outcome.setJobIdSource(stageConfig.getJobIdSource());
     outcome.setCommitter(MANIFEST_COMMITTER_CLASSNAME);
-    // real timestamp
+    // 记录提交时间戳
     outcome.setTimestamp(System.currentTimeMillis());
     final ZonedDateTime now = ZonedDateTime.now();
     outcome.setDate(now.toString());
     outcome.setHostname(NetUtils.getLocalHostname());
-    // add some extra diagnostics which can still be parsed by older
-    // builds of test applications.
-    // Audit Span information can go in here too, in future.
+    // 添加额外诊断信息，便于问题排查
+    // 后续版本可以加入追踪Span信息
     try {
       outcome.putDiagnostic(PRINCIPAL,
           UserGroupInformation.getCurrentUser().getShortUserName());
     } catch (IOException ignored) {
-      // don't know who we are? exclude from the diagnostics.
+      // 获取用户信息失败，跳过该诊断项
     }
     outcome.putDiagnostic(STAGE, stage);
     return outcome;
   }
 
   /**
-   * Add heap information to IOStatisticSetters gauges, with a stage in front of every key.
-   * @param ioStatisticsSetters map to update
-   * @param stage stage
+   * 将当前JVM堆内存信息作为计量指标添加到IO统计中，便于监控提交过程中的内存使用情况。
+   * @param ioStatisticsSetters 统计指标设置器
+   * @param stage 当前阶段名称，作为指标前缀
    */
   public static void addHeapInformation(IOStatisticsSetters ioStatisticsSetters,
       String stage) {
@@ -241,20 +235,18 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Create the filename for a report from the jobID.
-   * @param jobId jobId
-   * @return filename for a report.
+   * 根据作业ID生成作业汇总报告文件名。
+   * @param jobId 作业ID
+   * @return 汇总报告文件名
    */
   public static String createJobSummaryFilename(String jobId) {
     return String.format(SUMMARY_FILENAME_FORMAT, jobId);
   }
 
   /**
-   * Get an etag from a FileStatus which MUST BE
-   * an implementation of EtagSource and
-   * whose etag MUST NOT BE null/empty.
-   * @param status the status; may be null.
-   * @return the etag or null if not provided
+   * 从FileStatus中提取etag，只有当FileStatus实现EtagSource接口时才能提取，用于文件一致性校验。
+   * @param status 文件状态对象
+   * @return 提取到的etag，不支持则返回null
    */
   public static String getEtag(FileStatus status) {
     if (status instanceof EtagSource) {
@@ -265,19 +257,19 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Create the manifest store operations for the given FS.
-   * This supports binding to custom filesystem handlers.
-   * @param conf configuration.
-   * @param filesystem fs.
-   * @param path path under FS.
-   * @return a bonded store operations.
-   * @throws IOException on binding/init problems.
+   * 根据配置创建Manifest存储操作实例，支持通过配置自定义存储操作实现，适配不同文件系统的特殊需求。
+   * @param conf 配置
+   * @param filesystem 目标文件系统
+   * @param path 操作根路径
+   * @return 绑定到文件系统的存储操作实例
+   * @throws IOException 创建实例失败时抛出
    */
   public static ManifestStoreOperations createManifestStoreOperations(
       final Configuration conf,
       final FileSystem filesystem,
       final Path path) throws IOException {
     try {
+      // 从配置中获取自定义存储操作类，默认使用基于文件系统的实现
       final Class<? extends ManifestStoreOperations> storeClass = conf.getClass(
           OPT_STORE_OPERATIONS_CLASS,
           ManifestStoreOperationsThroughFileSystem.class,
@@ -295,48 +287,46 @@ public final class ManifestCommitterSupport {
   }
 
   /**
-   * Logic to create directory names from job and attempt.
-   * This is self-contained it so it can be used in tests
-   * as well as in the committer.
+   * 作业尝试目录结构构建器，负责根据输出路径、作业ID、尝试编号构建整个Manifest提交流程所需的所有目录路径，
+   * 统一管理目录结构，支持测试和生产环境复用。
    */
   public static class AttemptDirectories {
 
     /**
-     * Job output path.
+     * 作业输出根路径。
      */
     private final Path outputPath;
 
     /**
-     * Path for the job attempt.
+     * 当前作业尝试的根目录。
      */
     private final Path jobAttemptDir;
 
     /**
-     * Path for the job.
+     * 当前作业的根目录（所有尝试共享）。
      */
     private final Path jobPath;
 
     /**
-     * Subdir under the job attempt dir where task
-     * attempts will have subdirectories.
+     * 当前作业尝试下，所有任务尝试目录的父目录。
      */
     private final Path jobAttemptTaskSubDir;
 
     /**
-     * temp directory under job dest dir.
+     * 输出根目录下的暂存目录。
      */
     private final Path outputTempSubDir;
 
     /**
-     * Directory to save manifests into.
+     * 当前作业尝试下，存放所有任务清单的目录。
      */
     private final Path taskManifestDir;
 
     /**
-     * Build the attempt directories.
-     * @param outputPath output path
-     * @param jobUniqueId job ID/UUID
-     * @param jobAttemptNumber job attempt number
+     * 根据输出路径、作业唯一ID、尝试编号构建整个目录结构。
+     * @param outputPath 输出根路径
+     * @param jobUniqueId 作业唯一ID
+     * @param jobAttemptNumber 作业尝试编号
      */
     public AttemptDirectories(
         Path outputPath,
@@ -345,17 +335,18 @@ public final class ManifestCommitterSupport {
       this.outputPath = requireNonNull(outputPath, "Output path");
 
       this.outputTempSubDir = new Path(outputPath, PENDING_DIR_NAME);
-      // build the path for the job
+      // 构建作业根路径
       this.jobPath = new Path(outputTempSubDir,
           String.format(JOB_DIR_FORMAT_STR, jobUniqueId));
 
-      // then the specific path underneath that for the attempt.
+      // 构建当前尝试专属根路径
       this.jobAttemptDir = new Path(jobPath,
           String.format(JOB_ATTEMPT_DIR_FORMAT_STR, jobAttemptNumber));
 
-      // subdir for task attempts.
+      // 构建任务尝试父目录
       this.jobAttemptTaskSubDir = new Path(jobAttemptDir, JOB_TASK_ATTEMPT_SUBDIR);
 
+      // 构建任务清单存储目录
       this.taskManifestDir = new Path(jobAttemptDir, JOB_TASK_MANIFEST_SUBDIR);
     }
 
@@ -375,6 +366,11 @@ public final class ManifestCommitterSupport {
       return jobAttemptTaskSubDir;
     }
 
+    /**
+     * 根据任务尝试ID获取其专属工作目录路径。
+     * @param taskAttemptId 任务尝试ID
+     * @return 任务尝试工作目录
+     */
     public Path getTaskAttemptPath(String taskAttemptId) {
       return new Path(jobAttemptTaskSubDir, taskAttemptId);
     }

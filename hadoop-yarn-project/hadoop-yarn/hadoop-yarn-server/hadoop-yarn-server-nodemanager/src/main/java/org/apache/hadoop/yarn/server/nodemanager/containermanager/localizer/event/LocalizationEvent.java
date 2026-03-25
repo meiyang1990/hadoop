@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,10 +23,15 @@ import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceLocalizationService;
 
 /**
- * Events handled by {@link ResourceLocalizationService}
+ * 文件说明：资源本地化事件基类，所有资源本地化相关事件的父类
+ * 供 {@link ResourceLocalizationService} 资源本地化服务处理各类本地化事件
  */
 public class LocalizationEvent extends AbstractEvent<LocalizationEventType> {
 
+  /**
+   * 构造本地化事件，自动记录当前时间戳
+   * @param event 本地化事件类型
+   */
   public LocalizationEvent(LocalizationEventType event) {
     super(event, System.currentTimeMillis());
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,9 @@
  */
 
 /**
- * This package contains zkClient related classes.
+ * YARN服务端公共工具类包，包含ZooKeeper客户端相关实现类。
+ * 所有类均为YARN内部私有API，不对外公开使用。
  */
 @Private
 package org.apache.hadoop.yarn.lib;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
-

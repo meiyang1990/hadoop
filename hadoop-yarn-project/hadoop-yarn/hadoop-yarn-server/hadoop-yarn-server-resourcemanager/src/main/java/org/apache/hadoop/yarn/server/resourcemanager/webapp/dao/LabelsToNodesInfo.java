@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,23 +28,43 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 import org.apache.hadoop.yarn.server.resourcemanager.webapp.NodeIDsInfo;
 
+/**
+ * YARN ResourceManager Web UI 数据访问对象，存储节点标签到对应节点ID列表的映射信息
+ * 用于REST API返回标签与节点关联关系数据
+ */
 @XmlRootElement(name = "labelsToNodesInfo")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class LabelsToNodesInfo {
 
+  // 存储节点标签信息到对应节点ID列表的映射
   private Map<NodeLabelInfo, NodeIDsInfo> labelsToNodes = new HashMap<>();
 
+  /**
+   * JAXB反序列化所需的无参构造函数
+   */
   public LabelsToNodesInfo() {
   } // JAXB needs this
 
+  /**
+   * 带标签节点映射的构造函数
+   * @param labelsToNodes 节点标签到对应节点ID列表的映射
+   */
   public LabelsToNodesInfo(Map<NodeLabelInfo, NodeIDsInfo> labelsToNodes) {
     this.labelsToNodes = labelsToNodes;
   }
 
+  /**
+   * 获取标签到节点的映射关系
+   * @return 标签与对应节点ID列表的映射
+   */
   public Map<NodeLabelInfo, NodeIDsInfo> getLabelsToNodes() {
     return labelsToNodes;
   }
 
+  /**
+   * 设置标签到节点的映射关系
+   * @param labelsToNodes 标签与对应节点ID列表的映射
+   */
   public void setLabelsToNodes(Map<NodeLabelInfo, NodeIDsInfo> labelsToNodes) {
     this.labelsToNodes = labelsToNodes;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,22 +29,32 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 /**
- * This doc represents the {@link FlowActivityEntity} which is used for
- * showing all the flow runs with limited information.
+ * 流活动文档，存储YARN流运行的活动摘要信息，用于时间线服务文档存储，仅保存有限信息用于展示所有流运行。
  */
 public class FlowActivityDocument implements
     TimelineDocument<FlowActivityDocument> {
 
   private String id;
+  // 固定文档类型为YARN流活动
   private final String type = TimelineEntityType.YARN_FLOW_ACTIVITY.toString();
+  // 存储当日所有流活动子文档集合
   private Set<FlowActivitySubDoc> flowActivities = new HashSet<>();
+  // 日期时间戳（秒级），用于按天分区存储
   private long dayTimestamp;
+  // 流所属用户
   private String user;
+  // 流名称
   private String flowName;
 
   public FlowActivityDocument() {
   }
 
+  /**
+   * 构造函数，添加单个流运行活动。
+   * @param flowName 流名称
+   * @param flowVersion 流版本
+   * @param flowRunId 流运行ID
+   */
   public FlowActivityDocument(String flowName, String flowVersion,
       long flowRunId) {
     flowActivities.add(new FlowActivitySubDoc(flowName,
@@ -51,11 +62,8 @@ public class FlowActivityDocument implements
   }
 
   /**
-   * Merge the {@link FlowActivityDocument} that is passed with the current
-   * document for upsert.
-   *
-   * @param flowActivityDocument
-   *          that has to be merged
+   * 合并传入的流活动文档到当前文档，用于 upsert 更新场景。
+   * @param flowActivityDocument 需要合并的流活动文档
    */
   @Override
   public void merge(FlowActivityDocument flowActivityDocument) {
@@ -82,6 +90,12 @@ public class FlowActivityDocument implements
     return type;
   }
 
+  /**
+   * 添加一个新的流运行活动到当前文档。
+   * @param flowActivityName 流活动名称
+   * @param flowVersion 流版本
+   * @param flowRunId 流运行ID
+   */
   public void addFlowActivity(String flowActivityName, String flowVersion,
       long flowRunId) {
     flowActivities.add(new FlowActivitySubDoc(flowActivityName,
@@ -98,6 +112,7 @@ public class FlowActivityDocument implements
 
   @Override
   public long getCreatedTime() {
+    // 将秒级日期时间戳转换为毫秒级返回
     return TimeUnit.SECONDS.toMillis(dayTimestamp);
   }
 

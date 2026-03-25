@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,17 +27,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.DataChecksum;
+
 /**
- * A Checksum output stream.
- * Checksum for the contents of the file is calculated and
- * appended to the end of the file on close of the stream.
- * Used for IFiles
+ * IFile校验和输出流
+ * 为MapReduce中间文件IFile自动计算数据校验和，在流关闭时将校验和追加到文件末尾
+ * 用于MapReduce Shuffle阶段的中间结果文件写入，保障数据完整性
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class IFileOutputStream extends FilterOutputStream {
   /**
-   * The output stream to be checksummed. 
+   * 用于计算数据校验和的对象
    */
   private final DataChecksum sum;
   private byte[] barray;
@@ -44,57 +45,69 @@ public class IFileOutputStream extends FilterOutputStream {
   private boolean finished = false;
 
   /**
-   * Create a checksum output stream that writes
-   * the bytes to the given stream.
-   * @param out
+   * 构造IFile校验和输出流，包装底层输出流
+   * @param out 底层输出流
    */
   public IFileOutputStream(OutputStream out) {
     super(out);
+    // 创建CRC32类型的校验和计算器
     sum = DataChecksum.newDataChecksum(DataChecksum.Type.CRC32,
         Integer.MAX_VALUE);
+    // 初始化存储校验值的字节数组
     barray = new byte[sum.getChecksumSize()];
   }
   
   @Override
   public void close() throws IOException {
+    // 避免重复关闭
     if (closed) {
       return;
     }
     closed = true;
     try {
+      // 完成写入，追加校验和
       finish();
     } finally {
+      // 关闭底层输出流
       IOUtils.closeStream(out);
     }
   }
 
   /**
-   * Finishes writing data to the output stream, by writing
-   * the checksum bytes to the end. The underlying stream is not closed.
-   * @throws IOException
+   * 完成输出流写入，将计算好的校验和写入到文件末尾
+   * 不会关闭底层输出流
+   * @throws IOException IO异常
    */
   public void finish() throws IOException {
+    // 避免重复执行finish
     if (finished) {
       return;
     }
     finished = true;
+    // 将校验值写入到字节数组
     sum.writeValue(barray, 0, false);
+    // 将校验和写入到底层流
     out.write (barray, 0, sum.getChecksumSize());
+    // 刷新缓冲区
     out.flush();
   }
 
   /**
-   * Write bytes to the stream.
+   * 批量写入字节数组，同时更新校验和
    */
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
+    // 更新校验和计算
     sum.update(b, off,len);
+    // 写入底层输出流
     out.write(b,off,len);
   }
  
   @Override
   public void write(int b) throws IOException {
+    // 将int转为单字节
     barray[0] = (byte) (b & 0xFF);
+    // 调用批量写入方法，同时更新校验和
     write(barray,0,1);
   }
 

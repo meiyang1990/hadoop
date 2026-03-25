@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -21,17 +22,25 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.runtime.docker;
 
 /**
- * Encapsulates the docker stop command and its command
- * line arguments.
+ * 封装Docker stop停止容器命令及其命令行参数，用于YARN NodeManager停止Docker容器场景
  */
 public class DockerStopCommand extends DockerCommand {
   private static final String STOP_COMMAND = "stop";
 
+  /**
+   * 构造Docker stop停止命令，指定要停止的容器名称
+   * @param containerName 要停止的Docker容器名称
+   */
   public DockerStopCommand(String containerName) {
     super(STOP_COMMAND);
     super.addCommandArguments("name", containerName);
   }
 
+  /**
+   * 设置停止容器前的优雅等待超时时间
+   * @param value 等待超时时间（秒）
+   * @return 当前命令对象，支持链式调用
+   */
   public DockerStopCommand setGracePeriod(int value) {
     super.addCommandArguments("time", Integer.toString(value));
     return this;

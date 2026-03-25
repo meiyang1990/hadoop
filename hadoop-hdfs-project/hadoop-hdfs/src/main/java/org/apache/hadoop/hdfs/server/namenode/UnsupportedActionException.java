@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,14 +25,18 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This exception is thrown when an operation is not supported.
+ * 不支持操作异常类，当NameNode收到不支持的操作请求时抛出该异常
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class UnsupportedActionException extends IOException {
-  /** for java.io.Serializable */
+  /** 序列化版本ID，用于Java序列化机制 */
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造带有错误信息的不支持操作异常
+   * @param msg 异常描述信息
+   */
   public UnsupportedActionException(String msg) {
     super(msg);
   }

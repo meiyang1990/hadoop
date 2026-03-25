@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -49,6 +50,8 @@ import org.apache.hadoop.yarn.server.security.MasterKeyData;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
+ * 文件说明：AMRMProxyTokenSecretManager 用于AMRMProxyService生成和管理AMRM令牌的密钥管理器，支持主密钥轮转和NM状态恢复
+ * 
  * This secret manager instance is used by the AMRMProxyService to generate and
  * manage tokens.
  */
@@ -58,31 +61,45 @@ public class AMRMProxyTokenSecretManager extends
   private static final Logger LOG =
        LoggerFactory.getLogger(AMRMProxyTokenSecretManager.class);
 
+  // 序列号，用于生成新主密钥ID
   private int serialNo = new SecureRandom().nextInt();
+  // 下一个即将激活的主密钥
   private MasterKeyData nextMasterKey;
+  // 当前生效的主密钥
   private MasterKeyData currentMasterKey;
 
+  // 读写锁，保证主密钥操作的线程安全
   private final ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
   private final Lock readLock = readWriteLock.readLock();
   private final Lock writeLock = readWriteLock.writeLock();
 
+  // 定时器，用于执行主密钥轮转和激活任务
   private final Timer timer;
+  // 主密钥轮转间隔，单位毫秒
   private long rollingInterval;
+  // 新密钥激活延迟，单位毫秒，确保所有活跃AM获取到新密钥
   private long activationDelay;
 
+  // NM状态存储服务，用于持久化主密钥信息
   private NMStateStoreService nmStateStore;
 
+  // 保存当前本节点上运行的应用尝试ID集合
   private final Set<ApplicationAttemptId> appAttemptSet = new HashSet<>();
 
   /**
+   * 构造AMRMProxy令牌密钥管理器
    * Create an {@link AMRMProxyTokenSecretManager}.
-   * @param nmStateStoreService NM state store
+   * @param nmStateStoreService NM状态存储服务
    */
   public AMRMProxyTokenSecretManager(NMStateStoreService nmStateStoreService) {
     this.timer = new Timer();
     this.nmStateStore = nmStateStoreService;
   }
 
+  /**
+   * 初始化配置，读取密钥轮转间隔和激活延迟配置
+   * @param conf 配置对象
+   */
   public void init(Configuration conf) {
     this.rollingInterval =
         conf.getLong(
@@ -91,16 +108,19 @@ public class AMRMProxyTokenSecretManager extends
     // Adding delay = 1.5 * expiry interval makes sure that all active AMs get
     // the updated shared-key.
     String rmAmExpiryIntervalMS = conf.get(YarnConfiguration.RM_AM_EXPIRY_INTERVAL_MS);
+    // 检查配置是否为纯数字格式
     if (NumberUtils.isDigits(rmAmExpiryIntervalMS)) {
       this.activationDelay = (long) (conf.getLong(YarnConfiguration.RM_AM_EXPIRY_INTERVAL_MS,
           YarnConfiguration.DEFAULT_RM_AM_EXPIRY_INTERVAL_MS) * 1.5);
     } else {
+      // 解析带时间单位的配置
       this.activationDelay = (long) (conf.getTimeDuration(
           YarnConfiguration.RM_AM_EXPIRY_INTERVAL_MS,
           YarnConfiguration.DEFAULT_RM_AM_EXPIRY_INTERVAL_MS, TimeUnit.MILLISECONDS) * 1.5);
     }
     LOG.info("AMRMTokenKeyRollingInterval: {} ms and AMRMTokenKeyActivationDelay: {} ms.",
         this.rollingInterval, this.activationDelay);
+    // 校验配置：轮转间隔必须大于3倍过期间隔，否则抛出异常
     if (rollingInterval <= activationDelay * 2) {
       throw new IllegalArgumentException(
           YarnConfiguration.RM_AMRM_TOKEN_MASTER_KEY_ROLLING_INTERVAL_SECS
@@ -109,11 +129,15 @@ public class AMRMProxyTokenSecretManager extends
     }
   }
 
+  /**
+   * 启动密钥管理器，初始化当前主密钥并启动定时轮转任务
+   */
   public void start() {
     if (this.currentMasterKey == null) {
       this.currentMasterKey = createNewMasterKey();
       if (this.nmStateStore != null) {
         try {
+          // 持久化当前主密钥到状态存储
           this.nmStateStore.storeAMRMProxyCurrentMasterKey(
               this.currentMasterKey.getMasterKey());
         } catch (IOException e) {
@@ -121,10 +145,14 @@ public class AMRMProxyTokenSecretManager extends
         }
       }
     }
+    // 启动固定间隔的主密钥轮转定时任务
     this.timer.scheduleAtFixedRate(new MasterKeyRoller(), rollingInterval,
         rollingInterval);
   }
 
+  /**
+   * 停止密钥管理器，取消定时任务
+   */
   public void stop() {
     this.timer.cancel();
   }
@@ -134,6 +162,10 @@ public class AMRMProxyTokenSecretManager extends
     this.nmStateStore = nmStateStoreService;
   }
 
+  /**
+   * 应用尝试完成后，从集合中移除对应记录，清理令牌信息
+   * @param appAttemptId 完成的应用尝试ID
+   */
   public void applicationMasterFinished(ApplicationAttemptId appAttemptId) {
     this.writeLock.lock();
     try {
@@ -145,6 +177,9 @@ public class AMRMProxyTokenSecretManager extends
     }
   }
 
+  /**
+   * 主密钥轮转定时任务
+   */
   private class MasterKeyRoller extends TimerTask {
     @Override
     public void run() {
@@ -152,6 +187,9 @@ public class AMRMProxyTokenSecretManager extends
     }
   }
 
+  /**
+   * 执行主密钥轮转，生成新的下一个主密钥，延迟后激活
+   */
   @Private
   @VisibleForTesting
   public void rollMasterKey() {
@@ -161,6 +199,7 @@ public class AMRMProxyTokenSecretManager extends
       this.nextMasterKey = createNewMasterKey();
       if (this.nmStateStore != null) {
         try {
+          // 持久化下一个主密钥到状态存储
           this.nmStateStore
               .storeAMRMProxyNextMasterKey(this.nextMasterKey.getMasterKey());
         } catch (IOException e) {
@@ -168,12 +207,16 @@ public class AMRMProxyTokenSecretManager extends
         }
       }
 
+      // 延迟激活新密钥，确保所有活跃AM获取到更新
       this.timer.schedule(new NextKeyActivator(), this.activationDelay);
     } finally {
       this.writeLock.unlock();
     }
   }
 
+  /**
+   * 新密钥激活定时任务
+   */
   private class NextKeyActivator extends TimerTask {
     @Override
     public void run() {
@@ -181,6 +224,9 @@ public class AMRMProxyTokenSecretManager extends
     }
   }
 
+  /**
+   * 将预先生成的下一个主密钥切换为当前生效主密钥
+   */
   @Private
   @VisibleForTesting
   public void activateNextMasterKey() {
@@ -188,10 +234,12 @@ public class AMRMProxyTokenSecretManager extends
     try {
       LOG.info("Activating next master key with id: "
           + this.nextMasterKey.getMasterKey().getKeyId());
+      // 切换当前主密钥为下一个密钥
       this.currentMasterKey = this.nextMasterKey;
       this.nextMasterKey = null;
       if (this.nmStateStore != null) {
         try {
+          // 更新状态存储中的当前和下一个主密钥
           this.nmStateStore.storeAMRMProxyCurrentMasterKey(
               this.currentMasterKey.getMasterKey());
           this.nmStateStore.storeAMRMProxyNextMasterKey(null);
@@ -204,6 +252,10 @@ public class AMRMProxyTokenSecretManager extends
     }
   }
 
+  /**
+   * 创建新的主密钥，递增序列号生成密钥ID
+   * @return 新创建的主密钥数据
+   */
   @Private
   @VisibleForTesting
   public MasterKeyData createNewMasterKey() {
@@ -215,15 +267,23 @@ public class AMRMProxyTokenSecretManager extends
     }
   }
 
+  /**
+   * 为指定应用尝试创建并返回AMRM令牌
+   * @param appAttemptId 应用尝试ID
+   * @return 创建好的AMRM令牌
+   */
   public Token<AMRMTokenIdentifier> createAndGetAMRMToken(
       ApplicationAttemptId appAttemptId) {
     this.writeLock.lock();
     try {
       LOG.info("Create AMRMToken for ApplicationAttempt: " + appAttemptId);
+      // 创建AMRM令牌标识符
       AMRMTokenIdentifier identifier =
           new AMRMTokenIdentifier(appAttemptId, getMasterKey()
               .getMasterKey().getKeyId());
+      // 生成令牌密码
       byte[] password = this.createPassword(identifier);
+      // 将应用尝试加入活跃集合
       appAttemptSet.add(appAttemptId);
       return new Token<>(identifier.getBytes(), password, identifier.getKind(), new Text());
     } finally {
@@ -237,6 +297,7 @@ public class AMRMProxyTokenSecretManager extends
   public MasterKeyData getMasterKey() {
     this.readLock.lock();
     try {
+      // 有下一个密钥则返回下一个，否则返回当前生效密钥
       return nextMasterKey == null ? currentMasterKey : nextMasterKey;
     } finally {
       this.readLock.unlock();
@@ -246,6 +307,7 @@ public class AMRMProxyTokenSecretManager extends
   /**
    * Retrieve the password for the given {@link AMRMTokenIdentifier}. Used by
    * RPC layer to validate a remote {@link AMRMTokenIdentifier}.
+   * 根据令牌标识符获取对应的密码，用于RPC层验证远程AMRM令牌有效性
    */
   @Override
   public byte[] retrievePassword(AMRMTokenIdentifier identifier)
@@ -255,20 +317,25 @@ public class AMRMProxyTokenSecretManager extends
       ApplicationAttemptId applicationAttemptId =
           identifier.getApplicationAttemptId();
       LOG.debug("Trying to retrieve password for {}", applicationAttemptId);
+      // 检查应用尝试是否在本节点活跃集合中
       if (!appAttemptSet.contains(applicationAttemptId)) {
         throw new InvalidToken(applicationAttemptId
             + " not found in AMRMProxyTokenSecretManager.");
       }
+      // 匹配当前主密钥ID
       if (identifier.getKeyId() == this.currentMasterKey.getMasterKey()
           .getKeyId()) {
         return createPassword(identifier.getBytes(),
             this.currentMasterKey.getSecretKey());
-      } else if (nextMasterKey != null
+      } 
+      // 匹配下一个主密钥ID
+      else if (nextMasterKey != null
           && identifier.getKeyId() == this.nextMasterKey.getMasterKey()
               .getKeyId()) {
         return createPassword(identifier.getBytes(),
             this.nextMasterKey.getSecretKey());
       }
+      // 密钥ID不匹配，令牌无效
       throw new InvalidToken("Invalid AMRMToken from "
           + applicationAttemptId);
     } finally {
@@ -279,6 +346,7 @@ public class AMRMProxyTokenSecretManager extends
   /**
    * Creates an empty TokenId to be used for de-serializing an
    * {@link AMRMTokenIdentifier} by the RPC layer.
+   * 创建空的AMRM令牌标识符，用于RPC层反序列化
    */
   @Override
   public AMRMTokenIdentifier createIdentifier() {
@@ -315,6 +383,7 @@ public class AMRMProxyTokenSecretManager extends
       ApplicationAttemptId applicationAttemptId =
           identifier.getApplicationAttemptId();
       LOG.info("Creating password for " + applicationAttemptId);
+      // 使用当前生效主密钥生成密码
       return createPassword(identifier.getBytes(), getMasterKey()
           .getSecretKey());
     } finally {
@@ -325,12 +394,13 @@ public class AMRMProxyTokenSecretManager extends
   /**
    * Recover secretManager from state store. Called after serviceInit before
    * serviceStart.
+   * 从NM状态存储恢复密钥管理器状态，在服务初始化后启动前调用
    *
-   * @param state the state to recover from
+   * @param state 恢复状态数据
    */
   public void recover(RecoveredAMRMProxyState state) {
     if (state != null) {
-      // recover the current master key
+      // 恢复当前生效主密钥
       MasterKey currentKey = state.getCurrentMasterKey();
       if (currentKey != null) {
         this.currentMasterKey = new MasterKeyData(currentKey,
@@ -340,11 +410,12 @@ public class AMRMProxyTokenSecretManager extends
             + " for AMRMProxyTokenSecretManager");
       }
 
-      // recover the next master key if not null
+      // 恢复待激活的下一个主密钥
       MasterKey nextKey = state.getNextMasterKey();
       if (nextKey != null) {
         this.nextMasterKey = new MasterKeyData(nextKey,
             createSecretKey(nextKey.getBytes().array()));
+        // 按原延迟计划安排激活任务
         this.timer.schedule(new NextKeyActivator(), this.activationDelay);
       }
     }

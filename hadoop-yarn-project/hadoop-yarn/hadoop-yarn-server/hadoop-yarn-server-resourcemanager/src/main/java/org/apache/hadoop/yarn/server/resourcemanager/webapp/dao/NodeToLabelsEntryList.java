@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,17 +25,28 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * 节点标签关系列表数据访问对象，用于RM WebUI接口返回节点到标签的映射列表数据
+ */
 @XmlRootElement(name = "nodeToLabelsName")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class NodeToLabelsEntryList {
 
+  // 存储节点-标签关系条目列表
   protected ArrayList<NodeToLabelsEntry> nodeToLabels =
       new ArrayList<NodeToLabelsEntry>();
 
+  /**
+   * JAXB反序列化需要的无参构造函数
+   */
   public NodeToLabelsEntryList() {
     // JAXB needs this
   }
 
+  /**
+   * 获取节点-标签关系条目列表
+   * @return 节点-标签关系条目列表
+   */
   public ArrayList<NodeToLabelsEntry> getNodeToLabels() {
     return nodeToLabels;
   }

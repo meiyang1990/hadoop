@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,26 +47,28 @@ import org.slf4j.LoggerFactory;
 import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * Common utility methods used by the store implementations.
+ * YARN联邦状态存储工具类，提供联邦状态存储实现通用工具方法。
  */
 public final class FederationStateStoreUtils {
 
+  /** 日志记录器 */
   public static final Logger LOG =
       LoggerFactory.getLogger(FederationStateStoreUtils.class);
 
+  /** 联邦状态存储连接URL配置键 */
   public final static String FEDERATION_STORE_URL = "url";
 
   private FederationStateStoreUtils() {
   }
 
   /**
-   * Returns the SQL <code>FederationStateStore</code> connections to the pool.
+   * 关闭JDBC资源，将连接归还到Hikari连接池。
    *
-   * @param log the logger interface
-   * @param cstmt the interface used to execute SQL stored procedures
-   * @param conn the SQL connection
-   * @param rs the ResultSet interface used to execute SQL stored procedures
-   * @throws YarnException on failure
+   * @param log 日志记录器
+   * @param cstmt 存储过程语句对象
+   * @param conn JDBC连接
+   * @param rs 结果集对象
+   * @throws YarnException 关闭失败时抛出异常
    */
   public static void returnToPool(Logger log, CallableStatement cstmt,
       Connection conn, ResultSet rs) throws YarnException {
@@ -99,12 +102,12 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Returns the SQL <code>FederationStateStore</code> connections to the pool.
+   * 关闭JDBC语句和连接，归还连接到连接池（无结果集版本）。
    *
-   * @param log the logger interface
-   * @param cstmt the interface used to execute SQL stored procedures
-   * @param conn the SQL connection
-   * @throws YarnException on failure
+   * @param log 日志记录器
+   * @param cstmt 存储过程语句对象
+   * @param conn JDBC连接
+   * @throws YarnException 关闭失败时抛出异常
    */
   public static void returnToPool(Logger log, CallableStatement cstmt,
       Connection conn) throws YarnException {
@@ -112,11 +115,11 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Returns the SQL <code>FederationStateStore</code> connections to the pool.
+   * 关闭JDBC语句，归还连接到连接池（仅语句版本）。
    *
-   * @param log the logger interface
-   * @param cstmt the interface used to execute SQL stored procedures
-   * @throws YarnException on failure
+   * @param log 日志记录器
+   * @param cstmt 存储过程语句对象
+   * @throws YarnException 关闭失败时抛出异常
    */
   public static void returnToPool(Logger log, CallableStatement cstmt)
       throws YarnException {
@@ -124,12 +127,12 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Throws an exception due to an error in <code>FederationStateStore</code>.
+   * 记录错误日志并抛出通用YarnException。
    *
-   * @param log the logger interface
-   * @param errMsg the error message
-   * @param t the throwable raised in the called class.
-   * @throws YarnException on failure
+   * @param log 日志记录器
+   * @param errMsg 错误消息
+   * @param t 原始异常
+   * @throws YarnException 包装后的异常
    */
   public static void logAndThrowException(Logger log, String errMsg,
       Throwable t) throws YarnException {
@@ -143,12 +146,11 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Throws an <code>FederationStateStoreException</code> due to an error in
-   * <code>FederationStateStore</code>.
+   * 记录错误日志并抛出FederationStateStoreException。
    *
-   * @param log the logger interface
-   * @param errMsg the error message
-   * @throws YarnException on failure
+   * @param log 日志记录器
+   * @param errMsg 错误消息
+   * @throws YarnException 包装后的异常
    */
   public static void logAndThrowStoreException(Logger log, String errMsg)
       throws YarnException {
@@ -157,13 +159,12 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Throws an <code>FederationStateStoreException</code> due to an error in
-   * <code>FederationStateStore</code>.
+   * 记录格式化错误日志并抛出FederationStateStoreException。
    *
-   * @param log the logger interface
-   * @param errMsgFormat the error message format string.
-   * @param args referenced by the format specifiers in the format string.
-   * @throws YarnException on failure
+   * @param log 日志记录器
+   * @param errMsgFormat 错误消息格式
+   * @param args 格式参数
+   * @throws YarnException 包装后的异常
    */
   public static void logAndThrowStoreException(Logger log, String errMsgFormat, Object... args)
       throws YarnException {
@@ -174,14 +175,13 @@ public final class FederationStateStoreUtils {
 
 
   /**
-   * Throws an <code>FederationStateStoreException</code> due to an error in
-   * <code>FederationStateStore</code>.
+   * 记录格式化错误日志（含原始异常）并抛出FederationStateStoreException。
    *
-   * @param t the throwable raised in the called class.
-   * @param log the logger interface.
-   * @param errMsgFormat the error message format string.
-   * @param args referenced by the format specifiers in the format string.
-   * @throws YarnException on failure
+   * @param t 原始异常
+   * @param log 日志记录器
+   * @param errMsgFormat 错误消息格式
+   * @param args 格式参数
+   * @throws YarnException 包装后的异常
    */
   public static void logAndThrowStoreException(
       Throwable t, Logger log, String errMsgFormat, Object... args) throws YarnException {
@@ -196,12 +196,11 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Throws an <code>FederationStateStoreInvalidInputException</code> due to an
-   * error in <code>FederationStateStore</code>.
+   * 记录错误日志并抛出FederationStateStoreInvalidInputException（输入非法异常）。
    *
-   * @param log the logger interface
-   * @param errMsg the error message
-   * @throws YarnException on failure
+   * @param log 日志记录器
+   * @param errMsg 错误消息
+   * @throws YarnException 包装后的异常
    */
   public static void logAndThrowInvalidInputException(Logger log, String errMsg)
       throws YarnException {
@@ -210,13 +209,12 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Throws an <code>FederationStateStoreRetriableException</code> due to an
-   * error in <code>FederationStateStore</code>.
+   * 记录错误日志并抛出FederationStateStoreRetriableException（可重试异常）。
    *
-   * @param log the logger interface
-   * @param errMsg the error message
-   * @param t the throwable raised in the called class.
-   * @throws YarnException on failure
+   * @param log 日志记录器
+   * @param errMsg 错误消息
+   * @param t 原始异常
+   * @throws YarnException 包装后的异常
    */
   public static void logAndThrowRetriableException(Logger log, String errMsg,
       Throwable t) throws YarnException {
@@ -230,14 +228,13 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Throws an <code>FederationStateStoreRetriableException</code> due to an
-   * error in <code>FederationStateStore</code>.
+   * 记录格式化错误日志（含原始异常）并抛出FederationStateStoreRetriableException。
    *
-   * @param t the throwable raised in the called class.
-   * @param log the logger interface.
-   * @param errMsgFormat the error message format string.
-   * @param args referenced by the format specifiers in the format string.
-   * @throws YarnException on failure
+   * @param t 原始异常
+   * @param log 日志记录器
+   * @param errMsgFormat 错误消息格式
+   * @param args 格式参数
+   * @throws YarnException 包装后的异常
    */
   public static void logAndThrowRetriableException(
       Throwable t, Logger log, String errMsgFormat, Object... args) throws YarnException {
@@ -252,13 +249,12 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Throws an <code>FederationStateStoreRetriableException</code> due to an
-   * error in <code>FederationStateStore</code>.
+   * 记录格式化错误日志并抛出FederationStateStoreRetriableException。
    *
-   * @param log the logger interface.
-   * @param errMsgFormat the error message format string.
-   * @param args referenced by the format specifiers in the format string.
-   * @throws YarnException on failure
+   * @param log 日志记录器
+   * @param errMsgFormat 错误消息格式
+   * @param args 格式参数
+   * @throws YarnException 包装后的异常
    */
   public static void logAndThrowRetriableException(
       Logger log, String errMsgFormat, Object... args) throws YarnException {
@@ -268,12 +264,11 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Sets a specific value for a specific property of
-   * <code>HikariDataSource</code> SQL connections.
+   * 为Hikari数据源添加自定义连接属性。
    *
-   * @param dataSource the <code>HikariDataSource</code> connections
-   * @param property the property to set
-   * @param value the value to set
+   * @param dataSource Hikari数据源对象
+   * @param property 属性名称
+   * @param value 属性值
    */
   public static void setProperty(HikariDataSource dataSource, String property,
       String value) {
@@ -284,10 +279,10 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Sets a specific username for <code>HikariDataSource</code> SQL connections.
+   * 设置Hikari数据源连接用户名。
    *
-   * @param dataSource the <code>HikariDataSource</code> connections
-   * @param userNameDB the value to set
+   * @param dataSource Hikari数据源对象
+   * @param userNameDB 数据库用户名
    */
   public static void setUsername(HikariDataSource dataSource,
       String userNameDB) {
@@ -300,10 +295,10 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Sets a specific password for <code>HikariDataSource</code> SQL connections.
+   * 设置Hikari数据源连接密码。
    *
-   * @param dataSource the <code>HikariDataSource</code> connections
-   * @param password the value to set
+   * @param dataSource Hikari数据源对象
+   * @param password 数据库密码
    */
   public static void setPassword(HikariDataSource dataSource, String password) {
     if (password != null) {
@@ -315,24 +310,21 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Filter HomeSubCluster based on Filter SubCluster.
+   * 根据过滤条件判断是否保留该子集群的Home信息。
    *
-   * @param filterSubCluster filter query conditions
-   * @param homeSubCluster homeSubCluster
-   * @return return true, if match filter conditions,
-   *         return false, if not match filter conditions.
+   * @param filterSubCluster 过滤条件子集群ID，null表示不过滤
+   * @param homeSubCluster 当前待判断子集群ID
+   * @return 符合过滤条件返回true，否则返回false
    */
   public static boolean filterHomeSubCluster(SubClusterId filterSubCluster,
       SubClusterId homeSubCluster) {
 
-    // If the filter condition is empty,
-    // it means that homeSubCluster needs to be added
+    // 如果过滤条件为空，保留所有子集群
     if (filterSubCluster == null) {
       return true;
     }
 
-    // If the filter condition filterSubCluster is not empty,
-    // and filterSubCluster is equal to homeSubCluster, it needs to be added
+    // 如果ID匹配则保留
     if (filterSubCluster.equals(homeSubCluster)) {
       return true;
     }
@@ -341,12 +333,11 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Encode for Writable objects.
-   * This method will convert the writable object to a base64 string.
+   * 将Writable对象序列化为Base64编码字符串。
    *
-   * @param key Writable Key.
-   * @return base64 string.
-   * @throws IOException raised on errors performing I/O.
+   * @param key 待序列化的Writable对象
+   * @return Base64编码字符串
+   * @throws IOException 序列化IO异常
    */
   public static String encodeWritable(Writable key) throws IOException {
     ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -357,11 +348,11 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Decode Base64 string to Writable object.
+   * 将Base64编码字符串反序列化为Writable对象。
    *
-   * @param w Writable Key.
-   * @param idStr base64 string.
-   * @throws IOException raised on errors performing I/O.
+   * @param w 目标Writable对象，结果将写入此对象
+   * @param idStr Base64编码字符串
+   * @throws IOException 反序列化IO异常
    */
   public static void decodeWritable(Writable w, String idStr) throws IOException {
     DataInputStream in = new DataInputStream(
@@ -370,14 +361,11 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Convert MasterKey to DelegationKey.
+   * 从RouterMasterKeyRequest转换得到DelegationKey（令牌密钥）。
+   * 调用前需使用FederationRouterRMTokenInputValidator验证请求非空。
    *
-   * Before using this function,
-   * please use FederationRouterRMTokenInputValidator to verify the request.
-   * By default, the request is not empty, and the internal object is not empty.
-   *
-   * @param request RouterMasterKeyRequest
-   * @return DelegationKey.
+   * @param request 路由器主密钥请求
+   * @return 转换后的DelegationKey
    */
   public static DelegationKey convertMasterKeyToDelegationKey(RouterMasterKeyRequest request) {
     RouterMasterKey masterKey = request.getRouterMasterKey();
@@ -385,10 +373,10 @@ public final class FederationStateStoreUtils {
   }
 
   /**
-   * Convert MasterKey to DelegationKey.
+   * 从RouterMasterKey转换得到DelegationKey。
    *
-   * @param masterKey masterKey.
-   * @return DelegationKey.
+   * @param masterKey 路由器存储的主密钥
+   * @return 转换后的DelegationKey
    */
   private static DelegationKey convertMasterKeyToDelegationKey(RouterMasterKey masterKey) {
     ByteBuffer keyByteBuf = masterKey.getKeyBytes();

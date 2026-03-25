@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,6 +31,9 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 import java.util.List;
 
+/**
+ * 调度器概览信息数据访问对象，为YARN ResourceManager Web UI提供调度器整体统计信息
+ */
 @XmlRootElement(name = "scheduler")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class SchedulerOverviewInfo {
@@ -48,29 +52,40 @@ public class SchedulerOverviewInfo {
 
   }
 
+  /**
+   * 从资源调度器实例构造调度器概览信息
+   * @param rs 资源调度器实例
+   */
   public SchedulerOverviewInfo(ResourceScheduler rs) {
-    // Parse the schedule type
+    // 解析调度器类型
     this.schedulerType = getSchedulerName(rs);
 
-    // Parse and allocate resource information
+    // 解析分配资源限制信息
     this.minimumAllocation = new ResourceInfo(rs.getMinimumResourceCapability());
     this.maximumAllocation = new ResourceInfo(rs.getMaximumResourceCapability());
 
-    // Parse App Priority
+    // 解析应用优先级上限
     this.applicationPriority = rs.getMaxClusterLevelAppPriority().getPriority();
 
-    // Resolving resource types
+    // 解析资源类型信息
     List<ResourceTypeInfo> resourceTypeInfos = ResourceUtils.getResourcesTypeInfo();
+    // 按名称不区分大小写排序
     resourceTypeInfos.sort((o1, o2) -> o1.getName().compareToIgnoreCase(o2.getName()));
+    // 将所有资源类型拼接为逗号分隔字符串
     this.schedulingResourceType = StringUtils.join(resourceTypeInfos, ",");
 
-    // clusterMetrics
+    // 获取集群指标并提取调度器相关指标
     ClusterMetricsInfo clusterMetrics = new ClusterMetricsInfo(rs);
     this.schedulerBusy = clusterMetrics.getRmSchedulerBusyPercent();
     this.rmDispatcherEventQueueSize = clusterMetrics.getRmEventQueueSize();
     this.schedulerDispatcherEventQueueSize = clusterMetrics.getSchedulerEventQueueSize();
   }
 
+  /**
+   * 根据调度器实例获取调度器显示名称
+   * @param rs 资源调度器实例
+   * @return 调度器显示名称
+   */
   private static String getSchedulerName(ResourceScheduler rs) {
     if (rs instanceof CapacityScheduler) {
       return "Capacity Scheduler";

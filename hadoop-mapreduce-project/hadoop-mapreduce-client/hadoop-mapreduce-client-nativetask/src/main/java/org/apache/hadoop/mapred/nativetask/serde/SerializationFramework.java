@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,16 +20,28 @@ package org.apache.hadoop.mapred.nativetask.serde;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 原生任务序列化框架类型枚举
+ * 定义了MapReduce本地任务支持的两种序列化框架类型，用于选择Java Writable序列化还是原生序列化
+ */
 @InterfaceAudience.Private
 public enum SerializationFramework {
   WRITABLE_SERIALIZATION(0), NATIVE_SERIALIZATION(1);
 
   private int type;
 
+  /**
+   * 构造序列化框架枚举实例
+   * @param type 序列化框架类型编号
+   */
   SerializationFramework(int type) {
     this.type = type;
   }
 
+  /**
+   * 获取序列化框架的类型编号
+   * @return 序列化框架类型编号
+   */
   public int getType() {
     return type;
   }

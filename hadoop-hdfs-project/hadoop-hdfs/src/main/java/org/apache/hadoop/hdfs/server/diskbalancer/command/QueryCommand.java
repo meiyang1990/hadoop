@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,19 +39,24 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Gets the current status of disk balancer command.
+ * 文件：磁盘均衡器查询命令实现类
+ * 功能：实现查询指定数据节点上磁盘均衡任务当前运行状态的命令，支持批量查询和详细输出
  */
 public class QueryCommand extends Command {
 
   /**
-   * Constructs QueryCommand.
-   *
-   * @param conf - Configuration.
+   * 构造QueryCommand对象，使用标准输出打印结果
+   * @param conf Hadoop配置对象
    */
   public QueryCommand(Configuration conf) {
     this(conf, System.out);
   }
 
+  /**
+   * 构造QueryCommand对象，指定输出流打印结果
+   * @param conf Hadoop配置对象
+   * @param ps 输出流
+   */
   public QueryCommand(Configuration conf, final PrintStream ps) {
     super(conf, ps);
     addValidCommandParameters(DiskBalancerCLI.QUERY,
@@ -60,16 +66,18 @@ public class QueryCommand extends Command {
   }
 
   /**
-   * Executes the Client Calls.
-   *
-   * @param cmd - CommandLine
+   * 执行查询磁盘均衡任务状态命令
+   * @param cmd 命令行参数对象
+   * @throws Exception 执行过程抛出的异常
    */
   @Override
   public void execute(CommandLine cmd) throws Exception {
     LOG.info("Executing \"query plan\" command.");
+    // 存储查询结果输出文本
     TextStringBuilder result = new TextStringBuilder();
     Preconditions.checkState(cmd.hasOption(DiskBalancerCLI.QUERY));
     verifyCommandOptions(DiskBalancerCLI.QUERY, cmd);
+    // 获取用户输入的待查询数据节点列表
     String nodeVal = cmd.getOptionValue(DiskBalancerCLI.QUERY);
     if (StringUtils.isBlank(nodeVal)) {
       String warnMsg = "The number of input nodes is 0. "
@@ -78,6 +86,7 @@ public class QueryCommand extends Command {
           DiskBalancerException.Result.INVALID_NODE);
     }
     nodeVal = nodeVal.trim();
+    // 去重并排序存储节点地址
     Set<String> resultSet = new TreeSet<>();
     String[] nodes = nodeVal.split(",");
     Collections.addAll(resultSet, nodes);
@@ -85,10 +94,12 @@ public class QueryCommand extends Command {
         "Get current status of the diskbalancer for DataNode(s). "
             + "These DataNode(s) are parsed from '%s'.", nodeVal);
     recordOutput(result, outputLine);
+    // 遍历每个数据节点查询状态
     for (String nodeName : resultSet) {
-      // if the string is not name:port format use the default port.
+      // 如果不是 主机:端口 格式，使用默认IPC端口补全
       String nodeAddress = nodeName;
       if (!nodeName.matches("[^\\:]+:[0-9]{2,5}")) {
+        // 从配置中读取数据节点默认IPC端口
         int defaultIPC = NetUtils.createSocketAddr(
             getConf().getTrimmed(DFSConfigKeys.DFS_DATANODE_IPC_ADDRESS_KEY,
                 DFSConfigKeys.DFS_DATANODE_IPC_ADDRESS_DEFAULT)).getPort();
@@ -96,8 +107,10 @@ public class QueryCommand extends Command {
         LOG.debug("Using default data node port :  {}", nodeAddress);
       }
 
+      // 获取数据节点RPC代理对象
       ClientDatanodeProtocol dataNode = getDataNodeProxy(nodeAddress);
       try {
+        // 查询磁盘均衡任务状态
         DiskBalancerWorkStatus workStatus = dataNode.queryDiskBalancerPlan();
         outputLine = String.format("DataNode: %s%nPlan File: %s%nPlan ID: %s%nResult: %s%n",
             nodeAddress,
@@ -105,6 +118,7 @@ public class QueryCommand extends Command {
             workStatus.getPlanID(),
             workStatus.getResult().toString());
         result.append(outputLine);
+        // 如果开启verbose模式，添加详细状态信息
         if (cmd.hasOption(DiskBalancerCLI.VERBOSE)) {
           outputLine = String.format("%s", workStatus.currentStateString());
           result.append(outputLine);
@@ -115,11 +129,12 @@ public class QueryCommand extends Command {
         throw ex;
       }
     }
+    // 输出最终查询结果
     getPrintStream().println(result);
   }
 
   /**
-   * Gets extended help for this command.
+   * 打印查询命令的帮助信息
    */
   @Override
   public void printHelp() {

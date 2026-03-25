@@ -1,6 +1,7 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
+ * or more contributor license agreements.  See the NOTICE
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
  * to you under the Apache License, Version 2.0 (the
@@ -25,6 +26,10 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.server.protocol.BlockStorageMovementCommand.BlockMovingInfo;
 
 /**
+ * 文件：BlockMoveTaskHandler.java
+ * 所属模块：HDFS NameNode 存储策略满足器(SPS)
+ * 核心职责：定义块移动任务处理器的通用接口，支持不同的块移动实现策略
+ * 
  * Interface for implementing different ways of block moving approaches. One can
  * connect directly to DN and request block move, and other can talk NN to
  * schedule via heart-beats.
@@ -34,9 +39,10 @@ import org.apache.hadoop.hdfs.server.protocol.BlockStorageMovementCommand.BlockM
 public interface BlockMoveTaskHandler {
 
   /**
-   * This is an interface method to handle the move tasks. BlockMovingInfo must
-   * contain the required info to move the block, that source location,
-   * destination location and storage types.
+   * 提交一个块移动任务进行处理
+   * 任务信息包含块的源位置、目标位置和存储类型等必要信息
+   * @param blkMovingInfo 待移动块的信息描述
+   * @throws IOException 提交任务过程中发生IO异常时抛出
    */
   void submitMoveTask(BlockMovingInfo blkMovingInfo) throws IOException;
 

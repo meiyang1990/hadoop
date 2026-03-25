@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,62 +32,52 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
+/**
+ * 容量调度器队列存储容器，支持通过全路径和短名称两种方式查询队列，
+ * 处理短名称歧义问题，保证并发读写安全。
+ */
 public class CSQueueStore {
-  //This map is the single source of truth, this will store ALL queues
-  //using the queue path as the key
+  // 队列存储真值映射表，以队列全路径为key存储所有队列，是唯一权威数据源
   private final Map<String, CSQueue> fullNameQueues = new HashMap<>();
 
-  //this map will contain all short names and the paths they can be derived from
-  //this set is required for remove operation to properly set the short name
-  //mapping when the ambiguity is resolved.
+  // 短名称到全路径列表的映射，存储所有存在该短名称的队列全路径，
+  // 用于删除队列后重新处理短名称歧义
   private final Map<String, Set<String>> shortNameToLongNames = new HashMap<>();
 
-  //This map will store the result to the get calls to prevent unnecessary
-  //checks, this will be updated on queue add / remove
+  // 查询缓存映射，存储可唯一确定的全路径/无歧义短名称到队列的映射，
+  // 用于加速查询，队列增删时会更新该缓存
   private final Map<String, CSQueue> getMap = new HashMap<>();
 
-  //this lock will be used to make sure isAmbiguous can be called parallel
-  //it will be only blocked during add / remove operations.
+  // 读写锁，支持并发查询，仅在增删队列时加写锁阻塞修改
   private ReadWriteLock modificationLock = new ReentrantReadWriteLock();
 
   /**
-   * This getter method will return an immutable map with all the queues with
-   * queue path as the key.
-   * @return Map containing all queues and having path as key
+   * 获取所有队列的不可变映射，以队列全路径为key。
+   * @return 包含所有队列的不可变映射
    */
   Map<String, CSQueue> getFullNameQueues() {
     return ImmutableMap.copyOf(fullNameQueues);
   }
 
   /**
-   * This getter method will return an immutable map with all queues
-   * which can be disambiguously referenced by short name, using short name
-   * as the key.
-   * @return Map containing queues and having short name as key
+   * 获取所有可通过短名称无歧义访问的队列映射，以短名称为key。
+   * @return 包含无歧义短名称队列的不可变映射
    */
   @VisibleForTesting
   Map<String, CSQueue> getShortNameQueues() {
-    //this is not the most efficient way to create a short named list
-    //but this method is only used in tests
     try {
       modificationLock.readLock().lock();
       return ImmutableMap.copyOf(
           fullNameQueues
-              //getting all queues from path->queue map
               .entrySet()
               .stream()
-              //filtering the list to contain only disambiguous short names
+              // 过滤出缓存命中且对应到当前队列的无歧义短名称
               .filter(
-                  //keeping queues where get(queueShortname) == queue
-                  //these are the ambigous references
                   entry -> getMap.get(entry.getValue().getQueueShortName())
                       == entry.getValue())
-              //making a map from the stream
               .collect(
                   Collectors.toMap(
-                      //using the queue's short name as key
                       entry->entry.getValue().getQueueShortName(),
-                      //using the queue as value
                       entry->entry.getValue()))
       );
     } finally {
@@ -95,33 +86,31 @@ public class CSQueueStore {
   }
 
   /**
-   * This method will update the getMap for the short name provided, depending
-   * on how many queues are present with the same shortname.
-   * @param shortName The short name of the queue to be updated
+   * 根据当前短名称对应的队列数量，更新查询缓存中的短名称映射。
+   * 如果只有一个队列则缓存该映射，多个则移除缓存表示歧义。
+   * @param shortName 需要更新的短名称
    */
   private void updateGetMapForShortName(String shortName) {
-    //we protect the root, since root can be both a full path and a short name
-    //we simply deny adding root as a shortname to the getMap.
+    // root队列特殊处理，root始终作为全路径，不加入短名称缓存
     if (shortName.equals(CapacitySchedulerConfiguration.ROOT)) {
       return;
     }
-    //getting all queues with the same short name
+    // 获取该短名称对应的所有队列全路径
     Set<String> fullNames = this.shortNameToLongNames.get(shortName);
 
-    //if there is only one queue we add it to the getMap
+    // 只有一个队列时，将短名称加入缓存
     if (fullNames != null && fullNames.size() == 1) {
       getMap.put(shortName,
           fullNameQueues.get(fullNames.iterator().next()));
     } else {
-      //in all other cases using only shortName cannot disambigously identifiy
-      //a queue
+      // 多个队列时，移除缓存表示无法通过短名称唯一确定
       getMap.remove(shortName);
     }
   }
 
   /**
-   * Method for adding a queue to the store.
-   * @param queue Queue to be added
+   * 添加队列到存储，更新全路径映射、短名称歧义映射和查询缓存。
+   * @param queue 待添加的队列
    */
   public void add(CSQueue queue) {
     String fullName = queue.getQueuePath();
@@ -130,21 +119,22 @@ public class CSQueueStore {
     try {
       modificationLock.writeLock().lock();
 
+      // 更新全路径映射和查询缓存
       fullNameQueues.put(fullName, queue);
       getMap.put(fullName, queue);
 
-      //we only update short queue name ambiguity for non root queues
+      // 非root队列需要更新短名称歧义映射
       if (!shortName.equals(CapacitySchedulerConfiguration.ROOT)) {
-        //getting or creating the ambiguity set for the current queue
+        // 获取或创建该短名称对应的全路径集合
         Set<String> fullNamesSet =
             this.shortNameToLongNames.getOrDefault(shortName, new HashSet<>());
 
-        //adding the full name to the queue
+        // 添加当前队列全路径到集合
         fullNamesSet.add(fullName);
         this.shortNameToLongNames.put(shortName, fullNamesSet);
       }
 
-      //updating the getMap references for the queue
+      // 更新短名称查询缓存
       updateGetMapForShortName(shortName);
     } finally {
       modificationLock.writeLock().unlock();
@@ -152,12 +142,11 @@ public class CSQueueStore {
   }
 
   /**
-   * Method for removing a queue from the store.
-   * @param queue The queue to be removed
+   * 从存储中移除指定队列，更新所有映射关系。
+   * @param queue 待移除的队列
    */
   public void remove(CSQueue queue) {
-    //if no queue is specified, we can consider it already removed,
-    //also consistent with hashmap behaviour
+    // 空队列直接返回，保持和HashMap行为一致
     if (queue == null) {
       return;
     }
@@ -167,21 +156,21 @@ public class CSQueueStore {
       String fullName = queue.getQueuePath();
       String shortName = queue.getQueueShortName();
 
+      // 从全路径映射和查询缓存中移除
       fullNameQueues.remove(fullName);
       getMap.remove(fullName);
 
-      //we only update short queue name ambiguity for non root queues
+      // 非root队列需要更新短名称歧义映射
       if (!shortName.equals(CapacitySchedulerConfiguration.ROOT)) {
         Set<String> fullNamesSet = this.shortNameToLongNames.get(shortName);
         fullNamesSet.remove(fullName);
-        //if there are no more queues with the current short name, we simply
-        //remove the set to free up some memory
+        // 集合为空则移除整个短名称条目释放内存
         if (fullNamesSet.size() == 0) {
           this.shortNameToLongNames.remove(shortName);
         }
       }
 
-      //updating the getMap references for the queue
+      // 更新短名称查询缓存
       updateGetMapForShortName(shortName);
 
     } finally {
@@ -190,8 +179,8 @@ public class CSQueueStore {
   }
 
   /**
-   * Method for removing a queue from the store by name.
-   * @param name A deterministic name for the queue to be removed
+   * 根据名称从存储中移除队列，支持全路径或短名称。
+   * @param name 待移除队列的名称
    */
   public void remove(String name) {
     CSQueue queue = get(name);
@@ -201,9 +190,9 @@ public class CSQueueStore {
   }
 
   /**
-   * Returns a queue by looking it up by its fully qualified name.
-   * @param fullName The full name/path of the queue
-   * @return The queue or null if none found
+   * 通过全路径查询队列。
+   * @param fullName 队列全路径
+   * @return 队列实例，不存在则返回null
    */
   CSQueue getByFullName(String fullName) {
     if (fullName == null) {
@@ -219,11 +208,9 @@ public class CSQueueStore {
   }
 
   /**
-   * Check for name ambiguity returns true, if there are at least two queues
-   * with the same short name. Queue named "root" is protected, and it will
-   * always return the root queue regardless of ambiguity.
-   * @param shortName The short name to be checked for ambiguity
-   * @return true if there are at least two queues found false otherwise
+   * 检查指定短名称是否存在歧义（对应两个及以上队列）。
+   * @param shortName 待检查的短名称
+   * @return 存在歧义返回true，否则返回false
    */
   boolean isAmbiguous(String shortName) {
     if (shortName == null) {
@@ -246,10 +233,9 @@ public class CSQueueStore {
   }
 
   /**
-   * Getter method for the queue it can find queues by both full and
-   * short names.
-   * @param name Full or short name of the queue
-   * @return the queue
+   * 通过名称查询队列，同时支持全路径和无歧义短名称。
+   * @param name 队列名称（全路径或短名称）
+   * @return 队列实例，不存在或歧义则返回null
    */
   public CSQueue get(String name) {
     if (name == null) {
@@ -264,7 +250,7 @@ public class CSQueueStore {
   }
 
   /**
-   * Clears the store, removes all queue references.
+   * 清空存储，移除所有队列引用。
    */
   public void clear() {
     try {
@@ -278,8 +264,8 @@ public class CSQueueStore {
   }
 
   /**
-   * Returns all queues as a list.
-   * @return List containing all the queues
+   * 获取所有队列的不可变集合。
+   * @return 包含所有队列的不可变列表
    */
   public Collection<CSQueue> getQueues() {
     try {

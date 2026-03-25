@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,16 +26,23 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
 /**
- * An OrderingPolicy which orders SchedulableEntities by input order
+ * FIFO排序策略，按照先入先出顺序对可调度实体进行排序
+ * 先比较优先级，优先级相同则按提交顺序排序
  */
 public class FifoOrderingPolicy<S extends SchedulableEntity> extends AbstractComparatorOrderingPolicy<S> {
   
+  /**
+   * 构造FIFO排序策略，初始化比较器链和可调度实体集合
+   */
   public FifoOrderingPolicy() {
     List<Comparator<SchedulableEntity>> comparators =
         new ArrayList<Comparator<SchedulableEntity>>();
+    // 先按优先级排序
     comparators.add(new PriorityComparator());
+    // 优先级相同按FIFO顺序（提交顺序）排序
     comparators.add(new FifoComparator());
     this.comparator = new CompoundComparator(comparators);
+    // 使用跳表集合存储，支持并发访问并保持排序顺序
     this.schedulableEntities = new ConcurrentSkipListSet<S>(comparator);
 
   }

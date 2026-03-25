@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,8 @@
  */
 
 /**
- * This package contains helper classes for any Info object.
+ * YARN ResourceManager Web UI DAO 辅助工具包
+ * 提供 Web 界面数据访问对象相关的各类辅助工具类，用于处理各类信息对象的构造与转换
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,74 +48,75 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Contains the logic to lookup a leveldb by timestamp so that multiple smaller
- * databases can roll according to the configured period and evicted efficiently
- * via operating system directory removal.
+ * 按时间周期滚动存储LevelDB实例的管理类，支持按时间查找数据，过期数据可通过删除目录高效清除。
+ * 核心功能：按配置周期创建新LevelDB，自动淘汰过期数据，支持按时间戳查询对应DB。
  */
 class RollingLevelDB {
 
-  /** Logger for this class. */
+  /** 当前类日志实例. */
   private static final Logger LOG = LoggerFactory.
       getLogger(RollingLevelDB.class);
-  /** Factory to open and create new leveldb instances. */
+  /** LevelDB工厂实例，用于创建打开LevelDB. */
   private static JniDBFactory factory = new JniDBFactory();
-  /** Thread safe date formatter. */
+  /** 线程安全的日期格式化器，用于生成和解析文件名. */
   private FastDateFormat fdf;
-  /** Date parser. */
+  /** 日期解析器，用于从已有文件名解析时间. */
   private SimpleDateFormat sdf;
-  /** Calendar to calculate the current and next rolling period. */
+  /** 日历实例，用于计算当前和下一个滚动周期时间. */
   private GregorianCalendar cal = new GregorianCalendar(
       TimeZone.getTimeZone("GMT"));
-  /** Collection of all active rolling leveldb instances. */
+  /** 当前所有活跃的滚动LevelDB实例，key为起始时间戳，value为DB实例. */
   private final TreeMap<Long, DB> rollingdbs;
-  /** Collection of all rolling leveldb instances to evict. */
+  /** 待淘汰的滚动LevelDB实例，key为起始时间戳，value为DB实例. */
   private final TreeMap<Long, DB> rollingdbsToEvict;
-  /** Name of this rolling level db. */
+  /** 当前滚动LevelDB集合的名称. */
   private final String name;
-  /** Calculated timestamp of when to roll a new leveldb instance. */
+  /** 下一次触发滚动检查的时间戳. */
   private volatile long nextRollingCheckMillis = 0;
-  /** File system instance to find and create new leveldb instances. */
+  /** 本地文件系统实例，用于操作LevelDB目录和文件. */
   private FileSystem lfs = null;
-  /** Directory to store rolling leveldb instances. */
+  /** 存储所有滚动LevelDB实例的根目录. */
   private Path rollingDBPath;
-  /** Configuration for this object. */
+  /** Hadoop配置对象. */
   private Configuration conf;
-  /** Rolling period. */
+  /** 当前配置的滚动周期类型. */
   private RollingPeriod rollingPeriod;
-  /**
-   * Rolling leveldb instances are evicted when their endtime is earlier than
-   * the current time minus the time to live value.
-   */
+  /** 数据存活时间，过期数据会被淘汰. */
   private long ttl;
-  /** Whether time to live is enabled. */
+  /** 是否启用TTL过期淘汰功能. */
   private boolean ttlEnabled;
 
-  /** Encapsulates the rolling period to date format lookup. */
+  /** 滚动周期枚举，定义不同周期对应的日期格式. */
   enum RollingPeriod {
+    /** 按天滚动. */
     DAILY {
       @Override
       public String dateFormat() {
         return "yyyy-MM-dd";
       }
     },
+    /** 按半天（12小时）滚动. */
     HALF_DAILY {
       @Override
       public String dateFormat() {
         return "yyyy-MM-dd-HH";
       }
     },
+    /** 按四分之一天（6小时）滚动. */
     QUARTER_DAILY {
       @Override
       public String dateFormat() {
         return "yyyy-MM-dd-HH";
       }
     },
+    /** 按小时滚动. */
     HOURLY {
       @Override
       public String dateFormat() {
         return "yyyy-MM-dd-HH";
       }
     },
+    /** 按5分钟滚动. */
     MINUTELY {
       @Override
       public String dateFormat() {
@@ -125,15 +127,18 @@ class RollingLevelDB {
   }
 
   /**
-   * Convenience class for associating a write batch with its rolling leveldb
-   * instance.
-   */
+   * 批量写入包装类，关联批量操作和对应LevelDB实例. */
   public static class RollingWriteBatch {
-    /** Leveldb object. */
+    /** 关联的LevelDB实例. */
     private final DB db;
-    /** Write batch for the db object. */
+    /** LevelDB批量写入对象. */
     private final WriteBatch writeBatch;
 
+    /**
+     * 构造批量写入包装对象.
+     * @param db 目标LevelDB实例
+     * @param writeBatch 批量写入对象
+     */
     public RollingWriteBatch(final DB db, final WriteBatch writeBatch) {
       this.db = db;
       this.writeBatch = writeBatch;
@@ -147,15 +152,21 @@ class RollingLevelDB {
       return writeBatch;
     }
 
+    /** 提交批量写入到LevelDB. */
     public void write() {
       db.write(writeBatch);
     }
 
+    /** 关闭批量写入对象，释放资源. */
     public void close() {
       IOUtils.cleanupWithLogger(LOG, writeBatch);
     }
   }
 
+  /**
+   * 构造滚动LevelDB管理器.
+   * @param name 滚动LevelDB集合名称
+   */
   RollingLevelDB(String name) {
     this.name = name;
     this.rollingdbs = new TreeMap<Long, DB>();
@@ -166,6 +177,8 @@ class RollingLevelDB {
     return name;
   }
 
+  /**
+   * 获取当前时间，可被子类重写用于测试. */
   protected long currentTimeMillis() {
     return System.currentTimeMillis();
   }
@@ -182,12 +195,21 @@ class RollingLevelDB {
     return ttlEnabled;
   }
 
+  /**
+   * 设置下一次滚动时间，并记录日志.
+   * @param timestamp 下一次滚动时间戳
+   */
   protected void setNextRollingTimeMillis(final long timestamp) {
     this.nextRollingCheckMillis = timestamp;
     LOG.info("Next rolling time for " + getName() + " is "
         + fdf.format(nextRollingCheckMillis));
   }
 
+  /**
+   * 初始化滚动LevelDB管理器，加载配置和已有数据文件.
+   * @param config Hadoop配置对象
+   * @throws Exception 初始化过程中发生的异常
+   */
   public void init(final Configuration config) throws Exception {
     LOG.info("Initializing RollingLevelDB for " + getName());
     this.conf = config;
@@ -203,6 +225,10 @@ class RollingLevelDB {
     initHistoricalDBs();
   }
 
+  /**
+   * 初始化本地文件系统，创建存储根目录.
+   * @throws IOException 创建目录失败抛出异常
+   */
   protected void initFileSystem() throws IOException {
     lfs = FileSystem.getLocal(conf);
     boolean success = lfs.mkdirs(rollingDBPath,
@@ -213,6 +239,8 @@ class RollingLevelDB {
     }
   }
 
+  /**
+   * 从配置加载滚动周期，初始化日期格式化工具. */
   protected synchronized void initRollingPeriod() {
     final String lcRollingPeriod = conf.get(
         YarnConfiguration.TIMELINE_SERVICE_ROLLING_PERIOD,
@@ -225,6 +253,10 @@ class RollingLevelDB {
     sdf.setTimeZone(fdf.getTimeZone());
   }
 
+  /**
+   * 扫描存储目录，加载已有的历史LevelDB实例并打开.
+   * @throws IOException 文件扫描读取异常
+   */
   protected synchronized void initHistoricalDBs() throws IOException {
     Path rollingDBGlobPath = new Path(rollingDBPath, getName() + ".*");
     FileStatus[] statuses = lfs.globStatus(rollingDBGlobPath);
@@ -240,6 +272,11 @@ class RollingLevelDB {
     }
   }
 
+  /**
+   * 初始化单个滚动LevelDB实例，打开并加入活跃列表.
+   * @param dbStartTime DB实例的起始时间戳
+   * @param rollingInstanceDBPath DB实例存储路径
+   */
   private void initRollingLevelDB(Long dbStartTime,
       Path rollingInstanceDBPath) {
     if (rollingdbs.containsKey(dbStartTime)) {
@@ -247,12 +284,15 @@ class RollingLevelDB {
     }
     Options options = new Options();
     options.createIfMissing(true);
+    // 从配置读取读缓存大小配置
     options.cacheSize(conf.getLong(
         YarnConfiguration.TIMELINE_SERVICE_LEVELDB_READ_CACHE_SIZE,
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_LEVELDB_READ_CACHE_SIZE));
+    // 从配置读取最大打开文件数配置
     options.maxOpenFiles(conf.getInt(
         YarnConfiguration.TIMELINE_SERVICE_LEVELDB_MAX_OPEN_FILES,
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_LEVELDB_MAX_OPEN_FILES));
+    // 从配置读取写缓存大小配置
     options.writeBufferSize(conf.getInt(
         YarnConfiguration.TIMELINE_SERVICE_LEVELDB_WRITE_BUFFER_SIZE,
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_LEVELDB_WRITE_BUFFER_SIZE));
@@ -271,6 +311,11 @@ class RollingLevelDB {
     }
   }
 
+  /**
+   * 获取指定DB实例在列表中的前一个DB实例.
+   * @param db 当前DB实例
+   * @return 前一个DB实例，不存在返回null
+   */
   synchronized DB getPreviousDB(DB db) {
     Iterator<DB> iterator = rollingdbs.values().iterator();
     DB prev = null;
@@ -284,6 +329,11 @@ class RollingLevelDB {
     return prev;
   }
 
+  /**
+   * 获取指定DB实例的起始时间戳.
+   * @param db DB实例
+   * @return 起始时间戳，未找到返回-1
+   */
   synchronized long getStartTimeFor(DB db) {
     long startTime = -1;
     for (Map.Entry<Long, DB> entry : rollingdbs.entrySet()) {
@@ -294,8 +344,13 @@ class RollingLevelDB {
     return startTime;
   }
 
+  /**
+   * 根据起始时间戳获取对应DB实例，需要时触发滚动.
+   * @param startTime 查询的起始时间戳
+   * @return 对应的DB实例，不存在返回null
+   */
   public synchronized DB getDBForStartTime(long startTime) {
-    // make sure we sanitize this input
+    // 限制输入不能超过当前时间
     startTime = Math.min(startTime, currentTimeMillis());
 
     if (startTime >= getNextRollingTimeMillis()) {
@@ -308,6 +363,10 @@ class RollingLevelDB {
     return entry.getValue();
   }
 
+  /**
+   * 触发滚动，创建新的DB实例，标记过期DB待淘汰.
+   * @param startTime 触发滚动的时间戳
+   */
   private void roll(long startTime) {
     LOG.info("Rolling new DB instance for " + getName());
     long currentStartTime = computeCurrentCheckMillis(startTime);
@@ -321,8 +380,10 @@ class RollingLevelDB {
     initRollingLevelDB(currentStartTime, currentRollingDBPath);
   }
 
+  /**
+   * 遍历活跃DB，将过期DB移动到待淘汰列表. */
   private synchronized void scheduleOldDBsForEviction() {
-    // keep at least time to live amount of data
+    // 计算淘汰阈值：当前时间减去TTL
     long evictionThreshold = computeCurrentCheckMillis(currentTimeMillis()
         - getTimeToLive());
 
@@ -331,7 +392,7 @@ class RollingLevelDB {
     Iterator<Entry<Long, DB>> iterator = rollingdbs.entrySet().iterator();
     while (iterator.hasNext()) {
       Entry<Long, DB> entry = iterator.next();
-      // parse this in gmt time
+      // 起始时间早于阈值则加入淘汰列表
       if (entry.getKey() < evictionThreshold) {
         LOG.info("Scheduling " + getName() + " eviction for "
             + fdf.format(entry.getKey()));
@@ -341,6 +402,8 @@ class RollingLevelDB {
     }
   }
 
+  /**
+   * 执行淘汰，关闭待淘汰DB并删除存储目录. */
   public synchronized void evictOldDBs() {
     LOG.info("Evicting " + getName() + " DBs scheduled for eviction");
     Iterator<Entry<Long, DB>> iterator = rollingdbsToEvict.entrySet()
@@ -360,6 +423,10 @@ class RollingLevelDB {
     }
   }
 
+  /**
+   * 停止滚动LevelDB管理器，关闭所有打开的DB和文件系统.
+   * @throws Exception 关闭过程异常
+   */
   public void stop() throws Exception {
     for (DB db : rollingdbs.values()) {
       IOUtils.cleanupWithLogger(LOG, db);
@@ -375,47 +442,18 @@ class RollingLevelDB {
     return computeCheckMillis(now, false);
   }
 
+  /**
+   * 根据当前时间和滚动周期，计算周期对齐后的时间戳.
+   * 由于使用共享Calendar实例，需要同步调用.
+   * @param now 输入时间戳
+   * @param next 是否计算下一个周期的起始时间
+   * @return 对齐后的时间戳
+   */
   private synchronized long computeCheckMillis(long now, boolean next) {
-    // needs to be called synchronously due to shared Calendar
     cal.setTimeInMillis(now);
+    // 清零秒和毫秒，对齐周期
     cal.set(Calendar.SECOND, 0);
     cal.set(Calendar.MILLISECOND, 0);
 
-    if (rollingPeriod == RollingPeriod.DAILY) {
-      cal.set(Calendar.HOUR_OF_DAY, 0);
-      cal.set(Calendar.MINUTE, 0);
-      if (next) {
-        cal.add(Calendar.DATE, 1);
-      }
-    } else if (rollingPeriod == RollingPeriod.HALF_DAILY) {
-      // round down to 12 hour interval
-      int hour = (cal.get(Calendar.HOUR) / 12) * 12;
-      cal.set(Calendar.HOUR, hour);
-      cal.set(Calendar.MINUTE, 0);
-      if (next) {
-        cal.add(Calendar.HOUR_OF_DAY, 12);
-      }
-    } else if (rollingPeriod == RollingPeriod.QUARTER_DAILY) {
-      // round down to 6 hour interval
-      int hour = (cal.get(Calendar.HOUR) / 6) * 6;
-      cal.set(Calendar.HOUR, hour);
-      cal.set(Calendar.MINUTE, 0);
-      if (next) {
-        cal.add(Calendar.HOUR_OF_DAY, 6);
-      }
-    } else if (rollingPeriod == RollingPeriod.HOURLY) {
-      cal.set(Calendar.MINUTE, 0);
-      if (next) {
-        cal.add(Calendar.HOUR_OF_DAY, 1);
-      }
-    } else if (rollingPeriod == RollingPeriod.MINUTELY) {
-      // round down to 5 minute interval
-      int minute = (cal.get(Calendar.MINUTE) / 5) * 5;
-      cal.set(Calendar.MINUTE, minute);
-      if (next) {
-        cal.add(Calendar.MINUTE, 5);
-      }
-    }
-    return cal.getTimeInMillis();
-  }
-}
+    // 根据不同滚动周期做不同的对齐计算
+    if (

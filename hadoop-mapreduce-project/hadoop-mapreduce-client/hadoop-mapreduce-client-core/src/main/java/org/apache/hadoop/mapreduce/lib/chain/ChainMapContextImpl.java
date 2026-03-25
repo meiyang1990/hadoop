@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,18 +42,32 @@ import org.apache.hadoop.mapreduce.TaskInputOutputContext;
 import org.apache.hadoop.security.Credentials;
 
 /**
- * A simple wrapper class that delegates most of its functionality to the
- * underlying context, but overrides the methods to do with record readers ,
- * record writers and configuration.
+ * @file ChainMapContextImpl.java
+ * @brief Chain链式Map处理阶段的上下文包装实现类，用于多Map串联处理场景
+ * 
+ * 该类是MapContext接口的包装实现，大部分功能委托给基础上下文，
+ * 仅覆盖与RecordReader、RecordWriter和配置相关的方法，
+ * 支持在同一个Map任务中串联执行多个Mapper处理器，每个Mapper使用独立的输入输出和配置。
  */
 class ChainMapContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
     MapContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {
 
+  // 当前Mapper使用的RecordReader
   private RecordReader<KEYIN, VALUEIN> reader;
+  // 当前Mapper使用的RecordWriter
   private RecordWriter<KEYOUT, VALUEOUT> output;
+  // 基础上下文，大部分方法委托给它执行
   private TaskInputOutputContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> base;
+  // 当前Mapper的独立配置
   private Configuration conf;
 
+  /**
+   * 构造ChainMap上下文包装类
+   * @param base 基础任务上下文，用于委托非覆盖方法
+   * @param rr 当前Mapper使用的RecordReader
+   * @param rw 当前Mapper使用的RecordWriter
+   * @param conf 当前Mapper的独立配置
+   */
   ChainMapContextImpl(
       TaskInputOutputContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> base,
       RecordReader<KEYIN, VALUEIN> rr, RecordWriter<KEYOUT, VALUEOUT> rw,
@@ -80,6 +95,7 @@ class ChainMapContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
 
   @Override
   public InputSplit getInputSplit() {
+    // 如果基础上下文是MapContext实例，委托获取输入分片
     if (base instanceof MapContext) {
       MapContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> mc = 
         (MapContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT>) base;

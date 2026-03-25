@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,7 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.storage.entity
- * contains classes related to implementation for entity table.
+ * 本包提供基于HBase存储的时间线服务实体表相关实现，包含实体表的数据读写、 schema 定义等核心逻辑。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

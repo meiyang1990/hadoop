@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,43 +23,37 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.yarn.server.api.ResourceManagerAdministrationProtocol;
 
 /**
- * Defines the contract to be implemented by the request interceptor classes,
- * that can be used to intercept and inspect messages sent from the client to
- * the resource manager.
+ * 文件功能：定义了ResourceManager管理请求拦截器需要实现的接口规范，
+ * 用于YARN Router中拦截检查客户端发往ResourceManager的管理请求，
+ * 支持责任链模式组织多个拦截器处理请求。
  */
 public interface RMAdminRequestInterceptor
     extends ResourceManagerAdministrationProtocol, Configurable {
   /**
-   * This method is called for initializing the interceptor. This is guaranteed
-   * to be called only once in the lifetime of this instance.
+   * 初始化拦截器，在拦截器实例生命周期内仅会被调用一次。
    *
-   * @param user the name of the client
+   * @param user 发起请求的客户端用户名
    */
   void init(String user);
 
   /**
-   * This method is called to release the resources held by the interceptor.
-   * This will be called when the application pipeline is being destroyed. The
-   * concrete implementations should dispose the resources and forward the
-   * request to the next interceptor, if any.
+   * 关闭拦截器并释放持有的资源，在拦截器管道销毁时调用。
+   * 具体实现需要释放自身资源，并将关闭请求转发给下一个拦截器。
    */
   void shutdown();
 
   /**
-   * Sets the next interceptor in the pipeline. The concrete implementation of
-   * this interface should always pass the request to the nextInterceptor after
-   * inspecting the message. The last interceptor in the chain is responsible to
-   * send the messages to the resource manager service and so the last
-   * interceptor will not receive this method call.
+   * 设置责任链中的下一个拦截器。拦截器处理完请求后需要将请求转发给下一个拦截器。
+   * 责任链的最后一个拦截器直接将请求发往ResourceManager服务，不会调用此方法。
    *
-   * @param nextInterceptor the RMAdminRequestInterceptor to set in the pipeline
+   * @param nextInterceptor 责任链中的下一个请求拦截器
    */
   void setNextInterceptor(RMAdminRequestInterceptor nextInterceptor);
 
   /**
-   * Returns the next interceptor in the chain.
+   * 获取责任链中的下一个拦截器。
    *
-   * @return the next interceptor in the chain
+   * @return 责任链中的下一个请求拦截器
    */
   RMAdminRequestInterceptor getNextInterceptor();
 

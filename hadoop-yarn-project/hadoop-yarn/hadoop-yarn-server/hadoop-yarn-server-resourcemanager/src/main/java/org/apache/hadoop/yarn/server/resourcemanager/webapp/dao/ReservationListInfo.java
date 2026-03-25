@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,22 +29,33 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Simple class that represent a list of reservations.
+ * YARN RM Web API 预约资源列表的数据传输对象，用于封装预约列表信息返回给前端。
  */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ReservationListInfo {
   @XmlElement(name = "reservations")
+  // 存储预约信息列表
   private List<ReservationInfo> reservations;
 
+  /**
+   * 默认构造方法，初始化空预约列表。
+   */
   public ReservationListInfo() {
     reservations = new ArrayList<>();
   }
 
+  /**
+   * 根据预约列表响应构造预约列表信息对象。
+   * @param response 预约列表查询响应
+   * @param includeResourceAllocations 是否包含资源分配信息
+   * @throws Exception 构造过程异常
+   */
   public ReservationListInfo(ReservationListResponse response,
         boolean includeResourceAllocations) throws Exception {
     this();
 
+    // 遍历所有预约分配状态，转换为WebDAO格式
     for (ReservationAllocationState allocation :
             response.getReservationAllocationState()) {
       reservations.add(new ReservationInfo(allocation,
@@ -51,6 +63,10 @@ public class ReservationListInfo {
     }
   }
 
+  /**
+   * 获取预约信息列表。
+   * @return 预约信息列表
+   */
   public List<ReservationInfo> getReservations() {
     return reservations;
   }

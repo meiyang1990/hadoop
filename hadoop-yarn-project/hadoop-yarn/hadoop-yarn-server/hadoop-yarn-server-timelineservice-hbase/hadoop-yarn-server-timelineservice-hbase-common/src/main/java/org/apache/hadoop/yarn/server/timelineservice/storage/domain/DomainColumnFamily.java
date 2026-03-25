@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,29 +23,32 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ColumnFamily
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.Separator;
 
 /**
- * Represents the domain table column families.
+ * 定义HBase域表中所有列族，用于时间线服务存储域元数据
  */
 public enum DomainColumnFamily implements ColumnFamily<DomainTable> {
   /**
-   * Info column family houses known columns such as created_time, owners,
-   * readers.
+   * 信息列族，存储域的基础信息：创建时间、所有者、可读用户等
    */
   INFO("i");
 
   /**
-   * Byte representation of this column family.
+   * 列族名称的字节数组形式（用于HBase读写）
    */
   private final byte[] bytes;
 
   /**
-   * @param value create a column family with this name. Must be lower case and
-   *          without spaces.
+   * 构造函数，根据字符串名称生成列族对应的字节数组
+   * @param value 列族名称缩写
    */
   DomainColumnFamily(String value) {
     // column families should be lower case and not contain any spaces.
     this.bytes = Bytes.toBytes(Separator.SPACE.encode(value));
   }
 
+  /**
+   * 获取列族名称的字节数组副本
+   * @return 列族字节数组
+   */
   public byte[] getBytes() {
     return Bytes.copy(bytes);
   }

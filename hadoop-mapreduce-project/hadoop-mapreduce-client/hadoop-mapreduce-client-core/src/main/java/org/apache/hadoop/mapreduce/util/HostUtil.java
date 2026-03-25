@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,21 @@ package org.apache.hadoop.mapreduce.util;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
+/**
+ * MapReduce任务主机地址处理工具类，提供任务日志URL构造、Tracker名称转换等功能
+ * 用于处理MapReduce任务执行过程中与主机地址相关的通用操作
+ */
 @Private
 @Unstable
 public class HostUtil {
 
   /**
-   * Construct the taskLogUrl
-   * @param taskTrackerHostName
-   * @param httpPort
-   * @param taskAttemptID
-   * @return the taskLogUrl
+   * 构造任务日志的完整访问URL
+   * @param scheme URL协议头(http/https)
+   * @param taskTrackerHostName TaskTracker主机名
+   * @param httpPort TaskTracker HTTP服务端口
+   * @param taskAttemptID 任务尝试ID
+   * @return 拼接完成的任务日志访问URL
    */
   public static String getTaskLogUrl(String scheme, String taskTrackerHostName,
     String httpPort, String taskAttemptID) {
@@ -39,11 +45,13 @@ public class HostUtil {
   }
 
   /**
-   * Always throws {@link RuntimeException} because this method is not
-   * supposed to be called at runtime. This method is only for keeping
-   * binary compatibility with Hive 0.13. MAPREDUCE-5830 for the details.
-   * @deprecated Use {@link #getTaskLogUrl(String, String, String, String)}
-   * to construct the taskLogUrl.
+   * 为保持二进制兼容性保留的过期方法，运行时调用一定会抛出异常
+   * 仅用于兼容Hive 0.13版本，不应该在实际运行时被调用
+   * @deprecated 使用{@link #getTaskLogUrl(String, String, String, String)}替代
+   * @param taskTrackerHostName TaskTracker主机名
+   * @param httpPort TaskTracker HTTP服务端口
+   * @param taskAttemptID 任务尝试ID
+   * @return 永远不会返回正常结果
    */
   @Deprecated
   public static String getTaskLogUrl(String taskTrackerHostName,
@@ -53,13 +61,20 @@ public class HostUtil {
         "Use HostUtil.getTaskLogUrl(String, String, String, String) instead.");
   }
 
+  /**
+   * 将Tracker名称格式转换为纯主机名格式
+   * 移除Tracker名称前缀和端口部分，提取出纯净的主机名
+   * @param trackerName 原始Tracker名称，格式一般为tracker_<host>:<port>
+   * @return 提取后的纯净主机名
+   */
   public static String convertTrackerNameToHostName(String trackerName) {
-    // Ugly!
-    // Convert the trackerName to its host name
+    // 查找冒号位置分割主机名和端口
     int indexOfColon = trackerName.indexOf(":");
+    // 截取冒号前的部分作为主机名部分，无冒号则使用完整字符串
     String trackerHostName = (indexOfColon == -1) ? 
       trackerName : 
       trackerName.substring(0, indexOfColon);
+    // 移除"tracker_"前缀得到最终主机名
     return trackerHostName.substring("tracker_".length());
   }
 

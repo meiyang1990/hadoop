@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,16 +35,23 @@ import org.apache.hadoop.yarn.server.api.ResourceManagerAdministrationProtocolPB
 import org.apache.hadoop.yarn.server.api.ResourceTrackerPB;
 
 /**
+ * YARN ResourceManager 所有RPC协议的权限策略提供者，提供需要权限控制的服务列表。
  * {@link PolicyProvider} for YARN ResourceManager protocols.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class RMPolicyProvider extends PolicyProvider {
 
+  // 单例实例
   private static RMPolicyProvider rmPolicyProvider = null;
 
+  // 私有构造函数，防止外部实例化
   private RMPolicyProvider() {}
 
+  /**
+   * 获取RMPolicyProvider单例实例（双重检查锁定实现线程安全）。
+   * @return RMPolicyProvider单例
+   */
   @Private
   @Unstable
   public static RMPolicyProvider getInstance() {
@@ -57,25 +65,33 @@ public class RMPolicyProvider extends PolicyProvider {
     return rmPolicyProvider;
   }
 
+  // ResourceManager所有需要权限控制的RPC服务定义数组
   private static final Service[] resourceManagerServices = 
       new Service[] {
+    // NodeManager资源追踪协议权限配置
     new Service(
         YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCETRACKER_PROTOCOL, 
         ResourceTrackerPB.class),
+    // 客户端协议权限配置
     new Service(
         YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_APPLICATIONCLIENT_PROTOCOL, 
         ApplicationClientProtocolPB.class),
+    // ApplicationMaster协议权限配置
     new Service(
         YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_APPLICATIONMASTER_PROTOCOL, 
         ApplicationMasterProtocolPB.class),
+    // 分布式调度AM协议权限配置
     new Service(YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_DISTRIBUTEDSCHEDULING_PROTOCOL,
               DistributedSchedulingAMProtocolPB.class),
+    // RM管理协议权限配置
     new Service(
         YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_RESOURCEMANAGER_ADMINISTRATION_PROTOCOL, 
         ResourceManagerAdministrationProtocolPB.class),
+    // 容器管理协议权限配置
     new Service(
         YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_CONTAINER_MANAGEMENT_PROTOCOL, 
         ContainerManagementProtocolPB.class),
+    // HA服务协议权限配置
     new Service(
         CommonConfigurationKeys.SECURITY_HA_SERVICE_PROTOCOL_ACL,
         HAServiceProtocol.class),

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,7 +42,8 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 /**
- * This class implements crypto command-line operations.
+ * 提供HDFS加密区管理的命令行工具，支持创建/列出加密区、查询文件加密信息、重加密等操作
+ * 是HDFS透明加密功能的管理员命令行入口
  */
 @InterfaceAudience.Private
 public class CryptoAdmin extends Configured implements Tool {
@@ -54,6 +56,12 @@ public class CryptoAdmin extends Configured implements Tool {
     super(conf);
   }
 
+  /**
+   * 解析命令行参数并执行对应加密管理命令
+   * @param args 命令行参数数组
+   * @return 执行结果状态码，0表示成功，非0表示失败
+   * @throws IOException 执行过程中IO异常
+   */
   @Override
   public int run(String[] args) throws IOException {
     if (args.length == 0) {
@@ -84,6 +92,11 @@ public class CryptoAdmin extends Configured implements Tool {
     }
   }
 
+  /**
+   * CryptoAdmin命令行工具主入口方法
+   * @param argsArray 命令行输入参数
+   * @throws Exception 执行过程中可能抛出的异常
+   */
   public static void main(String[] argsArray) throws Exception {
     final CryptoAdmin cryptoAdmin = new CryptoAdmin(new Configuration());
     int res = ToolRunner.run(cryptoAdmin, argsArray);
@@ -91,14 +104,18 @@ public class CryptoAdmin extends Configured implements Tool {
   }
 
   /**
-   * NN exceptions contain the stack trace as part of the exception message.
-   * When it's a known error, pretty-print the error and squish the stack trace.
+   * 格式化格式化NN异常信息，提取异常类型和第一行错误信息，简化用户输出
+   * @param e 原始异常对象
+   * @return 格式化后的简洁异常信息
    */
   private static String prettifyException(Exception e) {
     return e.getClass().getSimpleName() + ": " +
       e.getLocalizedMessage().split("\n")[0];
   }
 
+  /**
+   * 创建加密区命令实现类，负责在指定路径创建新的HDFS加密区
+   */
   private static class CreateZoneCommand implements AdminHelper.Command {
     @Override
     public String getName() {
@@ -157,6 +174,9 @@ public class CryptoAdmin extends Configured implements Tool {
     }
   }
 
+  /**
+   * 列出所有加密区命令实现类，输出集群中所有加密区路径和对应的密钥名称
+   */
   private static class ListZonesCommand implements AdminHelper.Command {
     @Override
     public String getName() {
@@ -201,6 +221,9 @@ public class CryptoAdmin extends Configured implements Tool {
     }
   }
 
+  /**
+   * 查询指定文件加密信息命令实现类，输出文件的加密密钥版本等信息
+   */
   private static class GetFileEncryptionInfoCommand
       implements AdminHelper.Command {
     @Override
@@ -248,6 +271,9 @@ public class CryptoAdmin extends Configured implements Tool {
     }
   }
 
+  /**
+   * 为已有加密区预置回收站目录命令实现类，为没有回收站的加密区创建回收站
+   */
   private static class ProvisionTrashCommand implements AdminHelper.Command {
     @Override
     public String getName() {
@@ -289,6 +315,9 @@ public class CryptoAdmin extends Configured implements Tool {
     }
   }
 
+  /**
+   * 加密区重加密命令实现类，支持启动或取消加密区的重加密操作（密钥轮转）
+   */
   private static class ReencryptZoneCommand implements AdminHelper.Command {
     @Override
     public String getName() {
@@ -351,6 +380,9 @@ public class CryptoAdmin extends Configured implements Tool {
     }
   }
 
+  /**
+   * 列出所有加密区重加密状态命令实现类，输出各加密区当前重加密的进度和状态信息
+   */
   private static class ListReencryptionStatusCommand
       implements AdminHelper.Command {
     @Override

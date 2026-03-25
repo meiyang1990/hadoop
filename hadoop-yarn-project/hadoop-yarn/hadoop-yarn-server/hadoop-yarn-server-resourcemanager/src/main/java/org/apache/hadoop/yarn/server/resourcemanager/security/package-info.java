@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.resourcemanager.security
- * contains classes related to security.
+ * YARN ResourceManager 安全模块包，提供ResourceManager层面的安全认证、令牌管理等相关能力。
+ * 包含安全认证、委派令牌管理、AMRM令牌管理等ResourceManager核心安全功能的实现类。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

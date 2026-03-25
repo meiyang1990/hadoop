@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,6 +20,10 @@ package org.apache.hadoop.mapred.nativetask;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 原生任务模块常量定义类
+ * 统一存放原生MapReduce任务相关的配置项名称、默认值和数据结构长度常量
+ */
 @InterfaceAudience.Private
 public class Constants {
 

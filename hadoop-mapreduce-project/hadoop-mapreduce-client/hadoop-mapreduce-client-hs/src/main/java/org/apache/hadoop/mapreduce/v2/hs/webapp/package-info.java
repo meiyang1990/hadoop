@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * MapReduce历史服务器（JobHistoryServer）Web用户界面包
+ * 提供已完成MapReduce作业的可视化查询与监控功能，包含页面渲染、REST接口实现
+ * 该包仅供Hadoop内部使用，不对外暴露公共API
  */
 @InterfaceAudience.Private
 package org.apache.hadoop.mapreduce.v2.hs.webapp;

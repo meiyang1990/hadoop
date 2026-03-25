@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,22 +43,32 @@ import static org.apache.hadoop.yarn.api.records.ResourceInformation.VCORES_URI;
 import static org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager.NO_LABEL;
 
 /**
- * Controls how capacity and resource values are set and calculated for a queue.
- * Effective minimum and maximum resource values are set for each label and resource separately.
+ * 容量调度队列容量处理器，负责计算和设置队列的实际容量与资源值。
+ * 按标签和资源类型分别计算队列有效最小/最大资源值。
  */
 public class CapacitySchedulerQueueCapacityHandler {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(CapacitySchedulerQueueCapacityHandler.class);
 
+  // 不同容量类型对应的计算器映射
   private final Map<ResourceUnitCapacityType, AbstractQueueCapacityCalculator>
       calculators;
+  // 根队列专用计算器
   private final AbstractQueueCapacityCalculator rootCalculator =
       new RootQueueCapacityCalculator();
+  // 节点标签管理器
   private final RMNodeLabelsManager labelsManager;
+  // 已定义资源名称列表，保证内存、vcore排在前面
   private final Collection<String> definedResources = new LinkedHashSet<>();
+  // 是否为传统队列配置模式
   private final boolean isLegacyQueueMode;
 
+  /**
+   * 构造容量处理器，初始化不同容量类型的计算器，加载资源类型。
+   * @param labelsManager 节点标签管理器
+   * @param configuration 容量调度配置
+   */
   public CapacitySchedulerQueueCapacityHandler(RMNodeLabelsManager labelsManager,
                                                CapacitySchedulerConfiguration configuration) {
     this.calculators = new HashMap<>();
@@ -75,12 +86,10 @@ public class CapacitySchedulerQueueCapacityHandler {
   }
 
   /**
-   * Updates the resource and metrics values of all children under a specific queue.
-   * These values are calculated at runtime.
-   *
-   * @param clusterResource resource of the cluster
-   * @param queue           parent queue whose children will be updated
-   * @return update context that contains information about the update phase
+   * 更新指定队列下所有子队列的资源和容量指标值，运行时动态计算。
+   * @param clusterResource 集群总资源
+   * @param queue 父队列，需要更新该队列的所有子队列
+   * @return 更新上下文，包含更新阶段相关信息
    */
   public QueueCapacityUpdateContext updateChildren(Resource clusterResource, CSQueue queue) {
     ResourceLimits resourceLimits = new ResourceLimits(clusterResource);
@@ -92,11 +101,10 @@ public class CapacitySchedulerQueueCapacityHandler {
   }
 
   /**
-   * Updates the resource and metrics value of the root queue. Root queue always has percentage
-   * capacity type and is assigned the cluster resource as its minimum and maximum effective
-   * resource.
-   * @param rootQueue root queue
-   * @param clusterResource cluster resource
+   * 更新根队列资源容量，根队列始终使用百分比容量类型，
+   * 将整个集群资源作为其有效最小和最大资源。
+   * @param rootQueue 根队列
+   * @param clusterResource 集群总资源
    */
   public void updateRoot(CSQueue rootQueue, Resource clusterResource) {
     ResourceLimits resourceLimits = new ResourceLimits(clusterResource);
@@ -111,6 +119,7 @@ public class CapacitySchedulerQueueCapacityHandler {
         resourceLimits);
   }
 
+  // 递归更新队列及其所有子队列资源容量
   private void update(
       CSQueue queue, QueueCapacityUpdateContext updateContext, ResourceLimits resourceLimits) {
     if (queue == null || CollectionUtils.isEmpty(queue.getChildQueues())) {
@@ -124,6 +133,7 @@ public class CapacitySchedulerQueueCapacityHandler {
     updateChildrenAfterCalculation(resourceCalculationDriver, resourceLimits);
   }
 
+  // 计算完成后遍历更新所有子队列容量和资源
   private void updateChildrenAfterCalculation(
       ResourceCalculationDriver resourceCalculationDriver, ResourceLimits resourceLimits) {
     AbstractParentQueue parentQueue = (AbstractParentQueue) resourceCalculationDriver.getQueue();
@@ -141,8 +151,9 @@ public class CapacitySchedulerQueueCapacityHandler {
   }
 
   /**
-   * Updates the capacity values of the currently evaluated child.
-   * @param queue queue on which the capacities are set
+   * 更新当前正在计算的子队列容量值，加写锁保证线程安全。
+   * @param resourceCalculationDriver 资源计算驱动器
+   * @param queue 需要更新容量的队列
    */
   private void updateQueueCapacities(
       ResourceCalculationDriver resourceCalculationDriver, CSQueue queue) {
@@ -150,11 +161,11 @@ public class CapacitySchedulerQueueCapacityHandler {
     try {
       for (String label : queue.getConfiguredNodeLabels()) {
         if (!isLegacyQueueMode) {
-          // Post update capacities based on the calculated effective resource values
+          // 根据计算出的有效资源值更新容量
           setQueueCapacities(resourceCalculationDriver.getUpdateContext().getUpdatedClusterResource(
               label), queue, label);
         } else {
-          // Update capacities according to the legacy logic
+          // 按传统逻辑更新容量
           for (ResourceUnitCapacityType capacityType :
               queue.getConfiguredCapacityVector(label).getDefinedCapacityTypes()) {
             AbstractQueueCapacityCalculator calculator = calculators.get(capacityType);
@@ -168,12 +179,10 @@ public class CapacitySchedulerQueueCapacityHandler {
   }
 
   /**
-   * Sets capacity and absolute capacity values of a queue based on minimum and
-   * maximum effective resources.
-   *
-   * @param clusterResource overall cluster resource
-   * @param queue child queue for which the capacities are set
-   * @param label node label
+   * 根据计算得到的有效最小/最大资源，设置队列容量和绝对容量值。
+   * @param clusterResource 集群总资源
+   * @param queue 需要设置容量的子队列
+   * @param label 节点标签
    */
   public static void setQueueCapacities(Resource clusterResource, CSQueue queue, String label) {
     if (!(queue instanceof AbstractCSQueue)) {
@@ -181,7 +190,7 @@ public class CapacitySchedulerQueueCapacityHandler {
     }
 
     AbstractCSQueue csQueue = (AbstractCSQueue) queue;
-    // Do not override reservations when there are no cluster resources yet
+    // 集群资源还未初始化时不覆盖预留资源
     if ((csQueue instanceof ReservationQueue ||
         csQueue instanceof PlanQueue) &&
         Stream.of(clusterResource.getResources())
@@ -196,18 +205,16 @@ public class CapacitySchedulerQueueCapacityHandler {
     if (parent == null) {
       return;
     }
-    // Update capacity with a double calculated from the parent's minResources
-    // and the recently changed queue minResources.
-    // capacity = effectiveMinResource / {parent's effectiveMinResource}
+    // 根据父队列最小资源和当前队列最小资源计算容量占比
+    // capacity = 当前队列有效最小资源 / 父队列有效最小资源
     float result = resourceCalculator.divide(clusterResource,
         queue.getQueueResourceQuotas().getEffectiveMinResource(label),
         parent.getQueueResourceQuotas().getEffectiveMinResource(label));
     queue.getQueueCapacities().setCapacity(label,
         Float.isInfinite(result) ? 0 : result);
 
-    // Update maxCapacity with a double calculated from the parent's maxResources
-    // and the recently changed queue maxResources.
-    // maxCapacity = effectiveMaxResource / parent's effectiveMaxResource
+    // 根据父队列最大资源和当前队列最大资源计算最大容量占比
+    // maxCapacity = 当前队列有效最大资源 / 父队列有效最大资源
     result = resourceCalculator.divide(clusterResource,
         queue.getQueueResourceQuotas().getEffectiveMaxResource(label),
         parent.getQueueResourceQuotas().getEffectiveMaxResource(label));
@@ -217,6 +224,7 @@ public class CapacitySchedulerQueueCapacityHandler {
     csQueue.updateAbsoluteCapacities();
   }
 
+  // 加载所有资源类型名称，将内存、vcore排在最前面保证顺序
   private void loadResourceNames() {
     Set<String> resources = new HashSet<>(ResourceUtils.getResourceTypes().keySet());
     if (resources.contains(MEMORY_URI)) {

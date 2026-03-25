@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,11 +21,17 @@ package org.apache.hadoop.hdfs.qjournal.server;
 import java.io.IOException;
 
 /**
- * Exception when no edits are available.
+ * QJournal中当请求的最新事务ID比日志中已有的事务ID更新时抛出的异常。
+ * 用于标识当前日志节点没有足够新的事务数据满足请求。
  */
 public class NewerTxnIdException extends IOException {
   private static final long serialVersionUID = 0L;
 
+  /**
+   * 构造带格式化消息的异常实例。
+   * @param msgFormat 消息格式化字符串
+   * @param msgArgs 格式化参数
+   */
   public NewerTxnIdException(String msgFormat, Object... msgArgs) {
     super(String.format(msgFormat, msgArgs));
   }

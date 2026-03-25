@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,11 +33,18 @@ import org.apache.hadoop.log.LogThrottlingHelper;
 import org.apache.hadoop.log.LogThrottlingHelper.LogAction;
 
 /**
+ * 文件说明: HDFS NameNode 冗余编辑日志合并输入流，支持在多个冗余编辑日志流之间进行故障转移，
+ * 当当前读取的编辑日志流出现错误时，自动切换到下一个冗余流继续读取，保证编辑日志读取的可靠性。
+ * 主要用于支持日志的多副本冗余，在JournalNode集群等多日志副本场景下，实现高可用的日志读取。
+ *
  * A merged input stream that handles failover between different edit logs.
  *
  * We will currently try each edit log stream exactly once.  In other words, we
  * don't handle the "ping pong" scenario where different edit logs contain a
  * different subset of the available edits.
+ */
+/**
+ * 冗余编辑日志输入流，整合多个相同起始事务ID的冗余日志流，支持故障切换继续读取
  */
 class RedundantEditLogInputStream extends EditLogInputStream {
   public static final Logger LOG = LoggerFactory.getLogger(
@@ -47,6 +55,7 @@ class RedundantEditLogInputStream extends EditLogInputStream {
 
   /** Limit logging about fast forwarding the stream to every 5 seconds max. */
   private static final long FAST_FORWARD_LOGGING_INTERVAL_MS = 5000;
+  // 限流日志帮助类，限制快进日志的打印频率，最多每5秒打印一次
   private static final LogThrottlingHelper FAST_FORWARD_LOGGING_HELPER =
       new LogThrottlingHelper(FAST_FORWARD_LOGGING_INTERVAL_MS);
 
@@ -76,23 +85,30 @@ class RedundantEditLogInputStream extends EditLogInputStream {
    *                  +--------------------+
    * </pre>
    */
+  /**
+   * 流状态枚举，定义冗余输入流的所有可能状态和状态转换关系
+   */
   static private enum State {
-    /** We need to skip until prevTxId + 1 */
+    /** 需要跳转到 prevTxId + 1 事务位置 */
     SKIP_UNTIL,
-    /** We're ready to read opcodes out of the current stream */
+    /** 已就绪，可以从当前流读取操作码 */
     OK,
-    /** The current stream has failed. */
+    /** 当前流读取失败，等待切换 */
     STREAM_FAILED,
-    /** The current stream has failed, and resync() was called.  */
+    /** 当前流失败，已经调用过resync()尝试恢复 */
     STREAM_FAILED_RESYNC,
-    /** There are no more opcodes to read from this
-     * RedundantEditLogInputStream */
+    /** 已经没有更多操作码可读取，到达流末尾 */
     EOF;
   }
 
   private State state;
   private IOException prevException;
 
+  /**
+   * 构造冗余编辑日志输入流，校验输入流合法性并按结束事务ID排序
+   * @param streams 多个冗余编辑日志输入流集合，所有流必须有相同的起始事务ID
+   * @param startTxId 开始读取的起始事务ID
+   */
   RedundantEditLogInputStream(Collection<EditLogInputStream> streams,
       long startTxId) {
     this.curIdx = 0;
@@ -103,6 +119,7 @@ class RedundantEditLogInputStream extends EditLogInputStream {
     // EditLogInputStreams in a RedundantEditLogInputStream must be finalized,
     // and can't be pre-transactional.
     EditLogInputStream first = null;
+    // 校验所有输入流，确保所有流起始事务ID一致
     for (EditLogInputStream s : streams) {
       Preconditions.checkArgument(s.getFirstTxId() !=
           HdfsServerConstants.INVALID_TXID, "invalid first txid in stream: %s", s);
@@ -121,7 +138,7 @@ class RedundantEditLogInputStream extends EditLogInputStream {
 
     this.streams = streams.toArray(new EditLogInputStream[0]);
 
-    // We sort the streams here so that the streams that end later come first.
+    // 按结束事务ID从大到小排序，优先使用更长的流，保证能读到更多事务
     Arrays.sort(this.streams, new Comparator<EditLogInputStream>() {
       @Override
       public int compare(EditLogInputStream a, EditLogInputStream b) {
@@ -182,48 +199,60 @@ class RedundantEditLogInputStream extends EditLogInputStream {
       case SKIP_UNTIL:
        try {
           if (prevTxId != HdfsServerConstants.INVALID_TXID) {
+            // 记录日志，按限流规则判断是否需要打印
             LogAction logAction = FAST_FORWARD_LOGGING_HELPER.record();
             if (logAction.shouldLog()) {
               LOG.info("Fast-forwarding stream '" + streams[curIdx].getName() +
                   "' to transaction ID " + (prevTxId + 1) +
                   LogThrottlingHelper.getLogSupressionMessage(logAction));
             }
+            // 跳转到目标事务位置
             streams[curIdx].skipUntil(prevTxId + 1);
           }
         } catch (IOException e) {
+          // 跳转失败，标记当前流为失败
           prevException = e;
           state = State.STREAM_FAILED;
           LOG.warn("Got error skipUntil edit log input stream {}.", streams[curIdx].getName());
           break;
         }
+        // 跳转成功，切换到就绪状态
         state = State.OK;
         break;
       case OK:
         try {
+          // 从当前流读取下一个编辑操作
           FSEditLogOp op = streams[curIdx].readOp();
           if (op == null) {
+            // 到达流末尾
             state = State.EOF;
+            // 如果已经读到期望的最后事务，返回空表示读取完成
             if (streams[curIdx].getLastTxId() == prevTxId) {
               return null;
             } else {
+              // 未到期望结束位置就提前结束，抛出提前EOF异常
               throw new PrematureEOFException("got premature end-of-file " +
                   "at txid " + prevTxId + "; expected file to go up to " +
                   streams[curIdx].getLastTxId());
             }
           }
+          // 更新上一个读到的事务ID
           prevTxId = op.getTransactionId();
           return op;
         } catch (IOException e) {
+          // 读取异常，标记当前流为失败
           prevException = e;
           state = State.STREAM_FAILED;
         }
         break;
       case STREAM_FAILED:
+        // 已经没有更多流可用，抛出之前保存的异常
         if (curIdx + 1 == streams.length) {
           throw prevException;
         }
         long oldLast = streams[curIdx].getLastTxId();
         long newLast = streams[curIdx + 1].getLastTxId();
+        // 检查下一个流是否比当前流更短，如果更短则意味着会丢失元数据，直接抛出异常
         if (newLast < oldLast) {
           throw new IOException("We encountered an error reading " +
               streams[curIdx].getName() + ".  During automatic edit log " +
@@ -237,11 +266,13 @@ class RedundantEditLogInputStream extends EditLogInputStream {
         LOG.error("Got error reading edit log input stream " +
           streams[curIdx].getName() + "; failing over to edit log " +
           streams[curIdx + 1].getName(), prevException);
+        // 切换到下一个流，进入跳转状态
         curIdx++;
         state = State.SKIP_UNTIL;
         break;
       case STREAM_FAILED_RESYNC:
         if (curIdx + 1 == streams.length) {
+          // 已经是最后一个流，如果是提前EOF则直接结束，否则尝试重新同步
           if (prevException instanceof PrematureEOFException) {
             // bypass early EOF check
             state = State.EOF;
@@ -250,6 +281,7 @@ class RedundantEditLogInputStream extends EditLogInputStream {
             state = State.SKIP_UNTIL;
           }
         } else {
+          // 还有剩余流，直接切换到下一个
           LOG.error("failing over to edit log " +
               streams[curIdx + 1].getName());
           curIdx++;
@@ -257,6 +289,7 @@ class RedundantEditLogInputStream extends EditLogInputStream {
         }
         break;
       case EOF:
+        // 已经到达末尾，返回null
         return null;
       }
     }
@@ -282,6 +315,9 @@ class RedundantEditLogInputStream extends EditLogInputStream {
     return streams[curIdx].isInProgress();
   }
 
+  /**
+   * 提前EOF异常，当编辑日志流未到达预期的最后事务ID就提前结束时抛出
+   */
   static private final class PrematureEOFException extends IOException {
     private static final long serialVersionUID = 1L;
     PrematureEOFException(String msg) {

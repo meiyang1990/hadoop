@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,32 +35,48 @@ import org.apache.hadoop.mapreduce.RecordReader;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
- * An {@link InputFormat} for plain text files. Files are broken into lines.
- * Either line feed or carriage-return are used to signal end of line. 
- * Each line is divided into key and value parts by a separator byte. If no
- * such a byte exists, the key will be the entire line and value will be empty.
- * The separator byte can be specified in config file under the attribute name
- * mapreduce.input.keyvaluelinerecordreader.key.value.separator. The default
- * is the tab character ('\t').
+ * 键值对文本输入格式，用于处理纯文本键值对文件。
+ * 将文件按行分割，每行通过指定分隔符分割为键和值两部分，默认分隔符为制表符('\t')。
+ * 如果行中不存在分隔符，则整行作为键，值为空字符串。
+ * 分隔符可通过配置参数 mapreduce.input.keyvaluelinerecordreader.key.value.separator 指定。
+ * 继承自FileInputFormat，用于文本类型的MapReduce输入处理。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class KeyValueTextInputFormat extends FileInputFormat<Text, Text> {
 
+  /**
+   * 判断输入文件是否可分割，仅支持可分割压缩格式或未压缩文件进行分片。
+   * @param context 作业上下文
+   * @param file 待检查的输入文件路径
+   * @return 如果文件可分割返回true，否则返回false
+   */
   @Override
   protected boolean isSplitable(JobContext context, Path file) {
+    // 根据文件获取对应的压缩编解码器
     final CompressionCodec codec =
       new CompressionCodecFactory(context.getConfiguration()).getCodec(file);
+    // 未压缩文件可分割
     if (null == codec) {
       return true;
     }
+    // 仅支持可分割压缩编解码器分割文件
     return codec instanceof SplittableCompressionCodec;
   }
 
+  /**
+   * 创建键值对行记录读取器，用于从输入分片中读取键值对记录。
+   * @param genericSplit 输入分片
+   * @param context 任务尝试上下文
+   * @return 键值对行记录读取器实例
+   * @throws IOException 创建读取器时IO异常
+   */
   public RecordReader<Text, Text> createRecordReader(InputSplit genericSplit,
       TaskAttemptContext context) throws IOException {
     
+    // 更新任务状态，标记当前处理的分片
     context.setStatus(genericSplit.toString());
+    // 根据任务配置创建键值对行记录读取器
     return new KeyValueLineRecordReader(context.getConfiguration());
   }
 

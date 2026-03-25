@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -27,8 +28,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Provides CGroups functionality. Implementations are expected to be
- * thread-safe
+ * Linux Cgroups 控制接口，提供Cgroups操作的统一抽象，所有实现必须保证线程安全
+ * 用于YARN NodeManager对容器进行Linux内核Cgroups资源隔离
  */
 
 @InterfaceAudience.Private
@@ -36,8 +37,7 @@ import java.util.Set;
 public interface CGroupsHandler {
 
   /**
-   * List of supported cgroup controller types. The two boolean variables denote whether
-   * the controller is valid in v1, v2 or both.
+   * 支持的Cgroup控制器类型枚举，两个标识分别表示该控制器是否在v1/v2版本中有效
    */
   enum CGroupController {
     NET_CLS("net_cls", true, false),
@@ -77,8 +77,8 @@ public interface CGroupsHandler {
     }
 
     /**
-     * Returns a set of valid cgroup controller names for v1.
-     * @return a set of valid cgroup controller names for v1.
+     * 获取所有对cgroup v1有效的控制器名称集合
+     * @return v1版本有效的控制器名称集合
      */
     public static Set<String> getValidV1CGroups() {
       HashSet<String> validCgroups = new HashSet<>();
@@ -91,8 +91,8 @@ public interface CGroupsHandler {
     }
 
     /**
-     * Returns a set of valid cgroup controller names for v2.
-     * @return a set of valid cgroup controller names for v2.
+     * 获取所有对cgroup v2有效的控制器名称集合
+     * @return v2版本有效的控制器名称集合
      */
     public static Set<String> getValidV2CGroups() {
       HashSet<String> validCgroups = new HashSet<>();
@@ -105,7 +105,7 @@ public interface CGroupsHandler {
     }
   }
 
-  // v1 specific params
+  // Cgroup v1 特定参数名称
   String CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES = "limit_in_bytes";
   String CGROUP_PARAM_MEMORY_SWAP_HARD_LIMIT_BYTES = "memsw.limit_in_bytes";
   String CGROUP_PARAM_MEMORY_SOFT_LIMIT_BYTES = "soft_limit_in_bytes";
@@ -119,130 +119,124 @@ public interface CGroupsHandler {
   String CGROUP_CPU_QUOTA_US = "cfs_quota_us";
   String CGROUP_CPU_SHARES = "shares";
 
-  // v2 specific params
+  // Cgroup v2 特定参数名称
   String CGROUP_CONTROLLERS_FILE = "cgroup.controllers";
   String CGROUP_SUBTREE_CONTROL_FILE = "cgroup.subtree_control";
   String CGROUP_CPU_MAX = "max";
   String CGROUP_MEMORY_MAX = "max";
   String CGROUP_MEMORY_LOW = "low";
 
-  // present in v1 and v2
+  // Cgroup v1 和 v2 通用参数名称
   String CGROUP_PROCS_FILE = "cgroup.procs";
   String CGROUP_PARAM_CLASSID = "classid";
   String CGROUP_PARAM_WEIGHT = "weight";
 
   /**
-   * Mounts or initializes a cgroup controller.
-   * @param controller - the controller being initialized
-   * @throws ResourceHandlerException the initialization failed due to the
-   * environment
+   * 挂载并初始化指定的cgroup控制器
+   * @param controller 要初始化的控制器
+   * @throws ResourceHandlerException 环境异常导致初始化失败
    */
   void initializeCGroupController(CGroupController controller)
       throws ResourceHandlerException;
 
   /**
-   * Creates a cgroup for a given controller.
-   * @param controller - controller type for which the cgroup is being created
-   * @param cGroupId - id of the cgroup being created
-   * @return full path to created cgroup
-   * @throws ResourceHandlerException creation failed
+   * 为指定控制器创建一个新的cgroup
+   * @param controller 创建cgroup所用的控制器类型
+   * @param cGroupId 要创建的cgroup ID
+   * @return 创建好的cgroup的完整路径
+   * @throws ResourceHandlerException 创建失败
    */
   String createCGroup(CGroupController controller, String cGroupId)
       throws ResourceHandlerException;
 
   /**
-   * Deletes the specified cgroup.
-   * @param controller - controller type for the cgroup
-   * @param cGroupId - id of the cgroup being deleted
-   * @throws ResourceHandlerException deletion failed
+   * 删除指定的cgroup
+   * @param controller cgroup所属控制器类型
+   * @param cGroupId 要删除的cgroup ID
+   * @throws ResourceHandlerException 删除失败
    */
   void deleteCGroup(CGroupController controller, String cGroupId) throws
       ResourceHandlerException;
 
   /**
-   * Gets the absolute path to the specified cgroup controller.
-   * @param controller - controller type for the cgroup
-   * @return the root of the controller.
+   * 获取指定控制器的根路径
+   * @param controller 控制器类型
+   * @return 控制器根路径
    */
   String getControllerPath(CGroupController controller);
 
   /**
-   * Gets the valid cgroup controller names based on the version used.
-   * @return a set containing the valid controller names for the used cgroup version.
+   * 根据当前使用的cgroup版本，获取所有有效的控制器名称集合
+   * @return 当前版本有效的控制器名称集合
    */
   Set<String> getValidCGroups();
 
   /**
-   * Gets the relative path for the cgroup, independent of a controller, for a
-   * given cgroup id.
-   * @param cGroupId - id of the cgroup
-   * @return path for the cgroup relative to the root of (any) controller.
+   * 根据cgroup ID获取相对于控制器根路径的相对路径
+   * @param cGroupId cgroup ID
+   * @return 相对于任意控制器根的相对路径
    */
   String getRelativePathForCGroup(String cGroupId);
 
   /**
-   * Gets the full path for the cgroup, given a controller and a cgroup id.
-   * @param controller - controller type for the cgroup
-   * @param cGroupId - id of the cgroup
-   * @return full path for the cgroup
+   * 根据控制器和cgroup ID获取cgroup的完整路径
+   * @param controller cgroup所属控制器类型
+   * @param cGroupId cgroup ID
+   * @return cgroup完整路径
    */
   String getPathForCGroup(CGroupController controller, String
       cGroupId);
 
   /**
-   * Gets the full path for the cgroup's tasks file, given a controller and a
-   * cgroup id.
-   * @param controller - controller type for the cgroup
-   * @param cGroupId - id of the cgroup
-   * @return full path for the cgroup's tasks file
+   * 根据控制器和cgroup ID获取cgroup进程文件的完整路径
+   * @param controller cgroup所属控制器类型
+   * @param cGroupId cgroup ID
+   * @return cgroup进程文件完整路径
    */
   String getPathForCGroupTasks(CGroupController controller, String
       cGroupId);
 
   /**
-   * Gets the full path for a cgroup parameter, given a controller,
-   * cgroup id and parameter name.
-   * @param controller - controller type for the cgroup
-   * @param cGroupId - id of the cgroup
-   * @param param - cgroup parameter ( e.g classid )
-   * @return full path for the cgroup parameter
+   * 根据控制器、cgroup ID和参数名称获取参数文件的完整路径
+   * @param controller cgroup所属控制器类型
+   * @param cGroupId cgroup ID
+   * @param param cgroup参数名称，例如classid
+   * @return cgroup参数文件完整路径
    */
   String getPathForCGroupParam(CGroupController controller, String
       cGroupId, String param);
 
   /**
-   * updates a cgroup parameter, given a controller, cgroup id, parameter name.
-   * and a parameter value
-   * @param controller - controller type for the cgroup
-   * @param cGroupId - id of the cgroup
-   * @param param - cgroup parameter ( e.g classid )
-   * @param value - value to be written to the parameter file
-   * @throws ResourceHandlerException the operation failed
+   * 更新cgroup参数值
+   * @param controller cgroup所属控制器类型
+   * @param cGroupId cgroup ID
+   * @param param cgroup参数名称，例如classid
+   * @param value 要写入参数文件的值
+   * @throws ResourceHandlerException 操作失败
    */
   void updateCGroupParam(CGroupController controller, String cGroupId,
       String param, String value) throws ResourceHandlerException;
 
   /**
-   * reads a cgroup parameter value, given a controller, cgroup id, parameter.
-   * name
-   * @param controller - controller type for the cgroup
-   * @param cGroupId - id of the cgroup
-   * @param param - cgroup parameter ( e.g classid )
-   * @return parameter value as read from the parameter file
-   * @throws ResourceHandlerException the operation failed
+   * 读取cgroup参数值
+   * @param controller cgroup所属控制器类型
+   * @param cGroupId cgroup ID
+   * @param param cgroup参数名称，例如classid
+   * @return 从参数文件读取到的参数值
+   * @throws ResourceHandlerException 操作失败
    */
   String getCGroupParam(CGroupController controller, String cGroupId,
       String param) throws ResourceHandlerException;
 
   /**
-   * Returns CGroup Mount Path.
-   * @return parameter value as read from the parameter file
+   * 获取Cgroup根挂载路径
+   * @return Cgroup根挂载路径
    */
   String getCGroupMountPath();
 
   /**
-   * Returns CGroupV2 Mount Path.
-   * @return parameter value as read from the parameter file
+   * 获取Cgroup v2根挂载路径
+   * @return Cgroup v2根挂载路径
    */
   String getCGroupV2MountPath();
 }

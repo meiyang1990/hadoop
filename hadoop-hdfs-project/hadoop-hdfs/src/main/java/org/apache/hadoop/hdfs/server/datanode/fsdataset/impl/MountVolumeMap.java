@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,12 +28,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * MountVolumeMap contains information of the relationship
- * between underlying filesystem mount and datanode volumes.
+ * 文件级注释：底层文件系统挂载点与DataNode卷的映射关系管理类，用于支持同一磁盘挂载点下多存储类型卷的分层存储配置。
  *
- * This is useful when configuring block tiering on same disk mount
- * (HDFS-15548). For now,
- * we don't configure multiple volumes with same storage type on one mount.
+ * 类级注释：维护底层文件系统挂载点与DataNode卷之间的关系，支持同一磁盘挂载点上配置多个不同存储类型的卷，实现块分层存储。
+ * 当前设计不支持同一挂载点上配置多个相同存储类型的卷。
  */
 @InterfaceAudience.Private
 public class MountVolumeMap {
@@ -40,11 +39,21 @@ public class MountVolumeMap {
       mountVolumeMapping;
   private final Configuration conf;
 
+  /**
+   * 构造函数：初始化挂载点卷映射表
+   * @param conf Hadoop配置对象
+   */
   MountVolumeMap(Configuration conf) {
     mountVolumeMapping = new ConcurrentHashMap<>();
     this.conf = conf;
   }
 
+  /**
+   * 根据挂载点和存储类型获取对应卷的引用
+   * @param mount 挂载点路径
+   * @param storageType 存储类型
+   * @return 对应卷的引用，不存在则返回null
+   */
   FsVolumeReference getVolumeRefByMountAndStorageType(String mount,
       StorageType storageType) {
     if (mountVolumeMapping.containsKey(mount)) {
@@ -57,6 +66,10 @@ public class MountVolumeMap {
   /**
    * Return capacity ratio.
    * If not exists, return 1 to use full capacity.
+   * 根据挂载点和存储类型获取容量占比，如果不存在则返回1表示使用全部容量
+   * @param mount 挂载点路径
+   * @param storageType 存储类型
+   * @return 容量占比，不存在则返回1
    */
   double getCapacityRatioByMountAndStorageType(String mount,
       StorageType storageType) {
@@ -66,6 +79,10 @@ public class MountVolumeMap {
     return 1;
   }
 
+  /**
+   * 向映射表中添加一个卷
+   * @param volume 要添加的DataNode卷对象
+   */
   void addVolume(FsVolumeImpl volume) {
     String mount = volume.getMount();
     if (!mount.isEmpty()) {
@@ -80,17 +97,28 @@ public class MountVolumeMap {
     }
   }
 
+  /**
+   * 从映射表中移除指定卷
+   * @param target 要移除的目标卷
+   */
   void removeVolume(FsVolumeImpl target) {
     String mount = target.getMount();
     if (!mount.isEmpty()) {
       MountVolumeInfo info = mountVolumeMapping.get(mount);
       info.removeVolume(target);
       if (info.size() == 0) {
+        // 挂载点下没有卷时，移除该挂载点
         mountVolumeMapping.remove(mount);
       }
     }
   }
 
+  /**
+   * 设置指定卷的容量占比，同一挂载点下所有卷的容量占比总和不能超过1
+   * @param target 目标卷
+   * @param capacityRatio 要设置的容量占比
+   * @throws IOException 容量占比总和超过1时抛出异常
+   */
   void setCapacityRatio(FsVolumeImpl target, double capacityRatio)
       throws IOException {
     String mount = target.getMount();
@@ -107,6 +135,11 @@ public class MountVolumeMap {
     }
   }
 
+  /**
+   * 检查映射表中是否存在指定挂载点
+   * @param mount 挂载点路径
+   * @return 存在返回true，否则返回false
+   */
   public boolean hasMount(String mount) {
     return mountVolumeMapping.containsKey(mount);
   }

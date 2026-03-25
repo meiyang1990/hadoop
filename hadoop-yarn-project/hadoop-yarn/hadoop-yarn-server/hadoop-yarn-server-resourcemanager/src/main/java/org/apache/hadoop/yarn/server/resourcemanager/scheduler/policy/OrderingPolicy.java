@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,9 +24,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
 
 /**
- * OrderingPolicy is used by the scheduler to order SchedulableEntities for
- * container assignment and preemption.
- * @param <S> the type of {@link SchedulableEntity} that will be compared
+ * 文件说明：YARN资源调度器可调度实体排序策略接口
+ * 
+ * OrderingPolicy 被调度器用于对可调度实体进行排序，用于容器分配和抢占流程
+ * @param <S> 参与比较的{@link SchedulableEntity}子类型
  */
 public interface OrderingPolicy<S extends SchedulableEntity> {
   /*
@@ -35,103 +37,84 @@ public interface OrderingPolicy<S extends SchedulableEntity> {
    */
 
   /**
-   * Get the collection of {@link SchedulableEntity} Objects which are managed
-   * by this OrderingPolicy - should include processes returned by the
-   * Assignment and Preemption iterator with no guarantees regarding order.
-   * @return a collection of {@link SchedulableEntity} objects
+   * 获取该排序策略管理的所有可调度实体集合，不保证顺序
+   * @return 可调度实体集合
    */
   public Collection<S> getSchedulableEntities();
 
   /**
-   * Return an iterator over the collection of {@link SchedulableEntity}
-   * objects which orders them for container assignment.
-   * @param sel the {@link IteratorSelector} to filter with
-   * @return an iterator over the collection of {@link SchedulableEntity}
-   * objects
+   * 获取用于容器分配的可调度实体迭代器，已按排序策略排序
+   * @param sel 迭代器过滤器，用于过滤符合条件的实体
+   * @return 排序后的可调度实体迭代器
    */
   Iterator<S> getAssignmentIterator(IteratorSelector sel);
 
   /**
-   * Return an iterator over the collection of {@link SchedulableEntity}
-   * objects which orders them for preemption.
-   * @return an iterator over the collection of {@link SchedulableEntity}
+   * 获取用于抢占的可调度实体迭代器，已按排序策略排序
+   * @return 排序后的可调度实体迭代器
    */
   public Iterator<S> getPreemptionIterator();
 
   /**
-   * Add a {@link SchedulableEntity} to be managed for allocation and preemption
-   * ordering.
-   * @param s the {@link SchedulableEntity} to add
+   * 添加一个可调度实体到排序策略中进行管理，用于分配和抢占排序
+   * @param s 要添加的可调度实体
    */
   public void addSchedulableEntity(S s);
 
   /**
-   * Remove a {@link SchedulableEntity} from management for allocation and
-   * preemption ordering.
-   * @param s the {@link SchedulableEntity} to remove
-   * @return whether the {@link SchedulableEntity} was present before this
-   * operation
+   * 从排序策略中移除一个可调度实体，不再参与分配和抢占排序
+   * @param s 要移除的可调度实体
+   * @return 该实体本次移除前是否存在于集合中
    */
   public boolean removeSchedulableEntity(S s);
 
   /**
-   * Add a collection of {@link SchedulableEntity} objects to be managed for
-   * allocation and preemption ordering.
-   * @param sc the collection of {@link SchedulableEntity} objects to add
+   * 批量添加一批可调度实体到排序策略中进行管理
+   * @param sc 要添加的可调度实体集合
    */
   public void addAllSchedulableEntities(Collection<S> sc);
 
   /**
-   * Get the number of {@link SchedulableEntity} objects managed for allocation
-   * and preemption ordering.
-   * @return the number of {@link SchedulableEntity} objects
+   * 获取当前排序策略管理的可调度实体总数
+   * @return 可调度实体数量
    */
   public int getNumSchedulableEntities();
 
   /**
-   * Provides configuration information for the policy from the scheduler
-   * configuration.
-   * @param conf a map of scheduler configuration properties and values
+   * 从调度器配置中加载策略配置
+   * @param conf 调度器配置键值对
    */
   public void configure(Map<String, String> conf);
 
   /**
-   * Notify the {@code OrderingPolicy} that the {@link SchedulableEntity}
-   * has been allocated the given {@link RMContainer}, enabling the
-   * {@code OrderingPolicy} to take appropriate action. Depending on the
-   * comparator, a reordering of the {@link SchedulableEntity} may be required.
-   * @param schedulableEntity the {@link SchedulableEntity}
-   * @param r the allocated {@link RMContainer}
+   * 通知排序策略：可调度实体分配到了新容器，部分排序策略需要根据此信息重新排序
+   * @param schedulableEntity 分配到容器的可调度实体
+   * @param r 分配得到的RMContainer
    */
   public void containerAllocated(S schedulableEntity, RMContainer r);
 
   /**
-   * Notify the {@code OrderingPolicy} that the {@link SchedulableEntity}
-   * has released the given {@link RMContainer}, enabling the
-   * {@code OrderingPolicy} to take appropriate action. Depending on the
-   * comparator, a reordering of the {@link SchedulableEntity} may be required.
-   * @param schedulableEntity the {@link SchedulableEntity}
-   * @param r the released {@link RMContainer}
+   * 通知排序策略：可调度实体释放了一个容器，部分排序策略需要根据此信息重新排序
+   * @param schedulableEntity 释放容器的可调度实体
+   * @param r 释放的RMContainer
    */
   public void containerReleased(S schedulableEntity, RMContainer r);
 
   /**
-   * Notify the {@code OrderingPolicy} that the demand for the
-   * {@link SchedulableEntity} has been updated, enabling the
-   * {@code OrderingPolicy} to reorder the {@link SchedulableEntity} if needed.
-   * @param schedulableEntity the updated {@link SchedulableEntity}
+   * 通知排序策略：可调度实体的资源需求已更新，允许排序策略按需重新排序
+   * @param schedulableEntity 需求更新后的可调度实体
    */
   void demandUpdated(S schedulableEntity);
 
   /**
-   * Return information regarding configuration and status.
-   * @return configuration and status information
+   * 获取排序策略的配置与状态信息
+   * @return 配置状态信息字符串
    */
   public String getInfo();
 
   /**
-   * Return configuration name (which will be used to set ordering policy).
-   * @return configuration name
+   * 获取排序策略配置名称，用于在配置中指定该排序策略
+   * @return 排序策略配置名称
    */
   String getConfigName();
 

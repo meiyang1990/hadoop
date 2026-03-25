@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,22 +43,13 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSnapshot;
 import org.apache.hadoop.util.JsonSerialization;
 
 /**
- * This is the manifest of files which were created by
- * this task attempt.
- *
- * Versioning:
- * In a rolling cluster update, MR or Spark workers deployed on a newer
- * node (and/or with a newer version of artifacts in a cluster-FS hosted
- * tar.gz file) may be a later version of this class than that of
- * job committer.
- * If any changes are made to the manifest which are backwards compatible,
- * this new manifest can still be loaded from JSON and processed.
- *
- * If the manifest is no longer compatible, the job output may
- * be invalid.
- *
- * It is CRITICAL that the {@link #VERSION} constant is updated whenever
- * such an incompatible change is made.
+ * Task任务尝试生成的输出文件清单，记录该任务尝试产生的所有待提交文件和需要创建的目录信息。
+ * 用于基于清单的输出提交器流程，在作业提交阶段统一处理所有任务输出。
+ * 
+ * 版本兼容说明：
+ * 集群滚动升级时，新版本节点生成的清单需要被旧版本作业提交器处理，
+ * 向后兼容的修改可以直接保留JSON反序列化能力；不兼容修改必须更新VERSION常量，
+ * 避免加载错误格式的清单导致作业失败。
  */
 @SuppressWarnings("unused")
 @InterfaceAudience.Private
@@ -66,14 +58,12 @@ import org.apache.hadoop.util.JsonSerialization;
 public class TaskManifest extends AbstractManifestData<TaskManifest> {
 
   /**
-   * Supported version value: {@value}.
-   * If this is changed the value of {@code serialVersionUID} will change,
-   * to avoid deserialization problems.
+   * 当前清单格式版本，不兼容修改时必须更新。
    */
   public static final int VERSION = 1;
 
   /**
-   * Manifest type.
+   * 清单类型标识，包含完整类名和版本号，用于反序列化时校验。
    */
   public static final String TYPE =
       "org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.TaskManifest/"
@@ -83,80 +73,77 @@ public class TaskManifest extends AbstractManifestData<TaskManifest> {
       LoggerFactory.getLogger(TaskManifest.class);
 
   /**
-   * Serialization version.
+   * 序列化版本ID，随版本变化更新。
    */
   private static final long serialVersionUID = 7090285511966046094L + VERSION;
 
   /**
-   * Manifest type.
+   * 清单类型，用于反序列化校验。
    */
   @JsonProperty("type")
   private String type = TYPE;
 
-  /** Version marker. */
+  /**
+   * 版本标记，用于反序列化兼容校验。
+   */
   @JsonProperty("version")
   private int version = VERSION;
 
   /**
-   * Job ID; constant over multiple attempts.
+   * 作业ID，同一次作业的所有任务尝试共享该ID。
    */
   @JsonProperty("jobId")
   private String jobId;
 
   /**
-   * Number of the job attempt; starts at zero.
+   * 作业尝试编号，从0开始计数。
    */
   @JsonProperty("jobAttemptNumber")
   private int jobAttemptNumber;
 
   /**
-   * Task Attempt ID.
+   * 任务ID。
    */
   @JsonProperty("taskID")
   private String taskID;
 
   /**
-   * Task Attempt ID.
+   * 任务尝试ID。
    */
   @JsonProperty("taskAttemptID")
   private String taskAttemptID;
 
   /**
-   * The task attempt directory.
+   * 任务尝试的工作目录路径。
    */
   @JsonProperty("taskAttemptDir")
   private String taskAttemptDir;
 
   /**
-   * The list of files to commit from this task attempt, including
-   * precalculated destination and size.
+   * 待提交文件列表，每个条目包含源路径、目标路径、文件大小等信息。
    */
   @JsonProperty("files")
   private final List<FileEntry> filesToCommit = new ArrayList<>();
 
   /**
-   * The list of directories needed by this task attempt, both
-   * source and destination.
-   * All these directories must exist in the destination before any of
-   * the files can be renamed there.
+   * 需要在输出路径创建的目录列表，所有目录必须在文件提交前创建完成。
    */
   @JsonProperty("directories")
   private final List<DirEntry> destDirectories = new ArrayList<>();
 
   /**
-   * Any custom extra data committers may choose to add.
+   * 提交器可扩展自定义数据的预留字段。
    */
   private final Map<String, String> extraData = new HashMap<>(0);
 
   /**
-   * IOStatistics.
+   * IO操作统计信息快照。
    */
   @JsonProperty("iostatistics")
   private IOStatisticsSnapshot iostatistics = new IOStatisticsSnapshot();
 
   /**
-   * Empty constructor; will be used by jackson as well as in application
-   * code.
+   * 空构造函数，供Jackson反序列化和业务代码调用。
    */
   public TaskManifest() {
   }
@@ -228,8 +215,8 @@ public class TaskManifest extends AbstractManifestData<TaskManifest> {
   }
 
   /**
-   * Add a file to the list of files to commit.
-   * @param entry entry  to add
+   * 添加一个待提交文件到清单。
+   * @param entry 待添加的文件条目
    */
   public void addFileToCommit(FileEntry entry) {
     filesToCommit.add(entry);
@@ -240,8 +227,8 @@ public class TaskManifest extends AbstractManifestData<TaskManifest> {
   }
 
   /**
-   * Calculate the total amount of data which will be committed.
-   * @return the sum of sizes of all files to commit.
+   * 计算所有待提交文件的总大小。
+   * @return 总字节数
    */
   @JsonIgnore
   public long getTotalFileSize() {
@@ -249,16 +236,16 @@ public class TaskManifest extends AbstractManifestData<TaskManifest> {
   }
 
   /**
-   * All the destination directories.
-   * @return directory list.
+   * 获取所有需要创建的目标目录列表。
+   * @return 目录条目列表
    */
   public List<DirEntry> getDestDirectories() {
     return destDirectories;
   }
 
   /**
-   * Add a directory to the list of directories to create.
-   * @param entry entry  to add
+   * 添加一个需要创建的目标目录到清单。
+   * @param entry 待添加的目录条目
    */
   public void addDirectory(DirEntry entry) {
     destDirectories.add(entry);
@@ -274,9 +261,9 @@ public class TaskManifest extends AbstractManifestData<TaskManifest> {
   }
 
   /**
-   * To JSON.
-   * @return json string value.
-   * @throws IOException failure
+   * 将清单序列化为JSON字符串。
+   * @return JSON字符串
+   * @throws IOException 序列化失败
    */
   public String toJson() throws IOException {
     return serializer().toJson(this);
@@ -289,9 +276,9 @@ public class TaskManifest extends AbstractManifestData<TaskManifest> {
   }
 
   /**
-   * Validate the data: those fields which must be non empty, must be set.
-   * @throws IOException if the data is invalid
-   * @return
+   * 校验清单数据的完整性和合法性，包括类型版本校验、条目类型校验、路径冲突检测。
+   * @return 校验通过的本实例
+   * @throws IOException 数据校验失败
    */
   public TaskManifest validate() throws IOException {
     verify(TYPE.equals(type), "Wrong type: %s", type);
@@ -311,8 +298,8 @@ public class TaskManifest extends AbstractManifestData<TaskManifest> {
   }
 
   /**
-   * Get a JSON serializer for this class.
-   * @return a serializer.
+   * 创建当前类的JSON序列化器。
+   * @return JSON序列化器实例
    */
   @Override
   public JsonSerialization<TaskManifest> createSerializer() {
@@ -320,19 +307,19 @@ public class TaskManifest extends AbstractManifestData<TaskManifest> {
   }
 
   /**
-   * Create a JSON serializer for this class.
-   * @return a serializer.
+   * 创建TaskManifest的JSON序列化器。
+   * @return JSON序列化器实例
    */
   public static JsonSerialization<TaskManifest> serializer() {
     return new JsonSerialization<>(TaskManifest.class, false, true);
   }
 
   /**
-   * Load an instance from a file, then validate it.
-   * @param fs filesystem
-   * @param path path
-   * @return the loaded instance
-   * @throws IOException IO failure/the data is invalid
+   * 从文件加载TaskManifest并校验。
+   * @param fs 文件系统
+   * @param path 清单文件路径
+   * @return 加载并校验完成的清单实例
+   * @throws IOException IO错误或数据校验失败
    */
   public static TaskManifest load(FileSystem fs, Path path)
       throws IOException {
@@ -341,15 +328,13 @@ public class TaskManifest extends AbstractManifestData<TaskManifest> {
   }
 
   /**
-   * Load an instance from a file, then validate it.
-   * If loading through a listing; use this API so that filestatus
-   * hints can be used.
-   * @param serializer serializer.
-   * @param fs filesystem
-   * @param path path to load from
-   * @param status status of file to load
-   * @return the loaded instance
-   * @throws IOException IO failure/the data is invalid
+   * 从文件加载TaskManifest并校验，支持传入预获取的FileStatus减少IO调用。
+   * @param serializer 序列化器实例
+   * @param fs 文件系统
+   * @param path 清单文件路径
+   * @param status 预获取的文件状态信息
+   * @return 加载并校验完成的清单实例
+   * @throws IOException IO错误或数据校验失败
    */
   public static TaskManifest load(
       JsonSerialization<TaskManifest> serializer,

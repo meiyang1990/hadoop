@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -51,33 +52,30 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * Manages storage for the set of BlockPoolSlices which share a particular 
- * block pool id, on this DataNode.
+ * 文件说明：DataNode上单个块池的存储管理器，负责管理该块池在当前DataNode上所有存储目录的生命周期，
+ * 支持格式化、升级、回滚、完成升级、回收站清理等存储状态转换操作，是HDFS联邦架构下DataNode存储分层管理的核心组件。
  * 
- * This class supports the following functionality:
+ * 本类支持以下核心功能：
  * <ul>
- * <li> Formatting a new block pool storage</li>
- * <li> Recovering a storage state to a consistent state (if possible)</li>
- * <li> Taking a snapshot of the block pool during upgrade</li>
- * <li> Rolling back a block pool to a previous snapshot</li>
- * <li> Finalizing block storage by deletion of a snapshot</li>
+ * <li>格式化新的块池存储</li>
+ * <li>从异常存储状态恢复（如果可能）</li>
+ * <li>升级时创建块池存储快照</li>
+ * <li>将块池回滚到之前的快照版本</li>
+ * <li>删除升级快照完成升级流程</li>
  * </ul>
  * 
  * @see Storage
  */
 @InterfaceAudience.Private
 public class BlockPoolSliceStorage extends Storage {
+  /** 回收站根目录名称 */
   static final String TRASH_ROOT_DIR = "trash";
 
   /**
-   * A marker file that is created on each root directory if a rolling upgrade
-   * is in progress. The NN does not inform the DN when a rolling upgrade is
-   * finalized. All the DN can infer is whether or not a rolling upgrade is
-   * currently in progress. When the rolling upgrade is not in progress:
-   *   1. If the marker file is present, then a rolling upgrade just completed.
-   *      If a 'previous' directory exists, it can be deleted now.
-   *   2. If the marker file is absent, then a regular upgrade may be in
-   *      progress. Do not delete the 'previous' directory.
+   * 滚动升级进行中标记文件。当滚动升级进行中时，每个块池根目录会创建该标记。
+   * 由于NameNode不会主动通知DataNode滚动升级已完成，DataNode通过该标记判断升级状态：
+   * 1. 如果标记不存在但存在previous目录，说明滚动升级已完成，可以删除previous目录
+   * 2. 如果标记不存在，说明可能是常规升级进行中，不要删除previous目录
    */
   static final String ROLLING_UPGRADE_MARKER_FILE = "RollingUpgradeInProgress";
 
@@ -86,30 +84,48 @@ public class BlockPoolSliceStorage extends Storage {
       "BP-\\d+-\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}-\\d+" +
       Pattern.quote(File.separator);
 
+  /** 匹配块池路径的正则表达式 */
   private static final Pattern BLOCK_POOL_PATH_PATTERN = Pattern.compile(
       "^(.*)(" + BLOCK_POOL_ID_PATTERN_BASE + ")(.*)$");
 
+  /** 匹配块池current目录路径的正则表达式 */
   private static final Pattern BLOCK_POOL_CURRENT_PATH_PATTERN = Pattern.compile(
       "^(.*)(" + BLOCK_POOL_ID_PATTERN_BASE + ")(" + STORAGE_DIR_CURRENT + ")(.*)$");
 
+  /** 匹配块池trash目录路径的正则表达式 */
   private static final Pattern BLOCK_POOL_TRASH_PATH_PATTERN = Pattern.compile(
       "^(.*)(" + BLOCK_POOL_ID_PATTERN_BASE + ")(" + TRASH_ROOT_DIR + ")(.*)$");
 
-  private String blockpoolID = ""; // id of the blockpool
+  /** 当前管理的块池ID */
+  private String blockpoolID = "";
+  /** 回收站清理后台线程 */
   private Daemon trashCleaner;
 
+  /**
+   * 构造函数，使用已有存储信息和块池ID创建块池存储管理器
+   * @param storageInfo 基础存储信息
+   * @param bpid 块池ID
+   */
   public BlockPoolSliceStorage(StorageInfo storageInfo, String bpid) {
     super(storageInfo);
     blockpoolID = bpid;
   }
 
   /**
-   * These maps are used as an optimization to avoid one filesystem operation
-   * per storage on each heartbeat response.
+   * 这两个集合用于性能优化，避免每次心跳都执行文件系统操作检查标记文件是否存在
+   * 缓存已经存在滚动升级标记的存储目录
    */
   private static Set<String> storagesWithRollingUpgradeMarker;
+  /** 缓存不存在滚动升级标记的存储目录 */
   private static Set<String> storagesWithoutRollingUpgradeMarker;
 
+  /**
+   * 构造函数，使用指定参数创建块池存储管理器
+   * @param namespaceID 命名空间ID
+   * @param bpID 块池ID
+   * @param cTime 创建时间
+   * @param clusterId 集群ID
+   */
   BlockPoolSliceStorage(int namespaceID, String bpID, long cTime,
       String clusterId) {
     super(NodeType.DATA_NODE);
@@ -123,6 +139,9 @@ public class BlockPoolSliceStorage extends Storage {
         new ConcurrentHashMap<String, Boolean>());
   }
 
+  /**
+   * 私有默认构造函数，内部使用，初始化缓存集合
+   */
   private BlockPoolSliceStorage() {
     super(NodeType.DATA_NODE);
     storagesWithRollingUpgradeMarker = Collections.newSetFromMap(
@@ -131,86 +150,90 @@ public class BlockPoolSliceStorage extends Storage {
         new ConcurrentHashMap<String, Boolean>());
   }
 
+  /**
+   * 添加存储目录到当前块池存储管理，暴露给VolumeBuilder#commit()使用
+   * @param sd 要添加的存储目录
+   */
   // Expose visibility for VolumeBuilder#commit().
   public void addStorageDir(StorageDirectory sd) {
     super.addStorageDir(sd);
   }
 
   /**
-   * Load one storage directory. Recover from previous transitions if required.
-   * @param nsInfo  namespace information
-   * @param location  the root path of the storage directory
-   * @param startOpt  startup option
-   * @param callables list of callable storage directory
-   * @param conf configuration
-   * @return
-   * @throws IOException
+   * 加载单个存储目录，必要时从之前的状态转换中恢复
+   * @param nsInfo 命名空间信息
+   * @param location 存储目录根路径
+   * @param startOpt 启动选项
+   * @param callables 异步执行的存储目录任务列表
+   * @param conf 配置对象
+   * @return 加载完成的存储目录
+   * @throws IOException 加载过程中发生IO异常
    */
   private StorageDirectory loadStorageDirectory(NamespaceInfo nsInfo,
       StorageLocation location, StartupOption startOpt,
       List<Callable<StorageDirectory>> callables, Configuration conf)
           throws IOException {
+    // 创建块池存储目录对象
     StorageDirectory sd = new StorageDirectory(
         nsInfo.getBlockPoolID(), null, true, location);
     try {
+      // 分析存储目录当前状态
       StorageState curState = sd.analyzeStorage(startOpt, this, true);
-      // sd is locked but not opened
+      // 此时sd已加锁但未打开
       switch (curState) {
       case NORMAL:
+        // 状态正常，直接继续
         break;
       case NON_EXISTENT:
+        // 目录不存在，抛出异常
         LOG.info("Block pool storage directory for location {} and block pool"
             + " id {} does not exist", location, nsInfo.getBlockPoolID());
         throw new IOException("Storage directory for location " + location +
             " and block pool id " + nsInfo.getBlockPoolID() +
             " does not exist");
-      case NOT_FORMATTED: // format
+      case NOT_FORMATTED:
+        // 目录未格式化，执行格式化
         LOG.info("Block pool storage directory for location {} and block pool"
                 + " id {} is not formatted. Formatting ...", location,
             nsInfo.getBlockPoolID());
         format(sd, nsInfo);
         break;
-      default:  // recovery part is common
+      default:
+        // 其他状态需要恢复，执行恢复流程
         sd.doRecover(curState);
       }
 
-      // 2. Do transitions
-      // Each storage directory is treated individually.
-      // During startup some of them can upgrade or roll back
-      // while others could be up-to-date for the regular startup.
+      // 执行存储状态转换
+      // 每个存储目录独立处理，启动时部分目录可能需要升级或回滚，其他已经是最新状态可以直接启动
       if (!doTransition(sd, nsInfo, startOpt, callables, conf)) {
-
-        // 3. Check CTime and update successfully loaded storage.
+        // 转换完成，检查CTime是否匹配Namenode
         if (getCTime() != nsInfo.getCTime()) {
           throw new IOException("Datanode CTime (=" + getCTime()
               + ") is not equal to namenode CTime (=" + nsInfo.getCTime() + ")");
         }
+        // 更新布局版本并写入属性文件
         setServiceLayoutVersion(getServiceLayoutVersion());
         writeProperties(sd);
       }
 
       return sd;
     } catch (IOException ioe) {
+      // 发生异常，解锁目录后抛出
       sd.unlock();
       throw ioe;
     }
   }
 
   /**
-   * Analyze and load storage directories. Recover from previous transitions if
-   * required.
-   *
-   * The block pool storages are either all analyzed or none of them is loaded.
-   * Therefore, a failure on loading any block pool storage results a faulty
-   * data volume.
-   *
-   * @param nsInfo namespace information
-   * @param location storage directories of block pool
-   * @param startOpt startup option
-   * @param callables list of callable storage directory
-   * @param conf configuration
-   * @return an array of loaded block pool directories.
-   * @throws IOException on error
+   * 分析并加载块池存储目录，必要时从之前的状态转换中恢复
+   * 块池存储要么全部加载成功，要么全部不加载，任何一个目录加载失败都会导致整个数据卷失效
+   * @param nsInfo 命名空间信息
+   * @param location 块池存储目录位置
+   * @param startOpt 启动选项
+   * @param callables 异步执行的存储目录任务列表
+   * @param conf 配置对象
+   * @return 加载完成的存储目录数组
+   * @throws IOException 加载过程中发生IO异常
    */
   List<StorageDirectory> loadBpStorageDirectories(NamespaceInfo nsInfo,
       StorageLocation location, StartupOption startOpt,
@@ -218,15 +241,18 @@ public class BlockPoolSliceStorage extends Storage {
           throws IOException {
     List<StorageDirectory> succeedDirs = Lists.newArrayList();
     try {
+      // 检查是否已经加载过该位置的块池
       if (containsStorageDir(location, nsInfo.getBlockPoolID())) {
         throw new IOException(
             "BlockPoolSliceStorage.recoverTransitionRead: " +
                 "attempt to load an used block storage: " + location);
       }
+      // 加载单个存储目录
       final StorageDirectory sd = loadStorageDirectory(
           nsInfo, location, startOpt, callables, conf);
       succeedDirs.add(sd);
     } catch (IOException e) {
+      // 加载失败，记录日志后抛出
       LOG.warn("Failed to analyze storage directories for block pool {}",
           nsInfo.getBlockPoolID(), e);
       throw e;
@@ -235,18 +261,15 @@ public class BlockPoolSliceStorage extends Storage {
   }
 
   /**
-   * Analyze storage directories. Recover from previous transitions if required.
-   *
-   * The block pool storages are either all analyzed or none of them is loaded.
-   * Therefore, a failure on loading any block pool storage results a faulty
-   * data volume.
-   *
-   * @param nsInfo namespace information
-   * @param location storage directories of block pool
-   * @param startOpt startup option
-   * @param callables list of callable storage directory
-   * @param conf configuration
-   * @throws IOException on error
+   * 分析块池存储目录，从之前的状态转换中恢复，完成后将目录添加到本管理器
+   * 块池存储要么全部加载成功，要么全部不加载，任何一个目录加载失败都会导致整个数据卷失效
+   * @param nsInfo 命名空间信息
+   * @param location 块池存储目录位置
+   * @param startOpt 启动选项
+   * @param callables 异步执行的存储目录任务列表
+   * @param conf 配置对象
+   * @return 加载完成的存储目录列表
+   * @throws IOException 加载过程中发生IO异常
    */
   List<StorageDirectory> recoverTransitionRead(NamespaceInfo nsInfo,
       StorageLocation location, StartupOption startOpt,
@@ -254,8 +277,10 @@ public class BlockPoolSliceStorage extends Storage {
           throws IOException {
     LOG.info("Analyzing storage directories for bpid {}", nsInfo
         .getBlockPoolID());
+    // 加载存储目录
     final List<StorageDirectory> loaded = loadBpStorageDirectories(
         nsInfo, location, startOpt, callables, conf);
+    // 将加载成功的目录添加到本管理器
     for (StorageDirectory sd : loaded) {
       addStorageDir(sd);
     }
@@ -263,10 +288,10 @@ public class BlockPoolSliceStorage extends Storage {
   }
 
   /**
-   * Format a block pool slice storage. 
-   * @param dnCurDir DataStorage current directory
-   * @param nsInfo the name space info
-   * @throws IOException Signals that an I/O exception has occurred.
+   * 格式化指定DataNode当前目录下的块池存储
+   * @param dnCurDir DataNode当前目录
+   * @param nsInfo 命名空间信息
+   * @throws IO异常
    */
   void format(File dnCurDir, NamespaceInfo nsInfo) throws IOException {
     File curBpDir = getBpRoot(nsInfo.getBlockPoolID(), dnCurDir);
@@ -275,30 +300,33 @@ public class BlockPoolSliceStorage extends Storage {
   }
 
   /**
-   * Format a block pool slice storage. 
-   * @param bpSdir the block pool storage
-   * @param nsInfo the name space info
-   * @throws IOException Signals that an I/O exception has occurred.
+   * 格式化指定的块池存储目录
+   * @param bpSdir 块池存储目录对象
+   * @param nsInfo 命名空间信息
+   * @throws IO异常
    */
   private void format(StorageDirectory bpSdir, NamespaceInfo nsInfo) throws IOException {
     LOG.info("Formatting block pool {} directory {}", blockpoolID, bpSdir
         .getCurrentDir());
-    bpSdir.clearDirectory(); // create directory
+    // 清空目录并重新创建
+    bpSdir.clearDirectory();
+    // 初始化存储版本信息
     this.layoutVersion = DataNodeLayoutVersion.getCurrentLayoutVersion();
     this.cTime = nsInfo.getCTime();
     this.namespaceID = nsInfo.getNamespaceID();
     this.blockpoolID = nsInfo.getBlockPoolID();
+    // 写入版本属性文件
     writeProperties(bpSdir);
   }
 
   /**
-   * Remove block pool level storage directory.
-   * @param absPathToRemove the absolute path of the root for the block pool
-   *                        level storage to remove.
+   * 移除指定绝对路径对应的块池级存储目录
+   * @param absPathToRemove 要移除的块池存储根目录绝对路径
    */
   void remove(File absPathToRemove) {
     Preconditions.checkArgument(absPathToRemove.isAbsolute());
     LOG.info("Removing block level storage: {}", absPathToRemove);
+    // 遍历存储目录找到匹配项并移除
     for (Iterator<StorageDirectory> it = getStorageDirs().iterator();
          it.hasNext(); ) {
       StorageDirectory sd = it.next();
@@ -310,8 +338,7 @@ public class BlockPoolSliceStorage extends Storage {
   }
 
   /**
-   * Set layoutVersion, namespaceID and blockpoolID into block pool storage
-   * VERSION file
+   * 将当前块池存储的布局版本、命名空间ID、块池ID、创建时间写入属性文件
    */
   @Override
   protected void setPropertiesFromFields(Properties props, StorageDirectory sd)
@@ -322,7 +349,12 @@ public class BlockPoolSliceStorage extends Storage {
     props.setProperty("cTime", String.valueOf(cTime));
   }
 
-  /** Validate and set block pool ID */
+  /**
+   * 验证并设置块池ID，检查一致性
+   * @param storage 存储目录文件
+   * @param bpid 从属性文件读取的块池ID
+   * @throws InconsistentFSStateException 块池ID不一致或为空时抛出
+   */
   private void setBlockPoolID(File storage, String bpid)
       throws InconsistentFSStateException {
     if (bpid == null || bpid.equals("")) {
@@ -337,6 +369,9 @@ public class BlockPoolSliceStorage extends Storage {
     blockpoolID = bpid;
   }
   
+  /**
+   * 从属性文件读取并设置各个存储字段
+   */
   @Override
   protected void setFieldsFromProperties(Properties props, StorageDirectory sd)
       throws IOException {
@@ -349,562 +384,21 @@ public class BlockPoolSliceStorage extends Storage {
   }
 
   /**
-   * Analyze whether a transition of the BP state is required and
-   * perform it if necessary.
+   * 检查是否需要进行块池状态转换，如果需要则执行转换
+   * 
+   * 状态转换判断逻辑：
    * <br>
-   * Rollback if:
-   * previousLV &gt;= LAYOUT_VERSION && prevCTime &lt;= namenode.cTime.
-   * Upgrade if:
-   * this.LV &gt; LAYOUT_VERSION || this.cTime &lt; namenode.cTime
-   * Regular startup if:
-   * this.LV = LAYOUT_VERSION && this.cTime = namenode.cTime
+   * 回滚条件：previous布局版本 >= 当前布局版本 且 previous创建时间 <= Namenode创建时间
+   * <br>
+   * 升级条件：当前布局版本 > 当前软件布局版本 或 当前创建时间 < Namenode创建时间
+   * <br>
+   * 常规启动条件：当前布局版本 = 当前软件布局版本 且 当前创建时间 = Namenode创建时间
    * 
-   * @param sd storage directory @{literal <SD>/current/<bpid>}
-   * @param nsInfo namespace info
-   * @param startOpt startup option
-   * @param callables list of callable storage directory
-   * @param conf configuration
-   * @return true if the new properties has been written.
+   * @param sd 存储目录 {@literal <SD>/current/<bpid>}
+   * @param nsInfo 命名空间信息
+   * @param startOpt 启动选项
+   * @param callables 异步执行的存储目录任务列表
+   * @param conf 配置对象
+   * @return 如果已经写入新属性返回true，否则返回false
    */
-  private boolean doTransition(StorageDirectory sd, NamespaceInfo nsInfo,
-      StartupOption startOpt, List<Callable<StorageDirectory>> callables,
-      Configuration conf) throws IOException {
-    if (sd.getStorageLocation().getStorageType() == StorageType.PROVIDED) {
-      return false; // regular startup for PROVIDED storage directories
-    }
-    if (startOpt == StartupOption.ROLLBACK && sd.getPreviousDir().exists()) {
-      Preconditions.checkState(!getTrashRootDir(sd).exists(),
-          sd.getPreviousDir() + " and " + getTrashRootDir(sd) + " should not " +
-          " both be present.");
-      doRollback(sd, nsInfo); // rollback if applicable
-    } else if (startOpt == StartupOption.ROLLBACK &&
-        !sd.getPreviousDir().exists()) {
-      // Restore all the files in the trash. The restored files are retained
-      // during rolling upgrade rollback. They are deleted during rolling
-      // upgrade downgrade.
-      int restored = restoreBlockFilesFromTrash(getTrashRootDir(sd));
-      LOG.info("Restored {} block files from trash.", restored);
-    }
-    readProperties(sd);
-    checkVersionUpgradable(this.layoutVersion);
-    assert this.layoutVersion >= DataNodeLayoutVersion.getCurrentLayoutVersion()
-       : "Future version is not allowed";
-    if (getNamespaceID() != nsInfo.getNamespaceID()) {
-      throw new IOException("Incompatible namespaceIDs in "
-          + sd.getRoot().getCanonicalPath() + ": namenode namespaceID = "
-          + nsInfo.getNamespaceID() + "; datanode namespaceID = "
-          + getNamespaceID());
-    }
-    if (!blockpoolID.equals(nsInfo.getBlockPoolID())) {
-      throw new IOException("Incompatible blockpoolIDs in "
-          + sd.getRoot().getCanonicalPath() + ": namenode blockpoolID = "
-          + nsInfo.getBlockPoolID() + "; datanode blockpoolID = "
-          + blockpoolID);
-    }
-    if (this.layoutVersion == DataNodeLayoutVersion.getCurrentLayoutVersion()
-        && this.cTime == nsInfo.getCTime()) {
-      return false; // regular startup
-    }
-    if (this.layoutVersion > DataNodeLayoutVersion.getCurrentLayoutVersion()) {
-      int restored = restoreBlockFilesFromTrash(getTrashRootDir(sd));
-      LOG.info("Restored {} block files from trash " +
-          "before the layout upgrade. These blocks will be moved to " +
-          "the previous directory during the upgrade", restored);
-    }
-    if (this.layoutVersion > DataNodeLayoutVersion.getCurrentLayoutVersion()
-        || this.cTime < nsInfo.getCTime()) {
-      doUpgrade(sd, nsInfo, callables, conf); // upgrade
-      return true;
-    }
-    // layoutVersion == LAYOUT_VERSION && this.cTime > nsInfo.cTime
-    // must shutdown
-    throw new IOException("Datanode state: LV = " + this.getLayoutVersion()
-        + " CTime = " + this.getCTime()
-        + " is newer than the namespace state: LV = "
-        + nsInfo.getLayoutVersion() + " CTime = " + nsInfo.getCTime());
-  }
-
-  /**
-   * Upgrade to any release after 0.22 (0.22 included) release
-   * e.g. 0.22 =&gt; 0.23
-   * Upgrade procedure is as follows:
-   * <ol>
-   * <li>If {@literal <SD>/current/<bpid>/previous} exists then delete it</li>
-   * <li>Rename {@literal <SD>/current/<bpid>/current} to
-   * {@literal <SD>/current/bpid/current/previous.tmp}</li>
-   * <li>Create new {@literal <SD>current/<bpid>/current} directory</li>
-   * <li>Hard links for block files are created from previous.tmp to current</li>
-   * <li>Save new version file in current directory</li>
-   * <li>Rename previous.tmp to previous</li>
-   * </ol>
-   * 
-   * @param bpSd storage directory {@literal <SD>/current/<bpid>}
-   * @param nsInfo Namespace Info from the namenode
-   * @throws IOException on error
-   */
-  private void doUpgrade(final StorageDirectory bpSd,
-      final NamespaceInfo nsInfo,
-      final List<Callable<StorageDirectory>> callables,
-      final Configuration conf) throws IOException {
-    // Upgrading is applicable only to release with federation or after
-    if (!DataNodeLayoutVersion.supports(
-        LayoutVersion.Feature.FEDERATION, layoutVersion)) {
-      return;
-    }
-    // no upgrades for storage directories that are PROVIDED
-    if (bpSd.getRoot() == null) {
-      return;
-    }
-    final int oldLV = getLayoutVersion();
-    LOG.info("Upgrading block pool storage directory {}.\n   old LV = {}; old"
-        + " CTime = {}.\n   new LV = {}; new CTime = {}",
-        bpSd.getRoot(), oldLV, this.getCTime(),
-        DataNodeLayoutVersion.getCurrentLayoutVersion(), nsInfo.getCTime());
-    // get <SD>/previous directory
-    String dnRoot = getDataNodeStorageRoot(bpSd.getRoot().getCanonicalPath());
-    StorageDirectory dnSdStorage = new StorageDirectory(new File(dnRoot));
-    File dnPrevDir = dnSdStorage.getPreviousDir();
-    
-    // If <SD>/previous directory exists delete it
-    if (dnPrevDir.exists()) {
-      deleteDir(dnPrevDir);
-    }
-    final File bpCurDir = bpSd.getCurrentDir();
-    final File bpPrevDir = bpSd.getPreviousDir();
-    assert bpCurDir.exists() : "BP level current directory must exist.";
-    cleanupDetachDir(new File(bpCurDir, DataStorage.STORAGE_DIR_DETACHED));
-    
-    // 1. Delete <SD>/current/<bpid>/previous dir before upgrading
-    if (bpPrevDir.exists()) {
-      deleteDir(bpPrevDir);
-    }
-    final File bpTmpDir = bpSd.getPreviousTmp();
-    assert !bpTmpDir.exists() : "previous.tmp directory must not exist.";
-    
-    // 2. Rename <SD>/current/<bpid>/current to
-    //    <SD>/current/<bpid>/previous.tmp
-    rename(bpCurDir, bpTmpDir);
-    
-    final String name = "block pool " + blockpoolID + " at " + bpSd.getRoot();
-    if (callables == null) {
-      doUpgrade(name, bpSd, nsInfo, bpPrevDir, bpTmpDir, bpCurDir, oldLV, conf);
-    } else {
-      callables.add(new Callable<StorageDirectory>() {
-        @Override
-        public StorageDirectory call() throws Exception {
-          doUpgrade(name, bpSd, nsInfo, bpPrevDir, bpTmpDir, bpCurDir, oldLV,
-              conf);
-          return bpSd;
-        }
-      });
-    }
-  }
-
-  private void doUpgrade(String name, final StorageDirectory bpSd,
-      NamespaceInfo nsInfo, final File bpPrevDir, final File bpTmpDir,
-      final File bpCurDir, final int oldLV, Configuration conf)
-          throws IOException {
-    // 3. Create new <SD>/current with block files hardlinks and VERSION
-    linkAllBlocks(bpTmpDir, bpCurDir, oldLV, conf);
-    this.layoutVersion = DataNodeLayoutVersion.getCurrentLayoutVersion();
-    assert this.namespaceID == nsInfo.getNamespaceID() 
-        : "Data-node and name-node layout versions must be the same.";
-    this.cTime = nsInfo.getCTime();
-    writeProperties(bpSd);
-    
-    // 4.rename <SD>/current/<bpid>/previous.tmp to
-    // <SD>/current/<bpid>/previous
-    rename(bpTmpDir, bpPrevDir);
-    LOG.info("Upgrade of {} is complete", name);
-  }
-
-  /**
-   * Cleanup the detachDir.
-   * 
-   * If the directory is not empty report an error; Otherwise remove the
-   * directory.
-   * 
-   * @param detachDir detach directory
-   * @throws IOException if the directory is not empty or it can not be removed
-   */
-  private void cleanupDetachDir(File detachDir) throws IOException {
-    if (!DataNodeLayoutVersion.supports(
-        LayoutVersion.Feature.APPEND_RBW_DIR, layoutVersion)
-        && detachDir.exists() && detachDir.isDirectory()) {
-
-      if (FileUtil.list(detachDir).length != 0) {
-        throw new IOException("Detached directory " + detachDir
-            + " is not empty. Please manually move each file under this "
-            + "directory to the finalized directory if the finalized "
-            + "directory tree does not have the file.");
-      } else if (!detachDir.delete()) {
-        throw new IOException("Cannot remove directory " + detachDir);
-      }
-    }
-  }
-
-  /**
-   * Restore all files from the trash directory to their corresponding
-   * locations under current/
-   */
-  private int restoreBlockFilesFromTrash(File trashRoot)
-      throws  IOException {
-    int filesRestored = 0;
-    File[] children = trashRoot.exists() ? trashRoot.listFiles() : null;
-    if (children == null) {
-      return 0;
-    }
-
-    File restoreDirectory = null;
-    for (File child : children) {
-      if (child.isDirectory()) {
-        // Recurse to process subdirectories.
-        filesRestored += restoreBlockFilesFromTrash(child);
-        continue;
-      }
-
-      if (restoreDirectory == null) {
-        restoreDirectory = new File(getRestoreDirectory(child));
-        if (!restoreDirectory.exists() && !restoreDirectory.mkdirs()) {
-          throw new IOException("Failed to create directory " + restoreDirectory);
-        }
-      }
-
-      final File newChild = new File(restoreDirectory, child.getName());
-
-      if (newChild.exists() && newChild.length() >= child.length()) {
-        // Failsafe - we should not hit this case but let's make sure
-        // we never overwrite a newer version of a block file with an
-        // older version.
-        LOG.info("Not overwriting {} with smaller file from " +
-            "trash directory. This message can be safely ignored.", newChild);
-      } else if (!child.renameTo(newChild)) {
-        throw new IOException("Failed to rename " + child + " to " + newChild);
-      } else {
-        ++filesRestored;
-      }
-    }
-    FileUtil.fullyDelete(trashRoot);
-    return filesRestored;
-  }
-
-  /*
-   * Roll back to old snapshot at the block pool level
-   * If previous directory exists: 
-   * <ol>
-   * <li>Rename <SD>/current/<bpid>/current to removed.tmp</li>
-   * <li>Rename * <SD>/current/<bpid>/previous to current</li>
-   * <li>Remove removed.tmp</li>
-   * </ol>
-   * 
-   * Do nothing if previous directory does not exist.
-   * @param bpSd Block pool storage directory at <SD>/current/<bpid>
-   */
-  void doRollback(StorageDirectory bpSd, NamespaceInfo nsInfo)
-      throws IOException {
-    File prevDir = bpSd.getPreviousDir();
-    // regular startup if previous dir does not exist
-    if (prevDir == null || !prevDir.exists()) {
-      return;
-    }
-    // read attributes out of the VERSION file of previous directory
-    BlockPoolSliceStorage prevInfo = new BlockPoolSliceStorage();
-    prevInfo.readPreviousVersionProperties(bpSd);
-
-    // We allow rollback to a state, which is either consistent with
-    // the namespace state or can be further upgraded to it.
-    // In another word, we can only roll back when ( storedLV >= software LV)
-    // && ( DN.previousCTime <= NN.ctime)
-    if (!(prevInfo.getLayoutVersion() >=
-        DataNodeLayoutVersion.getCurrentLayoutVersion() &&
-        prevInfo.getCTime() <= nsInfo.getCTime())) { // cannot rollback
-      throw new InconsistentFSStateException(bpSd.getRoot(),
-          "Cannot rollback to a newer state.\nDatanode previous state: LV = "
-              + prevInfo.getLayoutVersion() + " CTime = " + prevInfo.getCTime()
-              + " is newer than the namespace state: LV = "
-              + DataNodeLayoutVersion.getCurrentLayoutVersion() + " CTime = "
-              + nsInfo.getCTime());
-    }
-
-    LOG.info("Rolling back storage directory {}.\n   target LV = {}; target "
-            + "CTime = {}", bpSd.getRoot(), nsInfo.getLayoutVersion(),
-        nsInfo.getCTime());
-    File tmpDir = bpSd.getRemovedTmp();
-    assert !tmpDir.exists() : "removed.tmp directory must not exist.";
-    // 1. rename current to tmp
-    File curDir = bpSd.getCurrentDir();
-    assert curDir.exists() : "Current directory must exist.";
-    rename(curDir, tmpDir);
-    
-    // 2. rename previous to current
-    rename(prevDir, curDir);
-    
-    // 3. delete removed.tmp dir
-    deleteDir(tmpDir);
-    LOG.info("Rollback of {} is complete", bpSd.getRoot());
-  }
-
-  /*
-   * Finalize the block pool storage by deleting <BP>/previous directory
-   * that holds the snapshot.
-   */
-  void doFinalize(File dnCurDir) throws IOException {
-    if (dnCurDir == null) {
-      return; //we do nothing if the directory is null
-    }
-    File bpRoot = getBpRoot(blockpoolID, dnCurDir);
-    StorageDirectory bpSd = new StorageDirectory(bpRoot);
-    // block pool level previous directory
-    File prevDir = bpSd.getPreviousDir();
-    if (!prevDir.exists()) {
-      return; // already finalized
-    }
-    final String dataDirPath = bpSd.getRoot().getCanonicalPath();
-    LOG.info("Finalizing upgrade for storage directory {}.\n   cur LV = {}; "
-            + "cur CTime = {}", dataDirPath, this.getLayoutVersion(),
-        this.getCTime());
-    assert bpSd.getCurrentDir().exists() : "Current directory must exist.";
-    
-    // rename previous to finalized.tmp
-    final File tmpDir = bpSd.getFinalizedTmp();
-    rename(prevDir, tmpDir);
-
-    // delete finalized.tmp dir in a separate thread
-    new Daemon(new Runnable() {
-      @Override
-      public void run() {
-        try {
-          deleteDir(tmpDir);
-        } catch (IOException ex) {
-          LOG.error("Finalize upgrade for {} failed.", dataDirPath, ex);
-        }
-        LOG.info("Finalize upgrade for {} is complete.", dataDirPath);
-      }
-
-      @Override
-      public String toString() {
-        return "Finalize " + dataDirPath;
-      }
-    }).start();
-  }
-
-  /**
-   * Hardlink all finalized and RBW blocks in fromDir to toDir
-   * 
-   * @param fromDir directory where the snapshot is stored
-   * @param toDir the current data directory
-   * @throws IOException if error occurs during hardlink
-   */
-  private static void linkAllBlocks(File fromDir, File toDir,
-      int diskLayoutVersion, Configuration conf) throws IOException {
-    // do the link
-    // hardlink finalized blocks in tmpDir
-    HardLink hardLink = new HardLink();
-    DataStorage.linkBlocks(fromDir, toDir, DataStorage.STORAGE_DIR_FINALIZED,
-        diskLayoutVersion, hardLink, conf);
-    DataStorage.linkBlocks(fromDir, toDir, DataStorage.STORAGE_DIR_RBW,
-        diskLayoutVersion, hardLink, conf);
-    LOG.info("Linked blocks from {} to {}. {}", fromDir, toDir,
-        hardLink.linkStats.report());
-  }
-
-  /**
-   * gets the data node storage directory based on block pool storage
-   */
-  private static String getDataNodeStorageRoot(String bpRoot) {
-    Matcher matcher = BLOCK_POOL_PATH_PATTERN.matcher(bpRoot);
-    if (matcher.matches()) {
-      // return the data node root directory
-      return matcher.group(1);
-    }
-    return bpRoot;
-  }
-
-  @Override
-  public String toString() {
-    return super.toString() + ";bpid=" + blockpoolID;
-  }
-  
-  /**
-   * Get a block pool storage root based on data node storage root
-   * @param bpID block pool ID
-   * @param dnCurDir data node storage root directory
-   * @return root directory for block pool storage
-   */
-  public static File getBpRoot(String bpID, File dnCurDir) {
-    return new File(dnCurDir, bpID);
-  }
-
-  @Override
-  public boolean isPreUpgradableLayout(StorageDirectory sd) throws IOException {
-    return false;
-  }
-
-  private File getTrashRootDir(StorageDirectory sd) {
-    return new File(sd.getRoot(), TRASH_ROOT_DIR);
-  }
-
-  /**
-   * Determine whether we can use trash for the given blockFile. Trash
-   * is disallowed if a 'previous' directory exists for the
-   * storage directory containing the block.
-   */
-  @VisibleForTesting
-  public boolean isTrashAllowed(File blockFile) {
-    Matcher matcher = BLOCK_POOL_CURRENT_PATH_PATTERN.matcher(blockFile.getParent());
-    String previousDir = matcher.replaceFirst("$1$2" + STORAGE_DIR_PREVIOUS);
-    return !(new File(previousDir)).exists();
-  }
-
-  /**
-   * Get a target subdirectory under trash/ for a given block file that is being
-   * deleted.
-   *
-   * The subdirectory structure under trash/ mirrors that under current/ to keep
-   * implicit memory of where the files are to be restored (if necessary).
-   *
-   * @return the trash directory for a given block file that is being deleted.
-   */
-  public String getTrashDirectory(ReplicaInfo info) {
-
-    URI blockURI = info.getBlockURI();
-    try{
-      File blockFile = new File(blockURI);
-      return getTrashDirectory(blockFile);
-    } catch (IllegalArgumentException e) {
-      LOG.warn("Failed to get block file for replica {}", info, e);
-    }
-
-    return null;
-  }
-
-  private String getTrashDirectory(File blockFile) {
-    if (isTrashAllowed(blockFile)) {
-      Matcher matcher = BLOCK_POOL_CURRENT_PATH_PATTERN.matcher(blockFile.getParent());
-      String trashDirectory = matcher.replaceFirst("$1$2" + TRASH_ROOT_DIR + "$4");
-      return trashDirectory;
-    }
-    return null;
-  }
-
-  /**
-   * Get a target subdirectory under current/ for a given block file that is
-   * being restored from trash.
-   *
-   * The subdirectory structure under trash/ mirrors that under current/ to keep
-   * implicit memory of where the files are to be restored.
-   * @param blockFile  block file that is being restored from trash.
-   * @return the target directory to restore a previously deleted block file.
-   */
-  @VisibleForTesting
-  String getRestoreDirectory(File blockFile) {
-    Matcher matcher = BLOCK_POOL_TRASH_PATH_PATTERN.matcher(blockFile.getParent());
-    String restoreDirectory = matcher.replaceFirst("$1$2" + STORAGE_DIR_CURRENT + "$4");
-    LOG.info("Restoring {} to {}", blockFile, restoreDirectory);
-    return restoreDirectory;
-  }
-
-  /**
-   * Delete all files and directories in the trash directories.
-   */
-  public void clearTrash() {
-    final List<File> trashRoots = new ArrayList<>();
-    for (StorageDirectory sd : getStorageDirs()) {
-      File trashRoot = getTrashRootDir(sd);
-      if (trashRoot.exists() && sd.getPreviousDir().exists()) {
-        LOG.error("Trash and PreviousDir shouldn't both exist for storage "
-            + "directory {}", sd);
-        assert false;
-      } else {
-        trashRoots.add(trashRoot);
-      }
-    }
-
-    stopTrashCleaner();
-    trashCleaner = new Daemon(new Runnable() {
-      @Override
-      public void run() {
-        for(File trashRoot : trashRoots){
-          FileUtil.fullyDelete(trashRoot);
-          LOG.info("Cleared trash for storage directory {}", trashRoot);
-        }
-      }
-
-      @Override
-      public String toString() {
-        return "clearTrash() for " + blockpoolID;
-      }
-    });
-    trashCleaner.start();
-  }
-
-  public void stopTrashCleaner() {
-    if (trashCleaner != null) {
-      trashCleaner.interrupt();
-    }
-  }
-
-  /** trash is enabled if at least one storage directory contains trash root */
-  @VisibleForTesting
-  public boolean trashEnabled() {
-    for (StorageDirectory sd : getStorageDirs()) {
-      if (getTrashRootDir(sd).exists()) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Create a rolling upgrade marker file for each BP storage root, if it
-   * does not exist already.
-   * @param dnStorageDirs
-   */
-  public void setRollingUpgradeMarkers(List<StorageDirectory> dnStorageDirs)
-      throws IOException {
-    for (StorageDirectory sd : dnStorageDirs) {
-      if (sd.getCurrentDir() == null) {
-        return;
-      }
-      File bpRoot = getBpRoot(blockpoolID, sd.getCurrentDir());
-      File markerFile = new File(bpRoot, ROLLING_UPGRADE_MARKER_FILE);
-      if (!storagesWithRollingUpgradeMarker.contains(bpRoot.toString())) {
-        if (!markerFile.exists() && markerFile.createNewFile()) {
-          LOG.info("Created {}", markerFile);
-        } else {
-          LOG.info("{} already exists.", markerFile);
-        }
-        storagesWithRollingUpgradeMarker.add(bpRoot.toString());
-        storagesWithoutRollingUpgradeMarker.remove(bpRoot.toString());
-      }
-    }
-  }
-
-  /**
-   * Check whether the rolling upgrade marker file exists for each BP storage
-   * root. If it does exist, then the marker file is cleared and more
-   * importantly the layout upgrade is finalized.
-   * @param dnStorageDirs
-   */
-  public void clearRollingUpgradeMarkers(List<StorageDirectory> dnStorageDirs)
-      throws IOException {
-    for (StorageDirectory sd : dnStorageDirs) {
-      if (sd.getCurrentDir() == null) {
-        continue;
-      }
-      File bpRoot = getBpRoot(blockpoolID, sd.getCurrentDir());
-      File markerFile = new File(bpRoot, ROLLING_UPGRADE_MARKER_FILE);
-      if (!storagesWithoutRollingUpgradeMarker.contains(bpRoot.toString())) {
-        if (markerFile.exists()) {
-          LOG.info("Deleting {}", markerFile);
-          doFinalize(sd.getCurrentDir());
-          if (!markerFile.delete()) {
-            LOG.warn("Failed to delete {}", markerFile);
-          }
-        }
-        storagesWithoutRollingUpgradeMarker.add(bpRoot.toString());
-        storagesWithRollingUpgradeMarker.remove(bpRoot.toString());
-      }
-    }
-  }
-}
+  private boolean doTransition

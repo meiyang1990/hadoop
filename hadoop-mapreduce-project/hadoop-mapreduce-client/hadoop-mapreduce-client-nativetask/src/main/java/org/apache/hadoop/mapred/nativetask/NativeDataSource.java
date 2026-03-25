@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,23 +25,27 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.mapred.nativetask.buffer.InputBuffer;
 
 /**
- * NativeDataSource loads data from upstream
+ * 原生任务数据源接口，定义从MapReduce上游任务获取输入数据的规范
+ * 为C++原生任务提供Java层的数据输入抽象，对接Hadoop的序列化与数据传递
  */
 @InterfaceAudience.Private
 public interface NativeDataSource {
 
   /**
-   * get input buffer
+   * 获取存储上游数据的输入缓冲区
+   * @return 输入缓冲区对象
    */
   public InputBuffer getInputBuffer();
 
   /**
-   * set listener. When data from upstream arrives, the listener will be activated.
+   * 设置数据到达监听器，当上游数据到达时触发回调处理
+   * @param handler 数据接收处理器实例
    */
   void setDataReceiver(DataReceiver handler);
 
   /**
-   * load data from upstream
+   * 从上游任务加载输入数据到缓冲区
+   * @throws IOException 加载数据失败时抛出IO异常
    */
   public void loadData() throws IOException;
 

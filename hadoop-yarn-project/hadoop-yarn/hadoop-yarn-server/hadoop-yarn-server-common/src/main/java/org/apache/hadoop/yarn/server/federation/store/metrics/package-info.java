@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -13,5 +14,10 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
+ */
+
+/**
+ * YARN联邦状态存储的指标统计包，提供联邦存储相关操作的监控指标采集与上报能力，
+ * 用于监控联邦元数据存储的性能、可用性和操作统计。
  */
 package org.apache.hadoop.yarn.server.federation.store.metrics;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,56 +27,54 @@ import org.apache.hadoop.hdfs.protocol.LayoutVersion;
 import org.apache.hadoop.hdfs.protocol.LayoutVersion.FeatureInfo;
 import org.apache.hadoop.hdfs.protocol.LayoutVersion.LayoutFeature;
 
-
+/**
+ * NameNode元数据磁盘布局版本管理类。
+ * 负责维护HDFS NameNode不同布局版本对应的功能特性，支持版本兼容性检查和滚动升级兼容性管理。
+ * 核心职责是记录每个布局版本引入的新功能，以及提供版本兼容性查询能力。
+ */
 @InterfaceAudience.Private
 public class NameNodeLayoutVersion { 
-  /** Build layout version and corresponding feature matrix */
+  /** 存储布局版本到对应支持的功能特性集合的映射 */
   public final static Map<Integer, SortedSet<LayoutFeature>> FEATURES
       = new HashMap<Integer, SortedSet<LayoutFeature>>();
 
+  /** 当前NameNode布局版本号，由所有功能特性计算得出 */
   public static final int CURRENT_LAYOUT_VERSION
       = LayoutVersion.getCurrentLayoutVersion(Feature.values());
+  /** 最低兼容布局版本号，用于回滚兼容性检查 */
   public static final int MINIMUM_COMPATIBLE_LAYOUT_VERSION
       = LayoutVersion.getMinimumCompatibleLayoutVersion(Feature.values());
 
   static {
+    // 加载通用布局版本功能特性到映射表
     LayoutVersion.updateMap(FEATURES, LayoutVersion.Feature.values());
+    // 加载NameNode专属布局版本功能特性到映射表
     LayoutVersion.updateMap(FEATURES, NameNodeLayoutVersion.Feature.values());
   }
   
+  /**
+   * 获取指定布局版本支持的所有功能特性集合。
+   * @param lv 布局版本号
+   * @return 对应版本支持的功能特性集合
+   */
   public static SortedSet<LayoutFeature> getFeatures(int lv) {
     return FEATURES.get(lv);
   }
 
+  /**
+   * 检查指定布局版本是否支持某一特定功能特性。
+   * @param f 待检查的功能特性
+   * @param lv 目标布局版本号
+   * @return true如果支持该特性，false否则
+   */
   public static boolean supports(final LayoutFeature f, final int lv) {
     return LayoutVersion.supports(FEATURES, f, lv);
   }
 
   /**
-   * Enums for features that change the layout version.
-   * <br><br>
-   * To add a new layout version:
-   * <ul>
-   * <li>Define a new enum constant with a short enum name, the new layout version 
-   * and description of the added feature.</li>
-   * <li>When adding a layout version with an ancestor that is not same as
-   * its immediate predecessor, use the constructor where a specific ancestor
-   * can be passed.
-   * </li>
-   * <li>Specify a minimum compatible layout version.  The minimum compatible
-   * layout version is the earliest prior version to which a downgrade is
-   * possible after initiating rolling upgrade.  If the feature cannot satisfy
-   * compatibility with any prior version, then set its minimum compatible
-   * layout version to itself to indicate that downgrade is impossible.
-   * Satisfying compatibility might require adding logic to the new feature to
-   * reject operations or handle them differently while rolling upgrade is in
-   * progress.  In general, it's possible to satisfy compatibility for downgrade
-   * if the new feature just involves adding new edit log ops.  Deeper
-   * structural changes, such as changing the way we place files in the metadata
-   * directories, might be incompatible.  Feature implementations should strive
-   * for compatibility, because it's in the best interest of our users to
-   * support downgrade.
-   * </ul>
+   * 枚举定义所有会改变NameNode布局版本的功能特性。
+   * 每个枚举实例对应一个新布局版本引入的功能，记录版本信息和兼容性描述。
+   * 新增布局版本需要遵循文档说明的添加规则，以保证回滚兼容性。
    */
   public enum Feature implements LayoutFeature {
     ROLLING_UPGRADE(-55, -53, -55, "Support rolling upgrade", false),
@@ -96,24 +95,23 @@ public class NameNodeLayoutVersion {
     private final FeatureInfo info;
 
     /**
-     * Feature that is added at layout version {@code lv} - 1. 
-     * @param lv new layout version with the addition of this feature
-     * @param minCompatLV minimum compatible layout version
-     * @param description description of the feature
+     * 构造功能特性枚举，父版本为当前新版本号+1。
+     * @param lv 新增该功能后的新布局版本号
+     * @param minCompatLV 该功能支持的最低兼容布局版本（回滚时允许回滚到的最早版本）
+     * @param description 功能特性描述
      */
     Feature(final int lv, int minCompatLV, final String description) {
       this(lv, lv + 1, minCompatLV, description, false);
     }
 
     /**
-     * NameNode feature that is added at layout version {@code ancestorLV}.
-     * @param lv new layout version with the addition of this feature
-     * @param ancestorLV layout version from which the new lv is derived from.
-     * @param minCompatLV minimum compatible layout version
-     * @param description description of the feature
-     * @param reserved true when this is a layout version reserved for previous
-     *        versions
-     * @param features set of features that are to be enabled for this version
+     * 构造功能特性枚举，允许指定父版本和兼容性信息。
+     * @param lv 新增该功能后的新布局版本号
+     * @param ancestorLV 该版本派生自的父布局版本号
+     * @param minCompatLV 该功能支持的最低兼容布局版本（回滚时允许回滚到的最早版本）
+     * @param description 功能特性描述
+     * @param reserved 是否为旧版本保留的布局版本
+     * @param features 该版本默认启用的子功能特性列表
      */
     Feature(final int lv, final int ancestorLV, int minCompatLV,
         final String description, boolean reserved, Feature... features) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,14 +23,21 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Framework uploaded exception type.
+ * MapReduce框架Jar包上传器自定义异常，用于表示上传过程中发生的错误。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
+/**
+ * MapReduce作业框架Jar包上传异常类，封装上传过程中的错误信息
+ */
 class UploaderException extends Exception {
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造带错误信息的上传异常对象
+   * @param message 错误描述信息
+   */
   UploaderException(String message) {
     super(message);
   }

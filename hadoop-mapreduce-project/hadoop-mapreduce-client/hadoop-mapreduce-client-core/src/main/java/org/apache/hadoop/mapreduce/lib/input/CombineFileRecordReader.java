@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,17 +28,15 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * A generic RecordReader that can hand out different recordReaders
- * for each chunk in a {@link CombineFileSplit}.
- * A CombineFileSplit can combine data chunks from multiple files. 
- * This class allows using different RecordReaders for processing
- * these data chunks from different files.
+ * CombineFileSplit的组合式RecordReader实现，可处理CombineFileSplit中多个不同文件块，为每个文件块创建对应RecordReader
+ * 当一个CombineFileSplit聚合了来自多个文件的数据块时，本类支持为每个不同文件块使用独立的RecordReader进行处理
  * @see CombineFileSplit
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class CombineFileRecordReader<K, V> extends RecordReader<K, V> {
 
+  // 构造函数参数类型签名，用于反射创建RecordReader实例
   static final Class [] constructorSignature = new Class [] 
                                          {CombineFileSplit.class,
                                           TaskAttemptContext.class,
@@ -51,6 +50,13 @@ public class CombineFileRecordReader<K, V> extends RecordReader<K, V> {
   protected long progress;
   protected RecordReader<K, V> curReader;
 
+  /**
+   * 初始化RecordReader，若当前已有子RecordReader则转发初始化调用
+   * @param split 输入分片CombineFileSplit
+   * @param context 任务尝试上下文
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public void initialize(InputSplit split,
       TaskAttemptContext context) throws IOException, InterruptedException {
     this.split = (CombineFileSplit)split;
@@ -60,8 +66,9 @@ public class CombineFileRecordReader<K, V> extends RecordReader<K, V> {
     }
   }
   
+  @Override
   public boolean nextKeyValue() throws IOException, InterruptedException {
-
+    // 当前无Reader或当前Reader已读完，切换到下一个Reader
     while ((curReader == null) || !curReader.nextKeyValue()) {
       if (!initNextRecordReader()) {
         return false;
@@ -70,14 +77,17 @@ public class CombineFileRecordReader<K, V> extends RecordReader<K, V> {
     return true;
   }
 
+  @Override
   public K getCurrentKey() throws IOException, InterruptedException {
     return curReader.getCurrentKey();
   }
   
+  @Override
   public V getCurrentValue() throws IOException, InterruptedException {
     return curReader.getCurrentValue();
   }
   
+  @Override
   public void close() throws IOException {
     if (curReader != null) {
       curReader.close();
@@ -86,20 +96,26 @@ public class CombineFileRecordReader<K, V> extends RecordReader<K, V> {
   }
   
   /**
-   * return progress based on the amount of data processed so far.
+   * 获取当前读取进度，基于已处理的数据量计算
+   * @return 进度值，范围0-1
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public float getProgress() throws IOException, InterruptedException {
-    long subprogress = 0;    // bytes processed in current split
+    long subprogress = 0;    // 当前分片已处理字节数
     if (null != curReader) {
-      // idx is always one past the current subsplit's true index.
+      // 索引idx比当前实际索引大1，因此取idx-1
       subprogress = (long)(curReader.getProgress() * split.getLength(idx - 1));
     }
     return Math.min(1.0f,  (progress + subprogress)/(float)(split.getLength()));
   }
   
   /**
-   * A generic RecordReader that can hand out different recordReaders
-   * for each chunk in the CombineFileSplit.
+   * 构造CombineFileRecordReader实例，为CombineFileSplit中每个块创建指定类型的RecordReader
+   * @param split 组合输入分片
+   * @param context 任务尝试上下文
+   * @param rrClass 子RecordReader类型
+   * @throws IOException IO异常
    */
   public CombineFileRecordReader(CombineFileSplit split,
                                  TaskAttemptContext context,
@@ -112,54 +128,62 @@ public class CombineFileRecordReader<K, V> extends RecordReader<K, V> {
     this.progress = 0;
 
     try {
+      // 通过反射获取子RecordReader的构造函数
       rrConstructor = rrClass.getDeclaredConstructor(constructorSignature);
       rrConstructor.setAccessible(true);
     } catch (Exception e) {
       throw new RuntimeException(rrClass.getName() + 
                                  " does not have valid constructor", e);
     }
+    // 初始化第一个RecordReader
     initNextRecordReader();
   }
   
   /**
-   * Get the record reader for the next chunk in this CombineFileSplit.
+   * 初始化CombineFileSplit中下一个块的RecordReader
+   * @return 成功初始化返回true，所有块处理完成返回false
+   * @throws IOException IO异常
    */
   protected boolean initNextRecordReader() throws IOException {
 
     if (curReader != null) {
+      // 关闭当前Reader
       curReader.close();
       curReader = null;
       if (idx > 0) {
-        progress += split.getLength(idx-1);    // done processing so far
+        // 累加已完成块的长度到总进度
+        progress += split.getLength(idx-1);
       }
     }
 
-    // if all chunks have been processed, nothing more to do.
+    // 所有块都处理完成，返回false
     if (idx == split.getNumPaths()) {
       return false;
     }
 
+    // 报告任务进度，防止超时
     context.progress();
 
-    // get a record reader for the idx-th chunk
+    // 创建当前索引块的RecordReader
     try {
       Configuration conf = context.getConfiguration();
-      // setup some helper config variables.
+      // 设置当前处理块的配置参数，供子Reader使用
       conf.set(MRJobConfig.MAP_INPUT_FILE, split.getPath(idx).toString());
       conf.setLong(MRJobConfig.MAP_INPUT_START, split.getOffset(idx));
       conf.setLong(MRJobConfig.MAP_INPUT_PATH, split.getLength(idx));
 
+      // 反射创建子RecordReader实例
       curReader =  rrConstructor.newInstance(new Object [] 
                             {split, context, Integer.valueOf(idx)});
 
       if (idx > 0) {
-        // initialize() for the first RecordReader will be called by MapTask;
-        // we're responsible for initializing subsequent RecordReaders.
+        // 第一个Reader由MapTask负责初始化，后续Reader需要本类自行初始化
         curReader.initialize(split, context);
       }
     } catch (Exception e) {
       throw new RuntimeException (e);
     }
+    // 索引自增，准备处理下一块
     idx++;
     return true;
   }

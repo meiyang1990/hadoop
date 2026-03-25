@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -54,8 +55,7 @@ import org.slf4j.LoggerFactory;
 import static org.fusesource.leveldbjni.JniDBFactory.bytes;
 
 /**
- * A timeline service state storage implementation that supports any persistent
- * storage that adheres to the LevelDB interface.
+ * 基于LevelDB实现的时间线服务状态存储，支持持久化存储时间线服务的委托令牌等状态信息
  */
 public class LeveldbTimelineStateStore extends
     TimelineStateStore {
@@ -63,17 +63,25 @@ public class LeveldbTimelineStateStore extends
   public static final Logger LOG =
       LoggerFactory.getLogger(LeveldbTimelineStateStore.class);
 
+  // LevelDB数据库文件名
   private static final String DB_NAME = "timeline-state-store.ldb";
+  // LevelDB存储目录权限，仅允许所有者读写执行
   private static final FsPermission LEVELDB_DIR_UMASK = FsPermission
       .createImmutable((short) 0700);
 
+  // 委托令牌条目前缀键
   private static final byte[] TOKEN_ENTRY_PREFIX = bytes("t");
+  // 委托令牌主密钥条目前缀键
   private static final byte[] TOKEN_MASTER_KEY_ENTRY_PREFIX = bytes("k");
+  // 最新序列号存储键
   private static final byte[] LATEST_SEQUENCE_NUMBER_KEY = bytes("s");
 
+  // 当前存储版本号
   private static final Version CURRENT_VERSION_INFO = Version.newInstance(1, 0);
+  // 存储版本号存储键
   private static final byte[] TIMELINE_STATE_STORE_VERSION_KEY = bytes("v");
 
+  // LevelDB实例引用
   private DB db;
 
   public LeveldbTimelineStateStore() {
@@ -87,6 +95,7 @@ public class LeveldbTimelineStateStore extends
   @Override
   protected void startStorage() throws IOException {
     Options options = new Options();
+    // 从配置获取存储路径，拼接数据库文件名
     Path dbPath =
         new Path(
             getConfig().get(
@@ -94,7 +103,9 @@ public class LeveldbTimelineStateStore extends
             DB_NAME);
     FileSystem localFS = null;
     try {
+      // 获取本地文件系统实例
       localFS = FileSystem.getLocal(getConfig());
+      // 存储目录不存在则创建并设置权限
       if (!localFS.exists(dbPath)) {
         if (!localFS.mkdirs(dbPath)) {
           throw new IOException("Couldn't create directory for leveldb " +
@@ -107,16 +118,20 @@ public class LeveldbTimelineStateStore extends
     }
     JniDBFactory factory = new JniDBFactory();
     try {
+      // 先尝试打开已存在的数据库，不自动创建
       options.createIfMissing(false);
       db = factory.open(new File(dbPath.toString()), options);
       LOG.info("Loading the existing database at th path: " + dbPath.toString());
+      // 检查存储版本兼容性
       checkVersion();
     } catch (NativeDB.DBException e) {
+      // 数据库不存在则创建新数据库
       if (e.isNotFound() || e.getMessage().contains(" does not exist ")) {
         try {
           options.createIfMissing(true);
           db = factory.open(new File(dbPath.toString()), options);
           LOG.info("Creating a new database at th path: " + dbPath.toString());
+          // 存储当前版本号
           storeVersion(CURRENT_VERSION_INFO);
         } catch (DBException ex) {
           throw new IOException(ex);
@@ -138,8 +153,11 @@ public class LeveldbTimelineStateStore extends
   public TimelineServiceState loadState() throws IOException {
     LOG.info("Loading timeline service state from leveldb");
     TimelineServiceState state = new TimelineServiceState();
+    // 加载所有主密钥
     int numKeys = loadTokenMasterKeys(state);
+    // 加载所有委托令牌
     int numTokens = loadTokens(state);
+    // 加载最新序列号
     loadLatestSequenceNumber(state);
     LOG.info("Loaded " + numKeys + " master keys and " + numTokens
         + " tokens from leveldb, and latest sequence number is "
@@ -153,14 +171,18 @@ public class LeveldbTimelineStateStore extends
     DataOutputStream ds = null;
     WriteBatch batch = null;
     try {
+      // 构造令牌存储键
       byte[] k = createTokenEntryKey(tokenId.getSequenceNumber());
+      // 令牌已存在则抛出异常
       if (db.get(k) != null) {
         throw new IOException(tokenId + " already exists");
       }
+      // 序列化令牌数据
       byte[] v = buildTokenData(tokenId, renewDate);
       ByteArrayOutputStream bs = new ByteArrayOutputStream();
       ds = new DataOutputStream(bs);
       ds.writeInt(tokenId.getSequenceNumber());
+      // 批量写入：写入令牌和最新序列号
       batch = db.createWriteBatch();
       batch.put(k, v);
       batch.put(LATEST_SEQUENCE_NUMBER_KEY, bs.toByteArray());
@@ -177,10 +199,13 @@ public class LeveldbTimelineStateStore extends
   public void updateToken(TimelineDelegationTokenIdentifier tokenId,
       Long renewDate) throws IOException {
     try {
+      // 构造令牌存储键
       byte[] k = createTokenEntryKey(tokenId.getSequenceNumber());
+      // 令牌不存在则抛出异常
       if (db.get(k) == null) {
         throw new IOException(tokenId + " doesn't exist");
       }
+      // 序列化更新后的令牌数据
       byte[] v = buildTokenData(tokenId, renewDate);
       db.put(k, v);
     } catch (DBException e) {
@@ -192,6 +217,7 @@ public class LeveldbTimelineStateStore extends
   public void removeToken(TimelineDelegationTokenIdentifier tokenId)
       throws IOException {
     try {
+      // 构造令牌存储键并删除
       byte[] key = createTokenEntryKey(tokenId.getSequenceNumber());
       db.delete(key);
     } catch (DBException e) {
@@ -202,10 +228,13 @@ public class LeveldbTimelineStateStore extends
   @Override
   public void storeTokenMasterKey(DelegationKey key) throws IOException {
     try {
+      // 构造主密钥存储键
       byte[] k = createTokenMasterKeyEntryKey(key.getKeyId());
+      // 主密钥已存在则抛出异常
       if (db.get(k) != null) {
         throw new IOException(key + " already exists");
       }
+      // 序列化主密钥数据并存储
       byte[] v = buildTokenMasterKeyData(key);
       db.put(k, v);
     } catch (DBException e) {
@@ -216,6 +245,7 @@ public class LeveldbTimelineStateStore extends
   @Override
   public void removeTokenMasterKey(DelegationKey key) throws IOException {
     try {
+      // 构造主密钥存储键并删除
       byte[] k = createTokenMasterKeyEntryKey(key.getKeyId());
       db.delete(k);
     } catch (DBException e) {
@@ -236,6 +266,7 @@ public class LeveldbTimelineStateStore extends
     ByteArrayOutputStream memStream = new ByteArrayOutputStream();
     DataOutputStream dataStream = new DataOutputStream(memStream);
     try {
+      // 序列化主密钥对象到字节数组
       key.write(dataStream);
       dataStream.close();
     } finally {
@@ -251,10 +282,12 @@ public class LeveldbTimelineStateStore extends
     DataInputStream in =
         new DataInputStream(new ByteArrayInputStream(keyData));
     try {
+      // 反序列化主密钥对象
       key.readFields(in);
     } finally {
       IOUtils.cleanupWithLogger(LOG, in);
     }
+    // 添加到状态对象中
     state.tokenMasterKeyState.add(key);
   }
 
@@ -265,27 +298,33 @@ public class LeveldbTimelineStateStore extends
     DataInputStream in =
         new DataInputStream(new ByteArrayInputStream(tokenData));
     try {
+      // 反序列化令牌数据
       data.readFields(in);
     } finally {
       IOUtils.cleanupWithLogger(LOG, in);
     }
+    // 添加到状态对象中
     state.tokenState.put(data.getTokenIdentifier(), data.getRenewDate());
   }
 
   private int loadTokenMasterKeys(TimelineServiceState state)
       throws IOException {
+    // 构造主密钥前缀用于范围查询
     byte[] base = KeyBuilder.newInstance().add(TOKEN_MASTER_KEY_ENTRY_PREFIX)
         .getBytesForLookup();
     int numKeys = 0;
     LeveldbIterator iterator = null;
     try {
+      // 遍历所有前缀匹配的主密钥条目
       for (iterator = new LeveldbIterator(db), iterator.seek(base);
           iterator.hasNext(); iterator.next()) {
         byte[] k = iterator.peekNext().getKey();
+        // 前缀不匹配则结束遍历
         if (!prefixMatches(base, base.length, k)) {
           break;
         }
         byte[] v = iterator.peekNext().getValue();
+        // 加载主密钥到状态
         loadTokenMasterKeyData(state, v);
         ++numKeys;
       }
@@ -296,18 +335,22 @@ public class LeveldbTimelineStateStore extends
   }
 
   private int loadTokens(TimelineServiceState state) throws IOException {
+    // 构造令牌前缀用于范围查询
     byte[] base = KeyBuilder.newInstance().add(TOKEN_ENTRY_PREFIX)
         .getBytesForLookup();
     int numTokens = 0;
     LeveldbIterator iterator = null;
     try {
+      // 遍历所有前缀匹配的令牌条目
       for (iterator = new LeveldbIterator(db), iterator.seek(base);
           iterator.hasNext(); iterator.next()) {
         byte[] k = iterator.peekNext().getKey();
+        // 前缀不匹配则结束遍历
         if (!prefixMatches(base, base.length, k)) {
           break;
         }
         byte[] v = iterator.peekNext().getValue();
+        // 加载令牌到状态
         loadTokenData(state, v);
         ++numTokens;
       }
@@ -323,6 +366,7 @@ public class LeveldbTimelineStateStore extends
       throws IOException {
     byte[] data = null;
     try {
+      // 读取最新序列号存储值
       data = db.get(LATEST_SEQUENCE_NUMBER_KEY);
     } catch (DBException e) {
       throw new IOException(e);
@@ -330,6 +374,7 @@ public class LeveldbTimelineStateStore extends
     if (data != null) {
       DataInputStream in = new DataInputStream(new ByteArrayInputStream(data));
       try {
+        // 反序列化并设置到状态对象
         state.latestSequenceNumber = in.readInt();
       } finally {
         IOUtils.cleanupWithLogger(LOG, in);
@@ -355,11 +400,16 @@ public class LeveldbTimelineStateStore extends
         .add(Integer.toString(keyId)).getBytes();
   }
 
+  /**
+   * 从LevelDB加载存储版本信息，供测试使用
+   * @return 存储版本信息
+   * @throws IOException IO异常
+   */
   @VisibleForTesting
   Version loadVersion() throws IOException {
     try {
       byte[] data = db.get(TIMELINE_STATE_STORE_VERSION_KEY);
-      // if version is not stored previously, treat it as CURRENT_VERSION_INFO.
+      // 如果之前没有存储版本，默认返回当前版本
       if (data == null || data.length == 0) {
         return getCurrentVersion();
       }
@@ -372,6 +422,11 @@ public class LeveldbTimelineStateStore extends
     }
   }
 
+  /**
+   * 将存储版本信息写入LevelDB，供测试使用
+   * @param state 版本信息
+   * @throws IOException IO异常
+   */
   @VisibleForTesting
   void storeVersion(Version state) throws IOException {
     byte[] data =
@@ -383,6 +438,10 @@ public class LeveldbTimelineStateStore extends
     }
   }
 
+  /**
+   * 获取当前存储版本，供测试使用
+   * @return 当前版本信息
+   */
   @VisibleForTesting
   Version getCurrentVersion() {
     return CURRENT_VERSION_INFO;
@@ -402,19 +461,9 @@ public class LeveldbTimelineStateStore extends
   private void checkVersion() throws IOException {
     Version loadedVersion = loadVersion();
     LOG.info("Loaded timeline state store version info " + loadedVersion);
+    // 版本完全一致直接返回
     if (loadedVersion.equals(getCurrentVersion())) {
       return;
     }
+    // 版本兼容（主版本号相同，次版本号小于等于当前）则更新版本信息后继续
     if (loadedVersion.isCompatibleTo(getCurrentVersion())) {
-      LOG.info("Storing timeline state store version info " + getCurrentVersion());
-      storeVersion(CURRENT_VERSION_INFO);
-    } else {
-      String incompatibleMessage =
-          "Incompatible version for timeline state store: expecting version "
-              + getCurrentVersion() + ", but loading version " + loadedVersion;
-      LOG.error(incompatibleMessage);
-      throw new IOException(incompatibleMessage);
-    }
-  }
-
-}

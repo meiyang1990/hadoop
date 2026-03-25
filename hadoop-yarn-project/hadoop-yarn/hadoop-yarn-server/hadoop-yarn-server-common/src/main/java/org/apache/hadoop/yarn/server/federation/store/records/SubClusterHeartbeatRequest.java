@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,24 +24,28 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
+ * 子集群心跳请求类，用于YARN联邦架构中向联邦状态存储上报子集群运行时信息。
  * <p>
- * SubClusterHeartbeatRequest is a report of the runtime information of the
- * subcluster that is participating in federation.
- *
- * <p>
- * It includes information such as:
+ * 包含上报的核心信息如下：
  * <ul>
- * <li>{@link SubClusterId}</li>
- * <li>The URL of the subcluster</li>
- * <li>The timestamp representing the last start time of the subCluster</li>
- * <li>{@code FederationsubClusterState}</li>
- * <li>The current capacity and utilization of the subCluster</li>
+ * <li>子集群唯一标识 {@link SubClusterId}</li>
+ * <li>子集群访问地址</li>
+ * <li>子集群上次启动时间戳</li>
+ * <li>子集群当前状态 {@link SubClusterState}</li>
+ * <li>子集群当前容量和利用率信息</li>
  * </ul>
  */
 @Private
 @Unstable
 public abstract class SubClusterHeartbeatRequest {
 
+  /**
+   * 创建新的子集群心跳请求实例，使用默认0作为上次心跳时间。
+   * @param subClusterId 子集群唯一标识
+   * @param state 子集群当前状态
+   * @param capability 子集群容量和利用率信息（JAXB序列化字符串）
+   * @return 新的子集群心跳请求实例
+   */
   @Private
   @Unstable
   public static SubClusterHeartbeatRequest newInstance(
@@ -48,11 +53,20 @@ public abstract class SubClusterHeartbeatRequest {
     return newInstance(subClusterId, 0, state, capability);
   }
 
+  /**
+   * 创建新的子集群心跳请求实例，完整参数构造。
+   * @param subClusterId 子集群唯一标识
+   * @param lastHeartBeat 上次心跳时间戳
+   * @param state 子集群当前状态
+   * @param capability 子集群容量和利用率信息（JAXB序列化字符串）
+   * @return 新的子集群心跳请求实例
+   */
   @Private
   @Unstable
   public static SubClusterHeartbeatRequest newInstance(
       SubClusterId subClusterId, long lastHeartBeat, SubClusterState state,
       String capability) {
+    // 使用Hadoop Records框架创建实例
     SubClusterHeartbeatRequest subClusterHeartbeatRequest =
         Records.newRecord(SubClusterHeartbeatRequest.class);
     subClusterHeartbeatRequest.setSubClusterId(subClusterId);
@@ -63,76 +77,72 @@ public abstract class SubClusterHeartbeatRequest {
   }
 
   /**
-   * Get the {@link SubClusterId} representing the unique identifier of the
-   * subcluster.
+   * 获取子集群唯一标识符。
    *
-   * @return the subcluster identifier
+   * @return 子集群标识符
    */
   @Public
   @Unstable
   public abstract SubClusterId getSubClusterId();
 
   /**
-   * Set the {@link SubClusterId} representing the unique identifier of the
-   * subCluster.
+   * 设置子集群唯一标识符。
    *
-   * @param subClusterId the subCluster identifier
+   * @param subClusterId 子集群标识符
    */
   @Private
   @Unstable
   public abstract void setSubClusterId(SubClusterId subClusterId);
 
   /**
-   * Get the last heart beat time of the subcluster.
+   * 获取子集群上次心跳时间戳。
    *
-   * @return the state of the subcluster
+   * @return 上次心跳时间戳
    */
   @Public
   @Unstable
   public abstract long getLastHeartBeat();
 
   /**
-   * Set the last heartbeat time of the subcluster.
+   * 设置子集群上次心跳时间戳。
    *
-   * @param time the last heartbeat time of the subcluster
+   * @param time 上次心跳时间戳
    */
   @Private
   @Unstable
   public abstract void setLastHeartBeat(long time);
 
   /**
-   * Get the {@link SubClusterState} of the subcluster.
+   * 获取子集群当前状态。
    *
-   * @return the state of the subcluster
+   * @return 子集群状态
    */
   @Public
   @Unstable
   public abstract SubClusterState getState();
 
   /**
-   * Set the {@link SubClusterState} of the subcluster.
+   * 设置子集群当前状态。
    *
-   * @param state the state of the subCluster
+   * @param state 子集群状态
    */
   @Private
   @Unstable
   public abstract void setState(SubClusterState state);
 
   /**
-   * Get the current capacity and utilization of the subcluster. This is the
-   * JAXB marshalled string representation of the <code>ClusterMetrics</code>.
+   * 获取子集群当前容量和利用率信息，为ClusterMetrics的JAXB序列化字符串。
    *
-   * @return the current capacity and utilization of the subcluster
+   * @return 子集群容量和利用率信息
    */
   @Public
   @Unstable
   public abstract String getCapability();
 
   /**
-   * Set the current capacity and utilization of the subCluster. This is the
-   * JAXB marshalled string representation of the <code>ClusterMetrics</code>.
+   * 设置子集群当前容量和利用率信息，为ClusterMetrics的JAXB序列化字符串。
    *
-   * @param capability the current capacity and utilization of the subcluster
+   * @param capability 子集群容量和利用率信息
    */
   @Private
   @Unstable

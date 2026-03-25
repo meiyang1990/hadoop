@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,22 +17,28 @@
  * limitations under the License.
  */
 
-
 package org.apache.hadoop.hdfs.server.datanode;
 
 import java.io.IOException;
 
 /**
- * Exception indicating that the target block already exists 
- * and is not set to be recovered/overwritten.  
+ * HDFS数据节点中，数据块副本已存在且不允许覆盖/恢复时抛出的异常
+ * 当尝试创建一个已存在且未标记为可恢复的副本时触发该异常
  */
 public class ReplicaAlreadyExistsException extends IOException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造无消息的副本已存在异常
+   */
   public ReplicaAlreadyExistsException() {
     super();
   }
 
+  /**
+   * 构造带指定错误信息的副本已存在异常
+   * @param msg 异常描述信息
+   */
   public ReplicaAlreadyExistsException(String msg) {
     super(msg);
   }

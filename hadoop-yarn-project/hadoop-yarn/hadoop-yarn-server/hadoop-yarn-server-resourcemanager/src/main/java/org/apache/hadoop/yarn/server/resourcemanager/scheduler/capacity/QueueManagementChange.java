@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,7 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.api.records.QueueState;
 
 /**
- * Encapsulates Queue entitlement and state updates needed
- * for adjusting capacity dynamically
+ * 封装动态调整队列容量所需的队列权限和状态变更信息
  *
  */
 @Private
@@ -33,31 +33,39 @@ public abstract class QueueManagementChange {
   private final CSQueue queue;
 
   /**
-   * Updating the queue may involve entitlement updates
-   * and/or QueueState changes
-   *
-   * QueueAction can potentially be enhanced
-   * for adding, removing queues for queue management
+   * 队列管理操作类型，当前仅支持更新队列，未来可扩展添加/删除队列功能
    */
   public enum QueueAction {
+    /** 更新队列配置 */
     UPDATE_QUEUE
   }
 
+  /** 自动创建叶子队列的模板配置更新 */
   private AutoCreatedLeafQueueConfig
       queueTemplateUpdate;
 
   private final QueueAction queueAction;
-  /**
-   * Updated Queue state with the new entitlement
-   */
+  /** 变更后队列需要切换到的目标状态 */
   private QueueState transitionToQueueState;
 
+  /**
+   * 构造队列管理变更对象
+   * @param queue 目标队列
+   * @param queueAction 要执行的操作
+   */
   public QueueManagementChange(final CSQueue queue,
       final QueueAction queueAction) {
     this.queue = queue;
     this.queueAction = queueAction;
   }
 
+  /**
+   * 构造包含状态变更和模板更新的队列管理变更对象
+   * @param queue 目标队列
+   * @param queueAction 要执行的操作
+   * @param targetQueueState 目标队列状态
+   * @param queueTemplateUpdates 队列模板更新配置
+   */
   public QueueManagementChange(final CSQueue queue,
       final QueueAction queueAction, QueueState targetQueueState,
       final AutoCreatedLeafQueueConfig
@@ -66,6 +74,12 @@ public abstract class QueueManagementChange {
     this.transitionToQueueState = targetQueueState;
   }
 
+  /**
+   * 构造包含模板更新的队列管理变更对象
+   * @param queue 目标队列
+   * @param queueAction 要执行的操作
+   * @param queueTemplateUpdates 队列模板更新配置
+   */
   public QueueManagementChange(final CSQueue queue,
       final QueueAction queueAction,
       final AutoCreatedLeafQueueConfig
@@ -74,18 +88,34 @@ public abstract class QueueManagementChange {
     this.queueTemplateUpdate = queueTemplateUpdates;
   }
 
+  /**
+   * 获取队列需要切换到的目标状态
+   * @return 目标队列状态
+   */
   public QueueState getTransitionToQueueState() {
     return transitionToQueueState;
   }
 
+  /**
+   * 获取需要变更的目标队列
+   * @return 目标队列对象
+   */
   public CSQueue getQueue() {
     return queue;
   }
 
+  /**
+   * 获取更新后的队列模板配置
+   * @return 更新后的队列模板
+   */
   public AutoCreatedLeafQueueConfig getUpdatedQueueTemplate() {
     return queueTemplateUpdate;
   }
 
+  /**
+   * 获取本次要执行的队列操作类型
+   * @return 操作类型枚举
+   */
   public QueueAction getQueueAction() {
     return queueAction;
   }
@@ -130,8 +160,17 @@ public abstract class QueueManagementChange {
         + transitionToQueueState + '}';
   }
 
+  /**
+   * 更新队列操作的具体实现类
+   */
   public static class UpdateQueue extends QueueManagementChange {
 
+    /**
+     * 构造包含状态变更和模板更新的更新队列操作
+     * @param queue 目标队列
+     * @param targetQueueState 目标队列状态
+     * @param queueTemplateUpdate 队列模板更新配置
+     */
     public UpdateQueue(final CSQueue queue, QueueState targetQueueState,
         final AutoCreatedLeafQueueConfig
             queueTemplateUpdate) {
@@ -139,6 +178,11 @@ public abstract class QueueManagementChange {
           queueTemplateUpdate);
     }
 
+    /**
+     * 构造仅包含模板更新的更新队列操作
+     * @param queue 目标队列
+     * @param queueTemplateUpdate 队列模板更新配置
+     */
     public UpdateQueue(final CSQueue queue,
         final AutoCreatedLeafQueueConfig
             queueTemplateUpdate) {

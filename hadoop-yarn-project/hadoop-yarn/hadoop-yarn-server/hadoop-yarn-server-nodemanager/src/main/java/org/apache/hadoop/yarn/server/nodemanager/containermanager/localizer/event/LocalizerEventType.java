@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,9 @@
 */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.event;
 
+/**
+ * 本地化器事件类型枚举，定义NodeManager容器本地化过程中所有可能的事件类型
+ */
 public enum LocalizerEventType {
   /** See {@link LocalizerResourceRequestEvent} */
   REQUEST_RESOURCE_LOCALIZATION

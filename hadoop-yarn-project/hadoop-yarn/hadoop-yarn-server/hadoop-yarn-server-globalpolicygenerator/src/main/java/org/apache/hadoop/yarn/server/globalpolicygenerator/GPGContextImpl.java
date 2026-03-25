@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  *  Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,12 +23,15 @@ import org.apache.hadoop.yarn.server.federation.utils.FederationRegistryClient;
 import org.apache.hadoop.yarn.server.federation.utils.FederationStateStoreFacade;
 
 /**
- * Context implementation for Global Policy Generator.
+ * 全局策略生成器(GPG)上下文实现类，持有GPG运行所需的核心依赖门面和客户端实例。
  */
 public class GPGContextImpl implements GPGContext {
 
+  // 联邦状态存储门面实例，用于访问联邦集群状态数据
   private FederationStateStoreFacade facade;
+  // 全局策略门面实例，用于生成全局策略
   private GPGPolicyFacade policyFacade;
+  // 联邦注册中心客户端，用于与联邦注册中心交互
   private FederationRegistryClient registryClient;
 
   @Override

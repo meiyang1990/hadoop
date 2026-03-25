@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,28 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Utility class for tracking descent into the structure of the
- * Visitor class (ImageVisitor, EditsVisitor etc.)
+ * HDFS离线镜像查看器深度计数器工具类。
+ * 用于跟踪Visitor类（ImageVisitor、EditsVisitor等）遍历文件系统目录树结构时的当前深度层级，
+ * 帮助Visitor维护遍历过程中的层级关系，支持深度递增、递减和当前深度查询操作。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class DepthCounter {
   private int depth = 0;
 
+  /**
+   * 层级深度加1，进入下一级目录时调用
+   */
   public void incLevel() { depth++; }
+
+  /**
+   * 层级深度减1，退出当前目录时调用，保证深度不会小于0
+   */
   public void decLevel() { if(depth >= 1) depth--; }
+
+  /**
+   * 获取当前遍历的层级深度
+   * @return 当前深度值，根目录深度为0
+   */
   public int  getLevel() { return depth; }
 }
-

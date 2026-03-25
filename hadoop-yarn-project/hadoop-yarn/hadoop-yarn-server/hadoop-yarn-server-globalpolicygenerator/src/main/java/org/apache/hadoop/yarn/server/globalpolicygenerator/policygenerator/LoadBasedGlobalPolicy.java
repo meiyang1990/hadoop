@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -49,13 +50,14 @@ import static org.apache.hadoop.yarn.conf.YarnConfiguration.FEDERATION_GPG_LOAD_
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.DEFAULT_FEDERATION_GPG_LOAD_BASED_SCALING;
 
 /**
- * Load based policy that generates weighted policies by scaling
- * the cluster load (based on pending) to a weight from 0.0 to 1.0.
+ * 基于负载的全局策略实现，根据子集群待处理应用数量将集群负载映射为0.0-1.0的权重，生成加权路由策略
+ * 用于YARN联邦环境中根据子集群负载动态调整调度权重，实现负载均衡
  */
 public class LoadBasedGlobalPolicy extends GlobalPolicy {
 
   private static final Logger LOG = LoggerFactory.getLogger(LoadBasedGlobalPolicy.class);
 
+  /** 权重缩放算法枚举 */
   public enum Scaling {
     LINEAR,
     QUADRATIC,
@@ -63,38 +65,42 @@ public class LoadBasedGlobalPolicy extends GlobalPolicy {
     NONE
   }
 
-  // Minimum pending count before the policy starts scaling down the weights
+  // 开始降低权重的最小待处理应用数阈值
   private int minPending;
-  // Maximum pending count before policy stops scaling down the weights
-  // (they'll be set to min weight)
+  // 停止降低权重的最大待处理应用数阈值，超过该阈值后权重将被设为最小值
   private int maxPending;
-  // Minimum weight that a sub cluster will be assigned
+  // 子集群可被分配的最小权重值
   private float minWeight;
-  // Maximum number of weights that can be scaled down simultaneously
+  // 单次可同时调整权重的最大子集群数量
   private int maxEdit;
-  // Scaling type
+  // 权重缩放算法类型
   private Scaling scaling = Scaling.NONE;
 
   @Override
   public void setConf(Configuration conf) {
     super.setConf(conf);
+    // 从配置加载最小待处理应用阈值
     minPending = conf.getInt(FEDERATION_GPG_LOAD_BASED_MIN_PENDING,
         DEFAULT_FEDERATION_GPG_LOAD_BASED_MIN_PENDING);
+    // 从配置加载最大待处理应用阈值
     maxPending = conf.getInt(FEDERATION_GPG_LOAD_BASED_MAX_PENDING,
         DEFAULT_FEDERATION_GPG_LOAD_BASED_MAX_PENDING);
+    // 从配置加载最小权重值
     minWeight = conf.getFloat(FEDERATION_GPG_LOAD_BASED_MIN_WEIGHT,
         DEFAULT_FEDERATION_GPG_LOAD_BASED_MIN_WEIGHT);
+    // 从配置加载单次最大可调整数量
     maxEdit = conf.getInt(FEDERATION_GPG_LOAD_BASED_MAX_EDIT,
         DEFAULT_FEDERATION_GPG_LOAD_BASED_MAX_EDIT);
 
     try {
+      // 解析配置的权重缩放算法类型
       scaling = Scaling.valueOf(conf.get(FEDERATION_GPG_LOAD_BASED_SCALING,
           DEFAULT_FEDERATION_GPG_LOAD_BASED_SCALING));
     } catch (IllegalArgumentException e) {
       LOG.warn("Invalid scaling mode provided", e);
     }
 
-    // Check that all configuration values are valid
+    // 校验所有配置值合法性
     if (!(minPending <= maxPending)) {
       throw new YarnRuntimeException("minPending = " + minPending
           + " must be less than or equal to maxPending=" + maxPending);
@@ -107,23 +113,20 @@ public class LoadBasedGlobalPolicy extends GlobalPolicy {
 
   @Override
   protected Map<Class<?>, String> registerPaths() {
-    // Register for the endpoints we want to receive information on
+    // 注册需要获取的集群指标信息对应的REST端点
     Map<Class<?>, String> map = new HashMap<>();
     map.put(ClusterMetricsInfo.class, RMWSConsts.METRICS);
     return map;
   }
 
   /**
-   * Update the policy of the queue.
+   * 更新队列的联邦路由策略，根据子集群负载动态生成新的权重策略
    *
-   * @param queueName   name of the queue
-   * @param clusterInfo subClusterId map to cluster information about the
-   *                    SubCluster used to make policy decisions
-   * @param currentManager the FederationPolicyManager for the queue's existing
-   * policy the manager may be null, in which case the policy
-   * will need to be created.
+   * @param queueName   队列名称
+   * @param clusterInfo 子集群元信息映射，存储各子集群上报的指标数据
+   * @param currentManager 当前队列已有的策略管理器，为空则新建
    *
-   * @return FederationPolicyManager.
+   * @return 更新后的联邦策略管理器
    */
   @Override
   protected FederationPolicyManager updatePolicy(String queueName,
@@ -143,19 +146,16 @@ public class LoadBasedGlobalPolicy extends GlobalPolicy {
   }
 
   /**
-   * GPG can help update the policy of the queue.
+   * 根据子集群负载指标生成加权位置策略管理器，自动计算各子集群权重
    *
-   * We automatically generate the weight of the subCluster
-   * according to the clusterMetrics of the subCluster.
-   *
-   * @param queue queueName.
-   * @param subClusterMetricInfos Metric information of the subCluster.
-   * @return WeightedLocalityPolicyManager.
+   * @param queue 队列名称
+   * @param subClusterMetricInfos 各子集群的指标信息映射
+   * @return 生成好的加权位置策略管理器
    */
   protected WeightedLocalityPolicyManager getWeightedLocalityPolicyManager(String queue,
       Map<SubClusterId, Map<Class, Object>> subClusterMetricInfos) {
 
-    // Parse the metric information of the subCluster.
+    // 解析提取各子集群的指标信息
     Map<SubClusterId, ClusterMetricsInfo> clusterMetrics =
         getSubClustersMetricsInfo(subClusterMetricInfos);
 
@@ -163,32 +163,33 @@ public class LoadBasedGlobalPolicy extends GlobalPolicy {
       return null;
     }
 
-    // Get the new weight of the subCluster.
+    // 计算目标权重并设置到策略管理器中
     WeightedLocalityPolicyManager manager = new WeightedLocalityPolicyManager();
     Map<SubClusterIdInfo, Float> weights = getTargetWeights(clusterMetrics);
     manager.setQueue(queue);
+    // 权重同时用于AM分配和路由器策略
     manager.getWeightedPolicyInfo().setAMRMPolicyWeights(weights);
     manager.getWeightedPolicyInfo().setRouterPolicyWeights(weights);
     return manager;
   }
 
   /**
-   * Get the ClusterMetric information of the subCluster.
+   * 从原始子集群信息中提取出集群指标信息
    *
-   * @param subClusterMetricsInfo subCluster Metric Information.
-   * @return Mapping relationship between subCluster and Metric.
+   * @param subClusterMetricsInfo 原始子集群信息映射
+   * @return 子集群到指标信息的映射
    */
   protected Map<SubClusterId, ClusterMetricsInfo> getSubClustersMetricsInfo(
       Map<SubClusterId, Map<Class, Object>> subClusterMetricsInfo) {
 
-    // Check whether the Metric information of the sub-cluster is empty,
-    // if it is empty, we will directly return null.
+    // 检查输入是否为空
     if(MapUtils.isEmpty(subClusterMetricsInfo)) {
       LOG.warn("The metric info of the subCluster is empty.");
       return null;
     }
 
     Map<SubClusterId, ClusterMetricsInfo> clusterMetrics = new HashMap<>();
+    // 遍历所有子集群提取指标信息
     for (Map.Entry<SubClusterId, Map<Class, Object>> entry : subClusterMetricsInfo.entrySet()) {
       SubClusterId subClusterId = entry.getKey();
       Map<Class, Object> subClusterMetrics = entry.getValue();
@@ -197,41 +198,42 @@ public class LoadBasedGlobalPolicy extends GlobalPolicy {
       clusterMetrics.put(subClusterId, clusterMetricsInfo);
     }
 
-    // return subCluster Metric Information.
     return clusterMetrics;
   }
 
   /**
-   * Get subCluster target weight.
+   * 根据各子集群待处理负载计算目标权重
    *
-   * @param clusterMetrics Metric of the subCluster.
-   * @return subCluster Weights.
+   * @param clusterMetrics 各子集群指标信息
+   * @return 子集群对应的目标权重映射
    */
   @VisibleForTesting
   protected Map<SubClusterIdInfo, Float> getTargetWeights(
       Map<SubClusterId, ClusterMetricsInfo> clusterMetrics) {
+    // 初始化为均匀权重（所有子集群权重均为1）
     Map<SubClusterIdInfo, Float> weights = GPGUtils.createUniformWeights(clusterMetrics.keySet());
 
     List<SubClusterId> scs = new ArrayList<>(clusterMetrics.keySet());
-    // Sort the sub clusters into descending order based on pending load
+    // 按待处理应用数降序排序子集群
     scs.sort(new SortByDescendingLoad(clusterMetrics));
 
-    // Keep the top N loaded sub clusters
+    // 只取负载最高的前N个子集群调整权重
     scs = scs.subList(0, Math.min(maxEdit, scs.size()));
 
+    // 遍历计算每个子集群最终权重
     for (SubClusterId sc : scs) {
       LOG.info("Updating weight for sub cluster {}", sc.toString());
       int pending = clusterMetrics.get(sc).getAppsPending();
       if (pending <= minPending) {
+        // 待处理数低于最小阈值，不调整权重（保持初始1.0）
         LOG.info("Load ({}) is lower than minimum ({}), skipping", pending, minPending);
       } else if (pending < maxPending) {
-        // The different scaling strategies should all map values from the
-        // range min_pending+1 to max_pending to the range min_weight to 1.0f
-        // so we pre-process and simplify the domain to some value [1, MAX-MIN)
+        // 待处理数在阈值区间内，根据缩放算法计算权重
+        // 将待处理数转换为[1, maxVal]区间，简化后续计算
         int val = pending - minPending;
         int maxVal = maxPending - minPending;
 
-        // Scale the weights to respect the config minimum
+        // 根据缩放算法计算权重并映射到[minWeight, 1.0]区间
         float weight = getWeightByScaling(maxVal, val);
         weight = weight * (1.0f - minWeight);
         weight += minWeight;
@@ -239,49 +241,42 @@ public class LoadBasedGlobalPolicy extends GlobalPolicy {
         LOG.info("Load ({}) is within maximum ({}), setting weights via {} "
             + "scale to {}", pending, maxPending, scaling, weight);
       } else {
+        // 待处理数超过最大阈值，直接设置为最小权重
         weights.put(new SubClusterIdInfo(sc), minWeight);
         LOG.info("Load ({}) exceeded maximum ({}), setting weight to minimum: {}",
             pending, maxPending, minWeight);
       }
     }
+    // 校验避免所有权重都为0的异常情况
     validateWeights(weights);
     return weights;
   }
 
   /**
-   * Get weight information.
-   * We will calculate the weight information according to different Scaling.
+   * 根据选定的缩放算法计算基础权重值
    *
-   * NONE: No calculation is required, and the weight is 1 at this time.
-   *
-   * LINEAR: For linear computation, we will use (maxPendingVal - curPendingVal) / (maxPendingVal).
-   *
-   * QUADRATIC: Calculated using quadratic,
-   * We will calculate quadratic for maxPendingVal, curPendingVal,
-   * then use this formula = (maxPendingVal - curPendingVal) / (maxPendingVal).
-   *
-   * LOG(LOGARITHM): Calculated using logarithm,
-   * We will calculate logarithm for maxPendingVal, curPendingVal,
-   * then use this formula = (maxPendingVal - curPendingVal) / (maxPendingVal).
-   *
-   * @param maxPendingVal maxPending - minPending
-   * @param curPendingVal pending - minPending
-   * @return Calculated weight information.
+   * @param maxPendingVal 最大区间值 = maxPending - minPending
+   * @param curPendingVal 当前区间值 = pending - minPending
+   * @return 计算得到的基础权重值，范围在[0, 1]
    */
   protected float getWeightByScaling(int maxPendingVal, int curPendingVal) {
     float weight = 1.0f;
     switch (scaling) {
     case NONE:
+      // 不缩放，保持权重为1
       break;
     case LINEAR:
+      // 线性缩放：负载越高权重越低，线性下降
       weight = (float) (maxPendingVal - curPendingVal) / (float) (maxPendingVal);
       break;
     case QUADRATIC:
+      // 二次缩放：低负载下降慢，高负载下降快，更快降低高负载子集群权重
       double maxValQuad = Math.pow(maxPendingVal, 2);
       double valQuad = Math.pow(curPendingVal, 2);
       weight = (float) (maxValQuad - valQuad) / (float) (maxValQuad);
       break;
     case LOG:
+      // 对数缩放：低负载下降快，高负载下降慢，对低负载更敏感
       double maxValLog = Math.log(maxPendingVal);
       double valLog = Math.log(curPendingVal);
       weight = (float) (maxValLog - valLog) / (float) (maxValLog);
@@ -294,22 +289,24 @@ public class LoadBasedGlobalPolicy extends GlobalPolicy {
   }
 
   /**
-   * Helper to avoid all zero weights. If weights are all zero, they're reset
-   * to one
-   * @param weights weights to validate
+   * 校验权重合法性，避免出现所有权重全为0的异常情况，若全0则重置为全1
+   * @param weights 需要校验的权重映射
    */
   private void validateWeights(Map<SubClusterIdInfo, Float> weights) {
     for(Float w : weights.values()) {
-      // If we find a nonzero weight, we're validated
+      // 只要存在一个非零权重，校验通过
       if(w > 0.0f) {
         return;
       }
     }
     LOG.warn("All {} generated weights were 0.0f. Resetting to 1.0f.", weights.size());
-    // All weights were zero. Reset all back to 1.0
+    // 所有权重都是0，重置为1，保证集群可用
     weights.replaceAll((i, v) -> 1.0f);
   }
 
+  /**
+   * 按子集群待处理应用数降序排序的比较器
+   */
   private static final class SortByDescendingLoad
       implements Comparator<SubClusterId> {
 
@@ -321,7 +318,7 @@ public class LoadBasedGlobalPolicy extends GlobalPolicy {
     }
 
     public int compare(SubClusterId a, SubClusterId b) {
-      // Sort by pending load
+      // 按待处理应用数降序排序
       return clusterMetrics.get(b).getAppsPending() - clusterMetrics.get(a)
           .getAppsPending();
     }

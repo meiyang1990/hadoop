@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,9 +26,8 @@ import org.apache.hadoop.classification.InterfaceStability;
 
 
 /**
- * This class implements a value aggregator that sums up a sequence of double
- * values.
- * 
+ * Double类型值累加聚合器实现，用于对一组double值执行求和聚合计算。
+ * 属于MapReduce聚合框架的内置实现，用于分组聚合场景下的数值求和。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -36,60 +36,54 @@ public class DoubleValueSum implements ValueAggregator<String> {
   double sum = 0;
 
   /**
-   * The default constructor
-   * 
+   * 构造函数，创建Double值累加聚合器并初始化。
    */
   public DoubleValueSum() {
     reset();
   }
 
   /**
-   * add a value to the aggregator
-   * 
-   * @param val
-   *          an object whose string representation represents a double value.
-   * 
+   * 添加新的待聚合值，将其解析为double后累加到总和中。
+   * @param val 待累加的对象，其字符串表示为一个double数值
    */
   public void addNextValue(Object val) {
     this.sum += Double.parseDouble(val.toString());
   }
 
   /**
-   * add a value to the aggregator
-   * 
-   * @param val
-   *          a double value.
-   * 
+   * 添加新的待聚合double值，直接累加到总和中。
+   * @param val 待累加的double数值
    */
   public void addNextValue(double val) {
     this.sum += val;
   }
 
   /**
-   * @return the string representation of the aggregated value
+   * 获取聚合结果的字符串表示。
+   * @return 累加总和的字符串形式
    */
   public String getReport() {
     return "" + sum;
   }
 
   /**
-   * @return the aggregated value
+   * 获取最终的累加总和结果。
+   * @return 所有输入值的累加和
    */
   public double getSum() {
     return this.sum;
   }
 
   /**
-   * reset the aggregator
+   * 重置累加器，将总和清零，准备下一轮聚合计算。
    */
   public void reset() {
     sum = 0;
   }
 
   /**
-   * @return return an array of one element. The element is a string
-   *         representation of the aggregated value. The return value is
-   *         expected to be used by the a combiner.
+   * 生成供Combiner使用的聚合结果输出。
+   * @return 包含一个元素的ArrayList，元素为累加总和的字符串表示
    */
   public ArrayList<String> getCombinerOutput() {
     ArrayList<String> retv = new ArrayList<String>(1);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -15,8 +16,8 @@
  * limitations under the License.
  */
 /**
- * Package containing classes related to Docker commands and common operations
- * used within the @{link DockerLinuxContainerRuntime}.
+ * 该包包含DockerLinuxContainerRuntime中使用的Docker命令执行和通用操作相关实现类，
+ * 负责YARN NodeManager上Docker容器运行时与Docker引擎交互的核心逻辑封装。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

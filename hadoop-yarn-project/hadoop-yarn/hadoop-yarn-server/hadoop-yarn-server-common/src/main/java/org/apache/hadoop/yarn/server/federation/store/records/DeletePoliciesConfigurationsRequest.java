@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -21,11 +22,15 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * This class is used for handling queue policy deletion requests.
- * We will delete all PoliciesConfigurations.
+ * YARN联邦路由策略配置删除请求类，封装删除路由策略配置的请求参数。
+ * 用于向联邦状态存储发起删除所有策略配置的请求。
  */
 public abstract class DeletePoliciesConfigurationsRequest {
 
+  /**
+   * 创建一个新的删除策略配置请求实例。
+   * @return 新建的DeletePoliciesConfigurationsRequest实例
+   */
   @Private
   @Unstable
   public static DeletePoliciesConfigurationsRequest newInstance() {

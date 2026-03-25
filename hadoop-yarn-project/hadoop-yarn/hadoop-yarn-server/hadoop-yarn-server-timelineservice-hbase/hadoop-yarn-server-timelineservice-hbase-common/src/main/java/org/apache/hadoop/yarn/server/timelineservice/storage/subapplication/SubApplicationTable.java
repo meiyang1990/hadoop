@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,44 +22,15 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.subapplication;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
 
 /**
- * The sub application table has column families:
- * info, config and metrics.
- * Info stores information about a timeline entity object
- * config stores configuration data of a timeline entity object
- * metrics stores the metrics of a timeline entity object
- *
- * Example sub application table record:
- *
- * <pre>
- * |-------------------------------------------------------------------------|
- * |  Row          | Column Family             | Column Family| Column Family|
- * |  key          | info                      | metrics      | config       |
- * |-------------------------------------------------------------------------|
- * | subAppUserId! | id:entityId               | metricId1:   | configKey1:  |
- * | clusterId!    | type:entityType           | metricValue1 | configValue1 |
- * | entityType!   |                           | @timestamp1  |              |
- * | idPrefix!|    |                           |              | configKey2:  |
- * | entityId!     | created_time:             | metricId1:   | configValue2 |
- * | userId        | 1392993084018             | metricValue2 |              |
- * |               |                           | @timestamp2  |              |
- * |               | i!infoKey:                |              |              |
- * |               | infoValue                 | metricId1:   |              |
- * |               |                           | metricValue1 |              |
- * |               |                           | @timestamp2  |              |
- * |               | e!eventId=timestamp=      |              |              |
- * |               | infoKey:                  |              |              |
- * |               | eventInfoValue            |              |              |
- * |               |                           |              |              |
- * |               | r!relatesToKey:           |              |              |
- * |               | id3=id4=id5               |              |              |
- * |               |                           |              |              |
- * |               | s!isRelatedToKey          |              |              |
- * |               | id7=id9=id6               |              |              |
- * |               |                           |              |              |
- * |               | flowVersion:              |              |              |
- * |               | versionValue              |              |              |
- * |-------------------------------------------------------------------------|
- * </pre>
+ * 子应用表定义，用于在HBase中存储YARN时间线服务的子应用实体数据。
+ * 该表包含三个列族：
+ * <ul>
+ *   <li>info：存储时间线实体的基础信息</li>
+ *   <li>config：存储时间线实体的配置数据</li>
+ *   <li>metrics：存储时间线实体的指标数据</li>
+ * </ul>
+ * 行键格式为：subAppUserId!clusterId!entityType!idPrefix!entityId!userId，
+ * 用于支持按维度高效查询子应用时间线数据。
  */
 public final class SubApplicationTable extends BaseTable<SubApplicationTable> {
 }

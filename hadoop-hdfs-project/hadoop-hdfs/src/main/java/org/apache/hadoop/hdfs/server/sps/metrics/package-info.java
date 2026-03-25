@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,7 @@
  */
 
 /**
- * This package provides the ability to expose external SPS metrics to JMX.
+ * 文件级包声明：存储倾斜策略服务(SPS)相关指标统计包
+ * 核心职责：提供将SPS运行指标暴露给JMX进行监控的能力，支持HDFS集群对存储倾斜均衡操作的运维监控
  */
 package org.apache.hadoop.hdfs.server.sps.metrics;

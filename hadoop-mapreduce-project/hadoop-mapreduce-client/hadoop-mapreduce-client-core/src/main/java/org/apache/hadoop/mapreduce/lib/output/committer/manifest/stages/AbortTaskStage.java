@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,10 +30,9 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.Manifest
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_TASK_ABORT_TASK;
 
 /**
- * Abort a task.
- *
- * This is done by deleting the task directory.
- * Exceptions may/may not be suppressed.
+ * 任务中止执行处理阶段，属于Manifest提交器流程中的一个步骤
+ * 
+ * 核心职责是删除任务尝试目录清理临时数据，根据配置决定是否忽略删除过程中的异常
  */
 public class AbortTaskStage extends
     AbstractJobOrTaskStage<Boolean, Path> {
@@ -40,15 +40,19 @@ public class AbortTaskStage extends
   private static final Logger LOG = LoggerFactory.getLogger(
       AbortTaskStage.class);
 
+  /**
+   * 构造任务中止处理阶段实例
+   * @param stageConfig 阶段配置信息
+   */
   public AbortTaskStage(final StageConfig stageConfig) {
     super(true, stageConfig, OP_STAGE_TASK_ABORT_TASK, false);
   }
 
   /**
-   * Delete the task attempt directory.
-   * @param suppressExceptions should exceptions be ignored?
-   * @return the directory
-   * @throws IOException failure when exceptions were not suppressed
+   * 执行任务中止逻辑：删除任务尝试的临时工作目录
+   * @param suppressExceptions 是否忽略删除过程中抛出的异常
+   * @return 被删除的任务尝试目录路径
+   * @throws IOException 当不忽略异常且删除操作失败时抛出IO异常
    */
   @Override
   protected Path executeStage(final Boolean suppressExceptions)
@@ -57,8 +61,10 @@ public class AbortTaskStage extends
     if (dir != null) {
       LOG.info("{}: Deleting task attempt directory {}", getName(), dir);
       if (suppressExceptions) {
+        // 递归删除目录并忽略异常
         deleteRecursiveSuppressingExceptions(dir, OP_DELETE_DIR);
       } else {
+        // 递归删除目录，异常向外抛出
         deleteRecursive(dir, OP_DELETE_DIR);
       }
     }

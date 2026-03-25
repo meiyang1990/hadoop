@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -23,7 +24,18 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerHeartbeatResponse;
 import org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords.LocalizerStatus;
 
+/**
+ * 资源本地化协议接口，定义了资源本地化器(NodeManager端)与NodeManager核心服务之间的心跳交互协议
+ * 用于在应用本地化资源过程中，同步本地化状态并获取调度指令
+ */
 public interface LocalizationProtocol {
+  /**
+   * 本地化器心跳上报，向NodeManager汇报当前本地化状态并获取响应指令
+   * @param status 当前本地化器状态，包含正在进行的本地化任务进度信息
+   * @return 心跳响应，包含NodeManager返回的后续本地化指令
+   * @throws YarnException YARN业务异常
+   * @throws IOException IO异常
+   */
   public LocalizerHeartbeatResponse heartbeat(LocalizerStatus status)
       throws YarnException, IOException;
 }

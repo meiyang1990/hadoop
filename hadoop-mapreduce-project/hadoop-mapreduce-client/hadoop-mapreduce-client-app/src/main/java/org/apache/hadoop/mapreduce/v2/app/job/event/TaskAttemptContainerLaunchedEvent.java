@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,13 +21,18 @@ package org.apache.hadoop.mapreduce.v2.app.job.event;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
+/**
+ * 任务尝试容器启动完成事件，用于通知应用Master任务尝试的容器已启动并提供Shuffle服务端口
+ * 当NodeManager启动Map任务尝试的容器后，发送该事件告知AppMaster Shuffle服务监听端口
+ */
 public class TaskAttemptContainerLaunchedEvent extends TaskAttemptEvent {
+  // Shuffle服务监听端口
   private int shufflePort;
 
   /**
-   * Create a new TaskAttemptEvent.
-   * @param id the id of the task attempt
-   * @param shufflePort the port that shuffle is listening on.
+   * 构造任务尝试容器启动事件
+   * @param id 任务尝试ID
+   * @param shufflePort Shuffle服务监听端口
    */
   public TaskAttemptContainerLaunchedEvent(TaskAttemptId id, int shufflePort) {
     super(id, TaskAttemptEventType.TA_CONTAINER_LAUNCHED);
@@ -35,9 +41,8 @@ public class TaskAttemptContainerLaunchedEvent extends TaskAttemptEvent {
 
   
   /**
-   * Get the port that the shuffle handler is listening on. This is only
-   * valid if the type of the event is TA_CONTAINER_LAUNCHED
-   * @return the port the shuffle handler is listening on.
+   * 获取Shuffle服务监听端口，仅当事件类型为TA_CONTAINER_LAUNCHED时有效
+   * @return Shuffle服务监听端口
    */
   public int getShufflePort() {
     return shufflePort;

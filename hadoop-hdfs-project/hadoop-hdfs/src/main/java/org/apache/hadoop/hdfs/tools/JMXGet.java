@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,20 +47,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.util.ExitUtil;
 
 /**
- * tool to get data from NameNode or DataNode using MBeans currently the
- * following MBeans are available (under hadoop domain):
- * hadoop:service=NameNode,name=FSNamesystemState (static)
- * hadoop:service=NameNode,name=NameNodeActivity (dynamic)
- * hadoop:service=NameNode,name=RpcActivityForPort9000 (dynamic)
- * hadoop:service=DataNode,name=RpcActivityForPort9867 (dynamic)
- * hadoop:name=service=DataNode,FSDatasetState-UndefinedStorageId663800459
- * (static)
- * hadoop:service=DataNode,name=DataNodeActivity-UndefinedStorageId-520845215
- * (dynamic)
- * 
- * 
- * implementation note: all logging is sent to System.err (since it is a command
- * line tool)
+ * HDFS JMX指标查询命令行工具，通过JMX从NameNode或DataNode获取MBean指标数据。
+ * 支持查询hadoop域下的多种MBean，包括FSNamesystemState、NameNodeActivity、RpcActivity等。
+ * 所有日志输出到System.err，查询结果输出到System.out，符合命令行工具使用习惯。
  */
 @InterfaceAudience.Private
 public class JMXGet {
@@ -70,27 +60,47 @@ public class JMXGet {
   private String service = "NameNode", port = "", server = "localhost";
   private String localVMUrl = null;
 
+  /**
+   * 构造空的JMXGet实例，后续通过setter设置参数。
+   */
   public JMXGet() {
   }
 
+  /**
+   * 设置要查询的JMX服务名称。
+   * @param service 服务名称，NameNode或DataNode
+   */
   public void setService(String service) {
     this.service = service;
   }
 
+  /**
+   * 设置JMX服务端口。
+   * @param port JMX端口号
+   */
   public void setPort(String port) {
     this.port = port;
   }
 
+  /**
+   * 设置JMX服务地址。
+   * @param server 服务主机地址，默认localhost
+   */
   public void setServer(String server) {
     this.server = server;
   }
 
+  /**
+   * 设置本地VM的JMX连接地址。
+   * @param url 本地JMX连接器地址
+   */
   public void setLocalVMUrl(String url) {
     this.localVMUrl = url;
   }
 
   /**
-   * print all attributes' values
+   * 打印所有匹配服务下所有MBean的所有属性值。
+   * @throws Exception 连接或查询过程中可能出现异常
    */
   public void printAllValues() throws Exception {
     err("List of all the available keys:");
@@ -99,16 +109,24 @@ public class JMXGet {
 
     for (ObjectName oname : hadoopObjectNames) {
       err(">>>>>>>>jmx name: " + oname.getCanonicalKeyPropertyListString());
+      // 获取MBean元信息
       MBeanInfo mbinfo = mbsc.getMBeanInfo(oname);
+      // 获取所有属性信息
       MBeanAttributeInfo[] mbinfos = mbinfo.getAttributes();
 
       for (MBeanAttributeInfo mb : mbinfos) {
+        // 查询属性值并打印
         val = mbsc.getAttribute(oname, mb.getName());
         System.out.format(format, mb.getName(), (val==null)?"":val.toString());
       }
     }
   }
 
+  /**
+   * 打印所有匹配名称正则表达式的属性值。
+   * @param attrRegExp 属性名称匹配正则表达式
+   * @throws Exception 连接或查询过程中可能出现异常
+   */
   public void printAllMatchedAttributes(String attrRegExp) throws Exception {
     err("List of the keys matching " + attrRegExp + " :");
     Object val = null;
@@ -118,6 +136,7 @@ public class JMXGet {
       MBeanInfo mbinfo = mbsc.getMBeanInfo(oname);
       MBeanAttributeInfo[] mbinfos = mbinfo.getAttributes();
       for (MBeanAttributeInfo mb : mbinfos) {
+        // 匹配属性名称前缀
         if (p.matcher(mb.getName()).lookingAt()) {
           val = mbsc.getAttribute(oname, mb.getName());
           System.out.format(format, mb.getName(), (val == null) ? "" : val.toString());
@@ -127,19 +146,24 @@ public class JMXGet {
   }
 
   /**
-   * get single value by key
+   * 根据属性名称查询单个属性值。
+   * @param key 要查询的属性名称
+   * @return 属性值字符串，未找到返回空字符串
+   * @throws Exception 连接或查询过程中可能出现异常
    */
   public String getValue(String key) throws Exception {
 
     Object val = null;
 
+    // 遍历所有匹配的MBean查找属性
     for (ObjectName oname : hadoopObjectNames) {
       try {
         val = mbsc.getAttribute(oname, key);
       } catch (AttributeNotFoundException anfe) {
-        /* just go to the next */
+        // 当前MBean不存在该属性，继续查找下一个
         continue;
       } catch (ReflectionException re) {
+        // 方法不存在也继续查找下一个
         if (re.getCause() instanceof NoSuchMethodException) {
           continue;
         }
@@ -153,8 +177,8 @@ public class JMXGet {
   }
 
   /**
-   * @throws Exception
-   *           initializes MBeanServer
+   * 初始化JMX连接，获取MBean服务器连接并查询对应服务的MBean列表。
+   * @throws Exception 初始化过程中可能出现连接、查询异常
    */
   public void init() throws Exception {
 
@@ -162,39 +186,35 @@ public class JMXGet {
         + ";localVMUrl=" + localVMUrl);
 
     String url_string = null;
-    // build connection url
+    // 构建JMX连接地址
     if (localVMUrl != null) {
-      // use
-      // jstat -snap <vmpid> | grep sun.management.JMXConnectorServer.address
-      // to get url
+      // 使用本地VM提供的JMX地址连接
       url_string = localVMUrl;
       err("url string for local pid = " + localVMUrl + " = " + url_string);
 
     } else if (!port.isEmpty() && !server.isEmpty()) {
-      // using server and port
+      // 使用指定的服务端地址和端口构建RMI连接地址
       url_string = "service:jmx:rmi:///jndi/rmi://" + server + ":" + port
       + "/jmxrmi";
-    } // else url stays null
+    } // 否则地址为空，使用本地VM平台MBean服务器
 
-    // Create an RMI connector client and
-    // connect it to the RMI connector server
+    // 创建RMI连接器客户端，连接到RMI连接器服务器
 
-    if (url_string == null) { // assume local vm (for example for Testing)
+    if (url_string == null) { // 假设连接到本地VM（多用于测试）
       mbsc = ManagementFactory.getPlatformMBeanServer();
     } else {
       JMXServiceURL url = new JMXServiceURL(url_string);
 
       err("Create RMI connector and connect to the RMI connector server" + url);
 
+      // 建立JMX连接
       JMXConnector jmxc = JMXConnectorFactory.connect(url, null);
-      // Get an MBeanServerConnection
-      //
+      // 获取MBean服务器连接
       err("\nGet an MBeanServerConnection");
       mbsc = jmxc.getMBeanServerConnection();
     }
 
-    // Get domains from MBeanServer
-    //
+    // 从MBean服务器获取所有域
     err("\nDomains:");
 
     String domains[] = mbsc.getDomains();
@@ -203,18 +223,17 @@ public class JMXGet {
       err("\tDomain = " + domain);
     }
 
-    // Get MBeanServer's default domain
-    //
+    // 获取MBean服务器默认域
     err("\nMBeanServer default domain = " + mbsc.getDefaultDomain());
 
-    // Get MBean count
-    //
+    // 获取MBean总数
     err("\nMBean count = " + mbsc.getMBeanCount());
 
-    // Query MBean names for specific domain "hadoop" and service
+    // 查询特定hadoop域和服务的MBean名称
     ObjectName query = new ObjectName("Hadoop:service=" + service + ",*");
     hadoopObjectNames = new ArrayList<ObjectName>(5);
     err("\nQuery MBeanServer MBeans:");
+    // 执行查询并排序结果
     Set<ObjectName> names = new TreeSet<ObjectName>(mbsc
         .queryNames(query, null));
 
@@ -226,7 +245,8 @@ public class JMXGet {
   }
 
   /**
-   * Print JMXGet usage information
+   * 打印工具帮助信息。
+   * @param opts 命令行选项定义
    */
   static void printUsage(Options opts) {
     HelpFormatter formatter = new HelpFormatter();
@@ -234,33 +254,43 @@ public class JMXGet {
   }
 
   /**
-   * @param msg error message
+   * 输出错误信息到标准错误流。
+   * @param msg 错误信息内容
    */
   private static void err(String msg) {
     System.err.println(msg);
   }
 
   /**
-   * parse args
+   * 解析命令行参数，生成命令行对象。
+   * @param opts 命令行选项定义对象
+   * @param args 原始命令行参数数组
+   * @return 解析后的命令行对象
+   * @throws IllegalArgumentException 参数解析失败抛出异常
    */
   private static CommandLine parseArgs(Options opts, String... args)
   throws IllegalArgumentException {
 
+    // 定义服务选项
     Option jmxService = Option.builder("service")
         .argName("NameNode|DataNode").hasArg()
         .desc("specify jmx service (NameNode by default)").build();
 
+    // 定义服务地址选项
     Option jmxServer = Option.builder("server")
         .argName("mbean server").hasArg()
         .desc("specify mbean server (localhost by default)").build();
 
+    // 定义帮助选项
     Option jmxHelp = Option.builder("help").desc("print help").build();
 
+    // 定义端口选项
     Option jmxPort = Option.builder("port")
         .argName("mbean server port")
         .hasArg().desc("specify mbean server port, "
         + "if missing - it will try to connect to MBean Server in the same VM").build();
 
+    // 定义本地VM连接选项
     Option jmxLocalVM = Option.builder("localVM")
         .argName("VM's connector url").hasArg()
         .desc("connect to the VM on the same machine;"
@@ -285,10 +315,14 @@ public class JMXGet {
     return commandLine;
   }
 
+  /**
+   * JMXGet工具主入口，处理命令行参数并执行查询。
+   * @param args 命令行参数
+   */
   public static void main(String[] args) {
     int res = -1;
 
-    // parse arguments
+    // 解析命令行参数
     Options opts = new Options();
     CommandLine commandLine = null;
     try {
@@ -298,7 +332,7 @@ public class JMXGet {
     }
 
     if (commandLine == null) {
-      // invalid arguments
+      // 参数非法，打印帮助并退出
       err("Invalid args");
       printUsage(opts);
       ExitUtil.terminate(-1);      
@@ -306,35 +340,42 @@ public class JMXGet {
 
     JMXGet jm = new JMXGet();
 
+    // 处理端口参数
     if (commandLine.hasOption("port")) {
       jm.setPort(commandLine.getOptionValue("port"));
     }
+    // 处理服务参数
     if (commandLine.hasOption("service")) {
       jm.setService(commandLine.getOptionValue("service"));
     }
+    // 处理服务地址参数
     if (commandLine.hasOption("server")) {
       jm.setServer(commandLine.getOptionValue("server"));
     }
 
+    // 处理本地VM连接参数
     if (commandLine.hasOption("localVM")) {
-      // from the file /tmp/hsperfdata*
       jm.setLocalVMUrl(commandLine.getOptionValue("localVM"));
     }
 
+    // 处理帮助请求
     if (commandLine.hasOption("help")) {
       printUsage(opts);
       ExitUtil.terminate(0);
     }
 
-    // rest of args
+    // 获取剩余参数（要查询的属性名称）
     args = commandLine.getArgs();
 
     try {
+      // 初始化JMX连接
       jm.init();
 
       if (args.length == 0) {
+        // 无参数，打印所有属性
         jm.printAllValues();
       } else {
+        // 逐个查询指定属性并打印结果
         for (String key : args) {
           err("key = " + key);
           String val = jm.getValue(key);
@@ -342,8 +383,10 @@ public class JMXGet {
             System.out.format(JMXGet.format, key, val);
         }
       }
+      // 执行成功，返回码0
       res = 0;
     } catch (Exception re) {
+      // 执行异常，打印堆栈，返回码-1
       re.printStackTrace();
       res = -1;
     }

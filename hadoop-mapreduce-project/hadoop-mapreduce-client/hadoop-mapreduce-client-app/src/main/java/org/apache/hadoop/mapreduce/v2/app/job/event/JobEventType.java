@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,43 +20,56 @@
 package org.apache.hadoop.mapreduce.v2.app.job.event;
 
 /**
- * Event types handled by Job.
+ * MapReduce作业处理的事件类型枚举，定义了作业生命周期中所有可能发生的事件类型，
+ * 用于作业状态机驱动作业状态流转，不同事件由不同组件产生触发。
  */
 public enum JobEventType {
 
-  //Producer:Client
+  // 生产者：客户端，客户端请求杀死作业
   JOB_KILL,
 
-  //Producer:MRAppMaster
+  // 生产者：MRAppMaster，作业初始化
   JOB_INIT,
+  // 生产者：MRAppMaster，作业初始化失败
   JOB_INIT_FAILED,
+  // 生产者：MRAppMaster，作业开始执行
   JOB_START,
 
-  //Producer:Task
+  // 生产者：Task，任务完成
   JOB_TASK_COMPLETED,
+  // 生产者：Task，Map任务需要重新调度
   JOB_MAP_TASK_RESCHEDULED,
+  // 生产者：Task，任务尝试执行完成
   JOB_TASK_ATTEMPT_COMPLETED,
 
-  //Producer:CommitterEventHandler
+  // 生产者：CommitterEventHandler，作业初始化完成
   JOB_SETUP_COMPLETED,
+  // 生产者：CommitterEventHandler，作业初始化失败
   JOB_SETUP_FAILED,
+  // 生产者：CommitterEventHandler，作业提交完成
   JOB_COMMIT_COMPLETED,
+  // 生产者：CommitterEventHandler，作业提交失败
   JOB_COMMIT_FAILED,
+  // 生产者：CommitterEventHandler，作业终止完成
   JOB_ABORT_COMPLETED,
 
-  //Producer:Job
+  // 生产者：Job，作业整体执行完成
   JOB_COMPLETED,
+  // 生产者：Job，作业失败等待超时
   JOB_FAIL_WAIT_TIMEDOUT,
 
-  //Producer:Any component
+  // 生产者：任意组件，作业诊断信息更新
   JOB_DIAGNOSTIC_UPDATE,
+  // 生产者：任意组件，内部错误发生
   INTERNAL_ERROR,
+  // 生产者：任意组件，作业计数器更新
   JOB_COUNTER_UPDATE,
   
-  //Producer:TaskAttemptListener
+  // 生产者：TaskAttemptListener，任务尝试获取数据失败
   JOB_TASK_ATTEMPT_FETCH_FAILURE,
   
-  //Producer:RMContainerAllocator
+  // 生产者：RMContainerAllocator，集群节点信息更新
   JOB_UPDATED_NODES,
+  // 生产者：RMContainerAllocator，ApplicationMaster重启
   JOB_AM_REBOOT
 }

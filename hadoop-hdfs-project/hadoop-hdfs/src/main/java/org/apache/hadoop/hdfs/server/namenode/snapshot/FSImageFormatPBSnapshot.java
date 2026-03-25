@@ -1,4 +1,5 @@
- /**
+// 这个文件已经全部加上中文注释
+/**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -85,10 +86,14 @@ import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.thirdparty.protobuf.ByteString;
 
+/**
+ * Protobuf格式FSImage中快照相关信息的读写处理工具类
+ * 提供从ProtoBuf格式镜像加载快照信息、以及将快照信息保存到ProtoBuf格式镜像的能力
+ */
 @InterfaceAudience.Private
 public class FSImageFormatPBSnapshot {
   /**
-   * Loading snapshot related information from protobuf based FSImage
+   * 从Protobuf格式FSImage中加载快照相关信息的加载器
    */
   public final static class Loader {
     private final FSNamesystem fsn;
@@ -96,6 +101,11 @@ public class FSImageFormatPBSnapshot {
     private final FSImageFormatProtobuf.Loader parent;
     private final Map<Integer, Snapshot> snapshotMap;
 
+    /**
+     * 构造快照信息加载器
+     * @param fsn 文件系统命名空间对象
+     * @param parent FSImage Protobuf格式加载器父对象
+     */
     public Loader(FSNamesystem fsn, FSImageFormatProtobuf.Loader parent) {
       this.fsn = fsn;
       this.fsDir = fsn.getFSDirectory();
@@ -104,8 +114,9 @@ public class FSImageFormatPBSnapshot {
     }
 
     /**
-     * The sequence of the ref node in refList must be strictly the same with
-     * the sequence in fsimage
+     * 加载INode引用段，refList中的顺序必须与fsimage中保存的严格一致
+     * @param in 输入流
+     * @throws IOException IO异常
      */
     public void loadINodeReferenceSection(InputStream in) throws IOException {
       final List<INodeReference> refList = parent.getLoaderContext()
@@ -141,8 +152,9 @@ public class FSImageFormatPBSnapshot {
     }
 
     /**
-     * Load the snapshots section from fsimage. Also add snapshottable feature
-     * to snapshottable directories.
+     * 从fsimage加载快照段，并为可快照目录添加快照功能特性
+     * @param in 输入流
+     * @throws IOException IO异常
      */
     public void loadSnapshotSection(InputStream in) throws IOException {
       SnapshotManager sm = fsn.getSnapshotManager();
@@ -181,7 +193,9 @@ public class FSImageFormatPBSnapshot {
     }
 
     /**
-     * Load the snapshot diff section from fsimage.
+     * 从fsimage加载快照差异段
+     * @param in 输入流
+     * @throws IOException IO异常
      */
     public void loadSnapshotDiffSection(InputStream in) throws IOException {
       final List<INodeReference> refList = parent.getLoaderContext()
@@ -358,299 +372,3 @@ public class FSImageFormatPBSnapshot {
           if (dirCopyInPb.hasAcl()) {
             int[] entries = AclEntryStatusFormat
                 .toInt(FSImageFormatPBINode.Loader.loadAclEntries(
-                    dirCopyInPb.getAcl(), state.getStringTable()));
-            acl = new AclFeature(entries);
-          }
-          XAttrFeature xAttrs = null;
-          if (dirCopyInPb.hasXAttrs()) {
-            xAttrs = new XAttrFeature(FSImageFormatPBINode.Loader.loadXAttrs(
-                dirCopyInPb.getXAttrs(), state.getStringTable()));
-          }
-
-          long modTime = dirCopyInPb.getModificationTime();
-          boolean noQuota = dirCopyInPb.getNsQuota() == -1
-              && dirCopyInPb.getDsQuota() == -1
-              && (!dirCopyInPb.hasTypeQuotas());
-
-          if (noQuota) {
-            copy = new INodeDirectoryAttributes.SnapshotCopy(name,
-              permission, acl, modTime, xAttrs);
-          } else {
-            EnumCounters<StorageType> typeQuotas = null;
-            if (dirCopyInPb.hasTypeQuotas()) {
-              ImmutableList<QuotaByStorageTypeEntry> qes =
-                  FSImageFormatPBINode.Loader.loadQuotaByStorageTypeEntries(
-                      dirCopyInPb.getTypeQuotas());
-              typeQuotas = new EnumCounters<StorageType>(StorageType.class,
-                  HdfsConstants.QUOTA_RESET);
-              for (QuotaByStorageTypeEntry qe : qes) {
-                if (qe.getQuota() >= 0 && qe.getStorageType() != null &&
-                    qe.getStorageType().supportTypeQuota()) {
-                  typeQuotas.set(qe.getStorageType(), qe.getQuota());
-                }
-              }
-            }
-            copy = new INodeDirectoryAttributes.CopyWithQuota(name, permission,
-                acl, modTime, dirCopyInPb.getNsQuota(),
-                dirCopyInPb.getDsQuota(), typeQuotas, xAttrs);
-          }
-        }
-        // load created list
-        List<INode> clist = loadCreatedList(in, dir,
-            diffInPb.getCreatedListSize());
-        // load deleted list
-        List<INode> dlist = loadDeletedList(refList, in, dir,
-            diffInPb.getDeletedINodeList(), diffInPb.getDeletedINodeRefList());
-        // create the directory diff
-        DirectoryDiff diff = new DirectoryDiff(snapshotId, copy, null,
-            childrenSize, clist, dlist, useRoot);
-        diffs.addFirst(diff);
-      }
-    }
-  }
-
-  /**
-   * Saving snapshot related information to protobuf based FSImage
-   */
-  public final static class Saver {
-    private final FSNamesystem fsn;
-    private final FileSummary.Builder headers;
-    private final FSImageFormatProtobuf.Saver parent;
-    private final SaveNamespaceContext context;
-    private long numImageErrors;
-
-    public Saver(FSImageFormatProtobuf.Saver parent,
-        FileSummary.Builder headers, SaveNamespaceContext context,
-        FSNamesystem fsn) {
-      this.parent = parent;
-      this.headers = headers;
-      this.context = context;
-      this.fsn = fsn;
-      this.numImageErrors = 0;
-    }
-
-    /**
-     * save all the snapshottable directories and snapshots to fsimage
-     */
-    public void serializeSnapshotSection(OutputStream out) throws IOException {
-      SnapshotManager sm = fsn.getSnapshotManager();
-      SnapshotSection.Builder b = SnapshotSection.newBuilder()
-          .setSnapshotCounter(sm.getSnapshotCounter())
-          .setNumSnapshots(sm.getNumSnapshots());
-
-      final List<INodeDirectory> snapshottables = sm.getSnapshottableDirs();
-      for (INodeDirectory sdir : snapshottables) {
-        b.addSnapshottableDir(sdir.getId());
-      }
-      b.build().writeDelimitedTo(out);
-      int i = 0;
-      for(INodeDirectory sdir : snapshottables) {
-        for (Snapshot s : sdir.getDirectorySnapshottableFeature()
-            .getSnapshotList()) {
-          Root sroot = s.getRoot();
-          SnapshotSection.Snapshot.Builder sb = SnapshotSection.Snapshot
-              .newBuilder().setSnapshotId(s.getId());
-          INodeSection.INodeDirectory.Builder db = buildINodeDirectory(sroot,
-              parent.getSaverContext());
-          INodeSection.INode r = INodeSection.INode.newBuilder()
-              .setId(sroot.getId())
-              .setType(INodeSection.INode.Type.DIRECTORY)
-              .setName(ByteString.copyFrom(sroot.getLocalNameBytes()))
-              .setDirectory(db).build();
-          sb.setRoot(r).build().writeDelimitedTo(out);
-          i++;
-          if (i % FSImageFormatProtobuf.Saver.CHECK_CANCEL_INTERVAL == 0) {
-            context.checkCancelled();
-          }
-        }
-      }
-      Preconditions.checkState(i == sm.getNumSnapshots());
-      parent.commitSection(headers, FSImageFormatProtobuf.SectionName.SNAPSHOT);
-    }
-
-    /**
-     * This can only be called after serializing both INode_Dir and SnapshotDiff
-     */
-    public void serializeINodeReferenceSection(OutputStream out)
-        throws IOException {
-      final List<INodeReference> refList = parent.getSaverContext()
-          .getRefList();
-      long i = 0;
-      for (INodeReference ref : refList) {
-        INodeReferenceSection.INodeReference.Builder rb =
-            buildINodeReference(ref, i++);
-        rb.build().writeDelimitedTo(out);
-      }
-      parent.commitSection(headers, SectionName.INODE_REFERENCE);
-    }
-
-    private INodeReferenceSection.INodeReference.Builder buildINodeReference(
-        final INodeReference ref, final long refIndex) throws IOException {
-      INodeReferenceSection.INodeReference.Builder rb =
-          INodeReferenceSection.INodeReference.newBuilder().
-            setReferredId(ref.getId());
-      if (ref instanceof WithName) {
-        rb.setLastSnapshotId(((WithName) ref).getLastSnapshotId()).setName(
-            ByteString.copyFrom(ref.getLocalNameBytes()));
-      } else if (ref instanceof DstReference) {
-        rb.setDstSnapshotId(ref.getDstSnapshotId());
-      }
-
-      if (fsn.getFSDirectory().getInode(ref.getId()) == null) {
-        FSImage.LOG.error(
-            "FSImageFormatPBSnapshot: Missing referred INodeId " +
-            ref.getId() + " for INodeReference index " + refIndex +
-            "; path=" + ref.getFullPathName() +
-            "; parent=" + (ref.getParent() == null ? "null" :
-                ref.getParent().getFullPathName()));
-        ++numImageErrors;
-      }
-      return rb;
-    }
-
-    /**
-     * save all the snapshot diff to fsimage
-     */
-    public void serializeSnapshotDiffSection(OutputStream out)
-        throws IOException {
-      INodeMap inodesMap = fsn.getFSDirectory().getINodeMap();
-      final List<INodeReference> refList = parent.getSaverContext()
-          .getRefList();
-      int i = 0;
-      Iterator<INodeWithAdditionalFields> iter = inodesMap.getMapIterator();
-      while (iter.hasNext()) {
-        INodeWithAdditionalFields inode = iter.next();
-        if (inode.isFile()) {
-          serializeFileDiffList(inode.asFile(), out);
-        } else if (inode.isDirectory()) {
-          serializeDirDiffList(inode.asDirectory(), refList, out);
-        }
-        ++i;
-        if (i % FSImageFormatProtobuf.Saver.CHECK_CANCEL_INTERVAL == 0) {
-          context.checkCancelled();
-        }
-        if (i % parent.getInodesPerSubSection() == 0) {
-          parent.commitSubSection(headers, FSImageFormatProtobuf.SectionName.SNAPSHOT_DIFF_SUB);
-          out = parent.getSectionOutputStream();
-        }
-      }
-      parent.commitSectionAndSubSection(headers,
-          FSImageFormatProtobuf.SectionName.SNAPSHOT_DIFF,
-          FSImageFormatProtobuf.SectionName.SNAPSHOT_DIFF_SUB);
-    }
-
-    private void serializeFileDiffList(INodeFile file, OutputStream out)
-        throws IOException {
-      FileWithSnapshotFeature sf = file.getFileWithSnapshotFeature();
-      if (sf != null) {
-        DiffList<FileDiff> diffList = sf.getDiffs().asList();
-        SnapshotDiffSection.DiffEntry entry = SnapshotDiffSection.DiffEntry
-            .newBuilder().setInodeId(file.getId()).setType(Type.FILEDIFF)
-            .setNumOfDiff(diffList.size()).build();
-        entry.writeDelimitedTo(out);
-        for (int i = diffList.size() - 1; i >= 0; i--) {
-          FileDiff diff = diffList.get(i);
-          SnapshotDiffSection.FileDiff.Builder fb = SnapshotDiffSection.FileDiff
-              .newBuilder().setSnapshotId(diff.getSnapshotId())
-              .setFileSize(diff.getFileSize());
-          if(diff.getBlocks() != null) {
-            for(Block block : diff.getBlocks()) {
-              fb.addBlocks(PBHelperClient.convert(block));
-            }
-          }
-          INodeFileAttributes copy = diff.snapshotINode;
-          if (copy != null) {
-            fb.setName(ByteString.copyFrom(copy.getLocalNameBytes()))
-                .setSnapshotCopy(buildINodeFile(copy, parent.getSaverContext()));
-          }
-          fb.build().writeDelimitedTo(out);
-        }
-      }
-    }
-
-    private void saveCreatedList(List<INode> created, OutputStream out)
-        throws IOException {
-      // local names of the created list member
-      for (INode c : created) {
-        SnapshotDiffSection.CreatedListEntry.newBuilder()
-            .setName(ByteString.copyFrom(c.getLocalNameBytes())).build()
-            .writeDelimitedTo(out);
-      }
-    }
-
-    private void serializeDirDiffList(INodeDirectory dir,
-        final List<INodeReference> refList, OutputStream out)
-        throws IOException {
-      DirectoryWithSnapshotFeature sf = dir.getDirectoryWithSnapshotFeature();
-      if (sf != null) {
-        DiffList<DirectoryDiff> diffList = sf.getDiffs().asList();
-        SnapshotDiffSection.DiffEntry entry = SnapshotDiffSection.DiffEntry
-            .newBuilder().setInodeId(dir.getId()).setType(Type.DIRECTORYDIFF)
-            .setNumOfDiff(diffList.size()).build();
-        entry.writeDelimitedTo(out);
-        for (int i = diffList.size() - 1; i >= 0; i--) { // reverse order!
-          DirectoryDiff diff = diffList.get(i);
-          SnapshotDiffSection.DirectoryDiff.Builder db = SnapshotDiffSection.
-              DirectoryDiff.newBuilder().setSnapshotId(diff.getSnapshotId())
-                           .setChildrenSize(diff.getChildrenSize())
-                           .setIsSnapshotRoot(diff.isSnapshotRoot());
-          INodeDirectoryAttributes copy = diff.snapshotINode;
-          if (!diff.isSnapshotRoot() && copy != null) {
-            db.setName(ByteString.copyFrom(copy.getLocalNameBytes()))
-                .setSnapshotCopy(
-                    buildINodeDirectory(copy, parent.getSaverContext()));
-          }
-          // process created list and deleted list
-          List<INode> created = diff.getChildrenDiff().getCreatedUnmodifiable();
-          db.setCreatedListSize(created.size());
-          List<INode> deleted = diff.getChildrenDiff().getDeletedUnmodifiable();
-          INode previousNode = null;
-          boolean misordered = false;
-          for (INode d : deleted) {
-            // getBytes() may return null below, and that is okay.
-            final int result = previousNode == null ? -1 :
-                previousNode.compareTo(d.getLocalNameBytes());
-            if (result == 0) {
-              FSImage.LOG.error(
-                  "Name '" + d.getLocalName() + "' is repeated in the " +
-                      "'deleted' difflist of directory " +
-                      dir.getFullPathName() + ", INodeId=" + dir.getId());
-              ++numImageErrors;
-            } else if (result > 0 && !misordered) {
-              misordered = true;
-              ++numImageErrors;
-            }
-            previousNode = d;
-            if (d.isReference()) {
-              refList.add(d.asReference());
-              db.addDeletedINodeRef(refList.size() - 1);
-            } else {
-              db.addDeletedINode(d.getId());
-            }
-          }
-          if (misordered) {
-            FSImage.LOG.error(
-                "Misordered entries in the 'deleted' difflist of directory " +
-                    dir.getFullPathName() + ", INodeId=" + dir.getId() +
-                    ". The full list is " +
-                    Arrays.toString(deleted.toArray()));
-          }
-          db.build().writeDelimitedTo(out);
-          saveCreatedList(created, out);
-        }
-      }
-    }
-
-
-    /**
-     * Number of non-fatal errors detected while writing the
-     * SnapshotDiff and INodeReference sections.
-     * @return the number of non-fatal errors detected.
-     */
-    public long getNumImageErrors() {
-      return numImageErrors;
-    }
-  }
-
-  private FSImageFormatPBSnapshot(){}
-}

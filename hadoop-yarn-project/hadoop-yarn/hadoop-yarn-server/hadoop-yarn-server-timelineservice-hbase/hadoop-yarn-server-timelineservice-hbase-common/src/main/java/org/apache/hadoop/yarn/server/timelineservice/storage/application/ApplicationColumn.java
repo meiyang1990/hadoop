@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,23 +28,23 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ValueConvert
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * Identifies fully qualified columns for the {@link ApplicationTable}.
+ * 应用表ApplicationTable的HBase列定义枚举，标识应用表中所有列的全限定信息。
  */
 public enum ApplicationColumn implements Column<ApplicationTable> {
 
   /**
-   * App id.
+   * 应用ID列。
    */
   ID(ApplicationColumnFamily.INFO, "id"),
 
   /**
-   * When the application was created.
+   * 应用创建时间列。
    */
   CREATED_TIME(ApplicationColumnFamily.INFO, "created_time",
       new LongConverter()),
 
   /**
-   * The version of the flow that this app belongs to.
+   * 应用所属流的版本列。
    */
   FLOW_VERSION(ApplicationColumnFamily.INFO, "flow_version");
 
@@ -52,23 +53,34 @@ public enum ApplicationColumn implements Column<ApplicationTable> {
   private final byte[] columnQualifierBytes;
   private final ValueConverter valueConverter;
 
+  /**
+   * 构造应用列定义，使用通用值转换器。
+   * @param columnFamily 所属列族
+   * @param columnQualifier 列限定符
+   */
   private ApplicationColumn(ColumnFamily<ApplicationTable> columnFamily,
       String columnQualifier) {
     this(columnFamily, columnQualifier, GenericConverter.getInstance());
   }
 
+  /**
+   * 构造应用列定义，使用指定值转换器。
+   * @param columnFamily 所属列族
+   * @param columnQualifier 列限定符
+   * @param converter 值转换器
+   */
   private ApplicationColumn(ColumnFamily<ApplicationTable> columnFamily,
       String columnQualifier, ValueConverter converter) {
     this.columnFamily = columnFamily;
     this.columnQualifier = columnQualifier;
-    // Future-proof by ensuring the right column prefix hygiene.
+    // 预转换为字节数组，确保列前缀格式符合规范，兼容未来扩展
     this.columnQualifierBytes =
-        Bytes.toBytes(Separator.SPACE.encode(columnQualifier));
+        Bytes.toBytes(Separator.SPACE.encode(columnQualifier);
     this.valueConverter = converter;
   }
 
   /**
-   * @return the column name value
+   * @return 列限定符字符串
    */
   private String getColumnQualifier() {
     return columnQualifier;

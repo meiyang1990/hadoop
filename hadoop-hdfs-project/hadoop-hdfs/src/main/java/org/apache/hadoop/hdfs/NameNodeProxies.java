@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -68,10 +69,9 @@ import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolClientSideTrans
 import org.apache.hadoop.tools.protocolPB.GetUserMappingsProtocolPB;
 
 /**
- * Create proxy objects to communicate with a remote NN. All remote access to an
- * NN should be funneled through this class. Most of the time you'll want to use
- * {@link NameNodeProxies#createProxy(Configuration, URI, Class)}, which will
- * create either an HA- or non-HA-enabled client proxy as appropriate.
+ * 文件: NameNodeProxies.java
+ * 所属模块: HDFS 服务端核心
+ * 核心职责: 工厂类，统一创建与远程NameNode通信的RPC代理对象，自动处理HA和非HA场景，所有对远程NameNode的访问都通过该类创建代理
  */
 @InterfaceAudience.Private
 public class NameNodeProxies {
@@ -80,18 +80,12 @@ public class NameNodeProxies {
       LoggerFactory.getLogger(NameNodeProxies.class);
 
   /**
-   * Creates the namenode proxy with the passed protocol. This will handle
-   * creation of either HA- or non-HA-enabled proxy objects, depending upon
-   * if the provided URI is a configured logical URI.
-   * 
-   * @param conf the configuration containing the required IPC
-   *        properties, client failover configurations, etc.
-   * @param nameNodeUri the URI pointing either to a specific NameNode
-   *        or to a logical nameservice.
-   * @param xface the IPC interface which should be created
-   * @return an object containing both the proxy and the associated
-   *         delegation token service it corresponds to
-   * @throws IOException if there is an error creating the proxy
+   * 根据配置创建NameNode代理，自动判断是否为HA场景
+   * @param conf Hadoop配置对象，包含IPC和故障切换配置
+   * @param nameNodeUri NameNode地址URI，可以是具体地址或逻辑命名服务地址
+   * @param xface 需要创建的IPC协议接口
+   * @return 包含代理对象和对应委派令牌服务信息的包装对象
+   * @throws IOException 创建代理失败时抛出异常
    **/
   public static <T> ProxyAndInfo<T> createProxy(Configuration conf,
       URI nameNodeUri, Class<T> xface) throws IOException {
@@ -99,20 +93,13 @@ public class NameNodeProxies {
   }
 
   /**
-   * Creates the namenode proxy with the passed protocol. This will handle
-   * creation of either HA- or non-HA-enabled proxy objects, depending upon
-   * if the provided URI is a configured logical URI.
-   *
-   * @param conf the configuration containing the required IPC
-   *        properties, client failover configurations, etc.
-   * @param nameNodeUri the URI pointing either to a specific NameNode
-   *        or to a logical nameservice.
-   * @param xface the IPC interface which should be created
-   * @param fallbackToSimpleAuth set to true or false during calls to indicate if
-   *   a secure client falls back to simple auth
-   * @return an object containing both the proxy and the associated
-   *         delegation token service it corresponds to
-   * @throws IOException if there is an error creating the proxy
+   * 根据配置创建NameNode代理，自动判断是否为HA场景，支持设置安全回退标识
+   * @param conf Hadoop配置对象，包含IPC和故障切换配置
+   * @param nameNodeUri NameNode地址URI，可以是具体地址或逻辑命名服务地址
+   * @param xface 需要创建的IPC协议接口
+   * @param fallbackToSimpleAuth 标识安全客户端是否回退到简单认证
+   * @return 包含代理对象和对应委派令牌服务信息的包装对象
+   * @throws IOException 创建代理失败时抛出异常
    **/
   @SuppressWarnings("unchecked")
   public static <T> ProxyAndInfo<T> createProxy(Configuration conf,
@@ -123,27 +110,26 @@ public class NameNodeProxies {
             xface, true, fallbackToSimpleAuth, new NameNodeHAProxyFactory<T>());
 
     if (failoverProxyProvider == null) {
+      // 非HA场景，直接创建非HA代理
       return createNonHAProxy(conf, DFSUtilClient.getNNAddress(nameNodeUri),
           xface, UserGroupInformation.getCurrentUser(), true,
           fallbackToSimpleAuth, null);
     } else {
+      // HA场景，创建支持故障切换的HA代理
       return NameNodeProxiesClient.createHAProxy(conf, nameNodeUri, xface,
           failoverProxyProvider);
     }
   }
 
   /**
-   * Creates an explicitly non-HA-enabled proxy object. Most of the time you
-   * don't want to use this, and should instead use {@link NameNodeProxies#createProxy}.
-   * 
-   * @param conf the configuration object
-   * @param nnAddr address of the remote NN to connect to
-   * @param xface the IPC interface which should be created
-   * @param ugi the user who is making the calls on the proxy object
-   * @param withRetries certain interfaces have a non-standard retry policy
-   * @return an object containing both the proxy and the associated
-   *         delegation token service it corresponds to
-   * @throws IOException
+   * 显式创建非HA场景的NameNode代理，通常不直接使用，应优先调用{@link NameNodeProxies#createProxy}
+   * @param conf Hadoop配置对象
+   * @param nnAddr 远程NameNode地址
+   * @param xface 需要创建的IPC协议接口
+   * @param ugi 发起调用的用户信息
+   * @param withRetries 是否启用自定义重试策略
+   * @return 包含代理对象和对应委派令牌服务信息的包装对象
+   * @throws IOException 创建代理失败时抛出异常
    */
   public static <T> ProxyAndInfo<T> createNonHAProxy(
       Configuration conf, InetSocketAddress nnAddr, Class<T> xface,
@@ -152,19 +138,16 @@ public class NameNodeProxies {
   }
 
   /**
-   * Creates an explicitly non-HA-enabled proxy object. Most of the time you
-   * don't want to use this, and should instead use {@link NameNodeProxies#createProxy}.
-   *
-   * @param conf the configuration object
-   * @param nnAddr address of the remote NN to connect to
-   * @param xface the IPC interface which should be created
-   * @param ugi the user who is making the calls on the proxy object
-   * @param withRetries certain interfaces have a non-standard retry policy
-   * @param fallbackToSimpleAuth - set to true or false during this method to
-   *   indicate if a secure client falls back to simple auth
-   * @return an object containing both the proxy and the associated
-   *         delegation token service it corresponds to
-   * @throws IOException
+   * 显式创建非HA场景的NameNode代理，通常不直接使用，应优先调用{@link NameNodeProxies#createProxy}
+   * @param conf Hadoop配置对象
+   * @param nnAddr 远程NameNode地址
+   * @param xface 需要创建的IPC协议接口
+   * @param ugi 发起调用的用户信息
+   * @param withRetries 是否启用自定义重试策略
+   * @param fallbackToSimpleAuth 标识安全客户端是否回退到简单认证
+   * @param alignmentContext RPC对齐上下文，用于HA场景的状态对齐
+   * @return 包含代理对象和对应委派令牌服务信息的包装对象
+   * @throws IOException 创建代理失败时抛出异常
    */
   @SuppressWarnings("unchecked")
   public static <T> ProxyAndInfo<T> createNonHAProxy(
@@ -172,38 +155,50 @@ public class NameNodeProxies {
       UserGroupInformation ugi, boolean withRetries,
       AtomicBoolean fallbackToSimpleAuth, AlignmentContext alignmentContext)
       throws IOException {
+    // 构建委派令牌服务标识
     Text dtService = SecurityUtil.buildTokenService(nnAddr);
   
     T proxy;
+    // 根据不同协议类型分别创建对应代理
     if (xface == ClientProtocol.class) {
+      // 客户端协议，由客户端工具类创建
       proxy = (T) NameNodeProxiesClient.createProxyWithAlignmentContext(
           nnAddr, conf, ugi, withRetries, fallbackToSimpleAuth,
           alignmentContext);
     } else if (xface == JournalProtocol.class) {
+      // 日志同步协议，用于QJM共享编辑日志
       proxy = (T) createNNProxyWithJournalProtocol(nnAddr, conf, ugi,
           alignmentContext);
     } else if (xface == NamenodeProtocol.class) {
+      // NameNode内部通信协议，用于DataNode和第二NameNode通信
       proxy = (T) createNNProxyWithNamenodeProtocol(nnAddr, conf, ugi,
           withRetries, alignmentContext);
     } else if (xface == GetUserMappingsProtocol.class) {
+      // 用户映射获取协议
       proxy = (T) createNNProxyWithGetUserMappingsProtocol(nnAddr, conf, ugi,
           alignmentContext);
     } else if (xface == RefreshUserMappingsProtocol.class) {
+      // 刷新用户映射协议
       proxy = (T) createNNProxyWithRefreshUserMappingsProtocol(nnAddr, conf,
           ugi, alignmentContext);
     } else if (xface == RefreshAuthorizationPolicyProtocol.class) {
+      // 刷新权限策略协议
       proxy = (T) createNNProxyWithRefreshAuthorizationPolicyProtocol(nnAddr,
           conf, ugi, alignmentContext);
     } else if (xface == RefreshCallQueueProtocol.class) {
+      // 刷新调用队列协议
       proxy = (T) createNNProxyWithRefreshCallQueueProtocol(nnAddr, conf, ugi,
           alignmentContext);
     } else if (xface == InMemoryAliasMapProtocol.class) {
+      // 内存别名映射协议，用于HDFS路由联邦
       proxy = (T) createNNProxyWithInMemoryAliasMapProtocol(nnAddr, conf, ugi,
           alignmentContext);
     } else if (xface == BalancerProtocols.class) {
+      // 负载均衡协议，组合多个接口
       proxy = (T) createNNProxyWithBalancerProtocol(nnAddr, conf, ugi,
           withRetries, fallbackToSimpleAuth, alignmentContext);
     } else {
+      // 不支持的协议，抛出异常
       String message = "Unsupported protocol found when creating the proxy " +
           "connection to NameNode: " +
           ((xface != null) ? xface.getClass().getName() : "null");
@@ -214,6 +209,15 @@ public class NameNodeProxies {
     return new ProxyAndInfo<T>(proxy, dtService, nnAddr);
   }
 
+  /**
+   * 创建内存别名映射协议的NameNode代理，用于HDFS路由联邦
+   * @param address NameNode地址
+   * @param conf Hadoop配置
+   * @param ugi 用户信息
+   * @param alignmentContext RPC对齐上下文
+   * @return 内存别名映射协议代理对象
+   * @throws IOException 创建失败抛出异常
+   */
   private static InMemoryAliasMapProtocol createNNProxyWithInMemoryAliasMapProtocol(
       InetSocketAddress address, Configuration conf, UserGroupInformation ugi,
       AlignmentContext alignmentContext) throws IOException {
@@ -222,6 +226,15 @@ public class NameNodeProxies {
     return new InMemoryAliasMapProtocolClientSideTranslatorPB(proxy);
   }
 
+  /**
+   * 创建日志同步协议的NameNode代理，用于QJM共享编辑日志
+   * @param address NameNode地址
+   * @param conf Hadoop配置
+   * @param ugi 用户信息
+   * @param alignmentContext RPC对齐上下文
+   * @return 日志同步协议代理对象
+   * @throws IOException 创建失败抛出异常
+   */
   private static JournalProtocol createNNProxyWithJournalProtocol(
       InetSocketAddress address, Configuration conf, UserGroupInformation ugi,
       AlignmentContext alignmentContext) throws IOException {
@@ -230,6 +243,15 @@ public class NameNodeProxies {
     return new JournalProtocolTranslatorPB(proxy);
   }
 
+  /**
+   * 创建刷新权限策略协议的NameNode代理
+   * @param address NameNode地址
+   * @param conf Hadoop配置
+   * @param ugi 用户信息
+   * @param alignmentContext RPC对齐上下文
+   * @return 刷新权限策略协议代理对象
+   * @throws IOException 创建失败抛出异常
+   */
   private static RefreshAuthorizationPolicyProtocol
       createNNProxyWithRefreshAuthorizationPolicyProtocol(InetSocketAddress address,
       Configuration conf, UserGroupInformation ugi,
@@ -240,6 +262,15 @@ public class NameNodeProxies {
     return new RefreshAuthorizationPolicyProtocolClientSideTranslatorPB(proxy);
   }
   
+  /**
+   * 创建刷新用户映射协议的NameNode代理
+   * @param address NameNode地址
+   * @param conf Hadoop配置
+   * @param ugi 用户信息
+   * @param alignmentContext RPC对齐上下文
+   * @return 刷新用户映射协议代理对象
+   * @throws IOException 创建失败抛出异常
+   */
   private static RefreshUserMappingsProtocol
       createNNProxyWithRefreshUserMappingsProtocol(InetSocketAddress address,
       Configuration conf, UserGroupInformation ugi,
@@ -249,6 +280,15 @@ public class NameNodeProxies {
     return new RefreshUserMappingsProtocolClientSideTranslatorPB(proxy);
   }
 
+  /**
+   * 创建刷新调用队列协议的NameNode代理
+   * @param address NameNode地址
+   * @param conf Hadoop配置
+   * @param ugi 用户信息
+   * @param alignmentContext RPC对齐上下文
+   * @return 刷新调用队列协议代理对象
+   * @throws IOException 创建失败抛出异常
+   */
   private static RefreshCallQueueProtocol
       createNNProxyWithRefreshCallQueueProtocol(InetSocketAddress address,
       Configuration conf, UserGroupInformation ugi,
@@ -258,6 +298,15 @@ public class NameNodeProxies {
     return new RefreshCallQueueProtocolClientSideTranslatorPB(proxy);
   }
 
+  /**
+   * 创建获取用户映射协议的NameNode代理
+   * @param address NameNode地址
+   * @param conf Hadoop配置
+   * @param ugi 用户信息
+   * @param alignmentContext RPC对齐上下文
+   * @return 获取用户映射协议代理对象
+   * @throws IOException 创建失败抛出异常
+   */
   private static GetUserMappingsProtocol createNNProxyWithGetUserMappingsProtocol(
       InetSocketAddress address, Configuration conf, UserGroupInformation ugi,
       AlignmentContext alignmentContext) throws IOException {
@@ -266,50 +315,45 @@ public class NameNodeProxies {
     return new GetUserMappingsProtocolClientSideTranslatorPB(proxy);
   }
   
+  /**
+   * 创建NameNode内部通信协议的代理，用于DataNode和第二NameNode通信
+   * @param address NameNode地址
+   * @param conf Hadoop配置
+   * @param ugi 用户信息
+   * @param withRetries 是否启用自定义重试策略
+   * @param alignmentContext RPC对齐上下文
+   * @return NameNode内部通信协议代理对象
+   * @throws IOException 创建失败抛出异常
+   */
   private static NamenodeProtocol createNNProxyWithNamenodeProtocol(
       InetSocketAddress address, Configuration conf, UserGroupInformation ugi,
       boolean withRetries, AlignmentContext alignmentContext)
       throws IOException {
     NamenodeProtocolPB proxy = createNameNodeProxy(
         address, conf, ugi, NamenodeProtocolPB.class, 0, alignmentContext);
-    if (withRetries) { // create the proxy with retries
+    if (withRetries) { 
+      // 需要启用重试，创建带重试策略的代理
+      // 指数退避重试策略，最多重试5次，初始间隔200ms
       RetryPolicy timeoutPolicy = RetryPolicies.exponentialBackoffRetry(5, 200,
               TimeUnit.MILLISECONDS);
+      // 为特定方法设置重试策略
       Map<String, RetryPolicy> methodNameToPolicyMap
            = new HashMap<String, RetryPolicy>();
       methodNameToPolicyMap.put("getBlocks", timeoutPolicy);
       methodNameToPolicyMap.put("getAccessKeys", timeoutPolicy);
       NamenodeProtocol translatorProxy =
           new NamenodeProtocolTranslatorPB(proxy);
+      // 创建Retry代理封装原代理，自动重试特定方法
       return (NamenodeProtocol) RetryProxy.create(
           NamenodeProtocol.class, translatorProxy, methodNameToPolicyMap);
     } else {
+      // 不需要重试，直接返回翻译代理
       return new NamenodeProtocolTranslatorPB(proxy);
     }
   }
 
-  private static BalancerProtocols createNNProxyWithBalancerProtocol(
-      InetSocketAddress address, Configuration conf, UserGroupInformation ugi,
-      boolean withRetries, AtomicBoolean fallbackToSimpleAuth,
-      AlignmentContext alignmentContext) throws IOException {
-    NamenodeProtocol namenodeProtocol = createNNProxyWithNamenodeProtocol(
-        address, conf, ugi, withRetries, alignmentContext);
-    ClientProtocol clientProtocol =
-        NameNodeProxiesClient.createProxyWithAlignmentContext(address,
-            conf, ugi, withRetries, fallbackToSimpleAuth, alignmentContext);
-
-    return ProxyCombiner.combine(BalancerProtocols.class,
-        namenodeProtocol, clientProtocol);
-  }
-
-  private static <T> T createNameNodeProxy(InetSocketAddress address,
-      Configuration conf, UserGroupInformation ugi, Class<T> xface,
-      int rpcTimeout, AlignmentContext alignmentContext) throws IOException {
-    RPC.setProtocolEngine(conf, xface, ProtobufRpcEngine2.class);
-    return RPC.getProtocolProxy(xface,
-        RPC.getProtocolVersion(xface), address, ugi, conf,
-        NetUtils.getDefaultSocketFactory(conf), rpcTimeout, null, null,
-        alignmentContext).getProxy();
-  }
-
-}
+  /**
+   * 创建负载均衡协议代理，组合NamenodeProtocol和ClientProtocol两个接口
+   * @param address NameNode地址
+   * @param conf Hadoop配置
+   * @

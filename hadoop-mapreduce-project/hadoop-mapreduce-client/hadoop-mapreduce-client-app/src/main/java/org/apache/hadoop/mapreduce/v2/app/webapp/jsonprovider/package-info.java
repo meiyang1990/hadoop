@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,7 @@
  */
 
 /**
- * Jersey2 JSON provider classes for the MapReduce Application web UI.
+ * MapReduce ApplicationMaster Web UI的Jersey2 JSON序列化提供者包。
+ * 本包提供了MapReduce应用Web界面所需的JSON数据序列化能力，将Java对象转换为JSON格式供前端UI展示。
  */
 package org.apache.hadoop.mapreduce.v2.app.webapp.jsonprovider;

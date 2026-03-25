@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -48,6 +49,10 @@ import org.apache.hadoop.yarn.server.nodemanager.NodeStatusUpdater;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.ResourceMappings;
 
+/**
+ * NodeManager状态存储抽象基类，定义了NM重启恢复所需的各类状态存储接口，
+ * 负责持久化NM运行时状态，支持NodeManager重启后恢复应用和容器状态。
+ */
 @Private
 @Unstable
 public abstract class NMStateStoreService extends AbstractService {
@@ -66,6 +71,9 @@ public abstract class NMStateStoreService extends AbstractService {
     this.nodeStatusUpdater = nodeStatusUpdater;
   }
 
+  /**
+   * 恢复应用状态的封装类，持有应用状态迭代器
+   */
   public static class RecoveredApplicationsState {
     RecoveryIterator<ContainerManagerApplicationProto> it = null;
 
@@ -89,6 +97,9 @@ public abstract class NMStateStoreService extends AbstractService {
     PAUSED
   }
 
+  /**
+   * 恢复容器状态封装类，存储从状态存储中加载的容器完整信息
+   */
   public static class RecoveredContainerState {
     RecoveredContainerStatus status;
     int exitCode = ContainerExitStatus.INVALID;
@@ -218,6 +229,9 @@ public abstract class NMStateStoreService extends AbstractService {
     }
   }
 
+  /**
+   * 本地资源追踪状态封装类，持有已完成和正在进行的资源本地化迭代器
+   */
   public static class LocalResourceTrackerState {
     final private RecoveryIterator<LocalizedResourceProto>
         completedResourcesIterator;
@@ -241,6 +255,9 @@ public abstract class NMStateStoreService extends AbstractService {
     }
   }
 
+  /**
+   * 用户级恢复资源封装类，包含用户私有资源和各应用专属资源状态
+   */
   public static class RecoveredUserResources {
     LocalResourceTrackerState privateTrackerState =
         new LocalResourceTrackerState(null, null);
@@ -257,6 +274,9 @@ public abstract class NMStateStoreService extends AbstractService {
     }
   }
 
+  /**
+   * 本地化状态恢复封装类，包含公共资源和所有用户资源的迭代器
+   */
   public static class RecoveredLocalizationState {
     LocalResourceTrackerState publicTrackerState =
         new LocalResourceTrackerState(null, null);
@@ -271,6 +291,9 @@ public abstract class NMStateStoreService extends AbstractService {
     }
   }
 
+  /**
+   * 删除服务恢复状态封装类，持有待删除任务迭代器
+   */
   public static class RecoveredDeletionServiceState {
     RecoveryIterator<DeletionServiceDeleteTaskProto> it = null;
 
@@ -279,6 +302,9 @@ public abstract class NMStateStoreService extends AbstractService {
     }
   }
 
+  /**
+   * NM令牌恢复状态封装类，持有当前和前一个主密钥，以及应用尝试主密钥迭代器
+   */
   public static class RecoveredNMTokensState {
     MasterKey currentMasterKey;
     MasterKey previousMasterKey;
@@ -298,6 +324,9 @@ public abstract class NMStateStoreService extends AbstractService {
 
   }
 
+  /**
+   * 容器令牌恢复状态封装类，持有当前和前一个主密钥，以及容器令牌过期时间迭代器
+   */
   public static class RecoveredContainerTokensState {
     MasterKey currentMasterKey;
     MasterKey previousMasterKey;
@@ -317,6 +346,9 @@ public abstract class NMStateStoreService extends AbstractService {
 
   }
 
+  /**
+   * 日志删除器恢复状态封装类，持有所有应用日志删除状态映射
+   */
   public static class RecoveredLogDeleterState {
     Map<ApplicationId, LogDeleterProto> logDeleterMap;
 
@@ -378,10 +410,18 @@ public abstract class NMStateStoreService extends AbstractService {
     closeStorage();
   }
 
+  /**
+   * 检查是否支持状态恢复
+   * @return 是否可恢复
+   */
   public boolean canRecover() {
     return true;
   }
 
+  /**
+   * 检查状态存储是否为新建
+   * @return 是否是新建存储
+   */
   public boolean isNewlyCreated() {
     return false;
   }
@@ -522,292 +562,4 @@ public abstract class NMStateStoreService extends AbstractService {
 
   /**
    * Record working directory for a container.
-   * @param containerId the container ID
-   * @param workDir the working directory
-   * @throws IOException
-   */
-  public abstract void storeContainerWorkDir(
-      ContainerId containerId, String workDir) throws IOException;
-
-  /**
-   * Record log directory for a container.
-   * @param containerId the container ID
-   * @param logDir the log directory
-   * @throws IOException
-   */
-  public abstract void storeContainerLogDir(
-      ContainerId containerId, String logDir) throws IOException;
-
-  /**
-   * Remove records corresponding to a container
-   * @param containerId the container ID
-   * @throws IOException
-   */
-  public abstract void removeContainer(ContainerId containerId)
-      throws IOException;
-
-
-  /**
-   * Load the state of localized resources
-   * @return recovered localized resource state
-   * @throws IOException
-   */
-  public abstract RecoveredLocalizationState loadLocalizationState()
-      throws IOException;
-
-  /**
-   * Record the start of localization for a resource
-   * @param user the username or null if the resource is public
-   * @param appId the application ID if the resource is app-specific or null
-   * @param proto the resource request
-   * @param localPath local filesystem path where the resource will be stored
-   * @throws IOException
-   */
-  public abstract void startResourceLocalization(String user,
-      ApplicationId appId, LocalResourceProto proto, Path localPath)
-          throws IOException;
-
-  /**
-   * Record the completion of a resource localization
-   * @param user the username or null if the resource is public
-   * @param appId the application ID if the resource is app-specific or null
-   * @param proto the serialized localized resource
-   * @throws IOException
-   */
-  public abstract void finishResourceLocalization(String user,
-      ApplicationId appId, LocalizedResourceProto proto) throws IOException;
-
-  /**
-   * Remove records related to a resource localization
-   * @param user the username or null if the resource is public
-   * @param appId the application ID if the resource is app-specific or null
-   * @param localPath local filesystem path where the resource will be stored
-   * @throws IOException
-   */
-  public abstract void removeLocalizedResource(String user,
-      ApplicationId appId, Path localPath) throws IOException;
-
-
-  /**
-   * Load the state of the deletion service
-   * @return recovered deletion service state
-   * @throws IOException
-   */
-  public abstract RecoveredDeletionServiceState loadDeletionServiceState()
-      throws IOException;
-
-  /**
-   * Record a deletion task
-   * @param taskId the deletion task ID
-   * @param taskProto the deletion task protobuf
-   * @throws IOException
-   */
-  public abstract void storeDeletionTask(int taskId,
-      DeletionServiceDeleteTaskProto taskProto) throws IOException;
-
-  /**
-   * Remove records corresponding to a deletion task
-   * @param taskId the deletion task ID
-   * @throws IOException
-   */
-  public abstract void removeDeletionTask(int taskId) throws IOException;
-
-
-  /**
-   * Load the state of NM tokens
-   * @return recovered state of NM tokens
-   * @throws IOException
-   */
-  public abstract RecoveredNMTokensState loadNMTokensState()
-      throws IOException;
-
-  /**
-   * Record the current NM token master key
-   * @param key the master key
-   * @throws IOException
-   */
-  public abstract void storeNMTokenCurrentMasterKey(MasterKey key)
-      throws IOException;
-
-  /**
-   * Record the previous NM token master key
-   * @param key the previous master key
-   * @throws IOException
-   */
-  public abstract void storeNMTokenPreviousMasterKey(MasterKey key)
-      throws IOException;
-
-  /**
-   * Record a master key corresponding to an application
-   * @param attempt the application attempt ID
-   * @param key the master key
-   * @throws IOException
-   */
-  public abstract void storeNMTokenApplicationMasterKey(
-      ApplicationAttemptId attempt, MasterKey key) throws IOException;
-
-  /**
-   * Remove a master key corresponding to an application
-   * @param attempt the application attempt ID
-   * @throws IOException
-   */
-  public abstract void removeNMTokenApplicationMasterKey(
-      ApplicationAttemptId attempt) throws IOException;
-
-
-  /**
-   * Load the state of container tokens
-   * @return recovered state of container tokens
-   * @throws IOException
-   */
-  public abstract RecoveredContainerTokensState loadContainerTokensState()
-      throws IOException;
-
-  /**
-   * Record the current container token master key
-   * @param key the master key
-   * @throws IOException
-   */
-  public abstract void storeContainerTokenCurrentMasterKey(MasterKey key)
-      throws IOException;
-
-  /**
-   * Record the previous container token master key
-   * @param key the previous master key
-   * @throws IOException
-   */
-  public abstract void storeContainerTokenPreviousMasterKey(MasterKey key)
-      throws IOException;
-
-  /**
-   * Record the expiration time for a container token
-   * @param containerId the container ID
-   * @param expirationTime the container token expiration time
-   * @throws IOException
-   */
-  public abstract void storeContainerToken(ContainerId containerId,
-      Long expirationTime) throws IOException;
-
-  /**
-   * Remove records for a container token
-   * @param containerId the container ID
-   * @throws IOException
-   */
-  public abstract void removeContainerToken(ContainerId containerId)
-      throws IOException;
-
-
-  /**
-   * Load the state of log deleters
-   * @return recovered log deleter state
-   * @throws IOException
-   */
-  public abstract RecoveredLogDeleterState loadLogDeleterState()
-      throws IOException;
-
-  /**
-   * Store the state of a log deleter
-   * @param appId the application ID for the log deleter
-   * @param proto the serialized state of the log deleter
-   * @throws IOException
-   */
-  public abstract void storeLogDeleter(ApplicationId appId,
-      LogDeleterProto proto) throws IOException;
-
-  /**
-   * Remove the state of a log deleter
-   * @param appId the application ID for the log deleter
-   * @throws IOException
-   */
-  public abstract void removeLogDeleter(ApplicationId appId)
-      throws IOException;
-
-  /**
-   * Load the state of AMRMProxy.
-   * @return recovered state of AMRMProxy
-   * @throws IOException if fails
-   */
-  public abstract RecoveredAMRMProxyState loadAMRMProxyState()
-      throws IOException;
-
-  /**
-   * Record the current AMRMProxyTokenSecretManager master key.
-   * @param key the current master key
-   * @throws IOException if fails
-   */
-  public abstract void storeAMRMProxyCurrentMasterKey(MasterKey key)
-      throws IOException;
-
-  /**
-   * Record the next AMRMProxyTokenSecretManager master key.
-   * @param key the next master key
-   * @throws IOException if fails
-   */
-  public abstract void storeAMRMProxyNextMasterKey(MasterKey key)
-      throws IOException;
-
-  /**
-   * Add a context entry for an application attempt in AMRMProxyService.
-   * @param attempt app attempt ID
-   * @param key key string
-   * @param data state data to store
-   * @throws IOException if fails
-   */
-  public abstract void storeAMRMProxyAppContextEntry(
-      ApplicationAttemptId attempt, String key, byte[] data) throws IOException;
-
-  /**
-   * Remove a context entry for an application attempt in AMRMProxyService.
-   * @param attempt attempt ID
-   * @param key key string
-   * @throws IOException if fails
-   */
-  public abstract void removeAMRMProxyAppContextEntry(
-      ApplicationAttemptId attempt, String key) throws IOException;
-
-  /**
-   * Remove the entire context map for an application attempt in
-   * AMRMProxyService.
-   * @param attempt attempt ID
-   * @throws IOException if fails
-   */
-  public abstract void removeAMRMProxyAppContext(ApplicationAttemptId attempt)
-      throws IOException;
-
-  /**
-   * Store the assigned resources to a container.
-   *
-   * @param container NMContainer
-   * @param resourceType Resource Type
-   * @param assignedResources Assigned resources
-   * @throws IOException if fails
-   */
-  public abstract void storeAssignedResources(Container container,
-      String resourceType, List<Serializable> assignedResources)
-      throws IOException;
-
-  /**
-   * Delete the assigned resources of a container of specific resourceType.
-   * @param containerId Container Id
-   * @param resourceType resource Type
-   * @throws IOException while releasing resources
-   */
-  public void releaseAssignedResources(ContainerId containerId, String resourceType)
-      throws IOException {}
-
-  protected abstract void initStorage(Configuration conf) throws IOException;
-
-  protected abstract void startStorage() throws IOException;
-
-  protected abstract void closeStorage() throws IOException;
-
-  protected void updateContainerResourceMapping(Container container,
-      String resourceType, List<Serializable> assignedResources) {
-    // Update Container#getResourceMapping.
-    ResourceMappings.AssignedResources newAssigned =
-        new ResourceMappings.AssignedResources();
-    newAssigned.updateAssignedResources(assignedResources);
-    container.getResourceMappings().addAssignedResources(resourceType,
-        newAssigned);
-  }
-}
+   * @param

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,13 +24,17 @@ import java.nio.ByteBuffer;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * read data from a input buffer
+ * 从原生任务的输入ByteBuffer中读取多种类型数据的实现类，为MapReduce本地任务提供高效的反序列化读取能力
  */
 @InterfaceAudience.Private
 public class ByteBufferDataReader extends DataInputStream {
   private ByteBuffer byteBuffer;
   private java.io.DataInputStream javaReader;
 
+  /**
+   * 构造基于指定输入缓冲区的数据读取器
+   * @param buffer 输入缓冲区，可为空
+   */
   public ByteBufferDataReader(InputBuffer buffer) {
     if (buffer != null) {
       reset(buffer);
@@ -37,6 +42,10 @@ public class ByteBufferDataReader extends DataInputStream {
     javaReader = new java.io.DataInputStream(this);
   }
 
+  /**
+   * 重置读取器，绑定新的输入缓冲区
+   * @param buffer 新的输入缓冲区
+   */
   public void reset(InputBuffer buffer) {
     this.byteBuffer = buffer.getByteBuffer();
   }

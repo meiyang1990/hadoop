@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -52,11 +53,16 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 import com.google.inject.Inject;
 
 /**
- * Render a block of HTML for a give job.
+ * 历史服务器作业详情页面HTML块，负责渲染单个已完成作业的概览信息
+ * 展示作业基本信息、ApplicationMaster信息、任务统计、尝试统计等内容
  */
 public class HsJobBlock extends HtmlBlock {
   final AppContext appContext;
 
+  /**
+   * 构造方法，注入应用上下文
+   * @param appctx 历史服务器应用上下文
+   */
   @Inject HsJobBlock(AppContext appctx) {
     appContext = appctx;
   }
@@ -65,6 +71,10 @@ public class HsJobBlock extends HtmlBlock {
    * (non-Javadoc)
    * @see org.apache.hadoop.yarn.webapp.view.HtmlBlock#render(org.apache.hadoop.yarn.webapp.view.HtmlBlock.Block)
    */
+  /**
+   * 渲染作业详情HTML页面块
+   * @param html HTML构建对象
+   */
   @Override protected void render(Block html) {
     String jid = $(JOB_ID);
     if (jid.isEmpty()) {
@@ -72,12 +82,15 @@ public class HsJobBlock extends HtmlBlock {
         p().__("Sorry, can't do anything without a JobID.").__();
       return;
     }
+    // 转换字符串JobID为JobId对象
     JobId jobID = MRApps.toJobID(jid);
+    // 从上下文中获取作业对象
     Job j = appContext.getJob(jobID);
     if (j == null) {
       html.p().__("Sorry, ", jid, " not found.").__();
       return;
     }
+    // 处理超过任务数量限制未被解析的超大作业
     if(j instanceof UnparsedJob) {
       final int taskCount = j.getTotalMaps() + j.getTotalReduces();
       UnparsedJob oversizedJob = (UnparsedJob) j;
@@ -89,8 +102,11 @@ public class HsJobBlock extends HtmlBlock {
           JHAdminConfig.MR_HS_LOADED_JOBS_TASKS_MAX + ".").__();
       return;
     }
+    // 获取作业的所有ApplicationMaster信息
     List<AMInfo> amInfos = j.getAMInfos();
+    // 构建作业信息DAO对象
     JobInfo job = new JobInfo(j);
+    // 构建作业概览信息块
     ResponseInfo infoBlock = info("Job Overview").
         __("Job Name:", job.getName()).
         __("User Name:", job.getUserName()).
@@ -103,10 +119,12 @@ public class HsJobBlock extends HtmlBlock {
         __("Elapsed:", StringUtils.formatTime(
             Times.elapsed(job.getStartTime(), job.getFinishTime(), false)));
     
+    // 根据AM数量选择单复数描述
     String amString =
         amInfos.size() == 1 ? "ApplicationMaster" : "ApplicationMasters"; 
     
     // todo - switch to use JobInfo
+    // 添加诊断信息到概览，将TaskID文本转换为可点击链接
     List<String> diagnostics = j.getDiagnostics();
     if(diagnostics != null && !diagnostics.isEmpty()) {
       StringBuilder b = new StringBuilder();
@@ -116,23 +134,27 @@ public class HsJobBlock extends HtmlBlock {
       infoBlock._r("Diagnostics:", b.toString());
     }
 
+    // 添加Map任务平均时间统计
     if(job.getNumMaps() > 0) {
       infoBlock.__("Average Map Time", StringUtils.formatTime(job.getAvgMapTime()));
     }
+    // 添加Reduce任务各阶段平均时间统计
     if(job.getNumReduces() > 0) {
       infoBlock.__("Average Shuffle Time", StringUtils.formatTime(job.getAvgShuffleTime()));
       infoBlock.__("Average Merge Time", StringUtils.formatTime(job.getAvgMergeTime()));
       infoBlock.__("Average Reduce Time", StringUtils.formatTime(job.getAvgReduceTime()));
     }
 
+    // 添加权限ACL信息
     for (ConfEntryInfo entry : job.getAcls()) {
       infoBlock.__("ACL "+entry.getName()+":", entry.getValue());
     }
+    // 开始渲染HTML容器
     DIV<Hamlet> div = html.
         __(InfoBlock.class).
       div(_INFO_WRAP);
     
-      // MRAppMasters Table
+      // 渲染ApplicationMaster信息表格
         TABLE<DIV<Hamlet>> table = div.table("#job");
         table.
           tr().
@@ -145,9 +167,11 @@ public class HsJobBlock extends HtmlBlock {
             th(_TH, "Logs").
             __();
         boolean odd = false;
+        // 遍历所有AM尝试，逐行渲染
           for (AMInfo amInfo : amInfos) {
             AMAttemptInfo attempt = new AMAttemptInfo(amInfo,
                 job.getId(), job.getUserName(), "", "");
+            // 奇偶行使用不同样式
             table.tr((odd = !odd) ? _ODD : _EVEN).
               td(String.valueOf(attempt.getAttemptId())).
               td(new Date(attempt.getStartTime()).toString()).
@@ -164,7 +188,7 @@ public class HsJobBlock extends HtmlBlock {
         
         html.div(_INFO_WRAP).        
       
-      // Tasks table
+      // 渲染任务数量统计表格
         table("#job").
           tr().
             th(_TH, "Task Type").
@@ -182,7 +206,7 @@ public class HsJobBlock extends HtmlBlock {
             td(String.valueOf(String.valueOf(job.getReducesCompleted()))).__()
           .__().
 
-        // Attempts table
+        // 渲染任务尝试状态统计表格
         table("#job").
         tr().
           th(_TH, "Attempt Type").
@@ -217,6 +241,11 @@ public class HsJobBlock extends HtmlBlock {
             __();
   }
 
+  /**
+   * 将诊断文本中的TaskID替换为指向任务详情页的超链接
+   * @param text 原始诊断文本
+   * @return 替换后包含超链接的文本
+   */
   static String addTaskLinks(String text) {
     return TaskID.taskIdPattern.matcher(text).replaceAll(
         "<a href=\"/jobhistory/task/$0\">$0</a>");

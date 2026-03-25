@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,24 +24,27 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
+ * 子集群注册请求类，用于子集群ResourceManager向联邦状态存储注册加入联邦集群。
  * <p>
- * SubClusterRegisterRequest is a request by a sub-cluster
- * {@code ResourceManager} to participate in federation.
- *
- * <p>
- * It includes information such as:
+ * 请求包含以下信息：
  * <ul>
- * <li>{@link SubClusterId}</li>
- * <li>The URL of the subcluster</li>
- * <li>The timestamp representing the last start time of the subCluster</li>
- * <li>{@code FederationsubClusterState}</li>
- * <li>The current capacity and utilization of the subCluster</li>
+ * <li>子集群唯一标识 {@link SubClusterId}</li>
+ * <li>子集群访问地址</li>
+ * <li>子集群最近启动时间戳</li>
+ * <li>子集群当前状态 {@code FederationsubClusterState}</li>
+ * <li>子集群当前容量和利用率信息</li>
  * </ul>
  */
 @Private
 @Unstable
 public abstract class SubClusterRegisterRequest {
 
+  /**
+   * 根据子集群信息构造新的子集群注册请求实例。
+   * 
+   * @param subClusterInfo 子集群信息对象
+   * @return 新的子集群注册请求实例
+   */
   @Private
   @Unstable
   public static SubClusterRegisterRequest newInstance(
@@ -52,20 +56,18 @@ public abstract class SubClusterRegisterRequest {
   }
 
   /**
-   * Get the {@link SubClusterInfo} encapsulating the information about the
-   * sub-cluster.
+   * 获取封装子集群全部信息的SubClusterInfo对象。
    *
-   * @return the information pertaining to the sub-cluster
+   * @return 子集群全部信息
    */
   @Public
   @Unstable
   public abstract SubClusterInfo getSubClusterInfo();
 
   /**
-   * Set the {@link SubClusterInfo} encapsulating the information about the
-   * sub-cluster.
+   * 设置封装子集群全部信息的SubClusterInfo对象。
    *
-   * @param subClusterInfo the information pertaining to the sub-cluster
+   * @param subClusterInfo 子集群全部信息
    */
   @Public
   @Unstable

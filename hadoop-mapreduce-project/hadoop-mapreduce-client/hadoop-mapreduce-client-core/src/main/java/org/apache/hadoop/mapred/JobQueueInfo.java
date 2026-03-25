@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,33 +28,36 @@ import org.apache.hadoop.mapreduce.QueueInfo;
 import org.apache.hadoop.mapreduce.QueueState;
 
 /**
- * Class that contains the information regarding the Job Queues which are 
- * maintained by the Hadoop Map/Reduce framework.
+ * 文件说明：MapReduce v1 API 作业队列信息实体类，保存Hadoop MapReduce框架维护的作业队列相关信息
+ * 继承新版QueueInfo，兼容旧版mapred API的使用需求
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class JobQueueInfo extends QueueInfo {
 
   /**
-   * Default constructor for Job Queue Info.
-   * 
+   * 构造函数：创建空的作业队列信息对象
    */
   public JobQueueInfo() {
     super();  
   }
 
   /**
-   * Construct a new JobQueueInfo object using the queue name and the
-   * scheduling information passed.
+   * 构造函数：根据队列名称和调度信息创建作业队列信息对象
    * 
-   * @param queueName Name of the job queue
-   * @param schedulingInfo Scheduling Information associated with the job
-   * queue
+   * @param queueName 作业队列名称
+   * @param schedulingInfo 关联作业队列的调度信息
    */
   public JobQueueInfo(String queueName, String schedulingInfo) {
     super(queueName, schedulingInfo);
   }
   
+  /**
+   * 构造函数：从新版QueueInfo转换为旧版JobQueueInfo
+   * 完成队列状态、子队列、属性和作业状态信息的拷贝
+   * 
+   * @param queue 新版QueueInfo对象
+   */
   JobQueueInfo(QueueInfo queue) {
     this(queue.getQueueName(), queue.getSchedulingInfo());
     setQueueState(queue.getState().getStateName());
@@ -63,9 +67,9 @@ public class JobQueueInfo extends QueueInfo {
   }
   
   /**
-   * Set the queue name of the JobQueueInfo
+   * 设置作业队列名称
    * 
-   * @param queueName Name of the job queue.
+   * @param queueName 作业队列名称
    */
   @InterfaceAudience.Private
   public void setQueueName(String queueName) {
@@ -73,9 +77,9 @@ public class JobQueueInfo extends QueueInfo {
   }
 
   /**
-   * Set the scheduling information associated to particular job queue
+   * 设置作业队列关联的调度信息
    * 
-   * @param schedulingInfo
+   * @param schedulingInfo 调度信息字符串
    */
   @InterfaceAudience.Private
   public void setSchedulingInfo(String schedulingInfo) {
@@ -83,8 +87,8 @@ public class JobQueueInfo extends QueueInfo {
   }
 
   /**
-   * Set the state of the queue
-   * @param state state of the queue.
+   * 设置队列当前状态
+   * @param state 队列状态名称
    */
   @InterfaceAudience.Private
   public void setQueueState(String state) {
@@ -92,13 +96,17 @@ public class JobQueueInfo extends QueueInfo {
   }
   
   /**
-   * Use getState() instead
+   * 获取队列状态，已废弃，请使用getState()替代
    */
   @Deprecated
   public String getQueueState() {
     return super.getState().toString();
   }
   
+  /**
+   * 设置当前队列的子队列列表
+   * @param children 子队列列表（旧版JobQueueInfo类型）
+   */
   @InterfaceAudience.Private
   public void setChildren(List<JobQueueInfo> children) {
     List<QueueInfo> list = new ArrayList<QueueInfo>();
@@ -108,6 +116,10 @@ public class JobQueueInfo extends QueueInfo {
     super.setQueueChildren(list);
   }
 
+  /**
+   * 获取当前队列的子队列列表
+   * @return 子队列列表（旧版JobQueueInfo类型）
+   */
   public List<JobQueueInfo> getChildren() {
     List<JobQueueInfo> list = new ArrayList<JobQueueInfo>();
     for (QueueInfo q : super.getQueueChildren()) {
@@ -116,19 +128,20 @@ public class JobQueueInfo extends QueueInfo {
     return list;
   }
 
+  /**
+   * 设置队列自定义属性
+   * @param props 自定义属性对象
+   */
   @InterfaceAudience.Private
   public void setProperties(Properties props) {
     super.setProperties(props);
   }
 
   /**
-   * Add a child {@link JobQueueInfo} to this {@link JobQueueInfo}. Modify the
-   * fully-qualified name of the child {@link JobQueueInfo} to reflect the
-   * hierarchy.
+   * 添加子队列到当前队列，更新子队列全限定名反映层级关系
+   * 仅用于测试场景
    * 
-   * Only for testing.
-   * 
-   * @param child
+   * @param child 要添加的子队列
    */
   void addChild(JobQueueInfo child) {
     List<JobQueueInfo> children = getChildren();
@@ -137,12 +150,10 @@ public class JobQueueInfo extends QueueInfo {
   }
 
   /**
-   * Remove the child from this {@link JobQueueInfo}. This also resets the
-   * queue-name of the child from a fully-qualified name to a simple queue name.
+   * 从当前队列移除子队列，将子队列名称从全限定名重置为简单名称
+   * 仅用于测试场景
    * 
-   * Only for testing.
-   * 
-   * @param child
+   * @param child 要移除的子队列
    */
   void removeChild(JobQueueInfo child) {
     List<JobQueueInfo> children = getChildren();
@@ -150,6 +161,10 @@ public class JobQueueInfo extends QueueInfo {
     setChildren(children);
   }
 
+  /**
+   * 设置队列中当前作业状态数组
+   * @param stats 作业状态数组
+   */
   @InterfaceAudience.Private
   public void setJobStatuses(org.apache.hadoop.mapreduce.JobStatus[] stats) {
     super.setJobStatuses(stats);

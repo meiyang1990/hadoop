@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.reader contains classes
- * which can be used across reader. This package contains classes which are
- * not related to storage implementations.
+ * 时间轴服务读取器基础包，提供多个读取器可共用的通用核心类，不包含具体存储实现相关代码。
+ * 该包负责封装时间线数据读取的通用能力，为不同存储实现提供可复用的基础组件。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

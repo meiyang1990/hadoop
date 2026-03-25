@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,60 +28,61 @@ import java.io.IOException;
 import java.util.Map;
 
 /**
- * Interface for the resource profiles manager. Provides an interface to get
- * the list of available profiles and some helper functions.
+ * 资源配置文件管理器接口，为YARN资源调度提供资源模板管理能力，
+ * 定义了获取、初始化、重载资源配置文件的统一接口规范。
+ * 资源配置文件用于预定义不同规格的资源模板，方便应用快速申请指定规格的资源。
  */
 public interface ResourceProfilesManager {
 
   /**
-   * Method to handle all initialization steps for ResourceProfilesManager.
-   * @param config Configuration object
-   * @throws IOException when invalid resource profile names are loaded
+   * 初始化资源配置文件管理器，从配置加载所有资源配置信息。
+   * @param config YARN配置对象
+   * @throws IOException 加载到无效资源配置名称时抛出
    */
   void init(Configuration config) throws IOException;
 
   /**
-   * Get the resource capability associated with given profile name.
-   * @param profile name of resource profile
-   * @return resource capability for given profile
+   * 根据配置名称获取对应的资源能力信息。
+   * @param profile 资源配置名称
+   * @return 对应配置的资源能力信息
    *
-   * @throws YarnException when any invalid profile name or feature is disabled
+   * @throws YarnException 配置名称无效或资源配置功能未开启时抛出
    */
   Resource getProfile(String profile) throws YarnException;
 
   /**
-   * Get all supported resource profiles.
-   * @return a map of resource objects associated with each profile
+   * 获取所有支持的资源配置及其对应的资源信息。
+   * @return 资源配置名称到资源信息的映射表
    *
-   * @throws YARNFeatureNotEnabledException when feature is disabled
+   * @throws YARNFeatureNotEnabledException 资源配置功能未开启时抛出
    */
   Map<String, Resource> getResourceProfiles() throws
       YARNFeatureNotEnabledException;
 
   /**
-   * Reload profiles based on updated configuration.
-   * @throws IOException when invalid resource profile names are loaded
+   * 根据更新后的配置重新加载资源配置信息。
+   * @throws IOException 加载到无效资源配置名称时抛出
    */
   void reloadProfiles() throws IOException;
 
   /**
-   * Get default supported resource profile.
-   * @return resource object which is default
-   * @throws YarnException when any invalid profile name or feature is disabled
+   * 获取默认资源配置对应的资源信息。
+   * @return 默认资源配置的资源对象
+   * @throws YarnException 配置名称无效或资源配置功能未开启时抛出
    */
   Resource getDefaultProfile() throws YarnException;
 
   /**
-   * Get minimum supported resource profile.
-   * @return resource object which is minimum
-   * @throws YarnException when any invalid profile name or feature is disabled
+   * 获取最小资源配置对应的资源信息。
+   * @return 最小资源配置的资源对象
+   * @throws YarnException 配置名称无效或资源配置功能未开启时抛出
    */
   Resource getMinimumProfile() throws YarnException;
 
   /**
-   * Get maximum supported resource profile.
-   * @return resource object which is maximum
-   * @throws YarnException when any invalid profile name or feature is disabled
+   * 获取最大资源配置对应的资源信息。
+   * @return 最大资源配置的资源对象
+   * @throws YarnException 配置名称无效或资源配置功能未开启时抛出
    */
   Resource getMaximumProfile() throws YarnException;
 }

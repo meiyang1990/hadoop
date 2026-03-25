@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -52,14 +53,9 @@ import java.util.Set;
 import java.util.HashSet;
 
 /**
- * Class for parsing mapred-queues.xml.
- *    The format consists nesting of
- *    queues within queues - a feature called hierarchical queues.
- *    The parser expects that queues are
- *    defined within the 'queues' tag which is the top level element for
- *    XML document.
- * 
- * Creates the complete queue hieararchy
+ * MapReduce 队列配置解析器，负责解析 mapred-queues.xml 配置文件，构建层次化队列结构
+ * <p/>
+ * 支持队列嵌套（层次化队列）特性，XML根元素必须为 <queues>，解析后生成完整的队列层级树
  */
 class QueueConfigurationParser {
   private static final Logger LOG =
@@ -67,18 +63,17 @@ class QueueConfigurationParser {
   
   private boolean aclsEnabled = false;
 
-  //Default root.
+  //默认根队列
   protected Queue root = null;
 
-  //xml tags for mapred-queues.xml
+  //mapred-queues.xml 配置标签常量定义
   static final String NAME_SEPARATOR = ":";
   static final String QUEUE_TAG = "queue";
   static final String ACL_SUBMIT_JOB_TAG = "acl-submit-job";
   static final String ACL_ADMINISTER_JOB_TAG = "acl-administer-jobs";
 
-  // The value read from queues config file for this tag is not used at all.
-  // To enable queue acls and job acls, mapreduce.cluster.acls.enabled is
-  // to be set in mapred-site.xml
+  // 该标签已废弃，配置文件中的该值不再使用
+  // 开启队列ACL需在 mapred-site.xml 中设置 mapreduce.cluster.acls.enabled
   @Deprecated
   static final String ACLS_ENABLED_TAG = "aclsEnabled";
 
@@ -91,12 +86,17 @@ class QueueConfigurationParser {
   static final String VALUE_TAG = "value";
 
   /**
-   * Default constructor for QueueConfigurationParser.
+   * 默认构造函数
    */
   QueueConfigurationParser() {
     
   }
 
+  /**
+   * 根据文件路径构造队列配置解析器，解析配置文件构建队列树
+   * @param confFile 队列配置文件路径
+   * @param areAclsEnabled 是否开启ACL权限控制
+   */
   QueueConfigurationParser(String confFile, boolean areAclsEnabled) {
     aclsEnabled = areAclsEnabled;
     File file = new File(confFile).getAbsoluteFile();
@@ -115,6 +115,11 @@ class QueueConfigurationParser {
     }
   }
 
+  /**
+   * 根据输入流构造队列配置解析器，解析XML输入构建队列树
+   * @param xmlInput XML配置输入流
+   * @param areAclsEnabled 是否开启ACL权限控制
+   */
   QueueConfigurationParser(InputStream xmlInput, boolean areAclsEnabled) {
     aclsEnabled = areAclsEnabled;
     loadFrom(xmlInput);
@@ -150,24 +155,22 @@ class QueueConfigurationParser {
   }
 
   /**
-   * Method to load the resource file.
-   * generates the root.
-   * 
-   * @param resourceInput InputStream that provides the XML to parse
-   * @return
-   * @throws ParserConfigurationException
-   * @throws SAXException
-   * @throws IOException
+   * 从输入流加载并解析XML配置，生成根队列节点
+   * @param resourceInput XML配置输入流
+   * @return 解析后的根队列节点
+   * @throws ParserConfigurationException 解析器配置错误
+   * @throws SAXException XML解析错误
+   * @throws IOException IO读取错误
    */
   protected Queue loadResource(InputStream resourceInput)
     throws ParserConfigurationException, SAXException, IOException {
     DocumentBuilderFactory docBuilderFactory =
         XMLUtils.newSecureDocumentBuilderFactory();
 
-    //ignore all comments inside the xml file
+    // 忽略XML文件中的注释
     docBuilderFactory.setIgnoringComments(true);
 
-    //allow includes in the xml file
+    // 开启命名空间支持，允许XML包含
     docBuilderFactory.setNamespaceAware(true);
     try {
       docBuilderFactory.setXIncludeAware(true);
@@ -186,9 +189,15 @@ class QueueConfigurationParser {
     return this.parseResource(queuesNode);
   }
 
+  /**
+   * 解析XML根queues节点，构建顶层队列结构
+   * @param queuesNode XML根queues元素节点
+   * @return 解析完成的虚拟根队列节点
+   */
   private Queue parseResource(Element queuesNode) {
     Queue rootNode = null;
     try {
+      // 校验根节点必须是<queues>标签
       if (!QUEUES_TAG.equals(queuesNode.getTagName())) {
         LOG.info("Bad conf file: top-level element not <queues>");
         throw new RuntimeException("No queues defined ");
@@ -196,6 +205,7 @@ class QueueConfigurationParser {
       NamedNodeMap nmp = queuesNode.getAttributes();
       Node acls = nmp.getNamedItem(ACLS_ENABLED_TAG);
 
+      // 废弃标签提示，告知用户需在mapred-site.xml配置ACL开关
       if (acls != null) {
         LOG.warn("Configuring " + ACLS_ENABLED_TAG + " flag in " +
             QueueManager.QUEUE_CONF_FILE_NAME + " is not valid. " +
@@ -212,13 +222,14 @@ class QueueConfigurationParser {
         throw new RuntimeException(" No queues defined ");
       }
 
-      //We have root level nodes.
+      // 遍历所有顶层队列节点
       for (int i = 0; i < props.getLength(); i++) {
         Node propNode = props.item(i);
         if (!(propNode instanceof Element)) {
           continue;
         }
 
+        // 根节点下只允许存在<queue>标签
         if (!propNode.getNodeName().equals(QUEUE_TAG)) {
           LOG.info("At root level only \" queue \" tags are allowed ");
           throw
@@ -226,7 +237,7 @@ class QueueConfigurationParser {
         }
 
         Element prop = (Element) propNode;
-        //Add children to root.
+        // 递归构建队列层次结构
         Queue q = createHierarchy("", prop);
         if(rootNode == null) {
           rootNode = new Queue();
@@ -242,17 +253,16 @@ class QueueConfigurationParser {
   }
 
   /**
-   * @param parent Name of the parent queue
-   * @param queueNode
-   * @return
+   * 递归构建队列层次结构，从XML节点生成Queue对象树
+   * @param parent 父队列完整名称
+   * @param queueNode 当前队列XML元素节点
+   * @return 构建完成的当前队列对象
    */
   private Queue createHierarchy(String parent, Element queueNode) {
 
     if (queueNode == null) {
       return null;
     }
-    //Name of the current queue.
-    //Complete qualified queue name.
     String name = "";
     Queue newQueue = new Queue();
     Map<String, AccessControlList> acls =
@@ -271,8 +281,10 @@ class QueueConfigurationParser {
         continue;
       }
       Element field = (Element) fieldNode;
+      // 解析队列名称，生成完整限定名（父队列名:当前队列名）
       if (QUEUE_NAME_TAG.equals(field.getTagName())) {
         String nameValue = field.getTextContent();
+        // 校验队列名称合法性：不允许为空，不允许包含分隔符冒号
         if (field.getTextContent() == null ||
           field.getTextContent().trim().equals("") ||
           field.getTextContent().contains(NAME_SEPARATOR)) {
@@ -282,19 +294,21 @@ class QueueConfigurationParser {
         if (!parent.equals("")) {
           name += parent + NAME_SEPARATOR;
         }
-        //generate the complete qualified name
-        //parent.child
+        // 生成完整限定名 格式：父队列名:当前队列名
         name += nameValue;
         newQueue.setName(name);
+        // 生成ACL属性完整名称
         submitKey = toFullPropertyName(name,
             QueueACL.SUBMIT_JOB.getAclName());
         adminKey = toFullPropertyName(name,
             QueueACL.ADMINISTER_JOBS.getAclName());
       }
 
+      // 收集子队列节点，后续递归处理
       if (QUEUE_TAG.equals(field.getTagName()) && field.hasChildNodes()) {
         subQueues.add(field);
       }
+      // ACL开启时解析提交任务和管理任务的权限列表
       if(isAclsEnabled()) {
         if (ACL_SUBMIT_JOB_TAG.equals(field.getTagName())) {
           acls.put(submitKey, new AccessControlList(field.getTextContent()));
@@ -305,17 +319,20 @@ class QueueConfigurationParser {
         }
       }
 
+      // 解析队列自定义属性
       if (PROPERTIES_TAG.equals(field.getTagName())) {
         Properties properties = populateProperties(field);
         newQueue.setProperties(properties);
       }
 
+      // 解析队列状态（运行/停止）
       if (STATE_TAG.equals(field.getTagName())) {
         String state = field.getTextContent();
         newQueue.setState(QueueState.getState(state));
       }
     }
     
+    // 默认ACL：如果未配置，设置为空权限列表
     if (!acls.containsKey(submitKey)) {
       acls.put(submitKey, new AccessControlList(" "));
     }
@@ -324,11 +341,10 @@ class QueueConfigurationParser {
       acls.put(adminKey, new AccessControlList(" "));
     }
     
-    //Set acls
+    // 设置ACL权限
     newQueue.setAcls(acls);
-    //At this point we have the queue ready at current height level.
-    //so we have parent name available.
 
+    // 递归处理所有子队列，添加到当前队列
     for(Element field:subQueues) {
       newQueue.addChild(createHierarchy(newQueue.getName(), field));
     }
@@ -336,10 +352,9 @@ class QueueConfigurationParser {
   }
 
   /**
-   * Populate the properties for Queue
-   *
-   * @param field
-   * @return
+   * 解析properties标签，填充队列自定义属性
+   * @param field propertiesXML元素节点
+   * @return 解析完成的属性集合
    */
   private Properties populateProperties(Element field) {
     Properties props = new Properties();
@@ -349,8 +364,6 @@ class QueueConfigurationParser {
     for (int i = 0; i < propfields.getLength(); i++) {
       Node prop = propfields.item(i);
 
-      //If this node is not of type element
-      //skip this.
       if (!(prop instanceof Element)) {
         continue;
       }
@@ -358,6 +371,7 @@ class QueueConfigurationParser {
       if (PROPERTY_TAG.equals(prop.getNodeName())) {
         if (prop.hasAttributes()) {
           NamedNodeMap nmp = prop.getAttributes();
+          // 同时存在key和value属性时才添加属性
           if (nmp.getNamedItem(KEY_TAG) != null && nmp.getNamedItem(
             VALUE_TAG) != null) {
             props.setProperty(
@@ -371,21 +385,15 @@ class QueueConfigurationParser {
   }
 
   /**
-   *
-   * Checks if there is NAME_TAG for queues.
-   *
-   * Checks if (queue has children)
-   *  then it shouldnot have acls-* or state
-   *   else
-   *  throws an Exception.
-   * @param node
+   * 校验队列XML节点格式合法性：
+   * 1. 必须包含name标签
+   * 2. 包含子queue的父队列不能同时配置ACL和状态标签（ACL和状态仅叶子节点配置）
+   * @param node 当前队列XML节点
    */
   private void validate(Node node) {
 
     NodeList fields = node.getChildNodes();
 
-    //Check if <queue> & (<acls-*> || <state>) are not siblings
-    //if yes throw an IOException.
     Set<String> siblings = new HashSet<String>();
     for (int i = 0; i < fields.getLength(); i++) {
       if (!(fields.item(i) instanceof Element)) {
@@ -394,11 +402,13 @@ class QueueConfigurationParser {
       siblings.add((fields.item(i)).getNodeName());
     }
 
+    // 必须配置队列名称
     if(! siblings.contains(QUEUE_NAME_TAG)) {
       throw new RuntimeException(
         " Malformed xml formation queue name not specified ");
     }
 
+    // 如果当前队列包含子队列，则不允许同时配置ACL和状态标签
     if (siblings.contains(QUEUE_TAG) && (
       siblings.contains(ACL_ADMINISTER_JOB_TAG) ||
         siblings.contains(ACL_SUBMIT_JOB_TAG) ||
@@ -411,6 +421,11 @@ class QueueConfigurationParser {
   }
 
 
+  /**
+   * 从完整队列名称中提取当前队列的短名称（去掉父队列前缀）
+   * @param fullQName 完整队列名称（父:子）
+   * @return 当前队列短名称
+   */
   private static String getSimpleQueueName(String fullQName) {
     int index = fullQName.lastIndexOf(NAME_SEPARATOR);
     if (index < 0) {
@@ -420,25 +435,22 @@ class QueueConfigurationParser {
   }
 
   /**
-   * Construct an {@link Element} for a single queue, constructing the inner
-   * queue &lt;name/&gt;, &lt;properties/&gt;, &lt;state/&gt; and the inner
-   * &lt;queue&gt; elements recursively.
-   * 
-   * @param document
-   * @param jqi
-   * @return
+   * 根据JobQueueInfo递归生成队列XML元素，包含名称、属性、状态和子队列
+   * @param document XML文档对象，用于创建元素
+   * @param jqi 队列信息对象
+   * @return 生成的队列XML元素
    */
   static Element getQueueElement(Document document, JobQueueInfo jqi) {
 
-    // Queue
+    // 创建队列标签
     Element q = document.createElement(QUEUE_TAG);
 
-    // Queue-name
+    // 创建队列名称标签
     Element qName = document.createElement(QUEUE_NAME_TAG);
     qName.setTextContent(getSimpleQueueName(jqi.getQueueName()));
     q.appendChild(qName);
 
-    // Queue-properties
+    // 创建队列自定义属性标签
     Properties props = jqi.getProperties();
     Element propsElement = document.createElement(PROPERTIES_TAG);
     if (props != null) {
@@ -452,7 +464,7 @@ class QueueConfigurationParser {
     }
     q.appendChild(propsElement);
 
-    // Queue-state
+    // 创建队列状态标签（非undefined状态才生成）
     String queueState = jqi.getState().getStateName();
     if (queueState != null
         && !queueState.equals(QueueState.UNDEFINED.getStateName())) {
@@ -461,15 +473,8 @@ class QueueConfigurationParser {
       q.appendChild(qStateElement);
     }
 
-    // Queue-children
+    // 递归创建子队列标签
     List<JobQueueInfo> children = jqi.getChildren();
     if (children != null) {
       for (JobQueueInfo child : children) {
-        q.appendChild(getQueueElement(document, child));
-      }
-    }
-
-    return q;
-  }
-
-}
+        q.appendChild(getQueueElement(document,

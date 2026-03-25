@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,6 +45,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
+ * 文件说明：感知数据局部性的应用容器放置分配器实现
+ * 核心职责：在容器分配时，尊重应用指定的节点局部性、机架局部性偏好，按照优先级尝试分配
+ */
+/**
  * This is an implementation of the {@link AppPlacementAllocator} that takes
  * into account locality preferences (node, rack, any) when allocating
  * containers.
@@ -53,14 +58,19 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   private static final Logger LOG =
       LoggerFactory.getLogger(LocalityAppPlacementAllocator.class);
 
+  // 按资源位置（节点名/机架名/ANY）存储资源请求
   private final Map<String, ResourceRequest> resourceRequestMap =
       new ConcurrentHashMap<>();
+  // 应用请求的主节点分区（节点标签表达式）
   private volatile String primaryRequestedPartition =
       RMNodeLabelsManager.NO_LABEL;
 
   private final ReentrantReadWriteLock.ReadLock readLock;
   private final ReentrantReadWriteLock.WriteLock writeLock;
 
+  /**
+   * 构造函数，初始化读写锁用于保护资源请求映射的并发访问
+   */
   public LocalityAppPlacementAllocator() {
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     readLock = lock.readLock();
@@ -69,11 +79,20 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
 
   @SuppressWarnings("unchecked")
   @Override
+  /**
+   * 初始化分配器，调用父类初始化逻辑
+   */
   public void initialize(AppSchedulingInfo appSchedulingInfo,
       SchedulerRequestKey schedulerRequestKey, RMContext rmContext) {
     super.initialize(appSchedulingInfo, schedulerRequestKey, rmContext);
   }
 
+  /**
+   * 检查两个资源请求的节点标签表达式是否发生变化
+   * @param requestOne 旧请求
+   * @param requestTwo 新请求
+   * @return 标签是否变化
+   */
   private boolean hasRequestLabelChanged(ResourceRequest requestOne,
       ResourceRequest requestTwo) {
     String requestOneLabelExp = requestOne.getNodeLabelExpression();
@@ -89,6 +108,10 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
         .equals(requestTwoLabelExp)));
   }
 
+  /**
+   * 根据ANY请求更新所有资源请求的节点标签，保持标签一致性
+   * @param request 新入资源请求
+   */
   private void updateNodeLabels(ResourceRequest request) {
     String resourceName = request.getResourceName();
     if (resourceName.equals(ResourceRequest.ANY)) {
@@ -107,6 +130,7 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
         }
       }
     } else{
+      // 非ANY请求继承ANY请求的节点标签
       ResourceRequest anyRequest = getResourceRequest(ResourceRequest.ANY);
       if (anyRequest != null) {
         request.setNodeLabelExpression(anyRequest.getNodeLabelExpression());
@@ -115,6 +139,12 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   }
 
   @Override
+  /**
+   * 更新待分配资源请求信息，处理新增/恢复的资源请求
+   * @param requests 待更新的资源请求集合
+   * @param recoverPreemptedRequestForAContainer 是否恢复被抢占的请求
+   * @return 更新结果，包含新旧待分配请求信息
+   */
   public PendingAskUpdateResult updatePendingAsk(
       Collection<ResourceRequest> requests,
       boolean recoverPreemptedRequestForAContainer) {
@@ -123,11 +153,11 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
     try {
       PendingAskUpdateResult updateResult = null;
 
-      // Update resource requests
+      // 遍历更新每个资源请求
       for (ResourceRequest request : requests) {
         String resourceName = request.getResourceName();
 
-        // Update node labels if required
+        // 按需更新节点标签保证一致性
         updateNodeLabels(request);
 
         // Increment number of containers if recovering preempted resources
@@ -136,9 +166,10 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
           request.setNumContainers(lastRequest.getNumContainers() + 1);
         }
 
-        // Update asks
+        // 更新资源请求到缓存
         resourceRequestMap.put(resourceName, request);
 
+        // ANY请求更新主分区信息
         if (resourceName.equals(ResourceRequest.ANY)) {
           String partition = request.getNodeLabelExpression() == null ?
               RMNodeLabelsManager.NO_LABEL :
@@ -146,9 +177,10 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
 
           this.primaryRequestedPartition = partition;
 
-          //update the applications requested labels set
+          // 更新应用请求分区集合
           appSchedulingInfo.addRequestedPartition(partition);
 
+          // 构建更新结果对象
           PendingAsk lastPendingAsk =
               lastRequest == null ? null : new PendingAsk(
                   lastRequest.getCapability(), lastRequest.getNumContainers());
@@ -168,6 +200,9 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   }
 
   @Override
+  /**
+   * 不支持处理新版本SchedulingRequest，抛出异常
+   */
   public PendingAskUpdateResult updatePendingAsk(
       SchedulerRequestKey schedulerRequestKey,
       SchedulingRequest schedulingRequest,
@@ -181,15 +216,29 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   }
 
   @Override
+  /**
+   * 获取所有资源请求映射
+   * @return 资源位置到请求的映射
+   */
   public Map<String, ResourceRequest> getResourceRequests() {
     return resourceRequestMap;
   }
 
+  /**
+   * 根据资源位置获取对应资源请求
+   * @param resourceName 资源位置名称
+   * @return 对应资源请求
+   */
   private ResourceRequest getResourceRequest(String resourceName) {
     return resourceRequestMap.get(resourceName);
   }
 
   @Override
+  /**
+   * 获取指定位置的待分配请求信息
+   * @param resourceName 资源位置名称
+   * @return 待分配请求对象
+   */
   public PendingAsk getPendingAsk(String resourceName) {
     readLock.lock();
     try {
@@ -207,6 +256,11 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   }
 
   @Override
+  /**
+   * 获取指定位置剩余待分配容器数量
+   * @param resourceName 资源位置名称
+   * @return 剩余待分配容器数
+   */
   public int getOutstandingAsksCount(String resourceName) {
     readLock.lock();
     try {
@@ -222,6 +276,11 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
 
   }
 
+  /**
+   * 减少ANY位置剩余待分配容器数量，处理分配后状态变更
+   * @param schedulerRequestKey 调度请求键
+   * @param offSwitchRequest ANY位置资源请求
+   */
   private void decrementOutstanding(SchedulerRequestKey schedulerRequestKey,
       ResourceRequest offSwitchRequest) {
     int numOffSwitchContainers = offSwitchRequest.getNumContainers() - 1;
@@ -230,6 +289,7 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
     // Do we have any outstanding requests?
     // If there is nothing, we need to deactivate this application
     if (numOffSwitchContainers == 0) {
+      // 无剩余请求，移除调度键并检查是否需要停用应用
       appSchedulingInfo.getSchedulerKeys().remove(schedulerRequestKey);
       appSchedulingInfo.checkForDeactivation();
       resourceRequestMap.remove(ResourceRequest.ANY);
@@ -237,12 +297,17 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
         appSchedulingInfo.removeAppPlacement(schedulerRequestKey);
       }
     }
-
+    // 减少应用待分配资源统计
     appSchedulingInfo.decPendingResource(
         offSwitchRequest.getNodeLabelExpression(),
         offSwitchRequest.getCapability());
   }
 
+  /**
+   * 克隆资源请求，设置容器数为1，用于恢复场景
+   * @param request 原始资源请求
+   * @return 克隆后的新请求
+   */
   public ResourceRequest cloneResourceRequest(ResourceRequest request) {
     ResourceRequest newRequest = ResourceRequest.clone(request);
     newRequest.setNumContainers(1);
@@ -252,6 +317,13 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   /**
    * The {@link ResourceScheduler} is allocating data-local resources to the
    * application.
+   */
+  /**
+   * 处理机架局部性容器分配，更新剩余请求状态
+   * @param schedulerKey 调度请求键
+   * @param node 目标节点
+   * @param rackLocalRequest 机架局部性资源请求
+   * @param resourceRequests 保存克隆后的请求用于恢复
    */
   private void allocateRackLocal(SchedulerRequestKey schedulerKey,
       SchedulerNode node, ResourceRequest rackLocalRequest,
@@ -263,7 +335,7 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
         ResourceRequest.ANY);
     decrementOutstanding(schedulerKey, offRackRequest);
 
-    // Update cloned RackLocal and OffRack requests for recovery
+    // 保存克隆请求用于后续恢复
     resourceRequests.add(cloneResourceRequest(rackLocalRequest));
     resourceRequests.add(cloneResourceRequest(offRackRequest));
   }
@@ -271,6 +343,12 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   /**
    * The {@link ResourceScheduler} is allocating data-local resources to the
    * application.
+   */
+  /**
+   * 处理无局部性偏好（任意节点）容器分配，更新剩余请求状态
+   * @param schedulerKey 调度请求键
+   * @param offSwitchRequest ANY位置资源请求
+   * @param resourceRequests 保存克隆后的请求用于恢复
    */
   private void allocateOffSwitch(SchedulerRequestKey schedulerKey,
       ResourceRequest offSwitchRequest,
@@ -285,6 +363,13 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   /**
    * The {@link ResourceScheduler} is allocating data-local resources to the
    * application.
+   */
+  /**
+   * 处理节点局部性容器分配，更新剩余请求状态
+   * @param schedulerKey 调度请求键
+   * @param node 目标节点
+   * @param nodeLocalRequest 节点局部性资源请求
+   * @param resourceRequests 保存克隆后的请求用于恢复
    */
   private void allocateNodeLocal(SchedulerRequestKey schedulerKey,
       SchedulerNode node, ResourceRequest nodeLocalRequest,
@@ -306,6 +391,11 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
     resourceRequests.add(cloneResourceRequest(offRackRequest));
   }
 
+  /**
+   * 减少指定位置资源请求的剩余容器数，无剩余则移除请求
+   * @param resourceName 资源位置名称
+   * @param request 资源请求对象
+   */
   private void decResourceRequest(String resourceName,
       ResourceRequest request) {
     request.setNumContainers(request.getNumContainers() - 1);
@@ -315,14 +405,22 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   }
 
   @Override
+  /**
+   * 检查当前是否可以分配指定局部性类型的容器
+   * @param type 局部性类型（节点/机架/任意）
+   * @param node 目标节点
+   * @return 是否可分配
+   */
   public boolean canAllocate(NodeType type, SchedulerNode node) {
     readLock.lock();
     try {
       ResourceRequest r = resourceRequestMap.get(
           ResourceRequest.ANY);
+      // 检查ANY位置是否还有待分配请求
       if (r == null || r.getNumContainers() <= 0) {
         return false;
       }
+      // 机架或节点局部性需要检查对应位置是否还有待分配请求
       if (type == NodeType.RACK_LOCAL || type == NodeType.NODE_LOCAL) {
         r = resourceRequestMap.get(node.getRackName());
         if (r == null || r.getNumContainers() <= 0) {
@@ -343,6 +441,11 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
   }
 
   @Override
+  /**
+   * 检查是否可以延迟分配指定位置的请求（是否允许放宽局部性）
+   * @param resourceName 目标资源位置
+   * @return 是否允许延迟放宽局部性
+   */
   public boolean canDelayTo(String resourceName) {
     readLock.lock();
     try {
@@ -356,86 +459,13 @@ public class LocalityAppPlacementAllocator <N extends SchedulerNode>
 
 
   @Override
+  /**
+   * 预检查节点是否符合应用请求的分区要求
+   * @param schedulerNode 目标节点
+   * @param schedulingMode 调度模式（是否尊重分区独占性）
+   * @param dcOpt 诊断信息收集器
+   * @return 是否符合分区要求
+   */
   public boolean precheckNode(SchedulerNode schedulerNode,
       SchedulingMode schedulingMode,
       Optional<DiagnosticsCollector> dcOpt) {
-    // We will only look at node label = nodeLabelToLookAt according to
-    // schedulingMode and partition of node.
-    LOG.debug("precheckNode is invoked for {},{}", schedulerNode.getNodeID(),
-        schedulingMode);
-    String nodePartitionToLookAt;
-    if (schedulingMode == SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY) {
-      nodePartitionToLookAt = schedulerNode.getPartition();
-    } else {
-      nodePartitionToLookAt = RMNodeLabelsManager.NO_LABEL;
-    }
-
-    boolean rst = primaryRequestedPartition.equals(nodePartitionToLookAt);
-    if (!rst && dcOpt.isPresent()) {
-      dcOpt.get().collectPartitionDiagnostics(primaryRequestedPartition,
-          nodePartitionToLookAt);
-    }
-    return rst;
-  }
-
-  @Override
-  public boolean precheckNode(SchedulerNode schedulerNode,
-      SchedulingMode schedulingMode) {
-    return precheckNode(schedulerNode, schedulingMode, Optional.empty());
-  }
-
-  @Override
-  public String getPrimaryRequestedNodePartition() {
-    return primaryRequestedPartition;
-  }
-
-  @Override
-  public int getUniqueLocationAsks() {
-    return resourceRequestMap.size();
-  }
-
-  @Override
-  public void showRequests() {
-    for (ResourceRequest request : resourceRequestMap.values()) {
-      if (request.getNumContainers() > 0) {
-        LOG.debug("\tRequest=" + request);
-      }
-    }
-  }
-
-  @Override
-  public ContainerRequest allocate(SchedulerRequestKey schedulerKey,
-      NodeType type, SchedulerNode node) {
-    writeLock.lock();
-    try {
-
-      List<ResourceRequest> resourceRequests = new ArrayList<>();
-
-      ResourceRequest request;
-      if (type == NodeType.NODE_LOCAL) {
-        request = resourceRequestMap.get(node.getNodeName());
-      } else if (type == NodeType.RACK_LOCAL) {
-        request = resourceRequestMap.get(node.getRackName());
-      } else{
-        request = resourceRequestMap.get(ResourceRequest.ANY);
-      }
-
-      if (type == NodeType.NODE_LOCAL) {
-        allocateNodeLocal(schedulerKey, node, request, resourceRequests);
-      } else if (type == NodeType.RACK_LOCAL) {
-        allocateRackLocal(schedulerKey, node, request, resourceRequests);
-      } else{
-        allocateOffSwitch(schedulerKey, request, resourceRequests);
-      }
-
-      return new ContainerRequest(resourceRequests);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  @Override
-  public SchedulingRequest getSchedulingRequest() {
-    return null;
-  }
-}

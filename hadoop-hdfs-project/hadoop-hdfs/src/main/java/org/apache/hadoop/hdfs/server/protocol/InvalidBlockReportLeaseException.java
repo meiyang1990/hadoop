@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,16 +25,21 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This exception is thrown when a datanode sends a full block report but it is
- * rejected by the Namenode due to an invalid lease (expired or otherwise).
+ * 数据节点发送全量块报告到名称节点时，若租约无效（已过期或其他问题）被拒绝，抛出此异常。
+ * 用于标识块报告携带的租约验证失败，需要数据节点重新发起块报告流程。
  *
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class InvalidBlockReportLeaseException extends IOException {
-  /** for java.io.Serializable. */
+  /** 用于Java序列化机制的版本标识 */
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造包含块报告ID和无效租约ID的异常实例
+   * @param blockReportID 被拒绝的块报告ID
+   * @param leaseID 无效的租约ID
+   */
   public InvalidBlockReportLeaseException(long blockReportID, long leaseID) {
     super("Block report 0x" + Long.toHexString(blockReportID) + " was rejected as lease 0x"
         + Long.toHexString(leaseID) +  " is invalid");

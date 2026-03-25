@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * Package
- * org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.conf
- * contains classes related to capacity scheduler configuration management.
+ * 容量调度器配置管理包，提供容量调度器队列配置的存储、加载、动态更新等能力。
+ * 包含支持配置持久化存储、ZK分布式同步配置等核心实现，支持容量调度器配置的在线动态变更。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

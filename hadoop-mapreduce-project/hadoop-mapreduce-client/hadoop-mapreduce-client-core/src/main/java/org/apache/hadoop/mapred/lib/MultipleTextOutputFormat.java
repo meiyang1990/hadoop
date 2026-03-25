@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,16 +30,28 @@ import org.apache.hadoop.mapred.TextOutputFormat;
 import org.apache.hadoop.util.Progressable;
 
 /**
- * This class extends the MultipleOutputFormat, allowing to write the output
- * data to different output files in Text output format.
+ * 文件级注释：多文本输出格式实现，继承自MultipleOutputFormat，支持将MapReduce计算结果
+ * 根据自定义规则输出到多个不同的文本格式输出文件，满足按关键字分文件输出的业务需求
+ *
+ * 该类扩展了MultipleOutputFormat，允许以文本格式将输出数据写入不同的输出文件。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class MultipleTextOutputFormat<K, V>
     extends MultipleOutputFormat<K, V> {
 
+  /** 单例实例化的文本输出格式对象，复用避免重复创建 */
   private TextOutputFormat<K, V> theTextOutputFormat = null;
 
+  /**
+   * 获取基础文本记录写入器，用于向指定输出文件写入文本格式的键值对
+   * @param fs 文件系统对象
+   * @param job 作业配置对象
+   * @param name 输出文件名
+   * @param arg3 进度上报回调对象
+   * @return 文本格式的记录写入器
+   * @throws IOException 文件操作异常
+   */
   @Override
   protected RecordWriter<K, V> getBaseRecordWriter(FileSystem fs, JobConf job,
       String name, Progressable arg3) throws IOException {

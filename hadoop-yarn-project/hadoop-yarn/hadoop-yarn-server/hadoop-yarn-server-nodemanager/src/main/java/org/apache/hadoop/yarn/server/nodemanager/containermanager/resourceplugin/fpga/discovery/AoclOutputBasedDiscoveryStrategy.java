@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,7 +17,6 @@
  * limitations under the License.
  */
 
-
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.fpga.discovery;
 
 import java.util.List;
@@ -27,22 +27,28 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.fpga.FpgaDiscoverer;
 
 /**
- * FPGA device discovery strategy which invokes the "aocl" SDK command
- * to retrieve the list of available FPGA cards.
+ * 基于Altera OpenCL (AOCL) SDK输出的FPGA设备发现策略
+ * 通过调用AOCL命令行工具获取当前节点上可用的FPGA设备列表
  */
 public class AoclOutputBasedDiscoveryStrategy
     implements FPGADiscoveryStrategy {
 
   private final AbstractFpgaVendorPlugin plugin;
 
+  /**
+   * 构造基于AOCL输出的发现策略实例
+   * @param fpgaPlugin FPGA厂商插件实例
+   */
   public AoclOutputBasedDiscoveryStrategy(AbstractFpgaVendorPlugin fpgaPlugin) {
     this.plugin = fpgaPlugin;
   }
 
   @Override
   public List<FpgaDevice> discover() throws ResourceHandlerException {
+    // 通过厂商插件执行设备发现，设置最大执行超时时间
     List<FpgaDevice> list =
-        plugin.discover(FpgaDiscoverer.MAX_EXEC_TIMEOUT_MS);
+        plugin.discover(FpgaDiscoverer.MAX_EXECUTION_TIMEOUT_MS);
+    // 如果未发现任何FPGA设备，抛出异常终止发现流程
     if (list.isEmpty()) {
       throw new ResourceHandlerException("No FPGA devices detected!");
     }

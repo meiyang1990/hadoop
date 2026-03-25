@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,26 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 
 /**
- * A event used to remove an attempt.
+ * RM状态存储中移除应用尝试的事件，用于YARN ResourceManager恢复流程中，
+ * 通知状态存储移除已完成应用尝试的持久化信息。
  */
 public class RMStateStoreRemoveAppAttemptEvent extends RMStateStoreEvent {
+  // 待移除的应用尝试ID
   private ApplicationAttemptId applicationAttemptId;
 
+  /**
+   * 构造移除应用尝试事件
+   * @param applicationAttemptId 待移除的应用尝试ID
+   */
   RMStateStoreRemoveAppAttemptEvent(ApplicationAttemptId applicationAttemptId) {
     super(RMStateStoreEventType.REMOVE_APP_ATTEMPT);
     this.applicationAttemptId = applicationAttemptId;
   }
 
+  /**
+   * 获取待移除的应用尝试ID
+   * @return 应用尝试ID
+   */
   public ApplicationAttemptId getApplicationAttemptId() {
     return applicationAttemptId;
   }

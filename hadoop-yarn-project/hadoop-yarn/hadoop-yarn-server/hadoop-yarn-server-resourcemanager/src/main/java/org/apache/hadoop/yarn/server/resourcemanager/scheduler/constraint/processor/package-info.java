@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * Package o.a.h.yarn.server.resourcemanager.scheduler.constraint.processor
- * contains classes related to scheduling containers using placement
- * processor.
+ * YARN ResourceManager 容器放置约束处理器包
+ * 本包包含基于放置处理器进行容器调度的相关实现，负责根据用户定义的放置约束处理容器分配位置
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

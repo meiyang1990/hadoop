@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -85,7 +86,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility methods to aid serving RM data through the REST and RPC APIs
+ * YARN ResourceManager 服务端工具类，为 REST 和 RPC API 提供公用工具方法
  */
 public class RMServerUtils {
 
@@ -106,9 +107,15 @@ public class RMServerUtils {
 
   private static Clock clock = SystemClock.getInstance();
 
+  /**
+   * 根据指定节点状态集合查询符合条件的RM节点
+   * @param context RM上下文
+   * @param acceptedStates 接受的节点状态集合
+   * @return 符合条件的RM节点列表
+   */
   public static List<RMNode> queryRMNodes(RMContext context,
       EnumSet<NodeState> acceptedStates) {
-    // nodes contains nodes that are NEW, RUNNING, UNHEALTHY or DECOMMISSIONING.
+    // 检查查询请求是否包含活跃和非活跃状态节点
     ArrayList<RMNode> results = new ArrayList<RMNode>();
     boolean hasActive = false;
     boolean hasInactive = false;
@@ -123,6 +130,7 @@ public class RMServerUtils {
         break;
       }
     }
+    // 查询活跃节点列表，过滤符合状态的节点
     if (hasActive) {
       for (RMNode rmNode : context.getRMNodes().values()) {
         if (acceptedStates.contains(rmNode.getState())) {
@@ -131,7 +139,7 @@ public class RMServerUtils {
       }
     }
 
-    // inactiveNodes contains nodes that are DECOMMISSIONED, LOST, OR REBOOTED
+    // 查询非活跃节点列表，过滤符合状态的节点
     if (hasInactive) {
       for (RMNode rmNode : context.getInactiveRMNodes().values()) {
         if ((rmNode != null) && acceptedStates.contains(rmNode.getState())) {
@@ -143,14 +151,14 @@ public class RMServerUtils {
   }
 
   /**
-   * Check if we have:
-   * - Request for same containerId and different target resource.
-   * - If targetResources violates maximum/minimumAllocation.
-   * @param rmContext RM context.
-   * @param request Allocate Request.
-   * @param maximumAllocation Maximum Allocation.
-   * @param updateErrors Container update errors.
-   * @return ContainerUpdateRequests.
+   * 验证并拆分容器更新请求，按更新类型分类
+   * - 检查同一个请求中是否存在对同一个容器的多次更新
+   * - 验证目标资源是否在最大最小分配范围内
+   * @param rmContext RM上下文
+   * @param request 分配请求
+   * @param maximumAllocation 最大分配资源
+   * @param updateErrors 容器更新错误列表
+   * @return 按类型拆分后的容器更新请求
    */
   public static ContainerUpdates
       validateAndSplitUpdateResourceRequests(RMContext rmContext,
@@ -159,13 +167,16 @@ public class RMServerUtils {
     ContainerUpdates updateRequests =
         new ContainerUpdates();
     Set<ContainerId> outstandingUpdate = new HashSet<>();
+    // 遍历所有更新请求逐个验证
     for (UpdateContainerRequest updateReq : request.getUpdateRequests()) {
+      // 获取容器信息并验证容器ID和版本
       RMContainer rmContainer = rmContext.getScheduler().getRMContainer(
           updateReq.getContainerId());
       String msg = validateContainerIdAndVersion(outstandingUpdate,
           updateReq, rmContainer);
       ContainerUpdateType updateType = updateReq.getContainerUpdateType();
       if (msg == null) {
+        // 处理资源增减类型的更新
         if ((updateType != ContainerUpdateType.PROMOTE_EXECUTION_TYPE) &&
             (updateType !=ContainerUpdateType.DEMOTE_EXECUTION_TYPE)) {
           if (validateIncreaseDecreaseRequest(
@@ -180,6 +191,7 @@ public class RMServerUtils {
             msg = RESOURCE_OUTSIDE_ALLOWED_RANGE;
           }
         } else {
+          // 处理执行类型升降级（机会容器<->保障容器）
           ExecutionType original = rmContainer.getExecutionType();
           ExecutionType target = updateReq.getExecutionType();
           if (target != original) {
@@ -195,11 +207,19 @@ public class RMServerUtils {
           }
         }
       }
+      // 如果有错误，添加到错误列表
       checkAndcreateUpdateError(updateErrors, updateReq, rmContainer, msg);
     }
     return updateRequests;
   }
 
+  /**
+   * 创建并添加容器更新错误到错误列表
+   * @param errors 错误列表
+   * @param updateReq 更新请求
+   * @param rmContainer 目标容器
+   * @param msg 错误原因
+   */
   private static void checkAndcreateUpdateError(
       List<UpdateContainerError> errors, UpdateContainerRequest updateReq,
       RMContainer rmContainer, String msg) {
@@ -218,20 +238,27 @@ public class RMServerUtils {
     }
   }
 
+  /**
+   * 验证容器ID和版本是否合法
+   * @param outstandingUpdate 当前请求中已处理的待更新容器集合
+   * @param updateReq 更新请求
+   * @param rmContainer 目标容器
+   * @return 错误信息，验证通过返回null
+   */
   private static String validateContainerIdAndVersion(
       Set<ContainerId> outstandingUpdate, UpdateContainerRequest updateReq,
       RMContainer rmContainer) {
     String msg = null;
+    // 容器不存在，ID无效
     if (rmContainer == null) {
       msg = INVALID_CONTAINER_ID;
     }
-    // Only allow updates if the requested version matches the current
-    // version
+    // 请求版本与当前容器版本不匹配
     if (msg == null && updateReq.getContainerVersion() !=
         rmContainer.getContainer().getVersion()) {
       msg = INCORRECT_CONTAINER_VERSION_ERROR;
     }
-    // No more than 1 container update per request.
+    // 同一个请求中对同一个容器发起多次更新
     if (msg == null &&
         outstandingUpdate.contains(updateReq.getContainerId())) {
       msg = UPDATE_OUTSTANDING_ERROR;
@@ -240,22 +267,20 @@ public class RMServerUtils {
   }
 
   /**
-   * Utility method to validate a list resource requests, by ensuring that the
-   * requested memory/vcore is non-negative and not greater than max.
-   *
-   * @param ask resource request.
-   * @param maximumAllocation Maximum Allocation.
-   * @param queueName queue name.
-   * @param scheduler YarnScheduler.
-   * @param rmContext RMContext.
-   * @param nodeLabelsEnabled the node labels feature enabled.
-   * @throws InvalidResourceRequestException when there is invalid request.
+   * 归一化并验证资源请求列表，确保请求资源合法
+   * @param ask 资源请求列表
+   * @param maximumAllocation 最大允许分配资源
+   * @param queueName 队列名称
+   * @param scheduler YARN调度器
+   * @param rmContext RM上下文
+   * @param nodeLabelsEnabled 是否启用节点标签功能
+   * @throws InvalidResourceRequestException 资源请求无效时抛出
    */
   public static void normalizeAndValidateRequests(List<ResourceRequest> ask,
       Resource maximumAllocation, String queueName, YarnScheduler scheduler,
       RMContext rmContext, boolean nodeLabelsEnabled)
           throws InvalidResourceRequestException {
-    // Get queue from scheduler
+    // 获取队列信息，动态队列可能不存在，忽略异常
     QueueInfo queueInfo = null;
     try {
       queueInfo = scheduler.getQueueInfo(queueName, false, false);
@@ -264,6 +289,7 @@ public class RMServerUtils {
       // dynamic queues
     }
 
+    // 逐个归一化验证资源请求
     for (ResourceRequest resReq : ask) {
       SchedulerUtils.normalizeAndValidateRequest(resReq, maximumAllocation,
           queueName, rmContext, queueInfo, nodeLabelsEnabled);
@@ -271,14 +297,10 @@ public class RMServerUtils {
   }
 
   /**
-   * Validate increase/decrease request.
-   *
-   * <pre>
-   * - Throw exception when any other error happens
-   * </pre>
-   * @param request SchedContainerChangeRequest.
-   * @param increase true, add container; false, decrease container.
-   * @throws InvalidResourceRequestException when there is invalid request.
+   * 验证容器资源变更请求合法性
+   * @param request 容器变更请求
+   * @param increase true为增加资源，false为减少资源
+   * @throws InvalidResourceRequestException 请求无效时抛出
    */
   public static void checkSchedContainerChangeRequest(
       SchedContainerChangeRequest request, boolean increase)
@@ -288,12 +310,10 @@ public class RMServerUtils {
     RMContainer rmContainer = request.getRMContainer();
     Resource targetResource = request.getTargetCapacity();
 
-    // Compare targetResource and original resource
+    // 获取容器原始资源
     Resource originalResource = rmContainer.getAllocatedResource();
 
-    // Resource comparasion should be >= (or <=) for all resource vectors, for
-    // example, you cannot request target resource of a <10G, 10> container to
-    // <20G, 8>
+    // 所有资源维度必须满足增减方向要求，不允许部分增部分减
     if (increase) {
       if (originalResource.getMemorySize() > targetResource.getMemorySize()
           || originalResource.getVirtualCores() > targetResource
@@ -318,7 +338,7 @@ public class RMServerUtils {
       }
     }
 
-    // Target resource of the increase request is more than NM can offer
+    // 验证目标资源不超过节点总资源
     ResourceScheduler scheduler = rmContext.getScheduler();
     RMNode rmNode = request.getSchedulerNode().getRMNode();
     if (!Resources.fitsIn(scheduler.getResourceCalculator(), targetResource,
@@ -330,15 +350,17 @@ public class RMServerUtils {
     }
   }
 
-  /*
-   * @throw <code>InvalidResourceBlacklistRequestException </code> if the
-   * resource is not able to be added to the blacklist.
+  /**
+   * 验证节点黑名单请求合法性
+   * @param blacklistRequest 黑名单请求
+   * @throws InvalidResourceBlacklistRequestException 请求无效时抛出
    */
   public static void validateBlacklistRequest(
       ResourceBlacklistRequest blacklistRequest)
       throws InvalidResourceBlacklistRequestException {
     if (blacklistRequest != null) {
       List<String> plus = blacklistRequest.getBlacklistAdditions();
+      // 不允许将ANY添加到黑名单，会导致所有节点都不可用
       if (plus != null && plus.contains(ResourceRequest.ANY)) {
         throw new InvalidResourceBlacklistRequestException(
             "Cannot add " + ResourceRequest.ANY + " to the blacklist!");
@@ -346,19 +368,28 @@ public class RMServerUtils {
     }
   }
 
-  // Sanity check and normalize target resource
+  /**
+   * 验证并归一化容器资源增减请求
+   * @param rmContext RM上下文
+   * @param request 更新请求
+   * @param maximumAllocation 最大允许分配资源
+   * @return 验证通过返回true，否则返回false
+   */
   private static boolean validateIncreaseDecreaseRequest(RMContext rmContext,
       UpdateContainerRequest request, Resource maximumAllocation) {
+    // 检查内存不超出范围
     if (request.getCapability().getMemorySize() < 0
         || request.getCapability().getMemorySize() > maximumAllocation
         .getMemorySize()) {
       return false;
     }
+    // 检查vcore不超出范围
     if (request.getCapability().getVirtualCores() < 0
         || request.getCapability().getVirtualCores() > maximumAllocation
         .getVirtualCores()) {
       return false;
     }
+    // 归一化资源到调度器要求的粒度
     ResourceScheduler scheduler = rmContext.getScheduler();
     request.setCapability(scheduler
         .getNormalizedResource(request.getCapability(), maximumAllocation));
@@ -366,15 +397,10 @@ public class RMServerUtils {
   }
 
   /**
-   * It will validate to make sure all the containers belong to correct
-   * application attempt id. If not then it will throw
-   * {@link InvalidContainerReleaseException}
-   *
-   * @param containerReleaseList containers to be released as requested by
-   *                             application master.
-   * @param appAttemptId         Application attempt Id
-   * @throws InvalidContainerReleaseException
-   * an Application Master tries to release containers not belonging to it using.
+   * 验证容器释放请求，确保释放的容器都属于当前应用尝试
+   * @param containerReleaseList 待释放容器ID列表
+   * @param appAttemptId 当前应用尝试ID
+   * @throws InvalidContainerReleaseException 存在不属于当前尝试的容器时抛出
    */
   public static void
       validateContainerReleaseRequest(List<ContainerId> containerReleaseList,
@@ -391,283 +417,9 @@ public class RMServerUtils {
     }
   }
 
-  public static UserGroupInformation verifyAdminAccess(
-      YarnAuthorizationProvider authorizer, String method, final Logger LOG)
-      throws IOException {
-    // by default, this method will use AdminService as module name
-    return verifyAdminAccess(authorizer, method, "AdminService", LOG);
-  }
-
   /**
-   * Utility method to verify if the current user has access based on the
-   * passed {@link AccessControlList}
-   *
-   * @param authorizer the {@link AccessControlList} to check against
-   * @param method     the method name to be logged
-   * @param module     like AdminService or NodeLabelManager
-   * @param LOG        the logger to use
-   * @return {@link UserGroupInformation} of the current user
-   * @throws IOException an I/O exception has occurred.
-   */
-  public static UserGroupInformation verifyAdminAccess(
-      YarnAuthorizationProvider authorizer, String method, String module,
-      final Logger LOG)
-      throws IOException {
-    UserGroupInformation user;
-    try {
-      user = UserGroupInformation.getCurrentUser();
-    } catch (IOException ioe) {
-      LOG.warn("Couldn't get current user", ioe);
-      RMAuditLogger.logFailure("UNKNOWN", method, "",
-          "AdminService", "Couldn't get current user");
-      throw ioe;
-    }
-
-    if (!authorizer.isAdmin(user)) {
-      LOG.warn("User " + user.getShortUserName() + " doesn't have permission" +
-          " to call '" + method + "'");
-
-      RMAuditLogger.logFailure(user.getShortUserName(), method, "", module,
-          RMAuditLogger.AuditConstants.UNAUTHORIZED_USER);
-
-      throw new AccessControlException("User " + user.getShortUserName() +
-          " doesn't have permission" +
-          " to call '" + method + "'");
-    }
-    if (LOG.isTraceEnabled()) {
-      LOG.trace(method + " invoked by user " + user.getShortUserName());
-    }
-    return user;
-  }
-
-  public static YarnApplicationState createApplicationState(
-      RMAppState rmAppState) {
-    switch (rmAppState) {
-    case NEW:
-      return YarnApplicationState.NEW;
-    case NEW_SAVING:
-      return YarnApplicationState.NEW_SAVING;
-    case SUBMITTED:
-      return YarnApplicationState.SUBMITTED;
-    case ACCEPTED:
-      return YarnApplicationState.ACCEPTED;
-    case RUNNING:
-      return YarnApplicationState.RUNNING;
-    case FINISHING:
-    case FINISHED:
-      return YarnApplicationState.FINISHED;
-    case KILLING:
-    case KILLED:
-      return YarnApplicationState.KILLED;
-    case FAILED:
-      return YarnApplicationState.FAILED;
-    default:
-      throw new YarnRuntimeException("Unknown state passed!");
-    }
-  }
-
-  public static YarnApplicationAttemptState convertRmAppAttemptStateToYarnApplicationAttemptState(
-      RMAppAttemptState currentState,
-      RMAppAttemptState previousState
-  ) {
-    return createApplicationAttemptState(
-        currentState == RMAppAttemptState.FINAL_SAVING
-        ? previousState
-        : currentState
-    );
-  }
-
-  public static YarnApplicationAttemptState createApplicationAttemptState(
-      RMAppAttemptState rmAppAttemptState) {
-    switch (rmAppAttemptState) {
-    case NEW:
-      return YarnApplicationAttemptState.NEW;
-    case SUBMITTED:
-      return YarnApplicationAttemptState.SUBMITTED;
-    case SCHEDULED:
-      return YarnApplicationAttemptState.SCHEDULED;
-    case ALLOCATED:
-      return YarnApplicationAttemptState.ALLOCATED;
-    case LAUNCHED:
-      return YarnApplicationAttemptState.LAUNCHED;
-    case ALLOCATED_SAVING:
-    case LAUNCHED_UNMANAGED_SAVING:
-      return YarnApplicationAttemptState.ALLOCATED_SAVING;
-    case RUNNING:
-      return YarnApplicationAttemptState.RUNNING;
-    case FINISHING:
-      return YarnApplicationAttemptState.FINISHING;
-    case FINISHED:
-      return YarnApplicationAttemptState.FINISHED;
-    case KILLED:
-      return YarnApplicationAttemptState.KILLED;
-    case FAILED:
-      return YarnApplicationAttemptState.FAILED;
-    default:
-      throw new YarnRuntimeException("Unknown state passed!");
-    }
-  }
-
-  /**
-   * Statically defined dummy ApplicationResourceUsageREport.  Used as
-   * a return value when a valid report cannot be found.
-   */
-  public static final ApplicationResourceUsageReport
-      DUMMY_APPLICATION_RESOURCE_USAGE_REPORT =
-      BuilderUtils.newApplicationResourceUsageReport(-1, -1,
-          Resources.createResource(-1, -1), Resources.createResource(-1, -1),
-          Resources.createResource(-1, -1), new HashMap<>(), new HashMap<>());
-
-
-  /**
-   * Find all configs whose name starts with
-   * YarnConfiguration.RM_PROXY_USER_PREFIX, and add a record for each one by
-   * replacing the prefix with ProxyUsers.CONF_HADOOP_PROXYUSER.
-   *
-   * @param conf Configuration.
-   */
-  public static void processRMProxyUsersConf(Configuration conf) {
-    Map<String, String> rmProxyUsers = new HashMap<String, String>();
-    for (Map.Entry<String, String> entry : conf) {
-      String propName = entry.getKey();
-      if (propName.startsWith(YarnConfiguration.RM_PROXY_USER_PREFIX)) {
-        rmProxyUsers.put(ProxyUsers.CONF_HADOOP_PROXYUSER + "." +
-                propName.substring(YarnConfiguration.RM_PROXY_USER_PREFIX
-                    .length()),
-            entry.getValue());
-      }
-    }
-    for (Map.Entry<String, String> entry : rmProxyUsers.entrySet()) {
-      conf.set(entry.getKey(), entry.getValue());
-    }
-  }
-
-  public static void validateApplicationTimeouts(
-      Map<ApplicationTimeoutType, Long> timeouts) throws YarnException {
-    if (timeouts != null) {
-      for (Map.Entry<ApplicationTimeoutType, Long> timeout : timeouts
-          .entrySet()) {
-        if (timeout.getValue() <= 0) {
-          String message = "Invalid application timeout, value="
-              + timeout.getValue() + " for type=" + timeout.getKey();
-          throw new YarnException(message);
-        }
-      }
-    }
-  }
-
-  /**
-   * Validate ISO8601 format with epoch time.
-   * @param timeoutsInISO8601 format
-   * @return expire time in local epoch
-   * @throws YarnException if given application timeout value is lesser than
-   *           current time.
-   */
-  public static Map<ApplicationTimeoutType, Long> validateISO8601AndConvertToLocalTimeEpoch(
-      Map<ApplicationTimeoutType, String> timeoutsInISO8601)
-      throws YarnException {
-    long currentTimeMillis = clock.getTime();
-    Map<ApplicationTimeoutType, Long> newApplicationTimeout =
-        new HashMap<ApplicationTimeoutType, Long>();
-    if (timeoutsInISO8601 != null) {
-      for (Map.Entry<ApplicationTimeoutType, String> timeout : timeoutsInISO8601
-          .entrySet()) {
-        long expireTime = 0L;
-        try {
-          expireTime =
-              Times.parseISO8601ToLocalTimeInMillis(timeout.getValue());
-        } catch (ParseException ex) {
-          String message =
-              "Expire time is not in ISO8601 format. ISO8601 supported "
-                  + "format is yyyy-MM-dd'T'HH:mm:ss.SSSZ. Configured "
-                  + "timeout value is " + timeout.getValue();
-          throw new YarnException(message, ex);
-        }
-        if (expireTime < currentTimeMillis) {
-          String message =
-              "Expire time is less than current time, current-time="
-                  + Times.formatISO8601(currentTimeMillis) + " expire-time="
-                  + Times.formatISO8601(expireTime);
-          throw new YarnException(message);
-        }
-        newApplicationTimeout.put(timeout.getKey(), expireTime);
-      }
-    }
-    return newApplicationTimeout;
-  }
-
-  /**
-   * Get applicable Node count for AM.
-   *
-   * @param rmContext context
-   * @param conf configuration
-   * @param amReqs am resource requests
-   * @return applicable node count
-   */
-  public static int getApplicableNodeCountForAM(RMContext rmContext,
-      Configuration conf, List<ResourceRequest> amReqs) {
-    // Determine the list of nodes that are eligible based on the strict
-    // resource requests
-    Set<NodeId> nodesForReqs = new HashSet<>();
-    for (ResourceRequest amReq : amReqs) {
-      if (amReq.getRelaxLocality() &&
-          !amReq.getResourceName().equals(ResourceRequest.ANY)) {
-        nodesForReqs.addAll(
-            rmContext.getScheduler().getNodeIds(amReq.getResourceName()));
-      }
-    }
-
-    if (YarnConfiguration.areNodeLabelsEnabled(conf)) {
-      // Determine the list of nodes that are eligible based on the node label
-      String amNodeLabelExpression = amReqs.get(0).getNodeLabelExpression();
-      Set<NodeId> nodesForLabels =
-          getNodeIdsForLabel(rmContext, amNodeLabelExpression);
-      if (nodesForLabels != null && !nodesForLabels.isEmpty()) {
-        // If only node labels, strip out any wildcard NodeIds and return
-        if (nodesForReqs.isEmpty()) {
-          for (Iterator<NodeId> it = nodesForLabels.iterator(); it.hasNext();) {
-            if (it.next().getPort() == 0) {
-              it.remove();
-            }
-          }
-          return nodesForLabels.size();
-        } else {
-          // The NodeIds common to both the strict resource requests and the
-          // node label is the eligible set
-          return Sets.intersection(nodesForReqs, nodesForLabels).size();
-        }
-      }
-    }
-
-    // If no strict resource request NodeIds nor node label NodeIds, then just
-    // return the entire cluster
-    if (nodesForReqs.isEmpty()) {
-      return rmContext.getScheduler().getNumClusterNodes();
-    }
-    // No node label NodeIds, so return the strict resource request NodeIds
-    return nodesForReqs.size();
-  }
-
-  private static Set<NodeId> getNodeIdsForLabel(RMContext rmContext,
-      String label) {
-    label = (label == null || label.trim().isEmpty())
-        ? RMNodeLabelsManager.NO_LABEL : label;
-    if (label.equals(RMNodeLabelsManager.NO_LABEL)) {
-      // NO_LABEL nodes aren't tracked directly
-      return rmContext.getNodeLabelManager().getNodesWithoutALabel();
-    } else {
-      Map<String, Set<NodeId>> labelsToNodes =
-          rmContext.getNodeLabelManager().getLabelsToNodes(
-              Collections.singleton(label));
-      return labelsToNodes.get(label);
-    }
-  }
-
-  public static Long getOrDefault(Map<String, Long> map, String key,
-      Long defaultValue) {
-    if (map.containsKey(key)) {
-      return map.get(key);
-    }
-    return defaultValue;
-  }
-}
+   * 验证当前用户是否拥有管理员访问权限，默认使用AdminService作为模块名
+   * @param authorizer 授权器
+   * @param method 调用方法名
+   * @param LOG 日志对象
+   * @return 当前

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,24 +27,26 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
 /** 
- * Manages NodeManager audit logs.
- *
- * Audit log format is written as key=value pairs. Tab separated.
+ * NodeManager审计日志管理器，负责记录NodeManager上的操作审计日志。
+ * 
+ * 审计日志格式采用键=值对，使用制表符分隔各个键值对。
  */
 public class NMAuditLogger {
   private static final Logger LOG =
        LoggerFactory.getLogger(NMAuditLogger.class);
 
+  /** 审计日志字段枚举，定义了日志中包含的各个字段 */
   enum Keys {USER, OPERATION, TARGET, RESULT, IP,
                     DESCRIPTION, APPID, CONTAINERID}
 
+  /** 审计日志常量定义，包含结果状态、分隔符和常用操作描述 */
   public static class AuditConstants {
     static final String SUCCESS = "SUCCESS";
     static final String FAILURE = "FAILURE";
     static final String KEY_VAL_SEPARATOR = "=";
     static final char PAIR_SEPARATOR = '\t';
 
-    // Some commonly used descriptions
+    // 常用操作描述常量
     public static final String START_CONTAINER = "Start Container Request";
     public static final String STOP_CONTAINER = "Stop Container Request";
     public static final String START_CONTAINER_REINIT =
@@ -56,7 +59,13 @@ public class NMAuditLogger {
   }
 
   /**
-   * A helper api for creating an audit log for a successful event.
+   * 构造成功操作的审计日志字符串
+   * @param user 操作发起用户
+   * @param operation 操作类型
+   * @param target 操作目标
+   * @param appId 所属应用ID
+   * @param containerId 所属容器ID
+   * @return 格式化后的审计日志字符串
    */
   static String createSuccessLog(String user, String operation, String target, 
       ApplicationId appId, ContainerId containerId) {
@@ -76,17 +85,16 @@ public class NMAuditLogger {
   }
 
   /**
-   * Create a readable and parseable audit log string for a successful event.
+   * 记录成功操作的审计日志
    *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user
-   * @param target The target on which the operation is being performed.
-   * @param appId Application Id in which operation was performed.
-   * @param containerId Container Id in which operation was performed.
+   * @param user 发起请求的用户
+   * @param operation 请求的操作类型
+   * @param target 操作作用的目标
+   * @param appId 操作所属的应用ID
+   * @param containerId 操作所属的容器ID
    *
    * <br><br>
-   * Note that the {@link NMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * 注意：NMAuditLogger使用制表符('\t')作为键值对分隔符，因此值字段不能包含制表符。
    */
   public static void logSuccess(String user, String operation, String target,
       ApplicationId appId, ContainerId containerId) {
@@ -96,15 +104,14 @@ public class NMAuditLogger {
   }
 
   /**
-   * Create a readable and parseable audit log string for a successful event.
+   * 记录不关联应用和容器的成功操作审计日志
    *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user
-   * @param target The target on which the operation is being performed.
+   * @param user 发起请求的用户
+   * @param operation 请求的操作类型
+   * @param target 操作作用的目标
    *
    * <br><br>
-   * Note that the {@link NMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * 注意：NMAuditLogger使用制表符('\t')作为键值对分隔符，因此值字段不能包含制表符。
    */
   public static void logSuccess(String user, String operation, String target) {
     if (LOG.isInfoEnabled()) {
@@ -113,8 +120,14 @@ public class NMAuditLogger {
   }
 
   /**
-   * A helper api for creating an audit log for a failure event.
-   * This is factored out for testing purpose.
+   * 构造失败操作的审计日志字符串，抽取出来方便测试
+   * @param user 操作发起用户
+   * @param operation 操作类型
+   * @param target 操作目标
+   * @param description 失败原因描述
+   * @param appId 所属应用ID
+   * @param containerId 所属容器ID
+   * @return 格式化后的审计日志字符串
    */
   static String createFailureLog(String user, String operation, String target, 
       String description, ApplicationId appId, ContainerId containerId) {
@@ -135,19 +148,17 @@ public class NMAuditLogger {
   }
 
   /**
-   * Create a readable and parseable audit log string for a failed event.
+   * 记录失败操作的审计日志
    *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user.
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
-   * @param appId ApplicationId in which operation was performed.
-   * @param containerId Container Id in which operation was performed.
+   * @param user 发起请求的用户
+   * @param operation 请求的操作类型
+   * @param target 操作作用的目标
+   * @param description 操作失败的额外描述信息
+   * @param appId 操作所属的应用ID
+   * @param containerId 操作所属的容器ID
    *
    * <br><br>
-   * Note that the {@link NMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * 注意：NMAuditLogger使用制表符('\t')作为键值对分隔符，因此值字段不能包含制表符。
    */
   public static void logFailure(String user, String operation, String target, 
       String description, ApplicationId appId, ContainerId containerId) {
@@ -157,17 +168,15 @@ public class NMAuditLogger {
   }
 
   /**
-   * Create a readable and parseable audit log string for a failed event.
+   * 记录不关联应用和容器的失败操作审计日志
    *
-   * @param user User who made the service request. 
-   * @param operation Operation requested by the user.
-   * @param target The target on which the operation is being performed. 
-   * @param description Some additional information as to why the operation
-   *                    failed.
+   * @param user 发起请求的用户
+   * @param operation 请求的操作类型
+   * @param target 操作作用的目标
+   * @param description 操作失败的额外描述信息
    *
    * <br><br>
-   * Note that the {@link NMAuditLogger} uses tabs ('\t') as a key-val delimiter
-   * and hence the value fields should not contains tabs ('\t').
+   * 注意：NMAuditLogger使用制表符('\t')作为键值对分隔符，因此值字段不能包含制表符。
    */
   public static void logFailure(String user, String operation, 
                          String target, String description) {
@@ -177,27 +186,25 @@ public class NMAuditLogger {
   }
 
   /**
-   * A helper api to add remote IP address
+   * 添加请求来源IP地址到审计日志
    */
   static void addRemoteIP(StringBuilder b) {
     InetAddress ip = Server.getRemoteIp();
-    // ip address can be null for testcases
+    // 测试场景下IP可能为null
     if (ip != null) {
       add(Keys.IP, ip.getHostAddress(), b);
     }
   }
 
   /**
-   * Adds the first key-val pair to the passed builder in the following format
-   * key=value
+   * 添加第一个键值对到日志生成器，格式为key=value
    */
   static void start(Keys key, String value, StringBuilder b) {
     b.append(key.name()).append(AuditConstants.KEY_VAL_SEPARATOR).append(value);
   }
 
   /**
-   * Appends the key-val pair to the passed builder in the following format
-   * <pair-delim>key=value
+   * 追加键值对到日志生成器，格式为\tkey=value
    */
   static void add(Keys key, String value, StringBuilder b) {
     b.append(AuditConstants.PAIR_SEPARATOR).append(key.name())

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,24 +28,23 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableList;
 
 /**
- * Class for de-duplication of instances. <br>
- * Hold the references count to a single instance. If there are no references
- * then the entry will be removed.<br>
- * Type E should implement {@link ReferenceCounter}<br>
- * Note: This class is NOT thread-safe.
+ * HDFS实例去重与引用计数工具类。<br>
+ * 维护每个实例的引用计数，当引用计数降为0时自动从映射中移除该实例。<br>
+ * 存储的元素类型必须实现{@link ReferenceCounter}接口维护自身计数<br>
+ * 注意：该类本身不是线程安全的（依赖底层ConcurrentHashMap保证并发安全性）
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class ReferenceCountMap<E extends ReferenceCountMap.ReferenceCounter> {
 
+  // 存储实例引用映射，键值均为实例本身，用于去重
   private Map<E, E> referenceMap = new ConcurrentHashMap<>();
 
   /**
-   * Add the reference. If the instance already present, just increase the
-   * reference count.
+   * 添加一个实例引用。如果实例已存在，仅增加其引用计数；不存在则插入并初始化计数。
    * 
-   * @param key Key to put in reference map
-   * @return Referenced instance
+   * @param key 要添加引用的实例
+   * @return 去重后的实际引用实例（已存在则返回原实例，不存在则返回新实例）
    */
   public E put(E key) {
     E value = referenceMap.putIfAbsent(key, key);
@@ -56,10 +56,9 @@ public class ReferenceCountMap<E extends ReferenceCountMap.ReferenceCounter> {
   }
 
   /**
-   * Delete the reference. Decrease the reference count for the instance, if
-   * any. On all references removal delete the instance from the map.
+   * 移除一个实例引用。减少实例的引用计数，当引用计数降为0时，从映射中彻底删除该实例。
    * 
-   * @param key Key to remove the reference.
+   * @param key 要移除引用的实例
    */
   public void remove(E key) {
     E value = referenceMap.get(key);
@@ -69,9 +68,9 @@ public class ReferenceCountMap<E extends ReferenceCountMap.ReferenceCounter> {
   }
 
   /**
-   * Get entries in the reference Map.
+   * 获取当前映射中所有存活实例的不可变列表，仅用于测试。
    * 
-   * @return
+   * @return 所有存活实例的不可变列表
    */
   @VisibleForTesting
   public ImmutableList<E> getEntries() {
@@ -79,7 +78,9 @@ public class ReferenceCountMap<E extends ReferenceCountMap.ReferenceCounter> {
   }
 
   /**
-   * Get the reference count for the key
+   * 获取指定实例的当前引用计数
+   * @param key 要查询的实例
+   * @return 实例当前引用计数，实例不存在则返回0
    */
   public long getReferenceCount(E key) {
     ReferenceCounter counter = referenceMap.get(key);
@@ -90,14 +91,15 @@ public class ReferenceCountMap<E extends ReferenceCountMap.ReferenceCounter> {
   }
 
   /**
-   * Get the number of unique elements
+   * 获取当前映射中存活的唯一实例总数
+   * @return 唯一实例数量
    */
   public int getUniqueElementsSize() {
     return referenceMap.size();
   }
 
   /**
-   * Clear the contents
+   * 清空映射中所有内容，仅用于测试
    */
   @VisibleForTesting
   public void clear() {
@@ -105,13 +107,25 @@ public class ReferenceCountMap<E extends ReferenceCountMap.ReferenceCounter> {
   }
 
   /**
-   * Interface for the reference count holder
+   * 引用计数持有者接口，定义维护引用计数的标准方法
    */
   public static interface ReferenceCounter {
+    /**
+     * 获取当前引用计数
+     * @return 当前引用计数值
+     */
     public int getRefCount();
 
+    /**
+     * 增加引用计数并返回新值
+     * @return 增加后的引用计数值
+     */
     public int incrementAndGetRefCount();
 
+    /**
+     * 减少引用计数并返回新值
+     * @return 减少后的引用计数值
+     */
     public int decrementAndGetRefCount();
   }
 }

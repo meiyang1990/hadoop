@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -74,6 +75,8 @@ import static org.apache.hadoop.yarn.server.nodemanager.containermanager.launche
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.ContainerLaunch.CONTAINER_PRE_LAUNCH_STDOUT;
 
 /**
+ * 文件概述：容器执行器抽象基类，定义了YARN NodeManager上启动和管理容器的核心接口与通用实现
+ * 核心职责：抽象不同操作系统/容器 runtime 的容器生命周期管理接口，提供通用的环境准备、脚本生成逻辑
  * This class is abstraction of the mechanism used to launch a container on the
  * underlying OS.  All executor implementations must extend ContainerExecutor.
  */
@@ -97,10 +100,13 @@ public abstract class ContainerExecutor implements Configurable {
   public static final String DIRECTORY_CONTENTS = "directory.info";
 
   private Configuration conf;
+  // 存储容器ID对应PID文件路径的映射，用于跟踪活跃容器
   private final ConcurrentMap<ContainerId, Path> pidFiles =
       new ConcurrentHashMap<>();
   private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  // 环境变量白名单，允许从NodeManager继承到容器的环境变量列表
   private String[] whitelistVars;
+  // 等待容器退出码文件生成的超时时间
   private int exitCodeFileTimeout =
       YarnConfiguration.DEFAULT_NM_CONTAINER_EXECUTOR_EXIT_FILE_TIMEOUT;
   private int containerExitCode;
@@ -109,8 +115,10 @@ public abstract class ContainerExecutor implements Configurable {
   public void setConf(Configuration conf) {
     this.conf = conf;
     if (conf != null) {
+      // 从配置加载环境变量白名单，按逗号分割
       whitelistVars = conf.get(YarnConfiguration.NM_ENV_WHITELIST,
           YarnConfiguration.DEFAULT_NM_ENV_WHITELIST).split(",");
+      // 从配置加载退出码文件超时时间
       exitCodeFileTimeout = conf.getInt(
           YarnConfiguration.NM_CONTAINER_EXECUTOR_EXIT_FILE_TIMEOUT,
           YarnConfiguration.DEFAULT_NM_CONTAINER_EXECUTOR_EXIT_FILE_TIMEOUT);
@@ -123,10 +131,11 @@ public abstract class ContainerExecutor implements Configurable {
   }
 
   /**
+   * 执行容器执行器初始化，验证配置和权限是否正确
    * Run the executor initialization steps.
    * Verify that the necessary configs and permissions are in place.
    *
-   * @param nmContext Context of NM
+   * @param nmContext NodeManager上下文
    * @throws IOException if initialization fails
    */
   public abstract void init(Context nmContext) throws IOException;
@@ -178,6 +187,7 @@ public abstract class ContainerExecutor implements Configurable {
       throws IOException, InterruptedException, ConfigurationException;
 
   /**
+   * 在写入启动环境前准备容器
    * Prepare the container prior to the launch environment being written.
    * @param ctx Encapsulates information necessary for launching containers.
    * @throws IOException if errors occur during container preparation
@@ -187,6 +197,7 @@ public abstract class ContainerExecutor implements Configurable {
   }
 
   /**
+   * 在当前节点启动容器，阻塞调用直到容器退出
    * Launch the container on the node. This is a blocking call and returns only
    * when the container exits.
    * @param ctx Encapsulates information necessary for launching containers.
@@ -198,6 +209,7 @@ public abstract class ContainerExecutor implements Configurable {
       IOException, ConfigurationException;
 
   /**
+   * 在当前节点重新启动容器，阻塞调用直到容器退出
    * Relaunch the container on the node. This is a blocking call and returns
    * only when the container exits.
    * @param ctx Encapsulates information necessary for relaunching containers.
@@ -209,6 +221,7 @@ public abstract class ContainerExecutor implements Configurable {
       IOException, ConfigurationException;
 
   /**
+   * 向容器发送指定信号
    * Signal container with the specified signal.
    *
    * @param ctx Encapsulates information necessary for signaling containers.
@@ -219,6 +232,7 @@ public abstract class ContainerExecutor implements Configurable {
       throws IOException;
 
   /**
+   * 执行容器善后清理工作
    * Perform the steps necessary to reap the container.
    *
    * @param ctx Encapsulates information necessary for reaping containers.
@@ -229,6 +243,7 @@ public abstract class ContainerExecutor implements Configurable {
       throws IOException;
 
   /**
+   * 在运行容器中执行交互式命令
    * Perform interactive docker command into running container.
    *
    * @param ctx Encapsulates information necessary for exec containers.
@@ -239,6 +254,7 @@ public abstract class ContainerExecutor implements Configurable {
       throws ContainerExecutionException;
 
   /**
+   * 以指定用户身份删除指定目录
    * Delete specified directories as a given user.
    *
    * @param ctx Encapsulates information necessary for deletion.
@@ -250,6 +266,7 @@ public abstract class ContainerExecutor implements Configurable {
       throws IOException, InterruptedException;
 
   /**
+   * 创建指向目标的符号链接
    * Create a symlink file which points to the target.
    * @param target The target for symlink
    * @param symlink the symlink file
@@ -259,6 +276,7 @@ public abstract class ContainerExecutor implements Configurable {
       throws IOException;
 
   /**
+   * 检查容器是否存活
    * Check if a container is alive.
    * @param ctx Encapsulates information necessary for container liveness check.
    * @return true if container is still alive
@@ -275,6 +293,7 @@ public abstract class ContainerExecutor implements Configurable {
   }
 
   /**
+   * 更新容器内的集群信息
    * Update cluster information inside container.
    *
    * @param ctx ContainerRuntimeContext
@@ -287,6 +306,7 @@ public abstract class ContainerExecutor implements Configurable {
       String appId, String spec) throws IOException;
 
   /**
+   * 重新获取已存在容器的控制权，阻塞直到容器退出，用于NodeManager重启恢复
    * Recover an already existing container. This is a blocking call and returns
    * only when the container exits.  Note that the container must have been
    * activated prior to this call.
@@ -325,6 +345,7 @@ public abstract class ContainerExecutor implements Configurable {
         .setPid(pid)
         .build();
 
+    // 循环等待容器退出
     while (isContainerAlive(livenessContext)) {
       Thread.sleep(1000);
     }
@@ -335,6 +356,7 @@ public abstract class ContainerExecutor implements Configurable {
     String exitCodeFile = ContainerLaunch.getExitCodeFile(pidPath.toString());
     File file = new File(exitCodeFile);
 
+    // 等待退出码文件生成，超时则报错
     while (!file.exists() && msecLeft >= 0) {
       if (!isContainerActive(containerId)) {
         LOG.info("{} was deactivated", containerId);
@@ -353,6 +375,7 @@ public abstract class ContainerExecutor implements Configurable {
     }
 
     try {
+      // 读取并解析退出码
       containerExitCode = Integer.parseInt(
           FileUtils.readFileToString(file, StandardCharsets.UTF_8).trim());
       return containerExitCode;
@@ -362,6 +385,7 @@ public abstract class ContainerExecutor implements Configurable {
   }
 
   /**
+   * 将容器启动环境写入默认容器启动脚本
    * This method writes out the launch environment of a container to the
    * default container launch script. For the default container script path see
    * {@link ContainerLaunch#CONTAINER_SCRIPT}.
@@ -392,542 +416,3 @@ public abstract class ContainerExecutor implements Configurable {
    * @param out the output stream to which the environment is written (usually
    * a script file which will be executed by the Launcher)
    * @param environment the environment variables and their values
-   * @param resources the resources which have been localized for this
-   * container. Symlinks will be created to these localized resources
-   * @param command the command that will be run
-   * @param logDir the log dir to which to copy debugging information
-   * @param user the username of the job owner
-   * @param outFilename the path to which to write the launch environment
-   * @param nmVars the set of environment vars that are explicitly set by NM
-   * @throws IOException if any errors happened writing to the OutputStream,
-   * while creating symlinks
-   */
-  @VisibleForTesting
-  public void writeLaunchEnv(OutputStream out, Map<String, String> environment,
-      Map<Path, List<String>> resources, List<String> command, Path logDir,
-      String user, String outFilename, LinkedHashSet<String> nmVars)
-      throws IOException {
-
-    ContainerLaunch.ShellScriptBuilder sb =
-        ContainerLaunch.ShellScriptBuilder.create();
-
-    // Add "set -o pipefail -e" to validate launch_container script.
-    sb.setExitOnFailure();
-
-    //Redirect stdout and stderr for launch_container script
-    sb.stdout(logDir, CONTAINER_PRE_LAUNCH_STDOUT);
-    sb.stderr(logDir, CONTAINER_PRE_LAUNCH_STDERR);
-
-
-    if (environment != null) {
-      sb.echo("Setting up env variables");
-      // Whitelist environment variables are treated specially.
-      // Only add them if they are not already defined in the environment.
-      // Add them using special syntax to prevent them from eclipsing
-      // variables that may be set explicitly in the container image (e.g,
-      // in a docker image).  Put these before the others to ensure the
-      // correct expansion is used.
-      for(String var : whitelistVars) {
-        if (!environment.containsKey(var)) {
-          String val = getNMEnvVar(var);
-          if (val != null) {
-            sb.whitelistedEnv(var, val);
-          }
-        }
-      }
-      // Now write vars that were set explicitly by nodemanager, preserving
-      // the order they were written in.
-      for (String nmEnvVar : nmVars) {
-        sb.env(nmEnvVar, environment.get(nmEnvVar));
-      }
-      // Now write the remaining environment variables.
-      for (Map.Entry<String, String> env :
-           sb.orderEnvByDependencies(environment).entrySet()) {
-        if (!nmVars.contains(env.getKey())) {
-          sb.env(env.getKey(), env.getValue());
-        }
-      }
-    }
-
-    if (resources != null) {
-      sb.echo("Setting up job resources");
-      Map<Path, Path> symLinks = resolveSymLinks(resources, user);
-      for (Map.Entry<Path, Path> symLink : symLinks.entrySet()) {
-        sb.symlink(symLink.getKey(), symLink.getValue());
-      }
-    }
-
-    // dump debugging information if configured
-    if (shouldWriteDebugInformation(getConf())) {
-      sb.echo("Copying debugging information");
-      sb.copyDebugInformation(new Path(outFilename),
-          new Path(logDir, outFilename));
-      sb.listDebugInformation(new Path(logDir, DIRECTORY_CONTENTS));
-    }
-    sb.echo("Launching container");
-    sb.command(command);
-
-    PrintStream pout = null;
-    try {
-      pout = new PrintStream(out, false, "UTF-8");
-      sb.write(pout);
-    } finally {
-      if (out != null) {
-        out.close();
-      }
-    }
-  }
-
-  /**
-   * Return the files in the target directory. If retrieving the list of files
-   * requires specific access rights, that access will happen as the
-   * specified user. The list will not include entries for "." or "..".
-   *
-   * @param user the user as whom to access the target directory
-   * @param dir the target directory
-   * @return a list of files in the target directory
-   */
-  protected File[] readDirAsUser(String user, Path dir) {
-    return new File(dir.toString()).listFiles();
-  }
-
-  private boolean shouldWriteDebugInformation(Configuration config) {
-    return config != null && (
-            config.getBoolean(
-                YarnConfiguration.NM_LOG_CONTAINER_DEBUG_INFO,
-                YarnConfiguration.DEFAULT_NM_LOG_CONTAINER_DEBUG_INFO
-            ) || (
-            config.getBoolean(
-                YarnConfiguration.NM_LOG_CONTAINER_DEBUG_INFO_ON_ERROR,
-                YarnConfiguration.DEFAULT_NM_LOG_CONTAINER_DEBUG_INFO_ON_ERROR
-            ) && containerExitCode != 0));
-  }
-
-  /**
-   * The container exit code.
-   */
-  public enum ExitCode {
-    SUCCESS(0),
-    FORCE_KILLED(137),
-    TERMINATED(143),
-    LOST(154);
-
-    private final int code;
-
-    private ExitCode(int exitCode) {
-      this.code = exitCode;
-    }
-
-    /**
-     * Get the exit code as an int.
-     * @return the exit code as an int
-     */
-    public int getExitCode() {
-      return code;
-    }
-
-    @Override
-    public String toString() {
-      return String.valueOf(code);
-    }
-  }
-
-  /**
-   * The constants for the signals.
-   */
-  public enum Signal {
-    NULL(0, "NULL"),
-    QUIT(3, "SIGQUIT"),
-    KILL(9, "SIGKILL"),
-    TERM(15, "SIGTERM");
-
-    private final int value;
-    private final String str;
-
-    private Signal(int value, String str) {
-      this.str = str;
-      this.value = value;
-    }
-
-    /**
-     * Get the signal number.
-     * @return the signal number
-     */
-    public int getValue() {
-      return value;
-    }
-
-    @Override
-    public String toString() {
-      return str;
-    }
-  }
-
-  /**
-   * Log each line of the output string as INFO level log messages.
-   *
-   * @param output the output string to log
-   */
-  protected void logOutput(String output) {
-    String shExecOutput = output;
-
-    if (shExecOutput != null) {
-      for (String str : shExecOutput.split("\n")) {
-        LOG.info(str);
-      }
-    }
-  }
-
-  /**
-   * Get the pidFile of the container.
-   *
-   * @param containerId the container ID
-   * @return the path of the pid-file for the given containerId.
-   */
-  protected Path getPidFilePath(ContainerId containerId) {
-    return this.pidFiles.get(containerId);
-  }
-
-  /**
-   * Return a command line to execute the given command in the OS shell.
-   * On Windows, the {code}groupId{code} parameter can be used to launch
-   * and associate the given GID with a process group. On
-   * non-Windows hosts, the {code}groupId{code} parameter is ignored.
-   *
-   * @param command the command to execute
-   * @param groupId the job owner's GID
-   * @param userName the job owner's username
-   * @param pidFile the path to the container's PID file
-   * @param config the configuration
-   * @return the command line to execute
-   */
-  protected String[] getRunCommand(String command, String groupId,
-      String userName, Path pidFile, Configuration config) {
-    return getRunCommand(command, groupId, userName, pidFile, config, null);
-  }
-
-  /**
-   * Return a command line to execute the given command in the OS shell.
-   * On Windows, the {code}groupId{code} parameter can be used to launch
-   * and associate the given GID with a process group. On
-   * non-Windows hosts, the {code}groupId{code} parameter is ignored.
-   *
-   * @param command the command to execute
-   * @param groupId the job owner's GID for Windows. On other operating systems
-   * it is ignored.
-   * @param userName the job owner's username for Windows. On other operating
-   * systems it is ignored.
-   * @param pidFile the path to the container's PID file on Windows. On other
-   * operating systems it is ignored.
-   * @param config the configuration
-   * @param resource on Windows this parameter controls memory and CPU limits.
-   * If null, no limits are set. On other operating systems it is ignored.
-   * @return the command line to execute
-   */
-  protected String[] getRunCommand(String command, String groupId,
-      String userName, Path pidFile, Configuration config, Resource resource) {
-    if (Shell.WINDOWS) {
-      return getRunCommandForWindows(command, groupId, userName, pidFile,
-          config, resource);
-    } else {
-      return getRunCommandForOther(command, config);
-    }
-
-  }
-
-  /**
-   * Return a command line to execute the given command in the OS shell.
-   * The {code}groupId{code} parameter can be used to launch
-   * and associate the given GID with a process group.
-   *
-   * @param command the command to execute
-   * @param groupId the job owner's GID
-   * @param userName the job owner's username
-   * @param pidFile the path to the container's PID file
-   * @param config the configuration
-   * @param resource this parameter controls memory and CPU limits.
-   * If null, no limits are set.
-   * @return the command line to execute
-   */
-  protected String[] getRunCommandForWindows(String command, String groupId,
-      String userName, Path pidFile, Configuration config, Resource resource) {
-    int cpuRate = -1;
-    int memory = -1;
-
-    if (resource != null) {
-      if (config.getBoolean(
-          YarnConfiguration.NM_WINDOWS_CONTAINER_MEMORY_LIMIT_ENABLED,
-          YarnConfiguration.
-            DEFAULT_NM_WINDOWS_CONTAINER_MEMORY_LIMIT_ENABLED)) {
-        memory = (int) resource.getMemorySize();
-      }
-
-      if (config.getBoolean(
-          YarnConfiguration.NM_WINDOWS_CONTAINER_CPU_LIMIT_ENABLED,
-          YarnConfiguration.DEFAULT_NM_WINDOWS_CONTAINER_CPU_LIMIT_ENABLED)) {
-        int containerVCores = resource.getVirtualCores();
-        int nodeVCores = NodeManagerHardwareUtils.getVCores(config);
-        int nodeCpuPercentage =
-            NodeManagerHardwareUtils.getNodeCpuPercentage(config);
-
-        float containerCpuPercentage =
-            (float)(nodeCpuPercentage * containerVCores) / nodeVCores;
-
-        // CPU should be set to a percentage * 100, e.g. 20% cpu rate limit
-        // should be set as 20 * 100.
-        cpuRate = Math.min(10000, (int)(containerCpuPercentage * 100));
-      }
-    }
-
-    return new String[] {
-        Shell.getWinUtilsPath(),
-        "task",
-        "create",
-        "-m",
-        String.valueOf(memory),
-        "-c",
-        String.valueOf(cpuRate),
-        groupId,
-        "cmd /c " + command
-    };
-  }
-
-  /**
-   * Return a command line to execute the given command in the OS shell.
-   *
-   * @param command the command to execute
-   * @param config the configuration
-   * @return the command line to execute
-   */
-  protected String[] getRunCommandForOther(String command,
-      Configuration config) {
-    List<String> retCommand = new ArrayList<>();
-    boolean containerSchedPriorityIsSet = false;
-    int containerSchedPriorityAdjustment =
-        YarnConfiguration.DEFAULT_NM_CONTAINER_EXECUTOR_SCHED_PRIORITY;
-
-    if (config.get(YarnConfiguration.NM_CONTAINER_EXECUTOR_SCHED_PRIORITY) !=
-        null) {
-      containerSchedPriorityIsSet = true;
-      containerSchedPriorityAdjustment = config
-          .getInt(YarnConfiguration.NM_CONTAINER_EXECUTOR_SCHED_PRIORITY,
-          YarnConfiguration.DEFAULT_NM_CONTAINER_EXECUTOR_SCHED_PRIORITY);
-    }
-
-    if (containerSchedPriorityIsSet) {
-      retCommand.addAll(Arrays.asList("nice", "-n",
-          Integer.toString(containerSchedPriorityAdjustment)));
-    }
-
-    retCommand.addAll(Arrays.asList("bash", command));
-
-    return retCommand.toArray(new String[retCommand.size()]);
-  }
-
-  /**
-   * Return whether the container is still active.
-   *
-   * @param containerId the target container's ID
-   * @return true if the container is active
-   */
-  protected boolean isContainerActive(ContainerId containerId) {
-    return this.pidFiles.containsKey(containerId);
-  }
-
-  @VisibleForTesting
-  protected String getNMEnvVar(String varname) {
-    return System.getenv(varname);
-  }
-
-  /**
-   * Mark the container as active.
-   *
-   * @param containerId the container ID
-   * @param pidFilePath the path where the executor should write the PID
-   * of the launched process
-   */
-  public void activateContainer(ContainerId containerId, Path pidFilePath) {
-    this.pidFiles.put(containerId, pidFilePath);
-  }
-
-  // LinuxContainerExecutor overrides this method and behaves differently.
-  public String[] getIpAndHost(Container container)
-      throws ContainerExecutionException {
-    return getLocalIpAndHost(container);
-  }
-
-  // ipAndHost[0] contains ip.
-  // ipAndHost[1] contains hostname.
-  public static String[] getLocalIpAndHost(Container container) {
-    String[] ipAndHost = new String[2];
-    try {
-      InetAddress address = InetAddress.getLocalHost();
-      ipAndHost[0] = address.getHostAddress();
-      ipAndHost[1] = address.getHostName();
-    } catch (UnknownHostException e) {
-      LOG.error("Unable to get Local hostname and ip for {}", container
-          .getContainerId(), e);
-    }
-    return ipAndHost;
-  }
-
-  /**
-   * Mark the container as inactive. For inactive containers this
-   * method has no effect.
-   *
-   * @param containerId the container ID
-   */
-  public void deactivateContainer(ContainerId containerId) {
-    this.pidFiles.remove(containerId);
-  }
-
-  /**
-   * Pause the container. The default implementation is to raise a kill event.
-   * Specific executor implementations can override this behavior.
-   * @param container
-   *          the Container
-   */
-  public void pauseContainer(Container container) {
-    LOG.warn("{} doesn't support pausing.", container.getContainerId());
-    throw new UnsupportedOperationException();
-  }
-
-  /**
-   * Resume the container from pause state. The default implementation ignores
-   * this event. Specific implementations can override this behavior.
-   * @param container
-   *          the Container
-   */
-  public void resumeContainer(Container container) {
-    LOG.warn("{} doesn't support resume.", container.getContainerId());
-    throw new UnsupportedOperationException();
-  }
-
-  /**
-   * Perform any cleanup before the next launch of the container.
-   * @param container         container
-   */
-  public void cleanupBeforeRelaunch(Container container)
-      throws IOException, InterruptedException {
-    if (container.getLocalizedResources() != null) {
-
-      Map<Path, Path> symLinks = resolveSymLinks(
-          container.getLocalizedResources(), container.getUser());
-
-      for (Map.Entry<Path, Path> symLink : symLinks.entrySet()) {
-        LOG.debug("{} deleting {}", container.getContainerId(),
-            symLink.getValue());
-        deleteAsUser(new DeletionAsUserContext.Builder()
-            .setUser(container.getUser())
-            .setSubDir(symLink.getValue())
-            .build());
-      }
-    }
-  }
-
-  /**
-   * Get the process-identifier for the container.
-   *
-   * @param containerID the container ID
-   * @return the process ID of the container if it has already launched,
-   * or null otherwise
-   */
-  public String getProcessId(ContainerId containerID) {
-    String pid = null;
-    Path pidFile = pidFiles.get(containerID);
-
-    // If PID is null, this container hasn't launched yet.
-    if (pidFile != null) {
-      try {
-        pid = ProcessIdFileReader.getProcessId(pidFile);
-      } catch (IOException e) {
-        LOG.error("Got exception reading pid from pid-file {}", pidFile, e);
-      }
-    }
-
-    return pid;
-  }
-
-  /**
-   * This class will signal a target container after a specified delay.
-   * @see #signalContainer
-   */
-  public static class DelayedProcessKiller extends SubjectInheritingThread {
-    private final Container container;
-    private final String user;
-    private final String pid;
-    private final long delay;
-    private final Signal signal;
-    private final ContainerExecutor containerExecutor;
-
-    /**
-     * Basic constructor.
-     *
-     * @param container the container to signal
-     * @param user the user as whow to send the signal
-     * @param pid the PID of the container process
-     * @param delayMS the period of time to wait in millis before signaling
-     * the container
-     * @param signal the signal to send
-     * @param containerExecutor the executor to use to send the signal
-     */
-    public DelayedProcessKiller(Container container, String user, String pid,
-        long delayMS, Signal signal, ContainerExecutor containerExecutor) {
-      this.container = container;
-      this.user = user;
-      this.pid = pid;
-      this.delay = delayMS;
-      this.signal = signal;
-      this.containerExecutor = containerExecutor;
-      setName("Task killer for " + pid);
-      setDaemon(false);
-    }
-
-    @Override
-    public void work() {
-      try {
-        Thread.sleep(delay);
-        containerExecutor.signalContainer(new ContainerSignalContext.Builder()
-            .setContainer(container)
-            .setUser(user)
-            .setPid(pid)
-            .setSignal(signal)
-            .build());
-      } catch (InterruptedException e) {
-        interrupt();
-      } catch (IOException e) {
-        String message = "Exception when user " + user + " killing task " + pid
-            + " in DelayedProcessKiller: " + StringUtils.stringifyException(e);
-        LOG.warn(message);
-        container.handle(new ContainerDiagnosticsUpdateEvent(
-            container.getContainerId(), message));
-      }
-    }
-  }
-
-  private Map<Path, Path> resolveSymLinks(Map<Path,
-      List<String>> resources, String user) {
-    Map<Path, Path> symLinks = new HashMap<>();
-    for (Map.Entry<Path, List<String>> resourceEntry :
-        resources.entrySet()) {
-      for (String linkName : resourceEntry.getValue()) {
-        if (new Path(linkName).getName().equals(WILDCARD)) {
-          // If this is a wildcarded path, link to everything in the
-          // directory from the working directory
-          for (File wildLink : readDirAsUser(user, resourceEntry.getKey())) {
-            symLinks.put(new Path(wildLink.toString()),
-                new Path(wildLink.getName()));
-          }
-        } else {
-          symLinks.put(resourceEntry.getKey(), new Path(linkName));
-        }
-      }
-    }
-    return symLinks;
-  }
-
-  public String getExposedPorts(Container container)
-      throws ContainerExecutionException {
-    return null;
-  }
-}

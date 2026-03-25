@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,6 +26,7 @@ import org.apache.hadoop.yarn.server.federation.store.records.SetSubClusterPolic
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
+ * 文件说明：基于ProtocolBuffer实现的设置子集群策略配置响应实体，属于YARN联邦存储层的PB实现类
  * Protocol buffer based implementation of
  * {@link SetSubClusterPolicyConfigurationResponse}.
  */
@@ -33,21 +35,35 @@ import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 public class SetSubClusterPolicyConfigurationResponsePBImpl
     extends SetSubClusterPolicyConfigurationResponse {
 
+  // PB协议对象实例，默认使用默认实例
   private SetSubClusterPolicyConfigurationResponseProto proto =
       SetSubClusterPolicyConfigurationResponseProto.getDefaultInstance();
+  // PB构建器，用于构造修改对象
   private SetSubClusterPolicyConfigurationResponseProto.Builder builder = null;
+  // 标识当前是否通过proto对象访问数据
   private boolean viaProto = false;
 
+  /**
+   * 无参构造函数，初始化PB构建器
+   */
   public SetSubClusterPolicyConfigurationResponsePBImpl() {
     builder = SetSubClusterPolicyConfigurationResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有proto对象的构造函数
+   * @param proto 已构造完成的PB协议对象
+   */
   public SetSubClusterPolicyConfigurationResponsePBImpl(
       SetSubClusterPolicyConfigurationResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的PB协议对象，合并本地修改后返回
+   * @return 序列化用的PB协议对象
+   */
   public SetSubClusterPolicyConfigurationResponseProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -55,6 +71,7 @@ public class SetSubClusterPolicyConfigurationResponsePBImpl
     return proto;
   }
 
+  // 将本地构建器修改合并到proto对象
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -63,6 +80,7 @@ public class SetSubClusterPolicyConfigurationResponsePBImpl
     viaProto = true;
   }
 
+  // 延迟初始化构建器，如果当前是proto模式则基于现有proto创建构建器
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = SetSubClusterPolicyConfigurationResponseProto.newBuilder(proto);

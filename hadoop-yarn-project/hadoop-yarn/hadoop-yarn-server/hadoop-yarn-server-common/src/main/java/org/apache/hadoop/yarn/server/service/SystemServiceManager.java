@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,8 +18,8 @@
 package org.apache.hadoop.yarn.server.service;
 
 /**
- * Marker interface for starting services from RM. The implementation should
- * launch configured services.
+ * YARN系统服务管理器标记接口，供ResourceManager启动系统服务使用。
+ * 实现类负责按照配置启动各类系统服务，统一管理系统服务生命周期。
  */
 public interface SystemServiceManager {
 

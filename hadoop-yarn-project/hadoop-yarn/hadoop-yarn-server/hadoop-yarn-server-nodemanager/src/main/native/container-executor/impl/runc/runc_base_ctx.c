@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * @file runc_base_ctx.c
+ * @brief runC容器运行时基础上下文管理实现，为YARN NodeManager使用runC启动容器提供底层支持
+ *
+ * 主要功能包括：runC运行根目录和镜像分层目录管理、分层挂载点路径处理、分层目录锁管理
  */
 
 #include <sys/types.h>
@@ -37,9 +45,10 @@
 #define LAYER_MOUNT_SUFFIX_LEN  (sizeof(LAYER_MOUNT_SUFFIX) -1)
 
 /**
- * Get the path to the runtime layers directory.
+ * 获取runC运行时分层根目录路径
  *
- * Returns the heap-allocated path to the layers directory or NULL on error.
+ * @param run_root runC运行根目录
+ * @return 堆分配的分层根目录路径，失败返回NULL
  */
 char* get_runc_layers_path(const char* run_root) {
   char* layers_path = NULL;
@@ -50,9 +59,11 @@ char* get_runc_layers_path(const char* run_root) {
 }
 
 /**
- * Get the path to a layer directory.
+ * 获取指定分层目录路径
  *
- * Returns the heap-allocated path to the layer directory or NULL on error.
+ * @param run_root runC运行根目录
+ * @param layer_name 分层名称
+ * @return 堆分配的分层目录路径，失败返回NULL
  */
 char* get_runc_layer_path(const char* run_root, const char* layer_name) {
   char* layer_path = NULL;
@@ -63,9 +74,10 @@ char* get_runc_layer_path(const char* run_root, const char* layer_name) {
 }
 
 /**
- * Get the path to a layer's mountpoint.
+ * 获取分层挂载点路径
  *
- * Returns the heap-allocated path to the layer's mountpoint or NULL on error.
+ * @param layer_path 分层目录路径
+ * @return 堆分配的分层挂载点路径，失败返回NULL
  */
 char* get_runc_layer_mount_path(const char* layer_path) {
   char* mount_path = NULL;
@@ -76,9 +88,10 @@ char* get_runc_layer_mount_path(const char* layer_path) {
 }
 
 /**
- * Get the layer path from a layer's mountpoint.
+ * 从挂载点路径反向解析出分层目录路径
  *
- * Returns the heap-allocated path to the layer directory or NULL on error.
+ * @param mount_path 分层挂载点路径
+ * @return 堆分配的分层目录路径，失败返回NULL
  */
 char* get_runc_layer_path_from_mount_path(const char* mount_path) {
   size_t mount_path_len = strlen(mount_path);
@@ -94,32 +107,36 @@ char* get_runc_layer_path_from_mount_path(const char* mount_path) {
 }
 
 /**
- * Creates the run root directory and layers directory structure
- * underneath if necessary.
- * Returns the malloc'd run root path or NULL if there was an error.
+ * 创建runC运行根目录和分层目录结构（不存在时创建）
+ * @return 堆分配的运行根目录路径，失败返回NULL
  */
 static char* setup_runc_run_root_directories() {
   char* layers_path = NULL;
+  // 从配置读取runC运行根目录配置
   char* run_root = get_configuration_value(RUNC_RUN_ROOT_KEY,
       CONTAINER_EXECUTOR_CFG_RUNC_SECTION, get_cfg());
   if (run_root == NULL) {
+    // 配置不存在，使用默认路径
     run_root = strdup(DEFAULT_RUNC_ROOT);
     if (run_root == NULL) {
       goto mem_fail;
     }
   }
 
+  // 创建运行根目录，目录已存在不算错误
   if (mkdir(run_root, S_IRWXU) != 0 && errno != EEXIST) {
     fprintf(ERRORFILE, "Error creating runC run root at %s : %s\n", run_root,
         strerror(errno));
     goto fail;
   }
 
+  // 构造分层根目录路径
   layers_path = get_runc_layers_path(run_root);
   if (layers_path == NULL) {
     goto mem_fail;
   }
 
+  // 创建分层根目录，目录已存在不算错误
   if (mkdir(layers_path, S_IRWXU) != 0 && errno != EEXIST) {
     fprintf(ERRORFILE, "Error creating layers directory at %s : %s\n",
         layers_path, strerror(errno));
@@ -141,7 +158,8 @@ mem_fail:
 
 
 /**
- * Initialize an uninitialized runC base context.
+ * 初始化未初始化的runC基础上下文
+ * @param ctx 待初始化的runC基础上下文
  */
 void init_runc_base_ctx(runc_base_ctx* ctx) {
   memset(ctx, 0, sizeof(*ctx));
@@ -150,10 +168,9 @@ void init_runc_base_ctx(runc_base_ctx* ctx) {
 }
 
 /**
- * Releases the resources underneath a runC base context but does NOT free the
- * structure itself. This is particularly useful for stack-allocated contexts
- * or structures that embed the context.
- * free_runc_base_ctx should be used for heap-allocated contexts.
+ * 释放runC基础上下文持有的资源，不释放上下文本身
+ * 适用于栈分配或嵌入其他结构中的上下文对象
+ * @param ctx 待销毁的runC基础上下文
  */
 void destroy_runc_base_ctx(runc_base_ctx* ctx) {
   if (ctx != NULL) {
@@ -165,9 +182,8 @@ void destroy_runc_base_ctx(runc_base_ctx* ctx) {
 }
 
 /**
- * Allocates and initializes a runC base context.
- *
- * Returns a pointer to the allocated and initialized context or NULL on error.
+ * 分配并初始化runC基础上下文
+ * @return 分配初始化完成的上下文指针，失败返回NULL
  */
 runc_base_ctx* alloc_runc_base_ctx() {
   runc_base_ctx* ctx = malloc(sizeof(*ctx));
@@ -178,7 +194,8 @@ runc_base_ctx* alloc_runc_base_ctx() {
 }
 
 /**
- * Free a runC base context and all memory assruncated with it.
+ * 释放整个runC基础上下文及其关联的所有内存
+ * @param ctx 待释放的runC基础上下文
  */
 void free_runc_base_ctx(runc_base_ctx* ctx) {
   destroy_runc_base_ctx(ctx);
@@ -186,17 +203,18 @@ void free_runc_base_ctx(runc_base_ctx* ctx) {
 }
 
 /**
- * Opens the base context for use. This will create the container runtime
- * root directory and layer lock files, if necessary.
- *
- * Returns true on success or false if there was an error.
+ * 打开runC基础上下文，创建必要的目录和锁文件
+ * @param ctx 待打开的上下文
+ * @return 成功返回true，失败返回false
  */
 bool open_runc_base_ctx(runc_base_ctx* ctx) {
+  // 创建运行根目录和分层目录结构
   ctx->run_root = setup_runc_run_root_directories();
   if (ctx->run_root == NULL) {
     return false;
   }
 
+  // 构造分层锁文件路径
   char* lock_path = get_runc_layer_path(ctx->run_root, "lock");
   if (lock_path == NULL) {
     fputs("Cannot allocate memory\n", ERRORFILE);
@@ -204,6 +222,7 @@ bool open_runc_base_ctx(runc_base_ctx* ctx) {
   }
 
   bool result = true;
+  // 打开锁文件，不存在则创建
   ctx->layers_lock_fd = open(lock_path, O_RDWR | O_CREAT | O_CLOEXEC, S_IRWXU);
   if (ctx->layers_lock_fd == -1) {
     fprintf(ERRORFILE, "Cannot open lock file %s : %s\n", lock_path,
@@ -216,9 +235,8 @@ bool open_runc_base_ctx(runc_base_ctx* ctx) {
 }
 
 /**
- * Allocates and opens a base context.
- *
- * Returns a pointer to the context or NULL on error.
+ * 分配并打开runC基础上下文
+ * @return 初始化完成的上下文指针，失败返回NULL
  */
 runc_base_ctx* setup_runc_base_ctx() {
   runc_base_ctx* ctx = alloc_runc_base_ctx();
@@ -232,6 +250,12 @@ runc_base_ctx* setup_runc_base_ctx() {
 }
 
 
+/**
+ * 执行文件锁操作，处理中断自动重试
+ * @param fd 锁文件描述符
+ * @param lock_cmd fcntl锁命令（F_RDLCK/F_WRLCK/F_UNLCK)
+ * @return 成功返回true，失败返回false
+ */
 static bool do_lock_cmd(int fd, int lock_cmd) {
   struct flock fl;
   memset(&fl, 0, sizeof(fl));
@@ -239,6 +263,7 @@ static bool do_lock_cmd(int fd, int lock_cmd) {
   fl.l_whence = SEEK_SET;
   fl.l_start = 0;
   fl.l_len = 0;
+  // 阻塞加锁，被中断自动重试
   while (true) {
     int rc = fcntl(fd, F_SETLKW, &fl);
     if (rc == 0) {
@@ -252,9 +277,9 @@ static bool do_lock_cmd(int fd, int lock_cmd) {
 }
 
 /**
- * Acquire the layer read lock.
- *
- * Returns true on success or false on error.
+ * 获取分层目录读锁
+ * @param ctx runC基础上下文
+ * @return 成功返回true，失败返回false
  */
 bool acquire_runc_layers_read_lock(runc_base_ctx* ctx) {
   if (ctx->layers_lock_state == F_RDLCK) {
@@ -268,17 +293,16 @@ bool acquire_runc_layers_read_lock(runc_base_ctx* ctx) {
 }
 
 /**
- * Acquire the layer write lock.
- *
- * Returns true on success or false on error.
+ * 获取分层目录写锁
+ * @param ctx runC基础上下文
+ * @return 成功返回true，失败返回false
  */
 bool acquire_runc_layers_write_lock(runc_base_ctx* ctx) {
   if (ctx->layers_lock_state == F_WRLCK) {
     return true;
   }
   if (ctx->layers_lock_state == F_RDLCK) {
-    // Release before trying to acquire write lock, otherwise two processes
-    // attempting to upgrade from read lock to a write lock can deadlock.
+    // 从读锁升级为写锁前先释放读锁，避免死锁
     if (!release_runc_layers_lock(ctx)) {
       return false;
     }
@@ -291,9 +315,9 @@ bool acquire_runc_layers_write_lock(runc_base_ctx* ctx) {
 }
 
 /**
- * Release the layer lock.
- *
- * Returns true on success or false on error.
+ * 释放分层目录锁
+ * @param ctx runC基础上下文
+ * @return 成功返回true，失败返回false
  */
 bool release_runc_layers_lock(runc_base_ctx* ctx) {
   if (ctx->layers_lock_state == F_UNLCK) {

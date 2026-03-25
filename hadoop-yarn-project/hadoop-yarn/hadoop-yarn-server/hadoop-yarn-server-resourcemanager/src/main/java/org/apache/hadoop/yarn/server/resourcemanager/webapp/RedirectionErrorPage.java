@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,14 +23,18 @@ import org.apache.hadoop.yarn.webapp.SubView;
 import org.apache.hadoop.yarn.webapp.YarnWebParams;
 
 /**
- * This class is used to display a message that the proxy request failed
- * because of a redirection issue.
+ * YARN RM Web UI 重定向错误页面
+ * 当RM Web代理访问ApplicationMaster UI发生重定向循环时，展示错误提示信息
  */
 public class RedirectionErrorPage extends RmView {
-  @Override protected void preHead(Page.HTML<__> html) {
+  @Override
+  protected void preHead(Page.HTML<__> html) {
+    // 获取请求中的应用ID
     String aid = $(YarnWebParams.APPLICATION_ID);
 
+    // 执行通用头部预处理
     commonPreHead(html);
+    // 设置错误提示信息，说明重定向循环原因和解决方法
     set(YarnWebParams.ERROR_MESSAGE,
         "The application master for " + aid + " redirected the "
         + "resource manager's web proxy's request back to the web proxy, "
@@ -41,7 +46,9 @@ public class RedirectionErrorPage extends RmView {
         + "administrator to resolve the issue.");
   }
 
-  @Override protected Class<? extends SubView> content() {
+  @Override
+  protected Class<? extends SubView> content() {
+    // 返回错误块视图类，展示错误信息
     return ErrorBlock.class;
   }
 }

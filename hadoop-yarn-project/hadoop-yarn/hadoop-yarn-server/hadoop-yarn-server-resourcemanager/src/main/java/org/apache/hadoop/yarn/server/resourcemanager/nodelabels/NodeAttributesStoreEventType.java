@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,8 +20,9 @@
 package org.apache.hadoop.yarn.server.resourcemanager.nodelabels;
 
 /**
- * Event type to store the NodeAttributes.
+ * 节点属性存储事件类型枚举，定义节点属性持久化存储相关的事件类型。
  */
 public enum NodeAttributesStoreEventType {
+ /** 存储节点属性事件 */
  STORE_ATTRIBUTES
 }

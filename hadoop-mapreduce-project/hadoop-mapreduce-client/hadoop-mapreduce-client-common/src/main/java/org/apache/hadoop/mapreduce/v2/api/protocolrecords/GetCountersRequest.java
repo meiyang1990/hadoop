@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,9 +21,21 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 
+/**
+ * 获取MapReduce作业计数器信息请求协议接口
+ * 定义了客户端向服务端请求获取指定作业计数器的请求结构
+ */
 public interface GetCountersRequest {
+  /**
+   * 获取请求对应的作业ID
+   * @return 目标作业ID
+   */
   public abstract JobId getJobId();
   
+  /**
+   * 设置请求对应的作业ID
+   * @param jobId 目标作业ID
+   */
   public abstract void setJobId(JobId jobId);
 
 }

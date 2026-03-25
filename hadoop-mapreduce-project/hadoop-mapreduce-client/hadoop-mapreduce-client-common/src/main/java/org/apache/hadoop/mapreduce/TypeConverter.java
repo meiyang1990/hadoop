@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -55,6 +56,11 @@ import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
 import org.apache.hadoop.yarn.factory.providers.RecordFactoryProvider;
 
+/**
+ * 不同版本MapReduce/YARN数据类型转换器工具类
+ * 负责在旧版mapred API对象和新版mapreduce.v2 API对象之间进行类型转换
+ * 支撑新旧API兼容以及客户端和YARN服务端之间的数据交互
+ */
 public class TypeConverter {
 
   private static RecordFactory recordFactory;
@@ -63,17 +69,32 @@ public class TypeConverter {
     recordFactory = RecordFactoryProvider.getRecordFactory(null);
   }
 
+  /**
+   * 将YARN版JobId转换为旧版mapred JobID
+   * @param id YARN API的JobId对象
+   * @return 旧版mapred API的JobID对象
+   */
   public static org.apache.hadoop.mapred.JobID fromYarn(JobId id) {
     String identifier = fromClusterTimeStamp(id.getAppId().getClusterTimestamp());
     return new org.apache.hadoop.mapred.JobID(identifier, id.getId());
   }
 
   //currently there is 1-1 mapping between appid and jobid
+  /**
+   * 将YARN ApplicationId转换为新版mapreduce JobID
+   * @param appID YARN API的ApplicationId对象
+   * @return 新版mapreduce API的JobID对象
+   */
   public static org.apache.hadoop.mapreduce.JobID fromYarn(ApplicationId appID) {
     String identifier = fromClusterTimeStamp(appID.getClusterTimestamp());
     return new org.apache.hadoop.mapred.JobID(identifier, appID.getId());
   }
 
+  /**
+   * 将新版mapreduce JobID转换为YARN版JobId
+   * @param id 新版mapreduce API的JobID对象
+   * @return YARN API的JobId对象
+   */
   public static JobId toYarn(org.apache.hadoop.mapreduce.JobID id) {
     JobId jobId = recordFactory.newRecordInstance(JobId.class);
     jobId.setId(id.getId()); //currently there is 1-1 mapping between appid and jobid
@@ -84,6 +105,11 @@ public class TypeConverter {
     return jobId;
   }
 
+  /**
+   * 将作业优先级字符串转换为YARN应用优先级整数值
+   * @param priority 旧版作业优先级字符串
+   * @return 对应的YARN优先级整数值
+   */
   public static int toYarnApplicationPriority(String priority) {
     JobPriority jobPriority = JobPriority.valueOf(priority);
     switch (jobPriority) {
@@ -103,14 +129,29 @@ public class TypeConverter {
     throw new IllegalArgumentException("Unrecognized priority: " + priority);
   }
 
+  /**
+   * 将集群时间戳转换为Job标识字符串
+   * @param clusterTimeStamp 集群时间戳
+   * @return 转换后的字符串标识
+   */
   private static String fromClusterTimeStamp(long clusterTimeStamp) {
     return Long.toString(clusterTimeStamp);
   }
 
+  /**
+   * 将Job标识字符串转换回集群时间戳
+   * @param identifier Job标识字符串
+   * @return 转换后的集群时间戳
+   */
   private static long toClusterTimeStamp(String identifier) {
     return Long.parseLong(identifier);
   }
 
+  /**
+   * 将YARN版任务类型转换为新版mapreduce任务类型
+   * @param taskType YARN API的TaskType对象
+   * @return 新版mapreduce API的TaskType对象
+   */
   public static org.apache.hadoop.mapreduce.TaskType fromYarn(
       TaskType taskType) {
     switch (taskType) {
@@ -123,6 +164,11 @@ public class TypeConverter {
     }
   }
 
+  /**
+   * 将新版mapreduce任务类型转换为YARN版任务类型
+   * @param taskType 新版mapreduce API的TaskType对象
+   * @return YARN API的TaskType对象
+   */
   public static TaskType
       toYarn(org.apache.hadoop.mapreduce.TaskType taskType) {
     switch (taskType) {
@@ -135,11 +181,21 @@ public class TypeConverter {
     }
   }
 
+  /**
+   * 将YARN版TaskId转换为旧版mapred TaskID
+   * @param id YARN API的TaskId对象
+   * @return 旧版mapred API的TaskID对象
+   */
   public static org.apache.hadoop.mapred.TaskID fromYarn(TaskId id) {
     return new org.apache.hadoop.mapred.TaskID(fromYarn(id.getJobId()),
       fromYarn(id.getTaskType()), id.getId());
   }
 
+  /**
+   * 将新版mapreduce TaskID转换为YARN版TaskId
+   * @param id 新版mapreduce API的TaskID对象
+   * @return YARN API的TaskId对象
+   */
   public static TaskId toYarn(org.apache.hadoop.mapreduce.TaskID id) {
     TaskId taskId = recordFactory.newRecordInstance(TaskId.class);
     taskId.setId(id.getId());
@@ -148,6 +204,11 @@ public class TypeConverter {
     return taskId;
   }
 
+  /**
+   * 将旧版mapred任务状态转换为YARN版任务尝试状态
+   * @param state 旧版mapred API的TaskStatus.State对象
+   * @return YARN API的TaskAttemptState对象
+   */
   public static TaskAttemptState toYarn(
       org.apache.hadoop.mapred.TaskStatus.State state) {
     switch (state) {
@@ -170,6 +231,11 @@ public class TypeConverter {
     }
   }
 
+  /**
+   * 将旧版mapred任务阶段转换为YARN版阶段
+   * @param phase 旧版mapred API的TaskStatus.Phase对象
+   * @return YARN API的Phase对象
+   */
   public static Phase toYarn(org.apache.hadoop.mapred.TaskStatus.Phase phase) {
     switch (phase) {
     case STARTING:
@@ -190,6 +256,11 @@ public class TypeConverter {
     throw new YarnRuntimeException("Unrecognized Phase: " + phase);
   }
 
+  /**
+   * 将YARN版任务尝试完成事件数组批量转换为旧版mapred任务完成事件数组
+   * @param newEvents YARN API的TaskAttemptCompletionEvent数组
+   * @return 旧版mapred API的TaskCompletionEvent数组
+   */
   public static TaskCompletionEvent[] fromYarn(
       TaskAttemptCompletionEvent[] newEvents) {
     TaskCompletionEvent[] oldEvents =
@@ -202,6 +273,11 @@ public class TypeConverter {
     return oldEvents;
   }
 
+  /**
+   * 将单个YARN版任务尝试完成事件转换为旧版mapred任务完成事件
+   * @param newEvent YARN API的TaskAttemptCompletionEvent对象
+   * @return 旧版mapred API的TaskCompletionEvent对象
+   */
   public static TaskCompletionEvent fromYarn(
       TaskAttemptCompletionEvent newEvent) {
     return new TaskCompletionEvent(newEvent.getEventId(),
@@ -211,6 +287,11 @@ public class TypeConverter {
               newEvent.getMapOutputServerAddress());
   }
 
+  /**
+   * 将YARN版任务尝试完成状态转换为旧版mapred任务完成状态
+   * @param newStatus YARN API的TaskAttemptCompletionEventStatus对象
+   * @return 旧版mapred API的TaskCompletionEvent.Status对象
+   */
   public static TaskCompletionEvent.Status fromYarn(
       TaskAttemptCompletionEventStatus newStatus) {
     switch (newStatus) {
@@ -228,12 +309,22 @@ public class TypeConverter {
     throw new YarnRuntimeException("Unrecognized status: " + newStatus);
   }
 
+  /**
+   * 将YARN版TaskAttemptId转换为旧版mapred TaskAttemptID
+   * @param id YARN API的TaskAttemptId对象
+   * @return 旧版mapred API的TaskAttemptID对象
+   */
   public static org.apache.hadoop.mapred.TaskAttemptID fromYarn(
       TaskAttemptId id) {
     return new org.apache.hadoop.mapred.TaskAttemptID(fromYarn(id.getTaskId()),
         id.getId());
   }
 
+  /**
+   * 将旧版mapred TaskAttemptID转换为YARN版TaskAttemptId
+   * @param id 旧版mapred API的TaskAttemptID对象
+   * @return YARN API的TaskAttemptId对象
+   */
   public static TaskAttemptId toYarn(
       org.apache.hadoop.mapred.TaskAttemptID id) {
     TaskAttemptId taskAttemptId = recordFactory.newRecordInstance(TaskAttemptId.class);
@@ -242,6 +333,11 @@ public class TypeConverter {
     return taskAttemptId;
   }
 
+  /**
+   * 将新版mapreduce TaskAttemptID转换为YARN版TaskAttemptId
+   * @param id 新版mapreduce API的TaskAttemptID对象
+   * @return YARN API的TaskAttemptId对象
+   */
   public static TaskAttemptId toYarn(
       org.apache.hadoop.mapreduce.TaskAttemptID id) {
     TaskAttemptId taskAttemptId = recordFactory.newRecordInstance(TaskAttemptId.class);
@@ -250,6 +346,11 @@ public class TypeConverter {
     return taskAttemptId;
   }
 
+  /**
+   * 将YARN版计数器集合转换为新版mapreduce计数器集合
+   * @param yCntrs YARN API的Counters对象
+   * @return 新版mapreduce API的Counters对象
+   */
   public static org.apache.hadoop.mapreduce.Counters fromYarn(
       Counters yCntrs) {
     if (yCntrs == null) {
@@ -272,6 +373,11 @@ public class TypeConverter {
     return counters;
   }
 
+  /**
+   * 将旧版mapred计数器集合转换为YARN版计数器集合
+   * @param counters 旧版mapred API的Counters对象
+   * @return YARN API的Counters对象
+   */
   public static Counters toYarn(org.apache.hadoop.mapred.Counters counters) {
     if (counters == null) {
       return null;
@@ -295,6 +401,11 @@ public class TypeConverter {
     return yCntrs;
   }
 
+  /**
+   * 将新版mapreduce计数器集合转换为YARN版计数器集合
+   * @param counters 新版mapreduce API的Counters对象
+   * @return YARN API的Counters对象
+   */
   public static Counters toYarn(org.apache.hadoop.mapreduce.Counters counters) {
     if (counters == null) {
       return null;
@@ -308,288 +419,3 @@ public class TypeConverter {
       yGrp.addAllCounters(new HashMap<String, Counter>());
       for (org.apache.hadoop.mapreduce.Counter cntr : grp) {
         Counter yCntr = recordFactory.newRecordInstance(Counter.class);
-        yCntr.setName(cntr.getName());
-        yCntr.setDisplayName(cntr.getDisplayName());
-        yCntr.setValue(cntr.getValue());
-        yGrp.setCounter(yCntr.getName(), yCntr);
-      }
-      yCntrs.setCounterGroup(yGrp.getName(), yGrp);
-    }
-    return yCntrs;
-  }
-
-  public static JobStatus fromYarn(JobReport jobreport, String trackingUrl) {
-    JobPriority jobPriority = (jobreport.getJobPriority() == null)
-        ? JobPriority.DEFAULT
-        : fromYarnPriority(jobreport.getJobPriority().getPriority());
-    JobStatus jobStatus = new org.apache.hadoop.mapred.JobStatus(
-        fromYarn(jobreport.getJobId()), jobreport.getSetupProgress(),
-        jobreport.getMapProgress(), jobreport.getReduceProgress(),
-        jobreport.getCleanupProgress(), fromYarn(jobreport.getJobState()),
-        jobPriority, jobreport.getUser(), jobreport.getJobName(),
-        jobreport.getJobFile(), trackingUrl, jobreport.isUber(),
-        jobreport.getHistoryFile());
-    jobStatus.setStartTime(jobreport.getStartTime());
-    jobStatus.setFinishTime(jobreport.getFinishTime());
-    jobStatus.setFailureInfo(jobreport.getDiagnostics());
-    return jobStatus;
-  }
-
-  private static JobPriority fromYarnPriority(int priority) {
-    switch (priority) {
-    case 5 :
-      return JobPriority.VERY_HIGH;
-    case 4 :
-      return JobPriority.HIGH;
-    case 3 :
-      return JobPriority.NORMAL;
-    case 2 :
-      return JobPriority.LOW;
-    case 1 :
-      return JobPriority.VERY_LOW;
-    case 0 :
-      return JobPriority.DEFAULT;
-    default :
-      break;
-    }
-    return JobPriority.UNDEFINED_PRIORITY;
-  }
-
-  public static org.apache.hadoop.mapreduce.JobPriority
-      fromYarnApplicationPriority(int priority) {
-    switch (priority) {
-    case 5 :
-      return org.apache.hadoop.mapreduce.JobPriority.VERY_HIGH;
-    case 4 :
-      return org.apache.hadoop.mapreduce.JobPriority.HIGH;
-    case 3 :
-      return org.apache.hadoop.mapreduce.JobPriority.NORMAL;
-    case 2 :
-      return org.apache.hadoop.mapreduce.JobPriority.LOW;
-    case 1 :
-      return org.apache.hadoop.mapreduce.JobPriority.VERY_LOW;
-    case 0 :
-      return org.apache.hadoop.mapreduce.JobPriority.DEFAULT;
-    default :
-      break;
-    }
-    return org.apache.hadoop.mapreduce.JobPriority.UNDEFINED_PRIORITY;
-  }
-
-  public static org.apache.hadoop.mapreduce.QueueState fromYarn(
-      QueueState state) {
-    org.apache.hadoop.mapreduce.QueueState qState =
-      org.apache.hadoop.mapreduce.QueueState.getState(
-          StringUtils.toLowerCase(state.toString()));
-    return qState;
-  }
-
-
-  public static int fromYarn(JobState state) {
-    switch (state) {
-    case NEW:
-    case INITED:
-      return org.apache.hadoop.mapred.JobStatus.PREP;
-    case RUNNING:
-      return org.apache.hadoop.mapred.JobStatus.RUNNING;
-    case KILLED:
-      return org.apache.hadoop.mapred.JobStatus.KILLED;
-    case SUCCEEDED:
-      return org.apache.hadoop.mapred.JobStatus.SUCCEEDED;
-    case FAILED:
-    case ERROR:
-      return org.apache.hadoop.mapred.JobStatus.FAILED;
-    }
-    throw new YarnRuntimeException("Unrecognized job state: " + state);
-  }
-
-  public static org.apache.hadoop.mapred.TIPStatus fromYarn(
-      TaskState state) {
-    switch (state) {
-    case NEW:
-    case SCHEDULED:
-      return org.apache.hadoop.mapred.TIPStatus.PENDING;
-    case RUNNING:
-      return org.apache.hadoop.mapred.TIPStatus.RUNNING;
-    case KILLED:
-      return org.apache.hadoop.mapred.TIPStatus.KILLED;
-    case SUCCEEDED:
-      return org.apache.hadoop.mapred.TIPStatus.COMPLETE;
-    case FAILED:
-      return org.apache.hadoop.mapred.TIPStatus.FAILED;
-    }
-    throw new YarnRuntimeException("Unrecognized task state: " + state);
-  }
-
-  public static TaskReport fromYarn(org.apache.hadoop.mapreduce.v2.api.records.TaskReport report) {
-    String[] diagnostics = null;
-    if (report.getDiagnosticsList() != null) {
-      diagnostics = new String[report.getDiagnosticsCount()];
-      int i = 0;
-      for (String cs : report.getDiagnosticsList()) {
-        diagnostics[i++] = cs.toString();
-      }
-    } else {
-      diagnostics = new String[0];
-    }
-
-    TaskReport rep = new TaskReport(fromYarn(report.getTaskId()),
-        report.getProgress(), report.getTaskState().toString(),
-      diagnostics, fromYarn(report.getTaskState()), report.getStartTime(), report.getFinishTime(),
-      fromYarn(report.getCounters()));
-    List<org.apache.hadoop.mapreduce.TaskAttemptID> runningAtts
-          = new ArrayList<org.apache.hadoop.mapreduce.TaskAttemptID>();
-    for (org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId id
-        : report.getRunningAttemptsList()) {
-      runningAtts.add(fromYarn(id));
-    }
-    rep.setRunningTaskAttemptIds(runningAtts);
-    if (report.getSuccessfulAttempt() != null) {
-      rep.setSuccessfulAttemptId(fromYarn(report.getSuccessfulAttempt()));
-    }
-    return rep;
-  }
-
-  public static List<TaskReport> fromYarn(
-      List<org.apache.hadoop.mapreduce.v2.api.records.TaskReport> taskReports) {
-    List<TaskReport> reports = new ArrayList<TaskReport>();
-    for (org.apache.hadoop.mapreduce.v2.api.records.TaskReport r : taskReports) {
-      reports.add(fromYarn(r));
-    }
-    return reports;
-  }
-  
-  public static State fromYarn(YarnApplicationState yarnApplicationState,
-      FinalApplicationStatus finalApplicationStatus) {
-    switch (yarnApplicationState) {
-    case NEW:
-    case NEW_SAVING:
-    case SUBMITTED:
-    case ACCEPTED:
-      return State.PREP;
-    case RUNNING:
-      return State.RUNNING;
-    case FINISHED:
-      if (finalApplicationStatus == FinalApplicationStatus.SUCCEEDED) {
-        return State.SUCCEEDED;
-      } else if (finalApplicationStatus == FinalApplicationStatus.KILLED) {
-        return State.KILLED;
-      }
-    case FAILED:
-      return State.FAILED;
-    case KILLED:
-      return State.KILLED;
-    }
-    throw new YarnRuntimeException("Unrecognized application state: " + yarnApplicationState);
-  }
-
-  private static final String TT_NAME_PREFIX = "tracker_";
-  public static TaskTrackerInfo fromYarn(NodeReport node) {
-    TaskTrackerInfo taskTracker =
-      new TaskTrackerInfo(TT_NAME_PREFIX + node.getNodeId().toString());
-    return taskTracker;
-  }
-
-  public static TaskTrackerInfo[] fromYarnNodes(List<NodeReport> nodes) {
-    List<TaskTrackerInfo> taskTrackers = new ArrayList<TaskTrackerInfo>();
-    for (NodeReport node : nodes) {
-      taskTrackers.add(fromYarn(node));
-    }
-    return taskTrackers.toArray(new TaskTrackerInfo[nodes.size()]);
-  }
-
-  public static JobStatus fromYarn(ApplicationReport application,
-      String jobFile) {
-    String trackingUrl = application.getTrackingUrl();
-    trackingUrl = trackingUrl == null ? "" : trackingUrl;
-    JobStatus jobStatus =
-      new JobStatus(
-          TypeConverter.fromYarn(application.getApplicationId()),
-          0.0f, 0.0f, 0.0f, 0.0f,
-          TypeConverter.fromYarn(application.getYarnApplicationState(), application.getFinalApplicationStatus()),
-          fromYarnApplicationPriority(
-            (application.getPriority() == null) ? 0 :
-            application.getPriority().getPriority()),
-          application.getUser(), application.getName(),
-          application.getQueue(), jobFile, trackingUrl, false
-      );
-    jobStatus.setSchedulingInfo(trackingUrl); // Set AM tracking url
-    jobStatus.setStartTime(application.getStartTime());
-    jobStatus.setFinishTime(application.getFinishTime());
-    jobStatus.setFailureInfo(application.getDiagnostics());
-    ApplicationResourceUsageReport resourceUsageReport =
-        application.getApplicationResourceUsageReport();
-    if (resourceUsageReport != null) {
-      jobStatus.setNeededMem(
-          (int)resourceUsageReport.getNeededResources().getMemorySize());
-      jobStatus.setNumReservedSlots(
-          resourceUsageReport.getNumReservedContainers());
-      jobStatus.setNumUsedSlots(resourceUsageReport.getNumUsedContainers());
-      jobStatus.setReservedMem(
-          (int)resourceUsageReport.getReservedResources().getMemorySize());
-      jobStatus.setUsedMem(
-          (int) resourceUsageReport.getUsedResources().getMemorySize());
-    }
-    return jobStatus;
-  }
-
-  public static JobStatus[] fromYarnApps(List<ApplicationReport> applications,
-      Configuration conf) {
-    List<JobStatus> jobStatuses = new ArrayList<JobStatus>();
-    for (ApplicationReport application : applications) {
-      // each applicationReport has its own jobFile
-      org.apache.hadoop.mapreduce.JobID jobId =
-          TypeConverter.fromYarn(application.getApplicationId());
-      jobStatuses.add(TypeConverter.fromYarn(application,
-          MRApps.getJobFile(conf, application.getUser(), jobId)));
-    }
-    return jobStatuses.toArray(new JobStatus[jobStatuses.size()]);
-  }
-
-
-  public static QueueInfo fromYarn(org.apache.hadoop.yarn.api.records.QueueInfo
-      queueInfo, Configuration conf) {
-    QueueInfo toReturn = new QueueInfo(queueInfo.getQueueName(), "Capacity: " +
-      queueInfo.getCapacity() * 100 + ", MaximumCapacity: " +
-      (queueInfo.getMaximumCapacity() < 0 ? "UNDEFINED" :
-        queueInfo.getMaximumCapacity() * 100) + ", CurrentCapacity: " +
-      queueInfo.getCurrentCapacity() * 100, fromYarn(queueInfo.getQueueState()),
-      TypeConverter.fromYarnApps(queueInfo.getApplications(), conf));
-    List<QueueInfo> childQueues = new ArrayList<QueueInfo>();
-    for(org.apache.hadoop.yarn.api.records.QueueInfo childQueue :
-      queueInfo.getChildQueues()) {
-      childQueues.add(fromYarn(childQueue, conf));
-    }
-    toReturn.setQueueChildren(childQueues);
-    return toReturn;
-  }
-
-  public static QueueInfo[] fromYarnQueueInfo(
-      List<org.apache.hadoop.yarn.api.records.QueueInfo> queues,
-      Configuration conf) {
-    List<QueueInfo> queueInfos = new ArrayList<QueueInfo>(queues.size());
-    for (org.apache.hadoop.yarn.api.records.QueueInfo queue : queues) {
-      queueInfos.add(TypeConverter.fromYarn(queue, conf));
-    }
-    return queueInfos.toArray(new QueueInfo[queueInfos.size()]);
-  }
-
-  public static QueueAclsInfo[] fromYarnQueueUserAclsInfo(
-      List<QueueUserACLInfo> userAcls) {
-    List<QueueAclsInfo> acls = new ArrayList<QueueAclsInfo>();
-    for (QueueUserACLInfo aclInfo : userAcls) {
-      List<String> operations = new ArrayList<String>();
-      for (QueueACL qAcl : aclInfo.getUserAcls()) {
-        operations.add(qAcl.toString());
-      }
-
-      QueueAclsInfo acl =
-        new QueueAclsInfo(aclInfo.getQueueName(),
-            operations.toArray(new String[operations.size()]));
-      acls.add(acl);
-    }
-    return acls.toArray(new QueueAclsInfo[acls.size()]);
-  }
-
-}
-

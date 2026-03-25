@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,15 +29,22 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.MapReduceBase;
 
 /** 
- * Implements the identity function, mapping inputs directly to outputs. 
+ * 实现恒等映射函数，将输入的键值对不做修改直接输出。
+ * 常用于MapReduce中不需要Map阶段做处理、只需要Shuffle排序的场景，例如全量排序、仅Reduce阶段计算的作业。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class IdentityMapper<K, V>
     extends MapReduceBase implements Mapper<K, V, K, V> {
 
-  /** The identity function.  Input key/value pair is written directly to
-   * output.*/
+  /** 
+   * 恒等映射方法，将输入的键值对直接输出，不做任何转换处理。
+   * @param key 输入键
+   * @param val 输入值
+   * @param output 输出收集器
+   * @param reporter 作业进度报告器
+   * @throws IOException 输出收集时可能抛出IO异常
+   */
   public void map(K key, V val,
                   OutputCollector<K, V> output, Reporter reporter)
     throws IOException {

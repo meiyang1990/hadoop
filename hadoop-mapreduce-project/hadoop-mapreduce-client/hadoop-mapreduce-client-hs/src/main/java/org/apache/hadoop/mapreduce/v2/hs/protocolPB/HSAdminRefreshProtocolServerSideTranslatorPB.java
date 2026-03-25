@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,10 @@
  * limitations under the License.
  */
 
+/**
+ * @file HSAdminRefreshProtocolServerSideTranslatorPB.java
+ * 历史服务器管理刷新协议Protobuf服务端转换器，负责将PB格式的RPC请求转换为内部接口调用
+ */
 package org.apache.hadoop.mapreduce.v2.hs.protocolPB;
 
 import java.io.IOException;
@@ -35,33 +40,54 @@ import org.apache.hadoop.mapreduce.v2.hs.proto.HSAdminRefreshProtocolProtos.Refr
 import org.apache.hadoop.thirdparty.protobuf.RpcController;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
+/**
+ * 历史服务器管理刷新协议PB服务端转换器
+ * 负责处理Protobuf序列化的RPC请求，将请求转发给内部历史服务器刷新接口实现，
+ * 并将结果转换为Protobuf格式返回给客户端，完成协议格式转换
+ */
 @Private
 public class HSAdminRefreshProtocolServerSideTranslatorPB implements
     HSAdminRefreshProtocolPB {
 
+  // 内部历史服务器刷新协议实现实例
   private final HSAdminRefreshProtocol impl;
 
+  // 空刷新管理员ACL响应单例，该操作无返回数据
   private final static RefreshAdminAclsResponseProto 
     VOID_REFRESH_ADMIN_ACLS_RESPONSE = RefreshAdminAclsResponseProto
       .newBuilder().build();
 
+  // 空刷新已加载作业缓存响应单例，该操作无返回数据
   private final static RefreshLoadedJobCacheResponseProto 
     VOID_REFRESH_LOADED_JOB_CACHE_RESPONSE = RefreshLoadedJobCacheResponseProto
       .newBuilder().build();
 
+  // 空刷新作业保留策略设置响应单例，该操作无返回数据
   private final static RefreshJobRetentionSettingsResponseProto 
     VOID_REFRESH_JOB_RETENTION_SETTINGS_RESPONSE = 
       RefreshJobRetentionSettingsResponseProto.newBuilder().build();
 
+  // 空刷新日志保留策略设置响应单例，该操作无返回数据
   private final static RefreshLogRetentionSettingsResponseProto 
     VOID_REFRESH_LOG_RETENTION_SETTINGS_RESPONSE = 
       RefreshLogRetentionSettingsResponseProto.newBuilder().build();
 
+  /**
+   * 构造转换器，绑定内部刷新协议实现
+   * @param impl 历史服务器刷新协议内部实现实例
+   */
   public HSAdminRefreshProtocolServerSideTranslatorPB(
       HSAdminRefreshProtocol impl) {
     this.impl = impl;
   }
 
+  /**
+   * 处理刷新管理员ACL的PB RPC请求
+   * @param controller RPC控制器
+   * @param request PB格式请求
+   * @return PB格式空响应
+   * @throws ServiceException 服务异常，包装内部IO异常
+   */
   @Override
   public RefreshAdminAclsResponseProto refreshAdminAcls(
       RpcController controller, RefreshAdminAclsRequestProto request)
@@ -74,6 +100,13 @@ public class HSAdminRefreshProtocolServerSideTranslatorPB implements
     return VOID_REFRESH_ADMIN_ACLS_RESPONSE;
   }
 
+  /**
+   * 处理刷新已加载作业缓存的PB RPC请求
+   * @param controller RPC控制器
+   * @param request PB格式请求
+   * @return PB格式空响应
+   * @throws ServiceException 服务异常，包装内部IO异常
+   */
   @Override
   public RefreshLoadedJobCacheResponseProto refreshLoadedJobCache(
       RpcController controller, RefreshLoadedJobCacheRequestProto request)
@@ -86,6 +119,13 @@ public class HSAdminRefreshProtocolServerSideTranslatorPB implements
     return VOID_REFRESH_LOADED_JOB_CACHE_RESPONSE;
   }
 
+  /**
+   * 处理刷新作业保留策略设置的PB RPC请求
+   * @param controller RPC控制器
+   * @param request PB格式请求
+   * @return PB格式空响应
+   * @throws ServiceException 服务异常，包装内部IO异常
+   */
   @Override
   public RefreshJobRetentionSettingsResponseProto refreshJobRetentionSettings(
       RpcController controller, 
@@ -99,6 +139,13 @@ public class HSAdminRefreshProtocolServerSideTranslatorPB implements
     return VOID_REFRESH_JOB_RETENTION_SETTINGS_RESPONSE;
   }
 
+  /**
+   * 处理刷新日志保留策略设置的PB RPC请求
+   * @param controller RPC控制器
+   * @param request PB格式请求
+   * @return PB格式空响应
+   * @throws ServiceException 服务异常，包装内部IO异常
+   */
   @Override
   public RefreshLogRetentionSettingsResponseProto refreshLogRetentionSettings(
       RpcController controller, 

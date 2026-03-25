@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,42 +23,26 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- *
- * This abstract class that represents a bucketed series of
- *  measurements of a quantity being measured in a running task
- *  attempt. 
- *
- * <p>The sole constructor is called with a count, which is the
- *  number of buckets into which we evenly divide the spectrum of
- *  progress from 0.0D to 1.0D .  In the future we may provide for
- *  custom split points that don't have to be uniform.
- *
- * <p>A subclass determines how we fold readings for portions of a
- *  bucket and how we interpret the readings by overriding
- *  {@code extendInternal(...)} and {@code initializeInterval()}
+ * 周期性统计数据累加器抽象类，用于按任务进度分段累加任务运行过程中的指标观测值
+ * 
+ * 将0.0到1.0的任务进度范围平均划分为多个桶（进度段），每个桶保存对应进度区间内的观测值统计结果。
+ * 子类通过实现抽象方法决定不同类型指标的累加计算方式，支持递增型指标（如CPU时间）和任意波动型指标（如内存占用）。
+ * 该设计通过分段统计节省JobTracker内存，同时保留任务运行过程中指标随进度变化的分布信息。
  */
 @Private
 @Unstable
 public abstract class PeriodicStatsAccumulator {
-  // The range of progress from 0.0D through 1.0D is divided into
-  //  count "progress segments".  This object accumulates an
-  //  estimate of the effective value of a time-varying value during
-  //  the zero-based i'th progress segment, ranging from i/count
-  //  through (i+1)/count . 
-  // This is an abstract class.  We have two implementations: one
-  //  for monotonically increasing time-dependent variables
-  //  [currently, CPU time in milliseconds and wallclock time in
-  //  milliseconds] and one for quantities that can vary arbitrarily
-  //  over time, currently virtual and physical memory used, in
-  //  kilobytes. 
-  // We carry int's here.  This saves a lot of JVM heap space in the
-  //  job tracker per running task attempt [200 bytes per] but it
-  //  has a small downside.
-  // No task attempt can run for more than 57 days nor occupy more
-  //  than two terabytes of virtual memory. 
+  // 将0.0到1.0的任务进度范围划分为count个进度段，每个进度段对应一个统计桶
+  // 当前提供两种实现：
+  // 1. 单调递增型指标：如CPU时间、墙钟时间（单位毫秒）
+  // 2. 任意波动型指标：如物理内存、虚拟内存占用（单位KB）
+  // 使用int存储结果，可节省JVM堆空间，限制：任务运行不超过57天，内存不超过2TB，满足绝大多数场景
   protected final int count;
   protected final int[] values;
     
+  /**
+   * 统计状态容器，保存上一次观测的状态数据，用于增量计算
+   */
   static class StatsetState {
     int oldValue = 0;
     double oldProgress = 0.0D;
@@ -65,11 +50,13 @@ public abstract class PeriodicStatsAccumulator {
     double currentAccumulation = 0.0D;
   }
 
-  // We provide this level of indirection to reduce the memory
-  //  footprint of done task attempts.  When a task's progress
-  //  reaches 1.0D, we delete this objecte StatsetState.
+  // 引入间接引用减少已完成任务的内存占用，任务进度到达1.0后会释放该对象
   StatsetState state = new StatsetState();
 
+  /**
+   * 构造方法，初始化指定分段数量的统计累加器
+   * @param count 进度分段数量，将0~1进度平均划分为count个区间
+   */
   PeriodicStatsAccumulator(int count) {
     this.count = count;
     this.values = new int[count];
@@ -78,132 +65,116 @@ public abstract class PeriodicStatsAccumulator {
     }
   }
 
+  /**
+   * 获取所有分段统计结果数组
+   * @return 存放各分段统计值的数组
+   */
   protected int[] getValues() {
     return values;
   }
 
-  // The concrete implementation of this abstract function
-  //  accumulates more data into the current progress segment.
-  //  newProgress [from the call] and oldProgress [from the object]
-  //  must be in [or at the border of] a single progress segment.
   /**
-   *
-   * adds a new reading to the current bucket.
-   *
-   * @param newProgress the endpoint of the interval this new
-   *                      reading covers
-   * @param newValue the value of the reading at {@code newProgress} 
-   *
-   * The class has three instance variables, {@code oldProgress} and
-   *  {@code oldValue} and {@code currentAccumulation}. 
-   *
-   * {@code extendInternal} can count on three things: 
-   *
-   *   1: The first time it's called in a particular instance, both
-   *      oldXXX's will be zero.
-   *
-   *   2: oldXXX for a later call is the value of newXXX of the
-   *      previous call.  This ensures continuity in accumulation from
-   *      one call to the next.
-   *
-   *   3: {@code currentAccumulation} is owned by 
-   *      {@code initializeInterval} and {@code extendInternal}.
+   * 抽象方法，子类实现当前进度区间内的指标累加逻辑
+   * 
+   * 调用约定：
+   * 1. 首次调用时，oldProgress和oldValue均为0
+   * 2. 后续调用时，oldXXX为上一次调用的newXXX值，保证累加连续性
+   * 3. currentAccumulation由当前方法和initializeInterval共同维护
+   * 
+   * @param newProgress 当前区间结束进度，本次观测覆盖区间为[oldProgress, newProgress]
+   * @param newValue 当前结束进度对应的指标观测值
    */
   protected abstract void extendInternal(double newProgress, int newValue);
 
-  // What has to be done when you open a new interval
   /**
-   * initializes the state variables to be ready for a new interval
+   * 初始化新进度区间的状态变量，为新分段累加做准备
    */
   protected void initializeInterval() {
     state.currentAccumulation = 0.0D;
   }
 
-  // called for each new reading
   /**
-   * This method calls {@code extendInternal} at least once.  It
-   *  divides the current progress interval [from the last call's
-   *  {@code newProgress}  to this call's {@code newProgress} ]
-   *  into one or more subintervals by splitting at any point which
-   *  is an interval boundary if there are any such points.  It
-   *  then calls {@code extendInternal} for each subinterval, or the
-   *  whole interval if there are no splitting points.
+   * 处理新的指标观测值，按进度分段拆分区间并调用累加逻辑
    * 
-   *  <p>For example, if the value was {@code 300} last time with
-   *  {@code 0.3}  progress, and count is {@code 5}, and you get a
-   *  new reading with the variable at {@code 700} and progress at
-   *  {@code 0.7}, you get three calls to {@code extendInternal}:
-   *  one extending from progress {@code 0.3} to {@code 0.4} [the
-   *  next boundary] with a value of {@code 400}, the next one
-   *  through {@code 0.6} with a  value of {@code 600}, and finally
-   *  one at {@code 700} with a progress of {@code 0.7} . 
-   *
-   * @param newProgress the endpoint of the progress range this new
-   *                      reading covers
-   * @param newValue the value of the reading at {@code newProgress} 
+   * 将从上一次观测到本次观测的进度区间，按分段边界拆分为多个子区间，
+   * 对每个子区间通过插值计算边界值，依次调用extendInternal完成每个分段的累加，
+   * 最后处理剩余未跨边界的区间部分。任务完成后释放状态对象节省内存。
+   * 
+   * @param newProgress 本次观测的进度终点
+   * @param newValue 本次观测的指标值
    */    
   protected void extend(double newProgress, int newValue) {
+    // 状态已释放或进度回退，直接返回
     if (state == null || newProgress < state.oldProgress) {
       return;
     }
 
-    // This correctness of this code depends on 100% * count = count.
+    // 计算旧进度和新进度对应的分段索引
     int oldIndex = (int)(state.oldProgress * count);
     int newIndex = (int)(newProgress * count);
     int originalOldValue = state.oldValue;
 
+    // 计算总指标变化量和总进度变化量，用于插值计算
     double fullValueDistance = (double)newValue - state.oldValue;
     double fullProgressDistance = newProgress - state.oldProgress;
     double originalOldProgress = state.oldProgress;
 
-    // In this loop we detect each subinterval boundary within the
-    //  range from the old progress to the new one.  Then we
-    //  interpolate the value from the old value to the new one to
-    //  infer what its value might have been at each such boundary.
-    //  Lastly we make the necessary calls to extendInternal to fold
-    //  in the data for each trapazoid where no such trapazoid
-    //  crosses a boundary.
+    // 遍历所有跨越的分段边界，逐个处理每个完整分段
     for (int closee = oldIndex; closee < newIndex; ++closee) {
+      // 计算当前分段边界的进度值
       double interpolationProgress = (double)(closee + 1) / count;
-      // In floats, x * y / y might not equal y.
+      // 处理浮点精度问题，确保不超过本次观测进度
       interpolationProgress = Math.min(interpolationProgress, newProgress);
 
+      // 计算当前分段的进度占比，插值计算边界位置的指标值
       double progressLength = (interpolationProgress - originalOldProgress);
       double interpolationProportion = progressLength / fullProgressDistance;
-
       double interpolationValueDistance
         = fullValueDistance * interpolationProportion;
-
-      // estimates the value at the next [interpolated] subsegment boundary
       int interpolationValue
         = (int)interpolationValueDistance + originalOldValue;
 
+      // 累加当前分段数据，更新状态，保存当前分段统计结果
       extendInternal(interpolationProgress, interpolationValue);
-
       advanceState(interpolationProgress, interpolationValue);
-
       values[closee] = (int)state.currentAccumulation;
+      // 初始化下一个分段的状态
       initializeInterval();
-
     }
 
+    // 处理最后一个不完整分段（未到达下一个边界）
     extendInternal(newProgress, newValue);
     advanceState(newProgress, newValue);
 
+    // 进度到达终点，释放状态对象节省内存
     if (newIndex == count) {
       state = null;
     }
   }
 
+  /**
+   * 更新状态对象，保存本次观测结果作为下一次计算的基准
+   * @param newProgress 本次观测进度
+   * @param newValue 本次观测指标值
+   */
   protected void advanceState(double newProgress, int newValue) {
     state.oldValue = newValue;
     state.oldProgress = newProgress;
   }    
 
+  /**
+   * 获取进度分段总数
+   * @return 分段数量
+   */
   int getCount() {
     return count;
   }
 
+  /**
+   * 获取指定索引分段的统计结果
+   * @param index 分段索引
+   * @return 对应分段的统计值
+   */
   int get(int index) {
     return values[index];
   }

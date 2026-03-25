@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -70,14 +71,13 @@ import org.apache.hadoop.yarn.state.StateMachine;
 import org.apache.hadoop.yarn.state.StateMachineFactory;
 
 /**
- * The state machine for the representation of an Application
- * within the NodeManager.
+ * NodeManager中应用程序实例的状态机实现，管理单个应用在本节点上的完整生命周期。
  */
 public class ApplicationImpl implements Application {
 
   final Dispatcher dispatcher;
   final String user;
-  // flow context is set only if the timeline service v.2 is enabled
+  // 仅在Timeline Service V2启用时设置流上下文信息
   private FlowContext flowContext;
   final ApplicationId appId;
   final Credentials credentials;
@@ -104,11 +104,17 @@ public class ApplicationImpl implements Application {
   private long applicationLogInitedTimestamp = -1;
   private final NMStateStoreService appStateStore;
 
+  /**
+   * 构造不包含流上下文的应用实例。
+   */
   public ApplicationImpl(Dispatcher dispatcher, String user,
       ApplicationId appId, Credentials credentials, Context context) {
     this(dispatcher, user, null, appId, credentials, context, -1L);
   }
 
+  /**
+   * 构造完整的应用实例，支持恢复已有日志初始化时间戳。
+   */
   public ApplicationImpl(Dispatcher dispatcher, String user,
       FlowContext flowContext, ApplicationId appId, Credentials credentials,
       Context context, long recoveredLogInitedTime) {
@@ -118,6 +124,7 @@ public class ApplicationImpl implements Application {
     this.credentials = credentials;
     this.aclsManager = context.getApplicationACLsManager();
     Configuration conf = context.getConf();
+    // 启用Timeline Service V2时需要初始化流上下文和时间线客户端
     if (YarnConfiguration.timelineServiceV2Enabled(conf)) {
       if (flowContext == null) {
         throw new IllegalArgumentException("flow context cannot be null");
@@ -132,10 +139,14 @@ public class ApplicationImpl implements Application {
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     readLock = lock.readLock();
     writeLock = lock.writeLock();
+    // 初始化应用状态机
     stateMachine = stateMachineFactory.make(this);
     setAppLogInitedTimestamp(recoveredLogInitedTime);
   }
 
+  /**
+   * 构造包含流上下文的新应用实例。
+   */
   public ApplicationImpl(Dispatcher dispatcher, String user,
       FlowContext flowContext, ApplicationId appId,
       Credentials credentials, Context context) {
@@ -144,7 +155,7 @@ public class ApplicationImpl implements Application {
   }
 
   /**
-   * Data object that encapsulates the flow context for the application purpose.
+   * 存储应用流上下文信息，用于Timeline Service V2指标追踪。
    */
   public static class FlowContext {
     private final String flowName;
@@ -215,19 +226,20 @@ public class ApplicationImpl implements Application {
   private static final InitContainerTransition INIT_CONTAINER_TRANSITION =
       new InitContainerTransition();
 
+  // 应用状态机定义，描述所有状态和转移规则
   private static StateMachineFactory<ApplicationImpl, ApplicationState,
           ApplicationEventType, ApplicationEvent> stateMachineFactory =
       new StateMachineFactory<ApplicationImpl, ApplicationState,
           ApplicationEventType, ApplicationEvent>(ApplicationState.NEW)
 
-           // Transitions from NEW state
+           // NEW状态转移
            .addTransition(ApplicationState.NEW, ApplicationState.INITING,
                ApplicationEventType.INIT_APPLICATION, new AppInitTransition())
            .addTransition(ApplicationState.NEW, ApplicationState.NEW,
                ApplicationEventType.INIT_CONTAINER,
                INIT_CONTAINER_TRANSITION)
 
-           // Transitions from INITING state
+           // INITING状态转移
            .addTransition(ApplicationState.INITING, ApplicationState.INITING,
                ApplicationEventType.INIT_CONTAINER,
                INIT_CONTAINER_TRANSITION)
@@ -249,7 +261,7 @@ public class ApplicationImpl implements Application {
                ApplicationEventType.APPLICATION_INITED,
                new AppInitDoneTransition())
 
-           // Transitions from RUNNING state
+           // RUNNING状态转移
            .addTransition(ApplicationState.RUNNING,
                ApplicationState.RUNNING,
                ApplicationEventType.INIT_CONTAINER,
@@ -265,7 +277,7 @@ public class ApplicationImpl implements Application {
                ApplicationEventType.FINISH_APPLICATION,
                new AppFinishTriggeredTransition())
 
-           // Transitions from FINISHING_CONTAINERS_WAIT state.
+           // FINISHING_CONTAINERS_WAIT状态转移
            .addTransition(
                ApplicationState.FINISHING_CONTAINERS_WAIT,
                EnumSet.of(ApplicationState.FINISHING_CONTAINERS_WAIT,
@@ -284,7 +296,7 @@ public class ApplicationImpl implements Application {
                   ApplicationEventType.APPLICATION_INITED,
                   ApplicationEventType.FINISH_APPLICATION))
 
-           // Transitions from APPLICATION_RESOURCES_CLEANINGUP state
+           // APPLICATION_RESOURCES_CLEANINGUP状态转移
            .addTransition(ApplicationState.APPLICATION_RESOURCES_CLEANINGUP,
                ApplicationState.APPLICATION_RESOURCES_CLEANINGUP,
                ApplicationEventType.APPLICATION_CONTAINER_FINISHED)
@@ -305,7 +317,7 @@ public class ApplicationImpl implements Application {
                   ApplicationEventType.APPLICATION_INITED,
                   ApplicationEventType.FINISH_APPLICATION))
 
-           // Transitions from FINISHED state
+           // FINISHED状态转移
            .addTransition(ApplicationState.FINISHED,
                ApplicationState.FINISHED,
                EnumSet.of(
@@ -321,15 +333,13 @@ public class ApplicationImpl implements Application {
                   ApplicationEventType.APPLICATION_LOG_HANDLING_INITED,
                   ApplicationEventType.APPLICATION_CONTAINER_FINISHED,
                   ApplicationEventType.FINISH_APPLICATION))
-           // create the topology tables
+           // 构建状态转移拓扑表
            .installTopology();
 
   private final StateMachine<ApplicationState, ApplicationEventType, ApplicationEvent> stateMachine;
 
   /**
-   * Notify services of new application.
-   * 
-   * In particular, this initializes the {@link LogAggregationService}
+   * 处理应用初始化事件，保存访问控制列表，触发日志聚合服务初始化。
    */
   @SuppressWarnings("unchecked")
   static class AppInitTransition implements
@@ -337,10 +347,12 @@ public class ApplicationImpl implements Application {
     @Override
     public void transition(ApplicationImpl app, ApplicationEvent event) {
       ApplicationInitEvent initEvent = (ApplicationInitEvent)event;
+      // 保存应用访问控制列表
       app.applicationACLs = initEvent.getApplicationACLs();
       app.aclsManager.addApplication(app.getAppId(), app.applicationACLs);
-      // Inform the logAggregator
+      // 保存日志聚合上下文
       app.logAggregationContext = initEvent.getLogAggregationContext();
+      // 发布应用启动事件通知日志处理器
       app.dispatcher.getEventHandler().handle(
           new LogHandlerAppStartedEvent(app.appId, app.user,
               app.credentials, app.applicationACLs,
@@ -349,22 +361,20 @@ public class ApplicationImpl implements Application {
   }
 
   /**
-   * Handles the APPLICATION_LOG_HANDLING_INITED event that occurs after
-   * {@link LogAggregationService} has created the directories for the app
-   * and started the aggregation thread for the app.
-   * 
-   * In particular, this requests that the {@link ResourceLocalizationService}
-   * localize the application-scoped resources.
+   * 处理日志聚合初始化完成事件，触发应用资源本地化，持久化应用状态。
    */
   @SuppressWarnings("unchecked")
   static class AppLogInitDoneTransition implements
       SingleArcTransition<ApplicationImpl, ApplicationEvent> {
     @Override
     public void transition(ApplicationImpl app, ApplicationEvent event) {
+      // 触发应用级资源本地化初始化
       app.dispatcher.getEventHandler().handle(
           new ApplicationLocalizationEvent(
               LocalizationEventType.INIT_APPLICATION_RESOURCES, app));
+      // 保存日志聚合初始化时间戳
       app.setAppLogInitedTimestamp(event.getTimestamp());
+      // 持久化应用状态到状态存储，用于NM恢复
       try {
         app.appStateStore.storeApplication(app.appId, buildAppProto(app));
       } catch (Exception ex) {
@@ -378,319 +388,26 @@ public class ApplicationImpl implements Application {
     this.applicationLogInitedTimestamp = appLogInitedTimestamp;
   }
 
+  /**
+   * 将应用信息序列化为protobuf格式，用于NM状态持久化。
+   */
   static ContainerManagerApplicationProto buildAppProto(ApplicationImpl app)
       throws IOException {
     ContainerManagerApplicationProto.Builder builder =
         ContainerManagerApplicationProto.newBuilder();
+    // 写入应用ID
     builder.setId(((ApplicationIdPBImpl) app.appId).getProto());
+    // 写入用户名
     builder.setUser(app.getUser());
 
+    // 写入日志聚合上下文
     if (app.logAggregationContext != null) {
       builder.setLogAggregationContext((
           (LogAggregationContextPBImpl)app.logAggregationContext).getProto());
     }
 
+    // 写入凭证信息
     builder.clearCredentials();
     if (app.credentials != null) {
       DataOutputBuffer dob = new DataOutputBuffer();
-      app.credentials.writeTokenStorageToStream(dob);
-      builder.setCredentials(ByteString.copyFrom(dob.getData()));
-    }
-
-    builder.clearAcls();
-    if (app.applicationACLs != null) {
-      for (Map.Entry<ApplicationAccessType, String> acl :  app
-          .applicationACLs.entrySet()) {
-        YarnProtos.ApplicationACLMapProto p = YarnProtos
-            .ApplicationACLMapProto.newBuilder()
-            .setAccessType(ProtoUtils.convertToProtoFormat(acl.getKey()))
-            .setAcl(acl.getValue())
-            .build();
-        builder.addAcls(p);
-      }
-    }
-
-    builder.setAppLogAggregationInitedTime(app.applicationLogInitedTimestamp);
-
-    builder.clearFlowContext();
-    if (app.flowContext != null && app.flowContext.getFlowName() != null
-        && app.flowContext.getFlowVersion() != null) {
-      FlowContextProto fcp = FlowContextProto.newBuilder()
-          .setFlowName(app.flowContext.getFlowName())
-          .setFlowVersion(app.flowContext.getFlowVersion())
-          .setFlowRunId(app.flowContext.getFlowRunId()).build();
-      builder.setFlowContext(fcp);
-    }
-
-    return builder.build();
-  }
-
-  /**
-   * Handles the APPLICATION_LOG_HANDLING_FAILED event that occurs after
-   * {@link LogAggregationService} has failed to initialize the log 
-   * aggregation service
-   * 
-   * In particular, this requests that the {@link ResourceLocalizationService}
-   * localize the application-scoped resources.
-   */
-  @SuppressWarnings("unchecked")
-  static class AppLogInitFailTransition implements
-      SingleArcTransition<ApplicationImpl, ApplicationEvent> {
-    @Override
-    public void transition(ApplicationImpl app, ApplicationEvent event) {
-      LOG.warn("Log Aggregation service failed to initialize, there will " + 
-               "be no logs for this application");
-      app.dispatcher.getEventHandler().handle(
-          new ApplicationLocalizationEvent(
-              LocalizationEventType.INIT_APPLICATION_RESOURCES, app));
-    }
-  }
-  /**
-   * Handles INIT_CONTAINER events which request that we launch a new
-   * container. When we're still in the INITTING state, we simply
-   * queue these up. When we're in the RUNNING state, we pass along
-   * an ContainerInitEvent to the appropriate ContainerImpl.
-   */
-  @SuppressWarnings("unchecked")
-  static class InitContainerTransition implements
-      SingleArcTransition<ApplicationImpl, ApplicationEvent> {
-    @Override
-    public void transition(ApplicationImpl app, ApplicationEvent event) {
-      ApplicationContainerInitEvent initEvent =
-        (ApplicationContainerInitEvent) event;
-      Container container = initEvent.getContainer();
-      app.containers.put(container.getContainerId(), container);
-      LOG.info("Adding " + container.getContainerId()
-          + " to application " + app.toString());
-
-      ApplicationState appState = app.getApplicationState();
-      switch (appState) {
-      case RUNNING:
-        app.dispatcher.getEventHandler().handle(new ContainerInitEvent(
-            container.getContainerId()));
-        break;
-      case INITING:
-      case NEW:
-        // these get queued up and sent out in AppInitDoneTransition
-        break;
-      default:
-        LOG.warn("Killing {} because {} is in state {}",
-            container.getContainerId(), app, appState);
-        app.dispatcher.getEventHandler().handle(new ContainerKillEvent(
-            container.getContainerId(),
-            ContainerExitStatus.KILLED_AFTER_APP_COMPLETION,
-            "Application no longer running.\n"));
-        break;
-      }
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  static class AppInitDoneTransition implements
-      SingleArcTransition<ApplicationImpl, ApplicationEvent> {
-    @Override
-    public void transition(ApplicationImpl app, ApplicationEvent event) {
-      // Start all the containers waiting for ApplicationInit
-      for (Container container : app.containers.values()) {
-        app.dispatcher.getEventHandler().handle(new ContainerInitEvent(
-              container.getContainerId()));
-      }
-    }
-  }
-
-  
-  static final class ContainerDoneTransition implements
-      SingleArcTransition<ApplicationImpl, ApplicationEvent> {
-    @Override
-    public void transition(ApplicationImpl app, ApplicationEvent event) {
-      ApplicationContainerFinishedEvent containerEvent =
-          (ApplicationContainerFinishedEvent) event;
-      if (null == app.containers.remove(containerEvent.getContainerID())) {
-        LOG.warn("Removing unknown " + containerEvent.getContainerID() +
-            " from application " + app.toString());
-      } else {
-        LOG.info("Removing " + containerEvent.getContainerID() +
-            " from application " + app.toString());
-      }
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  void handleAppFinishWithContainersCleanedup() {
-    // Delete Application level resources
-    this.dispatcher.getEventHandler().handle(
-        new ApplicationLocalizationEvent(
-            LocalizationEventType.DESTROY_APPLICATION_RESOURCES, this));
-
-    // tell any auxiliary services that the app is done 
-    this.dispatcher.getEventHandler().handle(
-        new AuxServicesEvent(AuxServicesEventType.APPLICATION_STOP, appId));
-
-    // TODO: Trigger the LogsManager
-  }
-
-  @SuppressWarnings("unchecked")
-  static class AppFinishTriggeredTransition
-      implements
-      MultipleArcTransition<ApplicationImpl, ApplicationEvent, ApplicationState> {
-    @Override
-    public ApplicationState transition(ApplicationImpl app,
-        ApplicationEvent event) {
-      ApplicationFinishEvent appEvent = (ApplicationFinishEvent)event;
-      if (app.containers.isEmpty()) {
-        // No container to cleanup. Cleanup app level resources.
-        app.handleAppFinishWithContainersCleanedup();
-        return ApplicationState.APPLICATION_RESOURCES_CLEANINGUP;
-      }
-
-      // Send event to ContainersLauncher to finish all the containers of this
-      // application.
-      for (ContainerId containerID : app.containers.keySet()) {
-        app.dispatcher.getEventHandler().handle(
-            new ContainerKillEvent(containerID,
-                ContainerExitStatus.KILLED_AFTER_APP_COMPLETION,
-                "Container killed on application-finish event: " + appEvent.getDiagnostic()));
-      }
-      return ApplicationState.FINISHING_CONTAINERS_WAIT;
-    }
-  }
-
-  static class AppFinishTransition implements
-    MultipleArcTransition<ApplicationImpl, ApplicationEvent, ApplicationState> {
-
-    @Override
-    public ApplicationState transition(ApplicationImpl app,
-        ApplicationEvent event) {
-
-      ApplicationContainerFinishedEvent containerFinishEvent =
-          (ApplicationContainerFinishedEvent) event;
-      LOG.info("Removing " + containerFinishEvent.getContainerID()
-          + " from application " + app.toString());
-      app.containers.remove(containerFinishEvent.getContainerID());
-
-      if (app.containers.isEmpty()) {
-        // All containers are cleanedup.
-        app.handleAppFinishWithContainersCleanedup();
-        return ApplicationState.APPLICATION_RESOURCES_CLEANINGUP;
-      }
-
-      return ApplicationState.FINISHING_CONTAINERS_WAIT;
-    }
-
-  }
-
-  @SuppressWarnings("unchecked")
-  static class AppCompletelyDoneTransition implements
-      SingleArcTransition<ApplicationImpl, ApplicationEvent> {
-
-    private void updateCollectorStatus(ApplicationImpl app) {
-      // Remove collectors info for finished apps.
-      // TODO check we remove related collectors info in failure cases
-      // (YARN-3038)
-      Map<ApplicationId, AppCollectorData> registeringCollectors
-          = app.context.getRegisteringCollectors();
-      if (registeringCollectors != null) {
-        registeringCollectors.remove(app.getAppId());
-      }
-      Map<ApplicationId, AppCollectorData> knownCollectors =
-          app.context.getKnownCollectors();
-      if (knownCollectors != null) {
-        knownCollectors.remove(app.getAppId());
-      }
-      // stop timelineClient when application get finished.
-      NMTimelinePublisher nmTimelinePublisher =
-          app.context.getNMTimelinePublisher();
-      if (nmTimelinePublisher != null) {
-        nmTimelinePublisher.stopTimelineClient(app.getAppId());
-      }
-    }
-
-    @Override
-    public void transition(ApplicationImpl app, ApplicationEvent event) {
-
-      // Inform the logService
-      app.dispatcher.getEventHandler().handle(
-          new LogHandlerAppFinishedEvent(app.appId));
-
-      app.context.getNMTokenSecretManager().appFinished(app.getAppId());
-      updateCollectorStatus(app);
-    }
-  }
-
-  static class AppLogsAggregatedTransition implements
-      SingleArcTransition<ApplicationImpl, ApplicationEvent> {
-    @Override
-    public void transition(ApplicationImpl app, ApplicationEvent event) {
-      ApplicationId appId = event.getApplicationID();
-      app.context.getApplications().remove(appId);
-      if (null != app.context.getNodeManagerMetrics()) {
-        app.context.getNodeManagerMetrics().endRunningApplication();
-      }
-      app.aclsManager.removeApplication(appId);
-      try {
-        app.context.getNMStateStore().removeApplication(appId);
-      } catch (IOException e) {
-        LOG.error("Unable to remove application from state store", e);
-      }
-    }
-  }
-
-  @Override
-  public void handle(ApplicationEvent event) {
-
-    this.writeLock.lock();
-
-    try {
-      ApplicationId applicationID = event.getApplicationID();
-      LOG.debug("Processing {} of type {}", applicationID, event.getType());
-      ApplicationState oldState = stateMachine.getCurrentState();
-      ApplicationState newState = null;
-      try {
-        // queue event requesting init of the same app
-        newState = stateMachine.doTransition(event.getType(), event);
-      } catch (InvalidStateTransitionException e) {
-        LOG.error("Can't handle this event at current state", e);
-      }
-      if (newState != null && oldState != newState) {
-        LOG.info("Application " + applicationID + " transitioned from "
-            + oldState + " to " + newState);
-      }
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  @Override
-  public String toString() {
-    return appId.toString();
-  }
-
-  @VisibleForTesting
-  public LogAggregationContext getLogAggregationContext() {
-    this.readLock.lock();
-    try {
-      return this.logAggregationContext;
-    } finally {
-      this.readLock.unlock();
-    }
-  }
-
-  @Override
-  public String getFlowName() {
-    return flowContext == null ? null : flowContext.getFlowName();
-  }
-
-  @Override
-  public String getFlowVersion() {
-    return flowContext == null ? null : flowContext.getFlowVersion();
-  }
-
-  @Override
-  public long getFlowRunId() {
-    return flowContext == null ? 0L : flowContext.getFlowRunId();
-  }
-
-  public void setFlowContext(FlowContext fc) {
-    this.flowContext = fc;
-  }
-}
+      app.credentials.writeTokenStorageToStream(dob

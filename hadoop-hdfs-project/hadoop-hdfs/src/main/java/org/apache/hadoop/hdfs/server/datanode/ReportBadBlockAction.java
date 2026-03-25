@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,9 +32,8 @@ import org.apache.hadoop.hdfs.server.protocol.DatanodeRegistration;
 import org.apache.hadoop.ipc.RemoteException;
 
 /**
- * ReportBadBlockAction is an instruction issued by {{BPOfferService}} to
- * {{BPServiceActor}} to report bad block to namenode
- *
+ * 报告损坏块的动作，由BPOfferService发给BPServiceActor，用于向NameNode上报本节点发现的坏块
+ * 实现BPServiceActorAction接口，可被BPServiceActor线程执行
  */
 public class ReportBadBlockAction implements BPServiceActorAction {
 
@@ -41,6 +41,12 @@ public class ReportBadBlockAction implements BPServiceActorAction {
   private final String storageUuid;
   private final StorageType storageType;
 
+  /**
+   * 构造上报坏块的动作对象
+   * @param block 需要上报的坏块信息
+   * @param storageUuid 坏块所在存储的UUID
+   * @param storageType 坏块所在存储的类型
+   */
   public ReportBadBlockAction(ExtendedBlock block, String storageUuid, 
       StorageType storageType) {
     this.block = block;
@@ -48,25 +54,39 @@ public class ReportBadBlockAction implements BPServiceActorAction {
     this.storageType = storageType;
   }
 
+  /**
+   * 执行上报坏块到NameNode的动作
+   * @param bpNamenode NameNode协议客户端
+   * @param bpRegistration 当前DataNode注册信息
+   * @throws BPServiceActorActionException 上报失败时抛出异常
+   */
   @Override
   public void reportTo(DatanodeProtocolClientSideTranslatorPB bpNamenode, 
     DatanodeRegistration bpRegistration) throws BPServiceActorActionException {
+    // 如果注册信息为空，直接返回不执行上报
     if (bpRegistration == null) {
       return;
     }
+    // 构造只包含当前DataNode的数组，用于构建LocatedBlock
     DatanodeInfo[] dnArr = {new DatanodeInfoBuilder()
         .setNodeID(bpRegistration).build()};
+    // 构造存储UUID数组
     String[] uuids = { storageUuid };
+    // 构造存储类型数组
     StorageType[] types = { storageType };
+    // 构造待上报的坏块LocatedBlock对象
     LocatedBlock[] locatedBlock = { new LocatedBlock(block,
         dnArr, uuids, types) };
 
     try {
+      // 调用NameNode接口上报坏块列表
       bpNamenode.reportBadBlocks(locatedBlock);
     } catch (RemoteException re) {
+      // 捕获远程异常，记录日志不抛出，避免影响后续处理
       DataNode.LOG.info("reportBadBlock encountered RemoteException for "
           + "block:  " + block , re);
     } catch (IOException e) {
+      // IO异常抛出，通知上层上报失败
       throw new BPServiceActorActionException("Failed to report bad block "
           + block + " to namenode.", e);
     }

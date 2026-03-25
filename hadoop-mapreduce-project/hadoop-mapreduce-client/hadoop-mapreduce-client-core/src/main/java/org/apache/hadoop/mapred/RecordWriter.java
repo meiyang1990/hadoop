@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,11 +26,9 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.fs.FileSystem;
 
 /**
- * <code>RecordWriter</code> writes the output &lt;key, value&gt; pairs 
- * to an output file.
- 
- * <p><code>RecordWriter</code> implementations write the job outputs to the
- * {@link FileSystem}.
+ * RecordWriter 接口定义了将MapReduce任务输出的<键, 值>对写入输出文件的规范。
+ * 
+ * 实现类负责将作业的输出结果写入到Hadoop文件系统中，是MapReduce旧API输出体系的核心接口。
  * 
  * @see OutputFormat
  */
@@ -37,19 +36,19 @@ import org.apache.hadoop.fs.FileSystem;
 @InterfaceStability.Stable
 public interface RecordWriter<K, V> {
   /** 
-   * Writes a key/value pair.
+   * 写入一个键值对到输出文件。
    *
-   * @param key the key to write.
-   * @param value the value to write.
-   * @throws IOException
+   * @param key 待写入的键
+   * @param value 待写入的值
+   * @throws IOException 写入过程中发生I/O错误时抛出
    */      
   void write(K key, V value) throws IOException;
 
   /** 
-   * Close this <code>RecordWriter</code> to future operations.
+   * 关闭RecordWriter，释放资源并完成所有写入操作。
    * 
-   * @param reporter facility to report progress.
-   * @throws IOException
+   * @param reporter 用于报告写入进度的工具对象
+   * @throws IOException 关闭过程中发生I/O错误时抛出
    */ 
   void close(Reporter reporter) throws IOException;
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,14 +21,23 @@ package org.apache.hadoop.yarn.server.volume.csi.exception;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
- * Base class for all volume related exceptions.
+ * CSI卷相关异常的基类，所有YARN CSI卷管理相关异常都继承此类
  */
 public class VolumeException extends YarnException {
 
+  /**
+   * 构造只包含错误消息的异常
+   * @param message 错误消息
+   */
   public VolumeException(String message) {
     super(message);
   }
 
+  /**
+   * 构造包含错误消息和根异常的异常
+   * @param message 错误消息
+   * @param e 根异常
+   */
   public VolumeException(String message, Exception e) {
     super(message, e);
   }

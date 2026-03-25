@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,20 +18,15 @@
  */
 
 /**
- * Disk Balancer connects to a {@link org.apache.hadoop.hdfs.server.datanode
- * .DataNode} and attempts to spread data across all volumes evenly.
+ * HDFS磁盘均衡器顶层包，提供DataNode节点磁盘间数据均衡能力。
  *
- * This is achieved by :
+ * 磁盘均衡器的核心工作流程：
  *
- * 1) Calculating the average data that should be on a set of volumes grouped
- * by the type. For example, how much data should be on each volume of SSDs on a
- * machine.
+ * 1) 按存储介质类型分组，计算每组卷中每个卷应承载的平均数据量。例如计算一台节点上所有SSD卷每个卷应分布的数据量。
  *
- * 2) Once we know the average data that is expected to be on a volume we
- * move data from volumes with higher than average load to volumes with
- * less than average load.
+ * 2) 根据计算出的平均值，将数据从超出平均使用率的卷移动到低于平均使用率的卷，实现空间均衡。
  *
- * 3) Disk Balancer operates against data nodes which are live and operational.
+ * 3) 磁盘均衡器可在线运行，不影响DataNode节点正常对外提供服务。
  *
  */
 package org.apache.hadoop.hdfs.server.diskbalancer;

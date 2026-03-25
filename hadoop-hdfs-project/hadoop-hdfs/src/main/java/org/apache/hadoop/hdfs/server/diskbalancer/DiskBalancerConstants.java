@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -20,20 +21,23 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Constants used by Disk Balancer.
+ * 磁盘均衡器模块定义的全局常量集合
+ * 存储磁盘均衡器各组件共用的常量定义
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public final class DiskBalancerConstants {
+  /** 磁盘均衡器移动数据的带宽配置键名 */
   public static final String DISKBALANCER_BANDWIDTH = "DiskBalancerBandwidth";
+  /** 磁盘均衡器处理卷名称配置键名 */
   public static final String DISKBALANCER_VOLUME_NAME =
       "DiskBalancerVolumeName";
 
-  /** Min and Max Plan file versions that we know of. **/
+  /** 支持的最小和最大规划文件版本 */
   public static final int DISKBALANCER_MIN_VERSION = 1;
   public static final int DISKBALANCER_MAX_VERSION = 1;
 
-  // never constructed.
+  // 禁止实例化工具类
   private DiskBalancerConstants() {
   }
 }

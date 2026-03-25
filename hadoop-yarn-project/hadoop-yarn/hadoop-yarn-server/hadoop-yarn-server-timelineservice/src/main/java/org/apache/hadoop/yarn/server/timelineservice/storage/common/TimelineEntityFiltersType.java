@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,39 +22,45 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 import org.apache.hadoop.yarn.server.timelineservice.reader.filter.TimelineFilter.TimelineFilterType;
 
 /**
- * Used to define which filter to match.
+ * 时间线实体过滤器类型枚举，定义不同实体属性允许使用的过滤类型，用于时间线数据存储查询时过滤合法性校验。
  */
 enum TimelineEntityFiltersType {
+  /** 配置信息过滤 */
   CONFIG {
     boolean isValidFilter(TimelineFilterType filterType) {
       return filterType == TimelineFilterType.LIST ||
           filterType == TimelineFilterType.KEY_VALUE;
     }
   },
+  /** 实体信息过滤 */
   INFO {
     boolean isValidFilter(TimelineFilterType filterType) {
       return filterType == TimelineFilterType.LIST ||
           filterType == TimelineFilterType.KEY_VALUE;
     }
   },
+  /** 指标数据过滤 */
   METRIC {
     boolean isValidFilter(TimelineFilterType filterType) {
       return filterType == TimelineFilterType.LIST ||
           filterType == TimelineFilterType.COMPARE;
     }
   },
+  /** 事件过滤 */
   EVENT {
     boolean isValidFilter(TimelineFilterType filterType) {
       return filterType == TimelineFilterType.LIST ||
           filterType == TimelineFilterType.EXISTS;
     }
   },
+  /** 被关联关系过滤 */
   IS_RELATED_TO {
     boolean isValidFilter(TimelineFilterType filterType) {
       return filterType == TimelineFilterType.LIST ||
           filterType == TimelineFilterType.KEY_VALUES;
     }
   },
+  /** 关联关系过滤 */
   RELATES_TO {
     boolean isValidFilter(TimelineFilterType filterType) {
       return filterType == TimelineFilterType.LIST ||
@@ -62,10 +69,10 @@ enum TimelineEntityFiltersType {
   };
 
   /**
-   * Checks whether filter type is valid for the filter being matched.
+   * 检查给定的过滤类型对当前实体属性是否合法。
    *
-   * @param filterType filter type.
-   * @return true, if its a valid filter, false otherwise.
+   * @param filterType 待检查的过滤类型
+   * @return 合法返回true，否则返回false
    */
   abstract boolean isValidFilter(TimelineFilterType filterType);
 }

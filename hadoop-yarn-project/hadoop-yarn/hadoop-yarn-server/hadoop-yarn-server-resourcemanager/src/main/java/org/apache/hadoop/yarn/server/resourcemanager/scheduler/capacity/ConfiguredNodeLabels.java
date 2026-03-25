@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,33 +29,38 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Contains node labels for all queues extracted from configuration properties.
- * A queue has a configured node label if it has a property set with an
- * accessible-node-labels prefix.
- * Example:
- * yarn.scheduler.capacity.root.accessible-node-labels.test-label.capacity
+ * 容量调度器中从配置文件提取的所有队列节点标签容器。
+ * 凡是配置了accessible-node-labels前缀属性的队列，都会在此记录其允许使用的节点标签。
+ * 示例配置: yarn.scheduler.capacity.root.accessible-node-labels.test-label.capacity
  */
 public class ConfiguredNodeLabels {
+  // 按队列路径存储该队列配置的可访问节点标签
   private final Map<String, Set<String>> configuredNodeLabelsByQueue;
+  // 空标签集合，代表队列未配置任何标签时使用默认值（仅包含空标签）
   private static final Set<String> NO_LABEL =
       ImmutableSet.of(RMNodeLabelsManager.NO_LABEL);
 
+  /**
+   * 构造空的配置节点标签容器.
+   */
   public ConfiguredNodeLabels() {
     configuredNodeLabelsByQueue = new HashMap<>();
   }
 
+  /**
+   * 从容量调度器配置中加载队列节点标签配置.
+   * @param conf 容量调度器配置对象
+   */
   public ConfiguredNodeLabels(
       CapacitySchedulerConfiguration conf) {
     this.configuredNodeLabelsByQueue = conf.getConfiguredNodeLabelsByQueue();
   }
 
   /**
-   * Returns a set of configured node labels for a queue. If no labels are set
-   * for a queue, it defaults to a one element immutable collection containing
-   * empty label.
-   * @param queuePath path of the queue
-   * @return configured node labels or an immutable set containing the empty
-   * label
+   * 获取指定队列配置的可访问节点标签集合。如果队列未配置任何标签，
+   * 则返回仅包含空标签的不可变集合作为默认值。
+   * @param queuePath 队列全路径
+   * @return 该队列配置的可访问节点标签，无配置则返回仅含空标签的集合
    */
   public Set<String> getLabelsByQueue(String queuePath) {
     Set<String> labels = configuredNodeLabelsByQueue.get(queuePath);
@@ -67,9 +73,9 @@ public class ConfiguredNodeLabels {
   }
 
   /**
-   * Set node labels for a specific queue.
-   * @param queuePath path of the queue
-   * @param nodeLabels configured node labels to set
+   * 为指定队列设置可访问节点标签.
+   * @param queuePath 队列全路径
+   * @param nodeLabels 需要设置的配置节点标签集合
    */
   public void setLabelsByQueue(
       String queuePath, Collection<String> nodeLabels) {
@@ -77,8 +83,8 @@ public class ConfiguredNodeLabels {
   }
 
   /**
-   * Get all configured node labels aggregated from each queue.
-   * @return all node labels
+   * 获取所有队列配置中出现过的全部节点标签集合.
+   * @return 所有队列配置聚合后的全部节点标签，无配置则返回仅含空标签的集合
    */
   public Set<String> getAllConfiguredLabels() {
     Set<String> nodeLabels = configuredNodeLabelsByQueue.values().stream()

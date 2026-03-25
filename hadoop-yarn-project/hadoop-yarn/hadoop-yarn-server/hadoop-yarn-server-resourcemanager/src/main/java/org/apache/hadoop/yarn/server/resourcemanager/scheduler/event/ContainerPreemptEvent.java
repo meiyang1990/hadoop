@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,14 +23,19 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
 /**
- * Simple event class used to communicate kill reserved containers, mark
- * containers for preemption and kill already preemption-marked containers.
+ * 容器抢占事件，用于资源调度器中传递抢占相关指令，支持杀死预留容器、标记容器待抢占、杀死已标记抢占容器三种场景。
  */
 public class ContainerPreemptEvent extends SchedulerEvent {
 
   private final ApplicationAttemptId aid;
   private final RMContainer container;
 
+  /**
+   * 构造容器抢占事件。
+   * @param aid 应用尝试ID
+   * @param container 待处理的RM容器对象
+   * @param type 调度事件类型
+   */
   public ContainerPreemptEvent(ApplicationAttemptId aid, RMContainer container,
       SchedulerEventType type) {
     super(type);
@@ -37,10 +43,18 @@ public class ContainerPreemptEvent extends SchedulerEvent {
     this.container = container;
   }
 
+  /**
+   * 获取待抢占处理的RM容器对象。
+   * @return 待处理RM容器
+   */
   public RMContainer getContainer(){
     return this.container;
   }
 
+  /**
+   * 获取容器所属的应用尝试ID。
+   * @return 应用尝试ID
+   */
   public ApplicationAttemptId getAppId() {
     return aid;
   }

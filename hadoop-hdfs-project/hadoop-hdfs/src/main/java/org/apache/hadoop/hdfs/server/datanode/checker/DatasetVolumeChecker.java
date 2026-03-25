@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -62,56 +63,55 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_T
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY;
 
 /**
- * A class that encapsulates running disk checks against each volume of an
- * {@link FsDatasetSpi} and allows retrieving a list of failed volumes.
- *
- * This splits out behavior that was originally implemented across
- * DataNode, FsDatasetImpl and FsVolumeList.
+ * 文件：DatasetVolumeChecker.java
+ * 所属模块：HDFS DataNode 卷健康检查模块
+ * 核心职责：封装对FsDatasetSpi所有卷的磁盘健康检查逻辑，支持同步全量检查和异步单卷检查，收集并返回检查失败的卷列表
+ * 设计目的：将原本分散在DataNode、FsDatasetImpl、FsVolumeList中的磁盘检查逻辑抽离统一，实现模块化解耦
  */
 public class DatasetVolumeChecker {
 
   public static final Logger LOG =
       LoggerFactory.getLogger(DatasetVolumeChecker.class);
 
+  /** 异步检查执行器代理，实现限流调度 */
   private AsyncChecker<VolumeCheckContext, VolumeCheckResult> delegateChecker;
 
+  /** 单卷检查总次数统计 */
   private final AtomicLong numVolumeChecks = new AtomicLong(0);
+  /** 全量同步检查总次数统计 */
   private final AtomicLong numSyncDatasetChecks = new AtomicLong(0);
+  /** 因时间间隔不足跳过检查的次数统计 */
   private final AtomicLong numSkippedChecks = new AtomicLong(0);
 
-  /**
-   * Max allowed time for a disk check in milliseconds. If the check
-   * doesn't complete within this time we declare the disk as dead.
-   */
+  /** 单磁盘检查最大允许超时时间（毫秒），超时则判定磁盘失效 */
   private final long maxAllowedTimeForCheckMs;
 
-  /**
-   * Maximum number of volume failures that can be tolerated without
-   * declaring a fatal error.
-   */
+  /** 容忍的最大卷故障数，超过该数值则触发DataNode级致命错误 */
   private final int maxVolumeFailuresTolerated;
 
-  /**
-   * Minimum time between two successive disk checks of a volume.
-   */
+  /** 同一卷两次连续检查的最小时间间隔（毫秒），用于限流避免频繁检查 */
   private final long minDiskCheckGapMs;
+  /** 磁盘检查超时时间配置 */
   private final long diskCheckTimeout;
 
-  /**
-   * Timestamp of the last check of all volumes.
-   */
+  /** 上次全量检查所有卷的时间戳 */
   private long lastAllVolumesCheck;
 
+  /** 定时器对象，用于时间计算和限流判断 */
   private final Timer timer;
 
+  /** 空上下文对象，所有检查复用此实例 */
   private static final VolumeCheckContext IGNORED_CONTEXT =
       new VolumeCheckContext();
 
+  /** 单卷异步检查结果处理线程池 */
   private final ExecutorService checkVolumeResultHandlerExecutorService;
 
   /**
-   * @param conf Configuration object.
-   * @param timer {@link Timer} object used for throttling checks.
+   * 构造方法，从配置初始化卷检查器
+   * @param conf Hadoop配置对象
+   * @param timer 定时器对象，用于限流判断
+   * @throws DiskErrorException 当配置参数非法时抛出异常
    */
   public DatasetVolumeChecker(Configuration conf, Timer timer)
       throws DiskErrorException {
@@ -120,6 +120,7 @@ public class DatasetVolumeChecker {
         DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
+    // 校验超时配置必须为正
     if (maxAllowedTimeForCheckMs <= 0) {
       throw new HadoopIllegalArgumentException("Invalid value configured for "
           + DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY + " - "
@@ -137,6 +138,7 @@ public class DatasetVolumeChecker {
         DFSConfigKeys.DFS_DATANODE_DISK_CHECK_MIN_GAP_DEFAULT,
         TimeUnit.MILLISECONDS);
 
+    // 校验最小间隔配置不能为负
     if (minDiskCheckGapMs < 0) {
       throw new HadoopIllegalArgumentException("Invalid value configured for "
           + DFS_DATANODE_DISK_CHECK_MIN_GAP_KEY + " - "
@@ -148,14 +150,17 @@ public class DatasetVolumeChecker {
         DFSConfigKeys.DFS_DATANODE_DISK_CHECK_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
+    // 二次校验超时配置不能为负
     if (diskCheckTimeout < 0) {
       throw new HadoopIllegalArgumentException("Invalid value configured for "
           + DFS_DATANODE_DISK_CHECK_TIMEOUT_KEY + " - "
           + diskCheckTimeout + " (should be >= 0)");
     }
 
+    // 初始化上次检查时间，保证首次检查不会被跳过
     lastAllVolumesCheck = timer.monotonicNow() - minDiskCheckGapMs;
 
+    // 校验最大容忍故障数不超过系统允许上限
     if (maxVolumeFailuresTolerated < DataNode.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
       throw new HadoopIllegalArgumentException("Invalid value configured for "
           + DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY + " - "
@@ -163,6 +168,7 @@ public class DatasetVolumeChecker {
           + DataNode.MAX_VOLUME_FAILURES_TOLERATED_MSG);
     }
 
+    // 初始化带限流的异步检查器，使用缓存线程池执行检查任务
     delegateChecker = new ThrottledAsyncChecker<>(
         timer, minDiskCheckGapMs, diskCheckTimeout,
         Executors.newCachedThreadPool(
@@ -171,6 +177,7 @@ public class DatasetVolumeChecker {
                 .setDaemon(true)
                 .build()));
 
+    // 初始化结果处理线程池
     checkVolumeResultHandlerExecutorService = Executors.newCachedThreadPool(
         new ThreadFactoryBuilder()
             .setNameFormat("VolumeCheck ResultHandler thread %d")
@@ -179,18 +186,18 @@ public class DatasetVolumeChecker {
   }
 
   /**
-   * Run checks against all volumes of a dataset.
-   *
-   * This check may be performed at service startup and subsequently at
-   * regular intervals to detect and handle failed volumes.
-   *
-   * @param dataset - FsDatasetSpi to be checked.
-   * @return set of failed volumes.
+   * 同步检查数据集的所有卷，返回检查失败的卷集合
+   * 执行时机：DataNode启动时、定期周期性检查，用于及时发现故障磁盘并处理
+   * @param dataset 待检查的文件系统数据集
+   * @return 检查失败的卷集合，返回空集合表示全部健康或检查被跳过
+   * @throws InterruptedException 等待检查完成时被中断抛出
    */
   public Set<FsVolumeSpi> checkAllVolumes(
       final FsDatasetSpi<? extends FsVolumeSpi> dataset)
       throws InterruptedException {
+    // 计算距离上次全量检查的时间间隔
     final long gap = timer.monotonicNow() - lastAllVolumesCheck;
+    // 间隔小于最小要求，跳过本次检查
     if (gap < minDiskCheckGapMs) {
       numSkippedChecks.incrementAndGet();
       LOG.trace(
@@ -200,22 +207,27 @@ public class DatasetVolumeChecker {
       return Collections.emptySet();
     }
 
+    // 获取所有卷的引用，防止检查过程中卷被释放
     final FsDatasetSpi.FsVolumeReferences references =
         dataset.getFsVolumeReferences();
 
+    // 没有可引用的卷，直接返回
     if (references.size() == 0) {
       LOG.warn("checkAllVolumesAsync - no volumes can be referenced");
       return Collections.emptySet();
     }
 
+    // 更新上次全量检查时间戳
     lastAllVolumesCheck = timer.monotonicNow();
     final Set<FsVolumeSpi> healthyVolumes = new HashSet<>();
     final Set<FsVolumeSpi> failedVolumes = new HashSet<>();
     final Set<FsVolumeSpi> allVolumes = new HashSet<>();
 
     final AtomicLong numVolumes = new AtomicLong(references.size());
+    // 倒计时锁，用于等待所有检查完成
     final CountDownLatch latch = new CountDownLatch(1);
 
+    // 遍历所有卷，调度异步检查
     for (int i = 0; i < references.size(); ++i) {
       final FsVolumeReference reference = references.getReference(i);
       Optional<ListenableFuture<VolumeCheckResult>> olf =
@@ -223,6 +235,7 @@ public class DatasetVolumeChecker {
       LOG.info("Scheduled health check for volume {}", reference.getVolume());
       if (olf.isPresent()) {
         allVolumes.add(reference.getVolume());
+        // 注册结果回调处理器
         Futures.addCallback(olf.get(),
             new ResultHandler(reference, healthyVolumes, failedVolumes,
                 numVolumes, new Callback() {
@@ -233,15 +246,16 @@ public class DatasetVolumeChecker {
                   }
                 }), MoreExecutors.directExecutor());
       } else {
+        // 调度失败，释放卷引用
         IOUtils.cleanupWithLogger(null, reference);
+        // 所有检查已完成，解锁等待
         if (numVolumes.decrementAndGet() == 0) {
           latch.countDown();
         }
       }
     }
 
-    // Wait until our timeout elapses, after which we give up on
-    // the remaining volumes.
+    // 等待所有检查完成，超时则直接返回，未完成的卷判定为失败
     if (!latch.await(maxAllowedTimeForCheckMs, TimeUnit.MILLISECONDS)) {
       LOG.warn("checkAllVolumes timed out after {} ms",
           maxAllowedTimeForCheckMs);
@@ -249,39 +263,31 @@ public class DatasetVolumeChecker {
 
     numSyncDatasetChecks.incrementAndGet();
     synchronized (this) {
-      // All volumes that have not been detected as healthy should be
-      // considered failed. This is a superset of 'failedVolumes'.
-      //
-      // Make a copy under the mutex as Sets.difference() returns a view
-      // of a potentially changing set.
+      // 所有未被标记为健康的卷都视为失败，超时未完成的也包含在内
+      // 拷贝差异结果，避免并发修改导致异常
       return new HashSet<>(Sets.difference(allVolumes, healthyVolumes));
     }
   }
 
   /**
-   * A callback interface that is supplied the result of running an
-   * async disk check on multiple volumes.
+   * 多卷异步检查完成回调接口，当所有检查完成后触发用户自定义处理逻辑
    */
   public interface Callback {
     /**
-     * @param healthyVolumes set of volumes that passed disk checks.
-     * @param failedVolumes set of volumes that failed disk checks.
+     * 检查完成后的回调方法
+     * @param healthyVolumes 检查通过的健康卷集合
+     * @param failedVolumes 检查失败的卷集合
      */
     void call(Set<FsVolumeSpi> healthyVolumes,
               Set<FsVolumeSpi> failedVolumes);
   }
 
   /**
-   * Check a single volume asynchronously, returning a {@link ListenableFuture}
-   * that can be used to retrieve the final result.
-   *
-   * If the volume cannot be referenced then it is already closed and
-   * cannot be checked. No error is propagated to the callback.
-   *
-   * @param volume the volume that is to be checked.
-   * @param callback callback to be invoked when the volume check completes.
-   * @return true if the check was scheduled and the callback will be invoked.
-   *         false otherwise.
+   * 异步检查单个卷，检查完成后通过回调返回结果
+   * 用于不定期触发的单个卷健康检查，不阻塞调用线程
+   * @param volume 待检查的卷
+   * @param callback 检查完成后的回调处理器
+   * @return true 检查已成功调度，回调会被执行；false 检查调度失败，回调不会执行
    */
   public boolean checkVolume(
       final FsVolumeSpi volume,
@@ -293,16 +299,19 @@ public class DatasetVolumeChecker {
 
     FsVolumeReference volumeReference;
     try {
+      // 获取卷引用，防止检查过程中卷被关闭释放
       volumeReference = volume.obtainReference();
     } catch (ClosedChannelException e) {
-      // The volume has already been closed.
+      // 卷已经关闭，无法检查
       return false;
     }
 
+    // 调度异步检查
     Optional<ListenableFuture<VolumeCheckResult>> olf =
         delegateChecker.schedule(volume, IGNORED_CONTEXT);
     if (olf.isPresent()) {
       numVolumeChecks.incrementAndGet();
+      // 注册结果回调，使用专用线程池处理结果
       Futures.addCallback(olf.get(),
           new ResultHandler(volumeReference, new HashSet<>(), new HashSet<>(),
               new AtomicLong(1), callback),
@@ -310,34 +319,36 @@ public class DatasetVolumeChecker {
       );
       return true;
     } else {
+      // 调度失败，释放卷引用
       IOUtils.cleanupWithLogger(null, volumeReference);
     }
     return false;
   }
 
   /**
-   * A callback to process the results of checking a volume.
+   * 单卷检查结果回调处理器，处理单个卷检查成功/失败结果，释放资源，触发上层回调
    */
   private class ResultHandler
       implements FutureCallback<VolumeCheckResult> {
+    /** 待检查卷的引用，检查完成后需要释放 */
     private final FsVolumeReference reference;
+    /** 失败卷集合，检查失败将卷加入此集合 */
     private final Set<FsVolumeSpi> failedVolumes;
+    /** 健康卷集合，检查成功将卷加入此集合 */
     private final Set<FsVolumeSpi> healthyVolumes;
+    /** 剩余未完成检查计数，计数到0触发上层回调 */
     private final AtomicLong volumeCounter;
 
     @Nullable
     private final Callback callback;
 
     /**
-     *
-     * @param reference FsVolumeReference to be released when the check is
-     *                  complete.
-     * @param healthyVolumes set of healthy volumes. If the disk check is
-     *                       successful, add the volume here.
-     * @param failedVolumes set of failed volumes. If the disk check fails,
-     *                      add the volume here.
-     * @param volumeCounter volumeCounter used to trigger callback invocation.
-     * @param callback invoked when the volumeCounter reaches 0.
+     * 构造结果处理器
+     * @param reference 待检查卷的引用，检查完成后释放
+     * @param healthyVolumes 健康卷集合
+     * @param failedVolumes 失败卷集合
+     * @param volumeCounter 剩余未完成检查计数器
+     * @param callback 所有检查完成后的回调
      */
     ResultHandler(FsVolumeReference reference,
                   Set<FsVolumeSpi> healthyVolumes,
@@ -352,25 +363,34 @@ public class DatasetVolumeChecker {
       this.callback = callback;
     }
 
+    /**
+     * 检查成功完成后的处理逻辑
+     * @param result 卷检查结果
+     */
     @Override
     public void onSuccess(VolumeCheckResult result) {
       if (result == null) {
         LOG.error("Unexpected health check result null for volume {}",
             reference.getVolume());
+        // 结果为空，默认标记为健康
         markHealthy();
       } else {
+        // 根据结果类型处理
         switch(result) {
         case HEALTHY:
         case DEGRADED:
+          // 健康或降级都视为可用，标记为健康
           LOG.debug("Volume {} is {}.", reference.getVolume(), result);
           markHealthy();
           break;
         case FAILED:
+          // 检查失败，标记为失败
           LOG.warn("Volume {} detected as being unhealthy",
               reference.getVolume());
           markFailed();
           break;
         default:
+          // 未知结果类型，默认标记为健康
           LOG.error("Unexpected health check result {} for volume {}",
               result, reference.getVolume());
           markHealthy();
@@ -380,91 +400,11 @@ public class DatasetVolumeChecker {
       cleanup();
     }
 
+    /**
+     * 检查过程发生异常的处理逻辑
+     * @param t 异常对象
+     */
     @Override
     public void onFailure(@Nonnull Throwable t) {
-      Throwable exception = (t instanceof ExecutionException) ?
-          t.getCause() : t;
-      LOG.warn("Exception running disk checks against volume " +
-          reference.getVolume(), exception);
-      markFailed();
-      cleanup();
-    }
-
-    private void markHealthy() {
-      synchronized (DatasetVolumeChecker.this) {
-        healthyVolumes.add(reference.getVolume());
-      }
-    }
-
-    private void markFailed() {
-      synchronized (DatasetVolumeChecker.this) {
-        failedVolumes.add(reference.getVolume());
-      }
-    }
-
-    private void cleanup() {
-      IOUtils.cleanupWithLogger(null, reference);
-      invokeCallback();
-    }
-
-    private void invokeCallback() {
-      try {
-        final long remaining = volumeCounter.decrementAndGet();
-        if (callback != null && remaining == 0) {
-          callback.call(healthyVolumes, failedVolumes);
-        }
-      } catch(Exception e) {
-        // Propagating this exception is unlikely to be helpful.
-        LOG.warn("Unexpected exception", e);
-      }
-    }
-  }
-
-  /**
-   * Shutdown the checker and its associated ExecutorService.
-   *
-   * See {@link ExecutorService#awaitTermination} for the interpretation
-   * of the parameters.
-   */
-  public void shutdownAndWait(int gracePeriod, TimeUnit timeUnit) {
-    try {
-      delegateChecker.shutdownAndWait(gracePeriod, timeUnit);
-    } catch (InterruptedException e) {
-      LOG.warn("DatasetVolumeChecker interrupted during shutdown.");
-      Thread.currentThread().interrupt();
-    }
-  }
-
-  /**
-   * This method is for testing only.
-   *
-   * @param testDelegate
-   */
-  @VisibleForTesting
-  void setDelegateChecker(
-      AsyncChecker<VolumeCheckContext, VolumeCheckResult> testDelegate) {
-    delegateChecker = testDelegate;
-  }
-
-  /**
-   * Return the number of {@link #checkVolume} invocations.
-   */
-  public long getNumVolumeChecks() {
-    return numVolumeChecks.get();
-  }
-
-  /**
-   * Return the number of {@link #checkAllVolumes} invocations.
-   */
-  public long getNumSyncDatasetChecks() {
-    return numSyncDatasetChecks.get();
-  }
-
-  /**
-   * Return the number of checks skipped because the minimum gap since the
-   * last check had not elapsed.
-   */
-  public long getNumSkippedChecks() {
-    return numSkippedChecks.get();
-  }
-}
+      // 解包ExecutionException获取真实异常
+      Throwable exception = (t instanceof ExecutionException

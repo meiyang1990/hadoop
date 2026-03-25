@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -28,15 +29,16 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterPolicyCo
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Policy that allows operator to configure "weights" for routing. This picks a
- * {@link PriorityRouterPolicy} for the router and a
- * {@link BroadcastAMRMProxyPolicy} for the amrmproxy as they are designed to
- * work together.
+ * YARN联邦优先级广播策略管理器，基于权重进行路由。
+ * 路由层使用{@link PriorityRouterPolicy}，AMRMProxy层使用{@link BroadcastAMRMProxyPolicy}，两个策略设计为配合工作。
  */
 public class PriorityBroadcastPolicyManager extends AbstractPolicyManager {
 
   private WeightedPolicyInfo weightedPolicyInfo;
 
+  /**
+   * 构造函数，硬编码绑定一对匹配的路由和AMRMProxy策略。
+   */
   public PriorityBroadcastPolicyManager() {
     // this structurally hard-codes two compatible policies for Router and
     // AMRMProxy.
@@ -48,7 +50,9 @@ public class PriorityBroadcastPolicyManager extends AbstractPolicyManager {
   @Override
   public SubClusterPolicyConfiguration serializeConf()
       throws FederationPolicyInitializationException {
+    // 将权重策略信息序列化为字节缓冲
     ByteBuffer buf = weightedPolicyInfo.toByteBuffer();
+    // 构造并返回序列化后的子集群策略配置
     return SubClusterPolicyConfiguration.newInstance(getQueue(),
         this.getClass().getCanonicalName(), buf);
   }
@@ -65,6 +69,7 @@ public class PriorityBroadcastPolicyManager extends AbstractPolicyManager {
 
   @Override
   public boolean isSupportWeightedPolicyInfo() {
+    // 当前策略管理器支持权重策略配置
     return true;
   }
 }

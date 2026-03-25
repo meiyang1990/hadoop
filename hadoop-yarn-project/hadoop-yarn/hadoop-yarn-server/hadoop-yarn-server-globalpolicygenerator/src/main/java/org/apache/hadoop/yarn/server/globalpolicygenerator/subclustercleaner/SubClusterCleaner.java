@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,9 +34,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The sub-cluster cleaner is one of the GPG's services that periodically checks
- * the membership table in FederationStateStore and mark sub-clusters that have
- * not sent a heartbeat in certain amount of time as LOST.
+ * 子集群清理器是全局策略生成器(GPG)的服务之一，会定期检查联邦状态存储中的成员表，
+ * 将超过指定时间未发送心跳的子集群标记为LOST状态。
  */
 public class SubClusterCleaner implements Runnable {
 
@@ -46,12 +46,11 @@ public class SubClusterCleaner implements Runnable {
   private long heartbeatExpirationMillis;
 
   /**
-   * The sub-cluster cleaner runnable is invoked by the sub cluster cleaner
-   * service to check the membership table and remove sub clusters that have not
-   * sent a heart beat in some amount of time.
+   * 构造子集群清理器，从配置读取心跳过期时间，初始化清理工具。
+   * 该可执行任务会被子集群清理服务定时调用，检查并标记过期子集群。
    *
-   * @param conf configuration.
-   * @param gpgContext GPGContext.
+   * @param conf 配置对象
+   * @param gpgContext 全局策略生成器上下文
    */
   public SubClusterCleaner(Configuration conf, GPGContext gpgContext) {
     this.heartbeatExpirationMillis = conf.getTimeDuration(
@@ -65,9 +64,11 @@ public class SubClusterCleaner implements Runnable {
   @Override
   public void run() {
     try {
+      // 获取当前时间作为检查基准
       Date now = new Date();
       LOG.info("SubClusterCleaner at {}", now);
 
+      // 从联邦状态存储获取所有子集群信息
       Map<SubClusterId, SubClusterInfo> infoMap =
           this.gpgContext.getStateStoreFacade().getSubClusters(false, true);
 
@@ -75,6 +76,7 @@ public class SubClusterCleaner implements Runnable {
       for (Map.Entry<SubClusterId, SubClusterInfo> entry : infoMap.entrySet()) {
         SubClusterInfo subClusterInfo = entry.getValue();
 
+        // 获取该子集群最后一次心跳时间
         Date lastHeartBeat = new Date(subClusterInfo.getLastHeartBeat());
         if (LOG.isDebugEnabled()) {
           LOG.debug("Checking subcluster {} in state {}, last heartbeat at {}",
@@ -82,11 +84,14 @@ public class SubClusterCleaner implements Runnable {
               lastHeartBeat);
         }
 
+        // 只检查当前可用状态的子集群
         if (subClusterInfo.getState().isUsable()) {
+          // 计算距离过期还剩多少时间
           long timeUntilDeregister = this.heartbeatExpirationMillis
               - (now.getTime() - lastHeartBeat.getTime());
           // Deregister sub-cluster as SC_LOST if last heartbeat too old
           if (timeUntilDeregister < 0) {
+            // 心跳已过期，将子集群标记为LOST状态并注销
             LOG.warn(
                 "Deregistering subcluster {} in state {} last heartbeat at {}",
                 subClusterInfo.getSubClusterId(), subClusterInfo.getState(),
@@ -99,6 +104,7 @@ public class SubClusterCleaner implements Runnable {
                   + subClusterInfo.getSubClusterId(), e);
             }
           } else if (LOG.isDebugEnabled()) {
+            // 未过期，debug日志输出剩余时间
             LOG.debug("Time until deregister for subcluster {}: {}",
                 entry.getKey(),
                 DurationFormatUtils.formatDurationISO(timeUntilDeregister));
@@ -106,6 +112,7 @@ public class SubClusterCleaner implements Runnable {
         }
       }
     } catch (Throwable e) {
+      // 捕获所有异常，避免线程退出，保证定时任务持续运行
       LOG.error("Subcluster cleaner fails: ", e);
     }
   }

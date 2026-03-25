@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,229 +44,212 @@ import org.apache.hadoop.yarn.server.resourcemanager.blacklist.BlacklistManager;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 
 /**
- * Interface to an Application Attempt in the Resource Manager.
- * A {@link RMApp} can have multiple app attempts based on
- * {@link YarnConfiguration#RM_AM_MAX_ATTEMPTS}. For specific
- * implementation take a look at {@link RMAppAttemptImpl}.
+ * YARN ResourceManager中应用尝试的接口定义。
+ * 一个{@link RMApp}应用可以根据{@link YarnConfiguration#RM_AM_MAX_ATTEMPTS}配置，
+ * 拥有多次应用尝试（AM重启重试），具体实现参考{@link RMAppAttemptImpl}。
  */
 public interface RMAppAttempt extends EventHandler<RMAppAttemptEvent> {
 
   /**
-   * Get the application attempt id for this {@link RMAppAttempt}.
-   * @return the {@link ApplicationAttemptId} for this RM attempt.
+   * 获取本次应用尝试的唯一ID。
+   * @return 本次应用尝试的{@link ApplicationAttemptId}
    */
   ApplicationAttemptId getAppAttemptId();
 
   /**
-   * The state of the {@link RMAppAttempt}.
-   * @return the state {@link RMAppAttemptState} of this {@link RMAppAttempt}
+   * 获取本次应用尝试的内部状态。
+   * @return 本次应用尝试的{@link RMAppAttemptState}状态
    */
   RMAppAttemptState getAppAttemptState();
 
   /**
-   * The host on which the {@link RMAppAttempt} is running/ran on.
-   * @return the host on which the {@link RMAppAttempt} ran/is running on.
+   * 获取运行本次ApplicationMaster的节点主机名。
+   * @return ApplicationMaster所在的主机名
    */
   String getHost();
 
   /**
-   * The rpc port of the {@link RMAppAttempt}.
-   * @return the rpc port of the {@link RMAppAttempt} to which the clients can connect
-   * to.
+   * 获取ApplicationMaster的RPC服务端口。
+   * @return 客户端可连接的ApplicationMaster RPC端口
    */
   int getRpcPort();
 
   /**
-   * The url at which the status of the application attempt can be accessed.
-   * @return the url at which the status of the attempt can be accessed.
+   * 获取应用尝试状态追踪的访问URL（经过代理转发）。
+   * @return 可访问的应用尝试状态追踪URL
    */
   String getTrackingUrl();
 
   /**
-   * The original url at which the status of the application attempt can be 
-   * accessed. This url is not fronted by a proxy. This is only intended to be
-   * used by the proxy.
-   * @return the url at which the status of the attempt can be accessed and is
-   * not fronted by a proxy.
+   * 获取应用尝试状态追踪的原始URL（未经过代理转发，仅供代理服务使用）。
+   * @return 未经过代理转发的原始应用尝试状态追踪URL
    */
   String getOriginalTrackingUrl();
 
   /**
-   * The base to be prepended to web URLs that are not relative, and the user
-   * has been checked.
-   * @return the base URL to be prepended to web URLs that are not relative.
+   * 获取非相对Web URL的基础前缀路径。
+   * @return 非相对Web URL需要前置添加的基础URL路径
    */
   String getWebProxyBase();
 
   /**
-   * Diagnostics information for the application attempt.
-   * @return diagnostics information for the application attempt.
+   * 获取应用尝试的诊断信息。
+   * @return 应用尝试的诊断信息文本
    */
   String getDiagnostics();
 
   /**
-   * Progress for the application attempt.
-   * @return the progress for this {@link RMAppAttempt}
+   * 获取应用尝试的进度（0~1）。
+   * @return 本次应用尝试的进度值
    */
   float getProgress();
 
   /**
-   * The final status set by the AM.
-   * @return the final status that is set by the AM when unregistering itself. Can return a null 
-   * if the AM has not unregistered itself. 
+   * 获取ApplicationMaster设置的应用最终状态。
+   * @return ApplicationMaster注销时设置的最终状态，AM未注销时返回null
    */
   FinalApplicationStatus getFinalApplicationStatus();
 
   /**
-   * Return a list of the last set of finished containers, resetting the
-   * finished containers to empty.
-   * @return the list of just finished containers, re setting the finished containers.
+   * 取出最近完成的容器列表，取出后清空本地缓存的完成容器。
+   * @return 刚完成的容器状态列表，取出后重置缓存
    */
   List<ContainerStatus> pullJustFinishedContainers();
 
   /**
-   * Returns a reference to the map of last set of finished containers to the
-   * corresponding node. This does not reset the finished containers.
-   * @return the list of just finished containers, this does not reset the
-   * finished containers.
+   * 获取最近完成容器按节点分组的引用，不会重置完成容器缓存。
+   * @return 按节点分组的最近完成容器状态引用，不重置缓存
    */
   ConcurrentMap<NodeId, List<ContainerStatus>>
       getJustFinishedContainersReference();
 
   /**
-   * Return the list of last set of finished containers. This does not reset
-   * the finished containers.
-   * @return the list of just finished containers
+   * 获取最近完成的容器列表，不会重置完成容器缓存。
+   * @return 最近完成容器状态列表，不重置缓存
    */
   List<ContainerStatus> getJustFinishedContainers();
 
   /**
-   * The map of conatiners per Node that are already sent to the AM.
-   * @return map of per node list of finished container status sent to AM
+   * 获取已经发送给AM的完成容器按节点分组的映射。
+   * @return 已经发送给AM的按节点分组的完成容器状态映射
    */
   ConcurrentMap<NodeId, List<ContainerStatus>>
       getFinishedContainersSentToAMReference();
 
   /**
-   * The container on which the Application Master is running.
-   * @return the {@link Container} on which the application master is running.
+   * 获取运行ApplicationMaster的容器。
+   * @return 运行ApplicationMaster的{@link Container}对象
    */
   Container getMasterContainer();
 
   /**
-   * The application submission context for this {@link RMAppAttempt}.
-   * @return the application submission context for this Application.
+   * 获取本次应用尝试的提交上下文信息。
+   * @return 本次应用的提交上下文
    */
   ApplicationSubmissionContext getSubmissionContext();
 
   /**
-   * The AMRMToken belonging to this app attempt
-   * @return The AMRMToken belonging to this app attempt
+   * 获取本次应用尝试对应的AMRM令牌（用于AM和RM之间的认证）。
+   * @return 本次应用尝试的AMRM令牌
    */
   Token<AMRMTokenIdentifier> getAMRMToken();
 
   /**
-   * The master key for client-to-AM tokens for this app attempt. This is only
-   * used for RMStateStore. Normal operation must invoke the secret manager to
-   * get the key and not use the local key directly.
-   * @return The master key for client-to-AM tokens for this app attempt
+   * 获取本次应用尝试客户端到AM令牌的主密钥。仅用于RM状态存储，
+   * 正常运行需要通过密钥管理器获取密钥，不能直接使用本地密钥。
+   * @return 本次应用尝试客户端到AM令牌的主密钥
    */
   @LimitedPrivate("RMStateStore")
   SecretKey getClientTokenMasterKey();
 
   /**
-   * Create a token for authenticating a client connection to the app attempt
-   * @param clientName the name of the client requesting the token
-   * @return the token or null if the attempt is not running
+   * 创建客户端连接到本次应用尝试的认证令牌。
+   * @param clientName 请求令牌的客户端名称
+   * @return 认证令牌，尝试未运行时返回null
    */
   Token<ClientToAMTokenIdentifier> createClientToken(String clientName);
 
   /**
-   * Get application container and resource usage information.
-   * @return an ApplicationResourceUsageReport object.
+   * 获取应用容器和资源使用情况报告。
+   * @return 应用资源使用报告对象
    */
   ApplicationResourceUsageReport getApplicationResourceUsageReport();
 
   /**
-   * Get the {@link BlacklistManager} that manages blacklists for AM failures
-   * @return the {@link BlacklistManager} that tracks AM failures.
+   * 获取管理AM失败黑名单的黑名单管理器。
+   * @return 跟踪AM失败的黑名单管理器
    */
   BlacklistManager getAMBlacklistManager();
 
   /**
-   * the start time of the application.
-   * @return the start time of the application.
+   * 获取应用尝试的启动时间戳。
+   * @return 应用尝试的启动时间戳
    */
   long getStartTime();
 
   /**
-   * The current state of the {@link RMAppAttempt}.
+   * 获取本次应用尝试当前状态。
    * 
-   * @return the current state {@link RMAppAttemptState} for this application
-   *         attempt.
+   * @return 本次应用尝试当前的{@link RMAppAttemptState}
    */
   RMAppAttemptState getState();
 
   /**
-   * The previous state of the {@link RMAppAttempt} before the current state.
+   * 获取本次应用尝试当前状态之前的上一个状态。
    *
-   * @return the previous state of the {@link RMAppAttempt} before the current state
-   * for this application attempt.
+   * @return 本次应用尝试上一个状态
    */
   RMAppAttemptState getPreviousState();
 
   /**
-   * Create the external user-facing state of the attempt of ApplicationMaster
-   * from the current state of the {@link RMAppAttempt}.
+   * 根据当前内部状态转换为对用户公开的Yarn应用尝试状态。
    * 
-   * @return the external user-facing state of the attempt ApplicationMaster.
+   * @return 对用户公开的应用尝试状态
    */
   YarnApplicationAttemptState createApplicationAttemptState();
   
   /**
-   * Create the Application attempt report from the {@link RMAppAttempt}
+   * 根据当前信息生成应用尝试报告对象，供API返回。
    * 
-   * @return {@link ApplicationAttemptReport}
+   * @return 生成的应用尝试报告对象
    */
   ApplicationAttemptReport createApplicationAttemptReport();
 
   /**
-   * Return the flag which indicates whether the attempt failure should be
-   * counted to attempt retry count.
+   * 返回本次尝试失败是否应该计入最大重试次数。
    * <p>
-   * There failure types should not be counted to attempt retry count:
+   * 以下失败类型不应该计入重试次数：
    * <ul>
-   *   <li>preempted by the scheduler.</li>
-   *   <li>
-   *     hardware failures, such as NM failing, lost NM and NM disk errors.
-   *   </li>
-   *   <li>killed by RM because of RM restart or failover.</li>
+   *   <li>被调度器抢占</li>
+   *   <li>节点硬件故障，如NM宕机、节点失联、NM磁盘错误</li>
+   *   <li>RM重启或故障转移导致的杀死</li>
    * </ul>
    *
-   * @return attempt retry count.
+   * @return 是否应该计入最大重试次数
    */
   boolean shouldCountTowardsMaxAttemptRetry();
   
   /**
-   * Get metrics from the {@link RMAppAttempt}
-   * @return metrics
+   * 获取本次应用尝试的度量指标。
+   * @return 应用尝试度量指标
    */
   RMAppAttemptMetrics getRMAppAttemptMetrics();
 
   /**
-   * the finish time of the application attempt.
-   * @return the finish time of the application attempt.
+   * 获取应用尝试的完成时间戳。
+   * @return 应用尝试的完成时间戳
    */
   long getFinishTime();
 
   /**
-   * To capture Launch diagnostics of the app.
-   * @param amLaunchDiagnostics amLaunchDiagnostics.
+   * 更新AM启动失败的诊断信息。
+   * @param amLaunchDiagnostics AM启动诊断信息
    */
   void updateAMLaunchDiagnostics(String amLaunchDiagnostics);
 
   /**
-   * @return Set of nodes which are blacklisted by the application
+   * 获取应用黑名单中的节点集合。
+   * @return 被应用加入黑名单的节点地址集合
    */
   Set<String> getBlacklistedNodes();
 }

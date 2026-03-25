@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,22 +26,25 @@ import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
+ * 获取应用归属子集群响应类，YARN联邦状态存储查询应用归属子集群后返回的结果封装。
+ * 
  * <p>
- * The response sent by <code>Federation state
- * store</code> to a query for the home subcluster of a newly submitted
- * application.
- *
- * <p>
- * The request includes the mapping details, i.e.:
+ * 响应包含应用与归属子集群的映射信息，包括：
  * <ul>
- * <li>{@code ApplicationId}</li>
- * <li>{@code SubClusterId}</li>
+ * <li>{@code ApplicationId} 应用ID</li>
+ * <li>{@code SubClusterId} 归属子集群ID</li>
  * </ul>
  */
 @Private
 @Unstable
 public abstract class GetApplicationHomeSubClusterResponse {
 
+  /**
+   * 创建仅包含应用ID和归属子集群ID的响应实例。
+   * @param appId 应用ID
+   * @param homeSubCluster 归属子集群ID
+   * @return 新建的查询响应对象
+   */
   @Private
   @Unstable
   public static GetApplicationHomeSubClusterResponse newInstance(
@@ -53,6 +57,13 @@ public abstract class GetApplicationHomeSubClusterResponse {
     return mapResponse;
   }
 
+  /**
+   * 创建包含应用ID、创建时间和归属子集群ID的响应实例。
+   * @param appId 应用ID
+   * @param homeSubCluster 归属子集群ID
+   * @param createTime 应用创建时间
+   * @return 新建的查询响应对象
+   */
   @Private
   @Unstable
   public static GetApplicationHomeSubClusterResponse newInstance(
@@ -65,6 +76,14 @@ public abstract class GetApplicationHomeSubClusterResponse {
     return mapResponse;
   }
 
+  /**
+   * 创建包含完整应用信息的响应实例，包含应用提交上下文。
+   * @param appId 应用ID
+   * @param homeSubCluster 归属子集群ID
+   * @param createTime 应用创建时间
+   * @param context 应用提交上下文
+   * @return 新建的查询响应对象
+   */
   @Private
   @Unstable
   public static GetApplicationHomeSubClusterResponse newInstance(
@@ -79,21 +98,18 @@ public abstract class GetApplicationHomeSubClusterResponse {
   }
 
   /**
-   * Get the {@link ApplicationHomeSubCluster} representing the mapping of the
-   * application to it's home sub-cluster.
+   * 获取应用到归属子集群的完整映射信息。
    *
-   * @return the mapping of the application to it's home sub-cluster.
+   * @return 应用与归属子集群映射对象
    */
   @Public
   @Unstable
   public abstract ApplicationHomeSubCluster getApplicationHomeSubCluster();
 
   /**
-   * Set the {@link ApplicationHomeSubCluster} representing the mapping of the
-   * application to it's home sub-cluster.
+   * 设置应用到归属子集群的映射信息。
    *
-   * @param applicationHomeSubCluster the mapping of the application to it's
-   *          home sub-cluster.
+   * @param applicationHomeSubCluster 应用与归属子集群映射对象
    */
   @Private
   @Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,6 +26,9 @@ import org.apache.hadoop.yarn.webapp.View;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 
+/**
+ * 应用历史服务Web UI关于信息块，渲染时间线服务器版本信息面板。
+ */
 public class AboutBlock extends HtmlBlock {
   @Inject
   AboutBlock(View.ViewContext ctx) {
@@ -33,13 +37,17 @@ public class AboutBlock extends HtmlBlock {
 
   @Override
   protected void render(Block html) {
+    // 创建时间线服务关于信息对象
     TimelineAbout tsInfo = TimelineUtils.createTimelineAbout(
         "Timeline Server - Generic History Service UI");
+    // 初始化概览信息面板，添加时间线服务版本信息
     info("Timeline Server Overview").
         __("Timeline Server Version:", tsInfo.getTimelineServiceBuildVersion() +
             " on " + tsInfo.getTimelineServiceVersionBuiltOn()).
+        // 添加Hadoop整体版本信息
         __("Hadoop Version:", tsInfo.getHadoopBuildVersion() +
             " on " + tsInfo.getHadoopVersionBuiltOn());
+    // 将信息面板渲染到HTML页面
     html.__(InfoBlock.class);
   }
 }

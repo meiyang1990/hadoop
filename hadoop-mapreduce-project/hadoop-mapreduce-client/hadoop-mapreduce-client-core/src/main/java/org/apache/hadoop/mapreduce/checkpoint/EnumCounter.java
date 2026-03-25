@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,10 +18,19 @@
  */
 package org.apache.hadoop.mapreduce.checkpoint;
 
+/**
+ * MapReduce任务检查点机制的统计计数器枚举
+ * 用于定义检查点相关的各类统计指标，帮助监控检查点操作的性能和数据量
+ */
 public enum EnumCounter {
+  /** 输入Key计数 */
   INPUTKEY,
+  /** 输入Value计数 */
   INPUTVALUE,
+  /** 输出记录计数 */
   OUTPUTRECORDS,
+  /** 检查点写入字节数 */
   CHECKPOINT_BYTES,
+  /** 检查点操作耗时（毫秒） */
   CHECKPOINT_MS
 }

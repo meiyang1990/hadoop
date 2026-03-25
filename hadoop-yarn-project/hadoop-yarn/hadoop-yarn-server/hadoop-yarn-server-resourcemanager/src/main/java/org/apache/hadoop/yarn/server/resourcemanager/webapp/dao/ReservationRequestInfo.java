@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,25 +27,37 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * Simple class representing a reservation request.
+ * YARN资源预留请求信息的数据访问对象，用于Web API序列化/反序列化
+ * 封装资源预留请求的各项参数，供REST接口返回或接收请求数据
  */
 @XmlRootElement(name = "reservation-definition")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ReservationRequestInfo {
 
+  // 预留资源的能力信息（包含内存、CPU等资源量）
   @XmlElement(name = "capability")
   private ResourceInfo capability;
+  // 最小并发容器数量要求
   @XmlElement(name = "min-concurrency")
   private int minConcurrency;
+  // 需要的总容器数量
   @XmlElement(name = "num-containers")
   private int numContainers;
+  // 预留时长，单位毫秒
   @XmlElement(name = "duration")
   private long duration;
 
+  /**
+   * 默认构造函数，供JAXB序列化使用
+   */
   public ReservationRequestInfo() {
 
   }
 
+  /**
+   * 根据API层的ReservationRequest构造DAO对象
+   * @param request 原始资源预留请求对象
+   */
   public ReservationRequestInfo(ReservationRequest request) {
     capability = new ResourceInfo(request.getCapability());
     minConcurrency = request.getConcurrency();

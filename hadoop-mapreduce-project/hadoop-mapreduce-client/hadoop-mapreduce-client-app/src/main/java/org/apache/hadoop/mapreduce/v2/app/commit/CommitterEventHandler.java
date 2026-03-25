@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,6 +57,10 @@ import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFact
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 输出提交器事件处理器，负责处理MapReduce作业生命周期中与输出提交相关的各类事件
+ * 包括作业初始化、作业提交、作业终止、任务终止等操作，异步处理事件避免阻塞主流程
+ */
 public class CommitterEventHandler extends AbstractService
     implements EventHandler<CommitterEvent> {
 
@@ -80,11 +85,24 @@ public class CommitterEventHandler extends AbstractService
   private Path endCommitFailureFile;
   
 
+  /**
+   * 构造提交器事件处理器
+   * @param context ApplicationMaster上下文
+   * @param committer 输出提交器实例
+   * @param rmHeartbeatHandler ResourceManager心跳处理器
+   */
   public CommitterEventHandler(AppContext context, OutputCommitter committer,
       RMHeartbeatHandler rmHeartbeatHandler) {
     this(context, committer, rmHeartbeatHandler, null);
   }
   
+  /**
+   * 构造提交器事件处理器，指定作业类加载器
+   * @param context ApplicationMaster上下文
+   * @param committer 输出提交器实例
+   * @param rmHeartbeatHandler ResourceManager心跳处理器
+   * @param jobClassLoader 作业自定义类加载器
+   */
   public CommitterEventHandler(AppContext context, OutputCommitter committer,
       RMHeartbeatHandler rmHeartbeatHandler, ClassLoader jobClassLoader) {
     super("CommitterEventHandler");
@@ -98,13 +116,17 @@ public class CommitterEventHandler extends AbstractService
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
+    // 读取提交线程取消超时配置
     commitThreadCancelTimeoutMs = conf.getInt(
         MRJobConfig.MR_AM_COMMITTER_CANCEL_TIMEOUT_MS,
         MRJobConfig.DEFAULT_MR_AM_COMMITTER_CANCEL_TIMEOUT_MS);
+    // 读取有效提交窗口配置
     commitWindowMs = conf.getLong(MRJobConfig.MR_AM_COMMIT_WINDOW_MS,
         MRJobConfig.DEFAULT_MR_AM_COMMIT_WINDOW_MS);
     try {
+      // 获取文件系统实例
       fs = FileSystem.get(conf);
+      // 构造作业ID并生成提交状态文件路径
       JobID id = TypeConverter.fromYarn(context.getApplicationID());
       JobId jobId = TypeConverter.toYarn(id);
       String user = UserGroupInformation.getCurrentUser().getShortUserName();
@@ -118,12 +140,12 @@ public class CommitterEventHandler extends AbstractService
 
   @Override
   protected void serviceStart() throws Exception {
+    // 构建线程工厂，命名处理线程
     ThreadFactoryBuilder tfBuilder = new ThreadFactoryBuilder()
         .setNameFormat("CommitterEvent Processor #%d");
     if (jobClassLoader != null) {
-      // if the job classloader is enabled, we need to use the job classloader
-      // as the thread context classloader (TCCL) of these threads in case the
-      // committer needs to load another class via TCCL
+      // 如果启用了作业类加载器，需要将其设置为处理线程的上下文类加载器
+      // 保证提交器可以通过TCCL加载作业自定义类
       ThreadFactory backingTf = new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
@@ -135,8 +157,10 @@ public class CommitterEventHandler extends AbstractService
       tfBuilder.setThreadFactory(backingTf);
     }
     ThreadFactory tf = tfBuilder.build();
+    // 初始化固定大小线程池处理事件
     launcherPool = new HadoopThreadPoolExecutor(5, 5, 1,
         TimeUnit.HOURS, new LinkedBlockingQueue<Runnable>(), tf);
+    // 创建事件拉取线程，从队列取出事件交给线程池处理
     eventHandlingThread = new SubjectInheritingThread(new Runnable() {
       @Override
       public void run() {
@@ -150,8 +174,7 @@ public class CommitterEventHandler extends AbstractService
             }
             return;
           }
-          // the events from the queue are handled in parallel
-          // using a thread pool
+          // 使用线程池并行处理队列中的事件
           launcherPool.execute(new EventProcessor(event));        }
       }
     });
@@ -162,6 +185,10 @@ public class CommitterEventHandler extends AbstractService
 
 
   @Override
+  /**
+   * 将提交事件放入事件队列等待处理
+   * @param event 待处理的提交事件
+   */
   public void handle(CommitterEvent event) {
     try {
       eventQueue.put(event);
@@ -173,7 +200,7 @@ public class CommitterEventHandler extends AbstractService
   @Override
   protected void serviceStop() throws Exception {
     if (stopped.getAndSet(true)) {
-      // return if already stopped
+      // 已停止则直接返回
       return;
     }
     if (eventHandlingThread != null) {
@@ -185,6 +212,10 @@ public class CommitterEventHandler extends AbstractService
     super.serviceStop();
   }
 
+  /**
+   * 标记作业提交开始，保证同一时间只有一个提交线程运行
+   * @throws IOException 如果已有提交线程正在运行则抛出异常
+   */
   private synchronized void jobCommitStarted() throws IOException {
     if (jobCommitThread != null) {
       throw new IOException("Commit while another commit thread active: "
@@ -194,6 +225,9 @@ public class CommitterEventHandler extends AbstractService
     jobCommitThread = Thread.currentThread();
   }
 
+  /**
+   * 标记作业提交结束，清空当前提交线程并唤醒等待线程
+   */
   private synchronized void jobCommitEnded() {
     if (jobCommitThread == Thread.currentThread()) {
       jobCommitThread = null;
@@ -201,13 +235,16 @@ public class CommitterEventHandler extends AbstractService
     }
   }
 
+  /**
+   * 取消正在进行的作业提交，中断提交线程并等待其终止
+   */
   private synchronized void cancelJobCommit() {
     Thread threadCommitting = jobCommitThread;
     if (threadCommitting != null && threadCommitting.isAlive()) {
       LOG.info("Cancelling commit");
       threadCommitting.interrupt();
 
-      // wait up to configured timeout for commit thread to finish
+      // 等待提交线程在超时时间内完成退出
       long now = context.getClock().getTime();
       long timeoutTimestamp = now + commitThreadCancelTimeoutMs;
       try {
@@ -221,9 +258,16 @@ public class CommitterEventHandler extends AbstractService
     }
   }
 
+  /**
+   * 事件处理器，负责处理单个提交器事件并路由到对应处理方法
+   */
   private class EventProcessor implements Runnable {
     private CommitterEvent event;
 
+    /**
+     * 构造事件处理器实例
+     * @param event 需要处理的提交事件
+     */
     EventProcessor(CommitterEvent event) {
       this.event = event;
     }
@@ -231,6 +275,7 @@ public class CommitterEventHandler extends AbstractService
     @Override
     public void run() {
       LOG.info("Processing the event " + event.toString());
+      // 根据事件类型分发到对应处理方法
       switch (event.getType()) {
       case JOB_SETUP:
         handleJobSetup((CommitterJobSetupEvent) event);
@@ -250,6 +295,10 @@ public class CommitterEventHandler extends AbstractService
       }
     }
     
+    /**
+     * 处理作业初始化事件，调用OutputCommitter完成作业setup并发送完成事件
+     * @param event 作业初始化事件
+     */
     @SuppressWarnings("unchecked")
     protected void handleJobSetup(CommitterJobSetupEvent event) {
       try {
@@ -263,6 +312,12 @@ public class CommitterEventHandler extends AbstractService
       }
     }
 
+    /**
+     * 创建空文件标记提交状态，支持可重复提交时覆盖已有文件
+     * @param p 要创建的文件路径
+     * @param overwrite 是否允许覆盖已有文件
+     * @throws IOException 创建文件失败时抛出
+     */
     // If job commit is repeatable, then we should allow
     // startCommitFile/endCommitSuccessFile/endCommitFailureFile to be written
     // by other AM before.
@@ -270,10 +325,15 @@ public class CommitterEventHandler extends AbstractService
       fs.create(p, overwrite).close();
     }
 
+    /**
+     * 处理作业提交事件，调用OutputCommitter完成作业输出提交并处理结果
+     * @param event 作业提交事件
+     */
     @SuppressWarnings("unchecked")
     protected void handleJobCommit(CommitterJobCommitEvent event) {
       boolean commitJobIsRepeatable = false;
       try {
+        // 检查提交器是否支持可重复提交
         commitJobIsRepeatable = committer.isCommitJobRepeatable(
             event.getJobContext());
       } catch (IOException e) {
@@ -281,30 +341,44 @@ public class CommitterEventHandler extends AbstractService
       }
 
       try {
+        // 创建提交开始标记文件
         touchz(startCommitFile, commitJobIsRepeatable);
+        // 标记提交开始
         jobCommitStarted();
+        // 等待到有效提交窗口再执行提交，保证心跳正常
         waitForValidCommitWindow();
+        // 执行作业提交
         committer.commitJob(event.getJobContext());
+        // 创建提交成功标记文件
         touchz(endCommitSuccessFile, commitJobIsRepeatable);
+        // 发送提交完成事件
         context.getEventHandler().handle(
             new JobCommitCompletedEvent(event.getJobID()));
       } catch (Exception e) {
         LOG.error("Could not commit job", e);
         try {
+          // 创建提交失败标记文件
           touchz(endCommitFailureFile, commitJobIsRepeatable);
         } catch (Exception e2) {
           LOG.error("could not create failure file.", e2);
         }
+        // 发送提交失败事件
         context.getEventHandler().handle(
             new JobCommitFailedEvent(event.getJobID(),
                 StringUtils.stringifyException(e)));
       } finally {
+        // 标记提交结束
         jobCommitEnded();
       }
     }
 
+    /**
+     * 处理作业终止事件，取消正在进行的提交，调用OutputCommitter终止作业并发送完成事件
+     * @param event 作业终止事件
+     */
     @SuppressWarnings("unchecked")
     protected void handleJobAbort(CommitterJobAbortEvent event) {
+      // 先取消正在进行的提交
       cancelJobCommit();
 
       try {
@@ -317,6 +391,10 @@ public class CommitterEventHandler extends AbstractService
           event.getJobID(), event.getFinalState()));
     }
 
+    /**
+     * 处理任务终止事件，调用OutputCommitter清理任务输出并发送清理完成事件
+     * @param event 任务终止事件
+     */
     @SuppressWarnings("unchecked")
     protected void handleTaskAbort(CommitterTaskAbortEvent event) {
       try {
@@ -329,11 +407,17 @@ public class CommitterEventHandler extends AbstractService
               TaskAttemptEventType.TA_CLEANUP_DONE));
     }
 
+    /**
+     * 等待有效提交窗口：距离上次RM心跳在指定时间范围内才允许提交
+     * 避免在RM长时间心跳超时后提交，提升提交可靠性
+     * @throws InterruptedException 线程等待被中断时抛出
+     */
     private synchronized void waitForValidCommitWindow()
         throws InterruptedException {
       long lastHeartbeatTime = rmHeartbeatHandler.getLastHeartbeatTime();
       long now = context.getClock().getTime();
 
+      // 如果距离上次心跳超过窗口大小，等待下一次心跳后再继续
       while (now - lastHeartbeatTime > commitWindowMs) {
         rmHeartbeatHandler.runOnNextHeartbeat(new Runnable() {
           @Override

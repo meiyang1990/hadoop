@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,27 +29,48 @@ import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptReport;
 import org.apache.hadoop.yarn.api.records.YarnApplicationAttemptState;
 
+/**
+ * YARN Web UI 应用尝试信息数据访问对象
+ * 封装应用尝试的基础信息，用于Web服务返回JSON/XML格式数据
+ */
 @Public
 @Evolving
 @XmlRootElement(name = "appAttempt")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppAttemptInfo {
 
+  // 应用尝试ID
   protected String appAttemptId;
+  // ApplicationMaster所在节点主机名
   protected String host;
+  // ApplicationMaster RPC服务端口
   protected int rpcPort;
+  // 应用追踪页面URL
   protected String trackingUrl;
+  // 原始应用追踪页面URL
   protected String originalTrackingUrl;
+  // 诊断信息，用于错误排查
   protected String diagnosticsInfo;
+  // 应用尝试当前状态
   protected YarnApplicationAttemptState appAttemptState;
+  // ApplicationMaster所在容器ID
   protected String amContainerId;
+  // 应用尝试启动时间戳
   protected long startedTime;
+  // 应用尝试完成时间戳
   protected long finishedTime;
 
+  /**
+   * JAXB要求的无参构造方法
+   */
   public AppAttemptInfo() {
     // JAXB needs this
   }
 
+  /**
+   * 根据应用尝试报告构造AppAttemptInfo对象
+   * @param appAttempt 应用尝试报告
+   */
   public AppAttemptInfo(ApplicationAttemptReport appAttempt) {
     appAttemptId = appAttempt.getApplicationAttemptId().toString();
     host = appAttempt.getHost();

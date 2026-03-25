@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,53 +26,41 @@ import java.util.TreeSet;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * This class tracks changes in the layout version of HDFS.
- * 
- * Layout version is changed for following reasons:
+ * 文件级注释：HDFS磁盘布局版本管理类，负责跟踪HDFS元数据存储格式的版本变更
+ *
+ * 布局版本变更通常由以下原因触发：
  * <ol>
- * <li>The layout of how namenode or datanode stores information 
- * on disk changes.</li>
- * <li>A new operation code is added to the editlog.</li>
- * <li>Modification such as format of a record, content of a record 
- * in editlog or fsimage.</li>
+ * <li>NameNode或DataNode磁盘存储结构发生变化</li>
+ * <li>Editlog新增操作码</li>
+ * <li>Editlog或FsImage中的记录格式、内容发生修改</li>
  * </ol>
  * <br>
- * <b>How to update layout version:<br></b>
- * When a change requires new layout version, please add an entry into
- * {@link Feature} with a short enum name, new layout version and description
- * of the change. Please see {@link Feature} for further details.
+ * <b>如何更新布局版本:<br></b>
+ * 当变更需要新增布局版本时，在{@link Feature}枚举中添加新条目，包含简短枚举名、新版本号和变更描述，详见{@link Feature}
  * <br>
  */
 @InterfaceAudience.Private
 public class LayoutVersion {
   /**
-   * Version in which HDFS-2991 was fixed. This bug caused OP_ADD to
-   * sometimes be skipped for append() calls. If we see such a case when
-   * loading the edits, but the version is known to have that bug, we
-   * workaround the issue. Otherwise we should consider it a corruption
-   * and bail.
+   * 修复HDFS-2991问题的版本阈值，该问题会导致append调用有时跳过OP_ADD操作
+   * 加载editlog时，如果遇到该问题且版本低于此阈值，会进行兼容处理；否则判定为数据损坏
    */
   public static final int BUGFIX_HDFS_2991_VERSION = -40;
 
   /**
-   * The interface to be implemented by NameNode and DataNode layout features 
+   * 布局特性接口，NameNode和DataNode布局特性需要实现该接口
    */
   public interface LayoutFeature {
     public FeatureInfo getInfo();
   }
 
   /**
-   * Enums for features that change the layout version before rolling
-   * upgrade is supported.
+   * 布局特性枚举，定义所有会改变布局版本的特性，支持滚动升级前的版本管理
    * <br><br>
-   * To add a new layout version:
+   * 添加新布局版本步骤：
    * <ul>
-   * <li>Define a new enum constant with a short enum name, the new layout version 
-   * and description of the added feature.</li>
-   * <li>When adding a layout version with an ancestor that is not same as
-   * its immediate predecessor, use the constructor where a specific ancestor
-   * can be passed.
-   * </li>
+   * <li>定义新枚举常量，包含简短名称、新布局版本号和特性描述</li>
+   * <li>如果新版本的父版本不是直接前驱，使用可指定父版本的构造方法</li>
    * </ul>
    */
   public enum Feature implements LayoutFeature {
@@ -115,8 +104,8 @@ public class LayoutVersion {
         "block IDs in the edits log and image files"),
     EDITLOG_SUPPORT_RETRYCACHE(-47, "Record ClientId and CallId in editlog to " 
         + "enable rebuilding retry cache in case of HA failover"),
-    EDITLOG_ADD_BLOCK(-48, "Add new editlog that only records allocation of "
-        + "the new block instead of the entire block list"),
+    EDITLOG_ADD_BLOCK(-48, "Add new editlog that only records allocation of " +
+        "the new block instead of the entire block list"),
     ADD_DATANODE_AND_STORAGE_UUIDS(-49, "Replace StorageID with DatanodeUuid."
         + " Use distinct StorageUuid per storage directory."),
     ADD_LAYOUT_FLAGS(-50, "Add support for layout flags."),
@@ -130,22 +119,21 @@ public class LayoutVersion {
     private final FeatureInfo info;
 
     /**
-     * Feature that is added at layout version {@code lv} - 1. 
-     * @param lv new layout version with the addition of this feature
-     * @param description description of the feature
+     * 构造方法，在当前版本号减一引入的布局特性
+     * @param lv 新增该特性后的新布局版本
+     * @param description 特性描述
      */
     Feature(final int lv, final String description) {
       this(lv, lv + 1, description, false);
     }
 
     /**
-     * Feature that is added at layout version {@code ancestoryLV}.
-     * @param lv new layout version with the addition of this feature
-     * @param ancestorLV layout version from which the new lv is derived from.
-     * @param description description of the feature
-     * @param reserved true when this is a layout version reserved for previous
-     *        version
-     * @param features set of features that are to be enabled for this version
+     * 构造方法，从指定父版本派生的布局特性
+     * @param lv 新增该特性后的新布局版本
+     * @param ancestorLV 该版本派生自的父布局版本
+     * @param description 特性描述
+     * @param reserved 是否为旧版本预留的版本
+     * @param features 该版本需要启用的额外特性集合
      */
     Feature(final int lv, final int ancestorLV, final String description,
         boolean reserved, Feature... features) {
@@ -158,7 +146,9 @@ public class LayoutVersion {
     }
   }
   
-  /** Feature information. */
+  /**
+   * 布局特性信息类，存储单个布局特性的元数据
+   */
   public static class FeatureInfo {
     private final int lv;
     private final int ancestorLV;
@@ -184,37 +174,34 @@ public class LayoutVersion {
     }
     
     /** 
-     * Accessor method for feature layout version 
-     * @return int lv value
+     * 获取特性对应的布局版本
+     * @return 布局版本号
      */
     public int getLayoutVersion() {
       return lv;
     }
 
     /** 
-     * Accessor method for feature ancestor layout version 
-     * @return int ancestor LV value
+     * 获取父布局版本
+     * @return 父布局版本号
      */
     public int getAncestorLayoutVersion() {
       return ancestorLV;
     }
 
     /**
-     * Accessor method for feature minimum compatible layout version.  If the
-     * feature does not define a minimum compatible layout version, then this
-     * method returns the feature's own layout version.  This would indicate
-     * that the feature cannot provide compatibility with any prior layout
-     * version.
+     * 获取该特性最小兼容布局版本
+     * 如果未定义最小兼容版本，则返回特性自身版本，表示不兼容任何更早版本
      *
-     * @return int minimum compatible LV value
+     * @return 最小兼容布局版本号
      */
     public int getMinimumCompatibleLayoutVersion() {
       return minCompatLV != null ? minCompatLV : lv;
     }
 
     /**
-     * Accessor method for feature description 
-     * @return String feature description 
+     * 获取特性描述
+     * @return 特性描述字符串
      */
     public String getDescription() {
       return description;
@@ -229,6 +216,9 @@ public class LayoutVersion {
     }
   }
 
+  /**
+   * 布局特性比较器，按布局版本号排序
+   */
   static class LayoutFeatureComparator implements Comparator<LayoutFeature> {
     @Override
     public int compare(LayoutFeature arg0, LayoutFeature arg1) {
@@ -237,20 +227,27 @@ public class LayoutVersion {
     }
   }
  
+  /**
+   * 更新布局版本到特性集合的映射，构建每个布局版本支持的所有特性集合
+   * @param map 待更新的版本-特性集合映射
+   * @param features 需要添加的布局特性数组
+   */
   public static void updateMap(Map<Integer, SortedSet<LayoutFeature>> map,
       LayoutFeature[] features) {
-    // Go through all the enum constants and build a map of
-    // LayoutVersion <-> Set of all supported features in that LayoutVersion
+    // 收集已有的所有特性，用于顺序校验
     SortedSet<LayoutFeature> existingFeatures = new TreeSet<LayoutFeature>(
         new LayoutFeatureComparator());
     for (SortedSet<LayoutFeature> s : map.values()) {
       existingFeatures.addAll(s);
     }
+    // 前一个特性，用于校验最小兼容版本的顺序
     LayoutFeature prevF = existingFeatures.isEmpty() ? null :
         existingFeatures.first();
+    // 遍历所有待添加特性
     for (LayoutFeature f : features) {
       final FeatureInfo info = f.getInfo();
       int minCompatLV = info.getMinimumCompatibleLayoutVersion();
+      // 校验：特性必须按最小兼容版本升序排列
       if (prevF != null &&
           minCompatLV > prevF.getInfo().getMinimumCompatibleLayoutVersion()) {
         throw new AssertionError(String.format(
@@ -258,25 +255,33 @@ public class LayoutVersion {
             "version.  Check features %s and %s.", prevF, f));
       }
       prevF = f;
+      // 获取父版本对应的特性集合
       SortedSet<LayoutFeature> ancestorSet = map.get(info.getAncestorLayoutVersion());
       if (ancestorSet == null) {
-        // Empty set
+        // 父版本不存在，新建空集合
         ancestorSet = new TreeSet<LayoutFeature>(new LayoutFeatureComparator());
         map.put(info.getAncestorLayoutVersion(), ancestorSet);
       }
+      // 基于父版本集合创建新版本特性集合
       SortedSet<LayoutFeature> featureSet = new TreeSet<LayoutFeature>(ancestorSet);
+      // 添加当前版本指定的额外特性
       if (info.getSpecialFeatures() != null) {
         for (LayoutFeature specialFeature : info.getSpecialFeatures()) {
           featureSet.add(specialFeature);
         }
       }
+      // 添加当前特性
       featureSet.add(f);
+      // 将新版本特性集合存入映射
       map.put(info.getLayoutVersion(), featureSet);
     }
   }
   
   /**
-   * Gets formatted string that describes {@link LayoutVersion} information.
+   * 生成布局版本信息的格式化字符串，用于日志输出和展示
+   * @param map 版本到特性集合的映射
+   * @param values 所有布局特性数组
+   * @return 格式化后的布局版本信息字符串
    */
   public String getString(Map<Integer, SortedSet<LayoutFeature>> map,
       LayoutFeature[] values) {
@@ -299,11 +304,11 @@ public class LayoutVersion {
   }
   
   /**
-   * Returns true if a given feature is supported in the given layout version
-   * @param map layout feature map
-   * @param f Feature
-   * @param lv LayoutVersion
-   * @return true if {@code f} is supported in layout version {@code lv}
+   * 检查指定布局版本是否支持给定特性
+   * @param map 版本到特性集合的映射
+   * @param f 待检查的布局特性
+   * @param lv 目标布局版本
+   * @return true 如果指定版本支持该特性，否则false
    */
   public static boolean supports(Map<Integer, SortedSet<LayoutFeature>> map,
       final LayoutFeature f, final int lv) {
@@ -312,17 +317,18 @@ public class LayoutVersion {
   }
   
   /**
-   * Get the current layout version
+   * 获取当前最新的布局版本号
+   * @param features 所有布局特性数组
+   * @return 当前最新布局版本号
    */
   public static int getCurrentLayoutVersion(LayoutFeature[] features) {
     return getLastNonReservedFeature(features).getInfo().getLayoutVersion();
   }
 
   /**
-   * Gets the minimum compatible layout version.
-   *
-   * @param features all features to check
-   * @return minimum compatible layout version
+   * 获取当前版本最小兼容的布局版本号
+   * @param features 所有布局特性数组
+   * @return 最小兼容布局版本号
    */
   public static int getMinimumCompatibleLayoutVersion(
       LayoutFeature[] features) {
@@ -330,13 +336,20 @@ public class LayoutVersion {
         .getMinimumCompatibleLayoutVersion();
   }
 
+  /**
+   * 获取最后一个非预留的布局特性，用于获取当前最新版本信息
+   * @param features 所有布局特性数组
+   * @return 最后一个非预留布局特性
+   */
   static LayoutFeature getLastNonReservedFeature(LayoutFeature[] features) {
+    // 从后往前遍历，找到第一个非预留版本
     for (int i = features.length -1; i >= 0; i--) {
       final FeatureInfo info = features[i].getInfo();
       if (!info.isReservedForOldRelease()) {
         return features[i];
       }
     }
+    // 所有版本都是预留的，抛出断言错误
     throw new AssertionError("All layout versions are reserved.");
   }
 }

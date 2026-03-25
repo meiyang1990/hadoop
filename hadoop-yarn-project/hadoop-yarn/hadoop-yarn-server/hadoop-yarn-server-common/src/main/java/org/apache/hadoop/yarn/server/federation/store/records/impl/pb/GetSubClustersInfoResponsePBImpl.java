@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,30 +36,46 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterInfo;
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of {@link GetSubClustersInfoResponse}.
+ * 文件说明: YARN联邦环境下，获取子集群信息响应的Protobuf实现类
+ * 基于Protocol Buffer实现{@link GetSubClustersInfoResponse}接口。
  */
 @Private
 @Unstable
 public class GetSubClustersInfoResponsePBImpl
     extends GetSubClustersInfoResponse {
 
+  // Protobuf消息对象
   private GetSubClustersInfoResponseProto proto =
       GetSubClustersInfoResponseProto.getDefaultInstance();
+  // Protobuf构建器
   private GetSubClustersInfoResponseProto.Builder builder = null;
+  // 标识当前是否通过proto对象存储数据
   private boolean viaProto = false;
 
+  // 缓存的子集群信息列表
   private List<SubClusterInfo> subClusterInfos;
 
+  /**
+   * 构造函数，初始化一个空的构建器。
+   */
   public GetSubClustersInfoResponsePBImpl() {
     builder = GetSubClustersInfoResponseProto.newBuilder();
   }
 
+  /**
+   * 构造函数，基于已有proto对象构造实现。
+   * @param proto 已构造好的proto对象
+   */
   public GetSubClustersInfoResponsePBImpl(
       GetSubClustersInfoResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前响应对应的proto对象，合并本地缓存数据后返回。
+   * @return 构建完成的proto对象
+   */
   public GetSubClustersInfoResponseProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -66,12 +83,18 @@ public class GetSubClustersInfoResponsePBImpl
     return proto;
   }
 
+  /**
+   * 将本地缓存的子集群信息合并到proton构建器中。
+   */
   private void mergeLocalToBuilder() {
     if (this.subClusterInfos != null) {
       addSubClusterInfosToProto();
     }
   }
 
+  /**
+   * 将本地缓存数据合并到proto对象。
+   */
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -81,6 +104,9 @@ public class GetSubClustersInfoResponsePBImpl
     viaProto = true;
   }
 
+  /**
+   * 如果当前是proto模式，初始化构建器。
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = GetSubClustersInfoResponseProto.newBuilder(proto);
@@ -104,6 +130,9 @@ public class GetSubClustersInfoResponsePBImpl
     addSubClusterInfosToProto();
   }
 
+  /**
+   * 从proto对象中懒加载初始化子集群信息列表。
+   */
   private void initSubClustersInfoList() {
     if (this.subClusterInfos != null) {
       return;
@@ -117,6 +146,9 @@ public class GetSubClustersInfoResponsePBImpl
     }
   }
 
+  /**
+   * 将本地缓存的子集群信息写入proto构建器。
+   */
   private void addSubClusterInfosToProto() {
     maybeInitBuilder();
     builder.clearSubClusterInfos();
@@ -155,10 +187,20 @@ public class GetSubClustersInfoResponsePBImpl
     builder.addAllSubClusterInfos(iterable);
   }
 
+  /**
+   * 将业务对象转换为proto格式。
+   * @param r 业务层子集群信息对象
+   * @return proto格式子集群信息
+   */
   private SubClusterInfoProto convertToProtoFormat(SubClusterInfo r) {
     return ((SubClusterInfoPBImpl) r).getProto();
   }
 
+  /**
+   * 将proto格式转换为业务对象。
+   * @param r proto格式子集群信息
+   * @return 业务层子集群信息对象
+   */
   private SubClusterInfoPBImpl convertFromProtoFormat(SubClusterInfoProto r) {
     return new SubClusterInfoPBImpl(r);
   }

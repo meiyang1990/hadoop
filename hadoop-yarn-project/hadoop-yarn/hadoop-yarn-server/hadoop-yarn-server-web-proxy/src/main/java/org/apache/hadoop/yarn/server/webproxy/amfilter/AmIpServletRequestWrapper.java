@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -23,9 +24,18 @@ import java.security.Principal;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 
+/**
+ * YARN Web代理AM过滤器请求包装器，封装已认证的用户Principal信息
+ * 用于在Web代理请求中注入ApplicationMaster认证后的用户信息
+ */
 public class AmIpServletRequestWrapper extends HttpServletRequestWrapper {
   private final AmIpPrincipal principal;
 
+  /**
+   * 构造请求包装器，注入自定义Principal
+   * @param request 原始Http请求
+   * @param principal 已认证的AM请求Principal
+   */
   public AmIpServletRequestWrapper(HttpServletRequest request, 
       AmIpPrincipal principal) {
     super(request);

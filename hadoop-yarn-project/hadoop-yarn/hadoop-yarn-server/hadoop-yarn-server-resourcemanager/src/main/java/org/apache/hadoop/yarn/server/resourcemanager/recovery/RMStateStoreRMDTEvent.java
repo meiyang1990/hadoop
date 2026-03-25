@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,14 +21,30 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
 
+/**
+ * RM状态存储中关于RM委托令牌的事件类，
+ * 用于持久化存储委托令牌更新/删除等状态变更事件，支持ResourceManager故障恢复
+ */
 public class RMStateStoreRMDTEvent extends RMStateStoreEvent {
+  // RM委托令牌标识符
   private RMDelegationTokenIdentifier rmDTIdentifier;
+  // 令牌更新到期时间
   private Long renewDate;
 
+  /**
+   * 构造RM委托令牌状态存储事件
+   * @param type 事件类型
+   */
   public RMStateStoreRMDTEvent(RMStateStoreEventType type) {
     super(type);
   }
 
+  /**
+   * 构造包含完整委托令牌信息的状态存储事件
+   * @param rmDTIdentifier RM委托令牌标识符
+   * @param renewDate 令牌更新到期时间
+   * @param type 事件类型
+   */
   public RMStateStoreRMDTEvent(RMDelegationTokenIdentifier rmDTIdentifier,
       Long renewDate, RMStateStoreEventType type) {
     this(type);
@@ -35,10 +52,18 @@ public class RMStateStoreRMDTEvent extends RMStateStoreEvent {
     this.renewDate = renewDate;
   }
 
+  /**
+   * 获取RM委托令牌标识符
+   * @return RM委托令牌标识符
+   */
   public RMDelegationTokenIdentifier getRmDTIdentifier() {
     return rmDTIdentifier;
   }
 
+  /**
+   * 获取令牌更新到期时间
+   * @return 令牌更新到期时间戳
+   */
   public Long getRenewDate() {
     return renewDate;
   }

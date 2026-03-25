@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,8 +29,8 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * {@link CapacityScheduler} configuration provider based on local
- * {@code capacity-scheduler.xml} file.
+ * 基于本地capacity-scheduler.xml文件的容量调度器配置提供器，
+ * 从本地配置文件加载容量调度器的队列配置。
  */
 public class FileBasedCSConfigurationProvider implements
     CSConfigurationProvider {
@@ -37,8 +38,8 @@ public class FileBasedCSConfigurationProvider implements
   private RMContext rmContext;
 
   /**
-   * Construct file based CS configuration provider with given context.
-   * @param rmContext the RM context
+   * 构造基于文件的容量调度器配置提供器，绑定RM上下文
+   * @param rmContext ResourceManager上下文对象
    */
   public FileBasedCSConfigurationProvider(RMContext rmContext) {
     this.rmContext = rmContext;
@@ -47,18 +48,27 @@ public class FileBasedCSConfigurationProvider implements
   @Override
   public void init(Configuration conf) {}
 
+  /**
+   * 从本地配置文件加载容量调度器配置
+   * @param conf 基础YARN配置对象
+   * @return 加载完成的容量调度器配置对象
+   * @throws IOException 加载配置过程中发生IO异常时抛出
+   */
   @Override
   public CapacitySchedulerConfiguration loadConfiguration(Configuration conf)
       throws IOException {
     try {
+      // 从RM配置提供器获取容量调度器配置文件输入流
       InputStream csInputStream =
           this.rmContext.getConfigurationProvider()
               .getConfigurationInputStream(conf,
                   YarnConfiguration.CS_CONFIGURATION_FILE);
+      // 如果找到配置文件，将其添加到配置中并返回实例
       if (csInputStream != null) {
         conf.addResource(csInputStream);
         return new CapacitySchedulerConfiguration(conf, false);
       }
+      // 未找到配置文件，使用默认配置创建实例
       return new CapacitySchedulerConfiguration(conf, true);
     } catch (Exception e) {
       throw new IOException(e);

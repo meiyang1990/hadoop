@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,24 +19,25 @@
 package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 
 /**
- * Interface which has to be implemented for encoding and decoding row keys and
- * columns.
+ * HBase时间线存储键转换器接口，定义行键和列的编解码规范，
+ * 用于将自定义类型数据转换为HBase存储所需的字节数组，反之亦然。
+ *
+ * @param <T> 需要编解码的键类型
  */
 public interface KeyConverter<T> {
   /**
-   * Encodes a key as a byte array.
+   * 将指定键编码为字节数组，用于存储到HBase。
    *
-   * @param key key to be encoded.
-   * @return a byte array.
+   * @param key 待编码的键对象
+   * @return 编码后的字节数组
    */
   byte[] encode(T key);
 
   /**
-   * Decodes a byte array and returns a key of type T.
+   * 将字节数组解码为指定类型的键对象。
    *
-   * @param bytes byte representation
-   * @return an object(key) of type T which has been constructed after decoding
-   * the bytes.
+   * @param bytes 待解码的HBase字节数据
+   * @return 解码后的键对象
    */
   T decode(byte[] bytes);
 }

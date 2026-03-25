@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,9 +46,8 @@ import java.util.Set;
 import java.util.Base64;
 
 /**
- * A Router specific delegation token secret manager.
- * The secret manager is responsible for generating and accepting the password
- * for each token.
+ * Router 专用的代理令牌密钥管理器，负责生成和验证代理令牌密码，
+ * 将密钥和令牌信息持久化存储到联邦状态存储中，支持联邦集群多Router共享认证信息。
  */
 public class RouterDelegationTokenSecretManager
     extends AbstractDelegationTokenSecretManager<RMDelegationTokenIdentifier> {
@@ -55,19 +55,17 @@ public class RouterDelegationTokenSecretManager
   private static final Logger LOG = LoggerFactory
       .getLogger(RouterDelegationTokenSecretManager.class);
 
+  // 联邦状态存储门面，提供对状态存储的高层访问接口
   private FederationStateStoreFacade federationFacade;
 
   /**
-   * Create a Router Secret manager.
+   * 构造Router代理令牌密钥管理器。
    *
-   * @param delegationKeyUpdateInterval        the number of milliseconds for rolling
-   *                                           new secret keys.
-   * @param delegationTokenMaxLifetime         the maximum lifetime of the delegation
-   *                                           tokens in milliseconds
-   * @param delegationTokenRenewInterval       how often the tokens must be renewed
-   *                                           in milliseconds
-   * @param delegationTokenRemoverScanInterval how often the tokens are scanned
-   * @param conf Configuration.
+   * @param delegationKeyUpdateInterval        滚动生成新密钥的间隔毫秒数
+   * @param delegationTokenMaxLifetime         代理令牌最大生命周期毫秒数
+   * @param delegationTokenRenewInterval       代理令牌必须更新的间隔毫秒数
+   * @param delegationTokenRemoverScanInterval 过期令牌扫描间隔毫秒数
+   * @param conf 配置对象
    */
   public RouterDelegationTokenSecretManager(long delegationKeyUpdateInterval,
       long delegationTokenMaxLifetime, long delegationTokenRenewInterval,
@@ -82,33 +80,34 @@ public class RouterDelegationTokenSecretManager
     return new RMDelegationTokenIdentifier();
   }
 
+  /**
+   * 判断异常是否为停止服务时的中断异常，可以忽略。
+   * @param e 捕获的异常
+   * @return 是否可以忽略该异常
+   */
   private boolean shouldIgnoreException(Exception e) {
     return !running && e.getCause() instanceof InterruptedException;
   }
 
   /**
-   * The Router Supports Store the New Master Key.
-   * During this Process, Facade will call the specific StateStore to store the MasterKey.
-   *
-   * @param newKey DelegationKey
+   * 将新生成的主密钥存储到联邦状态存储。
    */
   @Override
   public void storeNewMasterKey(DelegationKey newKey) {
     try {
+      // 通过门面存储新主密钥
       federationFacade.storeNewMasterKey(newKey);
     } catch (Exception e) {
       if (!shouldIgnoreException(e)) {
         LOG.error("Error in storing master key with KeyID: {}.", newKey.getKeyId());
+        // 存储失败直接终止进程
         ExitUtil.terminate(1, e);
       }
     }
   }
 
   /**
-   * The Router Supports Remove the master key.
-   * During this Process, Facade will call the specific StateStore to remove the MasterKey.
-   *
-   * @param delegationKey DelegationKey
+   * 从联邦状态存储删除指定主密钥。
    */
   @Override
   public void removeStoredMasterKey(DelegationKey delegationKey) {
@@ -123,11 +122,7 @@ public class RouterDelegationTokenSecretManager
   }
 
   /**
-   * The Router Supports Store new Token.
-   *
-   * @param identifier RMDelegationToken
-   * @param renewDate renewDate
-   * @throws IOException IO exception occurred.
+   * 将新代理令牌存储到联邦状态存储。
    */
   @Override
   public void storeNewToken(RMDelegationTokenIdentifier identifier,
@@ -144,14 +139,15 @@ public class RouterDelegationTokenSecretManager
   }
 
   /**
-   * The Router Supports Store new Token.
+   * 将包含完整令牌信息的新代理令牌存储到联邦状态存储。
    *
-   * @param identifier RMDelegationToken.
-   * @param tokenInfo DelegationTokenInformation.
+   * @param identifier RM代理令牌标识符
+   * @param tokenInfo 代理令牌信息
    */
   public void storeNewToken(RMDelegationTokenIdentifier identifier,
       DelegationTokenInformation tokenInfo) {
     try {
+      // 编码令牌信息为字符串
       String token =
           RouterDelegationTokenSupport.encodeDelegationTokenInformation(tokenInfo);
       long renewDate = tokenInfo.getRenewDate();
@@ -167,11 +163,7 @@ public class RouterDelegationTokenSecretManager
   }
 
   /**
-   * The Router Supports Update Token.
-   *
-   * @param id RMDelegationToken
-   * @param renewDate renewDate
-   * @throws IOException IO exception occurred
+   * 更新联邦状态存储中已有代理令牌的更新时间。
    */
   @Override
   public void updateStoredToken(RMDelegationTokenIdentifier id, long renewDate) throws IOException {
@@ -187,15 +179,16 @@ public class RouterDelegationTokenSecretManager
   }
 
   /**
-   * The Router Supports Update Token.
+   * 更新联邦状态存储中已有代理令牌的完整信息。
    *
-   * @param identifier RMDelegationToken.
-   * @param tokenInfo DelegationTokenInformation.
+   * @param identifier RM代理令牌标识符
+   * @param tokenInfo 更新后的代理令牌信息
    */
   public void updateStoredToken(RMDelegationTokenIdentifier identifier,
       DelegationTokenInformation tokenInfo) {
     try {
       long renewDate = tokenInfo.getRenewDate();
+      // 重新编码令牌信息
       String token = RouterDelegationTokenSupport.encodeDelegationTokenInformation(tokenInfo);
       federationFacade.updateStoredToken(identifier, renewDate, token);
     } catch (Exception e) {
@@ -208,10 +201,7 @@ public class RouterDelegationTokenSecretManager
   }
 
   /**
-   * The Router Supports Remove Token.
-   *
-   * @param identifier Delegation Token
-   * @throws IOException IO exception occurred.
+   * 从联邦状态存储删除指定代理令牌。
    */
   @Override
   public void removeStoredToken(RMDelegationTokenIdentifier identifier) throws IOException {
@@ -227,13 +217,12 @@ public class RouterDelegationTokenSecretManager
   }
 
   /**
-   * The Router supports obtaining the DelegationKey stored in the Router StateStote
-   * according to the DelegationKey.
+   * 根据指定密钥信息从联邦状态存储获取完整主密钥。
    *
-   * @param key Param DelegationKey
-   * @return Delegation Token
-   * @throws YarnException An internal conversion error occurred when getting the Token
-   * @throws IOException IO exception occurred
+   * @param key 待查询的主密钥信息
+   * @return 完整的主密钥对象
+   * @throws YarnException 获取过程中YARN内部错误
+   * @throws IOException 获取过程中IO错误
    */
   public DelegationKey getMasterKeyByDelegationKey(DelegationKey key)
       throws YarnException, IOException {
@@ -241,8 +230,10 @@ public class RouterDelegationTokenSecretManager
       RouterMasterKeyResponse response = federationFacade.getMasterKeyByDelegationKey(key);
       RouterMasterKey masterKey = response.getRouterMasterKey();
       ByteBuffer keyByteBuf = masterKey.getKeyBytes();
+      // 读取字节数组
       byte[] keyBytes = new byte[keyByteBuf.remaining()];
       keyByteBuf.get(keyBytes);
+      // 构造返回完整DelegationKey对象
       DelegationKey delegationKey =
           new DelegationKey(masterKey.getKeyId(), masterKey.getExpiryDate(), keyBytes);
       return delegationKey;
@@ -254,12 +245,12 @@ public class RouterDelegationTokenSecretManager
   }
 
   /**
-   * Get RMDelegationTokenIdentifier according to RouterStoreToken.
+   * 根据令牌标识符从联邦状态存储获取完整RM代理令牌标识符。
    *
-   * @param identifier RMDelegationTokenIdentifier
-   * @return RMDelegationTokenIdentifier
-   * @throws YarnException An internal conversion error occurred when getting the Token
-   * @throws IOException IO exception occurred
+   * @param identifier 待查询的令牌标识符
+   * @return 完整的RM代理令牌标识符
+   * @throws YarnException 获取过程中YARN内部错误
+   * @throws IOException 获取过程中IO错误
    */
   public RMDelegationTokenIdentifier getTokenByRouterStoreToken(
       RMDelegationTokenIdentifier identifier) throws YarnException, IOException {
@@ -273,6 +264,10 @@ public class RouterDelegationTokenSecretManager
     }
   }
 
+  /**
+   * 设置联邦状态存储门面，用于测试注入。
+   * @param federationFacade 要设置的门面实例
+   */
   public void setFederationFacade(FederationStateStoreFacade federationFacade) {
     this.federationFacade = federationFacade;
   }
@@ -302,6 +297,12 @@ public class RouterDelegationTokenSecretManager
     return allTokens;
   }
 
+  /**
+   * 获取指定令牌的更新日期。
+   * @param ident 令牌标识符
+   * @return 更新日期毫秒时间戳
+   * @throws InvalidToken 令牌不存在于缓存时抛出
+   */
   public long getRenewDate(RMDelegationTokenIdentifier ident)
       throws InvalidToken {
     DelegationTokenInformation info = currentTokens.get(ident);
@@ -314,39 +315,47 @@ public class RouterDelegationTokenSecretManager
 
   @Override
   protected synchronized int incrementDelegationTokenSeqNum() {
+    // 代理令牌序列号递增操作交由状态存储处理，保证全局唯一
     return federationFacade.incrementDelegationTokenSeqNum();
   }
 
   @Override
   protected void storeToken(RMDelegationTokenIdentifier rmDelegationTokenIdentifier,
       DelegationTokenInformation tokenInfo) throws IOException {
+    // 先存入本地缓存
     this.currentTokens.put(rmDelegationTokenIdentifier, tokenInfo);
+    // 更新用户令牌统计
     this.addTokenForOwnerStats(rmDelegationTokenIdentifier);
+    // 持久化到状态存储
     storeNewToken(rmDelegationTokenIdentifier, tokenInfo);
   }
 
   @Override
   protected void updateToken(RMDelegationTokenIdentifier rmDelegationTokenIdentifier,
       DelegationTokenInformation tokenInfo) throws IOException {
+    // 更新本地缓存
     this.currentTokens.put(rmDelegationTokenIdentifier, tokenInfo);
+    // 更新持久化存储
     updateStoredToken(rmDelegationTokenIdentifier, tokenInfo);
   }
 
   @Override
   protected DelegationTokenInformation getTokenInfo(
       RMDelegationTokenIdentifier ident) {
-    // First check if I have this..
+    // 先查询本地缓存
     DelegationTokenInformation tokenInfo = currentTokens.get(ident);
     if (tokenInfo == null) {
       try {
+        // 本地缓存未命中，从状态存储加载
         RouterRMTokenResponse response = federationFacade.getTokenByRouterStoreToken(ident);
         RouterStoreToken routerStoreToken = response.getRouterStoreToken();
         String tokenStr = routerStoreToken.getTokenInfo();
+        // Base64解码得到字节数组
         byte[] tokenBytes = Base64.getUrlDecoder().decode(tokenStr);
+        // 反序列化得到令牌信息
         tokenInfo = RouterDelegationTokenSupport.decodeDelegationTokenInformation(tokenBytes);
       } catch (Exception e) {
-        LOG.error("Error retrieving tokenInfo [" + ident.getSequenceNumber()
-            + "] from StateStore.", e);
+        LOG.error("Error retrieving tokenInfo [{}] from StateStore.", ident.getSequenceNumber(), e);
         throw new YarnRuntimeException(e);
       }
     }
@@ -355,21 +364,25 @@ public class RouterDelegationTokenSecretManager
 
   @Override
   protected synchronized int getDelegationTokenSeqNum() {
+    // 从状态存储获取当前最大代理令牌序列号
     return federationFacade.getDelegationTokenSeqNum();
   }
 
   @Override
   protected synchronized void setDelegationTokenSeqNum(int seqNum) {
+    // 更新状态存储中的代理令牌序列号
     federationFacade.setDelegationTokenSeqNum(seqNum);
   }
 
   @Override
   protected synchronized int getCurrentKeyId() {
+    // 从状态存储获取当前主密钥ID
     return federationFacade.getCurrentKeyId();
   }
 
   @Override
   protected synchronized int incrementCurrentKeyId() {
+    // 主密钥ID递增，由状态存储保证一致性
     return federationFacade.incrementCurrentKeyId();
   }
 }

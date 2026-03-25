@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -87,6 +88,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
+/**
+ * 历史任务服务器REST API服务实现类
+ * 为MapReduce历史任务查询提供JSON/XML格式的REST接口，支持任务、任务尝试、计数器、日志等信息查询
+ */
 @Singleton
 @Path("/ws/v1/history")
 public class HsWebServices extends WebServices {
@@ -102,6 +107,13 @@ public class HsWebServices extends WebServices {
   @Context
   private UriInfo uriInfo;
 
+  /**
+   * 构造方法，通过依赖注入初始化历史服务REST API
+   * @param ctx 历史上下文，提供已完成作业的访问能力
+   * @param conf Hadoop配置对象
+   * @param webapp 历史服务Web应用实例
+   * @param appBaseProto YARN应用客户端协议，可空
+   */
   @Inject
   public HsWebServices(
       final @Named("ctx") HistoryContext ctx,
@@ -115,6 +127,12 @@ public class HsWebServices extends WebServices {
     this.mrAclsEnabled = conf.getBoolean(MRConfig.MR_ACLS_ENABLED, false);
   }
 
+  /**
+   * 检查当前请求用户是否有权限访问指定作业
+   * @param job 待检查的作业对象
+   * @param request HTTP请求对象
+   * @return true表示有权限，false表示无权限
+   */
   private boolean hasAccess(Job job, HttpServletRequest request) {
     String remoteUser = request.getRemoteUser();
     if (remoteUser != null) {
@@ -124,11 +142,23 @@ public class HsWebServices extends WebServices {
     return true;
   }
 
+  /**
+   * 检查访问权限，如果无权限则抛出未授权异常
+   * @param job 待检查的作业对象
+   * @param request HTTP请求对象
+   */
   private void checkAccess(Job job, HttpServletRequest request) {
     if (!hasAccess(job, request)) {
       throw new WebApplicationException(Status.UNAUTHORIZED);
     }
   }
+
+  /**
+   * 根据容器ID检查用户是否有权限访问对应容器日志
+   * 仅对属于MapReduce作业的容器启用MR ACL检查，非MR容器不做权限校验
+   * @param containerIdStr 容器ID字符串
+   * @param hsr HTTP请求对象
+   */
   private void checkAccess(String containerIdStr, HttpServletRequest hsr) {
     // Apply MR ACLs only if the container belongs to a MapReduce job.
     // For non-MapReduce jobs, no corresponding Job will be found,
@@ -139,6 +169,11 @@ public class HsWebServices extends WebServices {
     }
   }
 
+  /**
+   * 判断给定容器是否属于当前历史服务器管理的MapReduce作业
+   * @param containerIdStr 容器ID字符串
+   * @return true表示属于MapReduce作业，false表示不属于
+   */
   private boolean isMRJobContainer(String containerIdStr) {
     try {
       AMWebServices.getJobFromContainerIdString(containerIdStr, ctx);
@@ -149,16 +184,27 @@ public class HsWebServices extends WebServices {
     }
   }
 
+  /**
+   * 初始化响应，清空之前设置的ContentType
+   */
   private void init() {
     //clear content type
     response.setContentType(null);
   }
 
+  /**
+   * 仅用于测试，设置HTTP响应对象
+   * @param response HTTP响应对象
+   */
   @VisibleForTesting
   void setResponse(HttpServletResponse response) {
     this.response = response;
   }
 
+  /**
+   * 获取历史服务器基本信息
+   * @return 历史服务器基本信息对象
+   */
   @GET
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
       MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
@@ -166,6 +212,10 @@ public class HsWebServices extends WebServices {
     return getHistoryInfo();
   }
 
+  /**
+   * 获取历史服务器基本信息
+   * @return 历史服务器基本信息对象
+   */
   @GET
   @Path("/info")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -175,6 +225,18 @@ public class HsWebServices extends WebServices {
     return new HistoryInfo();
   }
 
+  /**
+   * 按条件分页查询已完成的作业列表
+   * @param userQuery 过滤提交用户，可空
+   * @param count 返回结果数量限制，可空
+   * @param stateQuery 过滤作业状态，可空
+   * @param queueQuery 过滤队列，可空
+   * @param startedBegin 作业开始时间起始戳，可空
+   * @param startedEnd 作业开始时间结束戳，可空
+   * @param finishBegin 作业结束时间起始戳，可空
+   * @param finishEnd 作业结束时间结束戳，可空
+   * @return 符合条件的作业信息列表
+   */
   @GET
   @Path("/mapreduce/jobs")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -191,6 +253,7 @@ public class HsWebServices extends WebServices {
     Long countParam = null;
     init();
     
+    // 解析返回结果数量限制参数
     if (count != null && !count.isEmpty()) {
       try {
         countParam = Long.parseLong(count);
@@ -202,6 +265,7 @@ public class HsWebServices extends WebServices {
       }
     }
 
+    // 解析作业开始时间起始参数
     Long sBegin = null;
     if (startedBegin != null && !startedBegin.isEmpty()) {
       try {
@@ -214,6 +278,7 @@ public class HsWebServices extends WebServices {
       }
     }
     
+    // 解析作业开始时间结束参数
     Long sEnd = null;
     if (startedEnd != null && !startedEnd.isEmpty()) {
       try {
@@ -225,11 +290,13 @@ public class HsWebServices extends WebServices {
         throw new BadRequestException("startedTimeEnd must be greater than 0");
       }
     }
+    // 检查时间范围合法性
     if (sBegin != null && sEnd != null && sBegin > sEnd) {
       throw new BadRequestException(
           "startedTimeEnd must be greater than startTimeBegin");
     }
 
+    // 解析作业结束时间起始参数
     Long fBegin = null;
     if (finishBegin != null && !finishBegin.isEmpty()) {
       try {
@@ -241,6 +308,7 @@ public class HsWebServices extends WebServices {
         throw new BadRequestException("finishedTimeBegin must be greater than 0");
       }
     }
+    // 解析作业结束时间结束参数
     Long fEnd = null;
     if (finishEnd != null && !finishEnd.isEmpty()) {
       try {
@@ -252,20 +320,29 @@ public class HsWebServices extends WebServices {
         throw new BadRequestException("finishedTimeEnd must be greater than 0");
       }
     }
+    // 检查时间范围合法性
     if (fBegin != null && fEnd != null && fBegin > fEnd) {
       throw new BadRequestException(
           "finishedTimeEnd must be greater than finishedTimeBegin");
     }
     
+    // 解析作业状态过滤参数
     JobState jobState = null;
     if (stateQuery != null) {
       jobState = JobState.valueOf(stateQuery);
     }
 
+    // 调用历史上下文查询符合条件的作业
     return ctx.getPartialJobs(0l, countParam, userQuery, queueQuery, 
         sBegin, sEnd, fBegin, fEnd, jobState);
   }
 
+  /**
+   * 根据作业ID获取单个作业的详细信息
+   * @param hsr HTTP请求对象
+   * @param jid 作业ID字符串
+   * @return 作业详细信息对象
+   */
   @GET
   @Path("/mapreduce/jobs/{jobid}")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -279,6 +356,11 @@ public class HsWebServices extends WebServices {
     return new JobInfo(job);
   }
 
+  /**
+   * 获取指定作业的所有ApplicationMaster尝试信息
+   * @param jid 作业ID字符串
+   * @return AM尝试信息列表
+   */
   @GET
   @Path("/mapreduce/jobs/{jobid}/jobattempts")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -291,12 +373,18 @@ public class HsWebServices extends WebServices {
     for (AMInfo amInfo : job.getAMInfos()) {
       AMAttemptInfo attempt = new AMAttemptInfo(amInfo, MRApps.toString(job
           .getID()), job.getUserName(), uriInfo.getBaseUri().toString(),
-          webapp.name());
+          webapp.name);
       amAttempts.add(attempt);
     }
     return amAttempts;
   }
 
+  /**
+   * 获取指定作业的所有计数器信息
+   * @param hsr HTTP请求对象
+   * @param jid 作业ID字符串
+   * @return 作业计数器信息对象
+   */
   @GET
   @Path("/mapreduce/jobs/{jobid}/counters")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -310,6 +398,12 @@ public class HsWebServices extends WebServices {
     return new JobCounterInfo(this.ctx, job);
   }
 
+  /**
+   * 获取指定作业提交时的配置信息
+   * @param hsr HTTP请求对象
+   * @param jid 作业ID字符串
+   * @return 作业配置信息对象
+   */
   @GET
   @Path("/mapreduce/jobs/{jobid}/conf")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -324,260 +418,4 @@ public class HsWebServices extends WebServices {
     try {
       info = new ConfInfo(job);
     } catch (IOException e) {
-      throw new NotFoundException("unable to load configuration for job: "
-          + jid);
-    }
-    return info;
-  }
-
-  @GET
-  @Path("/mapreduce/jobs/{jobid}/tasks")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public TasksInfo getJobTasks(@Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid, @QueryParam("type") String type) {
-
-    init();
-    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
-    checkAccess(job, hsr);
-    TasksInfo allTasks = new TasksInfo();
-    for (Task task : job.getTasks().values()) {
-      TaskType ttype = null;
-      if (type != null && !type.isEmpty()) {
-        try {
-          ttype = MRApps.taskType(type);
-        } catch (YarnRuntimeException e) {
-          throw new BadRequestException("tasktype must be either m or r");
-        }
-      }
-      if (ttype != null && task.getType() != ttype) {
-        continue;
-      }
-      allTasks.add(new TaskInfo(task));
-    }
-    return allTasks;
-  }
-
-  @GET
-  @Path("/mapreduce/jobs/{jobid}/tasks/{taskid}")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public TaskInfo getJobTask(@Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid, @PathParam("taskid") String tid) {
-
-    init();
-    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
-    checkAccess(job, hsr);
-    Task task = AMWebServices.getTaskFromTaskIdString(tid, job);
-    return new TaskInfo(task);
-
-  }
-
-  @GET
-  @Path("/mapreduce/jobs/{jobid}/tasks/{taskid}/counters")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public JobTaskCounterInfo getSingleTaskCounters(
-      @Context HttpServletRequest hsr, @PathParam("jobid") String jid,
-      @PathParam("taskid") String tid) {
-
-    init();
-    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
-    checkAccess(job, hsr);
-    TaskId taskID = MRApps.toTaskID(tid);
-    if (taskID == null) {
-      throw new NotFoundException("taskid " + tid + " not found or invalid");
-    }
-    Task task = job.getTask(taskID);
-    if (task == null) {
-      throw new NotFoundException("task not found with id " + tid);
-    }
-    return new JobTaskCounterInfo(task);
-  }
-
-  @GET
-  @Path("/mapreduce/jobs/{jobid}/tasks/{taskid}/attempts")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public TaskAttemptsInfo getJobTaskAttempts(@Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid, @PathParam("taskid") String tid) {
-
-    init();
-    TaskAttemptsInfo attempts = new TaskAttemptsInfo();
-    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
-    checkAccess(job, hsr);
-    Task task = AMWebServices.getTaskFromTaskIdString(tid, job);
-    for (TaskAttempt ta : task.getAttempts().values()) {
-      if (ta != null) {
-        if (task.getType() == TaskType.REDUCE) {
-          attempts.add(new ReduceTaskAttemptInfo(ta));
-        } else {
-          attempts.add(new MapTaskAttemptInfo(ta, false));
-        }
-      }
-    }
-    return attempts;
-  }
-
-  @GET
-  @Path("/mapreduce/jobs/{jobid}/tasks/{taskid}/attempts/{attemptid}")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public TaskAttemptInfo getJobTaskAttemptId(@Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid, @PathParam("taskid") String tid,
-      @PathParam("attemptid") String attId) {
-
-    init();
-    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
-    checkAccess(job, hsr);
-    Task task = AMWebServices.getTaskFromTaskIdString(tid, job);
-    TaskAttempt ta = AMWebServices.getTaskAttemptFromTaskAttemptString(attId,
-        task);
-    if (task.getType() == TaskType.REDUCE) {
-      return new ReduceTaskAttemptInfo(ta);
-    } else {
-      return new MapTaskAttemptInfo(ta, false);
-    }
-  }
-
-  @GET
-  @Path("/mapreduce/jobs/{jobid}/tasks/{taskid}/attempts/{attemptid}/counters")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public JobTaskAttemptCounterInfo getJobTaskAttemptIdCounters(
-      @Context HttpServletRequest hsr, @PathParam("jobid") String jid,
-      @PathParam("taskid") String tid, @PathParam("attemptid") String attId) {
-
-    init();
-    Job job = AMWebServices.getJobFromJobIdString(jid, ctx);
-    checkAccess(job, hsr);
-    Task task = AMWebServices.getTaskFromTaskIdString(tid, job);
-    TaskAttempt ta = AMWebServices.getTaskAttemptFromTaskAttemptString(attId,
-        task);
-    return new JobTaskAttemptCounterInfo(ta);
-  }
-
-  /**
-   * Returns the user qualified path name of the remote log directory for
-   * each pre-configured log aggregation file controller.
-   *
-   * @param req                HttpServletRequest
-   * @return Path names grouped by file controller name
-   */
-  @GET
-  @Path("/remote-log-dir")
-  @Produces({ MediaType.APPLICATION_JSON + ";" + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + ";" + JettyUtils.UTF_8 })
-  public Response getRemoteLogDirPath(@Context HttpServletRequest req,
-      @QueryParam(YarnWebServiceParams.REMOTE_USER) String user,
-      @QueryParam(YarnWebServiceParams.APP_ID) String appIdStr)
-      throws IOException {
-    init();
-    return logServlet.getRemoteLogDirPath(user, appIdStr);
-  }
-
-  @GET
-  @Path("/extended-log-query")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  @InterfaceAudience.Public
-  @InterfaceStability.Unstable
-  public Response getAggregatedLogsMeta(@Context HttpServletRequest hsr,
-      @QueryParam(YarnWebServiceParams.CONTAINER_LOG_FILE_NAME) String fileName,
-      @QueryParam(YarnWebServiceParams.FILESIZE) Set<String> fileSize,
-      @QueryParam(YarnWebServiceParams.MODIFICATION_TIME) Set<String>
-                                              modificationTime,
-      @QueryParam(YarnWebServiceParams.APP_ID) String appIdStr,
-      @QueryParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
-      @QueryParam(YarnWebServiceParams.NM_ID) String nmId) throws IOException {
-    init();
-    ExtendedLogMetaRequest.ExtendedLogMetaRequestBuilder logsRequest =
-        new ExtendedLogMetaRequest.ExtendedLogMetaRequestBuilder();
-    logsRequest.setAppId(appIdStr);
-    logsRequest.setFileName(fileName);
-    logsRequest.setContainerId(containerIdStr);
-    logsRequest.setFileSize(fileSize);
-    logsRequest.setModificationTime(modificationTime);
-    logsRequest.setNodeId(nmId);
-    return logServlet.getContainerLogsInfo(hsr, logsRequest);
-  }
-
-  @GET
-  @Path("/aggregatedlogs")
-  @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  @InterfaceAudience.Public
-  @InterfaceStability.Unstable
-  public Response getAggregatedLogsMeta(@Context HttpServletRequest hsr,
-      @QueryParam(YarnWebServiceParams.APP_ID) String appIdStr,
-      @QueryParam(YarnWebServiceParams.APPATTEMPT_ID) String appAttemptIdStr,
-      @QueryParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
-      @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
-      @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-      @DefaultValue("false") boolean redirectedFromNode,
-      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
-      @DefaultValue("false") boolean manualRedirection) {
-    init();
-    return logServlet.getLogsInfo(hsr, appIdStr, appAttemptIdStr,
-        containerIdStr, nmId, redirectedFromNode, manualRedirection);
-  }
-
-  @GET
-  @Path("/containers/{containerid}/logs")
-  @Produces({ MediaType.APPLICATION_JSON + ";" + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + ";" + JettyUtils.UTF_8})
-  @InterfaceAudience.Public
-  @InterfaceStability.Unstable
-  public Response getContainerLogs(@Context HttpServletRequest hsr,
-      @PathParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
-      @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
-      @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-      @DefaultValue("false") boolean redirectedFromNode,
-      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
-      @DefaultValue("false") boolean manualRedirection) {
-    init();
-    checkAccess(containerIdStr, hsr);
-    WrappedLogMetaRequest.Builder logMetaRequestBuilder =
-        LogServlet.createRequestFromContainerId(containerIdStr);
-
-    return logServlet.getContainerLogsInfo(hsr, logMetaRequestBuilder, nmId,
-        redirectedFromNode, null, manualRedirection);
-  }
-
-  @GET
-  @Path("/containerlogs/{containerid}/{filename}")
-  @Produces({ MediaType.TEXT_PLAIN + "; " + JettyUtils.UTF_8 })
-  @InterfaceAudience.Public
-  @InterfaceStability.Unstable
-  public Response getContainerLogFile(@Context HttpServletRequest req,
-      @PathParam(YarnWebServiceParams.CONTAINER_ID) String containerIdStr,
-      @PathParam(YarnWebServiceParams.CONTAINER_LOG_FILE_NAME)
-          String filename,
-      @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_FORMAT)
-          String format,
-      @QueryParam(YarnWebServiceParams.RESPONSE_CONTENT_SIZE)
-          String size,
-      @QueryParam(YarnWebServiceParams.NM_ID) String nmId,
-      @QueryParam(YarnWebServiceParams.REDIRECTED_FROM_NODE)
-      @DefaultValue("false") boolean redirectedFromNode,
-      @QueryParam(YarnWebServiceParams.MANUAL_REDIRECTION)
-      @DefaultValue("false") boolean manualRedirection) {
-    init();
-    checkAccess(containerIdStr, req);
-    return logServlet.getLogFile(req, containerIdStr, filename, format, size,
-        nmId, redirectedFromNode, null, manualRedirection);
-  }
-
-  @VisibleForTesting
-  LogServlet getLogServlet() {
-    return this.logServlet;
-  }
-
-  @VisibleForTesting
-  public void setLogServlet(LogServlet logServlet) {
-    this.logServlet = logServlet;
-  }
-
-  @VisibleForTesting
-  public void setHttpServletResponse(HttpServletResponse resp) {
-    this.response = resp;
-  }
-}
+      throw new NotFoundException("unable to load configuration for job

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,4 +17,10 @@
  * limitations under the License.
  */
 
+/**
+ * 设备框架资源插件包，提供YARN NodeManager上通用的异构设备资源管理抽象框架。
+ * 核心职责是统一GPU、FPGA等各类硬件设备的资源分配、隔离调度逻辑，
+ * 允许第三方快速扩展自定义设备资源插件，无需重复实现基础设备管理流程。
+ * 该框架集成在NodeManager容器管理器的资源插件体系中，负责节点本地设备发现、分配和回收。
+ */
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.deviceframework;

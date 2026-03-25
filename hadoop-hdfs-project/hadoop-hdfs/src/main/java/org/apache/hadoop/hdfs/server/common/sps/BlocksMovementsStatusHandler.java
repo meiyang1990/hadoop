@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,18 +23,19 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Blocks movements status handler, which can be used to collect details of the
- * completed block movements.
+ * 文件：BlocksMovementsStatusHandler.java
+ * 所属模块：HDFS核心服务端，存储策略满足性(Storage Policy Satisfier, SPS)子系统
+ * 核心职责：定义块移动状态处理接口，用于收集已完成的块移动操作的详细信息，支持不同实现对移动结果进行自定义处理
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface BlocksMovementsStatusHandler {
 
   /**
-   * Collect all the storage movement attempt finished blocks.
+   * 处理单个已完成移动尝试的块，将其纳入状态收集或后续处理流程
+   * 用于SPS系统完成块移动尝试后，回调通知处理移动结果
    *
-   * @param moveAttemptFinishedBlk
-   *          storage movement attempt finished block
+   * @param moveAttemptFinishedBlk 已完成移动尝试的块信息
    */
   void handle(BlockMovementAttemptFinished moveAttemptFinishedBlk);
 }

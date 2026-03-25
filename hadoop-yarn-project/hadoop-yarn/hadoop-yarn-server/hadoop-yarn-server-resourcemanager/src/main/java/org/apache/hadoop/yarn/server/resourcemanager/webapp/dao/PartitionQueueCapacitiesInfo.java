@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,7 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
- * This class represents queue capacities for a given partition
+ * 分区队列容量信息数据访问对象，用于YARN ResourceManager Web UI，封装指定节点分区下队列的容量信息
  */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -47,9 +48,30 @@ public class PartitionQueueCapacitiesInfo {
   private ResourceInfo effectiveMinResource;
   private ResourceInfo effectiveMaxResource;
 
+  /**
+   * 无参构造函数，用于XML序列化/反序列化
+   */
   public PartitionQueueCapacitiesInfo() {
   }
 
+  /**
+   * 全参数构造函数，创建分区队列容量信息对象
+   * @param partitionName 节点分区名称
+   * @param queueCapacityVectorInfo 队列容量向量信息
+   * @param capacity 队列容量占比
+   * @param usedCapacity 已使用容量占比
+   * @param maxCapacity 最大容量占比
+   * @param absCapacity 相对于根队列的绝对容量占比
+   * @param absUsedCapacity 相对于根队列的绝对已使用容量占比
+   * @param absMaxCapacity 相对于根队列的绝对最大容量占比
+   * @param maxAMLimitPercentage ApplicationMaster资源最大占比限制
+   * @param weight 队列调度权重
+   * @param normalizedWeight 标准化后的调度权重
+   * @param confMinRes 配置的最小资源量
+   * @param confMaxRes 配置的最大资源量
+   * @param effMinRes 实际生效的最小资源量
+   * @param effMaxRes 实际生效的最大资源量
+   */
   public PartitionQueueCapacitiesInfo(String partitionName,
       QueueCapacityVectorInfo queueCapacityVectorInfo,
       float capacity, float usedCapacity, float maxCapacity, float absCapacity,
@@ -167,6 +189,10 @@ public class PartitionQueueCapacitiesInfo {
     return configuredMinResource;
   }
 
+  /**
+   * 获取配置的最大资源量，空资源或未配置时返回null
+   * @return 配置的最大资源量信息，未配置则返回null
+   */
   public ResourceInfo getConfiguredMaxResource() {
     if (configuredMaxResource == null
         || configuredMaxResource.getResource().equals(Resources.none())) {

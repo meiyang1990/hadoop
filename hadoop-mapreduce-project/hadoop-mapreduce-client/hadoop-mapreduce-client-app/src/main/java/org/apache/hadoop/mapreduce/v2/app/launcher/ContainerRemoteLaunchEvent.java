@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -24,12 +25,23 @@ import org.apache.hadoop.util.StringInterner;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 
+/**
+ * 容器远程启动事件，承载YARN容器远程启动所需的全部上下文信息
+ * 用于向容器启动器发送远程启动任务尝试的事件通知
+ */
 public class ContainerRemoteLaunchEvent extends ContainerLauncherEvent {
 
   private final Container allocatedContainer;
   private final ContainerLaunchContext containerLaunchContext;
   private final Task task;
 
+  /**
+   * 构造容器远程启动事件，初始化所有启动所需信息
+   * @param taskAttemptID 任务尝试ID，标识本次要启动的任务尝试
+   * @param containerLaunchContext YARN容器启动上下文，包含启动命令、环境变量等信息
+   * @param allocatedContainer YARN分配给本次任务的容器对象
+   * @param remoteTask 要远程执行的MapReduce任务对象
+   */
   public ContainerRemoteLaunchEvent(TaskAttemptId taskAttemptID,
       ContainerLaunchContext containerLaunchContext,
       Container allocatedContainer, Task remoteTask) {
@@ -42,14 +54,26 @@ public class ContainerRemoteLaunchEvent extends ContainerLauncherEvent {
     this.task = remoteTask;
   }
 
+  /**
+   * 获取YARN容器启动上下文
+   * @return 容器启动上下文对象，包含启动参数信息
+   */
   public ContainerLaunchContext getContainerLaunchContext() {
     return this.containerLaunchContext;
   }
 
+  /**
+   * 获取YARN分配给本次任务的容器对象
+   * @return 已分配的YARN容器对象
+   */
   public Container getAllocatedContainer() {
     return this.allocatedContainer;
   }
 
+  /**
+   * 获取需要远程执行的MapReduce任务对象
+   * @return 远程执行的任务对象
+   */
   public Task getRemoteTask() {
     return this.task;
   }

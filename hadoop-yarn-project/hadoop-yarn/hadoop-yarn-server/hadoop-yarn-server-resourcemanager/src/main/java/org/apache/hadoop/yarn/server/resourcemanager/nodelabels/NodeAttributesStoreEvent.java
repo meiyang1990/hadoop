@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,13 +27,20 @@ import org.apache.hadoop.yarn.nodelabels.AttributeValue;
 import org.apache.hadoop.yarn.server.api.protocolrecords.AttributeMappingOperationType;
 
 /**
- * Event capturing details to store the Node Attributes in the backend store.
+ * 节点属性持久化存储事件，封装了需要写入后端存储的节点属性变更信息
  */
 public class NodeAttributesStoreEvent
     extends AbstractEvent<NodeAttributesStoreEventType> {
+  // 节点属性映射表：key为节点ID，value为该节点关联的所有属性与对应值
   private Map<String, Map<NodeAttribute, AttributeValue>> nodeAttributeMapping;
+  // 当前操作类型（添加/删除/更新等）
   private AttributeMappingOperationType operation;
 
+  /**
+   * 构造节点属性存储事件
+   * @param nodeAttributeMappingList 需要持久化的节点属性映射集合
+   * @param operation 属性映射操作类型
+   */
   public NodeAttributesStoreEvent(
       Map<String, Map<NodeAttribute, AttributeValue>> nodeAttributeMappingList,
       AttributeMappingOperationType operation) {
@@ -41,11 +49,19 @@ public class NodeAttributesStoreEvent
     this.operation = operation;
   }
 
+  /**
+   * 获取需要持久化的节点属性映射集合
+   * @return 按节点分组的节点属性映射表
+   */
   public Map<String,
       Map<NodeAttribute, AttributeValue>> getNodeAttributeMappingList() {
     return nodeAttributeMapping;
   }
 
+  /**
+   * 获取当前操作类型
+   * @return 属性映射操作类型
+   */
   public AttributeMappingOperationType getOperation() {
     return operation;
   }

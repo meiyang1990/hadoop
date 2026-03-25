@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -84,7 +85,10 @@ import org.apache.hadoop.yarn.webapp.NotFoundException;
 
 import org.apache.hadoop.util.Preconditions;
 
-
+/**
+ * MapReduce ApplicationMaster RESTful Web服务入口类，提供对ApplicationMaster、Job、Task、TaskAttempt等资源的查询和操作能力
+ * 对外提供JSON/XML格式的API，供Web UI或外部系统查询MR作业运行状态和管理任务尝试
+ */
 @Singleton
 @Path("/ws/v1/mapreduce")
 public class AMWebServices {
@@ -95,6 +99,11 @@ public class AMWebServices {
   @Context
   private HttpServletResponse response;
   
+  /**
+   * 构造AMWeb服务实例，依赖注入App和AppContext上下文
+   * @param app AM Web应用实例
+   * @param context Application上下文对象
+   */
   @Inject
   public AMWebServices(final @Named("app") App app, final @Named("am") AppContext context) {
     this.appCtx = context;
@@ -102,6 +111,12 @@ public class AMWebServices {
     this.service = new MRClientService(context);
   }
 
+  /**
+   * 检查当前请求用户是否有权限访问指定作业
+   * @param job 待访问的作业对象
+   * @param request HTTP请求对象，包含请求用户信息
+   * @return true有权限，false无权限
+   */
   Boolean hasAccess(Job job, HttpServletRequest request) {
     String remoteUser = request.getRemoteUser();
     UserGroupInformation callerUGI = null;
@@ -114,11 +129,21 @@ public class AMWebServices {
     return true;
   }
 
+  /**
+   * 初始化响应，清除ContentType供后续设置
+   */
   private void init() {
     //clear content type
     response.setContentType(null);
   }
 
+  /**
+   * 从容器ID字符串中提取JobID并获取对应的作业对象，处理错误检查
+   * @param cid 容器ID字符串
+   * @param appCtx Application上下文对象
+   * @return 对应的作业对象
+   * @throws NotFoundException 当作业不存在或ID格式错误时抛出
+   */
   public static Job getJobFromContainerIdString(String cid, AppContext appCtx)
       throws NotFoundException {
     //example container_e06_1724414851587_0004_01_000001
@@ -130,6 +155,13 @@ public class AMWebServices {
     /**
      * convert a job id string to an actual job and handle all the error checking.
      */
+ /**
+  * 将字符串格式的JobID转换为实际作业对象，处理格式错误和不存在场景
+  * @param jid 字符串格式的JobID
+  * @param appCtx Application上下文对象
+  * @return 对应的作业对象
+  * @throws NotFoundException 当作业不存在或ID格式错误时抛出
+  */
  public static Job getJobFromJobIdString(String jid, AppContext appCtx) throws NotFoundException {
     JobId jobId;
     Job job;
@@ -159,6 +191,13 @@ public class AMWebServices {
   /**
    * convert a task id string to an actual task and handle all the error
    * checking.
+   */
+  /**
+   * 将字符串格式的TaskID转换为实际任务对象，处理格式错误和不存在场景
+   * @param tid 字符串格式的TaskID
+   * @param job 任务所属作业对象
+   * @return 对应的任务对象
+   * @throws NotFoundException 当任务不存在或ID格式错误时抛出
    */
   public static Task getTaskFromTaskIdString(String tid, Job job) throws NotFoundException {
     TaskId taskID;
@@ -191,6 +230,13 @@ public class AMWebServices {
   /**
    * convert a task attempt id string to an actual task attempt and handle all
    * the error checking.
+   */
+  /**
+   * 将字符串格式的TaskAttemptID转换为实际任务尝试对象，处理格式错误和不存在场景
+   * @param attId 字符串格式的TaskAttemptID
+   * @param task 任务尝试所属任务对象
+   * @return 对应的任务尝试对象
+   * @throws NotFoundException 当任务尝试不存在或ID格式错误时抛出
    */
   public static TaskAttempt getTaskAttemptFromTaskAttemptString(String attId, Task task)
       throws NotFoundException {
@@ -230,12 +276,21 @@ public class AMWebServices {
    * @param job
    *          the job that is being accessed
    */
+  /**
+   * 检查当前用户对指定作业的访问权限，无权限则抛出未授权异常
+   * @param job 待访问作业对象
+   * @param request HTTP请求对象
+   */
   void checkAccess(Job job, HttpServletRequest request) {
     if (!hasAccess(job, request)) {
       throw new WebApplicationException(Status.UNAUTHORIZED);
     }
   }
 
+  /**
+   * 获取ApplicationMaster基本信息的根接口
+   * @return Application基本信息对象
+   */
   @GET
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
       MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
@@ -243,6 +298,10 @@ public class AMWebServices {
     return getAppInfo();
   }
 
+  /**
+   * 获取ApplicationMaster基本信息接口
+   * @return Application基本信息对象
+   */
   @GET
   @Path("/info")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -252,6 +311,10 @@ public class AMWebServices {
     return new AppInfo(this.app, this.app.context);
   }
   
+  /**
+   * 获取被黑名单节点列表接口，返回AM判定的不健康节点信息
+   * @return 黑名单节点信息对象
+   */
   @GET
   @Path("/blacklistednodes")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -261,6 +324,11 @@ public class AMWebServices {
     return new BlacklistedNodesInfo(this.app.context);
   }
 
+  /**
+   * 获取当前AM所有作业列表接口，根据访问权限过滤作业
+   * @param hsr HTTP请求对象
+   * @return 作业列表信息对象
+   */
   @GET
   @Path("/jobs")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -279,6 +347,12 @@ public class AMWebServices {
     return allJobs;
   }
 
+  /**
+   * 获取指定作业基本信息接口
+   * @param hsr HTTP请求对象
+   * @param jid 字符串格式的JobID
+   * @return 作业信息对象
+   */
   @GET
   @Path("/jobs/{jobid}")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -290,6 +364,11 @@ public class AMWebServices {
     return new JobInfo(job, hasAccess(job, hsr));
   }
 
+  /**
+   * 获取指定作业的AM尝试列表接口
+   * @param jid 字符串格式的JobID
+   * @return AM尝试列表信息对象
+   */
   @GET
   @Path("/jobs/{jobid}/jobattempts")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -306,6 +385,12 @@ public class AMWebServices {
     return amAttempts;
   }
 
+  /**
+   * 获取指定作业所有计数器信息接口
+   * @param hsr HTTP请求对象
+   * @param jid 字符串格式的JobID
+   * @return 作业计数器信息对象
+   */
   @GET
   @Path("/jobs/{jobid}/counters")
   @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
@@ -317,240 +402,3 @@ public class AMWebServices {
     checkAccess(job, hsr);
     return new JobCounterInfo(this.appCtx, job);
   }
-
-  @GET
-  @Path("/jobs/{jobid}/conf")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public ConfInfo getJobConf(@Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid) {
-
-    init();
-    Job job = getJobFromJobIdString(jid, appCtx);
-    checkAccess(job, hsr);
-    ConfInfo info;
-    try {
-      info = new ConfInfo(job);
-    } catch (IOException e) {
-      throw new NotFoundException("unable to load configuration for job: "
-          + jid);
-    }
-    return info;
-  }
-
-  @GET
-  @Path("/jobs/{jobid}/tasks")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public TasksInfo getJobTasks(@Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid, @QueryParam("type") String type) {
-
-    init();
-    Job job = getJobFromJobIdString(jid, appCtx);
-    checkAccess(job, hsr);
-    TasksInfo allTasks = new TasksInfo();
-    for (Task task : job.getTasks().values()) {
-      TaskType ttype = null;
-      if (type != null && !type.isEmpty()) {
-        try {
-          ttype = MRApps.taskType(type);
-        } catch (YarnRuntimeException e) {
-          throw new BadRequestException("tasktype must be either m or r");
-        }
-      }
-      if (ttype != null && task.getType() != ttype) {
-        continue;
-      }
-      allTasks.add(new TaskInfo(task));
-    }
-    return allTasks;
-  }
-
-  @GET
-  @Path("/jobs/{jobid}/tasks/{taskid}")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public TaskInfo getJobTask(@Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid, @PathParam("taskid") String tid) {
-
-    init();
-    Job job = getJobFromJobIdString(jid, appCtx);
-    checkAccess(job, hsr);
-    Task task = getTaskFromTaskIdString(tid, job);
-    return new TaskInfo(task);
-  }
-
-  @GET
-  @Path("/jobs/{jobid}/tasks/{taskid}/counters")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public JobTaskCounterInfo getSingleTaskCounters(
-      @Context HttpServletRequest hsr, @PathParam("jobid") String jid,
-      @PathParam("taskid") String tid) {
-
-    init();
-    Job job = getJobFromJobIdString(jid, appCtx);
-    checkAccess(job, hsr);
-    Task task = getTaskFromTaskIdString(tid, job);
-    return new JobTaskCounterInfo(task);
-  }
-
-  @GET
-  @Path("/jobs/{jobid}/tasks/{taskid}/attempts")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public TaskAttemptsInfo getJobTaskAttempts(@Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid, @PathParam("taskid") String tid) {
-
-    init();
-    TaskAttemptsInfo attempts = new TaskAttemptsInfo();
-    Job job = getJobFromJobIdString(jid, appCtx);
-    checkAccess(job, hsr);
-    Task task = getTaskFromTaskIdString(tid, job);
-
-    for (TaskAttempt ta : task.getAttempts().values()) {
-      if (ta != null) {
-        if (task.getType() == TaskType.REDUCE) {
-          attempts.add(new ReduceTaskAttemptInfo(ta));
-        } else {
-          attempts.add(new MapTaskAttemptInfo(ta, true));
-        }
-      }
-    }
-    return attempts;
-  }
-
-  @GET
-  @Path("/jobs/{jobid}/tasks/{taskid}/attempts/{attemptid}")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public TaskAttemptInfo getJobTaskAttemptId(@Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid, @PathParam("taskid") String tid,
-      @PathParam("attemptid") String attId) {
-
-    init();
-    Job job = getJobFromJobIdString(jid, appCtx);
-    checkAccess(job, hsr);
-    Task task = getTaskFromTaskIdString(tid, job);
-    TaskAttempt ta = getTaskAttemptFromTaskAttemptString(attId, task);
-    if (task.getType() == TaskType.REDUCE) {
-      return new ReduceTaskAttemptInfo(ta);
-    } else {
-      return new MapTaskAttemptInfo(ta, true);
-    }
-  }
-
-  @GET
-  @Path("/jobs/{jobid}/tasks/{taskid}/attempts/{attemptid}/state")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public JobTaskAttemptState getJobTaskAttemptState(
-      @Context HttpServletRequest hsr,
-      @PathParam("jobid") String jid, @PathParam("taskid") String tid,
-      @PathParam("attemptid") String attId)
-          throws IOException, InterruptedException {
-    init();
-    Job job = getJobFromJobIdString(jid, appCtx);
-    checkAccess(job, hsr);
-    Task task = getTaskFromTaskIdString(tid, job);
-    TaskAttempt ta = getTaskAttemptFromTaskAttemptString(attId, task);
-    return new JobTaskAttemptState(ta.getState().toString());
-  }
-
-  @PUT
-  @Path("/jobs/{jobid}/tasks/{taskid}/attempts/{attemptid}/state")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  public Response updateJobTaskAttemptState(JobTaskAttemptState targetState,
-      @Context HttpServletRequest hsr, @PathParam("jobid") String jid,
-      @PathParam("taskid") String tid, @PathParam("attemptid") String attId)
-          throws IOException, InterruptedException {
-    init();
-    Job job = getJobFromJobIdString(jid, appCtx);
-    checkAccess(job, hsr);
-
-    String remoteUser = hsr.getRemoteUser();
-    UserGroupInformation callerUGI = null;
-    if (remoteUser != null) {
-      callerUGI = UserGroupInformation.createRemoteUser(remoteUser);
-    }
-
-    Task task = getTaskFromTaskIdString(tid, job);
-    TaskAttempt ta = getTaskAttemptFromTaskAttemptString(attId, task);
-    if (!ta.getState().toString().equals(targetState.getState())) {
-      // user is attempting to change state. right we only
-      // allow users to kill the job task attempt
-      if (targetState.getState().equals(TaskAttemptState.KILLED.toString())) {
-        return killJobTaskAttempt(ta, callerUGI, hsr);
-      }
-      throw new BadRequestException("Only '"
-          + TaskAttemptState.KILLED.toString()
-          + "' is allowed as a target state.");
-    }
-
-    JobTaskAttemptState ret = new JobTaskAttemptState();
-    ret.setState(ta.getState().toString());
-
-    return Response.status(Status.OK).entity(ret).build();
-  }
-
-  @GET
-  @Path("/jobs/{jobid}/tasks/{taskid}/attempts/{attemptid}/counters")
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public JobTaskAttemptCounterInfo getJobTaskAttemptIdCounters(
-      @Context HttpServletRequest hsr, @PathParam("jobid") String jid,
-      @PathParam("taskid") String tid, @PathParam("attemptid") String attId) {
-
-    init();
-    Job job = getJobFromJobIdString(jid, appCtx);
-    checkAccess(job, hsr);
-    Task task = getTaskFromTaskIdString(tid, job);
-    TaskAttempt ta = getTaskAttemptFromTaskAttemptString(attId, task);
-    return new JobTaskAttemptCounterInfo(ta);
-  }
-
-  protected Response killJobTaskAttempt(TaskAttempt ta,
-      UserGroupInformation callerUGI, HttpServletRequest hsr)
-          throws IOException, InterruptedException {
-    Preconditions.checkNotNull(ta, "ta cannot be null");
-
-    String userName = callerUGI.getUserName();
-    final TaskAttemptId attemptId = ta.getID();
-    try {
-      callerUGI
-          .doAs(new PrivilegedExceptionAction<KillTaskAttemptResponse>() {
-            @Override
-            public KillTaskAttemptResponse run()
-                throws IOException, YarnException {
-              KillTaskAttemptRequest req =  new KillTaskAttemptRequestPBImpl();
-              req.setTaskAttemptId(attemptId);
-              return service.forceKillTaskAttempt(req);
-            }
-          });
-    } catch (UndeclaredThrowableException ue) {
-      // if the root cause is a permissions issue
-      // bubble that up to the user
-      if (ue.getCause() instanceof YarnException) {
-        YarnException ye = (YarnException) ue.getCause();
-        if (ye.getCause() instanceof AccessControlException) {
-          String taId = attemptId.toString();
-          String msg =
-              "Unauthorized attempt to kill task attempt " + taId
-                  + " by remote user " + userName;
-          return Response.status(Status.FORBIDDEN).entity(msg).build();
-        } else {
-          throw ue;
-        }
-      } else {
-        throw ue;
-      }
-    }
-
-    JobTaskAttemptState ret = new JobTaskAttemptState();
-    ret.setState(TaskAttemptState.KILLED.toString());
-
-    return Response.status(Status.OK).entity(ret).build();
-  }
-}

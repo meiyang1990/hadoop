@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -15,4 +16,9 @@
  * the License.
  */
 
+/**
+ * YARN Unmanaged Application Master（非托管应用 masters）服务端核心包，
+ * 提供对用户自主管理的 Application Master 的支持，包含相关公共实现和工具类。
+ * 非托管AM允许应用不依赖YARN的资源分配自行管理运行，适用于特殊调度场景。
+ */
 package org.apache.hadoop.yarn.server.uam;

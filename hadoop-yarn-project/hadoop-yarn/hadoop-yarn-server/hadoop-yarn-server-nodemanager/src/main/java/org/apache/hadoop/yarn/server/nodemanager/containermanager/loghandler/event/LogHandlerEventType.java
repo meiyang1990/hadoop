@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -18,8 +19,17 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.event;
 
+/**
+ * 日志处理器事件类型枚举
+ * 定义了NodeManager日志处理模块支持的所有事件类型
+ */
 public enum LogHandlerEventType {
+  /** 应用启动事件 */
   APPLICATION_STARTED,
+  /** 容器完成事件 */
   CONTAINER_FINISHED,
-  APPLICATION_FINISHED, LOG_AGG_TOKEN_UPDATE
+  /** 应用完成事件 */
+  APPLICATION_FINISHED,
+  /** 日志聚合令牌更新事件 */
+  LOG_AGG_TOKEN_UPDATE
 }

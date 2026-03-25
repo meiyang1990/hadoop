@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,35 +35,31 @@ import java.util.Comparator;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The SchedulingPolicy is used by the fair scheduler mainly to determine
- * what a queue's fair share and steady fair share should be as well as
- * calculating available headroom. This determines how resources can be
- * shared between running applications within a queue.
+ * 公平调度器的调度策略抽象基类，用于计算队列的公平份额、稳定公平份额以及可用资源余量，
+ * 决定同一队列内运行应用之间的资源分配方式。
  * <p>
- * Every queue has a policy, including parents and children. If a child
- * queue doesn't specify one, it inherits the parent's policy.
- * The policy for a child queue must be compatible with the policy of
- * the parent queue; there are some combinations that aren't allowed.
- * See {@link SchedulingPolicy#isChildPolicyAllowed(SchedulingPolicy)}.
- * The policy for a queue is specified by setting property
- * <i>schedulingPolicy</i> in the fair scheduler configuration file.
- * The default policy is {@link FairSharePolicy} if not specified.
+ * 每个队列（包括父队列和子队列）都配置有独立的调度策略，子队列未指定时继承父队列策略。
+ * 子队列策略必须与父队列策略兼容，部分组合不被允许，
+ * 具体兼容规则见 {@link SchedulingPolicy#isChildPolicyAllowed(SchedulingPolicy)}。
+ * 队列策略在公平调度器配置文件中通过<i>schedulingPolicy</i>属性指定，
+ * 未指定时默认使用 {@link FairSharePolicy}。
  */
 @Public
 @Evolving
 public abstract class SchedulingPolicy {
+  // 策略实例缓存，保证每个策略类全局只有一个单例
   private static final ConcurrentHashMap<Class<? extends SchedulingPolicy>, SchedulingPolicy> instances =
       new ConcurrentHashMap<Class<? extends SchedulingPolicy>, SchedulingPolicy>();
 
+  // 默认调度策略实例
   public static final SchedulingPolicy DEFAULT_POLICY =
       getInstance(FairSharePolicy.class);
 
   /**
-   * Returns a {@link SchedulingPolicy} instance corresponding
-   * to the passed clazz.
+   * 根据策略类获取单例实例，缓存已创建的实例保证全局唯一。
    *
-   * @param clazz a class that extends {@link SchedulingPolicy}
-   * @return a {@link SchedulingPolicy} instance
+   * @param clazz 继承SchedulingPolicy的策略类
+   * @return 对应策略的单例实例
    */
   public static SchedulingPolicy getInstance(
       Class<? extends SchedulingPolicy> clazz) {
@@ -75,16 +72,13 @@ public abstract class SchedulingPolicy {
   }
 
   /**
-   * Returns {@link SchedulingPolicy} instance corresponding to the
-   * {@link SchedulingPolicy} passed as a string. The policy can be "fair" for
-   * FairSharePolicy, "fifo" for FifoPolicy, or "drf" for
-   * DominantResourceFairnessPolicy. For a custom
-   * {@link SchedulingPolicy}s in the RM classpath, the policy should be
-   * canonical class name of the {@link SchedulingPolicy}.
+   * 从配置字符串解析出调度策略实例，支持别名和自定义全类名两种写法。
+   * 别名："fair"对应FairSharePolicy、"fifo"对应FifoPolicy、"drf"对应DominantResourceFairnessPolicy；
+   * 自定义策略填写完整类名即可，类必须在RM的类路径下。
    * 
-   * @param policy canonical class name or "drf" or "fair" or "fifo"
-   * @return a {@link SchedulingPolicy} instance parsed from given policy
-   * @throws AllocationConfigurationException for any errors.
+   * @param policy 策略名称别名或自定义策略的完整类名
+   * @return 解析得到的调度策略单例实例
+   * @throws AllocationConfigurationException 解析出错（类不存在或不是SchedulingPolicy子类）时抛出
    *
    */
   @SuppressWarnings("unchecked")
@@ -92,6 +86,7 @@ public abstract class SchedulingPolicy {
       throws AllocationConfigurationException {
     @SuppressWarnings("rawtypes")
     Class clazz;
+    // 转小写统一匹配格式
     String text = StringUtils.toLowerCase(policy);
     if (text.equalsIgnoreCase(FairSharePolicy.NAME)) {
       clazz = FairSharePolicy.class;
@@ -100,6 +95,7 @@ public abstract class SchedulingPolicy {
     } else if (text.equalsIgnoreCase(DominantResourceFairnessPolicy.NAME)) {
       clazz = DominantResourceFairnessPolicy.class;
     } else {
+      // 自定义策略尝试加载类
       try {
         clazz = Class.forName(policy);
       } catch (ClassNotFoundException cnfe) {
@@ -107,6 +103,7 @@ public abstract class SchedulingPolicy {
             + " SchedulingPolicy class not found!");
       }
     }
+    // 检查类继承关系
     if (!SchedulingPolicy.class.isAssignableFrom(clazz)) {
       throw new AllocationConfigurationException(policy
           + " does not extend SchedulingPolicy");
@@ -115,99 +112,87 @@ public abstract class SchedulingPolicy {
   }
 
   /**
-   * Initialize the scheduling policy with cluster resources.
-   * @deprecated Since it doesn't track cluster resource changes, replaced by
-   * {@link #initialize(FSContext)}.
+   * 使用集群总资源初始化调度策略。
+   * @deprecated 该方法无法跟踪集群资源变化，已被 {@link #initialize(FSContext)} 替代。
    *
-   * @param clusterCapacity cluster resources
+   * @param clusterCapacity 集群总资源
    */
   @Deprecated
   public void initialize(Resource clusterCapacity) {}
 
   /**
-   * Initialize the scheduling policy with a {@link FSContext} object, which has
-   * a pointer to the cluster resources among other information.
+   * 使用公平调度器上下文对象初始化调度策略，上下文包含集群资源等信息。
    *
-   * @param fsContext a {@link FSContext} object which has a pointer to the
-   *                  cluster resources
+   * @param fsContext 公平调度器上下文，持有集群资源等信息
    */
   public void initialize(FSContext fsContext) {}
 
   /**
-   * The {@link ResourceCalculator} returned by this method should be used
-   * for any calculations involving resources.
+   * 获取当前策略使用的资源计算器，所有资源计算都应使用该计算器。
    *
-   * @return ResourceCalculator instance to use
+   * @return 当前策略的资源计算器实例
    */
   public abstract ResourceCalculator getResourceCalculator();
 
   /**
-   * @return returns the name of {@link SchedulingPolicy}
+   * @return 获取当前调度策略的名称
    */
   public abstract String getName();
 
   /**
-   * The comparator returned by this method is to be used for sorting the
-   * {@link Schedulable}s in that queue.
+   * 获取队列内部可调度对象（应用/子队列）的排序比较器，用于调度前排序。
    * 
-   * @return the comparator to sort by
+   * @return 排序使用的比较器
    */
   public abstract Comparator<Schedulable> getComparator();
 
   /**
-   * Computes and updates the shares of {@link Schedulable}s as per
-   * the {@link SchedulingPolicy}, to be used later for scheduling decisions.
-   * The shares computed are instantaneous and only consider queues with
-   * running applications.
+   * 根据当前调度策略计算并更新所有可调度对象的瞬时公平份额，
+   * 计算仅考虑正在运行应用的队列，结果用于后续调度决策。
    * 
-   * @param schedulables {@link Schedulable}s whose shares are to be updated
-   * @param totalResources Total {@link Resource}s in the cluster
+   * @param schedulables 需要更新份额的可调度对象集合
+   * @param totalResources 集群总资源
    */
   public abstract void computeShares(
       Collection<? extends Schedulable> schedulables, Resource totalResources);
 
   /**
-   * Computes and updates the steady shares of {@link FSQueue}s as per the
-   * {@link SchedulingPolicy}. The steady share does not differentiate
-   * between queues with and without running applications under them. The
-   * steady share is not used for scheduling, it is displayed on the Web UI
-   * for better visibility.
+   * 根据当前调度策略计算并更新所有队列的稳定公平份额，
+   * 稳定份额不区分队列是否有运行应用，仅用于Web UI展示，不参与实际调度。
    *
-   * @param queues {@link FSQueue}s whose shares are to be updated
-   * @param totalResources Total {@link Resource}s in the cluster
+   * @param queues 需要更新稳定份额的队列集合
+   * @param totalResources 集群总资源
    */
   public abstract void computeSteadyShares(
       Collection<? extends FSQueue> queues, Resource totalResources);
 
   /**
-   * Check if the resource usage is over the fair share under this policy.
+   * 检查当前策略下资源使用量是否超过分配的公平份额。
    *
-   * @param usage {@link Resource} the resource usage
-   * @param fairShare {@link Resource} the fair share
-   * @return true if check passes (is over) or false otherwise
+   * @param usage 实际资源使用量
+   * @param fairShare 分配的公平份额
+   * @return 使用量超过公平份额返回true，否则返回false
    */
   public abstract boolean checkIfUsageOverFairShare(
       Resource usage, Resource fairShare);
 
   /**
-   * Get headroom by calculating the min of {@code clusterAvailable} and
-   * ({@code queueFairShare} - {@code queueUsage}) resources that are
-   * applicable to this policy. For eg if only memory then leave other
-   * resources such as CPU to same as {@code clusterAvailable}.
+   * 计算队列的可用资源余量（headroom），计算逻辑为取集群可分配给当前队列的最大资源
+   * 与（公平份额 - 当前已使用资源）每个维度资源的最小值，不支持的资源维度保持集群可用值不变。
    *
-   * @param queueFairShare fairshare in the queue
-   * @param queueUsage resources used in the queue
-   * @param maxAvailable available resource in cluster for this queue
-   * @return calculated headroom
+   * @param queueFairShare 队列的公平份额
+   * @param queueUsage 队列当前已使用资源
+   * @param maxAvailable 集群可分配给该队列的最大可用资源
+   * @return 计算得到的队列可用资源余量
    */
   public abstract Resource getHeadroom(Resource queueFairShare,
       Resource queueUsage, Resource maxAvailable);
 
   /**
-   * Check whether the policy of a child queue is allowed.
+   * 检查当前父策略是否允许子队列使用指定的子策略。
    *
-   * @param childPolicy the policy of child queue
-   * @return true if the child policy is allowed; false otherwise
+   * @param childPolicy 子队列拟使用的调度策略
+   * @return 允许则返回true，否则返回false
    */
   public boolean isChildPolicyAllowed(SchedulingPolicy childPolicy) {
     return true;

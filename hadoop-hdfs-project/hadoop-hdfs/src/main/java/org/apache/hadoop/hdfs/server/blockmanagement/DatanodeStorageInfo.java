@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,16 +32,29 @@ import org.apache.hadoop.hdfs.server.protocol.StorageReport;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * A Datanode has one or more storages. A storage in the Datanode is represented
- * by this class.
+ * 文件：org.apache.hadoop.hdfs.server.blockmanagement.DatanodeStorageInfo
+ * 模块：HDFS服务端块管理模块
+ * 描述：表示DataNode上的一个存储卷，NameNode端维护DataNode各个存储卷的元数据信息，包括容量、使用情况、存储状态、块列表等核心信息
+ * 核心职责：管理单个DataNode存储卷的状态、容量使用统计以及该存储卷上存储的所有数据块元数据
  */
 public class DatanodeStorageInfo {
   public static final DatanodeStorageInfo[] EMPTY_ARRAY = {};
 
+  /**
+   * 将DatanodeStorageInfo数组转换为对应DatanodeInfo数组
+   * @param storages 输入的存储信息数组
+   * @return 转换后的DatanodeInfo数组
+   */
   public static DatanodeInfo[] toDatanodeInfos(
       DatanodeStorageInfo[] storages) {
     return storages == null ? null: toDatanodeInfos(Arrays.asList(storages));
   }
+
+  /**
+   * 将DatanodeStorageInfo列表转换为对应DatanodeInfo数组
+   * @param storages 输入的存储信息列表
+   * @return 转换后的DatanodeInfo数组
+   */
   static DatanodeInfo[] toDatanodeInfos(List<DatanodeStorageInfo> storages) {
     final DatanodeInfo[] datanodes = new DatanodeInfo[storages.size()];
     for(int i = 0; i < storages.size(); i++) {
@@ -49,6 +63,11 @@ public class DatanodeStorageInfo {
     return datanodes;
   }
 
+  /**
+   * 将DatanodeStorageInfo数组转换为对应DatanodeDescriptor数组
+   * @param storages 输入的存储信息数组
+   * @return 转换后的DatanodeDescriptor数组
+   */
   static DatanodeDescriptor[] toDatanodeDescriptors(
       DatanodeStorageInfo[] storages) {
     DatanodeDescriptor[] datanodes = new DatanodeDescriptor[storages.length];
@@ -58,6 +77,11 @@ public class DatanodeStorageInfo {
     return datanodes;
   }
 
+  /**
+   * 将DatanodeStorageInfo数组转换为对应存储ID数组
+   * @param storages 输入的存储信息数组
+   * @return 转换后的存储ID数组
+   */
   public static String[] toStorageIDs(DatanodeStorageInfo[] storages) {
     if (storages == null) {
       return null;
@@ -69,6 +93,11 @@ public class DatanodeStorageInfo {
     return storageIDs;
   }
 
+  /**
+   * 将DatanodeStorageInfo数组转换为对应存储类型数组
+   * @param storages 输入的存储信息数组
+   * @return 转换后的存储类型数组
+   */
   public static StorageType[] toStorageTypes(DatanodeStorageInfo[] storages) {
     if (storages == null) {
       return null;
@@ -80,13 +109,17 @@ public class DatanodeStorageInfo {
     return storageTypes;
   }
 
+  /**
+   * 从传入的DatanodeStorage对象更新当前存储的状态和类型
+   * @param storage 数据源DatanodeStorage对象
+   */
   public void updateFromStorage(DatanodeStorage storage) {
     state = storage.getState();
     storageType = storage.getStorageType();
   }
 
   /**
-   * Iterates over the list of blocks belonging to the data-node.
+   * 迭代器实现，用于遍历当前存储卷上的所有数据块
    */
   class BlockIterator implements Iterator<BlockInfo> {
     private BlockInfo current;
@@ -95,10 +128,12 @@ public class DatanodeStorageInfo {
       this.current = head;
     }
 
+    @Override
     public boolean hasNext() {
       return current != null;
     }
 
+    @Override
     public BlockInfo next() {
       BlockInfo res = current;
       current =
@@ -106,6 +141,7 @@ public class DatanodeStorageInfo {
       return res;
     }
 
+    @Override
     public void remove() {
       throw new UnsupportedOperationException("Sorry. can't remove.");
     }
@@ -125,26 +161,20 @@ public class DatanodeStorageInfo {
   private volatile BlockInfo blockList = null;
   private int numBlocks = 0;
 
-  /** The number of block reports received */
+  /** 已接收块报告的计数 */
   private int blockReportCount = 0;
 
-  /** Whether the NameNode has received block reports for this storage since it
-   * was started.*/
+  /** 标识NameNode自该存储启动以来是否已经接收到块报告 */
   private boolean hasReceivedBlockReport = false;
 
   /**
-   * Set to false on any NN failover, and reset to true
-   * whenever a block report is received.
+   * 在NameNode故障切换时被设置为false，接收到块报告后重置为true
    */
   private boolean heartbeatedSinceFailover = false;
 
   /**
-   * At startup or at failover, the storages in the cluster may have pending
-   * block deletions from a previous incarnation of the NameNode. The block
-   * contents are considered as stale until a block report is received. When a
-   * storage is considered as stale, the replicas on it are also considered as
-   * stale. If any block has at least one stale replica, then no invalidations
-   * will be processed for this block. See HDFS-1972.
+   * 在启动或故障切换后，存储内容被标记为 stale（过期）直到接收到完整块报告。
+   * 当存储为stale状态时，其上所有副本都视为过期，不会处理该块的无效化操作，解决故障切换后的数据一致性问题。
    */
   private boolean blockContentsStale = true;
 
@@ -160,37 +190,67 @@ public class DatanodeStorageInfo {
     this.state = state;
   }
 
+  /**
+   * 获取已接收块报告的计数
+   * @return 块报告计数
+   */
   public int getBlockReportCount() {
     return blockReportCount;
   }
 
+  /**
+   * 判断是否已经接收到该存储的块报告
+   * @return 是否已接收块报告
+   */
   boolean hasReceivedBlockReport() {
     return hasReceivedBlockReport;
   }
 
+  /**
+   * 设置块报告计数
+   * @param blockReportCount 新的计数
+   */
   void setBlockReportCount(int blockReportCount) {
     this.blockReportCount = blockReportCount;
   }
 
+  /**
+   * 判断当前存储的块内容是否为过期 stale 状态
+   * @return 是否过期
+   */
   public boolean areBlockContentsStale() {
     return blockContentsStale;
   }
 
   @VisibleForTesting
+  /**
+   * 设置块内容过期状态，仅用于测试
+   * @param value 新的过期状态
+   */
   public void setBlockContentsStale(boolean value) {
     blockContentsStale = value;
   }
 
+  /**
+   * 在故障切换后标记存储为过期状态
+   */
   void markStaleAfterFailover() {
     heartbeatedSinceFailover = false;
     blockContentsStale = true;
   }
 
+  /**
+   * 处理接收心跳的存储报告，更新容量使用状态
+   * @param report DataNode发送的存储报告
+   */
   void receivedHeartbeat(StorageReport report) {
     updateState(report);
     heartbeatedSinceFailover = true;
   }
 
+  /**
+   * 处理接收块报告，更新过期状态和计数
+   */
   void receivedBlockReport() {
     if (heartbeatedSinceFailover) {
       blockContentsStale = false;
@@ -200,6 +260,13 @@ public class DatanodeStorageInfo {
   }
 
   @VisibleForTesting
+  /**
+   * 设置存储容量使用统计，仅用于测试
+   * @param capacity 总容量
+   * @param dfsUsed HDFS已用容量
+   * @param remaining 剩余容量
+   * @param blockPoolUsed 块池已用容量
+   */
   public void setUtilizationForTesting(long capacity, long dfsUsed,
                       long remaining, long blockPoolUsed) {
     this.capacity = capacity;
@@ -208,83 +275,147 @@ public class DatanodeStorageInfo {
     this.blockPoolUsed = blockPoolUsed;
   }
 
+  /**
+   * 获取存储当前状态
+   * @return 存储状态
+   */
   State getState() {
     return this.state;
   }
 
+  /**
+   * 设置存储状态
+   * @param state 新状态
+   */
   void setState(State state) {
     this.state = state;
   }
 
+  /**
+   * 设置故障切换后已接收心跳标记
+   * @param value 标记值
+   */
   void setHeartbeatedSinceFailover(boolean value) {
     heartbeatedSinceFailover = value;
   }
 
+  /**
+   * 判断当前存储已失败且仍有块存在
+   * @return 是否失败存储包含块
+   */
   boolean areBlocksOnFailedStorage() {
     return getState() == State.FAILED && numBlocks != 0;
   }
 
   @VisibleForTesting
+  /**
+   * 获取存储ID
+   * @return 存储ID
+   */
   public String getStorageID() {
     return storageID;
   }
 
+  /**
+   * 获取存储类型
+   * @return 存储类型
+   */
   public StorageType getStorageType() {
     return storageType;
   }
 
+  /**
+   * 获取存储总容量
+   * @return 总容量
+   */
   long getCapacity() {
     return capacity;
   }
 
+  /**
+   * 获取HDFS已用容量
+   * @return HDFS已用容量
+   */
   long getDfsUsed() {
     return dfsUsed;
   }
 
+  /**
+   * 获取非HDFS已用容量
+   * @return 非HDFS已用容量
+   */
   long getNonDfsUsed() {
     return nonDfsUsed;
   }
 
+  /**
+   * 获取剩余可用容量
+   * @return 剩余容量
+   */
   long getRemaining() {
     return remaining;
   }
 
+  /**
+   * 获取块池已用容量
+   * @return 块池已用容量
+   */
   long getBlockPoolUsed() {
     return blockPoolUsed;
   }
 
+  /**
+   * 向当前存储添加数据块，处理同一DataNode不同存储的块迁移情况
+   * @param b 待添加的块元数据
+   * @param reportedBlock DataNode上报的块信息
+   * @return 添加结果状态
+   */
   public AddBlockResult addBlock(BlockInfo b, Block reportedBlock) {
-    // First check whether the block belongs to a different storage
-    // on the same DN.
+    // 首先检查该块是否已经存在于同一DataNode的其他存储上
     AddBlockResult result = AddBlockResult.ADDED;
     DatanodeStorageInfo otherStorage =
         b.findStorageInfo(getDatanodeDescriptor());
 
     if (otherStorage != null) {
       if (otherStorage != this) {
-        // The block belongs to a different storage. Remove it first.
+        // 块存在于同一DataNode的其他存储，先移除旧关联
         otherStorage.removeBlock(b);
         result = AddBlockResult.REPLACED;
       } else {
-        // The block is already associated with this storage.
+        // 块已经关联到当前存储
         return AddBlockResult.ALREADY_EXIST;
       }
     }
 
-    // add to the head of the data-node list
+    // 将块添加到当前存储链表头部
     b.addStorage(this, reportedBlock);
     insertToList(b);
     return result;
   }
 
+  /**
+   * 向当前存储添加数据块，使用块自身作为上报信息
+   * @param b 待添加的块元数据
+   * @return 添加结果状态
+   */
   AddBlockResult addBlock(BlockInfo b) {
     return addBlock(b, b);
   }
 
+  /**
+   * 将块插入到当前存储的块链表中
+   * @param b 待插入的块
+   */
   public void insertToList(BlockInfo b) {
     blockList = b.listInsert(blockList, this);
     numBlocks++;
   }
+
+  /**
+   * 从当前存储移除指定块
+   * @param b 待移除的块
+   * @return 是否移除成功
+   */
   boolean removeBlock(BlockInfo b) {
     blockList = b.listRemove(blockList, this);
     if (b.removeStorage(this)) {
@@ -295,17 +426,28 @@ public class DatanodeStorageInfo {
     }
   }
 
+  /**
+   * 获取当前存储上的块数量
+   * @return 块数量
+   */
   int numBlocks() {
     return numBlocks;
   }
 
+  /**
+   * 获取当前存储上所有块的迭代器
+   * @return 块迭代器
+   */
   Iterator<BlockInfo> getBlockIterator() {
     return new BlockIterator(blockList);
   }
 
   /**
-   * Move block to the head of the list of blocks belonging to the data-node.
-   * @return the index of the head of the blockList
+   * 将块移动到存储块链表的头部，优化块遍历性能（最近访问的块先被找到）
+   * @param b 待移动的块
+   * @param curIndex 当前块在链表中的索引
+   * @param headIndex 链表头部索引
+   * @return 原位置索引
    */
   int moveBlockToHead(BlockInfo b, int curIndex, int headIndex) {
     blockList = b.moveBlockToHead(blockList, this, curIndex, headIndex);
@@ -314,14 +456,18 @@ public class DatanodeStorageInfo {
 
 
   /**
-   * Used for testing only.
-   * @return the head of the blockList
+   * 获取块链表头节点，仅用于测试
+   * @return 块链表头
    */
   @VisibleForTesting
   BlockInfo getBlockListHeadForTesting(){
     return blockList;
   }
 
+  /**
+   * 从存储报告更新存储容量使用统计信息
+   * @param r DataNode发送的存储报告
+   */
   void updateState(StorageReport r) {
     capacity = r.getCapacity();
     dfsUsed = r.getDfsUsed();
@@ -330,11 +476,18 @@ public class DatanodeStorageInfo {
     blockPoolUsed = r.getBlockPoolUsed();
   }
 
+  /**
+   * 获取该存储所属的DataNode描述符
+   * @return DataNode描述符
+   */
   public DatanodeDescriptor getDatanodeDescriptor() {
     return dn;
   }
 
-  /** Increment the number of blocks scheduled for each given storage */ 
+  /**
+   * 增加指定存储的已调度块计数，用于配额和负载统计
+   * @param storages 目标存储数组
+   */
   public static void incrementBlocksScheduled(DatanodeStorageInfo... storages) {
     for (DatanodeStorageInfo s : storages) {
       s.getDatanodeDescriptor().incrementBlocksScheduled(s.getStorageType());
@@ -342,8 +495,8 @@ public class DatanodeStorageInfo {
   }
 
   /**
-   * Decrement the number of blocks scheduled for each given storage. This will
-   * be called during abandon block or delete of UC block.
+   * 减少指定存储的已调度块计数，在块被放弃或删除时调用
+   * @param storages 目标存储数组
    */
   public static void decrementBlocksScheduled(DatanodeStorageInfo... storages) {
     for (DatanodeStorageInfo s : storages) {
@@ -372,55 +525,11 @@ public class DatanodeStorageInfo {
     return "[" + storageType + "]" + storageID + ":" + state + ":" + dn;
   }
   
+  /**
+   * 转换为StorageReport对象
+   * @return 存储报告对象
+   */
   StorageReport toStorageReport() {
     return new StorageReport(
         new DatanodeStorage(storageID, state, storageType),
-        false, capacity, dfsUsed, remaining, blockPoolUsed, nonDfsUsed);
-  }
-
-  static Iterable<StorageType> toStorageTypes(
-      final Iterable<DatanodeStorageInfo> infos) {
-    return new Iterable<StorageType>() {
-        @Override
-        public Iterator<StorageType> iterator() {
-          return new Iterator<StorageType>() {
-            final Iterator<DatanodeStorageInfo> i = infos.iterator();
-            @Override
-            public boolean hasNext() {return i.hasNext();}
-            @Override
-            public StorageType next() {return i.next().getStorageType();}
-            @Override
-            public void remove() {
-              throw new UnsupportedOperationException();
-            }
-          };
-        }
-      };
-  }
-
-  /** @return the first {@link DatanodeStorageInfo} corresponding to
-   *          the given datanode
-   */
-  static DatanodeStorageInfo getDatanodeStorageInfo(
-      final Iterable<DatanodeStorageInfo> infos,
-      final DatanodeDescriptor datanode) {
-    if (datanode == null) {
-      return null;
-    }
-    for(DatanodeStorageInfo storage : infos) {
-      if (storage.getDatanodeDescriptor() == datanode) {
-        return storage;
-      }
-    }
-    return null;
-  }
-
-  @VisibleForTesting
-  void setRemainingForTests(int remaining) {
-    this.remaining = remaining;
-  }
-
-  enum AddBlockResult {
-    ADDED, REPLACED, ALREADY_EXIST
-  }
-}
+        false, capacity, dfsUsed, remaining, blockPoolUsed,

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  *  Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Classes comprising the policy generator for the GPG. Responsibilities include
- * generating and updating policies based on the cluster status.
+ * YARN全局策略生成器（GPG）的核心策略生成包。
+ * 包内包含策略生成相关核心类，负责基于集群当前状态生成、更新全局调度策略，
+ * 为YARN联邦集群提供统一的全局资源调度策略支持。
  */
-
 package org.apache.hadoop.yarn.server.globalpolicygenerator.policygenerator;

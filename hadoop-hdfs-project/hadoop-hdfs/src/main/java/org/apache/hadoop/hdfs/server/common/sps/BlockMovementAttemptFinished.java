@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,8 +26,8 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.protocol.DatanodeInfo;
 
 /**
- * This class represents status from a block movement task. This will have the
- * information of the task which was successful or failed due to errors.
+ * 存储块移动任务完成后的结果信息，包含移动任务的执行状态、源节点、目标节点等核心信息，
+ * 用于在存储策略满足性调度（SPS）流程中传递任务执行结果。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -38,18 +39,13 @@ public class BlockMovementAttemptFinished {
   private final BlockMovementStatus status;
 
   /**
-   * Construct movement attempt finished info.
+   * 构造块移动任务完成结果对象。
    *
-   * @param block
-   *          block
-   * @param src
-   *          src datanode
-   * @param target
-   *          target datanode
-   * @param targetType
-   *          target storage type
-   * @param status
-   *          movement status
+   * @param block 待移动的块信息
+   * @param src 源数据节点
+   * @param target 目标数据节点
+   * @param targetType 目标存储类型
+   * @param status 移动任务执行状态
    */
   public BlockMovementAttemptFinished(Block block, DatanodeInfo src,
       DatanodeInfo target, StorageType targetType, BlockMovementStatus status) {
@@ -61,29 +57,32 @@ public class BlockMovementAttemptFinished {
   }
 
   /**
-   * @return details of the block, which attempted to move from src to target
-   *         node.
+   * 获取本次移动的块信息。
+   * @return 待移动块对象
    */
   public Block getBlock() {
     return block;
   }
 
   /**
-   * @return the target datanode where it moved the block.
+   * 获取本次移动的目标数据节点。
+   * @return 目标数据节点信息
    */
   public DatanodeInfo getTargetDatanode() {
     return target;
   }
 
   /**
-   * @return target storage type.
+   * 获取本次移动的目标存储类型。
+   * @return 目标存储类型
    */
   public StorageType getTargetType() {
     return targetType;
   }
 
   /**
-   * @return block movement status code.
+   * 获取本次块移动任务的执行状态。
+   * @return 块移动状态枚举
    */
   public BlockMovementStatus getStatus() {
     return status;

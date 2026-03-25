@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,11 +21,21 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.preempt
 
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
+/**
+ * 封装可被抢占杀死的容器信息，用于容量调度器抢占机制。
+ * 记录待kill容器、所属节点分区和叶子队列信息，为抢占决策提供元数据。
+ */
 public class KillableContainer {
   RMContainer container;
   String partition;
   String leafQueueName;
 
+  /**
+   * 构造可被抢占杀死的容器信息对象。
+   * @param container 待处理的RM容器实例
+   * @param partition 容器所在节点分区
+   * @param leafQueueName 容器所属叶子队列名称
+   */
   public KillableContainer(RMContainer container, String partition, String leafQueueName) {
     this.container = container;
     this.partition = partition;

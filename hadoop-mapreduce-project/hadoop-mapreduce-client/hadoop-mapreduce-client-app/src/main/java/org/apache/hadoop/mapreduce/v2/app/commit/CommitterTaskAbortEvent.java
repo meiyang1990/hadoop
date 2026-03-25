@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,11 +22,20 @@ package org.apache.hadoop.mapreduce.v2.app.commit;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
+/**
+ * 任务提交器的任务终止事件，封装任务尝试终止相关信息
+ * 用于MapReduce输出提交器处理任务异常终止流程
+ */
 public class CommitterTaskAbortEvent extends CommitterEvent {
 
   private final TaskAttemptId attemptID;
   private final TaskAttemptContext attemptContext;
 
+  /**
+   * 构造任务终止事件对象
+   * @param attemptID 任务尝试ID
+   * @param attemptContext 任务尝试上下文
+   */
   public CommitterTaskAbortEvent(TaskAttemptId attemptID,
       TaskAttemptContext attemptContext) {
     super(CommitterEventType.TASK_ABORT);
@@ -33,10 +43,18 @@ public class CommitterTaskAbortEvent extends CommitterEvent {
     this.attemptContext = attemptContext;
   }
 
+  /**
+   * 获取当前终止任务的尝试ID
+   * @return 任务尝试ID
+   */
   public TaskAttemptId getAttemptID() {
     return attemptID;
   }
 
+  /**
+   * 获取当前终止任务的上下文对象
+   * @return 任务尝试上下文
+   */
   public TaskAttemptContext getAttemptContext() {
     return attemptContext;
   }

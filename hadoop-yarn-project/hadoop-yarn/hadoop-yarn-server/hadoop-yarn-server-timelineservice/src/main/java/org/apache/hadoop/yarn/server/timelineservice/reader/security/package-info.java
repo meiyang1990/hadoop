@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,7 @@
  */
 
 /**
- * Package org.apache.hadoop.server.timelineservice.reader.security contains
- * classes to be used to support SPNEGO authentication for timeline reader.
+ * 时间线服务读取器安全认证包，提供时间线读取HTTP服务的SPNEGO认证支持，包含相关实现类。
  */
 @InterfaceAudience.Private
 package org.apache.hadoop.yarn.server.timelineservice.reader.security;

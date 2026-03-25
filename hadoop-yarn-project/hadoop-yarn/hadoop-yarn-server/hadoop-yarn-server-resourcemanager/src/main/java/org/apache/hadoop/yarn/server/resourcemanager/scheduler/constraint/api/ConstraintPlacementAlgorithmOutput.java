@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,34 +24,51 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Encapsulates the output of the ConstraintPlacementAlgorithm. The Algorithm
- * is free to produce multiple of output objects at the end of each run and it
- * must use the provided ConstraintPlacementAlgorithmOutputCollector to
- * aggregate/collect this output. Similar to the MapReduce Mapper/Reducer
- * which is provided a collector to collect output.
+ * 约束放置算法输出结果封装类，对应YARN调度中约束放置算法的计算结果。
+ * 类似MapReduce中Mapper/Reducer的输出收集器，算法每次运行可生成多个输出对象，
+ * 通过ConstraintPlacementAlgorithmOutputCollector收集汇总结果。
  */
 public class ConstraintPlacementAlgorithmOutput {
 
+  /** 所属应用的ID */
   private final ApplicationId applicationId;
 
+  /**
+   * 构造方法，绑定所属应用
+   * @param applicationId 应用ID
+   */
   public ConstraintPlacementAlgorithmOutput(ApplicationId applicationId) {
     this.applicationId = applicationId;
   }
 
+  /** 放置成功的调度请求列表 */
   private final List<PlacedSchedulingRequest> placedRequests =
       new ArrayList<>();
 
+  /** 放置失败被拒绝的调度请求列表 */
   private final List<SchedulingRequestWithPlacementAttempt> rejectedRequests =
       new ArrayList<>();
 
+  /**
+   * 获取放置成功的调度请求列表
+   * @return 放置成功请求列表
+   */
   public List<PlacedSchedulingRequest> getPlacedRequests() {
     return placedRequests;
   }
 
+  /**
+   * 获取放置被拒绝的调度请求列表
+   * @return 被拒绝请求列表
+   */
   public List<SchedulingRequestWithPlacementAttempt> getRejectedRequests() {
     return rejectedRequests;
   }
 
+  /**
+   * 获取所属应用ID
+   * @return 应用ID
+   */
   public ApplicationId getApplicationId() {
     return applicationId;
   }

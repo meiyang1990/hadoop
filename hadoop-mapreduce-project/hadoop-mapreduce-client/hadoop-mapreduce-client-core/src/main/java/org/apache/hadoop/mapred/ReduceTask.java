@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -57,7 +58,11 @@ import org.apache.hadoop.util.ReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** A Reduce task. */
+/**
+ * MapReduce Reduce任务实现类，负责执行Reduce阶段的核心逻辑：
+ * 包括混洗（Shuffle）拉取Map输出、排序分组、调用用户Reduce函数处理并输出结果
+ * 支持新旧两种MapReduce API，支持跳过错误记录、本地作业运行等特性
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class ReduceTask extends Task {
@@ -129,10 +134,21 @@ public class ReduceTask extends Task {
   private final SortedSet<FileStatus> mapOutputFilesOnDisk = 
       new TreeSet<FileStatus>(mapOutputFileComparator);
   
+  /**
+   * 空构造函数，用于Writable反序列化
+   */
   public ReduceTask() {
     super();
   }
 
+  /**
+   * 构造Reduce任务实例
+   * @param jobFile 作业配置文件路径
+   * @param taskId 任务尝试ID
+   * @param partition Reduce分区编号
+   * @param numMaps 该作业对应的Map任务总数
+   * @param numSlotsRequired 需要占用的资源槽位数
+   */
   public ReduceTask(String jobFile, TaskAttemptID taskId,
                     int partition, int numMaps, int numSlotsRequired) {
     super(jobFile, taskId, partition, numSlotsRequired);
@@ -141,15 +157,18 @@ public class ReduceTask extends Task {
   
 
   /**
-   * Register the set of mapper outputs created by a LocalJobRunner-based
-   * job with this ReduceTask so it knows where to fetch from.
-   *
-   * This should not be called in normal (networked) execution.
+   * 为LocalJobRunner本地运行模式设置本地Map输出文件位置映射，
+   * 让Reduce任务直接从本地文件拉取Map输出，不需要网络传输
+   * @param mapFiles Map任务尝试ID到输出文件的映射
    */
   public void setLocalMapFiles(Map<TaskAttemptID, MapOutputFile> mapFiles) {
     this.localMapFiles = mapFiles;
   }
 
+  /**
+   * 初始化Map输出压缩编解码器，如果作业启用了Map输出压缩则创建对应实例
+   * @return 压缩编解码器实例，未启用压缩则返回null
+   */
   private CompressionCodec initCodec() {
     // check if map-outputs are to be compressed
     if (conf.getCompressMapOutput()) {
@@ -162,6 +181,9 @@ public class ReduceTask extends Task {
   }
 
   @Override
+  /**
+   * 判断当前任务是否为Map任务，Reduce任务固定返回false
+   */
   public boolean isMapTask() {
     return false;
   }
@@ -169,7 +191,8 @@ public class ReduceTask extends Task {
   public int getNumMaps() { return numMaps; }
   
   /**
-   * Localize the given JobConf to be specific for this task.
+   * 本地化当前Reduce任务的配置，写入Map任务总数到配置中
+   * @param conf 任务配置对象
    */
   @Override
   public void localizeConfiguration(JobConf conf) throws IOException {
@@ -181,7 +204,7 @@ public class ReduceTask extends Task {
   public void write(DataOutput out) throws IOException {
     super.write(out);
 
-    out.writeInt(numMaps);                        // write the number of maps
+    out.writeInt(numMaps);                        // 写入Map任务总数
   }
 
   @Override
@@ -200,6 +223,11 @@ public class ReduceTask extends Task {
     return fileList.toArray(new Path[0]);
   }
 
+  /**
+   * Reduce阶段值迭代器实现，统计输入记录数并更新Reduce阶段进度
+   * @param <KEY> 键类型
+   * @param <VALUE> 值类型
+   */
   private class ReduceValuesIterator<KEY,VALUE> 
           extends ValuesIterator<KEY,VALUE> {
     public ReduceValuesIterator (RawKeyValueIterator in,
@@ -221,12 +249,21 @@ public class ReduceTask extends Task {
       return super.next();
     }
     
+    /**
+     * 更新Reduce阶段进度并通知任务报告器
+     */
     public void informReduceProgress() {
       reducePhase.set(super.in.getProgress().getProgress()); // update progress
       reporter.progress();
     }
   }
 
+  /**
+   * 支持跳过错误分组的Reduce值迭代器，用于错误容忍模式，
+   * 根据配置跳过出问题的分组，避免整个Reduce任务失败
+   * @param <KEY> 键类型
+   * @param <VALUE> 值类型
+   */
   private class SkippingReduceValuesIterator<KEY,VALUE> 
      extends ReduceValuesIterator<KEY,VALUE> {
      private SkipRangeIterator skipIt;
@@ -269,6 +306,10 @@ public class ReduceTask extends Task {
        return super.more() && hasNext; 
      }
      
+     /**
+      * 根据跳过范围检查并跳过需要跳过的分组，统计跳过数量
+      * @throws IOException IO异常
+      */
      private void mayBeSkip() throws IOException {
        hasNext = skipIt.hasNext();
        if(!hasNext) {
@@ -292,7 +333,7 @@ public class ReduceTask extends Task {
          skip++;
        }
        
-       //close the skip writer once all the ranges are skipped
+       // 所有需要跳过的范围处理完成后关闭跳过输出文件
        if(skip>0 && skipIt.skippedAllRanges() && skipWriter!=null) {
          skipWriter.close();
        }
@@ -302,6 +343,12 @@ public class ReduceTask extends Task {
      }
      
      @SuppressWarnings("unchecked")
+     /**
+      * 将跳过的记录写入跳过输出文件，便于后续分析
+      * @param key 跳过记录的键
+      * @param value 跳过记录的值
+      * @throws IOException IO异常
+      */
      private void writeSkippedRec(KEY key, VALUE value) throws IOException{
        if(skipWriter==null) {
          Path skipDir = SkipBadRecords.getSkipOutputPath(conf);
@@ -317,51 +364,66 @@ public class ReduceTask extends Task {
 
   @Override
   @SuppressWarnings("unchecked")
+  /**
+   * Reduce任务主执行方法，完成整个Reduce阶段流程：混洗拉取、排序、用户reduce执行、输出
+   * @param job 任务配置
+   * @param umbilical 与ApplicationMaster通信的协议对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   * @throws ClassNotFoundException 类找不到异常
+   */
   public void run(JobConf job, final TaskUmbilicalProtocol umbilical)
     throws IOException, InterruptedException, ClassNotFoundException {
     job.setBoolean(JobContext.SKIP_RECORDS, isSkipping());
 
     if (isMapOrReduce()) {
+      // 注册三个执行阶段的进度对象
       copyPhase = getProgress().addPhase("copy");
       sortPhase  = getProgress().addPhase("sort");
       reducePhase = getProgress().addPhase("reduce");
     }
-    // start thread that will handle communication with parent
+    // 启动与父服务通信的进度报告线程
     TaskReporter reporter = startReporter(umbilical);
     
     boolean useNewApi = job.getUseNewReducer();
     initialize(job, getJobID(), reporter, useNewApi);
 
-    // check if it is a cleanupJobTask
+    // 检查是否是作业清理任务，直接执行清理后退出
     if (jobCleanup) {
       runJobCleanupTask(umbilical, reporter);
       return;
     }
+    // 检查是否是作业初始化任务，直接执行初始化后退出
     if (jobSetup) {
       runJobSetupTask(umbilical, reporter);
       return;
     }
+    // 检查是否是任务清理任务，直接执行清理后退出
     if (taskCleanup) {
       runTaskCleanupTask(umbilical, reporter);
       return;
     }
     
-    // Initialize the codec
+    // 初始化压缩编解码器
     codec = initCodec();
     RawKeyValueIterator rIter = null;
     ShuffleConsumerPlugin shuffleConsumerPlugin = null;
     
+    // 如果配置了Combiner，创建Combiner输出收集器
     Class combinerClass = conf.getCombinerClass();
     CombineOutputCollector combineCollector = 
       (null != combinerClass) ? 
      new CombineOutputCollector(reduceCombineOutputCounter, reporter, conf) : null;
 
+    // 加载配置的Shuffle消费者插件类
     Class<? extends ShuffleConsumerPlugin> clazz =
           job.getClass(MRConfig.SHUFFLE_CONSUMER_PLUGIN, Shuffle.class, ShuffleConsumerPlugin.class);
 					
+    // 创建Shuffle消费者插件实例
     shuffleConsumerPlugin = ReflectionUtils.newInstance(clazz, job);
     LOG.info("Using ShuffleConsumerPlugin: " + shuffleConsumerPlugin);
 
+    // 构造Shuffle消费者上下文，初始化插件
     ShuffleConsumerPlugin.Context shuffleContext = 
       new ShuffleConsumerPlugin.Context(getTaskID(), job, FileSystem.getLocal(job), umbilical, 
                   super.lDirAlloc, reporter, codec, 
@@ -374,271 +436,20 @@ public class ReduceTask extends Task {
                   mapOutputFile, localMapFiles);
     shuffleConsumerPlugin.init(shuffleContext);
 
+    // 执行Shuffle拉取和合并排序，得到排序后的键值对迭代器
     rIter = shuffleConsumerPlugin.run();
 
-    // free up the data structures
+    // 清理磁盘上的Map输出文件引用
     mapOutputFilesOnDisk.clear();
     
-    sortPhase.complete();                         // sort is complete
+    // 排序阶段完成，切换到Reduce阶段，更新任务状态到ApplicationMaster
+    sortPhase.complete();
     setPhase(TaskStatus.Phase.REDUCE); 
     statusUpdate(umbilical);
     Class keyClass = job.getMapOutputKeyClass();
     Class valueClass = job.getMapOutputValueClass();
     RawComparator comparator = job.getOutputValueGroupingComparator();
 
+    // 根据API版本调用对应Reducer执行逻辑
     if (useNewApi) {
-      runNewReducer(job, umbilical, reporter, rIter, comparator, 
-                    keyClass, valueClass);
-    } else {
-      runOldReducer(job, umbilical, reporter, rIter, comparator, 
-                    keyClass, valueClass);
-    }
-
-    shuffleConsumerPlugin.close();
-    done(umbilical, reporter);
-  }
-
-  @SuppressWarnings("unchecked")
-  private <INKEY,INVALUE,OUTKEY,OUTVALUE>
-  void runOldReducer(JobConf job,
-                     TaskUmbilicalProtocol umbilical,
-                     final TaskReporter reporter,
-                     RawKeyValueIterator rIter,
-                     RawComparator<INKEY> comparator,
-                     Class<INKEY> keyClass,
-                     Class<INVALUE> valueClass) throws IOException {
-    Reducer<INKEY,INVALUE,OUTKEY,OUTVALUE> reducer = 
-      ReflectionUtils.newInstance(job.getReducerClass(), job);
-    // make output collector
-    String finalName = getOutputName(getPartition());
-
-    RecordWriter<OUTKEY, OUTVALUE> out = new OldTrackingRecordWriter<OUTKEY, OUTVALUE>(
-        this, job, reporter, finalName);
-    final RecordWriter<OUTKEY, OUTVALUE> finalOut = out;
-    
-    OutputCollector<OUTKEY,OUTVALUE> collector = 
-      new OutputCollector<OUTKEY,OUTVALUE>() {
-        public void collect(OUTKEY key, OUTVALUE value)
-          throws IOException {
-          finalOut.write(key, value);
-          // indicate that progress update needs to be sent
-          reporter.progress();
-        }
-      };
-    
-    // apply reduce function
-    try {
-      //increment processed counter only if skipping feature is enabled
-      boolean incrProcCount = SkipBadRecords.getReducerMaxSkipGroups(job)>0 &&
-        SkipBadRecords.getAutoIncrReducerProcCount(job);
-      
-      ReduceValuesIterator<INKEY,INVALUE> values = isSkipping() ? 
-          new SkippingReduceValuesIterator<INKEY,INVALUE>(rIter, 
-              comparator, keyClass, valueClass, 
-              job, reporter, umbilical) :
-          new ReduceValuesIterator<INKEY,INVALUE>(rIter, 
-          comparator, keyClass, valueClass,
-          job, reporter);
-      values.informReduceProgress();
-      while (values.more()) {
-        reduceInputKeyCounter.increment(1);
-        reducer.reduce(values.getKey(), values, collector, reporter);
-        if(incrProcCount) {
-          reporter.incrCounter(SkipBadRecords.COUNTER_GROUP, 
-              SkipBadRecords.COUNTER_REDUCE_PROCESSED_GROUPS, 1);
-        }
-        values.nextKey();
-        values.informReduceProgress();
-      }
-
-      reducer.close();
-      reducer = null;
-      
-      out.close(reporter);
-      out = null;
-    } finally {
-      IOUtils.cleanupWithLogger(LOG, reducer);
-      closeQuietly(out, reporter);
-    }
-  }
-
-  static class OldTrackingRecordWriter<K, V> implements RecordWriter<K, V> {
-
-    private final RecordWriter<K, V> real;
-    private final org.apache.hadoop.mapred.Counters.Counter reduceOutputCounter;
-    private final org.apache.hadoop.mapred.Counters.Counter fileOutputByteCounter;
-    private final List<Statistics> fsStats;
-
-    @SuppressWarnings({ "deprecation", "unchecked" })
-    public OldTrackingRecordWriter(ReduceTask reduce, JobConf job,
-        TaskReporter reporter, String finalName) throws IOException {
-      this.reduceOutputCounter = reduce.reduceOutputCounter;
-      this.fileOutputByteCounter = reduce.fileOutputByteCounter;
-      List<Statistics> matchedStats = null;
-      if (job.getOutputFormat() instanceof FileOutputFormat) {
-        matchedStats = getFsStatistics(FileOutputFormat.getOutputPath(job), job);
-      }
-      fsStats = matchedStats;
-
-      FileSystem fs = FileSystem.get(job);
-      long bytesOutPrev = getOutputBytes(fsStats);
-      this.real = job.getOutputFormat().getRecordWriter(fs, job, finalName,
-          reporter);
-      long bytesOutCurr = getOutputBytes(fsStats);
-      fileOutputByteCounter.increment(bytesOutCurr - bytesOutPrev);
-    }
-
-    @Override
-    public void write(K key, V value) throws IOException {
-      long bytesOutPrev = getOutputBytes(fsStats);
-      real.write(key, value);
-      long bytesOutCurr = getOutputBytes(fsStats);
-      fileOutputByteCounter.increment(bytesOutCurr - bytesOutPrev);
-      reduceOutputCounter.increment(1);
-    }
-
-    @Override
-    public void close(Reporter reporter) throws IOException {
-      long bytesOutPrev = getOutputBytes(fsStats);
-      real.close(reporter);
-      long bytesOutCurr = getOutputBytes(fsStats);
-      fileOutputByteCounter.increment(bytesOutCurr - bytesOutPrev);
-    }
-
-    private long getOutputBytes(List<Statistics> stats) {
-      if (stats == null) return 0;
-      long bytesWritten = 0;
-      for (Statistics stat: stats) {
-        bytesWritten = bytesWritten + stat.getBytesWritten();
-      }
-      return bytesWritten;
-    }
-  }
-
-  static class NewTrackingRecordWriter<K,V> 
-      extends org.apache.hadoop.mapreduce.RecordWriter<K,V> {
-    private final org.apache.hadoop.mapreduce.RecordWriter<K,V> real;
-    private final org.apache.hadoop.mapreduce.Counter outputRecordCounter;
-    private final org.apache.hadoop.mapreduce.Counter fileOutputByteCounter;
-    private final List<Statistics> fsStats;
-
-    @SuppressWarnings("unchecked")
-    NewTrackingRecordWriter(ReduceTask reduce,
-        org.apache.hadoop.mapreduce.TaskAttemptContext taskContext)
-        throws InterruptedException, IOException {
-      this.outputRecordCounter = reduce.reduceOutputCounter;
-      this.fileOutputByteCounter = reduce.fileOutputByteCounter;
-
-      List<Statistics> matchedStats = null;
-      if (reduce.outputFormat instanceof org.apache.hadoop.mapreduce.lib.output.FileOutputFormat) {
-        matchedStats = getFsStatistics(org.apache.hadoop.mapreduce.lib.output.FileOutputFormat
-            .getOutputPath(taskContext), taskContext.getConfiguration());
-      }
-
-      fsStats = matchedStats;
-
-      long bytesOutPrev = getOutputBytes(fsStats);
-      this.real = (org.apache.hadoop.mapreduce.RecordWriter<K, V>) reduce.outputFormat
-          .getRecordWriter(taskContext);
-      long bytesOutCurr = getOutputBytes(fsStats);
-      fileOutputByteCounter.increment(bytesOutCurr - bytesOutPrev);
-    }
-
-    @Override
-    public void close(TaskAttemptContext context) throws IOException,
-    InterruptedException {
-      long bytesOutPrev = getOutputBytes(fsStats);
-      real.close(context);
-      long bytesOutCurr = getOutputBytes(fsStats);
-      fileOutputByteCounter.increment(bytesOutCurr - bytesOutPrev);
-    }
-
-    @Override
-    public void write(K key, V value) throws IOException, InterruptedException {
-      long bytesOutPrev = getOutputBytes(fsStats);
-      real.write(key,value);
-      long bytesOutCurr = getOutputBytes(fsStats);
-      fileOutputByteCounter.increment(bytesOutCurr - bytesOutPrev);
-      outputRecordCounter.increment(1);
-    }
-
-    private long getOutputBytes(List<Statistics> stats) {
-      if (stats == null) return 0;
-      long bytesWritten = 0;
-      for (Statistics stat: stats) {
-        bytesWritten = bytesWritten + stat.getBytesWritten();
-      }
-      return bytesWritten;
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private <INKEY,INVALUE,OUTKEY,OUTVALUE>
-  void runNewReducer(JobConf job,
-                     final TaskUmbilicalProtocol umbilical,
-                     final TaskReporter reporter,
-                     RawKeyValueIterator rIter,
-                     RawComparator<INKEY> comparator,
-                     Class<INKEY> keyClass,
-                     Class<INVALUE> valueClass
-                     ) throws IOException,InterruptedException, 
-                              ClassNotFoundException {
-    // wrap value iterator to report progress.
-    final RawKeyValueIterator rawIter = rIter;
-    rIter = new RawKeyValueIterator() {
-      public void close() throws IOException {
-        rawIter.close();
-      }
-      public DataInputBuffer getKey() throws IOException {
-        return rawIter.getKey();
-      }
-      public Progress getProgress() {
-        return rawIter.getProgress();
-      }
-      public DataInputBuffer getValue() throws IOException {
-        return rawIter.getValue();
-      }
-      public boolean next() throws IOException {
-        boolean ret = rawIter.next();
-        reporter.setProgress(rawIter.getProgress().getProgress());
-        return ret;
-      }
-    };
-    // make a task context so we can get the classes
-    org.apache.hadoop.mapreduce.TaskAttemptContext taskContext =
-      new org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl(job,
-          getTaskID(), reporter);
-    // make a reducer
-    org.apache.hadoop.mapreduce.Reducer<INKEY,INVALUE,OUTKEY,OUTVALUE> reducer =
-      (org.apache.hadoop.mapreduce.Reducer<INKEY,INVALUE,OUTKEY,OUTVALUE>)
-        ReflectionUtils.newInstance(taskContext.getReducerClass(), job);
-    org.apache.hadoop.mapreduce.RecordWriter<OUTKEY,OUTVALUE> trackedRW = 
-      new NewTrackingRecordWriter<OUTKEY, OUTVALUE>(this, taskContext);
-    job.setBoolean("mapred.skip.on", isSkipping());
-    job.setBoolean(JobContext.SKIP_RECORDS, isSkipping());
-    org.apache.hadoop.mapreduce.Reducer.Context 
-         reducerContext = createReduceContext(reducer, job, getTaskID(),
-                                               rIter, reduceInputKeyCounter, 
-                                               reduceInputValueCounter, 
-                                               trackedRW,
-                                               committer,
-                                               reporter, comparator, keyClass,
-                                               valueClass);
-    try {
-      reducer.run(reducerContext);
-    } finally {
-      trackedRW.close(reducerContext);
-    }
-  }
-  
-  private <OUTKEY, OUTVALUE>
-  void closeQuietly(RecordWriter<OUTKEY, OUTVALUE> c, Reporter r) {
-    if (c != null) {
-      try {
-        c.close(r);
-      } catch (Exception e) {
-        LOG.info("Exception in closing " + c, e);
-      }
-    }
-  }
-}
+      runNewReducer(job, um

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,20 +27,39 @@ import org.apache.hadoop.yarn.server.volume.csi.VolumeId;
 import org.apache.hadoop.yarn.server.volume.csi.VolumeMetaData;
 
 /**
- * Major volume interface at RM's view, it maintains the volume states and
- * state transition according to the CSI volume lifecycle.
+ * YARN RM侧存储卷抽象接口，维护存储卷生命周期状态，根据CSI规范处理状态流转
  */
 @Private
 @Unstable
 public interface Volume extends EventHandler<VolumeEvent> {
 
+  /**
+   * 获取存储卷当前生命周期状态
+   * @return 存储卷当前状态
+   */
   VolumeState getVolumeState();
 
+  /**
+   * 获取存储卷唯一标识ID
+   * @return 存储卷ID
+   */
   VolumeId getVolumeId();
 
+  /**
+   * 获取存储卷元数据信息
+   * @return 存储卷元数据
+   */
   VolumeMetaData getVolumeMeta();
 
+  /**
+   * 获取CSI适配器客户端，用于和CSI适配器通信
+   * @return CSI适配器协议客户端
+   */
   CsiAdaptorProtocol getClient();
 
+  /**
+   * 设置CSI适配器客户端
+   * @param client CSI适配器协议客户端
+   */
   void setClient(CsiAdaptorProtocol client);
 }

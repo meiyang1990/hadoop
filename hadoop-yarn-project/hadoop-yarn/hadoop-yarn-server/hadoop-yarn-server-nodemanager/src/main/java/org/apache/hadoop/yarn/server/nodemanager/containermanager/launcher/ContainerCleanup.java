@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,11 +46,8 @@ import java.io.IOException;
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher.ContainerLaunch.EXIT_CODE_FILE_SUFFIX;
 
 /**
- * Cleanup the container.
- * Cancels the launch if launch has not started yet or signals
- * the executor to not execute the process if not already done so.
- * Also, sends a SIGTERM followed by a SIGKILL to the process if
- * the process id is available.
+ * 容器清理任务，负责在容器退出或被杀死后清理相关资源
+ * 如果容器尚未启动则取消启动，否则会给容器进程发送信号终止进程并清理文件资源
  */
 public class ContainerCleanup implements Runnable {
 
@@ -64,7 +62,15 @@ public class ContainerCleanup implements Runnable {
   private final ContainerLaunch launch;
   private final long sleepDelayBeforeSigKill;
 
-
+  /**
+   * 构造容器清理任务
+   * @param context NodeManager全局上下文
+   * @param configuration 配置对象
+   * @param dispatcher 事件分发器
+   * @param exec 容器执行器
+   * @param container 待清理的容器
+   * @param containerLaunch 容器启动对象
+   */
   public ContainerCleanup(Context context, Configuration configuration,
       Dispatcher dispatcher, ContainerExecutor exec,
       Container container,
@@ -88,14 +94,14 @@ public class ContainerCleanup implements Runnable {
     LOG.info("Cleaning up container " + containerIdStr);
 
     try {
+      // 在状态存储中标记容器已被杀死
       context.getNMStateStore().storeContainerKilled(containerId);
     } catch (IOException e) {
       LOG.error("Unable to mark container " + containerId
           + " killed in store", e);
     }
 
-    // launch flag will be set to true if process already launched,
-    // in process of launching, or failed to launch.
+    // 判断容器是否已经启动，只要启动完成/启动中/启动失败都算已启动
     boolean alreadyLaunched = !launch.markLaunched() ||
         launch.isLaunchCompleted();
     if (!alreadyLaunched) {
@@ -104,29 +110,23 @@ public class ContainerCleanup implements Runnable {
       return;
     }
     LOG.debug("Marking container {} as inactive", containerIdStr);
-    // this should ensure that if the container process has not launched
-    // by this time, it will never be launched
+    // 标记容器为非激活，确保未启动的容器不会再被启动
     exec.deactivateContainer(containerId);
     Path pidFilePath = launch.getPidFilePath();
     LOG.debug("Getting pid for container {} to kill"
         + " from pid file {}", containerIdStr, pidFilePath != null ?
         pidFilePath : "null");
-    // however the container process may have already started
-    try {
 
-      // get process id from pid file if available
-      // else if shell is still active, get it from the shell
+    try {
+      // 从pid文件或启动进程中获取容器进程ID
       String processId = launch.getContainerPid();
 
-      // kill process
       String user = container.getUser();
       if (processId != null) {
+        // 如果获取到进程ID，发送信号终止进程
         signalProcess(processId, user, containerIdStr);
       } else {
-        // Normally this means that the process was notified about
-        // deactivateContainer above and did not start.
-        // Since we already set the state to RUNNING or REINITIALIZING
-        // we have to send a killed event to continue.
+        // 如果还未生成pid文件，且启动未完成，直接发送容器杀死事件
         if (!launch.isLaunchCompleted()) {
           LOG.warn("Container clean up before pid file created "
               + containerIdStr);
@@ -137,15 +137,10 @@ public class ContainerCleanup implements Runnable {
                       ContainerExecutor.ExitCode.FORCE_KILLED.getExitCode() :
                       ContainerExecutor.ExitCode.TERMINATED.getExitCode(),
                   "Container terminated before pid file created."));
-          // There is a possibility that the launch grabbed the file name before
-          // the deactivateContainer above but it was slow enough to avoid
-          // getContainerPid.
-          // Increasing YarnConfiguration.NM_PROCESS_KILL_WAIT_MS
-          // reduces the likelihood of this race condition and process leak.
         }
       }
 
-      // rm container in docker
+      // 如果是Docker容器，提交延迟删除任务
       if (DockerLinuxContainerRuntime.isDockerContainerRequested(conf,
           container.getLaunchContext().getEnvironment())) {
         rmDockerContainerDelayed();
@@ -155,10 +150,11 @@ public class ContainerCleanup implements Runnable {
           "Exception when trying to cleanup container " + containerIdStr
               + ": " + StringUtils.stringifyException(e);
       LOG.warn(message);
+      // 更新容器诊断信息通知异常
       dispatcher.getEventHandler().handle(
           new ContainerDiagnosticsUpdateEvent(containerId, message));
     } finally {
-      // cleanup pid file if present
+      // 清理pid文件和退出码文件
       if (pidFilePath != null) {
         try {
           FileContext lfs = FileContext.getLocalFSFileContext();
@@ -172,7 +168,7 @@ public class ContainerCleanup implements Runnable {
     }
 
     try {
-      // Reap the container
+      // 收割容器资源
       launch.reapContainer();
     } catch (IOException ioe) {
       LOG.warn("{} exception trying to reap container. Ignoring.", containerId,
@@ -180,6 +176,9 @@ public class ContainerCleanup implements Runnable {
     }
   }
 
+  /**
+   * 向删除服务提交Docker容器延迟删除任务
+   */
   private void rmDockerContainerDelayed() {
     DeletionService deletionService = context.getDeletionService();
     DockerContainerDeletionTask deletionTask =
@@ -188,10 +187,18 @@ public class ContainerCleanup implements Runnable {
     deletionService.delete(deletionTask);
   }
 
+  /**
+   * 向容器进程发送终止信号，先发送TERM，延迟后再发送KILL
+   * @param processId 进程ID
+   * @param user 容器所属用户
+   * @param containerIdStr 容器ID字符串
+   * @throws IOException 发送信号失败时抛出
+   */
   private void signalProcess(String processId, String user,
       String containerIdStr) throws IOException {
     LOG.debug("Sending signal to pid {} as user {} for container {}",
         processId, user, containerIdStr);
+    // 如果配置了延迟，则先发送TERM信号，否则直接发送KILL
     final ContainerExecutor.Signal signal =
         sleepDelayBeforeSigKill > 0 ? ContainerExecutor.Signal.TERM :
             ContainerExecutor.Signal.KILL;
@@ -202,11 +209,20 @@ public class ContainerCleanup implements Runnable {
         (result ? "success" : "failed"));
 
     if (sleepDelayBeforeSigKill > 0) {
+      // 启动延迟杀死线程，等待配置时间后发送KILL信号
       new ContainerExecutor.DelayedProcessKiller(container, user, processId,
           sleepDelayBeforeSigKill, ContainerExecutor.Signal.KILL, exec).start();
     }
   }
 
+  /**
+   * 调用容器执行器发送信号给目标进程
+   * @param user 进程所属用户
+   * @param processId 目标进程ID
+   * @param signal 要发送的信号
+   * @return 发送是否成功
+   * @throws IOException 发送失败时抛出
+   */
   private boolean sendSignal(String user, String processId,
       ContainerExecutor.Signal signal)
       throws IOException {

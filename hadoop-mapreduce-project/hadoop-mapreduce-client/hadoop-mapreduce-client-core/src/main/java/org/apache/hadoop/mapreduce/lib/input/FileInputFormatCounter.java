@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,9 +22,16 @@ package org.apache.hadoop.mapreduce.lib.input;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+/**
+ * FileInputFormat计数器枚举类，定义了FileInputFormat使用的度量计数器
+ * 用于在MapReduce任务执行过程中统计输入文件相关的指标
+ */
 // Counters used by Task classes
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public enum FileInputFormatCounter {
+  /**
+   * 统计读取输入文件的总字节数
+   */
   BYTES_READ
 }

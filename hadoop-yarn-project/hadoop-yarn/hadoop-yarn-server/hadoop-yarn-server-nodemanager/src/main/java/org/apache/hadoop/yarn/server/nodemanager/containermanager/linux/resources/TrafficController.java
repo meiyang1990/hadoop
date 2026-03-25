@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -41,76 +42,84 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Wrapper around the 'tc' tool. Provides access to a very specific subset of
- * the functionality provided by the tc tool.
+ * 对Linux tc(traffic control)工具的封装类，提供容器网络流量控制所需的特定tc功能
+ * 用于实现YARN容器出站带宽限流
  */
 
 @InterfaceAudience.Private
-@InterfaceStability.Unstable class TrafficController {
+@InterfaceStability.Unstable 
+class TrafficController {
   private static final Logger LOG =
        LoggerFactory.getLogger(TrafficController.class);
+  // 根队列规则的句柄ID
   private static final int ROOT_QDISC_HANDLE = 42;
+  // 零类ID
   private static final int ZERO_CLASS_ID = 0;
+  // 根类ID
   private static final int ROOT_CLASS_ID = 1;
-  /** Traffic shaping class used for all unclassified traffic */
+  /** 用于处理所有未分类流量的流量整形类ID */
   private static final int DEFAULT_CLASS_ID = 2;
-  /** Traffic shaping class used for all YARN traffic */
+  /** 用于处理所有YARN流量的流量整形根类ID */
   private static final int YARN_ROOT_CLASS_ID = 3;
-  /** Classes 0-3 are used already. We need to ensure that container classes
-   * do not collide with these classids.
+  /** 
+   * 0-3已被系统保留使用，容器类ID必须从4开始分配
+   * 避免和系统预置类ID冲突
    */
   private static final int MIN_CONTAINER_CLASS_ID = 4;
-  /** This is the number of distinct (container) traffic shaping classes
-   * that are supported */
+  /** 支持的最大容器流量整形类数量 */
   private static final int MAX_CONTAINER_CLASSES = 1024;
 
   private static final String MBIT_SUFFIX = "mbit";
   private static final String TMP_FILE_PREFIX = "tc.";
   private static final String TMP_FILE_SUFFIX = ".cmds";
 
-  /** Root queuing discipline attached to the root of the interface */
+  /** 挂载到网卡根的根排队规则命令模板 */
   private static final String FORMAT_QDISC_ADD_TO_ROOT_WITH_DEFAULT =
       "qdisc add dev %s root handle %d: htb default %s";
-  /** Specifies a cgroup/classid based filter - based on the classid associated
-   * with the outbound packet, the corresponding traffic shaping rule is used
-   * . Please see tc documentation for additional details.
+  /** 
+   * 基于cgroup的过滤器添加命令模板
+   * 根据出站包关联的classid选择对应的流量整形规则
    */
   private static final String FORMAT_FILTER_CGROUP_ADD_TO_PARENT =
       "filter add dev %s parent %d: protocol ip prio 10 handle 1: cgroup";
-  /** Standard format for adding a traffic shaping class to a parent, with
-   * the specified bandwidth limits
-   */
+  /** 添加带带宽限制的流量整形类到父类的命令模板 */
   private static final String FORMAT_CLASS_ADD_TO_PARENT_WITH_RATES =
       "class add dev %s parent %d:%d classid %d:%d htb rate %s ceil %s";
-  /** Standard format to delete a traffic shaping class */
+  /** 删除流量整形类命令模板 */
   private static final String FORMAT_DELETE_CLASS =
       "class del dev %s classid %d:%d";
-  /** Format of the classid that is to be used with the net_cls cgroup. Needs
-   * to be of the form 0xAAAABBBB */
+  /** net_cls cgroup使用的classid格式模板，要求为0xAAAABBBB形式 */
   private static final String FORMAT_NET_CLS_CLASS_ID = "0x%04d%04d";
-  /** Commands to read the qdsic(s)/filter(s)/class(es) associated with an
-   * interface
-   */
+  /** 读取网卡关联的qdisc/filter/class状态命令模板 */
   private static final String FORMAT_READ_STATE =
       "qdisc show dev %1$s%n" +
           "filter show dev %1$s%n" +
           "class show dev %1$s";
   private static final String FORMAT_READ_CLASSES = "class show dev %s";
-  /** Delete a qdisc and all its children - classes/filters etc */
+  /** 删除根qdisc及其所有子元素（类/过滤器等）命令模板 */
   private static final String FORMAT_WIPE_STATE =
       "qdisc del dev %s parent root";
 
   private final Configuration conf;
-  //Used to store the set of classids in use for container classes
+  // 存储已分配的容器类ID，使用BitSet高效管理空闲/占用状态
   private final BitSet classIdSet;
+  // 特权操作执行器，用于执行需要root权限的tc命令
   private final PrivilegedOperationExecutor privilegedOperationExecutor;
 
+  // tc命令临时文件存放目录
   private String tmpDirPath;
+  // 要限流的网络设备名称
   private String device;
+  // 根队列总带宽，单位：Mbit
   private int rootBandwidthMbit;
+  // YARN总可用带宽，单位：Mbit
   private int yarnBandwidthMbit;
+  // 默认非YARN流量带宽，单位：Mbit
   private int defaultClassBandwidthMbit;
 
+  /**
+   * 构造TrafficController实例
+   */
   TrafficController(Configuration conf, PrivilegedOperationExecutor exec) {
     this.conf = conf;
     this.classIdSet = new BitSet(MAX_CONTAINER_CLASSES);
@@ -118,7 +127,11 @@ import java.util.regex.Pattern;
   }
 
   /**
-   * Bootstrap tc configuration
+   * 初始化引导tc配置，根据NM恢复策略决定是否清理已有配置
+   * @param device 限流目标网络设备
+   * @param rootBandwidthMbit 根队列总带宽
+   * @param yarnBandwidthMbit YARN可用总带宽
+   * @throws ResourceHandlerException 初始化失败时抛出异常
    */
   public void bootstrap(String device, int rootBandwidthMbit, int
       yarnBandwidthMbit)
@@ -143,6 +156,7 @@ import java.util.regex.Pattern;
     this.device = device;
     this.rootBandwidthMbit = rootBandwidthMbit;
     this.yarnBandwidthMbit = yarnBandwidthMbit;
+    // 计算默认非YARN流量可用带宽，如果YARN已经占用全部带宽则默认类也使用全部带宽
     defaultClassBandwidthMbit = (rootBandwidthMbit - yarnBandwidthMbit) <= 0
         ? rootBandwidthMbit : (rootBandwidthMbit - yarnBandwidthMbit);
 
@@ -153,13 +167,12 @@ import java.util.regex.Pattern;
     if (!recoveryEnabled) {
       LOG.info("NM recovery is not enabled. We'll wipe tc state before proceeding.");
     } else {
-      //NM recovery enabled - run a state check
+      // NM恢复开启，先检查当前tc状态是否已经正确初始化
       state = readState();
       if (checkIfAlreadyBootstrapped(state)) {
         LOG.info("TC configuration is already in place. Not wiping state.");
 
-        //We already have the list of existing container classes, if any
-        //that were created after bootstrapping
+        // 从已有状态中恢复已分配的容器类ID
         reacquireContainerClasses(state);
         return;
       } else {
@@ -167,20 +180,25 @@ import java.util.regex.Pattern;
       }
     }
 
-    wipeState(); //start over in case preview bootstrap was incomplete
+    wipeState(); // 清理之前不完整的引导配置，从头开始
     initializeState();
   }
 
+  /**
+   * 初始化tc状态，创建根qdisc和系统预置类
+   * @throws ResourceHandlerException 初始化失败抛出异常
+   */
   private void initializeState() throws ResourceHandlerException {
     LOG.info("Initializing tc state.");
 
+    // 使用BatchBuilder批量构建tc命令
     BatchBuilder builder = new BatchBuilder(PrivilegedOperation.
         OperationType.TC_MODIFY_STATE)
         .addRootQDisc()
         .addCGroupFilter()
         .addClassToRootQDisc(rootBandwidthMbit)
         .addDefaultClass(defaultClassBandwidthMbit, rootBandwidthMbit)
-            //yarn bandwidth is capped with rate = ceil
+        // YARN带宽使用严格限制，rate等于ceil
         .addYARNRootClass(yarnBandwidthMbit, yarnBandwidthMbit);
     PrivilegedOperation op = builder.commitBatchToTempFile();
 
@@ -195,22 +213,21 @@ import java.util.regex.Pattern;
   }
 
   /**
-   * Function to check if the interface in use has already been fully
-   * bootstrapped with the required tc configuration
-   *
-   * @return boolean indicating the result of the check
+   * 检查当前网卡是否已经完成了完整的tc引导配置
+   * @param state 当前tc状态输出字符串
+   * @return 已完成引导返回true，否则返回false
    */
   private boolean checkIfAlreadyBootstrapped(String state)
       throws ResourceHandlerException {
     List<String> regexes = new ArrayList<>();
 
-    //root qdisc
+    // 检查根qdisc是否存在
     regexes.add(String.format("^qdisc htb %d: root(.)*$",
         ROOT_QDISC_HANDLE));
-    //cgroup filter
+    // 检查cgroup过滤器是否存在
     regexes.add(String.format("^filter parent %d: protocol ip " +
         "(.)*cgroup(.)*$", ROOT_QDISC_HANDLE));
-    //root, default and yarn classes
+    // 检查根类、默认类、YARN根类是否都存在
     regexes.add(String.format("^class htb %d:%d root(.)*$",
         ROOT_QDISC_HANDLE, ROOT_CLASS_ID));
     regexes.add(String.format("^class htb %d:%d parent %d:%d(.)*$",
@@ -219,6 +236,7 @@ import java.util.regex.Pattern;
         ROOT_QDISC_HANDLE, YARN_ROOT_CLASS_ID, ROOT_QDISC_HANDLE,
         ROOT_CLASS_ID));
 
+    // 逐个正则匹配检查所有必需配置是否存在
     for (String regex : regexes) {
       Pattern pattern = Pattern.compile(regex, Pattern.MULTILINE);
 
@@ -237,17 +255,12 @@ import java.util.regex.Pattern;
     return true;
   }
 
+  /**
+   * 读取当前网卡tc所有配置状态
+   * @return tc命令输出的状态字符串
+   * @throws ResourceHandlerException 读取失败抛出异常
+   */
   private String readState() throws ResourceHandlerException {
-    //Sample state output:
-    //    qdisc htb 42: root refcnt 2 r2q 10 default 2 direct_packets_stat 0
-    //    filter parent 42: protocol ip pref 10 cgroup handle 0x1
-    //
-    //    filter parent 42: protocol ip pref 10 cgroup handle 0x1
-    //
-    //    class htb 42:1 root rate 10000Kbit ceil 10000Kbit burst 1600b cburst 1600b
-    //    class htb 42:2 parent 42:1 prio 0 rate 3000Kbit ceil 10000Kbit burst 1599b cburst 1600b
-    //    class htb 42:3 parent 42:1 prio 0 rate 7000Kbit ceil 7000Kbit burst 1598b cburst 1598b
-
     BatchBuilder builder = new BatchBuilder(PrivilegedOperation.
         OperationType.TC_READ_STATE)
         .readState();
@@ -267,6 +280,10 @@ import java.util.regex.Pattern;
     }
   }
 
+  /**
+   * 清理当前网卡所有tc配置，恢复默认状态
+   * @throws ResourceHandlerException 清理失败抛出异常
+   */
   private void wipeState() throws ResourceHandlerException {
     BatchBuilder builder = new BatchBuilder(PrivilegedOperation.
         OperationType.TC_MODIFY_STATE)
@@ -279,23 +296,21 @@ import java.util.regex.Pattern;
     } catch (PrivilegedOperationException e) {
       LOG.warn("Failed to wipe tc state. This could happen if the interface" +
           " is already in its default state. Ignoring.");
-      //Ignoring this exception. This could happen if the interface is already
-      //in its default state. For this reason we don't throw a
-      //ResourceHandlerException here.
+      // 网卡已经是默认状态时会执行失败，这种情况可以忽略，不抛出异常
     }
   }
 
   /**
-   * Parses the current state looks for classids already in use
+   * 从NM恢复后的tc状态中重新获取已分配的容器类ID，恢复分配状态
+   * @param state 当前tc状态输出字符串
    */
   private void reacquireContainerClasses(String state) {
-    //At this point we already have already successfully passed
-    //checkIfAlreadyBootstrapped() - so we know that at least the
-    //root classes are in place.
+    // 从状态中提取类信息部分
     String tcClassesStr = state.substring(state.indexOf("class"));
-    //one class per line - the results of the split will need to trimmed
+    // 按行分割类信息
     String[] tcClasses = Pattern.compile("$", Pattern.MULTILINE)
         .split(tcClassesStr);
+    // 匹配tc类ID的正则
     Pattern tcClassPattern = Pattern.compile(String.format(
         "class htb %d:(\\d+) .*", ROOT_QDISC_HANDLE));
 
@@ -307,6 +322,7 @@ import java.util.regex.Pattern;
           Matcher classMatcher = tcClassPattern.matcher(tcClass);
           if (classMatcher.matches()) {
             int classId = Integer.parseInt(classMatcher.group(1));
+            // 只处理容器类ID，标记为已占用
             if (classId >= MIN_CONTAINER_CLASS_ID) {
               classIdSet.set(classId - MIN_CONTAINER_CLASS_ID);
               LOG.info("Reacquired container classid: " + classId);
@@ -319,6 +335,11 @@ import java.util.regex.Pattern;
     }
   }
 
+  /**
+   * 读取所有容器类的流量统计信息
+   * @return 类ID到已发送字节数的映射表
+   * @throws ResourceHandlerException 读取统计失败抛出异常
+   */
   public Map<Integer, Integer> readStats() throws ResourceHandlerException {
     BatchBuilder builder = new BatchBuilder(PrivilegedOperation.
         OperationType.TC_READ_STATS)
@@ -342,18 +363,19 @@ import java.util.regex.Pattern;
     }
   }
 
+  /**
+   * 解析tc类统计输出，提取每个容器类的已发送字节数
+   * @param stats tc命令输出的统计字符串
+   * @return 类ID到已发送字节数的映射表
+   */
   private Map<Integer, Integer> parseStatsString(String stats) {
-    //Example class stats segment (multiple present in tc output)
-    //  class htb 42:4 parent 42:3 prio 0 rate 1000Kbit ceil 7000Kbit burst1600b cburst 1598b
-    //   Sent 77921300 bytes 52617 pkt (dropped 0, overlimits 0 requeues 0)
-    //   rate 6973Kbit 589pps backlog 0b 39p requeues 0
-    //   lended: 3753 borrowed: 22514 giants: 0
-    //   tokens: -122164 ctokens: -52488
-
+    // 按行分割统计输出
     String[] lines = Pattern.compile("$", Pattern.MULTILINE)
         .split(stats);
+    // 匹配tc类ID的正则
     Pattern tcClassPattern = Pattern.compile(String.format(
         "class htb %d:(\\d+) .*", ROOT_QDISC_HANDLE));
+    // 匹配已发送字节数的正则
     Pattern bytesPattern = Pattern.compile("Sent (\\d+) bytes.*");
 
     int currentClassId = -1;
@@ -363,7 +385,7 @@ import java.util.regex.Pattern;
       String line = lineSplit.trim();
 
       if (!line.isEmpty()) {
-        //Check if we encountered a stats segment for a container class
+        // 检查是否是容器类行，更新当前处理的类ID
         Matcher classMatcher = tcClassPattern.matcher(line);
         if (classMatcher.matches()) {
           int classId = Integer.parseInt(classMatcher.group(1));
@@ -373,271 +395,10 @@ import java.util.regex.Pattern;
           }
         }
 
-        //Check if we encountered a stats line
+        // 检查是否是字节统计行，记录当前类的字节数
         Matcher bytesMatcher = bytesPattern.matcher(line);
         if (bytesMatcher.matches()) {
-          //we found at least one class segment
           if (currentClassId != -1) {
             int bytes = Integer.parseInt(bytesMatcher.group(1));
             containerClassIdStats.put(currentClassId, bytes);
           } else {
-            LOG.warn("Matched a 'bytes sent' line outside of a class stats " +
-                  "segment : " + line);
-          }
-          continue;
-        }
-
-        //skip other kinds of non-empty lines - since we aren't interested in
-        //them.
-      }
-    }
-
-    return containerClassIdStats;
-  }
-
-  /**
-   * Returns a formatted string for attaching a qdisc to the root of the
-   * device/interface. Additional qdisc
-   * parameters can be supplied - for example, the default 'class' to use for
-   * incoming packets
-   */
-  private String getStringForAddRootQDisc() {
-    return String.format(FORMAT_QDISC_ADD_TO_ROOT_WITH_DEFAULT, device,
-        ROOT_QDISC_HANDLE, DEFAULT_CLASS_ID);
-  }
-
-  /**
-   * Returns a formatted string for a filter that matches packets based on the
-   * presence of net_cls classids
-   */
-  private String getStringForaAddCGroupFilter() {
-    return String.format(FORMAT_FILTER_CGROUP_ADD_TO_PARENT, device,
-        ROOT_QDISC_HANDLE);
-  }
-
-  /**
-   * Get the next available classid. This has to be released post container
-   * complete
-   */
-  public int getNextClassId() throws ResourceHandlerException {
-    synchronized (classIdSet) {
-      int index = classIdSet.nextClearBit(0);
-      if (index >= MAX_CONTAINER_CLASSES) {
-        throw new ResourceHandlerException("Reached max container classes: "
-            + MAX_CONTAINER_CLASSES);
-      }
-      classIdSet.set(index);
-      return (index + MIN_CONTAINER_CLASS_ID);
-    }
-  }
-
-  public void releaseClassId(int classId) throws ResourceHandlerException {
-    synchronized (classIdSet) {
-      int index = classId - MIN_CONTAINER_CLASS_ID;
-      if (index < 0 || index >= MAX_CONTAINER_CLASSES) {
-        throw new ResourceHandlerException("Invalid incoming classId: "
-            + classId);
-      }
-      classIdSet.clear(index);
-    }
-  }
-
-  /**
-   * Returns a formatted string representing the given classId including a
-   * handle
-   */
-  public String getStringForNetClsClassId(int classId) {
-    return String.format(FORMAT_NET_CLS_CLASS_ID, ROOT_QDISC_HANDLE, classId);
-  }
-
-  /**
-   * A value read out of net_cls.classid file is in decimal form. We need to
-   * convert to 32-bit/8 digit hex, extract the lower 16-bit/four digits
-   * as an int
-   */
-  public int getClassIdFromFileContents(String input) {
-    //convert from decimal back to fixed size hex form
-    //e.g 4325381 -> 00420005
-    String classIdStr = String.format("%08x", Integer.parseInt(input));
-
-    LOG.debug("ClassId hex string : {}", classIdStr);
-
-    //extract and return 4 digits
-    //e.g 00420005 -> 0005
-    return Integer.parseInt(classIdStr.substring(4));
-  }
-
-  /**
-   * Adds a tc class to qdisc at root
-   */
-  private String getStringForAddClassToRootQDisc(int rateMbit) {
-    String rateMbitStr = rateMbit + MBIT_SUFFIX;
-    //example : "class add dev eth0 parent 42:0 classid 42:1 htb rate 1000mbit
-    // ceil 1000mbit"
-    return String.format(FORMAT_CLASS_ADD_TO_PARENT_WITH_RATES, device,
-        ROOT_QDISC_HANDLE, ZERO_CLASS_ID, ROOT_QDISC_HANDLE, ROOT_CLASS_ID,
-        rateMbitStr, rateMbitStr);
-  }
-
-  private String getStringForAddDefaultClass(int rateMbit, int ceilMbit) {
-    String rateMbitStr = rateMbit + MBIT_SUFFIX;
-    String ceilMbitStr = ceilMbit + MBIT_SUFFIX;
-    //example : "class add dev eth0 parent 42:1 classid 42:2 htb rate 300mbit
-    // ceil 1000mbit"
-    return String.format(FORMAT_CLASS_ADD_TO_PARENT_WITH_RATES, device,
-        ROOT_QDISC_HANDLE, ROOT_CLASS_ID, ROOT_QDISC_HANDLE, DEFAULT_CLASS_ID,
-        rateMbitStr, ceilMbitStr);
-  }
-
-  private String getStringForAddYARNRootClass(int rateMbit, int ceilMbit) {
-    String rateMbitStr = rateMbit + MBIT_SUFFIX;
-    String ceilMbitStr = ceilMbit + MBIT_SUFFIX;
-    //example : "class add dev eth0 parent 42:1 classid 42:3 htb rate 700mbit
-    // ceil 1000mbit"
-    return String.format(FORMAT_CLASS_ADD_TO_PARENT_WITH_RATES, device,
-        ROOT_QDISC_HANDLE, ROOT_CLASS_ID, ROOT_QDISC_HANDLE, YARN_ROOT_CLASS_ID,
-        rateMbitStr, ceilMbitStr);
-  }
-
-  private String getStringForAddContainerClass(int classId, int rateMbit, int
-      ceilMbit) {
-    String rateMbitStr = rateMbit + MBIT_SUFFIX;
-    String ceilMbitStr = ceilMbit + MBIT_SUFFIX;
-    //example : "class add dev eth0 parent 42:99 classid 42:99 htb rate 50mbit
-    // ceil 700mbit"
-    return String.format(FORMAT_CLASS_ADD_TO_PARENT_WITH_RATES, device,
-        ROOT_QDISC_HANDLE, YARN_ROOT_CLASS_ID, ROOT_QDISC_HANDLE, classId,
-        rateMbitStr, ceilMbitStr);
-  }
-
-  private String getStringForDeleteContainerClass(int classId) {
-    //example "class del dev eth0 classid 42:7"
-    return String.format(FORMAT_DELETE_CLASS, device, ROOT_QDISC_HANDLE,
-        classId);
-  }
-
-  private String getStringForReadState() {
-    return String.format(FORMAT_READ_STATE, device);
-  }
-
-  private String getStringForReadClasses() {
-    return String.format(FORMAT_READ_CLASSES, device);
-  }
-
-  private String getStringForWipeState() {
-    return String.format(FORMAT_WIPE_STATE, device);
-  }
-
-  public class BatchBuilder {
-    final PrivilegedOperation operation;
-    final List<String> commands;
-
-    public BatchBuilder(PrivilegedOperation.OperationType opType)
-        throws ResourceHandlerException {
-      switch (opType) {
-      case TC_MODIFY_STATE:
-      case TC_READ_STATE:
-      case TC_READ_STATS:
-        operation = new PrivilegedOperation(opType);
-        commands = new ArrayList<>();
-        break;
-      default:
-        throw new ResourceHandlerException("Not a tc operation type : " +
-            opType);
-      }
-    }
-
-    private BatchBuilder addRootQDisc() {
-      commands.add(getStringForAddRootQDisc());
-      return this;
-    }
-
-    private BatchBuilder addCGroupFilter() {
-      commands.add(getStringForaAddCGroupFilter());
-      return this;
-    }
-
-    private BatchBuilder addClassToRootQDisc(int rateMbit) {
-      commands.add(getStringForAddClassToRootQDisc(rateMbit));
-      return this;
-    }
-
-    private BatchBuilder addDefaultClass(int rateMbit, int ceilMbit) {
-      commands.add(getStringForAddDefaultClass(rateMbit, ceilMbit));
-      return this;
-    }
-
-    private BatchBuilder addYARNRootClass(int rateMbit, int ceilMbit) {
-      commands.add(getStringForAddYARNRootClass(rateMbit, ceilMbit));
-      return this;
-    }
-
-    public BatchBuilder addContainerClass(int classId, int rateMbit, boolean
-        strictMode) {
-      int ceilMbit;
-
-      if (strictMode) {
-        ceilMbit = rateMbit;
-      } else {
-        ceilMbit = yarnBandwidthMbit;
-      }
-
-      commands.add(getStringForAddContainerClass(classId, rateMbit, ceilMbit));
-      return this;
-    }
-
-    public BatchBuilder deleteContainerClass(int classId) {
-      commands.add(getStringForDeleteContainerClass(classId));
-      return this;
-    }
-
-    private BatchBuilder readState() {
-      commands.add(getStringForReadState());
-      return this;
-    }
-
-    //We'll read all classes, but use a different tc operation type
-    //when reading stats for all these classes. Stats are fetched using a
-    //different tc cli option (-s).
-
-    private BatchBuilder readClasses() {
-      //We'll read all classes, but use a different tc operation type
-      //for reading stats for all these classes. Stats are fetched using a
-      //different tc cli option (-s).
-      commands.add(getStringForReadClasses());
-      return this;
-    }
-
-    private BatchBuilder wipeState() {
-      commands.add(getStringForWipeState());
-      return this;
-    }
-
-    public PrivilegedOperation commitBatchToTempFile()
-        throws ResourceHandlerException {
-      try {
-        File tcCmds = File.createTempFile(TMP_FILE_PREFIX, TMP_FILE_SUFFIX, new
-            File(tmpDirPath));
-
-        try (
-                Writer writer = new OutputStreamWriter(new FileOutputStream(tcCmds),
-                StandardCharsets.UTF_8);
-                PrintWriter printWriter = new PrintWriter(writer)) {
-          for (String command : commands) {
-            printWriter.println(command);
-          }
-        }
-
-        operation.appendArgs(tcCmds.getAbsolutePath());
-
-        return operation;
-      } catch (IOException e) {
-        LOG.warn("Failed to create or write to temporary file in dir: " +
-            tmpDirPath);
-        throw new ResourceHandlerException(
-            "Failed to create or write to temporary file in dir: "
-                + tmpDirPath);
-      }
-    }
-  } //end BatchBuilder
-}

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdfs.server.protocol.BlockStorageMovementCommand.BlockM
 import org.apache.hadoop.net.NetworkTopology;
 
 /**
+ * 文件级注释：存储策略满足器(SPS)与NameNode模块之间的通信接口，定义SPS访问NameNode核心能力的统一契约
  * An interface for the communication between SPS and Namenode module.
  */
 @InterfaceAudience.Private
@@ -38,104 +40,92 @@ import org.apache.hadoop.net.NetworkTopology;
 public interface Context {
 
   /**
-   * Returns true if the SPS is running, false otherwise.
+   * 检查SPS服务当前是否正在运行
+   * @return true表示SPS正在运行，false表示已停止
    */
   boolean isRunning();
 
   /**
-   * Returns true if the Namenode in safe mode, false otherwise.
+   * 检查NameNode当前是否处于安全模式
+   * @return true表示NameNode在安全模式，false表示不在
    */
   boolean isInSafeMode();
 
   /**
-   * Gets the network topology.
-   *
-   * @param datanodeMap
-   *          target datanodes
-   *
-   * @return network topology
+   * 根据目标数据节点信息获取集群网络拓扑结构
+   * @param datanodeMap 目标数据节点信息映射
+   * @return 集群网络拓扑对象
    */
   NetworkTopology getNetworkTopology(DatanodeMap datanodeMap);
 
   /**
-   * Returns true if the give file exists in the Namespace.
-   *
-   * @param filePath
-   *          - file info
-   * @return true if the given file exists, false otherwise.
+   * 检查指定文件是否存在于NameNode命名空间中
+   * @param filePath 文件路径标识（inode ID）
+   * @return true表示文件存在，false表示不存在
    */
   boolean isFileExist(long filePath);
 
   /**
-   * Gets the storage policy details for the given policy ID.
-   *
-   * @param policyId
-   *          - Storage policy ID
-   * @return the detailed policy object
+   * 根据策略ID获取对应的存储策略详情
+   * @param policyId 存储策略ID
+   * @return 存储策略详细对象
    */
   BlockStoragePolicy getStoragePolicy(byte policyId);
 
   /**
-   * Remove the hint which was added to track SPS call.
-   *
-   * @param spsPath
-   *          - user invoked satisfier path
-   * @throws IOException
+   * 移除跟踪SPS调用的路径提示，处理完成后清理标记
+   * @param spsPath 需要清理的SPS路径标识（inode ID）
+   * @throws IOException IO操作异常时抛出
    */
   void removeSPSHint(long spsPath) throws IOException;
 
   /**
-   * Gets the number of live datanodes in the cluster.
-   *
-   * @return number of live datanodes
+   * 获取集群中存活数据节点的总数量
+   * @return 存活数据节点数量
    */
   int getNumLiveDataNodes();
 
   /**
-   * Get the file info for a specific file.
-   *
-   * @param file
-   *          file path
-   * @return file status metadata information
+   * 获取指定文件的元数据信息
+   * @param file 文件路径标识（inode ID）
+   * @return 文件状态元数据对象
+   * @throws IOException IO操作异常时抛出
    */
   HdfsFileStatus getFileInfo(long file) throws IOException;
 
   /**
-   * Returns all the live datanodes and its storage details.
-   *
-   * @throws IOException
+   * 获取所有存活数据节点的存储信息报告
+   * @return 存活数据节点存储报告数组
+   * @throws IOException IO操作异常时抛出
    */
   DatanodeStorageReport[] getLiveDatanodeStorageReport()
       throws IOException;
 
   /**
-   * @return next SPS path info to process.
+   * 获取下一个需要SPS处理的路径
+   * @return 待处理路径标识（inode ID），无待处理路径时返回null
    */
   Long getNextSPSPath();
 
   /**
-   * Do scan and collects the files under that directory and adds to the given
-   * BlockStorageMovementNeeded.
-   *
-   * @param filePath
-   *          file path
+   * 扫描指定目录下的所有文件，收集不符合存储策略的块并添加到处理队列
+   * @param filePath 根目录路径标识（inode ID）
+   * @throws IOException IO操作异常时抛出
+   * @throws InterruptedException 线程中断时抛出
    */
   void scanAndCollectFiles(long filePath)
       throws IOException, InterruptedException;
 
   /**
-   * Handles the block move tasks. BlockMovingInfo must contain the required
-   * info to move the block, that source location, destination location and
-   * storage types.
+   * 提交块移动任务，由NameNode调度数据节点执行块迁移
+   * @param blkMovingInfo 块移动信息，包含源位置、目标位置和存储类型等必要信息
+   * @throws IOException IO操作异常时抛出
    */
   void submitMoveTask(BlockMovingInfo blkMovingInfo) throws IOException;
 
   /**
-   * This can be used to notify to the SPS about block movement attempt
-   * finished. Then SPS will re-check whether it needs retry or not.
-   *
-   * @param moveAttemptFinishedBlks
-   *          list of movement attempt finished blocks
+   * 通知SPS模块块移动尝试已完成，由SPS判断是否需要重试
+   * @param moveAttemptFinishedBlks 移动尝试已完成的块数组
    */
   void notifyMovementTriedBlocks(Block[] moveAttemptFinishedBlks);
 }

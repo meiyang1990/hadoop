@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,117 +18,140 @@
  */
 package org.apache.hadoop.hdfs.util;
 
-/** Read-write lock interface for FSNamesystem. */
+/**
+ * 文件级注释：HDFS文件系统命名空间使用的读写锁接口，定义了不同模式读写锁的统一操作规范
+ * 为FSNamesystem提供可扩展的读写锁抽象，支持全局锁和分段锁等多种模式，提升并发访问性能
+ * 
+ * 读写锁接口，专门为HDFS的FSNamesystem设计，提供读写分离的并发控制能力
+ */
 public interface RwLock {
-  /** Acquire read lock. */
+  /**
+   * 获取默认全局模式的读锁
+   */
   default void readLock() {
     readLock(RwLockMode.GLOBAL);
   }
 
-  /** Acquire read lock.
-   * @param lockMode The lock type for acquiring a read lock
+  /**
+   * 根据指定锁模式获取读锁
+   * @param lockMode 要获取的读锁模式
    */
   void readLock(RwLockMode lockMode);
 
-  /** Acquire read lock, unless interrupted while waiting.
-   * @throws InterruptedException if the thread is interrupted
+  /**
+   * 可中断方式获取默认全局模式读锁，等待过程中可响应中断
+   * @throws InterruptedException 等待过程中线程被中断时抛出
    */
   default void readLockInterruptibly() throws InterruptedException {
     readLockInterruptibly(RwLockMode.GLOBAL);
   }
 
-  /** Acquire read lock, unless interrupted while waiting.
-   * @param lockMode The lock type for acquiring a read lock
-   * @throws InterruptedException if the thread is interrupted
+  /**
+   * 可中断方式获取指定模式读锁，等待过程中可响应中断
+   * @param lockMode 要获取的读锁模式
+   * @throws InterruptedException 等待过程中线程被中断时抛出
    */
   void readLockInterruptibly(RwLockMode lockMode) throws InterruptedException;
 
-  /** Release read lock. */
+  /**
+   * 释放默认全局模式读锁，使用默认操作名
+   */
   default void readUnlock() {
     readUnlock(RwLockMode.GLOBAL, "OTHER");
   }
 
   /**
-   * Release read lock with operation name.
-   * @param opName Option name.
+   * 释放默认全局模式读锁，指定当前操作名称
+   * @param opName 当前操作名称，用于日志和监控
    */
   default void readUnlock(String opName) {
     readUnlock(RwLockMode.GLOBAL, opName);
   }
 
   /**
-   * Release read lock with operation name.
-   * @param lockMode The lock type for releasing the read lock
-   * @param opName Option name.
+   * 释放指定模式读锁，指定当前操作名称
+   * @param lockMode 要释放的读锁模式
+   * @param opName 当前操作名称，用于日志和监控
    */
   void readUnlock(RwLockMode lockMode, String opName);
 
-  /** Check if the current thread holds read lock.
-   * @return true if the read lock is held by the current thread, else false
+  /**
+   * 检查当前线程是否持有默认全局模式读锁
+   * @return true如果当前线程持有读锁，否则返回false
    */
   default boolean hasReadLock() {
     return hasReadLock(RwLockMode.GLOBAL);
   }
 
-  /** Check if the current thread holds read lock.
-   * @param lockMode The lock type used to check whether a read lock is held
-   * @return true if the read lock is held by the current thread, else false
+  /**
+   * 检查当前线程是否持有指定模式读锁
+   * @param lockMode 要检查的读锁模式
+   * @return true如果当前线程持有对应读锁，否则返回false
    */
   boolean hasReadLock(RwLockMode lockMode);
 
-  /** Acquire write lock. */
+  /**
+   * 获取默认全局模式写锁
+   */
   default void writeLock() {
     writeLock(RwLockMode.GLOBAL);
   }
 
-  /** Acquire write lock.
-   * @param lockMode The lock type for acquiring a write lock
+  /**
+   * 根据指定锁模式获取写锁
+   * @param lockMode 要获取的写锁模式
    */
   void writeLock(RwLockMode lockMode);
   
-  /** Acquire write lock, unless interrupted while waiting.
-   * @throws InterruptedException if the thread is interrupted
+  /**
+   * 可中断方式获取默认全局模式写锁，等待过程中可响应中断
+   * @throws InterruptedException 等待过程中线程被中断时抛出
    */
   default void writeLockInterruptibly() throws InterruptedException {
     writeLockInterruptibly(RwLockMode.GLOBAL);
   }
 
-  /** Acquire write lock, unless interrupted while waiting.
-   * @param lockMode The lock type for acquiring a write lock
-   * @throws InterruptedException if the thread is interrupted
+  /**
+   * 可中断方式获取指定模式写锁，等待过程中可响应中断
+   * @param lockMode 要获取的写锁模式
+   * @throws InterruptedException 等待过程中线程被中断时抛出
    */
   void writeLockInterruptibly(RwLockMode lockMode) throws InterruptedException;
 
-  /** Release write lock. */
+  /**
+   * 释放默认全局模式写锁，使用默认操作名
+   */
   default void writeUnlock() {
     writeUnlock(RwLockMode.GLOBAL, "OTHER");
   }
 
   /**
-   * Release write lock with operation name.
-   * @param opName Option name.
+   * 释放默认全局模式写锁，指定当前操作名称
+   * @param opName 当前操作名称，用于日志和监控
    */
   default void writeUnlock(String opName) {
     writeUnlock(RwLockMode.GLOBAL, opName);
   }
 
   /**
-   * Release write lock with operation name.
-   * @param lockMode The lock type for releasing the write lock
-   * @param opName Option name.
+   * 释放指定模式写锁，指定当前操作名称
+   * @param lockMode 要释放的写锁模式
+   * @param opName 当前操作名称，用于日志和监控
    */
   void writeUnlock(RwLockMode lockMode, String opName);
 
-  /** Check if the current thread holds write lock.
-   * @return true if the write lock is held by the current thread, else false
+  /**
+   * 检查当前线程是否持有默认全局模式写锁
+   * @return true如果当前线程持有写锁，否则返回false
    */
   default boolean hasWriteLock() {
     return hasWriteLock(RwLockMode.GLOBAL);
   }
 
-  /** Check if the current thread holds write lock.
-   * @param lockMode The lock type used to check whether a write lock is held
-   * @return true if the write lock is held by the current thread, else false.
+  /**
+   * 检查当前线程是否持有指定模式写锁
+   * @param lockMode 要检查的写锁模式
+   * @return true如果当前线程持有对应写锁，否则返回false
    */
   boolean hasWriteLock(RwLockMode lockMode);
 }

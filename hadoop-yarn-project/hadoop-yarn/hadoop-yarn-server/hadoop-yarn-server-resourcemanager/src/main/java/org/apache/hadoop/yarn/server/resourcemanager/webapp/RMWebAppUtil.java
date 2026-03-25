@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -63,7 +64,7 @@ import org.apache.hadoop.yarn.server.security.http.RMAuthenticationFilterInitial
 import org.apache.hadoop.yarn.webapp.BadRequestException;
 
 /**
- * Util class for ResourceManager WebApp.
+ * ResourceManager WebApp 工具类，提供Web服务安全配置、应用提交上下文构造等公共能力。
  */
 public final class RMWebAppUtil {
 
@@ -71,31 +72,22 @@ public final class RMWebAppUtil {
       LoggerFactory.getLogger(RMWebAppUtil.class);
 
   /**
-   * Private constructor.
+   * 工具类禁止实例化，私有构造函数。
    */
   private RMWebAppUtil() {
     // not called
   }
 
   /**
-   * Helper method to setup filters and authentication for ResourceManager
-   * WebServices.
-   *
-   * Use the customized yarn filter instead of the standard kerberos filter to
-   * allow users to authenticate using delegation tokens 4 conditions need to be
-   * satisfied:
-   *
-   * 1. security is enabled.
-   *
-   * 2. http auth type is set to kerberos.
-   *
-   * 3. "yarn.resourcemanager.webapp.use-yarn-filter" override is set to true.
-   *
-   * 4. hadoop.http.filter.initializers container
-   * AuthenticationFilterInitializer.
-   *
-   * @param conf RM configuration.
-   * @param rmDTSecretManager RM specific delegation token secret manager.
+   * 为ResourceManager Web服务配置安全认证与过滤器链，支持代理用户、委派令牌认证等特性。
+   * 只有同时满足四个条件才会替换使用RM自定义认证过滤器：
+   * 1. 集群安全模式已启用
+   * 2. HTTP认证类型配置为kerberos
+   * 3. 配置启用RM自定义委派令牌认证过滤器
+   * 4. 原有过滤器链包含标准Hadoop认证过滤器初始化器
+   * 
+   * @param conf ResourceManager配置对象
+   * @param rmDTSecretManager RM委派令牌密钥管理器，用于认证过滤器验证令牌
    **/
   public static void setupSecurityAndFilters(Configuration conf,
       RMDelegationTokenSecretManager rmDTSecretManager) {
@@ -112,7 +104,7 @@ public final class RMWebAppUtil {
     String actualInitializers = "";
     Class<?>[] initializersClasses = conf.getClasses(filterInitializerConfKey);
 
-    // setup CORS
+    // 配置跨域资源共享过滤器
     if (enableCorsFilter) {
       conf.setBoolean(HttpCrossOriginFilterInitializer.PREFIX
           + HttpCrossOriginFilterInitializer.ENABLED_SUFFIX, true);
@@ -121,6 +113,7 @@ public final class RMWebAppUtil {
     boolean hasHadoopAuthFilterInitializer = false;
     boolean hasRMAuthFilterInitializer = false;
     if (initializersClasses != null) {
+      // 遍历现有过滤器初始化器，检查是否存在标准认证过滤器和RM认证过滤器
       for (Class<?> initializer : initializersClasses) {
         if (initializer.getName()
             .equals(AuthenticationFilterInitializer.class.getName())) {
@@ -131,6 +124,7 @@ public final class RMWebAppUtil {
           hasRMAuthFilterInitializer = true;
         }
       }
+      // 满足所有替换条件，替换标准Hadoop认证过滤器为RM自定义认证过滤器
       if (UserGroupInformation.isSecurityEnabled()
           && useYarnAuthenticationFilter && hasHadoopAuthFilterInitializer
           && conf.get(authTypeKey, "")
@@ -139,6 +133,7 @@ public final class RMWebAppUtil {
         for (Class<?> filterInitializer : initializersClasses) {
           if (filterInitializer.getName()
               .equals(AuthenticationFilterInitializer.class.getName())) {
+            // 如果还没有RM认证过滤器，添加进去
             if (!hasRMAuthFilterInitializer) {
               target.add(RMAuthenticationFilterInitializer.class.getName());
             }
@@ -147,30 +142,32 @@ public final class RMWebAppUtil {
           target.add(filterInitializer.getName());
         }
 
+        // 移除代理用户过滤器，由RM认证过滤器统一处理
         target.remove(ProxyUserAuthenticationFilterInitializer.class.getName());
 
+        // 生成新的过滤器初始化器配置字符串
         actualInitializers = StringUtils.join(",", target);
 
         LOG.info("Using RM authentication filter(kerberos/delegation-token)"
             + " for RM webapp authentication");
+        // 给RM认证过滤器设置委派令牌密钥管理器，用于令牌验证
         RMAuthenticationFilter
             .setDelegationTokenSecretManager(rmDTSecretManager);
+        // 更新配置，使用新的过滤器链
         conf.set(filterInitializerConfKey, actualInitializers);
       }
     }
 
-    // if security is not enabled and the default filter initializer has not
-    // been set, set the initializer to include the
-    // RMAuthenticationFilterInitializer which in turn will set up the simple
-    // auth filter.
-
+    // 非安全模式下，如果没有配置认证过滤器，添加RM简单认证过滤器
     String initializers = conf.get(filterInitializerConfKey);
     if (!UserGroupInformation.isSecurityEnabled()) {
       if (initializersClasses == null || initializersClasses.length == 0) {
+        // 完全没有配置过滤器，直接使用RM认证过滤器
         conf.set(filterInitializerConfKey,
             RMAuthenticationFilterInitializer.class.getName());
         conf.set(authTypeKey, "simple");
       } else if (initializers.equals(StaticUserWebFilter.class.getName())) {
+        // 已有静态用户过滤器，追加RM认证过滤器
         conf.set(filterInitializerConfKey,
             RMAuthenticationFilterInitializer.class.getName() + ","
                 + initializers);
@@ -180,28 +177,29 @@ public final class RMWebAppUtil {
   }
 
   /**
-   * Create the actual ApplicationSubmissionContext to be submitted to the RM
-   * from the information provided by the user.
+   * 根据用户通过WebAPI提交的应用信息，构造可提交给RM的ApplicationSubmissionContext对象。
    *
-   * @param newApp the information provided by the user
-   * @param conf RM configuration
-   * @return returns the constructed ApplicationSubmissionContext
-   * @throws IOException in case of Error
+   * @param newApp 用户通过Web提交的应用信息对象
+   * @param conf RM配置对象
+   * @return 构造完成的应用提交上下文，可直接提交给RM
+   * @throws IOException 解析过程中IO异常
    */
   public static ApplicationSubmissionContext createAppSubmissionContext(
       ApplicationSubmissionContextInfo newApp, Configuration conf)
       throws IOException {
 
-    // create local resources and app submission context
+    // 创建本地资源，构造应用提交上下文
 
     ApplicationId appid;
     String error =
         "Could not parse application id " + newApp.getApplicationId();
     try {
+      // 解析应用ID字符串
       appid = ApplicationId.fromString(newApp.getApplicationId());
     } catch (Exception e) {
       throw new BadRequestException(error);
     }
+    // 构造应用提交上下文核心对象
     ApplicationSubmissionContext appContext = ApplicationSubmissionContext
         .newInstance(appid, newApp.getApplicationName(), newApp.getQueue(),
             Priority.newInstance(newApp.getPriority()),
@@ -212,13 +210,17 @@ public final class RMWebAppUtil {
             newApp.getKeepContainersAcrossApplicationAttempts(),
             newApp.getAppNodeLabelExpression(),
             newApp.getAMContainerNodeLabelExpression());
+    // 设置应用标签
     appContext.setApplicationTags(newApp.getApplicationTags());
+    // 设置尝试失败有效间隔
     appContext.setAttemptFailuresValidityInterval(
         newApp.getAttemptFailuresValidityInterval());
+    // 如果提供了日志聚合上下文，设置进去
     if (newApp.getLogAggregationContextInfo() != null) {
       appContext.setLogAggregationContext(
           createLogAggregationContext(newApp.getLogAggregationContextInfo()));
     }
+    // 如果提供了预留ID，解析后设置进去
     String reservationIdStr = newApp.getReservationId();
     if (reservationIdStr != null && !reservationIdStr.isEmpty()) {
       ReservationId reservationId =
@@ -229,51 +231,51 @@ public final class RMWebAppUtil {
   }
 
   /**
-   * Create the actual Resource inside the ApplicationSubmissionContextInfo to
-   * be submitted to the RM from the information provided by the user.
+   * 根据用户提交的资源请求信息，构造Resource对象并校验资源请求不超过集群配置的最大值。
    *
-   * @param newApp the information provided by the user
-   * @param conf RM configuration
-   * @return returns the constructed Resource inside the
-   *         ApplicationSubmissionContextInfo
-   * @throws BadRequestException
+   * @param newApp 用户提交的应用信息
+   * @param conf RM配置对象
+   * @return 校验通过的Resource对象
+   * @throws BadRequestException 请求资源超过集群最大值时抛出
    */
   private static Resource createAppSubmissionContextResource(
       ApplicationSubmissionContextInfo newApp, Configuration conf)
       throws BadRequestException {
+    // 校验请求vCore数不超过集群最大值
     if (newApp.getResource().getvCores() > conf.getInt(
         YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES,
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_VCORES)) {
       String msg = "Requested more cores than configured max";
       throw new BadRequestException(msg);
     }
+    // 校验请求内存不超过集群最大值
     if (newApp.getResource().getMemorySize() > conf.getInt(
         YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
         YarnConfiguration.DEFAULT_RM_SCHEDULER_MAXIMUM_ALLOCATION_MB)) {
       String msg = "Requested more memory than configured max";
       throw new BadRequestException(msg);
     }
+    // 构造并返回Resource对象
     Resource r = Resource.newInstance(newApp.getResource().getMemorySize(),
         newApp.getResource().getvCores());
     return r;
   }
 
   /**
-   * Create the ContainerLaunchContext required for the
-   * ApplicationSubmissionContext. This function takes the user information and
-   * generates the ByteBuffer structures required by the ContainerLaunchContext
+   * 根据用户提交的容器启动信息，构造ContainerLaunchContext对象，处理Base64编码的凭证和辅助服务数据。
    *
-   * @param newApp the information provided by the user
-   * @return created context
-   * @throws BadRequestException
-   * @throws IOException
+   * @param newApp 用户提交的应用信息
+   * @return 构造完成的容器启动上下文
+   * @throws BadRequestException 解析数据失败时抛出
+   * @throws IOException IO处理异常时抛出
    */
   private static ContainerLaunchContext createContainerLaunchContext(
       ApplicationSubmissionContextInfo newApp)
       throws BadRequestException, IOException {
 
-    // create container launch context
+    // 构造容器启动上下文
 
+    // 处理辅助服务数据，解码Base64为ByteBuffer
     HashMap<String, ByteBuffer> hmap = new HashMap<String, ByteBuffer>();
     for (Map.Entry<String, String> entry : newApp
         .getContainerLaunchContextInfo().getAuxillaryServiceData().entrySet()) {
@@ -284,6 +286,7 @@ public final class RMWebAppUtil {
       }
     }
 
+    // 处理本地资源，转换为LocalResource对象
     HashMap<String, LocalResource> hlr = new HashMap<String, LocalResource>();
     for (Map.Entry<String, LocalResourceInfo> entry : newApp
         .getContainerLaunchContextInfo().getResources().entrySet()) {
@@ -293,12 +296,14 @@ public final class RMWebAppUtil {
       hlr.put(entry.getKey(), lr);
     }
 
+    // 序列化凭证到ByteBuffer，供容器使用
     DataOutputBuffer out = new DataOutputBuffer();
     Credentials cs = createCredentials(
         newApp.getContainerLaunchContextInfo().getCredentials());
     cs.writeTokenStorageToStream(out);
     ByteBuffer tokens = ByteBuffer.wrap(out.getData());
 
+    // 构造并返回容器启动上下文对象
     ContainerLaunchContext ctx = ContainerLaunchContext.newInstance(hlr,
         newApp.getContainerLaunchContextInfo().getEnvironment(),
         newApp.getContainerLaunchContextInfo().getCommands(), hmap, tokens,
@@ -308,15 +313,15 @@ public final class RMWebAppUtil {
   }
 
   /**
-   * Generate a Credentials object from the information in the CredentialsInfo
-   * object.
+   * 根据用户提交的凭证信息，构造Credentials对象，解码Base64编码的令牌和密钥。
    *
-   * @param credentials the CredentialsInfo provided by the user.
-   * @return
+   * @param credentials 用户提交的凭证信息对象
+   * @return 构造完成的Credentials对象
    */
   private static Credentials createCredentials(CredentialsInfo credentials) {
     Credentials ret = new Credentials();
     try {
+      // 解析令牌信息，从URL安全字符串解码
       for (Map.Entry<String, String> entry : credentials.getTokens()
           .entrySet()) {
         Text alias = new Text(entry.getKey());
@@ -324,6 +329,7 @@ public final class RMWebAppUtil {
         token.decodeFromUrlString(entry.getValue());
         ret.addToken(alias, token);
       }
+      // 解析密钥，从Base64编码解码
       for (Map.Entry<String, String> entry : credentials.getSecrets()
           .entrySet()) {
         Text alias = new Text(entry.getKey());
@@ -339,6 +345,12 @@ public final class RMWebAppUtil {
     return ret;
   }
 
+  /**
+   * 根据用户提交的日志聚合上下文信息，构造LogAggregationContext对象。
+   *
+   * @param logAggregationContextInfo 用户提交的日志聚合上下文信息
+   * @return 构造完成的日志聚合上下文对象
+   */
   private static LogAggregationContext createLogAggregationContext(
       LogAggregationContextInfo logAggregationContextInfo) {
     return LogAggregationContext.newInstance(
@@ -350,25 +362,25 @@ public final class RMWebAppUtil {
         logAggregationContextInfo.getLogAggregationPolicyParameters());
   }
 
- /**
-   * Helper method to retrieve the UserGroupInformation from the
-   * HttpServletRequest.
+  /**
+   * 从HttpServletRequest中提取请求发起者的UserGroupInformation对象。
    *
-   * @param hsr the servlet request
-   * @param usePrincipal true if we need to use the principal user, remote
-   *          otherwise.
-   * @return the user group information of the caller.
+   * @param hsr HTTP请求对象
+   * @param usePrincipal 是否优先使用Principal获取用户名，否则使用remoteUser
+   * @return 请求发起者的UGI对象，如果无法获取用户名返回null
    **/
   public static UserGroupInformation getCallerUserGroupInformation(
       HttpServletRequest hsr, boolean usePrincipal) {
 
     String remoteUser = hsr.getRemoteUser();
+    // 如果需要使用Principal获取用户名，从请求中提取
     if (usePrincipal) {
       Principal princ = hsr.getUserPrincipal();
       remoteUser = princ == null ? null : princ.getName();
     }
 
     UserGroupInformation callerUGI = null;
+    // 如果成功获取到用户名，创建远程用户UGI
     if (remoteUser != null) {
       callerUGI = UserGroupInformation.createRemoteUser(remoteUser);
     }

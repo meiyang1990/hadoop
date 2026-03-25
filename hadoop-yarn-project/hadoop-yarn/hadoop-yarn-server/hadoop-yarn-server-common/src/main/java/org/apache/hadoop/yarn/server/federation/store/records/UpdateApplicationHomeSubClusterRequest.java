@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -24,21 +25,25 @@ import org.apache.hadoop.yarn.util.Records;
 
 /**
  * <p>
- * The request sent by the <code>Router</code> to
- * <code>Federation state store</code> to update the home subcluster of a newly
- * submitted application.
+ * 更新应用所属主子集群的请求，由Router发送给联邦状态存储，用于更新新提交应用的主子集群映射。
  *
  * <p>
- * The request includes the mapping details, i.e.:
+ * 请求包含映射信息：
  * <ul>
- * <li>{@code ApplicationId}</li>
- * <li>{@code SubClusterId}</li>
+ * <li>应用ID</li>
+ * <li>子集群ID</li>
  * </ul>
  */
 @Private
 @Unstable
 public abstract class UpdateApplicationHomeSubClusterRequest {
 
+  /**
+   * 创建新的更新应用主子集群请求实例。
+   * 
+   * @param applicationHomeSubCluster 应用与主子集群的映射信息
+   * @return 封装好的请求实例
+   */
   @Private
   @Unstable
   public static UpdateApplicationHomeSubClusterRequest newInstance(
@@ -51,21 +56,18 @@ public abstract class UpdateApplicationHomeSubClusterRequest {
   }
 
   /**
-   * Get the {@link ApplicationHomeSubCluster} representing the mapping of the
-   * application to it's home sub-cluster.
+   * 获取应用与主子集群的映射信息。
    *
-   * @return the mapping of the application to it's home sub-cluster.
+   * @return 应用与主子集群的映射
    */
   @Public
   @Unstable
   public abstract ApplicationHomeSubCluster getApplicationHomeSubCluster();
 
   /**
-   * Set the {@link ApplicationHomeSubCluster} representing the mapping of the
-   * application to it's home sub-cluster.
+   * 设置应用与主子集群的映射信息。
    *
-   * @param applicationHomeSubCluster the mapping of the application to it's
-   *          home sub-cluster.
+   * @param applicationHomeSubCluster 应用与主子集群的映射
    */
   @Private
   @Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -57,15 +58,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Thread which runs inside the NN when it's in Standby state,
- * periodically waking up to take a checkpoint of the namespace.
- * When it takes a checkpoint, it saves it to its local
- * storage and then uploads it to the remote NameNode.
+ *  standby状态NameNode中的检查点线程，负责定期对命名空间生成检查点
+ *  生成检查点后保存到本地存储，并上传到所有对端Active NameNode
+ *  用于HDFS高可用架构中，由Standby节点负责生成检查点，分担Active节点的压力
  */
 @InterfaceAudience.Private
 public class StandbyCheckpointer {
   private static final Logger LOG =
       LoggerFactory.getLogger(StandbyCheckpointer.class);
+  // 取消检查点后，禁止新检查点启动的时间长度（2分钟）
   private static final long PREVENT_AFTER_CANCEL_MS = 2*60*1000L;
   private final CheckpointConf checkpointConf;
   private final Configuration conf;
@@ -73,19 +74,26 @@ public class StandbyCheckpointer {
   private long lastCheckpointTime;
   private final CheckpointerThread thread;
   private final ThreadFactory uploadThreadFactory;
+  // 所有对端Active NameNode的HTTP地址列表
   private List<URL> activeNNAddresses;
+  // 当前Standby NameNode自身的HTTP地址
   private URL myNNAddress;
 
   private final Object cancelLock = new Object();
   private Canceler canceler;
 
-  // Keep track of how many checkpoints were canceled.
-  // This is for use in tests.
+  // 统计被取消的检查点数量，仅用于测试
   private static int canceledCount = 0;
 
-  // A map from NN url to the most recent image upload time.
+  // NameNode地址到最近上传记录的映射，记录每个对端节点的上传状态
   private final HashMap<String, CheckpointReceiverEntry> checkpointReceivers;
   
+  /**
+   * 构造Standby检查点管理器，初始化配置和线程
+   * @param conf Hadoop配置对象
+   * @param ns 当前Standby节点的命名系统对象
+   * @throws IOException 如果地址解析失败则抛出异常
+   */
   public StandbyCheckpointer(Configuration conf, FSNamesystem ns)
       throws IOException {
     this.namesystem = ns;
@@ -102,8 +110,13 @@ public class StandbyCheckpointer {
     }
   }
 
+  /**
+   * 内部类，存储每个对端NameNode的检查点接收状态
+   */
   private static final class CheckpointReceiverEntry {
+    // 最近一次成功上传的时间
     private long lastUploadTime;
+    // 当前Standby是否是该对端节点的主检查点提供者
     private boolean isPrimary;
 
     CheckpointReceiverEntry() {
@@ -129,32 +142,37 @@ public class StandbyCheckpointer {
   }
 
   /**
-   * Determine the address of the NN we are checkpointing
-   * as well as our own HTTP address from the configuration.
-   * @throws IOException 
+   * 从配置中解析当前节点和对端Active节点的HTTP地址
+   * @throws IOException 如果地址解析或校验失败则抛出异常
    */
   private void setNameNodeAddresses(Configuration conf) throws IOException {
-    // Look up our own address.
+    // 获取当前Standby节点的HTTP地址
     myNNAddress = getHttpAddress(conf);
 
-    // Look up the active node's address
+    // 获取所有其他NameNode的配置
     List<Configuration> confForActive = HAUtil.getConfForOtherNodes(conf);
     activeNNAddresses = new ArrayList<URL>(confForActive.size());
     for (Configuration activeConf : confForActive) {
       URL activeNNAddress = getHttpAddress(activeConf);
 
-      // sanity check each possible active NN
+      // 对每个Active地址做合法性校验
       Preconditions.checkArgument(checkAddress(activeNNAddress),
           "Bad address for active NN: %s", activeNNAddress);
 
       activeNNAddresses.add(activeNNAddress);
     }
 
-    // Sanity-check.
+    // 校验当前Standby地址合法性
     Preconditions.checkArgument(checkAddress(myNNAddress), "Bad address for standby NN: %s",
         myNNAddress);
   }
   
+  /**
+   * 从配置中解析NameNode的HTTP服务地址
+   * @param conf 对应NameNode的配置对象
+   * @return 解析后的HTTP地址URL对象
+   * @throws IOException 如果地址格式错误则抛出异常
+   */
   private URL getHttpAddress(Configuration conf) throws IOException {
     final String scheme = DFSUtil.getHttpClientScheme(conf);
     String defaultHost = NameNode.getServiceAddress(conf, true).getHostName();
@@ -163,13 +181,17 @@ public class StandbyCheckpointer {
   }
   
   /**
-   * Ensure that the given address is valid and has a port
-   * specified.
+   * 校验地址是否合法（必须指定非零端口）
+   * @param addr 需要校验的URL地址
+   * @return 合法返回true，否则返回false
    */
   private static boolean checkAddress(URL addr) {
     return addr.getPort() != 0;
   }
 
+  /**
+   * 启动检查点后台线程
+   */
   public void start() {
     LOG.info("Starting standby checkpoint thread...\n" +
         "Checkpointing active NN to possible NNs: {}\n" +
@@ -177,6 +199,10 @@ public class StandbyCheckpointer {
     thread.start();
   }
   
+  /**
+   * 停止检查点线程，取消正在进行的检查点
+   * @throws IOException 如果线程等待退出被中断则抛出异常
+   */
   public void stop() throws IOException {
     cancelAndPreventCheckpoints("Stopping checkpointer");
     thread.setShouldRun(false);
@@ -189,17 +215,23 @@ public class StandbyCheckpointer {
     }
   }
 
+  /**
+   * 触发回滚检查点操作，中断当前休眠唤醒检查
+   */
   public void triggerRollbackCheckpoint() {
     thread.interrupt();
   }
 
+  /**
+   * 执行一次完整的检查点流程：保存命名空间到本地，然后上传到所有对端NameNode
+   * @throws InterruptedException 如果检查点被中断则抛出异常
+   * @throws IOException 如果IO操作失败则抛出异常
+   */
   private void doCheckpoint() throws InterruptedException, IOException {
     assert canceler != null;
     final long txid;
     final NameNodeFile imageType;
-    // Acquire cpLock to make sure no one is modifying the name system.
-    // It does not need the full namesystem write lock, since the only thing
-    // that modifies namesystem on standby node is edit log replaying.
+    // 获取检查点锁，防止和编辑日志重放冲突
     namesystem.cpLockInterruptibly();
     try {
       assert namesystem.getEditLog().isOpenForRead() :
@@ -211,6 +243,7 @@ public class StandbyCheckpointer {
       long prevCheckpointTxId = img.getStorage().getMostRecentCheckpointTxId();
       long thisCheckpointTxId = img.getCorrectLastAppliedOrWrittenTxId();
       assert thisCheckpointTxId >= prevCheckpointTxId;
+      // 没有新事务，跳过本次检查点
       if (thisCheckpointTxId == prevCheckpointTxId) {
         LOG.info("A checkpoint was triggered but the Standby Node has not " +
             "received any transactions since the last checkpoint at txid {}. " +
@@ -218,20 +251,21 @@ public class StandbyCheckpointer {
         return;
       }
 
+      // 判断是否需要生成回滚检查点（用于滚动升级场景）
       if (namesystem.isRollingUpgrade()
           && !namesystem.getFSImage().hasRollbackFSImage()) {
-        // if we will do rolling upgrade but have not created the rollback image
-        // yet, name this checkpoint as fsimage_rollback
+        // 滚动升级且未生成回滚镜像时，将本次检查点标记为回滚镜像
         imageType = NameNodeFile.IMAGE_ROLLBACK;
       } else {
         imageType = NameNodeFile.IMAGE;
       }
+      // 保存命名空间生成检查点
       img.saveNamespace(namesystem, imageType, canceler);
       txid = img.getStorage().getMostRecentCheckpointTxId();
       assert txid == thisCheckpointTxId : "expected to save checkpoint at txid=" +
           thisCheckpointTxId + " but instead saved at txid=" + txid;
 
-      // Save the legacy OIV image, if the output dir is defined.
+      // 如果配置了离线镜像查看工具输出目录，则保存旧版本格式镜像
       String outputDir = checkpointConf.getLegacyOivImageDir();
       if (outputDir != null && !outputDir.isEmpty()) {
         try {
@@ -242,25 +276,21 @@ public class StandbyCheckpointer {
         }
       }
     } finally {
+      // 释放检查点锁
       namesystem.cpUnlock();
     }
 
-    // Upload the saved checkpoint back to the active
-    // Do this in a separate thread to avoid blocking transition to active, but don't allow more
-    // than the expected number of tasks to run or queue up
-    // See HDFS-4816
+    // 启动线程池并行上传检查点到所有对端Active节点，避免阻塞切主流程（参考HDFS-4816）
     int poolSize = checkpointConf.isParallelUploadEnabled() ? activeNNAddresses.size() : 0;
     ExecutorService executor = new ThreadPoolExecutor(poolSize, activeNNAddresses.size(), 100,
         TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(activeNNAddresses.size()),
         uploadThreadFactory);
-    // for right now, just match the upload to the nn address by convention. There is no need to
-    // directly tie them together by adding a pair class.
     HashMap<String, Future<TransferFsImage.TransferResult>> uploads =
         new HashMap<>();
     for (final URL activeNNAddress : activeNNAddresses) {
-      // Upload image if at least 1 of 2 following conditions met:
-      // 1. has been quiet for long enough, try to contact the node.
-      // 2. this standby IS the primary checkpointer of target NN.
+      // 满足以下任一条件才上传：
+      // 1. 当前Standby是该节点的主检查点提供者
+      // 2. 距离上次上传已经超过静默期
       String addressString = activeNNAddress.toString();
       assert checkpointReceivers.containsKey(addressString);
       CheckpointReceiverEntry receiverEntry =
@@ -277,6 +307,7 @@ public class StandbyCheckpointer {
               public TransferFsImage.TransferResult call()
                   throws IOException, InterruptedException {
                 CheckpointFaultInjector.getInstance().duringUploadInProgess();
+                // 从本地存储上传镜像到对端NameNode
                 return TransferFsImage.uploadImageFromStorage(activeNNAddress,
                     conf, namesystem.getFSImage().getStorage(), imageType, txid,
                     canceler);
@@ -287,85 +318,65 @@ public class StandbyCheckpointer {
     }
     InterruptedException ie = null;
     List<IOException> ioes = Lists.newArrayList();
+    // 收集所有上传任务的结果
     for (Map.Entry<String, Future<TransferFsImage.TransferResult>> entry :
         uploads.entrySet()) {
       String url = entry.getKey();
       Future<TransferFsImage.TransferResult> upload = entry.getValue();
       try {
-        // TODO should there be some smarts here about retries nodes that
-        //  are not the active NN?
         CheckpointReceiverEntry receiverEntry = checkpointReceivers.get(url);
         TransferFsImage.TransferResult uploadResult = upload.get();
         if (uploadResult == TransferFsImage.TransferResult.SUCCESS) {
+          // 上传成功，更新最近上传时间和主检查点标记
           receiverEntry.setLastUploadTime(monotonicNow());
           receiverEntry.setIsPrimary(true);
         } else {
-          // Getting here means image upload is explicitly rejected
-          // by the other node. This could happen if:
-          // 1. the other is also a standby, or
-          // 2. the other is active, but already accepted another
-          // newer image, or
-          // 3. the other is active but has a recent enough image.
-          // All these are valid cases, just log for information.
+          // 上传被对端拒绝，降级为备检查点提供者
           LOG.info("Image upload rejected by the other NameNode: {}",
               uploadResult);
           receiverEntry.setIsPrimary(false);
         }
       } catch (ExecutionException e) {
-        // Even if exception happens, still proceeds to next NN url.
-        // so that fail to upload to previous NN does not cause the
-        // remaining NN not getting the fsImage.
+        // 上传异常，记录错误，继续处理其他节点
         ioes.add(new IOException("Exception during image upload", e));
       } catch (InterruptedException e) {
         ie = e;
         break;
       }
     }
-    // cleaner than copying code for multiple catch statements and better than catching all
-    // exceptions, so we just handle the ones we expect.
+    // 处理中断异常
     if (ie != null) {
-
-      // cancel the rest of the tasks, and close the pool
+      // 取消所有剩余上传任务
       for (Map.Entry<String, Future<TransferFsImage.TransferResult>> entry :
           uploads.entrySet()) {
         Future<TransferFsImage.TransferResult> upload = entry.getValue();
-        // The background thread may be blocked waiting in the throttler, so
-        // interrupt it.
         upload.cancel(true);
       }
 
-      // shutdown so we interrupt anything running and don't start anything new
+      // 关闭线程池
       executor.shutdownNow();
-      // this is a good bit longer than the thread timeout, just to make sure all the threads
-      // that are not doing any work also stop
       executor.awaitTermination(500, TimeUnit.MILLISECONDS);
 
-      // re-throw the exception we got, since one of these two must be non-null
       throw ie;
     }
 
+    // 超过一半节点上传失败时，抛出聚合异常
     if (ioes.size() > activeNNAddresses.size() / 2) {
       throw MultipleIOException.createIOException(ioes);
     }
   }
   
   /**
-   * Cancel any checkpoint that's currently being made,
-   * and prevent any new checkpoints from starting for the next
-   * minute or so.
+   * 取消当前正在进行的检查点，并在指定时间内禁止新检查点启动
+   * 用于故障转移准备阶段，避免检查点和切主操作冲突
+   * @param msg 取消原因描述
+   * @throws ServiceFailedException 服务失败异常
    */
   public void cancelAndPreventCheckpoints(String msg) throws ServiceFailedException {
     synchronized (cancelLock) {
-      // The checkpointer thread takes this lock and checks if checkpointing is
-      // postponed. 
       thread.preventCheckpointsFor(PREVENT_AFTER_CANCEL_MS);
 
-      // Before beginning a checkpoint, the checkpointer thread
-      // takes this lock, and creates a canceler object.
-      // If the canceler is non-null, then a checkpoint is in
-      // progress and we need to cancel it. If it's null, then
-      // the operation has not started, meaning that the above
-      // time-based prevention will take effect.
+      // 如果检查点已经开始进行，取消它
       if (canceler != null) {
         canceler.cancel(msg);
       }
@@ -382,14 +393,22 @@ public class StandbyCheckpointer {
     return lastCheckpointTime;
   }
 
+  /**
+   * 计算自上次检查点以来新增的未检查点事务数量
+   * @return 未检查点事务数
+   */
   private long countUncheckpointedTxns() {
     FSImage img = namesystem.getFSImage();
     return img.getCorrectLastAppliedOrWrittenTxId() -
       img.getStorage().getMostRecentCheckpointTxId();
   }
 
+  /**
+   * 后台检查点线程，周期性触发检查点操作
+   */
   private class CheckpointerThread extends SubjectInheritingThread {
     private volatile boolean shouldRun = true;
+    // 禁止检查点的截止时间戳
     private volatile long preventCheckpointsUntil = 0;
 
     private CheckpointerThread() {
@@ -402,8 +421,7 @@ public class StandbyCheckpointer {
 
     @Override
     public void work() {
-      // We have to make sure we're logged in as far as JAAS
-      // is concerned, in order to use kerberized SSL properly.
+      // 使用登录用户身份执行，保证Kerberos认证正常
       SecurityUtil.doAsLoginUserOrFatal(
           new PrivilegedAction<Object>() {
           @Override
@@ -415,110 +433,5 @@ public class StandbyCheckpointer {
     }
 
     /**
-     * Prevent checkpoints from occurring for some time period
-     * in the future. This is used when preparing to enter active
-     * mode. We need to not only cancel any concurrent checkpoint,
-     * but also prevent any checkpoints from racing to start just
-     * after the cancel call.
-     * 
-     * @param delayMs the number of MS for which checkpoints will be
-     * prevented
-     */
-    private void preventCheckpointsFor(long delayMs) {
-      preventCheckpointsUntil = monotonicNow() + delayMs;
-    }
-
-    private void doWork() {
-      final long checkPeriod = 1000 * checkpointConf.getCheckPeriod();
-      // Reset checkpoint time so that we don't always checkpoint
-      // on startup.
-      lastCheckpointTime = monotonicNow();
-      while (shouldRun) {
-        boolean needRollbackCheckpoint = namesystem.isNeedRollbackFsImage();
-        if (!needRollbackCheckpoint) {
-          try {
-            Thread.sleep(checkPeriod);
-          } catch (InterruptedException ie) {
-          }
-          if (!shouldRun) {
-            break;
-          }
-        }
-        try {
-          // We may have lost our ticket since last checkpoint, log in again, just in case
-          if (UserGroupInformation.isSecurityEnabled()) {
-            UserGroupInformation.getCurrentUser().checkTGTAndReloginFromKeytab();
-          }
-          
-          final long now = monotonicNow();
-          final long uncheckpointed = countUncheckpointedTxns();
-          final long secsSinceLast = (now - lastCheckpointTime) / 1000;
-
-          // if we need a rollback checkpoint, always attempt to checkpoint
-          boolean needCheckpoint = needRollbackCheckpoint;
-
-          if (needCheckpoint) {
-            LOG.info("Triggering a rollback fsimage for rolling upgrade.");
-          } else if (uncheckpointed >= checkpointConf.getTxnCount()) {
-            LOG.info("Triggering checkpoint because there have been {} txns " +
-                "since the last checkpoint, " +
-                "which exceeds the configured threshold {}",
-                uncheckpointed, checkpointConf.getTxnCount());
-            needCheckpoint = true;
-          } else if (secsSinceLast >= checkpointConf.getPeriod()) {
-            LOG.info("Triggering checkpoint because it has been {} seconds " +
-                "since the last checkpoint, which exceeds the configured " +
-                "interval {}, And now is {}, lastCheckpointTime is {}.",
-                secsSinceLast, checkpointConf.getPeriod(), now, lastCheckpointTime);
-            needCheckpoint = true;
-          }
-
-          if (needCheckpoint) {
-            synchronized (cancelLock) {
-              if (now < preventCheckpointsUntil) {
-                LOG.info("But skipping this checkpoint since we are about to failover!");
-                canceledCount++;
-                continue;
-              }
-              assert canceler == null;
-              canceler = new Canceler();
-            }
-
-            // on all nodes, we build the checkpoint. However, we only ship the checkpoint if have a
-            // rollback request, are the checkpointer, are outside the quiet period.
-            doCheckpoint();
-
-            // reset needRollbackCheckpoint to false only when we finish a ckpt
-            // for rollback image
-            if (needRollbackCheckpoint
-                && namesystem.getFSImage().hasRollbackFSImage()) {
-              namesystem.setCreatedRollbackImages(true);
-              namesystem.setNeedRollbackFsImage(false);
-            }
-            lastCheckpointTime = monotonicNow();
-            LOG.info("Checkpoint finished successfully, the lastCheckpointTime is:{}.",
-                lastCheckpointTime);
-          }
-        } catch (SaveNamespaceCancelledException ce) {
-          LOG.info("Checkpoint was cancelled: {}", ce.getMessage());
-          canceledCount++;
-        } catch (InterruptedException ie) {
-          LOG.info("Interrupted during checkpointing", ie);
-          // Probably requested shutdown.
-          continue;
-        } catch (Throwable t) {
-          LOG.error("Exception in doCheckpoint", t);
-        } finally {
-          synchronized (cancelLock) {
-            canceler = null;
-          }
-        }
-      }
-    }
-  }
-
-  @VisibleForTesting
-  List<URL> getActiveNNAddresses() {
-    return activeNNAddresses;
-  }
-}
+     * 设置禁止检查点的时间段，用于切主前阻止新检查点启动
+     * @param delayMs

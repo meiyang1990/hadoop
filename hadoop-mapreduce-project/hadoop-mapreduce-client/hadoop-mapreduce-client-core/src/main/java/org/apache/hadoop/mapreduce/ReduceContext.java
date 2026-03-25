@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,37 +26,44 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * The context passed to the {@link Reducer}.
- * @param <KEYIN> the class of the input keys
- * @param <VALUEIN> the class of the input values
- * @param <KEYOUT> the class of the output keys
- * @param <VALUEOUT> the class of the output values
+ * Reduce任务执行上下文接口，为Reducer提供运行时环境和数据访问能力
+ * 提供输入键值对访问、输出结果写入等核心能力，是Reducer与MapReduce框架交互的入口
+ * @param <KEYIN> 输入键的类型
+ * @param <VALUEIN> 输入值的类型
+ * @param <KEYOUT> 输出键的类型
+ * @param <VALUEOUT> 输出值的类型
  */
-@InterfaceAudience.Public
+@InterfaceAudience.PPublic
 @InterfaceStability.Evolving
 public interface ReduceContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
     extends TaskInputOutputContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
 
-  /** Start processing next unique key. */
+  /**
+   * 移动到下一个唯一输入键，准备处理该键对应的所有值
+   * @return 是否存在下一个可处理的唯一键，true表示存在，false表示所有键处理完成
+   * @throws IOException 当IO操作异常时抛出
+   * @throws InterruptedException 当线程被中断时抛出
+   */
   public boolean nextKey() throws IOException,InterruptedException;
 
   /**
-   * Iterate through the values for the current key, reusing the same value 
-   * object, which is stored in the context.
-   * @return the series of values associated with the current key. All of the 
-   * objects returned directly and indirectly from this method are reused.
+   * 获取当前键对应的所有值的可迭代对象，复用同一个值对象减少GC
+   * @return 当前键关联的所有值的可迭代对象，迭代返回的对象会被框架复用
+   * @throws IOException 当IO操作异常时抛出
+   * @throws InterruptedException 当线程被中断时抛出
    */
   public Iterable<VALUEIN> getValues() throws IOException, InterruptedException;
 
   /**
-   * {@link Iterator} to iterate over values for a given group of records.
+   * 值迭代器接口，用于遍历同一个键分组下的所有值
+   * 继承可标记迭代器接口，支持备份与恢复迭代位置
    */
   interface ValueIterator<VALUEIN> extends MarkableIteratorInterface<VALUEIN> {
 
     /**
-     * This method is called when the reducer moves from one key to 
-     * another.
-     * @throws IOException
+     * 当Reducer处理完当前键、切换到下一个键时调用该方法
+     * 重置备份存储，为下一个键的值迭代做准备
+     * @throws IOException 当IO操作异常时抛出
      */
     void resetBackupStore() throws IOException;
   }

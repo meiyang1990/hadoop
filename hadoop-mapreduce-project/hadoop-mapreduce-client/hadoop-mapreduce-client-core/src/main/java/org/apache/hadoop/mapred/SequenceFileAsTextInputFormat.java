@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,27 +26,39 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.Text;
 
 /**
- * This class is similar to SequenceFileInputFormat, 
- * except it generates SequenceFileAsTextRecordReader 
- * which converts the input keys and values to their 
- * String forms by calling toString() method.
+ * 将SequenceFile文件转换为文本格式输入的InputFormat实现
+ * 继承自SequenceFileInputFormat，核心区别是使用自定义RecordReader
+ * 将SequenceFile中原始键值对转换为字符串类型，方便MapReduce直接按文本处理
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class SequenceFileAsTextInputFormat
   extends SequenceFileInputFormat<Text, Text> {
 
+  /**
+   * 构造函数，初始化SequenceFile文本输入格式
+   */
   public SequenceFileAsTextInputFormat() {
     super();
   }
 
+  /**
+   * 创建并返回对应输入分片的RecordReader，负责读取SequenceFile并转换为Text键值对
+   * @param split 输入分片
+   * @param job 作业配置
+   * @param reporter 进度报告器
+   * @return 转换为文本格式的RecordReader实例
+   * @throws IOException IO异常
+   */
   public RecordReader<Text, Text> getRecordReader(InputSplit split,
                                                   JobConf job,
                                                   Reporter reporter)
     throws IOException {
 
+    // 上报当前分片处理进度
     reporter.setStatus(split.toString());
 
+    // 返回转换为文本的SequenceFile记录读取器
     return new SequenceFileAsTextRecordReader(job, (FileSplit) split);
   }
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,17 +19,15 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.activities;
 
-/*
- * Collection of diagnostics.
+/**
+ * YARN资源调度活动诊断信息常量集合，定义了各个层级调度决策的诊断原因常量，用于前端展示调度过程说明。
  */
 public class ActivityDiagnosticConstant {
-  // EMPTY means it does not have any diagnostic to display.
-  // In order not to show "diagnostic" line in frontend,
-  // we set the value to null.
+  // 空诊断：表示无诊断信息需要展示，设置为null避免前端显示多余的诊断行
   public final static String EMPTY = null;
 
-  /*
-   * Initial check diagnostics
+  /**
+   * 初始化检查阶段诊断信息
    */
   public final static String INIT_CHECK_SINGLE_NODE_REMOVED =
       "Initial check: node has been removed from scheduler";
@@ -37,8 +36,8 @@ public class ActivityDiagnosticConstant {
   public final static String INIT_CHECK_PARTITION_RESOURCE_INSUFFICIENT =
       "Initial check: insufficient resource in partition";
 
-  /*
-   * Queue level diagnostics
+  /**
+   * 队列层级诊断信息
    */
   public final static String QUEUE_NOT_ABLE_TO_ACCESS_PARTITION =
       "Queue is not able to access partition";
@@ -59,8 +58,8 @@ public class ActivityDiagnosticConstant {
       QUEUE_SKIPPED_BECAUSE_SINGLE_NODE_RESOURCE_INSUFFICIENT =
       "Queue skipped because node resource is insufficient";
 
-  /*
-   * Application level diagnostics
+  /**
+   * 应用层级诊断信息
    */
   public final static String APPLICATION_FAIL_TO_ALLOCATE =
       "Application fails to allocate";
@@ -70,8 +69,8 @@ public class ActivityDiagnosticConstant {
   public final static String APPLICATION_DO_NOT_NEED_RESOURCE =
       "Application does not need more resource";
 
-  /*
-   * Request level diagnostics
+  /**
+   * 请求层级诊断信息
    */
   public final static String REQUEST_SKIPPED_BECAUSE_NULL_ANY_REQUEST =
       "Request skipped because off-switch request is null";
@@ -86,8 +85,8 @@ public class ActivityDiagnosticConstant {
   public final static String REQUEST_DO_NOT_NEED_RESOURCE =
       "Request does not need more resource";
 
-  /*
-   * Node level diagnostics
+  /**
+   * 节点层级诊断信息
    */
   public final static String
       NODE_SKIPPED_BECAUSE_OF_NO_OFF_SWITCH_AND_LOCALITY_VIOLATION =

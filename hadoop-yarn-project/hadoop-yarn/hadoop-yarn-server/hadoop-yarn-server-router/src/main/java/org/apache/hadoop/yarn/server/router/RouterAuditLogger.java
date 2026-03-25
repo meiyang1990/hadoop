@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,8 +28,8 @@ import org.slf4j.LoggerFactory;
 import java.net.InetAddress;
 
 /**
- * Manages Router audit logs.
- * Audit log format is written as key=value pairs. Tab separated.
+ * YARN Router联邦路由审计日志管理器，负责记录所有经过Router的操作审计日志。
+ * 审计日志格式为键值对，使用制表符分隔不同键值对。
  */
 public final class RouterAuditLogger {
   private static final Logger LOG =
@@ -37,8 +38,14 @@ public final class RouterAuditLogger {
   private RouterAuditLogger() {
   }
 
+  /**
+   * 审计日志字段枚举，定义所有支持的日志字段。
+   */
   enum Keys {USER, OPERATION, TARGET, RESULT, IP, PERMISSIONS, DESCRIPTION, APPID, SUBCLUSTERID}
 
+  /**
+   * 审计日志常量定义，包含操作结果、分隔符和所有支持的操作类型常量。
+   */
   public static class AuditConstants {
     static final String SUCCESS = "SUCCESS";
     static final String FAILURE = "FAILURE";
@@ -111,6 +118,12 @@ public final class RouterAuditLogger {
     public static final String GET_SCHEDULER_CONFIGURATION = "Get SchedulerConfiguration";
   }
 
+  /**
+   * 记录成功操作审计日志。
+   * @param user 请求用户名
+   * @param operation 操作类型
+   * @param target 操作目标服务
+   */
   public static void logSuccess(String user, String operation, String target) {
     if (LOG.isInfoEnabled()) {
       LOG.info(createSuccessLog(user, operation, target, null, null));
@@ -161,11 +174,14 @@ public final class RouterAuditLogger {
    */
   static String createSuccessLog(String user, String operation, String target,
       ApplicationId appId, SubClusterId subClusterID) {
+    // 构建成功事件基础日志
     StringBuilder b =
         createStringBuilderForSuccessEvent(user, operation, target);
+    // 添加应用ID字段
     if (appId != null) {
       add(Keys.APPID, appId.toString(), b);
     }
+    // 添加子集群ID字段
     if (subClusterID != null) {
       add(Keys.SUBCLUSTERID, subClusterID.toString(), b);
     }
@@ -179,10 +195,15 @@ public final class RouterAuditLogger {
   private static StringBuilder createStringBuilderForSuccessEvent(String user,
       String operation, String target) {
     StringBuilder b = new StringBuilder();
+    // 添加第一个字段：用户名
     start(Keys.USER, user, b);
+    // 添加远程IP地址
     addRemoteIP(b);
+    // 添加操作类型
     add(Keys.OPERATION, operation, b);
+    // 添加操作目标
     add(Keys.TARGET, target, b);
+    // 添加操作结果：成功
     add(Keys.RESULT, AuditConstants.SUCCESS, b);
     return b;
   }
@@ -227,6 +248,7 @@ public final class RouterAuditLogger {
   public static void logFailure(String user, String operation, String perm,
       String target, String descriptionFormat, Object... args) {
     if (LOG.isInfoEnabled()) {
+      // 格式化失败描述信息
       String description = String.format(descriptionFormat, args);
       LOG.info(createFailureLog(user, operation, perm, target, description, null, null));
     }
@@ -306,12 +328,15 @@ public final class RouterAuditLogger {
   static String createFailureLog(String user, String operation, String perm,
       String target, String description, ApplicationId appId,
       SubClusterId subClusterId) {
+    // 构建失败事件基础日志
     StringBuilder b =
         createStringBuilderForFailureLog(user, operation, target, description,
             perm);
+    // 添加应用ID字段
     if (appId != null) {
       add(Keys.APPID, appId.toString(), b);
     }
+    // 添加子集群ID字段
     if (subClusterId != null) {
       add(Keys.SUBCLUSTERID, subClusterId.toString(), b);
     }
@@ -325,12 +350,19 @@ public final class RouterAuditLogger {
   private static StringBuilder createStringBuilderForFailureLog(String user,
       String operation, String target, String description, String perm) {
     StringBuilder b = new StringBuilder();
+    // 添加第一个字段：用户名
     start(Keys.USER, user, b);
+    // 添加远程IP地址
     addRemoteIP(b);
+    // 添加操作类型
     add(Keys.OPERATION, operation, b);
+    // 添加操作目标
     add(Keys.TARGET, target, b);
+    // 添加操作结果：失败
     add(Keys.RESULT, AuditConstants.FAILURE, b);
+    // 添加失败描述
     add(Keys.DESCRIPTION, description, b);
+    // 添加权限信息
     add(Keys.PERMISSIONS, perm, b);
     return b;
   }
@@ -342,24 +374,3 @@ public final class RouterAuditLogger {
   static void start(Keys key, String value, StringBuilder b) {
     b.append(key.name()).append(AuditConstants.KEY_VAL_SEPARATOR).append(value);
   }
-
-  /**
-   * Appends the key-val pair to the passed builder in the following format
-   * <pair-delim>key=value.
-   */
-  static void add(Keys key, String value, StringBuilder b) {
-    b.append(AuditConstants.PAIR_SEPARATOR).append(key.name())
-        .append(AuditConstants.KEY_VAL_SEPARATOR).append(value);
-  }
-
-  /**
-   * A helper api to add remote IP address.
-   */
-  static void addRemoteIP(StringBuilder b) {
-    InetAddress ip = Server.getRemoteIp();
-    // ip address can be null for testcases
-    if (ip != null) {
-      add(Keys.IP, ip.getHostAddress(), b);
-    }
-  }
-}

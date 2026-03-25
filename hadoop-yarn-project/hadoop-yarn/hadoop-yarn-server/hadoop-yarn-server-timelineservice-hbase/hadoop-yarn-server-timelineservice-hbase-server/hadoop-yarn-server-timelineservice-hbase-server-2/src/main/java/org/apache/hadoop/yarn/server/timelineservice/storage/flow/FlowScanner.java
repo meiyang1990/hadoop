@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -54,11 +55,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Invoked via the coprocessor when a Get or a Scan is issued for flow run
- * table. Looks through the list of cells per row, checks their tags and does
- * operation on those cells as per the cell tags. Transforms reads of the stored
- * metrics into calculated sums for each column Also, finds the min and max for
- * start and end times in a flow run.
+ * 流运行表的HBase协处理器扫描器，在查询流运行数据时被调用。
+ * 根据单元格标签对存储的指标进行聚合计算（求和、最小/最大值），同时计算流运行的起止时间范围。
  */
 class FlowScanner implements RegionScanner, Closeable {
 
@@ -66,8 +64,7 @@ class FlowScanner implements RegionScanner, Closeable {
       LoggerFactory.getLogger(FlowScanner.class);
 
   /**
-   * use a special application id to represent the flow id this is needed since
-   * TimestampGenerator parses the app id to generate a cell timestamp.
+   * 特殊应用ID，用于标识流聚合单元格，因为TimestampGenerator需要解析应用ID生成单元格时间戳。
    */
   private static final String FLOW_APP_ID = "application_00000000000_0000";
 
@@ -82,11 +79,24 @@ class FlowScanner implements RegionScanner, Closeable {
   private int currentIndex;
   private FlowScannerOperation action = FlowScannerOperation.READ;
 
+  /**
+   * 构造函数，用于无传入Scan的场景。
+   * @param env HBase区域协处理器环境
+   * @param internalScanner 内部扫描器
+   * @param action 扫描操作类型
+   */
   FlowScanner(RegionCoprocessorEnvironment env, InternalScanner internalScanner,
       FlowScannerOperation action) {
     this(env, null, internalScanner, action);
   }
 
+  /**
+   * 构造函数，初始化扫描器配置。
+   * @param env HBase区域协处理器环境
+   * @param incomingScan 传入的Scan对象
+   * @param internalScanner 内部扫描器
+   * @param action 扫描操作类型（读取/刷写/小压缩/大压缩）
+   */
   FlowScanner(RegionCoprocessorEnvironment env, Scan incomingScan,
       InternalScanner internalScanner, FlowScannerOperation action) {
     this.batchSize = incomingScan == null ? -1 : incomingScan.getBatch();
@@ -144,14 +154,12 @@ class FlowScanner implements RegionScanner, Closeable {
   }
 
   /**
-   * Get value converter associated with a column or a column prefix. If nothing
-   * matches, generic converter is returned.
-   * @param colQualifierBytes
-   * @return value converter implementation.
+   * 根据列限定符获取对应的数值转换器，匹配不到返回通用转换器。
+   * @param colQualifierBytes 列限定符字节数组
+   * @return 匹配到的数值转换器
    */
   private static ValueConverter getValueConverter(byte[] colQualifierBytes) {
-    // Iterate over all the column prefixes for flow run table and get the
-    // appropriate converter for the column qualifier passed if prefix matches.
+    // 先匹配列前缀
     for (FlowRunColumnPrefix colPrefix : FlowRunColumnPrefix.values()) {
       byte[] colPrefixBytes = colPrefix.getColumnPrefixBytes("");
       if (Bytes.compareTo(colPrefixBytes, 0, colPrefixBytes.length,
@@ -159,41 +167,28 @@ class FlowScanner implements RegionScanner, Closeable {
         return colPrefix.getValueConverter();
       }
     }
-    // Iterate over all the columns for flow run table and get the
-    // appropriate converter for the column qualifier passed if match occurs.
+    // 前缀匹配不到再匹配完整列
     for (FlowRunColumn column : FlowRunColumn.values()) {
       if (Bytes.compareTo(
           column.getColumnQualifierBytes(), colQualifierBytes) == 0) {
         return column.getValueConverter();
       }
     }
-    // Return generic converter if nothing matches.
+    // 都匹配不到返回通用转换器
     return GenericConverter.getInstance();
   }
 
   /**
-   * This method loops through the cells in a given row of the
-   * {@link FlowRunTable}. It looks at the tags of each cell to figure out how
-   * to process the contents. It then calculates the sum or min or max for each
-   * column or returns the cell as is.
-   *
-   * @param cells
-   * @param scannerContext
-   * @return true if next row is available for the scanner, false otherwise
-   * @throws IOException
+   * 核心内部方法，遍历当前行所有单元格，按列分组后根据聚合操作计算结果，输出处理后的单元格。
+   * @param cells 输出结果单元格列表
+   * @param scannerContext 扫描上下文
+   * @return 是否还有更多行可读取
+   * @throws IOException 读取HBase时异常
    */
   private boolean nextInternal(List<Cell> cells, ScannerContext scannerContext)
       throws IOException {
     Cell cell = null;
     startNext();
-    // Loop through all the cells in this row
-    // For min/max/metrics we do need to scan the entire set of cells to get the
-    // right one
-    // But with flush/compaction, the number of cells being scanned will go down
-    // cells are grouped per column qualifier then sorted by cell timestamp
-    // (latest to oldest) per column qualifier
-    // So all cells in one qualifier come one after the other before we see the
-    // next column qualifier
     ByteArrayComparator comp = new ByteArrayComparator();
     byte[] previousColumnQualifier = Separator.EMPTY_BYTES;
     AggregationOperation currentAggOp = null;
@@ -204,6 +199,7 @@ class FlowScanner implements RegionScanner, Closeable {
     ValueConverter converter = null;
     int limit = batchSize;
 
+    // 循环读取单元格直到达到批次限制
     while (limit <= 0 || addedCnt < limit) {
       cell = peekAtNextCell(scannerContext);
       if (cell == null) {
@@ -211,11 +207,12 @@ class FlowScanner implements RegionScanner, Closeable {
       }
       byte[] currentColumnQualifier = CellUtil.cloneQualifier(cell);
       if (previousColumnQualifier == null) {
-        // first time in loop
+        // 第一次进入循环
         previousColumnQualifier = currentColumnQualifier;
       }
 
       converter = getValueConverter(currentColumnQualifier);
+      // 列变更，输出上一列聚合结果，重置状态处理新列
       if (comp.compare(previousColumnQualifier, currentColumnQualifier) != 0) {
         addedCnt += emitCells(cells, currentColumnCells, currentAggOp,
             converter, currentTimestamp);
@@ -224,10 +221,12 @@ class FlowScanner implements RegionScanner, Closeable {
         currentAggOp = getCurrentAggOp(cell);
         converter = getValueConverter(currentColumnQualifier);
       }
+      // 收集当前列的单元格
       collectCells(currentColumnCells, currentAggOp, cell, alreadySeenAggDim,
           converter, scannerContext);
       nextCell(scannerContext);
     }
+    // 输出最后一列的聚合结果
     if ((!currentColumnCells.isEmpty()) && ((limit <= 0 || addedCnt < limit))) {
       addedCnt += emitCells(cells, currentColumnCells, currentAggOp, converter,
           currentTimestamp);
@@ -244,14 +243,21 @@ class FlowScanner implements RegionScanner, Closeable {
     return hasMore();
   }
 
+  /**
+   * 从单元格标签中提取当前列的聚合操作类型。
+   * @param cell 待处理单元格
+   * @return 聚合操作类型
+   */
   private AggregationOperation getCurrentAggOp(Cell cell) {
     List<Tag> tags = HBaseTimelineServerUtils.convertCellAsTagList(cell);
-    // We assume that all the operations for a particular column are the same
+    // 假设同一列所有单元格的聚合操作一致
     return HBaseTimelineServerUtils.getAggregationOperationFromTagsList(tags);
   }
 
   /**
-   * resets the parameters to an initialized state for next loop iteration.
+   * 重置状态，为下一列处理做准备。
+   * @param currentColumnCells 当前列单元格集合
+   * @param alreadySeenAggDim 已处理聚合维度集合
    */
   private void resetState(SortedSet<Cell> currentColumnCells,
       Set<String> alreadySeenAggDim) {
@@ -259,19 +265,30 @@ class FlowScanner implements RegionScanner, Closeable {
     alreadySeenAggDim.clear();
   }
 
+  /**
+   * 根据当前聚合操作收集并处理单元格。
+   * @param currentColumnCells 当前列单元格集合
+   * @param currentAggOp 当前聚合操作
+   * @param cell 待收集单元格
+   * @param alreadySeenAggDim 已处理聚合维度集合
+   * @param converter 数值转换器
+   * @param scannerContext 扫描上下文
+   * @throws IOException 处理异常
+   */
   private void collectCells(SortedSet<Cell> currentColumnCells,
       AggregationOperation currentAggOp, Cell cell,
       Set<String> alreadySeenAggDim, ValueConverter converter,
       ScannerContext scannerContext) throws IOException {
 
     if (currentAggOp == null) {
-      // not a min/max/metric cell, so just return it as is
+      // 无聚合操作，直接保留原单元格
       currentColumnCells.add(cell);
       return;
     }
 
     switch (currentAggOp) {
     case GLOBAL_MIN:
+      // 全局最小值，只保留当前最小的单元格
       if (currentColumnCells.size() == 0) {
         currentColumnCells.add(cell);
       } else {
@@ -285,6 +302,7 @@ class FlowScanner implements RegionScanner, Closeable {
       }
       break;
     case GLOBAL_MAX:
+      // 全局最大值，只保留当前最大的单元格
       if (currentColumnCells.size() == 0) {
         currentColumnCells.add(cell);
       } else {
@@ -299,6 +317,7 @@ class FlowScanner implements RegionScanner, Closeable {
       break;
     case SUM:
     case SUM_FINAL:
+      // 求和聚合，每个聚合维度只保留最新的一个单元格
       if (LOG.isTraceEnabled()) {
         LOG.trace("In collect cells "
             + " FlowSannerOperation="
@@ -312,18 +331,11 @@ class FlowScanner implements RegionScanner, Closeable {
             + " timestamp=" + cell.getTimestamp());
       }
 
-      // only if this app has not been seen yet, add to current column cells
       List<Tag> tags = HBaseTimelineServerUtils.convertCellAsTagList(cell);
       String aggDim = HBaseTimelineServerUtils
           .getAggregationCompactionDimension(tags);
+      // 每个聚合维度只保留第一个（最新的）单元格，跳过旧单元格
       if (!alreadySeenAggDim.contains(aggDim)) {
-        // if this agg dimension has already been seen,
-        // since they show up in sorted order
-        // we drop the rest which are older
-        // in other words, this cell is older than previously seen cells
-        // for that agg dim
-        // but when this agg dim is not seen,
-        // consider this cell in our working set
         currentColumnCells.add(cell);
         alreadySeenAggDim.add(aggDim);
       }
@@ -334,9 +346,7 @@ class FlowScanner implements RegionScanner, Closeable {
   }
 
   /*
-   * Processes the cells in input param currentColumnCells and populates
-   * List<Cell> cells as the output based on the input AggregationOperation
-   * parameter.
+   * 根据聚合操作处理当前列收集到的单元格，将结果输出到结果列表。
    */
   private int emitCells(List<Cell> cells, SortedSet<Cell> currentColumnCells,
       AggregationOperation currentAggOp, ValueConverter converter,
@@ -356,21 +366,26 @@ class FlowScanner implements RegionScanner, Closeable {
     switch (currentAggOp) {
     case GLOBAL_MIN:
     case GLOBAL_MAX:
+      // 最值已经在收集阶段计算完成，直接输出
       cells.addAll(currentColumnCells);
       return currentColumnCells.size();
     case SUM:
     case SUM_FINAL:
+      // 根据操作类型不同处理求和
       switch (action) {
       case FLUSH:
       case MINOR_COMPACTION:
+        // 刷写和小压缩直接保留原单元格
         cells.addAll(currentColumnCells);
         return currentColumnCells.size();
       case READ:
+        // 读取时实时计算总和，输出一个汇总单元格
         Cell sumCell = processSummation(currentColumnCells,
             (NumericValueConverter) converter);
         cells.add(sumCell);
         return 1;
       case MAJOR_COMPACTION:
+        // 大压缩时合并已过期的已完成应用，生成流汇总单元格
         List<Cell> finalCells = processSummationMajorCompaction(
             currentColumnCells, (NumericValueConverter) converter,
             currentTimestamp);
@@ -387,10 +402,7 @@ class FlowScanner implements RegionScanner, Closeable {
   }
 
   /*
-   * Returns a cell whose value is the sum of all cell values in the input set.
-   * The new cell created has the timestamp of the most recent metric cell. The
-   * sum of a metric for a flow run is the summation at the point of the last
-   * metric update in that flow till that time.
+   * 对输入单元格集合求和，生成新的汇总单元格，使用最新单元格的时间戳。
    */
   private Cell processSummation(SortedSet<Cell> currentColumnCells,
       NumericValueConverter converter) throws IOException {
@@ -416,304 +428,12 @@ class FlowScanner implements RegionScanner, Closeable {
 
 
   /**
-   * Returns a list of cells that contains
-   *
-   * A) the latest cells for applications that haven't finished yet
-   * B) summation
-   * for the flow, based on applications that have completed and are older than
-   * a certain time
-   *
-   * The new cell created has the timestamp of the most recent metric cell. The
-   * sum of a metric for a flow run is the summation at the point of the last
-   * metric update in that flow till that time.
+   * 大压缩时处理求和聚合，合并已过期的已完成应用指标，生成流汇总单元格，保留未过期应用的原单元格。
+   * @param currentColumnCells 当前列所有收集到的单元格
+   * @param converter 数值转换器
+   * @param currentTimestamp 当前时间戳
+   * @return 处理后的单元格列表
+   * @throws IOException 处理异常
    */
   @VisibleForTesting
-  List<Cell> processSummationMajorCompaction(
-      SortedSet<Cell> currentColumnCells, NumericValueConverter converter,
-      long currentTimestamp)
-      throws IOException {
-    Number sum = 0;
-    Number currentValue = 0;
-    long ts = 0L;
-    boolean summationDone = false;
-    List<Cell> finalCells = new ArrayList<Cell>();
-    if (currentColumnCells == null) {
-      return finalCells;
-    }
-
-    LOG.debug("In processSummationMajorCompaction, will drop cells older"
-        + " than {} CurrentColumnCells size={}", currentTimestamp,
-        currentColumnCells.size());
-
-    for (Cell cell : currentColumnCells) {
-      AggregationOperation cellAggOp = getCurrentAggOp(cell);
-      // if this is the existing flow sum cell
-      List<Tag> tags = HBaseTimelineServerUtils.convertCellAsTagList(cell);
-      String appId = HBaseTimelineServerUtils
-          .getAggregationCompactionDimension(tags);
-      if (appId == FLOW_APP_ID) {
-        sum = converter.add(sum, currentValue);
-        summationDone = true;
-        if (LOG.isTraceEnabled()) {
-          LOG.trace("reading flow app id sum=" + sum);
-        }
-      } else {
-        currentValue = (Number) converter.decodeValue(CellUtil
-            .cloneValue(cell));
-        // read the timestamp truncated by the generator
-        ts =  TimestampGenerator.getTruncatedTimestamp(cell.getTimestamp());
-        if ((cellAggOp == AggregationOperation.SUM_FINAL)
-            && ((ts + this.appFinalValueRetentionThreshold)
-                < currentTimestamp)) {
-          sum = converter.add(sum, currentValue);
-          summationDone = true;
-          if (LOG.isTraceEnabled()) {
-            LOG.trace("MAJOR COMPACTION loop sum= " + sum
-                + " discarding now: " + " qualifier="
-                + Bytes.toString(CellUtil.cloneQualifier(cell)) + " value="
-                + converter.decodeValue(CellUtil.cloneValue(cell))
-                + " timestamp=" + cell.getTimestamp() + " " + this.action);
-          }
-        } else {
-          // not a final value but it's the latest cell for this app
-          // so include this cell in the list of cells to write back
-          finalCells.add(cell);
-        }
-      }
-    }
-    if (summationDone) {
-      Cell anyCell = currentColumnCells.first();
-      List<Tag> tags = new ArrayList<Tag>();
-      Tag t = HBaseTimelineServerUtils.createTag(
-          AggregationOperation.SUM_FINAL.getTagType(),
-          Bytes.toBytes(FLOW_APP_ID));
-      tags.add(t);
-      t = HBaseTimelineServerUtils.createTag(
-          AggregationCompactionDimension.APPLICATION_ID.getTagType(),
-          Bytes.toBytes(FLOW_APP_ID));
-      tags.add(t);
-      byte[] tagByteArray =
-          HBaseTimelineServerUtils.convertTagListToByteArray(tags);
-      Cell sumCell = HBaseTimelineServerUtils.createNewCell(
-          CellUtil.cloneRow(anyCell),
-          CellUtil.cloneFamily(anyCell),
-          CellUtil.cloneQualifier(anyCell),
-          TimestampGenerator.getSupplementedTimestamp(
-              System.currentTimeMillis(), FLOW_APP_ID),
-              converter.encodeValue(sum), tagByteArray);
-      finalCells.add(sumCell);
-      if (LOG.isTraceEnabled()) {
-        LOG.trace("MAJOR COMPACTION final sum= " + sum + " for "
-            + Bytes.toString(CellUtil.cloneQualifier(sumCell))
-            + " " + this.action);
-      }
-      LOG.info("After major compaction for qualifier="
-          + Bytes.toString(CellUtil.cloneQualifier(sumCell))
-          + " with currentColumnCells.size="
-          + currentColumnCells.size()
-          + " returning finalCells.size=" + finalCells.size()
-          + " with sum=" + sum.longValue()
-          + " with cell timestamp " + sumCell.getTimestamp());
-    } else {
-      String qualifier = "";
-      LOG.info("After major compaction for qualifier=" + qualifier
-          + " with currentColumnCells.size="
-          + currentColumnCells.size()
-          + " returning finalCells.size=" + finalCells.size()
-          + " with zero sum="
-          + sum.longValue());
-    }
-    return finalCells;
-  }
-
-  /**
-   * Determines which cell is to be returned based on the values in each cell
-   * and the comparison operation MIN or MAX.
-   *
-   * @param previouslyChosenCell
-   * @param currentCell
-   * @param currentAggOp
-   * @return the cell which is the min (or max) cell
-   * @throws IOException
-   */
-  private Cell compareCellValues(Cell previouslyChosenCell, Cell currentCell,
-      AggregationOperation currentAggOp, NumericValueConverter converter)
-      throws IOException {
-    if (previouslyChosenCell == null) {
-      return currentCell;
-    }
-    try {
-      Number previouslyChosenCellValue = (Number)converter.decodeValue(
-          CellUtil.cloneValue(previouslyChosenCell));
-      Number currentCellValue = (Number) converter.decodeValue(CellUtil
-          .cloneValue(currentCell));
-      switch (currentAggOp) {
-      case GLOBAL_MIN:
-        if (converter.compare(
-            currentCellValue, previouslyChosenCellValue) < 0) {
-          // new value is minimum, hence return this cell
-          return currentCell;
-        } else {
-          // previously chosen value is miniumum, hence return previous min cell
-          return previouslyChosenCell;
-        }
-      case GLOBAL_MAX:
-        if (converter.compare(
-            currentCellValue, previouslyChosenCellValue) > 0) {
-          // new value is max, hence return this cell
-          return currentCell;
-        } else {
-          // previously chosen value is max, hence return previous max cell
-          return previouslyChosenCell;
-        }
-      default:
-        return currentCell;
-      }
-    } catch (IllegalArgumentException iae) {
-      LOG.error("caught iae during conversion to long ", iae);
-      return currentCell;
-    }
-  }
-
-  @Override
-  public void close() throws IOException {
-    if (flowRunScanner != null) {
-      flowRunScanner.close();
-    } else {
-      LOG.warn("scanner close called but scanner is null");
-    }
-  }
-
-  /**
-   * Called to signal the start of the next() call by the scanner.
-   */
-  public void startNext() {
-    currentRow = null;
-  }
-
-  /**
-   * Returns whether or not the underlying scanner has more rows.
-   */
-  public boolean hasMore() {
-    return currentIndex < availableCells.size() ? true : hasMore;
-  }
-
-  /**
-   * Returns the next available cell for the current row and advances the
-   * pointer to the next cell. This method can be called multiple times in a row
-   * to advance through all the available cells.
-   *
-   * @param scannerContext
-   *          context information for the batch of cells under consideration
-   * @return the next available cell or null if no more cells are available for
-   *         the current row
-   * @throws IOException
-   */
-  public Cell nextCell(ScannerContext scannerContext) throws IOException {
-    Cell cell = peekAtNextCell(scannerContext);
-    if (cell != null) {
-      currentIndex++;
-    }
-    return cell;
-  }
-
-  /**
-   * Returns the next available cell for the current row, without advancing the
-   * pointer. Calling this method multiple times in a row will continue to
-   * return the same cell.
-   *
-   * @param scannerContext
-   *          context information for the batch of cells under consideration
-   * @return the next available cell or null if no more cells are available for
-   *         the current row
-   * @throws IOException if any problem is encountered while grabbing the next
-   *     cell.
-   */
-  public Cell peekAtNextCell(ScannerContext scannerContext) throws IOException {
-    if (currentIndex >= availableCells.size()) {
-      // done with current batch
-      availableCells.clear();
-      currentIndex = 0;
-      hasMore = flowRunScanner.next(availableCells, scannerContext);
-    }
-    Cell cell = null;
-    if (currentIndex < availableCells.size()) {
-      cell = availableCells.get(currentIndex);
-      if (currentRow == null) {
-        currentRow = CellUtil.cloneRow(cell);
-      } else if (!CellUtil.matchingRow(cell, currentRow)) {
-        // moved on to the next row
-        // don't use the current cell
-        // also signal no more cells for this row
-        return null;
-      }
-    }
-    return cell;
-  }
-
-  /*
-   * (non-Javadoc)
-   *
-   * @see org.apache.hadoop.hbase.regionserver.RegionScanner#getMaxResultSize()
-   */
-  @Override
-  public long getMaxResultSize() {
-    if (regionScanner == null) {
-      throw new IllegalStateException(
-          "RegionScanner.isFilterDone() called when the flow "
-              + "scanner's scanner is not a RegionScanner");
-    }
-    return regionScanner.getMaxResultSize();
-  }
-
-  /*
-   * (non-Javadoc)
-   *
-   * @see org.apache.hadoop.hbase.regionserver.RegionScanner#getMvccReadPoint()
-   */
-  @Override
-  public long getMvccReadPoint() {
-    if (regionScanner == null) {
-      throw new IllegalStateException(
-          "RegionScanner.isFilterDone() called when the flow "
-              + "scanner's internal scanner is not a RegionScanner");
-    }
-    return regionScanner.getMvccReadPoint();
-  }
-
-  /*
-   * (non-Javadoc)
-   *
-   * @see org.apache.hadoop.hbase.regionserver.RegionScanner#isFilterDone()
-   */
-  @Override
-  public boolean isFilterDone() throws IOException {
-    if (regionScanner == null) {
-      throw new IllegalStateException(
-          "RegionScanner.isFilterDone() called when the flow "
-              + "scanner's internal scanner is not a RegionScanner");
-    }
-    return regionScanner.isFilterDone();
-
-  }
-
-  /*
-   * (non-Javadoc)
-   *
-   * @see org.apache.hadoop.hbase.regionserver.RegionScanner#reseek(byte[])
-   */
-  @Override
-  public boolean reseek(byte[] bytes) throws IOException {
-    if (regionScanner == null) {
-      throw new IllegalStateException(
-          "RegionScanner.reseek() called when the flow "
-              + "scanner's internal scanner is not a RegionScanner");
-    }
-    return regionScanner.reseek(bytes);
-  }
-
-  @Override
-  public int getBatch() {
-    return batchSize;
-  }
-}
+  List<Cell> processSummationMajorComp

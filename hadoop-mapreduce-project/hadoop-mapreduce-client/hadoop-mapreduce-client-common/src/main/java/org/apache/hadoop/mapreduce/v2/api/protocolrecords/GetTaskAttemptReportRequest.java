@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,20 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
+/**
+ * 获取任务尝试报告的请求接口，定义了MR ApplicationMaster与MR客户端之间获取任务尝试报告请求的结构。
+ * 用于客户端向服务端请求指定任务尝试的运行状态报告。
+ */
 public interface GetTaskAttemptReportRequest {
+  /**
+   * 获取请求查询的任务尝试ID。
+   * @return 要查询报告的任务尝试唯一标识
+   */
   public abstract TaskAttemptId getTaskAttemptId();
   
+  /**
+   * 设置需要查询报告的任务尝试ID。
+   * @param taskAttemptId 要查询报告的任务尝试唯一标识
+   */
   public abstract void setTaskAttemptId(TaskAttemptId taskAttemptId);
 }

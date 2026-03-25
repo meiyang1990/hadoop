@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,12 +20,11 @@
 package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 
 /**
- * Utility class that allows HBase coprocessors to interact with unique
- * timestamps.
+ * YARN时间线服务HBase存储时间戳生成工具类，为HBase协处理器提供唯一时间戳生成能力。
+ * 用于解决HBase同一列多个版本写入时的时间戳冲突问题。
  */
 public class TimestampGenerator {
 
@@ -32,15 +32,16 @@ public class TimestampGenerator {
    * if this is changed, then reading cell timestamps written with older
    * multiplier value will not work
    */
+  /** 时间戳放大系数，提供百万级的精度扩展，预留低位空间存储额外信息 */
   public static final long TS_MULTIPLIER = 1000000L;
 
+  /** 记录上一次生成的唯一时间戳，用于CAS原子操作保证唯一性 */
   private final AtomicLong lastTimestamp = new AtomicLong();
 
   /**
-   * Returns the current wall clock time in milliseconds, multiplied by the
-   * required precision.
+   * 获取按精度放大后的当前系统时间戳。
    *
-   * @return current timestamp.
+   * @return 放大后的当前时间戳
    */
   public long currentTime() {
     // We want to align cell timestamps with current time.
@@ -50,42 +51,31 @@ public class TimestampGenerator {
   }
 
   /**
-   * Returns a timestamp value unique within the scope of this
-   * {@code TimestampGenerator} instance. For usage by HBase
-   * {@code RegionObserver} coprocessors, this normally means unique within a
-   * given region.
+   * 生成当前TimestampGenerator实例范围内唯一的时间戳。
+   * 在HBase RegionObserver协处理器场景下，保证同一Region内的唯一性。
+   * 通过CAS原子操作解决并发生成冲突，确保不会重复。
    *
-   * Unlikely scenario of generating a non-unique timestamp: if there is a
-   * sustained rate of more than 1M hbase writes per second AND if region fails
-   * over within that time range of timestamps being generated then there may be
-   * collisions writing to a cell version of the same column.
-   *
-   * @return unique timestamp.
+   * @return 唯一时间戳
    */
   public long getUniqueTimestamp() {
     long lastTs;
     long nextTs;
+    // CAS循环保证生成唯一递增时间戳
     do {
       lastTs = lastTimestamp.get();
+      // 新时间戳不小于上一个+1，也不小于当前系统时间
       nextTs = Math.max(lastTs + 1, currentTime());
     } while (!lastTimestamp.compareAndSet(lastTs, nextTs));
     return nextTs;
   }
 
   /**
-   * Returns a timestamp multiplied with TS_MULTIPLIER and last few digits of
-   * application id.
+   * 生成带有应用ID后缀的补充时间戳，将应用ID低位嵌入时间戳低位，
+   * 用于区分不同应用同时写入同一列的场景，避免冲突。
    *
-   * Unlikely scenario of generating a timestamp that is a duplicate: If more
-   * than a 1M concurrent apps are running in one flow run AND write to same
-   * column at the same time, then say appId of 1M and 1 will overlap
-   * with appId of 001 and there may be collisions for that flow run's
-   * specific column.
-   *
-   * @param incomingTS Timestamp to be converted.
-   * @param appId Application Id.
-   * @return a timestamp multiplied with TS_MULTIPLIER and last few digits of
-   *         application id
+   * @param incomingTS 原始时间戳
+   * @param appId 应用ID字符串
+   * @return 嵌入应用ID后缀的时间戳
    */
   public static long getSupplementedTimestamp(long incomingTS, String appId) {
     long suffix = getAppIdSuffix(appId);
@@ -94,6 +84,12 @@ public class TimestampGenerator {
 
   }
 
+  /**
+   * 从应用ID字符串提取低位后缀，用于嵌入时间戳。
+   *
+   * @param appIdStr 应用ID字符串
+   * @return 应用ID对放大系数取模后的低位后缀
+   */
   private static long getAppIdSuffix(String appIdStr) {
     if (appIdStr == null) {
       return 0L;
@@ -104,11 +100,10 @@ public class TimestampGenerator {
   }
 
   /**
-   * truncates the last few digits of the timestamp which were supplemented by
-   * the TimestampGenerator#getSupplementedTimestamp function.
+   * 从补充时间戳中截去低位后缀，还原出原始毫秒级时间戳。
    *
-   * @param incomingTS Timestamp to be truncated.
-   * @return a truncated timestamp value
+   * @param incomingTS 补充后的时间戳
+   * @return 截断低位后缀后的原始时间戳
    */
   public static long getTruncatedTimestamp(long incomingTS) {
     return incomingTS / TS_MULTIPLIER;

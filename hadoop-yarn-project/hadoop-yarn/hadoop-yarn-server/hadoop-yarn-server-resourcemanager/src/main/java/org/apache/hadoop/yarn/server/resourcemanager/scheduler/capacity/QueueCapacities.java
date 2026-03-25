@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,14 +31,28 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.yarn.nodelabels.CommonNodeLabelsManager;
 import org.apache.hadoop.yarn.server.resourcemanager.nodelabels.RMNodeLabelsManager;
 
+/**
+ * 容量调度器队列容量管理器，按节点标签存储并管理队列各类容量指标，
+ * 支持绝对容量/相对容量/已用容量等多维度容量存储，线程安全访问。
+ */
 public class QueueCapacities {
+  // 默认无节点标签常量
   private static final String NL = CommonNodeLabelsManager.NO_LABEL;
+  // 标签不存在时默认容量值
   private static final float LABEL_DOESNT_EXIST_CAP = 0f;
+  // 按节点标签存储容量信息映射表
   private final Map<String, Capacities> capacitiesMap;
+  // 读锁，用于并发读操作
   private final ReadLock readLock;
+  // 写锁，用于并发写操作
   private final WriteLock writeLock;
+  // 是否是根队列标识
   private final boolean isRoot;
 
+  /**
+   * 构造队列容量管理器
+   * @param isRoot 是否为根队列
+   */
   public QueueCapacities(boolean isRoot) {
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     readLock = lock.readLock();
@@ -46,7 +61,7 @@ public class QueueCapacities {
     this.isRoot = isRoot;
   }
   
-  // Usage enum here to make implement cleaner
+  // 容量类型枚举，使用数组索引访问提高存储和访问效率
   private enum CapacityType {
     USED_CAP(0), ABS_USED_CAP(1), MAX_CAP(2), ABS_MAX_CAP(3), CAP(4), ABS_CAP(5),
       MAX_AM_PERC(6), RESERVED_CAP(7), ABS_RESERVED_CAP(8), WEIGHT(9), NORMALIZED_WEIGHT(10);
@@ -58,13 +73,16 @@ public class QueueCapacities {
     }
   }
 
+  /**
+   * 单个节点标签下的所有容量信息存储类，使用数组存储提高访问效率
+   */
   private static class Capacities {
     private final float[] capacitiesArr;
     
     public Capacities() {
       capacitiesArr = new float[CapacityType.values().length];
 
-      // Set weight to -1 by default (means not set)
+      // 默认权重为-1，表示未配置
       capacitiesArr[CapacityType.WEIGHT.idx] = -1;
     }
     
@@ -84,12 +102,18 @@ public class QueueCapacities {
     }
   }
   
+  /**
+   * 内部获取指定标签指定类型容量值的实现，加读锁保证线程安全
+   * @param label 节点标签
+   * @param type 容量类型
+   * @return 容量值
+   */
   private float _get(String label, CapacityType type) {
     readLock.lock();
     try {
       Capacities cap = capacitiesMap.get(label);
       if (null == cap) {
-        // Special handle weight mode
+        // 权重模式特殊处理，未配置返回-1
         if (type == CapacityType.WEIGHT) {
           return -1f;
         }
@@ -101,6 +125,12 @@ public class QueueCapacities {
     }
   }
   
+  /**
+   * 内部设置指定标签指定类型容量值的实现，加写锁保证线程安全
+   * @param label 节点标签
+   * @param type 容量类型
+   * @param value 容量值
+   */
   private void _set(String label, CapacityType type, float value) {
     writeLock.lock();
     try {
@@ -152,6 +182,7 @@ public class QueueCapacities {
   }
 
   public float getCapacity(String label) {
+    // 根队列无标签容量固定为1
     if (StringUtils.equals(label, RMNodeLabelsManager.NO_LABEL) && isRoot) {
       return 1f;
     }
@@ -172,6 +203,7 @@ public class QueueCapacities {
   }
 
   public float getAbsoluteCapacity(String label) {
+    // 根队列无标签绝对容量固定为1
     if (StringUtils.equals(label, RMNodeLabelsManager.NO_LABEL) && isRoot) {
       return 1f;
     }
@@ -303,6 +335,7 @@ public class QueueCapacities {
    * (absolute)capacity/(absolute)maximum-capacity, this will be used by queue
    * reinitialize, when we reinitialize a queue, we will first clear all
    * configurable fields, and load new values
+   * 清除所有可配置容量字段，用于队列重新初始化，加载新配置前清空旧值
    */
   public void clearConfigurableFields() {
     writeLock.lock();
@@ -319,6 +352,10 @@ public class QueueCapacities {
     }
   }
   
+  /**
+   * 获取所有已配置容量的节点标签集合
+   * @return 已存在的节点标签集合
+   */
   public Set<String> getExistingNodeLabels() {
     readLock.lock();
     try {

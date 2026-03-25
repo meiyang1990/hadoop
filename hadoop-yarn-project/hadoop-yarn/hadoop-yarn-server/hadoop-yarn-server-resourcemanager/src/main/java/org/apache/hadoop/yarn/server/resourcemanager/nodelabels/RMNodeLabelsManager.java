@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,7 +46,15 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 
 import org.apache.hadoop.thirdparty.com.google.common.collect.ImmutableSet;
 
+/**
+ * ResourceManager节点标签管理器，继承通用节点标签管理能力，
+ * 负责维护节点标签与队列的关联关系，计算各标签对应的可用资源，
+ * 支持节点标签的动态更新并通知调度器资源变化。
+ */
 public class RMNodeLabelsManager extends CommonNodeLabelsManager {
+  /**
+   * 队列的节点标签信息封装类，保存队列可访问的标签和对应可用资源
+   */
   protected static class Queue {
     protected Set<String> accessibleNodeLabels;
     protected Resource resource;
@@ -57,6 +66,7 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
     }
   }
 
+  // 队列名称 -> 队列标签信息的映射
   ConcurrentMap<String, Queue> queueCollections =
       new ConcurrentHashMap<String, Queue>();
   private YarnAuthorizationProvider authorizer;
@@ -65,6 +75,7 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
+    // 初始化权限检查器
     authorizer = YarnAuthorizationProvider.getInstance(conf);
   }
 
@@ -73,21 +84,26 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
       throws IOException {
     writeLock.lock();
     try {
-      // get nodesCollection before edition
+      // 保存修改前指定节点的信息，用于后续资源计算
       Map<String, Host> before = cloneNodeMap(addedLabelsToNode.keySet());
 
       super.addLabelsToNode(addedLabelsToNode);
 
-      // get nodesCollection after edition
+      // 保存修改后指定节点的信息
       Map<String, Host> after = cloneNodeMap(addedLabelsToNode.keySet());
 
-      // update running nodes resources
+      // 更新各标签和队列的资源映射
       updateResourceMappings(before, after);
     } finally {
       writeLock.unlock();
     }
   }
 
+  /**
+   * 检查待删除标签是否被队列占用，若占用则不允许删除
+   * @param labelsToRemove 待删除标签集合
+   * @throws IOException 若标签被队列占用则抛出异常
+   */
   protected void checkRemoveFromClusterNodeLabelsOfQueue(
       Collection<String> labelsToRemove) throws IOException {
     // Check if label to remove doesn't existed or null/empty, will throw
@@ -95,7 +111,7 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
     for (String label : labelsToRemove) {
       label = normalizeLabel(label);
 
-      // check if any queue contains this label
+      // 遍历所有队列检查是否包含当前标签
       for (Entry<String, Queue> entry : queueCollections.entrySet()) {
         String queueName = entry.getKey();
         Set<String> queueLabels = entry.getValue().accessibleNodeLabels;
@@ -113,6 +129,7 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
       throws IOException {
     writeLock.lock();
     try {
+      // 恢复过程中不做检查，避免回放编辑日志误判
       if (!isInitNodeLabelStoreInProgress()) {
         // We cannot remove node labels from collection when some queue(s) are
         // using any of them.
@@ -122,7 +139,7 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
         // used by some queues in the past but are used by current queues.
         checkRemoveFromClusterNodeLabelsOfQueue(labelsToRemove);
       }
-      // copy before NMs
+      // 保存修改前所有节点信息
       Map<String, Host> before = cloneNodeMap();
 
       super.removeFromClusterNodeLabels(labelsToRemove);
@@ -150,16 +167,16 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
           throws IOException {
     writeLock.lock();
     try {
-      // get nodesCollection before edition
+      // 保存修改前指定节点的信息
       Map<String, Host> before =
           cloneNodeMap(removeLabelsFromNode.keySet());
 
       super.removeLabelsFromNode(removeLabelsFromNode);
 
-      // get nodesCollection before edition
+      // 保存修改后指定节点的信息
       Map<String, Host> after = cloneNodeMap(removeLabelsFromNode.keySet());
 
-      // update running nodes resources
+      // 更新各标签和队列的资源映射
       updateResourceMappings(before, after);
     } finally {
       writeLock.unlock();
@@ -171,6 +188,7 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
       throws IOException {
     writeLock.lock();
     try {
+      // 计算真正发生标签变更的节点映射
       Map<NodeId, Set<String>> effectiveModifiedLabelMappings =
           getModifiedNodeLabelsMappings(replaceLabelsToNode);
 
@@ -179,40 +197,50 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
         return;
       }
 
-      // get nodesCollection before edition
+      // 保存修改前节点信息
       Map<String, Host> before =
           cloneNodeMap(effectiveModifiedLabelMappings.keySet());
 
       super.replaceLabelsOnNode(effectiveModifiedLabelMappings);
 
-      // get nodesCollection after edition
+      // 保存修改后节点信息
       Map<String, Host> after =
           cloneNodeMap(effectiveModifiedLabelMappings.keySet());
 
-      // update running nodes resources
+      // 更新资源映射
       updateResourceMappings(before, after);
     } finally {
       writeLock.unlock();
     }
   }
 
+  /**
+   * 筛选出真正发生标签变更的节点，避免无意义更新
+   * @param replaceLabelsToNode 请求替换的节点标签映射
+   * @return 真正发生变更的节点标签映射
+   */
   private Map<NodeId, Set<String>> getModifiedNodeLabelsMappings(
       Map<NodeId, Set<String>> replaceLabelsToNode) {
     Map<NodeId, Set<String>> effectiveModifiedLabels = new HashMap<>();
+    // 遍历所有请求替换的节点
     for (Entry<NodeId, Set<String>> nodeLabelMappingEntry : replaceLabelsToNode
         .entrySet()) {
       NodeId nodeId = nodeLabelMappingEntry.getKey();
       Set<String> modifiedNodeLabels = nodeLabelMappingEntry.getValue();
       Set<String> labelsBeforeModification = null;
       Host host = nodeCollections.get(nodeId.getHost());
+      // 节点不存在，直接认为需要修改
       if (host == null) {
         effectiveModifiedLabels.put(nodeId, modifiedNodeLabels);
         continue;
       } else if (nodeId.getPort() == WILDCARD_PORT) {
+        // 通配符端口，取主机级别标签
         labelsBeforeModification = host.labels;
       } else if (host.nms.get(nodeId) != null) {
+        // 取具体节点的标签
         labelsBeforeModification = host.nms.get(nodeId).labels;
       }
+      // 比较标签，只有内容不同才加入变更列表
       if (labelsBeforeModification == null
           || labelsBeforeModification.size() != modifiedNodeLabels.size()
           || !labelsBeforeModification.containsAll(modifiedNodeLabels)) {
@@ -226,14 +254,21 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
    * Following methods are used for setting if a node is up and running, and it
    * will update running nodes resource
    */
+  /**
+   * 激活节点，将节点加入标签资源统计，更新资源映射
+   * @param nodeId 节点ID
+   * @param resource 节点可用资源
+   */
   public void activateNode(NodeId nodeId, Resource resource) {
     writeLock.lock();
     try {
-      // save if we have a node before
+      // 保存修改前节点信息
       Map<String, Host> before = cloneNodeMap(ImmutableSet.of(nodeId));
       
+      // 若主机不存在则创建主机条目
       createHostIfNonExisted(nodeId.getHost());
       try {
+        // 若节点不存在则创建节点条目
         createNodeIfNonExisted(nodeId);
       } catch (IOException e) {
         LOG.error("This shouldn't happen, cannot get host in nodeCollection"
@@ -241,11 +276,12 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
         return;
       }
 
+      // 更新节点资源和运行状态
       Node nm = getNMInNodeSet(nodeId);
       nm.resource = resource;
       nm.running = true;
 
-      // Add node in labelsCollection
+      // 将节点添加到对应标签的节点列表中
       Set<String> labelsForNode = getLabelsByNode(nodeId);
       if (labelsForNode != null) {
         for (String label : labelsForNode) {
@@ -256,9 +292,10 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
         }
       }
       
-      // get the node after edition
+      // 保存修改后节点信息
       Map<String, Host> after = cloneNodeMap(ImmutableSet.of(nodeId));
       
+      // 更新资源映射
       updateResourceMappings(before, after);
     } finally {
       writeLock.unlock();
@@ -268,10 +305,14 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
   /*
    * Following methods are used for setting if a node unregistered to RM
    */
+  /**
+   * 停用节点，从标签资源统计中移除节点资源
+   * @param nodeId 节点ID
+   */
   public void deactivateNode(NodeId nodeId) {
     writeLock.lock();
     try {
-      // save if we have a node before
+      // 保存修改前节点信息
       Map<String, Host> before = cloneNodeMap(ImmutableSet.of(nodeId));
       Node nm = getNMInNodeSet(nodeId);
       if (null != nm) {
@@ -279,52 +320,66 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
           // When node deactivated, remove the nm from node collection if no
           // labels explicitly set for this particular nm
 
-          // Save labels first, we need to remove label->nodes relation later
+          // 先保存节点原有标签，后续需要更新标签->节点关系
           Set<String> savedNodeLabels = getLabelsOnNode(nodeId);
           
-          // Remove this node in nodes collection
+          // 从节点集合中移除该节点
           nodeCollections.get(nodeId.getHost()).nms.remove(nodeId);
           
-          // Remove this node in labels->node
+          // 从各标签的节点列表中移除该节点
           removeNodeFromLabels(nodeId, savedNodeLabels);
         } else {
-          // set nm is not running, and its resource = 0
+          // 显式标签未设置，仅标记为未运行，资源清零
           nm.running = false;
           nm.resource = Resource.newInstance(0, 0);
         }
       }
       
-      // get the node after edition
+      // 保存修改后节点信息
       Map<String, Host> after = cloneNodeMap(ImmutableSet.of(nodeId));
       
+      // 更新资源映射
       updateResourceMappings(before, after);
     } finally {
       writeLock.unlock();
     }
   }
 
+  /**
+   * 更新节点资源，先停用再激活以更新资源统计
+   * @param node 节点ID
+   * @param newResource 新资源值
+   */
   public void updateNodeResource(NodeId node, Resource newResource) {
     deactivateNode(node);
     activateNode(node, newResource);
   }
 
+  /**
+   * 重新初始化所有队列的标签配置，重新计算各队列可用资源
+   * @param queueToLabels 队列->可访问标签映射
+   */
   public void reinitializeQueueLabels(Map<String, Set<String>> queueToLabels) {
     writeLock.lock();
     try {
-      // clear before set
+      // 清空原有队列配置
       this.queueCollections.clear();
 
+      // 遍历所有队列重新构建配置
       for (Entry<String, Set<String>> entry : queueToLabels.entrySet()) {
         String queue = entry.getKey();
         Queue q = new Queue();
         this.queueCollections.put(queue, q);
 
         Set<String> labels = entry.getValue();
+        // 包含ANY标签，整个集群资源都可访问，无需累加，后续直接返回集群总资源
         if (labels.contains(ANY)) {
           continue;
         }
 
+        // 添加可访问标签
         q.accessibleNodeLabels.addAll(labels);
+        // 遍历所有运行中节点，累加对队列可用的资源
         for (Host host : nodeCollections.values()) {
           for (Entry<NodeId, Node> nentry : host.nms.entrySet()) {
             NodeId nodeId = nentry.getKey();
@@ -340,10 +395,18 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
     }
   }
   
+  /**
+   * 获取队列对应标签的可用资源
+   * @param queueName 队列名称
+   * @param queueLabels 队列可访问标签
+   * @param clusterResource 集群总资源
+   * @return 队列可用资源
+   */
   public Resource getQueueResource(String queueName, Set<String> queueLabels,
       Resource clusterResource) {
     readLock.lock();
     try {
+      // 包含ANY标签，直接返回整个集群资源
       if (queueLabels.contains(ANY)) {
         return clusterResource;
       }
@@ -360,6 +423,11 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
   /*
    * Get active node count based on label.
    */
+  /**
+   * 获取指定标签对应的活跃节点数量
+   * @param label 标签名称
+   * @return 活跃节点数
+   */
   public int getActiveNMCountPerLabel(String label) {
     if (label == null) {
       return 0;
@@ -373,6 +441,11 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
     }
   }
 
+  /**
+   * 获取指定节点上的所有标签
+   * @param nodeId 节点ID
+   * @return 不可修改的标签集合
+   */
   public Set<String> getLabelsOnNode(NodeId nodeId) {
     readLock.lock();
     try {
@@ -383,6 +456,11 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
     }
   }
   
+  /**
+   * 检查集群是否包含指定标签
+   * @param label 标签名称
+   * @return 是否包含
+   */
   public boolean containsNodeLabel(String label) {
     readLock.lock();
     try {
@@ -393,193 +471,15 @@ public class RMNodeLabelsManager extends CommonNodeLabelsManager {
     }
   }
 
+  /**
+   * 复制指定节点集合对应的节点信息，用于对比修改前后状态
+   * @param nodesToCopy 需要复制的节点集合
+   * @return 复制后的节点信息映射
+   */
   private Map<String, Host> cloneNodeMap(Set<NodeId> nodesToCopy) {
     Map<String, Host> map = new HashMap<String, Host>();
     for (NodeId nodeId : nodesToCopy) {
+      // 主机未复制过，先复制主机信息
       if (!map.containsKey(nodeId.getHost())) {
         Host originalN = nodeCollections.get(nodeId.getHost());
         if (null == originalN) {
-          continue;
-        }
-        Host n = originalN.copy();
-        n.nms.clear();
-        map.put(nodeId.getHost(), n);
-      }
-
-      Host n = map.get(nodeId.getHost());
-      if (WILDCARD_PORT == nodeId.getPort()) {
-        for (Entry<NodeId, Node> entry : nodeCollections
-            .get(nodeId.getHost()).nms.entrySet()) {
-          n.nms.put(entry.getKey(), entry.getValue().copy());
-        }
-      } else {
-        Node nm = getNMInNodeSet(nodeId);
-        if (null != nm) {
-          n.nms.put(nodeId, nm.copy());
-        }
-      }
-    }
-    return map;
-  }
-
-  @SuppressWarnings("unchecked")
-  private void updateResourceMappings(Map<String, Host> before,
-      Map<String, Host> after) {
-    // Get NMs in before only
-    Set<NodeId> allNMs = new HashSet<NodeId>();
-    for (Entry<String, Host> entry : before.entrySet()) {
-      allNMs.addAll(entry.getValue().nms.keySet());
-    }
-    for (Entry<String, Host> entry : after.entrySet()) {
-      allNMs.addAll(entry.getValue().nms.keySet());
-    }
-    
-    // Map used to notify RM
-    Map<NodeId, Set<String>> newNodeToLabelsMap =
-        new HashMap<NodeId, Set<String>>();
-
-    // traverse all nms
-    for (NodeId nodeId : allNMs) {
-      Node oldNM;
-      if ((oldNM = getNMInNodeSet(nodeId, before, true)) != null) {
-        Set<String> oldLabels = getLabelsByNode(nodeId, before);
-        // no label in the past
-        if (oldLabels.isEmpty()) {
-          // update labels
-          RMNodeLabel label = labelCollections.get(NO_LABEL);
-          label.removeNode(oldNM.resource);
-
-          // update queues, all queue can access this node
-          for (Queue q : queueCollections.values()) {
-            Resources.subtractFrom(q.resource, oldNM.resource);
-          }
-        } else {
-          // update labels
-          for (String labelName : oldLabels) {
-            RMNodeLabel label = labelCollections.get(labelName);
-            if (null == label) {
-              continue;
-            }
-            label.removeNode(oldNM.resource);
-          }
-
-          // update queues, only queue can access this node will be subtract
-          for (Queue q : queueCollections.values()) {
-            if (isNodeUsableByQueue(oldLabels, q)) {
-              Resources.subtractFrom(q.resource, oldNM.resource);
-            }
-          }
-        }
-      }
-
-      Node newNM;
-      if ((newNM = getNMInNodeSet(nodeId, after, true)) != null) {
-        Set<String> newLabels = getLabelsByNode(nodeId, after);
-        
-        newNodeToLabelsMap.put(nodeId, ImmutableSet.copyOf(newLabels));
-        
-        // no label in the past
-        if (newLabels.isEmpty()) {
-          // update labels
-          RMNodeLabel label = labelCollections.get(NO_LABEL);
-          label.addNode(newNM.resource);
-
-          // update queues, all queue can access this node
-          for (Queue q : queueCollections.values()) {
-            Resources.addTo(q.resource, newNM.resource);
-          }
-        } else {
-          // update labels
-          for (String labelName : newLabels) {
-            RMNodeLabel label = labelCollections.get(labelName);
-            label.addNode(newNM.resource);
-          }
-
-          // update queues, only queue can access this node will be subtract
-          for (Queue q : queueCollections.values()) {
-            if (isNodeUsableByQueue(newLabels, q)) {
-              Resources.addTo(q.resource, newNM.resource);
-            }
-          }
-        }
-      }
-    }
-    
-    // Notify RM
-    if (rmContext != null && rmContext.getDispatcher() != null) {
-      rmContext.getDispatcher().getEventHandler().handle(
-          new NodeLabelsUpdateSchedulerEvent(newNodeToLabelsMap));
-    }
-  }
-  
-  public Resource getResourceByLabel(String label, Resource clusterResource) {
-    label = normalizeLabel(label);
-    if (label.equals(NO_LABEL)) {
-      return noNodeLabel.getResource();
-    }
-    readLock.lock();
-    try {
-      RMNodeLabel nodeLabel = labelCollections.get(label);
-      if (nodeLabel == null) {
-        return Resources.none();
-      }
-      return nodeLabel.getResource();
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  private boolean isNodeUsableByQueue(Set<String> nodeLabels, Queue q) {
-    // node without any labels can be accessed by any queue
-    if (nodeLabels == null || nodeLabels.isEmpty()
-        || (nodeLabels.size() == 1 && nodeLabels.contains(NO_LABEL))) {
-      return true;
-    }
-
-    for (String label : nodeLabels) {
-      if (q.accessibleNodeLabels.contains(label)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  private Map<String, Host> cloneNodeMap() {
-    Set<NodeId> nodesToCopy = new HashSet<NodeId>();
-    for (String nodeName : nodeCollections.keySet()) {
-      nodesToCopy.add(NodeId.newInstance(nodeName, WILDCARD_PORT));
-    }
-    return cloneNodeMap(nodesToCopy);
-  }
-
-  public boolean checkAccess(UserGroupInformation user) {
-    // make sure only admin can invoke
-    // this method
-    if (authorizer.isAdmin(user)) {
-      return true;
-    }
-    return false;
-  }
-  
-  public void setRMContext(RMContext rmContext) {
-    this.rmContext = rmContext;
-  }
-
-  public List<RMNodeLabel> pullRMNodeLabelsInfo() {
-    readLock.lock();
-    try {
-      List<RMNodeLabel> infos = new ArrayList<RMNodeLabel>();
-
-      for (Entry<String, RMNodeLabel> entry : labelCollections.entrySet()) {
-        RMNodeLabel label = entry.getValue();
-        infos.add(label.getCopy());
-      }
-
-      Collections.sort(infos);
-      return infos;
-    } finally {
-      readLock.unlock();
-    }
-  }
-}

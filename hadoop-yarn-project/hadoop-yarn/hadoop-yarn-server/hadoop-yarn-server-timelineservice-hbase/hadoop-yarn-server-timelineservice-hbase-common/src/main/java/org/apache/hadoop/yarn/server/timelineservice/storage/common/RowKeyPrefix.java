@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,24 +19,18 @@
 package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 
 /**
- * In queries where a single result is needed, an exact rowkey can be used
- * through the corresponding rowkey#getRowKey() method. For queries that need to
- * scan over a range of rowkeys, a partial (the initial part) of rowkeys are
- * used. Classes implementing RowKeyPrefix indicate that they are the initial
- * part of rowkeys, with different constructors with fewer number of argument to
- * form a partial rowkey, a prefix.
+ * HBase行键前缀接口，用于支持范围扫描查询。
+ * 需要精确匹配单条结果时使用完整行键，需要扫描某一范围行键时使用行键前缀（行键的起始部分）。
+ * 实现类通过使用更少参数的构造器生成不同长度的行键前缀。
  *
- * @param <R> indicating the type of rowkey that a particular implementation is
- *          a prefix for.
+ * @param <R> 该前缀对应的完整行键类型
  */
 public interface RowKeyPrefix<R> {
 
   /**
-   * Create a row key prefix, meaning a partial rowkey that can be used in range
-   * scans. Which fields are included in the prefix will depend on the
-   * constructor of the specific instance that was used. Output depends on which
-   * constructor was used.
-   * @return a prefix of the following form {@code fist!second!...!last!}
+   * 生成用于范围扫描的行键前缀字节数组。
+   * 前缀包含的字段由构造实例时使用的构造器决定，输出格式为 {@code first!second!...!last!}。
+   * @return 行键前缀字节数组
    */
   byte[] getRowKeyPrefix();
 

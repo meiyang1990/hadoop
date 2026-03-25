@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,102 +32,21 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 
 /**
- * Distribute application-specific large, read-only files efficiently.
+ * 分布式缓存工具类，用于高效分发应用程序所需的大型只读文件到集群所有计算节点。
  *
- * <p><code>DistributedCache</code> is a facility provided by the Map-Reduce
- * framework to cache files (text, archives, jars etc.) needed by applications.
- * </p>
+ * <p><code>DistributedCache</code> 是MapReduce框架提供的缓存工具，用于缓存应用所需的文件
+ * （文本文件、压缩包、JAR包等）。</p>
  *
- * <p>Applications specify the files, via urls (hdfs:// or http://) to be cached
- * via the {@link org.apache.hadoop.mapred.JobConf}. The
- * <code>DistributedCache</code> assumes that the files specified via urls are
- * already present on the {@link FileSystem} at the path specified by the url
- * and are accessible by every machine in the cluster.</p>
+ * <p>应用通过URI指定需要缓存的文件，分布式缓存假设这些文件已经存在于文件系统中，
+ * 并且集群中所有节点都可以访问。</p>
  *
- * <p>The framework will copy the necessary files on to the worker node before
- * any tasks for the job are executed on that node. Its efficiency stems from
- * the fact that the files are only copied once per job and the ability to
- * cache archives which are un-archived on the workers.</p>
+ * <p>框架会在节点执行任何任务之前，将所需文件拷贝到该工作节点，效率来自于每个作业
+ * 只拷贝一次文件，并且支持在节点上自动解压归档文件。</p>
  *
- * <p><code>DistributedCache</code> can be used to distribute simple, read-only
- * data/text files and/or more complex types such as archives, jars etc.
- * Archives (zip, tar and tgz/tar.gz files) are un-archived at the worker nodes.
- * Jars may be optionally added to the classpath of the tasks, a rudimentary
- * software distribution mechanism.  Files have execution permissions.
- * In older version of Hadoop Map/Reduce users could optionally ask for symlinks
- * to be created in the working directory of the child task.  In the current
- * version symlinks are always created.  If the URL does not have a fragment
- * the name of the file or directory will be used. If multiple files or
- * directories map to the same link name, the last one added, will be used.  All
- * others will not even be downloaded.</p>
- *
- * <p><code>DistributedCache</code> tracks modification timestamps of the cache
- * files. Clearly the cache files should not be modified by the application
- * or externally while the job is executing.</p>
- *
- * <p>Here is an illustrative example on how to use the
- * <code>DistributedCache</code>:</p>
- * <p><blockquote><pre>
- *     // Setting up the cache for the application
- *
- *     1. Copy the requisite files to the <code>FileSystem</code>:
- *
- *     $ bin/hadoop fs -copyFromLocal lookup.dat /myapp/lookup.dat
- *     $ bin/hadoop fs -copyFromLocal map.zip /myapp/map.zip
- *     $ bin/hadoop fs -copyFromLocal mylib.jar /myapp/mylib.jar
- *     $ bin/hadoop fs -copyFromLocal mytar.tar /myapp/mytar.tar
- *     $ bin/hadoop fs -copyFromLocal mytgz.tgz /myapp/mytgz.tgz
- *     $ bin/hadoop fs -copyFromLocal mytargz.tar.gz /myapp/mytargz.tar.gz
- *
- *     2. Setup the application's <code>JobConf</code>:
- *
- *     JobConf job = new JobConf();
- *     DistributedCache.addCacheFile(new URI("/myapp/lookup.dat#lookup.dat"),
- *                                   job);
- *     DistributedCache.addCacheArchive(new URI("/myapp/map.zip"), job);
- *     DistributedCache.addFileToClassPath(new Path("/myapp/mylib.jar"), job);
- *     DistributedCache.addCacheArchive(new URI("/myapp/mytar.tar"), job);
- *     DistributedCache.addCacheArchive(new URI("/myapp/mytgz.tgz"), job);
- *     DistributedCache.addCacheArchive(new URI("/myapp/mytargz.tar.gz"), job);
- *
- *     3. Use the cached files in the {@link org.apache.hadoop.mapred.Mapper}
- *     or {@link org.apache.hadoop.mapred.Reducer}:
- *
- *     public static class MapClass extends MapReduceBase
- *     implements Mapper&lt;K, V, K, V&gt; {
- *
- *       private Path[] localArchives;
- *       private Path[] localFiles;
- *
- *       public void configure(JobConf job) {
- *         // Get the cached archives/files
- *         File f = new File("./map.zip/some/file/in/zip.txt");
- *       }
- *
- *       public void map(K key, V value,
- *                       OutputCollector&lt;K, V&gt; output, Reporter reporter)
- *       throws IOException {
- *         // Use data from the cached archives/files here
- *         // ...
- *         // ...
- *         output.collect(k, v);
- *       }
- *     }
- *
- * </pre></blockquote>
- *
- * It is also very common to use the DistributedCache by using
- * {@link org.apache.hadoop.util.GenericOptionsParser}.
- *
- * This class includes methods that should be used by users
- * (specifically those mentioned in the example above, as well
- * as {@link DistributedCache#addArchiveToClassPath(Path, Configuration)}),
- * as well as methods intended for use by the MapReduce framework
- * (e.g., {@link org.apache.hadoop.mapred.JobClient}).
- *
- * @see org.apache.hadoop.mapred.JobConf
- * @see org.apache.hadoop.mapred.JobClient
- * @see org.apache.hadoop.mapreduce.Job
+ * <p>该类是MapReduce 1.x时代的API，已被标记为Deprecated，推荐使用新版本API。
+ * 当前继承了新版本的实现保持向后兼容性。</p>
+ * 
+ * @see org.apache.hadoop.mapreduce.filecache.DistributedCache
  */
 @SuppressWarnings("deprecation")
 @InterfaceAudience.Public
@@ -135,87 +55,68 @@ import org.apache.hadoop.mapreduce.MRJobConfig;
 public class DistributedCache extends
     org.apache.hadoop.mapreduce.filecache.DistributedCache {
   /**
-   * Warning: {@link #CACHE_FILES_SIZES} is not a *public* constant.
-   * The variable is kept for M/R 1.x applications, M/R 2.x applications should
-   * use {@link MRJobConfig#CACHE_FILES_SIZES}
+   * 警告：这不是公开常量，仅为兼容MapReduce 1.x应用保留，MapReduce 2.x应用应使用{@link MRJobConfig#CACHE_FILES_SIZES}。
    */
   @Deprecated
   public static final String CACHE_FILES_SIZES =
       "mapred.cache.files.filesizes";
 
   /**
-   * Warning: {@link #CACHE_ARCHIVES_SIZES} is not a *public* constant.
-   * The variable is kept for M/R 1.x applications, M/R 2.x applications should
-   * use {@link MRJobConfig#CACHE_ARCHIVES_SIZES}
+   * 警告：这不是公开常量，仅为兼容MapReduce 1.x应用保留，MapReduce 2.x应用应使用{@link MRJobConfig#CACHE_ARCHIVES_SIZES}。
    */
   @Deprecated
   public static final String CACHE_ARCHIVES_SIZES =
     "mapred.cache.archives.filesizes";
 
   /**
-   * Warning: {@link #CACHE_ARCHIVES_TIMESTAMPS} is not a *public* constant.
-   * The variable is kept for M/R 1.x applications, M/R 2.x applications should
-   * use {@link MRJobConfig#CACHE_ARCHIVES_TIMESTAMPS}
+   * 警告：这不是公开常量，仅为兼容MapReduce 1.x应用保留，MapReduce 2.x应用应使用{@link MRJobConfig#CACHE_ARCHIVES_TIMESTAMPS}。
    */
   @Deprecated
   public static final String CACHE_ARCHIVES_TIMESTAMPS =
       "mapred.cache.archives.timestamps";
 
   /**
-   * Warning: {@link #CACHE_FILES_TIMESTAMPS} is not a *public* constant.
-   * The variable is kept for M/R 1.x applications, M/R 2.x applications should
-   * use {@link MRJobConfig#CACHE_FILE_TIMESTAMPS}
+   * 警告：这不是公开常量，仅为兼容MapReduce 1.x应用保留，MapReduce 2.x应用应使用{@link MRJobConfig#CACHE_FILE_TIMESTAMPS}。
    */
   @Deprecated
   public static final String CACHE_FILES_TIMESTAMPS =
       "mapred.cache.files.timestamps";
 
   /**
-   * Warning: {@link #CACHE_ARCHIVES} is not a *public* constant.
-   * The variable is kept for M/R 1.x applications, M/R 2.x applications should
-   * use {@link MRJobConfig#CACHE_ARCHIVES}
+   * 警告：这不是公开常量，仅为兼容MapReduce 1.x应用保留，MapReduce 2.x应用应使用{@link MRJobConfig#CACHE_ARCHIVES}。
    */
   @Deprecated
   public static final String CACHE_ARCHIVES = "mapred.cache.archives";
 
   /**
-   * Warning: {@link #CACHE_FILES} is not a *public* constant.
-   * The variable is kept for M/R 1.x applications, M/R 2.x applications should
-   * use {@link MRJobConfig#CACHE_FILES}
+   * 警告：这不是公开常量，仅为兼容MapReduce 1.x应用保留，MapReduce 2.x应用应使用{@link MRJobConfig#CACHE_FILES}。
    */
   @Deprecated
   public static final String CACHE_FILES = "mapred.cache.files";
 
   /**
-   * Warning: {@link #CACHE_LOCALARCHIVES} is not a *public* constant.
-   * The variable is kept for M/R 1.x applications, M/R 2.x applications should
-   * use {@link MRJobConfig#CACHE_LOCALARCHIVES}
+   * 警告：这不是公开常量，仅为兼容MapReduce 1.x应用保留，MapReduce 2.x应用应使用{@link MRJobConfig#CACHE_LOCALARCHIVES}。
    */
   @Deprecated
   public static final String CACHE_LOCALARCHIVES =
       "mapred.cache.localArchives";
 
   /**
-   * Warning: {@link #CACHE_LOCALFILES} is not a *public* constant.
-   * The variable is kept for M/R 1.x applications, M/R 2.x applications should
-   * use {@link MRJobConfig#CACHE_LOCALFILES}
+   * 警告：这不是公开常量，仅为兼容MapReduce 1.x应用保留，MapReduce 2.x应用应使用{@link MRJobConfig#CACHE_LOCALFILES}。
    */
   @Deprecated
   public static final String CACHE_LOCALFILES = "mapred.cache.localFiles";
 
   /**
-   * Warning: {@link #CACHE_SYMLINK} is not a *public* constant.
-   * The variable is kept for M/R 1.x applications, M/R 2.x applications should
-   * use {@link MRJobConfig#CACHE_SYMLINK}
+   * 警告：这不是公开常量，仅为兼容MapReduce 1.x应用保留，MapReduce 2.x应用应使用{@link MRJobConfig#CACHE_SYMLINK}。
    */
   @Deprecated
   public static final String CACHE_SYMLINK = "mapred.create.symlink";
 
   /**
-   * Add a archive that has been localized to the conf.  Used
-   * by internal DistributedCache code.
-   * @param conf The conf to modify to contain the localized caches
-   * @param str a comma separated list of local archives
+   * 将已本地化的归档文件添加到配置中，供分布式缓存内部使用。
+   * @param conf 要修改的配置对象
+   * @param str 逗号分隔的本地归档文件路径列表
    */
   @Deprecated
   public static void addLocalArchives(Configuration conf, String str) {
@@ -225,10 +126,9 @@ public class DistributedCache extends
   }
 
   /**
-   * Add a file that has been localized to the conf..  Used
-   * by internal DistributedCache code.
-   * @param conf The conf to modify to contain the localized caches
-   * @param str a comma separated list of local files
+   * 将已本地化的文件添加到配置中，供分布式缓存内部使用。
+   * @param conf 要修改的配置对象
+   * @param str 逗号分隔的本地文件路径列表
    */
   @Deprecated
   public static void addLocalFiles(Configuration conf, String str) {
@@ -238,15 +138,13 @@ public class DistributedCache extends
   }
 
   /**
-   * This method create symlinks for all files in a given dir in another
-   * directory. Currently symlinks cannot be disabled. This is a NO-OP.
+   * 在指定工作目录为缓存目录中的所有文件创建符号链接，当前版本已不支持禁用符号链接，此方法为空操作。
    *
-   * @param conf the configuration
-   * @param jobCacheDir the target directory for creating symlinks
-   * @param workDir the directory in which the symlinks are created
-   * @throws IOException
-   * @deprecated Internal to MapReduce framework.  Use DistributedCacheManager
-   * instead.
+   * @param conf 配置对象
+   * @param jobCacheDir 缓存文件所在的目标目录
+   * @param workDir 需要创建符号链接的工作目录
+   * @throws IOException 不会抛出异常
+   * @deprecated 仅MapReduce框架内部使用，请改用DistributedCacheManager
    */
   @Deprecated
   public static void createAllSymlink(
@@ -256,12 +154,11 @@ public class DistributedCache extends
   }
 
   /**
-   * Returns {@link FileStatus} of a given cache file on hdfs. Internal to
-   * MapReduce.
-   * @param conf configuration
-   * @param cache cache file
-   * @return <code>FileStatus</code> of a given cache file on hdfs
-   * @throws IOException
+   * 获取HDFS上指定缓存文件的FileStatus对象，供MapReduce内部使用。
+   * @param conf 配置对象
+   * @param cache 缓存文件的URI
+   * @return HDFS上该缓存文件的FileStatus
+   * @throws IOException 获取文件状态失败时抛出
    */
   @Deprecated
   public static FileStatus getFileStatus(Configuration conf, URI cache)
@@ -271,11 +168,11 @@ public class DistributedCache extends
   }
 
   /**
-   * Returns mtime of a given cache file on hdfs. Internal to MapReduce.
-   * @param conf configuration
-   * @param cache cache file
-   * @return mtime of a given cache file on hdfs
-   * @throws IOException
+   * 获取HDFS上指定缓存文件的修改时间戳，供MapReduce内部使用。
+   * @param conf 配置对象
+   * @param cache 缓存文件的URI
+   * @return 缓存文件的修改时间戳
+   * @throws IOException 获取时间戳失败时抛出
    */
   @Deprecated
   public static long getTimestamp(Configuration conf, URI cache)
@@ -284,11 +181,9 @@ public class DistributedCache extends
   }
 
   /**
-   * This is to check the timestamp of the archives to be localized.
-   * Used by internal MapReduce code.
-   * @param conf Configuration which stores the timestamp's
-   * @param timestamps comma separated list of timestamps of archives.
-   * The order should be the same as the order in which the archives are added.
+   * 设置归档文件的修改时间戳到配置中，用于本地化校验，供MapReduce内部使用。
+   * @param conf 存储时间戳的配置对象
+   * @param timestamps 逗号分隔的归档文件时间戳列表，顺序需与添加归档文件顺序一致
    */
   @Deprecated
   public static void setArchiveTimestamps(Configuration conf, String timestamps) {
@@ -296,11 +191,9 @@ public class DistributedCache extends
   }
 
   /**
-   * This is to check the timestamp of the files to be localized.
-   * Used by internal MapReduce code.
-   * @param conf Configuration which stores the timestamp's
-   * @param timestamps comma separated list of timestamps of files.
-   * The order should be the same as the order in which the files are added.
+   * 设置缓存文件的修改时间戳到配置中，用于本地化校验，供MapReduce内部使用。
+   * @param conf 存储时间戳的配置对象
+   * @param timestamps 逗号分隔的缓存文件时间戳列表，顺序需与添加文件顺序一致
    */
   @Deprecated
   public static void setFileTimestamps(Configuration conf, String timestamps) {
@@ -308,10 +201,9 @@ public class DistributedCache extends
   }
 
   /**
-   * Set the conf to contain the location for localized archives.  Used
-   * by internal DistributedCache code.
-   * @param conf The conf to modify to contain the localized caches
-   * @param str a comma separated list of local archives
+   * 设置本地化归档文件路径到配置中，供分布式缓存内部使用。
+   * @param conf 要修改的配置对象
+   * @param str 逗号分隔的本地归档文件路径列表
    */
   @Deprecated
   public static void setLocalArchives(Configuration conf, String str) {
@@ -319,10 +211,9 @@ public class DistributedCache extends
   }
 
   /**
-   * Set the conf to contain the location for localized files.  Used
-   * by internal DistributedCache code.
-   * @param conf The conf to modify to contain the localized caches
-   * @param str a comma separated list of local files
+   * 设置本地化文件路径到配置中，供分布式缓存内部使用。
+   * @param conf 要修改的配置对象
+   * @param str 逗号分隔的本地文件路径列表
    */
   @Deprecated
   public static void setLocalFiles(Configuration conf, String str) {

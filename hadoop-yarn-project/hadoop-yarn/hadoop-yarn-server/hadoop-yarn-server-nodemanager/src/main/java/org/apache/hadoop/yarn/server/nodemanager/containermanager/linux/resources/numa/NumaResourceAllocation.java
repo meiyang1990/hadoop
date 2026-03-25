@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,37 +26,67 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * NumaResourceAllocation contains Memory nodes and CPU nodes assigned to a
- * container.
+ * 存储容器分配到的NUMA节点资源信息，包含每个NUMA节点分配的内存和CPU数量
+ * 用于YARN NodeManager的NUMA感知资源分配功能
  */
 public class NumaResourceAllocation implements Serializable {
   private static final long serialVersionUID = 6339719798446595123L;
+  // NUMA节点ID到分配内存大小的映射，单位为字节
   private final ImmutableMap<String, Long> nodeVsMemory;
+  // NUMA节点ID到分配CPU核心数的映射
   private final ImmutableMap<String, Integer> nodeVsCpus;
 
+  /**
+   * 构造NUMA资源分配信息对象
+   * @param memoryAllocations 各NUMA节点内存分配结果
+   * @param cpuAllocations 各NUMA节点CPU分配结果
+   */
   public NumaResourceAllocation(Map<String, Long> memoryAllocations,
       Map<String, Integer> cpuAllocations) {
     nodeVsMemory = ImmutableMap.copyOf(memoryAllocations);
     nodeVsCpus = ImmutableMap.copyOf(cpuAllocations);
   }
 
+  /**
+   * 单NUMA节点场景构造NUMA资源分配信息对象
+   * @param memNodeId 内存分配所在NUMA节点ID
+   * @param memory 分配内存大小
+   * @param cpuNodeId CPU分配所在NUMA节点ID
+   * @param cpus 分配CPU核心数
+   */
   public NumaResourceAllocation(String memNodeId, long memory, String cpuNodeId,
       int cpus) {
     this(ImmutableMap.of(memNodeId, memory), ImmutableMap.of(cpuNodeId, cpus));
   }
 
+  /**
+   * 获取分配了内存的所有NUMA节点ID集合
+   * @return 分配内存的NUMA节点ID集合
+   */
   public Set<String> getMemNodes() {
     return nodeVsMemory.keySet();
   }
 
+  /**
+   * 获取分配了CPU的所有NUMA节点ID集合
+   * @return 分配CPU的NUMA节点ID集合
+   */
   public Set<String> getCpuNodes() {
     return nodeVsCpus.keySet();
   }
 
+  /**
+   * 获取所有NUMA节点的内存分配映射
+   * @return 不可变的NUMA节点到内存大小映射
+   */
   public ImmutableMap<String, Long> getNodeVsMemory() {
     return nodeVsMemory;
   }
 
+  /**
+   * 获取所有NUMA节点的CPU分配映射
+   * @return 不可变的NUMA节点到CPU核心数映射
+   */
   public ImmutableMap<String, Integer> getNodeVsCpus() {
     return nodeVsCpus;
   }

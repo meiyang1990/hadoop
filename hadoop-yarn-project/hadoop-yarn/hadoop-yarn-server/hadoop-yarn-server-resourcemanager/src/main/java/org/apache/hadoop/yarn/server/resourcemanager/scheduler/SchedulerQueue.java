@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,8 +25,7 @@ import org.apache.hadoop.yarn.api.records.QueueState;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 
 /**
- *
- * Represents a queue in Scheduler.
+ * YARN资源调度器中队列的抽象接口，定义所有调度队列都需要实现的核心能力
  *
  */
 @SuppressWarnings("rawtypes")
@@ -33,37 +33,37 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 public interface SchedulerQueue<T extends SchedulerQueue> extends Queue {
 
   /**
-   * Get list of child queues.
-   * @return a list of child queues
+   * 获取当前队列的所有子队列列表
+   * @return 子队列列表
    */
   List<T> getChildQueues();
 
   /**
-   * Get the parent queue.
-   * @return the parent queue
+   * 获取当前队列的父队列
+   * @return 父队列对象，根队列返回null
    */
   T getParent();
 
   /**
-   * Get current queue state.
-   * @return the queue state
+   * 获取当前队列的运行状态
+   * @return 队列状态（运行/停止等）
    */
   QueueState getState();
 
   /**
-   * Update the queue state.
-   * @param state the queue state
+   * 更新队列的运行状态
+   * @param state 待设置的队列状态
    */
   void updateQueueState(QueueState state);
 
   /**
-   * Stop the queue.
+   * 停止当前队列，不再接受新的应用调度
    */
   void stopQueue();
 
   /**
-   * Activate the queue.
-   * @throws YarnException if the queue can not be activated.
+   * 激活当前队列，恢复接受新应用的调度
+   * @throws YarnException 队列激活失败时抛出异常
    */
   void activateQueue() throws YarnException;
 }

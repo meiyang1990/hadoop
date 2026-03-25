@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,87 +23,83 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCap
 import java.util.Set;
 
 /**
- * A strategy class to encapsulate queue capacity setup and resource calculation
- * logic.
+ * 队列容量计算器抽象基类，封装队列容量配置与资源计算逻辑的通用框架
+ * 不同容量类型（绝对资源/百分比资源）的计算器实现该抽象类
  */
 public abstract class AbstractQueueCapacityCalculator {
 
   /**
-   * Sets the metrics and statistics after effective resource values calculation.
+   * 计算完实际资源值后，更新队列容量指标与统计信息
    *
-   * @param queue the queue on which the calculations are based
-   * @param resourceCalculationDriver driver that contains the intermediate calculation results for
-   *                                  a queue branch
-   * @param label         node label
+   * @param resourceCalculationDriver 包含队列分支中间计算结果的驱动对象
+   * @param queue 进行容量计算的目标队列
+   * @param label 节点标签
    */
   public abstract void updateCapacitiesAfterCalculation(
       ResourceCalculationDriver resourceCalculationDriver, CSQueue queue, String label);
 
 
   /**
-   * Returns the capacity type the calculator could handle.
+   * 获取当前计算器支持处理的容量类型
    *
-   * @return capacity type
+   * @return 容量类型（绝对资源/百分比资源）
    */
   public abstract ResourceUnitCapacityType getCapacityType();
 
   /**
-   * Calculates the minimum effective resource.
+   * 计算队列最小有效资源量
    *
-   * @param resourceCalculationDriver driver that contains the intermediate calculation results for
-   *                                  a queue branch
-   * @param context the units evaluated in the current iteration phase
-   * @param label         node label
-   * @return minimum effective resource
+   * @param resourceCalculationDriver 包含队列分支中间计算结果的驱动对象
+   * @param context 当前迭代阶段计算上下文
+   * @param label 节点标签
+   * @return 最小有效资源量
    */
   public abstract double calculateMinimumResource(ResourceCalculationDriver resourceCalculationDriver,
                                                  CalculationContext context,
                                                  String label);
 
   /**
-   * Calculates the maximum effective resource.
+   * 计算队列最大有效资源量
    *
-   * @param resourceCalculationDriver driver that contains the intermediate calculation results for
-   *                                  a queue branch
-   * @param context the units evaluated in the current iteration phase
-   * @param label         node label
-   * @return minimum effective resource
+   * @param resourceCalculationDriver 包含队列分支中间计算结果的驱动对象
+   * @param context 当前迭代阶段计算上下文
+   * @param label 节点标签
+   * @return 最大有效资源量
    */
   public abstract double calculateMaximumResource(ResourceCalculationDriver resourceCalculationDriver,
                                                  CalculationContext context,
                                                  String label);
 
   /**
-   * Executes all logic that must be called prior to the effective resource value calculations.
+   * 在开始计算实际资源值之前，执行必要的前置计算逻辑
    *
-   * @param resourceCalculationDriver driver that contains the parent queue on which the 
-   *                                  prerequisite calculation should be made
+   * @param resourceCalculationDriver 包含父队列信息的计算驱动对象，用于前置计算
    */
   public abstract void calculateResourcePrerequisites(
       ResourceCalculationDriver resourceCalculationDriver);
 
   /**
-   * Returns all resource names that are defined for the capacity type that is
-   * handled by the calculator.
+   * 获取当前计算器处理容量类型下，已定义的所有资源名称
    *
-   * @param queue queue for which the capacity vector is defined
-   * @param label node label
-   * @return resource names
+   * @param queue 容量向量定义所属队列
+   * @param label 节点标签
+   * @return 资源名称集合
    */
   protected Set<String> getResourceNames(CSQueue queue, String label) {
     return getResourceNames(queue, label, getCapacityType());
   }
 
   /**
-   * Returns all resource names that are defined for a capacity type.
+   * 获取指定容量类型下，已定义的所有资源名称
    *
-   * @param queue        queue for which the capacity vector is defined
-   * @param label        node label
-   * @param capacityType capacity type for which the resource names are defined
-   * @return resource names
+   * @param queue        容量向量定义所属队列
+   * @param label        节点标签
+   * @param capacityType 目标容量类型
+   * @return 资源名称集合
    */
   protected Set<String> getResourceNames(CSQueue queue, String label,
                                          ResourceUnitCapacityType capacityType) {
+    // 从队列已配置容量向量中按容量类型提取资源名称
     return queue.getConfiguredCapacityVector(label)
         .getResourceNamesByCapacityType(capacityType);
   }

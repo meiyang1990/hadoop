@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,18 +41,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class implements a {@link PlanFollower}. This is invoked on a timer, and
- * it is in charge to publish the state of the {@link Plan}s to the underlying
- * {@link CapacityScheduler}. This implementation does so, by
- * adding/removing/resizing leaf queues in the scheduler, thus affecting the
- * dynamic behavior of the scheduler in a way that is consistent with the
- * content of the plan. It also updates the plan's view on how much resources
- * are available in the cluster.
+ * 容量调度器专用计划同步器，实现了{@link PlanFollower}接口。
+ * 该组件会被定时器定期触发，负责将预约计划(Plan)的状态同步到底层CapacityScheduler，
+ * 通过动态增删改叶子队列，让调度器行为和预约计划保持一致，同时更新计划中集群可用资源视图。
  * 
- * This implementation of PlanFollower is relatively stateless, and it can
- * synchronize schedulers and Plans that have arbitrary changes (performing set
- * differences among existing queues). This makes it resilient to frequency of
- * synchronization, and RM restart issues (no "catch up" is necessary).
+ * 该实现相对无状态，能够处理任意计划变更（通过对比现有队列找出差异），
+ * 对同步频率不敏感，支持RM重启后直接工作（无需追赶历史状态）。
  */
 public class CapacitySchedulerPlanFollower extends AbstractSchedulerPlanFollower {
 
@@ -65,6 +60,7 @@ public class CapacitySchedulerPlanFollower extends AbstractSchedulerPlanFollower
     super.init(clock, sched, plans);
     LOG.info("Initializing Plan Follower Policy:"
         + this.getClass().getCanonicalName());
+    // 校验当前调度器必须是CapacityScheduler
     if (!(sched instanceof CapacityScheduler)) {
       throw new YarnRuntimeException(
           "CapacitySchedulerPlanFollower can only work with CapacityScheduler");
@@ -94,8 +90,10 @@ public class CapacitySchedulerPlanFollower extends AbstractSchedulerPlanFollower
       String planQueueName, Queue queue, String currResId) {
     PlanQueue planQueue = (PlanQueue)queue;
     try {
+      // 创建新的预约队列，挂靠到对应计划队列下
       ReservationQueue resQueue =
           new ReservationQueue(cs.getQueueContext(), currResId, planQueue);
+      // 将新队列添加到容量调度器
       cs.addQueue(resQueue);
     } catch (SchedulerDynamicEditException e) {
       LOG.warn(
@@ -112,8 +110,10 @@ public class CapacitySchedulerPlanFollower extends AbstractSchedulerPlanFollower
   protected void createDefaultReservationQueue(
       String planQueueName, Queue queue, String defReservationId) {
     PlanQueue planQueue = (PlanQueue)queue;
+    // 默认预约队列不存在才创建
     if (cs.getQueue(defReservationId) == null) {
       try {
+        // 创建默认预约队列，用于放置未匹配到预约的作业
         ReservationQueue defQueue =
             new ReservationQueue(cs.getQueueContext(), defReservationId, planQueue);
         cs.addQueue(defQueue);
@@ -134,8 +134,11 @@ public class CapacitySchedulerPlanFollower extends AbstractSchedulerPlanFollower
   protected Resource getPlanResources(
       Plan plan, Queue queue, Resource clusterResources) {
     PlanQueue planQueue = (PlanQueue)queue;
+    // 获取计划队列占集群总资源的绝对容量比例
     float planAbsCap = planQueue.getAbsoluteCapacity();
+    // 根据比例计算计划可用总资源
     Resource planResources = Resources.multiply(clusterResources, planAbsCap);
+    // 更新计划的总容量信息
     plan.setTotalCapacity(planResources);
     return planResources;
   }
@@ -143,9 +146,11 @@ public class CapacitySchedulerPlanFollower extends AbstractSchedulerPlanFollower
   @Override
   protected Resource getReservationQueueResourceIfExists(Plan plan,
       ReservationId reservationId) {
+    // 根据预约ID从调度器获取对应预约队列
     CSQueue resQueue = cs.getQueue(reservationId.toString());
     Resource reservationResource = null;
     if (resQueue != null) {
+      // 根据队列绝对容量计算已分配资源量
       reservationResource = Resources.multiply(cs.getClusterResource(),
           resQueue.getAbsoluteCapacity());
     }

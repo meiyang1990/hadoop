@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,11 +38,22 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
 
-/** An {@link OutputFormat} that writes {@link SequenceFile}s. */
+/**
+ * 用于输出SequenceFile格式文件的OutputFormat实现
+ * 负责将MapReduce计算结果以二进制SequenceFile格式写入文件系统
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class SequenceFileOutputFormat <K,V> extends FileOutputFormat<K, V> {
 
+  /**
+   * 创建并初始化SequenceFile写入器，负责处理压缩配置和文件路径处理
+   * @param context 任务尝试上下文，包含任务配置和信息
+   * @param keyClass 输出键的类型Class对象
+   * @param valueClass 输出值的类型Class对象
+   * @return 初始化完成的SequenceFile.Writer实例
+   * @throws IOException 创建写入器过程中IO异常
+   */
   protected SequenceFile.Writer getSequenceWriter(TaskAttemptContext context,
       Class<?> keyClass, Class<?> valueClass) 
       throws IOException {
@@ -49,18 +61,22 @@ public class SequenceFileOutputFormat <K,V> extends FileOutputFormat<K, V> {
 	    
     CompressionCodec codec = null;
     CompressionType compressionType = CompressionType.NONE;
+    // 判断是否需要开启输出压缩
     if (getCompressOutput(context)) {
-      // find the kind of compression to do
+      // 获取压缩类型配置
       compressionType = getOutputCompressionType(context);
-      // find the right codec
+      // 获取压缩编解码器类型，默认使用DefaultCodec
       Class<?> codecClass = getOutputCompressorClass(context, 
                                                      DefaultCodec.class);
+      // 通过反射实例化压缩编解码器
       codec = (CompressionCodec) 
         ReflectionUtils.newInstance(codecClass, conf);
     }
-    // get the path of the temporary output file 
+    // 获取临时输出文件路径
     Path file = getDefaultWorkFile(context, "");
+    // 获取文件系统实例
     FileSystem fs = file.getFileSystem(conf);
+    // 创建并返回SequenceFile写入器
     return SequenceFile.createWriter(fs, conf, file,
              keyClass,
              valueClass,
@@ -69,31 +85,40 @@ public class SequenceFileOutputFormat <K,V> extends FileOutputFormat<K, V> {
              context);
   }
   
+  /**
+   * 获取用于输出键值对的RecordWriter实例
+   * @param context 任务尝试上下文
+   * @return 适配SequenceFile写入的RecordWriter实例
+   * @throws IOException 获取写入器过程中IO异常
+   * @throws InterruptedException 过程被中断异常
+   */
   public RecordWriter<K, V> 
          getRecordWriter(TaskAttemptContext context
                          ) throws IOException, InterruptedException {
+    // 初始化SequenceFile写入器
     final SequenceFile.Writer out = getSequenceWriter(context,
       context.getOutputKeyClass(), context.getOutputValueClass());
 
+    // 封装为RecordWriter返回
     return new RecordWriter<K, V>() {
 
         public void write(K key, V value)
           throws IOException {
-
+          // 向SequenceFile追加写入键值对
           out.append(key, value);
         }
 
         public void close(TaskAttemptContext context) throws IOException { 
+          // 关闭底层写入器
           out.close();
         }
       };
   }
 
   /**
-   * Get the {@link CompressionType} for the output {@link SequenceFile}.
-   * @param job the {@link Job}
-   * @return the {@link CompressionType} for the output {@link SequenceFile}, 
-   *         defaulting to {@link CompressionType#RECORD}
+   * 从作业配置中获取SequenceFile输出的压缩类型
+   * @param job 作业上下文对象
+   * @return 配置的压缩类型，默认返回RECORD级压缩
    */
   public static CompressionType getOutputCompressionType(JobContext job) {
     String val = job.getConfiguration().get(FileOutputFormat.COMPRESS_TYPE, 
@@ -102,17 +127,17 @@ public class SequenceFileOutputFormat <K,V> extends FileOutputFormat<K, V> {
   }
   
   /**
-   * Set the {@link CompressionType} for the output {@link SequenceFile}.
-   * @param job the {@link Job} to modify
-   * @param style the {@link CompressionType} for the output
-   *              {@link SequenceFile} 
+   * 设置SequenceFile输出的压缩类型，自动开启输出压缩
+   * @param job 需要修改配置的作业对象
+   * @param style 要设置的压缩类型
    */
   public static void setOutputCompressionType(Job job, 
 		                                          CompressionType style) {
+    // 开启输出压缩
     setCompressOutput(job, true);
+    // 将压缩类型写入作业配置
     job.getConfiguration().set(FileOutputFormat.COMPRESS_TYPE, 
                                style.toString());
   }
 
 }
-

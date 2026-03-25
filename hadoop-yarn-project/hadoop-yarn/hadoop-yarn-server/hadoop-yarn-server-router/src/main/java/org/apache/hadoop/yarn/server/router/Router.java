@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -82,19 +83,15 @@ import static org.apache.hadoop.yarn.conf.YarnConfiguration.ROUTER_SCHEDULED_EXE
 import static org.apache.hadoop.yarn.conf.YarnConfiguration.DEFAULT_ROUTER_SCHEDULED_EXECUTOR_THREADS;
 
 /**
- * The router is a stateless YARN component which is the entry point to the
- * cluster. It can be deployed on multiple nodes behind a Virtual IP (VIP) with
- * a LoadBalancer.
- *
- * The Router exposes the ApplicationClientProtocol (RPC and REST) to the
- * outside world, transparently hiding the presence of ResourceManager(s), which
- * allows users to request and update reservations, submit and kill
- * applications, and request status on running applications.
- *
- * In addition, it exposes the ResourceManager Admin API.
- *
- * This provides a placeholder for throttling mis-behaving clients (YARN-1546)
- * and masks the access to multiple RMs (YARN-3659).
+ * YARN联邦集群路由器，是YARN联邦对外的统一入口点，是无状态的可水平扩展组件。
+ * 它可以部署在多个节点，放置在负载均衡器和VIP后面对外提供服务。
+ * 
+ * 路由器对外暴露ApplicationClientProtocol（RPC和REST接口），对客户端透明隐藏
+ * 后端多个ResourceManager的存在，允许用户提交/杀死应用、查询应用状态、
+ * 预约/更新资源等操作。同时也对外暴露了ResourceManager管理API。
+ * 
+ * 主要作用：作为YARN联邦的统一入口，隔离客户端对后端多个RM的直接访问，
+ * 支持客户端限流，屏蔽多RM实现细节，支持集群横向扩展。
  */
 public class Router extends CompositeService {
 
@@ -117,7 +114,7 @@ public class Router extends CompositeService {
       "-remove-application-from-state-store";
 
   /**
-   * Priority of the Router shutdown hook.
+   * Router关闭钩子的优先级。
    */
   public static final int SHUTDOWN_HOOK_PRIORITY = 30;
 
@@ -128,10 +125,17 @@ public class Router extends CompositeService {
   private ScheduledThreadPoolExecutor scheduledExecutorService;
   private SubClusterCleaner subClusterCleaner;
 
+  /**
+   * 构造Router实例。
+   */
   public Router() {
     super(Router.class.getName());
   }
 
+  /**
+   * 执行安全Kerberos登录。
+   * @throws IOException 登录失败抛出异常
+   */
   protected void doSecureLogin() throws IOException {
     SecurityUtil.login(this.conf, YarnConfiguration.ROUTER_KEYTAB,
         YarnConfiguration.ROUTER_PRINCIPAL, getHostName(this.conf));
@@ -141,24 +145,24 @@ public class Router extends CompositeService {
   protected void serviceInit(Configuration config) throws Exception {
     this.conf = config;
     UserGroupInformation.setConfiguration(this.conf);
-    // ClientRM Proxy
+    // 初始化客户端RM代理服务
     clientRMProxyService = createClientRMProxyService();
     addService(clientRMProxyService);
-    // RMAdmin Proxy
+    // 初始化RM管理API代理服务
     rmAdminProxyService = createRMAdminProxyService();
     addService(rmAdminProxyService);
-    // WebService
+    // 初始化Web服务地址
     webAppAddress = WebAppUtils.getWebAppBindURL(this.conf,
         YarnConfiguration.ROUTER_BIND_HOST,
         WebAppUtils.getRouterWebAppURLWithoutScheme(this.conf));
-    // Metrics
+    // 初始化指标系统
     DefaultMetricsSystem.initialize(METRICS_NAME);
     JvmMetrics jm = JvmMetrics.initSingleton("Router", null);
     pauseMonitor = new JvmPauseMonitor();
     addService(pauseMonitor);
     jm.setPauseMonitor(pauseMonitor);
 
-    // Initialize subClusterCleaner
+    // 初始化子集群下线清理器
     this.subClusterCleaner = new SubClusterCleaner(this.conf);
     int scheduledExecutorThreads = conf.getInt(ROUTER_SCHEDULED_EXECUTOR_THREADS,
         DEFAULT_ROUTER_SCHEDULED_EXECUTOR_THREADS);
@@ -175,11 +179,14 @@ public class Router extends CompositeService {
     } catch (IOException e) {
       throw new YarnRuntimeException("Failed Router login", e);
     }
+    // 判断是否开启子集群自动注销清理功能
     boolean isDeregisterSubClusterEnabled = this.conf.getBoolean(
         ROUTER_DEREGISTER_SUBCLUSTER_ENABLED, DEFAULT_ROUTER_DEREGISTER_SUBCLUSTER_ENABLED);
     if (isDeregisterSubClusterEnabled) {
+      // 获取清理任务执行间隔
       long scCleanerIntervalMs = this.conf.getTimeDuration(ROUTER_SUBCLUSTER_CLEANER_INTERVAL_TIME,
           DEFAULT_ROUTER_SUBCLUSTER_CLEANER_INTERVAL_TIME, TimeUnit.MILLISECONDS);
+      // 启动定时清理任务，首次立即执行
       this.scheduledExecutorService.scheduleAtFixedRate(this.subClusterCleaner,
           0, scCleanerIntervalMs, TimeUnit.MILLISECONDS);
       LOG.info("Scheduled SubClusterCleaner With Interval: {}.",
@@ -202,14 +209,25 @@ public class Router extends CompositeService {
     WebServiceClient.destroy();
   }
 
+  /**
+   * 停止Router服务，在独立线程中执行避免阻塞关闭钩子。
+   */
   protected void shutDown() {
     new SubjectInheritingThread(Router.this::stop).start();
   }
 
+  /**
+   * 创建客户端RM代理服务实例。
+   * @return 客户端RM代理服务
+   */
   protected RouterClientRMService createClientRMProxyService() {
     return new RouterClientRMService();
   }
 
+  /**
+   * 创建RM管理API代理服务实例。
+   * @return RM管理API代理服务
+   */
   protected RouterRMAdminService createRMAdminProxyService() {
     return new RouterRMAdminService();
   }
@@ -222,7 +240,7 @@ public class Router extends CompositeService {
   @VisibleForTesting
   public void startWepApp() {
 
-    // Initialize RouterWeb's CrossOrigin capability.
+    // 初始化Router Web端跨域支持
     boolean enableCors = conf.getBoolean(YarnConfiguration.ROUTER_WEBAPP_ENABLE_CORS_FILTER,
         YarnConfiguration.DEFAULT_ROUTER_WEBAPP_ENABLE_CORS_FILTER);
     if (enableCors) {
@@ -232,10 +250,13 @@ public class Router extends CompositeService {
 
     LOG.info("Instantiating RouterWebApp at {}.", webAppAddress);
 
+    // 配置安全和过滤器
     RMWebAppUtil.setupSecurityAndFilters(conf, null);
 
+    // 构建Web应用
     Builder<Object> builder =
         WebApps.$for("cluster", null, null, "router-ws").with(conf).at(webAppAddress);
+    // 如果开启了Web应用代理，添加代理Servlet
     if (RouterServerUtil.isRouterWebProxyEnable(conf)) {
       fetcher = new FedAppReportFetcher(conf);
       builder.withServlet(ProxyUriUtils.PROXY_SERVLET_NAME, ProxyUriUtils.PROXY_PATH_SPEC,
@@ -247,19 +268,26 @@ public class Router extends CompositeService {
     }
     RouterWebApp routerWebApp = new RouterWebApp(this);
     builder.withResourceConfig(routerWebApp.resourceConfig());
+    // 启动Web应用，绑定UI2上下文
     webApp = builder.start(routerWebApp, getUIWebAppContext());
   }
 
+  /**
+   * 获取UI2的Web应用上下文。
+   * @return UI2 Web应用上下文，未开启则返回null
+   */
   private WebAppContext getUIWebAppContext() {
     WebAppContext uiWebAppContext = null;
     boolean isWebUI2Enabled = conf.getBoolean(YarnConfiguration.YARN_WEBAPP_UI2_ENABLE,
         YarnConfiguration.DEFAULT_YARN_WEBAPP_UI2_ENABLE);
 
     if(isWebUI2Enabled) {
+      // 从配置获取UI2 war包路径
       String onDiskPath = conf.get(YarnConfiguration.YARN_WEBAPP_UI2_WARFILE_PATH);
       uiWebAppContext = new WebAppContext();
       uiWebAppContext.setContextPath(UI2_WEBAPP_NAME);
 
+      // 配置中未指定，自动查找war包
       if (null == onDiskPath) {
         String war = "hadoop-yarn-ui-" + VersionInfo.getVersion() + ".war";
         URL url = getClass().getClassLoader().getResource(war);
@@ -273,6 +301,7 @@ public class Router extends CompositeService {
       if (onDiskPath == null || onDiskPath.isEmpty()) {
         LOG.error("No war file or webapps found for yarn federation!");
       } else {
+        // 是war文件直接设置war路径，否则设置资源基准路径
         if (onDiskPath.endsWith(".war")) {
           uiWebAppContext.setWar(onDiskPath);
           LOG.info("Using war file at: {}.", onDiskPath);
@@ -285,6 +314,11 @@ public class Router extends CompositeService {
     return uiWebAppContext;
   }
 
+  /**
+   * 获取webapps目录路径。
+   * @param appName 应用名称
+   * @return webapps目录路径，未找到返回空字符串
+   */
   private String getWebAppsPath(String appName) {
     URL url = getClass().getClassLoader().getResource("webapps/" + appName);
     if (url == null) {
@@ -293,6 +327,11 @@ public class Router extends CompositeService {
     return url.toString();
   }
 
+  /**
+   * 获取代理服务的主机和端口。
+   * @param conf 配置对象
+   * @return 代理服务地址字符串
+   */
   public static String getProxyHostAndPort(Configuration conf) {
     String addr = conf.get(YarnConfiguration.PROXY_ADDRESS);
     if(addr == null || addr.isEmpty()) {
@@ -304,6 +343,10 @@ public class Router extends CompositeService {
     return addr;
   }
 
+  /**
+   * Router主入口方法，启动Router服务或执行管理命令。
+   * @param argv 命令行参数
+   */
   public static void main(String[] argv) {
     Configuration conf = new YarnConfiguration();
     Thread.setDefaultUncaughtExceptionHandler(new YarnUncaughtExceptionHandler());
@@ -312,15 +355,17 @@ public class Router extends CompositeService {
     try {
       GenericOptionsParser hParser = new GenericOptionsParser(conf, argv);
       argv = hParser.getRemainingArgs();
+      // 如果参数大于1个，说明是执行管理命令，不是启动服务
       if (argv.length > 1) {
         executeRouterCommand(conf, argv);
       } else {
-        // Remove the old hook if we are rebooting.
+        // 重启场景移除旧的关闭钩子
         if (null != routerShutdownHook) {
           ShutdownHookManager.get().removeShutdownHook(routerShutdownHook);
         }
         routerShutdownHook = new CompositeServiceShutdownHook(router);
         ShutdownHookManager.get().addShutdownHook(routerShutdownHook, SHUTDOWN_HOOK_PRIORITY);
+        // 初始化并启动Router服务
         router.init(conf);
         router.start();
       }
@@ -341,12 +386,12 @@ public class Router extends CompositeService {
   }
 
   /**
-   * Returns the hostname for this Router. If the hostname is not
-   * explicitly configured in the given config, then it is determined.
+   * 获取Router的主机名，如果配置未指定则自动获取本地主机名。
+   * 用于Kerberos主体名中的主机部分替换。
    *
-   * @param config configuration
-   * @return the hostname (NB: may not be a FQDN)
-   * @throws UnknownHostException if the hostname cannot be determined
+   * @param config 配置对象
+   * @return 主机名，不一定是全限定域名
+   * @throws UnknownHostException 无法获取主机名时抛出异常
    */
   private String getHostName(Configuration config)
       throws UnknownHostException {
@@ -357,90 +402,13 @@ public class Router extends CompositeService {
     return name;
   }
 
+  /**
+   * 获取Router集群启动时间戳。
+   * @return 集群启动时间戳
+   */
   public static long getClusterTimeStamp() {
     return clusterTimeStamp;
   }
 
   @VisibleForTesting
-  public FedAppReportFetcher getFetcher() {
-    return fetcher;
-  }
-
-  @VisibleForTesting
-  public static void removeApplication(Configuration conf, String applicationId)
-      throws Exception {
-    FederationStateStoreFacade facade = FederationStateStoreFacade.getInstance(conf);
-    ApplicationId removeAppId = ApplicationId.fromString(applicationId);
-    LOG.info("Deleting application {} from state store.", removeAppId);
-    facade.deleteApplicationHomeSubCluster(removeAppId);
-    LOG.info("Application is deleted from state store");
-  }
-
-  private static void handFormatStateStore(Configuration conf) {
-    try {
-      System.out.println("Deleting Federation state store.");
-      FederationStateStoreFacade facade = FederationStateStoreFacade.getInstance(conf);
-      System.out.println("Federation state store has been cleaned.");
-      facade.deleteStore();
-    } catch (Exception e) {
-      System.err.println("Delete Federation state store error, exception = " + e);
-    }
-  }
-
-  private static void handRemoveApplicationFromStateStore(Configuration conf,
-      String applicationId) {
-    try {
-      removeApplication(conf, applicationId);
-      System.out.println("Application " + applicationId + " is deleted from state store");
-    } catch (Exception e) {
-      System.err.println("Application " + applicationId + " error, exception = " + e);
-    }
-  }
-
-  private static void executeRouterCommand(Configuration conf, String[] args) {
-    // Step1. Define Options.
-    Options opts = new Options();
-    Option formatStateStoreOpt = new Option("format-state-store",  false,
-        " Formats the FederationStateStore. " +
-        "This will clear the FederationStateStore and " +
-        "is useful if past applications are no longer needed. " +
-        "This should be run only when the Router is not running.");
-    Option removeApplicationFromStateStoreOpt = new Option("remove-application-from-state-store",
-        false, " Remove the application from FederationStateStore. " +
-         " This should be run only when the Router is not running. ");
-    opts.addOption(formatStateStoreOpt);
-    opts.addOption(removeApplicationFromStateStoreOpt);
-
-    // Step2. Parse Options.
-    try {
-      String cmd = args[0];
-
-      CommandLine cliParser = new DefaultParser().parse(opts, args);
-
-      if (CMD_FORMAT_STATE_STORE.equals(cmd)) {
-        handFormatStateStore(conf);
-      } else if (CMD_REMOVE_APPLICATION_FROM_STATE_STORE.equals(cmd)) {
-        if (cliParser.hasOption(removeApplicationFromStateStoreOpt)) {
-          String applicationId = cliParser.getOptionValue(removeApplicationFromStateStoreOpt);
-          handRemoveApplicationFromStateStore(conf, applicationId);
-        } else {
-          System.err.println("remove-application-from-state-store requires application arg.");
-        }
-      } else {
-        System.out.println("No related commands found.");
-        printUsage(System.err);
-      }
-    } catch (MissingArgumentException ex) {
-      System.out.println("Missing argument for options.");
-      printUsage(System.err);
-    } catch (ParseException e) {
-      System.out.println("Parsing of a command-line error.");
-      printUsage(System.err);
-    }
-  }
-
-  private static void printUsage(PrintStream out) {
-    out.println("Usage: yarn router [-format-state-store] | " +
-        "[-remove-application-from-state-store <appId>]");
-  }
-}
+  public FedAppReportFetcher

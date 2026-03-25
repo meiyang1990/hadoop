@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -82,37 +83,67 @@ import org.apache.hadoop.thirdparty.com.google.common.collect.Maps;
 import org.apache.hadoop.thirdparty.protobuf.CodedOutputStream;
 
 /**
- * Utility class to read / write fsimage in protobuf format.
+ * Protobuf格式FsImage镜像文件的读写工具类，负责NameNode元数据镜像的序列化和反序列化。
+ * 该类提供了并行加载支持，提升大型集群元数据加载速度。
  */
 @InterfaceAudience.Private
 public final class FSImageFormatProtobuf {
   private static final Logger LOG = LoggerFactory
       .getLogger(FSImageFormatProtobuf.class);
 
+  // 并行加载开关，volatile保证并发可见性
   private static volatile boolean enableParallelLoad = false;
 
+  /**
+   * FsImage加载上下文，保存加载过程中的共享状态数据。
+   */
   public static final class LoaderContext {
     private SerialNumberManager.StringTable stringTable;
     private final ArrayList<INodeReference> refList = Lists.newArrayList();
 
+    /**
+     * 获取字符串序列化表，用于路径字符串去重压缩。
+     * @return 字符串表对象
+     */
     public SerialNumberManager.StringTable getStringTable() {
       return stringTable;
     }
 
+    /**
+     * 获取快照INode引用列表，保存快照中引用的原始节点。
+     * @return INode引用列表
+     */
     public ArrayList<INodeReference> getRefList() {
       return refList;
     }
   }
 
+  /**
+   * FsImage保存上下文，保存保存过程中的共享状态数据。
+   */
   public static final class SaverContext {
+    /**
+     * 基于值的去重映射表，为重复对象分配唯一ID，减少序列化冗余。
+     * @param <E> 去重对象类型
+     */
     public static class DeduplicationMap<E> {
       private final Map<E, Integer> map = Maps.newHashMap();
       private DeduplicationMap() {}
 
+      /**
+       * 创建新的去重映射实例。
+       * @param <T> 映射键类型
+       * @return 新去重映射实例
+       */
       static <T> DeduplicationMap<T> newMap() {
         return new DeduplicationMap<T>();
       }
 
+      /**
+       * 获取值对应的ID，如果不存在则分配新ID。
+       * @param value 待去重的值
+       * @return 值对应的ID，0表示null
+       */
       int getId(E value) {
         if (value == null) {
           return 0;
@@ -126,39 +157,59 @@ public final class FSImageFormatProtobuf {
         return v;
       }
 
+      /**
+       * 获取映射中已存储的条目数量。
+       * @return 条目数量
+       */
       int size() {
         return map.size();
       }
 
+      /**
+       * 获取所有条目集合用于序列化输出。
+       * @return 条目集合
+       */
       Set<Entry<E, Integer>> entrySet() {
         return map.entrySet();
       }
     }
     private final ArrayList<INodeReference> refList = Lists.newArrayList();
 
+    /**
+     * 获取快照INode引用列表。
+     * @return INode引用列表
+     */
     public ArrayList<INodeReference> getRefList() {
       return refList;
     }
   }
 
+  /**
+   * Protobuf格式FsImage加载器，实现从镜像文件恢复NameNode元数据。
+   * 支持并行加载大分区元数据，提升启动速度。
+   */
   public static final class Loader implements FSImageFormat.AbstractLoader {
     static final int MINIMUM_FILE_LENGTH = 8;
     private final Configuration conf;
     private final FSNamesystem fsn;
     private final LoaderContext ctx;
-    /** The MD5 sum of the loaded file */
+    /** 已加载镜像文件的MD5摘要 */
     private MD5Hash imgDigest;
-    /** The transaction ID of the last edit represented by the loaded file */
+    /** 镜像文件包含的最后一个事务ID */
     private long imgTxId;
     /**
-     * Whether the image's layout version must be the same with
-     * {@link HdfsServerConstants#NAMENODE_LAYOUT_VERSION}. This is only set to true
-     * when we're doing (rollingUpgrade rollback).
+     * 是否要求镜像布局版本必须和当前版本完全一致，仅在滚动升级回滚时使用。
      */
     private final boolean requireSameLayoutVersion;
 
     private File filename;
 
+    /**
+     * 构造FsImage加载器。
+     * @param conf Hadoop配置对象
+     * @param fsn 目标文件系统命名空间
+     * @param requireSameLayoutVersion 是否要求布局版本严格匹配
+     */
     Loader(Configuration conf, FSNamesystem fsn,
         boolean requireSameLayoutVersion) {
       this.conf = conf;
@@ -177,37 +228,43 @@ public final class FSImageFormatProtobuf {
       return imgTxId;
     }
 
+    /**
+     * 获取加载上下文对象。
+     * @return 加载上下文
+     */
     public LoaderContext getLoaderContext() {
       return ctx;
     }
 
     /**
-     * Thread to compute the MD5 of a file as this can be in parallel while
-     * loading the image without interfering much.
+     * 后台线程并行计算FsImage文件MD5摘要，和加载操作并行提升性能。
      */
     private static class DigestThread extends SubjectInheritingThread {
 
-      /**
-       * Exception thrown when computing the digest if it cannot be calculated.
-       */
+      /** 计算过程中发生的IO异常 */
       private volatile IOException ioe = null;
 
-      /**
-       * Calculated digest if there are no error.
-       */
+      /** 计算完成的MD5摘要 */
       private volatile MD5Hash digest = null;
 
-      /**
-       * FsImage file computed MD5.
-       */
+      /** 需要计算摘要的FsImage文件 */
       private final File file;
 
+      /**
+       * 构造摘要计算线程。
+       * @param inFile 待计算的FsImage文件
+       */
       DigestThread(File inFile) {
         file = inFile;
         setName(inFile.getName() + " MD5 compute");
         setDaemon(true);
       }
 
+      /**
+       * 获取计算完成的摘要，如果发生异常则抛出。
+       * @return MD5摘要
+       * @throws IOException 计算过程中发生异常
+       */
       public MD5Hash getDigest() throws IOException {
         if (ioe != null) {
           throw ioe;
@@ -215,6 +272,10 @@ public final class FSImageFormatProtobuf {
         return digest;
       }
 
+      /**
+       * 获取计算过程中发生的异常。
+       * @return IO异常，如果无异常返回null
+       */
       public IOException getException() {
         return ioe;
       }
@@ -237,15 +298,23 @@ public final class FSImageFormatProtobuf {
       }
     }
 
+    /**
+     * 加载指定FsImage文件，恢复元数据到FSNamesystem。
+     * @param file 待加载的FsImage文件
+     * @throws IOException 加载过程发生IO错误或格式错误
+     */
     void load(File file) throws IOException {
       filename = file;
       long start = Time.monotonicNow();
+      // 启动并行MD5计算线程
       DigestThread dt = new DigestThread(file);
       dt.start();
       RandomAccessFile raFile = new RandomAccessFile(file, "r");
       FileInputStream fin = new FileInputStream(file);
       try {
+        // 执行核心加载逻辑
         loadInternal(raFile, fin);
+        // 等待MD5计算完成并获取结果
         try {
           dt.join();
           imgDigest = dt.getDigest();
@@ -255,30 +324,31 @@ public final class FSImageFormatProtobuf {
         long end = Time.monotonicNow();
         LOG.info("Loaded FSImage in {} seconds.", (end - start) / 1000);
       } finally {
+        // 确保资源关闭
         fin.close();
         raFile.close();
       }
     }
 
     /**
-     * Given a FSImage FileSummary.section, return a LimitInput stream set to
-     * the starting position of the section and limited to the section length.
-     * @param section The FileSummary.Section containing the offset and length
-     * @param compressionCodec The compression codec in use, if any
-     * @return An InputStream for the given section
-     * @throws IOException
+     * 根据section描述创建对应输入流，定位到section起始位置并限制长度。
+     * @param section section描述信息，包含偏移和长度
+     * @param compressionCodec 使用的压缩算法，如果未压缩为null
+     * @return 包装好的section输入流
+     * @throws IOException 创建输入流发生IO错误
      */
     public InputStream getInputStreamForSection(FileSummary.Section section,
                                                 String compressionCodec)
         throws IOException {
       FileInputStream fin = new FileInputStream(filename);
       try {
-
           FileChannel channel = fin.getChannel();
+          // 定位到section起始偏移
           channel.position(section.getOffset());
+          // 创建限制长度的输入流
           InputStream in = new BufferedInputStream(new LimitInputStream(fin,
                   section.getLength()));
-
+          // 根据配置包装压缩流
           in = FSImageUtil.wrapInputStreamForCompression(conf,
                   compressionCodec, in);
           return in;
@@ -289,14 +359,10 @@ public final class FSImageFormatProtobuf {
     }
 
     /**
-     * Takes an ArrayList of Section's and removes all Section's whose
-     * name ends in _SUB, indicating they are sub-sections. The original
-     * array list is modified and a new list of the removed Section's is
-     * returned.
-     * @param sections Array List containing all Sections and Sub Sections
-     *                 in the image.
-     * @return ArrayList of the sections removed, or an empty list if none are
-     *         removed.
+     * 从所有section列表中提取出子section，修改原列表并返回提取结果。
+     * 子section名称以_SUB结尾，用于并行加载。
+     * @param sections 包含所有section和子section的列表
+     * @return 提取出的子section列表，无则返回空列表
      */
     private ArrayList<FileSummary.Section> getAndRemoveSubSections(
         ArrayList<FileSummary.Section> sections) {
@@ -305,6 +371,7 @@ public final class FSImageFormatProtobuf {
       while (iter.hasNext()) {
         FileSummary.Section s = iter.next();
         String name = s.getName();
+        // 过滤出名称以_SUB结尾的子section
         if (name.matches(".*_SUB$")) {
           subSections.add(s);
           iter.remove();
@@ -314,11 +381,10 @@ public final class FSImageFormatProtobuf {
     }
 
     /**
-     * Given an ArrayList of Section's, return all Section's with the given
-     * name, or an empty list if none are found.
-     * @param sections ArrayList of the Section's to search though
-     * @param name The name of the Sections to search for
-     * @return ArrayList of the sections matching the given name
+     * 从子section列表中筛选指定名称的子section。
+     * @param sections 待筛选的子section列表
+     * @param name 需要筛选的section名称
+     * @return 匹配名称的子section列表，无则返回空列表
      */
     private ArrayList<FileSummary.Section> getSubSectionsOfName(
         ArrayList<FileSummary.Section> sections, SectionName name) {
@@ -334,11 +400,8 @@ public final class FSImageFormatProtobuf {
     }
 
     /**
-     * Checks the number of threads configured for parallel loading and
-     * return an ExecutorService with configured number of threads. If the
-     * thread count is set to less than 1, it will be reset to the default
-     * value
-     * @return ExecutorServie with the correct number of threads
+     * 根据配置创建并行加载使用的线程池，处理非法配置并重置为默认值。
+     * @return 配置好线程数的线程池
      */
     private ExecutorService getParallelExecutorService() {
       int threads = conf.getInt(DFSConfigKeys.DFS_IMAGE_PARALLEL_THREADS_KEY,
@@ -356,12 +419,21 @@ public final class FSImageFormatProtobuf {
       return executorService;
     }
 
+    /**
+     * FsImage核心加载逻辑，按顺序加载各个section恢复元数据。
+     * @param raFile 随机访问文件句柄，用于读取文件头
+     * @param fin 文件输入流，用于读取section内容
+     * @throws IOException 读取或解析发生错误
+     */
     private void loadInternal(RandomAccessFile raFile, FileInputStream fin)
         throws IOException {
+      // 检查文件魔数验证格式
       if (!FSImageUtil.checkFileFormat(raFile)) {
         throw new IOException("Unrecognized file format");
       }
+      // 加载文件摘要信息
       FileSummary summary = FSImageUtil.loadSummary(raFile);
+      // 如果要求版本严格匹配，检查布局版本
       if (requireSameLayoutVersion && summary.getLayoutVersion() !=
           HdfsServerConstants.NAMENODE_LAYOUT_VERSION) {
         throw new IOException("Image version " + summary.getLayoutVersion() +
@@ -371,11 +443,13 @@ public final class FSImageFormatProtobuf {
 
       FileChannel channel = fin.getChannel();
 
+      // 创建INode和快照加载器实例
       FSImageFormatPBINode.Loader inodeLoader = new FSImageFormatPBINode.Loader(
           fsn, this);
       FSImageFormatPBSnapshot.Loader snapshotLoader = new FSImageFormatPBSnapshot.Loader(
           fsn, this);
 
+      // 获取所有section并按枚举顺序排序，保证加载顺序正确
       ArrayList<FileSummary.Section> sections = Lists.newArrayList(summary
           .getSectionsList());
       Collections.sort(sections, new Comparator<FileSummary.Section>() {
@@ -387,671 +461,4 @@ public final class FSImageFormatProtobuf {
             return n2 == null ? 0 : -1;
           } else if (n2 == null) {
             return -1;
-          } else {
-            return n1.ordinal() - n2.ordinal();
-          }
-        }
-      });
-
-      StartupProgress prog = NameNode.getStartupProgress();
-      /**
-       * beginStep() and the endStep() calls do not match the boundary of the
-       * sections. This is because that the current implementation only allows
-       * a particular step to be started for once.
-       */
-      Step currentStep = null;
-      boolean loadInParallel = enableParallelSaveAndLoad(conf);
-
-      ExecutorService executorService = null;
-      ArrayList<FileSummary.Section> subSections =
-          getAndRemoveSubSections(sections);
-      if (loadInParallel) {
-        executorService = getParallelExecutorService();
-      }
-
-      for (FileSummary.Section s : sections) {
-        channel.position(s.getOffset());
-        InputStream in = new BufferedInputStream(new LimitInputStream(fin,
-            s.getLength()));
-
-        in = FSImageUtil.wrapInputStreamForCompression(conf,
-            summary.getCodec(), in);
-
-        String n = s.getName();
-        SectionName sectionName = SectionName.fromString(n);
-        if (sectionName == null) {
-          throw new IOException("Unrecognized section " + n);
-        }
-
-        ArrayList<FileSummary.Section> stageSubSections;
-        switch (sectionName) {
-        case NS_INFO:
-          loadNameSystemSection(in);
-          break;
-        case STRING_TABLE:
-          loadStringTableSection(in);
-          break;
-        case INODE: {
-          currentStep = new Step(StepType.INODES);
-          prog.beginStep(Phase.LOADING_FSIMAGE, currentStep);
-          stageSubSections = getSubSectionsOfName(
-              subSections, SectionName.INODE_SUB);
-          if (loadInParallel && (stageSubSections.size() > 0)) {
-            inodeLoader.loadINodeSectionInParallel(executorService,
-                stageSubSections, summary.getCodec(), prog, currentStep);
-          } else {
-            inodeLoader.loadINodeSection(in, prog, currentStep);
-          }
-        }
-          break;
-        case INODE_REFERENCE:
-          snapshotLoader.loadINodeReferenceSection(in);
-          break;
-        case INODE_DIR:
-          stageSubSections = getSubSectionsOfName(
-              subSections, SectionName.INODE_DIR_SUB);
-          if (loadInParallel && stageSubSections.size() > 0) {
-            inodeLoader.loadINodeDirectorySectionInParallel(executorService,
-                stageSubSections, summary.getCodec());
-          } else {
-            inodeLoader.loadINodeDirectorySection(in);
-          }
-          inodeLoader.waitBlocksMapAndNameCacheUpdateFinished();
-          break;
-        case FILES_UNDERCONSTRUCTION:
-          inodeLoader.loadFilesUnderConstructionSection(in);
-          break;
-        case SNAPSHOT:
-          snapshotLoader.loadSnapshotSection(in);
-          break;
-        case SNAPSHOT_DIFF:
-          snapshotLoader.loadSnapshotDiffSection(in);
-          break;
-        case SECRET_MANAGER: {
-          prog.endStep(Phase.LOADING_FSIMAGE, currentStep);
-          Step step = new Step(StepType.DELEGATION_TOKENS);
-          prog.beginStep(Phase.LOADING_FSIMAGE, step);
-          loadSecretManagerSection(in, prog, step);
-          prog.endStep(Phase.LOADING_FSIMAGE, step);
-        }
-          break;
-        case CACHE_MANAGER: {
-          Step step = new Step(StepType.CACHE_POOLS);
-          prog.beginStep(Phase.LOADING_FSIMAGE, step);
-          loadCacheManagerSection(in, prog, step);
-          prog.endStep(Phase.LOADING_FSIMAGE, step);
-        }
-          break;
-        case ERASURE_CODING:
-          Step step = new Step(StepType.ERASURE_CODING_POLICIES);
-          prog.beginStep(Phase.LOADING_FSIMAGE, step);
-          loadErasureCodingSection(in);
-          prog.endStep(Phase.LOADING_FSIMAGE, step);
-          break;
-        default:
-          LOG.warn("Unrecognized section {}", n);
-          break;
-        }
-      }
-      if (executorService != null) {
-        executorService.shutdown();
-      }
-    }
-
-    private void loadNameSystemSection(InputStream in) throws IOException {
-      NameSystemSection s = NameSystemSection.parseDelimitedFrom(in);
-      BlockIdManager blockIdManager = fsn.getBlockManager().getBlockIdManager();
-      blockIdManager.setLegacyGenerationStamp(s.getGenstampV1());
-      blockIdManager.setGenerationStamp(s.getGenstampV2());
-      blockIdManager.setLegacyGenerationStampLimit(s.getGenstampV1Limit());
-      blockIdManager.setLastAllocatedContiguousBlockId(s.getLastAllocatedBlockId());
-      if (s.hasLastAllocatedStripedBlockId()) {
-        blockIdManager.setLastAllocatedStripedBlockId(
-            s.getLastAllocatedStripedBlockId());
-      }
-      imgTxId = s.getTransactionId();
-      if (s.hasRollingUpgradeStartTime()
-          && fsn.getFSImage().hasRollbackFSImage()) {
-        // we set the rollingUpgradeInfo only when we make sure we have the
-        // rollback image
-        fsn.setRollingUpgradeInfo(true, s.getRollingUpgradeStartTime());
-      }
-    }
-
-    private void loadStringTableSection(InputStream in) throws IOException {
-      StringTableSection s = StringTableSection.parseDelimitedFrom(in);
-      ctx.stringTable =
-          SerialNumberManager.newStringTable(s.getNumEntry(), s.getMaskBits());
-      for (int i = 0; i < s.getNumEntry(); ++i) {
-        StringTableSection.Entry e = StringTableSection.Entry
-            .parseDelimitedFrom(in);
-        ctx.stringTable.put(e.getId(), e.getStr());
-      }
-    }
-
-    private void loadSecretManagerSection(InputStream in, StartupProgress prog,
-        Step currentStep) throws IOException {
-      SecretManagerSection s = SecretManagerSection.parseDelimitedFrom(in);
-      int numKeys = s.getNumKeys(), numTokens = s.getNumTokens();
-      ArrayList<SecretManagerSection.DelegationKey> keys = Lists
-          .newArrayListWithCapacity(numKeys);
-      ArrayList<SecretManagerSection.PersistToken> tokens = Lists
-          .newArrayListWithCapacity(numTokens);
-
-      for (int i = 0; i < numKeys; ++i)
-        keys.add(SecretManagerSection.DelegationKey.parseDelimitedFrom(in));
-
-      prog.setTotal(Phase.LOADING_FSIMAGE, currentStep, numTokens);
-      Counter counter = prog.getCounter(Phase.LOADING_FSIMAGE, currentStep);
-      for (int i = 0; i < numTokens; ++i) {
-        tokens.add(SecretManagerSection.PersistToken.parseDelimitedFrom(in));
-      }
-
-      fsn.loadSecretManagerState(s, keys, tokens, counter);
-    }
-
-    private void loadCacheManagerSection(InputStream in, StartupProgress prog,
-        Step currentStep) throws IOException {
-      CacheManagerSection s = CacheManagerSection.parseDelimitedFrom(in);
-      int numPools = s.getNumPools();
-      ArrayList<CachePoolInfoProto> pools = Lists
-          .newArrayListWithCapacity(numPools);
-      ArrayList<CacheDirectiveInfoProto> directives = Lists
-          .newArrayListWithCapacity(s.getNumDirectives());
-      prog.setTotal(Phase.LOADING_FSIMAGE, currentStep, numPools);
-      Counter counter = prog.getCounter(Phase.LOADING_FSIMAGE, currentStep);
-      for (int i = 0; i < numPools; ++i) {
-        pools.add(CachePoolInfoProto.parseDelimitedFrom(in));
-        counter.increment();
-      }
-      for (int i = 0; i < s.getNumDirectives(); ++i)
-        directives.add(CacheDirectiveInfoProto.parseDelimitedFrom(in));
-      fsn.getCacheManager().loadState(
-          new CacheManager.PersistState(s, pools, directives));
-    }
-
-    private void loadErasureCodingSection(InputStream in)
-        throws IOException {
-      ErasureCodingSection s = ErasureCodingSection.parseDelimitedFrom(in);
-      List<ErasureCodingPolicyInfo> ecPolicies = Lists
-          .newArrayListWithCapacity(s.getPoliciesCount());
-      for (int i = 0; i < s.getPoliciesCount(); ++i) {
-        ecPolicies.add(PBHelperClient.convertErasureCodingPolicyInfo(
-            s.getPolicies(i)));
-      }
-      fsn.getErasureCodingPolicyManager().loadPolicies(ecPolicies, conf);
-    }
-  }
-
-  private static boolean enableParallelSaveAndLoad(Configuration conf) {
-    boolean loadInParallel = enableParallelLoad;
-    return loadInParallel;
-  }
-
-  public static void initParallelLoad(Configuration conf) {
-    enableParallelLoad =
-        conf.getBoolean(DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_KEY,
-            DFSConfigKeys.DFS_IMAGE_PARALLEL_LOAD_DEFAULT);
-  }
-
-  public static void refreshParallelSaveAndLoad(boolean enable) {
-    enableParallelLoad = enable;
-  }
-
-  public static boolean getEnableParallelLoad() {
-    return enableParallelLoad;
-  }
-
-  public static final class Saver {
-    public static final int CHECK_CANCEL_INTERVAL = 4096;
-    private boolean writeSubSections = false;
-    private int inodesPerSubSection = Integer.MAX_VALUE;
-
-    private final SaveNamespaceContext context;
-    private final SaverContext saverContext;
-    private long currentOffset = FSImageUtil.MAGIC_HEADER.length;
-    private long subSectionOffset = currentOffset;
-    private MD5Hash savedDigest;
-
-    private FileChannel fileChannel;
-    // OutputStream for the section data
-    private OutputStream sectionOutputStream;
-    private CompressionCodec codec;
-    private OutputStream underlyingOutputStream;
-    private Configuration conf;
-
-    Saver(SaveNamespaceContext context, Configuration conf) {
-      this.context = context;
-      this.saverContext = new SaverContext();
-      this.conf = conf;
-    }
-
-    public MD5Hash getSavedDigest() {
-      return savedDigest;
-    }
-
-    public SaveNamespaceContext getContext() {
-      return context;
-    }
-
-    public SaverContext getSaverContext() {
-      return saverContext;
-    }
-
-    public int getInodesPerSubSection() {
-      return inodesPerSubSection;
-    }
-
-    public OutputStream getSectionOutputStream() {
-      return sectionOutputStream;
-    }
-
-      /**
-     * Commit the length and offset of a fsimage section to the summary index,
-     * including the sub section, which will be committed before the section is
-     * committed.
-     * @param summary The image summary object
-     * @param name The name of the section to commit
-     * @param subSectionName The name of the sub-section to commit
-     * @throws IOException
-     */
-    public void commitSectionAndSubSection(FileSummary.Builder summary,
-        SectionName name, SectionName subSectionName) throws IOException {
-      commitSubSection(summary, subSectionName, true);
-      commitSection(summary, name, true);
-    }
-
-    public void commitSection(FileSummary.Builder summary, SectionName name)
-            throws IOException {
-      commitSection(summary, name, false);
-    }
-
-    public void commitSection(FileSummary.Builder summary, SectionName name,
-        boolean afterSubSectionCommit) throws IOException {
-      long oldOffset = currentOffset;
-      boolean subSectionCommitted = afterSubSectionCommit && writeSubSections;
-      if (!subSectionCommitted) {
-        flushSectionOutputStream();
-      }
-
-      if (codec != null) {
-        sectionOutputStream = codec.createOutputStream(underlyingOutputStream);
-      } else {
-        sectionOutputStream = underlyingOutputStream;
-      }
-      long length = fileChannel.position() - oldOffset;
-      summary.addSections(FileSummary.Section.newBuilder().setName(name.name)
-          .setLength(length).setOffset(currentOffset));
-      currentOffset += length;
-      subSectionOffset = currentOffset;
-    }
-
-    public void commitSubSection(FileSummary.Builder summary, SectionName name)
-            throws IOException {
-      this.commitSubSection(summary, name, false);
-    }
-
-    /**
-     * Commit the length and offset of a fsimage sub-section to the summary
-     * index.
-     * @param summary The image summary object
-     * @param name The name of the sub-section to commit
-     * @param isLast True if sub-section is the last sub-section of each section
-     * @throws IOException
-     */
-    public void commitSubSection(FileSummary.Builder summary, SectionName name, boolean isLast)
-        throws IOException {
-      if (!writeSubSections) {
-        return;
-      }
-
-      LOG.debug("Saving a subsection for {}", name.toString());
-      // The output stream must be flushed before the length is obtained
-      // as the flush can move the length forward.
-      flushSectionOutputStream();
-
-      if (codec == null || isLast) {
-        // To avoid empty sub-section, Do not create CompressionOutputStream
-        // if sub-section is last sub-section of each section
-        sectionOutputStream = underlyingOutputStream;
-      } else {
-        sectionOutputStream = codec.createOutputStream(underlyingOutputStream);
-      }
-      long length = fileChannel.position() - subSectionOffset;
-      if (length == 0) {
-        LOG.warn("The requested section for {} is empty. It will not be " +
-            "output to the image", name.toString());
-        return;
-      }
-      summary.addSections(FileSummary.Section.newBuilder().setName(name.name)
-          .setLength(length).setOffset(subSectionOffset));
-      subSectionOffset += length;
-    }
-
-    private void flushSectionOutputStream() throws IOException {
-      if (codec != null) {
-        ((CompressionOutputStream) sectionOutputStream).finish();
-      }
-      sectionOutputStream.flush();
-    }
-
-    /**
-     * @return number of non-fatal errors detected while writing the image.
-     * @throws IOException on fatal error.
-     */
-    long save(File file, FSImageCompression compression) throws IOException {
-      enableSubSectionsIfRequired();
-      FileOutputStream fout = new FileOutputStream(file);
-      fileChannel = fout.getChannel();
-      try {
-        LOG.info("Saving image file {} using {}", file, compression);
-        long startTime = monotonicNow();
-        long numErrors = saveInternal(
-            fout, compression, file.getAbsolutePath());
-        LOG.info("Image file {} of size {} bytes saved in {} seconds {}.", file,
-            file.length(), (monotonicNow() - startTime) / 1000,
-            (numErrors > 0 ? (" with" + numErrors + " errors") : ""));
-        return numErrors;
-      } finally {
-        fout.close();
-      }
-    }
-
-    private void enableSubSectionsIfRequired() {
-      boolean parallelEnabled = enableParallelSaveAndLoad(conf);
-      int inodeThreshold = conf.getInt(
-          DFSConfigKeys.DFS_IMAGE_PARALLEL_INODE_THRESHOLD_KEY,
-          DFSConfigKeys.DFS_IMAGE_PARALLEL_INODE_THRESHOLD_DEFAULT);
-      int targetSections = conf.getInt(
-          DFSConfigKeys.DFS_IMAGE_PARALLEL_TARGET_SECTIONS_KEY,
-          DFSConfigKeys.DFS_IMAGE_PARALLEL_TARGET_SECTIONS_DEFAULT);
-
-      if (parallelEnabled) {
-        if (targetSections <= 0) {
-          LOG.warn("{} is set to {}. It must be greater than zero. Setting to" +
-              " default of {}",
-              DFSConfigKeys.DFS_IMAGE_PARALLEL_TARGET_SECTIONS_KEY,
-              targetSections,
-              DFSConfigKeys.DFS_IMAGE_PARALLEL_TARGET_SECTIONS_DEFAULT);
-          targetSections =
-              DFSConfigKeys.DFS_IMAGE_PARALLEL_TARGET_SECTIONS_DEFAULT;
-        }
-        if (inodeThreshold <= 0) {
-          LOG.warn("{} is set to {}. It must be greater than zero. Setting to" +
-                  " default of {}",
-              DFSConfigKeys.DFS_IMAGE_PARALLEL_INODE_THRESHOLD_KEY,
-              inodeThreshold,
-              DFSConfigKeys.DFS_IMAGE_PARALLEL_INODE_THRESHOLD_DEFAULT);
-          inodeThreshold =
-              DFSConfigKeys.DFS_IMAGE_PARALLEL_INODE_THRESHOLD_DEFAULT;
-        }
-        int inodeCount = context.getSourceNamesystem().dir.getInodeMapSize();
-        // Only enable parallel sections if there are enough inodes
-        if (inodeCount >= inodeThreshold) {
-          writeSubSections = true;
-          // Calculate the inodes per section rounded up to the nearest int
-          inodesPerSubSection = (inodeCount + targetSections - 1) /
-              targetSections;
-        }
-      } else {
-        writeSubSections = false;
-      }
-    }
-
-    private static void saveFileSummary(OutputStream out, FileSummary summary)
-        throws IOException {
-      summary.writeDelimitedTo(out);
-      int length = getOndiskTrunkSize(summary);
-      byte[] lengthBytes = new byte[4];
-      ByteBuffer.wrap(lengthBytes).asIntBuffer().put(length);
-      out.write(lengthBytes);
-    }
-
-    private long saveInodes(FileSummary.Builder summary) throws IOException {
-      FSImageFormatPBINode.Saver saver = new FSImageFormatPBINode.Saver(this,
-          summary);
-
-      saver.serializeINodeSection(sectionOutputStream);
-      saver.serializeINodeDirectorySection(sectionOutputStream);
-      saver.serializeFilesUCSection(sectionOutputStream);
-
-      return saver.getNumImageErrors();
-    }
-
-    /**
-     * @return number of non-fatal errors detected while saving the image.
-     * @throws IOException on fatal error.
-     */
-    private long saveSnapshots(FileSummary.Builder summary) throws IOException {
-      FSImageFormatPBSnapshot.Saver snapshotSaver = new FSImageFormatPBSnapshot.Saver(
-          this, summary, context, context.getSourceNamesystem());
-
-      snapshotSaver.serializeSnapshotSection(sectionOutputStream);
-      // Skip snapshot-related sections when there is no snapshot.
-      if (context.getSourceNamesystem().getSnapshotManager()
-          .getNumSnapshots() > 0) {
-        snapshotSaver.serializeSnapshotDiffSection(sectionOutputStream);
-      }
-      snapshotSaver.serializeINodeReferenceSection(sectionOutputStream);
-      return snapshotSaver.getNumImageErrors();
-    }
-
-    /**
-     * @return number of non-fatal errors detected while writing the FsImage.
-     * @throws IOException on fatal error.
-     */
-    private long saveInternal(FileOutputStream fout,
-        FSImageCompression compression, String filePath) throws IOException {
-      StartupProgress prog = NameNode.getStartupProgress();
-      MessageDigest digester = MD5Hash.getDigester();
-      int layoutVersion =
-          context.getSourceNamesystem().getEffectiveLayoutVersion();
-
-      underlyingOutputStream = new DigestOutputStream(new BufferedOutputStream(
-          fout), digester);
-      underlyingOutputStream.write(FSImageUtil.MAGIC_HEADER);
-
-      fileChannel = fout.getChannel();
-
-      FileSummary.Builder b = FileSummary.newBuilder()
-          .setOndiskVersion(FSImageUtil.FILE_VERSION)
-          .setLayoutVersion(
-              context.getSourceNamesystem().getEffectiveLayoutVersion());
-
-      codec = compression.getImageCodec();
-      if (codec != null) {
-        b.setCodec(codec.getClass().getCanonicalName());
-        sectionOutputStream = codec.createOutputStream(underlyingOutputStream);
-      } else {
-        sectionOutputStream = underlyingOutputStream;
-      }
-
-      saveNameSystemSection(b);
-      // Check for cancellation right after serializing the name system section.
-      // Some unit tests, such as TestSaveNamespace#testCancelSaveNameSpace
-      // depends on this behavior.
-      context.checkCancelled();
-
-      Step step;
-
-      // Erasure coding policies should be saved before inodes
-      if (NameNodeLayoutVersion.supports(
-          NameNodeLayoutVersion.Feature.ERASURE_CODING, layoutVersion)) {
-        step = new Step(StepType.ERASURE_CODING_POLICIES, filePath);
-        prog.beginStep(Phase.SAVING_CHECKPOINT, step);
-        saveErasureCodingSection(b);
-        prog.endStep(Phase.SAVING_CHECKPOINT, step);
-      }
-
-      step = new Step(StepType.INODES, filePath);
-      prog.beginStep(Phase.SAVING_CHECKPOINT, step);
-      // Count number of non-fatal errors when saving inodes and snapshots.
-      long numErrors = saveInodes(b);
-      numErrors += saveSnapshots(b);
-      prog.endStep(Phase.SAVING_CHECKPOINT, step);
-
-      step = new Step(StepType.DELEGATION_TOKENS, filePath);
-      prog.beginStep(Phase.SAVING_CHECKPOINT, step);
-      saveSecretManagerSection(b);
-      prog.endStep(Phase.SAVING_CHECKPOINT, step);
-
-      step = new Step(StepType.CACHE_POOLS, filePath);
-      prog.beginStep(Phase.SAVING_CHECKPOINT, step);
-      saveCacheManagerSection(b);
-      prog.endStep(Phase.SAVING_CHECKPOINT, step);
-
-      saveStringTableSection(b);
-
-      // We use the underlyingOutputStream to write the header. Therefore flush
-      // the buffered stream (which is potentially compressed) first.
-      flushSectionOutputStream();
-
-      FileSummary summary = b.build();
-      saveFileSummary(underlyingOutputStream, summary);
-      underlyingOutputStream.close();
-      savedDigest = new MD5Hash(digester.digest());
-      return numErrors;
-    }
-
-    private void saveSecretManagerSection(FileSummary.Builder summary)
-        throws IOException {
-      final FSNamesystem fsn = context.getSourceNamesystem();
-      DelegationTokenSecretManager.SecretManagerState state = fsn
-          .saveSecretManagerState();
-      state.section.writeDelimitedTo(sectionOutputStream);
-      for (SecretManagerSection.DelegationKey k : state.keys)
-        k.writeDelimitedTo(sectionOutputStream);
-
-      for (SecretManagerSection.PersistToken t : state.tokens)
-        t.writeDelimitedTo(sectionOutputStream);
-
-      commitSection(summary, SectionName.SECRET_MANAGER);
-    }
-
-    private void saveCacheManagerSection(FileSummary.Builder summary)
-        throws IOException {
-      final FSNamesystem fsn = context.getSourceNamesystem();
-      CacheManager.PersistState state = fsn.getCacheManager().saveState();
-      state.section.writeDelimitedTo(sectionOutputStream);
-
-      for (CachePoolInfoProto p : state.pools)
-        p.writeDelimitedTo(sectionOutputStream);
-
-      for (CacheDirectiveInfoProto p : state.directives)
-        p.writeDelimitedTo(sectionOutputStream);
-
-      commitSection(summary, SectionName.CACHE_MANAGER);
-    }
-
-    private void saveErasureCodingSection(
-        FileSummary.Builder summary) throws IOException {
-      final FSNamesystem fsn = context.getSourceNamesystem();
-      ErasureCodingPolicyInfo[] ecPolicies =
-          fsn.getErasureCodingPolicyManager().getPersistedPolicies();
-      ArrayList<ErasureCodingPolicyProto> ecPolicyProtoes =
-          new ArrayList<ErasureCodingPolicyProto>();
-      for (ErasureCodingPolicyInfo p : ecPolicies) {
-        ecPolicyProtoes.add(PBHelperClient.convertErasureCodingPolicy(p));
-      }
-
-      ErasureCodingSection section = ErasureCodingSection.newBuilder().
-          addAllPolicies(ecPolicyProtoes).build();
-      section.writeDelimitedTo(sectionOutputStream);
-      commitSection(summary, SectionName.ERASURE_CODING);
-    }
-
-    private void saveNameSystemSection(FileSummary.Builder summary)
-        throws IOException {
-      final FSNamesystem fsn = context.getSourceNamesystem();
-      OutputStream out = sectionOutputStream;
-      BlockIdManager blockIdManager = fsn.getBlockManager().getBlockIdManager();
-      NameSystemSection.Builder b = NameSystemSection.newBuilder()
-          .setGenstampV1(blockIdManager.getLegacyGenerationStamp())
-          .setGenstampV1Limit(blockIdManager.getLegacyGenerationStampLimit())
-          .setGenstampV2(blockIdManager.getGenerationStamp())
-          .setLastAllocatedBlockId(blockIdManager.getLastAllocatedContiguousBlockId())
-          .setLastAllocatedStripedBlockId(blockIdManager.getLastAllocatedStripedBlockId())
-          .setTransactionId(context.getTxId());
-
-      // We use the non-locked version of getNamespaceInfo here since
-      // the coordinating thread of saveNamespace already has read-locked
-      // the namespace for us. If we attempt to take another readlock
-      // from the actual saver thread, there's a potential of a
-      // fairness-related deadlock. See the comments on HDFS-2223.
-      b.setNamespaceId(fsn.unprotectedGetNamespaceInfo().getNamespaceID());
-      if (fsn.isRollingUpgrade()) {
-        b.setRollingUpgradeStartTime(fsn.getRollingUpgradeInfo().getStartTime());
-      }
-      NameSystemSection s = b.build();
-      s.writeDelimitedTo(out);
-
-      commitSection(summary, SectionName.NS_INFO);
-    }
-
-    private void saveStringTableSection(FileSummary.Builder summary)
-        throws IOException {
-      OutputStream out = sectionOutputStream;
-
-      SerialNumberManager.StringTable stringTable =
-          SerialNumberManager.getStringTable();
-      StringTableSection.Builder b = StringTableSection.newBuilder()
-          .setNumEntry(stringTable.size())
-          .setMaskBits(stringTable.getMaskBits());
-      b.build().writeDelimitedTo(out);
-      for (Entry<Integer, String> e : stringTable) {
-        StringTableSection.Entry.Builder eb = StringTableSection.Entry
-            .newBuilder().setId(e.getKey()).setStr(e.getValue());
-        eb.build().writeDelimitedTo(out);
-      }
-      commitSection(summary, SectionName.STRING_TABLE);
-    }
-  }
-
-  /**
-   * Supported section name. The order of the enum determines the order of
-   * loading.
-   */
-  public enum SectionName {
-    NS_INFO("NS_INFO"),
-    STRING_TABLE("STRING_TABLE"),
-    EXTENDED_ACL("EXTENDED_ACL"),
-    ERASURE_CODING("ERASURE_CODING"),
-    INODE("INODE"),
-    INODE_SUB("INODE_SUB"),
-    INODE_REFERENCE("INODE_REFERENCE"),
-    INODE_REFERENCE_SUB("INODE_REFERENCE_SUB"),
-    SNAPSHOT("SNAPSHOT"),
-    INODE_DIR("INODE_DIR"),
-    INODE_DIR_SUB("INODE_DIR_SUB"),
-    FILES_UNDERCONSTRUCTION("FILES_UNDERCONSTRUCTION"),
-    SNAPSHOT_DIFF("SNAPSHOT_DIFF"),
-    SNAPSHOT_DIFF_SUB("SNAPSHOT_DIFF_SUB"),
-    SECRET_MANAGER("SECRET_MANAGER"),
-    CACHE_MANAGER("CACHE_MANAGER");
-
-    private static final SectionName[] values = SectionName.values();
-
-    public static SectionName fromString(String name) {
-      for (SectionName n : values) {
-        if (n.name.equals(name))
-          return n;
-      }
-      return null;
-    }
-
-    private final String name;
-
-    private SectionName(String name) {
-      this.name = name;
-    }
-  }
-
-  private static int getOndiskTrunkSize(
-      org.apache.hadoop.thirdparty.protobuf.GeneratedMessageV3 s) {
-    return CodedOutputStream.computeUInt32SizeNoTag(s.getSerializedSize())
-        + s.getSerializedSize();
-  }
-
-  private FSImageFormatProtobuf() {
-  }
-}
+          } else

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,35 +30,39 @@ import org.apache.hadoop.security.token.SecretManager;
 import org.apache.hadoop.security.token.Token;
 
 /**
- * SecretManager for job token. It can be used to cache generated job tokens.
+ * 文件说明：MapReduce作业令牌密钥管理器，负责生成、缓存和验证作业令牌，保障MapReduce作业内部通信安全
+ * 
+ * 作业令牌SecretManager实现，可缓存已生成的作业令牌，用于MapReduce作业的身份认证
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class JobTokenSecretManager extends SecretManager<JobTokenIdentifier> {
+  // 主密钥，用于生成作业令牌密码
   private final SecretKey masterKey;
+  // 缓存当前活跃作业的令牌密钥，key为作业ID，value为对应作业的密钥
   private final Map<String, SecretKey> currentJobTokens;
 
   /**
-   * Convert the byte[] to a secret key
-   * @param key the byte[] to create the secret key from
-   * @return the secret key
+   * 根据字节数组构造SecretKey对象
+   * @param key 用于生成密钥的字节数组
+   * @return 构造完成的SecretKey对象
    */
   public static SecretKey createSecretKey(byte[] key) {
     return SecretManager.createSecretKey(key);
   }
   
   /**
-   * Compute the HMAC hash of the message using the key
-   * @param msg the message to hash
-   * @param key the key to use
-   * @return the computed hash
+   * 使用给定密钥计算消息的HMAC哈希值
+   * @param msg 待计算哈希的消息
+   * @param key 用于计算的密钥
+   * @return 计算得到的哈希值
    */
   public static byte[] computeHash(byte[] msg, SecretKey key) {
     return createPassword(msg, key);
   }
   
   /**
-   * Default constructor
+   * 构造作业令牌密钥管理器，生成主密钥并初始化缓存
    */
   public JobTokenSecretManager() {
     this.masterKey = generateSecret();
@@ -65,9 +70,9 @@ public class JobTokenSecretManager extends SecretManager<JobTokenIdentifier> {
   }
   
   /**
-   * Create a new password/secret for the given job token identifier.
-   * @param identifier the job token identifier
-   * @return token password/secret
+   * 为指定作业令牌标识符生成对应的密码
+   * @param identifier 作业令牌标识符
+   * @return 生成的令牌密码字节数组
    */
   @Override
   public byte[] createPassword(JobTokenIdentifier identifier) {
@@ -76,9 +81,9 @@ public class JobTokenSecretManager extends SecretManager<JobTokenIdentifier> {
   }
 
   /**
-   * Add the job token of a job to cache
-   * @param jobId the job that owns the token
-   * @param token the job token
+   * 将作业的令牌添加到本地缓存，方便后续验证使用
+   * @param jobId 作业ID
+   * @param token 作业令牌对象
    */
   public void addTokenForJob(String jobId, Token<JobTokenIdentifier> token) {
     SecretKey tokenSecret = createSecretKey(token.getPassword());
@@ -88,8 +93,8 @@ public class JobTokenSecretManager extends SecretManager<JobTokenIdentifier> {
   }
 
   /**
-   * Remove the cached job token of a job from cache
-   * @param jobId the job whose token is to be removed
+   * 从缓存中移除已完成作业的令牌，清理缓存空间
+   * @param jobId 待移除令牌的作业ID
    */
   public void removeTokenForJob(String jobId) {
     synchronized (currentJobTokens) {
@@ -98,10 +103,10 @@ public class JobTokenSecretManager extends SecretManager<JobTokenIdentifier> {
   }
   
   /**
-   * Look up the token password/secret for the given jobId.
-   * @param jobId the jobId to look up
-   * @return token password/secret as SecretKey
-   * @throws InvalidToken
+   * 根据作业ID从缓存中查询对应作业的令牌密钥
+   * @param jobId 待查询的作业ID
+   * @return 查询到的令牌密钥SecretKey对象
+   * @throws InvalidToken 找不到对应令牌时抛出异常
    */
   public SecretKey retrieveTokenSecret(String jobId) throws InvalidToken {
     SecretKey tokenSecret = null;
@@ -115,10 +120,10 @@ public class JobTokenSecretManager extends SecretManager<JobTokenIdentifier> {
   }
   
   /**
-   * Look up the token password/secret for the given job token identifier.
-   * @param identifier the job token identifier to look up
-   * @return token password/secret as byte[]
-   * @throws InvalidToken
+   * 根据作业令牌标识符查询对应令牌密码字节数组
+   * @param identifier 待查询的作业令牌标识符
+   * @return 查询到的令牌密码字节数组
+   * @throws InvalidToken 找不到对应令牌时抛出异常
    */
   @Override
   public byte[] retrievePassword(JobTokenIdentifier identifier)
@@ -127,8 +132,8 @@ public class JobTokenSecretManager extends SecretManager<JobTokenIdentifier> {
   }
 
   /**
-   * Create an empty job token identifier
-   * @return a newly created empty job token identifier
+   * 创建一个空的作业令牌标识符实例，用于反序列化
+   * @return 新建的空作业令牌标识符对象
    */
   @Override
   public JobTokenIdentifier createIdentifier() {

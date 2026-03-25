@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -13,5 +14,10 @@
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
  * License for the specific language governing permissions and limitations under
  * the License.
+ */
+
+/**
+ * YARN 联邦集群缓存模块，提供联邦场景下各类元数据的缓存能力，
+ * 用于减少跨子集群RPC调用开销，提升联邦集群路由和调度性能。
  */
 package org.apache.hadoop.yarn.server.federation.cache;

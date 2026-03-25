@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.storage.reader
- * contains classes used to read entities from backend based on query type.
+ * 本包提供基于HBase存储的时间线服务数据读取能力，根据不同查询类型从后端存储中读取时间线实体数据。
+ * 是YARN时间线服务HBase存储层的读取模块，为上层查询接口提供结构化的实体数据读取能力。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

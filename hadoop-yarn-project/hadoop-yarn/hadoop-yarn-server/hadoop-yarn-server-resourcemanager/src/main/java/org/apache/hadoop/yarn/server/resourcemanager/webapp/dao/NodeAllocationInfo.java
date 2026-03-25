@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,6 +28,10 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * YARN RM Web UI 节点心跳分配信息数据访问对象，用于封装单次节点心跳的容器分配信息，
+ * 供Web接口序列化返回前端展示分配活动详情。
+ */
 /*
  * DAO object to display each node allocation in node heartbeat.
  */
@@ -41,9 +46,17 @@ public class NodeAllocationInfo {
   private static final Logger LOG =
       LoggerFactory.getLogger(NodeAllocationInfo.class);
 
+  /**
+   * 默认无参构造函数，供JAXB序列化使用。
+   */
   NodeAllocationInfo() {
   }
 
+  /**
+   * 根据调度层节点分配信息构造Web DAO对象，转换分配活动树结构。
+   * @param allocation 调度层节点分配原始信息
+   * @param groupBy 活动分组方式
+   */
   NodeAllocationInfo(NodeAllocation allocation,
       RMWSConsts.ActivitiesGroupBy groupBy) {
     this.partition = allocation.getPartition();

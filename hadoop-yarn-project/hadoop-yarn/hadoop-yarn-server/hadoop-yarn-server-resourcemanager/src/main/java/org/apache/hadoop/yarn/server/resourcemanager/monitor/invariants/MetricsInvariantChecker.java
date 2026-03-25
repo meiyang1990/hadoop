@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,21 +45,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * This policy checks at every invocation that a given set of invariants
- * (specified in a file) are respected over QueueMetrics and JvmMetrics. The
- * file may contain arbitrary (Javascrip) boolean expression over the metrics
- * variables.
- *
- * The right set of invariants depends on the deployment environment, a large
- * number of complex invariant can make this check expensive.
- *
- * The MetricsInvariantChecker can be configured to throw a RuntimeException or
- * simlpy warn in the logs if an invariant is not respected.
+ * YARN RM指标不变量检查器，通过文件中定义的JavaScript布尔表达式，
+ * 定期检查队列指标和JVM指标是否满足预期不变量约束。
+ * 可配置违反不变量时抛出异常或仅打日志告警，复杂不变量会增加检查开销。
  */
 public class MetricsInvariantChecker extends InvariantsChecker {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(MetricsInvariantChecker.class);
+  /** 不变量配置文件路径配置项key */
   public static final String INVARIANTS_FILE =
       "yarn.resourcemanager.invariant-checker.file";
 
@@ -68,10 +63,12 @@ public class MetricsInvariantChecker extends InvariantsChecker {
   private ScriptEngineManager manager;
   private Compilable scriptEngine;
   private String invariantFile;
+  /** 存储预编译后的单个不变量表达式，key为原表达式字符串 */
   private Map<String, CompiledScript> invariants;
+  /** 所有不变量合并后的预编译表达式，用于快速批量检查 */
   private CompiledScript combinedInvariants;
 
-  // set of metrics we monitor
+  // 被监控的指标对象
   private QueueMetrics queueMetrics;
   private JvmMetrics jvmMetrics;
 
@@ -81,27 +78,30 @@ public class MetricsInvariantChecker extends InvariantsChecker {
 
     super.init(config, rmContext, scheduler);
 
+    // 获取默认指标系统实例
     this.metricsSystem = DefaultMetricsSystem.instance();
+    // 获取根队列指标对象
     this.queueMetrics =
         QueueMetrics.forQueue(metricsSystem, "root", null, false, getConf());
+    // 获取JVM指标对象
     this.jvmMetrics = (JvmMetrics) metricsSystem.getSource("JvmMetrics");
 
-    // at first collect all metrics
+    // 初始化指标收集器，首次收集所有指标
     collector = new MetricsCollectorImpl();
     queueMetrics.getMetrics(collector, true);
     jvmMetrics.getMetrics(collector, true);
 
-    // prepare bindings and evaluation engine
+    // 初始化脚本引擎和绑定变量容器
     this.bindings = new SimpleBindings();
     this.manager = new ScriptEngineManager();
     this.scriptEngine = (Compilable) manager.getEngineByName("JavaScript");
 
-    // load metrics invariant from file
+    // 从配置读取不变量文件路径
     this.invariantFile = getConf().get(MetricsInvariantChecker.INVARIANTS_FILE);
 
     this.invariants = new HashMap<>();
 
-    // preload all bindings
+    // 预加载所有指标到绑定变量，替换空格为下划线符合标识符规范
     queueMetrics.getMetrics(collector, true);
     jvmMetrics.getMetrics(collector, true);
     for (MetricsRecord record : collector.getRecords()) {
@@ -112,17 +112,19 @@ public class MetricsInvariantChecker extends InvariantsChecker {
 
     StringBuilder sb = new StringBuilder();
     try {
+      // 按行读取不变量文件中所有表达式
       List<String> tempInv =
           Files.readLines(new File(invariantFile), StandardCharsets.UTF_8);
 
 
       boolean first = true;
-      // precompile individual invariants
+      // 预编译每个独立不变量表达式
       for (String inv : tempInv) {
 
         if(first) {
           first = false;
         } else {
+          // 用逻辑与连接所有表达式，构建合并表达式
           sb.append("&&");
         }
 
@@ -132,7 +134,7 @@ public class MetricsInvariantChecker extends InvariantsChecker {
             .append(") ");
       }
 
-      // create a single large combined invariant for speed of checking
+      // 编译合并后的表达式，用于后续快速批量检查
       combinedInvariants = scriptEngine.compile(sb.toString());
 
     } catch (IOException e) {
@@ -146,29 +148,30 @@ public class MetricsInvariantChecker extends InvariantsChecker {
 
   @Override
   public void editSchedule() {
-    // grab all changed metrics and update bindings
+    // 清空收集器，收集本次调度变更后变化的指标
     collector.clear();
     queueMetrics.getMetrics(collector, false);
     jvmMetrics.getMetrics(collector, false);
 
+    // 更新绑定变量中所有变化指标的最新值
     for (MetricsRecord record : collector.getRecords()) {
       for (AbstractMetric am : record.metrics()) {
         bindings.put(am.name().replace(' ', '_'), am.value());
       }
     }
 
-    // evaluate all invariants with new bindings
+    // 执行所有不变量检查
     try {
 
-      // fastpath check all invariants at once (much faster)
+      // 优先使用合并表达式快速批量检查所有不变量
       boolean allInvHold = (boolean) combinedInvariants.eval(bindings);
 
-      // if any fails, check individually to produce more insightful log
+      // 如果有不变量不满足，逐个检查定位具体哪个不满足
       if (!allInvHold) {
         for (Map.Entry<String, CompiledScript> e : invariants.entrySet()) {
           boolean invariantsHold = (boolean) e.getValue().eval(bindings);
           if (!invariantsHold) {
-            // filter bindings to produce minimal set
+            // 提取该不变量用到的所有指标变量，精简日志输出
             Map<String, Object> matchingBindings =
                 extractMatchingBindings(e.getKey(), bindings);
             logOrThrow("Invariant \"" + e.getKey()
@@ -181,6 +184,12 @@ public class MetricsInvariantChecker extends InvariantsChecker {
     }
   }
 
+  /**
+   * 提取表达式中用到的所有指标变量及其当前值，用于精简错误日志
+   * @param inv 不变量表达式字符串
+   * @param allBindings 所有绑定的指标变量
+   * @return 仅包含当前表达式用到的变量映射
+   */
   private static Map<String, Object> extractMatchingBindings(String inv,
       SimpleBindings allBindings) {
     Map<String, Object> matchingBindings = new HashMap<>();

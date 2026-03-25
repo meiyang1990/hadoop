@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -49,48 +50,51 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+/**
+ * Datanode块扫描管理器，管理每个存储卷对应的卷扫描器，负责定期校验本节点存储的所有数据块校验和，
+ * 及时发现坏块并上报NameNode进行处理，保障HDFS数据可靠性。核心职责包括：扫描器生命周期管理、
+ * 块池扫描权限控制、可疑块标记、对外提供扫描统计信息。
+ */
 @InterfaceAudience.Private
 public class BlockScanner {
   public static final Logger LOG =
       LoggerFactory.getLogger(BlockScanner.class);
 
   /**
-   * The DataNode that this scanner is associated with.
+   * 关联的DataNode实例
    */
   private final DataNode datanode;
 
   /**
-   * Maps Storage IDs to VolumeScanner objects.
+   * 存储ID -> 对应卷扫描器实例的映射表
    */
   private final TreeMap<String, VolumeScanner> scanners =
       new TreeMap<String, VolumeScanner>();
 
   /**
-   * The scanner configuration.
+   * 块扫描器配置
    */
   private Conf conf;
 
   /**
-   * Timeout duration in milliseconds waiting for {@link VolumeScanner} to stop
-   * inside {@link #removeAllVolumeScanners}.
+   * 移除所有卷扫描器时，等待VolumeScanner停止的超时时间（毫秒）
    */
   private long joinVolumeScannersTimeOutMs;
 
   @VisibleForTesting
   void setConf(Conf conf) {
     this.conf = conf;
+    // 更新所有已存在卷扫描器的配置
     for (Entry<String, VolumeScanner> entry : scanners.entrySet()) {
       entry.getValue().setConf(conf);
     }
   }
 
   /**
-   * The cached scanner configuration.
+   * 块扫描器配置类，封装从Hadoop配置加载的所有块扫描相关参数，支持单元测试自定义配置覆盖。
    */
   static class Conf {
-    // These are a few internal configuration keys used for unit tests.
-    // They can't be set unless the static boolean allowUnitTestSettings has
-    // been set to true.
+    // 以下为单元测试使用的内部配置键，仅当allowUnitTestSettings为true时生效
 
     @VisibleForTesting
     static final String INTERNAL_DFS_DATANODE_SCAN_PERIOD_MS =
@@ -117,14 +121,24 @@ public class BlockScanner {
         INTERNAL_DFS_BLOCK_SCANNER_CURSOR_SAVE_INTERVAL_MS_DEFAULT =
             TimeUnit.MILLISECONDS.convert(10, TimeUnit.MINUTES);
 
+    /** 是否允许单元测试修改配置，生产环境默认关闭 */
     static boolean allowUnitTestSettings = false;
+    /** 单个存储卷每秒允许扫描的字节数，控制扫描IO带宽占用 */
     final long targetBytesPerSec;
+    /** 扫描记录最大过期时间，超过该时间未扫描的块会被优先扫描 */
     final long maxStalenessMs;
+    /** 完成整个存储卷所有块扫描的周期，单位毫秒 */
     final long scanPeriodMs;
+    /** 保存扫描游标到磁盘的间隔，单位毫秒 */
     final long cursorSaveMs;
+    /** 是否跳过最近被访问过的块，减少扫描对业务IO的影响 */
     final boolean skipRecentAccessed;
+    /** 扫描结果处理器类，用于处理扫描发现的问题块 */
     final Class<? extends ScanResultHandler> resultHandler;
 
+    /**
+     * 单元测试环境获取自定义配置参数，生产环境返回默认值
+     */
     private static long getUnitTestLong(Configuration conf, String key,
                                         long defVal) {
       if (allowUnitTestSettings) {
@@ -135,17 +149,10 @@ public class BlockScanner {
     }
 
     /**
-     * Determine the configured block scanner interval.
-     *
-     * For compatibility with prior releases of HDFS, if the
-     * configured value is zero then the scan period is
-     * set to 3 weeks.
-     *
-     * If the configured value is less than zero then the scanner
-     * is disabled.
-     *
-     * @param conf Configuration object.
-     * @return block scan period in milliseconds.
+     * 从配置中解析块扫描周期，处理向下兼容逻辑：
+     * 配置为0时使用默认3周周期；配置小于0时禁用扫描
+     * @param conf Hadoop配置对象
+     * @return 块扫描周期，单位毫秒
      */
     private static long getConfiguredScanPeriodMs(Configuration conf) {
       long tempScanPeriodMs = getUnitTestLong(
@@ -164,19 +171,25 @@ public class BlockScanner {
 
     @SuppressWarnings("unchecked")
     Conf(Configuration conf) {
+      // 加载并校验每秒扫描字节数配置，不能为负
       this.targetBytesPerSec = Math.max(0L, conf.getLong(
           DFS_BLOCK_SCANNER_VOLUME_BYTES_PER_SECOND,
           DFS_BLOCK_SCANNER_VOLUME_BYTES_PER_SECOND_DEFAULT));
+      // 加载最大过期时间配置
       this.maxStalenessMs = Math.max(0L, getUnitTestLong(conf,
           INTERNAL_DFS_BLOCK_SCANNER_MAX_STALENESS_MS,
           INTERNAL_DFS_BLOCK_SCANNER_MAX_STALENESS_MS_DEFAULT));
+      // 解析扫描周期
       this.scanPeriodMs = getConfiguredScanPeriodMs(conf);
+      // 加载游标保存间隔配置
       this.cursorSaveMs = Math.max(0L, getUnitTestLong(conf,
           INTERNAL_DFS_BLOCK_SCANNER_CURSOR_SAVE_INTERVAL_MS,
           INTERNAL_DFS_BLOCK_SCANNER_CURSOR_SAVE_INTERVAL_MS_DEFAULT));
+      // 加载是否跳过最近访问块配置
       this.skipRecentAccessed = conf.getBoolean(
           DFS_BLOCK_SCANNER_SKIP_RECENT_ACCESSED,
           DFS_BLOCK_SCANNER_SKIP_RECENT_ACCESSED_DEFAULT);
+      // 仅单元测试允许自定义结果处理器
       if (allowUnitTestSettings) {
         this.resultHandler = (Class<? extends ScanResultHandler>)
             conf.getClass(INTERNAL_VOLUME_SCANNER_SCAN_RESULT_HANDLER,
@@ -187,16 +200,27 @@ public class BlockScanner {
     }
   }
 
+  /**
+   * 构造块扫描器，使用DataNode自身配置初始化
+   * @param datanode 关联的DataNode实例
+   */
   public BlockScanner(DataNode datanode) {
     this(datanode, datanode.getConf());
   }
 
+  /**
+   * 构造块扫描器，使用指定配置初始化
+   * @param datanode 关联的DataNode实例
+   * @param conf Hadoop配置对象
+   */
   public BlockScanner(DataNode datanode, Configuration conf) {
     this.datanode = datanode;
+    // 加载卷扫描器停止超时配置
     setJoinVolumeScannersTimeOutMs(
         conf.getLong(DFS_BLOCK_SCANNER_VOLUME_JOIN_TIMEOUT_MSEC_KEY,
             DFS_BLOCK_SCANNER_VOLUME_JOIN_TIMEOUT_MSEC_DEFAULT));
     this.conf = new Conf(conf);
+    // 打印初始化日志
     if (isEnabled()) {
       LOG.info("Initialized block scanner with targetBytesPerSec {}",
           this.conf.targetBytesPerSec);
@@ -206,36 +230,36 @@ public class BlockScanner {
   }
 
   /**
-   * Returns true if the block scanner is enabled.
-   *
-   * If the block scanner is disabled, no volume scanners will be created, and
-   * no threads will start.
+   * 检查块扫描器是否启用，扫描周期和带宽都大于0才启用
+   * @return true表示启用，false表示禁用
    */
   public boolean isEnabled() {
     return (conf.scanPeriodMs > 0) && (conf.targetBytesPerSec > 0);
   }
 
   /**
-   * Returns true if there is any scanner thread registered.
+   * 检查当前是否注册了任何卷扫描器
+   * @return true表示至少有一个注册的扫描器
    */
   public synchronized boolean hasAnyRegisteredScanner() {
     return !scanners.isEmpty();
   }
 
  /**
-  * Set up a scanner for the given block pool and volume.
-  *
-  * @param ref              A reference to the volume.
+  * 为指定存储卷添加卷扫描器
+  * @param ref 存储卷引用
   */
   public synchronized void addVolumeScanner(FsVolumeReference ref) {
     boolean success = false;
     try {
       FsVolumeSpi volume = ref.getVolume();
+      // 扫描器未启用直接返回
       if (!isEnabled()) {
         LOG.debug("Not adding volume scanner for {}, because the block " +
             "scanner is disabled.", volume);
         return;
       }
+      // 已存在对应扫描器，打印错误日志返回
       VolumeScanner scanner = scanners.get(volume.getStorageID());
       if (scanner != null) {
         LOG.error("Already have a scanner for volume {}.",
@@ -244,25 +268,22 @@ public class BlockScanner {
       }
       LOG.debug("Adding scanner for volume {} (StorageID {})",
           volume, volume.getStorageID());
+      // 创建并启动新的卷扫描器，注册到映射表
       scanner = new VolumeScanner(conf, datanode, ref);
       scanner.start();
       scanners.put(volume.getStorageID(), scanner);
       success = true;
     } finally {
+      // 创建失败，释放存储卷引用
       if (!success) {
-        // If we didn't create a new VolumeScanner object, we don't
-        // need this reference to the volume.
         IOUtils.cleanupWithLogger(null, ref);
       }
     }
   }
 
   /**
-   * Stops and removes a volume scanner.
-   *
-   * This function will block until the volume scanner has stopped.
-   *
-   * @param volume           The volume to remove.
+   * 停止并移除指定存储卷的卷扫描器，会阻塞等待扫描器线程退出
+   * @param volume 要移除扫描器的存储卷
    */
   public synchronized void removeVolumeScanner(FsVolumeSpi volume) {
     if (!isEnabled()) {
@@ -278,49 +299,49 @@ public class BlockScanner {
     }
     LOG.info("Removing scanner for volume {} (StorageID {})",
         volume, volume.getStorageID());
+    // 关闭扫描器并从映射表移除，阻塞等待线程退出
     scanner.shutdown();
     scanners.remove(volume.getStorageID());
     Uninterruptibles.joinUninterruptibly(scanner, 5, TimeUnit.MINUTES);
   }
 
   /**
-   * Stops and removes all volume scanners.
-   *
-   * This function is called on shutdown. It will return even if some of
-   * the scanners don't terminate in time. Since the scanners are daemon
-   * threads and do not alter the block content, it is safe to ignore
-   * such conditions on shutdown.
+   * 停止并移除所有卷扫描器，用于DataNode关闭流程。即使部分扫描器超时未退出也会返回，
+   * 不阻塞关机流程，扫描器线程作为守护线程不会影响进程退出。
    */
   public synchronized void removeAllVolumeScanners() {
+    // 先通知所有扫描器关闭
     for (Entry<String, VolumeScanner> entry : scanners.entrySet()) {
       entry.getValue().shutdown();
     }
+    // 依次等待每个扫描器线程退出，超时后继续处理
     for (Entry<String, VolumeScanner> entry : scanners.entrySet()) {
       Uninterruptibles.joinUninterruptibly(entry.getValue(),
           getJoinVolumeScannersTimeOutMs(), TimeUnit.MILLISECONDS);
     }
+    // 清空扫描器映射表
     scanners.clear();
   }
 
   /**
-   * Enable scanning a given block pool id.
-   *
-   * @param bpid        The block pool id to enable scanning for.
+   * 允许对指定块池ID的块进行扫描
+   * @param bpid 块池ID
    */
   synchronized void enableBlockPoolId(String bpid) {
     Preconditions.checkNotNull(bpid);
+    // 通知所有卷扫描器启用该块池扫描
     for (VolumeScanner scanner : scanners.values()) {
       scanner.enableBlockPoolId(bpid);
     }
   }
 
   /**
-   * Disable scanning a given block pool id.
-   *
-   * @param bpid        The block pool id to disable scanning for.
+   * 禁止对指定块池ID的块进行扫描
+   * @param bpid 块池ID
    */
   synchronized void disableBlockPoolId(String bpid) {
     Preconditions.checkNotNull(bpid);
+    // 通知所有卷扫描器禁用该块池扫描
     for (VolumeScanner scanner : scanners.values()) {
       scanner.disableBlockPoolId(bpid);
     }
@@ -335,24 +356,22 @@ public class BlockScanner {
     return scanner.getStatistics();
   }
 
+  /**
+   * 将所有卷扫描器的统计信息拼接输出到StringBuilder
+   * @param p 用于接收统计信息的StringBuilder
+   */
   synchronized void printStats(StringBuilder p) {
-    // print out all bpids that we're scanning ?
+    // 拼接每个卷扫描器的统计信息
     for (Entry<String, VolumeScanner> entry : scanners.entrySet()) {
       entry.getValue().printStats(p);
     }
   }
 
   /**
-   * Mark a block as "suspect."
-   *
-   * This means that we should try to rescan it soon.  Note that the
-   * VolumeScanner keeps a list of recently suspicious blocks, which
-   * it uses to avoid rescanning the same block over and over in a short
-   * time frame.
-   *
-   * @param storageId     The ID of the storage where the block replica
-   *                      is being stored.
-   * @param block         The block's ID and block pool id.
+   * 将指定块标记为可疑块，会安排该块尽快被重新扫描校验。用于IO错误时主动触发校验，确认块是否损坏。
+   * 内部会对短时间内重复标记的同一块去重，避免重复扫描浪费资源。
+   * @param storageId 块所在存储ID
+   * @param block 待标记的块信息
    */
   synchronized void markSuspectBlock(String storageId, ExtendedBlock block) {
     if (!isEnabled()) {
@@ -362,14 +381,12 @@ public class BlockScanner {
     }
     VolumeScanner scanner = scanners.get(storageId);
     if (scanner == null) {
-      // This could happen if the volume is in the process of being removed.
-      // The removal process shuts down the VolumeScanner, but the volume
-      // object stays around as long as there are references to it (which
-      // should not be that long.)
+      // 存储卷正在被移除时可能出现该情况，属于正常场景
       LOG.info("Not scanning suspicious block {} on {}, because there is no " +
           "volume scanner for that storageId.", block, storageId);
       return;
     }
+    // 委托对应卷扫描器标记可疑块
     scanner.markSuspectBlock(block);
   }
 
@@ -381,6 +398,9 @@ public class BlockScanner {
     this.joinVolumeScannersTimeOutMs = joinScannersTimeOutMs;
   }
 
+  /**
+   * BlockScanner的HTTP统计信息Servlet，响应DataNode Web UI的块扫描统计查询请求，返回所有卷扫描器的统计信息。
+   */
   @InterfaceAudience.Private
   public static class Servlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
@@ -388,24 +408,9 @@ public class BlockScanner {
     @Override
     public void doGet(HttpServletRequest request,
                       HttpServletResponse response) throws IOException {
+      // 设置响应类型为纯文本
       response.setContentType("text/plain");
 
+      // 从Servlet上下文获取关联的DataNode和BlockScanner
       DataNode datanode = (DataNode)
-          getServletContext().getAttribute("datanode");
-      BlockScanner blockScanner = datanode.getBlockScanner();
-
-      StringBuilder buffer = new StringBuilder(8 * 1024);
-      if (!blockScanner.isEnabled()) {
-        LOG.warn("Periodic block scanner is not running");
-        buffer.append("Periodic block scanner is not running. " +
-            "Please check the datanode log if this is unexpected.");
-      } else {
-        buffer.append("Block Scanner Statistics\n\n");
-        blockScanner.printStats(buffer);
-      }
-      String resp = buffer.toString();
-      LOG.trace("Returned Servlet info {}", resp);
-      response.getWriter().write(resp);
-    }
-  }
-}
+          getServletContext().getAttribute

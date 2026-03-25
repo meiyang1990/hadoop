@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,20 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
+/**
+ * 失败任务尝试标记请求协议记录
+ * 定义了将指定任务尝试标记为失败的请求接口，用于MapReduce ApplicationMaster与MR客户端之间的RPC通信
+ */
 public interface FailTaskAttemptRequest {
+  /**
+   * 获取需要标记为失败的任务尝试ID
+   * @return 需要失败处理的任务尝试ID
+   */
   public abstract TaskAttemptId getTaskAttemptId();
   
+  /**
+   * 设置需要标记为失败的任务尝试ID
+   * @param taskAttemptId 需要失败处理的任务尝试ID
+   */
   public abstract void setTaskAttemptId(TaskAttemptId taskAttemptId);
 }

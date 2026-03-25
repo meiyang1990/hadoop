@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,5 +17,9 @@
  * limitations under the License.
  */
 
-/** Router ClientRM Proxy Service package. **/
+/**
+ * YARN Router 客户端到ResourceManager代理服务包。
+ * 提供Router组件转发客户端请求到后端ResourceManager的核心能力，
+ * 支持联邦集群场景下跨RM的客户端请求路由。
+ */
 package org.apache.hadoop.yarn.server.router.clientrm;

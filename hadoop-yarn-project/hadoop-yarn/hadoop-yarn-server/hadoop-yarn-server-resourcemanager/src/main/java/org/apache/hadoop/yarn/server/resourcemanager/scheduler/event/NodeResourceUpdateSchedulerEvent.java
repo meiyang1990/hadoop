@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,11 +21,20 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
+/**
+ * 节点资源更新调度事件，当YARN集群节点资源发生变化时，
+ * 向资源调度器发送该事件触发调度器重新计算节点可用资源。
+ */
 public class NodeResourceUpdateSchedulerEvent extends SchedulerEvent {
 
   private final RMNode rmNode;
   private final ResourceOption resourceOption;
   
+  /**
+   * 构造节点资源更新调度事件。
+   * @param rmNode 目标资源节点
+   * @param resourceOption 新的资源配置选项
+   */
   public NodeResourceUpdateSchedulerEvent(RMNode rmNode,
       ResourceOption resourceOption) {
     super(SchedulerEventType.NODE_RESOURCE_UPDATE);

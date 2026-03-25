@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,8 @@ import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
 
 /**
- * Computes running MD5-of-CRC over reconstructed chunk CRCs.
+ * 条纹块校验和重建过程中，计算所有重建块CRC的MD5摘要，用于校验数据完整性。
+ * 在纠删码重建丢失块后，通过MD5-of-CRC方式验证重建结果的正确性。
  */
 @InterfaceAudience.Private
 public class StripedBlockChecksumMd5CrcReconstructor
@@ -33,6 +35,14 @@ public class StripedBlockChecksumMd5CrcReconstructor
   private MD5Hash md5;
   private MessageDigest digester;
 
+  /**
+   * 构造MD5-of-CRC校验和重建器，初始化父类重建上下文。
+   * @param worker 纠删码工作线程，处理重建任务
+   * @param stripedReconInfo 条纹重建任务信息，包含块位置、编码参数等
+   * @param checksumWriter 输出缓冲区，用于写入最终计算得到的校验和
+   * @param requestedBlockLength 请求重建的块长度
+   * @throws IOException 初始化异常
+   */
   public StripedBlockChecksumMd5CrcReconstructor(ErasureCodingWorker worker,
       StripedReconstructionInfo stripedReconInfo,
       DataOutputBuffer checksumWriter,
@@ -40,16 +50,30 @@ public class StripedBlockChecksumMd5CrcReconstructor
     super(worker, stripedReconInfo, checksumWriter, requestedBlockLength);
   }
 
+  /**
+   * 获取最终计算得到的MD5摘要对象，用于完整性校验。
+   * @return 计算完成的MD5Hash对象
+   */
   @Override
   public Object getDigestObject() {
     return md5;
   }
 
+  /**
+   * 初始化MD5消息摘要计算器。
+   * @throws IOException 初始化异常
+   */
   @Override
   void prepareDigester() throws IOException {
     digester = MD5Hash.getDigester();
   }
 
+  /**
+   * 更新MD5摘要，加入当前处理的CRC校验和字节数组。
+   * @param checksumBytes 待加入的CRC校验和字节数组
+   * @param dataBytesPerChecksum 每个校验和对应的数据字节数（本实现未使用该参数）
+   * @throws IOException 摘要计算器为空时抛出异常
+   */
   @Override
   void updateDigester(byte[] checksumBytes, int dataBytesPerChecksum)
       throws IOException {
@@ -62,6 +86,10 @@ public class StripedBlockChecksumMd5CrcReconstructor
     digester.update(checksumBytes, 0, checksumBytes.length);
   }
 
+  /**
+   * 完成MD5摘要计算，将结果写入输出缓冲区。
+   * @throws IOException 摘要计算器为空时抛出异常
+   */
   @Override
   void commitDigest() throws IOException {
     if (digester == null) {

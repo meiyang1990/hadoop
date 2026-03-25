@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,25 +25,42 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * FairScheduler QueueInfo list used for mapping to XML or JSON.
+ * 公平调度器队列信息列表，用于YARN Web UI XML/JSON序列化输出
  */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class FairSchedulerQueueInfoList {
   private ArrayList<FairSchedulerQueueInfo> queue;
 
+  /**
+   * 构造空的队列信息列表
+   */
   public FairSchedulerQueueInfoList() {
     queue = new ArrayList<>();
   }
 
+  /**
+   * 获取完整的队列信息列表
+   * @return 所有队列信息集合
+   */
   public ArrayList<FairSchedulerQueueInfo> getQueueInfoList() {
     return this.queue;
   }
 
+  /**
+   * 向列表中添加一个队列信息
+   * @param e 待添加的队列信息对象
+   * @return 添加成功返回true
+   */
   public boolean addToQueueInfoList(FairSchedulerQueueInfo e) {
     return this.queue.add(e);
   }
 
+  /**
+   * 根据索引获取指定位置的队列信息
+   * @param i 列表索引
+   * @return 指定索引处的队列信息对象
+   */
   public FairSchedulerQueueInfo getQueueInfo(int i) {
     return this.queue.get(i);
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,27 +41,38 @@ import org.apache.hadoop.util.ExitUtil;
 import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.util.Preconditions;
 
+/**
+ * 异步实现的HDFS编辑日志管理器，通过后台线程异步落盘编辑日志，降低NameNode前台RPC延迟
+ * 继承自FSEditLog，将日志写入和同步操作解耦到后台线程执行，提升NameNode响应性能
+ */
 class FSEditLogAsync extends FSEditLog implements Runnable {
   static final Logger LOG = LoggerFactory.getLogger(FSEditLog.class);
 
-  // use separate mutex to avoid possible deadlock when stopping the thread.
+  // 保护同步线程状态的独立互斥锁，避免停止线程时出现死锁
   private final Object syncThreadLock = new Object();
   private Thread syncThread;
+  // 线程本地变量存储当前线程待同步的编辑日志实例
   private static final ThreadLocal<Edit> THREAD_EDIT = new ThreadLocal<Edit>();
 
-  // requires concurrent access from caller threads and syncing thread.
+  // 等待后台线程处理的 pending 编辑日志队列，多线程并发访问需要线程安全
   private final BlockingQueue<Edit> editPendingQ;
 
-  // only accessed by syncing thread so no synchronization required.
-  // queue is unbounded because it's effectively limited by the size
-  // of the edit log buffer - ie. a sync will eventually be forced.
+  // 已写入日志但等待同步完成的编辑日志队列，仅由后台同步线程访问，无需同步
+  // 队列无界，大小受编辑日志缓冲区限制，最终会强制触发同步
   private final Deque<Edit> syncWaitQ = new ArrayDeque<Edit>();
 
+  // 上次记录队列满日志的时间戳
   private long lastFull = 0;
 
+  /**
+   * 构造异步编辑日志管理器，初始化pending队列并禁用操作实例缓存
+   * @param conf 配置对象
+   * @param storage NameNode存储管理器
+   * @param editsDirs 编辑日志存储目录列表
+   */
   FSEditLogAsync(Configuration conf, NNStorage storage, List<URI> editsDirs) {
     super(conf, storage, editsDirs);
-    // op instances cannot be shared due to queuing for background thread.
+    // 由于操作实例会被后台线程消费，无法复用缓存，因此禁用缓存
     cache.disableCache();
     int editPendingQSize = conf.getInt(
         DFSConfigKeys.DFS_NAMENODE_EDITS_ASYNC_LOGGING_PENDING_QUEUE_SIZE,
@@ -70,12 +82,19 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
     editPendingQ = new ArrayBlockingQueue<>(editPendingQSize);
   }
 
+  /**
+   * 检查后台同步线程是否存活
+   * @return 线程存活返回true，否则返回false
+   */
   private boolean isSyncThreadAlive() {
     synchronized(syncThreadLock) {
       return syncThread != null && syncThread.isAlive();
     }
   }
 
+  /**
+   * 启动后台编辑日志同步线程，如果线程已退出则重新启动
+   */
   private void startSyncThread() {
     synchronized(syncThreadLock) {
       if (!isSyncThreadAlive()) {
@@ -85,6 +104,9 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
     }
   }
 
+  /**
+   * 停止后台编辑日志同步线程，中断并等待线程退出
+   */
   private void stopSyncThread() {
     synchronized(syncThreadLock) {
       if (syncThread != null) {
@@ -92,7 +114,7 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
           syncThread.interrupt();
           syncThread.join();
         } catch (InterruptedException e) {
-          // we're quitting anyway.
+          // 进程即将退出，忽略中断异常
         } finally {
           syncThread = null;
         }
@@ -140,19 +162,20 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
   public void logSync() {
     Edit edit = THREAD_EDIT.get();
     if (edit != null) {
-      // do NOT remove to avoid expunge & rehash penalties.
+      // 不删除ThreadLocal条目，避免rehash和内存清理开销
       THREAD_EDIT.set(null);
       if (LOG.isDebugEnabled()) {
         LOG.debug("logSync " + edit);
       }
+      // 等待异步同步完成
       edit.logSyncWait();
     }
   }
 
   @Override
   public void logSyncAll() {
-    // doesn't actually log anything, just ensures that the queues are
-    // drained when it returns.
+    // 该方法本身不写入日志，仅保证返回时所有已入队日志都完成同步
+    // 构造特殊同步编辑日志，触发全量队列刷新
     Edit edit = new SyncEdit(this, null){
       @Override
       public boolean logEdit() {
@@ -163,10 +186,8 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
     edit.logSyncWait();
   }
 
-  // draining permits is intended to provide a high priority reservation.
-  // however, release of outstanding permits must be postponed until
-  // drained permits are restored to avoid starvation.  logic has some races
-  // but is good enough to serve its purpose.
+  // 排空信号量用于实现高优先级预留，避免队列满时线程饥饿
+  // 逻辑存在少量竞态但满足业务需求足够
   private Semaphore overflowMutex = new Semaphore(8){
     private AtomicBoolean draining = new AtomicBoolean();
     private AtomicInteger pendingReleases = new AtomicInteger();
@@ -175,7 +196,7 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
       draining.set(true);
       return super.drainPermits();
     }
-    // while draining, count the releases until release(int)
+    // 排空过程中暂存需要释放的许可数量，排空完成后统一释放
     private void tryRelease(int permits) {
       pendingReleases.getAndAdd(permits);
       if (!draining.get()) {
@@ -193,36 +214,38 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
     }
   };
 
+  /**
+   * 将编辑日志实例入队到pending队列，处理队列满时的流量控制
+   * @param edit 待处理编辑日志实例
+   */
   private void enqueueEdit(Edit edit) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("logEdit " + edit);
     }
     try {
-      // not checking for overflow yet to avoid penalizing performance of
-      // the common case.  if there is persistent overflow, a mutex will be
-      // use to throttle contention on the queue.
+      // 优先非阻塞入队，避免对正常流程产生性能开销，持续溢出时才进行限流
       if (!editPendingQ.offer(edit)) {
         Preconditions.checkState(
             isSyncThreadAlive(), "sync thread is not alive");
         long now = Time.monotonicNow();
+        // 每4秒最多打印一次队列满日志，避免日志刷屏
         if (now - lastFull > 4000) {
           lastFull = now;
           LOG.info("Edit pending queue is full");
         }
         if (Thread.holdsLock(this)) {
-          // if queue is full, synchronized caller must immediately relinquish
-          // the monitor before re-offering to avoid deadlock with sync thread
-          // which needs the monitor to write transactions.
+          // 调用方已经持有编辑日志锁，必须先释放锁等待，避免与后台线程死锁
+          // 后台线程写日志也需要持有锁，所以这里必须释放锁让渡给后台
           int permits = overflowMutex.drainPermits();
           try {
             do {
-              this.wait(1000); // will be notified by next logSync.
+              this.wait(1000); // 等待队列有空间后重试
             } while (!editPendingQ.offer(edit));
           } finally {
             overflowMutex.release(permits);
           }
         } else {
-          // mutex will throttle contention during persistent overflow.
+          // 调用方未持有锁，通过信号量限流，降低并发排队竞争
           overflowMutex.acquire();
           try {
             editPendingQ.put(edit);
@@ -232,16 +255,24 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
         }
       }
     } catch (Throwable t) {
-      // should never happen!  failure to enqueue an edit is fatal
+      // 入队失败属于致命错误，直接终止NameNode
       terminate(t);
     }
   }
 
+  /**
+   * 从pending队列取出编辑日志，用于后台线程处理
+   * @return 取出的编辑日志实例，超时/非阻塞返回null
+   * @throws InterruptedException 线程中断时抛出
+   */
   private Edit dequeueEdit() throws InterruptedException {
-    // only block for next edit if no pending syncs.
+    // 如果已有待同步的日志，非阻塞取出，先完成同步再处理新日志
     return syncWaitQ.isEmpty() ? editPendingQ.take() : editPendingQ.poll();
   }
 
+  /**
+   * 后台同步线程主运行方法，持续从队列取出编辑日志写入并同步
+   */
   @Override
   public void run() {
     try {
@@ -250,24 +281,24 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
         boolean doSync;
         Edit edit = dequeueEdit();
         if (edit != null) {
-          // sync if requested by edit log.
+          // 写入日志，判断是否需要同步
           doSync = edit.logEdit();
           syncWaitQ.add(edit);
           metrics.setPendingEditsCount(editPendingQ.size() + 1);
         } else {
-          // sync when editq runs dry, but have edits pending a sync.
+          // pending队列为空，但仍有待同步的日志，触发同步
           doSync = !syncWaitQ.isEmpty();
           metrics.setPendingEditsCount(0);
         }
         if (doSync) {
-          // normally edit log exceptions cause the NN to terminate, but tests
-          // relying on ExitUtil.terminate need to see the exception.
+          // 正常编辑日志同步异常会终止NameNode，此处捕获用于测试可见
           RuntimeException syncEx = null;
           try {
             logSync(getLastWrittenTxId());
           } catch (RuntimeException ex) {
             syncEx = ex;
           }
+          // 通知所有等待同步的编辑日志，同步已完成
           while ((edit = syncWaitQ.poll()) != null) {
             edit.logSyncNotify(syncEx);
           }
@@ -280,16 +311,25 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
     }
   }
 
+  /**
+   * 处理异步日志过程中的致命错误，终止NameNode进程
+   * @param t 抛出的异常
+   */
   private void terminate(Throwable t) {
     String message = "Exception while edit logging: "+t.getMessage();
     LOG.error(message, t);
     ExitUtil.terminate(1, message);
   }
 
+  /**
+   * 根据调用上下文创建对应类型的编辑日志实例
+   * @param op 编辑日志操作
+   * @return 编辑日志包装实例（RPC异步调用返回RpcEdit，同步调用返回SyncEdit）
+   */
   private Edit getEditInstance(FSEditLogOp op) {
     final Edit edit;
     final Server.Call rpcCall = Server.getCurCall().get();
-    // only rpc calls not explicitly sync'ed on the log will be async.
+    // 仅未持有日志锁的RPC调用才会走异步化处理
     if (rpcCall != null && !Thread.holdsLock(this)) {
       edit = new RpcEdit(this, op, rpcCall);
     } else {
@@ -298,6 +338,9 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
     return edit;
   }
 
+  /**
+   * 抽象编辑日志包装类，定义异步处理生命周期方法
+   */
   private abstract static class Edit {
     final FSEditLog log;
     final FSEditLogOp op;
@@ -307,18 +350,28 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
       this.op = op;
     }
 
-    // return whether edit log wants to sync.
+    /**
+     * 后台线程执行日志写入，返回是否需要同步落盘
+     * @return 需要同步返回true，否则返回false
+     */
     boolean logEdit() {
       return log.doEditTransaction(op);
     }
 
-    // wait for background thread to finish syncing.
+    /**
+     * 等待后台同步完成的抽象方法
+     */
     abstract void logSyncWait();
-    // wake up the thread in logSyncWait.
+    /**
+     * 同步完成后通知等待线程的抽象方法
+     * @param ex 同步过程中抛出的异常，成功则为null
+     */
     abstract void logSyncNotify(RuntimeException ex);
   }
 
-  // the calling thread is synchronously waiting for the edit to complete.
+  /**
+   * 同步等待编辑日志实现，调用线程需要阻塞等待同步完成
+   */
   private static class SyncEdit extends Edit {
     private final Object lock;
     private boolean done = false;
@@ -326,10 +379,8 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
 
     SyncEdit(FSEditLog log, FSEditLogOp op) {
       super(log, op);
-      // if the log is already sync'ed (ex. log rolling), must wait on it to
-      // avoid deadlock with sync thread.  the fsn lock protects against
-      // logging during a roll.  else lock on this object to avoid sync
-      // contention on edit log.
+      // 如果当前线程已持有日志锁（例如日志滚动场景），则使用日志锁作为等待锁
+      // 避免死锁，否则使用当前对象锁，减少对主日志锁的竞争
       lock = Thread.holdsLock(log) ? log : this;
     }
 
@@ -341,8 +392,7 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
             lock.wait(10);
           } catch (InterruptedException e) {}
         }
-        // only needed by tests that rely on ExitUtil.terminate() since
-        // normally exceptions terminate the NN.
+        // 仅测试场景需要，正常情况下异常会直接终止NameNode
         if (syncEx != null) {
           syncEx.fillInStackTrace();
           throw syncEx;
@@ -365,32 +415,35 @@ class FSEditLogAsync extends FSEditLog implements Runnable {
     }
   }
 
-  // the calling rpc thread will return immediately from logSync but the
-  // rpc response will not be sent until the edit is durable.
+  /**
+   * RPC异步编辑日志实现，RPC调用线程可提前返回，延迟发送响应直到同步完成
+   */
   private static class RpcEdit extends Edit {
     private final Server.Call call;
 
     RpcEdit(FSEditLog log, FSEditLogOp op, Server.Call call) {
       super(log, op);
       this.call = call;
+      // 推迟发送RPC响应，直到同步完成
       call.postponeResponse();
     }
 
     @Override
     public void logSyncWait() {
-      // logSync is a no-op to immediately free up rpc handlers.  the
-      // response is sent when the sync thread calls syncNotify.
+      // 空操作，让RPC线程立刻释放，提升吞吐量，响应延迟到同步完成后发送
     }
 
     @Override
     public void logSyncNotify(RuntimeException syncEx) {
       try {
         if (syncEx == null) {
+          // 同步成功，发送RPC响应给客户端
           call.sendResponse();
         } else {
+          // 同步失败，响应异常给客户端
           call.abortResponse(syncEx);
         }
-      } catch (Exception e) {} // don't care if not sent.
+      } catch (Exception e) {} // 发送失败不处理，不影响NameNode主流程
     }
 
     @Override

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,35 +38,32 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility class that creates proxy for specified protocols when federation is
- * enabled. The class creates a federation aware failover provider, i.e. the
- * failover provider uses the {@code FederationStateStore} to determine the
- * current active ResourceManager
+ * YARN联邦环境下的代理提供者工具类，为指定协议创建支持联邦感知的代理对象。
+ * 核心能力是创建能从联邦状态存储获取当前活跃ResourceManager信息的故障切换代理。
  */
 @Private
 @Unstable
 public final class FederationProxyProviderUtil {
 
+  /** 日志记录器 */
   public static final Logger LOG =
       LoggerFactory.getLogger(FederationProxyProviderUtil.class);
 
-  // Disable constructor
+  // 禁止实例化工具类
   private FederationProxyProviderUtil() {
   }
 
   /**
-   * Create a proxy for the specified protocol in the context of Federation. For
-   * non-HA, this is a direct connection to the ResourceManager address. When HA
-   * is enabled, the proxy handles the failover between the ResourceManagers as
-   * well.
+   * 在联邦环境中为指定子集群创建ResourceManager代理对象。
+   * 非HA模式下直接连接指定地址，HA模式下自动处理ResourceManager故障切换。
    *
-   * @param configuration Configuration to generate {@link ClientRMProxy}
-   * @param protocol Protocol for the proxy
-   * @param subClusterId the unique identifier or the sub-cluster
-   * @param user the user on whose behalf the proxy is being created
-   * @param <T> Type information of the proxy
-   * @return Proxy to the RM
-   * @throws IOException on failure
+   * @param configuration 生成代理使用的配置对象
+   * @param protocol 代理需要实现的协议接口
+   * @param subClusterId 目标子集群的唯一标识
+   * @param user 创建代理所代表的用户身份
+   * @param <T> 代理对象的类型
+   * @return 目标ResourceManager的代理对象
+   * @throws IOException 创建代理失败时抛出异常
    */
   @Public
   @Unstable
@@ -76,19 +74,17 @@ public final class FederationProxyProviderUtil {
   }
 
   /**
-   * Create a proxy for the specified protocol in the context of Federation. For
-   * non-HA, this is a direct connection to the ResourceManager address. When HA
-   * is enabled, the proxy handles the failover between the ResourceManagers as
-   * well.
+   * 在联邦环境中为指定子集群创建带认证令牌的ResourceManager代理对象。
+   * 非HA模式下直接连接指定地址，HA模式下自动处理ResourceManager故障切换。
    *
-   * @param configuration Configuration to generate {@link ClientRMProxy}
-   * @param protocol Protocol for the proxy
-   * @param subClusterId the unique identifier or the sub-cluster
-   * @param user the user on whose behalf the proxy is being created
-   * @param token the auth token to use for connection
-   * @param <T> Type information of the proxy
-   * @return Proxy to the RM
-   * @throws IOException on failure
+   * @param configuration 生成代理使用的配置对象
+   * @param protocol 代理需要实现的协议接口
+   * @param subClusterId 目标子集群的唯一标识
+   * @param user 创建代理所代表的用户身份
+   * @param token 连接使用的认证令牌
+   * @param <T> 代理对象的类型
+   * @return 目标ResourceManager的代理对象
+   * @throws IOException 创建代理失败时抛出异常
    */
   @Public
   @Unstable
@@ -96,19 +92,24 @@ public final class FederationProxyProviderUtil {
       final Class<T> protocol, SubClusterId subClusterId,
       UserGroupInformation user, Token<? extends TokenIdentifier> token)
       throws IOException {
+    // 基于传入配置创建YarnConfiguration实例
     final YarnConfiguration config = new YarnConfiguration(configuration);
+    // 更新配置，适配联邦环境下指定子集群的连接需求
     updateConfForFederation(config, subClusterId.getId());
+    // 调用通用工具创建RM代理对象
     return AMRMClientUtils.createRMProxy(config, protocol, user, token);
   }
 
   /**
-   * Updating the conf with Federation as long as certain subclusterId.
+   * 更新配置对象，适配联邦环境下访问指定子集群的需求。
+   * 核心修改：替换故障切换代理为联邦感知实现，适配传统HA场景切换。
    *
-   * @param conf configuration
-   * @param subClusterId subclusterId for the conf
+   * @param conf 需要修改的配置对象
+   * @param subClusterId 目标子集群ID
    */
   public static void updateConfForFederation(Configuration conf,
       String subClusterId) {
+    // 设置目标子集群ID到配置
     conf.set(YarnConfiguration.RM_CLUSTER_ID, subClusterId);
     /*
      * In a Federation setting, we will connect to not just the local cluster RM
@@ -121,11 +122,16 @@ public final class FederationProxyProviderUtil {
      * enable federation failover IF traditional HA is enabled so that the
      * appropriate failover RetryPolicy is initialized.
      */
+    // 标记启用联邦模式
     conf.setBoolean(YarnConfiguration.FEDERATION_ENABLED, true);
+    // 设置故障切换代理为联邦感知实现
     conf.setClass(YarnConfiguration.CLIENT_FAILOVER_PROXY_PROVIDER,
         FederationRMFailoverProxyProvider.class, RMFailoverProxyProvider.class);
+    // 如果原配置开启了传统HA，适配切换为联邦故障切换模式
     if (HAUtil.isHAEnabled(conf)) {
+      // 启用联邦故障切换能力，初始化对应重试策略
       conf.setBoolean(YarnConfiguration.FEDERATION_FAILOVER_ENABLED, true);
+      // 关闭传统RM HA模式，避免从本地配置读取RM地址
       conf.setBoolean(YarnConfiguration.RM_HA_ENABLED, false);
     }
   }

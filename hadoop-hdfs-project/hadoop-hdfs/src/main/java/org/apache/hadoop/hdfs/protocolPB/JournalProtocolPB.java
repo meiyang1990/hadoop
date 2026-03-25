@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,11 +25,12 @@ import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * Protocol used to journal edits to a remote node. Currently,
- * this is used to publish edits from the NameNode to a BackupNode.
- * 
- * Note: This extends the protocolbuffer service based interface to
- * add annotations required for security.
+ * 日志RPC协议PB版本接口，用于将HDFS编辑日志发送到远程节点进行持久化
+ * <p>
+ * 当前业务场景：用于主NameNode将编辑日志发布到BackupNode，支持HA架构下的元数据同步
+ * <p>
+ * 扩展自Protobuf生成的服务接口，添加Hadoop RPC和安全认证所需的注解
+ * </p>
  */
 @KerberosInfo(
     serverPrincipal = DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY,

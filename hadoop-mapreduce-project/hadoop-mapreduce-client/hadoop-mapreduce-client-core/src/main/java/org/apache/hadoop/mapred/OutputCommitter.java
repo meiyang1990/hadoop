@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,6 +25,11 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
+ * 文件级注释：
+ * 该文件是MapReduce旧版API中的输出提交器抽象基类，负责管理MapReduce作业和任务的输出提交流程
+ * 核心职责是提供作业初始化输出准备、任务临时输出管理、最终输出提交/回滚的标准化接口，
+ * 让MapReduce框架可以统一处理不同输出格式的输出提交逻辑，同时支持作业失败重试和输出恢复
+ *
  * <code>OutputCommitter</code> describes the commit of task output for a 
  * Map-Reduce job.
  *
@@ -70,21 +76,19 @@ import org.apache.hadoop.classification.InterfaceStability;
 public abstract class OutputCommitter 
                 extends org.apache.hadoop.mapreduce.OutputCommitter {
   /**
-   * For the framework to setup the job output during initialization.  This is
-   * called from the application master process for the entire job. This will be
-   * called multiple times, once per job attempt.
+   * 作业级输出初始化方法，在作业初始化阶段由应用主进程调用
+   * 负责创建作业所需的临时输出目录等初始化工作，每个作业尝试都会调用一次
    * 
-   * @param jobContext Context of the job whose output is being written.
-   * @throws IOException if temporary output could not be created
+   * @param jobContext 当前作业上下文，包含作业配置和信息
+   * @throws IOException 初始化失败时抛出IO异常
    */
   public abstract void setupJob(JobContext jobContext) throws IOException;
 
   /**
-   * For cleaning up the job's output after job completion.  This is called
-   * from the application master process for the entire job. This may be called
-   * multiple times.
+   * 作业完成后清理临时输出方法，已废弃
+   * 原负责在作业完成后清理临时输出目录，由应用主进程调用，可能被调用多次
    * 
-   * @param jobContext Context of the job whose output is being written.
+   * @param jobContext 当前作业上下文
    * @throws IOException
    * @deprecated Use {@link #commitJob(JobContext)} or 
    *                 {@link #abortJob(JobContext, int)} instead.
@@ -93,13 +97,10 @@ public abstract class OutputCommitter
   public void cleanupJob(JobContext jobContext) throws IOException { }
 
   /**
-   * For committing job's output after successful job completion. Note that this
-   * is invoked for jobs with final runstate as SUCCESSFUL.  This is called
-   * from the application master process for the entire job. This is guaranteed
-   * to only be called once.  If it throws an exception the entire job will
-   * fail.
+   * 作业成功完成后提交最终输出方法，由应用主进程调用，仅调用一次
+   * 仅当作业最终状态为SUCCESSFUL时才会调用，如果抛出异常整个作业会标记为失败
    * 
-   * @param jobContext Context of the job whose output is being written.
+   * @param jobContext 当前作业上下文
    * @throws IOException 
    */
   public void commitJob(JobContext jobContext) throws IOException {
@@ -107,13 +108,11 @@ public abstract class OutputCommitter
   }
   
   /**
-   * For aborting an unsuccessful job's output. Note that this is invoked for 
-   * jobs with final runstate as {@link JobStatus#FAILED} or 
-   * {@link JobStatus#KILLED}. This is called from the application
-   * master process for the entire job. This may be called multiple times.
+   * 作业失败/被杀死后终止作业输出，由应用主进程调用，可能被调用多次
+   * 仅当作业最终状态为FAILED或KILLED时才会调用，负责清理作业输出
    * 
-   * @param jobContext Context of the job whose output is being written.
-   * @param status final runstate of the job
+   * @param jobContext 当前作业上下文
+   * @param status 作业最终运行状态（FAILED/KILLED）
    * @throws IOException
    */
   public void abortJob(JobContext jobContext, int status) 
@@ -122,62 +121,50 @@ public abstract class OutputCommitter
   }
   
   /**
-   * Sets up output for the task. This is called from each individual task's
-   * process that will output to HDFS, and it is called just for that task. This
-   * may be called multiple times for the same task, but for different task
-   * attempts.
+   * 任务级输出初始化方法，在每个任务进程中调用，为任务准备临时输出
+   * 同一个任务的不同尝试都会调用一次，可能被调用多次
    * 
-   * @param taskContext Context of the task whose output is being written.
+   * @param taskContext 当前任务尝试上下文
    * @throws IOException
    */
   public abstract void setupTask(TaskAttemptContext taskContext)
   throws IOException;
   
   /**
-   * Check whether task needs a commit.  This is called from each individual
-   * task's process that will output to HDFS, and it is called just for that
-   * task.
+   * 检查当前任务是否需要提交输出，在每个任务进程中调用
+   * 用于跳过不需要提交输出的任务，减少不必要的提交操作
    * 
-   * @param taskContext
-   * @return true/false
+   * @param taskContext 当前任务尝试上下文
+   * @return true表示需要提交，false表示不需要
    * @throws IOException
    */
   public abstract boolean needsTaskCommit(TaskAttemptContext taskContext)
   throws IOException;
 
   /**
-   * To promote the task's temporary output to final output location.
-   * If {@link #needsTaskCommit(TaskAttemptContext)} returns true and this
-   * task is the task that the AM determines finished first, this method
-   * is called to commit an individual task's output.  This is to mark
-   * that tasks output as complete, as {@link #commitJob(JobContext)} will 
-   * also be called later on if the entire job finished successfully. This
-   * is called from a task's process. This may be called multiple times for the
-   * same task, but different task attempts.  It should be very rare for this to
-   * be called multiple times and requires odd networking failures to make this
-   * happen. In the future the Hadoop framework may eliminate this race.
+   * 提交当前任务的输出，将临时输出移动到最终输出位置，在任务进程中调用
+   * 仅当needsTaskCommit返回true，且该任务尝试被判定为成功时才会调用
+   * 同一个任务的不同尝试都会调用一次，作业整体成功后还会调用作业级提交
    * 
-   * @param taskContext Context of the task whose output is being written.
+   * @param taskContext 当前任务尝试上下文
    * @throws IOException if commit is not 
    */
   public abstract void commitTask(TaskAttemptContext taskContext)
   throws IOException;
   
   /**
-   * Discard the task output. This is called from a task's process to clean 
-   * up a single task's output that can not yet been committed. This may be
-   * called multiple times for the same task, but for different task attempts.
+   * 丢弃当前任务尝试的输出，清理任务临时文件，在任务进程中调用
+   * 当任务尝试失败不需要提交时调用，同一个任务的不同尝试都会调用一次
    * 
-   * @param taskContext
+   * @param taskContext 当前任务尝试上下文
    * @throws IOException
    */
   public abstract void abortTask(TaskAttemptContext taskContext)
   throws IOException;
 
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this is
-   * a bridge between the two.
+   * 检查是否支持任务输出恢复，已废弃，使用isRecoverySupported(JobContext)替代
+   * 该方法是新旧API的兼容桥接方法，默认返回false不支持恢复
    * 
    * @deprecated Use {@link #isRecoverySupported(JobContext)} instead.
    */
@@ -188,15 +175,11 @@ public abstract class OutputCommitter
   }
 
   /**
-   * Is task output recovery supported for restarting jobs?
-   * 
-   * If task output recovery is supported, job restart can be done more
-   * efficiently.
+   * 检查当前作业是否支持任务输出恢复，用于作业重启场景
+   * 如果支持恢复，作业重启可以复用已完成任务的输出，提升重启效率
    *
-   * @param jobContext
-   *          Context of the job whose output is being written.
-   * @return <code>true</code> if task output recovery is supported,
-   *         <code>false</code> otherwise
+   * @param jobContext 当前作业上下文
+   * @return <code>true</code>支持恢复，<code>false</code>不支持
    * @throws IOException
    * @see #recoverTask(TaskAttemptContext)
    */
@@ -205,24 +188,13 @@ public abstract class OutputCommitter
   }
 
   /**
-   * Returns true if an in-progress job commit can be retried. If the MR AM is
-   * re-run then it will check this value to determine if it can retry an
-   * in-progress commit that was started by a previous version.
-   * Note that in rare scenarios, the previous AM version might still be running
-   * at that time, due to system anomalies. Hence if this method returns true
-   * then the retry commit operation should be able to run concurrently with
-   * the previous operation.
+   * 检查作业提交是否支持重试，用于应用主进程(AM)失败重启场景
+   * 如果支持重试，AM重启后可以重试未完成的作业提交，提升作业成功率
+   * 默认不支持，具体实现类（如FileOutputCommitter）可覆盖开启支持
+   * 若返回true，要求重试提交可以和之前未完成的提交并发执行
    *
-   * If repeatable job commit is supported, job restart can tolerate previous
-   * AM failures during job commit.
-   *
-   * By default, it is not supported. Extended classes (like:
-   * FileOutputCommitter) should explicitly override it if provide support.
-   *
-   * @param jobContext
-   *          Context of the job whose output is being written.
-   * @return <code>true</code> repeatable job commit is supported,
-   *         <code>false</code> otherwise
+   * @param jobContext 当前作业上下文
+   * @return <code>true</code>支持重试提交，<code>false</code>不支持
    * @throws IOException
    */
   public boolean isCommitJobRepeatable(JobContext jobContext) throws
@@ -237,17 +209,11 @@ public abstract class OutputCommitter
   }
 
   /**
-   * Recover the task output. 
+   * 恢复已完成任务的输出，在作业重启时由应用主进程逐个任务调用
+   * 用于作业重启后恢复之前已经完成的任务输出，避免重新执行任务
+   * 重试次数可从任务上下文中的APPLICATION_ATTEMPT_ID获取，如果抛出异常任务会重新执行
    * 
-   * The retry-count for the job will be passed via the 
-   * {@link MRConstants#APPLICATION_ATTEMPT_ID} key in  
-   * {@link TaskAttemptContext#getConfiguration()} for the 
-   * <code>OutputCommitter</code>. This is called from the application master
-   * process, but it is called individually for each task.
-   * 
-   * If an exception is thrown the task will be attempted again. 
-   * 
-   * @param taskContext Context of the task whose output is being recovered
+   * @param taskContext 需要恢复的任务上下文
    * @throws IOException
    */
   public void recoverTask(TaskAttemptContext taskContext) 
@@ -255,9 +221,8 @@ public abstract class OutputCommitter
   }
   
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的setupJob方法
+   * 用于兼容新旧MapReduce API，参数类型转换后调用旧版实现
    */
   @Override
   public final void setupJob(org.apache.hadoop.mapreduce.JobContext jobContext
@@ -266,9 +231,8 @@ public abstract class OutputCommitter
   }
 
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的cleanupJob方法，已废弃
+   * 用于兼容新旧MapReduce API，参数类型转换后调用旧版实现
    * @deprecated Use {@link #commitJob(org.apache.hadoop.mapreduce.JobContext)}
    *             or {@link #abortJob(org.apache.hadoop.mapreduce.JobContext, org.apache.hadoop.mapreduce.JobStatus.State)}
    *             instead.
@@ -281,9 +245,8 @@ public abstract class OutputCommitter
   }
 
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的commitJob方法
+   * 用于兼容新旧MapReduce API，参数类型转换后调用旧版实现
    */
   @Override
   public final void commitJob(org.apache.hadoop.mapreduce.JobContext context
@@ -292,14 +255,14 @@ public abstract class OutputCommitter
   }
   
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的abortJob方法
+   * 用于兼容新旧MapReduce API，完成状态类型转换后调用旧版实现
    */
   @Override
   public final void abortJob(org.apache.hadoop.mapreduce.JobContext context, 
 		                   org.apache.hadoop.mapreduce.JobStatus.State runState) 
   throws IOException {
+    // 将新版API的作业状态转换为旧版API的整型状态码
     int state = JobStatus.getOldNewJobRunState(runState);
     if (state != JobStatus.FAILED && state != JobStatus.KILLED) {
       throw new IOException ("Invalid job run state : " + runState.name());
@@ -308,9 +271,8 @@ public abstract class OutputCommitter
   }
   
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的setupTask方法
+   * 用于兼容新旧MapReduce API，参数类型转换后调用旧版实现
    */
   @Override
   public final 
@@ -320,9 +282,8 @@ public abstract class OutputCommitter
   }
   
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的needsTaskCommit方法
+   * 用于兼容新旧MapReduce API，参数类型转换后调用旧版实现
    */
   @Override
   public final boolean 
@@ -332,9 +293,8 @@ public abstract class OutputCommitter
   }
 
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的commitTask方法
+   * 用于兼容新旧MapReduce API，参数类型转换后调用旧版实现
    */
   @Override
   public final 
@@ -344,9 +304,8 @@ public abstract class OutputCommitter
   }
   
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的abortTask方法
+   * 用于兼容新旧MapReduce API，参数类型转换后调用旧版实现
    */
   @Override
   public final 
@@ -356,9 +315,8 @@ public abstract class OutputCommitter
   }
   
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this
-   * is a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的recoverTask方法
+   * 用于兼容新旧MapReduce API，参数类型转换后调用旧版实现
    */
   @Override
   public final 
@@ -368,9 +326,8 @@ public abstract class OutputCommitter
   }
 
   /**
-   * This method implements the new interface by calling the old method. Note
-   * that the input types are different between the new and old apis and this is
-   * a bridge between the two.
+   * 新版API接口适配方法，桥接调用旧版API的isRecoverySupported方法
+   * 用于兼容新旧MapReduce API，参数类型转换后调用旧版实现
    */
   @Override
   public final boolean isRecoverySupported(

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,53 +24,51 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerDynamicE
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * 自动创建队列管理策略接口，定义容量调度器下动态自动创建叶子队列的管理规范
+ * 负责自动队列的初始化、容量调整和状态变更提交等核心生命周期操作
+ */
 public interface AutoCreatedQueueManagementPolicy {
 
   /**
-   * Initialize policy.
-   * @param parentQueue parent queue
-   * @throws IOException an I/O exception has occurred.
+   * 初始化策略，绑定父队列并完成初始配置加载
+   * @param parentQueue 父队列，自动创建队列的所属父队列
+   * @throws IOException 初始化过程中I/O异常
    */
   void init(AbstractParentQueue parentQueue) throws IOException;
 
   /**
-   * Reinitialize policy state ( if required ).
-   * @param parentQueue parent queue
-   * @throws IOException an I/O exception has occurred.
+   * 重新初始化策略状态，在配置变更时调用
+   * @param parentQueue 父队列，重新绑定的父队列
+   * @throws IOException 重新初始化过程中I/O异常
    */
   void reinitialize(AbstractParentQueue parentQueue) throws IOException;
 
   /**
-   * Get initial template for the specified leaf queue.
-   * @param leafQueue the leaf queue
-   * @return initial leaf queue template configurations and capacities for
-   * auto created queue
-   * @throws SchedulerDynamicEditException when get initialLeafQueue Configuration fails.
+   * 获取指定自动创建叶子队列的初始配置模板
+   * @param leafQueue 目标叶子队列
+   * @return 自动创建队列的初始配置和容量信息
+   * @throws SchedulerDynamicEditException 获取初始配置失败时抛出
    */
   AutoCreatedLeafQueueConfig getInitialLeafQueueConfiguration(
       AbstractAutoCreatedLeafQueue leafQueue)
       throws SchedulerDynamicEditException;
 
   /**
-   * Compute/Adjust child queue capacities
-   * for auto created leaf queues
-   * This computes queue entitlements but does not update LeafQueueState or
-   * queue capacities. Scheduler calls commitQueueManagemetChanges after
-   * validation after applying queue changes and commits to LeafQueueState
-   * are done in commitQueueManagementChanges.
+   * 计算并调整自动创建叶子队列的容量分配
+   * 仅计算队列配额变更，不更新实际队列状态，验证通过后由调度器提交变更
    *
-   * @return returns a list of suggested QueueEntitlementChange(s) which may
-   * or may not be enforced by the scheduler
-   * @throws SchedulerDynamicEditException when compute QueueManagementChanges fails.
+   * @return 建议的队列配额变更列表，由调度器决定是否最终生效
+   * @throws SchedulerDynamicEditException 计算队列管理变更失败时抛出
    */
   List<QueueManagementChange> computeQueueManagementChanges()
       throws SchedulerDynamicEditException;
 
   /**
-   * Commit/Update state for the specified queue management changes.
+   * 提交并更新队列状态，将计算好的队列变更应用到实际队列状态中
    *
-   * @param queueManagementChanges QueueManagementChange List.
-   * @throws SchedulerDynamicEditException when commit QueueManagementChanges fails.
+   * @param queueManagementChanges 待提交的队列变更列表
+   * @throws SchedulerDynamicEditException 提交队列管理变更失败时抛出
    */
   void commitQueueManagementChanges(
       List<QueueManagementChange> queueManagementChanges)

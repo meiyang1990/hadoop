@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,11 +23,12 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * The context that is given to the {@link Mapper}.
- * @param <KEYIN> the key input type to the Mapper
- * @param <VALUEIN> the value input type to the Mapper
- * @param <KEYOUT> the key output type from the Mapper
- * @param <VALUEOUT> the value output type from the Mapper
+ * Map任务执行上下文接口，提供给{@link Mapper}使用，封装Map任务的运行环境信息
+ * 提供输入输出、配置、计数器等核心能力的访问，继承TaskInputOutputContext通用能力
+ * @param <KEYIN> Mapper输入键类型
+ * @param <VALUEIN> Mapper输入值类型
+ * @param <KEYOUT> Mapper输出键类型
+ * @param <VALUEOUT> Mapper输出值类型
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -34,9 +36,9 @@ public interface MapContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT>
   extends TaskInputOutputContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
 
   /**
-   * Get the input split for this map.
+   * 获取当前Map任务处理的输入分片
+   * @return 当前Map任务对应的输入分片对象
    */
   public InputSplit getInputSplit();
   
 }
-     

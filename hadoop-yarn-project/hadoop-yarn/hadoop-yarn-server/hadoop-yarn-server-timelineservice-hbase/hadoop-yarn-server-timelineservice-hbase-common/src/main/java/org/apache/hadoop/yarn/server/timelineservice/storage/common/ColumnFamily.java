@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,16 +19,18 @@
 package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 
 /**
- * Type safe column family.
+ *  HBase列族的类型安全接口，为时间线服务HBase存储定义列族抽象。
+ *  用于将Java类型映射到HBase物理列族，避免硬编码字节数组带来的类型不安全问题。
  *
- * @param <T> refers to the table for which this column family is used for.
+ * @param <T> 该列族所属的表类型，限定列族只能作用于指定类型的表
  */
 public interface ColumnFamily<T extends BaseTable<T>> {
 
   /**
-   * Keep a local copy if you need to avoid overhead of repeated cloning.
+   * 获取列族名称的字节数组表示。
+   * 注意：如需避免重复克隆的性能开销，请调用方保留返回结果的本地副本。
    *
-   * @return a clone of the byte representation of the column family.
+   * @return 列族名称的字节数组副本
    */
   byte[] getBytes();
 

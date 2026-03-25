@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,6 +26,8 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterRegister
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
+ * 文件级注释：YARN联邦子集群注册响应的Protobuf实现类，基于ProtocolBuffer序列化实现，
+ * 用于联邦注册后返回子集群注册结果的存储与传输。
  * Protocol buffer based implementation of {@link SubClusterRegisterResponse}.
  */
 @Private
@@ -32,21 +35,35 @@ import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 public class SubClusterRegisterResponsePBImpl
     extends SubClusterRegisterResponse {
 
+  // 存储已构建完成的Protobuf对象实例
   private SubClusterRegisterResponseProto proto =
       SubClusterRegisterResponseProto.getDefaultInstance();
+  // Protobuf构建器，用于动态构建对象
   private SubClusterRegisterResponseProto.Builder builder = null;
+  // 标识当前是否使用已构建完成的proto对象，false表示正在通过builder构建
   private boolean viaProto = false;
 
+  /**
+   * 构造空的响应对象，初始化builder。
+   */
   public SubClusterRegisterResponsePBImpl() {
     builder = SubClusterRegisterResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造响应对象。
+   * @param proto 已有的SubClusterRegisterResponseProto对象
+   */
   public SubClusterRegisterResponsePBImpl(
       SubClusterRegisterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的Protobuf实例，若通过builder构建则先完成构建。
+   * @return 构建完成的SubClusterRegisterResponseProto对象
+   */
   public SubClusterRegisterResponseProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;

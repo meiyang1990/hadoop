@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,7 +29,7 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterId;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterInfo;
 
 /**
- * Base abstract class for a weighted {@link ConfigurableFederationPolicy}.
+ * YARN联邦可配置加权路由策略的抽象基类，提供策略初始化、配置存储和活跃子集群获取的通用能力，所有具体加权路由策略需继承此类。
  */
 public abstract class AbstractConfigurableFederationPolicy
     implements ConfigurableFederationPolicy {
@@ -44,33 +45,36 @@ public abstract class AbstractConfigurableFederationPolicy
   public void reinitialize(
       FederationPolicyInitializationContext initializationContext)
       throws FederationPolicyInitializationException {
+    // 标记配置已变更，需要子类重新初始化
     isDirty = true;
+    // 对初始化上下文做合法性校验
     FederationPolicyInitializationContextValidator
         .validate(initializationContext, this.getClass().getCanonicalName());
 
-    // perform consistency checks
+    // 从配置缓冲区反序列化得到新的策略配置信息
     WeightedPolicyInfo newPolicyInfo = WeightedPolicyInfo.fromByteBuffer(
         initializationContext.getSubClusterPolicyConfiguration().getParams());
 
-    // if nothing has changed skip the rest of initialization
-    // and signal to children that the reinit is free via isDirty var.
+    // 如果新老配置一致，无需重新初始化，标记为未变更
     if (policyInfo != null && policyInfo.equals(newPolicyInfo)) {
       isDirty = false;
       return;
     }
 
+    // 校验新配置合法性
     validate(newPolicyInfo);
+    // 更新策略配置
     setPolicyInfo(newPolicyInfo);
+    // 保存初始化上下文
     this.policyContext = initializationContext;
   }
 
   /**
-   * Overridable validation step for the policy configuration.
+   * 对策略配置进行合法性校验，子类可覆盖实现自定义校验逻辑。
    *
-   * @param newPolicyInfo the configuration to test.
+   * @param newPolicyInfo 待校验的新策略配置
    *
-   * @throws FederationPolicyInitializationException if the configuration is not
-   *           valid.
+   * @throws FederationPolicyInitializationException 如果配置非法则抛出异常
    */
   public void validate(WeightedPolicyInfo newPolicyInfo)
       throws FederationPolicyInitializationException {
@@ -81,50 +85,45 @@ public abstract class AbstractConfigurableFederationPolicy
   }
 
   /**
-   * Returns true whether the last reinitialization requires actual changes, or
-   * was "free" as the weights have not changed. This is used by subclasses
-   * overriding reinitialize and calling super.reinitialize() to know whether to
-   * quit early.
+   * 获取策略配置是否变更标记，用于子类判断是否需要执行额外初始化逻辑，若配置未变更可提前退出。
    *
-   * @return whether more work is needed to initialize.
+   * @return true表示配置变更需要重新初始化，false表示配置无变化无需额外处理
    */
   public boolean getIsDirty() {
     return isDirty;
   }
 
   /**
-   * Getter method for the configuration weights.
+   * 获取当前策略的配置信息对象。
    *
-   * @return the {@link WeightedPolicyInfo} representing the policy
-   *         configuration.
+   * @return 代表策略配置的WeightedPolicyInfo对象
    */
   public WeightedPolicyInfo getPolicyInfo() {
     return policyInfo;
   }
 
   /**
-   * Setter method for the configuration weights.
+   * 设置当前策略的配置信息对象。
    *
-   * @param policyInfo the {@link WeightedPolicyInfo} representing the policy
-   *          configuration.
+   * @param policyInfo 代表策略配置的WeightedPolicyInfo对象
    */
   public void setPolicyInfo(WeightedPolicyInfo policyInfo) {
     this.policyInfo = policyInfo;
   }
 
   /**
-   * Getter method for the {@link FederationPolicyInitializationContext}.
+   * 获取当前策略的初始化上下文。
    *
-   * @return the context for this policy.
+   * @return 当前策略的上下文对象
    */
   public FederationPolicyInitializationContext getPolicyContext() {
     return policyContext;
   }
 
   /**
-   * Setter method for the {@link FederationPolicyInitializationContext}.
+   * 设置当前策略的初始化上下文。
    *
-   * @param policyContext the context to assign to this policy.
+   * @param policyContext 要设置的上下文对象
    */
   public void setPolicyContext(
       FederationPolicyInitializationContext policyContext) {
@@ -132,19 +131,20 @@ public abstract class AbstractConfigurableFederationPolicy
   }
 
   /**
-   * This methods gets active subclusters map from the {@code
-   * FederationStateStoreFacade} and validate it not being null/empty.
+   * 从联邦状态存储获取所有活跃子集群信息，并校验列表非空。
    *
-   * @return the map of ids to info for all active subclusters.
+   * @return 所有活跃子集群的ID到信息的映射表
    *
-   * @throws YarnException if we can't get the list.
+   * @throws YarnException 如果获取失败或无活跃子集群则抛出异常
    */
   protected Map<SubClusterId, SubClusterInfo> getActiveSubclusters()
       throws YarnException {
 
+    // 从状态存储门面查询所有活跃子集群
     Map<SubClusterId, SubClusterInfo> activeSubclusters =
         getPolicyContext().getFederationStateStoreFacade().getSubClusters(true);
 
+    // 校验活跃子集群列表非空，为空抛出异常
     if (activeSubclusters == null || activeSubclusters.size() < 1) {
       throw new NoActiveSubclustersException(
           "Zero active subclusters, cannot pick where to send job.");

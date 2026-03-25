@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -26,6 +27,10 @@ import org.apache.hadoop.yarn.api.records.LocalResourceType;
 import org.apache.hadoop.yarn.api.records.LocalResourceVisibility;
 import org.apache.hadoop.yarn.api.records.URL;
 
+/**
+ * 本地化资源请求封装，用于NodeManager本地化缓存的匹配检索
+ * 继承LocalResource并实现Comparable接口，支持在有序集合中存储和比较
+ */
 public class LocalResourceRequest
     extends LocalResource implements Comparable<LocalResourceRequest> {
 
@@ -36,9 +41,9 @@ public class LocalResourceRequest
   private final String pattern;
 
   /**
-   * Wrap API resource to match against cache of localized resources.
-   * @param resource Resource requested by container
-   * @throws URISyntaxException If the path is malformed
+   * 根据容器请求的LocalResource构造本地化资源请求
+   * @param resource 容器请求的资源
+   * @throws URISyntaxException 如果路径格式错误抛出异常
    */
   public LocalResourceRequest(LocalResource resource)
       throws URISyntaxException {
@@ -49,6 +54,14 @@ public class LocalResourceRequest
         resource.getPattern());
   }
 
+  /**
+   * 全参数构造函数
+   * @param loc 资源路径
+   * @param timestamp 资源时间戳
+   * @param type 资源类型
+   * @param visibility 资源可见性
+   * @param pattern 资源解压模式
+   */
   LocalResourceRequest(Path loc, long timestamp, LocalResourceType type,
       LocalResourceVisibility visibility, String pattern) {
     this.loc = loc;
@@ -60,6 +73,7 @@ public class LocalResourceRequest
 
   @Override
   public int hashCode() {
+    // 基于路径、时间戳、类型、模式计算哈希值
     int hash = loc.hashCode() ^
       (int)((timestamp >>> 32) ^ timestamp) *
       type.hashCode();
@@ -80,8 +94,10 @@ public class LocalResourceRequest
     final LocalResourceRequest other = (LocalResourceRequest) o;
     String pattern = getPattern();
     String otherPattern = other.getPattern();
+    // 先比较模式是否相等
     boolean patternEquals = (pattern == null && otherPattern == null) || 
        (pattern != null && otherPattern != null && pattern.equals(otherPattern)); 
+    // 依次比较路径、时间戳、类型、模式
     return getPath().equals(other.getPath()) &&
            getTimestamp() == other.getTimestamp() &&
            getType() == other.getType() &&
@@ -93,12 +109,16 @@ public class LocalResourceRequest
     if (this == other) {
       return 0;
     }
+    // 优先比较路径
     int ret = getPath().compareTo(other.getPath());
     if (0 == ret) {
+      // 路径相同比较时间戳
       ret = (int)(getTimestamp() - other.getTimestamp());
       if (0 == ret) {
+        // 时间戳相同比较类型
         ret = getType().ordinal() - other.getType().ordinal();
         if (0 == ret) {
+          // 类型相同比较模式
           String pattern = getPattern();
           String otherPattern = other.getPattern();
           if (pattern == null && otherPattern == null) {
@@ -116,6 +136,7 @@ public class LocalResourceRequest
     return ret;
   }
 
+  /** 获取资源路径 */
   public Path getPath() {
     return loc;
   }

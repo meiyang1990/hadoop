@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,17 +21,27 @@ package org.apache.hadoop.mapreduce.v2.app.job.event;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 
-
-
+/**
+ * Map任务重调度事件，用于通知作业某个Map任务需要重新调度执行
+ * 继承自JobEvent，在应用Master的事件驱动体系中传递任务重调度信息
+ */
 public class JobMapTaskRescheduledEvent extends JobEvent {
 
   private TaskId taskID;
 
+  /**
+   * 构造Map任务重调度事件
+   * @param taskID 被重调度的Map任务ID
+   */
   public JobMapTaskRescheduledEvent(TaskId taskID) {
     super(taskID.getJobId(), JobEventType.JOB_MAP_TASK_RESCHEDULED);
     this.taskID = taskID;
   }
 
+  /**
+   * 获取被重调度的Map任务ID
+   * @return 重调度任务的ID对象
+   */
   public TaskId getTaskID() {
     return taskID;
   }

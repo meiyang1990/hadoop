@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.documentstore
- * .writer.cosmosdb DocumentStore writer implementation for CosmosDB.
+ * 时间线服务文档存储 Azure CosmosDB 写扩展包，提供适配 CosmosDB 的文档写入器实现。
+ * 该包是 YARN 时间线服务文档存储后端对 Azure CosmosDB 的集成实现。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

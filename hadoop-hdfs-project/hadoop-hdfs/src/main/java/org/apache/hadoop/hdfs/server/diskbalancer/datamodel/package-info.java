@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,15 +18,16 @@
  */
 
 /**
- * Disk Balancer Data Model is the Data Model for the cluster that
- * Disk Balancer is working against. This information is read
- * directly from NameNode or from a user supplied json model file.
- *
- * Here is the overview of the model maintained by diskBalancer.
- *
- * DiskBalancerCluster is a list of DiskBalancerDataNodes.
- * DiskBalancerDataNodes is a collection of DiskBalancerVolumeSets
- * DiskBalancerVolumeSets is a collection of DiskBalancerVolumes
- * DiskBalancerVolumes represents actual volumes on DataNodes.
+ * HDFS磁盘均衡器的数据模型包，定义了磁盘均衡器运行所需的集群拓扑与磁盘信息结构。
+ * 包中数据可从NameNode直接获取，也可从用户提供的JSON模型文件读取。
+ * <p>
+ * 数据模型层级结构概述：
+ * <ul>
+ * <li>DiskBalancerCluster：整个集群信息，包含所有DataNode列表</li>
+ * <li>DiskBalancerDataNodes：单DataNode信息，包含该节点上所有卷集合</li>
+ * <li>DiskBalancerVolumeSets：卷分组集合，包含多个卷</li>
+ * <li>DiskBalancerVolumes：DataNode上实际物理磁盘卷的抽象，存储卷的使用信息</li>
+ * </ul>
+ * 该包为磁盘均衡算法提供统一的集群磁盘数据视图，是均衡计算和移动规划的基础。
  */
 package org.apache.hadoop.hdfs.server.diskbalancer.datamodel;

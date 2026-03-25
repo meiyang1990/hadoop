@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,56 +29,55 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ValueConvert
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * Identifies partially qualified columns for the sub app table.
+ * 子应用HBase表的列前缀枚举定义，用于标识子应用表中不同类型的半限定列。
  */
 public enum SubApplicationColumnPrefix
     implements ColumnPrefix<SubApplicationTable> {
 
   /**
-   * To store TimelineEntity getIsRelatedToEntities values.
+   * 存储Timeline实体的被关联实体关系(isRelatedTo)。
    */
   IS_RELATED_TO(SubApplicationColumnFamily.INFO, "s"),
 
   /**
-   * To store TimelineEntity getRelatesToEntities values.
+   * 存储Timeline实体的关联实体关系(relatesTo)。
    */
   RELATES_TO(SubApplicationColumnFamily.INFO, "r"),
 
   /**
-   * To store TimelineEntity info values.
+   * 存储Timeline实体的基础信息。
    */
   INFO(SubApplicationColumnFamily.INFO, "i"),
 
   /**
-   * Lifecycle events for an entity.
+   * 存储实体的生命周期事件。
    */
   EVENT(SubApplicationColumnFamily.INFO, "e", true),
 
   /**
-   * Config column stores configuration with config key as the column name.
+   * 配置列，配置键作为列名后缀。
    */
   CONFIG(SubApplicationColumnFamily.CONFIGS, null),
 
   /**
-   * Metrics are stored with the metric name as the column name.
+   * 指标列，指标名称作为列名后缀，使用LongConverter转换值。
    */
   METRIC(SubApplicationColumnFamily.METRICS, null, new LongConverter());
 
   private final ColumnFamily<SubApplicationTable> columnFamily;
 
   /**
-   * Can be null for those cases where the provided column qualifier is the
-   * entire column name.
+   * 如果列限定符就是完整列名，该值可为null。
    */
   private final String columnPrefix;
   private final byte[] columnPrefixBytes;
   private final ValueConverter valueConverter;
 
   /**
-   * Private constructor, meant to be used by the enum definition.
+   * 供枚举定义使用的私有构造方法。
    *
-   * @param columnFamily that this column is stored in.
-   * @param columnPrefix for this column.
+   * @param columnFamily 当前列前缀所属的列族
+   * @param columnPrefix 列前缀字符串
    */
   SubApplicationColumnPrefix(ColumnFamily<SubApplicationTable> columnFamily,
       String columnPrefix) {
@@ -96,12 +96,12 @@ public enum SubApplicationColumnPrefix
   }
 
   /**
-   * Private constructor, meant to be used by the enum definition.
+   * 完整参数的私有构造方法，供枚举定义使用。
    *
-   * @param columnFamily that this column is stored in.
-   * @param columnPrefix for this column.
-   * @param converter used to encode/decode values to be stored in HBase for
-   * this column prefix.
+   * @param columnFamily 当前列前缀所属的列族
+   * @param columnPrefix 列前缀字符串
+   * @param compondColQual 是否为复合列限定符
+   * @param converter 该列前缀下值的编解码器
    */
   SubApplicationColumnPrefix(ColumnFamily<SubApplicationTable> columnFamily,
       String columnPrefix, boolean compondColQual, ValueConverter converter) {
@@ -111,14 +111,15 @@ public enum SubApplicationColumnPrefix
     if (columnPrefix == null) {
       this.columnPrefixBytes = null;
     } else {
-      // Future-proof by ensuring the right column prefix hygiene.
+      // 对列前缀进行编码，确保格式正确
       this.columnPrefixBytes =
           Bytes.toBytes(Separator.SPACE.encode(columnPrefix));
     }
   }
 
   /**
-   * @return the column name value
+   * 获取列前缀字符串。
+   * @return 列前缀字符串
    */
   public String getColumnPrefix() {
     return columnPrefix;
@@ -126,28 +127,33 @@ public enum SubApplicationColumnPrefix
 
   @Override
   public byte[] getColumnPrefixBytes(byte[] qualifierPrefix) {
+    // 合并列前缀和额外限定符得到完整列限定符
     return ColumnHelper.getColumnQualifier(
         this.columnPrefixBytes, qualifierPrefix);
   }
 
   @Override
   public byte[] getColumnPrefixBytes(String qualifierPrefix) {
+    // 合并列前缀和字符串类型额外限定符得到完整列限定符
     return ColumnHelper.getColumnQualifier(
         this.columnPrefixBytes, qualifierPrefix);
   }
 
   @Override
   public byte[] getColumnPrefixInBytes() {
+    // 返回列前缀的字节数组，不包含额外限定符
     return columnPrefixBytes != null ? columnPrefixBytes.clone() : null;
   }
 
   @Override
   public byte[] getColumnFamilyBytes() {
+    // 返回所属列族的字节数组表示
     return columnFamily.getBytes();
   }
 
   @Override
   public ValueConverter getValueConverter() {
+    // 获取当前列前缀的值编解码器
     return valueConverter;
   }
 

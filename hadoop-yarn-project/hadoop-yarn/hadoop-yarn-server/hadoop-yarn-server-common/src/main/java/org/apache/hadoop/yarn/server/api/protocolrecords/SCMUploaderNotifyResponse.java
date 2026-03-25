@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,28 +24,26 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
  * <p>
- * The response from the SharedCacheManager to the NodeManager that indicates
- * whether the NodeManager needs to delete the cached resource it was sending
- * the notification for.
+ * 共享缓存缓存管理器(SCM)返回给NodeManager的通知响应，告知NodeManager是否需要删除本次通知对应的缓存资源。
  * </p>
+ * 该响应用于NodeManager上传资源到共享缓存后的结果确认流程。
  */
 @Private
 @Unstable
 public abstract class SCMUploaderNotifyResponse {
 
   /**
-   * Get whether or not the shared cache manager has accepted the notified
-   * resource (i.e. the uploaded file should remain in the cache).
+   * 获取共享缓存管理器是否接受了本次通知的资源。
+   * 如果接受，则已上传的文件应保留在缓存中；否则NodeManager需要删除该资源。
    *
-   * @return boolean True if the resource has been accepted, false otherwise.
+   * @return boolean 接受资源返回true，需要删除资源返回false
    */
   public abstract boolean getAccepted();
 
   /**
-   * Set whether or not the shared cache manager has accepted the notified
-   * resource (i.e. the uploaded file should remain in the cache).
+   * 设置共享缓存管理器对本次通知资源的接受状态。
    *
-   * @param b True if the resource has been accepted, false otherwise.
+   * @param b 接受资源为true，拒绝资源为false
    */
   public abstract void setAccepted(boolean b);
 

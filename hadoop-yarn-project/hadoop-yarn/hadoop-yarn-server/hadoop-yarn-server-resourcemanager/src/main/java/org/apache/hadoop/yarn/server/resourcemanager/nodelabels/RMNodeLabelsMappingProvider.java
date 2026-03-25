@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,7 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.api.records.NodeLabel;
 
 /**
- * Interface which is responsible for providing
- * the node {@literal ->} labels map.
+ * YARN ResourceManager 节点标签映射提供者抽象基类，负责提供节点到对应标签的映射关系
  */
 public abstract class RMNodeLabelsMappingProvider extends AbstractService {
 
@@ -36,11 +36,11 @@ public abstract class RMNodeLabelsMappingProvider extends AbstractService {
   }
 
   /**
-   * Provides the labels. It is expected to give same Labels
-   * continuously until there is a change in labels.
+   * 获取指定节点集合对应的标签映射
+   * 在标签发生变更前，方法会持续返回相同的标签结果
    *
-   * @param nodes to fetch labels
-   * @return Set of node label strings applicable for a node
+   * @param nodes 需要获取标签的节点ID集合
+   * @return 节点ID到对应节点标签集合的映射
    */
   public abstract Map<NodeId, Set<NodeLabel>> getNodeLabels(Set<NodeId> nodes);
 }

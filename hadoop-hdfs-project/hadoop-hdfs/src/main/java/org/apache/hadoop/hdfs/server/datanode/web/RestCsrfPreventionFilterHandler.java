@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,12 +44,10 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.util.ReferenceCountUtil;
 
-
 /**
- * Netty handler that integrates with the {@link RestCsrfPreventionFilter}.  If
- * the filter determines that the request is allowed, then this handler forwards
- * the request to the next handler in the Netty pipeline.  Otherwise, this
- * handler drops the request and immediately sends an HTTP 400 response.
+ * DataNode Web服务的REST跨站请求伪造防护处理器，适配Netty管道与通用Hadoop CSRF过滤器
+ * 将通用Hadoop CSRF过滤器集成到DataNode的Netty HTTP服务中，对入站请求进行CSRF校验
+ * 校验通过则转发给下一级处理器，不通过则直接返回错误响应
  */
 @InterfaceAudience.Private
 @Sharable
@@ -60,14 +59,9 @@ final class RestCsrfPreventionFilterHandler
   private final RestCsrfPreventionFilter restCsrfPreventionFilter;
 
   /**
-   * Creates a new RestCsrfPreventionFilterHandler.  There will be a new
-   * instance created for each new Netty channel/pipeline serving a new request.
-   * To prevent the cost of repeated initialization of the filter, this
-   * constructor requires the caller to pass in a pre-built, fully initialized
-   * filter instance.  The filter is stateless after initialization, so it can
-   * be shared across multiple Netty channels/pipelines.
-   *
-   * @param restCsrfPreventionFilter initialized filter
+   * 构造CSRF防护处理器，复用预先初始化好的CSRF过滤器实例
+   * CSRF过滤器初始化后无状态，可在多个通道/管道间共享，避免重复初始化开销
+   * @param restCsrfPreventionFilter 已完成初始化的CSRF防护过滤器实例
    */
   RestCsrfPreventionFilterHandler(
       RestCsrfPreventionFilter restCsrfPreventionFilter) {
@@ -80,11 +74,12 @@ final class RestCsrfPreventionFilterHandler
   @Override
   protected void channelRead0(final ChannelHandlerContext ctx,
       final HttpRequest req) throws Exception {
+    // 过滤器存在则执行CSRF校验
     if(restCsrfPreventionFilter != null) {
       restCsrfPreventionFilter.handleHttpInteraction(new NettyHttpInteraction(
           ctx, req));
     } else {
-      // we do not have a valid filter simply pass requests
+      // 无有效过滤器直接放行请求
       new NettyHttpInteraction(ctx, req).proceed();
     }
   }
@@ -92,26 +87,27 @@ final class RestCsrfPreventionFilterHandler
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
     LOG.error("Exception in " + this.getClass().getSimpleName(), cause);
+    // 返回500错误并关闭连接
     sendResponseAndClose(ctx,
         new DefaultHttpResponse(HTTP_1_1, INTERNAL_SERVER_ERROR));
   }
 
   /**
-   * Finish handling this pipeline by writing a response with the
-   * "Connection: close" header, flushing, and scheduling a close of the
-   * connection.
-   *
-   * @param ctx context to receive the response
-   * @param resp response to send
+   * 发送HTTP响应并关闭连接，设置Connection: close头
+   * @param ctx Netty通道上下文
+   * @param resp 要发送的HTTP响应
    */
   private static void sendResponseAndClose(ChannelHandlerContext ctx,
       DefaultHttpResponse resp) {
+    // 设置连接关闭头
     resp.headers().set(CONNECTION, CLOSE);
+    // 刷新响应并添加关闭连接监听器
     ctx.writeAndFlush(resp).addListener(ChannelFutureListener.CLOSE);
   }
 
   /**
-   * {@link HttpInteraction} implementation for use in a Netty pipeline.
+   * 适配Netty HTTP请求的HttpInteraction实现，供CSRF过滤器调用
+   * 封装Netty请求头、方法获取和后续处理逻辑，对接通用CSRF过滤器接口
    */
   private static final class NettyHttpInteraction implements HttpInteraction {
 
@@ -119,10 +115,9 @@ final class RestCsrfPreventionFilterHandler
     private final HttpRequest req;
 
     /**
-     * Creates a new NettyHttpInteraction.
-     *
-     * @param ctx context to receive the response
-     * @param req request to process
+     * 构造Netty环境的HTTP交互实例
+     * @param ctx Netty通道上下文
+     * @param req 待处理的Netty HTTP请求
      */
     NettyHttpInteraction(ChannelHandlerContext ctx, HttpRequest req) {
       this.ctx = ctx;
@@ -141,37 +136,39 @@ final class RestCsrfPreventionFilterHandler
 
     @Override
     public void proceed() {
+      // 增加引用计数，将请求转发给下一级处理器处理
       ReferenceCountUtil.retain(req);
       ctx.fireChannelRead(req);
     }
 
     @Override
     public void sendError(int code, String message) {
+      // 构造错误响应并关闭连接
       HttpResponseStatus status = new HttpResponseStatus(code, message);
       sendResponseAndClose(ctx, new DefaultHttpResponse(HTTP_1_1, status));
     }
   }
 
   /**
-   * Creates a {@link RestCsrfPreventionFilter} for the {@DatanodeHttpServer}.
-   * This method takes care of configuration and implementing just enough of the
-   * servlet API and related interfaces so that the DataNode can get a fully
-   * initialized instance of the filter.
-   *
-   * @param conf configuration to read
-   * @return initialized filter, or null if CSRF protection not enabled
+   * 根据Hadoop配置初始化DataNode Web服务的CSRF防护过滤器
+   * 读取配置参数并构造满足Servlet规范的过滤器配置，完成过滤器初始化
+   * @param conf Hadoop配置对象
+   * @return 初始化完成的CSRF过滤器实例，若CSRF防护未启用则返回null
    */
   public static RestCsrfPreventionFilter initializeState(
       Configuration conf) {
+    // 判断配置是否启用CSRF防护
     if (!conf.getBoolean(DFS_WEBHDFS_REST_CSRF_ENABLED_KEY,
         DFS_WEBHDFS_REST_CSRF_ENABLED_DEFAULT)) {
       return null;
     }
+    // 获取过滤器类名和配置参数
     String restCsrfClassName = RestCsrfPreventionFilter.class.getName();
     Map<String, String> restCsrfParams = RestCsrfPreventionFilter
         .getFilterParams(conf, "dfs.webhdfs.rest-csrf.");
     RestCsrfPreventionFilter filter = new RestCsrfPreventionFilter();
     try {
+      // 使用基于Map的过滤器配置完成初始化
       filter.init(new DatanodeHttpServer
           .MapBasedFilterConfig(restCsrfClassName, restCsrfParams));
     } catch (ServletException e) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,96 +29,113 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ValueConvert
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * Identifies partially qualified columns for the entity table.
+ * 实体表HBase列前缀枚举，用于标识实体表中不同类型数据的列前缀
  */
 public enum EntityColumnPrefix implements ColumnPrefix<EntityTable> {
 
   /**
-   * To store TimelineEntity getIsRelatedToEntities values.
+   * 存储Timeline实体的被关联关系集合
    */
   IS_RELATED_TO(EntityColumnFamily.INFO, "s"),
 
   /**
-   * To store TimelineEntity getRelatesToEntities values.
+   * 存储Timeline实体的关联关系集合
    */
   RELATES_TO(EntityColumnFamily.INFO, "r"),
 
   /**
-   * To store TimelineEntity info values.
+   * 存储Timeline实体的基础信息
    */
   INFO(EntityColumnFamily.INFO, "i"),
 
   /**
-   * Lifecycle events for an entity.
+   * 存储实体的生命周期事件
    */
   EVENT(EntityColumnFamily.INFO, "e", true),
 
   /**
-   * Config column stores configuration with config key as the column name.
+   * 存储实体配置信息，配置键作为列名后缀
    */
   CONFIG(EntityColumnFamily.CONFIGS, null),
 
   /**
-   * Metrics are stored with the metric name as the column name.
+   * 存储实体指标数据，指标名称作为列名后缀
    */
   METRIC(EntityColumnFamily.METRICS, null, new LongConverter());
 
+  // 所属列族
   private final ColumnFamily<EntityTable> columnFamily;
 
   /**
-   * Can be null for those cases where the provided column qualifier is the
-   * entire column name.
+   * 列前缀字符串，若列限定符本身就是完整列名则为null
    */
   private final String columnPrefix;
+  // 列前缀字节数组（HBase存储使用）
   private final byte[] columnPrefixBytes;
+  // 值转换器，用于HBase值的编解码
   private final ValueConverter valueConverter;
 
   /**
-   * Private constructor, meant to be used by the enum definition.
+   * 私有构造函数，供枚举定义使用
    *
-   * @param columnFamily that this column is stored in.
-   * @param columnPrefix for this column.
+   * @param columnFamily 该列前缀所属列族
+   * @param columnPrefix 列前缀字符串
    */
   EntityColumnPrefix(ColumnFamily<EntityTable> columnFamily,
       String columnPrefix) {
     this(columnFamily, columnPrefix, false, GenericConverter.getInstance());
   }
 
+  /**
+   * 私有构造函数，供枚举定义使用
+   *
+   * @param columnFamily 该列前缀所属列族
+   * @param columnPrefix 列前缀字符串
+   * @param compondColQual 是否为复合列限定符
+   */
   EntityColumnPrefix(ColumnFamily<EntityTable> columnFamily,
       String columnPrefix, boolean compondColQual) {
     this(columnFamily, columnPrefix, compondColQual,
         GenericConverter.getInstance());
   }
 
+  /**
+   * 私有构造函数，供枚举定义使用
+   *
+   * @param columnFamily 该列前缀所属列族
+   * @param columnPrefix 列前缀字符串
+   * @param converter 值编解码转换器
+   */
   EntityColumnPrefix(ColumnFamily<EntityTable> columnFamily,
       String columnPrefix, ValueConverter converter) {
     this(columnFamily, columnPrefix, false, converter);
   }
 
   /**
-   * Private constructor, meant to be used by the enum definition.
+   * 私有构造函数，供枚举定义使用
    *
-   * @param columnFamily that this column is stored in.
-   * @param columnPrefix for this column.
-   * @param converter used to encode/decode values to be stored in HBase for
-   * this column prefix.
+   * @param columnFamily 该列前缀所属列族
+   * @param columnPrefix 列前缀字符串
+   * @param compondColQual 是否为复合列限定符
+   * @param converter 值编解码转换器
    */
   EntityColumnPrefix(ColumnFamily<EntityTable> columnFamily,
       String columnPrefix, boolean compondColQual, ValueConverter converter) {
     this.valueConverter = converter;
     this.columnFamily = columnFamily;
     this.columnPrefix = columnPrefix;
+    // 列前缀为空时字节数组也置空
     if (columnPrefix == null) {
       this.columnPrefixBytes = null;
     } else {
-      // Future-proof by ensuring the right column prefix hygiene.
+      // 对列前缀编码后转换为字节数组，保证前缀格式一致性
       this.columnPrefixBytes =
           Bytes.toBytes(Separator.SPACE.encode(columnPrefix));
     }
   }
 
   /**
-   * @return the column name value
+   * @return 获取列前缀字符串
    */
   public String getColumnPrefix() {
     return columnPrefix;
@@ -125,38 +143,45 @@ public enum EntityColumnPrefix implements ColumnPrefix<EntityTable> {
 
   @Override
   public byte[] getColumnPrefixBytes(byte[] qualifierPrefix) {
+    // 拼接前缀得到完整列限定符字节数组
     return ColumnHelper.getColumnQualifier(
         this.columnPrefixBytes, qualifierPrefix);
   }
 
   @Override
   public byte[] getColumnPrefixBytes(String qualifierPrefix) {
+    // 拼接前缀得到完整列限定符字节数组
     return ColumnHelper.getColumnQualifier(
         this.columnPrefixBytes, qualifierPrefix);
   }
 
   @Override
   public byte[] getColumnPrefixInBytes() {
+    // 返回字节数组拷贝，避免外部修改内部状态
     return columnPrefixBytes != null ? columnPrefixBytes.clone() : null;
   }
 
   @Override
   public byte[] getColumnFamilyBytes() {
+    // 返回所属列族的字节数组
     return columnFamily.getBytes();
   }
 
   @Override
   public ValueConverter getValueConverter() {
+    // 返回该列前缀对应值的编解码转换器
     return valueConverter;
   }
 
   @Override
   public Attribute[] getCombinedAttrsWithAggr(Attribute... attributes) {
+    // 直接返回原始属性，该类型不需要聚合属性
     return attributes;
   }
 
   @Override
   public boolean supplementCellTimeStamp() {
+    // 该类型不需要补充单元格时间戳
     return false;
   }
 }

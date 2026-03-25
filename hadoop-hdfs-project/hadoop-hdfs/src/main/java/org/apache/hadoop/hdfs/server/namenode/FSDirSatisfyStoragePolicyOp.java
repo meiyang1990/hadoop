@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,31 +37,27 @@ import org.apache.hadoop.hdfs.util.RwLockMode;
 import org.apache.hadoop.util.Lists;
 
 /**
- * Helper class to perform storage policy satisfier related operations.
+ * 文件级存储策略满足操作工具类，为NameNode处理存储策略满足请求提供辅助能力，
+ * 负责权限检查、扩展属性标记、路径加入异步处理队列等操作，支撑存储策略自动满足功能。
  */
 final class FSDirSatisfyStoragePolicyOp {
 
   /**
-   * Private constructor for preventing FSDirSatisfyStoragePolicyOp object
-   * creation. Static-only class.
+   * 工具类私有构造方法，禁止实例化，仅提供静态方法。
    */
   private FSDirSatisfyStoragePolicyOp() {
   }
 
   /**
-   * Satisfy storage policy function which will add the entry to SPS call queue
-   * and will perform satisfaction async way.
+   * 触发指定路径的存储策略满足操作，添加路径到存储策略满足管理器异步队列，
+   * 由后台线程异步处理数据块迁移，使文件/目录符合指定存储策略。
    *
-   * @param fsd
-   *          fs directory
-   * @param bm
-   *          block manager
-   * @param src
-   *          source path
-   * @param logRetryCache
-   *          whether to record RPC ids in editlog for retry cache rebuilding
-   * @return file status info
-   * @throws IOException
+   * @param fsd          FSDirectory对象，管理文件系统目录树
+   * @param bm           BlockManager对象，管理数据块
+   * @param src          源路径，需要满足存储策略的路径
+   * @param logRetryCache 是否需要在编辑日志中记录RPC ID用于重试缓存重建
+   * @return 目标路径的文件状态信息
+   * @throws IOException 权限检查、元数据操作异常
    */
   static FileStatus satisfyStoragePolicy(FSDirectory fsd, BlockManager bm,
       String src, boolean logRetryCache) throws IOException {
@@ -71,12 +68,13 @@ final class FSDirSatisfyStoragePolicyOp {
     fsd.writeLock();
     try {
 
-      // check operation permission.
+      // 检查操作权限并解析路径
       iip = fsd.resolvePath(pc, src, DirOp.WRITE);
       if (fsd.isPermissionEnabled()) {
         fsd.checkPathAccess(pc, iip, FsAction.WRITE);
       }
       INode inode = FSDirectory.resolveLastINode(iip);
+      // 空文件跳过处理，无块需要迁移
       if (inode.isFile() && inode.asFile().numBlocks() == 0) {
         if (NameNode.LOG.isInfoEnabled()) {
           NameNode.LOG.info(
@@ -85,24 +83,27 @@ final class FSDirSatisfyStoragePolicyOp {
               inode.getFullPathName());
         }
       } else if (inodeHasSatisfyXAttr(inode)) {
+        // 已经存在满足标记，拒绝重复请求
         NameNode.LOG
             .warn("Cannot request to call satisfy storage policy on path: "
                 + inode.getFullPathName()
                 + ", as this file/dir was already called for satisfying "
                 + "storage policy.");
       } else {
+        // 构建存储策略满足扩展属性
         XAttr satisfyXAttr = XAttrHelper
             .buildXAttr(XATTR_SATISFY_STORAGE_POLICY);
         List<XAttr> xAttrs = Arrays.asList(satisfyXAttr);
         List<XAttr> existingXAttrs = XAttrStorage.readINodeXAttrs(inode);
+        // 设置扩展属性到inode
         List<XAttr> newXAttrs = FSDirXAttrOp.setINodeXAttrs(fsd, existingXAttrs,
             xAttrs, EnumSet.of(XAttrSetFlag.CREATE));
         XAttrStorage.updateINodeXAttrs(inode, newXAttrs,
             iip.getLatestSnapshotId());
+        // 记录操作到编辑日志
         fsd.getEditLog().logSetXAttrs(src, xAttrs, logRetryCache);
 
-        // Adding directory in the pending queue, so FileInodeIdCollector
-        // process directory child in batch and recursively
+        // 将路径ID加入存储策略满足管理器的待处理队列，后台异步处理
         StoragePolicySatisfyManager spsManager =
             fsd.getBlockManager().getSPSManager();
         if (spsManager != null) {
@@ -115,12 +116,19 @@ final class FSDirSatisfyStoragePolicyOp {
     return fsd.getAuditFileInfo(iip);
   }
 
+  /**
+   * 无权限保护版本的存储策略满足触发，直接将inode加入处理队列，
+   * 用于内部恢复场景，已经提前完成权限和路径检查。
+   *
+   * @param inode  目标inode
+   * @param fsd    FSDirectory对象
+   * @return 成功加入队列返回true，空文件跳过返回false
+   */
   static boolean unprotectedSatisfyStoragePolicy(INode inode, FSDirectory fsd) {
     if (inode.isFile() && inode.asFile().numBlocks() == 0) {
       return false;
     } else {
-      // Adding directory in the pending queue, so FileInodeIdCollector process
-      // directory child in batch and recursively
+      // 将路径ID加入存储策略满足管理器的待处理队列，后台异步处理
       StoragePolicySatisfyManager spsManager =
           fsd.getBlockManager().getSPSManager();
       if (spsManager != null) {
@@ -130,6 +138,12 @@ final class FSDirSatisfyStoragePolicyOp {
     }
   }
 
+  /**
+   * 检查inode是否已经存在存储策略满足扩展属性，避免重复提交请求。
+   *
+   * @param inode 目标inode
+   * @return 存在满足标记返回true，否则返回false
+   */
   private static boolean inodeHasSatisfyXAttr(INode inode) {
     final XAttrFeature f = inode.getXAttrFeature();
     if (inode.isFile() && f != null
@@ -139,6 +153,15 @@ final class FSDirSatisfyStoragePolicyOp {
     return false;
   }
 
+  /**
+   * 存储策略满足处理完成后，移除inode上的存储策略满足扩展属性，
+   * 更新元数据并记录操作到编辑日志。
+   *
+   * @param fsd      FSDirectory对象
+   * @param inode    目标inode
+   * @param spsXAttr 存储策略满足扩展属性对象
+   * @throws IOException 元数据更新异常
+   */
   static void removeSPSXattr(FSDirectory fsd, INode inode, XAttr spsXAttr)
       throws IOException {
     try {

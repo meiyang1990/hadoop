@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,20 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
+/**
+ * 终止任务尝试请求协议记录
+ * 封装KillTaskAttempt RPC请求所需的参数，用于客户端向MR ApplicationMaster请求终止指定的任务尝试
+ */
 public interface KillTaskAttemptRequest {
+  /**
+   * 获取需要终止的任务尝试ID
+   * @return 目标任务尝试的唯一标识ID
+   */
   public abstract TaskAttemptId getTaskAttemptId();
   
+  /**
+   * 设置需要终止的任务尝试ID
+   * @param taskAttemptId 目标任务尝试的唯一标识ID
+   */
   public abstract void setTaskAttemptId(TaskAttemptId taskAttemptId);
 }

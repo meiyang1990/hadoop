@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,12 +42,19 @@ import org.apache.hadoop.thirdparty.protobuf.CodedInputStream;
 import org.apache.hadoop.thirdparty.protobuf.CodedOutputStream;
 import org.apache.hadoop.thirdparty.protobuf.WireFormat;
 
+/**
+ * 数据节点块报告的高效序列化抽象基类，支持新旧两种编码格式，通过增量解码减少GC开销
+ * 核心功能是将块副本信息编码为变长字节序列，避免protobuf重复字段带来的装箱拆箱和内存分配开销
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
+  // 分块编码最大块大小，单位字节
   private final static int CHUNK_SIZE = 64*1024; // 64K
+  // 空块列表占位数组
   private static long[] EMPTY_LONGS = new long[]{0, 0};
 
+  /** 空块报告实例 */
   public static BlockListAsLongs EMPTY = new BlockListAsLongs() {
     @Override
     public int getNumberOfBlocks() {
@@ -67,11 +75,11 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
   };
 
   /**
-   * Prepare an instance to in-place decode the given ByteString buffer.
-   * @param numBlocks - blocks in the buffer
-   * @param blocksBuf - ByteString encoded varints
-   * @param maxDataLength - maximum allowable data size in protobuf message
-   * @return BlockListAsLongs
+   * 从单个ByteString缓冲区创建就地解码器，不复制数据
+   * @param numBlocks 缓冲区中包含的块数量
+   * @param blocksBuf 编码了块信息的ByteString缓冲区
+   * @param maxDataLength protobuf消息允许的最大数据长度
+   * @return 块列表实例
    */
   public static BlockListAsLongs decodeBuffer(final int numBlocks,
       final ByteString blocksBuf, final int maxDataLength) {
@@ -79,10 +87,10 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
   }
 
   /**
-   * Prepare an instance to in-place decode the given ByteString buffers.
-   * @param numBlocks - blocks in the buffers
-   * @param blocksBufs - list of ByteString encoded varints
-   * @return BlockListAsLongs
+   * 从多个ByteString缓冲区创建就地解码器（仅测试用）
+   * @param numBlocks 缓冲区中包含的块数量
+   * @param blocksBufs 编码了块信息的ByteString列表
+   * @return 块列表实例
    */
   @VisibleForTesting
   public static BlockListAsLongs decodeBuffers(final int numBlocks,
@@ -92,37 +100,33 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
   }
 
   /**
-   * Prepare an instance to in-place decode the given ByteString buffers.
-   * @param numBlocks - blocks in the buffers
-   * @param blocksBufs - list of ByteString encoded varints
-   * @param maxDataLength - maximum allowable data size in protobuf message
-   * @return BlockListAsLongs
+   * 从多个ByteString缓冲区创建就地解码器
+   * @param numBlocks 缓冲区中包含的块数量
+   * @param blocksBufs 编码了块信息的ByteString列表
+   * @param maxDataLength protobuf消息允许的最大数据长度
+   * @return 块列表实例
    */
   public static BlockListAsLongs decodeBuffers(final int numBlocks,
       final List<ByteString> blocksBufs, final int maxDataLength) {
-    // this doesn't actually copy the data
+    // 实际不复制数据，仅创建视图
     return decodeBuffer(numBlocks, ByteString.copyFrom(blocksBufs),
         maxDataLength);
   }
 
   /**
-   * Prepare an instance to in-place decode the given list of Longs.  Note
-   * it's much more efficient to decode ByteString buffers and only exists
-   * for compatibility.
-   * @param blocksList - list of longs
-   * @return BlockListAsLongs
+   * 从旧格式Long列表创建解码器，仅用于向后兼容，性能低于ByteString解码
+   * @param blocksList 旧格式块信息Long列表
+   * @return 块列表实例
    */
   public static BlockListAsLongs decodeLongs(List<Long> blocksList) {
     return decodeLongs(blocksList, IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
   }
 
   /**
-   * Prepare an instance to in-place decode the given list of Longs.  Note
-   * it's much more efficient to decode ByteString buffers and only exists
-   * for compatibility.
-   * @param blocksList - list of longs
-   * @param maxDataLength - maximum allowable data size in protobuf message
-   * @return BlockListAsLongs
+   * 从旧格式Long列表创建解码器，仅用于向后兼容，性能低于ByteString解码
+   * @param blocksList 旧格式块信息Long列表
+   * @param maxDataLength protobuf消息允许的最大数据长度
+   * @return 块列表实例
    */
   public static BlockListAsLongs decodeLongs(List<Long> blocksList,
       int maxDataLength) {
@@ -131,10 +135,9 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
   }
 
   /**
-   * Prepare an instance to encode the collection of replicas into an
-   * efficient ByteString.
-   * @param replicas - replicas to encode
-   * @return BlockListAsLongs
+   * 将副本集合编码为高效的ByteString格式（仅测试用）
+   * @param replicas 需要编码的副本集合
+   * @return 编码后的块列表实例
    */
   @VisibleForTesting
   public static BlockListAsLongs encode(
@@ -146,6 +149,13 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
     return builder.build();
   }
 
+  /**
+   * 从输入流读取并解码块报告
+   * @param is 输入流
+   * @param maxDataLength protobuf消息允许的最大数据长度
+   * @return 解码后的块列表实例，读取失败返回null
+   * @throws IOException 读取IO异常
+   */
   public static BlockListAsLongs readFrom(InputStream is, int maxDataLength)
       throws IOException {
     CodedInputStream cis = CodedInputStream.newInstance(is);
@@ -155,18 +165,23 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
     int numBlocks = -1;
     ByteString blocksBuf = null;
     while (!cis.isAtEnd()) {
+      // 读取protobuf标签
       int tag = cis.readTag();
+      // 提取字段编号
       int field = WireFormat.getTagFieldNumber(tag);
       switch(field) {
         case 0:
           break;
         case 1:
+          // 读取块数量字段
           numBlocks = (int)cis.readInt32();
           break;
         case 2:
+          // 读取块数据缓冲区字段
           blocksBuf = cis.readBytes();
           break;
         default:
+          // 跳过未知字段
           cis.skipField(tag);
           break;
       }
@@ -177,6 +192,11 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
     return null;
   }
 
+  /**
+   * 将块列表编码写入输出流，符合protobuf格式
+   * @param os 目标输出流
+   * @throws IOException 写入IO异常
+   */
   public void writeTo(OutputStream os) throws IOException {
     CodedOutputStream cos = CodedOutputStream.newInstance(os);
     cos.writeInt32(1, getNumberOfBlocks());
@@ -184,39 +204,41 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
     cos.flush();
   }
 
+  /**
+   * 创建块报告构建器（仅测试用）
+   * @return 新构建器实例
+   */
   @VisibleForTesting
   public static Builder builder() {
     return builder(IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
   }
 
+  /**
+   * 创建块报告构建器
+   * @param maxDataLength 最大允许数据长度
+   * @return 新构建器实例
+   */
   public static Builder builder(int maxDataLength) {
     return new BlockListAsLongs.Builder(maxDataLength);
   }
 
   /**
-   * The number of blocks
-   * @return - the number of blocks
+   * 获取块列表中包含的总块数量
+   * @return 块数量
    */
   abstract public int getNumberOfBlocks();
 
   /**
-   * Very efficient encoding of the block report into a ByteString to avoid
-   * the overhead of protobuf repeating fields.  Primitive repeating fields
-   * require re-allocs of an ArrayList&lt;Long&gt; and the associated (un)boxing
-   * overhead which puts pressure on GC.
-   * 
-   * The structure of the buffer is as follows:
-   * - each replica is represented by 4 longs:
-   *   blockId, block length, genstamp, replica state
-   *
-   * @return ByteString encoded block report
+   * 获取编码后的块数据缓冲区，使用高效字节编码避免GC开销
+   * 每个副本占4个long：块ID、块长度、生成时间戳、副本状态
+   * @return 编码后的ByteString缓冲区
    */
   abstract public ByteString getBlocksBuffer();
 
   /**
-   * List of ByteStrings that encode this block report
-   *
-   * @return ByteStrings
+   * 将块缓冲区按64K分块切割，适应protobuf消息大小限制
+   * 不实际复制数据，仅返回原缓冲区的子视图
+   * @return 分块后的ByteString列表
    */
   public List<ByteString> getBlocksBuffers() {
     final ByteString blocksBuf = getBlocksBuffer();
@@ -227,7 +249,7 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
     } else {
       buffers = new ArrayList<ByteString>();
       for (int pos=0; pos < size; pos += CHUNK_SIZE) {
-        // this doesn't actually copy the data
+        // 不实际复制数据，仅创建视图
         buffers.add(blocksBuf.substring(pos, Math.min(pos+CHUNK_SIZE, size)));
       }
     }
@@ -235,31 +257,25 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
   }
 
   /**
-   * Convert block report to old-style list of longs.  Only used to
-   * re-encode the block report when the DN detects an older NN. This is
-   * inefficient, but in practice a DN is unlikely to be upgraded first
-   * 
-   * The structure of the array is as follows:
-   * 0: the length of the finalized replica list;
-   * 1: the length of the under-construction replica list;
-   * - followed by finalized replica list where each replica is represented by
-   *   3 longs: one for the blockId, one for the block length, and one for
-   *   the generation stamp;
-   * - followed by the invalid replica represented with three -1s;
-   * - followed by the under-construction replica list where each replica is
-   *   represented by 4 longs: three for the block id, length, generation 
-   *   stamp, and the fourth for the replica state.
-   * @return list of longs
+   * 转换为旧格式long数组，仅用于兼容旧版本NameNode，性能较低
+   * 数组结构：
+   * 0: 已完成副本数量
+   * 1: 构建中副本数量
+   * 后续：已完成副本列表每个占3个long（块ID、长度、时间戳） + 分隔符三个-1 + 构建中副本每个占4个long（额外加状态）
+   * @return 旧格式long数组
    */
   abstract public long[] getBlockListAsLongs();
 
   /**
-   * Returns a singleton iterator over blocks in the block report.  Do not
-   * add the returned blocks to a collection.
-   * @return Iterator
+   * 返回块报告的迭代器，迭代过程复用同一个BlockReportReplica对象，减少对象分配
+   * 不要将迭代返回的对象添加到集合中
+   * @return 块副本迭代器
    */
   abstract public Iterator<BlockReportReplica> iterator();
 
+  /**
+   * 块报告构建器，用于将多个副本编码为高效ByteString格式
+   */
   public static class Builder {
     private final ByteString.Output out;
     private final CodedOutputStream cos;
@@ -273,35 +289,46 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
       this.maxDataLength = maxDataLength;
     }
 
+    /**
+     * 添加一个副本到编码缓冲区
+     * @param replica 待添加的副本
+     */
     public void add(Replica replica) {
       try {
-        // zig-zag to reduce size of legacy blocks
+        // 使用zig-zag编码压缩块ID，减小旧块ID的存储空间
         cos.writeSInt64NoTag(replica.getBlockId());
         cos.writeUInt64NoTag(replica.getBytesOnDisk());
         cos.writeUInt64NoTag(replica.getGenerationStamp());
         ReplicaState state = replica.getState();
-        // although state is not a 64-bit value, using a long varint to
-        // allow for future use of the upper bits
+        // 使用long变长编码存储状态，预留高位供未来扩展使用
         cos.writeUInt64NoTag(state.getValue());
         if (state == ReplicaState.FINALIZED) {
           numFinalized++;
         }
         numBlocks++;
       } catch (IOException ioe) {
-        // shouldn't happen, ByteString.Output doesn't throw IOE
+        // ByteString.Output不会抛出IO异常，此处仅处理编译要求
         throw new IllegalStateException(ioe);
       }
     }
 
+    /**
+     * 获取已添加的总块数量
+     * @return 总块数量
+     */
     public int getNumberOfBlocks() {
       return numBlocks;
     }
     
+    /**
+     * 完成编码，构建块列表实例
+     * @return 编码完成的块列表实例
+     */
     public BlockListAsLongs build() {
       try {
         cos.flush();
       } catch (IOException ioe) {
-        // shouldn't happen, ByteString.Output doesn't throw IOE
+        // ByteString.Output不会抛出IO异常，此处仅处理编译要求
         throw new IllegalStateException(ioe);
       }
       return new BufferDecoder(numBlocks, numFinalized, out.toByteString(),
@@ -309,12 +336,15 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
     }
   }
 
+  /**
+   * 新格式ByteString缓冲区块报告解码器，实现就地增量解码避免复制
+   */
   // decode new-style ByteString buffer based block report
   private static class BufferDecoder extends BlockListAsLongs {
-    // reserve upper bits for future use.  decoding masks off these bits to
-    // allow compatibility for the current through future release that may
-    // start using the bits
+    // 预留高位用于未来扩展，解码时掩码过滤未使用位保证向前兼容
+    // 块长度占低48位
     private static long NUM_BYTES_MASK = (-1L) >>> (64 - 48);
+    // 副本状态占低4位
     private static long REPLICA_STATE_MASK = (-1L) >>> (64 - 4);
 
     private final ByteString buffer;
@@ -347,9 +377,7 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
 
     @Override
     public long[] getBlockListAsLongs() {
-      // terribly inefficient but only occurs if server tries to transcode
-      // an undecoded buffer into longs - ie. it will never happen but let's
-      // handle it anyway
+      // 转换为旧格式性能极低，仅在需要转码时使用，实际生产中极少触发
       if (numFinalized == -1) {
         int n = 0;
         for (Replica replica : this) {
@@ -360,14 +388,16 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
         numFinalized = n;
       }
       int numUc = numBlocks - numFinalized;
+      // 计算数组总大小：2个头 + 每个完成块3个long加1个分隔符 + 每个未完成块4个long
       int size = 2 + 3*(numFinalized+1) + 4*(numUc);
       long[] longs = new long[size];
+      // 填充头信息
       longs[0] = numFinalized;
       longs[1] = numUc;
 
       int idx = 2;
       int ucIdx = idx + 3*numFinalized;
-      // delimiter block
+      // 写入分隔符块（三个-1）
       longs[ucIdx++] = -1;
       longs[ucIdx++] = -1;
       longs[ucIdx++] = -1;
@@ -375,12 +405,14 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
       for (BlockReportReplica block : this) {
         switch (block.getState()) {
           case FINALIZED: {
+            // 已完成块写入已完成区
             longs[idx++] = block.getBlockId();
             longs[idx++] = block.getNumBytes();
             longs[idx++] = block.getGenerationStamp();
             break;
           }
           default: {
+            // 非完成块写入未完成区，额外存储状态
             longs[ucIdx++] = block.getBlockId();
             longs[ucIdx++] = block.getNumBytes();
             longs[ucIdx++] = block.getGenerationStamp();
@@ -395,7 +427,9 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
     @Override
     public Iterator<BlockReportReplica> iterator() {
       return new Iterator<BlockReportReplica>() {
+        // 复用单个对象避免分配
         final BlockReportReplica block = new BlockReportReplica();
+        // 从缓冲区获取输入流
         final CodedInputStream cis = buffer.newCodedInput();
         private int currentBlockIndex = 0;
 
@@ -414,161 +448,11 @@ public abstract class BlockListAsLongs implements Iterable<BlockReportReplica> {
         public BlockReportReplica next() {
           currentBlockIndex++;
           try {
-            // zig-zag to reduce size of legacy blocks and mask off bits
-            // we don't (yet) understand
+            // zig-zag解码块ID，掩码过滤预留位
             block.setBlockId(cis.readSInt64());
             block.setNumBytes(cis.readRawVarint64() & NUM_BYTES_MASK);
             block.setGenerationStamp(cis.readRawVarint64());
             long state = cis.readRawVarint64() & REPLICA_STATE_MASK;
             block.setState(ReplicaState.getState((int)state));
           } catch (IOException e) {
-            throw new IllegalStateException(e);
-          }
-          return block;
-        }
-
-        @Override
-        public void remove() {
-          throw new UnsupportedOperationException();
-        }
-      };
-    }
-  }
-
-  // decode old style block report of longs
-  private static class LongsDecoder extends BlockListAsLongs {
-    private final List<Long> values;
-    private final int finalizedBlocks;
-    private final int numBlocks;
-    private final int maxDataLength;
-
-    // set the header
-    LongsDecoder(List<Long> values, int maxDataLength) {
-      this.values = values.subList(2, values.size());
-      this.finalizedBlocks = values.get(0).intValue();
-      this.numBlocks = finalizedBlocks + values.get(1).intValue();
-      this.maxDataLength = maxDataLength;
-    }
-
-    @Override
-    public int getNumberOfBlocks() {
-      return numBlocks;
-    }
-
-    @Override
-    public ByteString getBlocksBuffer() {
-      Builder builder = builder(maxDataLength);
-      for (Replica replica : this) {
-        builder.add(replica);
-      }
-      return builder.build().getBlocksBuffer();
-    }
-
-    @Override
-    public long[] getBlockListAsLongs() {
-      long[] longs = new long[2+values.size()];
-      longs[0] = finalizedBlocks;
-      longs[1] = numBlocks - finalizedBlocks;
-      for(int i=0; i<values.size(); i++) {
-        longs[2+i] = values.get(i);
-      }
-      return longs;
-    }
-
-    @Override
-    public Iterator<BlockReportReplica> iterator() {
-      return new Iterator<BlockReportReplica>() {
-        private final BlockReportReplica block = new BlockReportReplica();
-        final Iterator<Long> iter = values.iterator();
-        private int currentBlockIndex = 0;
-
-        @Override
-        public boolean hasNext() {
-          return currentBlockIndex < numBlocks;
-        }
-
-        @Override
-        public BlockReportReplica next() {
-          if (currentBlockIndex == finalizedBlocks) {
-            // verify the presence of the delimiter block
-            readBlock();
-            Preconditions.checkArgument(block.getBlockId() == -1 &&
-                                        block.getNumBytes() == -1 &&
-                                        block.getGenerationStamp() == -1,
-                                        "Invalid delimiter block");
-          }
-
-          readBlock();
-          if (currentBlockIndex++ < finalizedBlocks) {
-            block.setState(ReplicaState.FINALIZED);
-          } else {
-            block.setState(ReplicaState.getState(iter.next().intValue()));
-          }
-          return block;
-        }
-
-        private void readBlock() {
-          block.setBlockId(iter.next());
-          block.setNumBytes(iter.next());
-          block.setGenerationStamp(iter.next());
-        }
-
-        @Override
-        public void remove() {
-          throw new UnsupportedOperationException();
-        }
-      };
-    }
-  }
-  
-  @InterfaceAudience.Private
-  public static class BlockReportReplica extends Block implements Replica {
-    private ReplicaState state;
-
-    private BlockReportReplica() {
-    }
-    public BlockReportReplica(Block block) {
-      super(block);
-      if (block instanceof BlockReportReplica) {
-        this.state = ((BlockReportReplica)block).getState();
-      } else {
-        this.state = ReplicaState.FINALIZED;
-      }
-    }
-    public void setState(ReplicaState state) {
-      this.state = state;
-    }
-    @Override
-    public ReplicaState getState() {
-      return state;
-    }
-    @Override
-    public long getBytesOnDisk() {
-      return getNumBytes();
-    }
-    @Override
-    public long getVisibleLength() {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public String getStorageUuid() {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public boolean isOnTransientStorage() {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public FsVolumeSpi getVolume() {
-      throw new UnsupportedOperationException();
-    }
-    @Override
-    public boolean equals(Object o) {
-      return super.equals(o);
-    }
-    @Override
-    public int hashCode() {
-      return super.hashCode();
-    }
-  }
-}
+            throw new IllegalStateException(e

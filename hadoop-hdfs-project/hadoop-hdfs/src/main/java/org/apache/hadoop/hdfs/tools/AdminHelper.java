@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -34,34 +35,52 @@ import java.net.URI;
 import java.util.List;
 
 /**
- * Helper methods for CacheAdmin/CryptoAdmin/StoragePolicyAdmin
+ * @file AdminHelper.java
+ * HDFS管理工具公共帮助类，为CacheAdmin、CryptoAdmin、StoragePolicyAdmin等管理工具提供通用辅助方法
  */
 public class AdminHelper {
   /**
-   * Maximum length for printed lines
+   * 输出文本最大行宽
    */
   static final int MAX_LINE_WIDTH = 80;
   static final String HELP_COMMAND_NAME = "-help";
 
+  /**
+   * 从默认配置获取HDFS分布式文件系统实例
+   * @param conf Hadoop配置对象
+   * @return HDFS分布式文件系统实例
+   * @throws IOException 获取文件系统失败时抛出异常
+   */
   public static DistributedFileSystem getDFS(Configuration conf)
       throws IOException {
     FileSystem fs = FileSystem.get(conf);
     return checkAndGetDFS(fs, conf);
   }
 
+  /**
+   * 根据指定URI获取HDFS分布式文件系统实例
+   * @param uri 文件系统URI
+   * @param conf Hadoop配置对象
+   * @return HDFS分布式文件系统实例
+   * @throws IOException 获取文件系统失败时抛出异常
+   */
   static DistributedFileSystem getDFS(URI uri, Configuration conf)
       throws IOException {
     FileSystem fs = FileSystem.get(uri, conf);
     return checkAndGetDFS(fs, conf);
   }
 
+  /**
+   * 检查文件系统类型并返回HDFS实例，支持处理ViewFileSystemOverloadScheme场景
+   * @param fs 待检查的文件系统对象
+   * @param conf Hadoop配置对象
+   * @return 类型检查通过后的HDFS分布式文件系统实例
+   * @throws IOException 类型不匹配或获取原始文件系统失败时抛出异常
+   */
   static DistributedFileSystem checkAndGetDFS(FileSystem fs, Configuration conf)
       throws IOException {
     if ((fs instanceof ViewFileSystemOverloadScheme)) {
-      // With ViewFSOverloadScheme, the admin will pass -fs option with intended
-      // child fs mount path. GenericOptionsParser would have set the given -fs
-      // as FileSystem's defaultURI. So, we are using FileSystem.getDefaultUri
-      // to use the given -fs path.
+      // ViewFSOverloadScheme场景下，从默认URI获取实际挂载的原始HDFS文件系统
       fs = ((ViewFileSystemOverloadScheme) fs)
           .getRawFileSystem(new Path(FileSystem.getDefaultUri(conf)), conf);
     }
@@ -74,8 +93,9 @@ public class AdminHelper {
   }
 
   /**
-   * NN exceptions contain the stack trace as part of the exception message.
-   * When it's a known error, pretty-print the error and squish the stack trace.
+   * 美化NameNode异常信息，提取第一行错误信息，去除冗长栈追踪
+   * @param e 原始异常对象
+   * @return 美化后的异常字符串
    */
   static String prettifyException(Exception e) {
     if (e.getLocalizedMessage() != null) {
@@ -88,6 +108,10 @@ public class AdminHelper {
     }
   }
 
+  /**
+   * 创建用于展示命令选项说明的表格对象
+   * @return 配置好的选项说明表格
+   */
   static TableListing getOptionDescriptionListing() {
     return new TableListing.Builder()
         .addField("").addField("", true)
@@ -95,9 +119,10 @@ public class AdminHelper {
   }
 
   /**
-   * Parses a time-to-live value from a string
-   * @return The ttl in milliseconds
-   * @throws IOException if it could not be parsed
+   * 解析缓存池TTL（生存时间）字符串转换为毫秒值
+   * @param maxTtlString 输入的TTL字符串
+   * @return 解析后的TTL毫秒值，never对应永不过期
+   * @throws IOException 解析失败时抛出异常
    */
   static Long parseTtlString(String maxTtlString) throws IOException {
     Long maxTtl = null;
@@ -111,6 +136,11 @@ public class AdminHelper {
     return maxTtl;
   }
 
+  /**
+   * 解析限制值字符串，支持unlimited表示无限制
+   * @param limitString 输入的限制字符串
+   * @return 解析后的限制长整型值，unlimited对应无限制常量
+   */
   static Long parseLimitString(String limitString) {
     Long limit = null;
     if (limitString != null) {
@@ -123,6 +153,12 @@ public class AdminHelper {
     return limit;
   }
 
+  /**
+   * 根据命令名称从命令数组匹配对应命令实例，自动处理help命令
+   * @param commandName 待匹配的命令名称
+   * @param commands 可用命令数组
+   * @return 匹配到的命令实例，未匹配返回null
+   */
   static Command determineCommand(String commandName, Command[] commands) {
     Preconditions.checkNotNull(commands);
     if (HELP_COMMAND_NAME.equals(commandName)) {
@@ -136,6 +172,12 @@ public class AdminHelper {
     return null;
   }
 
+  /**
+   * 打印管理工具的使用帮助信息
+   * @param longUsage 是否打印详细帮助
+   * @param toolName 当前工具名称
+   * @param commands 可用命令数组
+   */
   static void printUsage(boolean longUsage, String toolName,
       Command[] commands) {
     Preconditions.checkNotNull(commands);
@@ -153,16 +195,36 @@ public class AdminHelper {
     System.err.println();
   }
 
+  /**
+   * 管理工具命令接口，定义所有管理命令需要实现的统一接口
+   */
   interface Command {
+    /** 获取命令名称 */
     String getName();
+    /** 获取命令简短使用说明 */
     String getShortUsage();
+    /** 获取命令详细使用说明 */
     String getLongUsage();
+    /**
+     * 执行命令业务逻辑
+     * @param conf Hadoop配置对象
+     * @param args 命令参数列表
+     * @return 执行结果状态码，0成功，非0失败
+     * @throws IOException 执行过程中IO异常抛出
+     */
     int run(Configuration conf, List<String> args) throws IOException;
   }
 
+  /**
+   * Help命令实现类，负责打印管理工具的帮助信息
+   */
   static class HelpCommand implements Command {
     private final Command[] commands;
 
+    /**
+     * 构造Help命令，绑定所有可用命令
+     * @param commands 所有可用命令数组
+     */
     public HelpCommand(Command[] commands) {
       Preconditions.checkNotNull(commands, "commands cannot be null.");
       this.commands = commands;
@@ -192,6 +254,7 @@ public class AdminHelper {
     @Override
     public int run(Configuration conf, List<String> args) throws IOException {
       if (args.size() == 0) {
+        // 无参数时打印所有命令详细帮助
         for (AdminHelper.Command command : commands) {
           System.err.println(command.getLongUsage());
         }
@@ -202,10 +265,11 @@ public class AdminHelper {
         return 1;
       }
       final String commandName = args.get(0);
-      // prepend a dash to match against the command names
+      // 添加横线前缀匹配命令名称
       final AdminHelper.Command command = AdminHelper
           .determineCommand("-" + commandName, commands);
       if (command == null) {
+        // 命令不存在，打印所有可用命令名称
         System.err.print("Unknown command '" + commandName + "'.\n");
         System.err.print("Valid help command names are:\n");
         String separator = "";
@@ -216,6 +280,7 @@ public class AdminHelper {
         System.err.print("\n");
         return 1;
       }
+      // 打印指定命令的详细帮助
       System.err.print(command.getLongUsage());
       return 0;
     }

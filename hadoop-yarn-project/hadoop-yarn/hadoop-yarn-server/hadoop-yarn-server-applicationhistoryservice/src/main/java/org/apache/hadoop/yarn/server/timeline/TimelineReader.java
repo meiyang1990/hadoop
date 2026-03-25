@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,6 +35,9 @@ import org.apache.hadoop.yarn.api.records.timeline.TimelineDomains;
 import org.apache.hadoop.yarn.server.timeline.TimelineDataManager.CheckAcl;
 
 /**
+ * 文件说明：时间线数据读取接口，定义了YARN应用时间线服务读取实体、事件、域信息的统一接口
+ * 该接口由时间线存储层实现，为上层查询提供统一的查询入口，支持多维度条件查询时间线数据
+ * 
  * This interface is for retrieving timeline information.
  */
 @InterfaceAudience.Private
@@ -41,6 +45,7 @@ import org.apache.hadoop.yarn.server.timeline.TimelineDataManager.CheckAcl;
 public interface TimelineReader {
 
   /**
+   * 查询实体时可指定返回的字段枚举，用于控制返回数据范围，减少不必要的数据传输
    * Possible fields to retrieve for {@link #getEntities} and {@link #getEntity}
    * .
    */
@@ -53,56 +58,37 @@ public interface TimelineReader {
   }
 
   /**
+   * 查询结果默认数量限制，避免单次返回过多数据导致性能问题
    * Default limit for {@link #getEntities} and {@link #getEntityTimelines}.
    */
   final long DEFAULT_LIMIT = 100;
 
   /**
-   * This method retrieves a list of entity information, {@link TimelineEntity},
-   * sorted by the starting timestamp for the entity, descending. The starting
-   * timestamp of an entity is a timestamp specified by the client. If it is not
-   * explicitly specified, it will be chosen by the store to be the earliest
-   * timestamp of the events received in the first put for the entity.
+   * 按条件分页查询时间线实体列表，结果按实体起始时间降序排序
+   * 支持按时间窗口、主键过滤、副键过滤多条件组合查询，可指定返回字段范围
    * 
    * @param entityType
-   *          The type of entities to return (required).
+   *          要查询的实体类型（必填）
    * @param limit
-   *          A limit on the number of entities to return. If null, defaults to
-   *          {@link #DEFAULT_LIMIT}.
+   *          返回实体数量限制，为null时使用默认限制{@link #DEFAULT_LIMIT}
    * @param windowStart
-   *          The earliest start timestamp to retrieve (exclusive). If null,
-   *          defaults to retrieving all entities until the limit is reached.
+   *          查询起始时间窗口（开区间，仅包含晚于此时间的实体），为null时不限制起始时间
    * @param windowEnd
-   *          The latest start timestamp to retrieve (inclusive). If null,
-   *          defaults to {@link Long#MAX_VALUE}
+   *          查询结束时间窗口（闭区间，仅包含早于等于此时间的实体），为null时默认值为{@link Long#MAX_VALUE}
    * @param fromId
-   *          If fromId is not null, retrieve entities earlier than and
-   *          including the specified ID. If no start time is found for the
-   *          specified ID, an empty list of entities will be returned. The
-   *          windowEnd parameter will take precedence if the start time of this
-   *          entity falls later than windowEnd.
+   *          分页起始实体ID，不为null时返回该ID及之前的实体，用于分页查询
    * @param fromTs
-   *          If fromTs is not null, ignore entities that were inserted into the
-   *          store after the given timestamp. The entity's insert timestamp
-   *          used for this comparison is the store's system time when the first
-   *          put for the entity was received (not the entity's start time).
+   *          插入时间过滤戳，不为null时忽略该时间之后插入的实体，基于存储系统插入时间而非实体起始时间
    * @param primaryFilter
-   *          Retrieves only entities that have the specified primary filter. If
-   *          null, retrieves all entities. This is an indexed retrieval, and no
-   *          entities that do not match the filter are scanned.
+   *          主键过滤条件，仅返回匹配该主键的实体，为null不过滤，基于索引查询性能高
    * @param secondaryFilters
-   *          Retrieves only entities that have exact matches for all the
-   *          specified filters in their primary filters or other info. This is
-   *          not an indexed retrieval, so all entities are scanned but only
-   *          those matching the filters are returned.
+   *          副过滤条件，仅返回匹配所有给定主键/其他信息的实体，无索引需要全表扫描
    * @param fieldsToRetrieve
-   *          Specifies which fields of the entity object to retrieve (see
-   *          {@link Field}). If the set of fields contains
-   *          {@link Field#LAST_EVENT_ONLY} and not {@link Field#EVENTS}, the
-   *          most recent event for each entity is retrieved. If null, retrieves
-   *          all fields.
-   * @return An {@link TimelineEntities} object.
-   * @throws IOException
+   *          指定需要返回的实体字段，为null返回全部字段，如果仅包含LAST_EVENT_ONLY则每个实体只返回最新事件
+   * @param checkAcl
+   *          ACL权限检查器，用于验证查询者对实体的访问权限
+   * @return 封装查询结果的TimelineEntities对象
+   * @throws IOException 读取存储时发生IO异常
    */
   TimelineEntities getEntities(String entityType,
       Long limit, Long windowStart, Long windowEnd, String fromId, Long fromTs,
@@ -110,70 +96,60 @@ public interface TimelineReader {
       EnumSet<Field> fieldsToRetrieve, CheckAcl checkAcl) throws IOException;
 
   /**
-   * This method retrieves the entity information for a given entity.
+   * 根据实体ID和类型查询单个实体的完整信息，可指定返回字段
    * 
    * @param entityId
-   *          The entity whose information will be retrieved.
+   *          待查询的实体ID
    * @param entityType
-   *          The type of the entity.
+   *          待查询的实体类型
    * @param fieldsToRetrieve
-   *          Specifies which fields of the entity object to retrieve (see
-   *          {@link Field}). If the set of fields contains
-   *          {@link Field#LAST_EVENT_ONLY} and not {@link Field#EVENTS}, the
-   *          most recent event for each entity is retrieved. If null, retrieves
-   *          all fields.
-   * @return An {@link TimelineEntity} object.
-   * @throws IOException
+   *          指定需要返回的实体字段，为null返回全部字段
+   * @return 封装查询结果的TimelineEntity对象
+   * @throws IOException 读取存储时发生IO异常
    */
   TimelineEntity getEntity(String entityId, String entityType, EnumSet<Field>
       fieldsToRetrieve) throws IOException;
 
   /**
-   * This method retrieves the events for a list of entities all of the same
-   * entity type. The events for each entity are sorted in order of their
-   * timestamps, descending.
+   * 批量查询同类型实体的时间线事件，每个实体的事件按时间戳降序排序
    * 
    * @param entityType
-   *          The type of entities to retrieve events for.
+   *          待查询的实体类型
    * @param entityIds
-   *          The entity IDs to retrieve events for.
+   *          待查询的实体ID集合
    * @param limit
-   *          A limit on the number of events to return for each entity. If
-   *          null, defaults to {@link #DEFAULT_LIMIT} events per entity.
+   *          每个实体返回事件数量限制，为null使用默认限制{@link #DEFAULT_LIMIT}
    * @param windowStart
-   *          If not null, retrieves only events later than the given time
-   *          (exclusive)
+   *          时间窗口起始（开区间，仅返回晚于此时间的事件），为null不限制
    * @param windowEnd
-   *          If not null, retrieves only events earlier than the given time
-   *          (inclusive)
+   *          时间窗口结束（闭区间，仅返回早于等于此时间的事件），为null不限制
    * @param eventTypes
-   *          Restricts the events returned to the given types. If null, events
-   *          of all types will be returned.
-   * @return An {@link TimelineEvents} object.
-   * @throws IOException
+   *          限定返回的事件类型，为null返回所有类型
+   * @return 封装查询结果的TimelineEvents对象
+   * @throws IOException 读取存储时发生IO异常
    */
   TimelineEvents getEntityTimelines(String entityType,
       SortedSet<String> entityIds, Long limit, Long windowStart,
       Long windowEnd, Set<String> eventTypes) throws IOException;
 
   /**
-   * This method retrieves the domain information for a given ID.
+   * 根据域ID查询单个时间线域信息
    * 
-   * @return a {@link TimelineDomain} object.
-   * @throws IOException
+   * @param domainId
+   *          待查询的域ID
+   * @return 封装查询结果的TimelineDomain对象
+   * @throws IOException 读取存储时发生IO异常
    */
   TimelineDomain getDomain(
       String domainId) throws IOException;
 
   /**
-   * This method retrieves all the domains that belong to a given owner.
-   * The domains are sorted according to the created time firstly and the
-   * modified time secondly in descending order.
+   * 查询指定用户拥有的所有时间线域，结果先按创建时间降序、再按修改时间降序排序
    * 
    * @param owner
-   *          the domain owner
-   * @return an {@link TimelineDomains} object.
-   * @throws IOException
+   *          域所有者用户名
+   * @return 封装查询结果的TimelineDomains对象
+   * @throws IOException 读取存储时发生IO异常
    */
   TimelineDomains getDomains(String owner) throws IOException;
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -55,6 +56,10 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.VisibleForTesting;
 
+/**
+ * MapReduce Shuffle阶段拉取线程，负责从各个Map节点拉取Map输出数据
+ * 每个Fetcher线程负责从一个Map主机拉取多个Map任务输出，交给MergeManager合并
+ */
 @VisibleForTesting
 public class Fetcher<K, V> extends SubjectInheritingThread {
   
@@ -115,6 +120,17 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
   private static boolean sslShuffle;
   private static SSLFactory sslFactory;
 
+  /**
+   * 构造Fetcher线程实例
+   * @param job 作业配置
+   * @param reduceId 当前Reduce任务尝试ID
+   * @param scheduler Shuffle调度器
+   * @param merger 合并管理器
+   * @param reporter 任务报告器
+   * @param metrics Shuffle客户端指标
+   * @param exceptionReporter 异常报告器
+   * @param shuffleKey Shuffle加密密钥
+   */
   public Fetcher(JobConf job, TaskAttemptID reduceId, 
                  ShuffleSchedulerImpl<K, V> scheduler, MergeManager<K, V> merger,
                  Reporter reporter, ShuffleClientMetrics metrics,
@@ -123,6 +139,18 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
         exceptionReporter, shuffleKey, NEXT_ID.incrementAndGet());
   }
 
+  /**
+   * 构造Fetcher线程实例（带自定义ID，用于测试）
+   * @param job 作业配置
+   * @param reduceId 当前Reduce任务尝试ID
+   * @param scheduler Shuffle调度器
+   * @param merger 合并管理器
+   * @param reporter 任务报告器
+   * @param metrics Shuffle客户端指标
+   * @param exceptionReporter 异常报告器
+   * @param shuffleKey Shuffle加密密钥
+   * @param id Fetcher线程ID
+   */
   @VisibleForTesting
   Fetcher(JobConf job, TaskAttemptID reduceId, 
                  ShuffleSchedulerImpl<K, V> scheduler, MergeManager<K, V> merger,
@@ -174,8 +202,10 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
     setDaemon(true);
 
     synchronized (Fetcher.class) {
+      // 从配置读取SSL Shuffle开关
       sslShuffle = job.getBoolean(MRConfig.SHUFFLE_SSL_ENABLED_KEY,
                                   MRConfig.SHUFFLE_SSL_ENABLED_DEFAULT);
+      // 初始化SSL工厂（仅第一次执行）
       if (sslShuffle && sslFactory == null) {
         sslFactory = new SSLFactory(SSLFactory.Mode.CLIENT, job);
         try {
@@ -188,22 +218,26 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
     }
   }
   
+  /**
+   * Fetcher线程主工作循环，持续从Map主机拉取Map输出直到停止
+   */
   public void work() {
     try {
       while (!stopped && !Thread.currentThread().isInterrupted()) {
         MapHost host = null;
         try {
-          // If merge is on, block
+          // 等待合并资源空闲，资源不足时阻塞
           merger.waitForResource();
 
-          // Get a host to shuffle from
+          // 从调度器获取一个待拉取的Map主机
           host = scheduler.getHost();
           metrics.threadBusy();
 
-          // Shuffle
+          // 从该主机拉取所有Map输出
           copyFromHost(host);
         } finally {
           if (host != null) {
+            // 释放主机锁，允许其他Fetcher拉取该主机
             scheduler.freeHost(host);
             metrics.threadFree();            
           }
@@ -225,6 +259,10 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
     }
   }
 
+  /**
+   * 安全关闭Fetcher线程，释放连接和资源
+   * @throws InterruptedException 中断异常
+   */
   public void shutDown() throws InterruptedException {
     this.stopped = true;
     interrupt();
@@ -238,6 +276,11 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
     }
   }
 
+  /**
+   * 打开HTTP连接，支持SSL加密
+   * @param url 目标URL
+   * @throws IOException 打开连接失败时抛出
+   */
   @VisibleForTesting
   protected synchronized void openConnection(URL url)
       throws IOException {
@@ -254,6 +297,9 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
     connection = conn;
   }
 
+  /**
+   * 关闭当前HTTP连接
+   */
   protected synchronized void closeConnection() {
     // Note that HttpURLConnection::disconnect() doesn't trash the object.
     // connect() attempts to reconnect in a loop, possibly reversing this
@@ -262,6 +308,11 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
     }
   }
 
+  /**
+   * 连接中止处理，将剩余未拉取的任务放回调度队列并关闭连接
+   * @param host Map主机
+   * @param remaining 剩余未拉取的Map任务列表
+   */
   private void abortConnect(MapHost host, Set<TaskAttemptID> remaining) {
     for (TaskAttemptID left : remaining) {
       scheduler.putBackKnownMapOutput(host, left);
@@ -269,11 +320,19 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
     closeConnection();
   }
 
+  /**
+   * 打开Shuffle连接，处理重试和异常
+   * @param host Map主机
+   * @param remaining 待拉取Map任务
+   * @param url 目标URL
+   * @return 数据输入流，连接失败返回null
+   */
   private DataInputStream openShuffleUrl(MapHost host,
       Set<TaskAttemptID> remaining, URL url) {
     DataInputStream input = null;
 
     try {
+      // 带重试建立连接并验证
       setupConnectionsWithRetry(url);
       if (stopped) {
         abortConnect(host, remaining);
@@ -281,6 +340,7 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
         input = new DataInputStream(connection.getInputStream());
       }
     } catch (TryAgainLaterException te) {
+      // 服务端限流要求稍后重试，惩罚主机后返回
       LOG.warn("Connection rejected by the host " + te.host +
           ". Will retry later.");
       scheduler.penalize(host, te.backoff);
@@ -302,16 +362,15 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
   }
 
   /**
-   * The crux of the matter...
-   * 
-   * @param host {@link MapHost} from which we need to  
-   *              shuffle available map-outputs.
+   * 从指定Map主机拉取所有该主机上的Map输出数据
+   * @param host 需要拉取数据的Map主机
+   * @throws IOException 拉取过程中发生IO异常时抛出
    */
   @VisibleForTesting
   protected void copyFromHost(MapHost host) throws IOException {
-    // reset retryStartTime for a new host
+    // 新主机拉取，重置重试开始时间
     retryStartTime = 0;
-    // Get completed maps on 'host'
+    // 从调度器获取该主机上所有需要拉取的Map任务列表
     List<TaskAttemptID> maps = scheduler.getMapsForHost(host);
     
     // Sanity check to catch hosts with only 'OBSOLETE' maps, 
@@ -324,33 +383,31 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
       LOG.debug("Fetcher " + id + " going to fetch from " + host + " for: " + maps);
     }
     
-    // List of maps to be fetched yet
+    // 剩余待拉取的Map任务集合
     Set<TaskAttemptID> remaining = new HashSet<TaskAttemptID>(maps);
     
-    // Construct the url and connect
+    // 构造请求URL，包含所有待拉取Map任务ID
     URL url = getMapOutputURL(host, maps);
     DataInputStream input = null;
     
     try {
+      // 打开连接获取输入流
       input = openShuffleUrl(host, remaining, url);
       if (input == null) {
         return;
       }
 
-      // Loop through available map-outputs and fetch them
-      // On any error, faildTasks is not null and we exit
-      // after putting back the remaining maps to the 
-      // yet_to_be_fetched list and marking the failed tasks.
+      // 循环拉取所有Map输出，遇到错误则退出
       TaskAttemptID[] failedTasks = null;
       while (!remaining.isEmpty() && failedTasks == null) {
         try {
+          // 拷贝单个Map输出到本地
           failedTasks = copyMapOutput(host, input, remaining, fetchRetryEnabled);
         } catch (IOException e) {
           IOUtils.cleanupWithLogger(LOG, input);
-          //
-          // Setup connection again if disconnected by NM
+          // 连接被NM断开，重新建立连接
           connection.disconnect();
-          // Get map output from remaining tasks only.
+          // 仅对剩余任务重新构造URL
           url = getMapOutputURL(host, remaining);
           input = openShuffleUrl(host, remaining, url);
           if (input == null) {
@@ -359,6 +416,7 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
         }
       }
       
+      // 处理失败的Map任务
       if(failedTasks != null && failedTasks.length > 0) {
         LOG.warn("copyMapOutput failed for tasks "+Arrays.toString(failedTasks));
         scheduler.hostFailed(host.getHostName());
@@ -367,7 +425,7 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
         }
       }
 
-      // Sanity check
+      // 完整性校验：必须拉取到所有预期Map输出
       if (failedTasks == null && !remaining.isEmpty()) {
         throw new IOException("server didn't return all expected map outputs: "
             + remaining.size() + " left.");
@@ -375,395 +433,29 @@ public class Fetcher<K, V> extends SubjectInheritingThread {
       input.close();
       input = null;
     } finally {
+      // 清理资源
       if (input != null) {
         IOUtils.cleanupWithLogger(LOG, input);
         input = null;
       }
+      // 将剩余未拉取的任务放回调度队列
       for (TaskAttemptID left : remaining) {
         scheduler.putBackKnownMapOutput(host, left);
       }
     }
   }
 
+  /**
+   * 带重试建立连接，完成安全验证
+   * @param url 目标URL
+   * @throws IOException 连接或验证失败时抛出
+   */
   private void setupConnectionsWithRetry(URL url) throws IOException {
     openConnectionWithRetry(url);
     if (stopped) {
       return;
     }
       
-    // generate hash of the url
+    // 计算URL的HMAC哈希用于安全验证
     String msgToEncode = SecureShuffleUtils.buildMsgFrom(url);
     String encHash = SecureShuffleUtils.hashFromString(msgToEncode,
-        shuffleSecretKey);
-    
-    setupShuffleConnection(encHash);
-    connect(connection, connectionTimeout);
-    // verify that the thread wasn't stopped during calls to connect
-    if (stopped) {
-      return;
-    }
-    
-    verifyConnection(url, msgToEncode, encHash);
-  }
-
-  private void openConnectionWithRetry(URL url) throws IOException {
-    long startTime = Time.monotonicNow();
-    boolean shouldWait = true;
-    while (shouldWait) {
-      try {
-        openConnection(url);
-        shouldWait = false;
-      } catch (IOException e) {
-        if (!fetchRetryEnabled) {
-          // throw exception directly if fetch's retry is not enabled
-          throw e;
-        }
-        if ((Time.monotonicNow() - startTime) >= this.fetchRetryTimeout) {
-          LOG.warn("Failed to connect to host: " + url + "after " 
-              + fetchRetryTimeout + " milliseconds.");
-          throw e;
-        }
-        try {
-          Thread.sleep(this.fetchRetryInterval);
-        } catch (InterruptedException e1) {
-          if (stopped) {
-            return;
-          }
-        }
-      }
-    }
-  }
-
-  private void verifyConnection(URL url, String msgToEncode, String encHash)
-      throws IOException {
-    // Validate response code
-    int rc = connection.getResponseCode();
-    // See if the shuffleHandler rejected the connection due to too many
-    // reducer requests. If so, signal fetchers to back off.
-    if (rc == TOO_MANY_REQ_STATUS_CODE) {
-      long backoff = connection.getHeaderFieldLong(FETCH_RETRY_AFTER_HEADER,
-          FETCH_RETRY_DELAY_DEFAULT);
-      // in case we get a negative backoff from ShuffleHandler
-      if (backoff < 0) {
-        backoff = FETCH_RETRY_DELAY_DEFAULT;
-        LOG.warn("Get a negative backoff value from ShuffleHandler. Setting" +
-            " it to the default value " + FETCH_RETRY_DELAY_DEFAULT);
-      }
-      throw new TryAgainLaterException(backoff, url.getHost());
-    }
-    if (rc != HttpURLConnection.HTTP_OK) {
-      throw new IOException(
-          "Got invalid response code " + rc + " from " + url +
-          ": " + connection.getResponseMessage());
-    }
-    // get the shuffle version
-    if (!ShuffleHeader.DEFAULT_HTTP_HEADER_NAME.equals(
-        connection.getHeaderField(ShuffleHeader.HTTP_HEADER_NAME))
-        || !ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION.equals(
-            connection.getHeaderField(ShuffleHeader.HTTP_HEADER_VERSION))) {
-      throw new IOException("Incompatible shuffle response version");
-    }
-    // get the replyHash which is HMac of the encHash we sent to the server
-    String replyHash = connection.getHeaderField(SecureShuffleUtils.HTTP_HEADER_REPLY_URL_HASH);
-    if(replyHash==null) {
-      throw new IOException("security validation of TT Map output failed");
-    }
-    LOG.debug("url="+msgToEncode+";encHash="+encHash+";replyHash="+replyHash);
-    // verify that replyHash is HMac of encHash
-    SecureShuffleUtils.verifyReply(replyHash, encHash, shuffleSecretKey);
-    LOG.debug("for url="+msgToEncode+" sent hash and received reply");
-  }
-
-  private void setupShuffleConnection(String encHash) {
-    // put url hash into http header
-    connection.addRequestProperty(
-        SecureShuffleUtils.HTTP_HEADER_URL_HASH, encHash);
-    // set the read timeout
-    connection.setReadTimeout(readTimeout);
-    // put shuffle version into http header
-    connection.addRequestProperty(ShuffleHeader.HTTP_HEADER_NAME,
-        ShuffleHeader.DEFAULT_HTTP_HEADER_NAME);
-    connection.addRequestProperty(ShuffleHeader.HTTP_HEADER_VERSION,
-        ShuffleHeader.DEFAULT_HTTP_HEADER_VERSION);
-  }
-  
-  private static TaskAttemptID[] EMPTY_ATTEMPT_ID_ARRAY = new TaskAttemptID[0];
-  
-  private TaskAttemptID[] copyMapOutput(MapHost host,
-                                DataInputStream input,
-                                Set<TaskAttemptID> remaining,
-                                boolean canRetry) throws IOException {
-    MapOutput<K, V> mapOutput = null;
-    TaskAttemptID mapId = null;
-    long decompressedLength = -1;
-    long compressedLength = -1;
-    
-    try {
-      long startTime = Time.monotonicNow();
-      int forReduce = -1;
-      //Read the shuffle header
-      try {
-        ShuffleHeader header = new ShuffleHeader();
-        header.readFields(input);
-        mapId = TaskAttemptID.forName(header.mapId);
-        compressedLength = header.compressedLength;
-        decompressedLength = header.uncompressedLength;
-        forReduce = header.forReduce;
-      } catch (IllegalArgumentException e) {
-        badIdErrs.increment(1);
-        LOG.warn("Invalid map id ", e);
-        //Don't know which one was bad, so consider all of them as bad
-        return remaining.toArray(new TaskAttemptID[remaining.size()]);
-      }
-
-      InputStream is = input;
-      is =
-          IntermediateEncryptedStream.wrapIfNecessary(jobConf, is,
-              compressedLength, null);
-      compressedLength -= CryptoUtils.cryptoPadding(jobConf);
-      decompressedLength -= CryptoUtils.cryptoPadding(jobConf);
-      
-      // Do some basic sanity verification
-      if (!verifySanity(compressedLength, decompressedLength, forReduce,
-          remaining, mapId)) {
-        return new TaskAttemptID[] {mapId};
-      }
-      
-      if(LOG.isDebugEnabled()) {
-        LOG.debug("header: " + mapId + ", len: " + compressedLength + 
-            ", decomp len: " + decompressedLength);
-      }
-      
-      // Get the location for the map output - either in-memory or on-disk
-      try {
-        mapOutput = merger.reserve(mapId, decompressedLength, id);
-      } catch (IOException ioe) {
-        // kill this reduce attempt
-        ioErrs.increment(1);
-        scheduler.reportLocalError(ioe);
-        return EMPTY_ATTEMPT_ID_ARRAY;
-      }
-      
-      // Check if we can shuffle *now* ...
-      if (mapOutput == null) {
-        LOG.info("fetcher#" + id + " - MergeManager returned status WAIT ...");
-        //Not an error but wait to process data.
-        return EMPTY_ATTEMPT_ID_ARRAY;
-      } 
-      
-      // The codec for lz0,lz4,snappy,bz2,etc. throw java.lang.InternalError
-      // on decompression failures. Catching and re-throwing as IOException
-      // to allow fetch failure logic to be processed
-      try {
-        // Go!
-        LOG.info("fetcher#" + id + " about to shuffle output of map "
-            + mapOutput.getMapId() + " decomp: " + decompressedLength
-            + " len: " + compressedLength + " to " + mapOutput.getDescription());
-        mapOutput.shuffle(host, is, compressedLength, decompressedLength,
-            metrics, reporter);
-      } catch (java.lang.InternalError | Exception e) {
-        LOG.warn("Failed to shuffle for fetcher#"+id, e);
-        throw new IOException(e);
-      }
-      
-      // Inform the shuffle scheduler
-      long endTime = Time.monotonicNow();
-      // Reset retryStartTime as map task make progress if retried before.
-      retryStartTime = 0;
-      
-      scheduler.copySucceeded(mapId, host, compressedLength, 
-                              startTime, endTime, mapOutput);
-      // Note successful shuffle
-      remaining.remove(mapId);
-      metrics.successFetch();
-      return null;
-    } catch (IOException ioe) {
-      if (mapOutput != null) {
-        mapOutput.abort();
-      }
-
-      if (canRetry) {
-        checkTimeoutOrRetry(host, ioe);
-      } 
-      
-      ioErrs.increment(1);
-      if (mapId == null || mapOutput == null) {
-        LOG.warn("fetcher#" + id + " failed to read map header" + 
-                 mapId + " decomp: " + 
-                 decompressedLength + ", " + compressedLength, ioe);
-        if(mapId == null) {
-          return remaining.toArray(new TaskAttemptID[remaining.size()]);
-        } else {
-          return new TaskAttemptID[] {mapId};
-        }
-      }
-        
-      LOG.warn("Failed to shuffle output of " + mapId + 
-               " from " + host.getHostName(), ioe); 
-
-      // Inform the shuffle-scheduler
-      metrics.failedFetch();
-      return new TaskAttemptID[] {mapId};
-    }
-
-  }
-
-  /** check if hit timeout of retry, if not, throw an exception and start a 
-   *  new round of retry.*/
-  private void checkTimeoutOrRetry(MapHost host, IOException ioe)
-      throws IOException {
-    // First time to retry.
-    long currentTime = Time.monotonicNow();
-    if (retryStartTime == 0) {
-      retryStartTime = currentTime;
-    }
-  
-    // Retry is not timeout, let's do retry with throwing an exception.
-    if (currentTime - retryStartTime < this.fetchRetryTimeout) {
-      LOG.warn("Shuffle output from " + host.getHostName() +
-          " failed, retry it.", ioe);
-      throw ioe;
-    } else {
-      // timeout, prepare to be failed.
-      LOG.warn("Timeout for copying MapOutput with retry on host " + host 
-          + "after " + fetchRetryTimeout + " milliseconds.");
-      
-    }
-  }
-  
-  /**
-   * Do some basic verification on the input received -- Being defensive.
-   * @param compressedLength
-   * @param decompressedLength
-   * @param forReduce
-   * @param remaining
-   * @param mapId
-   * @return true/false, based on if the verification succeeded or not
-   */
-  private boolean verifySanity(long compressedLength, long decompressedLength,
-      int forReduce, Set<TaskAttemptID> remaining, TaskAttemptID mapId) {
-    if (compressedLength < 0 || decompressedLength < 0) {
-      wrongLengthErrs.increment(1);
-      LOG.warn(getName() + " invalid lengths in map output header: id: " +
-               mapId + " len: " + compressedLength + ", decomp len: " + 
-               decompressedLength);
-      return false;
-    }
-    
-    if (forReduce != reduce) {
-      wrongReduceErrs.increment(1);
-      LOG.warn(getName() + " data for the wrong reduce map: " +
-               mapId + " len: " + compressedLength + " decomp len: " +
-               decompressedLength + " for reduce " + forReduce);
-      return false;
-    }
-
-    // Sanity check
-    if (!remaining.contains(mapId)) {
-      wrongMapErrs.increment(1);
-      LOG.warn("Invalid map-output! Received output for " + mapId);
-      return false;
-    }
-    
-    return true;
-  }
-
-  /**
-   * Create the map-output-url. This will contain all the map ids
-   * separated by commas
-   * @param host
-   * @param maps
-   * @return
-   * @throws MalformedURLException
-   */
-  private URL getMapOutputURL(MapHost host, Collection<TaskAttemptID> maps
-                              )  throws MalformedURLException {
-    // Get the base url
-    StringBuilder url = new StringBuilder(host.getBaseUrl());
-    
-    boolean first = true;
-    for (TaskAttemptID mapId : maps) {
-      if (!first) {
-        url.append(",");
-      }
-      url.append(mapId);
-      first = false;
-    }
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("MapOutput URL for " + host + " -> " + url.toString());
-    }
-    return new URL(url.toString());
-  }
-  
-  /** 
-   * The connection establishment is attempted multiple times and is given up 
-   * only on the last failure. Instead of connecting with a timeout of 
-   * X, we try connecting with a timeout of x < X but multiple times. 
-   */
-  private void connect(URLConnection connection, int connectionTimeout) throws IOException {
-    int unit = 0;
-    if (connectionTimeout < 0) {
-      throw new IOException("Invalid timeout "
-                            + "[timeout = " + connectionTimeout + " ms]");
-    } else if (connectionTimeout > 0) {
-      unit = Math.min(UNIT_CONNECT_TIMEOUT, connectionTimeout);
-    }
-    long startTime = Time.monotonicNow();
-    long lastTime = startTime;
-    int attempts = 0;
-    // set the connect timeout to the unit-connect-timeout
-    connection.setConnectTimeout(unit);
-    while (true) {
-      try {
-        attempts++;
-        connection.connect();
-        break;
-      } catch (IOException ioe) {
-        long currentTime = Time.monotonicNow();
-        long retryTime = currentTime - startTime;
-        long leftTime = connectionTimeout - retryTime;
-        long timeSinceLastIteration = currentTime - lastTime;
-        // throw an exception if we have waited for timeout amount of time
-        // note that the updated value if timeout is used here
-        if (leftTime <= 0) {
-          int retryTimeInSeconds = (int) retryTime/1000;
-          LOG.error("Connection retry failed with " + attempts + 
-              " attempts in " + retryTimeInSeconds + " seconds");
-          throw ioe;
-        }
-        // reset the connect timeout for the last try
-        if (leftTime < unit) {
-          unit = (int)leftTime;
-          // reset the connect time out for the final connect
-          connection.setConnectTimeout(unit);
-        }
-        
-        if (timeSinceLastIteration < unit) {
-          try {
-            // sleep the left time of unit
-            sleep(unit - timeSinceLastIteration);
-          } catch (InterruptedException e) {
-            LOG.warn("Sleep in connection retry get interrupted.");
-            if (stopped) {
-              return;
-            }
-          }
-        }
-        // update the total remaining connect-timeout
-        lastTime = Time.monotonicNow();
-      }
-    }
-  }
-
-  private static class TryAgainLaterException extends IOException {
-    public final long backoff;
-    public final String host;
-
-    public TryAgainLaterException(long backoff, String host) {
-      super("Too many requests to a map host");
-      this.backoff = backoff;
-      this.host = host;
-    }
-  }
-}

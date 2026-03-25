@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,8 @@
  */
 
 /**
- * This package contains classes to recovery the resourcemanager.
+ * YARN ResourceManager 恢复机制包，提供ResourceManager重启后的状态恢复能力，
+ * 包含各种状态存储与恢复实现，支持HA高可用场景下的故障转移恢复。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

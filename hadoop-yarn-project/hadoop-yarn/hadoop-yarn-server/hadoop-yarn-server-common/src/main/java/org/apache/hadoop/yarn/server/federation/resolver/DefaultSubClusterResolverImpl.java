@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -35,21 +36,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
- * Default simple sub-cluster and rack resolver class.
- *
- * This class expects a three-column comma separated file, specified in
- * yarn.federation.machine-list. Each line of the file should be of the format:
- *
+ * 默认子集群和机架解析器实现类。
+ * 
+ * 该类从配置指定的逗号分隔文件加载节点-子集群-机架映射关系，
+ * 文件路径由配置项 yarn.federation.machine-list 指定，每行格式为：
  * nodeName, subClusterId, rackName
- *
- * Lines that do not follow this format will be ignored. This resolver only
- * loads the file when load() is explicitly called; it will not react to changes
- * to the file.
- *
- * It is case-insensitive on the rack and node names and ignores
- * leading/trailing whitespace.
- *
+ * 
+ * 不符合格式的行会被忽略，映射关系仅在调用load()方法时加载一次，
+ * 不支持文件变更后动态刷新。对节点名和机架名大小写不敏感，
+ * 自动忽略首尾空白字符。
+ * 
+ * 用于联邦YARN环境中，根据节点名或机架名解析对应的子集群ID。
  */
 public class DefaultSubClusterResolverImpl extends AbstractSubClusterResolver
     implements SubClusterResolver {
@@ -58,13 +55,13 @@ public class DefaultSubClusterResolverImpl extends AbstractSubClusterResolver
       LoggerFactory.getLogger(DefaultSubClusterResolverImpl.class);
   private Configuration conf;
 
-  // Index of the node hostname in the machine info file.
+  // 节点主机名在机器信息文件中的列索引
   private static final int NODE_NAME_INDEX = 0;
 
-  // Index of the sub-cluster ID in the machine info file.
+  // 子集群ID在机器信息文件中的列索引
   private static final int SUBCLUSTER_ID_INDEX = 1;
 
-  // Index of the rack name ID in the machine info file.
+  // 机架名在机器信息文件中的列索引
   private static final int RACK_NAME_INDEX = 2;
 
   @Override
@@ -80,11 +77,13 @@ public class DefaultSubClusterResolverImpl extends AbstractSubClusterResolver
   @Override
   public SubClusterId getSubClusterForNode(String nodename)
       throws YarnException {
+    // 统一转为大写后调用父类查询方法，实现大小写不敏感匹配
     return super.getSubClusterForNode(nodename.toUpperCase());
   }
 
   @Override
   public void load() {
+    // 从配置中获取机器列表文件路径
     String fileName =
         this.conf.get(YarnConfiguration.FEDERATION_MACHINE_LIST, "");
 
@@ -99,6 +98,7 @@ public class DefaultSubClusterResolverImpl extends AbstractSubClusterResolver
       BufferedReader reader = null;
 
       try {
+        // 解析文件路径
         file = Paths.get(fileName);
       } catch (InvalidPathException e) {
         LOG.info("The configured machine list file path {} does not exist",
@@ -107,15 +107,22 @@ public class DefaultSubClusterResolverImpl extends AbstractSubClusterResolver
       }
 
       try {
+        // 打开UTF-8编码的文件读取流
         reader = Files.newBufferedReader(file, StandardCharsets.UTF_8);
         String line = null;
+        // 逐行读取文件
         while ((line = reader.readLine()) != null) {
+          // 按逗号分割列
           String[] tokens = line.split(",");
+          // 只处理格式正确（3列）的行
           if (tokens.length == 3) {
 
+            // 处理节点名：去除首尾空白，转为大写
             String nodeName = tokens[NODE_NAME_INDEX].trim().toUpperCase();
+            // 创建子集群ID对象
             SubClusterId subClusterId =
                 SubClusterId.newInstance(tokens[SUBCLUSTER_ID_INDEX].trim());
+            // 处理机架名：去除首尾空白，转为大写
             String rackName = tokens[RACK_NAME_INDEX].trim().toUpperCase();
 
             if (LOG.isDebugEnabled()) {
@@ -125,13 +132,17 @@ public class DefaultSubClusterResolverImpl extends AbstractSubClusterResolver
                   subClusterId);
             }
 
+            // 存入节点->子集群映射缓存
             this.getNodeToSubCluster().put(nodeName, subClusterId);
+            // 存入机架->子集群集合映射缓存
             loadRackToSubCluster(rackName, subClusterId);
           } else {
+            // 格式错误的行记录警告并跳过
             LOG.warn("Skipping malformed line in machine list: " + line);
           }
         }
       } finally {
+        // 关闭文件读取流
         if (reader != null) {
           reader.close();
         }
@@ -143,15 +154,22 @@ public class DefaultSubClusterResolverImpl extends AbstractSubClusterResolver
     }
   }
 
+  /**
+   * 加载机架与子集群的映射关系到缓存。
+   * @param rackName 处理后的机架名
+   * @param subClusterId 对应的子集群ID
+   */
   private void loadRackToSubCluster(String rackName,
       SubClusterId subClusterId) {
     String rackNameUpper = rackName.toUpperCase();
 
+    // 机架不存在则初始化空集合
     if (!this.getRackToSubClusters().containsKey(rackNameUpper)) {
       this.getRackToSubClusters().put(rackNameUpper,
           new HashSet<SubClusterId>());
     }
 
+    // 将子集群ID添加到机架对应的集合中
     this.getRackToSubClusters().get(rackNameUpper).add(subClusterId);
 
   }
@@ -159,6 +177,7 @@ public class DefaultSubClusterResolverImpl extends AbstractSubClusterResolver
   @Override
   public Set<SubClusterId> getSubClustersForRack(String rackname)
       throws YarnException {
+    // 统一转为大写后调用父类查询方法，实现大小写不敏感匹配
     return super.getSubClustersForRack(rackname.toUpperCase());
   }
 }

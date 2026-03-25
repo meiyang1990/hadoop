@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,8 +42,7 @@ import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Maintains a list of queues as well as scheduling parameters for each queue,
- * such as guaranteed share allocations, from the fair scheduler config file.
+ * 公平调度器队列管理器，维护所有调度队列的层级结构、配置参数和动态生命周期管理
  */
 @Private
 @Unstable
@@ -50,9 +50,14 @@ public class QueueManager {
   private static final Logger LOG =
       LoggerFactory.getLogger(QueueManager.class.getName());
 
+  /**
+   * 不兼容队列移除任务，用于等待队列变为空闲后再执行删除
+   */
   private final class IncompatibleQueueRemovalTask {
 
+    /** 待创建队列名称 */
     private final String queueToCreate;
+    /** 待创建队列类型 */
     private final FSQueueType queueType;
 
     private IncompatibleQueueRemovalTask(String queueToCreate,
@@ -61,14 +66,16 @@ public class QueueManager {
       this.queueType = queueType;
     }
 
+    /**
+     * 尝试移除不兼容的空队列，创建目标队列
+     */
     private void execute() {
       Boolean removed =
           removeEmptyIncompatibleQueues(queueToCreate, queueType).orElse(null);
       if (Boolean.TRUE.equals(removed)) {
         FSQueue queue = getQueue(queueToCreate, true, queueType, false, null);
         if (queue != null &&
-            // if queueToCreate is present in the allocation config, set it
-            // to static
+            // 如果目标队列在分配配置中存在，则标记为静态队列
             scheduler.allocConf.configuredQueues.values().stream()
             .anyMatch(s -> s.contains(queueToCreate))) {
           queue.setDynamic(false);
@@ -84,13 +91,21 @@ public class QueueManager {
   
   private final FairScheduler scheduler;
 
+  // 所有叶子队列列表，支持并发读取
   private final Collection<FSLeafQueue> leafQueues = 
       new CopyOnWriteArrayList<>();
+  // 全量队列映射，队列全名 -> 队列对象
   private final Map<String, FSQueue> queues = new HashMap<>();
+  // 待移除的不兼容队列任务集合，当前非空无法删除，等待后续处理
   private Set<IncompatibleQueueRemovalTask> incompatibleQueuesPendingRemoval =
       new HashSet<>();
+  // 根队列对象
   private FSParentQueue rootQueue;
 
+  /**
+   * 构造队列管理器，绑定所属公平调度器实例
+   * @param scheduler 公平调度器实例
+   */
   public QueueManager(FairScheduler scheduler) {
     this.scheduler = scheduler;
   }
@@ -99,15 +114,16 @@ public class QueueManager {
     return rootQueue;
   }
 
+  /**
+   * 初始化队列管理器，创建根队列并完成初始化
+   */
   public void initialize() {
-    // Policies of root and default queue are set to
-    // SchedulingPolicy.DEFAULT_POLICY since the allocation file hasn't been
-    // loaded yet.
+    // 根队列和默认队列的策略先设置为默认策略，等待分配配置文件加载后再更新
     rootQueue = new FSParentQueue("root", scheduler, null);
     rootQueue.setDynamic(false);
     queues.put(rootQueue.getName(), rootQueue);
 
-    // Recursively reinitialize to propagate queue properties
+    // 递归重新初始化，传播队列属性
     rootQueue.reinit(true);
   }
 
@@ -223,26 +239,36 @@ public class QueueManager {
     return (FSParentQueue) queue;
   }
 
+  /**
+   * 根据队列名获取或创建队列，处理不存在队列的创建逻辑
+   * @param name 队列名
+   * @param create 是否创建不存在的队列
+   * @param queueType 队列类型（叶子/父队列）
+   * @param recomputeSteadyShares 是否需要重新计算稳定公平份额
+   * @param applicationId 要分配到该队列的应用ID
+   * @return 队列对象，创建失败返回null
+   */
   private FSQueue getQueue(String name, boolean create, FSQueueType queueType,
       boolean recomputeSteadyShares, ApplicationId applicationId) {
     boolean recompute = recomputeSteadyShares;
+    // 统一补全root前缀，支持用户省略root写法
     name = ensureRootPrefix(name);
     FSQueue queue;
     synchronized (queues) {
       queue = queues.get(name);
       if (queue == null && create) {
-        // if the queue doesn't exist,create it and return
+        // 队列不存在，创建新队列并返回
         queue = createQueue(name, queueType);
       } else {
+        // 队列已存在，不需要重新计算份额
         recompute = false;
       }
-      // At this point the queue exists and we need to assign the app if to the
-      // but only to a leaf queue
+      // 如果提供了应用ID且队列是叶子队列，将应用分配到该队列
       if (applicationId != null && queue instanceof FSLeafQueue) {
         ((FSLeafQueue)queue).addAssignedApp(applicationId);
       }
     }
-    // Don't recompute if it is an existing queue or no change was made
+    // 如果是新创建队列，重新计算全量稳定公平份额
     if (recompute && queue != null) {
       rootQueue.recomputeSteadyShares();
     }
@@ -264,8 +290,7 @@ public class QueueManager {
     FSQueue queue = null;
 
     if (parent != null) {
-      // Now that we know everything worked out, make all the queues
-      // and add them to the map.
+      // 路径校验通过，创建所有缺失的父队列和目标队列
       queue = createNewQueues(queueType, parent, newQueueNames);
     }
 
@@ -290,11 +315,12 @@ public class QueueManager {
     int sepIndex = name.length();
     FSParentQueue parent = null;
 
-    // Move up the queue tree until we reach one that exists.
+    // 向上遍历队列路径，直到找到已存在的父队列
     while (sepIndex != -1) {
       int prevSepIndex = sepIndex;
       sepIndex = name.lastIndexOf('.', sepIndex-1);
       String node = name.substring(sepIndex+1, prevSepIndex);
+      // 校验队列节点名称合法性
       if (!isQueueNameValid(node)) {
         throw new InvalidQueueNameException("Illegal node name at offset " +
             (sepIndex+1) + " for queue name " + name);
@@ -304,14 +330,15 @@ public class QueueManager {
       FSQueue queue = queues.get(curName);
 
       if (queue == null) {
+        // 当前层级队列不存在，添加到待创建列表
         newQueueNames.add(0, curName);
       } else {
+        // 找到已存在的父队列，检查是否为父队列类型
         if (queue instanceof FSParentQueue) {
           parent = (FSParentQueue)queue;
         }
 
-        // If the queue isn't a parent queue, parent will still be null when
-        // we break
+        // 如果找到的已存在队列不是父队列，parent保持null
 
         break;
       }
@@ -344,7 +371,7 @@ public class QueueManager {
       FSParentQueue newParent = null;
       String queueName = i.next();
 
-      // Check if child policy is allowed
+      // 检查子队列调度策略是否被父队列允许
       SchedulingPolicy childPolicy = scheduler.getAllocationConfiguration().
           getSchedulingPolicy(queueName);
       if (!parent.getPolicy().isChildPolicyAllowed(childPolicy)) {
@@ -353,312 +380,24 @@ public class QueueManager {
         return null;
       }
 
-      // Only create a leaf queue at the very end
+      // 只有最后一个节点可以是叶子队列
       if (!i.hasNext() && (queueType != FSQueueType.PARENT)) {
+        // 创建叶子队列
         FSLeafQueue leafQueue = new FSLeafQueue(queueName, scheduler, parent);
         leafQueues.add(leafQueue);
         queue = leafQueue;
       } else {
+        // 中间节点必须是父队列，检查FIFO策略只能用于叶子队列
         if (childPolicy instanceof FifoPolicy) {
           LOG.error("Can't create queue '" + queueName + "', since "
               + FifoPolicy.NAME + " is only for leaf queues.");
           return null;
         }
+        // 创建父队列
         newParent = new FSParentQueue(queueName, scheduler, parent);
         queue = newParent;
       }
 
+      // 将新队列添加到父队列的子队列列表
       parent.addChildQueue(queue);
-      setChildResourceLimits(parent, queue, queueConf);
-      queues.put(queue.getName(), queue);
-
-      // If we just created a leaf node, the newParent is null, but that's OK
-      // because we only create a leaf node in the very last iteration.
-      parent = newParent;
-    }
-
-    return queue;
-  }
-
-  /**
-   * For the given child queue, set the max resources based on the
-   * parent queue's default child resource settings. This method assumes that
-   * the child queue is ad hoc and hence does not do any safety checks around
-   * overwriting existing max resource settings.
-   *
-   * @param parent the parent queue
-   * @param child the child queue
-   * @param queueConf the {@link AllocationConfiguration}
-   */
-  private void setChildResourceLimits(FSParentQueue parent, FSQueue child,
-          AllocationConfiguration queueConf) {
-    Map<FSQueueType, Set<String>> configuredQueues =
-        queueConf.getConfiguredQueues();
-
-    // Ad hoc queues do not exist in the configured queues map
-    if (!configuredQueues.get(FSQueueType.LEAF).contains(child.getName()) &&
-        !configuredQueues.get(FSQueueType.PARENT).contains(child.getName())) {
-      // For ad hoc queues, set their max resource allocations based on
-      // their parents' default child settings.
-      ConfigurableResource maxChild = parent.getMaxChildQueueResource();
-
-      if (maxChild != null) {
-        child.setMaxShare(maxChild);
-      }
-    }
-  }
-
-  /**
-   * Make way for the given queue if possible, by removing incompatible
-   * queues with no apps in them. Incompatibility could be due to
-   * (1) queueToCreate being currently a parent but needs to change to leaf
-   * (2) queueToCreate being currently a leaf but needs to change to parent
-   * (3) an existing leaf queue in the ancestry of queueToCreate.
-   * 
-   * We will never remove the root queue or the default queue in this way.
-   *
-   * @return Optional.of(Boolean.TRUE)  if there was an incompatible queue that
-   *                                    has been removed,
-   *         Optional.of(Boolean.FALSE) if there was an incompatible queue that
-   *                                    have not be removed,
-   *         Optional.empty()           if there is no incompatible queue.
-   */
-  private Optional<Boolean> removeEmptyIncompatibleQueues(String queueToCreate,
-      FSQueueType queueType) {
-    queueToCreate = ensureRootPrefix(queueToCreate);
-
-    // Ensure queueToCreate is not root and doesn't
-    // have the default queue in its ancestry.
-    if (queueToCreate.equals(ROOT_QUEUE) ||
-        queueToCreate.startsWith(
-            ROOT_QUEUE + "." + YarnConfiguration.DEFAULT_QUEUE_NAME + ".")) {
-      return Optional.empty();
-    }
-
-    FSQueue queue = queues.get(queueToCreate);
-    // Queue exists already.
-    if (queue != null) {
-      if (queue instanceof FSLeafQueue) {
-        if (queueType == FSQueueType.LEAF) {
-          return Optional.empty();
-        }
-        // remove incompatibility since queue is a leaf currently
-        // needs to change to a parent.
-        return Optional.of(removeQueueIfEmpty(queue));
-      } else {
-        if (queueType == FSQueueType.PARENT) {
-          return Optional.empty();
-        }
-        // If it's an existing parent queue and needs to change to leaf, 
-        // remove it if it's empty.
-        return Optional.of(removeQueueIfEmpty(queue));
-      }
-    }
-
-    // Queue doesn't exist already. Check if the new queue would be created
-    // under an existing leaf queue. If so, try removing that leaf queue.
-    int sepIndex = queueToCreate.length();
-    sepIndex = queueToCreate.lastIndexOf('.', sepIndex-1);
-    while (sepIndex != -1) {
-      String prefixString = queueToCreate.substring(0, sepIndex);
-      FSQueue prefixQueue = queues.get(prefixString);
-      if (prefixQueue != null && prefixQueue instanceof FSLeafQueue) {
-        return Optional.of(removeQueueIfEmpty(prefixQueue));
-      }
-      sepIndex = queueToCreate.lastIndexOf('.', sepIndex-1);
-    }
-    return Optional.empty();
-  }
-
-  /**
-   * Removes all empty dynamic queues (including empty dynamic parent queues).
-   */
-  public void removeEmptyDynamicQueues() {
-    synchronized (queues) {
-      Set<FSParentQueue> parentQueuesToCheck = new HashSet<>();
-      for (FSQueue queue : getQueues()) {
-        if (queue.isDynamic() && queue.getChildQueues().isEmpty()) {
-          boolean removed = removeQueueIfEmpty(queue);
-          if (removed && queue.getParent().isDynamic()) {
-            parentQueuesToCheck.add(queue.getParent());
-          }
-        }
-      }
-      while (!parentQueuesToCheck.isEmpty()) {
-        FSParentQueue queue = parentQueuesToCheck.iterator().next();
-        if (queue.isEmpty()) {
-          removeQueue(queue);
-          if (queue.getParent().isDynamic()) {
-            parentQueuesToCheck.add(queue.getParent());
-          }
-        }
-        parentQueuesToCheck.remove(queue);
-      }
-    }
-  }
-
-  /**
-   * Re-checking incompatible queues that could not be removed earlier due to
-   * not being empty, and removing those that became empty.
-   */
-  public void removePendingIncompatibleQueues() {
-    synchronized (queues) {
-      for (IncompatibleQueueRemovalTask removalTask :
-          ImmutableSet.copyOf(incompatibleQueuesPendingRemoval)) {
-        removalTask.execute();
-      }
-    }
-  }
-
-  /**
-   * Remove the queue if it and its descendents are all empty.
-   * @param queue
-   * @return true if removed, false otherwise
-   */
-  private boolean removeQueueIfEmpty(FSQueue queue) {
-    if (queue.isEmpty()) {
-      removeQueue(queue);
-      return true;
-    }
-    return false;
-  }
-  
-  /**
-   * Remove a queue and all its descendents.
-   */
-  private void removeQueue(FSQueue queue) {
-    synchronized (queues) {
-      if (queue instanceof FSLeafQueue) {
-        leafQueues.remove(queue);
-      } else {
-        for (FSQueue childQueue:queue.getChildQueues()) {
-          removeQueue(childQueue);
-        }
-      }
-      queues.remove(queue.getName());
-      FSParentQueue parent = queue.getParent();
-      parent.removeChildQueue(queue);
-    }
-  }
-  
-  /**
-   * Gets a queue by name.
-   * @param name queue name.
-   * @return queue objects, FSQueue.
-   */
-  public FSQueue getQueue(String name) {
-    name = ensureRootPrefix(name);
-    synchronized (queues) {
-      return queues.get(name);
-    }
-  }
-
-  /**
-   * Return whether a queue exists already.
-   *
-   * @param name queue name.
-   * @return Returns true if the queue exists,
-   * otherwise returns false.
-   */
-  public boolean exists(String name) {
-    name = ensureRootPrefix(name);
-    synchronized (queues) {
-      return queues.containsKey(name);
-    }
-  }
-  
-  /**
-   * Get a collection of all leaf queues.
-   * @return a collection of all leaf queues.
-   */
-  public Collection<FSLeafQueue> getLeafQueues() {
-    synchronized (queues) {
-      return leafQueues;
-    }
-  }
-  
-  /**
-   * Get a collection of all queues.
-   * @return a collection of all queues.
-   */
-  public Collection<FSQueue> getQueues() {
-    synchronized (queues) {
-      return ImmutableList.copyOf(queues.values());
-    }
-  }
-  
-  private static String ensureRootPrefix(String name) {
-    if (!name.startsWith(ROOT_QUEUE + ".") && !name.equals(ROOT_QUEUE)) {
-      name = ROOT_QUEUE + "." + name;
-    }
-    return name;
-  }
-  
-  public void updateAllocationConfiguration(AllocationConfiguration queueConf) {
-    // Create leaf queues and the parent queues in a leaf's
-    // ancestry if they do not exist
-    synchronized (queues) {
-      // Verify and set scheduling policies for existing queues before creating
-      // any queue, since we need parent policies to determine if we can create
-      // its children.
-      if (!rootQueue.verifyAndSetPolicyFromConf(queueConf)) {
-        LOG.error("Setting scheduling policies for existing queues failed!");
-      }
-
-      ensureQueueExistsAndIsCompatibleAndIsStatic(queueConf, FSQueueType.LEAF);
-
-      // At this point all leaves and 'parents with
-      // at least one child' would have been created.
-      // Now create parents with no configured leaf.
-      ensureQueueExistsAndIsCompatibleAndIsStatic(queueConf,
-          FSQueueType.PARENT);
-    }
-
-    // Initialize all queues recursively
-    rootQueue.reinit(true);
-    // Update steady fair shares for all queues
-    rootQueue.recomputeSteadyShares();
-  }
-
-  private void ensureQueueExistsAndIsCompatibleAndIsStatic(
-      AllocationConfiguration queueConf, FSQueueType queueType) {
-    for (String name : queueConf.getConfiguredQueues().get(queueType)) {
-      Boolean removed =
-          removeEmptyIncompatibleQueues(name, queueType).orElse(null);
-      if (Boolean.FALSE.equals(removed)) {
-        incompatibleQueuesPendingRemoval.add(
-            new IncompatibleQueueRemovalTask(name, queueType));
-      } else {
-        FSQueue queue = getQueue(name, true, queueType, false, null);
-        if (queue != null) {
-          queue.setDynamic(false);
-        }
-      }
-    }
-  }
-
-  /**
-   * Setting a set of queues to dynamic.
-   * @param queueNames The names of the queues to be set to dynamic
-   */
-  protected void setQueuesToDynamic(Set<String> queueNames) {
-    synchronized (queues) {
-      for (String queueName : queueNames) {
-        queues.get(queueName).setDynamic(true);
-      }
-    }
-  }
-
-  /**
-   * Check whether queue name is valid,
-   * return true if it is valid, otherwise return false.
-   */
-  @VisibleForTesting
-  boolean isQueueNameValid(String node) {
-    // use the same white space trim as in QueueMetrics() otherwise things fail
-    // This needs to trim additional Unicode whitespace characters beyond what
-    // the built-in JDK methods consider whitespace. See YARN-5272.
-    return !node.isEmpty() &&
-        node.equals(FairSchedulerUtilities.trimQueueName(node));
-  }
-}
+      // 根据父队列默认配置

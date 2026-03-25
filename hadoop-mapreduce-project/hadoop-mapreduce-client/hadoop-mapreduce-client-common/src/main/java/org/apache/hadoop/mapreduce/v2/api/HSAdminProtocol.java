@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,11 @@
  * limitations under the License.
  */
 
+/**
+ * @file HSAdminProtocol.java
+ * 该文件定义了Hadoop MapReduce历史服务器管理协议的公共接口，聚合了多类管理功能接口
+ */
+
 package org.apache.hadoop.mapreduce.v2.api;
 
 import org.apache.hadoop.classification.InterfaceAudience.Private;
@@ -25,6 +31,12 @@ import org.apache.hadoop.security.KerberosInfo;
 import org.apache.hadoop.security.RefreshUserMappingsProtocol;
 import org.apache.hadoop.tools.GetUserMappingsProtocol;
 
+/**
+ * 历史服务器管理协议接口，聚合多类用户与配置刷新管理能力
+ * 该接口定义了历史服务器端提供给管理客户端调用的管理操作集合，
+ * 组合了用户组映射获取、用户映射刷新、历史服务器配置刷新三类核心管理能力，
+ * 用于支持对MapReduce历史服务器的动态运维管理操作
+ */
 @KerberosInfo(serverPrincipal = CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_USER_NAME_KEY)
 @Private
 @InterfaceStability.Evolving

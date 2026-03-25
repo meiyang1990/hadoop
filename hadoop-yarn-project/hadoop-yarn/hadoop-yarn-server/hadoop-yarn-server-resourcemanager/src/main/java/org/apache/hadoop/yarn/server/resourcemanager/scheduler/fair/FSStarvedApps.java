@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,26 +25,29 @@ import java.util.Comparator;
 import java.util.concurrent.PriorityBlockingQueue;
 
 /**
- * Helper class to track starved applications.
- *
- * Initially, this uses a blocking queue. We could use other data structures
- * in the future. This class also has some methods to simplify testing.
+ * 公平调度器饥饿应用跟踪器，用于维护待抢占资源处理的饥饿应用队列
+ * 
+ * 最初使用阻塞队列实现，未来可替换为其他数据结构，同时提供简化测试的辅助方法
+ * 用于公平调度器的抢占机制，管理等待资源的饥饿应用
  */
 class FSStarvedApps {
 
-  // List of apps to be processed by the preemption thread.
+  // 等待抢占线程处理的饥饿应用优先级队列
   private PriorityBlockingQueue<FSAppAttempt> appsToProcess;
 
-  // App being currently processed. This assumes a single reader.
+  // 当前正在处理的饥饿应用，单消费者模型假设
   private FSAppAttempt appBeingProcessed;
 
+  /**
+   * 构造饥饿应用队列，初始化优先级阻塞队列
+   */
   FSStarvedApps() {
     appsToProcess = new PriorityBlockingQueue<>(10, new StarvationComparator());
   }
 
   /**
-   * Add a starved application if it is not already added.
-   * @param app application to add
+   * 添加饥饿应用到队列，如果应用未被添加且不在处理中则加入
+   * @param app 待添加的饥饿应用尝试
    */
   void addStarvedApp(FSAppAttempt app) {
     if (!app.equals(appBeingProcessed) && !appsToProcess.contains(app)) {
@@ -52,23 +56,25 @@ class FSStarvedApps {
   }
 
   /**
-   * Blocking call to fetch the next app to process. The returned app is
-   * tracked until the next call to this method. This tracking assumes a
-   * single reader.
+   * 阻塞获取下一个待处理的饥饿应用，返回的应用会被标记为处理中直到下一次调用
+   * 该方法基于单消费者模型设计
    *
-   * @return starved application to process
-   * @throws InterruptedException if interrupted while waiting
+   * @return 待处理的饥饿应用
+   * @throws InterruptedException 等待时被中断则抛出
    */
   FSAppAttempt take() throws InterruptedException {
-    // Reset appBeingProcessed before the blocking call
+    // 阻塞获取前清空当前处理中标记
     appBeingProcessed = null;
 
-    // Blocking call to fetch the next starved application
+    // 阻塞获取下一个饥饿应用
     FSAppAttempt app = appsToProcess.take();
     appBeingProcessed = app;
     return app;
   }
 
+  /**
+   * 饥饿程度比较器，按饥饿程度降序排序，饥饿程度越高优先级越高
+   */
   private static class StarvationComparator implements
       Comparator<FSAppAttempt>, Serializable {
     private static final long serialVersionUID = 1;
@@ -76,6 +82,7 @@ class FSStarvedApps {
     @Override
     public int compare(FSAppAttempt app1, FSAppAttempt app2) {
       int ret = 1;
+      // 如果app1的饥饿需求小于等于app2，说明app2更饥饿，返回1让app2排在前面
       if (Resources.fitsIn(app1.getStarvation(), app2.getStarvation())) {
         ret = -1;
       }

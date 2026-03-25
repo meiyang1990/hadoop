@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,25 +45,26 @@ import java.util.Set;
 
 /**
  * <p>
- * The DistributedOpportunisticContainerAllocator allocates containers on a
- * given list of nodes, after modifying the container sizes to respect the
- * limits set by the ResourceManager. It tries to distribute the containers
- * as evenly as possible.
+ * 分布式机会容器分配器，在给定节点列表上分配机会容器，根据ResourceManager限制调整容器大小，
+ * 并尽可能均匀地将容器分布到各个节点上。用于YARN分布式机会调度场景，提升集群资源利用率。
  * </p>
  */
 public class DistributedOpportunisticContainerAllocator
     extends OpportunisticContainerAllocator {
 
+  // 节点本地区分标记
   private static final int NODE_LOCAL_LOOP = 0;
+  // 机架本地区分标记
   private static final int RACK_LOCAL_LOOP = 1;
+  // 跨交换机（非本地）区分标记
   private static final int OFF_SWITCH_LOOP = 2;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DistributedOpportunisticContainerAllocator.class);
 
   /**
-   * Create a new Opportunistic Container Allocator.
-   * @param tokenSecretManager TokenSecretManager
+   * 创建分布式机会容器分配器实例。
+   * @param tokenSecretManager 容器令牌密钥管理器
    */
   public DistributedOpportunisticContainerAllocator(
       BaseContainerTokenSecretManager tokenSecretManager) {
@@ -70,10 +72,9 @@ public class DistributedOpportunisticContainerAllocator
   }
 
   /**
-   * Create a new Opportunistic Container Allocator.
-   * @param tokenSecretManager TokenSecretManager
-   * @param maxAllocationsPerAMHeartbeat max number of containers to be
-   *                                     allocated in one AM heartbeat
+   * 创建分布式机会容器分配器实例，指定单次心跳最大分配数量。
+   * @param tokenSecretManager 容器令牌密钥管理器
+   * @param maxAllocationsPerAMHeartbeat 单次AM心跳最大可分配容器数量
    */
   public DistributedOpportunisticContainerAllocator(
       BaseContainerTokenSecretManager tokenSecretManager,
@@ -88,34 +89,32 @@ public class DistributedOpportunisticContainerAllocator
       OpportunisticContainerContext opportContext, long rmIdentifier,
       String appSubmitter) throws YarnException {
 
-    // Update black list.
+    // 更新黑名单
     updateBlacklist(blackList, opportContext);
 
-    // Add OPPORTUNISTIC requests to the outstanding ones.
+    // 将机会调度请求添加到待处理请求队列
     opportContext.addToOutstandingReqs(oppResourceReqs);
     Set<String> nodeBlackList = new HashSet<>(opportContext.getBlacklist());
+    // 记录本轮已分配容器的节点，避免同一节点分配过多
     Set<String> allocatedNodes = new HashSet<>();
     List<Container> allocatedContainers = new ArrayList<>();
 
-    // Satisfy the outstanding OPPORTUNISTIC requests.
+    // 循环处理待分配请求直到无法继续分配
     boolean continueLoop = true;
     while (continueLoop) {
       continueLoop = false;
       List<Map<Resource, List<Allocation>>> allocations = new ArrayList<>();
+      // 按优先级从高到低处理待分配请求
       for (SchedulerRequestKey schedulerKey :
           opportContext.getOutstandingOpReqs().descendingKeySet()) {
-        // Allocated containers :
-        //  Key = Requested Capability,
-        //  Value = List of Containers of given cap (the actual container size
-        //          might be different than what is requested, which is why
-        //          we need the requested capability (key) to match against
-        //          the outstanding reqs)
+        // 计算本轮心跳剩余可分配容器数量
         int remAllocs = -1;
         int maxAllocationsPerAMHeartbeat = getMaxAllocationsPerAMHeartbeat();
         if (maxAllocationsPerAMHeartbeat > 0) {
           remAllocs =
               maxAllocationsPerAMHeartbeat - allocatedContainers.size()
                   - getTotalAllocations(allocations);
+          // 已达到单次心跳分配上限，停止分配
           if (remAllocs <= 0) {
             LOG.info("Not allocating more containers as we have reached max "
                     + "allocations per AM heartbeat {}",
@@ -123,28 +122,46 @@ public class DistributedOpportunisticContainerAllocator
             break;
           }
         }
+        // 为当前优先级分配容器
         Map<Resource, List<Allocation>> allocation = allocate(
             rmIdentifier, opportContext, schedulerKey, applicationAttemptId,
             appSubmitter, nodeBlackList, allocatedNodes, remAllocs);
         if (allocation.size() > 0) {
           allocations.add(allocation);
+          // 本次分配成功，继续循环尝试分配更多
           continueLoop = true;
         }
       }
+      // 匹配分配结果，从待处理请求中扣除已分配容器
       matchAllocation(allocations, allocatedContainers, opportContext);
     }
 
     return allocatedContainers;
   }
 
+  /**
+   * 按优先级和资源规格分配机会容器。
+   * @param rmIdentifier ResourceManager标识
+   * @param appContext 应用分配上下文
+   * @param schedKey 调度请求key（优先级+分区）
+   * @param appAttId 应用尝试ID
+   * @param userName 提交应用用户名
+   * @param blackList 节点黑名单
+   * @param allocatedNodes 已分配节点集合
+   * @param maxAllocations 最大可分配数量
+   * @return 分配结果，key为请求资源规格，value为分配列表
+   * @throws YarnException 分配异常
+   */
   private Map<Resource, List<Allocation>> allocate(long rmIdentifier,
       OpportunisticContainerContext appContext, SchedulerRequestKey schedKey,
       ApplicationAttemptId appAttId, String userName, Set<String> blackList,
       Set<String> allocatedNodes, int maxAllocations)
       throws YarnException {
     Map<Resource, List<Allocation>> containers = new HashMap<>();
+    // 遍历当前优先级下所有资源请求
     for (EnrichedResourceRequest enrichedAsk :
         appContext.getOutstandingOpReqs().get(schedKey).values()) {
+      // 计算剩余可分配数量
       int remainingAllocs = -1;
       if (maxAllocations > 0) {
         int totalAllocated = 0;
@@ -158,6 +175,7 @@ public class DistributedOpportunisticContainerAllocator
           break;
         }
       }
+      // 执行实际容器分配
       allocateContainersInternal(rmIdentifier, appContext.getAppParams(),
           appContext.getContainerIdGenerator(), blackList, allocatedNodes,
           appAttId, appContext.getNodeMap(), userName, containers, enrichedAsk,
@@ -174,6 +192,21 @@ public class DistributedOpportunisticContainerAllocator
     return containers;
   }
 
+  /**
+   * 内部实际分配容器逻辑，遵循节点本地 -> 机架本地 -> 跨交换机的分配顺序。
+   * @param rmIdentifier ResourceManager标识
+   * @param appParams 分配参数
+   * @param idCounter 容器ID生成器
+   * @param blacklist 节点黑名单
+   * @param allocatedNodes 已分配节点集合
+   * @param id 应用尝试ID
+   * @param allNodes 所有可用节点映射
+   * @param userName 提交应用用户名
+   * @param allocations 输出分配结果
+   * @param enrichedAsk  enriched资源请求
+   * @param maxAllocations 最大可分配数量
+   * @throws YarnException 分配异常
+   */
   private void allocateContainersInternal(long rmIdentifier,
       AllocationParams appParams, ContainerIdGenerator idCounter,
       Set<String> blacklist, Set<String> allocatedNodes,
@@ -187,36 +220,39 @@ public class DistributedOpportunisticContainerAllocator
       return;
     }
     ResourceRequest anyAsk = enrichedAsk.getRequest();
+    // 计算本次需要分配的容器数量
     int toAllocate = anyAsk.getNumContainers()
         - (allocations.isEmpty() ? 0 :
         allocations.get(anyAsk.getCapability()).size());
+    // 限制每轮分配最大数量，避免单次分配过多
     toAllocate = Math.min(toAllocate,
         appParams.getMaxAllocationsPerSchedulerKeyPerRound());
     if (maxAllocations >= 0) {
       toAllocate = Math.min(maxAllocations, toAllocate);
     }
     int numAllocated = 0;
-    // Node Candidates are selected as follows:
-    // * Node local candidates selected in loop == 0
-    // * Rack local candidates selected in loop == 1
-    // * From loop == 2 onwards, we revert to off switch allocations.
+    // 根据请求位置信息确定初始循环层级：有节点请求从节点本地开始，否则从跨交换机开始
     int loopIndex = OFF_SWITCH_LOOP;
     if (enrichedAsk.getNodeMap().size() > 0) {
       loopIndex = NODE_LOCAL_LOOP;
     }
+    // 循环分配直到满足需要分配数量
     while (numAllocated < toAllocate) {
+      // 根据当前层级查找候选节点
       Collection<RemoteNode> nodeCandidates =
           findNodeCandidates(loopIndex, allNodes, blacklist, allocatedNodes,
               enrichedAsk);
+      // 遍历候选节点尝试分配
       for (RemoteNode rNode : nodeCandidates) {
         String rNodeHost = rNode.getNodeId().getHost();
-        // Ignore black list
+        // 跳过黑名单节点
         if (blacklist.contains(rNodeHost)) {
           LOG.info("Nodes for scheduling has a blacklisted node" +
               " [" + rNodeHost + "]..");
           continue;
         }
         String location = ResourceRequest.ANY;
+        // 节点本地位匹配检查
         if (loopIndex == NODE_LOCAL_LOOP) {
           if (enrichedAsk.getNodeMap().containsKey(rNodeHost)) {
             location = rNodeHost;
@@ -224,10 +260,12 @@ public class DistributedOpportunisticContainerAllocator
             continue;
           }
         } else if (allocatedNodes.contains(rNodeHost)) {
+          // 非本地位，避免同一节点分配多个机会容器
           LOG.info("Opportunistic container has already been allocated on {}.",
               rNodeHost);
           continue;
         }
+        // 机架本地位匹配检查
         if (loopIndex == RACK_LOCAL_LOOP) {
           if (enrichedAsk.getRackMap().containsKey(
               rNode.getRackName())) {
@@ -236,10 +274,12 @@ public class DistributedOpportunisticContainerAllocator
             continue;
           }
         }
+        // 创建容器实例
         Container container = createContainer(rmIdentifier, appParams,
             idCounter, id, userName, allocations, location,
             anyAsk, rNode);
         numAllocated++;
+        // 更新调度metrics
         updateMetrics(loopIndex);
         allocatedNodes.add(rNodeHost);
         LOG.info("Allocated [" + container.getId() + "] as opportunistic at " +
@@ -248,14 +288,14 @@ public class DistributedOpportunisticContainerAllocator
           break;
         }
       }
+      // 分配失败后升级层级：节点本地 -> 机架本地 -> 跨交换机
       if (loopIndex == NODE_LOCAL_LOOP &&
           enrichedAsk.getRackMap().size() > 0) {
         loopIndex = RACK_LOCAL_LOOP;
       } else {
         loopIndex++;
       }
-      // Handle case where there are no nodes remaining after blacklist is
-      // considered.
+      // 所有层级都分配失败，结束分配
       if (loopIndex > OFF_SWITCH_LOOP && numAllocated == 0) {
         LOG.warn("Unable to allocate any opportunistic containers.");
         break;
@@ -264,7 +304,10 @@ public class DistributedOpportunisticContainerAllocator
   }
 
 
-
+  /**
+   * 根据分配层级更新对应位置的调度指标。
+   * @param loopIndex 当前分配层级
+   */
   private void updateMetrics(int loopIndex) {
     OpportunisticSchedulerMetrics metrics =
         OpportunisticSchedulerMetrics.getMetrics();
@@ -277,11 +320,21 @@ public class DistributedOpportunisticContainerAllocator
     }
   }
 
+  /**
+   * 根据当前分配层级查找符合分区要求的候选节点列表。
+   * @param loopIndex 当前分配层级
+   * @param allNodes 所有可用节点映射
+   * @param blackList 节点黑名单
+   * @param allocatedNodes 已分配节点集合
+   * @param enrichedRR  enriched资源请求
+   * @return 候选节点列表
+   */
   private Collection<RemoteNode> findNodeCandidates(int loopIndex,
       Map<String, RemoteNode> allNodes, Set<String> blackList,
       Set<String> allocatedNodes, EnrichedResourceRequest enrichedRR) {
     LinkedList<RemoteNode> retList = new LinkedList<>();
     String partition = getRequestPartition(enrichedRR);
+    // 跨交换机层级，收集所有同分区可用节点
     if (loopIndex > 1) {
       for (RemoteNode remoteNode : allNodes.values()) {
         if (StringUtils.equals(partition, getRemoteNodePartition(remoteNode))) {
@@ -290,22 +343,21 @@ public class DistributedOpportunisticContainerAllocator
       }
       return retList;
     } else {
-
+      // 节点本地或机架本地层级，收集对应位置的候选节点
       int numContainers = enrichedRR.getRequest().getNumContainers();
       while (numContainers > 0) {
         if (loopIndex == 0) {
-          // Node local candidates
+          // 收集节点本地候选节点
           numContainers = collectNodeLocalCandidates(
               allNodes, enrichedRR, retList, numContainers);
         } else {
-          // Rack local candidates
+          // 收集机架本地候选节点
           numContainers =
               collectRackLocalCandidates(allNodes, enrichedRR, retList,
                   blackList, allocatedNodes, numContainers);
         }
+        // 如果本次循环没有收集到新节点，停止循环
         if (numContainers == enrichedRR.getRequest().getNumContainers()) {
-          // If there is no change in numContainers, then there is no point
-          // in looping again.
           break;
         }
       }
@@ -313,6 +365,16 @@ public class DistributedOpportunisticContainerAllocator
     }
   }
 
+  /**
+   * 收集机架本地候选节点，优先放置在未分配过机会容器的节点。
+   * @param allNodes 所有可用节点映射
+   * @param enrichedRR enriched资源请求
+   * @param retList 输出候选节点列表
+   * @param blackList 节点黑名单
+   * @param allocatedNodes 已分配节点集合
+   * @param numContainers 需要收集的节点数量
+   * @return 剩余还需要收集的节点数量
+   */
   private int collectRackLocalCandidates(Map<String, RemoteNode> allNodes,
       EnrichedResourceRequest enrichedRR, LinkedList<RemoteNode> retList,
       Set<String> blackList, Set<String> allocatedNodes, int numContainers) {
@@ -324,6 +386,7 @@ public class DistributedOpportunisticContainerAllocator
         if (blackList.contains(rHost)) {
           continue;
         }
+        // 已分配节点放到队尾，未分配放到队头优先分配，实现尽量分散
         if (allocatedNodes.contains(rHost)) {
           retList.addLast(rNode);
         } else {
@@ -338,21 +401,13 @@ public class DistributedOpportunisticContainerAllocator
     return numContainers;
   }
 
+  /**
+   * 收集节点本地候选节点。
+   * @param allNodes 所有可用节点映射
+   * @param enrichedRR enriched资源请求
+   * @param retList 输出候选节点列表
+   * @param numContainers 需要收集的节点数量
+   * @return 剩余还需要收集的节点数量
+   */
   private int collectNodeLocalCandidates(Map<String, RemoteNode> allNodes,
-      EnrichedResourceRequest enrichedRR, List<RemoteNode> retList,
-      int numContainers) {
-    String partition = getRequestPartition(enrichedRR);
-    for (String nodeName : enrichedRR.getNodeMap().keySet()) {
-      RemoteNode remoteNode = allNodes.get(nodeName);
-      if (remoteNode != null &&
-          StringUtils.equals(partition, getRemoteNodePartition(remoteNode))) {
-        retList.add(remoteNode);
-        numContainers--;
-      }
-      if (numContainers == 0) {
-        break;
-      }
-    }
-    return numContainers;
-  }
-}
+      EnrichedResourceRequest enrichedRR, List<Remote

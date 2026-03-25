@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,6 +45,8 @@ import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
+ * 文件说明：MapReduce连接表达式的移位归约语法解析器，用于将用户定义的多数据源连接表达式解析为可执行的组合输入格式树
+ * 
  * Very simple shift-reduce parser for join expressions.
  *
  * This should be sufficient for the user extension permitted now, but ought to
@@ -65,12 +68,15 @@ import org.apache.hadoop.util.ReflectionUtils;
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class Parser {
+  /**
+   * 枚举类型定义连接表达式中支持的Token类型
+   */
   @InterfaceAudience.Public
   @InterfaceStability.Evolving
   public enum TType { CIF, IDENT, COMMA, LPAREN, RPAREN, QUOT, NUM, }
 
   /**
-   * Tagged-union type for tokens from the join expression.
+   * 联合类型Token基类，存储连接表达式解析出的词法单元
    * @see Parser.TType
    */
   @InterfaceAudience.Public
@@ -95,6 +101,9 @@ public class Parser {
     }
   }
 
+  /**
+   * 存储数值类型的Token实现类
+   */
   @InterfaceAudience.Public
   @InterfaceStability.Evolving
   public static class NumToken extends Token {
@@ -106,6 +115,9 @@ public class Parser {
     public double getNum() { return num; }
   }
 
+  /**
+   * 存储语法树节点的Token实现类
+   */
   @InterfaceAudience.Public
   @InterfaceStability.Evolving
   public static class NodeToken extends Token {
@@ -119,6 +131,9 @@ public class Parser {
     }
   }
 
+  /**
+   * 存储字符串类型的Token实现类
+   */
   @InterfaceAudience.Public
   @InterfaceStability.Evolving
   public static class StrToken extends Token {
@@ -133,9 +148,7 @@ public class Parser {
   }
 
   /**
-   * Simple lexer wrapping a StreamTokenizer.
-   * This encapsulates the creation of tagged-union Tokens and initializes the
-   * SteamTokenizer.
+   * 词法分析器，基于StreamTokenizer将输入表达式字符串切分为Token流
    */
   private static class Lexer {
 
@@ -152,6 +165,9 @@ public class Parser {
       tok.wordChars('_','_');
     }
 
+    /**
+     * 获取下一个Token，返回null表示到达输入末尾
+     */
     Token next() throws IOException {
       int type = tok.nextToken();
       switch (type) {
@@ -159,18 +175,24 @@ public class Parser {
         case StreamTokenizer.TT_EOL:
           return null;
         case StreamTokenizer.TT_NUMBER:
+          // 数值类型Token
           return new NumToken(tok.nval);
         case StreamTokenizer.TT_WORD:
+          // 标识符类型Token
           return new StrToken(TType.IDENT, tok.sval);
         case '"':
+          // 引用字符串类型Token
           return new StrToken(TType.QUOT, tok.sval);
         default:
           switch (type) {
             case ',':
+              // 逗号分隔符
               return new Token(TType.COMMA);
             case '(':
+              // 左括号
               return new Token(TType.LPAREN);
             case ')':
+              // 右括号
               return new Token(TType.RPAREN);
             default:
               throw new IOException("Unexpected: " + type);
@@ -179,14 +201,17 @@ public class Parser {
     }
   }
 
+  /**
+   * 抽象语法树节点基类，定义节点通用能力和扩展接口，实现了ComposableInputFormat接口
+   */
   @InterfaceAudience.Public
   @InterfaceStability.Evolving
   public abstract static class Node implements ComposableInputFormat {
     /**
-     * Return the node type registered for the particular identifier.
-     * By default, this is a CNode for any composite node and a WNode
-     * for &quot;wrapped&quot; nodes. User nodes will likely be composite
-     * nodes.
+     * 根据标识符获取对应的节点实例，创建新的节点对象
+     * @param ident 节点标识符
+     * @return 对应类型的节点实例
+     * @throws IOException 找不到对应节点类型或实例化失败时抛出
      * @see #addIdentifier(java.lang.String, java.lang.Class[], java.lang.Class, java.lang.Class)
      * @see CompositeInputFormat#setFormat(org.apache.hadoop.mapred.JobConf)
      */
@@ -205,20 +230,24 @@ public class Parser {
       }
     }
 
+    // 节点构造方法参数签名
     private static final Class<?>[] ncstrSig = { String.class };
+    // 标识符到节点构造方法的映射表
     private static final
         Map<String,Constructor<? extends Node>> nodeCstrMap =
         new HashMap<String,Constructor<? extends Node>>();
+    // 标识符到RecordReader构造方法的映射表
     protected static final
         Map<String,Constructor<? extends ComposableRecordReader>> rrCstrMap =
         new HashMap<String,Constructor<? extends ComposableRecordReader>>();
 
     /**
-     * For a given identifier, add a mapping to the nodetype for the parse
-     * tree and to the ComposableRecordReader to be created, including the
-     * formals required to invoke the constructor.
-     * The nodetype and constructor signature should be filled in from the
-     * child node.
+     * 注册新的节点类型标识符，关联对应的节点类和RecordReader类
+     * @param ident 节点标识符
+     * @param mcstrSig RecordReader构造方法参数签名
+     * @param nodetype 节点类对象
+     * @param cl RecordReader类对象
+     * @throws NoSuchMethodException 找不到对应构造方法时抛出
      */
     protected static void addIdentifier(String ident, Class<?>[] mcstrSig,
                               Class<? extends Node> nodetype,
@@ -234,7 +263,7 @@ public class Parser {
       rrCstrMap.put(ident, mcstr);
     }
 
-    // inst
+    // 实例变量
     protected int id = -1;
     protected String ident;
     protected Class<? extends WritableComparator> cmpcl;
@@ -250,16 +279,29 @@ public class Parser {
     protected void setKeyComparator(Class<? extends WritableComparator> cmpcl) {
       this.cmpcl = cmpcl;
     }
+    
+    /**
+     * 抽象方法：解析当前节点的参数列表，构建子节点结构
+     * @param args Token形式的参数列表
+     * @param job 作业配置对象
+     * @throws IOException 解析错误时抛出
+     */
     abstract void parse(List<Token> args, JobConf job) throws IOException;
   }
 
   /**
-   * Nodetype in the parse tree for &quot;wrapped&quot; InputFormats.
+   * 包装已有输入格式的语法树节点类型，用于将普通输入格式包装为可连接的叶子节点
    */
   static class WNode extends Node {
     private static final Class<?>[] cstrSig =
       { Integer.TYPE, RecordReader.class, Class.class };
 
+    /**
+     * 注册包装节点标识符到构造方法的映射
+     * @param ident 节点标识符
+     * @param cl 对应RecordReader类
+     * @throws NoSuchMethodException 找不到构造方法时抛出
+     */
     static void addIdentifier(String ident,
                               Class<? extends ComposableRecordReader> cl)
         throws NoSuchMethodException {
@@ -274,8 +316,7 @@ public class Parser {
     }
 
     /**
-     * Let the first actual define the InputFormat and the second define
-     * the <code>mapred.input.dir</code> property.
+     * 解析包装节点参数：第一个参数是InputFormat类名，第二个参数是输入路径
      */
     public void parse(List<Token> ll, JobConf job) throws IOException {
       StringBuilder sb = new StringBuilder();
@@ -283,6 +324,7 @@ public class Parser {
       while (i.hasNext()) {
         Token t = i.next();
         if (TType.COMMA.equals(t.getType())) {
+          // 逗号分隔，反射实例化InputFormat
           try {
           	inf = (InputFormat)ReflectionUtils.newInstance(
           			job.getClassByName(sb.toString()),
@@ -309,6 +351,7 @@ public class Parser {
 
     private JobConf getConf(JobConf job) {
       JobConf conf = new JobConf(job);
+      // 设置当前包装节点的输入路径
       FileInputFormat.setInputPaths(conf, indir);
       conf.setClassLoader(job.getClassLoader());
       return conf;
@@ -316,6 +359,7 @@ public class Parser {
 
     public InputSplit[] getSplits(JobConf job, int numSplits)
         throws IOException {
+      // 委托给底层包装的InputFormat生成分片
       return inf.getSplits(getConf(job), numSplits);
     }
 
@@ -325,6 +369,7 @@ public class Parser {
         if (!rrCstrMap.containsKey(ident)) {
           throw new IOException("No RecordReader for " + ident);
         }
+        // 创建对应类型的ComposableRecordReader，传入底层RecordReader实例
         return rrCstrMap.get(ident).newInstance(id,
             inf.getRecordReader(split, getConf(job), reporter), cmpcl);
       } catch (IllegalAccessException e) {
@@ -342,20 +387,26 @@ public class Parser {
   }
 
   /**
-   * Internal nodetype for &quot;composite&quot; InputFormats.
+   * 组合输入格式的语法树节点类型，用于组合多个子节点实现多数据源连接
    */
   static class CNode extends Node {
 
     private static final Class<?>[] cstrSig =
       { Integer.TYPE, JobConf.class, Integer.TYPE, Class.class };
 
+    /**
+     * 注册组合节点标识符到构造方法的映射
+     * @param ident 节点标识符
+     * @param cl 对应RecordReader类
+     * @throws NoSuchMethodException 找不到构造方法时抛出
+     */
     static void addIdentifier(String ident,
                               Class<? extends ComposableRecordReader> cl)
         throws NoSuchMethodException {
       Node.addIdentifier(ident, cstrSig, CNode.class, cl);
     }
 
-    // inst
+    // 存储子节点列表
     private ArrayList<Node> kids = new ArrayList<Node>();
 
     public CNode(String ident) {
@@ -364,23 +415,25 @@ public class Parser {
 
     public void setKeyComparator(Class<? extends WritableComparator> cmpcl) {
       super.setKeyComparator(cmpcl);
+      // 递归设置所有子节点的键比较器
       for (Node n : kids) {
         n.setKeyComparator(cmpcl);
       }
     }
 
     /**
-     * Combine InputSplits from child InputFormats into a
-     * {@link CompositeInputSplit}.
+     * 合并所有子节点的分片，生成组合分片数组
      */
     public InputSplit[] getSplits(JobConf job, int numSplits)
         throws IOException {
       InputSplit[][] splits = new InputSplit[kids.size()][];
       for (int i = 0; i < kids.size(); ++i) {
+        // 从每个子节点获取分片
         final InputSplit[] tmp = kids.get(i).getSplits(job, numSplits);
         if (null == tmp) {
           throw new IOException("Error gathering splits from child RReader");
         }
+        // 检查所有子节点分片数量一致
         if (i > 0 && splits[i-1].length != tmp.length) {
           throw new IOException("Inconsistent split cardinality from child " +
               i + " (" + splits[i-1].length + "/" + tmp.length + ")");
@@ -388,6 +441,7 @@ public class Parser {
         splits[i] = tmp;
       }
       final int size = splits[0].length;
+      // 将对应位置的子分片组合为一个组合分片
       CompositeInputSplit[] ret = new CompositeInputSplit[size];
       for (int i = 0; i < size; ++i) {
         ret[i] = new CompositeInputSplit(splits.length);
@@ -412,92 +466,10 @@ public class Parser {
         if (!rrCstrMap.containsKey(ident)) {
           throw new IOException("No RecordReader for " + ident);
         }
+        // 实例化对应类型的组合RecordReader
         ret = (CompositeRecordReader)
           rrCstrMap.get(ident).newInstance(id, job, capacity, cmpcl);
       } catch (IllegalAccessException e) {
         throw (IOException)new IOException().initCause(e);
       } catch (InstantiationException e) {
         throw (IOException)new IOException().initCause(e);
-      } catch (InvocationTargetException e) {
-        throw (IOException)new IOException().initCause(e);
-      }
-      for (int i = 0; i < capacity; ++i) {
-        ret.add(kids.get(i).getRecordReader(spl.get(i), job, reporter));
-      }
-      return (ComposableRecordReader)ret;
-    }
-
-    /**
-     * Parse a list of comma-separated nodes.
-     */
-    public void parse(List<Token> args, JobConf job) throws IOException {
-      ListIterator<Token> i = args.listIterator();
-      while (i.hasNext()) {
-        Token t = i.next();
-        t.getNode().setID(i.previousIndex() >> 1);
-        kids.add(t.getNode());
-        if (i.hasNext() && !TType.COMMA.equals(i.next().getType())) {
-          throw new IOException("Expected ','");
-        }
-      }
-    }
-
-    public String toString() {
-      StringBuilder sb = new StringBuilder();
-      sb.append(ident + "(");
-      for (Node n : kids) {
-        sb.append(n.toString() + ",");
-      }
-      sb.setCharAt(sb.length() - 1, ')');
-      return sb.toString();
-    }
-  }
-
-  private static Token reduce(Stack<Token> st, JobConf job) throws IOException {
-    LinkedList<Token> args = new LinkedList<Token>();
-    while (!st.isEmpty() && !TType.LPAREN.equals(st.peek().getType())) {
-      args.addFirst(st.pop());
-    }
-    if (st.isEmpty()) {
-      throw new IOException("Unmatched ')'");
-    }
-    st.pop();
-    if (st.isEmpty() || !TType.IDENT.equals(st.peek().getType())) {
-      throw new IOException("Identifier expected");
-    }
-    Node n = Node.forIdent(st.pop().getStr());
-    n.parse(args, job);
-    return new NodeToken(n);
-  }
-
-  /**
-   * Given an expression and an optional comparator, build a tree of
-   * InputFormats using the comparator to sort keys.
-   */
-  static Node parse(String expr, JobConf job) throws IOException {
-    if (null == expr) {
-      throw new IOException("Expression is null");
-    }
-    Class<? extends WritableComparator> cmpcl =
-      job.getClass("mapred.join.keycomparator", null, WritableComparator.class);
-    Lexer lex = new Lexer(expr);
-    Stack<Token> st = new Stack<Token>();
-    Token tok;
-    while ((tok = lex.next()) != null) {
-      if (TType.RPAREN.equals(tok.getType())) {
-        st.push(reduce(st, job));
-      } else {
-        st.push(tok);
-      }
-    }
-    if (st.size() == 1 && TType.CIF.equals(st.peek().getType())) {
-      Node ret = st.pop().getNode();
-      if (cmpcl != null) {
-        ret.setKeyComparator(cmpcl);
-      }
-      return ret;
-    }
-    throw new IOException("Missing ')'");
-  }
-
-}

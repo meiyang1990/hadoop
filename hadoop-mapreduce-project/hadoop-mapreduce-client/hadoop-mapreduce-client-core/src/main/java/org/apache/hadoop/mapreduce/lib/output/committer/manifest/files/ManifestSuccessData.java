@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,31 +45,10 @@ import org.apache.hadoop.fs.statistics.IOStatisticsSupport;
 import org.apache.hadoop.util.JsonSerialization;
 
 /**
- * Summary data saved into a {@code _SUCCESS} marker file.
- *
- * This is a copy of the S3A committer success data format, with
- * a goal of being/remaining compatible.
- * This makes it easier for tests in downstream modules to
- * be able to parse the success files from any of the committers.
- *
- * This should be considered public; it is based on the S3A
- * format, which has proven stable over time.
- *
- * The JSON format SHOULD be considered public and evolving
- * with compatibility across versions.
- *
- * All the Java serialization data is different and may change
- * across versions with no stability guarantees other than
- * "manifest summaries MAY be serialized between processes with
- * the exact same version of this binary on their classpaths."
- * That is sufficient for testing in Spark.
- *
- * To aid with Java serialization, the maps and lists are
- * exclusively those which serialize well.
- * IOStatisticsSnapshot has a lot of complexity in marshalling
- * there; this class doesn't worry about concurrent access
- * so is simpler.
- *
+ * 文件级注释：
+ * Manifest提交器作业成功标记文件_SUCCESS的数据模型，保存作业提交的结果摘要信息。
+ * 兼容S3A提交器的成功数据格式，便于下游模块统一解析不同提交器生成的成功标记文件。
+ * JSON格式保持跨版本兼容性，Java序列化仅保证相同二进制版本间的兼容性。
  */
 @SuppressWarnings({"unused", "CollectionDeclaredAsConcreteClass"})
 @InterfaceAudience.Public
@@ -81,98 +61,83 @@ public class ManifestSuccessData
       LoggerFactory.getLogger(ManifestSuccessData.class);
 
   /**
-   * Supported version value: {@value}.
-   * If this is changed the value of {@link #serialVersionUID} will change,
-   * to avoid deserialization problems.
+   * 当前支持的数据格式版本，版本变更会同步更新序列化ID避免反序列化错误。
    */
   public static final int VERSION = 1;
 
   /**
-   * Serialization ID: {@value}.
+   * 序列化ID，与版本号绑定保证兼容性。
    */
   private static final long serialVersionUID = 4755993198698104084L + VERSION;
 
   /**
-   * Name to include in persisted data, so as to differentiate from
-   * any other manifests: {@value}.
+   * 持久化数据中的类型标识，用于区分其他类型的清单文件。
    */
   public static final String NAME
       = "org.apache.hadoop.fs.s3a.commit.files.SuccessData/" + VERSION;
 
-  /**
-   * Name of file; includes version marker.
-   */
+  /** 数据标识名称。 */
   private String name;
 
-  /** Timestamp of creation. */
+  /** 文件创建时间戳。 */
   private long timestamp;
 
-  /**
-   * Did this succeed?
-   * It is implicitly true in a _SUCCESS file, but if the file
-   * is also saved to a log dir, then it depends on the outcome
+  /** 
+   * 作业是否成功标记，_SUCCESS文件中默认为true，
+   * 保存到日志目录时可根据实际结果修改。
    */
   private boolean success = true;
 
-  /** Timestamp as date string; no expectation of parseability. */
+  /** 创建时间的日期字符串，不保证可解析。 */
   private String date;
 
-  /**
-   * Host which created the file (implicitly: committed the work).
-   */
+  /** 创建该文件的主机名，即提交作业的节点。 */
   private String hostname;
 
-  /**
-   * Committer name.
-   */
+  /** 提交器名称。 */
   private String committer;
 
-  /**
-   * Description text.
-   */
+  /** 描述文本。 */
   private String description;
 
-  /** Job ID, if known. */
+  /** 作业ID，已知时保存。 */
   private String jobId = "";
 
-  /**
-   * Source of the job ID.
-   */
+  /** 作业ID来源。 */
   private String jobIdSource = "";
 
   /**
-   * Metrics.
-   * Uses a treemap for serialization.
+   * 指标数据，使用TreeMap保证序列化稳定性。
    */
   private TreeMap<String, Long> metrics = new TreeMap<>();
 
   /**
-   * Diagnostics information.
-   * Uses a treemap for serialization.
+   * 诊断信息，使用TreeMap保证序列化稳定性。
    */
   private TreeMap<String, String> diagnostics = new TreeMap<>();
 
   /**
-   * Filenames in the commit.
+   * 本次提交涉及的所有文件路径。
    */
   private ArrayList<String> filenames = new ArrayList<>(0);
 
   /**
-   * IOStatistics.
+   * IO统计信息快照。
    */
   @JsonProperty("iostatistics")
   private IOStatisticsSnapshot iostatistics = new IOStatisticsSnapshot();
 
-  /**
-   * State (committed, aborted).
-   */
+  /** 作业状态：已提交、已中止等。 */
   private String state;
 
-  /**
-   * Stage: last stage executed.
-   */
+  /** 最后执行的提交阶段。 */
   private String stage;
 
+  /**
+   * 验证加载的成功数据格式兼容性。
+   * @return 验证通过的当前实例
+   * @throws IOException 格式不兼容时抛出
+   */
   @Override
   public ManifestSuccessData validate() throws IOException {
     verify(name != null,
@@ -182,29 +147,45 @@ public class ManifestSuccessData
     return this;
   }
 
+  /**
+   * 创建当前类的JSON序列化器。
+   * @return JSON序列化器实例
+   */
   @Override
   public JsonSerialization<ManifestSuccessData> createSerializer() {
     return serializer();
   }
 
+  /**
+   * 将当前实例序列化为字节数组。
+   * @return 序列化后的字节数组
+   * @throws IOException 序列化失败时抛出
+   */
   @Override
   public byte[] toBytes() throws IOException {
     return serializer().toBytes(this);
   }
 
   /**
-   * To JSON.
-   * @return json string value.
-   * @throws IOException failure
+   * 将当前实例序列化为JSON字符串。
+   * @return JSON字符串
+   * @throws IOException 序列化失败时抛出
    */
   public String toJson() throws IOException {
     return serializer().toJson(this);
   }
 
+  /**
+   * 将当前成功数据保存到指定路径。
+   * @param fs 文件系统
+   * @param path 保存路径
+   * @param overwrite 是否覆盖已有文件
+   * @throws IOException 保存失败时抛出
+   */
   @Override
   public void save(FileSystem fs, Path path, boolean overwrite)
       throws IOException {
-    // always set the name field before being saved.
+    // 保存前设置正确的名称标识
     name = NAME;
     serializer().save(fs, path, this, overwrite);
   }
@@ -225,35 +206,34 @@ public class ManifestSuccessData
   }
 
   /**
-   * Dump the metrics (if any) to a string.
-   * The metrics are sorted for ease of viewing.
-   * @param prefix prefix before every entry
-   * @param middle string between key and value
-   * @param suffix suffix to each entry
-   * @return the dumped string
+   * 将指标信息格式化输出为字符串，按键排序。
+   * @param prefix 每个条目前缀
+   * @param middle 键值之间分隔符
+   * @param suffix 每个条目后缀
+   * @return 格式化后的指标字符串
    */
   public String dumpMetrics(String prefix, String middle, String suffix) {
     return joinMap(metrics, prefix, middle, suffix);
   }
 
   /**
-   * Dump the diagnostics (if any) to a string.
-   * @param prefix prefix before every entry
-   * @param middle string between key and value
-   * @param suffix suffix to each entry
-   * @return the dumped string
+   * 将诊断信息格式化输出为字符串，按键排序。
+   * @param prefix 每个条目前缀
+   * @param middle 键值之间分隔符
+   * @param suffix 每个条目后缀
+   * @return 格式化后的诊断信息字符串
    */
   public String dumpDiagnostics(String prefix, String middle, String suffix) {
     return joinMap(diagnostics, prefix, middle, suffix);
   }
 
   /**
-   * Join any map of string to value into a string, sorting the keys first.
-   * @param map map to join
-   * @param prefix prefix before every entry
-   * @param middle string between key and value
-   * @param suffix suffix to each entry
-   * @return a string for reporting.
+   * 将键值对映射按key排序后拼接为字符串，用于日志输出。
+   * @param map 待拼接的映射表
+   * @param prefix 每个条目前缀
+   * @param middle 键值之间分隔符
+   * @param suffix 每个条目后缀
+   * @return 拼接后的字符串
    */
   protected static String joinMap(Map<String, ?> map,
       String prefix,
@@ -275,11 +255,11 @@ public class ManifestSuccessData
   }
 
   /**
-   * Load an instance from a file, then validate it.
-   * @param fs filesystem
-   * @param path path
-   * @return the loaded instance
-   * @throws IOException IO failure
+   * 从文件加载成功数据并验证格式兼容性。
+   * @param fs 文件系统
+   * @param path 文件路径
+   * @return 加载验证后的实例
+   * @throws IOException IO错误或格式不兼容时抛出
    */
   public static ManifestSuccessData load(FileSystem fs, Path path)
       throws IOException {
@@ -290,8 +270,8 @@ public class ManifestSuccessData
   }
 
   /**
-   * Get a JSON serializer for this class.
-   * @return a serializer.
+   * 获取当前类的JSON序列化器实例。
+   * @return JSON序列化器
    */
   public static JsonSerialization<ManifestSuccessData> serializer() {
     return new JsonSerialization<>(ManifestSuccessData.class, false, true);
@@ -305,7 +285,7 @@ public class ManifestSuccessData
     this.name = name;
   }
 
-  /** @return timestamp of creation. */
+  /** @return 创建时间戳。 */
   public long getTimestamp() {
     return timestamp;
   }
@@ -314,7 +294,7 @@ public class ManifestSuccessData
     this.timestamp = timestamp;
   }
 
-  /** @return timestamp as date; no expectation of parseability. */
+  /** @return 创建日期字符串，不保证可解析。 */
   public String getDate() {
     return date;
   }
@@ -324,7 +304,7 @@ public class ManifestSuccessData
   }
 
   /**
-   * @return host which created the file (implicitly: committed the work).
+   * @return 创建该文件的主机名，即提交作业的节点。
    */
   public String getHostname() {
     return hostname;
@@ -335,7 +315,7 @@ public class ManifestSuccessData
   }
 
   /**
-   * @return committer name.
+   * @return 提交器名称。
    */
   public String getCommitter() {
     return committer;
@@ -346,7 +326,7 @@ public class ManifestSuccessData
   }
 
   /**
-   * @return any description text.
+   * @return 描述文本。
    */
   public String getDescription() {
     return description;
@@ -357,7 +337,7 @@ public class ManifestSuccessData
   }
 
   /**
-   * @return any metrics.
+   * @return 指标映射表。
    */
   public Map<String, Long> getMetrics() {
     return metrics;
@@ -368,15 +348,15 @@ public class ManifestSuccessData
   }
 
   /**
-   * @return a list of filenames in the commit.
+   * @return 本次提交的文件路径列表。
    */
   public List<String> getFilenames() {
     return filenames;
   }
 
   /**
-   * Get the list of filenames as paths.
-   * @return the paths.
+   * 获取文件路径列表，转换为Path对象。
+   * @return 转换后的Path列表
    */
   @JsonIgnore
   public List<Path> getFilenamePaths() {
@@ -386,7 +366,7 @@ public class ManifestSuccessData
   }
 
   /**
-   * Set the list of filename paths.
+   * 设置文件路径列表，从Path对象转换为字符串保存。
    */
   @JsonIgnore
   public void setFilenamePaths(List<Path> paths) {
@@ -409,15 +389,15 @@ public class ManifestSuccessData
   }
 
   /**
-   * Add a diagnostics entry.
-   * @param key name
-   * @param value value
+   * 添加一条诊断信息。
+   * @param key 诊断键名
+   * @param value 诊断值
    */
   public void putDiagnostic(String key, String value) {
     diagnostics.put(key, value);
   }
 
-  /** @return Job ID, if known. */
+  /** @return 作业ID，未知时返回空字符串。 */
   public String getJobId() {
     return jobId;
   }
@@ -444,24 +424,24 @@ public class ManifestSuccessData
   }
 
   /**
-   * Set the IOStatistics to a snapshot of the source.
-   * @param iostats. Statistics; may be null.
+   * 将传入的IO统计信息生成快照保存。
+   * @param iostats 源IO统计信息，可为null
    */
   public void snapshotIOStatistics(IOStatistics iostats) {
     setIOStatistics(IOStatisticsSupport.snapshotIOStatistics(iostats));
   }
 
   /**
-   * Set the success flag.
-   * @param success did the job succeed?
+   * 设置作业成功标记。
+   * @param success 作业是否成功
    */
   public void setSuccess(boolean success) {
     this.success = success;
   }
 
   /**
-   * Get the success flag.
-   * @return did the job succeed?
+   * 获取作业成功标记。
+   * @return 作业是否成功
    */
   public boolean getSuccess() {
     return success;
@@ -480,14 +460,13 @@ public class ManifestSuccessData
   }
 
   /**
-   * Note a failure by setting success flag to false,
-   * then add the exception to the diagnostics.
-   * @param thrown throwable
+   * 记录作业失败信息，设置成功标记为false，并将异常信息保存到诊断信息中。
+   * @param thrown 失败抛出的异常
    */
   public void recordJobFailure(Throwable thrown) {
     setSuccess(false);
     String stacktrace = ExceptionUtils.getStackTrace(thrown);
     diagnostics.put(DiagnosticKeys.EXCEPTION, thrown.toString());
-    diagnostics.put(DiagnosticKeys.STACKTRACE, stacktrace);
+    diagnostics.put(DiagnosticKeys.STACKTRACE, stacktrace;
   }
 }

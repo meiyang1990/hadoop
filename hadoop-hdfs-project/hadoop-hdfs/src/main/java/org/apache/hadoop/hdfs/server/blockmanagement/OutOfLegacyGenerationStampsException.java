@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,15 +24,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This exception is thrown when the name node runs out of V1 (legacy)
- * generation stamps.
- *
+ * HDFS块管理模块异常类，表示NameNode已耗尽V1（旧版）块生成戳
+ * 当系统使用旧版本块生成策略且分配完所有可用编号时抛出该异常
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class OutOfLegacyGenerationStampsException extends IOException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造异常对象，预置默认错误信息
+   */
   public OutOfLegacyGenerationStampsException() {
     super("Out of V1 (legacy) generation stamps\n");
   }

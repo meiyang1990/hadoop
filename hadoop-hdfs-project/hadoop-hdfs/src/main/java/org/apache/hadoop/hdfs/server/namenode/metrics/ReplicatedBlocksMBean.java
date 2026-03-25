@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,54 +21,61 @@ package org.apache.hadoop.hdfs.server.namenode.metrics;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * This interface defines the methods to get status pertaining to blocks of type
- * {@link org.apache.hadoop.hdfs.protocol.BlockType#CONTIGUOUS} in FSNamesystem
- * of a NameNode. It is also used for publishing via JMX.
+ * HDFS NameNode中复制块（CONTIGUOUS类型）状态指标的JMX MBean接口
+ * 用于通过JMX暴露复制块相关统计信息，供监控系统采集查看
  * <p>
- * Aggregated status of all blocks is reported in
+ * 所有块的聚合状态请查看
  * @see FSNamesystemMBean
- * Name Node runtime activity statistic info is reported in
+ * NameNode运行时活动统计请查看
  * @see org.apache.hadoop.hdfs.server.namenode.metrics.NameNodeMetrics
  */
 @InterfaceAudience.Private
 public interface ReplicatedBlocksMBean {
   /**
-   * Return low redundancy blocks count.
+   * 获取低冗余复制块数量（副本数低于要求值的块）
+   * @return 低冗余复制块总数
    */
   long getLowRedundancyReplicatedBlocks();
 
   /**
-   * Return corrupt blocks count.
+   * 获取损坏复制块数量
+   * @return 损坏复制块总数
    */
   long getCorruptReplicatedBlocks();
 
   /**
-   * Return missing blocks count.
+   * 获取缺失复制块数量（所有副本都不可用的块）
+   * @return 缺失复制块总数
    */
   long getMissingReplicatedBlocks();
 
   /**
-   * Return count of missing blocks with replication factor one.
+   * 获取副本因子为1的缺失复制块数量
+   * @return 副本因子为1的缺失复制块总数
    */
   long getMissingReplicationOneBlocks();
 
   /**
-    * Return count of badly distributed blocks
+   * 获取分布不良复制块数量（副本分布不符合机架感知策略的块）
+   * @return 分布不良复制块总数
    */
   long getBadlyDistributedBlocks();
 
   /**
-   * Return total bytes of future blocks.
+   * 获取即将提交的复制块总字节数（正在写入尚未完成的块）
+   * @return 即将提交的复制块总字节数
    */
   long getBytesInFutureReplicatedBlocks();
 
   /**
-   * Return count of blocks that are pending deletion.
+   * 获取待删除复制块数量
+   * @return 待删除复制块总数
    */
   long getPendingDeletionReplicatedBlocks();
 
   /**
-   * Return total number of replicated blocks.
+   * 获取集群中复制块总数
+   * @return 复制块总数量
    */
   long getTotalReplicatedBlocks();
 }

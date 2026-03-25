@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,28 +26,45 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.util.StringUtils;
 
 /**
- * The exception is thrown when file system state is inconsistent 
- * and is not recoverable. 
- * 
+ * 文件系统状态不一致且不可恢复时抛出的异常
+ * 通常出现在HDFS元数据存储目录损坏或状态异常场景
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class InconsistentFSStateException extends IOException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造函数，基于异常目录和描述信息创建异常
+   * @param dir 状态异常的目录
+   * @param descr 异常描述信息
+   */
   public InconsistentFSStateException(File dir, String descr) {
     super("Directory " + getFilePath(dir)
           + " is in an inconsistent state: " + descr);
   }
 
+  /**
+   * 构造函数，基于异常目录、描述信息和原始异常创建异常
+   * @param dir 状态异常的目录
+   * @param descr 异常描述信息
+   * @param ex 原始异常
+   */
   public InconsistentFSStateException(File dir, String descr, Throwable ex) {
     this(dir, descr + "\n" + StringUtils.stringifyException(ex));
   }
   
+  /**
+   * 获取文件的规范化路径，获取失败则返回普通路径
+   * @param dir 需要获取路径的目录对象
+   * @return 目录的完整路径字符串
+   */
   private static String getFilePath(File dir) {
     try {
+      // 尝试获取规范化绝对路径
       return dir.getCanonicalPath();
     } catch(IOException e) {}
+    // 获取失败则返回原始路径
     return dir.getPath();
   }
 }

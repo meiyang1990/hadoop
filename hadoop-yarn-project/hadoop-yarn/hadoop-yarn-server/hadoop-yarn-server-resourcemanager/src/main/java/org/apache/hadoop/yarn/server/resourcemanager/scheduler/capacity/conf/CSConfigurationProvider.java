@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,22 +26,25 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 import java.io.IOException;
 
 /**
- * Configuration provider for {@link CapacityScheduler}.
+ * 文件提供容量调度器的配置提供者抽象接口，定义了加载容量调度器配置的统一规范，
+ * 支持不同的配置存储实现（如本地文件、ZK存储等），实现配置加载逻辑的解耦。
+ *
+ * 容量调度器 {@link CapacityScheduler} 的配置提供者抽象接口。
  */
 public interface CSConfigurationProvider {
 
   /**
-   * Initialize the configuration provider with given conf.
-   * @param conf configuration to initialize with
-   * @throws IOException if initialization fails due to misconfiguration
+   * 使用给定的配置初始化配置提供者。
+   * @param conf 用于初始化的基础配置
+   * @throws IOException 如果配置错误导致初始化失败则抛出该异常
    */
   void init(Configuration conf) throws IOException;
 
   /**
-   * Loads capacity scheduler configuration object.
-   * @param conf initial bootstrap configuration
-   * @return CS configuration
-   * @throws IOException if fail to retrieve configuration
+   * 加载容量调度器配置对象。
+   * @param conf 初始引导配置
+   * @return 加载完成的容量调度器配置对象
+   * @throws IOException 如果获取配置失败则抛出该异常
    */
   CapacitySchedulerConfiguration loadConfiguration(Configuration conf)
       throws IOException;

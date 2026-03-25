@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +23,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * The unique identifier for an entity
+ * 时间线服务中实体的唯一标识符，通过ID和类型共同标识一个实体
  */
 @Private
 @Unstable
@@ -31,22 +32,27 @@ public class EntityIdentifier implements Comparable<EntityIdentifier> {
   private String id;
   private String type;
 
+  /**
+   * 构造实体标识符，通过实体ID和类型共同标识
+   * @param id 实体唯一ID
+   * @param type 实体类型
+   */
   public EntityIdentifier(String id, String type) {
     this.id = id;
     this.type = type;
   }
 
   /**
-   * Get the entity Id.
-   * @return The entity Id.
+   * 获取实体ID
+   * @return 实体ID
    */
   public String getId() {
     return id;
   }
 
   /**
-   * Get the entity type.
-   * @return The entity type.
+   * 获取实体类型
+   * @return 实体类型
    */
   public String getType() {
     return type;
@@ -54,8 +60,10 @@ public class EntityIdentifier implements Comparable<EntityIdentifier> {
 
   @Override
   public int compareTo(EntityIdentifier other) {
+    // 先比较实体类型
     int c = type.compareTo(other.type);
     if (c != 0) return c;
+    // 类型相同再比较实体ID
     return id.compareTo(other.id);
   }
 

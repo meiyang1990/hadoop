@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -53,42 +54,44 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.fs.FileUtil.maybeIgnoreMissingDirectory;
 
 /**
- * A base class for file-based {@link InputFormat}s.
- *
- * <p><code>FileInputFormat</code> is the base class for all file-based 
- * <code>InputFormat</code>s. This provides a generic implementation of
- * {@link #getSplits(JobContext)}.
- *
- * Implementations of <code>FileInputFormat</code> can also override the
- * {@link #isSplitable(JobContext, Path)} method to prevent input files
- * from being split-up in certain situations. Implementations that may
- * deal with non-splittable files <i>must</i> override this method, since
- * the default implementation assumes splitting is always possible.
+ * 文件型InputFormat的抽象基类，为所有基于文件的输入格式提供通用实现。
+ * 核心功能包括：输入路径管理、文件过滤、输入分片切分逻辑，子类只需实现具体的记录读取逻辑。
+ * 子类可以重写{@link #isSplitable(JobContext, Path)}方法控制文件是否可切分，默认所有文件均可切分。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
+  /** 输入目录配置项key */
   public static final String INPUT_DIR = 
     "mapreduce.input.fileinputformat.inputdir";
+  /** 分片最大字节数配置项key */
   public static final String SPLIT_MAXSIZE = 
     "mapreduce.input.fileinputformat.split.maxsize";
+  /** 分片最小字节数配置项key */
   public static final String SPLIT_MINSIZE = 
     "mapreduce.input.fileinputformat.split.minsize";
+  /** 路径过滤器类配置项key */
   public static final String PATHFILTER_CLASS = 
     "mapreduce.input.pathFilter.class";
+  /** 输入文件总数配置项key */
   public static final String NUM_INPUT_FILES =
     "mapreduce.input.fileinputformat.numinputfiles";
+  /** 是否递归遍历输入目录配置项key */
   public static final String INPUT_DIR_RECURSIVE =
     "mapreduce.input.fileinputformat.input.dir.recursive";
+  /** 非递归模式下是否忽略子目录配置项key */
   public static final String INPUT_DIR_NONRECURSIVE_IGNORE_SUBDIRS =
     "mapreduce.input.fileinputformat.input.dir.nonrecursive.ignore.subdirs";
+  /** 列取文件状态的线程数配置项key */
   public static final String LIST_STATUS_NUM_THREADS =
       "mapreduce.input.fileinputformat.list-status.num-threads";
+  /** 列取文件状态的默认线程数 */
   public static final int DEFAULT_LIST_STATUS_NUM_THREADS = 1;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(FileInputFormat.class);
 
+  /** 分片大小容差阈值：剩余文件大小超过splitSize的10%才会生成新分片 */
   private static final double SPLIT_SLOP = 1.1;   // 10% slop
   
   @Deprecated
@@ -96,6 +99,7 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
     BYTES_READ
   }
 
+  /** 默认隐藏文件过滤器，过滤掉以_或.开头的文件 */
   private static final PathFilter hiddenFileFilter = new PathFilter(){
       public boolean accept(Path p){
         String name = p.getName(); 
@@ -104,9 +108,8 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
     }; 
 
   /**
-   * Proxy PathFilter that accepts a path only if all filters given in the
-   * constructor do. Used by the listPaths() to apply the built-in
-   * hiddenFileFilter together with a user provided one (if any).
+   * 多过滤器组合路径过滤器，仅当所有内部过滤器都accept时才接受路径。
+   * 用于组合默认隐藏文件过滤器和用户自定义过滤器。
    */
   private static class MultiPathFilter implements PathFilter {
     private List<PathFilter> filters;
@@ -126,9 +129,9 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
   
   /**
-   * @param job
-   *          the job to modify
-   * @param inputDirRecursive
+   * 设置作业是否递归遍历输入目录
+   * @param job 待修改的作业对象
+   * @param inputDirRecursive 是否递归遍历
    */
   public static void setInputDirRecursive(Job job,
       boolean inputDirRecursive) {
@@ -137,9 +140,9 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
  
   /**
-   * @param job
-   *          the job to look at.
-   * @return should the files to be read recursively?
+   * 获取作业是否开启输入目录递归遍历
+   * @param job 作业上下文对象
+   * @return 是否递归遍历输入目录
    */
   public static boolean getInputDirRecursive(JobContext job) {
     return job.getConfiguration().getBoolean(INPUT_DIR_RECURSIVE,
@@ -147,37 +150,29 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
 
   /**
-   * Get the lower bound on split size imposed by the format.
-   * @return the number of bytes of the minimal split for this format
+   * 获取当前输入格式要求的最小分片大小
+   * @return 格式要求的最小分片字节数
    */
   protected long getFormatMinSplitSize() {
     return 1;
   }
 
   /**
-   * Is the given filename splittable? Usually, true, but if the file is
-   * stream compressed, it will not be.
-   *
-   * The default implementation in <code>FileInputFormat</code> always returns
-   * true. Implementations that may deal with non-splittable files <i>must</i>
-   * override this method.
-   *
-   * <code>FileInputFormat</code> implementations can override this and return
-   * <code>false</code> to ensure that individual input files are never split-up
-   * so that {@link Mapper}s process entire files.
-   * 
-   * @param context the job context
-   * @param filename the file name to check
-   * @return is this file splitable?
+   * 判断指定文件是否可以切分为多个分片
+   * 默认实现返回true，处理不可切分文件（如压缩文件）的子类必须重写此方法。
+   * 返回false可保证整个文件作为一个分片由单个Mapper处理。
+   * @param context 作业上下文
+   * @param filename 待检查的文件路径
+   * @return 文件是否可切分
    */
   protected boolean isSplitable(JobContext context, Path filename) {
     return true;
   }
 
   /**
-   * Set a PathFilter to be applied to the input paths for the map-reduce job.
-   * @param job the job to modify
-   * @param filter the PathFilter class use for filtering the input paths.
+   * 设置作业输入路径的过滤器
+   * @param job 待修改的作业对象
+   * @param filter 路径过滤器类
    */
   public static void setInputPathFilter(Job job,
                                         Class<? extends PathFilter> filter) {
@@ -186,9 +181,9 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
 
   /**
-   * Set the minimum input split size
-   * @param job the job to modify
-   * @param size the minimum size
+   * 设置输入分片最小字节数
+   * @param job 待修改的作业对象
+   * @param size 最小分片字节数
    */
   public static void setMinInputSplitSize(Job job,
                                           long size) {
@@ -196,18 +191,18 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
 
   /**
-   * Get the minimum split size
-   * @param job the job
-   * @return the minimum number of bytes that can be in a split
+   * 获取输入分片最小字节数配置
+   * @param job 作业上下文
+   * @return 最小分片字节数
    */
   public static long getMinSplitSize(JobContext job) {
     return job.getConfiguration().getLong(SPLIT_MINSIZE, 1L);
   }
 
   /**
-   * Set the maximum split size
-   * @param job the job to modify
-   * @param size the maximum split size
+   * 设置输入分片最大字节数
+   * @param job 待修改的作业对象
+   * @param size 最大分片字节数
    */
   public static void setMaxInputSplitSize(Job job,
                                           long size) {
@@ -215,9 +210,9 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
 
   /**
-   * Get the maximum split size.
-   * @param context the job to look at.
-   * @return the maximum number of bytes a split can include
+   * 获取输入分片最大字节数配置
+   * @param context 作业上下文
+   * @return 最大分片字节数
    */
   public static long getMaxSplitSize(JobContext context) {
     return context.getConfiguration().getLong(SPLIT_MAXSIZE, 
@@ -225,9 +220,9 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
 
   /**
-   * Get a PathFilter instance of the filter set for the input paths.
-   *
-   * @return the PathFilter instance set for the job, NULL if none has been set.
+   * 获取作业配置的输入路径过滤器实例
+   * @param context 作业上下文
+   * @return 路径过滤器实例，未配置则返回null
    */
   public static PathFilter getInputPathFilter(JobContext context) {
     Configuration conf = context.getConfiguration();
@@ -238,16 +233,11 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
 
   /**
-   * List input directories.
-   * Subclasses may override to, e.g., select only files matching a regular
-   * expression. 
-   *
-   * If security is enabled, this method collects
-   * delegation tokens from the input paths and adds them to the job's
-   * credentials.
-   * @param job the job to list input paths for and attach tokens to.
-   * @return array of FileStatus objects
-   * @throws IOException if zero items.
+   * 列取所有输入路径匹配的文件状态，应用过滤器并获取权限token
+   * 如果开启安全认证，会收集输入路径的委托令牌并添加到作业凭证中
+   * @param job 作业上下文
+   * @return 所有符合条件的输入文件状态列表
+   * @throws IOException 当没有输入路径或IO错误时抛出异常
    */
   protected List<FileStatus> listStatus(JobContext job
                                         ) throws IOException {
@@ -256,15 +246,14 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
       throw new IOException("No input paths specified in job");
     }
     
-    // get tokens for all the required FileSystems..
+    // 为所有输入文件系统获取NameNode委托令牌
     TokenCache.obtainTokensForNamenodes(job.getCredentials(), dirs, 
                                         job.getConfiguration());
 
-    // Whether we need to recursive look into the directory structure
+    // 获取是否递归遍历目录配置
     boolean recursive = getInputDirRecursive(job);
 
-    // creates a MultiPathFilter with the hiddenFileFilter and the
-    // user provided one (if any).
+    // 组合默认隐藏文件过滤器和用户自定义过滤器
     List<PathFilter> filters = new ArrayList<PathFilter>();
     filters.add(hiddenFileFilter);
     PathFilter jobFilter = getInputPathFilter(job);
@@ -275,12 +264,15 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
     
     List<FileStatus> result = null;
 
+    // 获取列取文件状态的线程数配置
     int numThreads = job.getConfiguration().getInt(LIST_STATUS_NUM_THREADS,
         DEFAULT_LIST_STATUS_NUM_THREADS);
     StopWatch sw = new StopWatch().start();
     if (numThreads == 1) {
+      // 单线程列取
       result = singleThreadedListStatus(job, dirs, inputFilter, recursive);
     } else {
+      // 多线程并发列取
       Iterable<FileStatus> locatedFiles = null;
       try {
         LocatedFileStatusFetcher locatedFileStatusFetcher = new LocatedFileStatusFetcher(
@@ -304,6 +296,15 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
     return result;
   }
 
+  /**
+   * 单线程列取输入路径下所有符合过滤条件的文件状态
+   * @param job 作业上下文
+   * @param dirs 输入路径数组
+   * @param inputFilter 路径过滤器
+   * @param recursive 是否递归遍历子目录
+   * @return 符合条件的文件状态列表
+   * @throws IOException 当输入路径错误或IO异常时抛出
+   */
   private List<FileStatus> singleThreadedListStatus(JobContext job, Path[] dirs,
       PathFilter inputFilter, boolean recursive) throws IOException {
     List<FileStatus> result = new ArrayList<FileStatus>();
@@ -319,12 +320,14 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
       } else {
         for (FileStatus globStat: matches) {
           if (globStat.isDirectory()) {
+            // 遍历目录下的文件
             RemoteIterator<LocatedFileStatus> iter =
                 fs.listLocatedStatus(globStat.getPath());
             while (iter.hasNext()) {
               LocatedFileStatus stat = iter.next();
               if (inputFilter.accept(stat.getPath())) {
                 if (recursive && stat.isDirectory()) {
+                  // 递归添加子目录中的文件
                   addInputPathRecursively(result, fs, stat.getPath(),
                       inputFilter);
                 } else {
@@ -346,29 +349,24 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
   
   /**
-   * Add files in the input path recursively into the results.
-   * @param result
-   *          The List to store all files.
-   * @param fs
-   *          The FileSystem.
-   * @param path
-   *          The input path.
-   * @param inputFilter
-   *          The input filter that can be used to filter files/dirs. 
-   * @throws IOException
+   * 递归遍历目录将所有符合过滤条件的文件添加到结果列表
+   * @param result 存储结果文件状态的列表
+   * @param fs 文件系统对象
+   * @param path 当前遍历的目录路径
+   * @param inputFilter 路径过滤器
+   * @throws IOException IO异常
    */
   protected void addInputPathRecursively(List<FileStatus> result,
       FileSystem fs, Path path, PathFilter inputFilter) 
       throws IOException {
-    // FNFE exceptions are caught whether raised in the list call,
-    // or in the hasNext() or next() calls, where async reporting
-    // may take place.
+    // 捕获列出目录过程中可能出现的文件找不到异常
     try {
       RemoteIterator<LocatedFileStatus> iter = fs.listLocatedStatus(path);
       while (iter.hasNext()) {
         LocatedFileStatus stat = iter.next();
         if (inputFilter.accept(stat.getPath())) {
           if (stat.isDirectory()) {
+            // 递归遍历子目录
             addInputPathRecursively(result, fs, stat.getPath(), inputFilter);
           } else {
             result.add(shrinkStatus(stat));
@@ -376,31 +374,23 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
         }
       }
     } catch (FileNotFoundException e) {
-      // unless the store is capabile of list inconsistencies, rethrow.
-      // because this is recursive, the caller method may also end up catching
-      // and rethrowing, which is slighly inefficient but harmless.
+      // 根据文件系统能力决定是否忽略消失的目录
       maybeIgnoreMissingDirectory(fs, path, e);
     }
   }
 
   /**
-   * The HdfsBlockLocation includes a LocatedBlock which contains messages
-   * for issuing more detailed queries to datanodes about a block, but these
-   * messages are useless during job submission currently. This method tries
-   * to exclude the LocatedBlock from HdfsBlockLocation by creating a new
-   * BlockLocation from original, reshaping the LocatedFileStatus,
-   * allowing {@link #listStatus(JobContext)} to scan more files with less
-   * memory footprint.
-   * @see BlockLocation
-   * @see org.apache.hadoop.fs.HdfsBlockLocation
-   * @param origStat The fat FileStatus.
-   * @return The FileStatus that has been shrunk.
+   * 压缩LocatedFileStatus占用的内存空间，移除HdfsBlockLocation中冗余的LocatedBlock引用
+   * 在作业提交阶段这些冗余信息没有用处，压缩后可以减少内存占用，支持扫描更多输入文件
+   * @param origStat 原始文件状态对象
+   * @return 压缩后的文件状态对象
    */
   public static FileStatus shrinkStatus(FileStatus origStat) {
     if (origStat.isDirectory() || origStat.getLen() == 0 ||
         !(origStat instanceof LocatedFileStatus)) {
       return origStat;
     } else {
+      // 重构块位置信息，移除冗余引用
       BlockLocation[] blockLocations =
           ((LocatedFileStatus)origStat).getBlockLocations();
       BlockLocation[] locs = new BlockLocation[blockLocations.length];
@@ -414,8 +404,12 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
 
   /**
-   * A factory that makes the split for this class. It can be overridden
-   * by sub-classes to make sub-types
+   * 创建FileSplit工厂方法，子类可重写创建自定义分片类型
+   * @param file 分片所属文件路径
+   * @param start 分片在文件中的起始偏移
+   * @param length 分片字节长度
+   * @param hosts 分片数据所在的节点主机列表
+   * @return 创建好的FileSplit对象
    */
   protected FileSplit makeSplit(Path file, long start, long length, 
                                 String[] hosts) {
@@ -423,240 +417,24 @@ public abstract class FileInputFormat<K, V> extends InputFormat<K, V> {
   }
   
   /**
-   * A factory that makes the split for this class. It can be overridden
-   * by sub-classes to make sub-types
+   * 创建带内存块位置的FileSplit工厂方法，子类可重写创建自定义分片类型
+   * @param file 分片所属文件路径
+   * @param start 分片在文件中的起始偏移
+   * @param length 分片字节长度
+   * @param hosts 分片数据所在的节点主机列表
+   * @param inMemoryHosts 缓存了分片数据的节点主机列表
+   * @return 创建好的FileSplit对象
    */
   protected FileSplit makeSplit(Path file, long start, long length, 
                                 String[] hosts, String[] inMemoryHosts) {
     return new FileSplit(file, start, length, hosts, inMemoryHosts);
   }
 
-  /** 
-   * Generate the list of files and make them into FileSplits.
-   * @param job the job context
-   * @throws IOException
-   */
-  public List<InputSplit> getSplits(JobContext job) throws IOException {
-    StopWatch sw = new StopWatch().start();
-    long minSize = Math.max(getFormatMinSplitSize(), getMinSplitSize(job));
-    long maxSize = getMaxSplitSize(job);
-
-    // generate splits
-    List<InputSplit> splits = new ArrayList<InputSplit>();
-    List<FileStatus> files = listStatus(job);
-
-    boolean ignoreDirs = !getInputDirRecursive(job)
-      && job.getConfiguration().getBoolean(INPUT_DIR_NONRECURSIVE_IGNORE_SUBDIRS, false);
-    for (FileStatus file: files) {
-      if (ignoreDirs && file.isDirectory()) {
-        continue;
-      }
-      Path path = file.getPath();
-      long length = file.getLen();
-      if (length != 0) {
-        BlockLocation[] blkLocations;
-        if (file instanceof LocatedFileStatus) {
-          blkLocations = requireNonNull(
-              ((LocatedFileStatus) file).getBlockLocations(),
-              () -> String.format("No block locations in LocatedFileStatus %s; length=%d",
-                  file, length));
-
-        } else {
-          FileSystem fs = path.getFileSystem(job.getConfiguration());
-          blkLocations = requireNonNull(fs.getFileBlockLocations(file, 0, length), () ->
-              String.format("No block locations returned from getFileBlockLocations(%s, 0, %d)"
-                      + "; status=%s",
-                  path, length, file));
-        }
-        if (isSplitable(job, path)) {
-          long blockSize = file.getBlockSize();
-          long splitSize = computeSplitSize(blockSize, minSize, maxSize);
-
-          long bytesRemaining = length;
-          while (((double) bytesRemaining)/splitSize > SPLIT_SLOP) {
-            int blkIndex = getBlockIndex(blkLocations, length-bytesRemaining);
-            splits.add(makeSplit(path, length-bytesRemaining, splitSize,
-                        blkLocations[blkIndex].getHosts(),
-                        blkLocations[blkIndex].getCachedHosts()));
-            bytesRemaining -= splitSize;
-          }
-
-          if (bytesRemaining != 0) {
-            int blkIndex = getBlockIndex(blkLocations, length-bytesRemaining);
-            splits.add(makeSplit(path, length-bytesRemaining, bytesRemaining,
-                       blkLocations[blkIndex].getHosts(),
-                       blkLocations[blkIndex].getCachedHosts()));
-          }
-        } else { // not splitable
-          if (LOG.isDebugEnabled()) {
-            // Log only if the file is big enough to be splitted
-            if (length > Math.min(file.getBlockSize(), minSize)) {
-              LOG.debug("File is not splittable so no parallelization "
-                  + "is possible: " + file.getPath());
-            }
-          }
-          splits.add(makeSplit(path, 0, length, blkLocations[0].getHosts(),
-                      blkLocations[0].getCachedHosts()));
-        }
-      } else { 
-        //Create empty hosts array for zero length files
-        splits.add(makeSplit(path, 0, length, new String[0]));
-      }
-    }
-    // Save the number of input files for metrics/loadgen
-    job.getConfiguration().setLong(NUM_INPUT_FILES, files.size());
-    sw.stop();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Total # of splits generated by getSplits: " + splits.size()
-          + ", TimeTaken: " + sw.now(TimeUnit.MILLISECONDS));
-    }
-    return splits;
-  }
-
-  protected long computeSplitSize(long blockSize, long minSize,
-                                  long maxSize) {
-    return Math.max(minSize, Math.min(maxSize, blockSize));
-  }
-
-  protected int getBlockIndex(BlockLocation[] blkLocations, 
-                              long offset) {
-    for (int i = 0 ; i < blkLocations.length; i++) {
-      // is the offset inside this block?
-      if ((blkLocations[i].getOffset() <= offset) &&
-          (offset < blkLocations[i].getOffset() + blkLocations[i].getLength())){
-        return i;
-      }
-    }
-    BlockLocation last = blkLocations[blkLocations.length -1];
-    long fileLength = last.getOffset() + last.getLength() -1;
-    throw new IllegalArgumentException("Offset " + offset + 
-                                       " is outside of file (0.." +
-                                       fileLength + ")");
-  }
-
   /**
-   * Sets the given comma separated paths as the list of inputs 
-   * for the map-reduce job.
-   * 
-   * @param job the job
-   * @param commaSeparatedPaths Comma separated paths to be set as 
-   *        the list of inputs for the map-reduce job.
+   * 根据输入文件生成分片列表，按照配置的分片大小规则对文件进行切分
+   * 考虑数据本地性，将分片和数据所在节点绑定，方便调度器分配任务
+   * @param job 作业上下文
+   * @return 生成的输入分片列表
+   * @throws IOException IO异常
    */
-  public static void setInputPaths(Job job, 
-                                   String commaSeparatedPaths
-                                   ) throws IOException {
-    setInputPaths(job, StringUtils.stringToPath(
-                        getPathStrings(commaSeparatedPaths)));
-  }
-
-  /**
-   * Add the given comma separated paths to the list of inputs for
-   *  the map-reduce job.
-   * 
-   * @param job The job to modify
-   * @param commaSeparatedPaths Comma separated paths to be added to
-   *        the list of inputs for the map-reduce job.
-   */
-  public static void addInputPaths(Job job, 
-                                   String commaSeparatedPaths
-                                   ) throws IOException {
-    for (String str : getPathStrings(commaSeparatedPaths)) {
-      addInputPath(job, new Path(str));
-    }
-  }
-
-  /**
-   * Set the array of {@link Path}s as the list of inputs
-   * for the map-reduce job.
-   * 
-   * @param job The job to modify 
-   * @param inputPaths the {@link Path}s of the input directories/files 
-   * for the map-reduce job.
-   */ 
-  public static void setInputPaths(Job job, 
-                                   Path... inputPaths) throws IOException {
-    Configuration conf = job.getConfiguration();
-    Path path = inputPaths[0].getFileSystem(conf).makeQualified(inputPaths[0]);
-    StringBuilder str = new StringBuilder(StringUtils.escapeString(path.toString()));
-    for(int i = 1; i < inputPaths.length;i++) {
-      str.append(StringUtils.COMMA_STR);
-      path = inputPaths[i].getFileSystem(conf).makeQualified(inputPaths[i]);
-      str.append(StringUtils.escapeString(path.toString()));
-    }
-    conf.set(INPUT_DIR, str.toString());
-  }
-
-  /**
-   * Add a {@link Path} to the list of inputs for the map-reduce job.
-   * 
-   * @param job The {@link Job} to modify
-   * @param path {@link Path} to be added to the list of inputs for 
-   *            the map-reduce job.
-   */
-  public static void addInputPath(Job job, 
-                                  Path path) throws IOException {
-    Configuration conf = job.getConfiguration();
-    path = path.getFileSystem(conf).makeQualified(path);
-    String dirStr = StringUtils.escapeString(path.toString());
-    String dirs = conf.get(INPUT_DIR);
-    conf.set(INPUT_DIR, dirs == null ? dirStr : dirs + "," + dirStr);
-  }
-  
-  // This method escapes commas in the glob pattern of the given paths.
-  private static String[] getPathStrings(String commaSeparatedPaths) {
-    int length = commaSeparatedPaths.length();
-    int curlyOpen = 0;
-    int pathStart = 0;
-    boolean globPattern = false;
-    List<String> pathStrings = new ArrayList<String>();
-    
-    for (int i=0; i<length; i++) {
-      char ch = commaSeparatedPaths.charAt(i);
-      switch(ch) {
-        case '{' : {
-          curlyOpen++;
-          if (!globPattern) {
-            globPattern = true;
-          }
-          break;
-        }
-        case '}' : {
-          curlyOpen--;
-          if (curlyOpen == 0 && globPattern) {
-            globPattern = false;
-          }
-          break;
-        }
-        case ',' : {
-          if (!globPattern) {
-            pathStrings.add(commaSeparatedPaths.substring(pathStart, i));
-            pathStart = i + 1 ;
-          }
-          break;
-        }
-        default:
-          continue; // nothing special to do for this character
-      }
-    }
-    pathStrings.add(commaSeparatedPaths.substring(pathStart, length));
-    
-    return pathStrings.toArray(new String[0]);
-  }
-  
-  /**
-   * Get the list of input {@link Path}s for the map-reduce job.
-   * 
-   * @param context The job
-   * @return the list of input {@link Path}s for the map-reduce job.
-   */
-  public static Path[] getInputPaths(JobContext context) {
-    String dirs = context.getConfiguration().get(INPUT_DIR, "");
-    String [] list = StringUtils.split(dirs);
-    Path[] result = new Path[list.length];
-    for (int i = 0; i < list.length; i++) {
-      result[i] = new Path(StringUtils.unEscapeString(list[i]));
-    }
-    return result;
-  }
-
-}
+  public List<InputSplit> getSplits(JobContext job)

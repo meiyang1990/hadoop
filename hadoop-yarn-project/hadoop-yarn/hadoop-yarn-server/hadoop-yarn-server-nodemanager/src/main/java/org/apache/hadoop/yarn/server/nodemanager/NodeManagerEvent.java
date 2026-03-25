@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,9 +20,17 @@ package org.apache.hadoop.yarn.server.nodemanager;
 
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * NodeManager节点管理器事件基类，所有NodeManager相关事件都继承此类
+ * 用于YARN事件驱动模型中封装NodeManager内部不同类型的事件
+ */
 public class NodeManagerEvent extends 
   AbstractEvent<NodeManagerEventType>{
 
+  /**
+   * 构造指定类型的NodeManager事件
+   * @param type 事件类型
+   */
   public NodeManagerEvent(NodeManagerEventType type) {
     super(type);
   }

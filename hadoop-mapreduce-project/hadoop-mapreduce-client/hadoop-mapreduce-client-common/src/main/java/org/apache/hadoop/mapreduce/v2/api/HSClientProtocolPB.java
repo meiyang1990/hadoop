@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,6 +21,10 @@ package org.apache.hadoop.mapreduce.v2.api;
 import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.yarn.proto.HSClientProtocol.HSClientProtocolService;
 
+/**
+ * 作业历史服务器客户端协议Protobuf实现接口
+ * 定义了客户端与历史服务器RPC通信的PB协议规范，继承自自动生成的Protobuf阻塞服务接口
+ */
 @ProtocolInfo(protocolName = "org.apache.hadoop.mapreduce.v2.api.HSClientProtocolPB",
     protocolVersion = 1)
 public interface HSClientProtocolPB extends HSClientProtocolService.BlockingInterface {

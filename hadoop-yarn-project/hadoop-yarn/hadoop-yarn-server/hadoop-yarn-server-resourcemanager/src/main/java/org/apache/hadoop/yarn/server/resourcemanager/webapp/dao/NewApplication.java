@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -23,6 +24,9 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * YARN RM Web API 新建应用响应数据对象，封装新分配应用的基础信息
+ */
 @XmlRootElement(name="NewApplication")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class NewApplication {
@@ -33,20 +37,36 @@ public class NewApplication {
   @XmlElement(name="maximum-resource-capability")
   ResourceInfo maximumResourceCapability;
 
+  /**
+   * 默认构造函数，初始化空应用ID和最大资源能力
+   */
   public NewApplication() {
     applicationId = "";
     maximumResourceCapability = new ResourceInfo();
   }
 
+  /**
+   * 带参数构造函数，使用指定应用ID和最大资源能力创建对象
+   * @param appId 新分配的应用ID
+   * @param maxResources 应用可使用的最大资源能力
+   */
   public NewApplication(String appId, ResourceInfo maxResources) {
     applicationId = appId;
     maximumResourceCapability = maxResources;
   }
 
+  /**
+   * 获取新建应用的应用ID
+   * @return 应用ID字符串
+   */
   public String getApplicationId() {
     return applicationId;
   }
 
+  /**
+   * 获取新建应用允许使用的最大资源能力
+   * @return 资源能力信息对象
+   */
   public ResourceInfo getMaximumResourceCapability() {
     return maximumResourceCapability;
   }

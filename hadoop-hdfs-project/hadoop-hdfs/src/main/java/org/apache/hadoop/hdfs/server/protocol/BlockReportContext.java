@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,37 +22,40 @@ package org.apache.hadoop.hdfs.server.protocol;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * The context of the block report.
- *
- * This is a set of fields that the Datanode sends to provide context about a
- * block report RPC.  The context includes a unique 64-bit ID which
- * identifies the block report as a whole.  It also includes the total number
- * of RPCs which this block report is split into, and the index into that
- * total for the current RPC.
+ * 文件描述：数据节点块报告上下文信息容器，存储块报告RPC调用的拆分元数据
+ * 
+ * 当数据节点需要上报大量块信息时，会将整个块报告拆分为多个RPC请求发送给NameNode，
+ * 此类用于携带整个块报告的全局标识和当前RPC请求的分片信息，帮助NameNode组装完整块报告。
  */
 @InterfaceAudience.Private
 public class BlockReportContext {
   /**
-   * The total number of RPCs contained in the block report.
+   * 整个块报告拆分后的总RPC请求数量
    */
   private final int totalRpcs;
 
   /**
-   * The index of this particular RPC.
+   * 当前RPC请求在整个块报告中的分片索引
    */
   private final int curRpc;
 
   /**
-   * A 64-bit ID which identifies the block report as a whole.
+   * 标识整个块报告的全局唯一64位ID
    */
   private final long reportId;
 
   /**
-   * The lease ID which this block report is using, or 0 if this block report is
-   * bypassing rate-limiting.
+   * 当前块报告使用的限流租约ID，若为0表示本次块报告绕过速率限制
    */
   private final long leaseId;
 
+  /**
+   * 构造块报告上下文对象
+   * @param totalRpcs 整个块报告拆分的总RPC数量
+   * @param curRpc 当前RPC请求的分片索引
+   * @param reportId 块报告全局唯一ID
+   * @param leaseId 限流租约ID，0表示不限制
+   */
   public BlockReportContext(int totalRpcs, int curRpc,
                             long reportId, long leaseId) {
     this.totalRpcs = totalRpcs;
@@ -60,18 +64,34 @@ public class BlockReportContext {
     this.leaseId = leaseId;
   }
 
+  /**
+   * 获取整个块报告拆分的总RPC数量
+   * @return 总RPC数量
+   */
   public int getTotalRpcs() {
     return totalRpcs;
   }
 
+  /**
+   * 获取当前RPC请求的分片索引
+   * @return 当前RPC索引
+   */
   public int getCurRpc() {
     return curRpc;
   }
 
+  /**
+   * 获取块报告全局唯一ID
+   * @return 块报告ID
+   */
   public long getReportId() {
     return reportId;
   }
 
+  /**
+   * 获取限流租约ID
+   * @return 租约ID，0表示不限流
+   */
   public long getLeaseId() {
     return leaseId;
   }

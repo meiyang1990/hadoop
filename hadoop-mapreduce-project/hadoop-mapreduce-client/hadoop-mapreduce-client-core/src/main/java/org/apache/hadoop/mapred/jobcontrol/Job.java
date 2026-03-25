@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,6 +33,10 @@ import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 兼容旧版mapred API的受控作业类，继承自新版mapreduce包下的ControlledJob，用于作业依赖调度场景
+ * 核心职责是封装旧版API的Job配置、ID和状态，支持JobControl对有依赖关系的作业进行顺序调度
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class Job extends ControlledJob {
@@ -45,9 +50,9 @@ public class Job extends ControlledJob {
   final public static int DEPENDENT_FAILED = 5;
 
   /** 
-   * Construct a job.
-   * @param jobConf a mapred job configuration representing a job to be executed.
-   * @param dependingJobs an array of jobs the current job depends on
+   * 构造带依赖作业列表的受控作业对象
+   * @param jobConf 待执行作业的旧版mapred作业配置
+   * @param dependingJobs 当前作业依赖的前置作业列表
    */
   @SuppressWarnings("unchecked")
   public Job(JobConf jobConf, ArrayList<?> dependingJobs) throws IOException {
@@ -55,12 +60,17 @@ public class Job extends ControlledJob {
           (List<ControlledJob>) dependingJobs);
   }
 
+  /**
+   * 构造无依赖作业的受控作业对象
+   * @param conf 待执行作业的旧版mapred作业配置
+   */
   public Job(JobConf conf) throws IOException {
     super(conf);
   }
 
   /**
-   * @return the mapred ID of this job as assigned by the mapred framework.
+   * 获取框架分配给本作业的旧版mapred作业ID
+   * @return 旧版JobID对象，如果未分配返回null
    */
   public JobID getAssignedJobID() {
     org.apache.hadoop.mapreduce.JobID temp = super.getMapredJobId();
@@ -71,8 +81,7 @@ public class Job extends ControlledJob {
   }
 
   /**
-   * @deprecated setAssignedJobID should not be called.
-   * JOBID is set by the framework.
+   * @deprecated 作业ID由框架分配，不应该手动调用该方法设置
    */
   @Deprecated
   public void setAssignedJobID(JobID mapredJobID) {
@@ -80,7 +89,8 @@ public class Job extends ControlledJob {
   }
 
   /**
-   * @return the mapred job conf of this job
+   * 获取本作业的旧版mapred作业配置
+   * @return 拷贝后的JobConf对象
    */
   public synchronized JobConf getJobConf() {
     return new JobConf(super.getJob().getConfiguration());
@@ -88,19 +98,21 @@ public class Job extends ControlledJob {
 
 
   /**
-   * Set the mapred job conf for this job.
-   * @param jobConf the mapred job conf for this job.
+   * 设置本作业的旧版mapred作业配置
+   * @param jobConf 要设置的旧版作业配置对象
    */
   public synchronized void setJobConf(JobConf jobConf) {
     try {
       super.setJob(org.apache.hadoop.mapreduce.Job.getInstance(jobConf));
     } catch (IOException ioe) { 
+      // 捕获并记录配置转换过程中的IO异常
       LOG.info("Exception" + ioe);
     }
   }
 
   /**
-   * @return the state of this job
+   * 获取当前作业的运行状态，兼容旧版API的状态编码
+   * @return 旧版状态编码：0成功/1等待/2运行中/3就绪/4失败/5依赖失败
    */
   public synchronized int getState() {
     State state = super.getJobState();
@@ -126,11 +138,8 @@ public class Job extends ControlledJob {
   }
   
   /**
-   * This is a no-op function, Its a behavior change from 1.x We no more can
-   * change the state from job
-   * 
-   * @param state
-   *          the new state for this job.
+   * @deprecated 从1.x版本后行为变更，不再允许手动修改作业状态，本方法为空操作
+   * @param state 要设置的新状态
    */
   @Deprecated
   protected synchronized void setState(int state) {
@@ -138,19 +147,17 @@ public class Job extends ControlledJob {
   }
   
   /**
-   * Add a job to this jobs' dependency list. 
-   * Dependent jobs can only be added while a Job 
-   * is waiting to run, not during or afterwards.
-   * 
-   * @param dependingJob Job that this Job depends on.
-   * @return <code>true</code> if the Job was added.
+   * 向当前作业的依赖列表添加前置作业，仅在作业等待运行时可添加
+   * @param dependingJob 当前作业依赖的前置作业
+   * @return 添加成功返回true
    */
   public synchronized boolean addDependingJob(Job dependingJob) {
     return super.addDependingJob(dependingJob);
   }
   
   /**
-   * @return the job client of this job
+   * 获取本作业对应的JobClient客户端实例
+   * @return 基于当前作业配置创建的JobClient，创建失败返回null
    */
   public JobClient getJobClient() {
     try {
@@ -161,14 +168,16 @@ public class Job extends ControlledJob {
   }
 
   /**
-   * @return the depending jobs of this job
+   * 获取当前作业所有依赖的前置作业列表
+   * @return 依赖作业列表
    */
   public ArrayList<Job> getDependingJobs() {
     return JobControl.castToJobList(super.getDependentJobs());
   }
 
   /**
-   * @return the mapred ID of this job as assigned by the mapred framework.
+   * 获取框架分配给本作业的旧版mapred作业ID字符串
+   * @return 作业ID字符串，未分配返回null
    */
   public synchronized String getMapredJobID() {
     if (super.getMapredJobId() != null) {
@@ -178,11 +187,8 @@ public class Job extends ControlledJob {
   }
 
   /**
-   * This is no-op method for backward compatibility. It's a behavior change
-   * from 1.x, we can not change job ids from job.
-   * 
-   * @param mapredJobID
-   *          the mapred job ID for this job.
+   * @deprecated 从1.x版本后行为变更，不再允许手动修改作业ID，本方法为空操作
+   * @param mapredJobID 要设置的作业ID字符串
    */
   @Deprecated
   public synchronized void setMapredJobID(String mapredJobID) {

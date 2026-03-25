@@ -27,15 +27,29 @@ import org.apache.hadoop.yarn.api.records.YarnApplicationAttemptState;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
+<<<<<<< HEAD
  * 记录一次 RM 应用尝试结束时可以确定、且需要持久化的核心字段。
  * 主要包括诊断信息、追踪 URL、最终状态以及 Yarn 端的尝试状态。
+=======
+ * 应用尝试完成数据，保存RM应用尝试结束时确定的、需要持久化存储的所有字段，用于应用历史服务存储
+>>>>>>> a7f26154e2430da367a92d826f772851319cf52d
  */
 @Public
 @Unstable
 public abstract class ApplicationAttemptFinishData {
 
   /**
+<<<<<<< HEAD
    * 工厂方法：将尝试结束时的关键信息封装到可持久化的记录实例中。
+=======
+   * 创建新的应用尝试完成数据实例
+   * @param appAttemptId 应用尝试ID
+   * @param diagnosticsInfo 诊断信息
+   * @param trackingURL 追踪URL
+   * @param finalApplicationStatus 应用最终状态
+   * @param yarnApplicationAttemptState YARN应用尝试状态
+   * @return 初始化完成的应用尝试完成数据实例
+>>>>>>> a7f26154e2430da367a92d826f772851319cf52d
    */
   @Public
   @Unstable

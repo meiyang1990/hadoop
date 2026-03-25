@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,18 +24,17 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.Block;
 
 /**
- * Interface for notifying about block movement attempt completion.
+ * 存储策略满足器(SPS)的块移动完成监听器接口，用于接收块移动尝试完成的通知。
+ * 当数据块移动尝试完成后，通过该接口通知SPS核心模块进行后续处理（重试或标记完成）。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface BlockMovementListener {
 
   /**
-   * This method used to notify to the SPS about block movement attempt
-   * finished. Then SPS will re-check whether it needs retry or not.
+   * 通知SPS模块一批数据块的移动尝试已完成，由SPS模块判断是否需要对失败块进行重试。
    *
-   * @param moveAttemptFinishedBlks
-   *          -list of movement attempt finished blocks
+   * @param moveAttemptFinishedBlks 已完成移动尝试的数据块列表（无论成功失败，均属于已尝试完成）
    */
   void notifyMovementTriedBlocks(Block[] moveAttemptFinishedBlks);
 }

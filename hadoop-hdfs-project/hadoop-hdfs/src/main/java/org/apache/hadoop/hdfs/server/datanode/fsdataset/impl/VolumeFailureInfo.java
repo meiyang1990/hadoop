@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,7 +21,9 @@ package org.apache.hadoop.hdfs.server.datanode.fsdataset.impl;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 
 /**
- * Tracks information about failure of a data volume.
+ * 文件存储卷故障信息记录类，用于记录DataNode上单个数据卷的故障详情，
+ * 供DataNode故障卷管理和容量统计使用。
+ * 追踪数据卷的故障相关信息。
  */
 final class VolumeFailureInfo {
   private final StorageLocation failedStorageLocation;
@@ -28,12 +31,11 @@ final class VolumeFailureInfo {
   private final long estimatedCapacityLost;
 
   /**
-   * Creates a new VolumeFailureInfo, when the capacity lost from this volume
-   * failure is unknown.  Typically, this means the volume failed immediately at
-   * startup, so there was never a chance to query its capacity.
+   * 构造VolumeFailureInfo，适用于无法估算故障损失容量的场景，
+   * 通常用于DataNode启动时就直接失败的卷，启动前无法获取其容量信息。
    *
-   * @param failedStorageLocation storage location that has failed
-   * @param failureDate date/time of failure in milliseconds since epoch
+   * @param failedStorageLocation 发生故障的存储位置
+   * @param failureDate 故障发生时间，毫秒级时间戳（自纪元起）
    */
   public VolumeFailureInfo(StorageLocation failedStorageLocation,
       long failureDate) {
@@ -41,11 +43,11 @@ final class VolumeFailureInfo {
   }
 
   /**
-   * Creates a new VolumeFailureInfo.
+   * 构造VolumeFailureInfo，包含完整的故障信息。
    *
-   * @param failedStorageLocation storage location that has failed
-   * @param failureDate date/time of failure in milliseconds since epoch
-   * @param estimatedCapacityLost estimate of capacity lost in bytes
+   * @param failedStorageLocation 发生故障的存储位置
+   * @param failureDate 故障发生时间，毫秒级时间戳（自纪元起）
+   * @param estimatedCapacityLost 预估损失容量，单位字节
    */
   public VolumeFailureInfo(StorageLocation failedStorageLocation,
       long failureDate, long estimatedCapacityLost) {
@@ -55,29 +57,28 @@ final class VolumeFailureInfo {
   }
 
   /**
-   * Returns the storage location that has failed.
+   * 获取发生故障的存储位置。
    *
-   * @return storage location that has failed
+   * @return 发生故障的存储位置对象
    */
   public StorageLocation getFailedStorageLocation() {
     return this.failedStorageLocation;
   }
 
   /**
-   * Returns date/time of failure
+   * 获取故障发生时间。
    *
-   * @return date/time of failure in milliseconds since epoch
+   * @return 故障发生时间，毫秒级时间戳（自纪元起）
    */
   public long getFailureDate() {
     return this.failureDate;
   }
 
   /**
-   * Returns estimate of capacity lost.  This is said to be an estimate, because
-   * in some cases it's impossible to know the capacity of the volume, such as if
-   * we never had a chance to query its capacity before the failure occurred.
+   * 获取故障导致的预估损失容量，该值为预估值，
+   * 当卷在获取容量前就发生故障时无法得到准确值。
    *
-   * @return estimate of capacity lost in bytes
+   * @return 预估损失容量，单位字节
    */
   public long getEstimatedCapacityLost() {
     return this.estimatedCapacityLost;

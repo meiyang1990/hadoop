@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,12 @@
 */
 package org.apache.hadoop.yarn.server.nodemanager.api.protocolrecords;
 
+/**
+ * 本地化器动作枚举，定义ResourceManager对NodeManager本地化进程的指令
+ */
 public enum LocalizerAction {
-  LIVE, DIE
+  /** 保持本地化进程存活，继续执行本地化任务 */
+  LIVE,
+  /** 终止本地化进程，退出执行 */
+  DIE
 }

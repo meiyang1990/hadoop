@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -23,16 +24,28 @@ import java.util.List;
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 import org.apache.hadoop.yarn.api.records.NodeReport;
 
-
-
+/**
+ * 作业节点更新事件，用于通知作业集群节点信息发生变更
+ * 承载更新后的节点报告列表，驱动作业重新分配任务处理运行
+ */
 public class JobUpdatedNodesEvent extends JobEvent {
 
   private final List<NodeReport> updatedNodes;
+
+  /**
+   * 构造作业节点更新事件
+   * @param jobId 目标作业ID
+   * @param updatedNodes 更新后的节点报告列表
+   */
   public JobUpdatedNodesEvent(JobId jobId, List<NodeReport> updatedNodes) {
     super(jobId, JobEventType.JOB_UPDATED_NODES);
     this.updatedNodes = updatedNodes;
   }
 
+  /**
+   * 获取更新后的节点报告列表
+   * @return 更新后的节点报告列表
+   */
   public List<NodeReport> getUpdatedNodes() {
     return updatedNodes;
   }

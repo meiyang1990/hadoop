@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,25 +27,41 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.RemoteNodeProt
 import org.apache.hadoop.yarn.server.api.protocolrecords.RemoteNode;
 
 /**
- * Implementation of {@link RemoteNode}.
+ * 基于Protobuf实现的RemoteNode，用于YARN服务端间远程节点信息的序列化传输
+ * 实现了 {@link RemoteNode} 接口。
  */
 public class RemoteNodePBImpl extends RemoteNode {
 
+  // Protobuf协议对象
   private RemoteNodeProto proto = RemoteNodeProto.getDefaultInstance();
+  // Protobuf构建器
   private RemoteNodeProto.Builder builder = null;
+  // 是否直接使用proto对象标识，false表示正在通过builder构建
   private boolean viaProto = false;
 
+  // 缓存节点ID对象
   private NodeId nodeId = null;
 
+  /**
+   * 空构造函数，初始化Protobuf构建器
+   */
   public RemoteNodePBImpl() {
     builder = RemoteNodeProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造封装
+   * @param proto 已有的RemoteNodeProto对象
+   */
   public RemoteNodePBImpl(RemoteNodeProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的Protobuf协议对象，合并本地修改后返回
+   * @return 序列化用的RemoteNodeProto对象
+   */
   public RemoteNodeProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -52,6 +69,7 @@ public class RemoteNodePBImpl extends RemoteNode {
     return proto;
   }
 
+  // 将本地缓存的节点信息合并到Protobuf构建器
   private void mergeLocalToBuilder() {
     if (this.nodeId != null
         && !((NodeIdPBImpl) nodeId).getProto().equals(
@@ -60,6 +78,7 @@ public class RemoteNodePBImpl extends RemoteNode {
     }
   }
 
+  // 将本地缓存的所有修改合并到最终Protobuf对象
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -69,6 +88,7 @@ public class RemoteNodePBImpl extends RemoteNode {
     viaProto = true;
   }
 
+  // 延迟初始化Protobuf构建器，如果当前是只读proto则转换为可写builder
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = RemoteNodeProto.newBuilder(proto);
@@ -85,6 +105,7 @@ public class RemoteNodePBImpl extends RemoteNode {
     if (!p.hasNodeId()) {
       return null;
     }
+    // 从Protobuf转换并缓存NodeId对象
     this.nodeId = ProtoUtils.convertFromProtoFormat(p.getNodeId());
     return this.nodeId;
   }

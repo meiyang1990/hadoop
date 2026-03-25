@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,67 +26,39 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * The difference between the current state and a previous state of a list.
+ * @file org/apache/hadoop/hdfs/util/Diff.java
+ * @brief 存储集合从旧状态到新状态的变更差异，支持增量变更计算、合并和回滚
+ *
+ * 基于有序集合的变更算法，维护新增元素列表(c-list)和删除元素列表(d-list)，
+ * 支持对创建、删除、修改操作的记录与回滚，可合并多个连续差异得到最终状态变更。
+ * 核心用于HDFS命名空间增量快照、编辑日志合并等场景，高效记录状态变更。
  * 
- * Given a previous state of a set and a sequence of create, delete and modify
- * operations such that the current state of the set can be obtained by applying
- * the operations on the previous state, the following algorithm construct the
- * difference between the current state and the previous state of the set.
- * 
- * <pre>
- * Two lists are maintained in the algorithm:
- * - c-list for newly created elements
- * - d-list for the deleted elements
- *
- * Denote the state of an element by the following
- *   (0, 0): neither in c-list nor d-list
- *   (c, 0): in c-list but not in d-list
- *   (0, d): in d-list but not in c-list
- *   (c, d): in both c-list and d-list
- *
- * For each case below, ( , ) at the end shows the result state of the element.
- *
- * Case 1. Suppose the element i is NOT in the previous state.           (0, 0)
- *   1.1. create i in current: add it to c-list                          (c, 0)
- *   1.1.1. create i in current and then create: impossible
- *   1.1.2. create i in current and then delete: remove it from c-list   (0, 0)
- *   1.1.3. create i in current and then modify: replace it in c-list    (c', 0)
- *
- *   1.2. delete i from current: impossible
- *
- *   1.3. modify i in current: impossible
- *
- * Case 2. Suppose the element i is ALREADY in the previous state.       (0, 0)
- *   2.1. create i in current: impossible
- *
- *   2.2. delete i from current: add it to d-list                        (0, d)
- *   2.2.1. delete i from current and then create: add it to c-list      (c, d)
- *   2.2.2. delete i from current and then delete: impossible
- *   2.2.2. delete i from current and then modify: impossible
- *
- *   2.3. modify i in current: put it in both c-list and d-list          (c, d)
- *   2.3.1. modify i in current and then create: impossible
- *   2.3.2. modify i in current and then delete: remove it from c-list   (0, d)
- *   2.3.3. modify i in current and then modify: replace it in c-list    (c', d)
- * </pre>
- *
- * @param <K> The key type.
- * @param <E> The element type, which must implement {@link Element} interface.
+ * @param <K> 元素键类型
+ * @param <E> 元素类型，必须实现 {@link Element} 接口
  */
 public class Diff<K, E extends Diff.Element<K>> {
-  /** An interface for the elements in a {@link Diff}. */
+  /**
+   * Diff中元素需要实现的接口，提供按键比较的能力
+   * @param <K> 键类型
+   */
   public static interface Element<K> extends Comparable<K> {
-    /** @return the key of this object. */
+    /** @return 当前元素的键 */
     public K getKey();
   }
 
-  /** An interface for passing a method in order to process elements. */
+  /**
+   * 元素处理回调接口，用于在差异合并时处理被覆盖/删除的元素
+   * @param <E> 元素类型
+   */
   public static interface Processor<E> {
-    /** Process the given element. */
+    /** 处理给定元素 */
     public void process(E element);
   }
 
-  /** Containing exactly one element. */
+  /**
+   * 包装单个元素的容器，用于返回查找结果
+   * @param <E> 元素类型
+   */
   public static class Container<E> {
     private final E element;
 
@@ -93,15 +66,15 @@ public class Diff<K, E extends Diff.Element<K>> {
       this.element = element;
     }
 
-    /** @return the element. */
+    /** @return 容器中存储的元素 */
     public E getElement() {
       return element;
     }
   }
   
-  /** 
-   * Undo information for some operations such as delete(E)
-   * and {@link Diff#modify(Element, Element)}.
+  /**
+   * 撤销操作信息存储，用于delete和modify操作的回滚
+   * @param <E> 元素类型
    */
   public static class UndoInfo<E> {
     private final int createdInsertionPoint;
@@ -115,24 +88,32 @@ public class Diff<K, E extends Diff.Element<K>> {
       this.deletedInsertionPoint = deletedInsertionPoint;
     }
     
+    /** @return 被替换/删除的原始元素，用于回滚 */
     public E getTrashedElement() {
       return trashed;
     }
   }
 
+  /** 默认列表初始容量 */
   private static final int DEFAULT_ARRAY_INITIAL_CAPACITY = 4;
 
   /**
-   * Search the element from the list.
-   * @return -1 if the list is null; otherwise, return the insertion point
-   *    defined in {@link Collections#binarySearch(List, Object)}.
-   *    Note that, when the list is null, -1 is the correct insertion point.
+   * 在有序列表中二分查找指定键对应的元素
+   * @param elements 有序元素列表，可以为null
+   * @param name 要查找的键
+   * @return 列表为null返回-1；否则返回Collections.binarySearch定义的查找结果，负数表示未找到，其绝对值减一为插入点
    */
   protected static <K, E extends Comparable<K>> int search(
       final List<E> elements, final K name) {
     return elements == null? -1: Collections.binarySearch(elements, name);
   }
 
+  /**
+   * 从列表指定位置移除元素，并校验移除元素和预期一致
+   * @param elements 目标列表
+   * @param i 查找结果（负数），插入点为-i-1
+   * @param expected 预期移除的元素
+   */
   private static <E> void remove(final List<E> elements, final int i,
       final E expected) {
     final E removed = elements.remove(-i - 1);
@@ -140,23 +121,39 @@ public class Diff<K, E extends Diff.Element<K>> {
         "removed != expected=%s, removed=%s.", expected, removed);
   }
 
-  /** c-list: element(s) created in current. */
+  /** 新增元素列表：当前状态相对于旧状态新增的元素 */
   private List<E> created;
-  /** d-list: element(s) deleted from current. */
+  /** 删除元素列表：当前状态相对于旧状态删除的元素 */
   private List<E> deleted;
   
+  /** 构造空差异对象 */
   protected Diff() {}
 
+  /**
+   * 构造指定初始新增和删除列表的差异对象
+   * @param created 初始新增元素列表
+   * @param deleted 初始删除元素列表
+   */
   protected Diff(final List<E> created, final List<E> deleted) {
     this.created = created;
     this.deleted = deleted;
   }
 
+  /**
+   * 获取新增元素列表的不可修改视图
+   * @return 不可修改的新增元素列表
+   */
   public List<E> getCreatedUnmodifiable() {
     return created != null? Collections.unmodifiableList(created)
         : Collections.emptyList();
   }
 
+  /**
+   * 更新新增列表指定位置的元素，校验键一致性
+   * @param index 列表索引
+   * @param element 新元素
+   * @return 被替换的旧元素
+   */
   public E setCreated(int index, E element) {
     final E old = created.set(index, element);
     if (old.compareTo(element.getKey()) != 0) {
@@ -166,6 +163,11 @@ public class Diff<K, E extends Diff.Element<K>> {
     return old;
   }
 
+  /**
+   * 从新增列表移除指定元素
+   * @param element 要移除的元素
+   * @return 移除成功返回true，元素不存在返回false
+   */
   public boolean removeCreated(final E element) {
     if (created != null) {
       final int i = search(created, element.getKey());
@@ -177,17 +179,27 @@ public class Diff<K, E extends Diff.Element<K>> {
     return false;
   }
 
+  /** 清空新增列表 */
   public void clearCreated() {
     if (created != null) {
       created.clear();
     }
   }
 
+  /**
+   * 获取删除元素列表的不可修改视图
+   * @return 不可修改的删除元素列表
+   */
   public List<E> getDeletedUnmodifiable() {
     return deleted != null? Collections.unmodifiableList(deleted)
         : Collections.emptyList();
   }
 
+  /**
+   * 检查删除列表是否包含指定键
+   * @param key 要检查的键
+   * @return 包含返回true，否则返回false
+   */
   public boolean containsDeleted(final K key) {
     if (deleted != null) {
       return search(deleted, key) >= 0;
@@ -195,13 +207,19 @@ public class Diff<K, E extends Diff.Element<K>> {
     return false;
   }
 
+  /**
+   * 检查删除列表是否包含指定元素
+   * @param element 要检查的元素
+   * @return 包含返回true，否则返回false
+   */
   public boolean containsDeleted(final E element) {
     return getDeleted(element.getKey()) == element;
   }
 
   /**
-   * @return null if the element is not found;
-   *         otherwise, return the element in the deleted list.
+   * 根据键从删除列表查找元素
+   * @param key 元素键
+   * @return 找到返回对应元素，找不到返回null
    */
   public E getDeleted(final K key) {
     if (deleted != null) {
@@ -213,6 +231,11 @@ public class Diff<K, E extends Diff.Element<K>> {
     return null;
   }
 
+  /**
+   * 从删除列表移除指定元素
+   * @param element 要移除的元素
+   * @return 移除成功返回true，元素不存在返回false
+   */
   public boolean removeDeleted(final E element) {
     if (deleted != null) {
       final int i = search(deleted, element.getKey());
@@ -224,25 +247,26 @@ public class Diff<K, E extends Diff.Element<K>> {
     return false;
   }
 
+  /** 清空删除列表 */
   public void clearDeleted() {
     if (deleted != null) {
       deleted.clear();
     }
   }
 
-  /** @return true if no changes contained in the diff */
+  /**
+   * 检查差异是否为空（无任何变更）
+   * @return 没有新增也没有删除返回true，否则返回false
+   */
   public boolean isEmpty() {
     return (created == null || created.isEmpty())
         && (deleted == null || deleted.isEmpty());
   }
   
   /**
-   * Add the given element to the created list,
-   * provided the element does not exist, i.e. i < 0.
-   *
-   * @param i the insertion point defined
-   *          in {@link Collections#binarySearch(List, Object)}
-   * @throws AssertionError if i >= 0.
+   * 将元素添加到新增列表的指定插入点
+   * @param element 要添加的元素
+   * @param i 二分查找结果（必须为负数，表示元素不存在）
    */
   private void addCreated(final E element, final int i) {
     if (i >= 0) {
@@ -255,22 +279,27 @@ public class Diff<K, E extends Diff.Element<K>> {
     created.add(-i - 1, element);
   }
 
-  /** Similar to {@link #addCreated(Element, int)} but for the deleted list. */
+  /**
+   * 将元素添加到删除列表的指定插入点
+   * @param element 要添加的元素
+   * @param i 二分查找结果（必须为负数，表示元素不存在）
+   */
   private void addDeleted(final E element, final int i) {
     if (i >= 0) {
       throw new AssertionError("Element already exists: element=" + element
           + ", deleted=" + deleted);
     }
     if (deleted == null) {
-      deleted = new ArrayList<>(DEFAULT_ARRAY_INITIAL_CAPACITY);
+      deleted = new ArrayList<>(DEFAULT_ARRAY_INITIAL_CAPAC);
     }
     deleted.add(-i - 1, element);
   }
 
 
   /**
-   * Create an element in current state.
-   * @return the c-list insertion point for undo.
+   * 记录创建元素操作，添加到新增列表
+   * @param element 要创建的元素
+   * @return 插入点，用于撤销操作
    */
   public int create(final E element) {
     final int c = search(created, element.getKey());
@@ -279,26 +308,28 @@ public class Diff<K, E extends Diff.Element<K>> {
   }
 
   /**
-   * Undo the previous create(E) operation. Note that the behavior is
-   * undefined if the previous operation is not create(E).
+   * 撤销上一次创建元素操作
+   * @param element 要撤销的元素
+   * @param insertionPoint create操作返回的插入点
    */
   public void undoCreate(final E element, final int insertionPoint) {
     remove(created, insertionPoint, element);
   }
 
   /**
-   * Delete an element from current state.
-   * @return the undo information.
+   * 记录删除元素操作，处理不同情况更新新增/删除列表
+   * @param element 要删除的元素
+   * @return 撤销信息，用于回滚该操作
    */
   public UndoInfo<E> delete(final E element) {
     final int c = search(created, element.getKey());
     E previous = null;
     Integer d = null;
     if (c >= 0) {
-      // remove a newly created element
+      // 删除的是刚新增的元素，直接从新增列表移除
       previous = created.remove(c);
     } else {
-      // not in c-list, it must be in previous
+      // 原状态已存在的元素，添加到删除列表
       d = search(deleted, element.getKey());
       addDeleted(element, d);
     }
@@ -306,8 +337,9 @@ public class Diff<K, E extends Diff.Element<K>> {
   }
   
   /**
-   * Undo the previous delete(E) operation. Note that the behavior is
-   * undefined if the previous operation is not delete(E).
+   * 撤销上一次删除元素操作
+   * @param element 被删除的元素
+   * @param undoInfo delete操作返回的撤销信息
    */
   public void undoDelete(final E element, final UndoInfo<E> undoInfo) {
     final int c = undoInfo.createdInsertionPoint;
@@ -319,8 +351,10 @@ public class Diff<K, E extends Diff.Element<K>> {
   }
 
   /**
-   * Modify an element in current state.
-   * @return the undo information.
+   * 记录修改元素操作，将旧元素加入删除列表、新元素加入新增列表
+   * @param oldElement 修改前的旧元素
+   * @param newElement 修改后的新元素
+   * @return 撤销信息，用于回滚该操作
    */
   public UndoInfo<E> modify(final E oldElement, final E newElement) {
     Preconditions.checkArgument(oldElement != newElement,
@@ -332,15 +366,15 @@ public class Diff<K, E extends Diff.Element<K>> {
     E previous = null;
     Integer d = null;
     if (c >= 0) {
-      // Case 1.1.3 and 2.3.3: element is already in c-list,
+      // 元素已经在新增列表，直接替换
       previous = created.set(c, newElement);
       
-      // For previous != oldElement, set it to oldElement
+      // 保留旧元素用于回滚
       previous = oldElement;
     } else {
       d = search(deleted, oldElement.getKey());
       if (d < 0) {
-        // Case 2.3: neither in c-list nor d-list
+        // 不在两个列表中，新增新元素、删除旧元素
         addCreated(newElement, c);
         addDeleted(oldElement, d);
       }
@@ -349,8 +383,10 @@ public class Diff<K, E extends Diff.Element<K>> {
   }
 
   /**
-   * Undo the previous modify(E, E) operation. Note that the behavior
-   * is undefined if the previous operation is not modify(E, E).
+   * 撤销上一次修改元素操作
+   * @param oldElement 修改前的旧元素
+   * @param newElement 修改后的新元素
+   * @param undoInfo modify操作返回的撤销信息
    */
   public void undoModify(final E oldElement, final E newElement,
       final UndoInfo<E> undoInfo) {
@@ -367,14 +403,9 @@ public class Diff<K, E extends Diff.Element<K>> {
   }
 
   /**
-   * Find an element in the previous state.
-   * 
-   * @return null if the element cannot be determined in the previous state
-   *         since no change is recorded and it should be determined in the
-   *         current state; otherwise, return a {@link Container} containing the
-   *         element in the previous state. Note that the element can possibly
-   *         be null which means that the element is not found in the previous
-   *         state.
+   * 根据键从差异中查找旧状态对应的元素
+   * @param name 元素键
+   * @return null表示差异中无记录，需要从当前状态查找；否则返回包装了旧状态元素的容器，容器元素为null表示旧状态不存在该元素
    */
   public Container<E> accessPrevious(final K name) {
     return accessPrevious(name, created, deleted);
@@ -384,31 +415,28 @@ public class Diff<K, E extends Diff.Element<K>> {
       final K name, final List<E> clist, final List<E> dlist) {
     final int d = search(dlist, name);
     if (d >= 0) {
-      // the element was in previous and was once deleted in current.
+      // 元素在删除列表，说明旧状态存在，当前被删除
       return new Container<E>(dlist.get(d));
     } else {
       final int c = search(clist, name);
-      // When c >= 0, the element in current is a newly created element.
+      // 元素在新增列表，说明旧状态不存在
       return c < 0? null: new Container<E>(null);
     }
   }
 
   /**
-   * Find an element in the current state.
-   * 
-   * @return null if the element cannot be determined in the current state since
-   *         no change is recorded and it should be determined in the previous
-   *         state; otherwise, return a {@link Container} containing the element in
-   *         the current state. Note that the element can possibly be null which
-   *         means that the element is not found in the current state.
+   * 根据键从差异中查找当前状态对应的元素
+   * @param name 元素键
+   * @return null表示差异中无记录，需要从旧状态查找；否则返回包装了当前状态元素的容器，容器元素为null表示当前状态不存在该元素
    */
   public Container<E> accessCurrent(K name) {
     return accessPrevious(name, deleted, created);
   }
 
   /**
-   * Apply this diff to previous state in order to obtain current state.
-   * @return the current state of the list.
+   * 将当前差异应用到旧状态列表，计算得到当前状态列表
+   * @param previous 旧状态有序列表
+   * @return 应用差异后的当前状态有序列表
    */
   public List<E> apply2Previous(final List<E> previous) {
     return apply2Previous(previous,
@@ -417,135 +445,28 @@ public class Diff<K, E extends Diff.Element<K>> {
 
   private static <K, E extends Diff.Element<K>> List<E> apply2Previous(
       final List<E> previous, final List<E> clist, final List<E> dlist) {
-    // Assumptions:
-    // (A1) All lists are sorted.
-    // (A2) All elements in dlist must be in previous.
-    // (A3) All elements in clist must be not in tmp = previous - dlist.
+    // 假设前提:
+    // (A1) 所有列表都是有序的
+    // (A2) 删除列表中所有元素都一定存在于旧状态
+    // (A3) 新增列表中所有元素一定不存在于 (旧状态 - 删除列表) 中
+    // 第一步：从旧状态删除dlist中的元素，得到中间结果tmp
     final List<E> tmp = new ArrayList<E>(previous.size() - dlist.size());
     {
       // tmp = previous - dlist
       final Iterator<E> i = previous.iterator();
       for(E deleted : dlist) {
-        E e = i.next(); //since dlist is non-empty, e must exist by (A2).
+        E e = i.next(); //根据A2假设，dlist非空时一定存在元素
         int cmp = 0;
+        // 找到对应元素前，把较小元素加入tmp
         for(; (cmp = e.compareTo(deleted.getKey())) < 0; e = i.next()) {
           tmp.add(e);
         }
-        Preconditions.checkState(cmp == 0); // check (A2)
+        Preconditions.checkState(cmp == 0); // 校验A2假设
       }
+      // 把剩余元素加入tmp
       for(; i.hasNext(); ) {
         tmp.add(i.next());
       }
     }
 
-    final List<E> current = new ArrayList<E>(tmp.size() + clist.size());
-    {
-      // current = tmp + clist
-      final Iterator<E> tmpIterator = tmp.iterator();
-      final Iterator<E> cIterator = clist.iterator();
-
-      E t = tmpIterator.hasNext()? tmpIterator.next(): null;
-      E c = cIterator.hasNext()? cIterator.next(): null;
-      for(; t != null || c != null; ) {
-        final int cmp = c == null? 1
-            : t == null? -1
-            : c.compareTo(t.getKey());
-
-        if (cmp < 0) {
-          current.add(c);
-          c = cIterator.hasNext()? cIterator.next(): null;
-        } else if (cmp > 0) {
-          current.add(t);
-          t = tmpIterator.hasNext()? tmpIterator.next(): null;
-        } else {
-          throw new AssertionError("Violated assumption (A3).");
-        }
-      }
-    }
-    return current;
-  }
-
-  /**
-   * Apply the reverse of this diff to current state in order
-   * to obtain the previous state.
-   * @return the previous state of the list.
-   */
-  public List<E> apply2Current(final List<E> current) {
-    return apply2Previous(current,
-        getDeletedUnmodifiable(), getCreatedUnmodifiable());
-  }
-  
-  /**
-   * Combine this diff with a posterior diff.  We have the following cases:
-   * 
-   * <pre>
-   * 1. For (c, 0) in the posterior diff, check the element in this diff:
-   * 1.1 (c', 0)  in this diff: impossible
-   * 1.2 (0, d')  in this diff: put in c-list --&gt; (c, d')
-   * 1.3 (c', d') in this diff: impossible
-   * 1.4 (0, 0)   in this diff: put in c-list --&gt; (c, 0)
-   * This is the same logic as create(E).
-   * 
-   * 2. For (0, d) in the posterior diff,
-   * 2.1 (c', 0)  in this diff: remove from c-list --&gt; (0, 0)
-   * 2.2 (0, d')  in this diff: impossible
-   * 2.3 (c', d') in this diff: remove from c-list --&gt; (0, d')
-   * 2.4 (0, 0)   in this diff: put in d-list --&gt; (0, d)
-   * This is the same logic as delete(E).
-   * 
-   * 3. For (c, d) in the posterior diff,
-   * 3.1 (c', 0)  in this diff: replace the element in c-list --&gt; (c, 0)
-   * 3.2 (0, d')  in this diff: impossible
-   * 3.3 (c', d') in this diff: replace the element in c-list --&gt; (c, d')
-   * 3.4 (0, 0)   in this diff: put in c-list and d-list --&gt; (c, d)
-   * This is the same logic as modify(E, E).
-   * </pre>
-   * 
-   * @param posterior The posterior diff to combine with.
-   * @param deletedProcesser
-   *     process the deleted/overwritten elements in case 2.1, 2.3, 3.1 and 3.3.
-   */
-  public void combinePosterior(final Diff<K, E> posterior,
-      final Processor<E> deletedProcesser) {
-    final Iterator<E> createdIterator
-        = posterior.getCreatedUnmodifiable().iterator();
-    final Iterator<E> deletedIterator
-        = posterior.getDeletedUnmodifiable().iterator();
-
-    E c = createdIterator.hasNext()? createdIterator.next(): null;
-    E d = deletedIterator.hasNext()? deletedIterator.next(): null;
-
-    for(; c != null || d != null; ) {
-      final int cmp = c == null? 1
-          : d == null? -1
-          : c.compareTo(d.getKey());
-      if (cmp < 0) {
-        // case 1: only in c-list
-        create(c);
-        c = createdIterator.hasNext()? createdIterator.next(): null;
-      } else if (cmp > 0) {
-        // case 2: only in d-list
-        final UndoInfo<E> ui = delete(d);
-        if (deletedProcesser != null) {
-          deletedProcesser.process(ui.trashed);
-        }
-        d = deletedIterator.hasNext()? deletedIterator.next(): null;
-      } else {
-        // case 3: in both c-list and d-list 
-        final UndoInfo<E> ui = modify(d, c);
-        if (deletedProcesser != null) {
-          deletedProcesser.process(ui.trashed);
-        }
-        c = createdIterator.hasNext()? createdIterator.next(): null;
-        d = deletedIterator.hasNext()? deletedIterator.next(): null;
-      }
-    }
-  }
-
-  @Override
-  public String toString() {
-    return getClass().getSimpleName()
-        +  "{created=" + getCreatedUnmodifiable()
-        + ", deleted=" + getDeletedUnmodifiable() + "}";
-  }
-}
+    // 第二步：合并tmp

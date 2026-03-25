@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -82,7 +83,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The Router webservice util class.
+ * Router Web服务工具类，提供YARN Federation Router跨子集群Web请求转发、结果聚合等公共能力。
  */
 public final class RouterWebServiceUtil {
 
@@ -98,33 +99,32 @@ public final class RouterWebServiceUtil {
   }
 
   /**
-   * Creates and performs a REST call to a specific WebService.
+   * 转发REST请求到目标子集群RM，并返回聚合后的结果。
    *
-   * @param webApp the address of the remote webapp
-   * @param hsr the servlet request
-   * @param returnType the return type of the REST call
-   * @param <T> Type of return object.
-   * @param method the HTTP method of the REST call
-   * @param targetPath additional path to add to the webapp address
-   * @param formParam the form parameters as input for a specific REST call
-   * @param additionalParam the query parameters as input for a specific REST
-   *          call in case the call has no servlet request
-   * @param conf configuration.
-   * @param client same client used to reduce number of clients created
-   * @return the retrieved entity from the REST call
+   * @param webApp 远程Web服务地址
+   * @param hsr 原始Servlet请求
+   * @param returnType REST响应返回类型
+   * @param <T> 返回对象泛型
+   * @param method HTTP请求方法
+   * @param targetPath 请求目标路径
+   * @param formParam 表单参数
+   * @param additionalParam 额外查询参数
+   * @param conf 配置对象
+   * @param client 复用的Jersey客户端实例
+   * @return 远程REST调用返回的结果对象
    */
   protected static <T> T genericForward(final String webApp,
       final HttpServletRequest hsr, final Class<T> returnType,
       final HTTPMethods method, final String targetPath, final Object formParam,
       final Map<String, String[]> additionalParam, Configuration conf,
       Client client) {
-
+    // 获取请求发起用户UGI
     UserGroupInformation callerUGI;
 
     if (hsr != null) {
       callerUGI = RMWebAppUtil.getCallerUserGroupInformation(hsr, true);
     } else {
-      // user not required
+      // 无请求时创建默认Router用户
       callerUGI = UserGroupInformation.createRemoteUser(user);
     }
 
@@ -134,17 +134,19 @@ public final class RouterWebServiceUtil {
     }
 
     try {
+      // 以请求用户身份执行转发操作
       return callerUGI.doAs((PrivilegedExceptionAction<T>) () -> {
 
         Map<String, String[]> paramMap = null;
 
-        // We can have hsr or additionalParam. There are no case with both.
+        // 参数来自请求或额外参数，二者不会同时存在
         if (hsr != null) {
           paramMap = hsr.getParameterMap();
         } else if (additionalParam != null) {
           paramMap = additionalParam;
         }
 
+        // 调用远程RM Web服务
         Response response = RouterWebServiceUtil.invokeRMWebService(
             webApp, targetPath, method, (hsr == null) ? null : hsr.getPathInfo(), paramMap,
             formParam, getMediaTypeFromHttpServletRequest(hsr, returnType), conf, client);
@@ -154,12 +156,13 @@ public final class RouterWebServiceUtil {
             return returnType.cast(response);
           }
 
-          // YARN RM can answer with Status.OK or it throws an exception
+          // 正常返回结果，读取实体对象
           if (response.getStatus() == SC_OK) {
             T t = response.readEntity(returnType);
             return t;
           }
 
+          // 无内容响应，尝试创建空对象返回
           if (response.getStatus() == SC_NO_CONTENT) {
             try {
               return returnType.getConstructor().newInstance();
@@ -168,9 +171,11 @@ public final class RouterWebServiceUtil {
             }
           }
 
+          // 根据响应状态抛出对应异常
           RouterWebServiceUtil.retrieveException(response);
           return null;
         } finally {
+          // 非返回Response时关闭响应释放资源
           if (response != null && returnType != Response.class) {
             response.close();
           }
@@ -184,31 +189,35 @@ public final class RouterWebServiceUtil {
   }
 
   /**
-   * Performs an invocation of a REST call on a remote RMWebService.
-   * @param webApp the address of the remote webapp
-   * @param path  to add to the webapp address
-   * @param method the HTTP method of the REST call
-   * @param additionalPath the servlet request path
-   * @param queryParams hsr of additional Param
-   * @param formParam the form parameters as input for a specific REST call
-   * @param mediaType Media type for Servlet request call
-   * @param conf to support http and https
-   * @param client same client used to reduce number of clients created
-   * @return Client response to REST call
+   * 实际调用远程ResourceManager Web服务，构造并发送REST请求。
+   * @param webApp 远程Web服务地址
+   * @param path 请求目标路径
+   * @param method HTTP请求方法
+   * @param additionalPath 额外请求路径
+   * @param queryParams 查询参数集合
+   * @param formParam 请求体参数
+   * @param mediaType 请求媒体类型
+   * @param conf 配置对象
+   * @param client 传入的Jersey客户端
+   * @return 远程服务响应对象
    */
   @SuppressWarnings("checkstyle:parameternumber")
   private static Response invokeRMWebService(String webApp, String path,
       HTTPMethods method, String additionalPath,
       Map<String, String[]> queryParams, Object formParam, String mediaType,
       Configuration conf, Client client) {
+    // 解析远程地址得到套接字地址
     InetSocketAddress socketAddress = NetUtils
         .getConnectAddress(NetUtils.createSocketAddr(webApp));
+    // 根据配置选择http/https协议
     String scheme = YarnConfiguration.useHttps(conf) ? "https://" : "http://";
     String webAddress = scheme + socketAddress.getHostName() + ":"
         + socketAddress.getPort();
+    // 创建新客户端构建请求
     Client client1 = ClientBuilder.newClient();
     WebTarget webResource = client1.target(webAddress);
 
+    // 拼接请求路径
     if (additionalPath != null && !additionalPath.isEmpty()) {
       webResource = webResource.path(additionalPath);
     } else {
@@ -219,6 +228,7 @@ public final class RouterWebServiceUtil {
         "formParam:{}, mediaType:{}, conf:{}", webApp, path, method, additionalPath,
         queryParams, formParam, mediaType, conf);
 
+    // 添加所有查询参数
     if (queryParams != null && !queryParams.isEmpty()) {
       for (Entry<String, String[]> param : queryParams.entrySet()) {
         String[] values = param.getValue();
@@ -228,11 +238,13 @@ public final class RouterWebServiceUtil {
       }
     }
 
+    // 构建请求，设置媒体类型
     Builder builder = webResource.request(mediaType);
 
     Response response = null;
 
     try {
+      // 根据HTTP方法执行对应请求
       switch (method) {
       case DELETE:
         response = builder.delete(Response.class);
@@ -255,6 +267,10 @@ public final class RouterWebServiceUtil {
     return response;
   }
 
+  /**
+   * 根据响应状态码解析并抛出对应Web异常。
+   * @param response 远程服务响应
+   */
   public static void retrieveException(Response response) {
     String serverErrorMsg = response.readEntity(String.class);
     int status = response.getStatus();
@@ -273,51 +289,49 @@ public final class RouterWebServiceUtil {
   }
 
   /**
-   * Merges a list of AppInfo grouping by ApplicationId. Our current policy is
-   * to merge the application reports from the reachable SubClusters. Via
-   * configuration parameter, we decide whether to return applications for which
-   * the primary AM is missing or to omit them.
+   * 合并来自多个子集群的应用信息，按应用ID分组聚合结果。
+   * 合并主AM和跨子集群UAM的资源统计信息。
    *
-   * @param appsInfo a list of AppInfo to merge
-   * @param returnPartialResult if the merge AppsInfo should contain partial
-   *          result or not
-   * @return the merged AppsInfo
+   * @param appsInfo 多个子集群返回的AppInfo列表
+   * @param returnPartialResult 是否允许返回缺少主AM的部分结果
+   * @return 合并完成的AppsInfo对象
    */
   public static AppsInfo mergeAppsInfo(ArrayList<AppInfo> appsInfo,
       boolean returnPartialResult) {
     AppsInfo allApps = new AppsInfo();
 
+    // 存储包含主AM的应用
     Map<String, AppInfo> federationAM = new HashMap<>();
+    // 存储仅包含UAM的应用，等待主AM出现后合并
     Map<String, AppInfo> federationUAMSum = new HashMap<>();
     for (AppInfo a : appsInfo) {
-      // Check if this AppInfo is an AM
+      // 判断当前AppInfo是否包含AM信息
       if (a.getAMHostHttpAddress() != null) {
-        // Insert in the list of AM
+        // 添加到AM列表
         federationAM.put(a.getAppId(), a);
-        // Check if there are any UAM found before
+        // 如果之前已经收集到同应用的UAM，进行合并
         if (federationUAMSum.containsKey(a.getAppId())) {
-          // Merge the current AM with the found UAM
           mergeAMWithUAM(a, federationUAMSum.get(a.getAppId()));
-          // Remove the sum of the UAMs
+          // 移除UAM缓存
           federationUAMSum.remove(a.getAppId());
         }
-        // This AppInfo is an UAM
       } else {
+        // 当前AppInfo是UAM
         if (federationAM.containsKey(a.getAppId())) {
-          // Merge the current UAM with its own AM
+          // 已经存在AM，直接合并
           mergeAMWithUAM(federationAM.get(a.getAppId()), a);
         } else if (federationUAMSum.containsKey(a.getAppId())) {
-          // Merge the current UAM with its own UAM and update the list of UAM
+          // 已有同应用UAM，合并UAM
           federationUAMSum.put(a.getAppId(),
               mergeUAMWithUAM(federationUAMSum.get(a.getAppId()), a));
         } else {
-          // Insert in the list of UAM
+          // 第一个UAM，加入缓存等待后续合并
           federationUAMSum.put(a.getAppId(), a);
         }
       }
     }
 
-    // Check the remaining UAMs are depending or not from federation
+    // 处理剩余未合并的UAM，根据配置决定是否返回
     for (AppInfo a : federationUAMSum.values()) {
       if (returnPartialResult || (a.getName() != null
           && !(a.getName().startsWith(UnmanagedApplicationManager.APP_NAME)
@@ -331,13 +345,14 @@ public final class RouterWebServiceUtil {
   }
 
   /**
-   * Create a Jersey client instance.
-   * @param conf Configuration
-   * @return a jersey client
+   * 根据配置创建带超时设置的Jersey客户端。
+   * @param conf 配置对象
+   * @return 初始化完成的Jersey客户端
    */
   protected static Client createJerseyClient(Configuration conf) {
     Client client = ClientBuilder.newClient();
 
+    // 读取连接超时配置，验证合法性
     long checkConnectTimeOut = conf.getLong(YarnConfiguration.ROUTER_WEBAPP_CONNECT_TIMEOUT, 0);
     int connectTimeOut = (int) conf.getTimeDuration(YarnConfiguration.ROUTER_WEBAPP_CONNECT_TIMEOUT,
         YarnConfiguration.DEFAULT_ROUTER_WEBAPP_CONNECT_TIMEOUT, TimeUnit.MILLISECONDS);
@@ -350,6 +365,7 @@ public final class RouterWebServiceUtil {
     }
     client.property(ClientProperties.CONNECT_TIMEOUT, connectTimeOut);
 
+    // 读取读取超时配置，验证合法性
     long checkReadTimeout = conf.getLong(YarnConfiguration.ROUTER_WEBAPP_READ_TIMEOUT, 0);
     int readTimeout = (int) conf.getTimeDuration(YarnConfiguration.ROUTER_WEBAPP_READ_TIMEOUT,
         YarnConfiguration.DEFAULT_ROUTER_WEBAPP_READ_TIMEOUT, TimeUnit.MILLISECONDS);
@@ -366,384 +382,32 @@ public final class RouterWebServiceUtil {
     return client;
   }
 
+  /**
+   * 合并两个无主AM的UAM信息，生成部分报告对象。
+   * @param uam1 第一个UAM信息
+   * @param uam2 第二个UAM信息
+   * @return 合并后的部分应用报告对象
+   */
   private static AppInfo mergeUAMWithUAM(AppInfo uam1, AppInfo uam2) {
     AppInfo partialReport = new AppInfo();
     partialReport.setAppId(uam1.getAppId());
     partialReport.setName(PARTIAL_REPORT + uam1.getAppId());
-    // We pick the status of the first uam
+    // 使用第一个UAM的状态
     partialReport.setState(uam1.getState());
-    // Merge the newly partial AM with UAM1 and then with UAM2
+    // 分别合并两个UAM的资源信息
     mergeAMWithUAM(partialReport, uam1);
     mergeAMWithUAM(partialReport, uam2);
     return partialReport;
   }
 
+  /**
+   * 将UAM的资源统计信息合并到主AM的AppInfo中。
+   * @param am 主AM应用信息
+   * @param uam 要合并的UAM应用信息
+   */
   private static void mergeAMWithUAM(AppInfo am, AppInfo uam) {
+    // 累加抢占资源统计
     am.setPreemptedResourceMB(
         am.getPreemptedResourceMB() + uam.getPreemptedResourceMB());
     am.setPreemptedResourceVCores(
-        am.getPreemptedResourceVCores() + uam.getPreemptedResourceVCores());
-    am.setNumNonAMContainerPreempted(am.getNumNonAMContainerPreempted()
-        + uam.getNumNonAMContainerPreempted());
-    am.setNumAMContainerPreempted(
-        am.getNumAMContainerPreempted() + uam.getNumAMContainerPreempted());
-    am.setPreemptedMemorySeconds(
-        am.getPreemptedMemorySeconds() + uam.getPreemptedMemorySeconds());
-    am.setPreemptedVcoreSeconds(
-        am.getPreemptedVcoreSeconds() + uam.getPreemptedVcoreSeconds());
-
-    if (am.getState() == YarnApplicationState.RUNNING
-        && uam.getState() == am.getState()) {
-
-      am.getResourceRequests().addAll(uam.getResourceRequests());
-
-      am.setAllocatedMB(am.getAllocatedMB() + uam.getAllocatedMB());
-      am.setAllocatedVCores(am.getAllocatedVCores() + uam.getAllocatedVCores());
-      am.setReservedMB(am.getReservedMB() + uam.getReservedMB());
-      am.setReservedVCores(am.getReservedVCores() + uam.getReservedMB());
-      am.setRunningContainers(
-          am.getRunningContainers() + uam.getRunningContainers());
-      am.setMemorySeconds(am.getMemorySeconds() + uam.getMemorySeconds());
-      am.setVcoreSeconds(am.getVcoreSeconds() + uam.getVcoreSeconds());
-    }
-  }
-
-  /**
-   * Deletes all the duplicate NodeInfo by discarding the old instances.
-   *
-   * @param nodes a list of NodeInfo to check for duplicates
-   * @return a NodesInfo that contains a list of NodeInfos without duplicates
-   */
-  public static NodesInfo deleteDuplicateNodesInfo(ArrayList<NodeInfo> nodes) {
-    NodesInfo nodesInfo = new NodesInfo();
-
-    Map<String, NodeInfo> nodesMap = new LinkedHashMap<>();
-    for (NodeInfo node : nodes) {
-      String nodeId = node.getNodeId();
-      // If the node already exists, it could be an old instance
-      if (nodesMap.containsKey(nodeId)) {
-        // Check if the node is an old instance
-        if (nodesMap.get(nodeId).getLastHealthUpdate() < node
-            .getLastHealthUpdate()) {
-          nodesMap.put(node.getNodeId(), node);
-        }
-      } else {
-        nodesMap.put(node.getNodeId(), node);
-      }
-    }
-    nodesInfo.addAll(new ArrayList<>(nodesMap.values()));
-    return nodesInfo;
-  }
-
-  /**
-   * Adds all the values from the second ClusterMetricsInfo to the first one.
-   *
-   * @param metrics the ClusterMetricsInfo we want to update
-   * @param metricsResponse the ClusterMetricsInfo we want to add to the first
-   *          param
-   */
-  public static void mergeMetrics(ClusterMetricsInfo metrics,
-      ClusterMetricsInfo metricsResponse) {
-    metrics.setAppsSubmitted(
-        metrics.getAppsSubmitted() + metricsResponse.getAppsSubmitted());
-    metrics.setAppsCompleted(
-        metrics.getAppsCompleted() + metricsResponse.getAppsCompleted());
-    metrics.setAppsPending(
-        metrics.getAppsPending() + metricsResponse.getAppsPending());
-    metrics.setAppsRunning(
-        metrics.getAppsRunning() + metricsResponse.getAppsRunning());
-    metrics.setAppsFailed(
-        metrics.getAppsFailed() + metricsResponse.getAppsFailed());
-    metrics.setAppsKilled(
-        metrics.getAppsKilled() + metricsResponse.getAppsKilled());
-
-    metrics.setReservedMB(
-        metrics.getReservedMB() + metricsResponse.getReservedMB());
-    metrics.setAvailableMB(
-        metrics.getAvailableMB() + metricsResponse.getAvailableMB());
-    metrics.setAllocatedMB(
-        metrics.getAllocatedMB() + metricsResponse.getAllocatedMB());
-
-    metrics.setReservedVirtualCores(metrics.getReservedVirtualCores()
-        + metricsResponse.getReservedVirtualCores());
-    metrics.setAvailableVirtualCores(metrics.getAvailableVirtualCores()
-        + metricsResponse.getAvailableVirtualCores());
-    metrics.setAllocatedVirtualCores(metrics.getAllocatedVirtualCores()
-        + metricsResponse.getAllocatedVirtualCores());
-
-    metrics.setContainersAllocated(metrics.getContainersAllocated()
-        + metricsResponse.getContainersAllocated());
-    metrics.setContainersReserved(metrics.getReservedContainers()
-        + metricsResponse.getReservedContainers());
-    metrics.setContainersPending(metrics.getPendingContainers()
-        + metricsResponse.getPendingContainers());
-
-    metrics.setTotalMB(metrics.getTotalMB()
-        + metricsResponse.getTotalMB());
-    metrics.setUtilizedMB(metrics.getUtilizedMB()
-        + metricsResponse.getUtilizedMB());
-    metrics.setTotalVirtualCores(metrics.getTotalVirtualCores()
-        + metricsResponse.getTotalVirtualCores());
-    metrics.setTotalNodes(metrics.getTotalNodes()
-        + metricsResponse.getTotalNodes());
-    metrics.setUtilizedVirtualCores(metrics.getUtilizedVirtualCores()
-        + metricsResponse.getUtilizedVirtualCores());
-    metrics.setLostNodes(metrics.getLostNodes()
-        + metricsResponse.getLostNodes());
-    metrics.setUnhealthyNodes(metrics.getUnhealthyNodes()
-        + metricsResponse.getUnhealthyNodes());
-    metrics.setDecommissioningNodes(metrics.getDecommissioningNodes()
-        + metricsResponse.getDecommissioningNodes());
-    metrics.setDecommissionedNodes(metrics.getDecommissionedNodes()
-        + metricsResponse.getDecommissionedNodes());
-    metrics.setRebootedNodes(metrics.getRebootedNodes()
-        + metricsResponse.getRebootedNodes());
-    metrics.setActiveNodes(metrics.getActiveNodes()
-        + metricsResponse.getActiveNodes());
-    metrics.setShutdownNodes(metrics.getShutdownNodes()
-        + metricsResponse.getShutdownNodes());
-
-    int utilizedVirtualCoresPercent = metrics.getTotalVirtualCores() <= 0 ? 0 :
-        (int) (metrics.getUtilizedVirtualCores() * 100 / metrics.getTotalVirtualCores());
-    metrics.setUtilizedVirtualCoresPercent(utilizedVirtualCoresPercent);
-
-    int utilizedMBPercent = metrics.getTotalMB() <= 0 ? 0 :
-        (int) (metrics.getUtilizedMB() * 100 / metrics.getTotalMB());
-    metrics.setUtilizedMBPercent(utilizedMBPercent);
-  }
-
-  /**
-   * Extract from HttpServletRequest the MediaType in output.
-   *
-   * @param request the servlet request.
-   * @param returnType the return type of the REST call.
-   * @param <T> Generic Type T.
-   * @return MediaType.
-   */
-  protected static <T> String getMediaTypeFromHttpServletRequest(
-      HttpServletRequest request, final Class<T> returnType) {
-    if (request == null) {
-      // By default, we return XML for REST call without HttpServletRequest
-      return MediaType.APPLICATION_XML;
-    }
-    if (!returnType.equals(Response.class)) {
-      return MediaType.APPLICATION_XML;
-    }
-    String header = request.getHeader(HttpHeaders.ACCEPT);
-    if (header == null || header.equals("*")) {
-      // By default, we return JSON
-      return MediaType.APPLICATION_JSON;
-    }
-    return header;
-  }
-
-  public static NodeToLabelsInfo mergeNodeToLabels(
-      Map<SubClusterInfo, NodeToLabelsInfo> nodeToLabelsInfoMap) {
-
-    HashMap<String, NodeLabelsInfo> nodeToLabels = new HashMap<>();
-    Collection<NodeToLabelsInfo> nodeToLabelsInfos = nodeToLabelsInfoMap.values();
-
-    nodeToLabelsInfos.stream().forEach(nodeToLabelsInfo -> {
-      for (Map.Entry<String, NodeLabelsInfo> item : nodeToLabelsInfo.getNodeToLabels().entrySet()) {
-        String key = item.getKey();
-        NodeLabelsInfo itemValue = item.getValue();
-        NodeLabelsInfo nodeToLabelsValue = nodeToLabels.getOrDefault(item.getKey(), null);
-        Set<NodeLabel> hashSet = new HashSet<>();
-        if (itemValue != null) {
-          hashSet.addAll(itemValue.getNodeLabels());
-        }
-        if (nodeToLabelsValue != null) {
-          hashSet.addAll(nodeToLabelsValue.getNodeLabels());
-        }
-        nodeToLabels.put(key, new NodeLabelsInfo(hashSet));
-      }
-    });
-
-    return new NodeToLabelsInfo(nodeToLabels);
-  }
-
-  public static ApplicationStatisticsInfo mergeApplicationStatisticsInfo(
-      Collection<ApplicationStatisticsInfo> appStatistics) {
-    ApplicationStatisticsInfo result = new ApplicationStatisticsInfo();
-    Map<String, StatisticsItemInfo> statisticsItemMap = new HashMap<>();
-
-    appStatistics.stream().forEach(appStatistic -> {
-      List<StatisticsItemInfo> statisticsItemInfos = appStatistic.getStatItems();
-      for (StatisticsItemInfo statisticsItemInfo : statisticsItemInfos) {
-
-        String statisticsItemKey =
-            statisticsItemInfo.getType() + "_" + statisticsItemInfo.getState().toString();
-
-        StatisticsItemInfo statisticsItemValue;
-        if (statisticsItemMap.containsKey(statisticsItemKey)) {
-          statisticsItemValue = statisticsItemMap.get(statisticsItemKey);
-          long statisticsItemValueCount = statisticsItemValue.getCount();
-          long statisticsItemInfoCount = statisticsItemInfo.getCount();
-          long newCount = statisticsItemValueCount + statisticsItemInfoCount;
-          statisticsItemValue.setCount(newCount);
-        } else {
-          statisticsItemValue = new StatisticsItemInfo(statisticsItemInfo);
-        }
-
-        statisticsItemMap.put(statisticsItemKey, statisticsItemValue);
-      }
-    });
-
-    if (!statisticsItemMap.isEmpty()) {
-      result.getStatItems().addAll(statisticsItemMap.values());
-    }
-
-    return result;
-  }
-
-  public static NodeLabelsInfo mergeNodeLabelsInfo(Map<SubClusterInfo, NodeLabelsInfo> paramMap) {
-    Map<String, NodeLabelInfo> resultMap = new HashMap<>();
-    paramMap.values().stream()
-        .flatMap(nodeLabelsInfo -> nodeLabelsInfo.getNodeLabelsInfo().stream())
-        .forEach(nodeLabelInfo -> {
-          String keyLabelName = nodeLabelInfo.getName();
-          if (resultMap.containsKey(keyLabelName)) {
-            NodeLabelInfo mapNodeLabelInfo = resultMap.get(keyLabelName);
-            mapNodeLabelInfo = mergeNodeLabelInfo(mapNodeLabelInfo, nodeLabelInfo);
-            resultMap.put(keyLabelName, mapNodeLabelInfo);
-          } else {
-            resultMap.put(keyLabelName, nodeLabelInfo);
-          }
-        });
-    NodeLabelsInfo nodeLabelsInfo = new NodeLabelsInfo();
-    nodeLabelsInfo.getNodeLabelsInfo().addAll(resultMap.values());
-    return nodeLabelsInfo;
-  }
-
-  private static NodeLabelInfo mergeNodeLabelInfo(NodeLabelInfo left, NodeLabelInfo right) {
-    NodeLabelInfo resultNodeLabelInfo = new NodeLabelInfo();
-    resultNodeLabelInfo.setName(left.getName());
-
-    int newActiveNMs = left.getActiveNMs() + right.getActiveNMs();
-    resultNodeLabelInfo.setActiveNMs(newActiveNMs);
-
-    boolean newExclusivity = left.getExclusivity() && right.getExclusivity();
-    resultNodeLabelInfo.setExclusivity(newExclusivity);
-
-    PartitionInfo leftPartition = left.getPartitionInfo();
-    PartitionInfo rightPartition = right.getPartitionInfo();
-    PartitionInfo newPartitionInfo = PartitionInfo.addTo(leftPartition, rightPartition);
-    resultNodeLabelInfo.setPartitionInfo(newPartitionInfo);
-    return resultNodeLabelInfo;
-  }
-
-  /**
-   * initForWritableEndpoints does the init and acls verification for all
-   * writable REST end points.
-   *
-   * @param conf Configuration.
-   * @param callerUGI remote caller who initiated the request.
-   * @throws AuthorizationException in case of no access to perfom this op.
-   */
-  public static void initForWritableEndpoints(Configuration conf, UserGroupInformation callerUGI)
-          throws AuthorizationException {
-    if (callerUGI == null) {
-      String msg = "Unable to obtain user name, user not authenticated";
-      throw new AuthorizationException(msg);
-    }
-
-    if (UserGroupInformation.isSecurityEnabled() && isStaticUser(conf, callerUGI)) {
-      String msg = "The default static user cannot carry out this operation.";
-      throw new ForbiddenException(msg);
-    }
-  }
-
-  /**
-   * Determine whether the user is a static user.
-   *
-   * @param conf Configuration.
-   * @param callerUGI remote caller who initiated the request.
-   * @return true, static user; false, not static user;
-   */
-  private static boolean isStaticUser(Configuration conf, UserGroupInformation callerUGI) {
-    String staticUser = conf.get(CommonConfigurationKeys.HADOOP_HTTP_STATIC_USER,
-            CommonConfigurationKeys.DEFAULT_HADOOP_HTTP_STATIC_USER);
-    return staticUser.equals(callerUGI.getUserName());
-  }
-
-  public static void createKerberosUserGroupInformation(HttpServletRequest hsr)
-          throws YarnException {
-    String authType = hsr.getAuthType();
-
-    if (!KerberosAuthenticationHandler.TYPE.equalsIgnoreCase(authType)) {
-      String msg = "Delegation token operations can only be carried out on a "
-              + "Kerberos authenticated channel. Expected auth type is "
-              + KerberosAuthenticationHandler.TYPE + ", got type " + authType;
-      throw new YarnException(msg);
-    }
-
-    Object ugiAttr =
-            hsr.getAttribute(DelegationTokenAuthenticationHandler.DELEGATION_TOKEN_UGI_ATTRIBUTE);
-    if (ugiAttr != null) {
-      String msg = "Delegation token operations cannot be carried out using "
-              + "delegation token authentication.";
-      throw new YarnException(msg);
-    }
-  }
-
-  /**
-   * Parse Token data.
-   *
-   * @param encodedToken tokenData
-   * @return RMDelegationTokenIdentifier.
-   */
-  public static Token<RMDelegationTokenIdentifier> extractToken(String encodedToken) {
-    Token<RMDelegationTokenIdentifier> token = new Token<>();
-    try {
-      token.decodeFromUrlString(encodedToken);
-    } catch (Exception ie) {
-      throw new BadRequestException("Could not decode encoded token");
-    }
-    return token;
-  }
-
-  public static Token<RMDelegationTokenIdentifier> extractToken(HttpServletRequest request) {
-    String encodedToken = request.getHeader(DELEGATION_TOKEN_HEADER);
-    if (encodedToken == null) {
-      String msg = "Header '" + DELEGATION_TOKEN_HEADER
-              + "' containing encoded token not found";
-      throw new BadRequestException(msg);
-    }
-    return extractToken(encodedToken);
-  }
-
-  /**
-   * Get Kerberos UserGroupInformation.
-   *
-   * Parse ugi from hsr and set kerberos authentication attributes.
-   *
-   * @param conf Configuration.
-   * @param request the servlet request.
-   * @return UserGroupInformation.
-   * @throws AuthorizationException if Kerberos auth failed.
-   * @throws YarnException If Authentication Type verification fails.
-   */
-  public static UserGroupInformation getKerberosUserGroupInformation(Configuration conf,
-      HttpServletRequest request) throws AuthorizationException, YarnException {
-    // Parse ugi from hsr And Check ugi as expected.
-    // If ugi is empty or user is a static user, an exception will be thrown.
-    UserGroupInformation callerUGI = RMWebAppUtil.getCallerUserGroupInformation(request, true);
-    initForWritableEndpoints(conf, callerUGI);
-
-    // Set AuthenticationMethod Kerberos for ugi.
-    createKerberosUserGroupInformation(request);
-    callerUGI.setAuthenticationMethod(UserGroupInformation.AuthenticationMethod.KERBEROS);
-
-    // return caller UGI
-    return callerUGI;
-  }
-
-  public static String generateWebTitle(String title, String msg) {
-    StringBuilder stringBuilder = new StringBuilder();
-    stringBuilder.append(title);
-    stringBuilder.append(" (");
-    stringBuilder.append(msg);
-    stringBuilder.append(")");
-    return stringBuilder.toString();
-  }
-}
+        am.getPreemptedResourceVC

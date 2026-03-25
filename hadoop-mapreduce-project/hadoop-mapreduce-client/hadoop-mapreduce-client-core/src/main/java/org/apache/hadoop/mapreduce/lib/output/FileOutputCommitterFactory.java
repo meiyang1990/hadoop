@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,11 +25,19 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
- * Creates a {@link FileOutputCommitter}, always.
+ * 文件输出提交器工厂，始终创建标准FileOutputCommitter实例。
+ * 作为PathOutputCommitterFactory的具体实现，用于MapReduce任务输出文件的提交管理
  */
 public final class FileOutputCommitterFactory
     extends PathOutputCommitterFactory {
 
+  /**
+   * 创建标准文件输出提交器实例
+   * @param outputPath 任务输出根路径
+   * @param context 任务尝试上下文
+   * @return 标准FileOutputCommitter实例
+   * @throws IOException 创建过程中IO异常
+   */
   @Override
   public PathOutputCommitter createOutputCommitter(Path outputPath,
       TaskAttemptContext context) throws IOException {

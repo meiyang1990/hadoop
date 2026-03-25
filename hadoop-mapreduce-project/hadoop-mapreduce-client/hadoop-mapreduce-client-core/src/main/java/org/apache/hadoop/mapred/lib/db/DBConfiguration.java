@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,6 +23,11 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.JobConf;
 
+/**
+ * 数据库输入输出配置类，为旧版MapReduce API提供数据库连接配置能力
+ * 继承新版mapreduce包中的DBConfiguration，复用核心逻辑，保持旧API兼容性
+ * 用于配置MapReduce作业读写关系型数据库所需的连接参数和表信息
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class DBConfiguration extends 
@@ -84,12 +90,12 @@ public class DBConfiguration extends
 
   
   /**
-   * Sets the DB access related fields in the JobConf.  
-   * @param job the job
-   * @param driverClass JDBC Driver class name
-   * @param dbUrl JDBC DB access URL. 
-   * @param userName DB access username 
-   * @param passwd DB access passwd
+   * 在旧版JobConf中配置数据库访问相关参数
+   * @param job 作业配置对象
+   * @param driverClass JDBC驱动类名
+   * @param dbUrl 数据库连接URL
+   * @param userName 数据库访问用户名
+   * @param passwd 数据库访问密码
    */
   public static void configureDB(JobConf job, String driverClass, String dbUrl
       , String userName, String passwd) {
@@ -103,18 +109,21 @@ public class DBConfiguration extends
   }
 
   /**
-   * Sets the DB access related fields in the JobConf.  
-   * @param job the job
-   * @param driverClass JDBC Driver class name
-   * @param dbUrl JDBC DB access URL. 
+   * 在旧版JobConf中配置数据库访问相关参数（不设置用户名密码）
+   * @param job 作业配置对象
+   * @param driverClass JDBC驱动类名
+   * @param dbUrl 数据库连接URL
    */
   public static void configureDB(JobConf job, String driverClass, String dbUrl) {
     configureDB(job, driverClass, dbUrl, null, null);
   }
 
+  /**
+   * 构造DBConfiguration实例，委托父类处理JobConf初始化
+   * @param job 旧版作业配置对象
+   */
   DBConfiguration(JobConf job) {
     super(job);
   }
   
 }
-

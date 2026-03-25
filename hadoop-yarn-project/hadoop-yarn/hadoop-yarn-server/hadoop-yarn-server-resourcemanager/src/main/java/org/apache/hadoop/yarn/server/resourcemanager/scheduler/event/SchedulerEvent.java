@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,7 +21,15 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * YARN资源调度器事件基类，所有调度相关事件都继承此类，
+ * 基于事件驱动架构实现调度器内部异步事件处理。
+ */
 public class SchedulerEvent extends AbstractEvent<SchedulerEventType> {
+  /**
+   * 构造指定类型的调度事件。
+   * @param type 调度事件类型
+   */
   public SchedulerEvent(SchedulerEventType type) {
     super(type);
   }

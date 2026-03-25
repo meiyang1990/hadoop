@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,8 +22,18 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler;
 
+/**
+ * 调度编辑策略接口，定义YARN资源调度器动态调整的扩展策略规范
+ * 供资源监控模块使用，允许自定义策略根据集群状态动态调整调度配置
+ */
 public interface SchedulingEditPolicy {
 
+  /**
+   * 初始化调度编辑策略，注入配置、RM上下文和调度器实例
+   * @param config YARN配置对象
+   * @param context RM上下文对象，包含集群全局状态
+   * @param scheduler 资源调度器实例，可用于获取调度状态和修改调度配置
+   */
   void init(Configuration config, RMContext context,
       ResourceScheduler scheduler);
 
@@ -33,8 +44,16 @@ public interface SchedulingEditPolicy {
    */
   void editSchedule();
 
+  /**
+   * 获取策略执行监控间隔，单位毫秒
+   * @return 两次调度编辑执行的间隔时间
+   */
   long getMonitoringInterval();
 
+  /**
+   * 获取策略名称，用于日志和监控标识
+   * @return 策略名称字符串
+   */
   String getPolicyName();
 
 }

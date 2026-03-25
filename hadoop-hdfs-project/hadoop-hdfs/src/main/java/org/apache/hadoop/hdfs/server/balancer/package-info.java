@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * The Balancer is a tool for balancing the data across
- * the storage devices of an HDFS cluster.
- * Over time, the data in the HDFS storage can become skewed,
- * The Balancer moves data blocks between DataNodes to balance data distribution.
+ * HDFS数据均衡工具包，提供HDFS集群数据均衡的核心实现。
+ * 随着集群运行，数据分布会逐渐出现不均衡，本包提供数据块重新分布能力，
+ * 通过在DataNode之间迁移数据块，让集群存储利用率达到均衡，提升集群整体性能。
  */
 package org.apache.hadoop.hdfs.server.balancer;

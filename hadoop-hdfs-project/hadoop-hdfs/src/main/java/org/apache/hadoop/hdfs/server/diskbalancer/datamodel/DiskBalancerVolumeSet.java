@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,39 +36,43 @@ import java.util.TreeSet;
 import java.util.UUID;
 
 /**
- * DiskBalancerVolumeSet is a collection of storage devices on the
- * data node which are of similar StorageType.
+ * 文件：磁盘均衡器卷集合模型
+ * 该类是数据节点上相同存储类型磁盘的集合，是磁盘均衡计划生成的基本单位，负责计算各磁盘数据密度并判断是否需要均衡
  */
 @JsonIgnoreProperties({"sortedQueue", "volumeCount", "idealUsed"})
 public class DiskBalancerVolumeSet {
   private static final Logger LOG =
       LoggerFactory.getLogger(DiskBalancerVolumeSet.class);
+  // 最大磁盘数量限制
   private final int maxDisks = 256;
 
   @JsonProperty("transient")
   private boolean isTransient;
+  // 当前集合包含的磁盘卷集合
   private Set<DiskBalancerVolume> volumes;
 
   @JsonIgnore
+  // 按数据密度排序的优先队列，存储需要移出数据的磁盘
   private TreeSet<DiskBalancerVolume> sortedQueue;
+  // 当前集合的存储类型（如SSD、HDD）
   private String storageType;
+  // 当前卷集合唯一ID
   private String setID;
 
+  // 当前卷集合的理想利用率
   private double idealUsed;
 
 
   /**
-   * Constructs Empty DiskNBalanceVolumeSet.
-   * This is needed by jackson
+   * 空构造函数，供Jackson反序列化使用
    */
   public DiskBalancerVolumeSet() {
     setID = UUID.randomUUID().toString();
   }
 
   /**
-   * Constructs a DiskBalancerVolumeSet.
-   *
-   * @param isTransient - boolean
+   * 构造指定 transient 属性的磁盘卷集合
+   * @param isTransient 是否为瞬时卷
    */
   public DiskBalancerVolumeSet(boolean isTransient) {
     this.isTransient = isTransient;
@@ -78,7 +83,8 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Constructs a new DiskBalancerVolumeSet.
+   * 拷贝构造函数，基于已有卷集合创建新实例
+   * @param volumeSet 要拷贝的源卷集合
    */
   public DiskBalancerVolumeSet(DiskBalancerVolumeSet volumeSet) {
     this.isTransient = volumeSet.isTransient();
@@ -89,9 +95,8 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Tells us if this volumeSet is transient.
-   *
-   * @return - true or false
+   * 获取当前卷集合是否为瞬时卷
+   * @return true 是瞬时卷，false 不是
    */
   @JsonProperty("transient")
   public boolean isTransient() {
@@ -99,9 +104,8 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Set the transient properties for this volumeSet.
-   *
-   * @param transientValue - Boolean
+   * 设置当前卷集合的 transient 属性
+   * @param transientValue 瞬时属性值
    */
   @JsonProperty("transient")
   public void setTransient(boolean transientValue) {
@@ -109,28 +113,20 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Computes Volume Data Density. Adding a new volume changes
-   * the volumeDataDensity for all volumes. So we throw away
-   * our priority queue and recompute everything.
-   *
-   * we discard failed volumes from this computation.
-   *
-   * totalCapacity = totalCapacity of this volumeSet
-   * totalUsed = totalDfsUsed for this volumeSet
-   * idealUsed = totalUsed / totalCapacity
-   * dfsUsedRatio = dfsUsedOnAVolume / Capacity On that Volume
-   * volumeDataDensity = idealUsed - dfsUsedRatio
+   * 计算当前卷集合中所有正常磁盘的数据密度
+   * 数据密度 = 理想利用率 - 当前磁盘实际利用率，反映该磁盘需要移出多少数据
+   * 排除故障卷和跳过卷后重新计算所有磁盘的数据密度并重建排序队列
    */
   public void computeVolumeDataDensity() {
     long totalCapacity = 0;
     long totalUsed = 0;
     sortedQueue.clear();
 
-    // when we plan to re-distribute data we need to make
-    // sure that we skip failed volumes.
+    // 遍历所有卷，累加总容量和总已用空间，跳过故障和已标记跳过的卷
     for (DiskBalancerVolume volume : volumes) {
       if (!volume.isFailed() && !volume.isSkip()) {
 
+        // 有效容量为负，标记该卷为配置错误跳过处理
         if (volume.computeEffectiveCapacity() < 0) {
           skipMisConfiguredVolume(volume);
           continue;
@@ -141,11 +137,13 @@ public class DiskBalancerVolumeSet {
       }
     }
 
+    // 计算理想利用率：总已用空间 / 总有效容量，截断小数精度
     if (totalCapacity != 0) {
       this.idealUsed = truncateDecimals(totalUsed /
           (double) totalCapacity);
     }
 
+    // 计算每个正常卷的数据密度并加入排序队列
     for (DiskBalancerVolume volume : volumes) {
       if (!volume.isFailed() && !volume.isSkip()) {
         double dfsUsedRatio =
@@ -159,18 +157,20 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Truncate to 4 digits since uncontrolled precision is some times
-   * counter intitive to what users expect.
-   * @param value - double.
-   * @return double.
+   * 将double值截断为保留4位小数，避免精度过高影响用户理解
+   * @param value 原始double值
+   * @return 截断后保留4位小数的值
    */
   private double truncateDecimals(double value) {
     final int multiplier = 10000;
     return (double) ((long) (value * multiplier)) / multiplier;
   }
+
+  /**
+   * 处理配置错误的卷：记录错误日志并标记该卷跳过处理
+   * @param volume 配置错误的卷
+   */
   private void skipMisConfiguredVolume(DiskBalancerVolume volume) {
-    //probably points to some sort of mis-configuration. Log this and skip
-    // processing this volume.
     String errMessage = String.format("Real capacity is negative." +
                                           "This usually points to some " +
                                           "kind of mis-configuration.%n" +
@@ -191,9 +191,8 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Returns the number of volumes in the Volume Set.
-   *
-   * @return int
+   * 获取当前卷集合包含的卷总数
+   * @return 卷数量
    */
   @JsonIgnore
   public int getVolumeCount() {
@@ -201,28 +200,25 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Get Storage Type.
-   *
-   * @return String
+   * 获取当前卷集合的存储类型
+   * @return 存储类型字符串
    */
   public String getStorageType() {
     return storageType;
   }
 
   /**
-   * Set Storage Type.
-   * @param typeOfStorage -- StorageType
+   * 设置当前卷集合的存储类型
+   * @param typeOfStorage 存储类型字符串
    */
   public void setStorageType(String typeOfStorage) {
     this.storageType = typeOfStorage;
   }
 
   /**
-   * adds a given volume into this volume set.
-   *
-   * @param volume - volume to add.
-   *
-   * @throws Exception
+   * 向当前卷集合添加新磁盘卷，并重新计算数据密度
+   * @param volume 要添加的磁盘卷
+   * @throws Exception 参数校验失败时抛出异常
    */
   public void addVolume(DiskBalancerVolume volume) throws Exception {
     Preconditions.checkNotNull(volume, "volume cannot be null");
@@ -230,7 +226,7 @@ public class DiskBalancerVolumeSet {
                              "Mismatch in volumeSet and volume's transient " +
                                  "properties.");
 
-
+    // 第一个卷确定集合的存储类型，后续添加的卷必须和集合存储类型一致
     if (this.storageType == null) {
       Preconditions.checkState(volumes.size() == 0L, "Storage Type is Null but"
           + " volume size is " + volumes.size());
@@ -245,9 +241,8 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Returns a list diskVolumes that are part of this volume set.
-   *
-   * @return List
+   * 获取当前卷集合所有磁盘卷列表
+   * @return 磁盘卷列表
    */
   public List<DiskBalancerVolume> getVolumes() {
     return new ArrayList<>(volumes);
@@ -255,27 +250,29 @@ public class DiskBalancerVolumeSet {
 
 
   @JsonIgnore
+  /**
+   * 获取按数据密度排序的优先队列
+   * @return 排序后的TreeSet
+   */
   public TreeSet<DiskBalancerVolume> getSortedQueue() {
     return sortedQueue;
   }
 
   /**
-   * Computes whether we need to do any balancing on this volume Set at all.
-   * It checks if any disks are out of threshold value
-   *
-   * @param thresholdPercentage - threshold - in percentage
-   *
-   * @return true if balancing is needed false otherwise.
+   * 判断当前卷集合是否需要执行磁盘均衡
+   * 检查是否存在任意正常磁盘的数据密度绝对值超过阈值，超过则需要均衡
+   * @param thresholdPercentage 均衡阈值百分比
+   * @return true 需要均衡，false 不需要均衡
    */
   public boolean isBalancingNeeded(double thresholdPercentage) {
     double threshold = thresholdPercentage / 100.0d;
 
+    // 少于等于1个磁盘无需均衡
     if(volumes == null || volumes.size() <= 1) {
-      // there is nothing we can do with a single volume.
-      // so no planning needed.
       return false;
     }
 
+    // 遍历所有卷，只要有一个正常卷超过阈值就需要均衡
     for (DiskBalancerVolume vol : volumes) {
       boolean notSkip = !vol.isFailed() && !vol.isTransient() && !vol.isSkip();
       Double absDensity =
@@ -289,12 +286,9 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Remove a volume from the current set.
-   *
-   * This call does not recompute the volumeDataDensity. It has to be
-   * done manually after this call.
-   *
-   * @param volume - Volume to remove
+   * 从当前集合移除指定磁盘卷
+   * 调用该方法后需要手动重新计算数据密度
+   * @param volume 要移除的磁盘卷
    */
   public void removeVolume(DiskBalancerVolume volume) {
     volumes.remove(volume);
@@ -302,36 +296,41 @@ public class DiskBalancerVolumeSet {
   }
 
   /**
-   * Get Volume Set ID.
-   * @return String
+   * 获取当前卷集合唯一ID
+   * @return 卷集合ID字符串
    */
   public String getSetID() {
     return setID;
   }
 
   /**
-   * Set VolumeSet ID.
-   * @param volID String
+   * 设置当前卷集合唯一ID
+   * @param volID 卷集合ID字符串
    */
   public void setSetID(String volID) {
     this.setID = volID;
   }
 
   /**
-   * Gets the idealUsed for this volume set.
+   * 获取当前卷集合的理想利用率
+   * @return 理想利用率
    */
-
   @JsonIgnore
   public double getIdealUsed() {
     return this.idealUsed;
   }
 
+  /**
+   * 最小堆比较器，按磁盘数据密度降序排序
+   * 数据密度越大，说明该磁盘已用占比越低，需要移入更多数据；反之需要移出数据
+   */
   static class MinHeap implements Comparator<DiskBalancerVolume>, Serializable {
 
     /**
-     * Compares its two arguments for order.  Returns a negative integer,
-     * zero, or a positive integer as the first argument is less than, equal
-     * to, or greater than the second.
+     * 比较两个磁盘卷的数据密度，按降序排序
+     * @param first 第一个磁盘卷
+     * @param second 第二个磁盘卷
+     * @return 比较结果
      */
     @Override
     public int compare(DiskBalancerVolume first, DiskBalancerVolume second) {

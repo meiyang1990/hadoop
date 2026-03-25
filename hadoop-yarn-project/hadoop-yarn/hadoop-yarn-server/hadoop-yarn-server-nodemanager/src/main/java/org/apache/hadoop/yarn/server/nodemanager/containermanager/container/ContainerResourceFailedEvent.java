@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,30 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalResourceRequest;
 
+/**
+ * 容器资源本地化失败事件，用于通知容器管理器资源下载或本地化失败
+ */
 public class ContainerResourceFailedEvent extends ContainerResourceEvent {
 
+  // 资源失败诊断信息，用于记录失败原因
   private final String diagnosticMesage;
 
+  /**
+   * 构造容器资源失败事件
+   * @param container 目标容器ID
+   * @param rsrc 失败的资源请求
+   * @param diagnosticMesage 失败诊断信息
+   */
   public ContainerResourceFailedEvent(ContainerId container,
       LocalResourceRequest rsrc, String diagnosticMesage) {
     super(container, ContainerEventType.RESOURCE_FAILED, rsrc);
     this.diagnosticMesage = diagnosticMesage;
   }
 
+  /**
+   * 获取资源失败的诊断信息
+   * @return 失败诊断信息
+   */
   public String getDiagnosticMessage() {
     return diagnosticMesage;
   }

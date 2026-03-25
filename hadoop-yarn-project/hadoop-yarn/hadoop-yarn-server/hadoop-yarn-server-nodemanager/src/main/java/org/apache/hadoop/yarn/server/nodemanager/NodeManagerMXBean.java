@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,17 +23,16 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This is the JMX management interface for NodeManager.
- * End users shouldn't be implementing these interfaces, and instead
- * access this information through the JMX APIs.
+ * NodeManager JMX监控管理接口，对外暴露NodeManager运行状态指标，供JMX生态采集监控。
+ * 用户无需自行实现该接口，可直接通过JMX API获取对应监控信息。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface NodeManagerMXBean {
   /**
-   * Gets if security is enabled.
+   * 获取当前NodeManager是否启用安全认证。
    *
-   * @return true, if security is enabled.
+   * @return true 表示安全认证已启用，false表示未启用
    * */
   boolean isSecurityEnabled();
 }

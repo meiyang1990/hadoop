@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,14 +23,27 @@ import org.apache.hadoop.yarn.server.timelineservice.documentstore.collection.Co
 import org.apache.hadoop.yarn.server.timelineservice.documentstore.lib.DocumentStoreVendor;
 
 /**
- * Every {@link DocumentStoreVendor} have to implement this for creating
- * writer to its backend.
+ * 文档存储写入器抽象接口，不同文档存储厂商需要实现该接口，提供对后端存储的写入能力
+ * 为时间线服务指标数据写入提供统一的存储操作抽象
+ * @param <Document> 文档类型泛型
  */
 public interface DocumentStoreWriter<Document> extends AutoCloseable {
 
+  /**
+   * 创建存储时间线数据的数据库
+   */
   void createDatabase();
 
+  /**
+   * 创建指定名称的文档集合
+   * @param collectionName 集合名称
+   */
   void createCollection(String collectionName);
 
+  /**
+   * 将单个文档写入对应类型的集合中
+   * @param document 待写入文档
+   * @param collectionType 集合类型（区分不同类型的时间线数据）
+   */
   void writeDocument(Document document, CollectionType collectionType);
 }

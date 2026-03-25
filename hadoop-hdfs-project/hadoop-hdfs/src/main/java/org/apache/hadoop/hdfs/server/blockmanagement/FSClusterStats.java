@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,57 +24,49 @@ import org.apache.hadoop.fs.StorageType;
 import java.util.Map;
 
 /**
- * This interface is used for retrieving the load related statistics of
- * the cluster.
+ * 文件级注释：HDFS集群负载统计接口，定义了获取集群整体负载、节点状态和存储统计的统一方法
+ * 该接口用于获取集群负载相关统计信息，供块放置选择、负载均衡等模块查询集群状态
  */
 @InterfaceAudience.Private
+/**
+ * 集群负载统计接口，定义获取HDFS集群各类负载和状态统计信息的统一规范
+ * 核心职责：为块放置决策、负载均衡提供集群运行状态统计数据
+ */
 public interface FSClusterStats {
 
   /**
-   * an indication of the total load of the cluster.
-   *
-   * @return a count of the total number of block transfers and block
-   *         writes that are currently occuring on the cluster.
+   * 获取集群当前总体负载
+   * @return 集群当前正在进行的块传输和块写入操作总数量
    */
   public int getTotalLoad();
 
   /**
-   * Indicate whether or not the cluster is now avoiding
-   * to use stale DataNodes for writing.
-   *
-   * @return True if the cluster is currently avoiding using stale DataNodes
-   *         for writing targets, and false otherwise.
+   * 查询集群是否开启了避免将数据写入过时DataNode的策略
+   * @return true表示当前集群正在避免使用过时DataNode作为写入目标，false表示未开启该策略
    */
   public boolean isAvoidingStaleDataNodesForWrite();
 
   /**
-   * Indicates number of datanodes that are in service.
-   * @return Number of datanodes that are both alive and not decommissioned.
+   * 获取当前处于服务可用状态的DataNode数量
+   * @return 存活且未处于退役/已退役状态的DataNode数量
    */
   public int getNumDatanodesInService();
 
   /**
-   * An indication of the average load of non-decommission(ing|ed) nodes
-   * eligible for block placement.
-   *
-   * @return average of the in service number of block transfers and block
-   *         writes that are currently occurring on the cluster.
+   * 获取可用于块放置的在服务节点的平均负载
+   * @return 在服务节点上当前正在进行的块传输和块写入操作的平均值
    */
   public double getInServiceXceiverAverage();
 
   /**
-   * An indication of the average load of volumes at non-decommission(ing|ed)
-   * nodes eligible for block placement.
-   *
-   * @return average of in service number of block transfers and block
-   *         writes that are currently occurring on the volumes of the
-   *         cluster.
+   * 获取可用于块放置的在服务节点卷层面的平均负载
+   * @return 在服务节点所有卷上当前正在进行的块传输和块写入操作的平均值
    */
   double getInServiceXceiverAverageForVolume();
 
   /**
-   * Indicates the storage statistics per storage type.
-   * @return storage statistics per storage type.
+   * 获取按存储类型分类的存储统计信息
+   * @return 存储类型到对应存储统计信息的映射表
    */
   Map<StorageType, StorageTypeStats> getStorageTypeStats();
 }

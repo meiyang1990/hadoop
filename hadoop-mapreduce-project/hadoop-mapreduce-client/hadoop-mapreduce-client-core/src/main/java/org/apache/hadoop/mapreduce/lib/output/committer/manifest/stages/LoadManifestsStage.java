@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,12 +57,10 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.Man
 import static org.apache.hadoop.util.functional.RemoteIterators.haltableRemoteIterator;
 
 /**
- * Stage to load all the task manifests in the job attempt directory.
- * Invoked in Job Commit.
- * Manifests are loaded in parallel.
- * The IOStatistics snapshot passed in is built up with the statistics
- * and the statistics stripped from the manifest if prune == true.
- * This keeps the memory footprint of each manifest down.
+ * 文件：加载作业尝试目录下所有任务清单文件的提交阶段
+ * 调用时机：作业提交阶段执行
+ * 核心功能：并行加载所有任务生成的清单文件，合并目录信息，将待提交文件写入本地序列文件
+ * 内存优化：若开启修剪，会移除清单中的IO统计信息以降低内存占用
  */
 public class LoadManifestsStage extends
     AbstractJobOrTaskStage<
@@ -72,29 +71,33 @@ public class LoadManifestsStage extends
       LoadManifestsStage.class);
 
   /**
-   * Summary of manifest loading.
+   * 清单加载过程的汇总信息
    */
   private final SummaryInfo summaryInfo = new SummaryInfo();
 
   /**
-   * Map of directories from manifests, coalesced to reduce duplication.
+   * 从所有清单中收集得到的目录条目映射，合并去重减少冗余
    */
   private final Map<String, DirEntry> directories = new ConcurrentHashMap<>();
 
   /**
-   * Writer of entries.
+   * 文件条目写入器，用于将待提交文件写入本地文件
    */
   private EntryFileIO.EntryWriter entryWriter;
 
+  /**
+   * 构造加载清单阶段实例
+   * @param stageConfig 阶段配置信息
+   */
   public LoadManifestsStage(final StageConfig stageConfig) {
     super(false, stageConfig, OP_STAGE_JOB_LOAD_MANIFESTS, true);
   }
 
   /**
-   * Load the manifests.
-   * @param arguments stage arguments
-   * @return the summary and a list of manifests.
-   * @throws IOException IO failure.
+   * 执行加载所有任务清单的核心流程
+   * @param arguments 阶段输入参数
+   * @return 加载结果，包含汇总信息和处理后的清单数据
+   * @throws IOException IO操作失败时抛出
    */
   @Override
   protected LoadManifestsStage.Result executeStage(
@@ -109,22 +112,22 @@ public class LoadManifestsStage extends
 
     final Path entrySequenceData = arguments.getEntrySequenceData();
 
-    // the entry writer for queuing data.
+    // 初始化用于排队条目的写入器
     entryWriter = entryFileIO.launchEntryWriter(
             entryFileIO.createWriter(entrySequenceData),
             arguments.queueCapacity);
 
     try {
 
-      // sync fs before the list
+      // 列清单文件前同步文件系统元数据
       msync(manifestDir);
 
-      // build a list of all task manifests successfully committed,
-      // which will break out if the writing is stopped (due to any failure)
+      // 获取所有已成功提交的任务清单文件，写入停止时会自动中断遍历
       final RemoteIterator<FileStatus> manifestFiles =
           haltableRemoteIterator(listManifests(),
               () -> entryWriter.isActive());
 
+      // 并行处理所有清单文件
       processAllManifests(manifestFiles);
       maybeAddIOStatistics(getIOStatistics(), manifestFiles);
 
@@ -134,29 +137,27 @@ public class LoadManifestsStage extends
           manifestDir,
           summaryInfo);
 
-      // close cleanly
+      // 正常关闭写入器
       entryWriter.close();
 
-      // if anything failed, raise it.
+      // 如果写入过程出现异常，抛出异常
       entryWriter.maybeRaiseWriteException();
 
-      // collect any stats
     } catch (EntryWriteException e) {
-      // something went wrong while writing.
-      // raise anything on the write thread,
+      // 写入过程发生错误
+      // 先检查写入线程是否已有异常
       entryWriter.maybeRaiseWriteException();
 
-      // falling back to that from the worker thread
+      // 没有的话抛出工作线程捕获的异常
       throw e;
     } finally {
-      // close which is a no-op if the clean close was invoked;
-      // it is not a no-op if something went wrong with reading/parsing/processing
-      // the manifests.
+      // 再次关闭，正常关闭后此处为空操作；读取/解析/处理出错时会执行关闭清理
       entryWriter.close();
     }
 
+    // 封装加载完成的清单数据：将目录集合转为ArrayList释放ConcurrentHashMap占用
     final LoadedManifestData loadedManifestData = new LoadedManifestData(
-        new ArrayList<>(directories.values()),  // new array to free up the map
+        new ArrayList<>(directories.values()),
         entrySequenceData,
         entryWriter.getCount());
 
@@ -164,9 +165,9 @@ public class LoadManifestsStage extends
   }
 
   /**
-   * Load and process all the manifests.
-   * @param manifestFiles list of manifest files.
-   * @throws IOException failure to load/parse/queue
+   * 并行加载处理所有清单文件
+   * @param manifestFiles 清单文件状态迭代器
+   * @throws IOException 加载/解析/排队失败时抛出
    */
   private void processAllManifests(
       final RemoteIterator<FileStatus> manifestFiles) throws IOException {
@@ -179,33 +180,32 @@ public class LoadManifestsStage extends
   }
 
   /**
-   * Method invoked to process one manifest.
-   * @param status file to process.
-   * @throws IOException failure to load/parse/queue
+   * 处理单个任务清单文件
+   * @param status 清单文件状态
+   * @throws IOException 加载/解析/排队失败时抛出
    */
   private void processOneManifest(FileStatus status)
       throws IOException {
     updateAuditContext(OP_LOAD_ALL_MANIFESTS);
 
+    // 加载清单文件到内存
     TaskManifest manifest = fetchTaskManifest(status);
     progress();
 
-    // update the directories
+    // 合并去重目录信息
     final int created = coalesceDirectories(manifest);
     final String attemptID = manifest.getTaskAttemptID();
     LOG.debug("{}: task attempt {} added {} directories",
         getName(), attemptID, created);
 
-    // add to the summary.
+    // 更新汇总统计信息
     summaryInfo.add(manifest);
 
-    // clear the manifest extra data so if
-    // blocked waiting for queue capacity,
-    // memory use is reduced.
+    // 清理清单中的额外数据，降低排队等待时的内存占用
     manifest.setIOStatistics(null);
     manifest.getExtraData().clear();
 
-    // queue those files.
+    // 将待提交文件条目写入队列
     final boolean enqueued = entryWriter.enqueue(manifest.getFilesToCommit());
     if (!enqueued) {
       LOG.warn("{}: Failed to write manifest for task {}",
@@ -216,26 +216,20 @@ public class LoadManifestsStage extends
   }
 
   /**
-   * Coalesce all directories and clear the entry in the manifest.
-   * There's only ever one writer at a time, which it is hoped reduces
-   * contention. before the lock is acquired: if there are no new directories,
-   * the write lock is never needed.
-   * @param manifest manifest to process
-   * @return the number of directories created;
+   * 合并清单中的目录信息并去重，处理后清空清单中的目录条目
+   * 只有存在新目录需要添加时才会加锁，减少锁竞争
+   * @param manifest 待处理的任务清单
+   * @return 新增不重复目录的数量
    */
   @VisibleForTesting
   int coalesceDirectories(final TaskManifest manifest) {
 
-    // build a list of dirs to create.
-    // this scans the map
+    // 过滤出全局目录映射中不存在的目录
     final List<DirEntry> toCreate = manifest.getDestDirectories().stream()
         .filter(e -> !directories.containsKey(e))
         .collect(Collectors.toList());
     if (!toCreate.isEmpty()) {
-      // need to add more directories;
-      // still a possibility that they may be created between the
-      // filtering and this thread having the write lock.
-
+      // 需要新增目录，加锁同步保证原子性，避免重复插入
       synchronized (directories) {
         toCreate.forEach(entry -> {
           directories.putIfAbsent(entry.getDir(), entry);
@@ -246,12 +240,10 @@ public class LoadManifestsStage extends
   }
 
   /**
-   * Precommit preparation of a single manifest file.
-   * To reduce the memory foot print, the IOStatistics and
-   * extra data of each manifest is cleared.
-   * @param status status of file.
-   * @return number of files.
-   * @throws IOException IO Failure.
+   * 加载并验证单个任务清单文件，为降低内存占用会清理统计和额外数据
+   * @param status 清单文件状态
+   * @return 加载完成的任务清单对象
+   * @throws IOException 文件无效或加载失败时抛出
    */
   private TaskManifest fetchTaskManifest(FileStatus status)
       throws IOException {
@@ -259,7 +251,7 @@ public class LoadManifestsStage extends
       throw new PathIOException(status.getPath().toString(),
           "Not a valid manifest file; file status = " + status);
     }
-    // load the manifest, which includes validation.
+    // 加载并验证清单
     final TaskManifest manifest = loadManifest(status);
     final String id = manifest.getTaskAttemptID();
     final int filecount = manifest.getFilesToCommit().size();
@@ -267,7 +259,7 @@ public class LoadManifestsStage extends
     LOG.info("{}: Task Attempt {} file {}: File count: {}; data size={}",
         getName(), id, status.getPath(), filecount, size);
 
-    // record file size for tracking of memory consumption, work etc.
+    // 记录统计样本，用于监控和诊断
     final IOStatisticsStore iostats = getIOStatistics();
     iostats.addSample(COMMITTER_TASK_MANIFEST_FILE_SIZE, status.getLen());
     iostats.addSample(COMMITTER_TASK_FILE_COUNT_MEAN, filecount);
@@ -277,23 +269,23 @@ public class LoadManifestsStage extends
   }
 
   /**
-   * Stage arguments.
+   * 加载清单阶段的输入参数封装
    */
   public static final class Arguments {
     /**
-     * File where the listing has been saved.
+     * 本地存储文件条序列的文件
      */
     private final File entrySequenceFile;
 
     /**
-     * Capacity for queue between manifest loader and the writers.
+     * 加载线程和写入线程之间的队列容量
      */
     private final int queueCapacity;
 
     /**
-     * Arguments.
-     * @param entrySequenceFile path to local file to create for storing entries
-     * @param queueCapacity capacity of the queue
+     * 构造参数实例
+     * @param entrySequenceFile 本地存储条目的文件路径
+     * @param queueCapacity 队列容量限制
      */
     public Arguments(
         final File entrySequenceFile,
@@ -309,20 +301,20 @@ public class LoadManifestsStage extends
   }
 
   /**
-   * Result of the stage.
+   * 加载清单阶段的输出结果封装
    */
   public static final class Result {
     private final SummaryInfo summary;
 
     /**
-     * Output of this stage to pass on to the subsequence stages.
+     * 传递给后续阶段的加载完成的清单数据
      */
     private final LoadedManifestData loadedManifestData;
 
     /**
-     * Result.
-     * @param summary summary of jobs
-     * @param loadedManifestData all loaded manifest data
+     * 构造结果实例
+     * @param summary 加载过程汇总信息
+     * @param loadedManifestData 处理完成的清单数据
      */
     public Result(
         final SummaryInfo summary,
@@ -341,7 +333,7 @@ public class LoadManifestsStage extends
   }
 
   /**
-   * IOE to raise on queueing failure.
+   * 条目写入失败时抛出的异常
    */
   public static final class EntryWriteException extends IOException {
 
@@ -350,54 +342,50 @@ public class LoadManifestsStage extends
           + taskId + "to local file");
     }
   }
+
   /**
-   * Summary information.
-   * Implementation note: atomic counters are used here to keep spotbugs quiet,
-   * not because of any concurrency risks.
+   * 加载过程汇总信息，使用原子计数器保证线程安全
    */
   public static final class SummaryInfo implements IOStatisticsSource {
 
     /**
-     * Aggregate IOStatistics.
+     * 聚合所有清单的IO统计信息
      */
     private final IOStatisticsSnapshot iostatistics = snapshotIOStatistics();
 
     /**
-     * Task IDs.
+     * 所有加载成功的任务ID列表
      */
     private final List<String> taskIDs = new ArrayList<>();
 
     /**
-     * Task IDs.
+     * 所有加载成功的任务尝试ID列表
      */
     private final List<String> taskAttemptIDs = new ArrayList<>();
 
     /**
-     * How many manifests were loaded.
+     * 已加载的清单数量
      */
     private AtomicLong manifestCount = new AtomicLong();
 
     /**
-     * Total number of files to rename.
+     * 所有待提交文件总数
      */
     private AtomicLong fileCount = new AtomicLong();
 
     /**
-     * Total number of directories which may need
-     * to be created.
-     * As there is no dedup, this is likely to be
-     * a (major) overestimate.
+     * 所有需要创建的目录总数（未去重，数值会比实际大）
      */
     private AtomicLong directoryCount = new AtomicLong();
 
     /**
-     * Total amount of data to be committed.
+     * 所有待提交文件的总大小
      */
     private AtomicLong totalFileSize = new AtomicLong();
 
     /**
-     * Get the IOStatistics.
-     * @return aggregate IOStatistics
+     * 获取聚合后的IO统计信息
+     * @return 聚合IO统计快照
      */
     @Override
     public IOStatisticsSnapshot getIOStatistics() {
@@ -429,8 +417,8 @@ public class LoadManifestsStage extends
     }
 
     /**
-     * Add all statistics; synchronized.
-     * @param manifest manifest to add.
+     * 同步添加单个清单的统计信息到汇总
+     * @param manifest 已加载的任务清单
      */
     public synchronized void add(TaskManifest manifest) {
       manifestCount.incrementAndGet();
@@ -443,8 +431,8 @@ public class LoadManifestsStage extends
     }
 
     /**
-     * To String includes all summary info except statistics.
-     * @return string value
+     * 生成汇总信息的字符串表示，不包含详细统计
+     * @return 汇总信息字符串
      */
     @Override
     public String toString() {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,20 +24,14 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configurable;
 
 /** 
- * Partitions the key space.
+ * MapReduce分区器抽象基类，负责对Map阶段输出的中间结果键空间进行分区。
  * 
- * <p><code>Partitioner</code> controls the partitioning of the keys of the 
- * intermediate map-outputs. The key (or a subset of the key) is used to derive
- * the partition, typically by a hash function. The total number of partitions
- * is the same as the number of reduce tasks for the job. Hence this controls
- * which of the <code>m</code> reduce tasks the intermediate key (and hence the 
- * record) is sent for reduction.</p>
+ * <p>分区器控制Map输出中间键的分区规则，通常基于键（或键的子集）通过哈希函数计算分区编号。
+ * 分区总数与作业的Reduce任务数量相等，因此分区器决定了每个中间键（对应记录）会被发送到哪一个Reduce任务进行归约处理。</p>
  *
- * <p>Note: A <code>Partitioner</code> is created only when there are multiple
- * reducers.</p>
+ * <p>注意：只有当作业存在多个Reduce任务时，才会创建分区器实例。</p>
  *
- * <p>Note: If you require your Partitioner class to obtain the Job's
- * configuration object, implement the {@link Configurable} interface.</p>
+ * <p>注意：如果需要让分区器类获取作业的配置对象，需要实现{@link Configurable}接口。</p>
  * 
  * @see Reducer
  */
@@ -45,15 +40,13 @@ import org.apache.hadoop.conf.Configurable;
 public abstract class Partitioner<KEY, VALUE> {
   
   /** 
-   * Get the partition number for a given key (hence record) given the total 
-   * number of partitions i.e. number of reduce-tasks for the job.
+   * 根据给定的键、值和分区总数（即作业Reduce任务总数）计算得到该记录对应的分区编号。
+   * 通常基于键的全部或子集计算哈希值得到分区。
    *   
-   * <p>Typically a hash function on a all or a subset of the key.</p>
-   *
-   * @param key the key to be partioned.
-   * @param value the entry value.
-   * @param numPartitions the total number of partitions.
-   * @return the partition number for the <code>key</code>.
+   * @param key  需要分区的键
+   * @param value 对应条目的值
+   * @param numPartitions 分区总数，等于作业Reduce任务数量
+   * @return 该键对应的分区编号
    */
   public abstract int getPartition(KEY key, VALUE value, int numPartitions);
   

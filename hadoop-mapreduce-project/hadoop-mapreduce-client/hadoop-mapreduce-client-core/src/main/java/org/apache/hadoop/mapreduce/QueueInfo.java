@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,9 +33,8 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.util.StringInterner;
 
 /**
- * Class that contains the information regarding the Job Queues which are 
- * maintained by the Hadoop Map/Reduce framework.
- * 
+ * MapReduce作业队列信息实体类，保存YARN/Hadoop MapReduce框架维护的作业队列基本信息，
+ * 包括队列名称、调度信息、队列状态、队列中作业状态以及子队列信息等，支持序列化传输。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -56,8 +56,7 @@ public class QueueInfo implements Writable {
   private Properties props;
 
   /**
-   * Default constructor for QueueInfo.
-   * 
+   * 无参构造函数，默认初始化队列状态为运行中，创建空的子队列列表和属性对象
    */
   public QueueInfo() {
     // make it running by default.
@@ -67,12 +66,9 @@ public class QueueInfo implements Writable {
   }
   
   /**
-   * Construct a new QueueInfo object using the queue name and the
-   * scheduling information passed.
-   * 
-   * @param queueName Name of the job queue
-   * @param schedulingInfo Scheduling Information associated with the job
-   * queue
+   * 带参数构造函数，通过队列名称和调度信息创建队列信息对象
+   * @param queueName 作业队列名称
+   * @param schedulingInfo 与队列关联的调度信息
    */
   public QueueInfo(String queueName, String schedulingInfo) {
     this();
@@ -81,11 +77,11 @@ public class QueueInfo implements Writable {
   }
   
   /**
-   * 
-   * @param queueName
-   * @param schedulingInfo
-   * @param state
-   * @param stats
+   * 全参数构造函数，创建包含完整信息的队列信息对象
+   * @param queueName 作业队列名称
+   * @param schedulingInfo 与队列关联的调度信息
+   * @param state 队列当前状态
+   * @param stats 队列中已提交作业的状态数组
    */
   public QueueInfo(String queueName, String schedulingInfo, QueueState state,
                    JobStatus[] stats) {
@@ -95,37 +91,32 @@ public class QueueInfo implements Writable {
   }
 
   /**
-   * Set the queue name of the JobQueueInfo
-   * 
-   * @param queueName Name of the job queue.
+   * 设置队列名称
+   * @param queueName 作业队列名称
    */
   protected void setQueueName(String queueName) {
     this.queueName = queueName;
   }
 
   /**
-   * Get the queue name from JobQueueInfo
-   * 
-   * @return queue name
+   * 获取队列名称
+   * @return 队列名称
    */
   public String getQueueName() {
     return queueName;
   }
 
   /**
-   * Set the scheduling information associated to particular job queue
-   * 
-   * @param schedulingInfo
+   * 设置队列对应的调度信息
+   * @param schedulingInfo 调度信息字符串
    */
   protected void setSchedulingInfo(String schedulingInfo) {
     this.schedulingInfo = schedulingInfo;
   }
 
   /**
-   * Gets the scheduling information associated to particular job queue.
-   * If nothing is set would return <b>"N/A"</b>
-   * 
-   * @return Scheduling information associated to particular Job Queue
+   * 获取队列对应的调度信息，如果未设置则返回默认值"N/A"
+   * @return 队列关联的调度信息字符串
    */
   public String getSchedulingInfo() {
     if(schedulingInfo != null) {
@@ -136,16 +127,16 @@ public class QueueInfo implements Writable {
   }
   
   /**
-   * Set the state of the queue
-   * @param state state of the queue.
+   * 设置队列当前状态
+   * @param state 队列状态对象
    */
   protected void setState(QueueState state) {
     queueState = state;
   }
   
   /**
-   * Return the queue state
-   * @return the queue state.
+   * 获取队列当前状态
+   * @return 队列状态对象
    */
   public QueueState getState() {
     return queueState;
@@ -156,9 +147,8 @@ public class QueueInfo implements Writable {
   }
 
   /** 
-   * Get immediate children.
-   * 
-   * @return list of QueueInfo
+   * 获取当前队列的所有直接子队列信息
+   * @return 子队列信息列表
    */
   public List<QueueInfo> getQueueChildren() {
     return children;
@@ -169,9 +159,8 @@ public class QueueInfo implements Writable {
   }
 
   /**
-   * Get properties.
-   * 
-   * @return Properties
+   * 获取队列自定义属性集合
+   * @return 队列属性Properties对象
    */
   public Properties getProperties() {
     return props;
@@ -182,8 +171,8 @@ public class QueueInfo implements Writable {
   }
 
   /**
-   * Get the jobs submitted to queue
-   * @return list of JobStatus for the submitted jobs
+   * 获取当前队列中所有已提交作业的状态数组
+   * @return 作业状态数组
    */
   public JobStatus[] getJobStatuses() {
     return stats;
@@ -191,17 +180,24 @@ public class QueueInfo implements Writable {
   
   @Override
   public void readFields(DataInput in) throws IOException {
+    // 从输入流读取并 intern 队列名称，减少内存占用
     queueName = StringInterner.weakIntern(Text.readString(in));
+    // 从输入流读取队列状态枚举
     queueState = WritableUtils.readEnum(in, QueueState.class);
+    // 从输入流读取并 intern 调度信息
     schedulingInfo = StringInterner.weakIntern(Text.readString(in));
+    // 读取作业状态数组长度
     int length = in.readInt();
     stats = new JobStatus[length];
+    // 逐个读取作业状态信息
     for (int i = 0; i < length; i++) {
       stats[i] = new JobStatus();
       stats[i].readFields(in);
     }
+    // 读取子队列数量
     int count = in.readInt();
     children.clear();
+    // 逐个读取子队列信息
     for (int i = 0; i < count; i++) {
       QueueInfo childQueueInfo = new QueueInfo();
       childQueueInfo.readFields(in);
@@ -211,19 +207,26 @@ public class QueueInfo implements Writable {
 
   @Override
   public void write(DataOutput out) throws IOException {
+    // 将队列名称写入输出流
     Text.writeString(out, queueName);
+    // 将队列状态枚举写入输出流
     WritableUtils.writeEnum(out, queueState);
     
+    // 处理调度信息，空值写入默认值"N/A"
     if(schedulingInfo!= null) {
       Text.writeString(out, schedulingInfo);
     }else {
       Text.writeString(out, "N/A");
     }
+    // 写入作业状态数组长度
     out.writeInt(stats.length);
+    // 逐个写入作业状态
     for (JobStatus stat : stats) {
       stat.write(out);
     }
+    // 写入子队列数量
     out.writeInt(children.size());
+    // 逐个写入子队列信息
     for(QueueInfo childQueueInfo : children) {
       childQueueInfo.write(out);
     }

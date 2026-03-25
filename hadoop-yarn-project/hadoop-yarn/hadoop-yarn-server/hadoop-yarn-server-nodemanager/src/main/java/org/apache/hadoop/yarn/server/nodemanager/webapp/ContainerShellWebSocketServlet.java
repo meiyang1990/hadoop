@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,11 +25,15 @@ import org.eclipse.jetty.websocket.servlet.WebSocketServlet;
 import org.eclipse.jetty.websocket.servlet.WebSocketServletFactory;
 
 /**
- * Container shell web socket interface.
+ * 容器交互式Shell的WebSocket服务端Servlet，负责处理NodeManager节点上容器的终端交互WebSocket连接
  */
 @WebServlet(urlPatterns="/container/container/*")
 public class ContainerShellWebSocketServlet extends WebSocketServlet{
 
+  /**
+   * 配置WebSocket工厂，注册容器Shell消息处理类
+   * @param factory WebSocket服务工厂实例
+   */
   @Override
   public void configure(WebSocketServletFactory factory) {
     factory.register(ContainerShellWebSocket.class);

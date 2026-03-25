@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,21 +22,22 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.util.SequentialNumber;
 
 /**
- * An id which uniquely identifies an inode. Id 1 to 16384 are reserved for
- * potential future usage. The id won't be recycled and is not expected to wrap
- * around in a very long time. Root inode id is always 16385. Id 0 is used for
- * backward compatibility support.
+ * HDFS INode ID生成器，负责生成全局唯一的INode标识。
+ * 1~16384为保留ID预留给未来使用，ID不会回收重复使用，长时间运行也不会产生溢出问题。
+ * 根目录INode ID固定为16385，0用于向后兼容旧版本数据。
  */
 @InterfaceAudience.Private
 public class INodeId extends SequentialNumber {
   /**
-   * The last reserved inode id. InodeIDs are allocated from LAST_RESERVED_ID +
-   * 1.
+   * 最后一个保留的INode ID，正式分配的INode ID从LAST_RESERVED_ID + 1开始。
    */
   public static final long LAST_RESERVED_ID = 1 << 14; // 16384
   public static final long ROOT_INODE_ID = LAST_RESERVED_ID + 1; // 16385
   public static final long INVALID_INODE_ID = -1;
 
+  /**
+   * 构造INode ID生成器，从根INode ID开始顺序生成。
+   */
   INodeId() {
     super(ROOT_INODE_ID);
   }

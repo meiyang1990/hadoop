@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,269 +24,200 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.lib.output.committer.manifest.impl.ManifestStoreOperationsThroughFileSystem;
 
 /**
- * Public constants for the manifest committer.
- * This includes all configuration options and their default values.
+ * Manifest输出提交器的公共常量定义类，包含所有配置选项及其默认值，为整个ManifestCommitter模块提供统一的常量基础。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class ManifestCommitterConstants {
 
   /**
-   * Suffix to use in manifest files in the manifest subdir.
-   * Value: {@value}.
+   * 清单目录中清单文件的后缀名。
    */
   public static final String MANIFEST_SUFFIX = "-manifest.json";
 
   /**
-   * Prefix for summary files in the report dir. Call
+   * 报告目录中摘要文件的前缀名。
    */
   public static final String SUMMARY_FILENAME_PREFIX = "summary-";
 
   /**
-   * Format string used to build a summary file from a Job ID.
+   * 根据作业ID构建摘要文件名的格式字符串。
    */
   public static final String SUMMARY_FILENAME_FORMAT =
       SUMMARY_FILENAME_PREFIX + "%s.json";
 
   /**
-   * Suffix to use for temp files before renaming them.
-   * Value: {@value}.
+   * 临时文件重命名前使用的后缀名。
    */
   public static final String TMP_SUFFIX = ".tmp";
 
   /**
-   * Initial number of all app attempts.
-   * This is fixed in YARN; for Spark jobs the
-   * same number "0" is used.
+   * 应用尝试ID的初始值，在YARN和Spark作业中均统一使用0作为初始值。
    */
   public static final int INITIAL_APP_ATTEMPT_ID = 0;
 
   /**
-   * Format string for building a job dir.
-   * Value: {@value}.
+   * 构建作业目录路径的格式字符串。
    */
   public static final String JOB_DIR_FORMAT_STR = "%s";
 
   /**
-   * Format string for building a job attempt dir.
-   * This uses the job attempt number so previous versions
-   * can be found trivially.
-   * Value: {@value}.
+   * 构建作业尝试目录路径的格式字符串，使用作业尝试编号生成目录名，方便查找历史版本。
    */
   public static final String JOB_ATTEMPT_DIR_FORMAT_STR = "%02d";
 
   /**
-   * Name of directory under job attempt dir for manifests.
+   * 作业尝试目录下存放清单文件的子目录名称。
    */
   public static final String JOB_TASK_MANIFEST_SUBDIR = "manifests";
 
   /**
-   * Name of directory under job attempt dir for task attempts.
+   * 作业尝试目录下存放任务尝试数据的子目录名称。
    */
   public static final String JOB_TASK_ATTEMPT_SUBDIR = "tasks";
 
 
   /**
-   * Committer classname as recorded in the committer _SUCCESS file.
+   * 记录在提交成功标记文件中的Manifest提交器完整类名。
    */
   public static final String MANIFEST_COMMITTER_CLASSNAME =
       ManifestCommitter.class.getName();
 
   /**
-   * Marker file to create on success: {@value}.
+   * 作业成功完成后创建的标记文件名。
    */
   public static final String SUCCESS_MARKER = "_SUCCESS";
 
-  /** Default job marker option: {@value}. */
+  /** 是否默认创建作业成功目录标记，默认值: true。 */
   public static final boolean DEFAULT_CREATE_SUCCESSFUL_JOB_DIR_MARKER = true;
 
   /**
-   * The limit to the number of committed objects tracked during
-   * job commits and saved to the _SUCCESS file.
-   * Value: {@value}.
+   * 作业提交过程中跟踪并保存到成功标记文件中的已提交对象数量上限。
    */
   public static final int SUCCESS_MARKER_FILE_LIMIT = 100;
 
   /**
-   * The UUID for jobs: {@value}.
-   * This was historically created in Spark 1.x's SQL queries,
-   * but "went away".
-   * It has been restored in recent spark releases.
-   * If found: it is used instead of the MR job attempt ID.
+   * Spark作业写入UUID的配置属性名，该参数在新版Spark中被恢复使用，如果存在则优先使用它代替MapReduce作业尝试ID。
    */
   public static final String SPARK_WRITE_UUID = "spark.sql.sources.writeJobUUID";
 
   /**
-   * String to use as source of the job ID.
-   * This SHOULD be kept in sync with that of
-   * {@code AbstractS3ACommitter.JobUUIDSource}.
-   * Value: {@value}.
+   * 标识作业ID来源为MapReduce作业ID的字符串，需要和AbstractS3ACommitter.JobUUIDSource保持一致。
    */
   public static final String JOB_ID_SOURCE_MAPREDUCE = "JobID";
 
   /**
-   * Prefix to use for config options: {@value}.
+   * 所有Manifest提交器配置选项的前缀。
    */
   public static final String OPT_PREFIX = "mapreduce.manifest.committer.";
 
   /**
-   * Should dir cleanup do parallel deletion of task attempt dirs
-   * before trying to delete the toplevel dirs.
-   * For GCS this may deliver speedup, while on ABFS it may avoid
-   * timeouts in certain deployments, something
-   * {@link #OPT_CLEANUP_PARALLEL_DELETE_BASE_FIRST}
-   * can alleviate.
-   * Value: {@value}.
+   * 清理配置选项：是否在删除顶级目录前并行删除任务尝试目录，在部分云存储服务中可以提升速度避免超时。
    */
   public static final String OPT_CLEANUP_PARALLEL_DELETE =
       OPT_PREFIX + "cleanup.parallel.delete";
 
-  /**
-   * Default value:  {@value}.
-   */
+  /** 并行删除任务尝试目录默认值: true。 */
   public static final boolean OPT_CLEANUP_PARALLEL_DELETE_DIRS_DEFAULT = true;
 
   /**
-   * Should parallel cleanup try to delete the base first?
-   * Best for azure as it skips the task attempt deletions unless
-   * the toplevel delete fails.
-   * Value: {@value}.
+   * 并行清理配置选项：是否优先尝试删除顶级基础目录，仅当顶级目录删除失败时才删除子目录，对Azure存储优化明显。
    */
   public static final String OPT_CLEANUP_PARALLEL_DELETE_BASE_FIRST =
       OPT_PREFIX + "cleanup.parallel.delete.base.first";
 
-  /**
-   * Default value of option {@link #OPT_CLEANUP_PARALLEL_DELETE_BASE_FIRST}:  {@value}.
-   */
+  /** 优先删除基础目录选项默认值: false。 */
   public static final boolean OPT_CLEANUP_PARALLEL_DELETE_BASE_FIRST_DEFAULT = false;
 
   /**
-   * Threads to use for IO.
+   * IO处理线程数量配置选项。
    */
   public static final String OPT_IO_PROCESSORS = OPT_PREFIX + "io.threads";
 
-  /**
-   * Default value:  {@value}.
-   */
+  /** IO处理线程数量默认值: 32。 */
   public static final int OPT_IO_PROCESSORS_DEFAULT = 32;
 
   /**
-   * Directory for saving job summary reports.
-   * These are the _SUCCESS files, but are saved even on
-   * job failures.
-   * Value: {@value}.
+   * 保存作业摘要报告的目录配置选项，摘要即使作业失败也会保存。
    */
   public static final String OPT_SUMMARY_REPORT_DIR =
       OPT_PREFIX + "summary.report.directory";
 
   /**
-   * Directory for moving manifests under for diagnostics.
-   * Value: {@value}.
+   * 用于诊断的清单文件保存目录配置选项。
    */
   public static final String OPT_DIAGNOSTICS_MANIFEST_DIR =
       OPT_PREFIX + "diagnostics.manifest.directory";
 
   /**
-   * Should the output be validated?
-   * This will check expected vs actual file lengths, and,
-   * if etags can be obtained, etags.
-   * Value: {@value}.
+   * 是否验证输出结果配置选项，会检查预期与实际文件长度，如果支持ETag还会验证ETag。
    */
   public static final String OPT_VALIDATE_OUTPUT = OPT_PREFIX + "validate.output";
 
-  /**
-   * Default value: {@value}.
-   */
+  /** 输出验证默认值: false。 */
   public static final boolean OPT_VALIDATE_OUTPUT_DEFAULT = false;
 
   /**
-   * Should job commit delete for files/directories at the targets
-   * of renames, and, if found, deleting them?
-   *
-   * This is part of the effective behavior of the FileOutputCommitter,
-   * however it adds an extra delete call per file being committed.
-   *
-   * If a job is writing to a directory which has only just been created
-   * or were unique filenames are being used, there is no need to perform
-   * this preparation.
-   * The recognition of newly created dirs is automatic.
-   *
-   * Value: {@value}.
+   * 作业提交配置选项：是否在重命名前删除目标路径已存在的文件/目录，这兼容旧版FileOutputCommitter行为，但会增加额外删除操作。
+   * 如果输出目录是新建或使用唯一文件名，不需要开启该选项。
    */
   public static final String OPT_DELETE_TARGET_FILES =
       OPT_PREFIX + "delete.target.files";
 
-  /**
-   * Default value: {@value}.
-   */
+  /** 删除目标文件默认值: false。 */
   public static final boolean OPT_DELETE_TARGET_FILES_DEFAULT = false;
 
   /**
-   * Name of the factory.
+   * Manifest输出提交器工厂的完整类名。
    */
   public static final String MANIFEST_COMMITTER_FACTORY =
       ManifestCommitterFactory.class.getName();
 
   /**
-   * Classname of the store operations; filesystems and tests
-   * may override.
-   * Value: {@value}.
+   * 存储操作实现类的配置选项，允许文件系统和测试自定义实现。
    */
   public static final String OPT_STORE_OPERATIONS_CLASS = OPT_PREFIX + "store.operations.classname";
 
   /**
-   * Default classname of the store operations.
+   * 存储操作实现类默认值，使用基于Hadoop FileSystem的实现。
    */
   public static final String STORE_OPERATIONS_CLASS_DEFAULT =
       ManifestStoreOperationsThroughFileSystem.class.getName();
 
   /**
-   * Stage attribute in audit context: {@value}.
+   * 审计上下文中阶段属性的键名。
    */
   public static final String CONTEXT_ATTR_STAGE = "st";
 
   /**
-   * Task ID attribute in audit context: {@value}.
+   * 审计上下文中任务尝试ID属性的键名。
    */
   public static final String CONTEXT_ATTR_TASK_ATTEMPT_ID = "ta";
 
   /**
-   * Stream Capabilities probe for spark dynamic partitioning compatibility.
+   * 动态分区功能能力标识，用于兼容Spark动态分区场景。
    */
   public static final String CAPABILITY_DYNAMIC_PARTITIONING =
       "mapreduce.job.committer.dynamic.partitioning";
 
 
   /**
-   * Queue capacity between task manifest loading an entry file writer.
-   * If more than this number of manifest lists are waiting to be written,
-   * the enqueue is blocking.
-   * There's an expectation that writing to the local file is a lot faster
-   * than the parallelized buffer reads, therefore that this queue can
-   * be emptied at the same rate it is filled.
-   * Value {@value}.
+   * 任务清单加载和入口文件写入之间队列容量配置选项，超过容量时入队操作会阻塞，期望本地写入速度快于读取速度保证队列及时排空。
    */
   public static final String OPT_WRITER_QUEUE_CAPACITY =
       OPT_PREFIX + "writer.queue.capacity";
 
 
-  /**
-   * Default value of {@link #OPT_WRITER_QUEUE_CAPACITY}.
-   * Value {@value}.
-   */
+  /** 写入队列容量默认值，和IO处理线程数保持一致。 */
   public static final int DEFAULT_WRITER_QUEUE_CAPACITY = OPT_IO_PROCESSORS_DEFAULT;
 
   /**
-   * How many attempts to save a task manifest by save and rename
-   * before giving up.
-   * Value: {@value}.
+   * 保存任务清单时重试次数配置选项，使用保存再重命名机制，达到次数后放弃。
    */
   public static final String OPT_MANIFEST_SAVE_ATTEMPTS =
       OPT_PREFIX + "manifest.save.attempts";
 
-  /**
-   * Default value of {@link #OPT_MANIFEST_SAVE_ATTEMPTS}: {@value}.
-   */
+  /** 保存清单重试次数默认值: 5。 */
   public static final int OPT_MANIFEST_SAVE_ATTEMPTS_DEFAULT = 5;
 
   private ManifestCommitterConstants() {

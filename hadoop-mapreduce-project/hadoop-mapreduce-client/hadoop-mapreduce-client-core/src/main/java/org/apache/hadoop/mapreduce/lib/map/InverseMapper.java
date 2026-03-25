@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,15 +25,26 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.Mapper;
 
-/** A {@link Mapper} that swaps keys and values. */
+/**
+ * 反转Map输入键值对的Mapper实现类
+ * 核心功能是将输入的<键, 值>对交换顺序，输出<值, 键>，常用于需要反转键值关系的MapReduce作业
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class InverseMapper<K, V> extends Mapper<K,V,V,K> {
 
-  /** The inverse function.  Input keys and values are swapped.*/
+  /**
+   * 反转输入键值对并输出
+   * @param key 输入键
+   * @param value 输入值
+   * @param context MapReduce上下文对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   @Override
   public void map(K key, V value, Context context
                   ) throws IOException, InterruptedException {
+    // 交换键值顺序后输出
     context.write(value, key);
   }
   

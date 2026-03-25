@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -71,9 +72,9 @@ import org.apache.hadoop.thirdparty.protobuf.RpcController;
 import static org.apache.hadoop.ipc.internal.ShadedProtobufHelper.ipc;
 
 /**
- * This class is the client side translator to translate the requests made on
- * {@link JournalProtocol} interfaces to the RPC server implementing
- * {@link JournalProtocolPB}.
+ * QJournal协议PB版本客户端转换器，负责将原生QJournalProtocol接口请求转换为Protobuf序列化格式的RPC请求，
+ * 用于客户端和基于Protobuf的QuorumJournalManager服务端进行通信。
+ * 实现了QJournalProtocol接口，对上层业务屏蔽PB序列化细节。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Stable
@@ -83,6 +84,10 @@ public class QJournalProtocolTranslatorPB implements ProtocolMetaInterface,
   private final static RpcController NULL_CONTROLLER = null;
   private final QJournalProtocolPB rpcProxy;
   
+  /**
+   * 构造函数，持有Protobuf版本的RPC代理
+   * @param rpcProxy Protobuf版本的QJournal协议RPC代理
+   */
   public QJournalProtocolTranslatorPB(QJournalProtocolPB rpcProxy) {
     this.rpcProxy = rpcProxy;
   }
@@ -120,6 +125,11 @@ public class QJournalProtocolTranslatorPB implements ProtocolMetaInterface,
     return ipc(() -> rpcProxy.getJournalState(NULL_CONTROLLER, req.build()));
   }
 
+  /**
+   * 将字符串格式的日志ID转换为Protobuf格式JournalIdProto
+   * @param jid 字符串格式日志ID
+   * @return Protobuf格式日志ID对象
+   */
   private JournalIdProto convertJournalId(String jid) {
     return JournalIdProto.newBuilder()
         .setIdentifier(jid)
@@ -180,6 +190,11 @@ public class QJournalProtocolTranslatorPB implements ProtocolMetaInterface,
         .build()));
   }
 
+  /**
+   * 将原生RequestInfo对象转换为Protobuf格式RequestInfoProto
+   * @param reqInfo 原生请求信息对象
+   * @return Protobuf格式请求信息对象
+   */
   private QJournalProtocolProtos.RequestInfoProto convert(
       RequestInfo reqInfo) {
     RequestInfoProto.Builder builder = RequestInfoProto.newBuilder()
@@ -278,6 +293,12 @@ public class QJournalProtocolTranslatorPB implements ProtocolMetaInterface,
             .build()));
   }
 
+  /**
+   * 检查指定方法是否在远程服务端被支持
+   * @param methodName 方法名称
+   * @return true表示方法支持，false表示不支持
+   * @throws IOException 远程调用异常
+   */
   public boolean isMethodSupported(String methodName) throws IOException {
     return RpcClientUtil.isMethodSupported(rpcProxy,
         QJournalProtocolPB.class, RPC.RpcKind.RPC_PROTOCOL_BUFFER,

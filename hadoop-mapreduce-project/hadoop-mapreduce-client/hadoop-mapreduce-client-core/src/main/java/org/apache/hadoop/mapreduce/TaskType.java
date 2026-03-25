@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,10 +23,23 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Enum for map, reduce, job-setup, job-cleanup, task-cleanup task types.
+ * 文件: TaskType.java
+ * 所属模块: hadoop-mapreduce-client-core
+ * 核心职责: 定义MapReduce框架中所有任务类型的枚举
+ * 
+ * 枚举类型，用于标识MapReduce作业中不同类型的任务，包括核心计算任务和作业生命周期任务
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public enum TaskType {
-  MAP, REDUCE, JOB_SETUP, JOB_CLEANUP, TASK_CLEANUP
+  /** Map阶段计算任务 */
+  MAP,
+  /** Reduce阶段计算任务 */
+  REDUCE,
+  /** 作业初始化设置任务 */
+  JOB_SETUP,
+  /** 作业清理任务 */
+  JOB_CLEANUP,
+  /** 单个任务清理任务 */
+  TASK_CLEANUP
 }

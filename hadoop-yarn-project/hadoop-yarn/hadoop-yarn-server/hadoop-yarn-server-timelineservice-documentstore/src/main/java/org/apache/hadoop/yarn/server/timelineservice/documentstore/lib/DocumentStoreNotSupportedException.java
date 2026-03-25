@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,15 +21,14 @@ package org.apache.hadoop.yarn.server.timelineservice.documentstore.lib;
 
 // 文档存储不支持异常，表示配置的文档存储供应商不属于支持的DocumentStoreVendor之一
 /**
- * Indicates that the document store vendor that was
- * configured does not belong to one of the {@link DocumentStoreVendor}.
+ * 文档存储不支持异常，当配置的文档存储厂商不在{@link DocumentStoreVendor}支持列表中时抛出该异常。
  */
 public class DocumentStoreNotSupportedException extends
     UnsupportedOperationException {
 
   /**
-   * Constructs exception with the specified detail message.
-   * @param message detailed message.
+   * 使用指定的详细信息构造异常实例。
+   * @param message 异常详细信息
    */
   public DocumentStoreNotSupportedException(String message) {
     super(message);

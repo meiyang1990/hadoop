@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,22 +23,40 @@ import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.SCMUploaderNot
 import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos.SCMUploaderNotifyRequestProtoOrBuilder;
 import org.apache.hadoop.yarn.server.api.protocolrecords.SCMUploaderNotifyRequest;
 
+/**
+ * SCM上传通知请求的Protobuf实现类，用于节点管理器向共享缓存管理器通知
+ * 有新的应用缓存资源上传完成。
+ */
 public class SCMUploaderNotifyRequestPBImpl extends SCMUploaderNotifyRequest {
+  // Protobuf消息对象
   SCMUploaderNotifyRequestProto proto =
       SCMUploaderNotifyRequestProto.getDefaultInstance();
+  // Protobuf消息构造器
   SCMUploaderNotifyRequestProto.Builder builder = null;
+  // 标记是否通过已有proto构建
   boolean viaProto = false;
 
+  /**
+   * 空构造函数，初始化Protobuf构造器。
+   */
   public SCMUploaderNotifyRequestPBImpl() {
     builder = SCMUploaderNotifyRequestProto.newBuilder();
   }
 
+  /**
+   * 通过已有Protobuf对象构造请求实例。
+   * @param proto 已有的Protobuf请求对象
+   */
   public SCMUploaderNotifyRequestPBImpl(
       SCMUploaderNotifyRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取构建完成的Protobuf请求对象。
+   * @return 构建完成的Protobuf请求
+   */
   public SCMUploaderNotifyRequestProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -77,6 +96,9 @@ public class SCMUploaderNotifyRequestPBImpl extends SCMUploaderNotifyRequest {
     builder.setFilename(filename);
   }
 
+  /**
+   * 将本地修改合并到Protobuf对象中。
+   */
   private void mergeLocalToProto() {
     if (viaProto)
       maybeInitBuilder();
@@ -84,6 +106,9 @@ public class SCMUploaderNotifyRequestPBImpl extends SCMUploaderNotifyRequest {
     viaProto = true;
   }
 
+  /**
+   * 如果需要则初始化构造器，从已有proto拷贝。
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = SCMUploaderNotifyRequestProto.newBuilder(proto);

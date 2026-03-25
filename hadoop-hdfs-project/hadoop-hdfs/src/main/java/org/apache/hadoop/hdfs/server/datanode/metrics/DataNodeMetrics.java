@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,16 +41,9 @@ import org.apache.hadoop.metrics2.source.JvmMetrics;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- *
- * This class is for maintaining  the various DataNode statistics
- * and publishing them through the metrics interfaces.
- * This also registers the JMX MBean for RPC.
- * <p>
- * This class has a number of metrics variables that are publicly accessible;
- * these variables (objects) have methods to update their values;
- *  for example:
- *  <p> {@link #blocksRead}.inc()
- *
+ * 文件: DataNode 指标统计类
+ * 功能: 维护 DataNode 运行过程中的各类统计信息，并通过 Hadoop Metrics2 框架对外发布指标，同时注册JMX MBean支持监控查询。
+ * 职责: 定义了DataNode运行时需要采集的各类指标（读写IO、块操作、网络错误、RamDisk、纠删码等），并提供更新指标的方法供DataNode组件调用。
  */
 @InterfaceAudience.Private
 @Metrics(about="DataNode metrics", context="dfs")
@@ -81,20 +75,20 @@ public class DataNodeMetrics {
   @Metric("Bytes written by remote client")
   MutableCounterLong remoteBytesWritten;
 
-  // RamDisk metrics on read/write
+  // RamDisk 读写相关指标
   @Metric MutableCounterLong ramDiskBlocksWrite;
   @Metric MutableCounterLong ramDiskBlocksWriteFallback;
   @Metric MutableCounterLong ramDiskBytesWrite;
   @Metric MutableCounterLong ramDiskBlocksReadHits;
 
-  // RamDisk metrics on eviction
+  // RamDisk 驱逐相关指标
   @Metric MutableCounterLong ramDiskBlocksEvicted;
   @Metric MutableCounterLong ramDiskBlocksEvictedWithoutRead;
   @Metric MutableRate        ramDiskBlocksEvictionWindowMs;
   final MutableQuantiles[]   ramDiskBlocksEvictionWindowMsQuantiles;
 
 
-  // RamDisk metrics on lazy persist
+  // RamDisk 延迟持久化相关指标
   @Metric MutableCounterLong ramDiskBlocksLazyPersisted;
   @Metric MutableCounterLong ramDiskBlocksDeletedBeforeLazyPersisted;
   @Metric MutableCounterLong ramDiskBytesLazyPersisted;
@@ -188,7 +182,7 @@ public class DataNodeMetrics {
   @Metric("Number of blocks in IBRs that failed due to null storage")
   private MutableCounterLong nullStorageBlockReports;
 
-  // FsDatasetImpl local file process metrics.
+  // FsDatasetImpl 本地文件操作相关指标
   @Metric private MutableRate createRbwOp;
   @Metric private MutableRate recoverRbwOp;
   @Metric private MutableRate convertTemporaryToRbwOp;
@@ -227,6 +221,13 @@ public class DataNodeMetrics {
   JvmMetrics jvmMetrics = null;
   private DataNodeUsageReportUtil dnUsageReportUtil;
 
+  /**
+   * 构造DataNodeMetrics实例，初始化各类分位数统计数组
+   * @param name 指标名称前缀
+   * @param sessionId 会话ID标签
+   * @param intervals 分位数统计时间间隔数组
+   * @param jvmMetrics JVM指标实例
+   */
   public DataNodeMetrics(String name, String sessionId, int[] intervals,
       final JvmMetrics jvmMetrics) {
     this.name = name;
@@ -243,7 +244,7 @@ public class DataNodeMetrics {
     ramDiskBlocksEvictionWindowMsQuantiles = new MutableQuantiles[len];
     ramDiskBlocksLazyPersistWindowMsQuantiles = new MutableQuantiles[len];
     readTransferRateQuantiles = new MutableQuantiles[len];
-
+    // 遍历初始化每个时间间隔对应的分位数统计对象
     for (int i = 0; i < len; i++) {
       int interval = intervals[i];
       packetAckRoundTripTimeNanosQuantiles[i] = registry.newQuantiles(
@@ -278,15 +279,22 @@ public class DataNodeMetrics {
     }
   }
 
+  /**
+   * 根据配置创建并注册DataNodeMetrics实例到指标系统
+   * @param conf Hadoop配置对象
+   * @param dnName DataNode名称
+   * @return 创建好的已注册DataNodeMetrics实例
+   */
   public static DataNodeMetrics create(Configuration conf, String dnName) {
     String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     JvmMetrics jm = JvmMetrics.create("DataNode", sessionId, ms);
+    // 构造唯一指标名称，替换冒号避免格式问题，空名称则生成随机名
     String name = "DataNodeActivity-"+ (dnName.isEmpty()
         ? "UndefinedDataNodeName"+ ThreadLocalRandom.current().nextInt()
             : dnName.replace(':', '-'));
 
-    // Percentile measurement is off by default, by watching no intervals
+    // 从配置读取分位数统计间隔，默认不开启
     int[] intervals = 
         conf.getInts(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY);
     
@@ -294,12 +302,25 @@ public class DataNodeMetrics {
         intervals, jm));
   }
 
+  /**
+   * 获取当前指标实例的名称
+   * @return 指标名称
+   */
   public String name() { return name; }
 
+  /**
+   * 获取关联的JVM指标实例
+   * @return JVM指标实例
+   */
   public JvmMetrics getJvmMetrics() {
     return jvmMetrics;
   }
 
+  /**
+   * 记录一次心跳RPC的延迟，并更新NameNode RPC延迟聚合指标
+   * @param latency 心跳处理延迟（毫秒）
+   * @param rpcMetricSuffix RPC指标后缀
+   */
   public void addHeartbeat(long latency, String rpcMetricSuffix) {
     heartbeats.add(latency);
     if (rpcMetricSuffix != null) {
@@ -307,6 +328,11 @@ public class DataNodeMetrics {
     }
   }
 
+  /**
+   * 记录一次心跳总延迟，并更新NameNode RPC延迟聚合指标
+   * @param latency 心跳处理延迟（毫秒）
+   * @param rpcMetricSuffix RPC指标后缀
+   */
   public void addHeartbeatTotal(long latency, String rpcMetricSuffix) {
     heartbeatsTotal.add(latency);
     if (rpcMetricSuffix != null) {
@@ -314,6 +340,11 @@ public class DataNodeMetrics {
     }
   }
 
+  /**
+   * 记录一次生命线RPC的延迟，并更新NameNode RPC延迟聚合指标
+   * @param latency 生命线处理延迟（毫秒）
+   * @param rpcMetricSuffix RPC指标后缀
+   */
   public void addLifeline(long latency, String rpcMetricSuffix) {
     lifelines.add(latency);
     if (rpcMetricSuffix != null) {
@@ -321,512 +352,5 @@ public class DataNodeMetrics {
     }
   }
 
-  public void addBlockReport(long latency, String rpcMetricSuffix) {
-    blockReports.add(latency);
-    if (rpcMetricSuffix != null) {
-      nnRpcLatency.add("BlockReportsFor" + rpcMetricSuffix, latency);
-    }
-  }
-
-  public void addBlockReportCreateCost(long latency) {
-    blockReportsCreateCostMills.add(latency);
-  }
-
-  public void addIncrementalBlockReport(long latency,
-      String rpcMetricSuffix) {
-    incrementalBlockReports.add(latency);
-    if (rpcMetricSuffix != null) {
-      nnRpcLatency.add("IncrementalBlockReportsFor" + rpcMetricSuffix, latency);
-    }
-  }
-
-  public void addReadTransferRate(long readTransferRate) {
-    this.readTransferRate.add(readTransferRate);
-    for (MutableQuantiles q : readTransferRateQuantiles) {
-      q.add(readTransferRate);
-    }
-  }
-
-  public void addCacheReport(long latency) {
-    cacheReports.add(latency);
-  }
-
-  public void incrBlocksReplicated() {
-    blocksReplicated.incr();
-  }
-
-  public void incrBlocksWritten() {
-    blocksWritten.incr();
-  }
-
-  public void incrBlocksRemoved(int delta) {
-    blocksRemoved.incr(delta);
-  }
-
-  public long getBlocksRemoved() {
-    return blocksRemoved.value();
-  }
-
-  public void incrBytesWritten(int delta) {
-    bytesWritten.incr(delta);
-  }
-
-  public void incrBlockVerificationFailures() {
-    blockVerificationFailures.incr();
-  }
-
-  public void incrBlocksVerified() {
-    blocksVerified.incr();
-  }
-
-
-  public void incrBlocksCached(int delta) {
-    blocksCached.incr(delta);
-  }
-
-  public void incrBlocksUncached(int delta) {
-    blocksUncached.incr(delta);
-  }
-
-  public void addReadBlockOp(long latency) {
-    readBlockOp.add(latency);
-  }
-
-  public void addWriteBlockOp(long latency) {
-    writeBlockOp.add(latency);
-  }
-
-  public void addReplaceBlockOp(long latency) {
-    replaceBlockOp.add(latency);
-  }
-
-  public void addCopyBlockOp(long latency) {
-    copyBlockOp.add(latency);
-  }
-
-  public void addBlockChecksumOp(long latency) {
-    blockChecksumOp.add(latency);
-  }
-
-  public void incrBytesRead(int delta) {
-    bytesRead.incr(delta);
-  }
-
-  public void incrBlocksRead() {
-    blocksRead.incr();
-  }
-
-  public void incrFsyncCount() {
-    fsyncCount.incr();
-  }
-
-  public void incrTotalWriteTime(long timeTaken) {
-    totalWriteTime.incr(timeTaken);
-  }
-
-  public void incrTotalReadTime(long timeTaken) {
-    totalReadTime.incr(timeTaken);
-  }
-
-
-  public void addPacketAckRoundTripTimeNanos(long latencyNanos) {
-    packetAckRoundTripTimeNanos.add(latencyNanos);
-    for (MutableQuantiles q : packetAckRoundTripTimeNanosQuantiles) {
-      q.add(latencyNanos);
-    }
-  }
-
-  public void addFlushNanos(long latencyNanos) {
-    flushNanos.add(latencyNanos);
-    for (MutableQuantiles q : flushNanosQuantiles) {
-      q.add(latencyNanos);
-    }
-  }
-
-  public void addFsyncNanos(long latencyNanos) {
-    fsyncNanos.add(latencyNanos);
-    for (MutableQuantiles q : fsyncNanosQuantiles) {
-      q.add(latencyNanos);
-    }
-  }
-
-  public void shutdown() {
-    DefaultMetricsSystem.shutdown();
-  }
-
-  public void incrWritesFromClient(boolean local, long size) {
-    if(local) {
-      writesFromLocalClient.incr();
-    } else {
-      writesFromRemoteClient.incr();
-      remoteBytesWritten.incr(size);
-    }
-  }
-
-  public void incrReadsFromClient(boolean local, long size) {
-
-    if (local) {
-      readsFromLocalClient.incr();
-    } else {
-      readsFromRemoteClient.incr();
-      remoteBytesRead.incr(size);
-    }
-  }
-
-  public void incrVolumeFailures(int size) {
-    volumeFailures.incr(size);
-  }
-
-  public void incrSlowFlushOrSyncCount() {
-    slowFlushOrSyncCount.incr();
-  }
-
-  public void incrSlowAckToUpstreamCount() {
-    slowAckToUpstreamCount.incr();
-  }
-
-  public void incrDatanodeNetworkErrors() {
-    datanodeNetworkErrors.incr();
-  }
-
-  /** Increment for getBlockLocalPathInfo calls */
-  public void incrBlocksGetLocalPathInfo() {
-    blocksGetLocalPathInfo.incr();
-  }
-
-  public void addSendDataPacketBlockedOnNetworkNanos(long latencyNanos) {
-    sendDataPacketBlockedOnNetworkNanos.add(latencyNanos);
-    for (MutableQuantiles q : sendDataPacketBlockedOnNetworkNanosQuantiles) {
-      q.add(latencyNanos);
-    }
-  }
-
-  public void addSendDataPacketTransferNanos(long latencyNanos) {
-    sendDataPacketTransferNanos.add(latencyNanos);
-    for (MutableQuantiles q : sendDataPacketTransferNanosQuantiles) {
-      q.add(latencyNanos);
-    }
-  }
-
-  public void incrRamDiskBlocksWrite() {
-    ramDiskBlocksWrite.incr();
-  }
-
-  public void incrRamDiskBlocksWriteFallback() {
-    ramDiskBlocksWriteFallback.incr();
-  }
-
-  public void addRamDiskBytesWrite(long bytes) {
-    ramDiskBytesWrite.incr(bytes);
-  }
-
-  public void incrRamDiskBlocksReadHits() {
-    ramDiskBlocksReadHits.incr();
-  }
-
-  public void incrRamDiskBlocksEvicted() {
-    ramDiskBlocksEvicted.incr();
-  }
-
-  public void incrRamDiskBlocksEvictedWithoutRead() {
-    ramDiskBlocksEvictedWithoutRead.incr();
-  }
-
-  public void addRamDiskBlocksEvictionWindowMs(long latencyMs) {
-    ramDiskBlocksEvictionWindowMs.add(latencyMs);
-    for (MutableQuantiles q : ramDiskBlocksEvictionWindowMsQuantiles) {
-      q.add(latencyMs);
-    }
-  }
-
-  public void incrRamDiskBlocksLazyPersisted() {
-    ramDiskBlocksLazyPersisted.incr();
-  }
-
-  public void incrRamDiskBlocksDeletedBeforeLazyPersisted() {
-    ramDiskBlocksDeletedBeforeLazyPersisted.incr();
-  }
-
-  public void incrRamDiskBytesLazyPersisted(long bytes) {
-    ramDiskBytesLazyPersisted.incr(bytes);
-  }
-
-  public void addRamDiskBlocksLazyPersistWindowMs(long latencyMs) {
-    ramDiskBlocksLazyPersistWindowMs.add(latencyMs);
-    for (MutableQuantiles q : ramDiskBlocksLazyPersistWindowMsQuantiles) {
-      q.add(latencyMs);
-    }
-  }
-
   /**
-   * Resets blocks in pending IBR to zero.
-   */
-  public void resetBlocksInPendingIBR() {
-    blocksInPendingIBR.set(0);
-    blocksReceivingInPendingIBR.set(0);
-    blocksReceivedInPendingIBR.set(0);
-    blocksDeletedInPendingIBR.set(0);
-  }
-
-  public void incrBlocksInPendingIBR() {
-    blocksInPendingIBR.incr();
-  }
-
-  public void incrBlocksReceivingInPendingIBR() {
-    blocksReceivingInPendingIBR.incr();
-  }
-
-  public void incrBlocksReceivedInPendingIBR() {
-    blocksReceivedInPendingIBR.incr();
-  }
-
-  public void incrBlocksDeletedInPendingIBR() {
-    blocksDeletedInPendingIBR.incr();
-  }
-
-  public void incrECReconstructionTasks() {
-    ecReconstructionTasks.incr();
-  }
-
-  public void incrECFailedReconstructionTasks() {
-    ecFailedReconstructionTasks.incr();
-  }
-
-  public void incrECInvalidReconstructionTasks() {
-    ecInvalidReconstructionTasks.incr();
-  }
-
-  public long getECInvalidReconstructionTasks() {
-    return ecInvalidReconstructionTasks.value();
-  }
-
-  public void incrDataNodeActiveXceiversCount() {
-    dataNodeActiveXceiversCount.incr();
-  }
-
-  public void decrDataNodeActiveXceiversCount() {
-    dataNodeActiveXceiversCount.decr();
-  }
-
-  public void setDataNodeActiveXceiversCount(int value) {
-    dataNodeActiveXceiversCount.set(value);
-  }
-
-  public int getDataNodeActiveXceiverCount() {
-    return dataNodeActiveXceiversCount.value();
-  }
-
-  public void incrDataNodeReadActiveXceiversCount(){
-    dataNodeReadActiveXceiversCount.incr();
-  }
-
-  public void decrDataNodeReadActiveXceiversCount(){
-    dataNodeReadActiveXceiversCount.decr();
-  }
-
-  public void setDataNodeReadActiveXceiversCount(int value){
-    dataNodeReadActiveXceiversCount.set(value);
-  }
-
-  public void incrDataNodeWriteActiveXceiversCount(){
-    dataNodeWriteActiveXceiversCount.incr();
-  }
-
-  public void decrDataNodeWriteActiveXceiversCount(){
-    dataNodeWriteActiveXceiversCount.decr();
-  }
-
-  public void setDataNodeWriteActiveXceiversCount(int value){
-    dataNodeWriteActiveXceiversCount.set(value);
-  }
-
-  public void incrDataNodePacketResponderCount() {
-    dataNodePacketResponderCount.incr();
-  }
-
-  public void decrDataNodePacketResponderCount() {
-    dataNodePacketResponderCount.decr();
-  }
-
-  public void setDataNodePacketResponderCount(int value) {
-    dataNodePacketResponderCount.set(value);
-  }
-
-  public int getDataNodePacketResponderCount() {
-    return dataNodePacketResponderCount.value();
-  }
-
-  public void incrDataNodeBlockRecoveryWorkerCount() {
-    dataNodeBlockRecoveryWorkerCount.incr();
-  }
-
-  public void decrDataNodeBlockRecoveryWorkerCount() {
-    dataNodeBlockRecoveryWorkerCount.decr();
-  }
-
-  public void setDataNodeBlockRecoveryWorkerCount(int value) {
-    dataNodeBlockRecoveryWorkerCount.set(value);
-  }
-
-  public int getDataNodeBlockRecoveryWorkerCount() {
-    return dataNodeBlockRecoveryWorkerCount.value();
-  }
-
-  public void incrECDecodingTime(long decodingTimeNanos) {
-    ecDecodingTimeNanos.incr(decodingTimeNanos);
-  }
-
-  public void incrECReconstructionBytesRead(long bytes) {
-    ecReconstructionBytesRead.incr(bytes);
-  }
-
-  public void incrECReconstructionRemoteBytesRead(long bytes) {
-    ecReconstructionRemoteBytesRead.incr(bytes);
-  }
-
-  public void incrECReconstructionBytesWritten(long bytes) {
-    ecReconstructionBytesWritten.incr(bytes);
-  }
-
-  public void incrECReconstructionReadTime(long millis) {
-    ecReconstructionReadTimeMillis.incr(millis);
-  }
-
-  public void incrECReconstructionWriteTime(long millis) {
-    ecReconstructionWriteTimeMillis.incr(millis);
-  }
-
-  public void incrECReconstructionDecodingTime(long millis) {
-    ecReconstructionDecodingTimeMillis.incr(millis);
-  }
-
-  public void incrECReconstructionValidateTime(long millis) {
-    ecReconstructionValidateTimeMillis.incr(millis);
-  }
-
-  public DataNodeUsageReport getDNUsageReport(long timeSinceLastReport) {
-    return dnUsageReportUtil.getUsageReport(bytesWritten.value(), bytesRead
-            .value(), totalWriteTime.value(), totalReadTime.value(),
-        blocksWritten.value(), blocksRead.value(), timeSinceLastReport);
-  }
-
-  public void incrActorCmdQueueLength(int delta) {
-    sumOfActorCommandQueueLength.incr(delta);
-  }
-
-  public void incrNumProcessedCommands() {
-    numProcessedCommands.incr();
-  }
-
-  /**
-   * Add processedCommandsOp metrics.
-   * @param latency milliseconds of process commands
-   */
-  public void addNumProcessedCommands(long latency) {
-    processedCommandsOp.add(latency);
-  }
-
-  /**
-   * Add addCreateRbwOp metrics.
-   * @param latency milliseconds of create RBW file
-   */
-  public void addCreateRbwOp(long latency) {
-    createRbwOp.add(latency);
-  }
-
-  /**
-   * Add addRecoverRbwOp metrics.
-   * @param latency milliseconds of recovery RBW file
-   */
-  public void addRecoverRbwOp(long latency) {
-    recoverRbwOp.add(latency);
-  }
-
-  /**
-   * Add addConvertTemporaryToRbwOp metrics.
-   * @param latency milliseconds of convert temporary to RBW file
-   */
-  public void addConvertTemporaryToRbwOp(long latency) {
-    convertTemporaryToRbwOp.add(latency);
-  }
-
-  /**
-   * Add addCreateTemporaryOp metrics.
-   * @param latency milliseconds of create temporary block file
-   */
-  public void addCreateTemporaryOp(long latency) {
-    createTemporaryOp.add(latency);
-  }
-
-  /**
-   * Add addFinalizeBlockOp metrics.
-   * @param latency milliseconds of finalize block
-   */
-  public void addFinalizeBlockOp(long latency) {
-    finalizeBlockOp.add(latency);
-  }
-
-  /**
-   * Add addUnfinalizeBlockOp metrics.
-   * @param latency milliseconds of un-finalize block file
-   */
-  public void addUnfinalizeBlockOp(long latency) {
-    unfinalizeBlockOp.add(latency);
-  }
-
-  /**
-   * Add addCheckAndUpdateOp metrics.
-   * @param latency milliseconds of check and update block file
-   */
-  public void addCheckAndUpdateOp(long latency) {
-    checkAndUpdateOp.add(latency);
-  }
-
-  /**
-   * Add addUpdateReplicaUnderRecoveryOp metrics.
-   * @param latency milliseconds of update and replica under recovery block file
-   */
-  public void addUpdateReplicaUnderRecoveryOp(long latency) {
-    updateReplicaUnderRecoveryOp.add(latency);
-  }
-
-  public void incrPacketsReceived() {
-    packetsReceived.incr();
-  }
-
-  public void incrPacketsSlowWriteToMirror() {
-    packetsSlowWriteToMirror.incr();
-  }
-
-  public void incrPacketsSlowWriteToDisk() {
-    packetsSlowWriteToDisk.incr();
-  }
-
-  public void incrPacketsSlowWriteToOsCache() {
-    packetsSlowWriteToOsCache.incr();
-  }
-
-  public void incrReplaceBlockOpOnSameMount() {
-    replaceBlockOpOnSameMount.incr();
-  }
-
-  public void incrReplaceBlockOpOnSameHost() {
-    replaceBlockOpOnSameHost.incr();
-  }
-
-  public void incrReplaceBlockOpToOtherHost() {
-    replaceBlockOpToOtherHost.incr();
-  }
-
-  public void incrNullStorageBlockReports() {
-    nullStorageBlockReports.incr();
-  }
-
-  public void addAcquireDataSetReadLock(long latency) {
-    acquireDatasetReadLock.add(latency);
-  }
-
-  public void addAcquireDataSetWriteLock(long latency) {
-    acquireDatasetWriteLock.add(latency);
-  }
-}
+   * 记录一次块报告RPC

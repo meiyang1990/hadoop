@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,7 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.KeyConverter
 import org.apache.hadoop.yarn.server.timelineservice.reader.TimelineReaderUtils;
 
 /**
- * Represents a row key for the domain table, which is the
- * cluster ! domain id.
+ * 表示HBase中domain表的行键，结构为 clusterId!domainId。
  */
 public class DomainRowKey {
   private final String clusterId;
@@ -35,6 +35,11 @@ public class DomainRowKey {
   private final DomainRowKeyConverter domainIdKeyConverter =
       new DomainRowKeyConverter();
 
+  /**
+   * 构造domain表行键对象。
+   * @param clusterId 集群ID
+   * @param domainId 域ID
+   */
   public DomainRowKey(String clusterId, String domainId) {
     this.clusterId = clusterId;
     this.domainId = domainId;
@@ -50,9 +55,9 @@ public class DomainRowKey {
   }
 
   /**
-   * Constructs a row key prefix for the domain table.
+   * 构造domain表的行键字节数组。
    *
-   * @return byte array with the row key
+   * @return 行键对应的字节数组
    */
   public  byte[] getRowKey() {
 
@@ -60,40 +65,34 @@ public class DomainRowKey {
   }
 
   /**
-   * Given the raw row key as bytes, returns the row key as an object.
+   * 从字节数组解析出DomainRowKey对象。
    *
-   * @param rowKey a rowkey represented as a byte array.
-   * @return an <cite>DomainRowKey</cite> object.
+   * @param rowKey 行键字节数组
+   * @return 解析后的DomainRowKey对象
    */
   public static DomainRowKey parseRowKey(byte[] rowKey) {
     return new DomainRowKeyConverter().decode(rowKey);
   }
 
   /**
-   * Constructs a row key for the domain table as follows:
-   * <p>
-   * {@code clusterId!domainId}.
-   * </p>
-   * @return String representation of row key.
+   * 获取行键的字符串表示，格式为 clusterId!domainId。
+   * @return 行键字符串
    */
   public String getRowKeyAsString() {
     return domainIdKeyConverter.encodeAsString(this);
   }
 
   /**
-   * Given the encoded row key as string, returns the row key as an object.
-   * @param encodedRowKey String representation of row key.
-   * @return A <cite>DomainRowKey</cite> object.
+   * 从字符串解析出DomainRowKey对象。
+   * @param encodedRowKey 编码后的行键字符串
+   * @return 解析后的DomainRowKey对象
    */
   public static DomainRowKey parseRowKeyFromString(String encodedRowKey) {
     return new DomainRowKeyConverter().decodeFromString(encodedRowKey);
   }
 
   /**
-   * Encodes and decodes row key for the domain table.
-   * The row key is of the
-   * form : domainId
-   * <p>
+   * 负责DomainRowKey的编码与解码，实现行键对象与字节数组/字符串的互相转换。
    */
   final private static class DomainRowKeyConverter
       implements KeyConverter<DomainRowKey>,
@@ -103,15 +102,7 @@ public class DomainRowKey {
     }
 
     /**
-     * The domain row key is of the form
-     * clusterId!domainId with each segment separated by !.
-     * The sizes below indicate sizes of each one of
-     * these segements in sequence.
-     * clusterId and domainId are strings.
-     * Strings are variable in size
-     * (i.e. they end whenever separator is encountered).
-     * This is used while
-     * decoding and helps in determining where to split.
+     * 各分段大小标记，两个分段都是可变长度（遇到分隔符截止），用于解码时分段切分。
      */
     private static final int[] SEGMENT_SIZES = {
         Separator.VARIABLE_SIZE,
@@ -120,7 +111,7 @@ public class DomainRowKey {
     /*
      * (non-Javadoc)
      *
-     * Encodes DomainRowKey object into a byte array
+     * 将DomainRowKey对象编码为字节数组
      *
      * @see org.apache.hadoop.yarn.server.timelineservice.storage.common
      * .KeyConverter#encode(java.lang.Object)
@@ -130,29 +121,32 @@ public class DomainRowKey {
       if (rowKey == null) {
         return Separator.EMPTY_BYTES;
       }
-
+      // 转义clusterId中的特殊字符
       byte[] cluster =
           Separator.encode(rowKey.getClusterId(), Separator.SPACE,
               Separator.TAB, Separator.QUALIFIERS);
+      // 转义domainId中的特殊字符
       byte[] domainIdBytes =
           Separator.encode(rowKey.getDomainId(), Separator.SPACE,
               Separator.TAB, Separator.QUALIFIERS);
-
+      // 使用分隔符拼接得到最终行键字节数组
       return Separator.QUALIFIERS.join(cluster, domainIdBytes);
     }
 
     @Override
     public DomainRowKey decode(byte[] rowKey) {
+      // 按分隔符切分行键得到两个分段
       byte[][] rowKeyComponents =
           Separator.QUALIFIERS.split(rowKey, SEGMENT_SIZES);
       if (rowKeyComponents.length != 2) {
         throw new IllegalArgumentException("the row key is not valid for "
             + "a domain id");
       }
+      // 还原clusterId中的转义字符
       String clusterId =
           Separator.decode(Bytes.toString(rowKeyComponents[0]),
               Separator.QUALIFIERS, Separator.TAB, Separator.SPACE);
-
+      // 还原domainId中的转义字符
       String domainId =
           Separator.decode(Bytes.toString(rowKeyComponents[1]),
               Separator.QUALIFIERS, Separator.TAB, Separator.SPACE);
@@ -162,12 +156,14 @@ public class DomainRowKey {
 
     @Override
     public String encodeAsString(DomainRowKey key) {
+      // 拼接并转义得到行键字符串
       return TimelineReaderUtils.joinAndEscapeStrings(
           new String[] {key.clusterId, key.domainId});
     }
 
     @Override
     public DomainRowKey decodeFromString(String encodedRowKey) {
+      // 拆分编码后的行键字符串
       List<String> split = TimelineReaderUtils.split(encodedRowKey);
       if (split == null || split.size() != 2) {
         throw new IllegalArgumentException(

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 
+=======
+// 这个文件已经全部加上中文注释
+>>>>>>> a7f26154e2430da367a92d826f772851319cf52d
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -194,9 +198,14 @@ import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import static org.apache.hadoop.service.Service.STATE.STARTED;
 
 /**
+<<<<<<< HEAD
  * 容器管理器实现类 - NodeManager的核心组件
  * 负责管理和协调容器的生命周期，包括启动、停止、监控和资源分配
  * 实现了ContainerManagementProtocol接口，处理来自ApplicationMaster的RPC请求
+=======
+ * NodeManager 容器管理器核心实现，负责管理本节点上所有容器的生命周期，处理来自RM/AM的容器管理请求，
+ * 协调资源本地化、容器启动/停止、监控、日志处理等核心流程。
+>>>>>>> a7f26154e2430da367a92d826f772851319cf52d
  */
 public class ContainerManagerImpl extends CompositeService implements
     ContainerManager {
@@ -270,6 +279,7 @@ public class ContainerManagerImpl extends CompositeService implements
   private boolean nmDispatherMetricEnabled;
 
   /**
+<<<<<<< HEAD
    * 构造ContainerManagerImpl实例
    * 
    * @param context NodeManager上下文
@@ -278,6 +288,9 @@ public class ContainerManagerImpl extends CompositeService implements
    * @param nodeStatusUpdater 节点状态更新器
    * @param metrics NodeManager指标收集器
    * @param dirsHandler 本地目录处理器服务
+=======
+   * 构造容器管理器实例，初始化各核心子服务与事件分发器
+>>>>>>> a7f26154e2430da367a92d826f772851319cf52d
    */
   public ContainerManagerImpl(Context context, ContainerExecutor exec,
       DeletionService deletionContext, NodeStatusUpdater nodeStatusUpdater,
@@ -329,7 +342,11 @@ public class ContainerManagerImpl extends CompositeService implements
     this.containersMonitor = createContainersMonitor(exec);
     addService(this.containersMonitor);
 
+<<<<<<< HEAD
     // 注册事件处理器
+=======
+    // 注册各类事件处理器
+>>>>>>> a7f26154e2430da367a92d826f772851319cf52d
     dispatcher.register(ContainerEventType.class,
         new ContainerEventDispatcher());
     dispatcher.register(ApplicationEventType.class,
@@ -369,6 +386,7 @@ public class ContainerManagerImpl extends CompositeService implements
     // 添加共享缓存上传服务（如果共享缓存被禁用，则不执行任何操作）
     SharedCacheUploadService sharedCacheUploader =
         createSharedCacheUploaderService();
+<<<<<<< HEAD
     addService(sharedCacheUploader);
     dispatcher.register(SharedCacheUploadEventType.class, sharedCacheUploader);
 
@@ -2683,3 +2701,6 @@ public class ContainerManagerImpl extends CompositeService implements
 
 // 这个文件已经全部加上中文注释
 
+=======
+    addService(sharedCacheUpload
+>>>>>>> a7f26154e2430da367a92d826f772851319cf52d

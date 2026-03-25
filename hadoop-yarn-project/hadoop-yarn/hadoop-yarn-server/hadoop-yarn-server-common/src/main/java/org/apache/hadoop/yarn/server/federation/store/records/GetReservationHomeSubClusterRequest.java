@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -24,13 +25,17 @@ import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Request class to obtain the home sub-cluster for the specified
- * {@link ReservationId}.
+ * YARN联邦存储层请求类，用于查询指定预留资源所在的归属子集群信息。
  */
 @Private
 @Unstable
 public abstract class GetReservationHomeSubClusterRequest {
 
+  /**
+   * 创建新的获取预留资源归属子集群请求实例。
+   * @param reservationId 目标预留资源ID
+   * @return 封装好的请求实例
+   */
   @Private
   @Unstable
   public static GetReservationHomeSubClusterRequest newInstance(
@@ -42,20 +47,18 @@ public abstract class GetReservationHomeSubClusterRequest {
   }
 
   /**
-   * Get the {@link ReservationId} representing the unique identifier of the
-   * application.
+   * 获取请求查询的预留资源ID。
    *
-   * @return the application identifier
+   * @return 预留资源唯一标识符
    */
   @Public
   @Unstable
   public abstract ReservationId getReservationId();
 
   /**
-   * Set the {@link ReservationId} representing the unique identifier of the
-   * application.
+   * 设置请求查询的预留资源ID。
    *
-   * @param reservationId the reservatopm identifier
+   * @param reservationId 预留资源唯一标识符
    */
   @Private
   @Unstable

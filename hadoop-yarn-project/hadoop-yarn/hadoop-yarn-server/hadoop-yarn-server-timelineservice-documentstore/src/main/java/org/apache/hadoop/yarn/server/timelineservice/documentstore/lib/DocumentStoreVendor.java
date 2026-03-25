@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,14 +21,22 @@ package org.apache.hadoop.yarn.server.timelineservice.documentstore.lib;
 
 // 文档存储供应商枚举，定义支持的文档存储厂商类型
 /**
- * Represents the different vendors for DocumentStore.
+ * 文档存储供应商枚举，定义了时间线服务文档存储支持的不同底层数据库供应商。
  */
 public enum DocumentStoreVendor {
 
+  /** Cosmos DB文档数据库 */
   COSMOS_DB,
+  /** MongoDB文档数据库 */
   MONGO_DB,
+  /** ElasticSearch搜索引擎 */
   ELASTIC_SEARCH;
 
+  /**
+   * 根据字符串名称解析对应的文档存储供应商枚举。
+   * @param storeTypeStr 供应商名称字符串
+   * @return 匹配的文档存储供应商枚举
+   */
   public static DocumentStoreVendor getStoreType(String storeTypeStr) {
     for (DocumentStoreVendor storeType : DocumentStoreVendor.values()) {
       if (storeType.name().equalsIgnoreCase(storeTypeStr)) {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,6 +31,10 @@ import org.apache.hadoop.mapreduce.Counters;
 import org.apache.hadoop.mapreduce.v2.app.job.Task;
 import org.apache.hadoop.mapreduce.v2.util.MRApps;
 
+/**
+ * 任务计数器信息数据传输对象，用于MapReduce Application WebUI展示单个任务的计数器信息
+ * 将任务的所有计数器分组整理，提供XML/JSON序列化支持
+ */
 @XmlRootElement(name = "jobTaskCounters")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class JobTaskCounterInfo {
@@ -40,14 +45,22 @@ public class JobTaskCounterInfo {
   protected String id;
   protected ArrayList<TaskCounterGroupInfo> taskCounterGroup;
 
+  /**
+   * 默认无参构造函数，供JAXB序列化使用
+   */
   public JobTaskCounterInfo() {
   }
 
+  /**
+   * 从任务对象构造任务计数器信息，整理所有计数器分组
+   * @param task 目标任务对象，从中提取计数器信息
+   */
   public JobTaskCounterInfo(Task task) {
     total = task.getCounters();
     this.id = MRApps.toString(task.getID());
     taskCounterGroup = new ArrayList<TaskCounterGroupInfo>();
     if (total != null) {
+      // 遍历所有计数器分组，逐个转换为WebDAO对象
       for (CounterGroup g : total) {
         if (g != null) {
           TaskCounterGroupInfo cginfo = new TaskCounterGroupInfo(g.getName(), g);

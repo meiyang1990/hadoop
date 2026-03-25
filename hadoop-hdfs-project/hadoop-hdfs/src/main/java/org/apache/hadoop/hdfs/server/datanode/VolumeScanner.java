@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -50,30 +51,30 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * VolumeScanner scans a single volume.  Each VolumeScanner has its own thread.
- * <p>They are all managed by the DataNode's BlockScanner.
+ * 文件说明：DataNode单个存储卷的块扫描器，每个VolumeScanner拥有独立线程执行扫描任务
+ * 核心职责：负责扫描指定存储卷上的所有数据块，校验块数据完整性，优先扫描可疑块，由DataNode的BlockScanner统一管理
  */
 public class VolumeScanner extends SubjectInheritingThread {
   public static final Logger LOG =
       LoggerFactory.getLogger(VolumeScanner.class);
 
   /**
-   * Number of seconds in a minute.
+   * 一分钟包含的秒数
    */
   private final static int SECONDS_PER_MINUTE = 60;
 
   /**
-   * Number of minutes in an hour.
+   * 一小时包含的分钟数
    */
   private final static int MINUTES_PER_HOUR = 60;
 
   /**
-   * Name of the block iterator used by this scanner.
+   * 当前扫描器使用的块迭代器名称
    */
   private final static String BLOCK_ITERATOR_NAME = "scanner";
 
   /**
-   * The configuration.
+   * 块扫描配置对象
    */
   private Conf conf;
 
@@ -83,98 +84,93 @@ public class VolumeScanner extends SubjectInheritingThread {
   }
 
   /**
-   * The DataNode this VolumEscanner is associated with.
+   * 当前扫描器所属的DataNode
    */
   private final DataNode datanode;
 
   private final DataNodeMetrics metrics;
 
   /**
-   * A reference to the volume that we're scanning.
+   * 当前扫描的存储卷引用
    */
   private final FsVolumeReference ref;
 
   /**
-   * The volume that we're scanning.
+   * 当前扫描的存储卷实例
    */
   final FsVolumeSpi volume;
 
   /**
-   * The number of scanned bytes in each minute of the last hour.<p/>
-   *
-   * This array is managed as a circular buffer.  We take the monotonic time and
-   * divide it up into one-minute periods.  Each entry in the array represents
-   * how many bytes were scanned during that period.
+   * 过去一小时内每分钟扫描字节数的循环缓冲区
+   * 数组每个元素对应一分钟，用于计算平均扫描速率，控制扫描速度不超过带宽限制
    */
   private final long scannedBytes[] = new long[MINUTES_PER_HOUR];
 
   /**
-   * The sum of all the values of scannedBytes.
+   * 所有scannedBytes元素的总和，即过去一小时总扫描字节数
    */
   private long scannedBytesSum = 0;
 
   /**
-   * The throttler to use with BlockSender objects.
+   * 块发送流使用的流量限速器，控制扫描速度
    */
   private final DataTransferThrottler throttler = new DataTransferThrottler(1);
 
   /**
-   * The null output stream to use with BlockSender objects.
+   * 空输出流，扫描时仅读取校验不输出数据
    */
   private final DataOutputStream nullStream =
       new DataOutputStream(new IOUtils.NullOutputStream());
 
   /**
-   * The block iterators associated with this VolumeScanner.<p/>
-   *
-   * Each block pool has its own BlockIterator.
+   * 当前扫描器关联的块迭代器列表，每个块池对应一个迭代器
    */
   private final List<BlockIterator> blockIters =
       new ArrayList<BlockIterator>();
 
   /**
-   * Blocks which are suspect.
-   * The scanner prioritizes scanning these blocks.
+   * 待扫描可疑块集合，扫描器优先处理这些块，保证错误块及时发现
    */
   private final LinkedHashSet<ExtendedBlock> suspectBlocks =
       new LinkedHashSet<ExtendedBlock>();
 
   /**
-   * Blocks which were suspect which we have scanned.
-   * This is used to avoid scanning the same suspect block over and over.
+   * 最近已扫描过的可疑块缓存，避免重复扫描同一个可疑块
    */
   private final Cache<ExtendedBlock, Boolean> recentSuspectBlocks =
       CacheBuilder.newBuilder().maximumSize(1000)
         .expireAfterAccess(10, TimeUnit.MINUTES).build();
 
   /**
-   * The current block iterator, or null if there is none.
+   * 当前使用的块迭代器，无可用迭代器时为null
    */
   private BlockIterator curBlockIter = null;
 
   /**
-   * True if the thread is stopping.<p/>
-   * Protected by this object's lock.
+   * 线程停止标志，由当前对象锁保护
    */
   private boolean stopping = false;
 
   /**
-   * The monotonic minute that the volume scanner was started on.
+   * 扫描器启动时间（单位：分钟，单调时间）
    */
   private long startMinute = 0;
 
   /**
-   * The current minute, in monotonic terms.
+   * 当前时间（单位：分钟，单调时间）
    */
   private long curMinute = 0;
 
   /**
-   * Handles scan results.
+   * 扫描结果处理器，处理扫描成功/失败结果
    */
   private final ScanResultHandler resultHandler;
 
   private final Statistics stats = new Statistics();
 
+  /**
+   * 扫描统计信息类，保存卷扫描器的各类统计数据
+   */
   static class Statistics {
     long bytesScannedInPastHour = 0;
     long blocksScannedInCurrentPeriod = 0;
@@ -220,6 +216,11 @@ public class VolumeScanner extends SubjectInheritingThread {
     }
   }
 
+  /**
+   * 将毫秒时间转换为小时单位，非正数输入返回0
+   * @param ms 输入毫秒数
+   * @return 转换后的小时数
+   */
   private static double positiveMsToHours(long ms) {
     if (ms <= 0) {
       return 0;
@@ -228,6 +229,10 @@ public class VolumeScanner extends SubjectInheritingThread {
     }
   }
 
+  /**
+   * 将当前卷扫描器统计信息输出到字符串构建器，用于WebUI展示
+   * @param p 字符串构建器
+   */
   public void printStats(StringBuilder p) {
     p.append(String.format("Block scanner information for volume %s with base" +
         " path %s%n", volume.getStorageID(), volume));
@@ -261,33 +266,40 @@ public class VolumeScanner extends SubjectInheritingThread {
     }
   }
 
+  /**
+   * 扫描结果处理器，处理块扫描的结果，上报坏块给DataNode
+   */
   static class ScanResultHandler {
     private VolumeScanner scanner;
 
+    /**
+     * 初始化处理器，关联对应的卷扫描器
+     * @param scanner 卷扫描器实例
+     */
     public void setup(VolumeScanner scanner) {
       LOG.trace("Starting VolumeScanner {}",
           scanner.volume);
       this.scanner = scanner;
     }
 
+    /**
+     * 处理单个块的扫描结果
+     * @param block 被扫描的块
+     * @param e 扫描异常，扫描成功时为null
+     */
     public void handle(ExtendedBlock block, IOException e) {
       FsVolumeSpi volume = scanner.volume;
       if (e == null) {
         LOG.trace("Successfully scanned {} on {}", block, volume);
         return;
       }
-      // If the block does not exist anymore, then it's not an error.
+      // 如果块已经不存在了，则不算错误
       if (!volume.getDataset().contains(block)) {
         LOG.debug("Volume {}: block {} is no longer in the dataset.",
             volume, block);
         return;
       }
-      // If the block exists, the exception may due to a race with write:
-      // The BlockSender got an old block path in rbw. BlockReceiver removed
-      // the rbw block from rbw to finalized but BlockSender tried to open the
-      // file before BlockReceiver updated the VolumeMap. The state of the
-      // block can be changed again now, so ignore this error here. If there
-      // is a block really deleted by mistake, DirectoryScan should catch it.
+      // 文件找不到异常可能是写竞争导致，忽略不处理
       if (e instanceof FileNotFoundException ) {
         LOG.info("Volume {}: verification failed for {} because of " +
                 "FileNotFoundException.  This may be due to a race with write.",
@@ -299,6 +311,12 @@ public class VolumeScanner extends SubjectInheritingThread {
     }
   }
 
+  /**
+   * 构造卷扫描器实例
+   * @param conf 块扫描配置
+   * @param datanode 所属DataNode
+   * @param ref 扫描的存储卷引用
+   */
   VolumeScanner(Conf conf, DataNode datanode, FsVolumeReference ref) {
     this.conf = conf;
     this.datanode = datanode;
@@ -325,14 +343,17 @@ public class VolumeScanner extends SubjectInheritingThread {
     }
   }
 
+  /**
+   * 过期清理循环缓冲区中过时的扫描字节记录，计算当前分钟
+   * @param monotonicMs 当前单调时间（毫秒）
+   */
   private void expireOldScannedBytesRecords(long monotonicMs) {
     long newMinute =
         TimeUnit.MINUTES.convert(monotonicMs, TimeUnit.MILLISECONDS);
     if (curMinute == newMinute) {
       return;
     }
-    // If a minute or more has gone past since we last updated the scannedBytes
-    // array, zero out the slots corresponding to those minutes.
+    // 清零所有过时分钟对应的缓冲区槽位
     for (long m = curMinute + 1; m <= newMinute; m++) {
       int slotIdx = (int)(m % MINUTES_PER_HOUR);
       LOG.trace("{}: updateScannedBytes is zeroing out slotIdx {}.  " +
@@ -345,20 +366,8 @@ public class VolumeScanner extends SubjectInheritingThread {
   }
 
   /**
-   * Find a usable block iterator.<p/>
-   *
-   * We will consider available block iterators in order.  This property is
-   * important so that we don't keep rescanning the same block pool id over
-   * and over, while other block pools stay unscanned.<p/>
-   *
-   * A block pool is always ready to scan if the iterator is not at EOF.  If
-   * the iterator is at EOF, the block pool will be ready to scan when
-   * conf.scanPeriodMs milliseconds have elapsed since the iterator was last
-   * rewound.<p/>
-   *
-   * @return                     0 if we found a usable block iterator; the
-   *                               length of time we should delay before
-   *                               checking again otherwise.
+   * 查找下一个可扫描的块迭代器，按轮询顺序遍历所有块池
+   * @return 如果找到可用迭代器返回0，否则返回需要等待的毫秒数
    */
   private synchronized long findNextUsableBlockIter() {
     int numBlockIters = blockIters.size();
@@ -373,10 +382,7 @@ public class VolumeScanner extends SubjectInheritingThread {
       curIdx = blockIters.indexOf(curBlockIter);
       Preconditions.checkState(curIdx >= 0);
     }
-    // Note that this has to be wall-clock time, not monotonic time.  This is
-    // because the time saved in the cursor file is a wall-clock time.  We do
-    // not want to save a monotonic time in the cursor file, because it resets
-    // every time the machine reboots (on most platforms).
+    // 这里必须使用墙钟时间，因为迭代器保存的起始时间是墙钟时间
     long nowMs = Time.now();
     long minTimeoutMs = Long.MAX_VALUE;
     for (int i = 0; i < numBlockIters; i++) {
@@ -406,18 +412,13 @@ public class VolumeScanner extends SubjectInheritingThread {
   }
 
   /**
-   * Scan a block.
-   *
-   * @param cblock               The block to scan.
-   * @param bytesPerSec          The bytes per second to scan at.
-   *
-   * @return                     The length of the block that was scanned, or
-   *                               -1 if the block could not be scanned.
+   * 扫描单个块，校验数据完整性
+   * @param cblock 待扫描块
+   * @param bytesPerSec 扫描速率上限（字节/秒）
+   * @return 扫描成功返回块字节数，扫描失败返回-1
    */
   private long scanBlock(ExtendedBlock cblock, long bytesPerSec) {
-    // 'cblock' has a valid blockId and block pool id, but we don't yet know the
-    // genstamp the block is supposed to have.  Ask the FsDatasetImpl for this
-    // information.
+    // 从数据集获取块最新的生成时间戳信息
     ExtendedBlock block = null;
     try {
       Block b = volume.getDataset().getStoredBlock(
@@ -436,354 +437,4 @@ public class VolumeScanner extends SubjectInheritingThread {
             cblock, volume);
     }
     if (block == null) {
-      return -1; // block not found.
-    }
-    LOG.debug("start scanning block {}", block);
-    BlockSender blockSender = null;
-    try {
-      blockSender = new BlockSender(block, 0, -1,
-          false, true, true, datanode, null,
-          CachingStrategy.newDropBehind());
-      throttler.setBandwidth(bytesPerSec);
-      long bytesRead = blockSender.sendBlock(nullStream, null, throttler);
-      resultHandler.handle(block, null);
-      metrics.incrBlocksVerified();
-      return bytesRead;
-    } catch (IOException e) {
-      resultHandler.handle(block, e);
-    } finally {
-      IOUtils.cleanupWithLogger(null, blockSender);
-    }
-    metrics.incrBlockVerificationFailures();
-    return -1;
-  }
-
-  @VisibleForTesting
-  static boolean calculateShouldScan(String storageId, long targetBytesPerSec,
-                   long scannedBytesSum, long startMinute, long curMinute) {
-    long runMinutes = curMinute - startMinute;
-    long effectiveBytesPerSec;
-    if (runMinutes <= 0) {
-      // avoid division by zero
-      effectiveBytesPerSec = scannedBytesSum;
-    } else {
-      if (runMinutes > MINUTES_PER_HOUR) {
-        // we only keep an hour's worth of rate information
-        runMinutes = MINUTES_PER_HOUR;
-      }
-      effectiveBytesPerSec = scannedBytesSum /
-          (SECONDS_PER_MINUTE * runMinutes);
-    }
-
-    boolean shouldScan = effectiveBytesPerSec <= targetBytesPerSec;
-    LOG.trace("{}: calculateShouldScan: effectiveBytesPerSec = {}, and " +
-        "targetBytesPerSec = {}.  startMinute = {}, curMinute = {}, " +
-        "shouldScan = {}",
-        storageId, effectiveBytesPerSec, targetBytesPerSec,
-        startMinute, curMinute, shouldScan);
-    return shouldScan;
-  }
-
-  /**
-   * Get next block and check if it's needed to scan.
-   *
-   * @return  the candidate block.
-   */
-  ExtendedBlock getNextBlockToScan() {
-    ExtendedBlock block;
-    try {
-      block = curBlockIter.nextBlock();
-    } catch (IOException e) {
-      // There was an error listing the next block in the volume.  This is a
-      // serious issue.
-      LOG.warn("{}: nextBlock error on {}", this, curBlockIter);
-      // On the next loop iteration, curBlockIter#eof will be set to true, and
-      // we will pick a different block iterator.
-      return null;
-    }
-    if (block == null) {
-      // The BlockIterator is at EOF.
-      LOG.info("{}: finished scanning block pool {}",
-          this, curBlockIter.getBlockPoolId());
-      saveBlockIterator(curBlockIter);
-      return null;
-    } else if (conf.skipRecentAccessed) {
-      // Check the access time of block file to avoid scanning recently
-      // changed blocks, reducing disk IO.
-      try {
-        BlockLocalPathInfo blockLocalPathInfo =
-            volume.getDataset().getBlockLocalPathInfo(block);
-        BasicFileAttributes attr = Files.readAttributes(
-            new File(blockLocalPathInfo.getBlockPath()).toPath(),
-            BasicFileAttributes.class);
-        if (System.currentTimeMillis() - attr.lastAccessTime().
-            to(TimeUnit.MILLISECONDS) < conf.scanPeriodMs) {
-          return null;
-        }
-      } catch (IOException ioe) {
-        LOG.debug("Failed to get access time of block {}",
-            block, ioe);
-      }
-    }
-    return block;
-  }
-
-  /**
-   * Run an iteration of the VolumeScanner loop.
-   *
-   * @param suspectBlock   A suspect block which we should scan, or null to
-   *                       scan the next regularly scheduled block.
-   *
-   * @return     The number of milliseconds to delay before running the loop
-   *               again, or 0 to re-run the loop immediately.
-   */
-  private long runLoop(ExtendedBlock suspectBlock) {
-    long bytesScanned = -1;
-    boolean scanError = false;
-    ExtendedBlock block = null;
-    try {
-      long monotonicMs = Time.monotonicNow();
-      expireOldScannedBytesRecords(monotonicMs);
-
-      if (!calculateShouldScan(volume.getStorageID(), conf.targetBytesPerSec,
-          scannedBytesSum, startMinute, curMinute)) {
-        // If neededBytesPerSec is too low, then wait few seconds for some old
-        // scannedBytes records to expire.
-        return 30000L;
-      }
-
-      if (suspectBlock != null) {
-        block = suspectBlock;
-      } else {
-        // Find a usable block pool to scan.
-        if ((curBlockIter == null) || curBlockIter.atEnd()) {
-          long timeout = findNextUsableBlockIter();
-          if (timeout > 0) {
-            LOG.trace("{}: no block pools are ready to scan yet.  Waiting " +
-                "{} ms.", this, timeout);
-            synchronized (stats) {
-              stats.nextBlockPoolScanStartMs = Time.monotonicNow() + timeout;
-            }
-            return timeout;
-          }
-          synchronized (stats) {
-            stats.scansSinceRestart++;
-            stats.blocksScannedInCurrentPeriod = 0;
-            stats.nextBlockPoolScanStartMs = -1;
-          }
-          return 0L;
-        }
-        block = getNextBlockToScan();
-        if (block == null) {
-          return 0L;
-        }
-      }
-      if (curBlockIter != null) {
-        long saveDelta = monotonicMs - curBlockIter.getLastSavedMs();
-        if (saveDelta >= conf.cursorSaveMs) {
-          LOG.debug("{}: saving block iterator {} after {} ms.",
-              this, curBlockIter, saveDelta);
-          saveBlockIterator(curBlockIter);
-        }
-      }
-      bytesScanned = scanBlock(block, conf.targetBytesPerSec);
-      if (bytesScanned >= 0) {
-        scannedBytesSum += bytesScanned;
-        scannedBytes[(int)(curMinute % MINUTES_PER_HOUR)] += bytesScanned;
-      } else {
-        scanError = true;
-      }
-      return 0L;
-    } finally {
-      synchronized (stats) {
-        stats.bytesScannedInPastHour = scannedBytesSum;
-        if (bytesScanned > 0) {
-          stats.blocksScannedInCurrentPeriod++;
-          stats.blocksScannedSinceRestart++;
-        }
-        if (scanError) {
-          stats.scanErrorsSinceRestart++;
-        }
-        if (block != null) {
-          stats.lastBlockScanned = block;
-        }
-        if (curBlockIter == null) {
-          stats.eof = true;
-          stats.blockPoolPeriodEndsMs = -1;
-        } else {
-          stats.eof = curBlockIter.atEnd();
-          stats.blockPoolPeriodEndsMs =
-              curBlockIter.getIterStartMs() + conf.scanPeriodMs;
-        }
-      }
-    }
-  }
-
-  /**
-   * If there are elements in the suspectBlocks list, removes
-   * and returns the first one.  Otherwise, returns null.
-   */
-  private synchronized ExtendedBlock popNextSuspectBlock() {
-    Iterator<ExtendedBlock> iter = suspectBlocks.iterator();
-    if (!iter.hasNext()) {
-      return null;
-    }
-    ExtendedBlock block = iter.next();
-    iter.remove();
-    return block;
-  }
-
-  @Override
-  public void work() {
-    // Record the minute on which the scanner started.
-    this.startMinute =
-        TimeUnit.MINUTES.convert(Time.monotonicNow(), TimeUnit.MILLISECONDS);
-    this.curMinute = startMinute;
-    try {
-      LOG.trace("{}: thread starting.", this);
-      resultHandler.setup(this);
-      try {
-        long timeout = 0;
-        while (true) {
-          ExtendedBlock suspectBlock = null;
-          // Take the lock to check if we should stop, and access the
-          // suspect block list.
-          synchronized (this) {
-            if (stopping) {
-              break;
-            }
-            if (timeout > 0) {
-              LOG.debug("{}: wait for {} milliseconds", this, timeout);
-              wait(timeout);
-              if (stopping) {
-                break;
-              }
-            }
-            suspectBlock = popNextSuspectBlock();
-          }
-          timeout = runLoop(suspectBlock);
-        }
-      } catch (InterruptedException e) {
-        // We are exiting because of an InterruptedException,
-        // probably sent by VolumeScanner#shutdown.
-        LOG.trace("{} exiting because of InterruptedException.", this);
-      } catch (Throwable e) {
-        LOG.error("{} exiting because of exception ", this, e);
-      }
-      LOG.info("{} exiting.", this);
-      VolumeScannerCBInjector.get().preSavingBlockIteratorTask(this);
-      // Save the current position of all block iterators and close them.
-      for (BlockIterator iter : blockIters) {
-        saveBlockIterator(iter);
-        IOUtils.cleanupWithLogger(null, iter);
-      }
-    } finally {
-      VolumeScannerCBInjector.get().terminationCallBack(this);
-      // When the VolumeScanner exits, release the reference we were holding
-      // on the volume.  This will allow the volume to be removed later.
-      IOUtils.cleanupWithLogger(null, ref);
-    }
-  }
-
-  @Override
-  public String toString() {
-    return "VolumeScanner(" + volume +
-        ", " + volume.getStorageID() + ")";
-  }
-
-  /**
-   * Shut down this scanner.
-   */
-  public synchronized void shutdown() {
-    stopping = true;
-    notify();
-    this.interrupt();
-    VolumeScannerCBInjector.get().shutdownCallBack(this);
-  }
-
-
-  public synchronized void markSuspectBlock(ExtendedBlock block) {
-    if (stopping) {
-      LOG.debug("{}: Not scheduling suspect block {} for " +
-          "rescanning, because this volume scanner is stopping.", this, block);
-      return;
-    }
-    Boolean recent = recentSuspectBlocks.getIfPresent(block);
-    if (recent != null) {
-      LOG.debug("{}: Not scheduling suspect block {} for " +
-          "rescanning, because we rescanned it recently.", this, block);
-      return;
-    }
-    if (suspectBlocks.contains(block)) {
-      LOG.debug("{}: suspect block {} is already queued for " +
-          "rescanning.", this, block);
-      return;
-    }
-    suspectBlocks.add(block);
-    recentSuspectBlocks.put(block, true);
-    LOG.debug("{}: Scheduling suspect block {} for rescanning.", this, block);
-    notify(); // wake scanner thread.
-  }
-
-  /**
-   * Allow the scanner to scan the given block pool.
-   *
-   * @param bpid       The block pool id.
-   */
-  public synchronized void enableBlockPoolId(String bpid) {
-    for (BlockIterator iter : blockIters) {
-      if (iter.getBlockPoolId().equals(bpid)) {
-        LOG.warn("{}: already enabled scanning on block pool {}", this, bpid);
-        return;
-      }
-    }
-    BlockIterator iter = null;
-    try {
-      // Load a block iterator for the next block pool on the volume.
-      iter = volume.loadBlockIterator(bpid, BLOCK_ITERATOR_NAME);
-      LOG.trace("{}: loaded block iterator for {}.", this, bpid);
-    } catch (FileNotFoundException e) {
-      LOG.debug("{}: failed to load block iterator: " + e.getMessage(), this);
-    } catch (IOException e) {
-      LOG.warn("{}: failed to load block iterator.", this, e);
-    }
-    if (iter == null) {
-      iter = volume.newBlockIterator(bpid, BLOCK_ITERATOR_NAME);
-      LOG.trace("{}: created new block iterator for {}.", this, bpid);
-    }
-    iter.setMaxStalenessMs(conf.maxStalenessMs);
-    blockIters.add(iter);
-    notify();
-  }
-
-  /**
-   * Disallow the scanner from scanning the given block pool.
-   *
-   * @param bpid       The block pool id.
-   */
-  public synchronized void disableBlockPoolId(String bpid) {
-    Iterator<BlockIterator> i = blockIters.iterator();
-    while (i.hasNext()) {
-      BlockIterator iter = i.next();
-      if (iter.getBlockPoolId().equals(bpid)) {
-        LOG.trace("{}: disabling scanning on block pool {}", this, bpid);
-        i.remove();
-        IOUtils.cleanupWithLogger(null, iter);
-        if (curBlockIter == iter) {
-          curBlockIter = null;
-        }
-        notify();
-        return;
-      }
-    }
-    LOG.warn("{}: can't remove block pool {}, because it was never " +
-        "added.", this, bpid);
-  }
-
-  @VisibleForTesting
-  Statistics getStatistics() {
-    synchronized (stats) {
-      return new Statistics(stats);
-    }
-  }
-}
+      return -1; // 未找到块

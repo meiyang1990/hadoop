@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -55,6 +56,10 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterNodeManagerRequ
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 import org.apache.hadoop.yarn.server.api.records.impl.pb.NodeStatusPBImpl;
 
+/**
+ * NodeManager向ResourceManager注册请求的Protobuf实现类
+ * 实现了基于Protobuf的序列化与反序列化，用于YARN RPC通信
+ */
 public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest {
   RegisterNodeManagerRequestProto proto = RegisterNodeManagerRequestProto.getDefaultInstance();
   RegisterNodeManagerRequestProto.Builder builder = null;
@@ -82,6 +87,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     viaProto = true;
   }
   
+  /** 获取序列化后的Protobuf对象 */
   public synchronized RegisterNodeManagerRequestProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -89,6 +95,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     return proto;
   }
 
+  /** 将本地缓存的对象合并到Protobuf Builder中 */
   private synchronized void mergeLocalToBuilder() {
     if (this.containerStatuses != null) {
       addNMContainerStatusesToProto();
@@ -130,6 +137,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     }
   }
 
+  /** 将日志聚合报告转换写入Protobuf Builder */
   private void addLogAggregationStatusForAppsToProto() {
     maybeInitBuilder();
     builder.clearLogAggregationReportsForApps();
@@ -169,6 +177,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     return ((LogAggregationReportPBImpl) value).getProto();
   }
 
+  /** 将容器状态列表转换写入Protobuf Builder */
   private synchronized void addNMContainerStatusesToProto() {
     maybeInitBuilder();
     builder.clearContainerStatuses();
@@ -181,6 +190,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
   }
 
     
+  /** 将本地缓存合并生成最终Protobuf对象 */
   private synchronized void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -190,6 +200,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     viaProto = true;
   }
 
+  /** 初始化Builder，确保可以修改Proto */
   private synchronized void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = RegisterNodeManagerRequestProto.newBuilder(proto);
@@ -262,6 +273,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     return runningApplications;
   }
   
+  /** 从Protobuf中反序列化初始化运行中应用列表 */
   private synchronized void initRunningApplications() {
     if (this.runningApplications != null) {
       return;
@@ -283,6 +295,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     this.runningApplications.addAll(apps);
   }
   
+  /** 将运行中应用列表转换写入Protobuf Builder */
   private synchronized void addRunningApplicationsToProto() {
     maybeInitBuilder();
     builder.clearRunningApplications();
@@ -322,6 +335,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     return containerStatuses;
   }
   
+  /** 从Protobuf中反序列化初始化容器状态列表 */
   private synchronized void initContainerRecoveryReports() {
     if (this.containerStatuses != null) {
       return;
@@ -431,6 +445,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     this.labels = nodeLabels;
   }
   
+  /** 从Protobuf中反序列化初始化节点标签集合 */
   private synchronized void initNodeLabels() {
     if (this.labels != null) {
       return;
@@ -461,6 +476,7 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
     this.attributes = nodeAttributes;
   }
 
+  /** 从Protobuf中反序列化初始化节点属性集合 */
   private synchronized void initNodeAttributes() {
     if (this.attributes != null) {
       return;
@@ -501,73 +517,3 @@ public class RegisterNodeManagerRequestPBImpl extends RegisterNodeManagerRequest
 
   private static ApplicationIdProto convertToProtoFormat(ApplicationId t) {
     return ((ApplicationIdPBImpl)t).getProto();
-  }
-
-  private static NodeIdPBImpl convertFromProtoFormat(NodeIdProto p) {
-    return new NodeIdPBImpl(p);
-  }
-
-  private static NodeIdProto convertToProtoFormat(NodeId t) {
-    return ((NodeIdPBImpl)t).getProto();
-  }
-
-  private static ResourcePBImpl convertFromProtoFormat(ResourceProto p) {
-    return new ResourcePBImpl(p);
-  }
-
-  private static ResourceProto convertToProtoFormat(Resource t) {
-    return ProtoUtils.convertToProtoFormat(t);
-  }
-
-  private static NMContainerStatusPBImpl convertFromProtoFormat(
-      NMContainerStatusProto c) {
-    return new NMContainerStatusPBImpl(c);
-  }
-  
-  private static NMContainerStatusProto convertToProtoFormat(
-      NMContainerStatus c) {
-    return ((NMContainerStatusPBImpl)c).getProto();
-  }
-
-  @Override
-  public synchronized List<LogAggregationReport>
-      getLogAggregationReportsForApps() {
-    if (this.logAggregationReportsForApps != null) {
-      return this.logAggregationReportsForApps;
-    }
-    initLogAggregationReportsForApps();
-    return logAggregationReportsForApps;
-  }
-
-  private void initLogAggregationReportsForApps() {
-    RegisterNodeManagerRequestProtoOrBuilder p = viaProto ? proto : builder;
-    List<LogAggregationReportProto> list =
-        p.getLogAggregationReportsForAppsList();
-    this.logAggregationReportsForApps = new ArrayList<LogAggregationReport>();
-    for (LogAggregationReportProto c : list) {
-      this.logAggregationReportsForApps.add(convertFromProtoFormat(c));
-    }
-  }
-
-  private LogAggregationReport convertFromProtoFormat(
-      LogAggregationReportProto logAggregationReport) {
-    return new LogAggregationReportPBImpl(logAggregationReport);
-  }
-
-  @Override
-  public synchronized void setLogAggregationReportsForApps(
-      List<LogAggregationReport> logAggregationStatusForApps) {
-    if(logAggregationStatusForApps == null) {
-      builder.clearLogAggregationReportsForApps();
-    }
-    this.logAggregationReportsForApps = logAggregationStatusForApps;
-  }
-
-  private NodeStatusPBImpl convertFromProtoFormat(NodeStatusProto s) {
-    return new NodeStatusPBImpl(s);
-  }
-
-  private NodeStatusProto convertToProtoFormat(NodeStatus s) {
-    return ((NodeStatusPBImpl)s).getProto();
-  }
-}

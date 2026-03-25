@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,9 +25,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that maintain the biggest of 
- * a sequence of strings.
- * 
+ * 字符串最大值聚合器实现，用于在MapReduce聚合任务中维护字符串序列的字典序最大值
+ * 作为ValueAggregator的实现类，配合MapReduce聚合框架完成同key字符串的最大值计算
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -35,19 +35,15 @@ public class StringValueMax implements ValueAggregator<String> {
   String maxVal = null;
     
   /**
-   *  the default constructor
-   *
+   * 默认构造函数，初始化时重置聚合状态
    */
   public StringValueMax() {
     reset();
   }
 
   /**
-   * add a value to the aggregator
-   * 
-   * @param val
-   *          a string.
-   * 
+   * 添加新的待聚合值，更新当前维护的最大值
+   * @param val 待添加的字符串值
    */
   public void addNextValue(Object val) {
     String newVal = val.toString();
@@ -58,30 +54,31 @@ public class StringValueMax implements ValueAggregator<String> {
     
     
   /**
-   * @return the aggregated value
+   * 获取聚合得到的最大值结果
+   * @return 字典序最大的字符串
    */
   public String getVal() {
     return this.maxVal;
   }
     
   /**
-   * @return the string representation of the aggregated value
+   * 获取聚合结果的字符串表示形式
+   * @return 聚合结果最大值字符串
    */
   public String getReport() {
     return maxVal;
   }
 
   /**
-   * reset the aggregator
+   * 重置聚合器状态，清空当前保存的最大值
    */
   public void reset() {
     maxVal = null;
   }
 
   /**
-   * @return return an array of one element. The element is a string
-   *         representation of the aggregated value. The return value is
-   *         expected to be used by the a combiner.
+   * 生成供Combiner使用的聚合输出结果
+   * @return 包含一个元素的ArrayList，元素为当前聚合得到的最大值字符串
    */
   public ArrayList<String> getCombinerOutput() {
     ArrayList<String> retv = new ArrayList<String>(1);

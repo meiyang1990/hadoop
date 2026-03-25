@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,12 +24,16 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * Simple class that represent a response to a delete operation.
+ * YARN ResourceManager REST API 预约删除操作响应数据对象，
+ * 用于封装预约删除操作的返回结果，供Web前端解析展示。
  */
 @XmlRootElement(name = "reservation-delete-response")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ReservationDeleteResponseInfo {
 
+  /**
+   * 默认无参构造器，供JAXB序列化/反序列化使用。
+   */
   public ReservationDeleteResponseInfo() {
 
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * @file oom_listener.h
+ * YARN NodeManager Linux平台cgroup内存OOM事件监听头文件
+ * 负责监听指定内存cgroup的OOM事件，当容器发生OOM时通知NodeManager
+ * 仅在Linux平台下编译生效
  */
 
 #if __linux
@@ -35,52 +43,33 @@
 This file implements a standard cgroups out of memory listener.
 */
 
+/**
+ * OOM监听器描述符结构，保存监听所需的所有文件描述符和路径信息
+ */
 typedef struct _oom_listener_descriptors {
-  /*
-   * Command line that was called to run this process.
-   */
+  /* 启动本进程的命令行参数 */
   const char *command;
-  /*
-   * Event descriptor to watch.
-   * It is filled in by the function,
-   * if not specified, yet.
-   */
+  /* 监听OOM事件的eventfd描述符，未初始化时为-1 */
   int event_fd;
-  /*
-   * cgroup.event_control file handle
-   */
+  /* cgroup.event_control控制文件的文件描述符 */
   int event_control_fd;
-  /*
-   * memory.oom_control file handle
-   */
+  /* memory.oom_control控制文件的文件描述符 */
   int oom_control_fd;
-  /*
-   * cgroup.event_control path
-   */
+  /* cgroup.event_control文件的完整路径 */
   char event_control_path[PATH_MAX];
-  /*
-   * memory.oom_control path
-   */
+  /* memory.oom_control文件的完整路径 */
   char oom_control_path[PATH_MAX];
-  /*
-   * Control command to write to
-   * cgroup.event_control
-   * Filled by the function.
-   */
+  /* 写入cgroup.event_control的绑定命令，格式为<event_fd> <oom_control_fd> */
   char oom_command[25];
-  /*
-   * Length of oom_command filled by the function.
-   */
+  /* oom_command的实际长度 */
   size_t oom_command_len;
-  /*
-   * Directory watch timeout
-   */
+  /* 目录监听超时时间（毫秒） */
   int watch_timeout;
 } _oom_listener_descriptors;
 
-/*
- Clean up allocated resources in a descriptor structure
-*/
+/**
+ * 清理OOM监听器描述符中分配的所有文件资源，重置状态
+ */
 inline void cleanup(_oom_listener_descriptors *descriptors) {
   close(descriptors->event_fd);
   descriptors->event_fd = -1;
@@ -91,11 +80,12 @@ inline void cleanup(_oom_listener_descriptors *descriptors) {
   descriptors->watch_timeout = 1000;
 }
 
-/*
- * Enable an OOM listener on the memory cgroup cgroup
- * descriptors: Structure that holds state for testing purposes
- * cgroup: cgroup path to watch. It has to be a memory cgroup
- * fd: File to forward events to. Normally this is stdout
+/**
+ * 在指定内存cgroup上启动OOM事件监听器
+ * @param descriptors 保存监听器状态的描述符结构，支持测试复用
+ * @param cgroup 要监听的内存cgroup路径
+ * @param fd 用于转发OOM事件的文件描述符，通常为标准输出
+ * @return 成功返回0，失败返回错误码
  */
 int oom_listener(_oom_listener_descriptors *descriptors, const char *cgroup, int fd);
 

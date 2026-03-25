@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,12 +29,20 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.ContainerManag
 
 
 /**
- * Pluggable ContainersLauncher interface for processing
- * ContainersLauncherEvents.
+ * 可插拔的容器启动器抽象接口，负责处理容器启动相关事件。
+ * 是YARN NodeManager中容器启动模块的扩展点，支持不同实现方式。
  */
 public interface AbstractContainersLauncher extends Service,
     EventHandler<ContainersLauncherEvent> {
 
+  /**
+   * 初始化容器启动器，注入NodeManager运行所需核心依赖。
+   * @param context NodeManager上下文对象，包含集群和节点运行状态信息
+   * @param dispatcher 事件分发器，用于分发容器相关事件
+   * @param exec 容器执行器，负责实际启动和管理容器进程
+   * @param dirsHandler 本地目录处理器，管理容器工作目录和磁盘空间
+   * @param containerManager 容器管理器实例，负责容器生命周期管理
+   */
   void init(Context context, Dispatcher dispatcher,
       ContainerExecutor exec, LocalDirsHandlerService dirsHandler,
       ContainerManagerImpl containerManager);

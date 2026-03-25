@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,13 +22,18 @@ package org.apache.hadoop.mapred;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-/** That what may be configured. */
+/**
+ * 该接口定义了可通过作业配置进行初始化的组件约定
+ * 供MapReduce框架中需要根据作业配置初始化的组件实现，比如Partitioner、InputFormat等
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface JobConfigurable {
-  /** Initializes a new instance from a {@link JobConf}.
-   *
-   * @param job the configuration
+  /**
+   * 使用给定的作业配置初始化当前组件实例
+   * 在组件实例创建后会被MapReduce框架调用，完成组件的初始化工作
+   * 
+   * @param job 当前作业的配置对象
    */
   void configure(JobConf job);
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,9 +20,14 @@
 package org.apache.hadoop.mapred;
 
 /**
- * A clock class - can be mocked out for testing.
+ * 时钟工具类，可在单元测试中通过Mock替换实现，便于控制时间逻辑
+ * 为MapReduce任务调度等需要获取当前时间的场景提供统一时间入口
  */
 class Clock {
+  /**
+   * 获取当前系统时间的毫秒数
+   * @return 当前系统时间，从1970-01-01 UTC开始的毫秒数
+   */
   long getTime() {
     return System.currentTimeMillis();
   }

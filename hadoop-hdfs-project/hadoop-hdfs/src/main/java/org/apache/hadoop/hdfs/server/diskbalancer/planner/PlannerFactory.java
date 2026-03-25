@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,20 +23,22 @@ import org.apache.hadoop.hdfs.server.diskbalancer.datamodel
     .DiskBalancerDataNode;
 
 /**
- * Returns a planner based on the user defined tags.
+ * 磁盘均衡计划工厂，根据用户指定的规划器类型创建对应的规划器实例
+ * 用于为数据节点生成磁盘数据均衡的移动计划
  */
 public final class PlannerFactory {
   private static final Logger LOG =
       LoggerFactory.getLogger(PlannerFactory.class);
 
+  /** 贪心规划器标识 */
   public static final String GREEDY_PLANNER = "greedyPlanner";
 
   /**
-   *  Gets a planner object.
-   * @param plannerName - name of the planner.
-   * @param node - Datanode.
-   * @param threshold - percentage
-   * @return Planner
+   * 根据规划器名称创建对应规划器实例，用于为指定数据节点生成磁盘均衡计划
+   * @param plannerName - 规划器名称，指定要创建的规划器类型
+   * @param node - 需要进行磁盘均衡的数据节点
+   * @param threshold - 磁盘使用率不均衡阈值，超过该阈值触发均衡
+   * @return 规划器实例，用于生成具体的均衡移动计划
    */
   public static Planner getPlanner(String plannerName,
       DiskBalancerDataNode node, double threshold) {
@@ -55,6 +58,6 @@ public final class PlannerFactory {
   }
 
   private PlannerFactory() {
-    // Never constructed
+    // 工具类不允许实例化
   }
 }

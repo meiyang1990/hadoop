@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,8 +33,7 @@ import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMApp;
 
 /**
- * Abstract implementation of SystemMetricsPublisher which is then extended by
- * metrics publisher implementations depending on timeline service version.
+ * 系统指标发布器抽象基类，供不同版本时间线服务的具体发布器实现扩展，提供多线程事件分发基础能力
  */
 public abstract class AbstractSystemMetricsPublisher extends CompositeService
     implements SystemMetricsPublisher {
@@ -49,19 +49,22 @@ public abstract class AbstractSystemMetricsPublisher extends CompositeService
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 从配置读取线程池大小，使用默认值兜底
     dispatcher =
     new MultiThreadedDispatcher(getConfig().getInt(
         YarnConfiguration.
         RM_SYSTEM_METRICS_PUBLISHER_DISPATCHER_POOL_SIZE,
         YarnConfiguration.
         DEFAULT_RM_SYSTEM_METRICS_PUBLISHER_DISPATCHER_POOL_SIZE));
+    // 设置停止时排空所有待处理事件
     dispatcher.setDrainEventsOnStop();
+    // 将分发器添加为服务
     addIfService(dispatcher);
     super.serviceInit(conf);
   }
 
   /**
-   * Dispatches ATS related events using multiple threads.
+   * 多线程事件分发器，用于并行处理ATS相关指标事件
    */
   @SuppressWarnings({ "rawtypes", "unchecked" })
   public static class MultiThreadedDispatcher extends CompositeService
@@ -72,6 +75,7 @@ public abstract class AbstractSystemMetricsPublisher extends CompositeService
 
     public MultiThreadedDispatcher(int num) {
       super(MultiThreadedDispatcher.class.getName());
+      // 按指定数量创建异步分发器
       for (int i = 0; i < num; ++i) {
         AsyncDispatcher dispatcher = createDispatcher();
         dispatchers.add(dispatcher);
@@ -87,25 +91,28 @@ public abstract class AbstractSystemMetricsPublisher extends CompositeService
     @Override
     public void register(Class<? extends Enum> eventType,
         EventHandler handler) {
+      // 向所有子分发器注册同一事件处理器
       for (AsyncDispatcher dispatcher : dispatchers) {
         dispatcher.register(eventType, handler);
       }
     }
 
     public void setDrainEventsOnStop() {
+      // 对所有子分发器设置停止排空
       for (AsyncDispatcher dispatcher : dispatchers) {
         dispatcher.setDrainEventsOnStop();
       }
     }
 
+    /**
+     * 复合事件处理器，按应用ID哈希分发事件到对应线程
+     */
     private class CompositEventHandler implements EventHandler<Event> {
 
       @Override
       public void handle(Event event) {
-        // Use hashCode (of ApplicationId) to dispatch the event to the child
-        // dispatcher, such that all the writing events of one application will
-        // be handled by one thread, the scheduled order of the these events
-        // will be preserved
+        // 根据事件哈希选择子分发器，保证同一个应用的所有事件都由同一个线程处理
+        // 维持应用事件的发布顺序一致性
         int index = (event.hashCode() & Integer.MAX_VALUE) % dispatchers.size();
         dispatchers.get(index).getEventHandler().handle(event);
       }
@@ -117,10 +124,13 @@ public abstract class AbstractSystemMetricsPublisher extends CompositeService
   }
 
   /**
-   * EventType which is used while publishing the events.
+   * 系统指标事件类型定义
    */
   protected enum SystemMetricsEventType {
-    PUBLISH_ENTITY, PUBLISH_APPLICATION_FINISHED_ENTITY
+    /** 发布实体事件 */
+    PUBLISH_ENTITY,
+    /** 发布应用完成实体事件 */
+    PUBLISH_APPLICATION_FINISHED_ENTITY
   }
 
   @Override
@@ -128,9 +138,7 @@ public abstract class AbstractSystemMetricsPublisher extends CompositeService
   }
 
   /**
-   * TimelinePublishEvent's hash code should be based on application's id this
-   * will ensure all the events related to a particular app goes to particular
-   * thread of MultiThreaded dispatcher.
+   * 时间线发布事件抽象基类，重写哈希方法保证同应用事件分发到同一线程
    */
   protected static abstract class TimelinePublishEvent
       extends AbstractEvent<SystemMetricsEventType> {
@@ -149,6 +157,7 @@ public abstract class AbstractSystemMetricsPublisher extends CompositeService
 
     @Override
     public int hashCode() {
+      // 基于应用ID计算哈希，保证同应用事件哈希一致
       return appId.hashCode();
     }
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,20 +23,18 @@ import javax.ws.rs.core.Feature;
 import javax.ws.rs.core.FeatureContext;
 
 /**
- * A JAX-RS {@link Feature} that registers custom MOXy JSON providers
- * for handling serialization and deserialization of JSON with or without
- * root elements.
- *
+ * JAX-RS功能实现类，为YARN RM Web服务注册自定义MOXy JSON提供者
+ * 支持带/不带根元素的JSON序列化与反序列化，禁用MOXy自动发现，确保自定义提供者按优先级生效
+ * 
  * <p>
- * This feature disables MOXy's automatic provider discovery to ensure
- * that the custom providers {@link IncludeRootJSONProvider} and
- * {@link ExcludeRootJSONProvider} are used explicitly with defined priorities.
+ * 本功能禁用MOXy自动提供者发现，确保自定义提供者{@link IncludeRootJSONProvider} 和
+ * {@link ExcludeRootJSONProvider} 按指定优先级显式使用。
  * </p>
  *
- * <p>Configuration details:</p>
+ * <p>配置详情:</p>
  * <ul>
- *   <li>Registers {@link IncludeRootJSONProvider} with priority {@code 2001}.</li>
- *   <li>Registers {@link ExcludeRootJSONProvider} with priority {@code 2002}.</li>
+ *   <li>注册{@link IncludeRootJSONProvider}，优先级为{@code 2001}。</li>
+ *   <li>注册{@link ExcludeRootJSONProvider}，优先级为{@code 2002}。</li>
  * </ul>
  *
  * @see IncludeRootJSONProvider
@@ -45,21 +44,20 @@ import javax.ws.rs.core.FeatureContext;
 public class JsonProviderFeature implements Feature {
 
   /**
-   * Do not use default constructor.
+   * 默认构造函数。
    */
   public JsonProviderFeature() {
   }
 
   /**
-   * Configures the feature by registering the custom JSON providers.
+   * 配置JAX-RS功能，注册自定义JSON提供者
    *
-   * @param context the {@link FeatureContext} provided by the JAX-RS runtime
-   * @return {@code true} to indicate that the feature was successfully configured
+   * @param context JAX-RS运行时提供的功能上下文
+   * @return {@code true} 表示功能配置成功
    */
   @Override
   public boolean configure(FeatureContext context) {
-    // Priorities are used to maintain order between the JSONProviders.
-    // This way, we can improve the determinism of the app.
+    // 优先级用于维护JSON提供者之间的顺序，保证应用行为确定性
     context.register(IncludeRootJSONProvider.class, 2001);
     context.register(ExcludeRootJSONProvider.class, 2002);
     return true;

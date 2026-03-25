@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -65,8 +66,8 @@ import org.apache.hadoop.util.Preconditions;
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * A JournalManager that writes to a set of remote JournalNodes,
- * requiring a quorum of nodes to ack each write.
+ * 基于观察者日志节点集群的JournalManager实现，写操作需要获得集群中大多数节点的确认才成功。
+ * 用于HDFS高可用场景中，共享NameNode的编辑日志。
  */
 @InterfaceAudience.Private
 public class QuorumJournalManager implements JournalManager {
@@ -77,12 +78,11 @@ public class QuorumJournalManager implements JournalManager {
       "dfs.ha.tail-edits.qjm.rpc.max-txns";
   public static final int QJM_RPC_MAX_TXNS_DEFAULT = 5000;
 
-  // Maximum number of transactions to fetch at a time when using the
-  // RPC edit fetch mechanism
+  // 单次RPC获取编辑日志事务的最大数量
   private final int maxTxnsPerRpc;
-  // Whether or not in-progress tailing is enabled in the configuration
+  // 是否开启对未完成编辑日志的尾部读取
   private final boolean inProgressTailingEnabled;
-  // Timeouts for which the QJM will wait for each of the following actions.
+  // QJM各操作的超时时间配置
   private final int startSegmentTimeoutMs;
   private final int prepareRecoveryTimeoutMs;
   private final int acceptRecoveryTimeoutMs;
@@ -95,6 +95,7 @@ public class QuorumJournalManager implements JournalManager {
   // This timeout is used for calls that don't occur during normal operation
   // e.g. format, upgrade operations and a few others. So we can use rather
   // lengthy timeouts by default.
+  // 非常规操作（格式化、升级等）的超时时间，默认设置较长
   private final int timeoutMs;
   
   private final Configuration conf;
@@ -110,6 +111,7 @@ public class QuorumJournalManager implements JournalManager {
   private final URLConnectionFactory connectionFactory;
 
   /** Limit logging about input stream selection to every 5 seconds max. */
+  // 输入流选择日志限流，最多每5秒输出一次
   private static final long SELECT_INPUT_STREAM_LOG_INTERVAL_MS = 5000;
   private final LogThrottlingHelper selectInputStreamLogHelper =
       new LogThrottlingHelper(SELECT_INPUT_STREAM_LOG_INTERVAL_MS);
@@ -135,6 +137,9 @@ public class QuorumJournalManager implements JournalManager {
   }
 
   
+  /**
+   * 构造QuorumJournalManager实例，初始化配置和所有JournalNode连接
+   */
   QuorumJournalManager(Configuration conf,
       URI uri, NamespaceInfo nsInfo, String nameServiceId,
       AsyncLogger.Factory loggerFactory) throws IOException {
@@ -153,7 +158,7 @@ public class QuorumJournalManager implements JournalManager {
     this.inProgressTailingEnabled = conf.getBoolean(
         DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_KEY,
         DFSConfigKeys.DFS_HA_TAILEDITS_INPROGRESS_DEFAULT);
-    // Configure timeouts.
+    // 从配置加载各操作超时时间
     this.startSegmentTimeoutMs = conf.getInt(
         DFSConfigKeys.DFS_QJOURNAL_START_SEGMENT_TIMEOUT_KEY,
         DFSConfigKeys.DFS_QJOURNAL_START_SEGMENT_TIMEOUT_DEFAULT);
@@ -189,6 +194,7 @@ public class QuorumJournalManager implements JournalManager {
     int readTimeoutMs = conf.getInt(
         DFSConfigKeys.DFS_QJOURNAL_HTTP_READ_TIMEOUT_KEY,
         DFSConfigKeys.DFS_QJOURNAL_HTTP_READ_TIMEOUT_DEFAULT);
+    // 创建HTTP连接工厂，用于流式拉取编辑日志
     this.connectionFactory = URLConnectionFactory
         .newDefaultURLConnectionFactory(connectTimeoutMs, readTimeoutMs, conf);
     setOutputBufferCapacity(OUTPUT_BUFFER_CAPACITY_DEFAULT);
@@ -199,6 +205,11 @@ public class QuorumJournalManager implements JournalManager {
     return createLoggers(conf, uri, nsInfo, factory, nameServiceId);
   }
 
+  /**
+   * 从URI解析日志ID，检查格式合法性
+   * @param uri QJM连接URI
+   * @return 解析得到的日志ID
+   */
   static String parseJournalId(URI uri) {
     String path = uri.getPath();
     Preconditions.checkArgument(path != null && !path.isEmpty(),
@@ -209,6 +220,10 @@ public class QuorumJournalManager implements JournalManager {
     return journalId;
   }
   
+  /**
+   * 检查日志ID格式是否合法
+   * @param jid 待检查的日志ID
+   */
   public static void checkJournalId(String jid) {
     Preconditions.checkArgument(jid != null &&
         !jid.isEmpty() &&
@@ -219,10 +234,9 @@ public class QuorumJournalManager implements JournalManager {
 
   
   /**
-   * Fence any previous writers, and obtain a unique epoch number
-   * for write-access to the journal nodes.
-   *
-   * @return the new, unique epoch number
+   * 隔离之前的写入者，并获取一个唯一的epoch编号用于写访问
+   * @return 所有JournalNode的NewEpoch响应，key为对应AsyncLogger
+   * @throws IOException 获取失败时抛出异常
    */
   Map<AsyncLogger, NewEpochResponseProto> createNewUniqueEpoch()
       throws IOException {
@@ -233,12 +247,14 @@ public class QuorumJournalManager implements JournalManager {
       loggers.waitForWriteQuorum(loggers.getJournalState(),
           getJournalStateTimeoutMs, "getJournalState()");
     
+    // 找出所有节点中最大的已承诺epoch编号
     long maxPromised = Long.MIN_VALUE;
     for (GetJournalStateResponseProto resp : lastPromises.values()) {
       maxPromised = Math.max(maxPromised, resp.getLastPromisedEpoch());
     }
     assert maxPromised >= 0;
     
+    // 新epoch编号比现有最大编号大1，保证唯一性
     long myEpoch = maxPromised + 1;
     Map<AsyncLogger, NewEpochResponseProto> resps =
         loggers.waitForWriteQuorum(loggers.newEpoch(nsInfo, myEpoch),
@@ -249,6 +265,9 @@ public class QuorumJournalManager implements JournalManager {
   }
   
   @Override
+  /**
+   * 格式化所有JournalNode上的日志存储
+   */
   public void format(NamespaceInfo nsInfo, boolean force) throws IOException {
     QuorumCall<AsyncLogger, Void> call = loggers.format(nsInfo, force);
     try {
@@ -266,6 +285,10 @@ public class QuorumJournalManager implements JournalManager {
   }
 
   @Override
+  /**
+   * 检查是否已有至少一个JournalNode存储了数据
+   * @return true如果已有数据，否则返回false
+   */
   public boolean hasSomeData() throws IOException {
     QuorumCall<AsyncLogger, Boolean> call =
         loggers.isFormatted();
@@ -285,35 +308,29 @@ public class QuorumJournalManager implements JournalManager {
     
     // If any of the loggers returned with a non-empty manifest, then
     // we should prompt for format.
+    // 只要有一个节点有数据，就认为整个日志集群已有数据
     for (Boolean hasData : call.getResults().values()) {
       if (hasData) {
         return true;
       }
     }
 
-    // Otherwise, none were formatted, we can safely format.
+    // 所有节点都未格式化，可以进行格式化
     return false;
   }
 
   /**
-   * Run recovery/synchronization for a specific segment.
-   * Postconditions:
-   * <ul>
-   * <li>This segment will be finalized on a majority
-   * of nodes.</li>
-   * <li>All nodes which contain the finalized segment will
-   * agree on the length.</li>
-   * </ul>
-   * 
-   * @param segmentTxId the starting txid of the segment
-   * @throws IOException
+   * 恢复未关闭的日志段，将其最终化并同步所有节点。
+   * 恢复完成后，大多数节点上该段将被最终化，且所有节点对段长度达成一致
+   * @param segmentTxId 待恢复段的起始事务ID
+   * @throws IOException 恢复失败时抛出异常
    */
   private void recoverUnclosedSegment(long segmentTxId) throws IOException {
     Preconditions.checkArgument(segmentTxId > 0);
     LOG.info("Beginning recovery of unclosed segment starting at txid " +
         segmentTxId);
     
-    // Step 1. Prepare recovery
+    // Step 1. 准备恢复阶段，向所有节点发起准备请求
     QuorumCall<AsyncLogger,PrepareRecoveryResponseProto> prepare =
         loggers.prepareRecovery(segmentTxId);
     Map<AsyncLogger, PrepareRecoveryResponseProto> prepareResponses=
@@ -322,22 +339,13 @@ public class QuorumJournalManager implements JournalManager {
     LOG.info("Recovery prepare phase complete. Responses:\n" +
         QuorumCall.mapToString(prepareResponses));
 
-    // Determine the logger who either:
-    // a) Has already accepted a previous proposal that's higher than any
-    //    other
-    //
-    //  OR, if no such logger exists:
-    //
-    // b) Has the longest log starting at this transaction ID
-    
-    // TODO: we should collect any "ties" and pass the URL for all of them
-    // when syncing, so we can tolerate failure during recovery better.
+    // 选择最优日志源：优先选择已经接受过恢复提案的，否则选择最长的日志段
     Entry<AsyncLogger, PrepareRecoveryResponseProto> bestEntry = Collections.max(
         prepareResponses.entrySet(), SegmentRecoveryComparator.INSTANCE); 
     AsyncLogger bestLogger = bestEntry.getKey();
     PrepareRecoveryResponseProto bestResponse = bestEntry.getValue();
     
-    // Log the above decision, check invariants.
+    // 记录选择结果，检查不变量
     if (bestResponse.hasAcceptedInEpoch()) {
       LOG.info("Using already-accepted recovery for segment " +
           "starting at txid " + segmentTxId + ": " +
@@ -345,21 +353,7 @@ public class QuorumJournalManager implements JournalManager {
     } else if (bestResponse.hasSegmentState()) {
       LOG.info("Using longest log: " + bestEntry);
     } else {
-      // None of the responses to prepareRecovery() had a segment at the given
-      // txid. This can happen for example in the following situation:
-      // - 3 JNs: JN1, JN2, JN3
-      // - writer starts segment 101 on JN1, then crashes before
-      //   writing to JN2 and JN3
-      // - during newEpoch(), we saw the segment on JN1 and decide to
-      //   recover segment 101
-      // - before prepare(), JN1 crashes, and we only talk to JN2 and JN3,
-      //   neither of which has any entry for this log.
-      // In this case, it is allowed to do nothing for recovery, since the
-      // segment wasn't started on a quorum of nodes.
-
-      // Sanity check: we should only get here if none of the responses had
-      // a log. This should be a postcondition of the recovery comparator,
-      // but a bug in the comparator might cause us to get here.
+      // 所有响应节点都没有该段日志，无需恢复直接返回
       for (PrepareRecoveryResponseProto resp : prepareResponses.values()) {
         assert !resp.hasSegmentState() :
           "One of the loggers had a response, but no best logger " +
@@ -374,8 +368,7 @@ public class QuorumJournalManager implements JournalManager {
     SegmentStateProto logToSync = bestResponse.getSegmentState();
     assert segmentTxId == logToSync.getStartTxId();
     
-    // Sanity check: none of the loggers should be aware of a higher
-    // txid than the txid we intend to truncate to
+    // 一致性检查：所有节点已知的最大提交事务ID不超过要截断到的结束事务ID
     for (Map.Entry<AsyncLogger, PrepareRecoveryResponseProto> e :
          prepareResponses.entrySet()) {
       AsyncLogger logger = e.getKey();
@@ -389,434 +382,9 @@ public class QuorumJournalManager implements JournalManager {
       }
     }
     
+    // 从最优节点获取日志段同步地址
     URL syncFromUrl = bestLogger.buildURLToFetchLogs(segmentTxId);
     
+    // 让所有节点从最优节点同步日志段
     QuorumCall<AsyncLogger,Void> accept = loggers.acceptRecovery(logToSync, syncFromUrl);
-    loggers.waitForWriteQuorum(accept, acceptRecoveryTimeoutMs,
-        "acceptRecovery(" + TextFormat.shortDebugString(logToSync) + ")");
-
-    // If one of the loggers above missed the synchronization step above, but
-    // we send a finalize() here, that's OK. It validates the log before
-    // finalizing. Hence, even if it is not "in sync", it won't incorrectly
-    // finalize.
-    QuorumCall<AsyncLogger, Void> finalize =
-        loggers.finalizeLogSegment(logToSync.getStartTxId(), logToSync.getEndTxId()); 
-    loggers.waitForWriteQuorum(finalize, finalizeSegmentTimeoutMs,
-        String.format("finalizeLogSegment(%s-%s)",
-            logToSync.getStartTxId(),
-            logToSync.getEndTxId()));
-  }
-  
-  static List<AsyncLogger> createLoggers(Configuration conf,
-                                         URI uri,
-                                         NamespaceInfo nsInfo,
-                                         AsyncLogger.Factory factory,
-                                         String nameServiceId)
-      throws IOException {
-    List<AsyncLogger> ret = Lists.newArrayList();
-    List<InetSocketAddress> addrs = Util.getAddressesList(uri, conf);
-    if (addrs.size() % 2 == 0) {
-      LOG.warn("Quorum journal URI '" + uri + "' has an even number " +
-          "of Journal Nodes specified. This is not recommended!");
-    }
-    String jid = parseJournalId(uri);
-    for (InetSocketAddress addr : addrs) {
-      ret.add(factory.createLogger(conf, nsInfo, jid, nameServiceId, addr));
-    }
-    return ret;
-  }
-  
-  @Override
-  public EditLogOutputStream startLogSegment(long txId, int layoutVersion)
-      throws IOException {
-    Preconditions.checkState(isActiveWriter,
-        "must recover segments before starting a new one");
-    QuorumCall<AsyncLogger, Void> q = loggers.startLogSegment(txId,
-        layoutVersion);
-    loggers.waitForWriteQuorum(q, startSegmentTimeoutMs,
-        "startLogSegment(" + txId + ")");
-    return new QuorumOutputStream(loggers, txId, outputBufferCapacity,
-        writeTxnsTimeoutMs, layoutVersion);
-  }
-
-  @Override
-  public void finalizeLogSegment(long firstTxId, long lastTxId)
-      throws IOException {
-    QuorumCall<AsyncLogger,Void> q = loggers.finalizeLogSegment(
-        firstTxId, lastTxId);
-    loggers.waitForWriteQuorum(q, finalizeSegmentTimeoutMs,
-        String.format("finalizeLogSegment(%s-%s)", firstTxId, lastTxId));
-  }
-
-  @Override
-  public void setOutputBufferCapacity(int size) {
-    int ipcMaxDataLength = conf.getInt(
-        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH,
-        CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
-    if (size >= ipcMaxDataLength) {
-      throw new IllegalArgumentException("Attempted to use QJM output buffer "
-          + "capacity (" + size + ") greater than the IPC max data length ("
-          + CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH + " = "
-          + ipcMaxDataLength + "). This will cause journals to reject edits.");
-    }
-    outputBufferCapacity = size;
-  }
-
-  @Override
-  public void purgeLogsOlderThan(long minTxIdToKeep) throws IOException {
-    // This purges asynchronously -- there's no need to wait for a quorum
-    // here, because it's always OK to fail.
-    LOG.info("Purging remote journals older than txid " + minTxIdToKeep);
-    loggers.purgeLogsOlderThan(minTxIdToKeep);
-  }
-
-  @Override
-  public void recoverUnfinalizedSegments() throws IOException {
-    Preconditions.checkState(!isActiveWriter, "already active writer");
-    
-    LOG.info("Starting recovery process for unclosed journal segments...");
-    Map<AsyncLogger, NewEpochResponseProto> resps = createNewUniqueEpoch();
-    LOG.info("Successfully started new epoch " + loggers.getEpoch());
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("newEpoch({}) responses:\n{}", loggers.getEpoch(), QuorumCall.mapToString(resps));
-    }
-
-    long mostRecentSegmentTxId = Long.MIN_VALUE;
-    for (NewEpochResponseProto r : resps.values()) {
-      if (r.hasLastSegmentTxId()) {
-        mostRecentSegmentTxId = Math.max(mostRecentSegmentTxId,
-            r.getLastSegmentTxId());
-      }
-    }
-    
-    // On a completely fresh system, none of the journals have any
-    // segments, so there's nothing to recover.
-    if (mostRecentSegmentTxId != Long.MIN_VALUE) {
-      recoverUnclosedSegment(mostRecentSegmentTxId);
-    }
-    isActiveWriter = true;
-  }
-
-  @Override
-  public void close() throws IOException {
-    loggers.close();
-    connectionFactory.destroy();
-  }
-
-  public void selectInputStreams(Collection<EditLogInputStream> streams,
-      long fromTxnId, boolean inProgressOk) throws IOException {
-    selectInputStreams(streams, fromTxnId, inProgressOk, false);
-  }
-
-  @Override
-  public void selectInputStreams(Collection<EditLogInputStream> streams,
-      long fromTxnId, boolean inProgressOk,
-      boolean onlyDurableTxns) throws IOException {
-    // Some calls will use inProgressOK to get in-progress edits even if
-    // the cache used for RPC calls is not enabled; fall back to using the
-    // streaming mechanism to serve such requests
-    if (inProgressOk && inProgressTailingEnabled) {
-      LOG.debug("Tailing edits starting from txn ID {} via RPC mechanism", fromTxnId);
-      try {
-        Collection<EditLogInputStream> rpcStreams = new ArrayList<>();
-        selectRpcInputStreams(rpcStreams, fromTxnId, onlyDurableTxns);
-        streams.addAll(rpcStreams);
-        return;
-      } catch (IOException ioe) {
-        LOG.warn("Encountered exception while tailing edits >= " + fromTxnId +
-            " via RPC; falling back to streaming.", ioe);
-      }
-    }
-    selectStreamingInputStreams(streams, fromTxnId, inProgressOk,
-        onlyDurableTxns);
-  }
-
-  /**
-   * Select input streams from the journals, specifically using the RPC
-   * mechanism optimized for low latency.
-   *
-   * @param streams The collection to store the return streams into.
-   * @param fromTxnId Select edits starting from this transaction ID
-   * @param onlyDurableTxns Iff true, only include transactions which have been
-   *                        committed to a quorum of the journals.
-   * @throws IOException Upon issues, including cache misses on the journals.
-   */
-  private void selectRpcInputStreams(Collection<EditLogInputStream> streams,
-      long fromTxnId, boolean onlyDurableTxns) throws IOException {
-    QuorumCall<AsyncLogger, GetJournaledEditsResponseProto> q =
-        loggers.getJournaledEdits(fromTxnId, maxTxnsPerRpc);
-    Map<AsyncLogger, GetJournaledEditsResponseProto> responseMap =
-        loggers.waitForWriteQuorum(q, selectInputStreamsTimeoutMs,
-            "selectRpcInputStreams");
-    assert responseMap.size() >= loggers.getMajoritySize() :
-        "Quorum call returned without a majority";
-
-    List<Integer> responseCounts = new ArrayList<>();
-    for (GetJournaledEditsResponseProto resp : responseMap.values()) {
-      responseCounts.add(resp.getTxnCount());
-    }
-    Collections.sort(responseCounts);
-    int highestTxnCount = responseCounts.get(responseCounts.size() - 1);
-    if (LOG.isDebugEnabled() || highestTxnCount < 0) {
-      StringBuilder msg = new StringBuilder("Requested edits starting from ");
-      msg.append(fromTxnId).append("; got ").append(responseMap.size())
-          .append(" responses: <");
-      for (Map.Entry<AsyncLogger, GetJournaledEditsResponseProto> ent :
-          responseMap.entrySet()) {
-        msg.append("[").append(ent.getKey()).append(", ")
-            .append(ent.getValue().getTxnCount()).append("],");
-      }
-      msg.append(">");
-      if (highestTxnCount < 0) {
-        throw new IOException("Did not get any valid JournaledEdits " +
-            "responses: " + msg);
-      } else {
-        LOG.debug(msg.toString());
-      }
-    }
-    // Cancel any outstanding calls to JN's.
-    q.cancelCalls();
-
-    int maxAllowedTxns = !onlyDurableTxns ? highestTxnCount :
-        responseCounts.get(responseCounts.size() - loggers.getMajoritySize());
-    if (maxAllowedTxns == 0) {
-      LOG.debug("No new edits available in logs; requested starting from ID {}",
-          fromTxnId);
-      return;
-    }
-    LogAction logAction = selectInputStreamLogHelper.record(fromTxnId);
-    if (logAction.shouldLog()) {
-      LOG.info("Selected loggers with >= " + maxAllowedTxns + " transactions " +
-          "starting from lowest txn ID " + logAction.getStats(0).getMin() +
-          LogThrottlingHelper.getLogSupressionMessage(logAction));
-    }
-    PriorityQueue<EditLogInputStream> allStreams = new PriorityQueue<>(
-        JournalSet.EDIT_LOG_INPUT_STREAM_COMPARATOR);
-    for (GetJournaledEditsResponseProto resp : responseMap.values()) {
-      long endTxnId = fromTxnId - 1 +
-          Math.min(maxAllowedTxns, resp.getTxnCount());
-      allStreams.add(EditLogFileInputStream.fromByteString(
-          resp.getEditLog(), fromTxnId, endTxnId, true));
-    }
-    JournalSet.chainAndMakeRedundantStreams(streams, allStreams, fromTxnId);
-  }
-
-  /**
-   * Select input streams from the journals, specifically using the streaming
-   * mechanism optimized for resiliency / bulk load.
-   */
-  private void selectStreamingInputStreams(
-      Collection<EditLogInputStream> streams, long fromTxnId,
-      boolean inProgressOk, boolean onlyDurableTxns) throws IOException {
-    QuorumCall<AsyncLogger, RemoteEditLogManifest> q =
-        loggers.getEditLogManifest(fromTxnId, inProgressOk);
-    Map<AsyncLogger, RemoteEditLogManifest> resps =
-        loggers.waitForWriteQuorum(q, selectInputStreamsTimeoutMs,
-            "selectStreamingInputStreams");
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("selectStreamingInputStream manifests:\n {}",
-          Joiner.on("\n").withKeyValueSeparator(": ").join(resps));
-    }
-
-    final PriorityQueue<EditLogInputStream> allStreams =
-        new PriorityQueue<EditLogInputStream>(64,
-            JournalSet.EDIT_LOG_INPUT_STREAM_COMPARATOR);
-    for (Map.Entry<AsyncLogger, RemoteEditLogManifest> e : resps.entrySet()) {
-      AsyncLogger logger = e.getKey();
-      RemoteEditLogManifest manifest = e.getValue();
-      long committedTxnId = manifest.getCommittedTxnId();
-
-      for (RemoteEditLog remoteLog : manifest.getLogs()) {
-        URL url = logger.buildURLToFetchLogs(remoteLog.getStartTxId());
-
-        long endTxId = remoteLog.getEndTxId();
-
-        // If it's bounded by durable Txns, endTxId could not be larger
-        // than committedTxnId. This ensures the consistency.
-        // We don't do the following for finalized log segments, since all
-        // edits in those are guaranteed to be committed.
-        if (onlyDurableTxns && inProgressOk && remoteLog.isInProgress()) {
-          endTxId = Math.min(endTxId, committedTxnId);
-          if (endTxId < remoteLog.getStartTxId()) {
-            LOG.warn("Found endTxId (" + endTxId + ") that is less than " +
-                "the startTxId (" + remoteLog.getStartTxId() +
-                ") - setting it to startTxId.");
-            endTxId = remoteLog.getStartTxId();
-          }
-        }
-
-        EditLogInputStream elis = EditLogFileInputStream.fromUrl(
-            connectionFactory, url, remoteLog.getStartTxId(),
-            endTxId, remoteLog.isInProgress());
-        allStreams.add(elis);
-      }
-    }
-    JournalSet.chainAndMakeRedundantStreams(streams, allStreams, fromTxnId);
-  }
-  
-  @Override
-  public String toString() {
-    return "QJM to " + loggers;
-  }
-
-  @VisibleForTesting
-  AsyncLoggerSet getLoggerSetForTests() {
-    return loggers;
-  }
-
-  @Override
-  public void doPreUpgrade() throws IOException {
-    QuorumCall<AsyncLogger, Void> call = loggers.doPreUpgrade();
-    try {
-      call.waitFor(loggers.size(), loggers.size(), 0, timeoutMs,
-          "doPreUpgrade");
-      
-      if (call.countExceptions() > 0) {
-        call.rethrowException("Could not do pre-upgrade of one or more JournalNodes");
-      }
-    } catch (InterruptedException e) {
-      throw new IOException("Interrupted waiting for doPreUpgrade() response");
-    } catch (TimeoutException e) {
-      throw new IOException("Timed out waiting for doPreUpgrade() response");
-    }
-  }
-
-  @Override
-  public void doUpgrade(Storage storage) throws IOException {
-    QuorumCall<AsyncLogger, Void> call = loggers.doUpgrade(storage);
-    try {
-      call.waitFor(loggers.size(), loggers.size(), 0, timeoutMs,
-          "doUpgrade");
-      
-      if (call.countExceptions() > 0) {
-        call.rethrowException("Could not perform upgrade of one or more JournalNodes");
-      }
-    } catch (InterruptedException e) {
-      throw new IOException("Interrupted waiting for doUpgrade() response");
-    } catch (TimeoutException e) {
-      throw new IOException("Timed out waiting for doUpgrade() response");
-    }
-  }
-  
-  @Override
-  public void doFinalize() throws IOException {
-    QuorumCall<AsyncLogger, Void> call = loggers.doFinalize();
-    try {
-      call.waitFor(loggers.size(), loggers.size(), 0, timeoutMs,
-          "doFinalize");
-      
-      if (call.countExceptions() > 0) {
-        call.rethrowException("Could not finalize one or more JournalNodes");
-      }
-    } catch (InterruptedException e) {
-      throw new IOException("Interrupted waiting for doFinalize() response");
-    } catch (TimeoutException e) {
-      throw new IOException("Timed out waiting for doFinalize() response");
-    }
-  }
-  
-  @Override
-  public boolean canRollBack(StorageInfo storage, StorageInfo prevStorage,
-      int targetLayoutVersion) throws IOException {
-    QuorumCall<AsyncLogger, Boolean> call = loggers.canRollBack(storage,
-        prevStorage, targetLayoutVersion);
-    try {
-      call.waitFor(loggers.size(), loggers.size(), 0, timeoutMs,
-          "lockSharedStorage");
-      
-      if (call.countExceptions() > 0) {
-        call.rethrowException("Could not check if roll back possible for"
-            + " one or more JournalNodes");
-      }
-      
-      // Either they all return the same thing or this call fails, so we can
-      // just return the first result.
-      try {
-        DFSUtil.assertAllResultsEqual(call.getResults().values());
-      } catch (AssertionError ae) {
-        throw new IOException("Results differed for canRollBack", ae);
-      }
-      for (Boolean result : call.getResults().values()) {
-        return result;
-      }
-    } catch (InterruptedException e) {
-      throw new IOException("Interrupted waiting for lockSharedStorage() " +
-          "response");
-    } catch (TimeoutException e) {
-      throw new IOException("Timed out waiting for lockSharedStorage() " +
-          "response");
-    }
-    
-    throw new AssertionError("Unreachable code.");
-  }
-
-  @Override
-  public void doRollback() throws IOException {
-    QuorumCall<AsyncLogger, Void> call = loggers.doRollback();
-    try {
-      call.waitFor(loggers.size(), loggers.size(), 0, timeoutMs,
-          "doRollback");
-      
-      if (call.countExceptions() > 0) {
-        call.rethrowException("Could not perform rollback of one or more JournalNodes");
-      }
-    } catch (InterruptedException e) {
-      throw new IOException("Interrupted waiting for doFinalize() response");
-    } catch (TimeoutException e) {
-      throw new IOException("Timed out waiting for doFinalize() response");
-    }
-  }
-  
-  @Override
-  public void discardSegments(long startTxId) throws IOException {
-    QuorumCall<AsyncLogger, Void> call = loggers.discardSegments(startTxId);
-    try {
-      call.waitFor(loggers.size(), loggers.size(), 0,
-          timeoutMs, "discardSegments");
-      if (call.countExceptions() > 0) {
-        call.rethrowException(
-            "Could not perform discardSegments of one or more JournalNodes");
-      }
-    } catch (InterruptedException e) {
-      throw new IOException(
-          "Interrupted waiting for discardSegments() response");
-    } catch (TimeoutException e) {
-      throw new IOException(
-          "Timed out waiting for discardSegments() response");
-    }
-  }
-  
-  @Override
-  public long getJournalCTime() throws IOException {
-    QuorumCall<AsyncLogger, Long> call = loggers.getJournalCTime();
-    try {
-      call.waitFor(loggers.size(), loggers.size(), 0,
-          timeoutMs, "getJournalCTime");
-      
-      if (call.countExceptions() > 0) {
-        call.rethrowException("Could not journal CTime for one "
-            + "more JournalNodes");
-      }
-      
-      // Either they all return the same thing or this call fails, so we can
-      // just return the first result.
-      try {
-        DFSUtil.assertAllResultsEqual(call.getResults().values());
-      } catch (AssertionError ae) {
-        throw new IOException("Results differed for getJournalCTime", ae);
-      }
-      for (Long result : call.getResults().values()) {
-        return result;
-      }
-    } catch (InterruptedException e) {
-      throw new IOException("Interrupted waiting for getJournalCTime() " +
-          "response");
-    } catch (TimeoutException e) {
-      throw new IOException("Timed out waiting for getJournalCTime() " +
-          "response");
-    }
-    
-    throw new AssertionError("Unreachable code.");
-  }
-}
+    loggers

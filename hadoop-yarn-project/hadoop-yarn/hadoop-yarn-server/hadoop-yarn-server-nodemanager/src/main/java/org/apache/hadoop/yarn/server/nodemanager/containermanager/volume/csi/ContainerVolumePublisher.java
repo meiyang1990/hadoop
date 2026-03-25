@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,7 +43,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Publish/un-publish CSI volumes on node manager.
+ * 在NodeManager节点上完成CSI卷的发布和回收清理，为容器挂载存储卷做准备。
+ * 负责调用CSI适配器完成节点层面的卷挂载操作，并生成容器内的挂载绑定关系。
  */
 public class ContainerVolumePublisher {
 
@@ -53,6 +55,12 @@ public class ContainerVolumePublisher {
   private final String localMountRoot;
   private final OCIContainerRuntime runtime;
 
+  /**
+   * 构造容器卷发布器，绑定目标容器、本地挂载根目录和OCI容器运行时。
+   * @param container 目标容器
+   * @param localMountRoot 本地挂载根目录
+   * @param runtime OCI容器运行时
+   */
   public ContainerVolumePublisher(Container container, String localMountRoot,
       OCIContainerRuntime runtime) {
     LOG.info("Initiate container volume publisher, containerID={},"
@@ -64,22 +72,13 @@ public class ContainerVolumePublisher {
   }
 
   /**
-   * It first discovers the volume info from container resource;
-   * then negotiates with CSI driver adaptor to publish the volume on this
-   * node manager, on a specific directory under container's work dir;
-   * and then map the local mounted directory to volume target mount in
-   * the docker container.
+   * 发布容器所需的所有CSI卷到当前NodeManager节点。
+   * 第一阶段（控制器创建卷）已在RM侧完成，本方法仅完成第二阶段节点层面挂载。
+   * 遍历所有容器请求的CSI卷，逐个完成节点挂载，生成本地路径到容器内路径的绑定映射。
    *
-   * CSI volume publish is a two phase work, by reaching up here
-   * we can assume the 1st phase is done on the RM side, which means
-   * YARN is already called the controller service of csi-driver
-   * to publish the volume; here we only need to call the node service of
-   * csi-driver to publish the volume on this local node manager.
-   *
-   * @return a map where each key is the local mounted path on current node,
-   *   and value is the remote mount path on the container.
-   * @throws YarnException
-   * @throws IOException
+   * @return 挂载绑定映射，key为节点本地挂载路径，value为容器内目标挂载路径
+   * @throws YarnException YARN服务异常
+   * @throws IOException IO操作异常
    */
   public Map<String, String> publishVolumes() throws YarnException,
       IOException {
@@ -87,6 +86,7 @@ public class ContainerVolumePublisher {
     Map<String, String> volumeMounts = new HashMap<>();
     List<VolumeMetaData> volumes = getVolumes();
     LOG.info("Found {} volumes to be published on this node", volumes.size());
+    // 遍历所有需要挂载的卷，逐个发布
     for (VolumeMetaData volume : volumes) {
       Map<String, String> bindings = publishVolume(volume);
       if (bindings != null && !bindings.isEmpty()) {
@@ -96,28 +96,52 @@ public class ContainerVolumePublisher {
     return volumeMounts;
   }
 
+  /**
+   * 卸载回收容器使用的所有CSI卷，容器退出后清理挂载。
+   * @throws YarnException YARN服务异常
+   * @throws IOException IO操作异常
+   */
   public void unpublishVolumes() throws YarnException, IOException {
     LOG.info("Un-publishing Volumes");
     List<VolumeMetaData> volumes = getVolumes();
     LOG.info("Volumes to un-publish {}", volumes.size());
+    // 遍历所有需要卸载的卷，逐个卸载
     for (VolumeMetaData volume : volumes) {
       this.unpublishVolume(volume);
     }
   }
 
+  /**
+   * 生成卷在节点本地的挂载路径。
+   * @param containerWorkDir 容器工作目录
+   * @param volumeId 卷ID
+   * @return 本地挂载目录文件对象
+   */
   private File getLocalVolumeMountPath(
       String containerWorkDir, String volumeId) {
     return new File(containerWorkDir, volumeId + "_mount");
   }
 
+  /**
+   * 生成卷在节点本地的临时 staging 路径。
+   * @param containerWorkDir 容器工作目录
+   * @param volumeId 卷ID
+   * @return 本地staging目录文件对象
+   */
   private File getLocalVolumeStagingPath(
       String containerWorkDir, String volumeId) {
     return new File(containerWorkDir, volumeId + "_staging");
   }
 
+  /**
+   * 从容器资源信息中提取所有需要挂载的CSI卷元数据。
+   * @return CSI卷元数据列表
+   * @throws InvalidVolumeException 卷信息无效异常
+   */
   private List<VolumeMetaData> getVolumes() throws InvalidVolumeException {
     List<VolumeMetaData> volumes = new ArrayList<>();
     Resource containerResource = container.getResource();
+    // 遍历容器所有资源信息，筛选出标记为CSI卷的资源
     if (containerResource != null) {
       for (ResourceInformation resourceInformation :
           containerResource.getAllResourcesListCopy()) {
@@ -134,10 +158,17 @@ public class ContainerVolumePublisher {
     return volumes;
   }
 
+  /**
+   * 发布单个CSI卷到当前节点，完成节点层面挂载。
+   * @param volume 卷元数据
+   * @return 挂载绑定映射，key为节点本地挂载路径，value为容器内目标挂载路径
+   * @throws IOException IO操作异常
+   * @throws YarnException YARN服务异常
+   */
   private Map<String, String> publishVolume(VolumeMetaData volume)
       throws IOException, YarnException {
     Map<String, String> bindVolumes = new HashMap<>();
-    // compose a local mount for CSI volume with the container ID
+    // 生成本地挂载路径和临时staging路径
     File localMount = getLocalVolumeMountPath(
         localMountRoot, volume.getVolumeId().toString());
     File localStaging = getLocalVolumeStagingPath(
@@ -145,38 +176,46 @@ public class ContainerVolumePublisher {
     LOG.info("Volume {}, local mount path: {}, local staging path {}",
         volume.getVolumeId().toString(), localMount, localStaging);
 
+    // 构造节点发布卷请求，指定单节点可写、文件系统类型的卷能力
     NodePublishVolumeRequest publishRequest = NodePublishVolumeRequest
-        .newInstance(volume.getVolumeId().getId(), // volume Id
-            false, // read only flag
-            localMount.getAbsolutePath(), // target path
-            localStaging.getAbsolutePath(), // staging path
+        .newInstance(volume.getVolumeId().getId(), // 卷ID
+            false, // 只读标志，默认非只读
+            localMount.getAbsolutePath(), // 节点侧目标挂载路径
+            localStaging.getAbsolutePath(), // 临时staging路径
             new ValidateVolumeCapabilitiesRequest.VolumeCapability(
                 ValidateVolumeCapabilitiesRequest
                     .AccessMode.SINGLE_NODE_WRITER,
                 ValidateVolumeCapabilitiesRequest.VolumeType.FILE_SYSTEM,
-                ImmutableList.of()), // capability
-            ImmutableMap.of(), // publish context
-            ImmutableMap.of());  // secrets
+                ImmutableList.of()), // 卷能力描述
+            ImmutableMap.of(), // 发布上下文参数
+            ImmutableMap.of());  // 密钥信息
 
-    // make sure the volume is a known type
+    // 检查对应驱动的CSI适配器客户端是否存在
     if (runtime.getCsiClients().get(volume.getDriverName()) == null) {
       throw new YarnException("No csi-adaptor is found that can talk"
           + " to csi-driver " + volume.getDriverName());
     }
 
-    // publish volume to node
+    // 调用CSI适配器完成节点层面的卷发布
     LOG.info("Publish volume on NM, request {}",
         publishRequest.toString());
     runtime.getCsiClients().get(volume.getDriverName())
         .nodePublishVolume(publishRequest);
-    // once succeed, bind the container to this mount
+    // 挂载成功后，添加绑定关系，供容器启动时挂载
     String containerMountPath = volume.getMountPoint();
     bindVolumes.put(localMount.getAbsolutePath(), containerMountPath);
     return bindVolumes;
   }
 
+  /**
+   * 卸载单个CSI卷，清理节点上的挂载。
+   * @param volume 卷元数据
+   * @throws YarnException YARN服务异常
+   * @throws IOException IO操作异常
+   */
   private void unpublishVolume(VolumeMetaData volume)
       throws YarnException, IOException {
+    // 获取对应驱动的CSI适配器客户端
     CsiAdaptorProtocol csiClient =
         runtime.getCsiClients().get(volume.getDriverName());
     if (csiClient == null) {
@@ -185,21 +224,22 @@ public class ContainerVolumePublisher {
               + " to csi-driver " + volume.getDriverName());
     }
 
-    // When container is launched, the container work dir is memorized,
-    // and that is also the dir we mount the volume to.
+    // 获取节点本地挂载路径
     File localMount = getLocalVolumeMountPath(container.getCsiVolumesRootDir(),
         volume.getVolumeId().toString());
+    // 如果挂载路径已不存在，跳过清理
     if (!localMount.exists()) {
       LOG.info("Local mount {} no longer exist, skipping cleaning"
           + " up the volume", localMount.getAbsolutePath());
       return;
     }
+    // 构造节点卸载卷请求
     NodeUnpublishVolumeRequest unpublishRequest =
         NodeUnpublishVolumeRequest.newInstance(
-            volume.getVolumeId().getId(), // volume id
-            localMount.getAbsolutePath());  // target path
+            volume.getVolumeId().getId(), // 卷ID
+            localMount.getAbsolutePath());  // 目标挂载路径
 
-    // un-publish volume from node
+    // 调用CSI适配器完成节点层面的卷卸载
     LOG.info("Un-publish volume {}, request {}",
         volume.getVolumeId().toString(), unpublishRequest.toString());
     csiClient.nodeUnpublishVolume(unpublishRequest);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,8 +20,15 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.container;
 
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
+/**
+ * 容器初始化事件，用于触发NodeManager上容器的初始化流程
+ */
 public class ContainerInitEvent extends ContainerEvent {
 
+  /**
+   * 构造容器初始化事件
+   * @param c 待初始化的容器ID
+   */
   public ContainerInitEvent(ContainerId c) {
     super(c, ContainerEventType.INIT_CONTAINER);
   }

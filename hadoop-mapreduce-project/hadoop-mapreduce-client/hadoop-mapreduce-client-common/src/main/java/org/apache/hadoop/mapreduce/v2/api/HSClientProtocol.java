@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,10 @@
 
 package org.apache.hadoop.mapreduce.v2.api;
 
-
+/**
+ * 文件说明：历史服务器客户端协议接口，定义客户端与MapReduce历史服务器之间的通信契约
+ * 该接口继承自通用MR客户端协议，用于专门标识历史服务器服务的通信接口，
+ * 供Hadoop客户端调用历史服务器服务，查询已完成MapReduce作业的历史信息。
+ */
 public interface HSClientProtocol extends MRClientProtocol {
 }

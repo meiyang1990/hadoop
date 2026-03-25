@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,26 +24,33 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.Partitioner;
 
 /**
-  *  This partitioner rehashes values returned by {@link Object#hashCode()}
-  *  to get smoother distribution between partitions which may improve
-  *  reduce reduce time in some cases and should harm things in no cases.
-  *  This partitioner is suggested with Integer and Long keys with simple
-  *  patterns in their distributions.
-  *  @since 2.0.3
+ * 对键的哈希值进行重哈希的分区器，通过改进哈希分布，让数据更均匀地分布到各个Reduce分区
+ * 解决原始哈希分布不均匀的问题，可以优化Reduce任务执行时间，不会对现有性能造成负面影响
+ * 特别适用于键分布存在规律模式的Integer、Long类型键场景，能够提升数据分发的均匀性
+ *  @since 2.0.3
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class RehashPartitioner<K, V> extends Partitioner<K, V> {
 
-  /** prime number seed for increasing hash quality */
+  /** 用于提升哈希质量的质数种子 */
   private static final int SEED = 1591267453;
 
-  /** Rehash {@link Object#hashCode()} to partition. */
+  /**
+   * 对键的原始哈希值进行重哈希，计算该键应该分配到的Reduce分区编号
+   * @param key 分区键
+   * @param value 分区值
+   * @param numReduceTasks 总Reduce任务数
+   * @return 分区编号，范围从0到numReduceTasks-1
+   */
   public int getPartition(K key, V value, int numReduceTasks) {
+    // 使用种子异或原始哈希值，打乱原始分布
     int h = SEED ^ key.hashCode();
+    // 多轮异或移位，进一步打散哈希位分布
     h ^= (h >>> 20) ^ (h >>> 12);
     h = h ^ (h >>> 7) ^ (h >>> 4);
 
+    // 去除符号位后对Reduce任务数取模，得到最终分区编号
     return (h & Integer.MAX_VALUE) % numReduceTasks;
   }
 }

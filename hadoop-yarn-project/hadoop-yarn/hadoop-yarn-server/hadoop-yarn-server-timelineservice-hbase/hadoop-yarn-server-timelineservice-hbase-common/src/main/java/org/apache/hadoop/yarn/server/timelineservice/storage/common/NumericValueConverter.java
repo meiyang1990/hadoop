@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,22 +19,26 @@
 
 package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 
+/**
+ * 本文件定义了数值类型转换器的扩展接口，为时间线服务HBase存储提供数值操作支持
+ */
+
 import java.util.Comparator;
 
 /**
- * Extends ValueConverter interface for numeric converters to support numerical
- * operations such as comparison, addition, etc.
+ * 扩展ValueConverter接口，为数值转换器提供比较、加法等数值操作能力
+ * 用于时间线服务存储层中指标数值的聚合与比较
  */
 public interface NumericValueConverter extends ValueConverter,
     Comparator<Number> {
   /**
-   * Adds two or more numbers. If either of the numbers are null, it is taken as
-   * 0.
+   * 对两个或多个数值执行加法聚合
+   * 输入为null时将其视为0处理
    *
-   * @param num1 the first number to add.
-   * @param num2 the second number to add.
-   * @param numbers Rest of the numbers to be added.
-   * @return result after adding up the numbers.
+   * @param num1 第一个要相加的数值
+   * @param num2 第二个要相加的数值
+   * @param numbers 后续需要相加的其他数值（可变参数）
+   * @return 所有数值相加后的结果
    */
   Number add(Number num1, Number num2, Number...numbers);
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,11 +22,12 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.apptoflow;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
 
 /**
- * The app_flow table as column families mapping. Mapping stores
- * appId to flowName and flowRunId mapping information
- *
- * Example app_flow table record:
- *
+ * AppFlow映射表定义，基于HBase存储应用ID到流信息的映射关系。
+ * 核心存储应用ID对应流名称、流运行ID、用户ID的映射，用于时间线服务中
+ * 快速通过应用ID查询所属流信息，支持多集群场景，不同集群的同一应用ID
+ * 会分开存储为不同列。
+ * 
+ * 表结构示例：
  * <pre>
  * |--------------------------------------|
  * |  Row       | Column Family           |
@@ -52,9 +54,8 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
  * |--------------------------------------|
  * </pre>
  *
- * It is possible (although unlikely) in a multi-cluster environment that there
- * may be more than one applications for a given app id. Different clusters are
- * recorded as different sets of columns.
+ * 在多集群环境中，虽然概率很低，但同一个应用ID可能出现在多个集群中，
+ * 因此不同集群的信息会分别存储为不同的列。
  */
 public final class AppToFlowTable extends BaseTable<AppToFlowTable> {
 }

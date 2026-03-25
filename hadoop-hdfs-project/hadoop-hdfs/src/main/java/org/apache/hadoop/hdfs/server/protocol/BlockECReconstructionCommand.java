@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,6 +32,8 @@ import java.util.Arrays;
 import java.util.Collection;
 
 /**
+ * 文件级注释：HDFS纠删码块重构命令，用于NameNode向DataNode下发缺失条带块组的重构任务
+ *
  * A BlockECReconstructionCommand is an instruction to a DataNode to
  * reconstruct a striped block group with missing blocks.
  *
@@ -49,9 +52,9 @@ public class BlockECReconstructionCommand extends DatanodeCommand {
   private final Collection<BlockECReconstructionInfo> ecTasks;
 
   /**
-   * Create BlockECReconstructionCommand from a collection of
-   * {@link BlockECReconstructionInfo}, each representing a reconstruction
-   * task
+   * 构造纠删码块重构命令，从任务信息集合创建命令
+   * @param action 命令类型
+   * @param blockECReconstructionInfoList 所有需要执行的重构任务列表
    */
   public BlockECReconstructionCommand(int action,
       Collection<BlockECReconstructionInfo> blockECReconstructionInfoList) {
@@ -68,7 +71,10 @@ public class BlockECReconstructionCommand extends DatanodeCommand {
     return sb.toString();
   }
 
-  /** Block and targets pair */
+  /**
+   * 类级注释：存储单个纠删码块重构任务的所有信息，包含待重构块、源节点、目标节点等信息
+   * Block and targets pair
+   */
   @InterfaceAudience.Private
   @InterfaceStability.Evolving
   public static class BlockECReconstructionInfo {
@@ -81,6 +87,15 @@ public class BlockECReconstructionCommand extends DatanodeCommand {
     private final byte[] excludeReconstructedIndices;
     private final ErasureCodingPolicy ecPolicy;
 
+    /**
+     * 构造单个纠删码重构任务信息（从DatanodeStorageInfo转换目标信息）
+     * @param block 待重构的扩展块
+     * @param sources 提供源数据的DataNode数组
+     * @param targetDnStorageInfo 目标存储信息数组
+     * @param liveBlockIndices 当前可用块在条带组中的索引
+     * @param excludeReconstructedIndices 需要排除的已重构块索引
+     * @param ecPolicy 纠删码编码策略
+     */
     public BlockECReconstructionInfo(ExtendedBlock block,
         DatanodeInfo[] sources, DatanodeStorageInfo[] targetDnStorageInfo,
         byte[] liveBlockIndices, byte[] excludeReconstructedIndices, ErasureCodingPolicy ecPolicy) {
@@ -91,6 +106,17 @@ public class BlockECReconstructionCommand extends DatanodeCommand {
           excludeReconstructedIndices, ecPolicy);
     }
 
+    /**
+     * 构造单个纠删码重构任务信息（直接传入转换完成的目标信息）
+     * @param block 待重构的扩展块
+     * @param sources 提供源数据的DataNode数组
+     * @param targets 存储重构结果的目标DataNode数组
+     * @param targetStorageIDs 目标存储ID数组
+     * @param targetStorageTypes 目标存储类型数组
+     * @param liveBlockIndices 当前可用块在条带组中的索引
+     * @param excludeReconstructedIndices 需要排除的已重构块索引
+     * @param ecPolicy 纠删码编码策略
+     */
     public BlockECReconstructionInfo(ExtendedBlock block,
         DatanodeInfo[] sources, DatanodeInfo[] targets,
         String[] targetStorageIDs, StorageType[] targetStorageTypes,
@@ -100,40 +126,73 @@ public class BlockECReconstructionCommand extends DatanodeCommand {
       this.targets = targets;
       this.targetStorageIDs = targetStorageIDs;
       this.targetStorageTypes = targetStorageTypes;
+      // 处理空可用索引数组，创建空数组避免空指针
       this.liveBlockIndices = liveBlockIndices == null ?
           new byte[]{} : liveBlockIndices;
       this.excludeReconstructedIndices = excludeReconstructedIndices;
       this.ecPolicy = ecPolicy;
     }
 
+    /**
+     * 获取待重构的扩展块
+     * @return 待重构的扩展块
+     */
     public ExtendedBlock getExtendedBlock() {
       return block;
     }
 
+    /**
+     * 获取源数据DataNode列表
+     * @return 提供源数据的DataNode数组
+     */
     public DatanodeInfo[] getSourceDnInfos() {
       return sources;
     }
 
+    /**
+     * 获取目标存储DataNode列表
+     * @return 存储重构结果的DataNode数组
+     */
     public DatanodeInfo[] getTargetDnInfos() {
       return targets;
     }
 
+    /**
+     * 获取目标存储ID列表
+     * @return 目标存储ID数组
+     */
     public String[] getTargetStorageIDs() {
       return targetStorageIDs;
     }
 
+    /**
+     * 获取目标存储类型列表
+     * @return 目标存储类型数组
+     */
     public StorageType[] getTargetStorageTypes() {
       return targetStorageTypes;
     }
 
+    /**
+     * 获取可用块在条带组中的索引列表
+     * @return 可用块索引数组
+     */
     public byte[] getLiveBlockIndices() {
       return liveBlockIndices;
     }
 
+    /**
+     * 获取需要排除的已重构块索引列表
+     * @return 需要排除的索引数组
+     */
     public byte[] getExcludeReconstructedIndices() {
       return excludeReconstructedIndices;
     }
 
+    /**
+     * 获取纠删码编码策略
+     * @return 当前任务使用的纠删码策略
+     */
     public ErasureCodingPolicy getErasureCodingPolicy() {
       return ecPolicy;
     }
@@ -149,6 +208,10 @@ public class BlockECReconstructionCommand extends DatanodeCommand {
     }
   }
 
+  /**
+   * 获取所有纠删码重构任务列表
+   * @return 当前命令包含的所有重构任务集合
+   */
   public Collection<BlockECReconstructionInfo> getECTasks() {
     return this.ecTasks;
   }

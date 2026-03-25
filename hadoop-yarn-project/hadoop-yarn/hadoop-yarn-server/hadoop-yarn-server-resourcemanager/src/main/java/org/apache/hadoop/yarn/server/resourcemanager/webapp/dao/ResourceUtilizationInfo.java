@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,25 +27,35 @@ import org.apache.hadoop.yarn.api.records.ResourceUtilization;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 
 /**
- * DAO object represents resource utilization of node and containers.
+ * YARN RM Web UI 节点资源利用率数据访问对象，封装节点整体和容器聚合的资源使用信息
  */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ResourceUtilizationInfo {
 
+  // 节点物理内存用量，单位MB
   protected int nodePhysicalMemoryMB;
+  // 节点虚拟内存用量，单位MB
   protected int nodeVirtualMemoryMB;
+  // 节点CPU使用率
   protected double nodeCPUUsage;
+  // 所有容器聚合物理内存用量，单位MB
   protected int aggregatedContainersPhysicalMemoryMB;
+  // 所有容器聚合虚拟内存用量，单位MB
   protected int aggregatedContainersVirtualMemoryMB;
+  // 所有容器聚合CPU使用率
   protected double containersCPUUsage;
 
   public ResourceUtilizationInfo() {
   } // JAXB needs this
 
+  /**
+   * 从RMNode节点信息构造资源利用率数据对象
+   * @param ni RM节点信息对象
+   */
   public ResourceUtilizationInfo(RMNode ni) {
 
-    // update node and containers resource utilization
+    // 获取节点整体资源利用率信息
     ResourceUtilization nodeUtilization = ni.getNodeUtilization();
     if (nodeUtilization != null) {
       this.nodePhysicalMemoryMB = nodeUtilization.getPhysicalMemory();
@@ -52,6 +63,7 @@ public class ResourceUtilizationInfo {
       this.nodeCPUUsage = nodeUtilization.getCPU();
     }
 
+    // 获取所有容器聚合资源利用率信息
     ResourceUtilization containerAggrUtilization = ni
         .getAggregatedContainersUtilization();
     if (containerAggrUtilization != null) {

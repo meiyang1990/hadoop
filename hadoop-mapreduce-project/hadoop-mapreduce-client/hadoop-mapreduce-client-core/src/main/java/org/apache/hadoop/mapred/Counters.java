@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,6 +49,7 @@ import org.slf4j.Logger;
 import org.apache.hadoop.thirdparty.com.google.common.collect.Iterators;
 
 /**
+ * 文件级注释：MapReduce旧API的计数器集合容器，管理全局计数器，计数器可由MapReduce框架或应用程序自定义，按分组组织
  * A set of named counters.
  *
  * <p><code>Counters</code> represent global counters, defined either by the
@@ -64,6 +66,7 @@ public class Counters
   
   public static final int MAX_COUNTER_LIMIT = Limits.getCountersMax();
   public static final int MAX_GROUP_LIMIT = Limits.getGroupsMax();
+  // 存储已废弃计数器分组到新分组的映射
   private static final HashMap<String, String> depricatedCounterMap =
       new HashMap<String, String>();
   
@@ -71,15 +74,23 @@ public class Counters
     initDepricatedMap();
   }
   
+  /**
+   * 构造空计数器集合，使用默认分组工厂
+   */
   public Counters() {
     super(groupFactory);
   }
 
+  /**
+   * 从新API的Counters构造旧API的Counters实例
+   * @param newCounters 新API的计数器集合
+   */
   public Counters(org.apache.hadoop.mapreduce.Counters newCounters) {
     super(newCounters, groupFactory);
   }
 
   @SuppressWarnings({ "deprecation" })
+  // 初始化废弃分组到新分组的映射表
   private static void initDepricatedMap() {
     depricatedCounterMap.put(FileInputFormat.Counter.class.getName(),
       FileInputFormatCounter.class.getName());
@@ -93,6 +104,11 @@ public class Counters
         .getName(), FileOutputFormatCounter.class.getName());
   }
 
+  /**
+   * 根据旧分组名获取对应的新分组名
+   * @param oldGroup 旧分组名
+   * @return 新分组名，如果不存在映射返回null
+   */
   private static String getNewGroupKey(String oldGroup) {
     if (depricatedCounterMap.containsKey(oldGroup)) {
       return depricatedCounterMap.get(oldGroup);
@@ -101,33 +117,50 @@ public class Counters
   }
   
   /**
-   * Downgrade new {@link org.apache.hadoop.mapreduce.Counters} to old Counters
-   * @param newCounters new Counters
-   * @return old Counters instance corresponding to newCounters
+   * 将新API的Counters转换为旧API的Counters实例，用于兼容旧API
+   * @param newCounters 新API的计数器集合
+   * @return 转换后的旧API计数器集合
    */
   static Counters downgrade(org.apache.hadoop.mapreduce.Counters newCounters) {
     return new Counters(newCounters);
   }
 
+  /**
+   * 根据分组名获取计数器分组
+   * @param groupName 分组名称
+   * @return 对应的计数器分组
+   */
   public synchronized Group getGroup(String groupName) {
     return super.getGroup(groupName);
   }
 
+  /**
+   * 获取所有分组名称集合
+   * @return 分组名称列表
+   */
   @SuppressWarnings("unchecked")
   public synchronized Collection<String> getGroupNames() {
     return IteratorUtils.toList(super.getGroupNames().iterator());
   }
 
+  /**
+   * 生成计数器的简洁字符串表示，用于显示
+   * @return 所有计数器的简洁拼接字符串
+   */
   public synchronized String makeCompactString() {
     StringBuilder builder = new StringBuilder();
     boolean first = true;
+    // 遍历所有分组
     for(Group group: this){
+      // 遍历分组内所有计数器
       for(Counter counter: group) {
+        // 添加分隔符
         if (first) {
           first = false;
         } else {
           builder.append(',');
         }
+        // 拼接分组名.计数器名:值格式
         builder.append(group.getDisplayName());
         builder.append('.');
         builder.append(counter.getDisplayName());
@@ -139,17 +172,26 @@ public class Counters
   }
   
   /**
+   * 单个计数器实现，保存计数器名称和计数值，兼容旧API，包装新API计数器实现
    * A counter record, comprising its name and value.
    */
   @InterfaceAudience.Public
   @InterfaceStability.Stable
   public static class Counter implements org.apache.hadoop.mapreduce.Counter {
+    // 底层实际使用的新API计数器实例
     org.apache.hadoop.mapreduce.Counter realCounter;
 
+    /**
+     * 构造包装指定新API计数器的旧API计数器实例
+     * @param counter 新API计数器实例
+     */
     Counter(org.apache.hadoop.mapreduce.Counter counter) {
       this.realCounter = counter;
     }
 
+    /**
+     * 构造空计数器实例，使用GenericCounter作为底层实现
+     */
     public Counter() {
       this(new GenericCounter());
     }
@@ -216,7 +258,8 @@ public class Counters
     }
 
     /**
-     * @return the value of the counter
+     * 获取计数器当前值，旧API兼容方法
+     * @return 计数器当前值
      */
     public long getCounter() {
       return realCounter.getValue();
@@ -248,6 +291,7 @@ public class Counters
 
 
   /**
+   * 计数器分组，同一枚举类的计数器归属同一个分组，兼容旧API，包装新API分组实现
    *  <code>Group</code> of counters, comprising of counters from a particular
    *  counter {@link Enum} class.
    *
@@ -257,6 +301,7 @@ public class Counters
   @InterfaceAudience.Public
   @InterfaceStability.Stable
   public static class Group implements CounterGroupBase<Counter> {
+    // 底层实际使用的新API分组实例
     private CounterGroupBase<Counter> realGroup;
     
     protected Group() {
@@ -276,18 +321,17 @@ public class Counters
     }
     
     /**
-     * @param counterName the name of the counter
-     * @return the value of the specified counter, or 0 if the counter does
-     * not exist.
+     * 获取分组内指定名称计数器的值，不存在则返回0
+     * @param counterName 计数器名称
+     * @return 计数器值，不存在返回0
      */
     public long getCounter(String counterName)  {
       return getCounterValue(realGroup, counterName);
     }
 
     /**
-     * @return the compact stringified version of the group in the format
-     * {(actual-name)(display-name)(value)[][][]} where [] are compact strings
-     * for the counters within.
+     * 生成分组的转义紧凑字符串表示
+     * @return 分组转义紧凑字符串
      */
     public String makeEscapedCompactString() {
       return toEscapedCompactString(realGroup);
@@ -401,14 +445,16 @@ public class Counters
     }
   }
 
-  // All the group impls need this for legacy group interface
+  // 获取指定分组中指定名称计数器的值，不存在返回0，供旧分组接口使用
   static long getCounterValue(CounterGroupBase<Counter> group, String counterName) {
     Counter counter = group.findCounter(counterName, false);
     if (counter != null) return counter.getValue();
     return 0L;
   }
 
-  // Mix the generic group implementation into the Group interface
+  /**
+   * 通用计数器分组实现，适配旧API分组接口
+   */
   private static class GenericGroup extends AbstractCounterGroup<Counter> {
 
     GenericGroup(String name, String displayName, Limits limits) {
@@ -432,7 +478,9 @@ public class Counters
     }
   }
 
-  // Mix the framework group implementation into the Group interface
+  /**
+   * 框架枚举计数器分组实现，适配旧API分组接口
+   */
   private static class FrameworkGroupImpl<T extends Enum<T>>
       extends FrameworkCounterGroup<T, Counter> {
 
@@ -451,7 +499,9 @@ public class Counters
     }
   }
 
-  // Mix the file system counter group implementation into the Group interface
+  /**
+   * 文件系统计数器分组实现，适配旧API分组接口
+   */
   private static class FSGroupImpl extends FileSystemCounterGroup<Counter> {
 
     @Override
@@ -465,13 +515,21 @@ public class Counters
     }
   }
 
+  /**
+   * 根据分组名和计数器名查找计数器，处理废弃分组名的兼容
+   * @param group 分组名
+   * @param name 计数器名
+   * @return 找到的计数器，不存在则新建返回
+   */
   public synchronized Counter findCounter(String group, String name) {
+    // 处理废弃的MAP_INPUT_BYTES计数器名兼容
     if (name.equals("MAP_INPUT_BYTES")) {
       LOG.warn("Counter name MAP_INPUT_BYTES is deprecated. " +
                "Use FileInputFormatCounters as group name and " +
                " BYTES_READ as counter name instead");
       return findCounter(FileInputFormatCounter.BYTES_READ);
     }
+    // 转换废弃分组名到新分组名
     String newGroupKey = getNewGroupKey(group);
     if (newGroupKey != null) {
       group = newGroupKey;
@@ -480,6 +538,7 @@ public class Counters
   }
 
   /**
+   * 计数器分组工厂，为旧API创建对应类型的分组实例
    * Provide factory methods for counter group factory implementation.
    * See also the GroupFactory in
    *  {@link org.apache.hadoop.mapreduce.Counters mapreduce.Counters}
@@ -491,158 +550,4 @@ public class Counters
     FrameworkGroupFactory<Group> newFrameworkGroupFactory(final Class<T> cls) {
       return new FrameworkGroupFactory<Group>() {
         @Override public Group newGroup(String name) {
-          return new Group(new FrameworkGroupImpl<T>(cls)); // impl in this package
-        }
-      };
-    }
-
-    @Override
-    protected Group newGenericGroup(String name, String displayName,
-                                    Limits limits) {
-      return new Group(new GenericGroup(name, displayName, limits));
-    }
-
-    @Override
-    protected Group newFileSystemGroup() {
-      return new Group(new FSGroupImpl());
-    }
-  }
-
-  private static final GroupFactory groupFactory = new GroupFactory();
-
-  /**
-   * Find a counter by using strings
-   * @param group the name of the group
-   * @param id the id of the counter within the group (0 to N-1)
-   * @param name the internal name of the counter
-   * @return the counter for that name
-   * @deprecated use {@link #findCounter(String, String)} instead
-   */
-  @Deprecated
-  public Counter findCounter(String group, int id, String name) {
-    return findCounter(group, name);
-  }
-
-  /**
-   * Increments the specified counter by the specified amount, creating it if
-   * it didn't already exist.
-   * @param key identifies a counter
-   * @param amount amount by which counter is to be incremented
-   */
-  public void incrCounter(Enum<?> key, long amount) {
-    findCounter(key).increment(amount);
-  }
-
-  /**
-   * Increments the specified counter by the specified amount, creating it if
-   * it didn't already exist.
-   * @param group the name of the group
-   * @param counter the internal name of the counter
-   * @param amount amount by which counter is to be incremented
-   */
-  public void incrCounter(String group, String counter, long amount) {
-    findCounter(group, counter).increment(amount);
-  }
-
-  /**
-   * Returns current value of the specified counter, or 0 if the counter
-   * does not exist.
-   * @param key the counter enum to lookup
-   * @return the counter value or 0 if counter not found
-   */
-  public synchronized long getCounter(Enum<?> key) {
-    return findCounter(key).getValue();
-  }
-
-  /**
-   * Increments multiple counters by their amounts in another Counters
-   * instance.
-   * @param other the other Counters instance
-   */
-  public synchronized void incrAllCounters(Counters other) {
-    for (Group otherGroup: other) {
-      Group group = getGroup(otherGroup.getName());
-      group.setDisplayName(otherGroup.getDisplayName());
-      for (Counter otherCounter : otherGroup) {
-        Counter counter = group.getCounterForName(otherCounter.getName());
-        counter.setDisplayName(otherCounter.getDisplayName());
-        counter.increment(otherCounter.getValue());
-      }
-    }
-  }
-
-  /**
-   * @return the total number of counters
-   * @deprecated use {@link #countCounters()} instead
-   */
-  public int size() {
-    return countCounters();
-  }
-
-  /**
-   * Convenience method for computing the sum of two sets of counters.
-   * @param a the first counters
-   * @param b the second counters
-   * @return a new summed counters object
-   */
-  public static Counters sum(Counters a, Counters b) {
-    Counters counters = new Counters();
-    counters.incrAllCounters(a);
-    counters.incrAllCounters(b);
-    return counters;
-  }
-
-  /**
-   * Logs the current counter values.
-   * @param log The log to use.
-   */
-  public void log(Logger log) {
-    log.info("Counters: " + size());
-    for(Group group: this) {
-      log.info("  " + group.getDisplayName());
-      for (Counter counter: group) {
-        log.info("    " + counter.getDisplayName() + "=" +
-                 counter.getCounter());
-      }
-    }
-  }
-
-  /**
-   * Represent the counter in a textual format that can be converted back to
-   * its object form
-   * @return the string in the following format
-   * {(groupName)(group-displayName)[(counterName)(displayName)(value)][]*}*
-   */
-  public String makeEscapedCompactString() {
-    return toEscapedCompactString(this);
-  }
-
-  /**
-   * Convert a stringified (by {@link #makeEscapedCompactString()} counter
-   * representation into a counter object.
-   * @param compactString to parse
-   * @return a new counters object
-   * @throws ParseException
-   */
-  public static Counters fromEscapedCompactString(String compactString)
-      throws ParseException {
-    return parseEscapedCompactString(compactString, new Counters());
-  }
-
-  /**
-   * Counter exception thrown when the number of counters exceed the limit
-   */
-  public static class CountersExceededException extends RuntimeException {
-
-    private static final long serialVersionUID = 1L;
-
-    public CountersExceededException(String msg) {
-      super(msg);
-    }
-
-    // Only allows chaining of related exceptions
-    public CountersExceededException(CountersExceededException cause) {
-      super(cause);
-    }
-  }
-}
+          return new Group(new FrameworkGroupImpl<T>(

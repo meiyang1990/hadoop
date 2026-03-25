@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,24 +42,45 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 import com.google.inject.Inject;
 import com.google.inject.servlet.RequestScoped;
 
+/**
+ * YARN FairScheduler调度器Web页面渲染类
+ * 负责生成公平调度器队列信息和应用信息的Web界面
+ */
 public class FairSchedulerPage extends RmView {
+  // 队列条目的CSS类名
   static final String _Q = ".ui-state-default.ui-corner-all";
+  // 队列最大宽度占比
   static final float Q_MAX_WIDTH = 0.8f;
+  // 队列统计信息的左侧位置占比
   static final float Q_STATS_POS = Q_MAX_WIDTH + 0.05f;
+  // 队列结束位置样式
   static final String Q_END = "left:101%";
+  // 稳态公平份额条样式
   static final String Q_GIVEN =
       "left:0%;background:none;border:1px solid #000000";
+  // 瞬时公平份额条样式
   static final String Q_INSTANTANEOUS_FS =
       "left:0%;background:none;border:1px dashed #000000";
+  // 超过公平份额的背景色
   static final String Q_OVER = "background:#FFA333";
+  // 低于公平份额的背景色
   static final String Q_UNDER = "background:#5BD75B";
+  // 稳态公平份额常量
   static final String STEADY_FAIR_SHARE = "Steady Fair Share";
+  // 瞬时公平份额常量
   static final String INSTANTANEOUS_FAIR_SHARE = "Instantaneous Fair Share";
+  
+  /**
+   * 请求级队列信息存储容器，用于在各个Block之间传递当前队列信息
+   */
   @RequestScoped
   static class FSQInfo {
     FairSchedulerQueueInfo qinfo;
   }
   
+  /**
+   * 叶子队列信息区块渲染类，负责渲染叶子队列的详细状态信息
+   */
   static class LeafQueueBlock extends HtmlBlock {
     final FairSchedulerLeafQueueInfo qinfo;
 
@@ -69,6 +91,7 @@ public class FairSchedulerPage extends RmView {
 
     @Override
     protected void render(Block html) {
+      // 构建队列状态响应信息
       ResponseInfo ri = info("\'" + qinfo.getQueueName() + "\' Queue Status").
           __("Used Resources:", qinfo.getUsedResources().toString()).
           __("Demand Resources:", qinfo.getDemandResources().toString()).
@@ -82,19 +105,24 @@ public class FairSchedulerPage extends RmView {
               qinfo.getMaxContainerAllocation().toString()).
           __("Reserved Resources:", qinfo.getReservedResources().toString());
       int maxApps = qinfo.getMaxApplications();
+      // 只有配置了最大运行应用数才显示该字段
       if (maxApps < Integer.MAX_VALUE) {
         ri.__("Max Running Applications:", qinfo.getMaxApplications());
       }
       ri.__(STEADY_FAIR_SHARE + ":", qinfo.getSteadyFairShare().toString());
       ri.__(INSTANTANEOUS_FAIR_SHARE + ":", qinfo.getFairShare().toString());
       ri.__("Preemptable:", qinfo.isPreemptable());
+      // 渲染信息区块
       html.__(InfoBlock.class);
 
-      // clear the info contents so this queue's info doesn't accumulate into another queue's info
+      // 清空信息内容，避免当前队列信息污染下一个队列
       ri.clear();
     }
   }
   
+  /**
+   * 父队列信息区块渲染类，负责渲染父队列的状态信息
+   */
   static class ParentQueueBlock extends HtmlBlock {
 	    final FairSchedulerQueueInfo qinfo;
 
@@ -105,6 +133,7 @@ public class FairSchedulerPage extends RmView {
 
     @Override
     protected void render(Block html) {
+      // 构建父队列状态响应信息
       ResponseInfo ri = info("\'" + qinfo.getQueueName() + "\' Queue Status").
           __("Used Resources:", qinfo.getUsedResources().toString()).
           __("Min Resources:", qinfo.getMinResources().toString()).
@@ -113,18 +142,23 @@ public class FairSchedulerPage extends RmView {
               qinfo.getMaxContainerAllocation().toString()).
           __("Reserved Resources:", qinfo.getReservedResources().toString());
       int maxApps = qinfo.getMaxApplications();
+      // 只有配置了最大运行应用数才显示该字段
       if (maxApps < Integer.MAX_VALUE) {
         ri.__("Max Running Applications:", qinfo.getMaxApplications());
       }
       ri.__(STEADY_FAIR_SHARE + ":", qinfo.getSteadyFairShare().toString());
       ri.__(INSTANTANEOUS_FAIR_SHARE + ":", qinfo.getFairShare().toString());
+      // 渲染信息区块
       html.__(InfoBlock.class);
 
-      // clear the info contents so this queue's info doesn't accumulate into another queue's info
+      // 清空信息内容，避免当前队列信息污染下一个队列
       ri.clear();
     }
   }
 
+  /**
+   * 队列层级结构渲染类，递归渲染所有子队列
+   */
   static class QueueBlock extends HtmlBlock {
     final FSQInfo fsqinfo;
 
@@ -134,13 +168,17 @@ public class FairSchedulerPage extends RmView {
 
     @Override
     public void render(Block html) {
+      // 获取当前队列的所有子队列
       Collection<FairSchedulerQueueInfo> subQueues = fsqinfo.qinfo.getChildQueues();
       UL<Hamlet> ul = html.ul("#pq");
+      // 遍历每个子队列生成HTML
       for (FairSchedulerQueueInfo info : subQueues) {
+        // 获取队列各项资源占比数据
         float capacity = info.getMaxResourcesFraction();
         float steadyFairShare = info.getSteadyFairShareMemoryFraction();
         float instantaneousFairShare = info.getFairShareMemoryFraction();
         float used = info.getUsedMemoryFraction();
+        // 创建队列条目，渲染资源占比条
         LI<UL<Hamlet>> li = ul.
           li().
             a(_Q).$style(width(capacity * Q_MAX_WIDTH)).
@@ -158,7 +196,9 @@ public class FairSchedulerPage extends RmView {
             span().$class("qstats").$style(left(Q_STATS_POS)).
             __(join(percent(used), " used")).__();
 
+        // 更新当前队列信息到容器
         fsqinfo.qinfo = info;
+        // 根据队列类型渲染不同区块，叶子队列直接显示详细信息，父队列递归渲染子队列
         if (info instanceof FairSchedulerLeafQueueInfo) {
           li.ul("#lq").li().__(LeafQueueBlock.class).__().__();
         } else {
@@ -172,6 +212,9 @@ public class FairSchedulerPage extends RmView {
     }
   }
   
+  /**
+   * 整个调度器队列总区块渲染类，负责渲染根队列和图例
+   */
   static class QueuesBlock extends HtmlBlock {
     final FairScheduler fs;
     final FSQInfo fsqinfo;
@@ -183,13 +226,16 @@ public class FairSchedulerPage extends RmView {
 
     @Override
     public void render(Block html) {
+      // 先渲染指标概览表格
       html.__(MetricsOverviewTable.class);
+      // 创建应用队列容器DOM结构
       UL<DIV<DIV<Hamlet>>> ul = html.
         div("#cs-wrapper.ui-widget").
           div(".ui-widget-header.ui-corner-top").
           __("Application Queues").__().
           div("#cs.ui-widget-content.ui-corner-bottom").
             ul();
+      // 调度器未初始化时显示默认队列
       if (fs == null) {
         ul.
           li().
@@ -197,10 +243,12 @@ public class FairSchedulerPage extends RmView {
               span().$style(Q_END).__("100% ").__().
               span(".q", "default").__().__();
       } else {
+        // 构建调度器信息对象，获取根队列
         FairSchedulerInfo sinfo = new FairSchedulerInfo(fs);
         fsqinfo.qinfo = sinfo.getRootQueueInfo();
         float used = fsqinfo.qinfo.getUsedMemoryFraction();
 
+        // 渲染图例说明
         ul.
           li().$style("margin-bottom: 1em").
             span().$style("font-weight: bold").__("Legend:").__().
@@ -219,6 +267,7 @@ public class FairSchedulerPage extends RmView {
             span().$class("qlegend ui-corner-all ui-state-default").
             __("Max Capacity").__().
             __().
+          // 渲染根队列条目
           li().
             a(_Q).$style(width(Q_MAX_WIDTH)).
               span().$style(join(width(used), ";left:0%;",
@@ -228,6 +277,7 @@ public class FairSchedulerPage extends RmView {
             __(join(percent(used), " used")).__().
             __(QueueBlock.class).__();
       }
+      // 闭合DOM标签，初始化JS树组件，渲染应用表格区块
       ul.__().__().
       script().$type("text/javascript").
           __("$('#cs').hide();").__().__().
@@ -235,8 +285,13 @@ public class FairSchedulerPage extends RmView {
     }
   }
   
-  @Override protected void postHead(Page.HTML<__> html) {
+  @Override
+  /**
+   * 在HTML头部添加页面所需CSS样式和JavaScript代码
+   */
+  protected void postHead(Page.HTML<__> html) {
     html.
+      // 添加页面CSS样式
       style().$type("text/css").
         __("#cs { padding: 0.5em 0 1em 0; margin-bottom: 1em; position: relative }",
           "#cs ul { list-style: none }",
@@ -245,8 +300,10 @@ public class FairSchedulerPage extends RmView {
           "#cs-wrapper .ui-widget-header { padding: 0.2em 0.5em }",
           ".qstats { font-weight: normal; font-size: 80%; position: absolute }",
           ".qlegend { font-weight: normal; padding: 0 1em; margin: 1em }",
-          "table.info tr th {width: 50%}").__(). // to center info table
+          "table.info tr th {width: 50%}").__(). // 设置信息表格列宽居中
+      // 引入jstree依赖JS
       script("/static/jt/jquery.jstree.js").
+      // 初始化jstree组件并绑定点击筛选事件
       script().$type("text/javascript").
         __("$(function() {",
           "  $('#cs a span').addClass('ui-corner-all').css('position', 'absolute');",
@@ -269,10 +326,16 @@ public class FairSchedulerPage extends RmView {
           "  });",
           "  $('#cs').show();",
           "});").__().
+        // 添加队列节点持久化JS
         __(SchedulerPageUtil.QueueBlockUtil.class);
   }
   
-  @Override protected Class<? extends SubView> content() {
+  @Override
+  /**
+   * 获取页面主内容区块类
+   * @return 队列总区块类
+   */
+  protected Class<? extends SubView> content() {
     return QueuesBlock.class;
   }
 
@@ -281,14 +344,29 @@ public class FairSchedulerPage extends RmView {
     return WebPageUtils.appsTableInit(true, false);
   }
 
+  /**
+   * 格式化浮点数为百分比字符串，保留1位小数
+   * @param f 浮点占比[0-1]
+   * @return 格式化后的百分比字符串
+   */
   static String percent(float f) {
     return StringUtils.formatPercent(f, 1);
   }
 
+  /**
+   * 生成宽度百分比CSS样式字符串
+   * @param f 宽度占比[0-1]
+   * @return CSS宽度属性字符串
+   */
   static String width(float f) {
     return StringUtils.format("width:%.1f%%", f * 100);
   }
 
+  /**
+   * 生成左侧偏移百分比CSS样式字符串
+   * @param f 左侧偏移占比[0-1]
+   * @return CSS左侧偏移属性字符串
+   */
   static String left(float f) {
     return StringUtils.format("left:%.1f%%", f * 100);
   }

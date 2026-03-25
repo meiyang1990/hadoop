@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -50,7 +51,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Applications block for the Router Web UI.
+ * Router Web UI 应用列表展示块，负责在联邦集群页面展示聚合后的应用信息。
  */
 public class AppsBlock extends RouterBlock {
 
@@ -66,55 +67,76 @@ public class AppsBlock extends RouterBlock {
 
   @Override
   protected void render(Block html) {
-
+    // 检查YARN联邦模式是否启用
     boolean isEnabled = isYarnFederationEnabled();
 
-    // Get subClusterName
+    // 获取请求参数中的子集群ID
     String subClusterName = $(APP_SC);
+    // 获取请求参数中的应用状态过滤条件
     String reqState = $(APP_STATE);
 
-    // We will try to get the subClusterName.
-    // If the subClusterName is not empty,
-    // it means that we need to get the Node list of a subCluster.
     AppsInfo appsInfo = null;
+    // 如果指定了子集群，查询该子集群的应用列表
     if (subClusterName != null && !subClusterName.isEmpty()) {
       initSubClusterMetricsOverviewTable(html, subClusterName);
       appsInfo = getSubClusterAppsInfo(subClusterName, reqState);
     } else {
-      // Metrics Overview Table
+      // 未指定子集群，展示全局聚合指标和全集群应用列表
       html.__(MetricsOverviewTable.class);
       appsInfo = getYarnFederationAppsInfo(isEnabled);
     }
 
+    // 初始化应用列表表格并渲染
     initYarnFederationAppsOfCluster(appsInfo, html);
   }
 
+  /**
+   * 对字符串进行HTML和JS转义，避免XSS攻击。
+   * @param str 原始字符串
+   * @return 转义后的字符串
+   */
   private static String escape(String str) {
     return escapeEcmaScript(escapeHtml4(str));
   }
 
+  /**
+   * 获取YARN联邦集群全局聚合后的应用列表。
+   * @param isEnabled 联邦模式是否启用
+   * @return 聚合后的应用信息
+   */
   private AppsInfo getYarnFederationAppsInfo(boolean isEnabled) {
     String webAddress = null;
     if (isEnabled) {
+      // 联邦模式启用，从Router获取全局应用列表
       webAddress = WebAppUtils.getRouterWebAppURLWithScheme(this.conf);
     } else {
+      // 联邦模式未启用，直接从本地RM获取应用列表
       webAddress = WebAppUtils.getRMWebAppURLWithScheme(this.conf);
     }
     return getSubClusterAppsInfoByWebAddress(webAddress, StringUtils.EMPTY);
   }
 
+  /**
+   * 根据子集群ID从对应子集群RM获取应用列表。
+   * @param subCluster 子集群ID
+   * @param states 应用状态过滤条件
+   * @return 子集群应用信息
+   */
   private AppsInfo getSubClusterAppsInfo(String subCluster, String states) {
     try {
       SubClusterId subClusterId = SubClusterId.newInstance(subCluster);
+      // 获取联邦状态存储门面，查询子集群信息
       FederationStateStoreFacade facade = FederationStateStoreFacade.getInstance(this.conf);
       SubClusterInfo subClusterInfo = facade.getSubCluster(subClusterId);
 
       if (subClusterInfo != null) {
-        // Prepare webAddress
+        // 获取子集群RM的Web服务地址
         String webAddress = subClusterInfo.getRMWebServiceAddress();
         String herfWebAppAddress;
         if (webAddress != null && !webAddress.isEmpty()) {
+          // 拼接完整的Web服务URL
           herfWebAppAddress = WebAppUtils.getHttpSchemePrefix(conf) + webAddress;
+          // 通过REST接口获取子集群应用列表
           return getSubClusterAppsInfoByWebAddress(herfWebAppAddress, states);
         }
       }
@@ -124,22 +146,37 @@ public class AppsBlock extends RouterBlock {
     return null;
   }
 
+  /**
+   * 通过指定Web地址调用REST接口获取应用列表。
+   * @param webAddress 目标Web服务地址
+   * @param states 应用状态过滤条件
+   * @return 应用信息列表
+   */
   private AppsInfo getSubClusterAppsInfoByWebAddress(String webAddress, String states) {
+    // 创建Jersey客户端
     Client client = RouterWebServiceUtil.createJerseyClient(conf);
+    // 构造请求参数
     Map<String, String[]> queryParams = new HashMap<>();
     if (StringUtils.isNotBlank(states)) {
       queryParams.put("states", new String[]{states});
     }
+    // 转发请求到目标服务获取应用列表
     AppsInfo apps = RouterWebServiceUtil
         .genericForward(webAddress, null, AppsInfo.class, HTTPMethods.GET,
         RMWSConsts.RM_WEB_SERVICE_PATH + RMWSConsts.APPS, null, queryParams, conf,
         client);
+    // 关闭客户端释放资源
     client.close();
     return apps;
   }
 
+  /**
+   * 初始化应用列表表格的HTML结构，并将应用数据注入页面供前端渲染。
+   * @param appsInfo 应用信息列表
+   * @param html HTML块对象
+   */
   private void initYarnFederationAppsOfCluster(AppsInfo appsInfo, Block html) {
-
+    // 创建应用表格表头
     TBODY<TABLE<Hamlet>> tbody = html.table("#apps").thead()
         .tr()
         .th(".id", "ID")
@@ -156,11 +193,11 @@ public class AppsBlock extends RouterBlock {
         .th(".ui", "Tracking UI")
         .__().__().tbody();
 
-    // Render the applications
+    // 构建前端表格需要的JSON数据
     StringBuilder appsTableData = new StringBuilder("[\n");
 
     if (appsInfo != null && CollectionUtils.isNotEmpty(appsInfo.getApps())) {
-
+      // 遍历转换每个应用信息为JSON格式字符串
       List<String> appInfoList =
           appsInfo.getApps().stream().map(this::parseAppInfoData).collect(Collectors.toList());
 
@@ -171,19 +208,27 @@ public class AppsBlock extends RouterBlock {
     }
 
     appsTableData.append("]");
+    // 将应用数据注入为页面全局JavaScript变量
     html.script().$type("text/javascript")
         .__("var appsTableData=" + appsTableData).__();
 
     tbody.__().__();
   }
 
+  /**
+   * 将单个应用信息解析为前端表格需要的JSON行格式。
+   * @param app 应用信息对象
+   * @return JSON格式的应用行字符串
+   */
   private String parseAppInfoData(AppInfo app) {
     StringBuilder appsDataBuilder = new StringBuilder();
     try {
+      // 格式化应用进度百分比
       String percent = String.format("%.1f", app.getProgress() * 100.0F);
+      // 获取追踪页面URL
       String trackingURL = app.getTrackingUrl() == null ? "#" : app.getTrackingUrl();
 
-      // AppID numerical value parsed by parseHadoopID in yarn.dt.plugins.js
+      // 拼接应用信息，构造JSON数组行
       appsDataBuilder.append("[\"")
           .append("<a href='").append(trackingURL).append("'>")
           .append(app.getAppId()).append("</a>\",\"")
@@ -196,13 +241,13 @@ public class AppsBlock extends RouterBlock {
           .append(app.getFinishTime()).append("\",\"")
           .append(app.getState()).append("\",\"")
           .append(app.getFinalStatus()).append("\",\"")
-          // Progress bar
+          // 进度条HTML
           .append("<br title='").append(percent).append("'> <div class='")
           .append(C_PROGRESSBAR).append("' title='")
           .append(join(percent, '%')).append("'> ").append("<div class='")
           .append(C_PROGRESSBAR_VALUE).append("' style='")
           .append(join("width:", percent, '%')).append("'> </div> </div>")
-          // History link
+          // 追踪链接
           .append("\",\"<a href='").append(trackingURL).append("'>")
           .append("History").append("</a>");
       appsDataBuilder.append("\"]\n");

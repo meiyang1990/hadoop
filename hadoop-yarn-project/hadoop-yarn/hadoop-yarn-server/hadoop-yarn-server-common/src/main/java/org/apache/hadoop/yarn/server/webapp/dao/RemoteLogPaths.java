@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,7 +25,8 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.List;
 
 /**
- * Container of a list of {@link RemoteLogPathEntry}.
+ * YARN Web REST API 数据传输对象，用于封装远程日志目录路径查询结果列表
+ * 存储批量RemoteLogPathEntry，用于序列化返回给前端调用方
  */
 @XmlRootElement(name = "remoteLogDirPathResult")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -36,6 +38,10 @@ public class RemoteLogPaths {
   //JAXB needs this
   public RemoteLogPaths() {}
 
+  /**
+   * 构造方法，传入预填充的远程日志路径条目列表
+   * @param paths 远程日志路径条目列表
+   */
   public RemoteLogPaths(List<RemoteLogPathEntry> paths) {
     this.paths = paths;
   }

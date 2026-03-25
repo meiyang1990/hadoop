@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -23,19 +24,21 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
 /**
- * Base interface for network tag mapping manager.
+ * 网络标签映射管理器基础接口，负责管理容器到网络标签的映射管理，
+ * 用于YARN节点管理器实现容器网络流量控制与隔离。
  */
 public interface NetworkTagMappingManager {
 
   /**
-   * Initialize the networkTagMapping manager.
+   * 初始化网络标签映射管理器，加载配置参数。
+   * @param conf 配置对象
    */
   void initialize(Configuration conf);
 
   /**
-   * Get networkTagHexID for the given container.
-   * @param container
-   * @return the networkTagID.
+   * 根据容器获取对应的十六进制格式网络标签ID，用于网络规则匹配。
+   * @param container 目标容器
+   * @return 十六进制格式的网络标签ID
    */
   String getNetworkTagHexID(Container container);
 }

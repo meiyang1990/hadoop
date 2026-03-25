@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,18 +19,26 @@
 package org.apache.hadoop.yarn.server.webapp.dao;
 
 /**
- * A remote log path for a log aggregation file controller.
+ * 日志聚合远程日志路径信息实体，用于在Web UI中传递日志文件控制器对应的远程路径信息
+ * <p>
+ * 存储格式为：
  * <pre>
  *   {@code <ROOT_PATH>/%USER/<SUFFIX>}
  * </pre>
+ * </p>
  */
 public class RemoteLogPathEntry {
   private String fileController;
   private String path;
 
-  //JAXB needs this
+  // JAXB序列化/反序列化需要无参构造函数
   public RemoteLogPathEntry() {}
 
+  /**
+   * 构造远程日志路径实体
+   * @param fileController 日志文件控制器名称
+   * @param path 远程日志根路径
+   */
   public RemoteLogPathEntry(String fileController, String path) {
     this.fileController = fileController;
     this.path = path;

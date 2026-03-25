@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 
 /**
- * Information about a loaded auxiliary service.
+ * NodeManager Web界面DA对象，存储已加载的辅助服务信息，供Web接口序列化返回使用。
  */
 @XmlRootElement(name = "service")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -34,10 +35,19 @@ public class AuxiliaryServiceInfo {
   private String version;
   private String startTime;
 
+  /**
+   * JAXB反序列化需要的默认无参构造方法。
+   */
   public AuxiliaryServiceInfo() {
     // JAXB needs this
   }
 
+  /**
+   * 构造辅助服务信息对象，格式化启动时间为指定格式字符串。
+   * @param name 辅助服务名称
+   * @param version 辅助服务版本
+   * @param startTime 辅助服务启动时间
+   */
   public AuxiliaryServiceInfo(String name, String version, Date startTime) {
     DateFormat dateFormat =
         new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");

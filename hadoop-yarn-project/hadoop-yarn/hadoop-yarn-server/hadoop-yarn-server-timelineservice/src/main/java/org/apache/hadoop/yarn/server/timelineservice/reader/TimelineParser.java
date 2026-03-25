@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,14 +25,18 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.server.timelineservice.reader.filter.TimelineFilterList;
 
+/**
+ * 时间线数据查询过滤器解析接口，定义查询条件解析的统一规范
+ * 用于将用户传入的查询条件解析为可执行的过滤规则列表
+ */
 @Private
 @Unstable
 interface TimelineParser extends Closeable {
   /**
-   * Method used for parsing.
+   * 执行解析操作，将输入的查询条件解析为过滤规则列表
    *
-   * @return a {@link TimelineFilterList} object.
-   * @throws TimelineParseException if any problem occurs while parsing.
+   * @return 解析完成的时间线过滤规则列表
+   * @throws TimelineParseException 解析过程中发生错误时抛出
    */
   TimelineFilterList parse() throws TimelineParseException;
 }

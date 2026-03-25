@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,10 +25,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.mapred.nativetask.util.ReadWriteBuffer;
 
 /**
- * a CommandDispatcher receives {@link Command} from upstream
- * and performs corresponding operations
+ * 命令分发器接口，接收来自上游的命令并执行对应操作
+ * 用于Native Task框架中Java层与Native层之间的命令调用分发
  */
 @InterfaceAudience.Private
 public interface CommandDispatcher {
+  /**
+   * 处理调用命令，执行对应操作并返回结果
+   * @param command 待处理的命令对象
+   * @param parameter 命令参数缓冲区
+   * @return 命令处理结果缓冲区
+   * @throws IOException 处理过程中发生IO异常时抛出
+   */
   public ReadWriteBuffer onCall(Command command, ReadWriteBuffer parameter) throws IOException;
 }

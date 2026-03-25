@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,6 +48,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * GPU设备发现器，负责在NodeManager节点上发现可用的NVIDIA GPU设备
+ * 支持自动发现（通过nvidia-smi工具）和手动配置两种模式
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class GpuDiscoverer extends Configured {
@@ -72,6 +77,7 @@ public class GpuDiscoverer extends Configured {
 
   private List<GpuDevice> gpuDevicesFromUser;
 
+  /** 校验配置是否已初始化，未初始化则抛出异常 */
   private void validateConfOrThrowException() throws YarnException {
     if (getConf() == null) {
       throw new YarnException("Please initialize (call initialize) before use "
@@ -103,17 +109,14 @@ public class GpuDiscoverer extends Configured {
   }
 
   /**
-   * Get GPU device information from system.
-   * This need to be called after initialize.
-   *
-   * Please note that this only works on *NIX platform, so external caller
-   * need to make sure this.
-   *
-   * @return GpuDeviceInformation
-   * @throws YarnException when any error happens
+   * 从系统获取GPU设备信息
+   * 必须在initialize之后调用，仅支持Unix-like系统
+   * @return GPU设备信息对象
+   * @throws YarnException 当发生任何错误时抛出
    */
   public synchronized GpuDeviceInformation getGpuDeviceInformation()
       throws YarnException {
+    // 检查是否已达到最大错误次数限制
     if (discoveryMaxErrors >= 0 &&
         numOfErrorExecutionSinceLastSucceed == discoveryMaxErrors) {
       String msg = getErrorMessageOfScriptExecutionThresholdReached();
@@ -122,15 +125,18 @@ public class GpuDiscoverer extends Configured {
     }
 
     try {
+      // 调用NVIDIA工具获取GPU信息
       lastDiscoveredGpuInformation =
           nvidiaBinaryHelper.getGpuDeviceInformation(pathOfGpuBinary,
               discoveryTimeoutMs);
     } catch (IOException e) {
+      // 执行出错，错误计数增加
       numOfErrorExecutionSinceLastSucceed++;
       String msg = getErrorMessageOfScriptExecution(e.getMessage());
       LOG.debug(msg);
       throw new YarnException(msg, e);
     } catch (YarnException e) {
+      // 解析输出解析错误，错误计数增加
       numOfErrorExecutionSinceLastSucceed++;
       String msg = getFailedToParseErrorMessage(e.getMessage());
       LOG.debug(msg, e);
@@ -140,6 +146,7 @@ public class GpuDiscoverer extends Configured {
     return lastDiscoveredGpuInformation;
   }
 
+  /** 检查是否开启自动发现GPU设备模式 */
   boolean isAutoDiscoveryEnabled() {
     String allowedDevicesStr = getConf().get(
         YarnConfiguration.NM_GPU_ALLOWED_DEVICES,
@@ -149,17 +156,19 @@ public class GpuDiscoverer extends Configured {
   }
 
   /**
-   * Get list of GPU devices usable by YARN.
-   *
-   * @return List of GPU devices
+   * 获取YARN可使用的GPU设备列表
+   * @return 可用GPU设备列表
+   * @throws YarnException 发现过程中发生错误抛出
    */
   public synchronized List<GpuDevice> getGpusUsableByYarn()
       throws YarnException {
     validateConfOrThrowException();
 
     if (isAutoDiscoveryEnabled()) {
+      // 自动发现模式，从系统信息解析GPU
       return parseGpuDevicesFromAutoDiscoveredGpuInfo();
     } else {
+      // 手动配置模式，解析用户配置的GPU列表
       if (gpuDevicesFromUser == null) {
         gpuDevicesFromUser = parseGpuDevicesFromUserDefinedValues();
       }
@@ -167,6 +176,11 @@ public class GpuDiscoverer extends Configured {
     }
   }
 
+  /**
+   * 从自动发现的GPU信息中解析出可用设备列表
+   * @return 解析后的GPU设备列表
+   * @throws YarnException 自动发现失败时抛出
+   */
   private List<GpuDevice> parseGpuDevicesFromAutoDiscoveredGpuInfo()
           throws YarnException {
     if (lastDiscoveredGpuInformation == null) {
@@ -184,7 +198,8 @@ public class GpuDiscoverer extends Configured {
     List<GpuDevice> gpuDevices = new ArrayList<>();
     if (lastDiscoveredGpuInformation.getGpus() != null) {
       int numberOfGpus = lastDiscoveredGpuInformation.getGpus().size();
-      LOG.debug("Found {} GPU devices", numberOfGpus);
+      LOG.debug("Found {} GPU devices", numberOfGpu);
+      // 遍历所有GPU信息，转换为GpuDevice对象
       for (int i = 0; i < numberOfGpus; i++) {
         List<PerGpuDeviceInformation> gpuInfos =
             lastDiscoveredGpuInformation.getGpus();
@@ -195,9 +210,9 @@ public class GpuDiscoverer extends Configured {
   }
 
   /**
-   * @return List of GpuDevices
-   * @throws YarnException when a GPU device is defined as a duplicate.
-   * The first duplicate GPU device will be added to the exception message.
+   * 从用户配置中解析GPU设备列表
+   * @return 解析后的GPU设备列表
+   * @throws YarnException 配置格式错误或存在重复设备时抛出
    */
   private List<GpuDevice> parseGpuDevicesFromUserDefinedValues()
       throws YarnException {
@@ -205,12 +220,15 @@ public class GpuDiscoverer extends Configured {
         YarnConfiguration.NM_GPU_ALLOWED_DEVICES,
         YarnConfiguration.AUTOMATICALLY_DISCOVER_GPU_DEVICES);
 
+    // 配置为空直接抛出异常
     if (devices.trim().isEmpty()) {
       throw GpuDeviceSpecificationException.createWithEmptyValueSpecified();
     }
     List<GpuDevice> gpuDevices = Lists.newArrayList();
+    // 按逗号分割多个设备
     for (String device : devices.split(",")) {
       if (device.trim().length() > 0) {
+        // 按冒号分割索引和minor号
         String[] splitByColon = device.trim().split(":");
         if (splitByColon.length != 2) {
           throwIfNecessary(GpuDeviceSpecificationException
@@ -220,6 +238,7 @@ public class GpuDiscoverer extends Configured {
 
         GpuDevice gpuDevice;
         try {
+          // 解析单个GPU设备
           gpuDevice = parseGpuDevice(splitByColon);
         } catch (NumberFormatException e) {
           throwIfNecessary(GpuDeviceSpecificationException
@@ -228,6 +247,7 @@ public class GpuDiscoverer extends Configured {
           continue;
         }
 
+        // 检查设备是否重复
         if (!gpuDevices.contains(gpuDevice)) {
           gpuDevices.add(gpuDevice);
         } else {
@@ -242,21 +262,30 @@ public class GpuDiscoverer extends Configured {
     return gpuDevices;
   }
 
+  /** 解析单个GPU设备，输入为[index:minorNumber]格式分割后的数组 */
   private GpuDevice parseGpuDevice(String[] splitByColon) {
     int index = Integer.parseInt(splitByColon[0]);
     int minorNumber = Integer.parseInt(splitByColon[1]);
     return new GpuDevice(index, minorNumber);
   }
 
+  /**
+   * 初始化GPU发现器，加载配置并尝试首次发现
+   * @param config 配置对象
+   * @param nvidiaHelper NVIDIA二进制工具帮助类
+   * @throws YarnException 初始化过程出错抛出
+   */
   public synchronized void initialize(Configuration config,
       NvidiaBinaryHelper nvidiaHelper) throws YarnException {
     setConf(config);
     this.nvidiaBinaryHelper = nvidiaHelper;
     if (isAutoDiscoveryEnabled()) {
+      // 重置错误计数
       numOfErrorExecutionSinceLastSucceed = 0;
+      // 查找nvidia-smi二进制文件路径
       lookUpAutoDiscoveryBinary(config);
 
-      // Try to discover GPU information once and print
+      // 首次尝试发现GPU信息，打印日志
       try {
         LOG.info("Trying to discover GPU information ...");
         GpuDeviceInformation info = getGpuDeviceInformation();
@@ -270,6 +299,11 @@ public class GpuDiscoverer extends Configured {
     }
   }
 
+  /**
+   * 查找nvidia-smi二进制文件路径，处理用户配置和默认搜索
+   * @param config 配置对象
+   * @throws YarnException 找不到二进制文件时抛出
+   */
   private void lookUpAutoDiscoveryBinary(Configuration config)
       throws YarnException {
     String configuredBinaryPath = config.get(
@@ -281,10 +315,13 @@ public class GpuDiscoverer extends Configured {
     File binaryPath;
     File configuredBinaryFile = new File(configuredBinaryPath);
     if (!configuredBinaryFile.exists()) {
+      // 用户配置路径不存在，去默认目录搜索
       binaryPath = lookupBinaryInDefaultDirs();
     } else if (configuredBinaryFile.isDirectory()) {
+      // 用户配置是目录，在目录下查找nvidia-smi
       binaryPath = handleConfiguredBinaryPathIsDirectory(configuredBinaryFile);
     } else {
+      // 用户配置是文件，直接使用，检查文件名是否正确
       binaryPath = configuredBinaryFile;
       // If path exists but file name is incorrect don't execute the file
       String fileName = binaryPath.getName();
@@ -299,19 +336,28 @@ public class GpuDiscoverer extends Configured {
       }
     }
 
+    // 保存绝对路径
     pathOfGpuBinary = binaryPath.getAbsolutePath();
 
+    // 读取发现超时配置
     discoveryTimeoutMs = config.getTimeDuration(
         YarnConfiguration.NM_GPU_DISCOVERY_TIMEOUT,
         YarnConfiguration.NM_GPU_DISCOVERY_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
 
+    // 读取最大错误次数配置
     discoveryMaxErrors = config.getInt(
         YarnConfiguration.NM_GPU_DISCOVERY_MAX_ERRORS,
         YarnConfiguration.NM_GPU_DISCOVERY_MAX_ERRORS_DEFAULT);
 
   }
 
+  /**
+   * 处理用户配置为目录的情况，在目录下查找nvidia-smi
+   * @param configuredBinaryFile 用户配置的目录
+   * @return 找到的nvidia-smi文件对象
+   * @throws YarnException 目录下找不到nvidia-smi抛出
+   */
   private File handleConfiguredBinaryPathIsDirectory(File configuredBinaryFile)
       throws YarnException {
     File binaryPath = new File(configuredBinaryFile, DEFAULT_BINARY_NAME);
@@ -328,6 +374,11 @@ public class GpuDiscoverer extends Configured {
     return binaryPath;
   }
 
+  /**
+   * 在默认搜索目录中查找nvidia-smi
+   * @return 找到的文件对象
+   * @throws YarnException 所有默认目录都找不到抛出
+   */
   private File lookupBinaryInDefaultDirs() throws YarnException {
     final File lookedUpBinary = lookupBinaryInDefaultDirsInternal();
     if (lookedUpBinary == null) {
@@ -339,6 +390,7 @@ public class GpuDiscoverer extends Configured {
     return lookedUpBinary;
   }
 
+  /** 内部方法：遍历默认目录查找nvidia-smi */
   private File lookupBinaryInDefaultDirsInternal() {
     Set<String> triedBinaryPaths = Sets.newHashSet();
     for (String dir : DEFAULT_BINARY_SEARCH_DIRS) {

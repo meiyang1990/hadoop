@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,67 +34,60 @@ import org.apache.hadoop.yarn.server.federation.store.records.DeletePoliciesConf
 import org.apache.hadoop.yarn.server.federation.store.records.DeletePoliciesConfigurationsResponse;
 
 /**
- * The FederationPolicyStore provides a key-value interface to access the
- * policies configured for the system. The key is a "queue" name, i.e., the
- * system allows to configure a different policy for each queue in the system
- * (though each policy can make dynamic run-time decisions on a per-job/per-task
- * basis). The value is a {@code SubClusterPolicyConfiguration}, a serialized
- * representation of the policy type and its parameters.
+ * YARN联邦路由策略存储接口，提供对队列级路由策略配置的存取能力。
+ * 策略以队列名为键存储，值为序列化的策略配置信息，支持为每个队列单独配置不同的
+ * 子集群选择路由策略，策略本身可在运行时基于作业/任务动态决策。
  */
 @Private
 @Unstable
 public interface FederationPolicyStore {
 
   /**
-   * Get the policy configuration for a given queue.
+   * 获取指定队列的路由策略配置。
    *
-   * @param request the queue whose {@code SubClusterPolicyConfiguration} is
-   *          required
-   * @return the {@code SubClusterPolicyConfiguration} for the specified queue,
-   *         or {@code null} if there is no mapping for the queue
-   * @throws YarnException if the request is invalid/fails
+   * @param request 请求，包含需要查询的队列名
+   * @return 指定队列的路由策略配置，不存在该队列时返回null
+   * @throws YarnException 请求无效或执行失败时抛出异常
    */
   GetSubClusterPolicyConfigurationResponse getPolicyConfiguration(
       GetSubClusterPolicyConfigurationRequest request) throws YarnException;
 
   /**
-   * Set the policy configuration for a given queue.
+   * 设置指定队列的路由策略配置。
    *
-   * @param request the {@code SubClusterPolicyConfiguration} with the
-   *          corresponding queue
-   * @return response empty on successfully updating the
-   *         {@code SubClusterPolicyConfiguration} for the specified queue
-   * @throws YarnException if the request is invalid/fails
+   * @param request 请求，包含队列名和对应的路由策略配置
+   * @return 更新成功返回空响应
+   * @throws YarnException 请求无效或执行失败时抛出异常
    */
   SetSubClusterPolicyConfigurationResponse setPolicyConfiguration(
       SetSubClusterPolicyConfigurationRequest request) throws YarnException;
 
   /**
-   * Get a map of all queue-to-policy configurations.
+   * 获取当前系统中所有队列的路由策略配置映射。
    *
-   * @param request empty to represent all configured queues in the system
-   * @return the policies for all currently active queues in the system
-   * @throws YarnException if the request is invalid/fails
+   * @param request 请求，空请求表示查询所有已配置队列
+   * @return 所有当前激活队列的路由策略配置集合
+   * @throws YarnException 请求无效或执行失败时抛出异常
    */
   GetSubClusterPoliciesConfigurationsResponse getPoliciesConfigurations(
       GetSubClusterPoliciesConfigurationsRequest request) throws YarnException;
 
   /**
-   * Delete PoliciesConfigurations.
+   * 批量删除指定队列的路由策略配置。
    *
-   * @param request List containing delete queues.
-   * @return response empty means the queue list has been deleted successfully.
-   * @throws YarnException if the request is invalid/fails
+   * @param request 请求，包含待删除的队列列表
+   * @return 删除成功返回空响应
+   * @throws YarnException 请求无效或执行失败时抛出异常
    */
   DeleteSubClusterPoliciesConfigurationsResponse deletePoliciesConfigurations(
       DeleteSubClusterPoliciesConfigurationsRequest request) throws YarnException;
 
   /**
-   * Delete all queue-to-policy configurations.
+   * 删除所有队列的路由策略配置。
    *
-   * @param request delete request.
-   * @return If the response is empty, the queue-to-policy configurations are deleted successfully.
-   * @throws Exception if the request is invalid/fails
+   * @param request 删除请求
+   * @return 删除成功返回空响应
+   * @throws Exception 请求无效或执行失败时抛出异常
    */
   DeletePoliciesConfigurationsResponse deleteAllPoliciesConfigurations(
       DeletePoliciesConfigurationsRequest request) throws Exception;

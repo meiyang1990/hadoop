@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.
- * documentstore.collection.document.flowactivity contains
- * FlowActivityDocument to audit all the flows at a day level.
+ * 时间线服务文档存储层流活动文档包，提供按天粒度统计所有YARN流活动审计的文档模型定义
+ * 包含FlowActivityDocument类，用于存储流维度的天级聚合活动数据，支撑YARN时间线服务的流活动历史查询
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,27 +43,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This policy selects the subcluster depending on the node where the Client
- * wants to run its application.
- *
- * It succeeds if:
- *
- * - There are three AMContainerResourceRequests in the order
- *   NODE, RACK, ANY
- *
- * It falls back to WeightedRandomRouterPolicy in case of:
- *
- * - Null or empty AMContainerResourceRequests;
- *
- * - One AMContainerResourceRequests and it has ANY as ResourceName;
- *
- * - The node is in blacklisted SubClusters.
- *
- * It fails if:
- *
- * - The node does not exist and RelaxLocality is False;
- *
- * - We have an invalid number (not 0, 1 or 3) resource requests
+ * YARN联邦环境下基于应用本地性的路由策略，根据应用期望运行的节点位置选择对应子集群。
+ * 
+ * 正常选中外置子集群的条件：
+ * 1. AM容器资源请求正好有3个，按顺序为NODE、RACK、ANY
+ * 
+ * 回退到加权随机路由策略的场景：
+ * 1. AM容器资源请求为空或null
+ * 2. 仅有1个资源请求且资源位置为ANY
+ * 3. 请求节点所在子集群在黑名单中
+ * 
+ * 校验失败场景：
+ * 1. 请求节点不存在且开启了严格本地址（不允许放宽本地址）
+ * 2. 资源请求数量无效（不是0、1、3）
  */
 public class LocalityRouterPolicy extends WeightedRandomRouterPolicy {
 
@@ -75,11 +68,16 @@ public class LocalityRouterPolicy extends WeightedRandomRouterPolicy {
   @Override
   public void reinitialize(FederationPolicyInitializationContext policyContext)
       throws FederationPolicyInitializationException {
+    // 调用父类完成初始化
     super.reinitialize(policyContext);
+    // 获取子集群解析器，用于解析节点/rack对应的子集群
     resolver = policyContext.getFederationSubclusterResolver();
+    // 获取配置中所有子集群的权重信息
     Map<SubClusterIdInfo, Float> weights =
         getPolicyInfo().getRouterPolicyWeights();
+    // 初始化可用子集群列表
     enabledSCs = new ArrayList<>();
+    // 遍历权重配置，收集权重大于0的启用子集群
     for (Map.Entry<SubClusterIdInfo, Float> entry : weights.entrySet()) {
       if (entry != null && entry.getValue() > 0) {
         enabledSCs.add(entry.getKey().toId());
@@ -92,64 +90,69 @@ public class LocalityRouterPolicy extends WeightedRandomRouterPolicy {
       ApplicationSubmissionContext appSubmissionContext,
       List<SubClusterId> blackListSubClusters) throws YarnException {
 
-    // null checks and default-queue behavior
+    // 空值校验和默认队列处理
     validate(appSubmissionContext);
 
+    // 获取AM容器的资源请求列表
     List<ResourceRequest> rrList =
         appSubmissionContext.getAMContainerResourceRequests();
 
-    // Fast path for FailForward to WeightedRandomRouterPolicy
+    // 满足回退条件，直接走父类加权随机路由
     if (rrList == null || rrList.isEmpty() || (rrList.size() == 1
         && ResourceRequest.isAnyLocation(rrList.get(0).getResourceName()))) {
       return super.getHomeSubcluster(appSubmissionContext, blackListSubClusters);
     }
 
+    // 资源请求数量不等于3，抛出异常
     if (rrList.size() != 3) {
       throw new FederationPolicyException(
           "Invalid number of resource requests: " + rrList.size());
     }
 
+    // 获取所有活跃子集群信息
     Map<SubClusterId, SubClusterInfo> activeSubClusters = getActiveSubclusters();
+    // 获取活跃子集群ID集合
     Set<SubClusterId> validSubClusters = activeSubClusters.keySet();
+    // 校验子集群可用性，确保至少有可用子集群
     FederationPolicyUtils.validateSubClusterAvailability(activeSubClusters.keySet(),
         blackListSubClusters);
 
     if (blackListSubClusters != null) {
-      // Remove from the active SubClusters from StateStore the blacklisted ones
+      // 从可用集合中移除黑名单内的子集群
       validSubClusters.removeAll(blackListSubClusters);
     }
 
     try {
-      // With three requests, this has been processed by the
-      // ResourceRequestInterceptorREST, and should have
-      // node, rack, and any
+      // 三个资源请求分别对应node、rack、any，由ResourceRequestInterceptorREST预处理
       SubClusterId targetId = null;
       ResourceRequest nodeRequest = null;
       ResourceRequest rackRequest = null;
       ResourceRequest anyRequest = null;
 
+      // 遍历解析每个资源请求，分类存储
       for (ResourceRequest rr : rrList) {
-        // Handle "node" requests
+        // 尝试解析节点对应的子集群
         try {
           targetId = resolver.getSubClusterForNode(rr.getResourceName());
           nodeRequest = rr;
         } catch (YarnException e) {
           LOG.error("Cannot resolve node : {}.", e.getMessage());
         }
-        // Handle "rack" requests
+        // 尝试解析rack对应的子集群
         try {
           resolver.getSubClustersForRack(rr.getResourceName());
           rackRequest = rr;
         } catch (YarnException e) {
           LOG.error("Cannot resolve rack : {}.", e.getMessage());
         }
-        // Handle "ANY" requests
+        // 标识ANY位置请求
         if (ResourceRequest.isAnyLocation(rr.getResourceName())) {
           anyRequest = rr;
           continue;
         }
       }
 
+      // 校验三个请求都存在
       if (nodeRequest == null) {
         throw new YarnException("Missing node request.");
       }
@@ -164,10 +167,11 @@ public class LocalityRouterPolicy extends WeightedRandomRouterPolicy {
           nodeRequest.getResourceName(), rackRequest.getResourceName(),
           anyRequest.getResourceName());
 
-      // Handle "node" requests
+      // 检查节点所在子集群是否可用（活跃且不在黑名单、已启用）
       if (validSubClusters.contains(targetId) && enabledSCs
           .contains(targetId)) {
         LOG.info("Node {} is in SubCluster: {}.", nodeRequest.getResourceName(), targetId);
+        // 返回对应子集群作为AM运行位置
         return targetId;
       } else {
         throw new YarnException("The node " + nodeRequest.getResourceName()
@@ -176,8 +180,7 @@ public class LocalityRouterPolicy extends WeightedRandomRouterPolicy {
     } catch (YarnException e) {
       LOG.error("Validating resource requests failed, " +
           "Falling back to WeightedRandomRouterPolicy placement : {}.", e.getMessage());
-      // FailForward to WeightedRandomRouterPolicy
-      // Overwrite request to use a default ANY
+      // 校验失败，回退到加权随机路由，替换请求为默认ANY位置
       ResourceRequest amReq = Records.newRecord(ResourceRequest.class);
       amReq.setPriority(appSubmissionContext.getPriority());
       amReq.setResourceName(ResourceRequest.ANY);
@@ -187,6 +190,7 @@ public class LocalityRouterPolicy extends WeightedRandomRouterPolicy {
       amReq.setNodeLabelExpression(appSubmissionContext.getNodeLabelExpression());
       amReq.setExecutionTypeRequest(ExecutionTypeRequest.newInstance(ExecutionType.GUARANTEED));
       appSubmissionContext.setAMContainerResourceRequests(Collections.singletonList(amReq));
+      // 调用父类方法选择子集群
       return super.getHomeSubcluster(appSubmissionContext, blackListSubClusters);
     }
   }

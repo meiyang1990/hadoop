@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,11 +32,10 @@ import org.apache.hadoop.thirdparty.protobuf.RpcController;
 import org.apache.hadoop.thirdparty.protobuf.ServiceException;
 
 /**
- * This class is used on the server side. Calls come across the wire for the
- * for protocol {@link ReconfigurationProtocolPB}.
- * This class translates the PB data types
- * to the native data types used inside the NN/DN as specified in the generic
- * ReconfigurationProtocol.
+ * 重新配置协议服务端Protobuf转换器，实现ReconfigurationProtocolPB服务端接口
+ * 负责将RPC请求中的Protobuf格式数据转换为HDFS内部使用的原生数据类型，
+ * 转发给NameNode/DataNode内部的ReconfigurationProtocol实现处理后，
+ * 再将结果转换回Protobuf格式返回给客户端。
  */
 public class ReconfigurationProtocolServerSideTranslatorPB implements
     ReconfigurationProtocolPB {
@@ -45,11 +45,22 @@ public class ReconfigurationProtocolServerSideTranslatorPB implements
   private static final StartReconfigurationResponseProto START_RECONFIG_RESP =
       StartReconfigurationResponseProto.newBuilder().build();
 
+  /**
+   * 构造函数，注入重新配置协议的原生实现
+   * @param impl 原生重新配置协议实现（NameNode或DataNode端）
+   */
   public ReconfigurationProtocolServerSideTranslatorPB(
       ReconfigurationProtocol impl) {
     this.impl = impl;
   }
 
+  /**
+   * 处理启动重新配置的RPC请求，转换格式并转发给内部实现
+   * @param controller RPC控制器
+   * @param request Protobuf格式的启动重新配置请求
+   * @return Protobuf格式的响应
+   * @throws ServiceException 服务异常，包装内部IO异常
+   */
   @Override
   public StartReconfigurationResponseProto startReconfiguration(
       RpcController controller, StartReconfigurationRequestProto request)
@@ -62,6 +73,13 @@ public class ReconfigurationProtocolServerSideTranslatorPB implements
     return START_RECONFIG_RESP;
   }
 
+  /**
+   * 处理获取可重新配置属性列表的RPC请求，转换格式并转发给内部实现
+   * @param controller RPC控制器
+   * @param request Protobuf格式的请求
+   * @return Protobuf格式的可配置属性列表响应
+   * @throws ServiceException 服务异常，包装内部IO异常
+   */
   @Override
   public ListReconfigurablePropertiesResponseProto listReconfigurableProperties(
       RpcController controller,
@@ -75,6 +93,13 @@ public class ReconfigurationProtocolServerSideTranslatorPB implements
     }
   }
 
+  /**
+   * 处理获取重新配置状态的RPC请求，转换格式并转发给内部实现
+   * @param unused RPC控制器（未使用）
+   * @param request Protobuf格式的获取状态请求
+   * @return Protobuf格式的重新配置状态响应
+   * @throws ServiceException 服务异常，包装内部IO异常
+   */
   @Override
   public GetReconfigurationStatusResponseProto getReconfigurationStatus(
       RpcController unused, GetReconfigurationStatusRequestProto request)

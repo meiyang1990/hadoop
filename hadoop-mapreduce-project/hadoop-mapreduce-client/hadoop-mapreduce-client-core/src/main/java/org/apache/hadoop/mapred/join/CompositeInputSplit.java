@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,8 +32,9 @@ import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
- * This InputSplit contains a set of child InputSplits. Any InputSplit inserted
- * into this collection must have a public default constructor.
+ * 多输入分片组合容器，用于将多个子InputSplit聚合为一个分片，供MapReduce连接操作使用。
+ * 被加入容器的所有子分片都必须拥有公开默认构造函数，支持序列化反序列化。
+ * 该类是MapReduce端连接操作的核心数据结构，用于将多个数据源同位置的分片组合，实现数据本地化连接。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -42,16 +44,23 @@ public class CompositeInputSplit implements InputSplit {
   private long totsize = 0L;
   private InputSplit[] splits;
 
+  /**
+   * 默认空构造函数，满足Writable序列化要求
+   */
   public CompositeInputSplit() { }
 
+  /**
+   * 构造指定容量的组合分片，预分配子分片数组空间
+   * @param capacity 可容纳的最大子分片数量
+   */
   public CompositeInputSplit(int capacity) {
     splits = new InputSplit[capacity];
   }
 
   /**
-   * Add an InputSplit to this collection.
-   * @throws IOException If capacity was not specified during construction
-   *                     or if capacity has been reached.
+   * 向组合分片容器中添加一个子InputSplit
+   * @param s 待添加的子InputSplit
+   * @throws IOException 如果容器未初始化或已达到容量上限抛出异常
    */
   public void add(InputSplit s) throws IOException {
     if (null == splits) {
@@ -65,28 +74,34 @@ public class CompositeInputSplit implements InputSplit {
   }
 
   /**
-   * Get ith child InputSplit.
+   * 获取指定索引位置的子InputSplit
+   * @param i 子分片索引
+   * @return 对应索引的子InputSplit
    */
   public InputSplit get(int i) {
     return splits[i];
   }
 
   /**
-   * Return the aggregate length of all child InputSplits currently added.
+   * 获取所有已添加子分片的总长度之和
+   * @return 组合分片总字节长度
    */
   public long getLength() throws IOException {
     return totsize;
   }
 
   /**
-   * Get the length of ith child InputSplit.
+   * 获取指定索引位置子分片的长度
+   * @param i 子分片索引
+   * @return 对应子分片的字节长度
    */
   public long getLength(int i) throws IOException {
     return splits[i].getLength();
   }
 
   /**
-   * Collect a set of hosts from all child InputSplits.
+   * 收集所有子分片的位置信息，合并去重后返回，用于调度时数据本地化
+   * @return 所有子分片所在DataNode节点主机名数组，无重复
    */
   public String[] getLocations() throws IOException {
     HashSet<String> hosts = new HashSet<String>();
@@ -102,45 +117,51 @@ public class CompositeInputSplit implements InputSplit {
   }
 
   /**
-   * getLocations from ith InputSplit.
+   * 获取指定索引位置子分片的位置信息
+   * @param i 子分片索引
+   * @return 对应子分片的主机位置数组
    */
   public String[] getLocation(int i) throws IOException {
     return splits[i].getLocations();
   }
 
   /**
-   * Write splits in the following format.
-   * {@code
-   * <count><class1><class2>...<classn><split1><split2>...<splitn>
-   * }
+   * 将组合分片序列化输出到DataOutput，格式为：分片数量 -> 各分片类名 -> 各分片序列化数据
+   * @param out 输出流
    */
   public void write(DataOutput out) throws IOException {
     WritableUtils.writeVInt(out, splits.length);
+    // 先写入所有子分片的类名，用于反序列化时实例化
     for (InputSplit s : splits) {
       Text.writeString(out, s.getClass().getName());
     }
+    // 再写入每个子分片自身的序列化数据
     for (InputSplit s : splits) {
       s.write(out);
     }
   }
 
   /**
-   * {@inheritDoc}
-   * @throws IOException If the child InputSplit cannot be read, typically
-   *                     for faliing access checks.
+   * 从DataInput反序列化读取组合分片数据，先读取类信息实例化对象，再反序列化每个子分片
+   * @param in 输入流
+   * @throws IOException 如果子分片实例化读取失败抛出异常
    */
   @SuppressWarnings("unchecked")  // Generic array assignment
   public void readFields(DataInput in) throws IOException {
+    // 读取子分片总数
     int card = WritableUtils.readVInt(in);
+    // 如果数组不存在或大小不匹配则重新分配
     if (splits == null || splits.length != card) {
       splits = new InputSplit[card];
     }
     Class<? extends InputSplit>[] cls = new Class[card];
     try {
+      // 先读取所有子分片的类信息
       for (int i = 0; i < card; ++i) {
         cls[i] =
           Class.forName(Text.readString(in)).asSubclass(InputSplit.class);
       }
+      // 逐个实例化子分片并反序列化数据
       for (int i = 0; i < card; ++i) {
         splits[i] = ReflectionUtils.newInstance(cls[i], null);
         splits[i].readFields(in);

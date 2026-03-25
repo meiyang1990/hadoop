@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,50 +37,92 @@ import org.apache.hadoop.yarn.util.Times;
 import org.apache.hadoop.yarn.util.resource.ResourceUtils;
 import org.apache.hadoop.yarn.util.StringHelper;
 
+/**
+ * YARN Web UI 应用信息数据访问对象，封装应用基本信息、运行状态、资源使用情况等数据，
+ * 用于 REST API 返回给前端展示。
+ */
 @Public
 @Evolving
 @XmlRootElement(name = "app")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppInfo {
 
+  // 应用ID
   protected String appId;
+  // 当前应用尝试ID
   protected String currentAppAttemptId;
+  // 提交应用的用户名
   protected String user;
+  // 应用名称
   protected String name;
+  // 应用所属队列
   protected String queue;
+  // 应用类型
   protected String type;
+  // ApplicationMaster所在主机
   protected String host;
+  // ApplicationMaster RPC端口
   protected int rpcPort;
+  // 应用当前状态
   protected YarnApplicationState appState;
+  // 当前运行容器数
   protected int runningContainers;
+  // 应用进度百分比
   protected float progress;
+  // 应用诊断信息
   protected String diagnosticsInfo;
+  // 原始追踪URL
   protected String originalTrackingUrl;
-  protected String trackingUrl;
+  // 追踪URL
   protected FinalApplicationStatus finalAppStatus;
+  // 应用提交时间
   private long submittedTime;
+  // 应用启动时间
   protected long startedTime;
+  // 应用启动完成时间
   private long launchTime;
+  // 应用结束时间
   protected long finishedTime;
+  // 应用已运行时间
   protected long elapsedTime;
+  // 应用标签，逗号分隔
   protected String applicationTags;
+  // 应用优先级
   protected int priority;
+  // 已分配CPU核心数
   private long allocatedCpuVcores;
+  // 已分配内存大小（MB）
   private long allocatedMemoryMB;
+  // 已分配GPU数量
   private long allocatedGpus;
+  // 预留CPU核心数
   private long reservedCpuVcores;
+  // 预留内存大小（MB）
   private long reservedMemoryMB;
+  // 预留GPU数量
   private long reservedGpus;
+  // 是否为非托管应用
   protected boolean unmanagedApplication;
+  // 应用节点标签表达式
   private String appNodeLabelExpression;
+  // ApplicationMaster节点标签表达式
   private String amNodeLabelExpression;
+  // 累计资源分配量（资源-秒）
   private String aggregateResourceAllocation;
+  // 累计被抢占资源量（资源-秒）
   private String aggregatePreemptedResourceAllocation;
 
+  /**
+   * JAXB 反序列化需要的无参构造方法
+   */
   public AppInfo() {
     // JAXB needs this
   }
 
+  /**
+   * 根据应用报告构造应用信息对象，提取所有需要展示的字段
+   * @param app YARN应用报告对象
+   */
   public AppInfo(ApplicationReport app) {
     appId = app.getApplicationId().toString();
     if (app.getCurrentApplicationAttemptId() != null) {
@@ -99,44 +142,55 @@ public class AppInfo {
     startedTime = app.getStartTime();
     launchTime = app.getLaunchTime();
     finishedTime = app.getFinishTime();
+    // 计算应用已运行时间
     elapsedTime = Times.elapsed(startedTime, finishedTime);
     finalAppStatus = app.getFinalApplicationStatus();
     priority = 0;
     if (app.getPriority() != null) {
       priority = app.getPriority().getPriority();
     }
+    // 获取应用资源使用报告
     ApplicationResourceUsageReport usageReport =
         app.getApplicationResourceUsageReport();
     if (usageReport != null) {
+      // 获取正在使用的容器数量
       runningContainers = usageReport
           .getNumUsedContainers();
       if (usageReport.getUsedResources() != null) {
+        // 提取已分配的CPU和内存
         allocatedCpuVcores = usageReport
             .getUsedResources().getVirtualCores();
         allocatedMemoryMB = usageReport
             .getUsedResources().getMemorySize();
+        // 提取预留的CPU和内存
         reservedCpuVcores = usageReport
             .getReservedResources().getVirtualCores();
         reservedMemoryMB = usageReport
             .getReservedResources().getMemorySize();
+        // 获取GPU资源类型索引
         Integer gpuIndex = ResourceUtils.getResourceTypeIndex()
             .get(ResourceInformation.GPU_URI);
         allocatedGpus = -1;
         reservedGpus = -1;
         if (gpuIndex != null) {
+          // 提取已分配和预留的GPU数量
           allocatedGpus = usageReport.getUsedResources()
               .getResourceValue(ResourceInformation.GPU_URI);
           reservedGpus = usageReport.getReservedResources()
               .getResourceValue(ResourceInformation.GPU_URI);
         }
       }
+      // 格式化累计资源分配为字符串
       aggregateResourceAllocation = StringHelper.getResourceSecondsString(
           usageReport.getResourceSecondsMap());
+      // 格式化累计被抢占资源为字符串
       aggregatePreemptedResourceAllocation = StringHelper
         .getResourceSecondsString(usageReport.getPreemptedResourceSecondsMap());
     }
+    // 转换进度为百分比
     progress = app.getProgress() * 100; // in percent
     if (app.getApplicationTags() != null && !app.getApplicationTags().isEmpty()) {
+      // 将标签集合拼接为CSV格式
       this.applicationTags = CSV_JOINER.join(app.getApplicationTags());
     }
     unmanagedApplication = app.isUnmanagedApp();

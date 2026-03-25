@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,10 +19,14 @@
 package org.apache.hadoop.hdfs.util;
 
 /**
- * This lock mode is used for FGL.
+ * 文件粒度锁(FGL, File Granularity Locking)的读写锁作用范围枚举
+ * 定义了HDFS元数据操作中不同层级锁的锁定范围，用于控制锁的粒度，提升并发性能
  */
 public enum RwLockMode {
+  /** 全局范围锁，锁定整个文件系统所有元数据 */
   GLOBAL,
+  /** 文件系统层范围锁，仅锁定文件系统目录树元数据 */
   FS,
+  /** 块管理层范围锁，仅锁定块映射信息元数据 */
   BM
 }

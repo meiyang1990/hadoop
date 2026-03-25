@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,13 @@
  * limitations under the License.
  */
 
+/**
+ * @file package-info.java
+ * @brief 本包提供NodeManager向时间线服务V2版本(ATSv2)上报各类事件的相关实现
+ * 
+ * 核心职责：实现NodeManager生命周期事件、容器事件的采集与上报，为YARN Timeline Service
+ * 提供节点侧的事件数据源，支撑应用运行指标与生命周期的可视化监控。
+ */
 /**
  * Package org.apache.hadoop.yarn.server.nodemanager.timelineservice contains
  * classes related to publishing container events and other NM lifecycle events

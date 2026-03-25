@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,10 +39,9 @@ import static org.apache.hadoop.yarn.server.resourcemanager.placement.FairQueueP
 import static org.apache.hadoop.yarn.server.resourcemanager.placement.FairQueuePlacementUtils.cleanName;
 
 /**
- * Places apps in queues by the secondary group of the submitter, if the
- * submitter is a member of more than one group.
- * The first "matching" queue based on the group list is returned. The match
- * takes into account the parent rule and create flag,
+ * YARN公平调度器二级用户组队列放置规则实现类。
+ * 当提交应用的用户属于多个用户组时，根据用户的次要用户组，将应用放置到已存在的对应队列中。
+ * 会按用户组列表顺序返回第一个匹配到的已配置队列，匹配结果会受到父规则和创建标记的影响。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -49,9 +49,16 @@ public class SecondaryGroupExistingPlacementRule extends FSPlacementRule {
   private static final Logger LOG =
       LoggerFactory.getLogger(SecondaryGroupExistingPlacementRule.class);
 
+  // 用户组映射服务提供者，用于获取用户所属的所有用户组
   private Groups groupProvider;
 
   @Override
+  /**
+   * 初始化放置规则，获取用户组映射服务
+   * @param scheduler 资源调度器实例
+   * @return 初始化成功返回true
+   * @throws IOException 初始化异常
+   */
   public boolean initialize(ResourceScheduler scheduler) throws IOException {
     super.initialize(scheduler);
     groupProvider = Groups.
@@ -61,12 +68,20 @@ public class SecondaryGroupExistingPlacementRule extends FSPlacementRule {
   }
 
   @Override
+  /**
+   * 为应用计算匹配的放置队列
+   * @param asc 应用提交上下文
+   * @param user 提交应用的用户名
+   * @return 匹配到的放置上下文，未匹配到返回null
+   * @throws YarnException 解析用户组失败时抛出异常
+   */
   public ApplicationPlacementContext getPlacementForApp(
       ApplicationSubmissionContext asc, String user) throws YarnException {
 
     // All users should have at least one group the primary group. If no groups
     // are returned then there is a real issue.
     final Set<String> groupSet;
+    // 获取用户所属的所有用户组
     try {
       groupSet = groupProvider.getGroupsSet(user);
     } catch (IOException ioe) {
@@ -76,11 +91,13 @@ public class SecondaryGroupExistingPlacementRule extends FSPlacementRule {
     String parentQueue = null;
     PlacementRule parentRule = getParentRule();
 
+    // 如果存在父放置规则，先通过父规则获取父队列
     if (parentRule != null) {
       LOG.debug("SecondaryGroupExisting rule: parent rule found: {}",
           parentRule.getName());
       ApplicationPlacementContext parent =
           parentRule.getPlacementForApp(asc, user);
+      // 父规则返回空，或得到的已经是叶子队列，放置失败
       if (parent == null || getQueueManager().
           getQueue(parent.getQueue()) instanceof FSLeafQueue) {
         LOG.debug("SecondaryGroupExisting rule: parent rule failed");
@@ -90,16 +107,20 @@ public class SecondaryGroupExistingPlacementRule extends FSPlacementRule {
       LOG.debug("SecondaryGroupExisting rule: parent rule result: {}",
           parentQueue);
     }
-    // now check the groups inside the parent
+    // 遍历用户所属所有组，查找匹配的已存在队列
     Iterator<String> it = groupSet.iterator();
     while (it.hasNext()) {
+      // 清理组名，移除非法字符
       String group = cleanName(it.next());
+      // 拼接完整队列路径
       String queueName =
           parentQueue == null ? assureRoot(group) : parentQueue + DOT + group;
+      // 队列已存在且已配置，返回该队列
       if (configuredQueue(queueName)) {
         return new ApplicationPlacementContext(queueName);
       }
     }
+    // 未找到匹配的已存在队列，放置失败
     return null;
   }
 }

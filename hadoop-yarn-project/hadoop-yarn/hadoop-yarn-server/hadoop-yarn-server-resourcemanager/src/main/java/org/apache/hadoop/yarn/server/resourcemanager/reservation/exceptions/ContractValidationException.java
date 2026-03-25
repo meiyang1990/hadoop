@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +23,7 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * This exception is thrown if the request made is not syntactically valid.
+ * YARN资源预留契约验证失败时抛出的异常，当预留请求不符合语法或契约约束时触发。
  */
 @Public
 @Unstable
@@ -30,6 +31,10 @@ public class ContractValidationException extends PlanningException {
 
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造包含错误信息的契约验证异常实例。
+   * @param message 错误描述信息
+   */
   public ContractValidationException(String message) {
     super(message);
   }

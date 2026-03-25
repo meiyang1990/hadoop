@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,36 +27,61 @@ import java.util.List;
 import java.util.ArrayList;
 
 /**
- * DAO object to display allocation activities.
+ * YARN RM WebAPI 批量分配活动信息数据访问对象，用于封装批量活动信息并序列化为XML/JSON返回前端
  */
 @XmlRootElement(name = "bulkActivities")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class BulkActivitiesInfo {
 
+  // 存储所有活动信息列表
   private ArrayList<ActivitiesInfo> activities = new ArrayList<>();
 
+  // 关联的子集群ID（联邦场景使用）
   private String subClusterId;
 
+  /**
+   * JAXB反序列化需要的无参构造函数
+   */
   public BulkActivitiesInfo() {
     // JAXB needs this
   }
 
+  /**
+   * 添加单个活动信息到批量列表
+   * @param activitiesInfo 待添加的活动信息对象
+   */
   public void add(ActivitiesInfo activitiesInfo) {
     activities.add(activitiesInfo);
   }
 
+  /**
+   * 获取所有活动信息列表
+   * @return 活动信息列表
+   */
   public ArrayList<ActivitiesInfo> getActivities() {
     return activities;
   }
 
+  /**
+   * 批量添加多个活动信息到列表
+   * @param activitiesInfoList 待添加的活动信息列表
+   */
   public void addAll(List<ActivitiesInfo> activitiesInfoList) {
     activities.addAll(activitiesInfoList);
   }
 
+  /**
+   * 获取关联的子集群ID
+   * @return 子集群ID
+   */
   public String getSubClusterId() {
     return subClusterId;
   }
 
+  /**
+   * 设置关联的子集群ID
+   * @param subClusterId 子集群ID
+   */
   public void setSubClusterId(String subClusterId) {
     this.subClusterId = subClusterId;
   }

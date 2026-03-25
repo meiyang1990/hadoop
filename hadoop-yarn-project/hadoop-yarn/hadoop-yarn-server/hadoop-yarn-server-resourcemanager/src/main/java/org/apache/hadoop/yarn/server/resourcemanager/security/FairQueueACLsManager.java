@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -31,13 +32,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This is the implementation of {@link QueueACLsManager} based on the
- * {@link FairScheduler}.
+ * 公平调度器队列ACL权限检查管理器，实现了{@link QueueACLsManager}接口，
+ * 专门为公平调度器提供队列访问权限控制能力。
  */
 public class FairQueueACLsManager extends QueueACLsManager {
   private static final Logger LOG = LoggerFactory
       .getLogger(FairQueueACLsManager.class);
 
+  /**
+   * 构造公平调度器队列ACL管理器实例。
+   * @param scheduler 资源调度器实例
+   * @param conf 配置对象
+   */
   public FairQueueACLsManager(ResourceScheduler scheduler, Configuration conf) {
     super(scheduler, conf);
   }
@@ -45,9 +51,11 @@ public class FairQueueACLsManager extends QueueACLsManager {
   @Override
   public boolean checkAccess(UserGroupInformation callerUGI, QueueACL acl,
       RMApp app, String remoteAddress, List<String> forwardedAddresses) {
+    // ACL未开启时直接允许访问
     if (!isACLsEnable) {
       return true;
     }
+    // 委托调度器检查应用当前所在队列的访问权限
     return scheduler.checkAccess(callerUGI, acl, app.getQueue());
   }
 
@@ -55,17 +63,21 @@ public class FairQueueACLsManager extends QueueACLsManager {
   public boolean checkAccess(UserGroupInformation callerUGI, QueueACL acl,
       RMApp app, String remoteAddress, List<String> forwardedAddresses,
       String targetQueue) {
+    // ACL未开启时直接允许访问
     if (!isACLsEnable) {
       return true;
     }
 
+    // 从公平调度器中获取目标队列实例
     FSQueue queue = ((FairScheduler) scheduler).getQueueManager()
         .getQueue(targetQueue);
+    // 目标队列不存在时记录警告日志并拒绝访问
     if (queue == null) {
       LOG.warn("Target queue " + targetQueue
           + " does not exist while trying to move " + app.getApplicationId());
       return false;
     }
+    // 委托调度器检查目标队列的访问权限
     return scheduler.checkAccess(callerUGI, acl, targetQueue);
   }
 

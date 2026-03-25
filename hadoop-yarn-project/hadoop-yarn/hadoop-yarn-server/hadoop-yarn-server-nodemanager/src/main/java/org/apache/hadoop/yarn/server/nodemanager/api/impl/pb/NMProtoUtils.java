@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -31,21 +32,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Utilities for converting from PB representations.
+ * NodeManager Protobuf转换工具类，负责将Protobuf格式的持久化数据转换为NodeManager内部对象。
+ * 主要用于删除任务恢复场景，将序列化的删除任务信息反序列化为内存对象。
  */
 public final class NMProtoUtils {
 
+  /** 日志处理器 */
   private static final Logger LOG =
        LoggerFactory.getLogger(NMProtoUtils.class);
 
+  /** 工具类禁止实例化 */
   private NMProtoUtils() { }
 
   /**
-   * Convert the Protobuf representation into a {@link DeletionTask}.
+   * 将Protobuf格式的删除任务转换为NodeManager内存中的DeletionTask对象。
+   * 根据任务类型分发到对应具体类型的转换方法，默认兼容处理为文件删除任务。
    *
-   * @param proto             the Protobuf representation for the DeletionTask
-   * @param deletionService   the {@link DeletionService}
-   * @return the converted {@link DeletionTask}
+   * @param proto             Protobuf格式的删除任务数据
+   * @param deletionService   删除任务所属的删除服务实例
+   * @return 转换完成的DeletionTask具体实例
    */
   public static DeletionTask convertProtoToDeletionTask(
       DeletionServiceDeleteTaskProto proto, DeletionService deletionService) {
@@ -66,23 +71,26 @@ public final class NMProtoUtils {
   }
 
   /**
-   * Convert the Protobuf representation into the {@link FileDeletionTask}.
+   * 将Protobuf格式数据转换为FileDeletionTask文件删除任务实例。
    *
-   * @param proto the Protobuf representation of the {@link FileDeletionTask}.
-   * @param deletionService the {@link DeletionService}.
-   * @param taskId the ID of the {@link DeletionTask}.
-   * @return the populated {@link FileDeletionTask}.
+   * @param proto Protobuf格式的文件删除任务数据
+   * @param deletionService 删除服务实例
+   * @param taskId 删除任务ID
+   * @return 转换完成的文件删除任务实例
    */
   public static FileDeletionTask convertProtoToFileDeletionTask(
       DeletionServiceDeleteTaskProto proto, DeletionService deletionService,
       int taskId) {
+    // 获取任务所属用户，没有则为空
     String user = proto.hasUser() ? proto.getUser() : null;
     Path subdir = null;
+    // 解析子目录路径
     if (proto.hasSubdir()) {
       subdir = new Path(proto.getSubdir());
     }
     List<Path> basePaths = null;
     List<String> basedirs = proto.getBasedirsList();
+    // 转换待删除基础路径列表
     if (basedirs != null && basedirs.size() > 0) {
       basePaths = new ArrayList<>(basedirs.size());
       for (String basedir : basedirs) {
@@ -94,18 +102,20 @@ public final class NMProtoUtils {
   }
 
   /**
-   * Convert the Protobuf format into the {@link DockerContainerDeletionTask}.
+   * 将Protobuf格式数据转换为DockerContainerDeletionTask容器删除任务实例。
    *
-   * @param proto Protobuf format of the {@link DockerContainerDeletionTask}.
-   * @param deletionService the {@link DeletionService}.
-   * @param taskId the ID of the {@link DeletionTask}.
-   * @return the populated {@link DockerContainerDeletionTask}.
+   * @param proto Protobuf格式的Docker容器删除任务数据
+   * @param deletionService 删除服务实例
+   * @param taskId 删除任务ID
+   * @return 转换完成的Docker容器删除任务实例
    */
   public static DockerContainerDeletionTask
       convertProtoToDockerContainerDeletionTask(
       DeletionServiceDeleteTaskProto proto, DeletionService deletionService,
       int taskId) {
+    // 获取任务所属用户，没有则为空
     String user = proto.hasUser() ? proto.getUser() : null;
+    // 获取待删除Docker容器ID，没有则为空
     String containerId =
         proto.hasDockerContainerId() ? proto.getDockerContainerId() : null;
     return new DockerContainerDeletionTask(taskId, deletionService, user,
@@ -113,22 +123,25 @@ public final class NMProtoUtils {
   }
 
   /**
-   * Convert the Protobuf representation to the {@link DeletionTaskRecoveryInfo}
-   * representation.
+   * 将Protobuf格式的删除任务转换为DeletionTaskRecoveryInfo删除任务恢复信息。
+   * 用于NodeManager重启后恢复删除任务队列，包含任务依赖和时间戳信息。
    *
-   * @param proto the Protobuf representation of the {@link DeletionTask}
-   * @param deletionService the {@link DeletionService}
-   * @return the populated {@link DeletionTaskRecoveryInfo}
+   * @param proto Protobuf格式的删除任务数据
+   * @param deletionService 删除服务实例
+   * @return 转换完成的删除任务恢复信息对象
    */
   public static DeletionTaskRecoveryInfo convertProtoToDeletionTaskRecoveryInfo(
       DeletionServiceDeleteTaskProto proto, DeletionService deletionService) {
+    // 先转换得到删除任务本身
     DeletionTask deletionTask =
         NMProtoUtils.convertProtoToDeletionTask(proto, deletionService);
     List<Integer> successorTaskIds = new ArrayList<>();
+    // 读取后继任务ID列表
     if (proto.getSuccessorIdsList() != null &&
         !proto.getSuccessorIdsList().isEmpty()) {
       successorTaskIds = proto.getSuccessorIdsList();
     }
+    // 获取删除任务创建时间戳
     long deletionTimestamp = proto.getDeletionTime();
     return new DeletionTaskRecoveryInfo(deletionTask, successorTaskIds,
         deletionTimestamp);

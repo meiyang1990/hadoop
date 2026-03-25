@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,6 +26,10 @@ import org.apache.hadoop.yarn.api.records.ReservationId;
 import org.apache.hadoop.yarn.server.resourcemanager.placement
     .ApplicationPlacementContext;
 
+/**
+ * 应用添加到调度器事件，YARN调度器处理新应用提交时的事件对象
+ * 封装新应用提交所需的全部上下文信息，供调度器处理应用加入队列
+ */
 public class AppAddedSchedulerEvent extends SchedulerEvent {
 
   private final ApplicationId applicationId;
@@ -36,23 +41,35 @@ public class AppAddedSchedulerEvent extends SchedulerEvent {
   private final ApplicationPlacementContext placementContext;
   private boolean unmanagedAM = false;
 
+  /**
+   * 构造方法，创建基本的应用添加事件
+   */
   public AppAddedSchedulerEvent(ApplicationId applicationId, String queue,
       String user) {
     this(applicationId, queue, user, false, null, Priority.newInstance(0),
         null);
   }
 
+  /**
+   * 构造方法，创建带放置上下文的应用添加事件
+   */
   public AppAddedSchedulerEvent(ApplicationId applicationId, String queue,
       String user, ApplicationPlacementContext placementContext) {
     this(applicationId, queue, user, false, null, Priority.newInstance(0),
         placementContext);
   }
 
+  /**
+   * 构造方法，创建带预留ID和优先级的应用添加事件
+   */
   public AppAddedSchedulerEvent(ApplicationId applicationId, String queue,
       String user, ReservationId reservationID, Priority appPriority) {
     this(applicationId, queue, user, false, reservationID, appPriority, null);
   }
 
+  /**
+   * 构造方法，从提交上下文创建应用添加事件，支持应用恢复场景
+   */
   public AppAddedSchedulerEvent(String user,
       ApplicationSubmissionContext submissionContext, boolean isAppRecovering,
       Priority appPriority) {
@@ -62,6 +79,9 @@ public class AppAddedSchedulerEvent extends SchedulerEvent {
     this.unmanagedAM = submissionContext.getUnmanagedAM();
   }
 
+  /**
+   * 构造方法，从提交上下文创建应用添加事件，带放置上下文，支持应用恢复场景
+   */
   public AppAddedSchedulerEvent(String user,
       ApplicationSubmissionContext submissionContext, boolean isAppRecovering,
       Priority appPriority, ApplicationPlacementContext placementContext) {
@@ -71,6 +91,9 @@ public class AppAddedSchedulerEvent extends SchedulerEvent {
     this.unmanagedAM = submissionContext.getUnmanagedAM();
   }
 
+  /**
+   * 全参数构造方法，创建完整的应用添加事件
+   */
   public AppAddedSchedulerEvent(ApplicationId applicationId, String queue,
       String user, boolean isAppRecovering, ReservationId reservationID,
       Priority appPriority, ApplicationPlacementContext placementContext) {

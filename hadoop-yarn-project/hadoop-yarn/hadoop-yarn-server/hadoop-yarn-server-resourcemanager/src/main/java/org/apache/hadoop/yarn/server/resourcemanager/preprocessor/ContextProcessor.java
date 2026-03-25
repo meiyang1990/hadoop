@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,20 +25,21 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 
 
-
 /**
- * This is the interface providing functionality to process
- * application submission context.
+ * YARN ResourceManager 应用提交上下文预处理接口，负责在应用提交到调度器前处理提交上下文。
+ * 用于在应用正式提交前对上下文信息进行补充、修改或验证，支持扩展自定义预处理逻辑。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface ContextProcessor {
   /**
-   * It will enrich the application submission context with value provided.
-   * @param host  Address of the host from where application launched.
-   * @param value  Value to be filled in ApplicationSubmissionContext.
-   * @param applicationId  Application Id of the application.
-   * @param submissionContext  Context of the application.
+   * 处理应用提交上下文，可根据输入信息补充或修改提交上下文内容。
+   * 该方法会在应用提交流程中被调用，允许预处理逻辑注入自定义配置。
+   * 
+   * @param host  提交应用的客户端主机地址
+   * @param value 需要填充到应用提交上下文中的预处理值
+   * @param applicationId  当前提交应用的应用ID
+   * @param submissionContext  应用提交上下文对象，可直接修改其内容
    */
   void process(String host, String value, ApplicationId applicationId,
       ApplicationSubmissionContext submissionContext);

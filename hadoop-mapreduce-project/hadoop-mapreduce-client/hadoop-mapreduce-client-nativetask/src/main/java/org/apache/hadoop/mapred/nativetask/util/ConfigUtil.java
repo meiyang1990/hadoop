@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,19 @@ import org.apache.hadoop.conf.Configuration;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 原生任务配置工具类，提供Hadoop配置对象到原生任务所需格式的转换工具方法
+ * 为MapReduce本地原生任务模块提供配置序列化和格式转换能力
+ */
 @InterfaceAudience.Private
 public abstract class ConfigUtil {
+  
+  /**
+   * 将Hadoop Configuration配置对象转换为原生C++任务可识别的字节数组二维格式
+   * 每个配置项会存储为两个连续字节数组：键、值，均采用UTF-8编码
+   * @param conf Hadoop配置对象
+   * @return 转换完成的二维字节数组，供原生任务读取配置
+   */
   public static byte[][] toBytes(Configuration conf) {
     List<byte[]> nativeConfigs = new ArrayList<byte[]>();
     for (Map.Entry<String, String> e : conf) {
@@ -37,6 +49,11 @@ public abstract class ConfigUtil {
     return nativeConfigs.toArray(new byte[nativeConfigs.size()][]);
   }
   
+  /**
+   * 将布尔数组转换为二进制字符串表示，true转换为'1'，false转换为'0'
+   * @param value 输入布尔数组
+   * @return 转换后的二进制字符串
+   */
   public static String booleansToString(boolean[] value) {
     StringBuilder sb = new StringBuilder();
     for (boolean b: value) {

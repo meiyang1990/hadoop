@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,10 +21,21 @@ package org.apache.hadoop.mapred;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-/** The states of a Tasks.
+/**
+ * 文件功能：定义MapReduce任务尝试信息（TaskInProgress）的所有状态枚举
+ * 描述了TaskInProgress在作业运行过程中的不同运行阶段状态
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public enum TIPStatus {
-  PENDING, RUNNING, COMPLETE, KILLED, FAILED;
+  /** 等待调度执行 */
+  PENDING, 
+  /** 正在运行中 */
+  RUNNING, 
+  /** 执行完成 */
+  COMPLETE, 
+  /** 被 killed 终止 */
+  KILLED, 
+  /** 执行失败 */
+  FAILED;
 }

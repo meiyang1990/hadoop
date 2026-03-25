@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,8 +30,9 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin
 import java.util.Set;
 
 /**
- * Hooks into NodeStatusUpdater to update resource.
- * */
+ * 设备资源更新实现，对接NodeStatusUpdater更新节点设备资源信息
+ * 属于YARN NodeManager设备框架，负责将设备插件发现的可用设备资源更新到节点资源中
+ */
 public class DeviceResourceUpdaterImpl extends NodeResourceUpdaterPlugin {
 
   final static Logger LOG = LoggerFactory.
@@ -39,6 +41,11 @@ public class DeviceResourceUpdaterImpl extends NodeResourceUpdaterPlugin {
   private String resourceName;
   private DevicePlugin devicePlugin;
 
+  /**
+   * 构造设备资源更新器
+   * @param resourceName 资源类型名称
+   * @param devicePlugin 对应设备插件实例
+   */
   public DeviceResourceUpdaterImpl(String resourceName,
       DevicePlugin devicePlugin) {
     this.devicePlugin = devicePlugin;
@@ -46,11 +53,17 @@ public class DeviceResourceUpdaterImpl extends NodeResourceUpdaterPlugin {
   }
 
   @Override
+  /**
+   * 更新节点已配置的设备资源总量
+   * @param res 节点资源对象，用于更新资源值
+   * @throws YarnException 设备发现异常时抛出
+   */
   public void updateConfiguredResource(Resource res)
       throws YarnException {
     LOG.info(resourceName + " plugin update resource ");
     Set<Device> devices = null;
     try {
+      // 通过设备插件获取当前节点所有可用设备
       devices = devicePlugin.getDevices();
     } catch (Exception e) {
       throw new YarnException("Exception thrown from plugin's getDevices"
@@ -61,6 +74,7 @@ public class DeviceResourceUpdaterImpl extends NodeResourceUpdaterPlugin {
           + " plugin failed to discover resource ( null value got).");
       return;
     }
+    // 将可用设备数量设置到节点资源中，供RM调度使用
     res.setResourceValue(resourceName, devices.size());
   }
 

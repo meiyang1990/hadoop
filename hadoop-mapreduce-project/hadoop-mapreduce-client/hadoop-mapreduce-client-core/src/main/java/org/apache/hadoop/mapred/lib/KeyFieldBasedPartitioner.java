@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,24 +24,24 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.Partitioner;
 
- /**   
-  *  Defines a way to partition keys based on certain key fields (also see
-  *  {@link KeyFieldBasedComparator}.
-  *  The key specification supported is of the form -k pos1[,pos2], where,
-  *  pos is of the form f[.c][opts], where f is the number
-  *  of the key field to use, and c is the number of the first character from
-  *  the beginning of the field. Fields and character posns are numbered 
-  *  starting with 1; a character position of zero in pos2 indicates the
-  *  field's last character. If '.c' is omitted from pos1, it defaults to 1
-  *  (the beginning of the field); if omitted from pos2, it defaults to 0 
-  *  (the end of the field).
-  */
+/**   
+ * 基于键的指定字段对Map输出键进行分区的分区器，兼容旧版MapReduce API
+ * 分区规则通过 -k pos1[,pos2] 格式定义，可精确指定用于分区的键字段范围：
+ * pos格式为 f[.c][opts]，其中f是字段编号，c是字段内起始字符位置
+ * 字段和字符位置从1开始计数；pos2中0表示对应字段的最后一个字符
+ * 若pos1省略'.c'则默认从字段第一个字符开始；若pos2省略'.c'则默认到字段最后一个字符结束
+ * 另可参考 {@link KeyFieldBasedComparator} 实现对应字段排序功能
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class KeyFieldBasedPartitioner<K2, V2> extends 
   org.apache.hadoop.mapreduce.lib.partition.KeyFieldBasedPartitioner<K2, V2> 
   implements Partitioner<K2, V2> {
 
+  /**
+   * 配置分区器，从作业配置中加载分区规则
+   * @param job 作业配置对象
+   */
   public void configure(JobConf job) {
     super.setConf(job);
   }

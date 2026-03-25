@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,148 +39,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The MultipleOutputs class simplifies writing output data 
- * to multiple outputs
+ * @file MultipleOutputs.java
+ * @brief MapReduce多输出输出工具类，支持将输出写入多个命名输出或自定义路径
  * 
- * <p> 
- * Case one: writing to additional outputs other than the job default output.
- *
- * Each additional output, or named output, may be configured with its own
- * <code>OutputFormat</code>, with its own key class and with its own value
- * class.
- * </p>
+ * 核心功能：
+ * 1. 支持在作业默认输出之外，添加多个额外的命名输出，每个输出可配置独立的OutputFormat、键值类型
+ * 2. 支持根据用户自定义路径将输出写入不同文件，实现按规则分文件输出
+ * 3. 支持对每个输出记录写入计数，默认关闭计数器
  * 
- * <p>
- * Case two: to write data to different files provided by user
- * </p>
- * 
- * <p>
- * MultipleOutputs supports counters, by default they are disabled. The 
- * counters group is the {@link MultipleOutputs} class name. The names of the 
- * counters are the same as the output name. These count the number records 
- * written to each output name.
- * </p>
- * 
- * Usage pattern for job submission:
- * <pre>
- *
- * Job job = new Job();
- *
- * FileInputFormat.setInputPath(job, inDir);
- * FileOutputFormat.setOutputPath(job, outDir);
- *
- * job.setMapperClass(MOMap.class);
- * job.setReducerClass(MOReduce.class);
- * ...
- *
- * // Defines additional single text based output 'text' for the job
- * MultipleOutputs.addNamedOutput(job, "text", TextOutputFormat.class,
- * LongWritable.class, Text.class);
- *
- * // Defines additional sequence-file based output 'sequence' for the job
- * MultipleOutputs.addNamedOutput(job, "seq",
- *   SequenceFileOutputFormat.class,
- *   LongWritable.class, Text.class);
- * ...
- *
- * job.waitForCompletion(true);
- * ...
- * </pre>
- * <p>
- * Usage in Reducer:
- * <pre>
- * &lt;K, V&gt; String generateFileName(K k, V v) {
- *   return k.toString() + "_" + v.toString();
- * }
- * 
- * public class MOReduce extends
- *   Reducer&lt;WritableComparable, Writable,WritableComparable, Writable&gt; {
- * private MultipleOutputs mos;
- * public void setup(Context context) {
- * ...
- * mos = new MultipleOutputs(context);
- * }
- *
- * public void reduce(WritableComparable key, Iterator&lt;Writable&gt; values,
- * Context context)
- * throws IOException {
- * ...
- * mos.write("text", , key, new Text("Hello"));
- * mos.write("seq", LongWritable(1), new Text("Bye"), "seq_a");
- * mos.write("seq", LongWritable(2), key, new Text("Chau"), "seq_b");
- * mos.write(key, new Text("value"), generateFileName(key, new Text("value")));
- * ...
- * }
- *
- * public void cleanup(Context) throws IOException {
- * mos.close();
- * ...
- * }
- *
- * }
- * </pre>
- * 
- * <p>
- * When used in conjuction with org.apache.hadoop.mapreduce.lib.output.LazyOutputFormat,
- * MultipleOutputs can mimic the behaviour of MultipleTextOutputFormat and MultipleSequenceFileOutputFormat
- * from the old Hadoop API - ie, output can be written from the Reducer to more than one location.
- * </p>
- * 
- * <p>
- * Use <code>MultipleOutputs.write(KEYOUT key, VALUEOUT value, String baseOutputPath)</code> to write key and 
- * value to a path specified by <code>baseOutputPath</code>, with no need to specify a named output.
- * <b>Warning</b>: when the baseOutputPath passed to MultipleOutputs.write
- * is a path that resolves outside of the final job output directory, the
- * directory is created immediately and then persists through subsequent
- * task retries, breaking the concept of output committing:
- * </p>
- * 
- * <pre>
- * private MultipleOutputs&lt;Text, Text&gt; out;
- * 
- * public void setup(Context context) {
- *   out = new MultipleOutputs&lt;Text, Text&gt;(context);
- *   ...
- * }
- * 
- * public void reduce(Text key, Iterable&lt;Text&gt; values, Context context) throws IOException, InterruptedException {
- * for (Text t : values) {
- *   out.write(key, t, generateFileName(&lt;<i>parameter list...</i>&gt;));
- *   }
- * }
- * 
- * protected void cleanup(Context context) throws IOException, InterruptedException {
- *   out.close();
- * }
- * </pre>
- * 
- * <p>
- * Use your own code in <code>generateFileName()</code> to create a custom path to your results. 
- * '/' characters in <code>baseOutputPath</code> will be translated into directory levels in your file system. 
- * Also, append your custom-generated path with "part" or similar, otherwise your output will be -00000, -00001 etc. 
- * No call to <code>context.write()</code> is necessary. See example <code>generateFileName()</code> code below. 
- * </p>
- * 
- * <pre>
- * private String generateFileName(Text k) {
- *   // expect Text k in format "Surname|Forename"
- *   String[] kStr = k.toString().split("\\|");
- *   
- *   String sName = kStr[0];
- *   String fName = kStr[1];
- *
- *   // example for k = Smith|John
- *   // output written to /user/hadoop/path/to/output/Smith/John-r-00000 (etc)
- *   return sName + "/" + fName;
- * }
- * </pre>
- * 
- * <p>
- * Using MultipleOutputs in this way will still create zero-sized default output, eg part-00000.
- * To prevent this use <code>LazyOutputFormat.setOutputFormatClass(job, TextOutputFormat.class);</code>
- * instead of <code>job.setOutputFormatClass(TextOutputFormat.class);</code> in your Hadoop job configuration.
- * </p> 
- * 
+ * 两种典型使用场景：
+ * - 场景一：定义多个额外命名输出，每个输出使用独立格式和类型，输出文件自动命名
+ * - 场景二：用户自定义输出路径，将不同数据写入不同文件/目录，实现动态输出分片
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -197,26 +67,25 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
     "mapreduce.multipleoutputs.counters";
 
   /**
-   * Counters group used by the counters of MultipleOutputs.
+   * MultipleOutputs计数器所在的计数器组名称
    */
   private static final String COUNTERS_GROUP = MultipleOutputs.class.getName();
   private static final Logger LOG =
       LoggerFactory.getLogger(org.apache.hadoop.mapred.lib.MultipleOutputs.class);
 
   /**
-   * Cache for the taskContexts
+   * 命名输出对应的TaskAttemptContext缓存，避免重复创建
    */
   private Map<String, TaskAttemptContext> taskContexts = new HashMap<String, TaskAttemptContext>();
   /**
-   * Cached TaskAttemptContext which uses the job's configured settings
+   * 使用作业默认输出格式的缓存上下文
    */
   private TaskAttemptContext jobOutputFormatContext;
 
   /**
-   * Checks if a named output name is valid token.
-   *
-   * @param namedOutput named output Name
-   * @throws IllegalArgumentException if the output name is not valid.
+   * @brief 检查命名输出名称是否合法，仅允许字母数字
+   * @param namedOutput 命名输出名称
+   * @throws IllegalArgumentException 名称不合法时抛出
    */
   private static void checkTokenName(String namedOutput) {
     if (namedOutput == null || namedOutput.length() == 0) {
@@ -239,11 +108,9 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   }
 
   /**
-   * Checks if output name is valid.
-   *
-   * name cannot be the name used for the default output
-   * @param outputPath base output Name
-   * @throws IllegalArgumentException if the output name is not valid.
+   * @brief 检查基础输出路径是否合法，不能使用默认输出保留名"part"
+   * @param outputPath 基础输出路径名称
+   * @throws IllegalArgumentException 名称不合法时抛出
    */
   private static void checkBaseOutputPath(String outputPath) {
     if (outputPath.equals(FileOutputFormat.PART)) {
@@ -252,10 +119,11 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   }
   
   /**
-   * Checks if a named output name is valid.
-   *
-   * @param namedOutput named output Name
-   * @throws IllegalArgumentException if the output name is not valid.
+   * @brief 检查命名输出名称整体合法性，包括格式检查和重复定义检查
+   * @param job 作业上下文
+   * @param namedOutput 命名输出名称
+   * @param alreadyDefined 是否已定义标志，true表示检查是否重复，false表示检查是否已定义
+   * @throws IllegalArgumentException 检查不通过时抛出
    */
   private static void checkNamedOutputName(JobContext job,
       String namedOutput, boolean alreadyDefined) {
@@ -271,6 +139,11 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
     }
   }
 
+  /**
+   * @brief 从作业配置中读取所有已定义的命名输出名称列表
+   * @param job 作业上下文
+   * @return 命名输出名称列表
+   */
   // Returns list of channel names.
   private static List<String> getNamedOutputsList(JobContext job) {
     List<String> names = new ArrayList<String>();
@@ -282,6 +155,12 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
     return names;
   }
 
+  /**
+   * @brief 从作业配置中获取指定命名输出的OutputFormat类
+   * @param job 作业上下文
+   * @param namedOutput 命名输出名称
+   * @return OutputFormat类对象
+   */
   // Returns the named output OutputFormat.
   @SuppressWarnings("unchecked")
   private static Class<? extends OutputFormat<?, ?>> getNamedOutputFormatClass(
@@ -291,6 +170,12 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
       OutputFormat.class);
   }
 
+  /**
+   * @brief 从作业配置中获取指定命名输出的键类型
+   * @param job 作业上下文
+   * @param namedOutput 命名输出名称
+   * @return 键类对象
+   */
   // Returns the key class for a named output.
   private static Class<?> getNamedOutputKeyClass(JobContext job,
                                                 String namedOutput) {
@@ -298,6 +183,12 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
       Object.class);
   }
 
+  /**
+   * @brief 从作业配置中获取指定命名输出的值类型
+   * @param job 作业上下文
+   * @param namedOutput 命名输出名称
+   * @return 值类对象
+   */
   // Returns the value class for a named output.
   private static Class<?> getNamedOutputValueClass(
       JobContext job, String namedOutput) {
@@ -306,15 +197,13 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   }
 
   /**
-   * Adds a named output for the job.
-   *
-   * @param job               job to add the named output
-   * @param namedOutput       named output name, it has to be a word, letters
-   *                          and numbers only, cannot be the word 'part' as
-   *                          that is reserved for the default output.
-   * @param outputFormatClass OutputFormat class.
-   * @param keyClass          key class
-   * @param valueClass        value class
+   * @brief 向作业添加一个命名输出配置
+   * 
+   * @param job               目标作业对象
+   * @param namedOutput       命名输出名称，仅允许字母数字，不能为"part"
+   * @param outputFormatClass 该输出使用的OutputFormat类
+   * @param keyClass          该输出使用的键类型
+   * @param valueClass        该输出使用的值类型
    */
   @SuppressWarnings("unchecked")
   public static void addNamedOutput(Job job, String namedOutput,
@@ -331,26 +220,22 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   }
 
   /**
-   * Enables or disables counters for the named outputs.
+   * @brief 设置是否启用多个输出的计数器功能
    * 
-   * The counters group is the {@link MultipleOutputs} class name.
-   * The names of the counters are the same as the named outputs. These
-   * counters count the number records written to each output name.
-   * By default these counters are disabled.
+   * 计数器会统计每个输出写入的记录数量，默认关闭
+   * 计数器组为MultipleOutputs类名，计数器名称与输出名称一致
    *
-   * @param job    job  to enable counters
-   * @param enabled indicates if the counters will be enabled or not.
+   * @param job    目标作业对象
+   * @param enabled true启用，false禁用
    */
   public static void setCountersEnabled(Job job, boolean enabled) {
     job.getConfiguration().setBoolean(COUNTERS_ENABLED, enabled);
   }
 
   /**
-   * Returns if the counters for the named outputs are enabled or not.
-   * By default these counters are disabled.
-   *
-   * @param job    the job 
-   * @return TRUE if the counters are enabled, FALSE if they are disabled.
+   * @brief 获取计数器是否启用的配置
+   * @param job 作业上下文
+   * @return true启用，false禁用，默认禁用
    */
   public static boolean getCountersEnabled(JobContext job) {
     return job.getConfiguration().getBoolean(COUNTERS_ENABLED, false);
@@ -362,7 +247,7 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   }
 
   /**
-   * Wraps RecordWriter to increment counters. 
+   * @brief 包装RecordWriter，实现写入时计数器递增
    */
   @SuppressWarnings("unchecked")
   private static class RecordWriterWithCounter extends RecordWriter {
@@ -370,6 +255,12 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
     private String counterName;
     private TaskInputOutputContext context;
 
+    /**
+     * @brief 构造带计数器的RecordWriter包装器
+     * @param writer 原始RecordWriter
+     * @param counterName 计数器名称
+     * @param context 任务上下文，用于获取计数器
+     */
     public RecordWriterWithCounter(RecordWriter writer, String counterName,
                                    TaskInputOutputContext context) {
       this.writer = writer;
@@ -380,6 +271,7 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
     @SuppressWarnings({"unchecked"})
     public void write(Object key, Object value) 
         throws IOException, InterruptedException {
+      // 写入前计数器加1
       context.getCounter(COUNTERS_GROUP, counterName).increment(1);
       writer.write(key, value);
     }
@@ -398,10 +290,8 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   private boolean countersEnabled;
   
   /**
-   * Creates and initializes multiple outputs support,
-   * it should be instantiated in the Mapper/Reducer setup method.
-   *
-   * @param context the TaskInputOutputContext object
+   * @brief 构造MultipleOutputs实例，应在Mapper/Reducer的setup方法中调用初始化
+   * @param context 任务输入输出上下文
    */
   public MultipleOutputs(
       TaskInputOutputContext<?, ?, KEYOUT, VALUEOUT> context) {
@@ -413,14 +303,13 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   }
 
   /**
-   * Write key and value to the namedOutput.
-   *
-   * Output path is a unique file generated for the namedOutput.
-   * For example, {namedOutput}-(m|r)-{part-number}
+   * @brief 将键值对写入指定命名输出，使用命名输出默认输出路径
    * 
-   * @param namedOutput the named output name
-   * @param key         the key
-   * @param value       the value
+   * 输出文件名格式为 {namedOutput}-(m|r)-{part-number}
+   *
+   * @param namedOutput 目标命名输出名称
+   * @param key         输出键
+   * @param value       输出值
    */
   @SuppressWarnings("unchecked")
   public <K, V> void write(String namedOutput, K key, V value)
@@ -429,17 +318,15 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   }
 
   /**
-   * Write key and value to baseOutputPath using the namedOutput.
+   * @brief 将键值对写入指定命名输出的自定义基础路径
    * 
-   * @param namedOutput    the named output name
-   * @param key            the key
-   * @param value          the value
-   * @param baseOutputPath base-output path to write the record to.
-   * Note: Framework will generate unique filename for the baseOutputPath
-   * <b>Warning</b>: when the baseOutputPath is a path that resolves
-   * outside of the final job output directory, the directory is created
-   * immediately and then persists through subsequent task retries, breaking
-   * the concept of output committing.
+   * 框架会为基础路径生成唯一的分片文件名
+   *
+   * @param namedOutput    目标命名输出名称
+   * @param key            输出键
+   * @param value          输出值
+   * @param baseOutputPath 自定义基础输出路径，可包含斜杠创建子目录
+   * <b>警告</b>：如果基础路径解析后位于作业最终输出目录之外，目录会被立即创建并在任务重试后保留，会破坏输出提交语义
    */
   @SuppressWarnings("unchecked")
   public <K, V> void write(String namedOutput, K key, V value,
@@ -455,25 +342,22 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
   }
 
   /**
-   * Write key value to an output file name.
+   * @brief 使用作业默认输出格式，将键值对写入自定义基础输出路径
    * 
-   * Gets the record writer from job's output format.  
-   * Job's output format should be a FileOutputFormat.
-   * 
-   * @param key       the key
-   * @param value     the value
-   * @param baseOutputPath base-output path to write the record to.
-   * Note: Framework will generate unique filename for the baseOutputPath
-   * <b>Warning</b>: when the baseOutputPath is a path that resolves
-   * outside of the final job output directory, the directory is created
-   * immediately and then persists through subsequent task retries, breaking
-   * the concept of output committing.
+   * 无需提前定义命名输出，直接使用作业配置的默认输出格式
+   * 作业默认OutputFormat必须是FileOutputFormat子类
+   *
+   * @param key            输出键
+   * @param value          输出值
+   * @param baseOutputPath 自定义基础输出路径，可包含斜杠创建子目录
+   * <b>警告</b>：如果基础路径解析后位于作业最终输出目录之外，目录会被立即创建并在任务重试后保留，会破坏输出提交语义
    */
   @SuppressWarnings("unchecked")
   public void write(KEYOUT key, VALUEOUT value, String baseOutputPath) 
       throws IOException, InterruptedException {
     checkBaseOutputPath(baseOutputPath);
     if (jobOutputFormatContext == null) {
+      // 创建包装后的上下文，复用原任务ID和配置，使用原上下文状态上报
       jobOutputFormatContext = 
         new TaskAttemptContextImpl(context.getConfiguration(), 
                                    context.getTaskAttemptID(),
@@ -482,6 +366,17 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
     getRecordWriter(jobOutputFormatContext, baseOutputPath).write(key, value);
   }
 
+  /**
+   * @brief 获取指定输出路径的RecordWriter，优先从缓存获取，不存在则创建
+   * 
+   * 方法同步保证多线程Mapper下的线程安全
+   *
+   * @param taskContext  任务上下文
+   * @param baseFileName 基础输出文件名/路径
+   * @return 对应路径的RecordWriter实例
+   * @throws IOException IO异常或类加载异常时抛出
+   * @throws InterruptedException 中断异常
+   */
   // by being synchronized MultipleOutputTask can be use with a
   // MultithreadedMapper.
   @SuppressWarnings("unchecked")
@@ -489,14 +384,15 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
       TaskAttemptContext taskContext, String baseFileName) 
       throws IOException, InterruptedException {
     
-    // look for record-writer in the cache
+    // 优先从缓存获取已创建的RecordWriter
     RecordWriter writer = recordWriters.get(baseFileName);
     
-    // If not in cache, create a new one
+    // 缓存未命中，创建新的RecordWriter
     if (writer == null) {
-      // get the record writer from context output format
+      // 设置当前输出名称，用于生成最终文件名
       FileOutputFormat.setOutputName(taskContext, baseFileName);
       try {
+        // 反射创建OutputFormat实例，获取RecordWriter
         writer = ((OutputFormat) ReflectionUtils.newInstance(
           taskContext.getOutputFormatClass(), taskContext.getConfiguration()))
           .getRecordWriter(taskContext);
@@ -504,123 +400,36 @@ public class MultipleOutputs<KEYOUT, VALUEOUT> {
         throw new IOException(e);
       }
  
-      // if counters are enabled, wrap the writer with context 
-      // to increment counters 
+      // 如果启用计数器，包装RecordWriter添加计数功能
       if (countersEnabled) {
         writer = new RecordWriterWithCounter(writer, baseFileName, context);
       }
       
-      // add the record-writer to the cache
+      // 将创建好的RecordWriter加入缓存
       recordWriters.put(baseFileName, writer);
     }
     return writer;
   }
 
-   // Create a taskAttemptContext for the named output with 
-   // output format and output key/value types put in the context
+   /**
+    * @brief 为指定命名输出创建TaskAttemptContext，配置对应输出格式和键值类型
+    * @param nameOutput 命名输出名称
+    * @return 配置好的TaskAttemptContext实例
+    * @throws IOException 创建过程IO异常
+    */
   private TaskAttemptContext getContext(String nameOutput) throws IOException {
       
     TaskAttemptContext taskContext = taskContexts.get(nameOutput);
     
+    // 缓存命中直接返回
     if (taskContext != null) {
         return taskContext;
     }
     
-    // The following trick leverages the instantiation of a record writer via
-    // the job thus supporting arbitrary output formats.
+    // 通过创建新Job实例的方式，复用OutputFormat的现有初始化逻辑，支持任意输出格式
     Job job = Job.getInstance(context.getConfiguration());
     job.setOutputFormatClass(getNamedOutputFormatClass(context, nameOutput));
     job.setOutputKeyClass(getNamedOutputKeyClass(context, nameOutput));
     job.setOutputValueClass(getNamedOutputValueClass(context, nameOutput));
     taskContext = new TaskAttemptContextImpl(job.getConfiguration(), context
-        .getTaskAttemptID(), new WrappedStatusReporter(context));
-
-    taskContexts.put(nameOutput, taskContext);
-
-    return taskContext;
-  }
-
-  private static class WrappedStatusReporter extends StatusReporter {
-
-    TaskAttemptContext context;
-
-    public WrappedStatusReporter(TaskAttemptContext context) {
-      this.context = context;
-    }
-
-    @Override
-    public Counter getCounter(Enum<?> name) {
-      return context.getCounter(name);
-    }
-
-    @Override
-    public Counter getCounter(String group, String name) {
-      return context.getCounter(group, name);
-    }
-
-    @Override
-    public void progress() {
-      context.progress();
-    }
-
-    @Override
-    public float getProgress() {
-      return context.getProgress();
-    }
-    
-    @Override
-    public void setStatus(String status) {
-      context.setStatus(status);
-    }
-  }
-
-  /**
-   * Closes all the opened outputs.
-   * 
-   * This should be called from cleanup method of map/reduce task.
-   * If overridden subclasses must invoke <code>super.close()</code> at the
-   * end of their <code>close()</code>
-   * 
-   */
-  @SuppressWarnings("unchecked")
-  public void close() throws IOException, InterruptedException {
-    Configuration conf = context.getConfiguration();
-    int nThreads = conf.getInt(MRConfig.MULTIPLE_OUTPUTS_CLOSE_THREAD_COUNT,
-        MRConfig.DEFAULT_MULTIPLE_OUTPUTS_CLOSE_THREAD_COUNT);
-    AtomicBoolean encounteredException = new AtomicBoolean(false);
-    ThreadFactory threadFactory = new ThreadFactoryBuilder().setNameFormat("MultipleOutputs-close")
-        .setUncaughtExceptionHandler(((t, e) -> {
-          LOG.error("Thread " + t + " failed unexpectedly", e);
-          encounteredException.set(true);
-        })).build();
-    ExecutorService executorService = Executors.newFixedThreadPool(nThreads, threadFactory);
-
-    List<Callable<Object>> callableList = new ArrayList<>(recordWriters.size());
-
-    for (RecordWriter writer : recordWriters.values()) {
-      callableList.add(() -> {
-        try {
-          writer.close(context);
-        } catch (IOException e) {
-          LOG.error("Error while closing MultipleOutput file", e);
-          encounteredException.set(true);
-        }
-        return null;
-      });
-    }
-    try {
-      executorService.invokeAll(callableList);
-    } catch (InterruptedException e) {
-      LOG.warn("Closing is Interrupted");
-      Thread.currentThread().interrupt();
-    } finally {
-      executorService.shutdown();
-    }
-
-    if (encounteredException.get()) {
-      throw new IOException(
-          "One or more threads encountered exception during close. See prior errors.");
-    }
-  }
-}
-
+        .getTaskAttemptID

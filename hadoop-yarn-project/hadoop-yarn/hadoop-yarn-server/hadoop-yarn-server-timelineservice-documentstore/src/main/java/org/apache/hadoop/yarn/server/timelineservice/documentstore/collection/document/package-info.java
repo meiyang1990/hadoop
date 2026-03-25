@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,10 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.
- * documentstore.collection.document contains interface for all the
- * Timeline Documents. Any new document that has to be persisted in
- * the document store should implement this.
+ * 时间线服务文档存储的文档模型包，定义了所有时间线文档的基础接口，
+ * 所有需要持久化到文档存储的新文档类型都需要实现该包下的基础接口。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

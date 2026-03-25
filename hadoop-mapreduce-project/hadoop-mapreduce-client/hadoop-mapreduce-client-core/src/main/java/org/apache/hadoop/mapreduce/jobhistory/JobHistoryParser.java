@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,7 +48,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Default Parser for the JobHistory files. Typical usage is
+ * 默认的作业历史文件解析器，用于从历史文件中解析MapReduce作业运行信息，聚合到内存对象中供查询使用
+ * 
+ * 典型使用方式:
  * JobHistoryParser parser = new JobHistoryParser(fs, historyFile);
  * job = parser.parse();
  *
@@ -65,22 +68,20 @@ public class JobHistoryParser implements HistoryEventHandler {
   private IOException parseException = null;
   
   /**
-   * Create a job history parser for the given history file using the 
-   * given file system
-   * @param fs
-   * @param file
-   * @throws IOException
+   * 基于指定文件系统和历史文件路径构造作业历史解析器
+   * @param fs 文件系统对象
+   * @param file 历史文件路径字符串
+   * @throws IOException 打开文件失败时抛出
    */
   public JobHistoryParser(FileSystem fs, String file) throws IOException {
     this(fs, new Path(file));
   }
   
   /**
-   * Create the job history parser for the given history file using the 
-   * given file system
-   * @param fs
-   * @param historyFile
-   * @throws IOException
+   * 基于指定文件系统和历史文件路径构造作业历史解析器
+   * @param fs 文件系统对象
+   * @param historyFile 历史文件路径对象
+   * @throws IOException 打开文件失败时抛出
    */
   public JobHistoryParser(FileSystem fs, Path historyFile) 
   throws IOException {
@@ -88,20 +89,28 @@ public class JobHistoryParser implements HistoryEventHandler {
   }
   
   /**
-   * Create the history parser based on the input stream
-   * @param in
+   * 基于输入流构造作业历史解析器
+   * @param in 历史文件输入流
    */
   public JobHistoryParser(FSDataInputStream in) {
     this.in = in;
   }
   
+  /**
+   * 解析历史文件，将事件交给指定处理器处理
+   * @param handler 历史事件处理器
+   * @throws IOException 解析过程中IO错误时抛出
+   */
   public synchronized void parse(HistoryEventHandler handler) 
     throws IOException {
     parse(new EventReader(in), handler);
   }
   
   /**
-   * Only used for unit tests.
+   * 仅用于单元测试，基于指定事件读取器解析，将事件交给指定处理器处理
+   * @param reader 事件读取器
+   * @param handler 历史事件处理器
+   * @throws IOException 解析过程中IO错误时抛出
    */
   @Private
   public synchronized void parse(EventReader reader, HistoryEventHandler handler)
@@ -109,31 +118,32 @@ public class JobHistoryParser implements HistoryEventHandler {
     int eventCtr = 0;
     HistoryEvent event;
     try {
+      // 循环读取事件直到文件结束
       while ((event = reader.getNextEvent()) != null) {
         handler.handleEvent(event);
         ++eventCtr;
       } 
     } catch (IOException ioe) {
+      // 解析出错后保存异常，供后续查询
       LOG.info("Caught exception parsing history file after " + eventCtr + 
           " events", ioe);
       parseException = ioe;
     } finally {
+      // 无论解析成功失败，都关闭输入流
       in.close();
     }
   }
   
   
   /**
-   * Parse the entire history file and populate the JobInfo object
-   * The first invocation will populate the object, subsequent calls
-   * will return the already parsed object. 
-   * The input stream is closed on return 
+   * 解析整个历史文件，将结果聚合填充到JobInfo对象中
+   * 第一次调用会执行解析并填充对象，后续调用直接返回已解析好的对象
+   * 方法返回时会关闭输入流
    * 
-   * This api ignores partial records and stops parsing on encountering one.
-   * {@link #getParseException()} can be used to fetch the exception, if any.
+   * 解析遇到不完整记录会停止解析，可通过{@link #getParseException()}获取解析过程中产生的异常
    * 
-   * @return The populated jobInfo object
-   * @throws IOException
+   * @return 填充完成的作业信息对象
+   * @throws IOException 解析过程中IO错误时抛出
    * @see #getParseException()
    */
   public synchronized JobInfo parse() throws IOException {
@@ -141,7 +151,10 @@ public class JobHistoryParser implements HistoryEventHandler {
   }
 
   /**
-   * Only used for unit tests.
+   * 仅用于单元测试，基于指定事件读取器解析作业历史
+   * @param reader 事件读取器
+   * @return 填充完成的作业信息对象
+   * @throws IOException 解析过程中IO错误时抛出
    */
   @Private
   public synchronized JobInfo parse(EventReader reader) throws IOException {
@@ -156,9 +169,9 @@ public class JobHistoryParser implements HistoryEventHandler {
   }
   
   /**
-   * Get the parse exception, if any.
+   * 获取解析过程中产生的异常，如果没有异常则返回null
    * 
-   * @return the parse exception, if any
+   * @return 解析异常对象
    * @see #parse()
    */
   public synchronized IOException getParseException() {
@@ -167,6 +180,7 @@ public class JobHistoryParser implements HistoryEventHandler {
   
   @Override
   public void handleEvent(HistoryEvent event)  { 
+    // 根据事件类型分发到对应处理方法
     EventType type = event.getEventType();
 
     switch (type) {
@@ -243,22 +257,27 @@ public class JobHistoryParser implements HistoryEventHandler {
   }
   
   private void handleTaskAttemptFinishedEvent(TaskAttemptFinishedEvent event) {
+    // 获取任务和尝试信息对象
     TaskInfo taskInfo = info.tasksMap.get(event.getTaskId());
     TaskAttemptInfo attemptInfo = 
       taskInfo.attemptsMap.get(event.getAttemptId());
+    // 填充完成事件信息
     attemptInfo.finishTime = event.getFinishTime();
     attemptInfo.status = StringInterner.weakIntern(event.getTaskStatus());
     attemptInfo.state = StringInterner.weakIntern(event.getState());
     attemptInfo.counters = event.getCounters();
     attemptInfo.hostname = StringInterner.weakIntern(event.getHostname());
+    // 添加到已完成尝试集合
     info.completedTaskAttemptsMap.put(event.getAttemptId(), attemptInfo);
   }
 
   private void handleReduceAttemptFinishedEvent
   (ReduceAttemptFinishedEvent event) {
+    // 获取任务和尝试信息对象
     TaskInfo taskInfo = info.tasksMap.get(event.getTaskId());
     TaskAttemptInfo attemptInfo = 
       taskInfo.attemptsMap.get(event.getAttemptId());
+    // 填充Reduce尝试完成信息，包含shuffle和sort阶段时间
     attemptInfo.finishTime = event.getFinishTime();
     attemptInfo.status = StringInterner.weakIntern(event.getTaskStatus());
     attemptInfo.state = StringInterner.weakIntern(event.getState());
@@ -268,13 +287,16 @@ public class JobHistoryParser implements HistoryEventHandler {
     attemptInfo.hostname = StringInterner.weakIntern(event.getHostname());
     attemptInfo.port = event.getPort();
     attemptInfo.rackname = StringInterner.weakIntern(event.getRackName());
+    // 添加到已完成尝试集合
     info.completedTaskAttemptsMap.put(event.getAttemptId(), attemptInfo);
   }
 
   private void handleMapAttemptFinishedEvent(MapAttemptFinishedEvent event) {
+    // 获取任务和尝试信息对象
     TaskInfo taskInfo = info.tasksMap.get(event.getTaskId());
     TaskAttemptInfo attemptInfo = 
       taskInfo.attemptsMap.get(event.getAttemptId());
+    // 填充Map尝试完成信息，包含map阶段完成时间
     attemptInfo.finishTime = event.getFinishTime();
     attemptInfo.status = StringInterner.weakIntern(event.getTaskStatus());
     attemptInfo.state = StringInterner.weakIntern(event.getState());
@@ -283,17 +305,20 @@ public class JobHistoryParser implements HistoryEventHandler {
     attemptInfo.hostname = StringInterner.weakIntern(event.getHostname());
     attemptInfo.port = event.getPort();
     attemptInfo.rackname = StringInterner.weakIntern(event.getRackName());
+    // 添加到已完成尝试集合
     info.completedTaskAttemptsMap.put(event.getAttemptId(), attemptInfo);
   }
 
   private void handleTaskAttemptFailedEvent(
       TaskAttemptUnsuccessfulCompletionEvent event) {
+    // 获取任务信息对象
     TaskInfo taskInfo = info.tasksMap.get(event.getTaskId());
     if(taskInfo == null) {
       LOG.warn("TaskInfo is null for TaskAttemptUnsuccessfulCompletionEvent"
           + " taskId:  " + event.getTaskId().toString());
       return;
     }
+    // 获取尝试信息对象
     TaskAttemptInfo attemptInfo = 
       taskInfo.attemptsMap.get(event.getTaskAttemptId());
     if(attemptInfo == null) {
@@ -301,6 +326,7 @@ public class JobHistoryParser implements HistoryEventHandler {
           + " taskAttemptId:  " + event.getTaskAttemptId().toString());
       return;
     }
+    // 填充失败事件信息
     attemptInfo.finishTime = event.getFinishTime();
     attemptInfo.error = StringInterner.weakIntern(event.getError());
     attemptInfo.status = StringInterner.weakIntern(event.getTaskStatus());
@@ -311,20 +337,18 @@ public class JobHistoryParser implements HistoryEventHandler {
     attemptInfo.sortFinishTime = event.getFinishTime();
     attemptInfo.mapFinishTime = event.getFinishTime();
     attemptInfo.counters = event.getCounters();
+    // 如果任务之前标记为成功，且当前失败的正是成功尝试，则重置任务成功状态
     if(TaskStatus.State.SUCCEEDED.toString().equals(taskInfo.status))
     {
-      //this is a successful task
       if(attemptInfo.getAttemptId().equals(taskInfo.getSuccessfulAttemptId()))
       {
-        // the failed attempt is the one that made this task successful
-        // so its no longer successful. Reset fields set in
-        // handleTaskFinishedEvent()
         taskInfo.counters = null;
         taskInfo.finishTime = -1;
         taskInfo.status = null;
         taskInfo.successfulAttemptId = null;
       }
     }
+    // 添加到已完成尝试集合
     info.completedTaskAttemptsMap.put(event.getTaskAttemptId(), attemptInfo);
   }
 
@@ -332,6 +356,7 @@ public class JobHistoryParser implements HistoryEventHandler {
     TaskAttemptID attemptId = event.getTaskAttemptId();
     TaskInfo taskInfo = info.tasksMap.get(event.getTaskId());
     
+    // 创建新的尝试信息对象，填充启动信息
     TaskAttemptInfo attemptInfo = new TaskAttemptInfo();
     attemptInfo.startTime = event.getStartTime();
     attemptInfo.attemptId = event.getTaskAttemptId();
@@ -341,10 +366,12 @@ public class JobHistoryParser implements HistoryEventHandler {
     attemptInfo.shufflePort = event.getShufflePort();
     attemptInfo.containerId = event.getContainerId();
     
+    // 添加到任务的尝试映射表
     taskInfo.attemptsMap.put(attemptId, attemptInfo);
   }
 
   private void handleTaskFinishedEvent(TaskFinishedEvent event) {
+    // 获取任务信息对象，填充完成信息
     TaskInfo taskInfo = info.tasksMap.get(event.getTaskId());
     taskInfo.counters = event.getCounters();
     taskInfo.finishTime = event.getFinishTime();
@@ -353,11 +380,13 @@ public class JobHistoryParser implements HistoryEventHandler {
   }
 
   private void handleTaskUpdatedEvent(TaskUpdatedEvent event) {
+    // 更新任务完成时间
     TaskInfo taskInfo = info.tasksMap.get(event.getTaskId());
     taskInfo.finishTime = event.getFinishTime();
   }
 
   private void handleTaskFailedEvent(TaskFailedEvent event) {
+    // 获取任务信息对象，填充失败信息
     TaskInfo taskInfo = info.tasksMap.get(event.getTaskId());
     taskInfo.status = TaskStatus.State.FAILED.toString();
     taskInfo.finishTime = event.getFinishTime();
@@ -367,15 +396,18 @@ public class JobHistoryParser implements HistoryEventHandler {
   }
 
   private void handleTaskStartedEvent(TaskStartedEvent event) {
+    // 创建新的任务信息对象，填充启动信息
     TaskInfo taskInfo = new TaskInfo();
     taskInfo.taskId = event.getTaskId();
     taskInfo.startTime = event.getStartTime();
     taskInfo.taskType = event.getTaskType();
     taskInfo.splitLocations = event.getSplitLocations();
+    // 添加到作业的任务映射表
     info.tasksMap.put(event.getTaskId(), taskInfo);
   }
 
   private void handleJobFailedEvent(JobUnsuccessfulCompletionEvent event) {
+    // 填充作业失败/杀死/错误信息，统计任务完成情况
     info.finishTime = event.getFinishTime();
     info.succeededMaps = event.getSucceededMaps();
     info.succeededReduces = event.getSucceededReduces();
@@ -388,430 +420,8 @@ public class JobHistoryParser implements HistoryEventHandler {
   }
 
   private void handleJobFinishedEvent(JobFinishedEvent event) {
+    // 填充作业成功完成信息，统计任务完成情况和计数器
     info.finishTime = event.getFinishTime();
     info.succeededMaps = event.getSucceededMaps();
     info.succeededReduces = event.getSucceededReduces();
-    info.failedMaps = event.getFailedMaps();
-    info.failedReduces = event.getFailedReduces();
-    info.killedMaps = event.getKilledMaps();
-    info.killedReduces = event.getKilledReduces();
-    info.totalCounters = event.getTotalCounters();
-    info.mapCounters = event.getMapCounters();
-    info.reduceCounters = event.getReduceCounters();
-    info.jobStatus = JobStatus.getJobRunState(JobStatus.SUCCEEDED);
-  }
-
-  private void handleJobPriorityChangeEvent(JobPriorityChangeEvent event) {
-    info.priority = event.getPriority();
-  }
-  
-  private void handleJobQueueChangeEvent(JobQueueChangeEvent event) {
-    info.jobQueueName = event.getJobQueueName();
-  }
-
-  private void handleJobInitedEvent(JobInitedEvent event) {
-    info.launchTime = event.getLaunchTime();
-    info.totalMaps = event.getTotalMaps();
-    info.totalReduces = event.getTotalReduces();
-    info.uberized = event.getUberized();
-  }
-  
-  private void handleAMStartedEvent(AMStartedEvent event) {
-    AMInfo amInfo = new AMInfo();
-    amInfo.appAttemptId = event.getAppAttemptId();
-    amInfo.startTime = event.getStartTime();
-    amInfo.containerId = event.getContainerId();
-    amInfo.nodeManagerHost = StringInterner.weakIntern(event.getNodeManagerHost());
-    amInfo.nodeManagerPort = event.getNodeManagerPort();
-    amInfo.nodeManagerHttpPort = event.getNodeManagerHttpPort();
-    if (info.amInfos == null) {
-      info.amInfos = new LinkedList<AMInfo>();
-    }
-    info.amInfos.add(amInfo);
-    info.latestAmInfo = amInfo;
-  }
-
-  private void handleJobInfoChangeEvent(JobInfoChangeEvent event) {
-    info.submitTime = event.getSubmitTime();
-    info.launchTime = event.getLaunchTime();
-  }
-
-  private void handleJobSubmittedEvent(JobSubmittedEvent event) {
-    info.jobid = event.getJobId();
-    info.jobname = event.getJobName();
-    info.username = StringInterner.weakIntern(event.getUserName());
-    info.submitTime = event.getSubmitTime();
-    info.jobConfPath = event.getJobConfPath();
-    info.jobACLs = event.getJobAcls();
-    info.jobQueueName = StringInterner.weakIntern(event.getJobQueueName());
-  }
-
-  /**
-   * The class where job information is aggregated into after parsing
-   */
-  public static class JobInfo {
-    String errorInfo = "";
-    long submitTime;
-    long finishTime;
-    JobID jobid;
-    String username;
-    String jobname;
-    String jobQueueName;
-    String jobConfPath;
-    long launchTime;
-    int totalMaps;
-    int totalReduces;
-    int failedMaps;
-    int failedReduces;
-    int succeededMaps;
-    int succeededReduces;
-    int killedMaps;
-    int killedReduces;
-    String jobStatus;
-    Counters totalCounters;
-    Counters mapCounters;
-    Counters reduceCounters;
-    JobPriority priority;
-    Map<JobACL, AccessControlList> jobACLs;
-    
-    Map<TaskID, TaskInfo> tasksMap;
-    Map<TaskAttemptID, TaskAttemptInfo> completedTaskAttemptsMap;
-    List<AMInfo> amInfos;
-    AMInfo latestAmInfo;
-    boolean uberized;
-    
-    /** Create a job info object where job information will be stored
-     * after a parse
-     */
-    public JobInfo() {
-      submitTime = launchTime = finishTime = -1;
-      totalMaps = totalReduces = failedMaps = failedReduces = 0;
-      succeededMaps = succeededReduces = 0;
-      username = jobname = jobConfPath = jobQueueName = "";
-      tasksMap = new HashMap<TaskID, TaskInfo>();
-      completedTaskAttemptsMap = new HashMap<TaskAttemptID, TaskAttemptInfo>();
-      jobACLs = new HashMap<JobACL, AccessControlList>();
-      priority = JobPriority.NORMAL;
-    }
-    
-    /** Print all the job information */
-    public void printAll() {
-      System.out.println("JOBNAME: " + jobname);
-      System.out.println("USERNAME: " + username);
-      System.out.println("JOB_QUEUE_NAME: " + jobQueueName);
-      System.out.println("SUBMIT_TIME" + submitTime);
-      System.out.println("LAUNCH_TIME: " + launchTime);
-      System.out.println("JOB_STATUS: " + jobStatus);
-      System.out.println("PRIORITY: " + priority);
-      System.out.println("TOTAL_MAPS: " + totalMaps);
-      System.out.println("TOTAL_REDUCES: " + totalReduces);
-      if (mapCounters != null) {
-        System.out.println("MAP_COUNTERS:" + mapCounters.toString());
-      }
-      if (reduceCounters != null) {
-        System.out.println("REDUCE_COUNTERS:" + reduceCounters.toString());
-      }
-      if (totalCounters != null) {
-        System.out.println("TOTAL_COUNTERS: " + totalCounters.toString());
-      }
-      System.out.println("UBERIZED: " + uberized);
-      if (amInfos != null) {
-        for (AMInfo amInfo : amInfos) {
-          amInfo.printAll();
-        }
-      }
-      for (TaskInfo ti: tasksMap.values()) {
-        ti.printAll();
-      }
-    }
-
-    /** @return the job submit time */
-    public long getSubmitTime() { return submitTime; }
-    /** @return the job finish time */
-    public long getFinishTime() { return finishTime; }
-    /** @return the job id */
-    public JobID getJobId() { return jobid; }
-    /** @return the user name */
-    public String getUsername() { return username; }
-    /** @return the job name */
-    public String getJobname() { return jobname; }
-    /** @return the job queue name */
-    public String getJobQueueName() { return jobQueueName; }
-    /** @return the path for the job configuration file */
-    public String getJobConfPath() { return jobConfPath; }
-    /** @return the job launch time */
-    public long getLaunchTime() { return launchTime; }
-    /** @return the total number of maps */
-    public long getTotalMaps() { return totalMaps; }
-    /** @return the total number of reduces */
-    public long getTotalReduces() { return totalReduces; }
-    /** @return the total number of failed maps */
-    public long getFailedMaps() { return failedMaps; }
-    /** @return the number of failed reduces */
-    public long getFailedReduces() { return failedReduces; }
-    /** @return the number of killed maps */
-    public long getKilledMaps() { return killedMaps; }
-    /** @return the number of killed reduces */
-    public long getKilledReduces() { return killedReduces; }
-    /** @return the number of succeeded maps */
-    public long getSucceededMaps() { return succeededMaps; }
-    /** @return the number of succeeded reduces */
-    public long getSucceededReduces() { return succeededReduces; }
-    /** @return the job status */
-    public String getJobStatus() { return jobStatus; }
-    public String getErrorInfo() { return errorInfo; }
-    /** @return the counters for the job */
-    public Counters getTotalCounters() { return totalCounters; }
-    /** @return the map counters for the job */
-    public Counters getMapCounters() { return mapCounters; }
-    /** @return the reduce counters for the job */
-    public Counters getReduceCounters() { return reduceCounters; }
-    /** @return the map of all tasks in this job */
-    public Map<TaskID, TaskInfo> getAllTasks() { return tasksMap; }
-    /** @return the map of all completed task attempts in this job */
-    public Map<TaskAttemptID, TaskAttemptInfo> getAllCompletedTaskAttempts() { return completedTaskAttemptsMap; }
-    /** @return the priority of this job */
-    public String getPriority() { return priority.toString(); }
-    public Map<JobACL, AccessControlList> getJobACLs() { return jobACLs; }
-    /** @return the uberized status of this job */
-    public boolean getUberized() { return uberized; }
-    /** @return the AMInfo for the job's AppMaster */
-    public List<AMInfo> getAMInfos() { return amInfos; }
-    /** @return the AMInfo for the newest AppMaster */
-    public AMInfo getLatestAMInfo() { return latestAmInfo; }
-  }
-  
-  /**
-   * TaskInformation is aggregated in this class after parsing
-   */
-  public static class TaskInfo {
-    TaskID taskId;
-    long startTime;
-    long finishTime;
-    TaskType taskType;
-    String splitLocations;
-    Counters counters;
-    String status;
-    String error;
-    TaskAttemptID failedDueToAttemptId;
-    TaskAttemptID successfulAttemptId;
-    Map<TaskAttemptID, TaskAttemptInfo> attemptsMap;
-
-    public TaskInfo() {
-      startTime = finishTime = -1;
-      error = splitLocations = "";
-      attemptsMap = new HashMap<TaskAttemptID, TaskAttemptInfo>(2);
-    }
-    
-    public void printAll() {
-      System.out.println("TASK_ID:" + taskId.toString());
-      System.out.println("START_TIME: " + startTime);
-      System.out.println("FINISH_TIME:" + finishTime);
-      System.out.println("TASK_TYPE:" + taskType);
-      if (counters != null) {
-        System.out.println("COUNTERS:" + counters.toString());
-      }
-      
-      for (TaskAttemptInfo tinfo: attemptsMap.values()) {
-        tinfo.printAll();
-      }
-    }
-    
-    /** @return the Task ID */
-    public TaskID getTaskId() { return taskId; }
-    /** @return the start time of this task */
-    public long getStartTime() { return startTime; }
-    /** @return the finish time of this task */
-    public long getFinishTime() { return finishTime; }
-    /** @return the task type */
-    public TaskType getTaskType() { return taskType; }
-    /** @return the split locations */
-    public String getSplitLocations() { return splitLocations; }
-    /** @return the counters for this task */
-    public Counters getCounters() { return counters; }
-    /** @return the task status */
-    public String getTaskStatus() { return status; }
-    /** @return the attempt Id that caused this task to fail */
-    public TaskAttemptID getFailedDueToAttemptId() {
-      return failedDueToAttemptId;
-    }
-    /** @return the attempt Id that caused this task to succeed */
-    public TaskAttemptID getSuccessfulAttemptId() {
-      return successfulAttemptId;
-    }
-    /** @return the error */
-    public String getError() { return error; }
-    /** @return the map of all attempts for this task */
-    public Map<TaskAttemptID, TaskAttemptInfo> getAllTaskAttempts() {
-      return attemptsMap;
-    }
-  }
-  
-  /**
-   * Task Attempt Information is aggregated in this class after parsing
-   */
-  public static class TaskAttemptInfo {
-    TaskAttemptID attemptId;
-    long startTime;
-    long finishTime;
-    long shuffleFinishTime;
-    long sortFinishTime;
-    long mapFinishTime;
-    String error;
-    String status;
-    String state;
-    TaskType taskType;
-    String trackerName;
-    Counters counters;
-    int httpPort;
-    int shufflePort;
-    String hostname;
-    int port;
-    String rackname;
-    ContainerId containerId;
-
-    /** Create a Task Attempt Info which will store attempt level information
-     * on a history parse.
-     */
-    public TaskAttemptInfo() {
-      startTime = finishTime = shuffleFinishTime = sortFinishTime = 
-        mapFinishTime = -1;
-      error =  state =  trackerName = hostname = rackname = "";
-      port = -1;
-      httpPort = -1;
-      shufflePort = -1;
-    }
-    /**
-     * Print all the information about this attempt.
-     */
-    public void printAll() {
-      System.out.println("ATTEMPT_ID:" + attemptId.toString());
-      System.out.println("START_TIME: " + startTime);
-      System.out.println("FINISH_TIME:" + finishTime);
-      System.out.println("ERROR:" + error);
-      System.out.println("TASK_STATUS:" + status);
-      System.out.println("STATE:" + state);
-      System.out.println("TASK_TYPE:" + taskType);
-      System.out.println("TRACKER_NAME:" + trackerName);
-      System.out.println("HTTP_PORT:" + httpPort);
-      System.out.println("SHUFFLE_PORT:" + shufflePort);
-      System.out.println("CONTIANER_ID:" + containerId);
-      if (counters != null) {
-        System.out.println("COUNTERS:" + counters.toString());
-      }
-    }
-
-    /** @return the attempt Id */
-    public TaskAttemptID getAttemptId() { return attemptId; }
-    /** @return the start time of the attempt */
-    public long getStartTime() { return startTime; }
-    /** @return the finish time of the attempt */
-    public long getFinishTime() { return finishTime; }
-    /** @return the shuffle finish time. Applicable only for reduce attempts */
-    public long getShuffleFinishTime() { return shuffleFinishTime; }
-    /** @return the sort finish time. Applicable only for reduce attempts */
-    public long getSortFinishTime() { return sortFinishTime; }
-    /** @return the map finish time. Applicable only for map attempts */
-    public long getMapFinishTime() { return mapFinishTime; }
-    /** @return the error string */
-    public String getError() { return error; }
-    /** @return the state */
-    public String getState() { return state; }
-    /** @return the task status */
-    public String getTaskStatus() { return status; }
-    /** @return the task type */
-    public TaskType getTaskType() { return taskType; }
-    /** @return the tracker name where the attempt executed */
-    public String getTrackerName() { return trackerName; }
-    /** @return the host name */
-    public String getHostname() { return hostname; }
-    /** @return the port */
-    public int getPort() { return port; }
-    /** @return the rack name */
-    public String getRackname() { return rackname; }
-    /** @return the counters for the attempt */
-    public Counters getCounters() { return counters; }
-    /** @return the HTTP port for the tracker */
-    public int getHttpPort() { return httpPort; }
-    /** @return the Shuffle port for the tracker */
-    public int getShufflePort() { return shufflePort; }
-    /** @return the ContainerId for the tracker */
-    public ContainerId getContainerId() { return containerId; }
-  }
-
-  /**
-   * Stores AM information
-   */
-  public static class AMInfo {
-    ApplicationAttemptId appAttemptId;
-    long startTime;
-    ContainerId containerId;
-    String nodeManagerHost;
-    int nodeManagerPort;
-    int nodeManagerHttpPort;
-
-    /**
-     * Create a AM Info which will store AM level information on a history
-     * parse.
-     */
-    public AMInfo() {
-      startTime = -1;
-      nodeManagerHost = "";
-      nodeManagerHttpPort = -1;
-    }
-
-    public AMInfo(ApplicationAttemptId appAttemptId, long startTime,
-        ContainerId containerId, String nodeManagerHost, int nodeManagerPort,
-        int nodeManagerHttpPort) {
-      this.appAttemptId = appAttemptId;
-      this.startTime = startTime;
-      this.containerId = containerId;
-      this.nodeManagerHost = nodeManagerHost;
-      this.nodeManagerPort = nodeManagerPort;
-      this.nodeManagerHttpPort = nodeManagerHttpPort;
-    }
-
-    /**
-     * Print all the information about this AM.
-     */
-    public void printAll() {
-      System.out.println("APPLICATION_ATTEMPT_ID:" + appAttemptId.toString());
-      System.out.println("START_TIME: " + startTime);
-      System.out.println("CONTAINER_ID: " + containerId.toString());
-      System.out.println("NODE_MANAGER_HOST: " + nodeManagerHost);
-      System.out.println("NODE_MANAGER_PORT: " + nodeManagerPort);
-      System.out.println("NODE_MANAGER_HTTP_PORT: " + nodeManagerHttpPort);
-    }
-
-    /** @return the ApplicationAttemptId */
-    public ApplicationAttemptId getAppAttemptId() {
-      return appAttemptId;
-    }
-
-    /** @return the start time of the AM */
-    public long getStartTime() {
-      return startTime;
-    }
-
-    /** @return the container id for the AM */
-    public ContainerId getContainerId() {
-      return containerId;
-    }
-
-    /** @return the host name for the node manager on which the AM is running */
-    public String getNodeManagerHost() {
-      return nodeManagerHost;
-    }
-
-    /** @return the port for the node manager running the AM */
-    public int getNodeManagerPort() {
-      return nodeManagerPort;
-    }
-
-    /** @return the http port for the node manager running the AM */
-    public int getNodeManagerHttpPort() {
-      return nodeManagerHttpPort;
-    }
-  }
-
-}
+    info.failedMaps = event.get

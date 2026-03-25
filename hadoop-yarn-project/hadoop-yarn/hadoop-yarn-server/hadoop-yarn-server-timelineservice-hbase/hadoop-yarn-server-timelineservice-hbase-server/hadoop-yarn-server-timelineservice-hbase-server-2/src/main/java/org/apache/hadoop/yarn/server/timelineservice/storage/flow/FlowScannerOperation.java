@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,30 +18,28 @@
  */
 package org.apache.hadoop.yarn.server.timelineservice.storage.flow;
 
-
 /**
- * Identifies the scanner operation on the {@link FlowRunTable}.
+ * 流运行表FlowRunTable上的扫描器操作类型枚举，标识HBase协处理器触发扫描的场景
  */
 public enum FlowScannerOperation {
 
   /**
-   * If the scanner is opened for reading
-   * during preGet or preScan.
+   * 扫描器用于读取操作，在preGet或preScan阶段打开
    */
   READ,
 
   /**
-   * If the scanner is opened during preFlush.
+   * 扫描器用于刷写操作，在preFlush阶段打开
    */
   FLUSH,
 
   /**
-   * If the scanner is opened during minor Compaction.
+   * 扫描器用于Minor Compaction（小合并）阶段打开
    */
   MINOR_COMPACTION,
 
   /**
-   * If the scanner is opened during major Compaction.
+   * 扫描器用于Major Compaction（大合并）阶段打开
    */
   MAJOR_COMPACTION
 }

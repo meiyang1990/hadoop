@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,22 +23,24 @@ import java.io.Serializable;
 
 import org.apache.hadoop.util.Preconditions;
 
-/** A class that represents an FPGA card. */
+/**
+ * 表示节点上一块FPGA设备的实体类，存储FPGA设备的基本信息和当前加载的比特流信息
+ */
 public class FpgaDevice implements Serializable {
   private static final long serialVersionUID = -4678487141824092751L;
   private final String type;
   private final int major;
   private final int minor;
 
-  // the alias device name. Intel use acl number acl0 to acl31
+  // FPGA设备别名，Intel平台使用acl0~acl31作为别名
   private final String aliasDevName;
 
-  // IP file identifier. matrix multiplication for instance (mutable)
+  // 当前加载的IP文件标识符，例如矩阵乘法，可动态变更
   private String IPID;
-  // SHA-256 hash of the uploaded aocx file (mutable)
+  // 上传的aocx比特流文件的SHA-256哈希值，可动态变更
   private String aocxHash;
 
-  // cached hash value
+  // 缓存的哈希值，用于提升hashCode计算性能
   private Integer hashCode;
 
   public String getType() {
@@ -72,6 +75,13 @@ public class FpgaDevice implements Serializable {
     return aliasDevName;
   }
 
+  /**
+   * 构造FPGA设备对象，校验必填参数非空
+   * @param type FPGA设备类型
+   * @param major 设备驱动主设备号
+   * @param minor 设备驱动次设备号
+   * @param aliasDevName 设备别名
+   */
   public FpgaDevice(String type, int major, int minor, String aliasDevName) {
     this.type = Preconditions.checkNotNull(type, "type must not be null");
     this.major = major;
@@ -82,16 +92,20 @@ public class FpgaDevice implements Serializable {
 
   @Override
   public boolean equals(Object obj) {
+    // 同一对象直接返回相等
     if (this == obj) {
       return true;
     }
+    // 比较对象为null直接不相等
     if (obj == null) {
       return false;
     }
+    // 类型不同直接不相等
     if (getClass() != obj.getClass()) {
       return false;
     }
     FpgaDevice other = (FpgaDevice) obj;
+    // 比较设备别名
     if (aliasDevName == null) {
       if (other.aliasDevName != null) {
         return false;
@@ -99,12 +113,15 @@ public class FpgaDevice implements Serializable {
     } else if (!aliasDevName.equals(other.aliasDevName)) {
       return false;
     }
+    // 比较主设备号
     if (major != other.major) {
       return false;
     }
+    // 比较次设备号
     if (minor != other.minor) {
       return false;
     }
+    // 比较设备类型
     if (type == null) {
       if (other.type != null) {
         return false;
@@ -117,6 +134,7 @@ public class FpgaDevice implements Serializable {
 
   @Override
   public int hashCode() {
+    // 延迟计算，缓存结果提升性能
     if (hashCode == null) {
       final int prime = 31;
       int result = 1;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,7 +30,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.List;
 
 /**
- * DAO object to display request allocation detailed information.
+ * 应用资源请求分配信息的数据访问对象，用于在ResourceManager Web UI展示请求分配详情
  */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -43,16 +44,24 @@ public class AppRequestAllocationInfo {
   AppRequestAllocationInfo() {
   }
 
+  /**
+   * 从调度活动节点构造应用请求分配信息对象
+   * @param activityNodes 调度活动节点列表
+   * @param groupBy 活动分组方式
+   */
   AppRequestAllocationInfo(List<ActivityNode> activityNodes,
       RMWSConsts.ActivitiesGroupBy groupBy) {
+    // 获取最后一个活动节点，提取最终分配结果信息
     ActivityNode lastActivityNode = Iterables.getLast(activityNodes);
     this.requestPriority = lastActivityNode.getRequestPriority();
     this.allocationRequestId = lastActivityNode.getAllocationRequestId();
     this.allocationState = lastActivityNode.getState().name();
+    // 如果是请求类型节点且包含诊断信息，保存诊断信息
     if (lastActivityNode.isRequestType()
         && lastActivityNode.getDiagnostic() != null) {
       this.diagnostic = lastActivityNode.getDiagnostic();
     }
+    // 转换并构造子活动节点信息，按指定分组方式组织
     this.children = ActivitiesUtils
         .getRequestActivityNodeInfos(activityNodes, groupBy);
   }

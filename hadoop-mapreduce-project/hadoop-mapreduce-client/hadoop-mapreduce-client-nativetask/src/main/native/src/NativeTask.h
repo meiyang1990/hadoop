@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,14 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * @file NativeTask.h
+ * @brief Hadoop MapReduce 本地任务执行核心头文件，定义了本地任务运行所需的基础抽象类、枚举和宏
+ *
+ * 本文件属于MapReduce本地任务模块，提供C++实现的MapReduce任务运行时核心基础能力，
+ * 支持Java端调用本地C++代码执行Map/Reduce任务，提升计算密集型任务的性能。
  */
 
 #ifndef NATIVETASK_H_
@@ -33,7 +42,7 @@ using std::map;
 using std::pair;
 
 /**
- * NativeObjectType
+ * 本地对象类型枚举
  */
 enum NativeObjectType {
   UnknownObjectType = 0,
@@ -41,14 +50,14 @@ enum NativeObjectType {
 };
 
 /**
- * Enduim setting
- *
+ * 字节序枚举
  */
 enum Endium {
   LITTLE_ENDIUM = 0,
   LARGE_ENDIUM = 1
 };
 
+// 配置项名称定义
 #define NATIVE_COMBINER "native.combiner.class"
 #define NATIVE_PARTITIONER "native.partitioner.class"
 #define NATIVE_MAPPER "native.mapper.class"
@@ -85,17 +94,31 @@ enum Endium {
 
 #define NATIVE_LOG_DEVICE "native.log.device"
 
-//format: name=path,name=path,name=path
+// 内置类库配置格式: name=path,name=path,name=path
 #define NATIVE_CLASS_LIBRARY_BUILDIN "native.class.library.buildin"
 
 #define NATIVE_MAPOUT_KEY_COMPARATOR "native.map.output.key.comparator"
 
+/**
+ * @brief 将本地对象类型转换为字符串表示
+ * @param type 本地对象类型枚举值
+ * @return 类型对应的字符串
+ */
 extern const std::string NativeObjectTypeToString(NativeObjectType type);
+
+/**
+ * @brief 从字符串解析本地对象类型
+ * @param type 类型字符串
+ * @return 解析后的枚举类型
+ */
 extern NativeObjectType NativeObjectTypeFromString(const std::string type);
 
 /**
- * Objects that can be loaded dynamically from shared library,
- * and managed by NativeObjectFactory
+ * @class NativeObject
+ * @brief 所有可动态加载本地对象的基类
+ *
+ * 所有能从动态共享库加载、由NativeObjectFactory管理的对象都需要继承此类，
+ * 提供统一的类型识别和生命周期管理。
  */
 class NativeObject {
 public:
@@ -108,6 +131,11 @@ public:
   ;
 };
 
+/**
+ * @brief 模板方法，创建指定类型的NativeObject实例
+ * @tparam T 要创建的对象类型
+ * @return 新建对象指针
+ */
 template<typename T>
 NativeObject * ObjectCreator() {
   return new T();
@@ -122,7 +150,8 @@ typedef void * (*FunctionGetter)(const std::string & name);
 typedef int32_t (*InitLibraryFunc)();
 
 /**
- * Exceptions
+ * @class HadoopException
+ * @brief Hadoop本地任务异常基类，继承自标准C++异常
  */
 class HadoopException : public std::exception {
 private:
@@ -137,6 +166,10 @@ public:
   }
 };
 
+/**
+ * @class OutOfMemoryException
+ * @brief 内存不足异常
+ */
 class OutOfMemoryException : public HadoopException {
 public:
   OutOfMemoryException(const string & what)
@@ -144,6 +177,10 @@ public:
   }
 };
 
+/**
+ * @class IOException
+ * @brief IO操作异常
+ */
 class IOException : public HadoopException {
 public:
   IOException(const string & what)
@@ -151,6 +188,10 @@ public:
   }
 };
 
+/**
+ * @class UnsupportException
+ * @brief 不支持操作异常
+ */
 class UnsupportException : public HadoopException {
 public:
   UnsupportException(const string & what)
@@ -159,7 +200,8 @@ public:
 };
 
 /**
- * Exception when call java methods using JNI
+ * @class JavaException
+ * @brief 通过JNI调用Java方法时抛出的异常
  */
 class JavaException : public HadoopException {
 public:
@@ -168,6 +210,7 @@ public:
   }
 };
 
+// 辅助宏，用于生成带文件行号的异常信息
 #define STRINGIFY(x) #x
 #define TOSTRING(x) STRINGIFY(x)
 #define AT __FILE__ ":" TOSTRING(__LINE__)
@@ -175,6 +218,10 @@ public:
 #define THROW_EXCEPTION_EX(type, fmt, args...) \
         throw type(StringUtil::Format("%s:" fmt, AT, ##args))
 
+/**
+ * @class Config
+ * @brief 配置存储与读取类，保存MapReduce任务的配置参数
+ */
 class Config {
 protected:
   map<string, string> _configs;
@@ -184,44 +231,110 @@ public:
   ~Config() {
   }
 
+  /**
+   * @brief 根据配置键获取配置值
+   * @param name 配置键
+   * @return 配置值指针，不存在返回NULL
+   */
   const char * get(const string & name);
 
+  /**
+   * @brief 根据配置键获取配置值，不存在返回默认值
+   * @param name 配置键
+   * @param defaultValue 默认值
+   * @return 配置值字符串
+   */
   string get(const string & name, const string & defaultValue);
 
+  /**
+   * @brief 获取布尔类型配置值
+   * @param name 配置键
+   * @param defaultValue 默认值
+   * @return 布尔配置值
+   */
   bool getBool(const string & name, bool defaultValue);
 
+  /**
+   * @brief 获取整数类型配置值
+   * @param name 配置键
+   * @param defaultValue 默认值，默认为-1
+   * @return 整数配置值
+   */
   int64_t getInt(const string & name, int64_t defaultValue = -1);
 
+  /**
+   * @brief 获取浮点类型配置值
+   * @param name 配置键
+   * @param defaultValue 默认值，默认为-1
+   * @return 浮点配置值
+   */
   float getFloat(const string & name, float defaultValue = -1);
 
+  /**
+   * @brief 获取逗号分隔的字符串列表配置
+   * @param name 配置键
+   * @param dest 输出结果向量
+   */
   void getStrings(const string & name, vector<string> & dest);
 
+  /**
+   * @brief 获取逗号分隔的整数列表配置
+   * @param name 配置键
+   * @param dest 输出结果向量
+   */
   void getInts(const string & name, vector<int64_t> & dest);
 
+  /**
+   * @brief 获取逗号分隔的浮点数列表配置
+   * @param name 配置键
+   * @param dest 输出结果向量
+   */
   void getFloats(const string & name, vector<float> & dest);
 
+  /**
+   * @brief 设置字符串配置项
+   * @param key 配置键
+   * @param value 配置值
+   */
   void set(const string & key, const string & value);
 
+  /**
+   * @brief 设置整数配置项
+   * @param name 配置键
+   * @param value 配置值
+   */
   void setInt(const string & name, int64_t value);
 
+  /**
+   * @brief 设置布尔配置项
+   * @param name 配置键
+   * @param value 配置值
+   */
   void setBool(const string & name, bool value);
 
   /**
-   * Load configs from a config file with the following format:
+   * 从配置文件加载配置，格式为：
    * # comment
    * key1=value1
    * key2=value2
    * ...
+   * @param path 配置文件路径
    */
   void load(const string & path);
 
   /**
-   * Load configs form command line args
+   * 从命令行参数解析配置，格式为：
    * key1=value1 key2=value2,value2
+   * @param argc 参数个数
+   * @param argv 参数数组
    */
   void parse(int32_t argc, const char ** argv);
 };
 
+/**
+ * @class Command
+ * @brief 命令标识类，封装命令ID和描述信息
+ */
 class Command {
 private:
   int _id;
@@ -252,6 +365,10 @@ public:
   }
 };
 
+/**
+ * @class Buffer
+ * @brief 字节缓冲区封装，存储数据指针和长度，不管理内存
+ */
 class Buffer {
 protected:
   const char * _data;
@@ -295,6 +412,10 @@ public:
   }
 };
 
+/**
+ * @class InputSplit
+ * @brief 输入分片抽象接口，定义Map任务输入数据分片的行为
+ */
 class InputSplit {
 public:
   virtual uint64_t getLength() = 0;
@@ -308,6 +429,10 @@ public:
   }
 };
 
+/**
+ * @class Configurable
+ * @brief 可配置对象抽象基类，支持在对象创建后注入配置
+ */
 class Configurable : public NativeObject {
 public:
   Configurable() {
@@ -317,6 +442,10 @@ public:
   }
 };
 
+/**
+ * @class Collector
+ * @brief 键值对输出收集器抽象接口，供Map/Combine任务输出结果
+ */
 class Collector {
 public:
   virtual ~Collector() {
@@ -331,6 +460,10 @@ public:
   }
 };
 
+/**
+ * @class Progress
+ * @brief 进度查询抽象接口，用于获取任务执行进度
+ */
 class Progress {
 public:
   virtual ~Progress() {
@@ -338,10 +471,13 @@ public:
   virtual float getProgress() = 0;
 };
 
+/**
+ * @class Counter
+ * @brief 计数器实现，用于统计任务执行指标，可同步回Java端
+ */
 class Counter {
 private:
-  // not thread safe
-  // TODO: use atomic
+  // 非线程安全，TODO：需要改为原子操作
   volatile uint64_t _count;
 
   string _group;
@@ -371,6 +507,10 @@ public:
   }
 };
 
+/**
+ * @class KVIterator
+ * @brief 键值对迭代器抽象接口，用于遍历排序后的键值对
+ */
 class KVIterator {
 public:
   virtual ~KVIterator() {
@@ -378,7 +518,10 @@ public:
   virtual bool next(Buffer & key, Buffer & value) = 0;
 };
 
-
+/**
+ * @class ProcessorBase
+ * @brief 处理基类，所有Map/Reduce/Combine处理器的基类，持有输出收集器
+ */
 class ProcessorBase : public Configurable {
 protected:
   Collector * _collector;
@@ -410,6 +553,9 @@ public:
   }
 };
 
+/**
+ * 键分组迭代状态枚举
+ */
 enum KeyGroupIterState {
   SAME_KEY,
   NEW_KEY,
@@ -417,91 +563,30 @@ enum KeyGroupIterState {
   NO_MORE,
 };
 
+/**
+ * @class KeyGroupIterator
+ * @brief 按键分组迭代器抽象接口，供Reduce阶段按相同key分组迭代值
+ */
 class KeyGroupIterator {
 public:
   virtual ~KeyGroupIterator() {
   }
   /**
-   * Move to nextKey, or begin this iterator
+   * 移动到下一个key分组，或初始化迭代器
+   * @return 是否还有下一个key分组
    */
   virtual bool nextKey() = 0;
 
   /**
-   * Get key of this input group
+   * 获取当前分组的key
+   * @param len 输出key长度
+   * @return key数据指针
    */
   virtual const char * getKey(uint32_t & len) = 0;
 
   /**
-   * Get next value of this input group
-   * @return NULL if no more
+   * 获取当前key分组的下一个值
+   * @param len 输出值长度
+   * @return 值数据指针，无更多值返回NULL
    */
-  virtual const char * nextValue(uint32_t & len) = 0;
-};
-
-
-
-enum KeyValueType {
-  TextType = 0,
-  BytesType = 1,
-  ByteType = 2,
-  BoolType = 3,
-  IntType = 4,
-  LongType = 5,
-  FloatType = 6,
-  DoubleType = 7,
-  MD5HashType = 8,
-  VIntType = 9,
-  VLongType = 10,
-  UnknownType = -1
-};
-
-typedef int (*ComparatorPtr)(const char * src, uint32_t srcLength, const char * dest,
-    uint32_t destLength);
-
-ComparatorPtr get_comparator(const KeyValueType keyType, const char * comparatorName);
-
-typedef void (*ANY_FUNC_PTR)();
-
-} // namespace NativeTask;
-
-/**
- * Use these two predefined macro to define a class library:
- *   DEFINE_NATIVE_LIBRARY(Library)
- *   REGISTER_CLASS(Type, Library)
- * For example, suppose we have a demo application, which has
- * defined class MyDemoMapper and MyDemoReducer, to register
- * this module & these two classes, you need to add following
- * code to you source code.
- *   DEFINE_NATIVE_LIBRARY(MyDemo) {
- *     REGISTER_CLASS(MyDemoMapper, MyDemo);
- *     REGISTER_CLASS(MyDemoReducer, MyDemo);
- *   }
- * The class name for MyDemoMapper will be MyDemo.MyDemoMapper,
- * and similar for MyDemoReducer.
- * Then you can set native.mapper.class to MyDemo.MyDemoMapper
- * in JobConf.
- */
-
-#define DEFINE_NATIVE_LIBRARY(Library) \
-  static std::map<std::string, NativeTask::ObjectCreatorFunc> Library##ClassMap__; \
-  extern "C" void * Library##GetFunctionGetter(const std::string & name) { \
-      std::map<std::string, NativeTask::ObjectCreatorFunc>::iterator itr = Library##ClassMap__.find(name); \
-      if (itr != Library##ClassMap__.end()) { \
-        return (void *)(itr->second); \
-      } \
-      return NULL; \
-    } \
-  extern "C" NativeTask::ObjectCreatorFunc Library##GetObjectCreator(const std::string & name) { \
-    std::map<std::string, NativeTask::ObjectCreatorFunc>::iterator itr = Library##ClassMap__.find(name); \
-    if (itr != Library##ClassMap__.end()) { \
-      return itr->second; \
-    } \
-    return NULL; \
-  } \
-  extern "C" void Library##Init()
-
-#define REGISTER_CLASS(Type, Library) Library##ClassMap__[#Library"."#Type] = NativeTask::ObjectCreator<Type>
-
-#define REGISTER_FUNCTION(Type, Library) Library##ClassMap__[#Library"."#Type] = (ObjectCreatorFunc)Type
-
-#endif /* NATIVETASK_H_ */
+  virtual

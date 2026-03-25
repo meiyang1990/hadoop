@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -23,8 +24,7 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.Loca
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.ResourceLocalizationService;
 
 /**
- * Event indicating that the {@link ResourceLocalizationService}
- * should fetch this resource.
+ * 资源本地化请求事件，通知 {@link ResourceLocalizationService} 下载本地化指定资源
  */
 public class LocalizerResourceRequestEvent extends LocalizerEvent {
 
@@ -33,6 +33,13 @@ public class LocalizerResourceRequestEvent extends LocalizerEvent {
   private final LocalResourceVisibility vis;
   private final String pattern;
 
+  /**
+   * 构造资源本地化请求事件
+   * @param resource 待本地化的资源对象
+   * @param vis 资源可见性
+   * @param context 本地化器上下文，包含容器相关信息
+   * @param pattern 资源解压模式（若为归档资源）
+   */
   public LocalizerResourceRequestEvent(LocalizedResource resource,
       LocalResourceVisibility vis, LocalizerContext context, String pattern) {
     super(LocalizerEventType.REQUEST_RESOURCE_LOCALIZATION,

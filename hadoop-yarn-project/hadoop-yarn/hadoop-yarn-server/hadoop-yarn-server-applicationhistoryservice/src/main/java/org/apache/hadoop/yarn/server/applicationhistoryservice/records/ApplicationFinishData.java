@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,13 +27,21 @@ import org.apache.hadoop.yarn.api.records.YarnApplicationState;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The class contains the fields that can be determined when <code>RMApp</code>
- * finishes, and that need to be stored persistently.
+ * 应用完成数据记录，封装RM应用结束后才能确定、需要持久化存储的所有信息，供应用历史服务使用。
  */
 @Public
 @Unstable
 public abstract class ApplicationFinishData {
 
+  /**
+   * 创建并初始化一个ApplicationFinishData实例。
+   * @param applicationId 应用ID
+   * @param finishTime 应用完成时间戳
+   * @param diagnosticsInfo 应用诊断信息
+   * @param finalApplicationStatus 应用最终状态
+   * @param yarnApplicationState YARN应用结束时状态
+   * @return 初始化完成的ApplicationFinishData实例
+   */
   @Public
   @Unstable
   public static ApplicationFinishData newInstance(ApplicationId applicationId,

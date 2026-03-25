@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,12 +19,12 @@
 package org.apache.hadoop.yarn.server.volume.csi;
 
 /**
- * CSI constants.
+ * YARN CSI存储卷集成模块的通用常量定义类，定义CSI相关的属性键和资源标签。
  */
 public final class CsiConstants {
 
   private CsiConstants() {
-    // Hide the constructor for this constant class.
+    // 隐藏常量类的构造方法，防止实例化
   }
 
   public static final String CSI_VOLUME_NAME = "volume.name";
@@ -33,5 +34,8 @@ public final class CsiConstants {
   public static final String CSI_VOLUME_MOUNT = "volume.mount";
   public static final String CSI_VOLUME_ACCESS_MODE =  "volume.accessMode";
 
+  /**
+   * CSI存储卷资源的标签，用于在YARN资源模型中标识CSI存储卷类型。
+   */
   public static final String CSI_VOLUME_RESOURCE_TAG = "system:csi-volume";
 }

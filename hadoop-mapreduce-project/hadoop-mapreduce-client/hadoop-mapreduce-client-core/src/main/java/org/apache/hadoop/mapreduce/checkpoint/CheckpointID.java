@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,10 +21,9 @@ package org.apache.hadoop.mapreduce.checkpoint;
 import org.apache.hadoop.io.Writable;
 
 /**
- * This class represent the identified (memento) for a checkpoint. It is allowed
- * to contain small amount of metadata about a checkpoint and must provide
- * sufficient information to the corresponding CheckpointService to locate and
- * retrieve the data contained in the checkpoint.
+ * CheckpointID 接口定义了MapReduce任务检查点的唯一标识符，用于定位和恢复检查点数据。
+ * 实现类可以携带少量检查点元数据，必须为CheckpointService提供足够信息以定位加载检查点。
+ * 继承Writable接口支持序列化，可在Hadoop RPC中传输。
  */
 public interface CheckpointID extends Writable {
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,53 +28,50 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * This class is a key-value store for the variables and their respective values
- * during an application placement. The class gives support for immutable
- * variables, which can be set only once, and has helper methods for replacing
- * the variables with their respective values in provided strings.
- * We don't extend the map interface, because we don't need all the features
- * a map provides, this class tries to be as simple as possible.
+ * 应用放置上下文变量存储容器，用于容量调度器放置规则处理时存储上下文变量
+ * 支持不可变变量（仅可设置一次），提供字符串变量替换工具方法
+ * 简化设计，不继承Map接口，仅暴露所需功能
  */
 public class VariableContext {
   /**
-   * This is our actual variable store.
+   * 存储普通变量的键值对
    */
   private Map<String, String> variables = new HashMap<>();
+  /**
+   * 存储变量原始值
+   */
   private Map<String, String> originalVariables = new HashMap<>();
 
   /**
-   * This is our conditional variable store.
+   * 存储条件变量的映射
    */
   private Map<String, MappingRuleConditionalVariable> conditionalVariables =
       new HashMap<>();
 
   /**
-   * This set contains the names of the immutable variables if null it is
-   * ignored.
+   * 存储不可变变量的名称集合，若为null则不检查不可变性
    */
   private Set<String> immutableNames;
 
   /**
-   * Some matchers may need to find a data in a set, which is not usable
-   * as a variable in substitutions, this store is for those sets.
+   * 存储额外数据集，用于匹配规则判断，不参与变量替换
    */
   private Map<String, Set<String>> extraDataset = new HashMap<>();
 
   /**
-   * Checks if the provided variable is immutable.
-   * @param name Name of the variable to check
-   * @return true if the variable is immutable
+   * 检查指定变量是否为不可变变量
+   * @param name 变量名称
+   * @return true 如果变量是不可变的
    */
   public boolean isImmutable(String name) {
     return (immutableNames != null && immutableNames.contains(name));
   }
 
   /**
-   * Can be used to provide a set which contains the name of the variables which
-   * should be immutable.
-   * @param variableNames Set containing the names of the immutable variables
-   * @throws IllegalStateException if the immutable set is already provided.
-   * @return same instance of VariableContext for daisy chaining.
+   * 设置不可变变量集合，仅可设置一次
+   * @param variableNames 不可变变量名称集合
+   * @throws IllegalStateException 如果不可变集合已经设置过
+   * @return 当前VariableContext实例，支持链式调用
    */
   public VariableContext setImmutables(Set<String> variableNames) {
     if (this.immutableNames != null) {
@@ -85,12 +83,10 @@ public class VariableContext {
   }
 
   /**
-   * Can be used to provide an array of strings which contains the names of the
-   * variables which should be immutable. An immutable set will be created
-   * from the array.
-   * @param variableNames Set containing the names of the immutable variables
-   * @throws IllegalStateException if the immutable set is already provided.
-   * @return same instance of VariableContext for daisy chaining.
+   * 通过数组设置不可变变量名称，内部将转换为不可变集合
+   * @param variableNames 不可变变量名称数组
+   * @throws IllegalStateException 如果不可变集合已经设置过
+   * @return 当前VariableContext实例，支持链式调用
    */
   public VariableContext setImmutables(String... variableNames) {
     if (this.immutableNames != null) {
@@ -102,13 +98,12 @@ public class VariableContext {
   }
 
   /**
-   * Adds a variable with value to the context or overrides an already existing
-   * one. If the variable is already set and immutable an IllegalStateException
-   * is thrown.
-   * @param name Name of the variable to be added to the context
-   * @param value Value of the variable
-   * @throws IllegalStateException if the variable is immutable and already set
-   * @return same instance of VariableContext for daisy chaining.
+   * 添加或更新普通变量，若变量已存在且不可变则抛出异常
+   * 若变量已定义为条件变量也不允许修改
+   * @param name 变量名称
+   * @param value 变量值
+   * @throws IllegalStateException 如果变量不可变或已定义为条件变量
+   * @return 当前VariableContext实例，支持链式调用
    */
   public VariableContext put(String name, String value) {
     if (variables.containsKey(name) && isImmutable(name)) {
@@ -125,15 +120,20 @@ public class VariableContext {
     return this;
   }
 
+  /**
+   * 存储变量原始值
+   * @param name 变量名称
+   * @param value 原始值
+   */
   public void putOriginal(String name, String value) {
     originalVariables.put(name, value);
   }
 
   /**
-   * This method is used to add a conditional variable to the variable context.
-   * @param name Name of the variable
-   * @param variable The conditional variable evaluator
-   * @return VariableContext for daisy chaining
+   * 添加条件变量，每个名称仅可添加一次
+   * @param name 条件变量名称
+   * @param variable 条件变量求值器实例
+   * @return 当前VariableContext实例，支持链式调用
    */
   public VariableContext putConditional(String name,
       MappingRuleConditionalVariable variable) {
@@ -146,27 +146,29 @@ public class VariableContext {
   }
 
   /**
-   * Returns the value of a variable, null values are replaced with "".
-   * @param name Name of the variable
-   * @return The value of the variable
+   * 获取变量值，null值会替换为空字符串
+   * @param name 变量名称
+   * @return 变量值，null返回空字符串
    */
   public String get(String name) {
     String ret = variables.get(name);
     return ret == null ? "" : ret;
   }
 
+  /**
+   * 获取变量原始值
+   * @param name 变量名称
+   * @return 变量原始值
+   */
   public String getOriginal(String name) {
     return originalVariables.get(name);
   }
 
   /**
-   * Adds a set to the context, each name can only be added once. The extra
-   * dataset is different from the regular variables because it cannot be
-   * referenced via tokens in the paths or any other input. However matchers
-   * and actions can explicitly access these datasets and can make decisions
-   * based on them.
-   * @param name Name which can be used to reference the collection
-   * @param set The dataset to be stored
+   * 添加额外数据集，每个名称仅可添加一次
+   * 额外数据集不参与字符串变量替换，仅可由规则显式访问用于匹配判断
+   * @param name 数据集引用名称
+   * @param set 要存储的数据集
    */
   public void putExtraDataset(String name, Set<String> set) {
     if (extraDataset.containsKey(name)) {
@@ -177,34 +179,29 @@ public class VariableContext {
   }
 
   /**
-   * Returns the dataset referenced by the name.
-   * @param name Name of the set to be returned.
-   * @return the dataset referenced by the name.
+   * 根据名称获取额外数据集
+   * @param name 数据集名称
+   * @return 对应数据集，不存在则返回null
    */
   public Set<String> getExtraDataset(String name) {
     return extraDataset.get(name);
   }
 
   /**
-   * Check if a variable is part of the context.
-   * @param name Name of the variable to be checked
-   * @return True if the variable is added to the context, false otherwise
+   * 检查上下文是否包含指定普通变量
+   * @param name 变量名称
+   * @return true 如果包含该变量
    */
   public boolean containsKey(String name) {
     return variables.containsKey(name);
   }
 
   /**
-   * This method replaces all variables in the provided string. The variables
-   * are reverse ordered by the length of their names in order to avoid partial
-   * replaces when a shorter named variable is a substring of a longer named
-   * variable.
-   * All variables will be replaced in the string.
-   * Null values will be considered as empty strings during the replace.
-   * If the input is null, null will be returned.
-   * @param input The string with variables
-   * @return A string with all the variables substituted with their respective
-   *         values.
+   * 替换输入字符串中的所有变量，按变量名长度降序排序处理
+   * 避免短变量名匹配长变量名字符串前缀导致错误替换
+   * null值视为空字符串，输入null返回null
+   * @param input 包含变量的输入字符串
+   * @return 替换完成后的字符串
    */
   public String replaceVariables(String input) {
     if (input == null) {
@@ -212,17 +209,12 @@ public class VariableContext {
     }
 
     String[] keys = variables.keySet().toArray(new String[]{});
-    //Replacing variables starting longest first, to avoid collision when a
-    //shorter variable name matches the beginning of a longer one.
-    //e.g. %user_something, if %user is defined it may replace the %user before
-    //we would reach the %user_something variable, so we start with the longer
-    //names first
+    // 按变量名长度降序排序，长变量先替换，避免短变量错误匹配长变量前缀
     Arrays.sort(keys, (a, b) -> b.length() - a.length());
 
     String ret = input;
     for (String key : keys) {
-      //we cannot match for null, so we just skip if we have a variable "name"
-      //with null
+      // 跳过null键
       if (key == null) {
         continue;
       }
@@ -233,42 +225,34 @@ public class VariableContext {
   }
 
   /**
-   * This method will consider the input as a queue path, which is a String
-   * separated by dot ('.') characters. The input will be split along the dots
-   * and all parts will be replaced individually. Replace only occur if a part
-   * exactly matches a variable name, no composite names or additional
-   * characters are supported.
-   * e.g. With variables %user and %default "%user.%default" will be substituted
-   * while "%user%default.something" won't.
-   * Null values will be considered as empty strings during the replace.
-   * If the input is null, null will be returned.
-   * @param input The string with variables
-   * @return A string with all the variable only path parts substituted with
-   *         their respective values.
+   * 按点分隔队列路径进行变量替换，仅对完全匹配路径段的变量进行替换
+   * 支持条件变量求值，仅路径段完全等于变量名才会替换
+   * null值视为空字符串，输入null返回null
+   * @param input 点分隔的队列路径字符串
+   * @return 替换完成后的路径字符串
    */
   public String replacePathVariables(String input) {
     if (input == null) {
       return null;
     }
 
+    // 按点分割路径段
     String[] parts = input.split("\\.");
     for (int i = 0; i < parts.length; i++) {
       String newVal = parts[i];
-      //if the part is a variable it should be in either the variable or the
-      //conditional variable map, otherwise we keep it's original value.
-      //This means undefined variables will return the name of the variable,
-      //but this is working as intended.
+      // 先检查是否为普通变量，再检查是否为条件变量，未找到则保留原值
       if (variables.containsKey(parts[i])) {
         newVal = variables.get(parts[i]);
       } else if (conditionalVariables.containsKey(parts[i])) {
         MappingRuleConditionalVariable condVariable =
             conditionalVariables.get(parts[i]);
         if (condVariable != null) {
+          // 调用条件变量求值器计算当前位置的值
           newVal = condVariable.evaluateInPath(parts, i);
         }
       }
 
-      //if a variable's value is null, we use empty string instead
+      // null值替换为空字符串
       if (newVal == null) {
         newVal = "";
       }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -81,11 +82,15 @@ import org.slf4j.LoggerFactory;
 
 import static org.apache.hadoop.hdfs.security.token.delegation.DelegationTokenIdentifier.HDFS_DELEGATION_KIND;
 
-
+/**
+ * 应用日志聚合器实现，负责将当前NM节点上单个应用的所有容器日志聚合上传到远程文件系统。
+ * 支持滚动日志聚合（应用运行时定期上传已滚动的日志）和应用结束后全量聚合两种模式。
+ */
 public class AppLogAggregatorImpl implements AppLogAggregator {
 
   private static final Logger LOG =
        LoggerFactory.getLogger(AppLogAggregatorImpl.class);
+  // 非滚动模式下线程等待间隔
   private static final int THREAD_SLEEP_TIME = 1000;
 
   private final LocalDirsHandlerService dirsHandler;
@@ -100,6 +105,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
   private final Path remoteNodeLogFileForApp;
   private final Path remoteNodeTmpLogFileForApp;
 
+  // 待聚合日志的容器ID队列
   private final BlockingQueue<ContainerId> pendingContainers;
   private final AtomicBoolean appFinishing = new AtomicBoolean();
   private final AtomicBoolean appAggregationFinished = new AtomicBoolean();
@@ -111,12 +117,13 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
   private final NodeId nodeId;
   private final LogAggregationFileControllerContext logControllerContext;
 
-  // These variables are only for testing
+  // 这些变量仅用于单元测试
   private final AtomicBoolean waiting = new AtomicBoolean(false);
   private int logAggregationTimes = 0;
   private long logFileSizeThreshold;
   private boolean renameTemporaryLogFileFailed = false;
 
+  // 当前未完成聚合的容器日志聚合器映射表
   private final Map<ContainerId, ContainerLogAggregator> containerLogAggregators =
       new HashMap<ContainerId, ContainerLogAggregator>();
   private final ContainerLogAggregationPolicy logAggPolicy;
@@ -126,12 +133,14 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
   private NMDelegationTokenManager delegationTokenManager;
 
   /**
-   * The value recovered from state store to determine the age of application
-   * log files if log retention is enabled. Files older than retention policy
-   * will not be uploaded but scheduled for cleaning up. -1 if not recovered.
+   * 从状态存储恢复的应用日志初始化时间，用于日志保留策略判断。
+   * 如果未恢复则为-1，超过保留时间的日志不会上传而是直接清理。
    */
   private final long recoveredLogInitedTime;
 
+  /**
+   * 构造AppLogAggregatorImpl，默认恢复时间为-1。
+   */
   public AppLogAggregatorImpl(Dispatcher dispatcher,
       DeletionService deletionService, Configuration conf,
       ApplicationId appId, UserGroupInformation userUgi, NodeId nodeId,
@@ -144,6 +153,9 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
         logAggregationContext, context, lfs, rollingMonitorInterval, -1, null);
   }
 
+  /**
+   * 构造AppLogAggregatorImpl，指定恢复的日志初始化时间。
+   */
   public AppLogAggregatorImpl(Dispatcher dispatcher,
       DeletionService deletionService, Configuration conf,
       ApplicationId appId, UserGroupInformation userUgi, NodeId nodeId,
@@ -158,6 +170,9 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
         recoveredLogInitedTime, null);
   }
 
+  /**
+   * 完整构造方法，支持注入日志聚合文件控制器，用于测试。
+   */
   public AppLogAggregatorImpl(Dispatcher dispatcher,
       DeletionService deletionService, Configuration conf,
       ApplicationId appId, UserGroupInformation userUgi, NodeId nodeId,
@@ -193,7 +208,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
         conf.getLong(YarnConfiguration.LOG_AGGREGATION_DEBUG_FILESIZE,
         YarnConfiguration.DEFAULT_LOG_AGGREGATION_DEBUG_FILESIZE);
     if (logAggregationFileController == null) {
-      // by default, use T-File Controller
+      // 默认使用TFile格式控制器
       this.logAggregationFileController = new LogAggregationTFileController();
       this.logAggregationFileController.initialize(conf, "TFile");
       this.logAggregationFileController.verifyAndCreateRemoteLogDir();
@@ -208,6 +223,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
       this.remoteNodeLogFileForApp = remoteNodeLogFileForApp;
       this.remoteNodeTmpLogFileForApp = getRemoteNodeTmpLogFileForApp();
     }
+    // 判断是否开启滚动日志聚合
     boolean logAggregationInRolling =
         rollingMonitorInterval > 0 && this.logAggregationContext != null
             && this.logAggregationContext.getRolledLogsIncludePattern() != null
@@ -219,15 +235,20 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
     } else {
       LOG.debug("Rolling mode is turned off");
     }
+    // 初始化日志聚合控制器上下文
     logControllerContext = new LogAggregationFileControllerContext(
             this.remoteNodeLogFileForApp,
             this.remoteNodeTmpLogFileForApp,
             logAggregationInRolling,
             rollingMonitorInterval,
             this.appId, this.appAcls, this.nodeId, this.userUgi);
+    // 初始化Delegation Token管理器
     delegationTokenManager = new NMDelegationTokenManager(conf);
   }
 
+  /**
+   * 获取容器日志聚合策略，优先使用应用指定策略，否则使用集群默认配置。
+   */
   private ContainerLogAggregationPolicy getLogAggPolicy(Configuration conf) {
     ContainerLogAggregationPolicy policy = getLogAggPolicyInstance(conf);
     String params = getLogAggPolicyParameters(conf);
@@ -237,8 +258,9 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
     return policy;
   }
 
-  // Use the policy class specified in LogAggregationContext if available.
-  // Otherwise use the cluster-wide default policy class.
+  /**
+   * 获取日志聚合策略实例，优先读取应用上下文指定的策略类，否则读取集群默认配置。
+   */
   private ContainerLogAggregationPolicy getLogAggPolicyInstance(
       Configuration conf) {
     Class<? extends ContainerLogAggregationPolicy> policyClass = null;
@@ -257,12 +279,13 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
                 className);
           }
         } catch (ClassNotFoundException cnfe) {
-          // We don't fail the app if the policy class isn't valid.
+          // 策略类无效不会导致应用失败，降级使用默认策略
           LOG.warn(this.appId + " specified invalid log aggregation policy " +
               className);
         }
       }
     }
+    // 如果应用未指定，读取集群默认配置
     if (policyClass == null) {
       policyClass = conf.getClass(YarnConfiguration.NM_LOG_AGG_POLICY_CLASS,
           AllContainerLogAggregationPolicy.class,
@@ -274,8 +297,9 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
     return ReflectionUtils.newInstance(policyClass, conf);
   }
 
-  // Use the policy parameters specified in LogAggregationContext if available.
-  // Otherwise use the cluster-wide default policy parameters.
+  /**
+   * 获取日志聚合策略参数，优先读取应用上下文指定参数，否则读取集群默认配置。
+   */
   private String getLogAggPolicyParameters(Configuration conf) {
     String params = null;
     if (this.logAggregationContext != null) {
@@ -287,29 +311,33 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
     return params;
   }
 
+  /**
+   * 为本次聚合周期上传所有待处理容器的日志。
+   * @param appFinished 应用是否已结束
+   * @throws LogAggregationDFSException 远程DFS操作失败抛出异常
+   */
   private void uploadLogsForContainers(boolean appFinished)
       throws LogAggregationDFSException {
     if (this.logAggregationDisabled) {
       return;
     }
 
+    // 添加系统凭证到用户UGI
     addCredentials();
     try {
+      // 移除过期的Delegation Token，刷新有效Token
       removeExpiredDelegationTokens();
     } catch (IOException | InterruptedException e) {
       LOG.warn("Removing expired delegation tokens failed for " + appId, e);
     }
-    // Create a set of Containers whose logs will be uploaded in this cycle.
-    // It includes:
-    // a) all containers in pendingContainers: those containers are finished
-    //    and satisfy the ContainerLogAggregationPolicy.
-    // b) some set of running containers: For all the Running containers,
-    //    we use exitCode of 0 to find those which satisfy the
-    //    ContainerLogAggregationPolicy.
+    // 收集本次聚合周期需要处理的容器：
+    // 1. 所有已完成并满足聚合策略的待处理容器
+    // 2. 滚动聚合模式下正在运行、且满足聚合策略的容器
     Set<ContainerId> pendingContainerInThisCycle = new HashSet<ContainerId>();
     this.pendingContainers.drainTo(pendingContainerInThisCycle);
     Set<ContainerId> finishedContainers =
         new HashSet<ContainerId>(pendingContainerInThisCycle);
+    // 遍历当前应用所有正在运行的容器，检查是否需要聚合
     if (this.context.getApplications().get(this.appId) != null) {
       for (Container container : this.context.getApplications()
         .get(this.appId).getContainers().values()) {
@@ -335,6 +363,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
     DeletionTask deletionTask = null;
     try {
       try {
+        // 初始化远程日志写入器
         logAggregationFileController.initializeWriter(logControllerContext);
       } catch (IOException e1) {
         logAggregationSucceedInThisCycle = false;
@@ -344,399 +373,7 @@ public class AppLogAggregatorImpl implements AppLogAggregator {
       }
 
       boolean uploadedLogsInThisCycle = false;
+      // 遍历处理每个待聚合容器
       for (ContainerId container : pendingContainerInThisCycle) {
         ContainerLogAggregator aggregator = null;
-        if (containerLogAggregators.containsKey(container)) {
-          aggregator = containerLogAggregators.get(container);
-        } else {
-          aggregator = new ContainerLogAggregator(container);
-          containerLogAggregators.put(container, aggregator);
-        }
-        Set<Path> uploadedFilePathsInThisCycle =
-            aggregator.doContainerLogAggregation(logAggregationFileController,
-            appFinished, finishedContainers.contains(container));
-        if (uploadedFilePathsInThisCycle.size() > 0) {
-          uploadedLogsInThisCycle = true;
-          if (enableLocalCleanup) {
-            LOG.trace("Uploaded the following files for {}: {}", container,
-                uploadedFilePathsInThisCycle.toString());
-            List<Path> uploadedFilePathsInThisCycleList = new ArrayList<>();
-            uploadedFilePathsInThisCycleList.addAll(uploadedFilePathsInThisCycle);
-            if (LOG.isDebugEnabled()) {
-              for (Path uploadedFilePath : uploadedFilePathsInThisCycleList) {
-                try {
-                  long fileSize = lfs.getFileStatus(uploadedFilePath).getLen();
-                  if (fileSize >= logFileSizeThreshold) {
-                    LOG.debug("Log File " + uploadedFilePath + " size is " + fileSize + " bytes");
-                  }
-                } catch (Exception e1) {
-                  LOG.error("Failed to get log file size " + e1);
-                }
-              }
-            }
-            deletionTask = new FileDeletionTask(delService, this.userUgi.getShortUserName(), null,
-                uploadedFilePathsInThisCycleList);
-          }
-        }
-
-        // This container is finished, and all its logs have been uploaded,
-        // remove it from containerLogAggregators.
-        if (finishedContainers.contains(container)) {
-          containerLogAggregators.remove(container);
-        }
-      }
-
-      logControllerContext.setUploadedLogsInThisCycle(uploadedLogsInThisCycle);
-      logControllerContext.setLogUploadTimeStamp(System.currentTimeMillis());
-      logControllerContext.increLogAggregationTimes();
-      try {
-        this.logAggregationFileController.postWrite(logControllerContext);
-        diagnosticMessage = "Log uploaded successfully for Application: "
-            + appId + " in NodeManager: "
-            + LogAggregationUtils.getNodeString(nodeId) + " at "
-            + Times.format(logControllerContext.getLogUploadTimeStamp())
-            + "\n";
-      } catch (Exception e) {
-        diagnosticMessage = e.getMessage();
-        renameTemporaryLogFileFailed = true;
-        logAggregationSucceedInThisCycle = false;
-      }
-    } finally {
-      LogAggregationDFSException exc = null;
-      try {
-        this.logAggregationFileController.closeWriter();
-      } catch (LogAggregationDFSException e) {
-        diagnosticMessage = e.getMessage();
-        renameTemporaryLogFileFailed = true;
-        logAggregationSucceedInThisCycle = false;
-        exc = e;
-      }
-      if (logAggregationSucceedInThisCycle && deletionTask != null) {
-        delService.delete(deletionTask);
-      }
-      if (diagnosticMessage != null && !diagnosticMessage.isEmpty()) {
-        LOG.debug("Sending log aggregation report along with the " +
-            "following diagnostic message:\"{}\"", diagnosticMessage);
-      }
-      if (!logAggregationSucceedInThisCycle) {
-        LOG.warn("Log aggregation did not succeed in this cycle");
-      }
-      sendLogAggregationReport(logAggregationSucceedInThisCycle,
-          diagnosticMessage, appFinished);
-      if (exc != null) {
-        throw exc;
-      }
-    }
-  }
-
-  private void addCredentials() {
-    if (UserGroupInformation.isSecurityEnabled()) {
-      Credentials systemCredentials =
-          context.getSystemCredentialsForApps().get(appId);
-      if (systemCredentials != null) {
-        LOG.debug("Adding new framework-token for {} for log-aggregation:"
-            + " {}; userUgi={}", appId, systemCredentials.getAllTokens(),
-            userUgi);
-        // this will replace old token
-        userUgi.addCredentials(systemCredentials);
-      }
-    }
-  }
-
-  private void removeExpiredDelegationTokens()
-      throws IOException, InterruptedException {
-    if (!UserGroupInformation.isSecurityEnabled()) {
-      return;
-    }
-
-    for (Map.Entry<Text, Token<?>> tokenEntry : userUgi.getCredentials().getTokenMap().entrySet()) {
-      Token<?> token = tokenEntry.getValue();
-
-      if (token.getKind().equals(HDFS_DELEGATION_KIND)) {
-        try {
-          delegationTokenManager.renewToken(token);
-          LOG.debug("HDFS Delegation Token for {} is successfully renewed: {}",
-              appId, token);
-        } catch (SecretManager.InvalidToken e) {
-          userUgi.removeToken(tokenEntry.getKey());
-          LOG.info("HDFS Delegation Token for {} is expired, " +
-              "removed from the credentials: {}", appId, token);
-        }
-      }
-    }
-  }
-
-  private void sendLogAggregationReport(
-      boolean logAggregationSucceedInThisCycle, String diagnosticMessage,
-      boolean appFinished) {
-    LogAggregationStatus logAggregationStatus =
-        logAggregationSucceedInThisCycle
-            ? LogAggregationStatus.RUNNING
-            : LogAggregationStatus.RUNNING_WITH_FAILURE;
-    sendLogAggregationReportInternal(logAggregationStatus, diagnosticMessage,
-        false);
-    if (appFinished) {
-      // If the app is finished, one extra final report with log aggregation
-      // status SUCCEEDED/FAILED will be sent to RM to inform the RM
-      // that the log aggregation in this NM is completed.
-      LogAggregationStatus finalLogAggregationStatus =
-          renameTemporaryLogFileFailed || !logAggregationSucceedInThisCycle
-              ? LogAggregationStatus.FAILED
-              : LogAggregationStatus.SUCCEEDED;
-      sendLogAggregationReportInternal(finalLogAggregationStatus, "", true);
-    }
-  }
-
-  private void sendLogAggregationReportInternal(
-      LogAggregationStatus logAggregationStatus, String diagnosticMessage,
-      boolean finalized) {
-    LogAggregationReport report =
-        Records.newRecord(LogAggregationReport.class);
-    report.setApplicationId(appId);
-    report.setDiagnosticMessage(diagnosticMessage);
-    report.setLogAggregationStatus(logAggregationStatus);
-    this.context.getLogAggregationStatusForApps().add(report);
-    this.context.getNMLogAggregationStatusTracker().updateLogAggregationStatus(
-        appId, logAggregationStatus, System.currentTimeMillis(),
-        diagnosticMessage, finalized);
-  }
-
-  @Override
-  public void run() {
-    try {
-      doAppLogAggregation();
-    } catch (LogAggregationDFSException e) {
-      // if the log aggregation could not be performed due to DFS issues
-      // let's not clean up the log files, since that can result in
-      // loss of logs
-      LOG.error("Error occurred while aggregating the log for the application "
-          + appId, e);
-    } catch (Exception e) {
-      // do post clean up of log directories on any other exception
-      LOG.error("Error occurred while aggregating the log for the application "
-          + appId, e);
-      doAppLogAggregationPostCleanUp();
-    } finally {
-      if (!this.appAggregationFinished.get() && !this.aborted.get()) {
-        LOG.warn("Log aggregation did not complete for application " + appId);
-        this.dispatcher.getEventHandler().handle(
-            new ApplicationEvent(this.appId,
-                ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED));
-      }
-      this.appAggregationFinished.set(true);
-    }
-  }
-
-  private void doAppLogAggregation() throws LogAggregationDFSException {
-    while (!this.appFinishing.get() && !this.aborted.get()) {
-      synchronized(this) {
-        try {
-          waiting.set(true);
-          if (logControllerContext.isLogAggregationInRolling()) {
-            wait(logControllerContext.getRollingMonitorInterval() * 1000);
-            if (this.appFinishing.get() || this.aborted.get()) {
-              break;
-            }
-            uploadLogsForContainers(false);
-          } else {
-            wait(THREAD_SLEEP_TIME);
-          }
-        } catch (InterruptedException e) {
-          LOG.warn("PendingContainers queue is interrupted");
-          this.appFinishing.set(true);
-        } catch (LogAggregationDFSException e) {
-          this.appFinishing.set(true);
-          throw e;
-        }
-      }
-    }
-
-    if (this.aborted.get()) {
-      return;
-    }
-
-    try {
-      // App is finished, upload the container logs.
-      uploadLogsForContainers(true);
-
-      doAppLogAggregationPostCleanUp();
-    } catch (LogAggregationDFSException e) {
-      LOG.error("Error during log aggregation", e);
-    }
-
-    this.dispatcher.getEventHandler().handle(
-        new ApplicationEvent(this.appId,
-            ApplicationEventType.APPLICATION_LOG_HANDLING_FINISHED));
-    this.appAggregationFinished.set(true);
-  }
-
-  private void doAppLogAggregationPostCleanUp() {
-    if (!enableLocalCleanup) {
-      return;
-    }
-    // Remove the local app-log-dirs
-    List<Path> localAppLogDirs = new ArrayList<Path>();
-    for (String rootLogDir : dirsHandler.getLogDirsForCleanup()) {
-      Path logPath = new Path(rootLogDir, applicationId);
-      try {
-        // check if log dir exists
-        lfs.getFileStatus(logPath);
-        localAppLogDirs.add(logPath);
-      } catch (UnsupportedFileSystemException ue) {
-        LOG.warn("Log dir {} is in an unsupported file system", rootLogDir,
-            ue);
-        continue;
-      } catch (IOException fe) {
-        LOG.warn("An exception occurred while getting file information", fe);
-        continue;
-      }
-    }
-
-    if (localAppLogDirs.size() > 0) {
-      LOG.debug("Cleaning up {} files", localAppLogDirs.size());
-      List<Path> localAppLogDirsList = new ArrayList<>();
-      localAppLogDirsList.addAll(localAppLogDirs);
-      DeletionTask deletionTask = new FileDeletionTask(delService,
-          this.userUgi.getShortUserName(), null, localAppLogDirsList);
-      this.delService.delete(deletionTask);
-    }
-  }
-
-  private Path getRemoteNodeTmpLogFileForApp() {
-    return new Path(remoteNodeLogFileForApp.getParent(),
-      (remoteNodeLogFileForApp.getName() + LogAggregationUtils.TMP_FILE_SUFFIX));
-  }
-
-  private boolean shouldUploadLogs(ContainerLogContext logContext) {
-    return logAggPolicy.shouldDoLogAggregation(logContext);
-  }
-
-  @Override
-  public void startContainerLogAggregation(ContainerLogContext logContext) {
-    if (shouldUploadLogs(logContext)) {
-      LOG.info("Considering container " + logContext.getContainerId()
-          + " for log-aggregation");
-      this.pendingContainers.add(logContext.getContainerId());
-    }
-  }
-
-  @Override
-  public synchronized void finishLogAggregation() {
-    LOG.info("Application just finished : " + this.applicationId);
-    this.appFinishing.set(true);
-    this.notifyAll();
-  }
-
-  @Override
-  public synchronized void abortLogAggregation() {
-    LOG.info("Aborting log aggregation for " + this.applicationId);
-    this.aborted.set(true);
-    this.notifyAll();
-  }
-
-  @Override
-  public void disableLogAggregation() {
-    this.logAggregationDisabled = true;
-  }
-
-  @Override
-  public void enableLogAggregation() {
-    this.logAggregationDisabled = false;
-  }
-
-  @Override
-  public boolean isAggregationEnabled() {
-    return !logAggregationDisabled;
-  }
-
-  @Private
-  @VisibleForTesting
-  // This is only used for testing.
-  // This will wake the log aggregation thread that is waiting for
-  // rollingMonitorInterval.
-  // To use this method, make sure the log aggregation thread is running
-  // and waiting for rollingMonitorInterval.
-  public synchronized void doLogAggregationOutOfBand() {
-    while(!waiting.get()) {
-      try {
-        wait(200);
-      } catch (InterruptedException e) {
-        // Do Nothing
-      }
-    }
-    LOG.info("Do OutOfBand log aggregation");
-    this.notifyAll();
-  }
-
-  class ContainerLogAggregator {
-    private final AggregatedLogFormat.LogRetentionContext retentionContext;
-    private final ContainerId containerId;
-    private Set<String> uploadedFileMeta = new HashSet<String>();
-    public ContainerLogAggregator(ContainerId containerId) {
-      this.containerId = containerId;
-      this.retentionContext = getRetentionContext();
-    }
-
-    private AggregatedLogFormat.LogRetentionContext getRetentionContext() {
-      final long logRetentionSecs =
-          conf.getLong(YarnConfiguration.LOG_AGGREGATION_RETAIN_SECONDS,
-              YarnConfiguration.DEFAULT_LOG_AGGREGATION_RETAIN_SECONDS);
-      return new AggregatedLogFormat.LogRetentionContext(
-          recoveredLogInitedTime, logRetentionSecs * 1000);
-    }
-
-    public Set<Path> doContainerLogAggregation(
-        LogAggregationFileController logAggregationFileController,
-        boolean appFinished, boolean containerFinished) {
-      LOG.info("Uploading logs for container " + containerId
-          + ". Current good log dirs are "
-          + StringUtils.join(",", dirsHandler.getLogDirsForRead()));
-      final LogKey logKey = new LogKey(containerId);
-      final LogValue logValue =
-          new LogValue(dirsHandler.getLogDirsForRead(), containerId,
-            userUgi.getShortUserName(), logAggregationContext,
-            this.uploadedFileMeta,  retentionContext, appFinished,
-            containerFinished);
-      try {
-        logAggregationFileController.write(logKey, logValue);
-      } catch (Exception e) {
-        LOG.error("Couldn't upload logs for " + containerId
-            + ". Skipping this container.", e);
-        return new HashSet<Path>();
-      }
-      this.uploadedFileMeta.addAll(logValue
-        .getCurrentUpLoadedFileMeta());
-      // if any of the previous uploaded logs have been deleted,
-      // we need to remove them from alreadyUploadedLogs
-      this.uploadedFileMeta = uploadedFileMeta.stream().filter(
-          next -> logValue.getAllExistingFilesMeta().contains(next)).collect(
-          Collectors.toSet());
-      // need to return files uploaded or older-than-retention clean up.
-      return Sets.union(logValue.getCurrentUpLoadedFilesPath(),
-          logValue.getObsoleteRetentionLogFiles());
-
-    }
-  }
-
-  // only for test
-  @VisibleForTesting
-  public UserGroupInformation getUgi() {
-    return this.userUgi;
-  }
-
-  public UserGroupInformation updateCredentials(Credentials cred) {
-    this.userUgi.addCredentials(cred);
-    return userUgi;
-  }
-
-  @VisibleForTesting
-  public LogAggregationFileController getLogAggregationFileController() {
-    return this.logAggregationFileController;
-  }
-
-  @VisibleForTesting
-  public LogAggregationFileControllerContext
-      getLogAggregationFileControllerContext() {
-    return this.logControllerContext;
-  }
-}
+        if (containerLogAggregators.containsKey(container

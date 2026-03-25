@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,39 +28,28 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 
 /** 
- * <code>InputFormat</code> describes the input-specification for a 
- * Map-Reduce job. 
+ * InputFormat 定义了MapReduce作业的输入规范，为MapReduce框架提供输入处理能力。
  * 
- * <p>The Map-Reduce framework relies on the <code>InputFormat</code> of the
- * job to:<p>
+ * <p>MapReduce框架依赖InputFormat完成以下核心工作：<p>
  * <ol>
  *   <li>
- *   Validate the input-specification of the job. 
- *   <li>
- *   Split-up the input file(s) into logical {@link InputSplit}s, each of 
- *   which is then assigned to an individual {@link Mapper}.
+ *   验证作业输入规格的合法性。
  *   </li>
  *   <li>
- *   Provide the {@link RecordReader} implementation to be used to glean
- *   input records from the logical <code>InputSplit</code> for processing by 
- *   the {@link Mapper}.
+ *   将输入文件切分为逻辑切片{@link InputSplit}，每个切片分配给一个独立的{@link Mapper}处理。
+ *   </li>
+ *   <li>
+ *   提供{@link RecordReader}实现，用于从逻辑InputSplit中读取输入记录，供Mapper处理。
  *   </li>
  * </ol>
  * 
- * <p>The default behavior of file-based {@link InputFormat}s, typically 
- * sub-classes of {@link FileInputFormat}, is to split the 
- * input into <i>logical</i> {@link InputSplit}s based on the total size, in 
- * bytes, of the input files. However, the {@link FileSystem} blocksize of  
- * the input files is treated as an upper bound for input splits. A lower bound 
- * on the split size can be set via 
+ * <p>基于文件的InputFormat（通常是{@link FileInputFormat}的子类）的默认行为是根据输入文件的总大小（字节）
+ * 将输入切分为逻辑切片，输入文件的{@link FileSystem}块大小被视为输入切片的上限，切片大小的下限可以通过
  * <a href="{@docRoot}/../hadoop-mapreduce-client/hadoop-mapreduce-client-core/mapred-default.xml#mapreduce.input.fileinputformat.split.minsize">
- * mapreduce.input.fileinputformat.split.minsize</a>.</p>
+ * mapreduce.input.fileinputformat.split.minsize</a>配置。</p>
  * 
- * <p>Clearly, logical splits based on input-size is insufficient for many 
- * applications since record boundaries are to respected. In such cases, the
- * application has to also implement a {@link RecordReader} on whom lies the
- * responsibility to respect record-boundaries and present a record-oriented
- * view of the logical <code>InputSplit</code> to the individual task.
+ * <p>显然，仅基于输入大小的逻辑切分在很多应用场景下是不够的，因为需要保证记录边界不被破坏。在这种场景下，
+ * 应用需要实现自定义{@link RecordReader}，由RecordReader负责保证记录边界，并为Mapper提供逻辑切片的面向记录的视图。
  *
  * @see InputSplit
  * @see RecordReader
@@ -70,32 +60,30 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 public abstract class InputFormat<K, V> {
 
   /** 
-   * Logically split the set of input files for the job.  
+   * 为作业切分输入，生成逻辑切片列表。
    * 
-   * <p>Each {@link InputSplit} is then assigned to an individual {@link Mapper}
-   * for processing.</p>
+   * <p>每个InputSplit会被分配给一个独立的Mapper处理。</p>
    *
-   * <p><i>Note</i>: The split is a <i>logical</i> split of the inputs and the
-   * input files are not physically split into chunks. For e.g. a split could
-   * be <i>&lt;input-file-path, start, offset&gt;</i> tuple. The InputFormat
-   * also creates the {@link RecordReader} to read the {@link InputSplit}.
+   * <p><i>注意</i>: 切分是对输入的逻辑划分，不会对输入文件进行物理切分。例如，一个切片通常
+   * 是<输入文件路径, 起始偏移, 长度>这样的元组。InputFormat还需要提供RecordReader来读取切片内容。
    * 
-   * @param context job configuration.
-   * @return an array of {@link InputSplit}s for the job.
+   * @param context 作业上下文，包含作业配置信息
+   * @return 当前作业所有逻辑切片组成的列表
+   * @throws IOException 切分过程中发生IO异常
+   * @throws InterruptedException 切分过程被中断
    */
   public abstract 
     List<InputSplit> getSplits(JobContext context
                                ) throws IOException, InterruptedException;
   
   /**
-   * Create a record reader for a given split. The framework will call
-   * {@link RecordReader#initialize(InputSplit, TaskAttemptContext)} before
-   * the split is used.
-   * @param split the split to be read
-   * @param context the information about the task
-   * @return a new record reader
-   * @throws IOException
-   * @throws InterruptedException
+   * 为指定切片创建记录读取器，框架会在使用切片前调用{@link RecordReader#initialize(InputSplit, TaskAttemptContext)}
+   * 初始化读取器。
+   * @param split 需要读取的逻辑切片
+   * @param context 任务尝试上下文，包含任务相关信息
+   * @return 用于读取切片的新记录读取器实例
+   * @throws IOException 创建读取器过程中发生IO异常
+   * @throws InterruptedException 创建读取器过程被中断
    */
   public abstract 
     RecordReader<K,V> createRecordReader(InputSplit split,
@@ -104,4 +92,3 @@ public abstract class InputFormat<K, V> {
                                                  InterruptedException;
 
 }
-

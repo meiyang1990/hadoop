@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,23 +23,22 @@ import org.apache.hadoop.hdfs.server.diskbalancer.datamodel.DiskBalancerDataNode
 import java.util.List;
 
 /**
- * ClusterConnector interface hides all specifics about how we communicate to
- * the HDFS cluster. This interface returns data in classes that diskbalancer
- * understands.
+ * 文件：HDFS磁盘均衡器集群连接接口
+ * 职责：抽象HDFS集群的访问逻辑，隐藏不同连接方式的实现细节，为磁盘均衡器提供统一的集群数据获取入口
+ * 设计目的：支持多种接入方式（如从NameNode获取、从配置文件读取等），实现模块解耦
  */
 public interface ClusterConnector {
 
   /**
-   * getNodes function returns a list of DiskBalancerDataNodes.
-   *
-   * @return Array of DiskBalancerDataNodes
+   * 获取集群中所有数据节点信息，转换为磁盘均衡器可识别的数据模型
+   * @return 磁盘均衡器数据节点列表，包含每个节点的磁盘容量、使用情况等信息
+   * @throws Exception 获取集群信息失败时抛出异常
    */
   List<DiskBalancerDataNode> getNodes() throws Exception;
 
   /**
-   * Returns info about the connector.
-   *
-   * @return String.
+   * 获取当前连接器的描述信息，用于日志记录和监控
+   * @return 连接器的描述字符串，包含连接类型、连接地址等信息
    */
   String getConnectorInfo();
 }

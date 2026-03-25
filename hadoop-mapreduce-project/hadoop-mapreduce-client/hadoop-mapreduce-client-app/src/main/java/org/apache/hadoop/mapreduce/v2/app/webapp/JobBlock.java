@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -48,21 +49,36 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * MapReduce作业详情页面HTML区块渲染类
+ * 负责在ApplicationMaster Web界面生成作业概览信息、ApplicationMaster尝试信息、任务统计信息和尝试统计信息的HTML内容
+ */
 public class JobBlock extends HtmlBlock {
   final AppContext appContext;
 
+  /**
+   * 构造方法，注入应用上下文
+   * @param appctx 应用上下文，提供对作业信息的访问
+   */
   @Inject JobBlock(AppContext appctx) {
     appContext = appctx;
   }
 
+  /**
+   * 渲染作业详情页面区块的HTML内容
+   * @param html HTML块输出对象
+   */
   @Override protected void render(Block html) {
+    // 从请求中获取作业ID参数
     String jid = $(JOB_ID);
     if (jid.isEmpty()) {
       html.
         p().__("Sorry, can't do anything without a JobID.").__();
       return;
     }
+    // 转换字符串作业ID为JobId对象
     JobId jobID = MRApps.toJobID(jid);
+    // 从应用上下文中获取作业实例
     Job job = appContext.getJob(jobID);
     if (job == null) {
       html.
@@ -70,11 +86,14 @@ public class JobBlock extends HtmlBlock {
       return;
     }
 
+    // 获取作业所有ApplicationMaster尝试信息列表
     List<AMInfo> amInfos = job.getAMInfos();
     String amString =
         amInfos.size() == 1 ? "ApplicationMaster" : "ApplicationMasters"; 
 
+    // 构造作业信息DTO对象用于页面展示
     JobInfo jinfo = new JobInfo(job, true);
+    // 构建作业概览信息块
     info("Job Overview").
         __("Job Name:", jinfo.getName()).
         __("User Name:", jinfo.getUserName()).
@@ -83,11 +102,12 @@ public class JobBlock extends HtmlBlock {
         __("Uberized:", jinfo.isUberized()).
         __("Started:", new Date(jinfo.getStartTime())).
         __("Elapsed:", StringUtils.formatTime(jinfo.getElapsedTime()));
+    // 创建信息包装DIV节点
     DIV<Hamlet> div = html.
         __(InfoBlock.class).
       div(_INFO_WRAP);
 
-    // MRAppMasters Table
+    // MRAppMasters 信息表渲染
     TABLE<DIV<Hamlet>> table = div.table("#job");
     table.
       tr().
@@ -99,6 +119,7 @@ public class JobBlock extends HtmlBlock {
       th(_TH, "Node").
       th(_TH, "Logs").
         __();
+    // 遍历所有AM尝试，渲染每行信息
     for (AMInfo amInfo : amInfos) {
       AMAttemptInfo attempt = new AMAttemptInfo(amInfo,
           jinfo.getId(), jinfo.getUserName());
@@ -117,8 +138,8 @@ public class JobBlock extends HtmlBlock {
     table.__();
     div.__();
 
+    // 开始渲染任务统计表格
     html.div(_INFO_WRAP).        
-      // Tasks table
         table("#job").
           tr().
             th(_TH, "Task Type").
@@ -131,7 +152,7 @@ public class JobBlock extends HtmlBlock {
             th("Map").
             td().
               div(_PROGRESSBAR).
-                $title(join(jinfo.getMapProgressPercent(), '%')). // tooltip
+                $title(join(jinfo.getMapProgressPercent(), '%')). // 进度提示文字
                 div(_PROGRESSBAR_VALUE).
                   $style(join("width:", jinfo.getMapProgressPercent(), '%')).__().__().__().
             td().a(url("tasks", jid, "m", "ALL"), String.valueOf(jinfo.getMapsTotal())).__().
@@ -142,7 +163,7 @@ public class JobBlock extends HtmlBlock {
             th("Reduce").
             td().
               div(_PROGRESSBAR).
-                $title(join(jinfo.getReduceProgressPercent(), '%')). // tooltip
+                $title(join(jinfo.getReduceProgressPercent(), '%')). // 进度提示文字
                 div(_PROGRESSBAR_VALUE).
                   $style(join("width:", jinfo.getReduceProgressPercent(), '%')).__().__().__().
             td().a(url("tasks", jid, "r", "ALL"), String.valueOf(jinfo.getReducesTotal())).__().
@@ -150,7 +171,7 @@ public class JobBlock extends HtmlBlock {
             td().a(url("tasks", jid, "r", "RUNNING"), String.valueOf(jinfo.getReducesRunning())).__().
             td().a(url("tasks", jid, "r", "COMPLETED"), String.valueOf(jinfo.getReducesCompleted())).__().__()
           .__().
-        // Attempts table
+        // 开始渲染任务尝试状态统计表格
         table("#job").
         tr().
           th(_TH, "Attempt Type").

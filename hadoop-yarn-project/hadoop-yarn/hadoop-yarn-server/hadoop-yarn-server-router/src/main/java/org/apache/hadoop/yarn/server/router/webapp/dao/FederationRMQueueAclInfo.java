@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,24 +27,43 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 联邦YARN环境下多子集群队列ACL信息DTO，聚合多个子集群的队列权限信息，供Router Web服务返回前端使用。
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class FederationRMQueueAclInfo extends RMQueueAclInfo {
 
+  // 存储各子集群的队列ACL信息列表
   @XmlElement(name = "subCluster")
   private List<RMQueueAclInfo> list = new ArrayList<>();
 
+  /**
+   * JAXB反序列化需要的无参构造函数。
+   */
   public FederationRMQueueAclInfo() {
   } // JAXB needs this
 
+  /**
+   * 构造函数，使用传入的子集群队列ACL列表初始化对象。
+   * @param list 各子集群队列ACL信息列表
+   */
   public FederationRMQueueAclInfo(ArrayList<RMQueueAclInfo> list) {
     this.list = list;
   }
 
+  /**
+   * 获取所有子集群的队列ACL信息列表。
+   * @return 子集群队列ACL信息列表
+   */
   public List<RMQueueAclInfo> getList() {
     return list;
   }
 
+  /**
+   * 设置子集群队列ACL信息列表。
+   * @param list 子集群队列ACL信息列表
+   */
   public void setList(List<RMQueueAclInfo> list) {
     this.list = list;
   }

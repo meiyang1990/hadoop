@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -21,10 +22,14 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * This class is used to respond to requests to delete PoliciesConfigurations.
+ * YARN联邦删除路由策略配置请求的响应类，封装删除操作的返回结果。
  */
 public abstract class DeletePoliciesConfigurationsResponse {
 
+  /**
+   * 创建一个新的DeletePoliciesConfigurationsResponse实例。
+   * @return 新建的响应实例
+   */
   @Private
   @Unstable
   public static DeletePoliciesConfigurationsResponse newInstance() {

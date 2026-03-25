@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +23,7 @@ import org.apache.hadoop.yarn.webapp.Controller;
 import com.google.inject.Inject;
 
 /**
- * Controller for the GPG Web UI.
+ * 全局策略生成器(GPG) Web UI 请求控制器，处理不同页面路由请求
  */
 public class GPGController extends Controller {
 

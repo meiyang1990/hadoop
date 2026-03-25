@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,11 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.mapreduce.security.TokenCache;
 import org.apache.hadoop.util.Progressable;
 
-/** A base class for {@link OutputFormat}. */
+/**
+ * 文件输出格式的抽象基类，为所有基于文件的OutputFormat提供公共基础能力，
+ * 负责管理输出目录配置、输出压缩设置、输出路径检查等通用逻辑。
+ * 是旧MapReduce API中所有文件类输出格式的父类。
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
@@ -41,9 +46,9 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
   }
   
   /**
-   * Set whether the output of the job is compressed.
-   * @param conf the {@link JobConf} to modify
-   * @param compress should the output of the job be compressed?
+   * 设置作业输出是否需要压缩
+   * @param conf 作业配置对象
+   * @param compress 是否压缩输出
    */
   public static void setCompressOutput(JobConf conf, boolean compress) {
     conf.setBoolean(org.apache.hadoop.mapreduce.lib.output.
@@ -51,10 +56,9 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
   }
   
   /**
-   * Is the job output compressed?
-   * @param conf the {@link JobConf} to look in
-   * @return <code>true</code> if the job output should be compressed,
-   *         <code>false</code> otherwise
+   * 获取作业输出是否需要压缩的配置
+   * @param conf 作业配置对象
+   * @return true表示需要压缩，false表示不需要压缩
    */
   public static boolean getCompressOutput(JobConf conf) {
     return conf.getBoolean(org.apache.hadoop.mapreduce.lib.output.
@@ -62,10 +66,9 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
   }
   
   /**
-   * Set the {@link CompressionCodec} to be used to compress job outputs.
-   * @param conf the {@link JobConf} to modify
-   * @param codecClass the {@link CompressionCodec} to be used to
-   *                   compress the job outputs
+   * 设置用于压缩作业输出的压缩编解码器类
+   * @param conf 作业配置对象
+   * @param codecClass 压缩编解码器类
    */
   public static void 
   setOutputCompressorClass(JobConf conf, 
@@ -77,12 +80,11 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
   }
   
   /**
-   * Get the {@link CompressionCodec} for compressing the job outputs.
-   * @param conf the {@link JobConf} to look in
-   * @param defaultValue the {@link CompressionCodec} to return if not set
-   * @return the {@link CompressionCodec} to be used to compress the 
-   *         job outputs
-   * @throws IllegalArgumentException if the class was specified, but not found
+   * 获取用于压缩作业输出的压缩编解码器类
+   * @param conf 作业配置对象
+   * @param defaultValue 如果未配置则返回的默认编解码器类
+   * @return 要使用的压缩编解码器类
+   * @throws IllegalArgumentException 配置了编解码器但找不到类时抛出
    */
   public static Class<? extends CompressionCodec> 
   getOutputCompressorClass(JobConf conf, 
@@ -103,30 +105,50 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
     return codecClass;
   }
   
+  /**
+   * 获取用于写入输出的RecordWriter实例，由子类实现具体的文件写入逻辑
+   * @param ignored 文件系统对象（参数保留但未实际使用）
+   * @param job 作业配置对象
+   * @param name 输出文件名
+   * @param progress 进度回调对象
+   * @return 用于写入键值对的RecordWriter
+   * @throws IOException 创建写入器失败时抛出
+   */
   public abstract RecordWriter<K, V> getRecordWriter(FileSystem ignored,
                                                JobConf job, String name,
                                                Progressable progress)
     throws IOException;
 
+  /**
+   * 检查作业输出目录规格，验证输出目录是否合法
+   * @param ignored 文件系统对象（参数保留但未实际使用）
+   * @param job 作业配置对象
+   * @throws FileAlreadyExistsException 输出目录已存在时抛出
+   * @throws InvalidJobConfException 输出目录未配置时抛出
+   * @throws IOException 文件系统操作失败时抛出
+   */
   public void checkOutputSpecs(FileSystem ignored, JobConf job) 
     throws FileAlreadyExistsException, 
            InvalidJobConfException, IOException {
-    // Ensure that the output directory is set and not already there
+    // 获取作业输出路径
     Path outDir = getOutputPath(job);
+    // 有Reduce任务但未配置输出目录，抛出异常
     if (outDir == null && job.getNumReduceTasks() != 0) {
       throw new InvalidJobConfException("Output directory not set in JobConf.");
     }
     if (outDir != null) {
+      // 获取输出路径所在的文件系统
       FileSystem fs = outDir.getFileSystem(job);
-      // normalize the output directory
+      // 标准化输出路径格式
       outDir = fs.makeQualified(outDir);
+      // 更新配置中的输出路径
       setOutputPath(job, outDir);
       
-      // get delegation token for the outDir's file system
+      // 为输出目录所在文件系统获取委托令牌，用于权限认证
       TokenCache.obtainTokensForNamenodes(job.getCredentials(), 
                                           new Path[] {outDir}, job);
       
-      // check its existence
+      // 检查输出目录是否已存在，存在则抛出异常避免覆盖已有数据
       if (fs.exists(outDir)) {
         throw new FileAlreadyExistsException("Output directory " + outDir + 
                                              " already exists");
@@ -135,11 +157,9 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
   }
 
   /**
-   * Set the {@link Path} of the output directory for the map-reduce job.
-   *
-   * @param conf The configuration of the job.
-   * @param outputDir the {@link Path} of the output directory for 
-   * the map-reduce job.
+   * 设置MapReduce作业的输出目录路径
+   * @param conf 作业配置对象
+   * @param outputDir 输出目录路径
    */
   public static void setOutputPath(JobConf conf, Path outputDir) {
     outputDir = new Path(conf.getWorkingDirectory(), outputDir);
@@ -148,14 +168,9 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
   }
 
   /**
-   * Set the {@link Path} of the task's temporary output directory 
-   * for the map-reduce job.
-   * 
-   * <p><i>Note</i>: Task output path is set by the framework.
-   * </p>
-   * @param conf The configuration of the job.
-   * @param outputDir the {@link Path} of the output directory 
-   * for the map-reduce job.
+   * 设置任务临时输出目录路径，由MapReduce框架内部调用
+   * @param conf 作业配置对象
+   * @param outputDir 任务临时输出目录路径
    */
   @Private
   public static void setWorkOutputPath(JobConf conf, Path outputDir) {
@@ -164,10 +179,8 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
   }
   
   /**
-   * Get the {@link Path} to the output directory for the map-reduce job.
-   * 
-   * @return the {@link Path} to the output directory for the map-reduce job.
-   * @see FileOutputFormat#getWorkOutputPath(JobConf)
+   * 获取MapReduce作业的输出目录路径
+   * @return 作业输出目录路径，未配置则返回null
    */
   public static Path getOutputPath(JobConf conf) {
     String name = conf.get(org.apache.hadoop.mapreduce.lib.output.
@@ -176,55 +189,15 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
   }
   
   /**
-   *  Get the {@link Path} to the task's temporary output directory 
-   *  for the map-reduce job
-   *  
-   * <b id="SideEffectFiles">Tasks' Side-Effect Files</b>
+   * 获取当前任务尝试的临时输出目录路径，用于存放任务侧输出文件，
+   * 避免推测执行中同一任务的多个尝试同时写入同一个文件冲突。
+   * <p>
+   * 任务成功完成后，框架会自动将临时目录中的文件移动到最终输出目录，
+   * 失败任务的临时目录会被直接丢弃，对应用户透明。
+   * </p>
    * 
-   * <p><i>Note:</i> The following is valid only if the {@link OutputCommitter}
-   *  is {@link FileOutputCommitter}. If <code>OutputCommitter</code> is not 
-   *  a <code>FileOutputCommitter</code>, the task's temporary output
-   *  directory is same as {@link #getOutputPath(JobConf)} i.e.
-   *  <code>${mapreduce.output.fileoutputformat.outputdir}$</code></p>
-   *  
-   * <p>Some applications need to create/write-to side-files, which differ from
-   * the actual job-outputs.
-   * 
-   * <p>In such cases there could be issues with 2 instances of the same TIP 
-   * (running simultaneously e.g. speculative tasks) trying to open/write-to the
-   * same file (path) on HDFS. Hence the application-writer will have to pick 
-   * unique names per task-attempt (e.g. using the attemptid, say 
-   * <code>attempt_200709221812_0001_m_000000_0</code>), not just per TIP.</p>
-   * 
-   * <p>To get around this the Map-Reduce framework helps the application-writer 
-   * out by maintaining a special 
-   * <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_${taskid}</code>
-   * sub-directory for each task-attempt on HDFS where the output of the 
-   * task-attempt goes. On successful completion of the task-attempt the files 
-   * in the <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_${taskid}</code> (only)
-   * are <i>promoted</i> to <code>${mapreduce.output.fileoutputformat.outputdir}</code>. Of course, the
-   * framework discards the sub-directory of unsuccessful task-attempts. This 
-   * is completely transparent to the application.</p>
-   * 
-   * <p>The application-writer can take advantage of this by creating any 
-   * side-files required in <code>${mapreduce.task.output.dir}</code> during execution
-   * of his reduce-task i.e. via {@link #getWorkOutputPath(JobConf)}, and the 
-   * framework will move them out similarly - thus she doesn't have to pick 
-   * unique paths per task-attempt.</p>
-   * 
-   * <p><i>Note</i>: the value of <code>${mapreduce.task.output.dir}</code> during
-   * execution of a particular task-attempt is actually 
-   * <code>${mapreduce.output.fileoutputformat.outputdir}/_temporary/_{$taskid}</code>, and this value is
-   * set by the map-reduce framework. So, just create any side-files in the 
-   * path  returned by {@link #getWorkOutputPath(JobConf)} from map/reduce 
-   * task to take advantage of this feature.</p>
-   * 
-   * <p>The entire discussion holds true for maps of jobs with 
-   * reducer=NONE (i.e. 0 reduces) since output of the map, in that case, 
-   * goes directly to HDFS.</p> 
-   * 
-   * @return the {@link Path} to the task's temporary output directory 
-   * for the map-reduce job.
+   * @param conf 作业配置对象
+   * @return 当前任务尝试的临时输出目录路径，未配置则返回null
    */
   public static Path getWorkOutputPath(JobConf conf) {
     String name = conf.get(JobContext.TASK_OUTPUT_DIR);
@@ -232,17 +205,15 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
   }
 
   /**
-   * Helper function to create the task's temporary output directory and 
-   * return the path to the task's output file.
-   * 
-   * @param conf job-configuration
-   * @param name temporary task-output filename
-   * @return path to the task's temporary output file
-   * @throws IOException
+   * 生成任务临时输出文件路径，创建临时目录并返回最终文件路径
+   * @param conf 作业配置对象
+   * @param name 输出文件名
+   * @return 任务临时输出文件的完整路径
+   * @throws IOException 路径解析或生成失败时抛出
    */
   public static Path getTaskOutputPath(JobConf conf, String name) 
   throws IOException {
-    // ${mapred.out.dir}
+    // 获取作业最终输出目录
     Path outputPath = getOutputPath(conf);
     if (outputPath == null) {
       throw new IOException("Undefined job output-path");
@@ -254,65 +225,51 @@ public abstract class FileOutputFormat<K, V> implements OutputFormat<K, V> {
       new TaskAttemptContextImpl(conf,
                                  TaskAttemptID.forName(conf.get(
                                      JobContext.TASK_ATTEMPT_ID)));
+    // 如果输出提交器是FileOutputCommitter，使用其工作路径作为临时输出根目录
     if (committer instanceof FileOutputCommitter) {
       workPath = ((FileOutputCommitter)committer).getWorkPath(context,
                                                               outputPath);
     }
     
-    // ${mapred.out.dir}/_temporary/_${taskid}/${name}
+    // 拼接生成最终临时输出文件路径
     return new Path(workPath, name);
   } 
 
   /**
-   * Helper function to generate a name that is unique for the task.
-   *
-   * <p>The generated name can be used to create custom files from within the
-   * different tasks for the job, the names for different tasks will not collide
-   * with each other.</p>
-   *
-   * <p>The given name is postfixed with the task type, 'm' for maps, 'r' for
-   * reduces and the task partition number. For example, give a name 'test'
-   * running on the first map o the job the generated name will be
-   * 'test-m-00000'.</p>
-   *
-   * @param conf the configuration for the job.
-   * @param name the name to make unique.
-   * @return a unique name accross all tasks of the job.
+   * 生成任务唯一文件名，保证同一作业不同任务生成的文件名不冲突
+   * @param conf 作业配置对象
+   * @param name 基础文件名
+   * @return 带任务分区和类型后缀的唯一文件名
    */
   public static String getUniqueName(JobConf conf, String name) {
+    // 获取当前任务的分区编号
     int partition = conf.getInt(JobContext.TASK_PARTITION, -1);
+    // 只能在任务执行上下文内调用
     if (partition == -1) {
       throw new IllegalArgumentException(
         "This method can only be called from within a Job");
     }
 
+    // 根据任务类型（Map/Reduce）生成短标记
     String taskType = conf.getBoolean(JobContext.TASK_ISMAP,
         JobContext.DEFAULT_TASK_ISMAP) ? "m" : "r";
 
+    // 格式化分区编号为5位固定长度，方便排序
     NumberFormat numberFormat = NumberFormat.getInstance();
     numberFormat.setMinimumIntegerDigits(5);
     numberFormat.setGroupingUsed(false);
 
+    // 拼接生成唯一名称
     return name + "-" + taskType + "-" + numberFormat.format(partition);
   }
 
   /**
-   * Helper function to generate a {@link Path} for a file that is unique for
-   * the task within the job output directory.
-   *
-   * <p>The path can be used to create custom files from within the map and
-   * reduce tasks. The path name will be unique for each task. The path parent
-   * will be the job output directory.</p>ls
-   *
-   * <p>This method uses the {@link #getUniqueName} method to make the file name
-   * unique for the task.</p>
-   *
-   * @param conf the configuration for the job.
-   * @param name the name for the file.
-   * @return a unique path accross all tasks of the job.
+   * 生成任务唯一文件路径，路径位于任务临时输出目录下，保证不同任务不冲突
+   * @param conf 作业配置对象
+   * @param name 基础文件名
+   * @return 唯一文件路径，可直接用于创建自定义输出文件
    */
   public static Path getPathForCustomFile(JobConf conf, String name) {
     return new Path(getWorkOutputPath(conf), getUniqueName(conf, name));
   }
 }
-

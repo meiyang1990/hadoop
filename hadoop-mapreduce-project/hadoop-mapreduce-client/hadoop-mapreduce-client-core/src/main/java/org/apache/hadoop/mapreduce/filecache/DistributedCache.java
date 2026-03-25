@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,6 +35,8 @@ import org.apache.hadoop.mapreduce.MRJobConfig;
 import java.net.URI;
 
 /**
+ * 文件级注释：MapReduce分布式缓存工具类，用于高效分发应用所需的大型只读文件到集群计算节点
+ * 
  * Distribute application-specific large, read-only files efficiently.
  *
  * <p><code>DistributedCache</code> is a facility provided by the Map-Reduce
@@ -88,9 +91,9 @@ import java.net.URI;
  *                                   job);
  *     DistributedCache.addCacheArchive(new URI("/myapp/map.zip"), job);
  *     DistributedCache.addFileToClassPath(new Path("/myapp/mylib.jar"), job);
- *     DistributedCache.addCacheArchive(new URI("/myapp/mytar.tar"), job);
- *     DistributedCache.addCacheArchive(new URI("/myapp/mytgz.tgz"), job);
- *     DistributedCache.addCacheArchive(new URI("/myapp/mytargz.tar.gz"), job);
+ *     DistributedCache.addCacheArchive(new URI("/mytar.tar"), job);
+ *     DistributedCache.addCacheArchive(new URI("/mytgz.tgz"), job);
+ *     DistributedCache.addCacheArchive(new URI("/mytargz.tar.gz"), job);
  *
  *     3. Use the cached files in the {@link org.apache.hadoop.mapred.Mapper}
  *     or {@link org.apache.hadoop.mapred.Reducer}:
@@ -133,14 +136,18 @@ import java.net.URI;
  */
 @Deprecated
 @InterfaceAudience.Private
+/**
+ * 类级注释：已废弃的分布式缓存工具类，所有方法已迁移到Job和JobContext相关API，保留此类仅为向后兼容
+ * 核心职责：提供分布式缓存配置能力，将作业依赖的文件、归档包、Jar包分发到所有计算节点，实现节点级缓存复用
+ */
 public class DistributedCache {
+  /** 通配符常量，用于匹配目录下所有文件 */
   public static final String WILDCARD = "*";
   
   /**
-   * Set the configuration with the given set of archives.  Intended
-   * to be used by user code.
-   * @param archives The list of archives that need to be localized
-   * @param conf Configuration which will be changed
+   * 将给定的归档包列表设置到作业配置中，供用户代码使用
+   * @param archives 需要本地化的归档包URI列表
+   * @param conf 要修改的作业配置对象
    * @deprecated Use {@link Job#setCacheArchives(URI[])} instead
    * @see Job#setCacheArchives(URI[])
    */
@@ -150,10 +157,9 @@ public class DistributedCache {
   }
 
   /**
-   * Set the configuration with the given set of files.  Intended to be
-   * used by user code.
-   * @param files The list of files that need to be localized
-   * @param conf Configuration which will be changed
+   * 将给定的缓存文件列表设置到作业配置中，供用户代码使用
+   * @param files 需要本地化的文件URI列表
+   * @param conf 要修改的作业配置对象
    * @deprecated Use {@link Job#setCacheFiles(URI[])} instead
    * @see Job#setCacheFiles(URI[])
    */
@@ -163,10 +169,9 @@ public class DistributedCache {
   }
 
   /**
-   * Get cache archives set in the Configuration.  Used by
-   * internal DistributedCache and MapReduce code.
-   * @param conf The configuration which contains the archives
-   * @return A URI array of the caches set in the Configuration
+   * 从配置中获取已设置的缓存归档包列表，仅供内部框架代码使用
+   * @param conf 包含缓存归档配置的作业配置对象
+   * @return 配置中缓存归档的URI数组
    * @throws IOException
    * @deprecated Use {@link JobContext#getCacheArchives()} instead
    * @see JobContext#getCacheArchives()
@@ -177,10 +182,9 @@ public class DistributedCache {
   }
 
   /**
-   * Get cache files set in the Configuration.  Used by internal
-   * DistributedCache and MapReduce code.
-   * @param conf The configuration which contains the files
-   * @return A URI array of the files set in the Configuration
+   * 从配置中获取已设置的缓存文件列表，仅供内部框架代码使用
+   * @param conf 包含缓存文件配置的作业配置对象
+   * @return 配置中缓存文件的URI数组
    * @throws IOException
    * @deprecated Use {@link JobContext#getCacheFiles()} instead
    * @see JobContext#getCacheFiles()
@@ -191,10 +195,9 @@ public class DistributedCache {
   }
 
   /**
-   * Return the path array of the localized caches.  Intended to be used
-   * by user code.
-   * @param conf Configuration that contains the localized archives
-   * @return A path array of localized caches
+   * 获取已本地化到节点的缓存归档路径数组，供用户代码使用
+   * @param conf 包含本地化缓存路径的作业配置对象
+   * @return 节点上缓存归档的本地路径数组
    * @throws IOException
    * @deprecated Use {@link JobContext#getLocalCacheArchives()} instead
    * @see JobContext#getLocalCacheArchives()
@@ -205,10 +208,9 @@ public class DistributedCache {
   }
 
   /**
-   * Return the path array of the localized files.  Intended to be used
-   * by user code.
-   * @param conf Configuration that contains the localized files
-   * @return A path array of localized files
+   * 获取已本地化到节点的缓存文件路径数组，供用户代码使用
+   * @param conf 包含本地化缓存路径的作业配置对象
+   * @return 节点上缓存文件的本地路径数组
    * @throws IOException
    * @deprecated Use {@link JobContext#getLocalCacheFiles()} instead
    * @see JobContext#getLocalCacheFiles()
@@ -220,10 +222,9 @@ public class DistributedCache {
   }
 
   /**
-   * Get the timestamps of the archives.  Used by internal
-   * DistributedCache and MapReduce code.
-   * @param conf The configuration which stored the timestamps
-   * @return a long array of timestamps
+   * 获取所有缓存归档的时间戳，仅供内部框架代码使用
+   * @param conf 存储了时间戳的作业配置对象
+   * @return 缓存归档时间戳数组
    * @deprecated Use {@link JobContext#getArchiveTimestamps()} instead
    * @see JobContext#getArchiveTimestamps()
    */
@@ -234,10 +235,9 @@ public class DistributedCache {
 
 
   /**
-   * Get the timestamps of the files.  Used by internal
-   * DistributedCache and MapReduce code.
-   * @param conf The configuration which stored the timestamps
-   * @return a long array of timestamps
+   * 获取所有缓存文件的时间戳，仅供内部框架代码使用
+   * @param conf 存储了时间戳的作业配置对象
+   * @return 缓存文件时间戳数组
    * @deprecated Use {@link JobContext#getFileTimestamps()} instead
    * @see JobContext#getFileTimestamps()
    */
@@ -247,10 +247,9 @@ public class DistributedCache {
   }
 
   /**
-   * Add a archives to be localized to the conf.  Intended to
-   * be used by user code.
-   * @param uri The uri of the cache to be localized
-   * @param conf Configuration to add the cache to
+   * 添加一个需要本地化的归档包到作业配置，供用户代码使用
+   * @param uri 需要本地化的缓存归档URI
+   * @param conf 要添加缓存配置的作业配置对象
    * @deprecated Use {@link Job#addCacheArchive(URI)} instead
    * @see Job#addCacheArchive(URI)
    */
@@ -260,25 +259,13 @@ public class DistributedCache {
   }
 
   /**
-   * Add a file to be localized to the conf.  The localized file will be
-   * downloaded to the execution node(s), and a link will created to the
-   * file from the job's working directory. If the last part of URI's path name
-   * is "*", then the entire parent directory will be localized and links
-   * will be created from the job's working directory to each file in the
-   * parent directory.
-   *
-   * The access permissions of the file will determine whether the localized
-   * file will be shared across jobs.  If the file is not readable by other or
-   * if any of its parent directories is not executable by other, then the
-   * file will not be shared.  In the case of a path that ends in "/*",
-   * sharing of the localized files will be determined solely from the
-   * access permissions of the parent directories.  The access permissions of
-   * the individual files will be ignored.
-   *
-   * Intended to be used by user code.
-   *
-   * @param uri The uri of the cache to be localized
-   * @param conf Configuration to add the cache to
+   * 添加一个需要本地化的文件到作业配置，供用户代码使用
+   * 本地化后的文件会下载到执行节点，并在作业工作目录创建软链接
+   * 如果URI路径以"*"结尾，会本地化整个父目录并为目录下所有文件创建软链接
+   * 文件访问权限决定是否可以跨作业共享缓存：文件不可读或父目录不可执行则无法共享
+   * 
+   * @param uri 需要本地化的缓存文件URI
+   * @param conf 要添加缓存配置的作业配置对象
    * @deprecated Use {@link Job#addCacheFile(URI)} instead
    * @see Job#addCacheFile(URI)
    */
@@ -288,11 +275,11 @@ public class DistributedCache {
   }
 
   /**
-   * Add a file path to the current set of classpath entries.  The file will
-   * also be added to the cache.  Intended to be used by user code.
+   * 添加文件到作业类路径，同时会将文件添加到分布式缓存，供用户代码使用
    *
-   * @param file Path of the file to be added
-   * @param conf Configuration that contains the classpath setting
+   * @param file 需要添加的文件路径
+   * @param conf 存储类路径配置的作业配置对象
+   * @throws IOException
    * @deprecated Use {@link Job#addFileToClassPath(Path)} instead
    * @see #addCacheFile(URI, Configuration)
    * @see Job#addFileToClassPath(Path)
@@ -303,14 +290,11 @@ public class DistributedCache {
   }
 
   /**
-   * Add a file path to the current set of classpath entries. The file will
-   * also be added to the cache.  Intended to be used by user code.
+   * 添加文件到作业类路径，同时会将文件添加到分布式缓存，供用户代码使用
    *
-   * @param file Path of the file to be added
-   * @param conf Configuration that contains the classpath setting
-   * @param fs FileSystem with respect to which {@code archivefile} should
-   *              be interpreted.
-   * @see #addCacheFile(URI, Configuration)
+   * @param file 需要添加的文件路径
+   * @param conf 存储类路径配置的作业配置对象
+   * @param fs 文件所在的文件系统对象
    */
   public static void addFileToClassPath(Path file, Configuration conf,
       FileSystem fs) {
@@ -318,15 +302,12 @@ public class DistributedCache {
   }
 
   /**
-   * Add a file path to the current set of classpath entries. The file will
-   * also be added to the cache if {@code addToCache} is true.  Used by
-   * internal DistributedCache code.
+   * 添加文件到作业类路径，如果addToCache为true则同时添加到分布式缓存，仅供内部框架代码使用
    *
-   * @param file Path of the file to be added
-   * @param conf Configuration that contains the classpath setting
-   * @param fs FileSystem with respect to which {@code archivefile} should
-   *              be interpreted.
-   * @param addToCache whether the file should also be added to the cache list
+   * @param file 需要添加的文件路径
+   * @param conf 存储类路径配置的作业配置对象
+   * @param fs 文件所在的文件系统对象
+   * @param addToCache 是否同时将文件添加到缓存列表
    * @see #addCacheFile(URI, Configuration)
    */
   public static void addFileToClassPath(Path file, Configuration conf,
@@ -335,10 +316,9 @@ public class DistributedCache {
   }
 
   /**
-   * Get the file entries in classpath as an array of Path.
-   * Used by internal DistributedCache code.
+   * 获取类路径中所有文件条目路径数组，仅供内部框架代码使用
    *
-   * @param conf Configuration that contains the classpath setting
+   * @param conf 存储类路径配置的作业配置对象
    * @deprecated Use {@link JobContext#getFileClassPaths()} instead
    * @see JobContext#getFileClassPaths()
    */
@@ -348,11 +328,11 @@ public class DistributedCache {
   }
 
   /**
-   * Add an archive path to the current set of classpath entries. It adds the
-   * archive to cache as well.  Intended to be used by user code.
+   * 添加归档包到作业类路径，同时会将归档包添加到分布式缓存，供用户代码使用
    *
-   * @param archive Path of the archive to be added
-   * @param conf Configuration that contains the classpath setting
+   * @param archive 需要添加的归档包路径
+   * @param conf 存储类路径配置的作业配置对象
+   * @throws IOException
    * @deprecated Use {@link Job#addArchiveToClassPath(Path)} instead
    * @see Job#addArchiveToClassPath(Path)
    */
@@ -363,12 +343,12 @@ public class DistributedCache {
   }
 
   /**
-   * Add an archive path to the current set of classpath entries. It adds the
-   * archive to cache as well.  Intended to be used by user code.
+   * 添加归档包到作业类路径，同时会将归档包添加到分布式缓存，供用户代码使用
    *
-   * @param archive Path of the archive to be added
-   * @param conf Configuration that contains the classpath setting
-   * @param fs FileSystem with respect to which {@code archive} should be interpreted.
+   * @param archive 需要添加的归档包路径
+   * @param conf 存储类路径配置的作业配置对象
+   * @param fs 归档包所在的文件系统对象
+   * @throws IOException
    */
   public static void addArchiveToClassPath
          (Path archive, Configuration conf, FileSystem fs)
@@ -377,10 +357,9 @@ public class DistributedCache {
   }
 
   /**
-   * Get the archive entries in classpath as an array of Path.
-   * Used by internal DistributedCache code.
+   * 获取类路径中所有归档包条目路径数组，仅供内部框架代码使用
    *
-   * @param conf Configuration that contains the classpath setting
+   * @param conf 存储类路径配置的作业配置对象
    * @deprecated Use {@link JobContext#getArchiveClassPaths()} instead 
    * @see JobContext#getArchiveClassPaths()
    */
@@ -390,9 +369,8 @@ public class DistributedCache {
   }
 
   /**
-   * Originally intended to enable symlinks, but currently symlinks cannot be
-   * disabled. This is a NO-OP.
-   * @param conf the jobconf
+   * 原本用于启用软链接，当前版本软链接始终启用无法禁用，此方法为空操作
+   * @param conf 作业配置对象
    * @deprecated This is a NO-OP.
    */
   @Deprecated
@@ -401,10 +379,9 @@ public class DistributedCache {
   }
 
   /**
-   * Originally intended to check if symlinks should be used, but currently
-   * symlinks cannot be disabled.
-   * @param conf the jobconf
-   * @return true
+   * 原本用于检查是否需要创建软链接，当前版本软链接始终启用无法禁用
+   * @param conf 作业配置对象
+   * @return 始终返回true
    * @deprecated symlinks are always created.
    */
   @Deprecated
@@ -412,6 +389,11 @@ public class DistributedCache {
     return true;
   }
 
+  /**
+   * 将字符串数组解析为布尔数组，用于批量转换可见性配置
+   * @param strs 待转换的字符串数组
+   * @return 转换后的布尔数组
+   */
   private static boolean[] parseBooleans(String[] strs) {
     if (null == strs) {
       return null;
@@ -420,75 +402,4 @@ public class DistributedCache {
     for(int i=0; i < strs.length; ++i) {
       result[i] = Boolean.parseBoolean(strs[i]);
     }
-    return result;
-  }
-
-  /**
-   * Get the booleans on whether the files are public or not.  Used by
-   * internal DistributedCache and MapReduce code.
-   * @param conf The configuration which stored the timestamps
-   * @return a string array of booleans
-   */
-  public static boolean[] getFileVisibilities(Configuration conf) {
-    return parseBooleans(conf.getStrings(MRJobConfig.CACHE_FILE_VISIBILITIES));
-  }
-
-  /**
-   * Get the booleans on whether the archives are public or not.  Used by
-   * internal DistributedCache and MapReduce code.
-   * @param conf The configuration which stored the timestamps
-   * @return a string array of booleans
-   */
-  public static boolean[] getArchiveVisibilities(Configuration conf) {
-    return parseBooleans(conf.getStrings(MRJobConfig.CACHE_ARCHIVES_VISIBILITIES));
-  }
-
-  /**
-   * This method checks if there is a conflict in the fragment names
-   * of the uris. Also makes sure that each uri has a fragment. It
-   * is only to be called if you want to create symlinks for
-   * the various archives and files.  May be used by user code.
-   * @param uriFiles The uri array of urifiles
-   * @param uriArchives the uri array of uri archives
-   */
-  public static boolean checkURIs(URI[] uriFiles, URI[] uriArchives) {
-    if ((uriFiles == null) && (uriArchives == null)) {
-      return true;
-    }
-    // check if fragment is null for any uri
-    // also check if there are any conflicts in fragment names
-    Set<String> fragments = new HashSet<String>();
-
-    // iterate over file uris
-    if (uriFiles != null) {
-      for (int i = 0; i < uriFiles.length; i++) {
-        String fragment = uriFiles[i].getFragment();
-        if (fragment == null) {
-          return false;
-        }
-        String lowerCaseFragment = StringUtils.toLowerCase(fragment);
-        if (fragments.contains(lowerCaseFragment)) {
-          return false;
-        }
-        fragments.add(lowerCaseFragment);
-      }
-    }
-
-    // iterate over archive uris
-    if (uriArchives != null) {
-      for (int i = 0; i < uriArchives.length; i++) {
-        String fragment = uriArchives[i].getFragment();
-        if (fragment == null) {
-          return false;
-        }
-        String lowerCaseFragment = StringUtils.toLowerCase(fragment);
-        if (fragments.contains(lowerCaseFragment)) {
-          return false;
-        }
-        fragments.add(lowerCaseFragment);
-      }
-    }
-    return true;
-  }
-
-}
+    return

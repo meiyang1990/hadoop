@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -55,13 +56,13 @@ import org.apache.hadoop.util.ServletUtil;
 import org.apache.hadoop.util.StringUtils;
 
 /**
- * This servlet is used in two cases:
+ * QJM共享编辑日志的HTTP获取服务Servlet，用于以下两种场景：
  * <ul>
- * <li>The QuorumJournalManager, when reading edits, fetches the edit streams
- * from the journal nodes.</li>
- * <li>During edits synchronization, one journal node will fetch edits from
- * another journal node.</li>
+ * <li>QuorumJournalManager读取编辑日志时，从JournalNode拉取编辑流</li>
+ * <li>编辑日志同步阶段，一个JournalNode从另一个JournalNode拉取编辑日志</li>
  * </ul>
+ * 该类是HDFS QJM（Quorum Journal Manager）架构中JournalNode对外提供编辑日志读取的HTTP服务端点，
+ * 用于支持NameNode读取 edits 和Journal节点间的数据同步。
  */
 @InterfaceAudience.Private
 public class GetJournalEditServlet extends DfsServlet {
@@ -75,6 +76,13 @@ public class GetJournalEditServlet extends DfsServlet {
   static final String SEGMENT_TXID_PARAM = "segmentTxId";
   static final String IN_PROGRESS_OK = "inProgressOk";
 
+  /**
+   * 验证请求发起者是否为合法的请求主体（NameNode或其他JournalNode）。
+   * @param request HTTP请求对象
+   * @param conf Hadoop配置对象
+   * @return 是否为合法请求
+   * @throws IOException 解析用户信息时抛出IO异常
+   */
   protected boolean isValidRequestor(HttpServletRequest request, Configuration conf)
       throws IOException {
     UserGroupInformation ugi = getUGI(request, conf);
@@ -86,14 +94,16 @@ public class GetJournalEditServlet extends DfsServlet {
     }
 
     Set<String> validRequestors = new HashSet<String>();
+    // 添加所有配置中的NameNode主体到合法请求列表
     validRequestors.addAll(DFSUtil.getAllNnPrincipals(conf));
     try {
+      // 添加SecondaryNameNode主体到合法请求列表
       validRequestors.add(
           SecurityUtil.getServerPrincipal(conf
               .get(DFSConfigKeys.DFS_SECONDARY_NAMENODE_KERBEROS_PRINCIPAL_KEY),
               SecondaryNameNode.getHttpAddress(conf).getHostName()));
     } catch (Exception e) {
-      // Don't halt if SecondaryNameNode principal could not be added.
+      // 添加失败不中断流程，仅记录日志
       LOG.debug("SecondaryNameNode principal could not be added", e);
       String msg = String.format(
         "SecondaryNameNode principal not considered, %s = %s, %s = %s",
@@ -105,7 +115,7 @@ public class GetJournalEditServlet extends DfsServlet {
       LOG.warn(msg);
     }
 
-    // Check the full principal name of all the configured valid requestors.
+    // 遍历所有已配置合法主体，匹配完整主体名
     for (String v : validRequestors) {
       if (LOG.isDebugEnabled())
         LOG.debug("isValidRequestor is comparing to valid requestor: " + v);
@@ -116,9 +126,7 @@ public class GetJournalEditServlet extends DfsServlet {
       }
     }
 
-    // Additionally, we compare the short name of the requestor to this JN's
-    // username, because we want to allow requests from other JNs during
-    // recovery, but we can't enumerate the full list of JNs.
+    // 额外允许其他JournalNode请求：比较短用户名，因为恢复阶段无法预先枚举所有JournalNode
     if (ugi.getShortUserName().equals(
           UserGroupInformation.getLoginUser().getShortUserName())) {
       if (LOG.isDebugEnabled())
@@ -132,6 +140,14 @@ public class GetJournalEditServlet extends DfsServlet {
     return false;
   }
   
+  /**
+   * 检查请求发起者合法性，不合法则返回错误响应。
+   * @param conf Hadoop配置对象
+   * @param request HTTP请求对象
+   * @param response HTTP响应对象
+   * @return 合法返回true，不合法返回false并已写入错误响应
+   * @throws IOException 发送错误响应时抛出IO异常
+   */
   private boolean checkRequestorOrSendError(Configuration conf,
       HttpServletRequest request, HttpServletResponse response)
           throws IOException {
@@ -146,6 +162,14 @@ public class GetJournalEditServlet extends DfsServlet {
     return true;
   }
   
+  /**
+   * 检查请求携带的命名空间信息是否与当前JournalNode存储匹配，不匹配则返回错误响应。
+   * @param storage 当前JournalNode存储对象
+   * @param request HTTP请求对象
+   * @param response HTTP响应对象
+   * @return 匹配返回true，不匹配返回false并已写入错误响应
+   * @throws IOException 发送错误响应时抛出IO异常
+   */
   private boolean checkStorageInfoOrSendError(JNStorage storage,
       HttpServletRequest request, HttpServletResponse response)
       throws IOException {
@@ -156,10 +180,12 @@ public class GetJournalEditServlet extends DfsServlet {
         request.getParameter(STORAGEINFO_PARAM));
 
     if (theirStorageInfoString != null) {
+      // 解析请求携带的命名空间ID和集群ID
       int theirNsId = StorageInfo.getNsIdFromColonSeparatedString(
           theirStorageInfoString);
       String theirClusterId = StorageInfo.getClusterIdFromColonSeparatedString(
           theirStorageInfoString);
+      // 匹配命名空间和集群ID，不匹配则拒绝请求
       if (myNsId != theirNsId || !myClusterId.equals(theirClusterId)) {
         String msg = "This node has namespaceId '" + myNsId + " and clusterId '"
             + myClusterId + "' but the requesting node expected '" + theirNsId
@@ -173,15 +199,25 @@ public class GetJournalEditServlet extends DfsServlet {
     return true;
   }
   
+  /**
+   * 处理HTTP GET请求，返回指定起始事务ID的编辑日志文件内容。
+   * @param request HTTP请求对象
+   * @param response HTTP响应对象
+   * @throws ServletException Servlet处理异常
+   * @throws IOException IO处理异常
+   */
   @Override
   public void doGet(final HttpServletRequest request,
       final HttpServletResponse response) throws ServletException, IOException {
     FileInputStream editFileIn = null;
     try {
       final ServletContext context = getServletContext();
+      // 从Servlet上下文获取Hadoop配置
       final Configuration conf = (Configuration) getServletContext()
           .getAttribute(JspHelper.CURRENT_CONF);
+      // 获取请求参数：日志ID
       final String journalId = request.getParameter(JOURNAL_ID_PARAM);
+      // 获取请求参数：是否允许返回进行中的分段
       final String inProgressOkStr = request.getParameter(IN_PROGRESS_OK);
       final boolean inProgressOk;
       if (inProgressOkStr != null &&
@@ -190,30 +226,32 @@ public class GetJournalEditServlet extends DfsServlet {
       } else {
         inProgressOk = true;
       }
+      // 校验日志ID格式合法性
       QuorumJournalManager.checkJournalId(journalId);
+      // 从上下文获取对应日志ID的存储对象
       final JNStorage storage = JournalNodeHttpServer
           .getJournalFromContext(context, journalId).getStorage();
 
-      // Check security
+      // 检查请求发起者合法性
       if (!checkRequestorOrSendError(conf, request, response)) {
         return;
       }
 
-      // Check that the namespace info is correct
+      // 检查命名空间信息一致性
       if (!checkStorageInfoOrSendError(storage, request, response)) {
         return;
       }
       
+      // 解析请求参数：分段起始事务ID
       long segmentTxId = ServletUtil.parseLongParam(request,
           SEGMENT_TXID_PARAM);
 
       FileJournalManager fjm = storage.getJournalManager();
       File editFile;
 
+      // 加锁防止文件在打开过程中被finalize修改
       synchronized (fjm) {
-        // Synchronize on the FJM so that the file doesn't get finalized
-        // out from underneath us while we're in the process of opening
-        // it up.
+        // 获取对应事务ID的编辑日志文件
         EditLogFile elf = fjm.getLogFile(segmentTxId, inProgressOk);
         if (elf == null) {
           response.sendError(HttpServletResponse.SC_NOT_FOUND,
@@ -221,14 +259,18 @@ public class GetJournalEditServlet extends DfsServlet {
           return;
         }
         editFile = elf.getFile();
+        // 设置文件校验响应头
         ImageServlet.setVerificationHeadersForGet(response, editFile);
+        // 设置文件名响应头
         ImageServlet.setFileNameHeaders(response, editFile);
+        // 打开文件输入流
         editFileIn = new FileInputStream(editFile);
       }
       
+      // 获取带宽限流控制器
       DataTransferThrottler throttler = ImageServlet.getThrottler(conf);
 
-      // send edits
+      // 将编辑日志文件拷贝到响应输出流返回给请求方
       TransferFsImage.copyFileToStream(response.getOutputStream(), editFile,
           editFileIn, throttler);
 
@@ -241,6 +283,14 @@ public class GetJournalEditServlet extends DfsServlet {
     }
   }
 
+  /**
+   * 构建获取编辑日志的请求路径，携带所有必要请求参数。
+   * @param journalId 日志ID
+   * @param segmentTxId 分段起始事务ID
+   * @param nsInfo 命名空间信息
+   * @param inProgressOk 是否允许返回进行中的分段
+   * @return 编码完成的请求路径
+   */
   public static String buildPath(String journalId, long segmentTxId,
       NamespaceInfo nsInfo, boolean inProgressOk) {
     StringBuilder path = new StringBuilder("/getJournal?");
@@ -254,7 +304,7 @@ public class GetJournalEditServlet extends DfsServlet {
       path.append("&" + IN_PROGRESS_OK).append("=")
           .append(inProgressOk);
     } catch (UnsupportedEncodingException e) {
-      // Never get here -- everyone supports UTF-8
+      // UTF-8必然支持，不会走到这里
       throw new RuntimeException(e);
     }
     return path.toString();

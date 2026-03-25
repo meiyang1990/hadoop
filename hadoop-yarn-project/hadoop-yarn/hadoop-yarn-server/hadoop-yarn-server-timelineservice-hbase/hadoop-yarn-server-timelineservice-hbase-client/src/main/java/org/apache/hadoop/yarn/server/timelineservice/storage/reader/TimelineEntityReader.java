@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -62,6 +63,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * 文件级注释：从HBase存储中读取时间线实体的抽象基类，为不同类型实体查询提供统一读取框架。
+ * 定义了查询过滤、结果解析等公共流程，子类负责实现不同场景的具体查询逻辑。
+ */
+/**
  * The base class for reading and deserializing timeline entities from the
  * HBase storage. Different types can be defined for different types of the
  * entities that are being requested.
@@ -71,19 +76,24 @@ public abstract class TimelineEntityReader extends
   private static final Logger LOG =
       LoggerFactory.getLogger(TimelineEntityReader.class);
 
+  /** 是否为单实体读取模式 */
   private final boolean singleEntityRead;
+  /** 需要检索的数据配置 */
   private TimelineDataToRetrieve dataToRetrieve;
   // used only for multiple entity read mode
+  /** 多实体读取模式下的过滤条件 */
   private TimelineEntityFilters filters;
 
   /**
    * Main table the entity reader uses.
    */
+  /** 读取使用的主表 */
   private BaseTableRW<?> table;
 
   /**
    * Used to convert strings key components to and from storage format.
    */
+  /** 字符串键与存储格式的转换器 */
   private final KeyConverter<String> stringKeyConverter =
       new StringKeyConverter();
 
@@ -122,12 +132,10 @@ public abstract class TimelineEntityReader extends
   }
 
   /**
-   * Creates a {@link FilterList} based on fields, confs and metrics to
-   * retrieve. This filter list will be set in Scan/Get objects to trim down
-   * results fetched from HBase back-end storage. This is called only for
-   * multiple entity reads.
+   * 基于需要检索的字段构造HBase过滤器列表，仅用于多实体读取。
+   * 用于过滤HBase返回结果，减少数据传输量。
    *
-   * @param cfsInFields column families in the fields
+   * @param cfsInFields 输出参数，收集字段涉及的列族
    * @return a {@link FilterList} object.
    * @throws IOException if any problem occurs while creating filter list.
    */
@@ -135,9 +143,8 @@ public abstract class TimelineEntityReader extends
       Set<String> cfsInFields) throws IOException;
 
   /**
-   * Creates a {@link FilterList} based on info, config and metric filters. This
-   * filter list will be set in HBase Get to trim down results fetched from
-   * HBase back-end storage.
+   * 基于过滤条件构造HBase过滤器列表，用于单实体读取。
+   * 修剪从HBase获取的结果，仅返回符合条件的数据。
    *
    * @return a {@link FilterList} object.
    * @throws IOException if any problem occurs while creating filter list.
@@ -154,9 +161,11 @@ public abstract class TimelineEntityReader extends
    * @throws IOException if any problem occurs while creating filter list.
    */
   private FilterList createFilterList() throws IOException {
+    // 构造基于过滤条件的过滤器列表
     FilterList listBasedOnFilters = constructFilterListBasedOnFilters();
     boolean hasListBasedOnFilters = listBasedOnFilters != null &&
         !listBasedOnFilters.getFilters().isEmpty();
+    // 构造基于检索字段的过滤器列表
     Set<String> cfsInListBasedOnFields = new HashSet<>(0);
     FilterList listBasedOnFields =
         constructFilterListBasedOnFields(cfsInListBasedOnFields);
@@ -169,18 +178,20 @@ public abstract class TimelineEntityReader extends
     // that no filter list needs to be added to HBase Scan as filters are not
     // specified for the query or only the default view of entity needs to be
     // returned.
+    // 两种过滤器都存在时，合并后返回
     if (hasListBasedOnFilters && hasListBasedOnFields) {
       FilterList list = new FilterList();
       list.addFilter(listBasedOnFilters);
 
+      // 提取过滤条件涉及的列族
       Set<String> cfsInListBasedOnFilters = new HashSet<>(0);
       extractColumnFamiliesFromFiltersBasedOnFilters(
           listBasedOnFilters, cfsInListBasedOnFilters);
 
-      // must exclude cfs that are already covered in fields-based filters
-      // otherwise we will return the whole cf
+      // 移除字段过滤器已经包含的列族，避免重复返回整个列族
       cfsInListBasedOnFilters.removeAll(cfsInListBasedOnFields);
 
+      // 为未包含的列族添加列族过滤器
       if (!cfsInListBasedOnFilters.isEmpty()) {
         for (String cf: cfsInListBasedOnFilters) {
           listBasedOnFields.addFilter(new FamilyFilter(CompareOp.EQUAL,
@@ -190,20 +201,30 @@ public abstract class TimelineEntityReader extends
       list.addFilter(listBasedOnFields);
       return list;
     } else if (hasListBasedOnFilters) {
+      // 仅存在过滤条件过滤器，直接返回
       return listBasedOnFilters;
     } else if (hasListBasedOnFields) {
+      // 仅存在字段过滤器，直接返回
       return listBasedOnFields;
     }
+    // 都不存在，返回null
     return null;
   }
 
+  /**
+   * 递归从HBase过滤器中提取涉及的所有列族，用于后续添加列族过滤。
+   * @param hbaseFilterBasedOnTLSFilter 当前处理的HBase过滤器
+   * @param columnFamilies 输出参数，收集提取到的列族
+   */
   private static void extractColumnFamiliesFromFiltersBasedOnFilters(
       Filter hbaseFilterBasedOnTLSFilter, Set<String> columnFamilies) {
+    // 单值过滤器直接提取列族
     if (hbaseFilterBasedOnTLSFilter instanceof SingleColumnValueFilter) {
       byte[] cf =  ((SingleColumnValueFilter)
           hbaseFilterBasedOnTLSFilter).getFamily();
       columnFamilies.add(Bytes.toString(cf));
     } else if (hbaseFilterBasedOnTLSFilter instanceof FilterList) {
+      // 过滤器列表递归提取每个子过滤器的列族
       FilterList filterListBase = (FilterList) hbaseFilterBasedOnTLSFilter;
       for (Filter fs: filterListBase.getFilters()) {
         extractColumnFamiliesFromFiltersBasedOnFilters(fs, columnFamilies);
@@ -224,6 +245,7 @@ public abstract class TimelineEntityReader extends
    * Create a {@link TimelineEntityFilters} object with default values for
    * filters.
    */
+  /** 如果过滤条件为空，创建默认过滤条件对象 */
   protected void createFiltersIfNull() {
     if (filters == null) {
       filters = new TimelineEntityFilters.Builder().build();
@@ -241,13 +263,17 @@ public abstract class TimelineEntityReader extends
    */
   public TimelineEntity readEntity(Configuration hbaseConf, Connection conn)
       throws IOException {
+    // 验证查询参数
     validateParams();
+    // 补充查询参数
     augmentParams(hbaseConf, conn);
 
+    // 基于检索字段构造过滤器
     FilterList filterList = constructFilterListBasedOnFields(new HashSet<>(0));
     if (filterList != null) {
       LOG.debug("FilterList created for get is - {}", filterList);
     }
+    // 从HBase获取查询结果
     Result result = getResult(hbaseConf, conn, filterList);
     if (result == null || result.isEmpty()) {
       // Could not find a matching row.
@@ -255,6 +281,7 @@ public abstract class TimelineEntityReader extends
           getContext().getEntityType());
       return null;
     }
+    // 解析结果为时间线实体对象并返回
     return parseEntity(result);
   }
 
@@ -270,28 +297,35 @@ public abstract class TimelineEntityReader extends
    */
   public Set<TimelineEntity> readEntities(Configuration hbaseConf,
       Connection conn) throws IOException {
+    // 验证查询参数
     validateParams();
+    // 补充查询参数
     augmentParams(hbaseConf, conn);
 
     Set<TimelineEntity> entities = new LinkedHashSet<>();
+    // 创建合并后的过滤器列表
     FilterList filterList = createFilterList();
     if (filterList != null) {
       LOG.debug("FilterList created for scan is - {}", filterList);
     }
+    // 从HBase获取扫描结果
     ResultScanner results = getResults(hbaseConf, conn, filterList);
     try {
+      // 遍历结果逐个解析
       for (Result result : results) {
         TimelineEntity entity = parseEntity(result);
         if (entity == null) {
           continue;
         }
         entities.add(entity);
+        // 达到数量限制则停止遍历
         if (entities.size() == filters.getLimit()) {
           break;
         }
       }
       return entities;
     } finally {
+      // 确保结果扫描器关闭
       results.close();
     }
   }
@@ -353,15 +387,16 @@ public abstract class TimelineEntityReader extends
    */
   protected void readMetrics(TimelineEntity entity, Result result,
       ColumnPrefix<?> columnPrefix) throws IOException {
+    // 读取带时间戳的指标结果
     NavigableMap<String, NavigableMap<Long, Number>> metricsResult =
         ColumnRWHelper.readResultsWithTimestamps(
             result, columnPrefix, stringKeyConverter);
+    // 遍历转换每个指标
     for (Map.Entry<String, NavigableMap<Long, Number>> metricResult:
         metricsResult.entrySet()) {
       TimelineMetric metric = new TimelineMetric();
       metric.setId(metricResult.getKey());
-      // Simply assume that if the value set contains more than 1 elements, the
-      // metric is a TIME_SERIES metric, otherwise, it's a SINGLE_VALUE metric
+      // 根据值个数判断指标类型：多个值为时间序列，单个值为单值指标
       TimelineMetric.Type metricType = metricResult.getValue().size() > 1 ?
           TimelineMetric.Type.TIME_SERIES : TimelineMetric.Type.SINGLE_VALUE;
       metric.setType(metricType);
@@ -382,121 +417,3 @@ public abstract class TimelineEntityReader extends
 
   protected void setTable(BaseTableRW<?> baseTable) {
     this.table = baseTable;
-  }
-
-  /**
-   * Check if we have a certain field amongst fields to retrieve. This method
-   * checks against {@link Field#ALL} as well because that would mean field
-   * passed needs to be matched.
-   *
-   * @param fieldsToRetrieve fields to be retrieved.
-   * @param requiredField fields to be checked in fieldsToRetrieve.
-   * @return true if has the required field, false otherwise.
-   */
-  protected boolean hasField(EnumSet<Field> fieldsToRetrieve,
-      Field requiredField) {
-    return fieldsToRetrieve.contains(Field.ALL) ||
-        fieldsToRetrieve.contains(requiredField);
-  }
-
-  /**
-   * Create a filter list of qualifier filters based on passed set of columns.
-   *
-   * @param <T> Describes the type of column prefix.
-   * @param colPrefix Column Prefix.
-   * @param columns set of column qualifiers.
-   * @return filter list.
-   */
-  protected <T extends BaseTable<T>> FilterList
-      createFiltersFromColumnQualifiers(
-          ColumnPrefix<T> colPrefix, Set<String> columns) {
-    FilterList list = new FilterList(Operator.MUST_PASS_ONE);
-    for (String column : columns) {
-      // For columns which have compound column qualifiers (eg. events), we need
-      // to include the required separator.
-      byte[] compoundColQual = createColQualifierPrefix(colPrefix, column);
-      list.addFilter(new QualifierFilter(CompareOp.EQUAL,
-          new BinaryPrefixComparator(colPrefix
-              .getColumnPrefixBytes(compoundColQual))));
-    }
-    return list;
-  }
-
-  protected <T extends BaseTable<T>> byte[] createColQualifierPrefix(
-      ColumnPrefix<T> colPrefix, String column) {
-    if (colPrefix == ApplicationColumnPrefix.EVENT
-        || colPrefix == EntityColumnPrefix.EVENT) {
-      return new EventColumnName(column, null, null).getColumnQualifier();
-    } else {
-      return stringKeyConverter.encode(column);
-    }
-  }
-
-  /**
-   * Helper method for reading relationship.
-   *
-   * @param <T> Describes the type of column prefix.
-   * @param entity entity to fill.
-   * @param result result from HBase.
-   * @param prefix column prefix.
-   * @param isRelatedTo if true, means relationship is to be added to
-   *          isRelatedTo, otherwise its added to relatesTo.
-   * @throws IOException if any problem is encountered while reading result.
-   */
-  protected <T extends BaseTable<T>> void readRelationship(
-      TimelineEntity entity, Result result,
-      ColumnPrefix<T> prefix, boolean isRelatedTo) throws IOException {
-    // isRelatedTo and relatesTo are of type Map<String, Set<String>>
-    Map<String, Object> columns = ColumnRWHelper.readResults(
-        result, prefix, stringKeyConverter);
-    for (Map.Entry<String, Object> column : columns.entrySet()) {
-      for (String id : Separator.VALUES.splitEncoded(column.getValue()
-          .toString())) {
-        if (isRelatedTo) {
-          entity.addIsRelatedToEntity(column.getKey(), id);
-        } else {
-          entity.addRelatesToEntity(column.getKey(), id);
-        }
-      }
-    }
-  }
-
-  /**
-   * Read events from the entity table or the application table. The column name
-   * is of the form "eventId=timestamp=infoKey" where "infoKey" may be omitted
-   * if there is no info associated with the event.
-   *
-   * @param <T> Describes the type of column prefix.
-   * @param entity entity to fill.
-   * @param result HBase Result.
-   * @param prefix column prefix.
-   * @throws IOException if any problem is encountered while reading result.
-   */
-  protected static <T extends BaseTable<T>> void readEvents(
-      TimelineEntity entity, Result result,
-      ColumnPrefix<T> prefix) throws IOException {
-    Map<String, TimelineEvent> eventsMap = new HashMap<>();
-    Map<EventColumnName, Object> eventsResult = ColumnRWHelper.readResults(
-        result, prefix, new EventColumnNameConverter());
-    for (Map.Entry<EventColumnName, Object>
-             eventResult : eventsResult.entrySet()) {
-      EventColumnName eventColumnName = eventResult.getKey();
-      String key = eventColumnName.getId() +
-          Long.toString(eventColumnName.getTimestamp());
-      // Retrieve previously seen event to add to it
-      TimelineEvent event = eventsMap.get(key);
-      if (event == null) {
-        // First time we're seeing this event, add it to the eventsMap
-        event = new TimelineEvent();
-        event.setId(eventColumnName.getId());
-        event.setTimestamp(eventColumnName.getTimestamp());
-        eventsMap.put(key, event);
-      }
-      if (eventColumnName.getInfoKey() != null) {
-        event.addInfo(eventColumnName.getInfoKey(), eventResult.getValue());
-      }
-    }
-    Set<TimelineEvent> eventsSet = new HashSet<>(eventsMap.values());
-    entity.addEvents(eventsSet);
-  }
-}

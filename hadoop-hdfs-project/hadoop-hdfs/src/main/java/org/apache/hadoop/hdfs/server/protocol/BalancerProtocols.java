@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,10 @@ import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.protocol.ClientProtocol;
 import org.apache.hadoop.security.KerberosInfo;
 
-
-/** The full set of protocols used by the Balancer. */
+/**
+ * 均衡器使用的协议聚合接口，整合客户端协议与NameNode协议，为HDFS数据均衡提供统一的RPC协议定义。
+ * 聚合了平衡器与NameNode交互所需的所有基础协议能力，无需额外定义新方法。
+ */
 @InterfaceAudience.Private
 @KerberosInfo(
     serverPrincipal = DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY)

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,12 +27,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * A utility class providing methods for serializing and deserializing
- * objects. The {@link #write(Object)} and {@link #read(byte[])} methods are
- * used by the {@link LeveldbTimelineStore} to store and retrieve arbitrary
- * JSON, while the {@link #writeReverseOrderedLong} and {@link
- * #readReverseOrderedLong} methods are used to sort entities in descending
- * start time order.
+ * 时间线数据存储的序列化工具类，提供对象JSON序列化和倒序长整型编码功能
+ * 被LeveldbTimelineStore用于存储任意JSON数据，以及对实体按开始时间降序排序
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -41,6 +38,7 @@ public class GenericObjectMapper {
   public static final ObjectReader OBJECT_READER;
   public static final ObjectWriter OBJECT_WRITER;
 
+  // 静态初始化Jackson JSON读写实例
   static {
     ObjectMapper mapper = new ObjectMapper();
     OBJECT_READER = mapper.reader(Object.class);
@@ -48,15 +46,12 @@ public class GenericObjectMapper {
   }
 
   /**
-   * Serializes an Object into a byte array. Along with {@link #read(byte[])},
-   * can be used to serialize an Object and deserialize it into an Object of
-   * the same type without needing to specify the Object's type,
-   * as long as it is one of the JSON-compatible objects understood by
-   * ObjectMapper.
+   * 将对象序列化为JSON字节数组，可配合read方法反序列化还原
+   * 用于LeveldbTimelineStore存储任意JSON兼容的对象，无需预先指定类型
    *
-   * @param o An Object
-   * @return A byte array representation of the Object
-   * @throws IOException if there is a write error
+   * @param o 待序列化对象
+   * @return 对象的JSON字节数组表示，空对象返回空数组
+   * @throws IOException 序列化写入失败时抛出
    */
   public static byte[] write(Object o) throws IOException {
     if (o == null) {
@@ -66,25 +61,23 @@ public class GenericObjectMapper {
   }
 
   /**
-   * Deserializes an Object from a byte array created with
-   * {@link #write(Object)}.
+   * 从write方法生成的字节数组反序列化还原对象
    *
-   * @param b A byte array
-   * @return An Object
-   * @throws IOException if there is a read error
+   * @param b 序列化得到的字节数组
+   * @return 反序列化后的对象，空输入返回null
+   * @throws IOException 反序列化读取失败时抛出
    */
   public static Object read(byte[] b) throws IOException {
     return read(b, 0);
   }
 
   /**
-   * Deserializes an Object from a byte array at a specified offset, assuming
-   * the bytes were created with {@link #write(Object)}.
+   * 从字节数组指定偏移位置反序列化还原对象
    *
-   * @param b A byte array
-   * @param offset Offset into the array
-   * @return An Object
-   * @throws IOException if there is a read error
+   * @param b 序列化得到的字节数组
+   * @param offset 反序列化起始偏移量
+   * @return 反序列化后的对象，空输入返回null
+   * @throws IOException 反序列化读取失败时抛出
    */
   public static Object read(byte[] b, int offset) throws IOException {
     if (b == null || b.length == 0) {
@@ -94,41 +87,53 @@ public class GenericObjectMapper {
   }
 
   /**
-   * Converts a long to a 8-byte array so that lexicographic ordering of the
-   * produced byte arrays sort the longs in descending order.
+   * 将长整型编码为8字节数组，使得编码后的字节数组按字典序排序时，原始长整型按降序排列
+   * 用于Leveldb中按开始时间降序排序时间线实体
    *
-   * @param l A long
-   * @return A byte array
+   * @param l 待编码的长整型
+   * @return 编码后的8字节数组
    */
   public static byte[] writeReverseOrderedLong(long l) {
     byte[] b = new byte[8];
     return writeReverseOrderedLong(l, b, 0);
   }
 
+  /**
+   * 将长整型编码到指定字节数组的指定偏移位置，保持倒序排序特性
+   * 
+   * @param l 待编码的长整型
+   * @param b 目标字节数组
+   * @param offset 写入起始偏移量
+   * @return 编码后的字节数组
+   */
   public static byte[] writeReverseOrderedLong(long l, byte[] b, int offset) {
+    // 对最高位取反，实现符号翻转
     b[offset] = (byte)(0x7f ^ ((l >> 56) & 0xff));
+    // 依次对中间字节按位取反
     for (int i = offset+1; i < offset+7; i++) {
       b[i] = (byte)(0xff ^ ((l >> 8*(7-i)) & 0xff));
     }
+    // 对最低位按位取反
     b[offset+7] = (byte)(0xff ^ (l & 0xff));
     return b;
   }
 
   /**
-   * Reads 8 bytes from an array starting at the specified offset and
-   * converts them to a long.  The bytes are assumed to have been created
-   * with {@link #writeReverseOrderedLong}.
+   * 从指定偏移位置读取8字节，还原由writeReverseOrderedLong编码的倒序长整型
    *
-   * @param b A byte array
-   * @param offset An offset into the byte array
-   * @return A long
+   * @param b 编码后的字节数组
+   * @param offset 读取起始偏移量
+   * @return 还原后的原始长整型
    */
   public static long readReverseOrderedLong(byte[] b, int offset) {
+    // 读取第一个字节到结果
     long l = b[offset] & 0xff;
+    // 依次读取后续字节，拼接成长整型
     for (int i = 1; i < 8; i++) {
       l = l << 8;
       l = l | (b[offset+i]&0xff);
     }
+    // 按位取反还原原始值
     return l ^ 0x7fffffffffffffffl;
   }
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,16 +22,23 @@ package org.apache.hadoop.hdfs.server.datanode;
 import java.util.List;
 
 /**
+ * 文件职责：定义数据节点数据集分段锁策略接口，用于将数据块映射到不同的子锁，
+ * 实现细粒度锁控制，降低锁竞争，提升DataNode多线程并发操作性能。
+ * <p>
  * This interface is used to generate sub lock name for a blockid.
  */
 public interface DataSetSubLockStrategy {
 
   /**
-   * Generate sub lock name for the given blockid.
-   * @param blockid the block id.
-   * @return sub lock name for the input blockid.
+   * 根据数据块ID计算对应子锁的名称，实现数据块到子锁的映射。
+   * @param blockid 目标数据块ID
+   * @return 该数据块对应的子锁名称
    */
   String blockIdToSubLock(long blockid);
 
+  /**
+   * 获取当前策略定义的所有子锁名称，用于提前初始化所有锁实例。
+   * @return 当前策略包含的所有子锁名称列表
+   */
   List<String> getAllSubLockNames();
 }

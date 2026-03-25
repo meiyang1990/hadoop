@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,8 +42,13 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.Credentials;
 
 /**
- * A {@link Mapper} which wraps a given one to allow custom 
- * {@link Mapper.Context} implementations.
+ * 文件说明: MapReduce Map阶段包装工具类，提供对已有Mapper的包装能力，支持自定义Mapper.Context实现
+ * 
+ * 包装类Mapper，允许用户基于已有MapContext实现自定义的Mapper.Context，方便扩展Map阶段逻辑
+ * @param <KEYIN> Map输入键类型
+ * @param <VALUEIN> Map输入值类型
+ * @param <KEYOUT> Map输出键类型
+ * @param <VALUEOUT> Map输出值类型
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -50,27 +56,36 @@ public class WrappedMapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>
     extends Mapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {
   
   /**
-   * Get a wrapped {@link Mapper.Context} for custom implementations.
-   * @param mapContext <code>MapContext</code> to be wrapped
-   * @return a wrapped <code>Mapper.Context</code> for custom implementations
+   * 获取包装后的Mapper.Context对象，基于已有MapContext实现自定义包装
+   * @param mapContext 待包装的原始MapContext对象
+   * @return 包装完成的可自定义扩展的Mapper.Context对象
    */
   public Mapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>.Context
   getMapContext(MapContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> mapContext) {
     return new Context(mapContext);
   }
   
+  /**
+   * 包装后的Context实现类，代理所有MapContext接口方法，方便子类自定义扩展
+   */
   @InterfaceStability.Evolving
   public class Context 
       extends Mapper<KEYIN, VALUEIN, KEYOUT, VALUEOUT>.Context {
 
+    // 被代理的原始MapContext对象
     protected MapContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> mapContext;
 
+    /**
+     * 构造方法，基于原始MapContext创建包装Context
+     * @param mapContext 原始MapContext对象
+     */
     public Context(MapContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> mapContext) {
       this.mapContext = mapContext;
     }
 
     /**
-     * Get the input split for this map.
+     * 获取当前Map任务处理的输入分片
+     * @return 当前输入分片对象
      */
     public InputSplit getInputSplit() {
       return mapContext.getInputSplit();

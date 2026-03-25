@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  *  Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,4 +17,8 @@
  * limitations under the License.
  */
 
+/**
+ * 全局策略生成器Web应用的数据访问对象层，封装Web接口返回的信息实体定义
+ * 用于将GPG后端数据转换为前端可解析的JSON数据结构
+ */
 package org.apache.hadoop.yarn.server.globalpolicygenerator.webapp.dao;

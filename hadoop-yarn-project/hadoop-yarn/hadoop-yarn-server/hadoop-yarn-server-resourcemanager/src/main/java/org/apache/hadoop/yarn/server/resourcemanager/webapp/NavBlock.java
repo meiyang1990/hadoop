@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -5,7 +6,7 @@
 * regarding copyright ownership.  The ASF licenses this file
 * to you under the Apache License, Version 2.0 (the
 * "License"); you may not use this file except in compliance
-* with the License.  You may obtain a copy of the License at
+* with the License.  You may obtain copy of the License at
 *
 *     http://www.apache.org/licenses/LICENSE-2.0
 *
@@ -31,6 +32,9 @@ import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 import static org.apache.hadoop.util.GenericsUtil.isLog4jLogger;
 
+/**
+ * YARN ResourceManager Web UI 导航栏渲染模块，负责生成页面顶部导航菜单HTML结构
+ */
 public class NavBlock extends HtmlBlock {
   private Configuration conf;
 
@@ -40,14 +44,19 @@ public class NavBlock extends HtmlBlock {
   }
 
   @Override public void render(Block html) {
+    // 默认不显示错误警告链接
     boolean addErrorsAndWarningsLink = false;
+    // 检查当前是否使用Log4j日志框架
     if (isLog4jLogger(NavBlock.class)) {
+      // 获取错误警告统计Appender实例
       Log4jWarningErrorMetricsAppender appender =
           Log4jWarningErrorMetricsAppender.findAppender();
+      // Appender存在则显示导航链接
       if (appender != null) {
         addErrorsAndWarningsLink = true;
       }
     }
+    // 开始构建主导航列表，容器id为nav，添加Cluster分类标题
     UL<DIV<Hamlet>> mainList = html.
       div("#nav").
         h3("Cluster").
@@ -55,27 +64,36 @@ public class NavBlock extends HtmlBlock {
           li().a(url("cluster"), "About").__().
           li().a(url("nodes"), "Nodes").__().
           li().a(url("nodelabels"), "Node Labels").__();
+    // 开始构建Applications二级导航菜单
     UL<LI<UL<DIV<Hamlet>>>> subAppsList = mainList.
           li().a(url("apps"), "Applications").
             ul();
+    // 添加一个空占位li节点
     subAppsList.li().__();
+    // 按应用状态生成分类导航链接
     for (YarnApplicationState state : YarnApplicationState.values()) {
       subAppsList.
               li().a(url("apps", state.toString()), state.toString()).__();
     }
+    // 关闭二级菜单和Applications一级菜单项
     subAppsList.__().__();
 
+    // 添加Scheduler一级导航链接，获取当前div上下文
     DIV<Hamlet> sectionBefore = mainList.
           li().a(url("scheduler"), "Scheduler").__().__();
+    // 追加工具扩展导航区域
     UL<DIV<Hamlet>> tools = WebPageUtils.appendToolSection(sectionBefore, conf);
 
+    // 无扩展工具则结束渲染
     if (tools == null) {
       return;
     }
 
+    // 添加错误警告日志导航链接（如果启用）
     if (addErrorsAndWarningsLink) {
       tools.li().a(url("errors-and-warnings"), "Errors/Warnings").__();
     }
+    // 关闭工具列表和导航容器
     tools.__().__();
   }
 }

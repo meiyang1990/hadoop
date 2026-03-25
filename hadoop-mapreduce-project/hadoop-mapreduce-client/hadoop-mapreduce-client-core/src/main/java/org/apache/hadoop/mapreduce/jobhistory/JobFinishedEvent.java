@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,38 +32,50 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 
 /**
- * Event to record successful completion of job
+ * 作业完成事件，用于记录作业成功完成的相关信息，存储在作业历史日志中
  *
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class JobFinishedEvent implements HistoryEvent {
 
+  // Avro序列化后的事件数据对象
   private JobFinished datum = null;
 
+  // 作业ID
   private JobID jobId;
+  // 作业完成时间戳
   private long finishTime;
+  // 成功完成的Map任务数
   private int succeededMaps;
+  // 成功完成的Reduce任务数
   private int succeededReduces;
+  // 失败的Map任务数
   private int failedMaps;
+  // 失败的Reduce任务数
   private int failedReduces;
+  // 被杀死的Map任务数
   private int killedMaps;
+  // 被杀死的Reduce任务数
   private int killedReduces;
+  // Map阶段计数器集合
   private Counters mapCounters;
+  // Reduce阶段计数器集合
   private Counters reduceCounters;
+  // 作业全局计数器集合
   private Counters totalCounters;
 
   /** 
-   * Create an event to record successful job completion
-   * @param id Job ID
-   * @param finishTime Finish time of the job
-   * @param succeededMaps The number of succeeded maps
-   * @param succeededReduces The number of succeeded reduces
-   * @param failedMaps The number of failed maps
-   * @param failedReduces The number of failed reduces
-   * @param mapCounters Map Counters for the job
-   * @param reduceCounters Reduce Counters for the job
-   * @param totalCounters Total Counters for the job
+   * 构造作业完成事件，记录作业完成时的核心信息
+   * @param id 作业ID
+   * @param finishTime 作业完成时间戳
+   * @param succeededMaps 成功完成的Map任务数
+   * @param succeededReduces 成功完成的Reduce任务数
+   * @param failedMaps 失败的Map任务数
+   * @param failedReduces 失败的Reduce任务数
+   * @param mapCounters Map阶段计数器
+   * @param reduceCounters Reduce阶段计数器
+   * @param totalCounters 作业全局计数器
    */
   public JobFinishedEvent(JobID id, long finishTime,
       int succeededMaps, int succeededReduces,
@@ -85,13 +98,16 @@ public class JobFinishedEvent implements HistoryEvent {
 
   JobFinishedEvent() {}
 
+  /**
+   * 获取Avro序列化后的事件数据对象，延迟初始化并填充所有字段
+   * @return 可序列化的Avro数据对象
+   */
   public Object getDatum() {
     if (datum == null) {
       datum = new JobFinished();
       datum.setJobid(new Utf8(jobId.toString()));
       datum.setFinishTime(finishTime);
-      // using finishedMaps & finishedReduces in the Avro schema for backward
-      // compatibility
+      // 保持Avro schema向后兼容性，沿用旧字段名finishedMaps/finishedReduces
       datum.setFinishedMaps(succeededMaps);
       datum.setFinishedReduces(succeededReduces);
       datum.setFailedMaps(failedMaps);
@@ -107,6 +123,10 @@ public class JobFinishedEvent implements HistoryEvent {
     return datum;
   }
 
+  /**
+   * 从Avro数据对象反序列化恢复事件信息
+   * @param oDatum Avro序列化的事件数据对象
+   */
   public void setDatum(Object oDatum) {
     this.datum = (JobFinished) oDatum;
     this.jobId = JobID.forName(datum.getJobid().toString());
@@ -155,13 +175,19 @@ public class JobFinishedEvent implements HistoryEvent {
     return reduceCounters;
   }
 
+  /**
+   * 将当前事件转换为YARN Timeline Service可存储的事件对象，暴露作业完成指标信息
+   * @return Timeline Service格式的事件对象
+   */
   @Override
   public TimelineEvent toTimelineEvent() {
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
     tEvent.addInfo("FINISH_TIME", getFinishTime());
+    // 计算总Map任务数（成功+失败+杀死）
     tEvent.addInfo("NUM_MAPS", getSucceededMaps() + getFailedMaps()
         + getKilledMaps());
+    // 计算总Reduce任务数（成功+失败+杀死）
     tEvent.addInfo("NUM_REDUCES", getSucceededReduces() + getFailedReduces()
         + getKilledReduces());
     tEvent.addInfo("FAILED_MAPS", getFailedMaps());
@@ -175,12 +201,19 @@ public class JobFinishedEvent implements HistoryEvent {
     return tEvent;
   }
 
+  /**
+   * 从作业计数器提取YARN Timeline Service可存储的度量指标集合
+   * @return Timeline Service格式的度量指标集合
+   */
   @Override
   public Set<TimelineMetric> getTimelineMetrics() {
+    // 转换全局计数器为Timeline指标
     Set<TimelineMetric> jobMetrics = JobHistoryEventUtils.
         countersToTimelineMetric(getTotalCounters(), finishTime);
+    // 添加Map阶段计数器，添加MAP前缀区分
     jobMetrics.addAll(JobHistoryEventUtils.
         countersToTimelineMetric(getMapCounters(), finishTime, "MAP:"));
+    // 添加Reduce阶段计数器，添加REDUCE前缀区分
     jobMetrics.addAll(JobHistoryEventUtils.
         countersToTimelineMetric(getReduceCounters(), finishTime, "REDUCE:"));
     return jobMetrics;

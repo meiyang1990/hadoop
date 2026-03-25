@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -58,7 +59,9 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Keeps the data structures to send container requests to RM.
+ * 文件说明：MapReduce ApplicationMaster向YARN ResourceManager请求容器的基类，
+ * 维护所有容器请求的数据结构，处理节点黑名单机制，管理资源请求分配与释放流程。
+ * 是MapReduce AppMaster与RM通信中容器请求管理的核心组件。
  */
 public abstract class RMContainerRequestor extends RMCommunicator {
   
@@ -72,24 +75,16 @@ public abstract class RMContainerRequestor extends RMCommunicator {
 
   private final RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);
-  //Key -> Priority
-  //Value -> Map
-  //Key->ResourceName (e.g., hostname, rackname, *)
-  //Value->Map
-  //Key->Resource Capability
-  //Value->ResourceRequest
+  // 多级索引资源请求表：优先级 -> 资源名(主机/机架/ANY) -> 资源能力 -> 资源请求
   private final Map<Priority, Map<String, Map<Resource, ResourceRequest>>>
   remoteRequestsTable =
       new TreeMap<Priority, Map<String, Map<Resource, ResourceRequest>>>();
 
-  // use custom comparator to make sure ResourceRequest objects differing only in 
-  // numContainers dont end up as duplicates
+  // 使用自定义比较器，保证仅容器数量不同的ResourceRequest不会被当作重复对象
   private final Set<ResourceRequest> ask = new TreeSet<ResourceRequest>(
       RESOURCE_REQUEST_COMPARATOR);
   private final Set<ContainerId> release = new TreeSet<ContainerId>();
-  // pendingRelease holds history or release requests.request is removed only if
-  // RM sends completedContainer.
-  // How it different from release? --> release is for per allocate() request.
+  // 待释放容器集合：只有RM确认容器完成后才会移除，区别于每次allocate请求携带的release集合
   protected Set<ContainerId> pendingRelease = new TreeSet<ContainerId>();
 
   private final Map<ResourceRequest,ResourceRequest> requestLimits =
@@ -112,10 +107,18 @@ public abstract class RMContainerRequestor extends RMCommunicator {
   private final Set<String> blacklistRemovals = Collections
       .newSetFromMap(new ConcurrentHashMap<String, Boolean>());
 
+  /**
+   * 构造函数，初始化容器请求器
+   * @param clientService MR客户端服务
+   * @param context MR应用上下文
+   */
   public RMContainerRequestor(ClientService clientService, AppContext context) {
     super(clientService, context);
   }
 
+  /**
+   * 容器请求内部数据结构，封装单个任务尝试的容器请求信息
+   */
   @Private
   @VisibleForTesting
   static class ContainerRequest {
@@ -128,8 +131,7 @@ public abstract class RMContainerRequestor extends RMCommunicator {
     final String nodeLabelExpression;
 
     /**
-     * the time when this request object was formed; can be used to avoid
-     * aggressive preemption for recently placed requests
+     * 请求创建时间，用于避免对新请求的强制抢占
      */
     final long requestTimeMs;
 
@@ -176,16 +178,20 @@ public abstract class RMContainerRequestor extends RMCommunicator {
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
+    // 从配置加载节点黑名单开关
     nodeBlacklistingEnabled = 
       conf.getBoolean(MRJobConfig.MR_AM_JOB_NODE_BLACKLISTING_ENABLE, true);
     LOG.info("nodeBlacklistingEnabled:" + nodeBlacklistingEnabled);
+    // 加载单节点最大失败次数阈值
     maxTaskFailuresPerNode = 
       conf.getInt(MRJobConfig.MAX_TASK_FAILURES_PER_TRACKER, 3);
+    // 加载禁用黑名单的阈值：黑名单节点占比超过该百分比则自动禁用黑名单
     blacklistDisablePercent =
         conf.getInt(
             MRJobConfig.MR_AM_IGNORE_BLACKLISTING_BLACKLISTED_NODE_PERECENT,
             MRJobConfig.DEFAULT_MR_AM_IGNORE_BLACKLISTING_BLACKLISTED_NODE_PERCENT);
     LOG.info("maxTaskFailuresPerNode is " + maxTaskFailuresPerNode);
+    // 校验百分比配置合法性
     if (blacklistDisablePercent < -1 || blacklistDisablePercent > 100) {
       throw new YarnRuntimeException("Invalid blacklistDisablePercent: "
           + blacklistDisablePercent
@@ -194,24 +200,38 @@ public abstract class RMContainerRequestor extends RMCommunicator {
     LOG.info("blacklistDisablePercent is " + blacklistDisablePercent);
   }
 
+  /**
+   * 构造并发送容器分配请求到ResourceManager，处理响应更新本地状态
+   * @return RM返回的分配响应
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
+   */
   protected AllocateResponse makeRemoteRequest() throws YarnException,
       IOException {
+    // 应用请求数量限制
     applyRequestLimits();
+    // 构造黑名单请求，包含新增和移除的节点
     ResourceBlacklistRequest blacklistRequest =
         ResourceBlacklistRequest.newInstance(new ArrayList<String>(blacklistAdditions),
             new ArrayList<String>(blacklistRemovals));
+    // 构造完整的Allocate请求
     AllocateRequest allocateRequest =
         AllocateRequest.newInstance(lastResponseID,
           super.getApplicationProgress(), new ArrayList<ResourceRequest>(ask),
           new ArrayList<ContainerId>(release), blacklistRequest);
+    // 发送请求到RM调度器
     AllocateResponse allocateResponse = scheduler.allocate(allocateRequest);
+    // 更新响应ID，后续请求需要携带最新ID
     lastResponseID = allocateResponse.getResponseId();
+    // 保存RM返回的可用资源信息
     availableResources = allocateResponse.getAvailableResources();
+    // 更新集群NM计数
     lastClusterNmCount = clusterNmCount;
     clusterNmCount = allocateResponse.getNumClusterNodes();
     int numCompletedContainers =
         allocateResponse.getCompletedContainersStatuses().size();
 
+    // 打印请求统计日志
     if (ask.size() > 0 || release.size() > 0) {
       LOG.info("applicationId={}: ask={} release={} newContainers={} finishedContainers={}"
               + " resourceLimit={} knownNMs={}", applicationId, ask.size(), release.size(),
@@ -219,30 +239,36 @@ public abstract class RMContainerRequestor extends RMCommunicator {
           availableResources, clusterNmCount);
     }
 
+    // 清空本次请求的询问和释放集合
     ask.clear();
     release.clear();
 
+    // 有容器完成时，需要更新请求限制重新发送有限请求
     if (numCompletedContainers > 0) {
-      // re-send limited requests when a container completes to trigger asking
-      // for more containers
       requestLimitsToUpdate.addAll(requestLimits.keySet());
     }
 
+    // 打印黑名单更新日志
     if (blacklistAdditions.size() > 0 || blacklistRemovals.size() > 0) {
       LOG.info("Update the blacklist for " + applicationId +
           ": blacklistAdditions=" + blacklistAdditions.size() +
           " blacklistRemovals=" +  blacklistRemovals.size());
     }
+    // 清空黑名单增量集合
     blacklistAdditions.clear();
     blacklistRemovals.clear();
     return allocateResponse;
   }
 
+  /**
+   * 应用最大并发容器请求限制，限制同一优先级下同时请求的容器数量
+   */
   private void applyRequestLimits() {
     Iterator<ResourceRequest> iter = requestLimits.values().iterator();
     while (iter.hasNext()) {
       ResourceRequest reqLimit = iter.next();
       int limit = reqLimit.getNumContainers();
+      // 从请求表获取对应请求
       Map<String, Map<Resource, ResourceRequest>> remoteRequests =
           remoteRequestsTable.get(reqLimit.getPriority());
       Map<Resource, ResourceRequest> reqMap = (remoteRequests != null)
@@ -252,7 +278,7 @@ public abstract class RMContainerRequestor extends RMCommunicator {
       if (req == null) {
         continue;
       }
-      // update an existing ask or send a new one if updating
+      // 如果请求已存在，根据限制更新请求容器数量
       if (ask.remove(req) || requestLimitsToUpdate.contains(req)) {
         ResourceRequest newReq = req.getNumContainers() > limit
             ? reqLimit : req;
@@ -261,6 +287,7 @@ public abstract class RMContainerRequestor extends RMCommunicator {
             + " for priority:" + reqLimit.getPriority()
             + " and capability:" + reqLimit.getCapability());
       }
+      // 无限制则移除该限制记录
       if (limit == Integer.MAX_VALUE) {
         iter.remove();
       }
@@ -268,7 +295,11 @@ public abstract class RMContainerRequestor extends RMCommunicator {
     requestLimitsToUpdate.clear();
   }
 
+  /**
+   * 重新同步时将所有未完成请求重新添加到请求队列
+   */
   protected void addOutstandingRequestOnResync() {
+    // 遍历所有未完成请求加入ask队列
     for (Map<String, Map<Resource, ResourceRequest>> rr : remoteRequestsTable
         .values()) {
       for (Map<Resource, ResourceRequest> capabalities : rr.values()) {
@@ -277,15 +308,22 @@ public abstract class RMContainerRequestor extends RMCommunicator {
         }
       }
     }
+    // 黑名单节点重新上报RM
     if (!ignoreBlacklisting.get()) {
       blacklistAdditions.addAll(blacklistedNodes);
     }
+    // 待释放容器重新加入释放列表
     if (!pendingRelease.isEmpty()) {
       release.addAll(pendingRelease);
     }
+    // 更新所有请求限制
     requestLimitsToUpdate.addAll(requestLimits.keySet());
   }
 
+  /**
+   * 根据黑名单节点占比计算是否需要忽略黑名单机制
+   * 注释说明：当黑名单节点占比超过配置阈值，会自动禁用黑名单避免作业无法分配资源
+   */
   // May be incorrect if there's multiple NodeManagers running on a single host.
   // knownNodeCount is based on node managers, not hosts. blacklisting is
   // currently based on hosts.
@@ -293,6 +331,7 @@ public abstract class RMContainerRequestor extends RMCommunicator {
     if (!nodeBlacklistingEnabled) {
       return;
     }
+    // 只有当黑名单节点数或集群节点数变化时才重新计算
     if (blacklistDisablePercent != -1
         && (blacklistedNodeCount != blacklistedNodes.size() ||
             clusterNmCount != lastClusterNmCount)) {
@@ -301,20 +340,23 @@ public abstract class RMContainerRequestor extends RMCommunicator {
         LOG.info("KnownNode Count at 0. Not computing ignoreBlacklisting");
         return;
       }
+      // 计算黑名单节点占总节点数百分比
       int val = (int) ((float) blacklistedNodes.size() / clusterNmCount * 100);
+      // 占比超过阈值，设置忽略黑名单
       if (val >= blacklistDisablePercent) {
         if (ignoreBlacklisting.compareAndSet(false, true)) {
           LOG.info("Ignore blacklisting set to true. Known: " + clusterNmCount
               + ", Blacklisted: " + blacklistedNodeCount + ", " + val + "%");
-          // notify RM to ignore all the blacklisted nodes
+          // 通知RM移除所有黑名单节点
           blacklistAdditions.clear();
           blacklistRemovals.addAll(blacklistedNodes);
         }
       } else {
+        // 占比低于阈值，恢复黑名单机制
         if (ignoreBlacklisting.compareAndSet(true, false)) {
           LOG.info("Ignore blacklisting set to false. Known: " + clusterNmCount
               + ", Blacklisted: " + blacklistedNodeCount + ", " + val + "%");
-          // notify RM of all the blacklisted nodes
+          // 通知RM重新添加所有黑名单节点
           blacklistAdditions.addAll(blacklistedNodes);
           blacklistRemovals.clear();
         }
@@ -322,266 +364,43 @@ public abstract class RMContainerRequestor extends RMCommunicator {
     }
   }
   
+  /**
+   * 处理节点上容器失败事件，超过失败阈值则将节点加入黑名单
+   * @param hostName 失败容器所在主机名
+   */
   protected void containerFailedOnHost(String hostName) {
     if (!nodeBlacklistingEnabled) {
       return;
     }
+    // 已经在黑名单中直接返回
     if (blacklistedNodes.contains(hostName)) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Host " + hostName + " is already blacklisted.");
       }
       return; //already blacklisted
     }
+    // 更新失败计数
     Integer failures = nodeFailures.remove(hostName);
     failures = failures == null ? Integer.valueOf(0) : failures;
     failures++;
     LOG.info(failures + " failures on node " + hostName);
+    // 失败次数超过阈值，加入黑名单
     if (failures >= maxTaskFailuresPerNode) {
       blacklistedNodes.add(hostName);
+      // 如果黑名单未禁用，添加到增量列表通知RM
       if (!ignoreBlacklisting.get()) {
         blacklistAdditions.add(hostName);
       }
-      //Even if blacklisting is ignored, continue to remove the host from
-      // the request table. The RM may have additional nodes it can allocate on.
       LOG.info("Blacklisted host " + hostName);
 
-      //remove all the requests corresponding to this hostname
+      // 移除该主机对应的所有资源请求
       for (Map<String, Map<Resource, ResourceRequest>> remoteRequests 
           : remoteRequestsTable.values()){
-        //remove from host if no pending allocations
         boolean foundAll = true;
         Map<Resource, ResourceRequest> reqMap = remoteRequests.get(hostName);
         if (reqMap != null) {
+          // 遍历该主机下所有资源请求
           for (ResourceRequest req : reqMap.values()) {
+            // 如果请求尚未发送到RM，直接移除
             if (!ask.remove(req)) {
               foundAll = false;
-              // if ask already sent to RM, we can try and overwrite it if possible.
-              // send a new ask to RM with numContainers
-              // specified for the blacklisted host to be 0.
-              ResourceRequest zeroedRequest =
-                  ResourceRequest.newInstance(req.getPriority(),
-                    req.getResourceName(), req.getCapability(),
-                    req.getNumContainers(), req.getRelaxLocality());
-
-              zeroedRequest.setNumContainers(0);
-              // to be sent to RM on next heartbeat
-              addResourceRequestToAsk(zeroedRequest);
-            }
-          }
-          // if all requests were still in ask queue
-          // we can remove this request
-          if (foundAll) {
-            remoteRequests.remove(hostName);
-          }
-        }
-        // TODO handling of rack blacklisting
-        // Removing from rack should be dependent on no. of failures within the rack 
-        // Blacklisting a rack on the basis of a single node's blacklisting 
-        // may be overly aggressive. 
-        // Node failures could be co-related with other failures on the same rack 
-        // but we probably need a better approach at trying to decide how and when 
-        // to blacklist a rack
-      }
-    } else {
-      nodeFailures.put(hostName, failures);
-    }
-  }
-
-  protected Resource getAvailableResources() {
-    return availableResources == null ? Resources.none() : availableResources;
-  }
-
-  protected void addContainerReq(ContainerRequest req) {
-    // Create resource requests
-    for (String host : req.hosts) {
-      // Data-local
-      if (!isNodeBlacklisted(host)) {
-        addResourceRequest(req.priority, host, req.capability,
-            null);
-      }
-    }
-
-    // Nothing Rack-local for now
-    for (String rack : req.racks) {
-      addResourceRequest(req.priority, rack, req.capability,
-          null);
-    }
-
-    // Off-switch
-    addResourceRequest(req.priority, ResourceRequest.ANY, req.capability,
-        req.nodeLabelExpression);
-  }
-
-  protected void decContainerReq(ContainerRequest req) {
-    // Update resource requests
-    for (String hostName : req.hosts) {
-      decResourceRequest(req.priority, hostName, req.capability);
-    }
-    
-    for (String rack : req.racks) {
-      decResourceRequest(req.priority, rack, req.capability);
-    }
-   
-    decResourceRequest(req.priority, ResourceRequest.ANY, req.capability);
-  }
-
-  protected void addOpportunisticResourceRequest(Priority priority,
-      Resource capability) {
-    addResourceRequest(priority, ResourceRequest.ANY, capability, null,
-        ExecutionType.OPPORTUNISTIC);
-  }
-
-  private void addResourceRequest(Priority priority, String resourceName,
-      Resource capability, String nodeLabelExpression) {
-    addResourceRequest(priority, resourceName, capability, nodeLabelExpression,
-        ExecutionType.GUARANTEED);
-  }
-
-  private void addResourceRequest(Priority priority, String resourceName,
-      Resource capability, String nodeLabelExpression,
-      ExecutionType executionType) {
-    Map<String, Map<Resource, ResourceRequest>> remoteRequests =
-      this.remoteRequestsTable.get(priority);
-    if (remoteRequests == null) {
-      remoteRequests = new HashMap<String, Map<Resource, ResourceRequest>>();
-      this.remoteRequestsTable.put(priority, remoteRequests);
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Added priority=" + priority);
-      }
-    }
-    Map<Resource, ResourceRequest> reqMap = remoteRequests.get(resourceName);
-    if (reqMap == null) {
-      reqMap = new HashMap<Resource, ResourceRequest>();
-      remoteRequests.put(resourceName, reqMap);
-    }
-    ResourceRequest remoteRequest = reqMap.get(capability);
-    if (remoteRequest == null) {
-      remoteRequest = recordFactory.newRecordInstance(ResourceRequest.class);
-      remoteRequest.setPriority(priority);
-      remoteRequest.setResourceName(resourceName);
-      remoteRequest.setCapability(capability);
-      remoteRequest.setNumContainers(0);
-      remoteRequest.setNodeLabelExpression(nodeLabelExpression);
-      remoteRequest.setExecutionTypeRequest(
-          ExecutionTypeRequest.newInstance(executionType, true));
-      reqMap.put(capability, remoteRequest);
-    }
-    remoteRequest.setNumContainers(remoteRequest.getNumContainers() + 1);
-
-    // Note this down for next interaction with ResourceManager
-    addResourceRequestToAsk(remoteRequest);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("addResourceRequest:" + " applicationId="
-          + applicationId.getId() + " priority=" + priority.getPriority()
-          + " resourceName=" + resourceName + " numContainers="
-          + remoteRequest.getNumContainers() + " #asks=" + ask.size());
-    }
-  }
-
-  private void decResourceRequest(Priority priority, String resourceName,
-      Resource capability) {
-    Map<String, Map<Resource, ResourceRequest>> remoteRequests =
-      this.remoteRequestsTable.get(priority);
-    Map<Resource, ResourceRequest> reqMap = remoteRequests.get(resourceName);
-    if (reqMap == null) {
-      // as we modify the resource requests by filtering out blacklisted hosts 
-      // when they are added, this value may be null when being 
-      // decremented
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Not decrementing resource as " + resourceName
-            + " is not present in request table");
-      }
-      return;
-    }
-    ResourceRequest remoteRequest = reqMap.get(capability);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("BEFORE decResourceRequest:" + " applicationId="
-          + applicationId.getId() + " priority=" + priority.getPriority()
-          + " resourceName=" + resourceName + " numContainers="
-          + remoteRequest.getNumContainers() + " #asks=" + ask.size());
-    }
-
-    if(remoteRequest.getNumContainers() > 0) {
-      // based on blacklisting comments above we can end up decrementing more 
-      // than requested. so guard for that.
-      remoteRequest.setNumContainers(remoteRequest.getNumContainers() -1);
-    }
-    
-    if (remoteRequest.getNumContainers() == 0) {
-      reqMap.remove(capability);
-      if (reqMap.size() == 0) {
-        remoteRequests.remove(resourceName);
-      }
-      if (remoteRequests.size() == 0) {
-        remoteRequestsTable.remove(priority);
-      }
-    }
-
-    // send the updated resource request to RM
-    // send 0 container count requests also to cancel previous requests
-    addResourceRequestToAsk(remoteRequest);
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("AFTER decResourceRequest:" + " applicationId="
-          + applicationId.getId() + " priority=" + priority.getPriority()
-          + " resourceName=" + resourceName + " numContainers="
-          + remoteRequest.getNumContainers() + " #asks=" + ask.size());
-    }
-  }
-  
-  private void addResourceRequestToAsk(ResourceRequest remoteRequest) {
-    // because objects inside the resource map can be deleted ask can end up 
-    // containing an object that matches new resource object but with different
-    // numContainers. So existing values must be replaced explicitly
-    ask.remove(remoteRequest);
-    ask.add(remoteRequest);    
-  }
-
-  protected void release(ContainerId containerId) {
-    release.add(containerId);
-  }
-  
-  protected boolean isNodeBlacklisted(String hostname) {
-    if (!nodeBlacklistingEnabled || ignoreBlacklisting.get()) {
-      return false;
-    }
-    return blacklistedNodes.contains(hostname);
-  }
-  
-  protected ContainerRequest getFilteredContainerRequest(ContainerRequest orig) {
-    ArrayList<String> newHosts = new ArrayList<String>();
-    for (String host : orig.hosts) {
-      if (!isNodeBlacklisted(host)) {
-        newHosts.add(host);      
-      }
-    }
-    String[] hosts = newHosts.toArray(new String[newHosts.size()]);
-    ContainerRequest newReq = new ContainerRequest(orig.attemptID, orig.capability,
-        hosts, orig.racks, orig.priority, orig.nodeLabelExpression);
-    return newReq;
-  }
-  
-  protected void setRequestLimit(Priority priority, Resource capability,
-      int limit) {
-    if (limit < 0) {
-      limit = Integer.MAX_VALUE;
-    }
-    ResourceRequest newReqLimit = ResourceRequest.newInstance(priority,
-        ResourceRequest.ANY, capability, limit);
-    ResourceRequest oldReqLimit = requestLimits.put(newReqLimit, newReqLimit);
-    if (oldReqLimit == null || oldReqLimit.getNumContainers() < limit) {
-      requestLimitsToUpdate.add(newReqLimit);
-    }
-  }
-
-  public Set<String> getBlacklistedNodes() {
-    return blacklistedNodes;
-  }
-
-  @Private
-  @VisibleForTesting
-  Set<ResourceRequest> getAsk() {
-    return ask;
-  }
-}

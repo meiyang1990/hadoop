@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,111 +32,110 @@ import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
 import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
+/**
+ * YARN ResourceManager 调度队列抽象接口，定义了调度队列必须实现的核心能力。
+ * 所有资源调度器（容量调度、公平调度等）的队列实现都需要遵循该接口规范。
+ */
 @Evolving
 @LimitedPrivate("yarn")
 public interface Queue {
   /**
-   * Get the queue name
-   * @return queue name
+   * 获取当前队列的名称
+   * @return 队列名称
    */
   String getQueueName();
 
   /**
-   * Get the queue metrics
-   * @return the queue metrics
+   * 获取当前队列的调度 metrics 指标
+   * @return 队列调度指标对象
    */
   QueueMetrics getMetrics();
 
   /**
-   * Get queue information
-   * @param includeChildQueues include child queues?
-   * @param recursive recursively get child queue information?
-   * @return queue information
+   * 获取当前队列的信息，可选择是否包含子队列信息
+   * @param includeChildQueues 是否包含子队列
+   * @param recursive 是否递归获取所有层级子队列信息
+   * @return 队列信息对象
    */
   QueueInfo getQueueInfo(boolean includeChildQueues, boolean recursive);
   
   /**
-   * Get queue ACLs for given <code>user</code>.
-   * @param user username
-   * @return queue ACLs for user
+   * 获取指定用户在当前队列上的权限信息列表
+   * @param user 目标用户
+   * @return 用户对队列的ACL权限列表
    */
   List<QueueUserACLInfo> getQueueUserAclInfo(UserGroupInformation user);
 
+  /**
+   * 检查指定用户是否拥有当前队列的指定ACL权限
+   * @param acl 待检查的权限类型
+   * @param user 目标用户
+   * @return true表示有权限，false表示无权限
+   */
   boolean hasAccess(QueueACL acl, UserGroupInformation user);
   
+  /**
+   * 获取当前队列的用户管理器，用于管理队列用户资源使用情况
+   * @return 用户管理器实例
+   */
   public AbstractUsersManager getAbstractUsersManager();
 
   /**
-   * Recover the state of the queue for a given container.
-   * @param clusterResource the resource of the cluster
-   * @param schedulerAttempt the application for which the container was allocated
-   * @param rmContainer the container that was recovered.
+   * 恢复RM重启后已分配容器的队列状态，用于故障恢复场景
+   * @param clusterResource 集群总资源
+   * @param schedulerAttempt 对应应用的调度尝试
+   * @param rmContainer 需要恢复的容器对象
    */
   public void recoverContainer(Resource clusterResource,
       SchedulerApplicationAttempt schedulerAttempt, RMContainer rmContainer);
   
   /**
-   * Get labels can be accessed of this queue
-   * labels={*}, means this queue can access any label
-   * labels={ }, means this queue cannot access any label except node without label
-   * labels={a, b, c} means this queue can access a or b or c  
-   * @return labels
+   * 获取当前队列允许访问的节点标签集合
+   * 特殊规则：labels={*}表示可访问任何标签；labels={ }表示仅可访问无标签节点；labels={a,b,c}表示可访问任一指定标签节点
+   * @return 当前队列可访问的节点标签集合
    */
   public Set<String> getAccessibleNodeLabels();
   
   /**
-   * Get default label expression of this queue. If label expression of
-   * ApplicationSubmissionContext and label expression of Resource Request not
-   * set, this will be used.
-   * 
-   * @return default label expression
+   * 获取当前队列默认节点标签表达式，当应用提交和资源请求都未指定标签时使用该默认值
+   * @return 默认节点标签表达式
    */
   public String getDefaultNodeLabelExpression();
 
   /**
-   * When new outstanding resource is asked, calling this will increase pending
-   * resource in a queue.
-   * 
-   * @param nodeLabel asked by application
-   * @param resourceToInc new resource asked
+   * 增加队列待分配资源统计，用于记录等待分配的资源总量
+   * @param nodeLabel 资源请求对应的节点标签
+   * @param resourceToInc 需要增加的待分配资源量
    */
   public void incPendingResource(String nodeLabel, Resource resourceToInc);
   
   /**
-   * When an outstanding resource is fulfilled or canceled, calling this will
-   * decrease pending resource in a queue.
-   * 
-   * @param nodeLabel
-   *          asked by application
-   * @param resourceToDec
-   *          new resource asked
+   * 减少队列待分配资源统计，当请求被分配或取消时调用
+   * @param nodeLabel 资源请求对应的节点标签
+   * @param resourceToDec 需要减少的待分配资源量
    */
   public void decPendingResource(String nodeLabel, Resource resourceToDec);
 
   /**
-   * Get the Default Application Priority for this queue
+   * 获取当前队列的默认应用优先级，当提交应用未指定优先级时使用该默认值
    *
-   * @return default application priority
+   * @return 默认应用优先级
    */
   public Priority getDefaultApplicationPriority();
 
   /**
-   * Increment Reserved Capacity
+   * 增加队列预留资源统计，用于记录已预留待使用的资源总量
    *
-   * @param partition
-   *          asked by application
-   * @param reservedRes
-   *          reserved resource asked
+   * @param partition 资源所在分区（节点标签）
+   * @param reservedRes 需要增加的预留资源量
    */
   public void incReservedResource(String partition, Resource reservedRes);
 
   /**
-   * Decrement Reserved Capacity
+   * 减少队列预留资源统计，当预留资源被使用或释放时调用
    *
-   * @param partition
-   *          asked by application
-   * @param reservedRes
-   *          reserved resource asked
+   * @param partition 资源所在分区（节点标签）
+   * @param reservedRes 需要减少的预留资源量
    */
   public void decReservedResource(String partition, Resource reservedRes);
 }

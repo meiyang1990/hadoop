@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,10 +27,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Implements the {@link ClientRequestInterceptor} interface and provides common
- * functionality which can can be used and/or extended by other concrete
- * interceptor classes.
- *
+ * YARN Router客户端请求拦截器抽象基类，实现ClientRequestInterceptor接口，提供责任链模式下拦截器的通用基础功能，
+ * 具体拦截器可继承此类复用通用逻辑，专注实现自身业务拦截逻辑。
  */
 public abstract class AbstractClientRequestInterceptor
     implements ClientRequestInterceptor {
@@ -46,7 +45,7 @@ public abstract class AbstractClientRequestInterceptor
   private RouterDelegationTokenSecretManager tokenSecretManager = null;
 
   /**
-   * Sets the {@link ClientRequestInterceptor} in the chain.
+   * 设置责任链中的下一个拦截器。
    */
   @Override
   public void setNextInterceptor(ClientRequestInterceptor nextInterceptor) {
@@ -54,7 +53,7 @@ public abstract class AbstractClientRequestInterceptor
   }
 
   /**
-   * Sets the {@link Configuration}.
+   * 设置拦截器配置对象，并传递给下一个拦截器。
    */
 
   @Override
@@ -66,7 +65,7 @@ public abstract class AbstractClientRequestInterceptor
   }
 
   /**
-   * Gets the {@link Configuration}.
+   * 获取当前拦截器的配置对象。
    */
   @Override
   public Configuration getConf() {
@@ -74,7 +73,7 @@ public abstract class AbstractClientRequestInterceptor
   }
 
   /**
-   * Initializes the {@link ClientRequestInterceptor}.
+   * 初始化拦截器，根据用户名创建用户凭证，并传递给下一个拦截器。
    */
   @Override
   public void init(String userName) {
@@ -85,7 +84,7 @@ public abstract class AbstractClientRequestInterceptor
   }
 
   /**
-   * Disposes the {@link ClientRequestInterceptor}.
+   * 关闭拦截器，传递关闭请求给下一个拦截器。
    */
   @Override
   public void shutdown() {
@@ -95,18 +94,24 @@ public abstract class AbstractClientRequestInterceptor
   }
 
   /**
-   * Gets the next {@link ClientRequestInterceptor} in the chain.
+   * 获取责任链中的下一个拦截器。
    */
   @Override
   public ClientRequestInterceptor getNextInterceptor() {
     return this.nextInterceptor;
   }
 
+  /**
+   * 获取Router代理令牌密钥管理器实例。
+   */
   @Override
   public RouterDelegationTokenSecretManager getTokenSecretManager() {
     return tokenSecretManager;
   }
 
+  /**
+   * 设置Router代理令牌密钥管理器实例。
+   */
   @Override
   public void setTokenSecretManager(RouterDelegationTokenSecretManager tokenSecretManager) {
     this.tokenSecretManager = tokenSecretManager;

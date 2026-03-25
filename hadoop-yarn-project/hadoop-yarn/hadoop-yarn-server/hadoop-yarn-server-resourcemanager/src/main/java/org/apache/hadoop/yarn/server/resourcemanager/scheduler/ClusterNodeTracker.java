@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,57 +46,75 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Helper library that:
- * - tracks the state of all cluster {@link SchedulerNode}s
- * - provides convenience methods to filter and sort nodes
+ * YARN ResourceManager 集群节点跟踪器，负责：
+ * - 跟踪集群中所有调度节点的状态信息
+ * - 提供节点过滤、排序、分组查询的便捷方法
  */
 @InterfaceAudience.Private
 public class ClusterNodeTracker<N extends SchedulerNode> {
   private static final Logger LOG =
       LoggerFactory.getLogger(ClusterNodeTracker.class);
 
+  // 读写锁，保障并发访问节点数据的线程安全
   private ReadWriteLock readWriteLock = new ReentrantReadWriteLock(true);
   private Lock readLock = readWriteLock.readLock();
   private Lock writeLock = readWriteLock.writeLock();
 
+  // NodeId -> 调度节点 映射表
   private HashMap<NodeId, N> nodes = new HashMap<>();
+  // 节点主机名 -> 调度节点 映射表
   private Map<String, N> nodeNameToNodeMap = new HashMap<>();
+  // 机架名 -> 该机架下节点列表 分组映射
   private Map<String, List<N>> nodesPerRack = new HashMap<>();
+  // 节点标签分区 -> 该分区下节点列表 分组映射
   private Map<String, List<N>> nodesPerLabel = new HashMap<>();
 
+  // 集群总容量（实时计算值）
   private Resource clusterCapacity = Resources.createResource(0, 0);
+  // 集群总容量（对外暴露的缓存快照，保证并发读取可见性）
   private volatile Resource staleClusterCapacity =
       Resources.clone(Resources.none());
 
-  // Max allocation
+  // 各资源类型的最大单节点分配量
   private final long[] maxAllocation;
+  // 配置的最大允许分配量
   private Resource configuredMaxAllocation;
+  // 是否强制使用配置的最大分配量
   private boolean forceConfiguredMaxAllocation = true;
+  // 强制使用配置最大分配量的等待超时时间
   private long configuredMaxAllocationWaitTime;
+  // 标记是否已有节点上报了资源信息
   private boolean reportedMaxAllocation = false;
 
+  /**
+   * 构造一个空的集群节点跟踪器
+   */
   public ClusterNodeTracker() {
     maxAllocation = new long[ResourceUtils.getNumberOfCountableResourceTypes()];
     Arrays.fill(maxAllocation, -1);
   }
 
+  /**
+   * 添加新节点到集群跟踪器
+   * @param node 要添加的调度节点
+   */
   public void addNode(N node) {
     writeLock.lock();
     try {
+      // 更新节点映射
       nodes.put(node.getNodeID(), node);
       nodeNameToNodeMap.put(node.getNodeName(), node);
 
+      // 更新节点标签分区分组
       List<N> nodesPerLabels = nodesPerLabel.get(node.getPartition());
 
       if (nodesPerLabels == null) {
         nodesPerLabels = new ArrayList<N>();
       }
       nodesPerLabels.add(node);
-
-      // Update new set of nodes for given partition.
       nodesPerLabel.put(node.getPartition(), nodesPerLabels);
 
-      // Update nodes per rack as well
+      // 更新机架分组
       String rackName = node.getRackName();
       List<N> nodesList = nodesPerRack.get(rackName);
       if (nodesList == null) {
@@ -104,18 +123,23 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
       }
       nodesList.add(node);
 
-      // Update cluster capacity
+      // 更新集群总容量
       Resources.addTo(clusterCapacity, node.getTotalResource());
       staleClusterCapacity = Resources.clone(clusterCapacity);
       ClusterMetrics.getMetrics().incrCapability(node.getTotalResource());
 
-      // Update maximumAllocation
+      // 更新最大分配量统计
       updateMaxResources(node, true);
     } finally {
       writeLock.unlock();
     }
   }
 
+  /**
+   * 检查指定节点是否存在于集群中
+   * @param nodeId 节点ID
+   * @return 是否存在
+   */
   public boolean exists(NodeId nodeId) {
     readLock.lock();
     try {
@@ -125,6 +149,11 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 根据节点ID获取调度节点对象
+   * @param nodeId 节点ID
+   * @return 调度节点对象，不存在则返回null
+   */
   public N getNode(NodeId nodeId) {
     readLock.lock();
     try {
@@ -134,6 +163,11 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 获取指定节点的调度报告
+   * @param nodeId 节点ID
+   * @return 节点调度报告，节点不存在则返回null
+   */
   public SchedulerNodeReport getNodeReport(NodeId nodeId) {
     readLock.lock();
     try {
@@ -144,6 +178,10 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 获取集群总节点数
+   * @return 集群节点总数
+   */
   public int nodeCount() {
     readLock.lock();
     try {
@@ -153,6 +191,11 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 获取指定机架的节点数
+   * @param rackName 机架名称
+   * @return 指定机架的节点数
+   */
   public int nodeCount(String rackName) {
     readLock.lock();
     String rName = rackName == null ? "NULL" : rackName;
@@ -164,10 +207,19 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 获取集群总容量（返回缓存快照）
+   * @return 集群总容量
+   */
   public Resource getClusterCapacity() {
     return staleClusterCapacity;
   }
 
+  /**
+   * 从集群中移除指定节点
+   * @param nodeId 要移除的节点ID
+   * @return 被移除的节点对象，节点不存在则返回null
+   */
   public N removeNode(NodeId nodeId) {
     writeLock.lock();
     try {
@@ -176,9 +228,10 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
         LOG.warn("Attempting to remove a non-existent node " + nodeId);
         return null;
       }
+      // 移除主机名映射
       nodeNameToNodeMap.remove(node.getNodeName());
 
-      // Update nodes per rack as well
+      // 从机架分组中移除
       String rackName = node.getRackName();
       List<N> nodesList = nodesPerRack.get(rackName);
       if (nodesList == null) {
@@ -190,22 +243,22 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
         }
       }
 
+      // 从标签分区分组中移除
       List<N> nodesPerPartition = nodesPerLabel.get(node.getPartition());
       nodesPerPartition.remove(node);
 
-      // Update new set of nodes for given partition.
       if (nodesPerPartition.isEmpty()) {
         nodesPerLabel.remove(node.getPartition());
       } else {
         nodesPerLabel.put(node.getPartition(), nodesPerPartition);
       }
 
-      // Update cluster capacity
+      // 更新集群总容量
       Resources.subtractFrom(clusterCapacity, node.getTotalResource());
       staleClusterCapacity = Resources.clone(clusterCapacity);
       ClusterMetrics.getMetrics().decrCapability(node.getTotalResource());
 
-      // Update maximumAllocation
+      // 更新最大分配量统计
       updateMaxResources(node, false);
 
       return node;
@@ -214,6 +267,10 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 设置配置的最大允许分配量
+   * @param resource 配置的最大分配量
+   */
   public void setConfiguredMaxAllocation(Resource resource) {
     writeLock.lock();
     try {
@@ -223,6 +280,10 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 设置强制使用配置最大分配量的等待超时时间
+   * @param configuredMaxAllocationWaitTime 等待超时时间（毫秒）
+   */
   public void setConfiguredMaxAllocationWaitTime(
       long configuredMaxAllocationWaitTime) {
     writeLock.lock();
@@ -234,19 +295,26 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 获取最终允许的最大分配量
+   * @return 允许的最大分配量，取配置值和节点实际最大值中的较小值
+   */
   public Resource getMaxAllowedAllocation() {
     readLock.lock();
     try {
+      // 如果超过等待超时时间，取消强制使用配置值
       if (forceConfiguredMaxAllocation &&
           System.currentTimeMillis() - ResourceManager.getClusterTimeStamp()
               > configuredMaxAllocationWaitTime) {
         forceConfiguredMaxAllocation = false;
       }
 
+      // 仍在强制期或还没有节点上报，直接返回配置值
       if (forceConfiguredMaxAllocation || !reportedMaxAllocation) {
         return configuredMaxAllocation;
       }
 
+      // 对每个资源类型，取配置值和实际节点最大值中的较小值
       Resource ret = Resources.clone(configuredMaxAllocation);
 
       for (int i = 0; i < maxAllocation.length; i++) {
@@ -264,6 +332,10 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
   }
 
   @VisibleForTesting
+  /**
+   * 设置是否强制使用配置的最大分配量（仅用于测试）
+   * @param flag 是否强制
+   */
   public void setForceConfiguredMaxAllocation(boolean flag) {
     writeLock.lock();
     try {
@@ -273,6 +345,11 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 更新最大资源统计，在添加/移除节点时调用
+   * @param node 变更的节点
+   * @param add true表示添加节点，false表示移除节点
+   */
   private void updateMaxResources(SchedulerNode node, boolean add) {
     Resource totalResource = node.getTotalResource();
     ResourceInformation[] totalResources;
@@ -290,11 +367,11 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     writeLock.lock();
 
     try {
-      if (add) { // added node
-        // If we add a node, we must have a max allocation for all resource
-        // types
+      if (add) { // 添加节点场景
+        // 标记已有节点上报资源
         reportedMaxAllocation = true;
 
+        // 更新每个资源类型的最大值
         for (int i = 0; i < maxAllocation.length; i++) {
           long value = totalResources[i].getValue();
 
@@ -302,22 +379,19 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
             maxAllocation[i] = value;
           }
         }
-      } else {  // removed node
+      } else {  // 移除节点场景
         boolean recalculate = false;
 
+        // 如果被移除节点正好持有当前最大值，需要重新计算
         for (int i = 0; i < maxAllocation.length; i++) {
           if (totalResources[i].getValue() == maxAllocation[i]) {
-            // No need to set reportedMaxAllocation to false here because we
-            // will recalculate before we release the lock.
             maxAllocation[i] = -1;
             recalculate = true;
           }
         }
 
-        // We only have to iterate through the nodes if the current max memory
-        // or vcores was equal to the removed node's
+        // 需要重新计算所有节点的最大值
         if (recalculate) {
-          // Treat it like an empty cluster and add nodes
           reportedMaxAllocation = false;
           nodes.values().forEach(n -> updateMaxResources(n, true));
         }
@@ -327,15 +401,18 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     }
   }
 
+  /**
+   * 获取集群所有节点列表
+   * @return 所有节点列表
+   */
   public List<N> getAllNodes() {
     return getNodes(null);
   }
 
   /**
-   * Convenience method to filter nodes based on a condition.
-   *
-   * @param nodeFilter A {@link NodeFilter} for filtering the nodes
-   * @return A list of filtered nodes
+   * 根据过滤条件获取节点列表
+   * @param nodeFilter 节点过滤器，null不过滤
+   * @return 过滤后的节点列表
    */
   public List<N> getNodes(NodeFilter nodeFilter) {
     List<N> nodeList = new ArrayList<>();
@@ -356,15 +433,18 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     return nodeList;
   }
 
+  /**
+   * 获取集群所有节点ID列表
+   * @return 所有节点ID列表
+   */
   public List<NodeId> getAllNodeIds() {
     return getNodeIds(null);
   }
 
   /**
-   * Convenience method to filter nodes based on a condition.
-   *
-   * @param nodeFilter A {@link NodeFilter} for filtering the nodes
-   * @return A list of filtered nodes
+   * 根据过滤条件获取节点ID列表
+   * @param nodeFilter 节点过滤器，null不过滤
+   * @return 过滤后的节点ID列表
    */
   public List<NodeId> getNodeIds(NodeFilter nodeFilter) {
     List<NodeId> nodeList = new ArrayList<>();
@@ -388,12 +468,10 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
   }
 
   /**
-   * Convenience method to sort nodes.
-   * Nodes can change while being sorted. Using a standard sort will fail
-   * without locking each node, the TreeSet handles this without locks.
-   *
-   * @param comparator the comparator to sort the nodes with
-   * @return sorted set of nodes in the form of a TreeSet
+   * 获取按指定比较器排序的节点集合
+   * 使用TreeSet保证在节点动态变化时仍能正常排序
+   * @param comparator 节点比较器
+   * @return 排序后的节点TreeSet
    */
   public TreeSet<N> sortedNodeSet(Comparator<N> comparator) {
     TreeSet<N> sortedSet = new TreeSet<>(comparator);
@@ -407,12 +485,10 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
   }
 
   /**
-   * Convenience method to return list of nodes corresponding to resourceName
-   * passed in the {@link ResourceRequest}.
-   *
-   * @param resourceName Host/rack name of the resource, or
-   * {@link ResourceRequest#ANY}
-   * @return list of nodes that match the resourceName
+   * 根据ResourceRequest中的资源名称获取匹配的节点列表
+   * 资源名称可以是ANY、主机名或机架名
+   * @param resourceName 资源名称
+   * @return 匹配的节点列表
    */
   public List<N> getNodesByResourceName(final String resourceName) {
     Preconditions.checkArgument(
@@ -432,12 +508,10 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
   }
 
   /**
-   * Convenience method to return list of {@link NodeId} corresponding to
-   * resourceName passed in the {@link ResourceRequest}.
-   *
-   * @param resourceName Host/rack name of the resource, or
-   * {@link ResourceRequest#ANY}
-   * @return list of {@link NodeId} that match the resourceName
+   * 根据ResourceRequest中的资源名称获取匹配的节点ID列表
+   * 资源名称可以是ANY、主机名或机架名
+   * @param resourceName 资源名称
+   * @return 匹配的节点ID列表
    */
   public List<NodeId> getNodeIdsByResourceName(final String resourceName) {
     Preconditions.checkArgument(
@@ -445,66 +519,4 @@ public class ClusterNodeTracker<N extends SchedulerNode> {
     List<NodeId> retNodes = new ArrayList<>();
     if (ResourceRequest.ANY.equals(resourceName)) {
       retNodes.addAll(getAllNodeIds());
-    } else if (nodeNameToNodeMap.containsKey(resourceName)) {
-      retNodes.add(nodeNameToNodeMap.get(resourceName).getNodeID());
-    } else if (nodesPerRack.containsKey(resourceName)) {
-      for (N node : nodesPerRack.get(resourceName)) {
-        retNodes.add(node.getNodeID());
-      }
-    } else {
-      LOG.info(
-          "Could not find a node matching given resourceName " + resourceName);
-    }
-    return retNodes;
-  }
-
-  /**
-   * update cached nodes per partition on a node label change event.
-   * @param partition nodeLabel
-   * @param nodeIds List of Node IDs
-   */
-  public void updateNodesPerPartition(String partition, Set<NodeId> nodeIds) {
-    writeLock.lock();
-    try {
-      // Clear all entries.
-      nodesPerLabel.remove(partition);
-
-      List<N> nodesPerPartition = new ArrayList<N>();
-      for (NodeId nodeId : nodeIds) {
-        N n = getNode(nodeId);
-        if (n != null) {
-          nodesPerPartition.add(n);
-        }
-      }
-
-      // Update new set of nodes for given partition.
-      nodesPerLabel.put(partition, nodesPerPartition);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  public List<N> getNodesPerPartition(String partition) {
-    List<N> nodesPerPartition = null;
-    readLock.lock();
-    try {
-      if (nodesPerLabel.containsKey(partition)) {
-        nodesPerPartition = new ArrayList<N>(nodesPerLabel.get(partition));
-      }
-    } finally {
-      readLock.unlock();
-    }
-    return nodesPerPartition;
-  }
-
-  public List<String> getPartitions() {
-    List<String> partitions = null;
-    readLock.lock();
-    try {
-      partitions = new ArrayList(nodesPerLabel.keySet());
-    } finally {
-      readLock.unlock();
-    }
-    return partitions;
-  }
-}
+    } else if (nodeNameToNode

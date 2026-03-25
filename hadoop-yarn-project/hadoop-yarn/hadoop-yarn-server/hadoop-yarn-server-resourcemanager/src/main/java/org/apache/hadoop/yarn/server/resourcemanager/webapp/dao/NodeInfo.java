@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,6 +39,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeRepo
 
 import org.apache.hadoop.classification.VisibleForTesting;
 
+/**
+ * YARN RM Web UI 节点信息数据访问对象，封装节点的完整信息用于Web响应序列化输出
+ */
 @XmlRootElement(name = "node")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class NodeInfo {
@@ -70,15 +74,22 @@ public class NodeInfo {
   private ResourceInfo totalResource;
   private String subClusterId;
 
+  /** JAXB要求的无参构造函数 */
   public NodeInfo() {
   } // JAXB needs this
 
+  /**
+   * 根据RM节点和调度器信息构造NodeInfo，从运行时对象提取Web需要展示的信息
+   * @param ni RM节点运行时对象
+   * @param sched 资源调度器对象
+   */
   public NodeInfo(RMNode ni, ResourceScheduler sched) {
     NodeId id = ni.getNodeID();
     SchedulerNodeReport report = sched.getNodeReport(id);
     this.numContainers = 0;
     this.usedMemoryMB = 0;
     this.availMemoryMB = 0;
+    // 调度报告存在时从报告提取资源使用信息
     if (report != null) {
       this.numContainers = report.getNumContainers();
       this.usedMemoryMB = report.getUsedResource().getMemorySize();
@@ -91,18 +102,20 @@ public class NodeInfo {
       Resource totalPhysical = ni.getPhysicalResource();
       long nodeMem;
       long nodeCores;
+      // 物理资源信息不存在时，推算总资源
       if (totalPhysical == null) {
         nodeMem =
             this.usedMemoryMB + this.availMemoryMB;
-        // If we don't know the number of physical cores, assume 1. Not
-        // accurate but better than nothing.
+        // 如果不知道物理核心数，默认设为1，总比没有好
         nodeCores = 1;
       } else {
         nodeMem = totalPhysical.getMemorySize();
         nodeCores = totalPhysical.getVirtualCores();
       }
+      // 计算内存利用率百分比
       this.memUtilization = nodeMem <= 0 ? 0
           : (float)report.getUtilization().getPhysicalMemory() * 100F / nodeMem;
+      // 计算CPU利用率百分比
       this.cpuUtilization =
           (float)report.getUtilization().getCPU() * 100F / nodeCores;
     }
@@ -116,7 +129,7 @@ public class NodeInfo {
     this.version = ni.getNodeManagerVersion();
     this.totalResource = new ResourceInfo(ni.getTotalCapability());
 
-    // Status of opportunistic containers.
+    // 初始化机会容器状态信息
     this.numRunningOpportContainers = 0;
     this.usedMemoryOpportGB = 0;
     this.usedVirtualCoresOpport = 0;
@@ -131,14 +144,14 @@ public class NodeInfo {
       this.numQueuedContainers = opportStatus.getQueuedOpportContainers();
     }
 
-    // add labels
+    // 处理节点标签，排序后存储
     Set<String> labelSet = ni.getNodeLabels();
     if (labelSet != null) {
       nodeLabels.addAll(labelSet);
       Collections.sort(nodeLabels);
     }
 
-    // add attributes
+    // 处理节点属性
     Set<NodeAttribute> attrs = ni.getAllNodeAttributes();
     nodeAttributesInfo = new NodeAttributesInfo();
     for (NodeAttribute attribute : attrs) {
@@ -146,7 +159,7 @@ public class NodeInfo {
       this.nodeAttributesInfo.addNodeAttributeInfo(info);
     }
 
-    // add allocation tags
+    // 处理分配标签
     allocationTags = new AllocationTagsInfo();
     Map<String, Long> allocationTagsInfo = ni.getAllocationTagsWithCount();
     if (allocationTagsInfo != null) {
@@ -154,7 +167,7 @@ public class NodeInfo {
           allocationTags.addAllocationTag(new AllocationTagInfo(tag, count)));
     }
 
-    // update node and containers resource utilization
+    // 更新节点和容器资源利用率信息
     this.resourceUtilization = new ResourceUtilizationInfo(ni);
   }
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,11 +22,19 @@ package org.apache.hadoop.yarn.server.resourcemanager.ahs;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.server.applicationhistoryservice.records.ContainerFinishData;
 
+/**
+ * 容器结束事件写入应用历史事件，用于资源管理器向应用历史服务写入容器结束信息。
+ */
 public class WritingContainerFinishEvent extends WritingApplicationHistoryEvent {
 
   private ContainerId containerId;
   private ContainerFinishData containerFinish;
 
+  /**
+   * 构造容器结束写入事件。
+   * @param containerId 容器ID
+   * @param containerFinish 容器结束数据
+   */
   public WritingContainerFinishEvent(ContainerId containerId,
       ContainerFinishData containerFinish) {
     super(WritingHistoryEventType.CONTAINER_FINISH);
@@ -38,10 +47,18 @@ public class WritingContainerFinishEvent extends WritingApplicationHistoryEvent 
     return containerId.getApplicationAttemptId().getApplicationId().hashCode();
   }
 
+  /**
+   * 获取当前事件对应的容器ID。
+   * @return 容器ID
+   */
   public ContainerId getContainerId() {
     return containerId;
   }
 
+  /**
+   * 获取容器结束数据。
+   * @return 容器结束数据
+   */
   public ContainerFinishData getContainerFinishData() {
     return containerFinish;
   }

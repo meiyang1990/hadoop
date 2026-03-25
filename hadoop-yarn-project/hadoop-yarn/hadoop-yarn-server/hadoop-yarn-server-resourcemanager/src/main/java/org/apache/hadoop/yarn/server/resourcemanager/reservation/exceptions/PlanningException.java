@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,9 +25,8 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * Exception thrown by the admission control subsystem when there is a problem
- * in trying to find an allocation for a user
- * {@link ReservationSubmissionRequest}.
+ * YARN资源预留规划异常，当预留准入控制子系统无法为用户的预留提交请求找到可用资源分配时抛出该异常。
+ * @see ReservationSubmissionRequest
  */
 
 @Public
@@ -35,14 +35,27 @@ public class PlanningException extends Exception {
 
   private static final long serialVersionUID = -684069387367879218L;
 
+  /**
+   * 使用指定错误信息构造规划异常。
+   * @param message 错误描述信息
+   */
   public PlanningException(String message) {
     super(message);
   }
 
+  /**
+   * 使用指定根异常构造规划异常。
+   * @param cause 根异常原因
+   */
   public PlanningException(Throwable cause) {
     super(cause);
   }
 
+  /**
+   * 使用指定错误信息和根异常构造规划异常。
+   * @param message 错误描述信息
+   * @param cause 根异常原因
+   */
   public PlanningException(String message, Throwable cause) {
     super(message, cause);
   }

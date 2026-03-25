@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.See the NOTICE file
@@ -44,23 +45,15 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeEventType;
 import org.apache.hadoop.yarn.util.MonotonicClock;
 
 /**
- * DecommissioningNodesWatcher is used by ResourceTrackerService to track
- * DECOMMISSIONING nodes to decide when, after all running containers on
- * the node have completed, will be transitioned into DECOMMISSIONED state
- * (NodeManager will be told to shutdown).
- * Under MR application, a node, after completes all its containers,
- * may still serve it map output data during the duration of the application
- * for reducers. A fully graceful mechanism would keep such DECOMMISSIONING
- * nodes until all involved applications complete. It could be however
- * undesirable under long-running applications scenario where a bunch
- * of "idle" nodes would stay around for long period of time.
- *
- * DecommissioningNodesWatcher balance such concern with a timeout policy ---
- * a DECOMMISSIONING node will be DECOMMISSIONED no later than
- * DECOMMISSIONING_TIMEOUT regardless of running containers or applications.
- *
- * DecommissioningNodesWatcher basically is no cost when no node is
- * DECOMMISSIONING.
+ * 退役节点监听器，供ResourceTrackerService使用，跟踪处于DECOMMISSIONING状态的节点，
+ * 等待节点上所有容器完成后，将节点状态转换为DECOMMISSIONED，并通知NodeManager关闭。
+ * <p>
+ * 在MapReduce应用场景下，节点上所有容器完成后，仍可能为Reducer提供Map输出数据。
+ * 完全优雅的退服需要等待所有关联应用完成才能下线节点，但这会导致长时间运行的应用场景下，
+ * 大量空闲节点长期保持DECOMMISSIONING状态占用资源，因此本工具通过超时策略平衡该问题：
+ * 无论是否还有容器或应用运行，DECOMMISSIONING节点都会在超时后强制转为DECOMMISSIONED状态。
+ * <p>
+ * 当没有节点处于DECOMMISSIONING状态时，本工具基本不会产生额外性能开销。
  */
 public class DecommissioningNodesWatcher {
   private static final Logger LOG =
@@ -68,30 +61,31 @@ public class DecommissioningNodesWatcher {
 
   private final RMContext rmContext;
 
-  // Once a RMNode is observed in DECOMMISSIONING state,
-  // All its ContainerStatus update are tracked inside DecomNodeContext.
+  /**
+   * 退役节点上下文，保存单个DECOMMISSIONING节点的跟踪信息，
+   * 记录该节点所有容器状态更新与退服进度。
+   */
   class DecommissioningNodeContext {
     private final NodeId nodeId;
 
-    // Last known NodeState.
+    // 当前节点状态
     private NodeState nodeState;
 
-    // The moment node is observed in DECOMMISSIONING state.
+    // 节点进入DECOMMISSIONING状态的起始时间
     private final long decommissioningStartTime;
 
     private long lastContainerFinishTime;
 
-    // number of running containers at the moment.
+    // 当前节点活跃容器数量
     private int numActiveContainers;
 
-    // All applications run on the node.
+    // 该节点上运行过的所有应用ID列表
     private List<ApplicationId> appIds;
 
-    // First moment the node is observed in DECOMMISSIONED state.
+    // 节点首次被观测到进入DECOMMISSIONED状态的时间
     private long decommissionedTime;
 
-    // Timeout in millis for this decommissioning node.
-    // This value could be dynamically updated with new value from RMNode.
+    // 当前节点退服超时时间（毫秒），可从RMNode动态更新
     private long timeoutMs;
 
     private long lastUpdateTime;
@@ -108,19 +102,27 @@ public class DecommissioningNodesWatcher {
     }
   }
 
-  // All DECOMMISSIONING nodes to track.
+  // 所有需要跟踪的DECOMMISSIONING节点上下文映射表
   private HashMap<NodeId, DecommissioningNodeContext> decomNodes =
       new HashMap<NodeId, DecommissioningNodeContext>();
 
   private Timer pollTimer;
   private MonotonicClock mclock;
 
+  /**
+   * 构造退役节点监听器，关联RM上下文。
+   * @param rmContext ResourceManager上下文
+   */
   public DecommissioningNodesWatcher(RMContext rmContext) {
     this.rmContext = rmContext;
     pollTimer = new Timer(true);
     mclock = new MonotonicClock();
   }
 
+  /**
+   * 初始化监听器，按配置的轮询间隔启动定时轮询任务。
+   * @param conf YARN配置
+   */
   public void init(Configuration conf) {
     int v = conf.getInt(
         YarnConfiguration.RM_DECOMMISSIONING_NODES_WATCHER_POLL_INTERVAL,
@@ -130,26 +132,27 @@ public class DecommissioningNodesWatcher {
   }
 
   /**
-   * Update rmNode decommissioning status based on NodeStatus.
-   * @param rmNode The node
-   * @param remoteNodeStatus latest NodeStatus
+   * 根据最新节点状态更新退服跟踪信息。
+   * @param rmNode 目标节点
+   * @param remoteNodeStatus NodeManager上报的最新节点状态
    */
   public synchronized void update(RMNode rmNode, NodeStatus remoteNodeStatus) {
     DecommissioningNodeContext context = decomNodes.get(rmNode.getNodeID());
     long now = mclock.getTime();
+    // 节点已进入DECOMMISSIONED状态
     if (rmNode.getState() == NodeState.DECOMMISSIONED) {
       if (context == null) {
         return;
       }
       context.nodeState = rmNode.getState();
-      // keep DECOMMISSIONED node for a while for status log, so that such
-      // host will appear as DECOMMISSIONED instead of quietly disappears.
+      // 保留DECOMMISSIONED节点一段时间用于状态日志，避免节点直接消失无法查看状态
       if (context.decommissionedTime == 0) {
         context.decommissionedTime = now;
       } else if (now - context.decommissionedTime > 60000L) {
         decomNodes.remove(rmNode.getNodeID());
       }
     } else if (rmNode.getState() == NodeState.DECOMMISSIONING) {
+      // 节点刚进入DECOMMISSIONING状态，新建上下文
       if (context == null) {
         context = new DecommissioningNodeContext(rmNode.getNodeID(),
             rmNode.getDecommissioningTimeout());
@@ -157,12 +160,14 @@ public class DecommissioningNodesWatcher {
         context.nodeState = rmNode.getState();
         context.decommissionedTime = 0;
       }
+      // 更新超时时间、最后更新时间
       context.updateTimeout(rmNode.getDecommissioningTimeout());
       context.lastUpdateTime = now;
 
+      // 更新当前节点运行的应用列表
       context.appIds = rmNode.getRunningApps();
 
-      // Count number of active containers.
+      // 统计当前节点活跃容器数量
       int numActiveContainers = 0;
       for (ContainerStatus cs : remoteNodeStatus.getContainersStatuses()) {
         ContainerState newState = cs.getState();
@@ -173,19 +178,23 @@ public class DecommissioningNodesWatcher {
       }
       context.numActiveContainers = numActiveContainers;
 
-      // maintain lastContainerFinishTime.
+      // 如果已经没有活跃容器，记录容器全部完成时间
       if (context.numActiveContainers == 0 &&
           context.lastContainerFinishTime == 0) {
         context.lastContainerFinishTime = now;
       }
     } else {
-      // remove node in other states
+      // 节点处于其他状态，移除跟踪
       if (context != null) {
         decomNodes.remove(rmNode.getNodeID());
       }
     }
   }
 
+  /**
+   * 从跟踪列表中移除指定节点。
+   * @param nodeId 目标节点ID
+   */
   public synchronized void remove(NodeId nodeId) {
     DecommissioningNodeContext context = decomNodes.get(nodeId);
     if (context != null) {
@@ -194,41 +203,53 @@ public class DecommissioningNodesWatcher {
     }
   }
 
+  /**
+   * 停止监听器，取消定时轮询。
+   */
   public void stop() {
     pollTimer.cancel();
     pollTimer = null;
   }
 
   /**
-   * Status about a specific decommissioning node.
-   *
+   * 退役节点状态枚举，表示节点当前退服阶段。
    */
   public enum DecommissioningNodeStatus {
-    // Node is not in DECOMMISSIONING state.
+    // 节点不处于DECOMMISSIONING状态，无需跟踪
     NONE,
 
-    // wait for running containers to complete
+    // 等待运行中容器完成
     WAIT_CONTAINER,
 
-    // wait for running application to complete (after all containers complete);
+    // 所有容器已完成，等待运行中应用完成
     WAIT_APP,
 
-    // Timeout waiting for either containers or applications to complete.
+    // 等待容器或应用完成超时
     TIMEOUT,
 
-    // nothing to wait, ready to be decommissioned
+    // 无需继续等待，可转为DECOMMISSIONED状态
     READY,
 
-    // The node has already been decommissioned
+    // 节点已完成退服
     DECOMMISSIONED,
   }
 
+  /**
+   * 检查指定节点是否已准备好完成退服。
+   * @param nodeId 目标节点ID
+   * @return true表示节点可转为DECOMMISSIONED状态，false否则
+   */
   public boolean checkReadyToBeDecommissioned(NodeId nodeId) {
     DecommissioningNodeStatus s = checkDecommissioningStatus(nodeId);
     return (s == DecommissioningNodeStatus.READY ||
             s == DecommissioningNodeStatus.TIMEOUT);
   }
 
+  /**
+   * 获取指定节点当前退服状态。
+   * @param nodeId 目标节点ID
+   * @return 节点当前退服状态枚举
+   */
   public DecommissioningNodeStatus checkDecommissioningStatus(NodeId nodeId) {
     DecommissioningNodeContext context = decomNodes.get(nodeId);
     if (context == null) {
@@ -239,16 +260,20 @@ public class DecommissioningNodesWatcher {
       return DecommissioningNodeStatus.DECOMMISSIONED;
     }
 
+    // 计算节点进入DECOMMISSIONING状态后的等待时长
     long waitTime = mclock.getTime() - context.decommissioningStartTime;
+    // 仍有活跃容器
     if (context.numActiveContainers > 0) {
       return (context.timeoutMs < 0 || waitTime < context.timeoutMs)?
           DecommissioningNodeStatus.WAIT_CONTAINER :
           DecommissioningNodeStatus.TIMEOUT;
     }
 
+    // 无活跃容器也无应用，直接准备完成退服
     if (context.appIds.size() == 0) {
       return DecommissioningNodeStatus.READY;
     } else {
+      // 还有应用未完成，继续等待或超时
       return (context.timeoutMs < 0 || waitTime < context.timeoutMs)?
           DecommissioningNodeStatus.WAIT_APP :
           DecommissioningNodeStatus.TIMEOUT;
@@ -256,10 +281,10 @@ public class DecommissioningNodesWatcher {
   }
 
   /**
-   * PollTimerTask periodically:
-   *   1. log status of all DECOMMISSIONING nodes;
-   *   2. identify and taken care of stale DECOMMISSIONING nodes
-   *      (for example, node already terminated).
+   * 定时轮询任务，周期性执行以下工作：
+   * 1. 日志输出所有DECOMMISSIONING节点的当前状态
+   * 2. 识别并清理过期 stale 节点（例如已终止的节点）
+   * 3. 触发已超时节点的退服完成流程
    */
   class PollTimerTask extends TimerTask {
     private final RMContext rmContext;
@@ -273,21 +298,22 @@ public class DecommissioningNodesWatcher {
       long now = mclock.getTime();
       Set<NodeId> staleNodes = new HashSet<NodeId>();
 
+      // 遍历所有跟踪节点检查状态
       for (Iterator<Map.Entry<NodeId, DecommissioningNodeContext>> it =
           decomNodes.entrySet().iterator(); it.hasNext();) {
         Map.Entry<NodeId, DecommissioningNodeContext> e = it.next();
         DecommissioningNodeContext d = e.getValue();
-        // Skip node recently updated (NM usually updates every second).
+        // 跳过最近更新过的节点，NM通常每秒更新一次状态
         if (now - d.lastUpdateTime < 5000L) {
           continue;
         }
-        // Remove stale non-DECOMMISSIONING node
+        // 移除非DECOMMISSIONING状态的过期节点
         if (d.nodeState != NodeState.DECOMMISSIONING) {
           LOG.debug("remove {} {}", d.nodeState, d.nodeId);
           it.remove();
           continue;
         } else if (now - d.lastUpdateTime > 60000L) {
-          // Node DECOMMISSIONED could become stale, remove as necessary.
+          // 长时间未收到节点更新，检查节点状态，过期则移除
           RMNode rmNode = getRmNode(d.nodeId);
           if (rmNode != null &&
               rmNode.getState() == NodeState.DECOMMISSIONED) {
@@ -296,6 +322,7 @@ public class DecommissioningNodesWatcher {
             continue;
           }
         }
+        // 收集已超时的节点
         if (d.timeoutMs >= 0 &&
             d.decommissioningStartTime + d.timeoutMs < now) {
           staleNodes.add(d.nodeId);
@@ -303,6 +330,7 @@ public class DecommissioningNodesWatcher {
         }
       }
 
+      // 处理所有超时节点，触发退服完成事件
       for (NodeId nodeId : staleNodes) {
         RMNode rmNode = this.rmContext.getRMNodes().get(nodeId);
         if (rmNode == null || rmNode.getState() != NodeState.DECOMMISSIONING) {
@@ -319,6 +347,11 @@ public class DecommissioningNodesWatcher {
     }
   }
 
+  /**
+   * 从活跃/非活跃节点列表获取RMNode实例。
+   * @param nodeId 目标节点ID
+   * @return RMNode实例，不存在则返回null
+   */
   private RMNode getRmNode(NodeId nodeId) {
     RMNode rmNode = this.rmContext.getRMNodes().get(nodeId);
     if (rmNode == null) {
@@ -327,7 +360,11 @@ public class DecommissioningNodesWatcher {
     return rmNode;
   }
 
-  // Time in second to be decommissioned.
+  /**
+   * 计算指定节点剩余退服超时时间（秒）。
+   * @param context 节点退服上下文
+   * @return 剩余秒数，负数表示无超时，0表示已超时
+   */
   private int getTimeoutInSec(DecommissioningNodeContext context) {
     if (context.nodeState == NodeState.DECOMMISSIONED) {
       return 0;
@@ -337,7 +374,7 @@ public class DecommissioningNodesWatcher {
     if (context.appIds.size() == 0 && context.numActiveContainers == 0) {
       return 0;
     }
-    // negative timeout value means no timeout (infinite timeout).
+    // 负超时表示无限等待，无超时
     if (context.timeoutMs < 0) {
       return -1;
     }
@@ -347,6 +384,9 @@ public class DecommissioningNodesWatcher {
     return Math.max(0, (int)(timeout / 1000));
   }
 
+  /**
+   * 日志输出所有DECOMMISSIONING节点的当前状态，仅DEBUG级别开启。
+   */
   private void logDecommissioningNodesStatus() {
     if (!LOG.isDebugEnabled() || decomNodes.size() == 0) {
       return;

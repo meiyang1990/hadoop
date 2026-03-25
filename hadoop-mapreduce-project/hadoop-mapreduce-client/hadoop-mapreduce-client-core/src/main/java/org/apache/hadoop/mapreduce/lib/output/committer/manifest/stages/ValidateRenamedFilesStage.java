@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -39,12 +40,10 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_JOB_VALIDATE_OUTPUT;
 
 /**
- * This stage validates all files by scanning the manifests
- * and verifying every file in every manifest is of the given size.
- * Returns a list of all files committed.
- *
- * Its cost is one getFileStatus() call (parallelized) per file.
- * Raises a {@link OutputValidationException} on a validation failure.
+ * 文件清单提交器的输出验证阶段，负责扫描所有任务清单文件，
+ * 验证所有已重命名到最终输出目录的文件信息与清单记录一致。
+ * 每个文件并行执行文件状态校验，验证失败会抛出异常中断提交流程。
+ * 最终返回所有验证通过的文件列表，供后续流程使用。
  */
 public class ValidateRenamedFilesStage extends
     AbstractJobOrTaskStage<
@@ -55,80 +54,83 @@ public class ValidateRenamedFilesStage extends
       ValidateRenamedFilesStage.class);
 
   /**
-   * List of all files committed.
+   * 存储所有验证通过的已提交文件条目。
    */
   private List<FileEntry> filesCommitted = new ArrayList<>();
 
+  /**
+   * 构造验证重命名文件阶段实例。
+   * @param stageConfig 阶段配置信息
+   */
   public ValidateRenamedFilesStage(final StageConfig stageConfig) {
     super(false, stageConfig, OP_STAGE_JOB_VALIDATE_OUTPUT, true);
   }
 
   /**
-   * Get the list of files committed.
-   * @return a possibly empty list.
+   * 线程安全地获取所有验证通过的已提交文件列表。
+   * @return 验证通过的文件列表，可能为空
    */
   private synchronized List<FileEntry> getFilesCommitted() {
     return filesCommitted;
   }
 
   /**
-   * Add a file entry to the list of committed files.
-   * @param entry entry
+   * 线程安全地添加验证通过的文件条目到已提交列表。
+   * @param entry 验证通过的文件条目
    */
   private synchronized void addFileCommitted(FileEntry entry) {
     filesCommitted.add(entry);
   }
 
   /**
-   * Validate the task manifests.
-   * This is done by listing all the directories
-   * and verifying that every file in the source list
-   * has a file in the destination of the same size.
-   * If two tasks have both written the same file or
-   * a source file was changed after the task was committed,
-   * then a mismatch will be detected -provided the file
-   * length is now different.
-   * @param entryFile path to entry file
-   * @return list of files committed.
+   * 执行验证阶段核心逻辑：读取任务输出清单文件，并行验证每个文件的路径、大小和ETag信息，
+   * 收集所有验证通过的文件并返回。
+   * @param entryFile 任务输出清单文件路径
+   * @return 所有验证通过的文件条目列表
+   * @throws IOException 读取清单文件或验证过程中出现IO异常
    */
   @Override
   protected List<FileEntry> executeStage(
       final Path entryFile)
       throws IOException {
 
+    // 创建文件条目IO工具实例
     final EntryFileIO entryFileIO = new EntryFileIO(getStageConfig().getConf());
 
+    // 自动关闭清单文件读取流
     try (SequenceFile.Reader reader = entryFileIO.createReader(entryFile)) {
-      // iterate over the entries in the file.
+      // 遍历清单中所有文件条目，使用并行线程池执行验证，遇到失败立即停止
       TaskPool.foreach(entryFileIO.iterateOver(reader))
           .executeWith(getIOProcessors())
           .stopOnFailure()
           .run(this::validateOneFile);
 
+      // 返回所有验证通过的文件列表
       return getFilesCommitted();
     }
   }
 
   /**
-   * Validate a file.
-   * @param entry entry to probe for
-   * @throws IOException IO problem.
-   * @throws OutputValidationException if the entry is not valid
+   * 验证单个文件条目：验证文件是否存在、是否为文件类型、长度是否匹配，
+   * 若存储系统支持ETag则额外验证ETag一致性。验证通过后添加到已提交列表。
+   * @param entry 待验证的文件条目
+   * @throws IOException IO操作异常
+   * @throws OutputValidationException 验证不通过时抛出
    */
   private void validateOneFile(FileEntry entry) throws IOException {
+    // 更新审计上下文，记录当前操作阶段
     updateAuditContext(OP_STAGE_JOB_VALIDATE_OUTPUT);
 
-    // report progress back
+    // 上报任务进度，避免Hadoop认为任务超时
     progress();
-    // look validate the file.
-    // raising an FNFE if the file isn't there.
     FileStatus destStatus;
     final Path sourcePath = entry.getSourcePath();
     Path destPath = entry.getDestPath();
     try {
+      // 获取目标文件的文件状态
       destStatus = getFileStatus(destPath);
 
-      // it must be a file
+      // 验证目标路径确实是文件，不是目录
       if (!destStatus.isFile()) {
         throw new OutputValidationException(destPath,
             "Expected a file renamed from " + sourcePath
@@ -137,8 +139,9 @@ public class ValidateRenamedFilesStage extends
       final long sourceSize = entry.getSize();
       final long destSize = destStatus.getLen();
 
-      // etags, if the source had one.
+      // 获取清单中记录的源文件ETag
       final String sourceEtag = entry.getEtag();
+      // 如果存储系统重命名后会保留ETag且清单记录了ETag，验证ETag一致性
       if (getOperations().storePreservesEtagsThroughRenames(destStatus.getPath())
           && isNotBlank(sourceEtag)) {
         final String destEtag = ManifestCommitterSupport.getEtag(destStatus);
@@ -158,7 +161,7 @@ public class ValidateRenamedFilesStage extends
 
         }
       }
-      // check the expected length after any etag validation
+      // 验证文件长度是否和清单记录一致
       if (destSize != sourceSize) {
         LOG.warn("Length of dest file {}: {} does not match that of manifest entry {}",
             destPath, destStatus, entry);
@@ -173,10 +176,11 @@ public class ValidateRenamedFilesStage extends
       }
 
     } catch (FileNotFoundException e) {
-      // file didn't exist
+      // 目标文件不存在，验证失败
       throw new OutputValidationException(destPath,
           "Expected a file, but it was not found", e);
     }
+    // 所有验证通过，添加到已提交文件列表
     addFileCommitted(entry);
   }
 

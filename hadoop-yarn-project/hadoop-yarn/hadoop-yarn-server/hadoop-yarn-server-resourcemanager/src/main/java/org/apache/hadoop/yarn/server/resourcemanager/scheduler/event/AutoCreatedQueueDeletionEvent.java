@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,13 +20,28 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.event;
 
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CSQueue;
 
+/**
+ * 自动创建队列删除事件，用于触发自动创建空队列的清理流程。
+ * 当动态自动创建的队列长时间没有应用运行时，调度器会收到该事件，
+ * 检查并删除空闲队列以释放资源。
+ */
 public class AutoCreatedQueueDeletionEvent extends SchedulerEvent{
+  // 待检查删除条件的队列
   private CSQueue checkQueue;
+
+  /**
+   * 构造自动创建队列删除事件
+   * @param checkQueue 待检查是否满足删除条件的队列
+   */
   public AutoCreatedQueueDeletionEvent(CSQueue checkQueue) {
     super(SchedulerEventType.AUTO_QUEUE_DELETION);
     this.checkQueue = checkQueue;
   }
 
+  /**
+   * 获取待检查删除条件的队列
+   * @return 待检查的容量调度队列
+   */
   public CSQueue getCheckQueue() {
     return checkQueue;
   }

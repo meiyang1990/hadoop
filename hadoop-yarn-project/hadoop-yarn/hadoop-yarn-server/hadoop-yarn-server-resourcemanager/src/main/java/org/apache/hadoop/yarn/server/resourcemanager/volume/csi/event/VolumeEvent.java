@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,21 +23,35 @@ import org.apache.hadoop.yarn.server.resourcemanager.volume.csi.lifecycle.Volume
 import org.apache.hadoop.yarn.server.volume.csi.VolumeId;
 
 /**
- * Base volume event class that used to trigger volume state transitions.
+ * CSI存储卷事件基类，用于触发存储卷状态转换，是所有CSI卷事件的父类。
  */
 public class VolumeEvent extends AbstractEvent<VolumeEventType> {
 
+  // 关联的CSI存储卷对象
   private Volume volume;
 
+  /**
+   * 构造CSI存储卷事件。
+   * @param volume 关联的存储卷对象
+   * @param volumeEventType 存储卷事件类型
+   */
   public VolumeEvent(Volume volume, VolumeEventType volumeEventType) {
     super(volumeEventType, System.currentTimeMillis());
     this.volume = volume;
   }
 
+  /**
+   * 获取当前事件关联的存储卷对象。
+   * @return 关联的存储卷对象
+   */
   public Volume getVolume() {
     return this.volume;
   }
 
+  /**
+   * 获取当前事件关联存储卷的唯一ID。
+   * @return 存储卷唯一ID
+   */
   public VolumeId getVolumeId() {
     return this.volume.getVolumeId();
   }

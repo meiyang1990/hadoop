@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -61,6 +62,10 @@ import org.xml.sax.SAXException;
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.allocation.AllocationFileQueueParser.EVERYBODY_ACL;
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.allocation.AllocationFileQueueParser.ROOT;
 
+/**
+ * 公平调度器分配配置文件加载服务，负责定期检查和热加载队列分配XML配置文件，
+ * 实现公平调度器队列配置的动态更新。
+ */
 @Public
 @Unstable
 public class AllocationFileLoaderService extends AbstractService {
@@ -68,29 +73,29 @@ public class AllocationFileLoaderService extends AbstractService {
   public static final Logger LOG = LoggerFactory.getLogger(
       AllocationFileLoaderService.class.getName());
 
-  /** Time to wait between checks of the allocation file */
+  /** 分配配置文件检查间隔，单位毫秒 */
   public static final long ALLOC_RELOAD_INTERVAL_MS = 10 * 1000;
 
   /**
-   * Time to wait after the allocation has been modified before reloading it
-   * (this is done to prevent loading a file that hasn't been fully written).
+   * 分配配置文件修改后等待重载的时间，避免加载未写入完成的文件，单位毫秒
    */
   public static final long ALLOC_RELOAD_WAIT_MS = 5 * 1000;
 
+  /** 重载线程退出等待超时时间，单位毫秒 */
   public static final long THREAD_JOIN_TIMEOUT_MS = 1000;
 
-  //Permitted allocation file filesystems (case insensitive)
+  // 允许加载分配配置文件的文件系统，不区分大小写
   private static final String SUPPORTED_FS_REGEX =
       "(?i)(hdfs)|(file)|(s3a)|(viewfs)";
 
   private final Clock clock;
   private final FairScheduler scheduler;
 
-  // Last time we successfully reloaded queues
+  // 上次成功重载队列配置的时间
   private volatile long lastSuccessfulReload;
   private volatile boolean lastReloadAttemptFailed = false;
 
-  // Path to XML file containing allocations.
+  // 分配配置XML文件路径
   private Path allocFile;
   private FileSystem fs;
 
@@ -119,6 +124,7 @@ public class AllocationFileLoaderService extends AbstractService {
     this.allocFile = getAllocationFile(conf);
     if (this.allocFile != null) {
       this.fs = allocFile.getFileSystem(conf);
+      // 创建后台线程定期检查分配文件是否变更
       reloadThread = new SubjectInheritingThread(() -> {
         while (running) {
           try {
@@ -126,8 +132,10 @@ public class AllocationFileLoaderService extends AbstractService {
               reloadListener.onCheck();
             }
             long time = clock.getTime();
+            // 获取分配文件最后修改时间
             long lastModified =
                 fs.getFileStatus(allocFile).getModificationTime();
+            // 文件已修改且等待时间已过，触发重载
             if (lastModified > lastSuccessfulReload &&
                 time > lastModified + ALLOC_RELOAD_WAIT_MS) {
               try {
@@ -140,6 +148,7 @@ public class AllocationFileLoaderService extends AbstractService {
                 lastReloadAttemptFailed = true;
               }
             } else if (lastModified == 0l) {
+              // 文件获取不到修改时间，输出警告
               if (!lastReloadAttemptFailed) {
                 LOG.warn("Failed to reload fair scheduler config file because" +
                     " last modified returned 0. File exists: "
@@ -151,6 +160,7 @@ public class AllocationFileLoaderService extends AbstractService {
             LOG.error("Exception while loading allocation file: " + e);
           }
           try {
+            // 等待下一次检查
             Thread.sleep(reloadIntervalMs);
           } catch (InterruptedException ex) {
             LOG.info(
@@ -187,14 +197,11 @@ public class AllocationFileLoaderService extends AbstractService {
   }
 
   /**
-   * Path to XML file containing allocations. If the
-   * path is relative, it is searched for in the
-   * classpath, but loaded like a regular File.
+   * 从配置中解析获取分配配置文件路径，处理相对路径和类路径查找
    *
-   * @param conf configuration.
-   * @return Allocation File Path.
-   * @throws UnsupportedFileSystemException
-   *    File system for a given file system name/scheme is not supported.
+   * @param conf 配置对象
+   * @return 分配文件路径，找不到返回null
+   * @throws UnsupportedFileSystemException 不支持的文件系统抛出异常
    */
   @VisibleForTesting
   public Path getAllocationFile(Configuration conf)
@@ -203,10 +210,12 @@ public class AllocationFileLoaderService extends AbstractService {
         FairSchedulerConfiguration.DEFAULT_ALLOCATION_FILE);
     Path allocPath = new Path(allocFilePath);
     String allocPathScheme = allocPath.toUri().getScheme();
+    // 检查文件系统是否在支持列表中
     if(allocPathScheme != null && !allocPathScheme.matches(SUPPORTED_FS_REGEX)){
       throw new UnsupportedFileSystemException("Allocation file "
           + allocFilePath + " uses an unsupported filesystem");
     } else if (!allocPath.isAbsolute()) {
+      // 相对路径从类路径查找
       URL url = Thread.currentThread().getContextClassLoader()
           .getResource(allocFilePath);
       if (url == null) {
@@ -219,6 +228,7 @@ public class AllocationFileLoaderService extends AbstractService {
         allocPath = new Path(url.getProtocol(), null, url.getPath());
       }
     } else if (allocPath.isAbsoluteAndSchemeAuthorityNull()){
+      // 绝对路径无scheme默认添加file scheme
       allocPath = new Path("file", null, allocFilePath);
     }
     return allocPath;
@@ -229,13 +239,12 @@ public class AllocationFileLoaderService extends AbstractService {
   }
 
   /**
-   * Updates the allocation list from the allocation config file. This file is
-   * expected to be in the XML format specified in the design doc.
+   * 从分配配置XML文件重新加载队列分配信息，解析后通知监听器更新配置
    *
-   * @throws IOException if the config file cannot be read.
-   * @throws AllocationConfigurationException if allocations are invalid.
-   * @throws ParserConfigurationException if XML parser is misconfigured.
-   * @throws SAXException if config file is malformed.
+   * @throws IOException 无法读取配置文件抛出
+   * @throws AllocationConfigurationException 分配配置非法抛出
+   * @throws ParserConfigurationException XML parser配置错误抛出
+   * @throws SAXException 配置文件格式错误抛出
    */
   public synchronized void reloadAllocations()
       throws IOException, ParserConfigurationException, SAXException,
@@ -246,42 +255,53 @@ public class AllocationFileLoaderService extends AbstractService {
     }
     LOG.info("Loading allocation file " + allocFile);
 
-    // Read and parse the allocations file.
+    // 初始化安全XML parser，读取并解析分配文件
     DocumentBuilderFactory docBuilderFactory = XMLUtils.newSecureDocumentBuilderFactory();
     docBuilderFactory.setIgnoringComments(true);
     DocumentBuilder builder = docBuilderFactory.newDocumentBuilder();
     Document doc = builder.parse(fs.open(allocFile));
     Element root = doc.getDocumentElement();
+    // 检查根节点是否为allocations
     if (!"allocations".equals(root.getTagName())) {
       throw new AllocationConfigurationException("Bad fair scheduler config "
           + "file: top-level element not <allocations>");
     }
     NodeList elements = root.getChildNodes();
 
+    // 解析分配文件整体结构
     AllocationFileParser allocationFileParser =
         new AllocationFileParser(elements);
     allocationFileParser.parse();
 
+    // 解析队列配置信息
     AllocationFileQueueParser queueParser =
         new AllocationFileQueueParser(allocationFileParser.getQueueElements());
     QueueProperties queueProperties = queueParser.parse();
 
-    // Load placement policy
+    // 加载队列放置策略
     getQueuePlacementPolicy(allocationFileParser);
+    // 设置根队列默认属性
     setupRootQueueProperties(allocationFileParser, queueProperties);
 
+    // 创建预留队列全局配置
     ReservationQueueConfiguration globalReservationQueueConfig =
         createReservationQueueConfig(allocationFileParser);
 
+    // 构建完整分配配置对象
     AllocationConfiguration info = new AllocationConfiguration(queueProperties,
         allocationFileParser, globalReservationQueueConfig);
 
+    // 更新重载时间和状态
     lastSuccessfulReload = clock.getTime();
     lastReloadAttemptFailed = false;
 
+    // 通知监别完成配置重载
     reloadListener.onReload(info);
   }
 
+  /**
+   * 从分配文件或调度器配置加载队列放置策略
+   */
   private void getQueuePlacementPolicy(
       AllocationFileParser allocationFileParser)
       throws AllocationConfigurationException {
@@ -294,16 +314,20 @@ public class AllocationFileLoaderService extends AbstractService {
     }
   }
 
+  /**
+   * 为根队列设置默认抢占超时和阈值，若分配文件未指定则使用全局默认值
+   */
   private void setupRootQueueProperties(
       AllocationFileParser allocationFileParser,
       QueueProperties queueProperties) {
-    // Set the min/fair share preemption timeout for the root queue
+    // 设置根队列最小资源抢占超时
     if (!queueProperties.getMinSharePreemptionTimeouts()
         .containsKey(QueueManager.ROOT_QUEUE)) {
       queueProperties.getMinSharePreemptionTimeouts().put(
           QueueManager.ROOT_QUEUE,
           allocationFileParser.getDefaultMinSharePreemptionTimeout());
     }
+    // 设置根队列公平份额抢占超时
     if (!queueProperties.getFairSharePreemptionTimeouts()
         .containsKey(QueueManager.ROOT_QUEUE)) {
       queueProperties.getFairSharePreemptionTimeouts().put(
@@ -311,7 +335,7 @@ public class AllocationFileLoaderService extends AbstractService {
           allocationFileParser.getDefaultFairSharePreemptionTimeout());
     }
 
-    // Set the fair share preemption threshold for the root queue
+    // 设置根队列公平份额抢占阈值
     if (!queueProperties.getFairSharePreemptionThresholds()
         .containsKey(QueueManager.ROOT_QUEUE)) {
       queueProperties.getFairSharePreemptionThresholds().put(
@@ -320,6 +344,9 @@ public class AllocationFileLoaderService extends AbstractService {
     }
   }
 
+  /**
+   * 从分配文件解析创建全局预留队列配置
+   */
   private ReservationQueueConfiguration createReservationQueueConfig(
       AllocationFileParser allocationFileParser) {
     ReservationQueueConfiguration globalReservationQueueConfig =
@@ -340,12 +367,9 @@ public class AllocationFileLoaderService extends AbstractService {
   }
 
   /**
-   * Returns the list of default permissions.
-   * The default permission for the root queue is everybody ("*")
-   * and the default permission for all other queues is nobody ("").
-   * The default permission list would be loaded before the permissions
-   * from allocation file.
-   * @return default permission list
+   * 返回默认权限列表，根队列默认开放所有人访问，其他队列默认无访问权限
+   * 默认权限会在分配文件权限加载前生效
+   * @return 默认权限列表
    */
   protected List<Permission> getDefaultPermissions() {
     if (defaultPermissions == null) {
@@ -361,9 +385,20 @@ public class AllocationFileLoaderService extends AbstractService {
     return defaultPermissions;
   }
 
+  /**
+   * 配置重载事件监听器接口，定义分配配置重载和检查的回调方法
+   */
   public interface Listener {
+    /**
+     * 分配配置重载完成后回调
+     * @param info 新加载的分配配置对象
+     * @throws IOException IO异常
+     */
     void onReload(AllocationConfiguration info) throws IOException;
 
+    /**
+     * 每次检查分配文件前回调，默认空实现
+     */
     default void onCheck() {
     }
   }

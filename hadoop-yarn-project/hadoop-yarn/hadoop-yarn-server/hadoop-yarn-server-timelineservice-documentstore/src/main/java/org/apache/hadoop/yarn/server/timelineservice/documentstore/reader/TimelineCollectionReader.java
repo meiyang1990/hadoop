@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,21 +44,29 @@ import java.util.Set;
 
 // 通用集合读取器，用于读取特定DocumentStoreVendor后端下属于CollectionType的文档
 /**
- * This is a generic Collection reader for reading documents belonging to a
- * {@link CollectionType} under a specific {@link DocumentStoreVendor} backend.
+ * 文档存储的通用集合读取器，负责从指定文档存储后端读取不同类型的时间线集合文档。
+ * 支持通用实体、流运行、流活动三种类型集合的读取。
  */
 public  class TimelineCollectionReader {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(TimelineCollectionReader.class);
 
+  // 通用时间线实体文档读取器
   private final DocumentStoreReader<TimelineEntityDocument>
       genericEntityDocReader;
+  // 流运行文档读取器
   private final DocumentStoreReader<FlowRunDocument>
       flowRunDocReader;
+  // 流活动文档读取器
   private final DocumentStoreReader<FlowActivityDocument>
       flowActivityDocReader;
 
+  /**
+   * 构造函数，初始化各类型文档读取器。
+   * @param conf Hadoop配置对象
+   * @throws YarnException 初始化读取器失败时抛出异常
+   */
   public TimelineCollectionReader(
       Configuration conf) throws YarnException {
     LOG.info("Initializing TimelineCollectionReader...");
@@ -70,28 +79,30 @@ public  class TimelineCollectionReader {
   }
 
   /**
-   * Read a document from {@link DocumentStoreVendor} backend for
-   * a {@link CollectionType}.
-   * @param context
-   *               of the timeline reader
-   * @return TimelineEntityDocument as response
-   * @throws IOException on error while reading
+   * 从文档存储后端读取单个指定类型的时间线文档。
+   * @param context 时间线读取上下文，包含查询条件信息
+   * @return 读取到的时间线实体文档
+   * @throws IOException 读取过程发生IO错误时抛出
    */
   public TimelineEntityDocument readDocument(
       TimelineReaderContext context) throws IOException {
     LOG.debug("Fetching document for entity type {}", context.getEntityType());
+    // 根据实体类型选择对应的读取逻辑
     switch (TimelineEntityType.valueOf(context.getEntityType())) {
     case YARN_APPLICATION:
+      // YARN应用实体从应用集合读取
       return genericEntityDocReader.readDocument(
           CollectionType.APPLICATION.getCollectionName(), context,
            TimelineEntityDocument.class);
     case YARN_FLOW_RUN:
+      // YARN流运行实体从流运行集合读取，转换为时间线实体文档
       FlowRunDocument flowRunDoc = flowRunDocReader.readDocument(
           CollectionType.FLOW_RUN.getCollectionName(), context,
           FlowRunDocument.class);
       FlowRunEntity flowRun = createFlowRunEntity(flowRunDoc);
       return new TimelineEntityDocument(flowRun);
     case YARN_FLOW_ACTIVITY:
+      // YARN流活动实体从流活动集合读取，转换为时间线实体文档
       FlowActivityDocument flowActivityDoc = flowActivityDocReader
           .readDocument(CollectionType.FLOW_RUN.getCollectionName(),
               context, FlowActivityDocument.class);
@@ -99,6 +110,7 @@ public  class TimelineCollectionReader {
           flowActivityDoc);
       return  new TimelineEntityDocument(flowActivity);
     default:
+      // 其他实体默认从通用实体集合读取
       return genericEntityDocReader.readDocument(
           CollectionType.ENTITY.getCollectionName(), context,
           TimelineEntityDocument.class);
@@ -106,25 +118,25 @@ public  class TimelineCollectionReader {
   }
 
   /**
-   * Read a list of  documents from {@link DocumentStoreVendor} backend for
-   * a {@link CollectionType}.
-   * @param context
-   *               of the timeline reader
-   * @param documentsSize
-   *               to limit
-   * @return List of TimelineEntityDocument as response
-   * @throws IOException on error while reading
+   * 从文档存储后端批量读取指定类型的时间线文档。
+   * @param context 时间线读取上下文，包含查询条件信息
+   * @param documentsSize 批量读取的最大文档数量限制
+   * @return 读取到的时间线实体文档列表
+   * @throws IOException 读取过程发生IO错误时抛出
    */
   public List<TimelineEntityDocument> readDocuments(
       TimelineReaderContext context, long documentsSize) throws IOException {
     List<TimelineEntityDocument> entityDocs = new ArrayList<>();
     LOG.debug("Fetching documents for entity type {}", context.getEntityType());
+    // 根据实体类型选择对应的批量读取逻辑
     switch (TimelineEntityType.valueOf(context.getEntityType())) {
     case YARN_APPLICATION:
+      // YARN应用实体从应用集合批量读取
       return genericEntityDocReader.readDocumentList(
           CollectionType.APPLICATION.getCollectionName(), context,
            TimelineEntityDocument.class, documentsSize);
     case YARN_FLOW_RUN:
+      // YARN流运行实体从流运行集合批量读取，逐个转换为时间线实体文档
       List<FlowRunDocument> flowRunDocs = flowRunDocReader.readDocumentList(
           CollectionType.FLOW_RUN.getCollectionName(), context,
                FlowRunDocument.class, documentsSize);
@@ -134,6 +146,7 @@ public  class TimelineCollectionReader {
       }
       return entityDocs;
     case YARN_FLOW_ACTIVITY:
+      // YARN流活动实体从流活动集合批量读取，逐个转换为时间线实体文档
       List<FlowActivityDocument> flowActivityDocs = flowActivityDocReader
           .readDocumentList(CollectionType.FLOW_ACTIVITY.getCollectionName(),
               context, FlowActivityDocument.class, documentsSize);
@@ -143,6 +156,7 @@ public  class TimelineCollectionReader {
       }
       return entityDocs;
     default:
+      // 其他实体默认从通用实体集合批量读取
       return genericEntityDocReader.readDocumentList(
           CollectionType.ENTITY.getCollectionName(), context,
           TimelineEntityDocument.class, documentsSize);
@@ -150,11 +164,9 @@ public  class TimelineCollectionReader {
   }
 
   /**
-   * Fetches the list of Entity Types i.e (YARN_CONTAINER,
-   * YARN_APPLICATION_ATTEMPT etc.) for an application Id.
-   * @param context
-   *               of the timeline reader
-   * @return List of EntityTypes as response
+   * 获取指定应用下所有实体类型列表。
+   * @param context 时间线读取上下文，包含应用ID信息
+   * @return 实体类型集合
    */
   public Set<String> fetchEntityTypes(
       TimelineReaderContext context) {
@@ -163,14 +175,19 @@ public  class TimelineCollectionReader {
         CollectionType.ENTITY.getCollectionName(), context);
   }
 
+  /**
+   * 从流活动文档构造流活动实体对象，转换存储模型为业务模型。
+   * @param context 时间线读取上下文
+   * @param flowActivityDoc 从文档存储读取的流活动文档
+   * @return 构造完成的流活动实体
+   */
   private FlowActivityEntity createFlowActivityEntity(
       TimelineReaderContext context, FlowActivityDocument flowActivityDoc) {
     FlowActivityEntity flowActivity = new FlowActivityEntity(
         context.getClusterId(), flowActivityDoc.getDayTimestamp(),
         flowActivityDoc.getUser(), flowActivityDoc.getFlowName());
     flowActivity.setId(flowActivityDoc.getId());
-    // get the list of run ids along with the version that are associated with
-    // this flow on this day
+    // 遍历文档中关联的所有流运行，添加到流活动实体中
     for (FlowActivitySubDoc activity : flowActivityDoc
         .getFlowActivities()) {
       FlowRunEntity flowRunEntity = new FlowRunEntity();
@@ -187,23 +204,28 @@ public  class TimelineCollectionReader {
     return flowActivity;
   }
 
+  /**
+   * 从流运行文档构造流运行实体对象，转换存储模型为业务模型。
+   * @param flowRunDoc 从文档存储读取的流运行文档
+   * @return 构造完成的流运行实体
+   */
   private FlowRunEntity createFlowRunEntity(FlowRunDocument flowRunDoc) {
     FlowRunEntity flowRun = new FlowRunEntity();
     flowRun.setRunId(flowRunDoc.getFlowRunId());
     flowRun.setUser(flowRunDoc.getUsername());
     flowRun.setName(flowRunDoc.getFlowName());
 
-    // read the start time
+    // 设置流运行开始时间
     if (flowRunDoc.getMinStartTime() > 0) {
       flowRun.setStartTime(flowRunDoc.getMinStartTime());
     }
 
-    // read the end time if available
+    // 设置流运行结束时间（如果存在）
     if (flowRunDoc.getMaxEndTime() > 0) {
       flowRun.setMaxEndTime(flowRunDoc.getMaxEndTime());
     }
 
-    // read the flow version
+    // 设置流版本（如果存在）
     if (!DocumentStoreUtils.isNullOrEmpty(flowRunDoc.getFlowVersion())) {
       flowRun.setVersion(flowRunDoc.getFlowVersion());
     }
@@ -213,6 +235,10 @@ public  class TimelineCollectionReader {
     return flowRun;
   }
 
+  /**
+   * 关闭所有读取器，释放资源。
+   * @throws Exception 关闭过程发生异常时抛出
+   */
   public void close() throws Exception {
     genericEntityDocReader.close();
     flowRunDocReader.close();

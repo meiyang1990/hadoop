@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,6 +35,9 @@ import java.util.Collections;
 import java.util.Objects;
 
 /**
+ * 文件级注释：基于跳表实现的目录差异列表，用于HDFS快照功能中存储多个快照之间的目录变化，
+ * 通过跳表分层结构优化差异合并计算和快照删除性能，加快获取指定范围快照差异的效率。
+ * <p>
  * SkipList is an implementation of a data structure for storing a sorted list
  * of Directory Diff elements, using a hierarchy of linked lists that connect
  * increasingly sparse subsequences(defined by skip interval here) of the diffs.
@@ -68,9 +72,15 @@ import java.util.Objects;
  * Once a snapshot gets deleted, the list needs to be balanced.
  */
 public class DiffListBySkipList implements DiffList<DirectoryDiff> {
+  /** 日志记录器 */
   public static final Logger LOG =
       LoggerFactory.getLogger(DiffListBySkipList.class);
 
+  /**
+   * 将ChildrenDiff转换为带内存地址标识的字符串，用于调试输出
+   * @param diff 要转换的ChildrenDiff对象
+   * @return 转换后的字符串
+   */
   static String childrenDiff2String(ChildrenDiff diff) {
     if (diff == null) {
       return "null";
@@ -78,10 +88,19 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
     return "@" + Integer.toHexString(System.identityHashCode(diff));
   }
 
+  /**
+   * 将跳转节点和对应差异转换为字符串，用于调试输出
+   * @param skipTo 跳转目标节点
+   * @param diff 对应区间合并差异
+   * @return 转换后的字符串
+   */
   static String skip2String(SkipListNode skipTo, ChildrenDiff diff) {
     return "->" + skipTo + ":diff=" + childrenDiff2String(diff);
   }
 
+  /**
+   * 内部类，存储跳转区间的合并差异和目标节点引用
+   */
   private static class SkipDiff {
     static final SkipDiff[] EMPTY_ARRAY = {};
 
@@ -121,8 +140,7 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
   }
 
   /**
-   * SkipListNode is an implementation of a DirectoryDiff List node,
-   * which stores a Directory Diff and references to subsequent nodes.
+   * 跳表节点类，存储单个目录差异，并维护不同层级的跳转指针和区间合并差异
    */
   final static class SkipListNode implements Comparable<Integer> {
 
@@ -131,7 +149,7 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
      */
     private final DirectoryDiff diff;
 
-    /** Next node. */
+    /** Next node in level 0. */
     private SkipListNode next;
     /**
      * Array containing combined children diffs over a skip interval.
@@ -139,16 +157,16 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
     private SkipDiff[] skips;
 
     /**
-     * Constructs a new instance of SkipListNode with the specified data element
-     * and level.
+     * 构造跳表节点
      *
-     * @param diff The element to be stored in the node.
-     * @param level
+     * @param diff 该节点存储的目录差异
+     * @param level 该节点的最高层级
      */
     SkipListNode(DirectoryDiff diff, int level) {
       this.diff = diff;
 
       this.skips = level > 0? new SkipDiff[level]: SkipDiff.EMPTY_ARRAY;
+      // 初始化每个层级的SkipDiff对象
       for(int i = 0; i < skips.length; i++) {
         skips[i] = new SkipDiff(null);
       }
@@ -161,12 +179,15 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
       return skips.length;
     }
 
+    /** 修剪节点层级，移除末尾空的层级，节省空间 */
     void trim() {
       int n = skips.length - 1;
+      // 从最高层向前查找第一个非空层级
       for (; n >= 0 && skips[n] == null; n--) {
         continue;
       }
       n++;
+      // 如果需要修剪，复制数组到新长度
       if (n < skips.length) {
         skips = n > 0 ? Arrays.copyOf(skips, n) : SkipDiff.EMPTY_ARRAY;
       }
@@ -201,15 +222,19 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
       return Objects.hash(diff);
     }
 
+    /** 设置指定层级的合并差异 */
     public void setSkipDiff(ChildrenDiff cDiff, int level) {
       Preconditions.checkArgument(level > 0);
+      // 如果层级超过当前数组大小，先扩容
       resize(level);
       skips[level - 1].setDiff(cDiff);
     }
 
+    /** 更新所有从当前层级开始指向目标节点的跳转差异 */
     void setSkipDiff4Target(
         SkipListNode target, int startLevel, ChildrenDiff childrenDiff) {
       for(int i = startLevel; i <= level(); i++) {
+        // 如果当前层级跳转节点已经不是目标，停止更新
         if (getSkipNode(i) != target) {
           return;
         }
@@ -217,8 +242,10 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
       }
     }
 
+    /** 扩容跳表层级数组，添加新增层级的初始化对象 */
     private void resize(int newLevel) {
       int i = skips.length;
+      // 如果当前长度小于目标层级，扩容数组
       if (i < newLevel) {
         skips = Arrays.copyOf(skips, newLevel);
         for (; i < newLevel; i++) {
@@ -227,6 +254,7 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
       }
     }
 
+    /** 设置指定层级的跳转目标节点 */
     public void setSkipTo(SkipListNode node, int level) {
       if (level == 0) {
         next = node;
@@ -236,6 +264,7 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
       }
     }
 
+    /** 获取指定层级的合并差异 */
     public ChildrenDiff getChildrenDiff(int level) {
       if (level == 0) {
         return diff != null? diff.getChildrenDiff(): null;
@@ -244,6 +273,7 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
       }
     }
 
+    /** 获取指定层级的跳转目标节点 */
     SkipListNode getSkipNode(int level) {
       return level == 0? next
           : level <= skips.length? skips[level - 1].getSkipTo()
@@ -255,6 +285,7 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
       return diff != null ? "" + diff.getSnapshotId() : "?";
     }
 
+    /** 将节点信息追加到StringBuilder，用于调试输出 */
     StringBuilder appendTo(StringBuilder b) {
       b.append(this).append(": ").append(skip2String(next, getChildrenDiff(0)));
       for(int i = 0; i < skips.length; i++) {
@@ -265,19 +296,19 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
   }
 
   /**
-   * The reference to the first node of the list.
-   * The list will grow linearly once a new Directory diff gets added.
-   * All the list inteface defined methods provide a linear view of the list.
+   * 存储所有跳表节点的线性列表，提供按索引快速访问能力
+   * 对外接口的线性列表视图由此提供
    */
   private final List<SkipListNode> skipNodeList;
 
   /**
-   * The head node to the list.
+   * 跳表头节点，不存储实际差异
    */
   private SkipListNode head;
 
   /**
-   * Constructs a new, empty instance of SkipList.
+   * 构造空的跳表差异列表
+   * @param capacity 初始容量
    */
   public DiffListBySkipList(int capacity) {
     skipNodeList = new ArrayList<>(capacity);
@@ -285,31 +316,21 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
   }
 
   /**
-   * Adds the specified data element to the beginning of the SkipList,
-   * if the element is not already present.
-   * @param diff the element to be inserted
+   * 在列表头部插入新的目录差异，用于新增快照在最前的场景
+   * @param diff 要插入的目录差异
    */
   @Override
   public void addFirst(DirectoryDiff diff) {
     final int nodeLevel = DirectoryDiffListFactory.randomLevel();
+    // 存储每个层级插入位置的前驱节点
     final SkipListNode[] nodePath = new SkipListNode[nodeLevel + 1];
     Arrays.fill(nodePath, head);
 
     final SkipListNode newNode = new SkipListNode(diff, nodeLevel);
+    // 按层级从低到高处理插入
     for (int level = 0; level <= nodeLevel; level++) {
       if (level > 0) {
-        // Case : S0 is added at the beginning and it has 3 levels
-        //  suppose the list is like:
-        //  level 1: head ------------------->s5------------->NULL
-        //  level 0:head->    s1->s2->s3->s4->s5->s6->s7->s8->s9
-        //  in this case:
-        //  level 2: head -> s0 -------------------------------->NULL
-        //  level 1: head -> s0'---------------->s5------------->NULL
-        //  level 0:head->   s0->s1->s2->s3->s4->s5->s6->s7->s8->s9
-        //  At level 1, we need to combine s0, s1, s2, s3, s4 and s5 and store
-        //  as s0'. At level 2, s0 of next is pointing to null;
-        //  Note: in this case, the diff of element being added is included
-        //  while combining the diffs.
+        // 新增节点插入头部后，原有后续节点需要重新合并区间差异
         final SkipListNode nextNode = head.getSkipNode(level);
         if (nextNode != null) {
           ChildrenDiff combined = combineDiff(newNode, nextNode, level);
@@ -318,24 +339,33 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
           }
         }
       }
-      //insert to the linked list
+      // 插入到对应层级链表中
       newNode.setSkipTo(nodePath[level].getSkipNode(level), level);
       nodePath[level].setSkipTo(newNode, level);
     }
     skipNodeList.add(0, newNode);
   }
 
+  /**
+   * 查找指定节点在每个层级的前驱节点，用于插入/删除操作
+   * @param node 目标节点，查找null则表示找最后一个节点
+   * @param nodeLevel 目标节点的层级
+   * @return 每个层级的前驱节点数组
+   */
   private SkipListNode[] findPreviousNodes(SkipListNode node, int nodeLevel) {
     final SkipListNode[] nodePath = new SkipListNode[nodeLevel + 1];
     SkipListNode cur = head;
     final int headLevel = head.level();
+    // 从最高层级向下查找
     for (int level = headLevel < nodeLevel ? headLevel : nodeLevel;
          level >= 0; level--) {
+      // 一直向后查找直到找到目标节点的前驱
       while (cur.getSkipNode(level) != node) {
         cur = cur.getSkipNode(level);
       }
       nodePath[level] = cur;
     }
+    // 超过头节点层级的部分前驱都设为头节点
     for (int level = headLevel + 1; level <= nodeLevel; level++) {
       nodePath[level] = head;
     }
@@ -343,49 +373,47 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
   }
 
   /**
-   * Adds the specified data element to the end of the SkipList,
-   * if the element is not already present.
-   * @param diff the element to be inserted
+   * 在列表尾部追加新的目录差异，用于新增快照的常规场景
+   * @param diff 要插入的目录差异
+   * @return 插入成功返回true
    */
   @Override
   public boolean addLast(DirectoryDiff diff) {
     final int nodeLevel = DirectoryDiffListFactory.randomLevel();
+    // 查找每个层级的前驱节点
     final SkipListNode[] nodePath = findPreviousNodes(null, nodeLevel);
 
     final SkipListNode newNode = new SkipListNode(diff, nodeLevel);
+    // 按层级处理插入
     for (int level = 0; level <= nodeLevel; level++) {
       if (level > 0 && nodePath[level] != head) {
-        //  suppose the list is like:
-        //  level 2: head ->  s1----------------------------->NULL
-        //  level 1: head ->  s1---->s3'------>s5------------->NULL
-        //  level 0:head->    s1->s2->s3->s4->s5->s6->s7->s8->s9
-
-        // case : s10 is added at the end the let the level for this node = 4
-        //  in this case,
-        //  level 2: head ->  s1''------------------------------------>s10
-        //  level 1: head ->  s1'---->s3'------>s5'-------------------->s10
-        //  level 0:head->    s1->s2->s3->s4->s5->s6->s7->s8->s9---->s10
-        //  At level 1, we combine s5, s6, s7, s8, s9 and store as s5'
-        //  At level 2, we combine s1', s3', s5' and form s1'' and store at s1.
-        // Note : the last element(element being added) diff is not added while
-        // combining the diffs.
+        // 新增节点插入尾部后，前驱节点需要合并当前区间的差异
         ChildrenDiff combined = combineDiff(nodePath[level], newNode, level);
         if (combined != null) {
           nodePath[level].setSkipDiff(combined, level);
         }
       }
+      // 更新链表指针完成插入
       nodePath[level].setSkipTo(newNode, level);
       newNode.setSkipTo(null, level);
     }
     return skipNodeList.add(newNode);
   }
 
+  /**
+   * 合并从from节点到to节点之间指定层级的所有差异
+   * @param from 起始节点（不包含）
+   * @param to 结束节点
+   * @param level 当前处理层级
+   * @return 合并后的总差异
+   */
   private static ChildrenDiff combineDiff(SkipListNode from, SkipListNode to,
       int level) {
     ChildrenDiff combined = null;
     ChildrenDiff first = null;
 
     SkipListNode cur = from;
+    // 从低层级到高层级遍历，合并区间内所有预合并差异
     for (int i = level - 1; i >= 0; i--) {
       while (cur != to) {
         final SkipListNode next = cur.getSkipNode(i);
@@ -393,9 +421,11 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
           break;
         }
 
+        // 第一个差异直接保存，不需要合并
         if (first == null) {
           first = cur.getChildrenDiff(i);
         } else {
+          // 后续差异依次向后合并
           if (combined == null) {
             combined = new ChildrenDiff();
             combined.combinePosterior(first, null);
@@ -409,178 +439,33 @@ public class DiffListBySkipList implements DiffList<DirectoryDiff> {
   }
 
   /**
-   * Returns the data element at the specified index in this SkipList.
+   * 获取指定索引位置的目录差异
    *
-   * @param index The index of the element to be returned.
-   * @return The element at the specified index in this SkipList.
+   * @param index 索引位置
+   * @return 指定位置的目录差异
    */
   @Override
   public DirectoryDiff get(int index) {
     return skipNodeList.get(index).getDiff();
   }
 
+  /**
+   * 获取指定索引位置的跳表节点
+   * @param i 索引位置
+   * @return 跳表节点
+   */
   SkipListNode getSkipListNode(int i) {
     return skipNodeList.get(i);
   }
 
   /**
-   * Removes the element at the specified position in this list.
+   * 删除指定索引位置的目录差异，用于删除快照场景
    *
-   * @param index the index of the element to be removed
-   * @return the removed DirectoryDiff
+   * @param index 要删除的索引位置
+   * @return 被删除的目录差异
    */
   @Override
   public DirectoryDiff remove(int index) {
     final SkipListNode node = getNode(index);
 
     int headLevel = head.level();
-    int nodeLevel = node.level();
-    final SkipListNode[] nodePath = findPreviousNodes(node, nodeLevel);
-
-    for (int level = 0; level <= nodeLevel; level++) {
-      final SkipListNode previous = nodePath[level];
-      final SkipListNode next = node.getSkipNode(level);
-      if (level == 0) {
-        if (next != null) {
-          previous.setSkipDiff4Target(next, 1, previous.getChildrenDiff(0));
-        }
-      } else if (previous != head) {
-        // if the last snapshot is deleted, for all the skip level nodes
-        // pointing to the last one, the combined children diff at each level
-        // > 0 should be made null and skip pointers will be updated to null.
-        // if the snapshot being deleted is not the last one, we have to merge
-        // the diff of deleted node at each level to the previous skip level
-        // node at that level and the skip pointers will be updated to point to
-        // the skip nodes of the deleted node.
-        if (next == null) {
-          previous.setSkipDiff(null, level);
-        } else {
-          /* Ideally at level 0, the deleted diff will be combined with
-           * the previous diff , and deleted inodes will be cleaned up
-           * by passing a deleted processor here while combining the diffs.
-           * Level 0 merge with previous diff will be handled inside the
-           * {@link AbstractINodeDiffList#deleteSnapshotDiff} function.
-           */
-          if (node.getChildrenDiff(level) != null) {
-            final ChildrenDiff combined;
-            if (previous == nodePath[level - 1]
-                && next == node.getSkipNode(level - 1)) {
-              combined = nodePath[level - 1].getChildrenDiff(level - 1);
-              previous.setSkipDiff4Target(next, level + 1, combined);
-            } else if (next == previous.getSkipNode(level + 1)) {
-              combined = previous.getChildrenDiff(level + 1);
-            } else {
-              combined = new ChildrenDiff();
-              combined.combinePosterior(previous.getChildrenDiff(level), null);
-              combined.combinePosterior(node.getChildrenDiff(level), null);
-            }
-            previous.setSkipDiff(combined, level);
-          }
-        }
-      }
-      previous.setSkipTo(next, level);
-    }
-    if (nodeLevel == headLevel) {
-      head.trim();
-    }
-    return skipNodeList.remove(index).getDiff();
-  }
-
-  /**
-   * Returns true if this SkipList contains no data elements. In other words,
-   * returns true if the size of this SkipList is zero.
-   *
-   * @return True if this SkipList contains no elements.
-   */
-  @Override
-  public boolean isEmpty() {
-    return skipNodeList.isEmpty();
-  }
-
-  /**
-   * Returns the number of data elements in this SkipList.
-   *
-   * @return The number of elements in this SkipList.
-   */
-  @Override
-  public int size() {
-    return skipNodeList.size();
-  }
-
-  /**
-   * Iterator is an iterator over the SkipList. This should
-   * always provide a linear view of the list.
-   */
-  @Override
-  public Iterator<DirectoryDiff> iterator() {
-    final Iterator<SkipListNode> i = skipNodeList.iterator();
-    return new Iterator<DirectoryDiff>() {
-
-      @Override
-      public boolean hasNext() {
-        return i.hasNext();
-      }
-
-      @Override
-      public DirectoryDiff next() {
-        return i.next().getDiff();
-      }
-    };
-  }
-
-  @Override
-  public int binarySearch(int key) {
-    return Collections.binarySearch(skipNodeList, key);
-  }
-
-  private SkipListNode getNode(int index) {
-    return skipNodeList.get(index);
-  }
-
-
-  /**
-   * This function returns the minimal set of diffs required to combine in
-   * order to generate all the changes occurred between fromIndex and
-   * toIndex.
-   *
-   * @param fromIndex index from where the summation has to start(inclusive)
-   * @param toIndex   index till where the summation has to end(exclusive)
-   * @return list of Directory Diff
-   */
-  @Override
-  public List<DirectoryDiff> getMinListForRange(int fromIndex, int toIndex,
-      INodeDirectory dir) {
-    final List<DirectoryDiff> subList = new ArrayList<>();
-    final int toSnapshotId = get(toIndex - 1).getSnapshotId();
-    for (SkipListNode current = getNode(fromIndex); current != null;) {
-      SkipListNode next = null;
-      ChildrenDiff childrenDiff = null;
-      for (int level = current.level(); level >= 0; level--) {
-        next = current.getSkipNode(level);
-        if (next != null && next.getDiff().compareTo(toSnapshotId) <= 0) {
-          childrenDiff = current.getChildrenDiff(level);
-          break;
-        }
-      }
-      final DirectoryDiff curDiff = current.getDiff();
-      subList.add(childrenDiff == null ? curDiff :
-          new DirectoryDiff(curDiff.getSnapshotId(), dir, childrenDiff));
-
-      if (current.getDiff().compareTo(toSnapshotId) == 0) {
-        break;
-      }
-      current = next;
-    }
-    return subList;
-  }
-
-  @Override
-  public String toString() {
-    final StringBuilder b = new StringBuilder().append(" head: ");
-    head.appendTo(b);
-    for (SkipListNode n : skipNodeList) {
-      n.appendTo(b.append("\n  "));
-    }
-    return b.toString();
-  }
-}

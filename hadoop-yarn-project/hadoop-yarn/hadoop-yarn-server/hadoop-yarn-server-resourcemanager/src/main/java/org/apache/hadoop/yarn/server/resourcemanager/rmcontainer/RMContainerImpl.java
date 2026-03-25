@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -65,12 +66,19 @@ import org.apache.hadoop.yarn.state.StateMachineFactory;
 import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
+/**
+ * ResourceManager端容器实现，维护容器生命周期状态，处理容器相关事件流转
+ * 代表YARN集群中一个已分配给应用尝试的容器，基于状态机实现容器生命周期管理
+ */
 @SuppressWarnings({"unchecked", "rawtypes"})
 public class RMContainerImpl implements RMContainer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RMContainerImpl.class);
 
+  /**
+   * 容器状态机工厂，定义所有容器状态和事件的转换规则
+   */
   private static final StateMachineFactory<RMContainerImpl, RMContainerState, 
                                            RMContainerEventType, RMContainerEvent> 
    stateMachineFactory = new StateMachineFactory<RMContainerImpl, 
@@ -164,36 +172,58 @@ public class RMContainerImpl implements RMContainer {
     // create the topology tables
     .installTopology();
 
+  /** 容器当前状态机实例 */
   private final StateMachine<RMContainerState, RMContainerEventType,
                                                  RMContainerEvent> stateMachine;
+  /** 读锁，用于保护状态查询 */
   private final ReadLock readLock;
+  /** 写锁，用于保护状态变更 */
   private final WriteLock writeLock;
+  /** 所属应用尝试ID */
   private final ApplicationAttemptId appAttemptId;
+  /** 分配节点ID */
   private final NodeId nodeId;
+  /** RM上下文，获取全局资源和服务 */
   private final RMContext rmContext;
+  /** 事件处理器，用于发送事件到其他组件 */
   private final EventHandler eventHandler;
+  /** 容器分配过期管理器 */
   private final ContainerAllocationExpirer containerAllocationExpirer;
+  /** 容器对应用户 */
   private final String user;
+  /** 节点标签表达式 */
   private final String nodeLabelExpression;
 
+  /** 当前容器信息 */
   private volatile Container container;
+  /** 预留资源 */
   private Resource reservedResource;
+  /** 预留节点 */
   private NodeId reservedNode;
+  /** 预留调度请求key */
   private SchedulerRequestKey reservedSchedulerKey;
+  /** 创建时间 */
   private long creationTime;
+  /** 完成时间 */
   private long finishTime;
+  /** 完成状态信息 */
   private ContainerStatus finishedStatus;
+  /** 是否是ApplicationMaster容器 */
   private boolean isAMContainer;
+  /** 恢复用容器请求 */
   private ContainerRequest containerRequestForRecovery;
 
-  // Only used for container resource increase and decrease. This is the
-  // resource to rollback to should container resource increase token expires.
+  /** 回滚用的最后确认资源，用于容器资源动态调整 */
   private Resource lastConfirmedResource;
+  /** 所属队列名称 */
   private volatile String queueName;
 
+  /** 是否是外部分配容器 */
   private boolean isExternallyAllocated;
+  /** 分配调度请求key */
   private SchedulerRequestKey allocatedSchedulerKey;
 
+  /** 分配标签集合 */
   private volatile Set<String> allocationTags = null;
 
   public RMContainerImpl(Container container, SchedulerRequestKey schedulerKey,
@@ -226,6 +256,9 @@ public class RMContainerImpl implements RMContainer {
         creationTime, nodeLabelExpression, false);
   }
 
+  /**
+   * 完整构造方法，初始化容器状态与依赖
+   */
   public RMContainerImpl(Container container, SchedulerRequestKey schedulerKey,
       ApplicationAttemptId appAttemptId, NodeId nodeId, String user,
       RMContext rmContext, long creationTime, String nodeLabelExpression,
@@ -253,6 +286,7 @@ public class RMContainerImpl implements RMContainer {
         shouldPublishNonAMContainerEventstoATS(rmContext);
 
     if (container.getId() != null) {
+      // 向应用历史写入器记录容器启动事件
       rmContext.getRMApplicationHistoryWriter().containerStarted(this);
     }
 
@@ -373,6 +407,7 @@ public class RMContainerImpl implements RMContainer {
   public String getLogURL() {
     readLock.lock();
     try {
+      // 构造容器日志访问URL
       StringBuilder logURL = new StringBuilder();
       logURL.append(WebAppUtils.getHttpSchemePrefix(rmContext
           .getYarnConfiguration()));
@@ -401,535 +436,3 @@ public class RMContainerImpl implements RMContainer {
 
   @Override
   public ContainerState getContainerState() {
-    readLock.lock();
-    try {
-      if (finishedStatus != null) {
-        return finishedStatus.getState();
-      } else {
-        return ContainerState.RUNNING;
-      }
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public ContainerRequest getContainerRequest() {
-    readLock.lock();
-    try {
-      return containerRequestForRecovery;
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  public void setContainerRequest(ContainerRequest request) {
-    writeLock.lock();
-    try {
-      this.containerRequestForRecovery = request;
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  @Override
-  public String toString() {
-    return getContainerId().toString();
-  }
-  
-  @Override
-  public boolean isAMContainer() {
-    readLock.lock();
-    try {
-      return isAMContainer;
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  public void setAMContainer(boolean isAMContainer) {
-    writeLock.lock();
-    try {
-      this.isAMContainer = isAMContainer;
-    } finally {
-      writeLock.unlock();
-    }
-
-    // Even if saveNonAMContainerMetaInfo is not true, the AM container's system
-    // metrics still need to be saved so that the AM's logs can be accessed.
-    // This call to getSystemMetricsPublisher().containerCreated() is mutually
-    // exclusive with the one in the RMContainerImpl constructor.
-    if (!saveNonAMContainerMetaInfo && this.isAMContainer) {
-      rmContext.getSystemMetricsPublisher().containerCreated(
-          this, this.creationTime);
-    }
-  }
-  
-  @Override
-  public void handle(RMContainerEvent event) {
-    LOG.debug("Processing {} of type {}", event.getContainerId(),
-        event.getType());
-
-    writeLock.lock();
-    try {
-      RMContainerState oldState = getState();
-      try {
-         stateMachine.doTransition(event.getType(), event);
-      } catch (InvalidStateTransitionException e) {
-        LOG.error("Can't handle this event at current state", e);
-        onInvalidStateTransition(event.getType(), oldState);
-      }
-      if (oldState != getState()) {
-        LOG.info(event.getContainerId() + " Container Transitioned from "
-            + oldState + " to " + getState());
-      }
-    }
-    
-    finally {
-      writeLock.unlock();
-    }
-  }
-  
-  public boolean completed() {
-    return finishedStatus != null;
-  }
-
-  @Override
-  public NodeId getNodeId() {
-    return nodeId;
-  }
-
-  @Override
-  public Set<String> getAllocationTags() {
-    return allocationTags;
-  }
-
-  public void setAllocationTags(Set<String> tags) {
-    this.allocationTags = tags;
-  }
-
-  private static class BaseTransition implements
-      SingleArcTransition<RMContainerImpl, RMContainerEvent> {
-
-    @Override
-    public void transition(RMContainerImpl cont, RMContainerEvent event) {
-
-    }
-  }
-
-  private static final class ContainerRecoveredTransition
-      implements
-      MultipleArcTransition<RMContainerImpl, RMContainerEvent, RMContainerState> {
-    @Override
-    public RMContainerState transition(RMContainerImpl container,
-        RMContainerEvent event) {
-      NMContainerStatus report =
-          ((RMContainerRecoverEvent) event).getContainerReport();
-      // Set the allocation tags from the NMContainerStatus
-      container.setAllocationTags(report.getAllocationTags());
-      // Notify AllocationTagsManager
-      container.rmContext.getAllocationTagsManager().addContainer(
-          container.getNodeId(), container.getContainerId(),
-          container.getAllocationTags());
-
-      if (report.getContainerState().equals(ContainerState.COMPLETE)) {
-        ContainerStatus status =
-            ContainerStatus.newInstance(report.getContainerId(),
-              report.getContainerState(), report.getDiagnostics(),
-              report.getContainerExitStatus());
-        new FinishedTransition().transition(container,
-          new RMContainerFinishedEvent(container.getContainerId(), status,
-            RMContainerEventType.FINISHED));
-        return RMContainerState.COMPLETED;
-      } else if (report.getContainerState().equals(ContainerState.RUNNING)) {
-        // Tell the app
-        container.eventHandler.handle(new RMAppRunningOnNodeEvent(container
-            .getApplicationAttemptId().getApplicationId(), container.nodeId));
-        return RMContainerState.RUNNING;
-      } else {
-        // This can never happen.
-        LOG.warn("RMContainer received unexpected recover event with container"
-            + " state " + report.getContainerState() + " while recovering.");
-        return RMContainerState.RUNNING;
-      }
-    }
-  }
-
-  private static final class ContainerReservedTransition
-      extends BaseTransition {
-
-    @Override
-    public void transition(RMContainerImpl container, RMContainerEvent event) {
-      RMContainerReservedEvent e = (RMContainerReservedEvent)event;
-      container.reservedResource = e.getReservedResource();
-      container.reservedNode = e.getReservedNode();
-      container.reservedSchedulerKey = e.getReservedSchedulerKey();
-
-      Container c = container.getContainer();
-      if (c != null) {
-        c.setNodeId(container.reservedNode);
-      }
-    }
-  }
-
-
-  private static final class ContainerStartedTransition extends
-      BaseTransition {
-
-    @Override
-    public void transition(RMContainerImpl container, RMContainerEvent event) {
-      // Notify AllocationTagsManager
-      container.rmContext.getAllocationTagsManager().addContainer(
-          container.getNodeId(), container.getContainerId(),
-          container.getAllocationTags());
-
-      container.eventHandler.handle(
-          new RMAppAttemptEvent(container.appAttemptId,
-              RMAppAttemptEventType.CONTAINER_ALLOCATED));
-
-      publishNonAMContainerEventstoATS(container);
-
-    }
-  }
-
-  private static final class AcquiredTransition extends BaseTransition {
-
-    @Override
-    public void transition(RMContainerImpl container, RMContainerEvent event) {
-      // Clear ResourceRequest stored in RMContainer, we don't need to remember
-      // this anymore.
-      container.setContainerRequest(null);
-      
-      // Register with containerAllocationExpirer.
-      container.containerAllocationExpirer.register(
-          new AllocationExpirationInfo(container.getContainerId()));
-
-      // Tell the app
-      container.eventHandler.handle(new RMAppRunningOnNodeEvent(container
-          .getApplicationAttemptId().getApplicationId(), container.nodeId, true));
-
-      // Opportunistic containers move directly from NEW to ACQUIRED
-      if (container.getState() == RMContainerState.NEW) {
-        publishNonAMContainerEventstoATS(container);
-      }
-    }
-  }
-
-  private static final class ContainerAcquiredWhileRunningTransition extends
-      BaseTransition {
-
-    @Override
-    public void transition(RMContainerImpl container, RMContainerEvent event) {
-      RMContainerUpdatesAcquiredEvent acquiredEvent =
-          (RMContainerUpdatesAcquiredEvent) event;
-      if (acquiredEvent.isIncreasedContainer()) {
-        // If container is increased but not started by AM, we will start
-        // containerAllocationExpirer for this container in this transition. 
-        container.containerAllocationExpirer.register(
-            new AllocationExpirationInfo(event.getContainerId(), true));
-      }
-    }
-  }
-  
-  private static final class NMReportedContainerChangeIsDoneTransition
-      extends BaseTransition {
-
-    @Override
-    public void transition(RMContainerImpl container, RMContainerEvent event) {
-      RMContainerNMDoneChangeResourceEvent nmDoneChangeResourceEvent =
-          (RMContainerNMDoneChangeResourceEvent)event;
-      Resource rmContainerResource = container.getAllocatedResource();
-      Resource nmContainerResource =
-          nmDoneChangeResourceEvent.getNMContainerResource();
-
-      if (Resources.equals(rmContainerResource, nmContainerResource)) {
-        // If rmContainerResource == nmContainerResource, the resource
-        // increase is confirmed.
-        // In this case:
-        //    - Set the lastConfirmedResource as nmContainerResource
-        //    - Unregister the allocation expirer
-        container.lastConfirmedResource = nmContainerResource;
-        container.containerAllocationExpirer.unregister(
-            new AllocationExpirationInfo(event.getContainerId()));
-      } else if (Resources.fitsIn(rmContainerResource, nmContainerResource)) {
-        // If rmContainerResource < nmContainerResource, this is caused by the
-        // following sequence:
-        //   1. AM asks for increase from 1G to 5G, and RM approves it
-        //   2. AM acquires the increase token and increases on NM
-        //   3. Before NM reports 5G to RM to confirm the increase, AM sends
-        //      a decrease request to 4G, and RM approves it
-        //   4. When NM reports 5G to RM, RM now sees its own allocation as 4G
-        // In this cases:
-        //    - Set the lastConfirmedResource as rmContainerResource
-        //    - Unregister the allocation expirer
-        //    - Notify NM to reduce its resource to rmContainerResource
-        container.lastConfirmedResource = rmContainerResource;
-        container.containerAllocationExpirer.unregister(
-            new AllocationExpirationInfo(event.getContainerId()));
-        container.eventHandler.handle(new RMNodeUpdateContainerEvent(
-            container.nodeId,
-            Collections.singletonMap(container.getContainer(),
-                ContainerUpdateType.DECREASE_RESOURCE)));
-      } else if (Resources.fitsIn(nmContainerResource, rmContainerResource)) {
-        // If nmContainerResource < rmContainerResource, this is caused by the
-        // following sequence:
-        //    1. AM asks for increase from 1G to 2G, and RM approves it
-        //    2. AM asks for increase from 2G to 4G, and RM approves it
-        //    3. AM only uses the 2G token to increase on NM, but never uses the
-        //       4G token
-        //    4. NM reports 2G to RM, but RM sees its own allocation as 4G
-        // In this case:
-        //    - Set the lastConfirmedResource as the maximum of
-        //      nmContainerResource and lastConfirmedResource
-        //    - Do NOT unregister the allocation expirer
-        // When the increase allocation expires, resource will be rolled back to
-        // the last confirmed resource.
-        container.lastConfirmedResource = Resources.componentwiseMax(
-            nmContainerResource, container.lastConfirmedResource);
-      } else {
-        // Something wrong happened, kill the container
-        LOG.warn("Something wrong happened, container size reported by NM"
-            + " is not expected, ContainerID=" + container.getContainerId()
-            + " rm-size-resource:" + rmContainerResource + " nm-size-resource:"
-            + nmContainerResource);
-        container.eventHandler.handle(new RMNodeCleanContainerEvent(
-            container.nodeId, container.getContainerId()));
-
-      }
-    }
-  }
-
-  private static class FinishedTransition extends BaseTransition {
-
-    @Override
-    public void transition(RMContainerImpl container, RMContainerEvent event) {
-      RMContainerFinishedEvent finishedEvent = (RMContainerFinishedEvent) event;
-
-      container.finishTime = System.currentTimeMillis();
-      container.finishedStatus = finishedEvent.getRemoteContainerStatus();
-      // Inform AppAttempt
-      // container.getContainer() can return null when a RMContainer is a
-      // reserved container
-      updateAttemptMetrics(container);
-
-      container.eventHandler.handle(new RMAppAttemptContainerFinishedEvent(
-        container.appAttemptId, finishedEvent.getRemoteContainerStatus(),
-          container.getAllocatedNode()));
-
-      container.rmContext.getRMApplicationHistoryWriter().containerFinished(
-        container);
-
-      boolean saveNonAMContainerMetaInfo =
-          shouldPublishNonAMContainerEventstoATS(container.rmContext);
-
-      if (saveNonAMContainerMetaInfo || container.isAMContainer()) {
-        container.rmContext.getSystemMetricsPublisher().containerFinished(
-            container, container.finishTime);
-      }
-    }
-
-    private static void updateAttemptMetrics(RMContainerImpl container) {
-      Resource resource = container.getContainer().getResource();
-      RMApp app = container.rmContext.getRMApps()
-          .get(container.getApplicationAttemptId().getApplicationId());
-      if (app != null) {
-        RMAppAttempt rmAttempt = app.getCurrentAppAttempt();
-        if (rmAttempt != null) {
-          long usedMillis = container.finishTime - container.creationTime;
-          rmAttempt.getRMAppAttemptMetrics()
-              .updateAggregateAppResourceUsage(resource, usedMillis);
-          // If this is a preempted container, update preemption metrics
-          if (ContainerExitStatus.PREEMPTED == container.finishedStatus
-              .getExitStatus()) {
-            rmAttempt.getRMAppAttemptMetrics()
-                .updatePreemptionInfo(resource, container);
-            rmAttempt.getRMAppAttemptMetrics()
-                .updateAggregatePreemptedAppResourceUsage(resource, usedMillis);
-          }
-        }
-      }
-    }
-  }
-
-  private static boolean shouldPublishNonAMContainerEventstoATS(
-      RMContext rmContext) {
-    return rmContext.getYarnConfiguration().getBoolean(
-        YarnConfiguration.APPLICATION_HISTORY_SAVE_NON_AM_CONTAINER_META_INFO,
-        YarnConfiguration
-            .DEFAULT_APPLICATION_HISTORY_SAVE_NON_AM_CONTAINER_META_INFO);
-  }
-
-  private static void publishNonAMContainerEventstoATS(
-      RMContainerImpl rmContainer) {
-    boolean saveNonAMContainerMetaInfo = shouldPublishNonAMContainerEventstoATS(
-        rmContainer.rmContext);
-
-    // If saveNonAMContainerMetaInfo is true, store system metrics for all
-    // containers. If false, and if this container is marked as the AM, metrics
-    // will still be published for this container, but that calculation happens
-    // later.
-    if (saveNonAMContainerMetaInfo && null != rmContainer.container.getId()) {
-      rmContainer.rmContext.getSystemMetricsPublisher().containerCreated(
-          rmContainer, rmContainer.creationTime);
-    }
-  }
-
-  private static final class KillTransition extends FinishedTransition {
-
-    @Override
-    public void transition(RMContainerImpl container, RMContainerEvent event) {
-
-      // Unregister from containerAllocationExpirer.
-      container.containerAllocationExpirer.unregister(
-          new AllocationExpirationInfo(container.getContainerId()));
-
-      // Inform node
-      container.eventHandler.handle(new RMNodeCleanContainerEvent(
-          container.nodeId, container.getContainerId()));
-
-      // Inform appAttempt
-      super.transition(container, event);
-    }
-  }
-
-  @Override
-  public ContainerReport createContainerReport() {
-    this.readLock.lock();
-    ContainerReport containerReport = null;
-    try {
-      containerReport = ContainerReport.newInstance(this.getContainerId(),
-          this.getAllocatedResource(), this.getAllocatedNode(),
-          this.getAllocatedSchedulerKey().getPriority(), this.getCreationTime(),
-          this.getFinishTime(), this.getDiagnosticsInfo(), this.getLogURL(),
-          this.getContainerExitStatus(), this.getContainerState(),
-          this.getNodeHttpAddress(),  this.getExecutionType());
-      containerReport.setExposedPorts(this.getExposedPorts());
-    } finally {
-      this.readLock.unlock();
-    }
-    return containerReport;
-  }
-
-  @Override
-  public String getNodeHttpAddress() {
-    readLock.lock();
-    try {
-      if (container.getNodeHttpAddress() != null) {
-        StringBuilder httpAddress = new StringBuilder();
-        httpAddress.append(WebAppUtils.getHttpSchemePrefix(rmContext
-            .getYarnConfiguration()));
-        httpAddress.append(container.getNodeHttpAddress());
-        return httpAddress.toString();
-      } else {
-        return null;
-      }
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public Map<String, List<Map<String, String>>> getExposedPorts() {
-    if (container.getExposedPorts() == null) {
-      return null;
-    }
-    return container.getExposedPorts();
-  }
-
-  @Override
-  public void setExposedPorts(Map<String, List<Map<String, String>>> ports) {
-    container.setExposedPorts(ports);
-  }
-
-  @Override
-  public String getNodeLabelExpression() {
-    if (nodeLabelExpression == null) {
-      return RMNodeLabelsManager.NO_LABEL;
-    }
-    return nodeLabelExpression;
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj instanceof RMContainer) {
-      if (null != getContainerId()) {
-        return getContainerId().equals(((RMContainer) obj).getContainerId());
-      }
-    }
-    return false;
-  }
-
-  @Override
-  public int hashCode() {
-    if (null != getContainerId()) {
-      return getContainerId().hashCode();
-    }
-    return super.hashCode();
-  }
-
-  @Override
-  public int compareTo(RMContainer o) {
-    if (getContainerId() != null && o.getContainerId() != null) {
-      return getContainerId().compareTo(o.getContainerId());
-    }
-    return -1;
-  }
-
-  public void setQueueName(String queueName) {
-    this.queueName = queueName;
-  }
-
-  @Override
-  public String getQueueName() {
-    return queueName;
-  }
-
-  @Override
-  public ExecutionType getExecutionType() {
-    return container.getExecutionType();
-  }
-
-  @Override
-  public boolean isRemotelyAllocated() {
-    return isExternallyAllocated;
-  }
-
-  @Override
-  public Resource getAllocatedOrReservedResource() {
-    readLock.lock();
-    try {
-      if (getState().equals(RMContainerState.RESERVED)) {
-        return getReservedResource();
-      } else {
-        return getAllocatedResource();
-      }
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public void setContainerId(ContainerId containerId) {
-    // In some cases, for example, global scheduling. It is possible that
-    // container created without container-id assigned, so we will publish
-    // container creation event to timeline service when id assigned.
-    container.setId(containerId);
-
-    if (containerId != null) {
-      rmContext.getRMApplicationHistoryWriter().containerStarted(this);
-    }
-  }
-
-  /**
-   * catch the InvalidStateTransition.
-   * @param state RMContainerState.
-   * @param rmContainerEventType RMContainerEventType.
-   */
-  @VisibleForTesting
-  protected void onInvalidStateTransition(
-      RMContainerEventType rmContainerEventType,
-      RMContainerState state){
-    LOG.error("Invalid event " + rmContainerEventType +
-              " on container " + this.getContainerId());
-  }
-}

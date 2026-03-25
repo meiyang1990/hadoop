@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.resourcemanager.rmapp.monitor contains
- * classes related to application monitor.
+ * YARN ResourceManager 应用监控包，包含所有与RM应用生命周期监控相关的核心类。
+ * 主要负责对YARN集群中运行的应用进行状态监控、超时检测和异常处理，保障集群应用资源的合理回收。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

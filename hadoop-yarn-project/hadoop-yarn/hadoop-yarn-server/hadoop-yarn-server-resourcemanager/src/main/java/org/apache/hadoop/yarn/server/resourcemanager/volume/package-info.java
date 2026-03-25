@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,10 @@
  */
 
 /**
- * This package contains classes to manage storage volumes in YARN.
+ * YARN ResourceManager 存储卷管理包，提供YARN集群中存储卷的管理能力，
+ * 支持CSI等外部存储卷的调度与生命周期管理。
+ * <p>
+ * 该包下所有类均为ResourceManager私有内部实现，不对外公开API。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

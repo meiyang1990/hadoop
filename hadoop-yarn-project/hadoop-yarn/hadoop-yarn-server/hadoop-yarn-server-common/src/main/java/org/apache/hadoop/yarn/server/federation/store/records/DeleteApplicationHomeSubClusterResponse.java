@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -22,16 +23,18 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * DeleteApplicationHomeSubClusterResponse contains the answer from the {@code
- * FederationApplicationHomeSubClusterStore} to a request to delete the mapping
- * of home subcluster of a submitted application. Currently response is empty if
- * the operation was successful, if not an exception reporting reason for a
- * failure.
+ * 联邦存储删除应用归属子集群映射操作的响应类，用于封装
+ * FederationApplicationHomeSubClusterStore对删除应用归属子集群映射请求的处理结果。
+ * 当前实现中，如果操作成功响应为空，失败则通过异常返回具体错误原因。
  */
 @Private
 @Unstable
 public abstract class DeleteApplicationHomeSubClusterResponse {
 
+  /**
+   * 创建一个新的删除应用归属子集群映射响应实例。
+   * @return 新建的响应对象
+   */
   @Private
   @Unstable
   public static DeleteApplicationHomeSubClusterResponse newInstance() {

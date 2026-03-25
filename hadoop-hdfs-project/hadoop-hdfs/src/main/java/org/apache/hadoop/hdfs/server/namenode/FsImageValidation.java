@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,24 +57,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_HA_NAMENODES_KEY_PREFIX;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_READ_LOCK_REPORTING_THRESHOLD_MS_KEY;
-import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_WRITE_LOCK_REPORTING_THRESHOLD_MS_KEY;
+import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_RPC_ADDRESS_KEY;
 import static org.apache.hadoop.hdfs.server.namenode.FsImageValidation.Cli.println;
 import static org.apache.hadoop.util.Time.now;
 
 /**
- * For validating {@link FSImage}.
- * This tool will load the user specified {@link FSImage},
- * build the namespace tree,
- * and then run validations over the namespace tree.
- *
- * The main difference of this tool and
- * {@link org.apache.hadoop.hdfs.tools.offlineImageViewer.OfflineImageViewer}
- * is that
- * {@link org.apache.hadoop.hdfs.tools.offlineImageViewer.OfflineImageViewer}
- * only loads {@link FSImage} but it does not build the namespace tree.
- * Therefore, running validations over the namespace tree is impossible in
- * {@link org.apache.hadoop.hdfs.tools.offlineImageViewer.OfflineImageViewer}.
+ * HDFS FSImage文件离线校验工具，负责加载指定FSImage构建完整命名空间树，
+ * 并对命名空间元数据执行多项完整性校验。
+ * 与离线镜像查看器不同，本工具会完整构建内存命名空间树，从而可以实现深层次的结构校验。
  */
 public class FsImageValidation {
   static final Logger LOG = LoggerFactory.getLogger(FsImageValidation.class);
@@ -81,8 +73,7 @@ public class FsImageValidation {
   static final String FS_IMAGE = "FS_IMAGE";
 
   /**
-   * Use an environment variable "PRINT_ERROR" to enable/disable printing error messages.
-   * The default is true
+   * 通过环境变量PRINT_ERROR控制是否打印错误详情，默认开启
    */
   static final boolean PRINT_ERROR;
 
@@ -91,30 +82,35 @@ public class FsImageValidation {
   }
 
   /**
-   * @return the boolean value of an environment property.
-   *         If the environment property is not set or cannot be parsed as a boolean,
-   *         return the default value.
+   * 从环境变量读取布尔值，读取失败或未设置时返回默认值
+   * @param property 环境变量名
+   * @param defaultValue 默认值
+   * @return 解析后的布尔值
    */
   static boolean getEnvBoolean(String property, boolean defaultValue) {
     final String env = System.getenv().get(property);
     final boolean setToNonDefault = ("" + !defaultValue).equalsIgnoreCase(env);
-    // default | setToNonDefault | value
-    // ---------------------------------
-    // true    |    true         | false
-    // true    |    false        | true
-    // false   |    true         | true
-    // false   |    false        | false
     final boolean value = defaultValue != setToNonDefault;
     LOG.info("ENV: {} = {} (\"{}\")", property, value, env);
     return value;
   }
 
+  /**
+   * 从环境变量读取字符串值并日志记录
+   * @param property 环境变量名
+   * @return 环境变量值
+   */
   static String getEnv(String property) {
     final String value = System.getenv().get(property);
     LOG.info("ENV: {} = {}", property, value);
     return value;
   }
 
+  /**
+   * 根据命令行参数创建FsImageValidation实例
+   * @param args 命令行参数
+   * @return FsImageValidation实例
+   */
   static FsImageValidation newInstance(String... args) {
     final String f = Cli.parse(args);
     if (f == null) {
@@ -124,6 +120,10 @@ public class FsImageValidation {
     return new FsImageValidation(new File(f));
   }
 
+  /**
+   * 初始化校验专用配置，关闭不必要功能关闭锁耗时告警
+   * @param conf Hadoop配置对象
+   */
   static void initConf(Configuration conf) {
     final int aDay = 24*3600_000;
     conf.setInt(DFS_NAMENODE_READ_LOCK_REPORTING_THRESHOLD_MS_KEY, aDay);
@@ -131,7 +131,7 @@ public class FsImageValidation {
     conf.setBoolean(DFS_NAMENODE_ENABLE_RETRY_CACHE_KEY, false);
   }
 
-  /** Set (fake) HA so that edit logs will not be loaded. */
+  /** 设置伪HA配置，避免加载编辑日志，只校验镜像文件 */
   static void setHaConf(String nsId, Configuration conf) {
     conf.set(DFSConfigKeys.DFS_NAMESERVICES, nsId);
     final String haNNKey = DFS_HA_NAMENODES_KEY_PREFIX + "." + nsId;
@@ -141,6 +141,9 @@ public class FsImageValidation {
     conf.set(rpcKey + "nn1", "127.0.0.1:8080");
   }
 
+  /**
+   * 初始化日志级别，关闭无关模块日志，开启核心模块调试日志
+   */
   static void initLogLevels() {
     Util.setLogLevel(FSImage.class, Level.TRACE);
     Util.setLogLevel(FileJournalManager.class, Level.TRACE);
@@ -151,7 +154,14 @@ public class FsImageValidation {
     Util.setLogLevel(TopMetrics.class, Level.OFF);
   }
 
+  /**
+   * 工具内部通用工具类，提供内存信息、日志级别调整、文件名过滤等能力
+   */
   static class Util {
+    /**
+     * 获取当前JVM内存使用信息
+     * @return 格式化后的内存信息字符串
+     */
     static String memoryInfo() {
       final Runtime runtime = Runtime.getRuntime();
       return "Memory Info: free=" + StringUtils.byteDesc(runtime.freeMemory())
@@ -159,6 +169,11 @@ public class FsImageValidation {
           + ", max=" + StringUtils.byteDesc(runtime.maxMemory());
     }
 
+    /**
+     * 设置指定类的日志级别并记录
+     * @param clazz 目标类
+     * @param level 目标日志级别
+     */
     static void setLogLevel(Class<?> clazz, Level level) {
       final org.apache.log4j.Logger logger = org.apache.log4j.Logger.getLogger(clazz);
       logger.setLevel(level);
@@ -166,6 +181,11 @@ public class FsImageValidation {
           logger.getEffectiveLevel());
     }
 
+    /**
+     * 将数字格式化为千分位分隔的字符串
+     * @param n 输入数字
+     * @return 格式化后的字符串
+     */
     static String toCommaSeparatedNumber(long n) {
       final StringBuilder b = new StringBuilder();
       for(; n > 999;) {
@@ -175,7 +195,11 @@ public class FsImageValidation {
       return b.insert(0, n).toString();
     }
 
-    /** @return a filter for the given type. */
+    /** 
+     * 创建匹配指定NameNode文件类型的文件名过滤器 
+     * @param type NameNode文件类型
+     * @return 文件名过滤器
+     */
     static FilenameFilter newFilenameFilter(NameNodeFile type) {
       final String prefix = type.getName() + "_";
       return new FilenameFilter() {
@@ -201,31 +225,51 @@ public class FsImageValidation {
     this.fsImageFile = fsImageFile;
   }
 
+  /**
+   * 执行FSImage校验，使用默认配置
+   * @return 校验发现的错误数量
+   * @throws Exception 执行过程中的异常
+   */
   int run() throws Exception {
     return run(new Configuration(), new AtomicInteger());
   }
 
+  /**
+   * 执行FSImage校验，使用默认配置，传入错误计数器
+   * @param errorCount 错误计数器
+   * @return 校验发现的错误数量
+   * @throws Exception 执行过程中的异常
+   */
   int run(AtomicInteger errorCount) throws Exception {
     return run(new Configuration(), errorCount);
   }
 
+  /**
+   * 执行FSImage校验主流程，依次执行INode引用校验和INodeMap校验
+   * @param conf Hadoop配置对象
+   * @param errorCount 错误计数器
+   * @return 本次校验新增的错误数量
+   * @throws Exception 执行过程中的异常
+   */
   int run(Configuration conf, AtomicInteger errorCount) throws Exception {
     final int initCount = errorCount.get();
     LOG.info(Util.memoryInfo());
     initConf(conf);
 
-    // check INodeReference
-    NameNode.initMetrics(conf, HdfsServerConstants.NamenodeRole.NAMENODE); // to avoid NPE
+    // 初始化NameNode指标避免NPE，然后执行INode引用校验
+    NameNode.initMetrics(conf, HdfsServerConstants.NamenodeRole.NAMENODE);
     final FSNamesystem namesystem = checkINodeReference(conf, errorCount);
 
-    // check INodeMap
+    // 执行INodeMap完整性校验，清理不可达节点
     final boolean changed = INodeMapValidation.run(namesystem.getFSDirectory(), errorCount);
     LOG.info(Util.memoryInfo());
 
+    // 输出本次校验结果
     final int d = errorCount.get() - initCount;
     if (d > 0) {
       Cli.println("Found %d error(s) in %s", d, fsImageFile.getAbsolutePath());
     }
+    // 如果INodeMap发生变更，保存修复后的新FSImage到临时目录
     if (changed) {
       final File dir = fsImageFile.isDirectory()? fsImageFile: fsImageFile.getParentFile();
       final Path temp = Files.createTempDirectory(dir.toPath(), "newFsImage");
@@ -235,7 +279,14 @@ public class FsImageValidation {
     return d;
   }
 
+  /**
+   * 加载指定FSImage文件到内存构建FSNamesystem
+   * @param conf Hadoop配置对象
+   * @return 加载完成的FSNamesystem对象
+   * @throws IOException 加载过程中的IO异常
+   */
   private FSNamesystem loadImage(Configuration conf) throws IOException {
+    // 定时任务输出FSImage加载进度，每分钟打印一次
     final TimerTask checkProgress = new TimerTask() {
       @Override
       public void run() {
@@ -246,11 +297,13 @@ public class FsImageValidation {
       }
     };
 
+    // 启动定时进度打印
     final Timer t = new Timer();
     t.scheduleAtFixedRate(checkProgress, 0, 60_000);
     final long loadStart = now();
     final FSNamesystem namesystem;
     if (fsImageFile.isDirectory()) {
+      // 输入是NameNode存储目录，按目录结构加载FSImage
       Cli.println("Loading %s as a directory.", fsImageFile);
       final String dir = fsImageFile.getCanonicalPath();
       conf.set(DFSConfigKeys.DFS_NAMENODE_NAME_DIR_KEY, dir);
@@ -259,38 +312,51 @@ public class FsImageValidation {
 
       final FSImage fsImage = new FSImage(conf);
       namesystem = new FSNamesystem(conf, fsImage, true);
-      // Avoid saving fsimage
+      // 避免回滚滚动升级信息
       namesystem.setRollingUpgradeInfo(false, 0);
 
       namesystem.loadFSImage(HdfsServerConstants.StartupOption.REGULAR);
     } else {
+      // 输入是单个FSImage文件，手动加载
       Cli.println("Loading %s as a file.", fsImageFile);
       final FSImage fsImage = new FSImage(conf);
       namesystem = new FSNamesystem(conf, fsImage, true);
 
+      // 初始化命名空间信息
       final NamespaceInfo namespaceInfo = NNStorage.newNamespaceInfo();
       namespaceInfo.clusterID = "cluster0";
       fsImage.getStorage().setStorageInfo(namespaceInfo);
 
       final FSImageFormat.LoaderDelegator loader
           = FSImageFormat.newLoader(conf, namesystem);
+      // 加写锁加载FSImage
       namesystem.writeLock(RwLockMode.GLOBAL);
       namesystem.getFSDirectory().writeLock();
       try {
         loader.load(fsImageFile, false);
         fsImage.setLastAppliedTxId(loader);
       } finally {
+        // 解锁
         namesystem.getFSDirectory().writeUnlock();
         namesystem.writeUnlock(RwLockMode.GLOBAL, "loadImage");
       }
     }
+    // 停止进度打印
     t.cancel();
+    // 输出加载完成统计
     Cli.println("Loaded %s %s with txid %d successfully in %s",
         FS_IMAGE, fsImageFile, namesystem.getFSImage().getLastAppliedTxId(),
         StringUtils.formatTime(now() - loadStart));
     return namesystem;
   }
 
+  /**
+   * 执行INode引用完整性校验，检查快照引用的INode是否存在
+   * @param conf Hadoop配置对象
+   * @param errorCount 错误计数器
+   * @return 加载完成的FSNamesystem对象
+   * @throws Exception 校验过程中的异常
+   */
   FSNamesystem checkINodeReference(Configuration conf,
       AtomicInteger errorCount) throws Exception {
     INodeReferenceValidation.start();
@@ -301,14 +367,25 @@ public class FsImageValidation {
     return namesystem;
   }
 
+  /**
+   * INodeMap完整性校验类，检查INodeMap中是否存在不可达的无效INode
+   */
   static class INodeMapValidation {
+    /**
+     * 执行INodeMap校验，移除无法从根节点访问的无效INode
+     * @param fsdir FSDirectory对象
+     * @param errorCount 错误计数器
+     * @return INodeMap是否发生变更（是否移除了无效节点）
+     */
     static boolean run(FSDirectory fsdir, AtomicInteger errorCount) {
       final String name = INodeMapValidation.class.getSimpleName();
       final int initErrorCount = errorCount.get();
+      // 统计从根节点可达的所有INode数量
       final Counts counts = INodeCountVisitor.countTree(fsdir.getRoot());
       final INodeMap map = fsdir.getINodeMap();
       final int oldSize = map.size();
       println("%s INodeMap old size: %d", name, oldSize);
+      // 遍历INodeMap，移除不可达INode并记录错误
       for (final Iterator<INodeWithAdditionalFields> j = map.getMapIterator(); j.hasNext();) {
         final INodeWithAdditionalFields i = j.next();
         if (counts.getCount(i) == 0) {
@@ -317,6 +394,7 @@ public class FsImageValidation {
               i, i.getId(), i.getFullPathName());
         }
       }
+      // 输出校验结果统计
       final int newSize = map.size();
       println("%s INodeMap new size: %d", name, newSize);
       println("%s ended successfully: %d error(s) found.", name,
@@ -325,124 +403,5 @@ public class FsImageValidation {
     }
   }
 
-  static class Cli extends Configured implements Tool {
-    static final String COMMAND;
-    static final String USAGE;
-    static {
-      final String clazz = FsImageValidation.class.getSimpleName();
-      COMMAND = Character.toLowerCase(clazz.charAt(0)) + clazz.substring(1);
-      USAGE = "Usage: hdfs " + COMMAND + " <" + FS_IMAGE + ">";
-    }
-
-    @Override
-    public int run(String[] args) throws Exception {
-      initLogLevels();
-
-      final FsImageValidation validation = FsImageValidation.newInstance(args);
-      final AtomicInteger errorCount = new AtomicInteger();
-      validation.run(getConf(), errorCount);
-      println("Error Count: %s", errorCount);
-      return errorCount.get() == 0? 0: 1;
-    }
-
-    static String parse(String... args) {
-      final String f;
-      if (args == null || args.length == 0) {
-        f = getEnv(FS_IMAGE);
-      } else if (args.length == 1) {
-        f = args[0];
-      } else {
-        throw new HadoopIllegalArgumentException(
-            "args = " + Arrays.toString(args));
-      }
-
-      println("%s = %s", FS_IMAGE, f);
-      return f;
-    }
-
-    static synchronized void println(String format, Object... args) {
-      final String s = String.format(format, args);
-      System.out.println(s);
-      LOG.info(s);
-    }
-
-    static synchronized void warn(String format, Object... args) {
-      final String s = "WARN: " + String.format(format, args);
-      System.out.println(s);
-      LOG.warn(s);
-    }
-
-    static synchronized void printError(String message, Throwable t) {
-      System.out.println(message);
-      if (t != null) {
-        t.printStackTrace(System.out);
-      }
-      LOG.error(message, t);
-    }
-
-    static synchronized void printError(AtomicInteger errorCount,
-        String format, Object... args) {
-      final int count = errorCount.incrementAndGet();
-      if (!PRINT_ERROR) {
-        return;
-      }
-
-      final String s = "FSIMAGE_ERROR " + count + ": "
-          + String.format(format, args);
-      System.out.println(s);
-      LOG.info(s);
-    }
-  }
-
-  public static int validate(FSNamesystem namesystem) throws Exception {
-    final AtomicInteger errorCount = new AtomicInteger();
-    final NNStorage nnStorage = namesystem.getFSImage().getStorage();
-    for(Storage.StorageDirectory sd : nnStorage.getStorageDirs()) {
-      validate(sd.getCurrentDir(), errorCount);
-    }
-    return errorCount.get();
-  }
-
-  public static void validate(File path, AtomicInteger errorCount)
-      throws Exception {
-    if (path.isFile()) {
-      new FsImageValidation(path).run(errorCount);
-    } else if (path.isDirectory()) {
-      final File[] images = path.listFiles(
-          Util.newFilenameFilter(NameNodeFile.IMAGE));
-      if (images == null || images.length == 0) {
-        Cli.warn("%s not found in %s", FSImage.class.getSimpleName(),
-            path.getAbsolutePath());
-        return;
-      }
-
-      Arrays.sort(images, Collections.reverseOrder());
-      for (int i = 0; i < images.length; i++) {
-        final File image = images[i];
-        Cli.println("%s %d) %s", FSImage.class.getSimpleName(),
-            i, image.getAbsolutePath());
-        FsImageValidation.validate(image, errorCount);
-      }
-    }
-
-    Cli.warn("%s is neither a file nor a directory", path.getAbsolutePath());
-  }
-
-  public static void main(String[] args) {
-    if (DFSUtil.parseHelpArgument(args, Cli.USAGE, System.out, true)) {
-      System.exit(0);
-    }
-
-    try {
-      System.exit(ToolRunner.run(new Configuration(), new Cli(), args));
-    } catch (HadoopIllegalArgumentException e) {
-      e.printStackTrace(System.err);
-      System.err.println(Cli.USAGE);
-      System.exit(-1);
-      ToolRunner.printGenericCommandUsage(System.err);
-    } catch (Throwable e) {
-      Cli.printError("Failed to run " + Cli.COMMAND, e);
-      System.exit(-2);
-    }
-  }
-}
+  /**
+   * 命令行交互工具类，实现Tool接口供ToolRunner调用，处理参数解析和输出

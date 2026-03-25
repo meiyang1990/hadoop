@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,22 +38,17 @@ import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
 
 /**
- * NLineInputFormat which splits N lines of input as one split.
- *
- * In many "pleasantly" parallel applications, each process/mapper 
- * processes the same input file (s), but with computations are 
- * controlled by different parameters.(Referred to as "parameter sweeps").
- * One way to achieve this, is to specify a set of parameters 
- * (one set per line) as input in a control file 
- * (which is the input path to the map-reduce application,
- * where as the input dataset is specified 
- * via a config variable in JobConf.).
+ * NLine输入格式，将输入文件按N行切分为一个输入分片。
  * 
- * The NLineInputFormat can be used in such applications, that splits 
- * the input file such that by default, one line is fed as
- * a value to one map task, and key is the offset.
- * i.e. (k,v) is (LongWritable, Text).
- * The location hints will span the whole mapred cluster.
+ * 在很多可高度并行化的应用场景中，每个Mapper进程处理同一个输入数据集，
+ * 但需要使用不同的参数进行计算（常被称为"参数扫描"场景）。
+ * 实现该需求的一种方式是：将一组参数（每行一组）写入控制文件作为MapReduce作业的输入，
+ * 而实际处理的数据集则通过JobConf中的配置变量指定。
+ * 
+ * NLineInputFormat专门适配此类场景：默认情况下，将输入文件每一行切分为一个分片，
+ * 每个分片对应一个Map任务，输出键为行偏移量（LongWritable），值为行内容（Text）。
+ * 分片可分布到整个集群节点并行处理。
+ * 本类是旧版MapReduce API的实现，对应新版API为org.apache.hadoop.mapreduce.lib.input.NLineInputFormat。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -60,6 +56,14 @@ public class NLineInputFormat extends FileInputFormat<LongWritable, Text>
                               implements JobConfigurable { 
   private int N = 1;
 
+  /**
+   * 获取当前输入分片的记录读取器，用于读取分片中的行记录
+   * @param genericSplit 待读取的输入分片
+   * @param job 作业配置对象
+   * @param reporter 进度报告器
+   * @return 按行读取的LineRecordReader实例
+   * @throws IOException 读取文件发生IO异常时抛出
+   */
   public RecordReader<LongWritable, Text> getRecordReader(
                                             InputSplit genericSplit,
                                             JobConf job,
@@ -70,38 +74,44 @@ public class NLineInputFormat extends FileInputFormat<LongWritable, Text>
   }
 
   /** 
-   * Logically splits the set of input files for the job, splits N lines
-   * of the input as one split.
-   * 
-   * @see org.apache.hadoop.mapred.FileInputFormat#getSplits(JobConf, int)
+   * 对作业输入文件进行逻辑切分，将每N行切为一个分片
+   * @param job 作业配置对象
+   * @param numSplits 期望切分的分片数量（本实现不依赖该参数，按N行规则切分）
+   * @return 切分完成的输入分片数组
+   * @throws IOException 读取文件状态发生IO异常时抛出
    */
   public InputSplit[] getSplits(JobConf job, int numSplits)
   throws IOException {
     ArrayList<FileSplit> splits = new ArrayList<FileSplit>();
+    // 遍历所有输入文件
     for (FileStatus status : listStatus(job)) {
+      // 调用新版API实现对当前文件按N行切分
       for (org.apache.hadoop.mapreduce.lib.input.FileSplit split : 
           org.apache.hadoop.mapreduce.lib.input.
           NLineInputFormat.getSplitsForFile(status, job, N)) {
+        // 将新版分片转换为旧版API的分片格式添加到结果列表
         splits.add(new FileSplit(split));
       }
     }
     return splits.toArray(new FileSplit[splits.size()]);
   }
 
+  /**
+   * 从作业配置中读取每个分片包含的行数N，初始化输入格式
+   * @param conf 作业配置对象
+   */
   public void configure(JobConf conf) {
     N = conf.getInt("mapreduce.input.lineinputformat.linespermap", 1);
   }
   
   /**
-   * NLineInputFormat uses LineRecordReader, which always reads
-   * (and consumes) at least one character out of its upper split
-   * boundary. So to make sure that each mapper gets N lines, we
-   * move back the upper split limits of each split 
-   * by one character here.
-   * @param fileName  Path of file
-   * @param begin  the position of the first byte in the file to process
-   * @param length  number of bytes in InputSplit
-   * @return  FileSplit
+   * 创建调整过边界的文件分片，修正LineRecordReader的越界读取问题
+   * LineRecordReader在读取时，总会向上分片边界外多读至少一个字符，
+   * 为了保证每个Mapper确实只读取N行，需要将每个分片的上边界回退一个字符。
+   * @param fileName 分片所属文件路径
+   * @param begin 分片起始字节偏移
+   * @param length 分片包含的字节长度
+   * @return 调整边界后的FileSplit实例
    */
   protected static FileSplit createFileSplit(Path fileName, long begin, long length) {
     return (begin == 0) 

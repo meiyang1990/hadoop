@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,21 +27,19 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.util.Progressable;
 
 /** 
- * <code>OutputFormat</code> describes the output-specification for a 
- * Map-Reduce job.
- *
- * <p>The Map-Reduce framework relies on the <code>OutputFormat</code> of the
- * job to:<p>
+ * MapReduce作业输出格式抽象接口，定义了MapReduce框架处理输出的规范。
+ * 
+ * <p>MapReduce框架依赖该接口完成两个核心功能：<p>
  * <ol>
  *   <li>
- *   Validate the output-specification of the job. For e.g. check that the 
- *   output directory doesn't already exist. 
+ *   验证作业输出配置合法性，例如检查输出目录是否已存在，避免覆盖已有数据。
+ *   </li>
  *   <li>
- *   Provide the {@link RecordWriter} implementation to be used to write out
- *   the output files of the job. Output files are stored in a 
- *   {@link FileSystem}.
+ *   提供{@link RecordWriter}实现，用于将作业输出写入到{@link FileSystem}中的输出文件。
  *   </li>
  * </ol>
+ * 
+ * 该接口是旧版MapReduce API的输出格式抽象，是所有具体输出格式实现的公共接口。
  * 
  * @see RecordWriter
  * @see JobConf
@@ -50,34 +49,28 @@ import org.apache.hadoop.util.Progressable;
 public interface OutputFormat<K, V> {
 
   /** 
-   * Get the {@link RecordWriter} for the given job.
+   * 获取指定作业分片对应的RecordWriter，用于写入该分片的输出数据。
    *
-   * @param ignored
-   * @param job configuration for the job whose output is being written.
-   * @param name the unique name for this part of the output.
-   * @param progress mechanism for reporting progress while writing to file.
-   * @return a {@link RecordWriter} to write the output for the job.
-   * @throws IOException
+   * @param ignored 已废弃参数，通常传入文件系统对象但未实际使用
+   * @param job 当前作业配置对象
+   * @param name 当前输出分片的唯一名称
+   * @param progress 进度报告回调对象，用于向框架上报写入进度
+   * @return 用于写入输出的RecordWriter实例
+   * @throws IOException  如果获取RecordWriter过程中发生IO错误
    */
   RecordWriter<K, V> getRecordWriter(FileSystem ignored, JobConf job,
                                      String name, Progressable progress)
   throws IOException;
 
   /** 
-   * Check for validity of the output-specification for the job.
+   * 在作业提交前验证输出配置的合法性，防止错误覆盖已有输出。
    *  
-   * <p>This is to validate the output specification for the job when it is
-   * a job is submitted.  Typically checks that it does not already exist,
-   * throwing an exception when it already exists, so that output is not
-   * overwritten.</p>
+   * <p>该方法在作业提交阶段被调用，通常会检查输出路径是否已存在：如果输出已存在则抛出异常，避免覆盖已有数据。
+   * 支持委托令牌的文件系统实现，通常会在此方法中收集目标路径的委托令牌并添加到作业配置中。</p>
    *
-   * Implementations which write to filesystems which support delegation
-   * tokens usually collect the tokens for the destination path(s)
-   * and attach them to the job configuration.
-   * @param ignored
-   * @param job job configuration.
-   * @throws IOException when output should not be attempted
+   * @param ignored 已废弃参数，通常传入文件系统对象但未实际使用
+   * @param job 当前作业配置对象
+   * @throws IOException 当输出配置不合法，不应该执行作业时抛出
    */
   void checkOutputSpecs(FileSystem ignored, JobConf job) throws IOException;
 }
-

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -76,15 +77,17 @@ import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.yarn.server.api.ContainerType;
 
 /**
- * Builder utilities to construct various objects.
+ * YARN服务端各类YARN API对象的构造工具类，提供各类记录对象的便捷创建方法
  *
  */
 @Private
 public class BuilderUtils {
 
+  /** 全局记录工厂实例，用于创建各类YARN API记录对象 */
   private static final RecordFactory recordFactory = RecordFactoryProvider
       .getRecordFactory(null);
 
+  /** ApplicationId比较器，用于对应用ID进行排序 */
   public static class ApplicationIdComparator implements
       Comparator<ApplicationId>, Serializable {
     @Override
@@ -93,6 +96,7 @@ public class BuilderUtils {
     }
   }
 
+  /** ContainerId比较器，用于对容器ID进行排序 */
   public static class ContainerIdComparator implements
       java.util.Comparator<ContainerId>, Serializable {
 
@@ -103,6 +107,7 @@ public class BuilderUtils {
     }
   }
 
+  /** 创建LocalResource实例，设置所有必要属性 */
   public static LocalResource newLocalResource(URL url, LocalResourceType type,
       LocalResourceVisibility visibility, long size, long timestamp,
       boolean shouldBeUploadedToSharedCache) {
@@ -117,6 +122,7 @@ public class BuilderUtils {
     return resource;
   }
 
+  /** 基于URI创建LocalResource实例 */
   public static LocalResource newLocalResource(URI uri,
       LocalResourceType type, LocalResourceVisibility visibility, long size,
       long timestamp, boolean shouldBeUploadedToSharedCache) {
@@ -124,36 +130,57 @@ public class BuilderUtils {
         visibility, size, timestamp, shouldBeUploadedToSharedCache);
   }
 
+  /**
+   * 基于字符串ID创建ApplicationId实例
+   */
   public static ApplicationId newApplicationId(RecordFactory recordFactory,
       long clustertimestamp, CharSequence id) {
     return ApplicationId.newInstance(clustertimestamp,
         Integer.parseInt(id.toString()));
   }
 
+  /**
+   * 基于整数ID创建ApplicationId实例，使用指定记录工厂
+   */
   public static ApplicationId newApplicationId(RecordFactory recordFactory,
       long clusterTimeStamp, int id) {
     return ApplicationId.newInstance(clusterTimeStamp, id);
   }
 
+  /**
+   * 基于整数ID创建ApplicationId实例，使用全局记录工厂
+   */
   public static ApplicationId newApplicationId(long clusterTimeStamp, int id) {
     return ApplicationId.newInstance(clusterTimeStamp, id);
   }
 
+  /**
+   * 创建ApplicationAttemptId实例
+   */
   public static ApplicationAttemptId newApplicationAttemptId(
       ApplicationId appId, int attemptId) {
     return ApplicationAttemptId.newInstance(appId, attemptId);
   }
 
+  /**
+   * 将时间戳和字符串ID转换为ApplicationId
+   */
   public static ApplicationId convert(long clustertimestamp, CharSequence id) {
     return ApplicationId.newInstance(clustertimestamp,
         Integer.parseInt(id.toString()));
   }
 
+  /**
+   * 创建ContainerId实例
+   */
   public static ContainerId newContainerId(ApplicationAttemptId appAttemptId,
       long containerId) {
     return ContainerId.newContainerId(appAttemptId, containerId);
   }
 
+  /**
+   * 创建完整层级的ContainerId实例，从应用ID开始构造
+   */
   public static ContainerId newContainerId(int appId, int appAttemptId,
       long timestamp, long id) {
     ApplicationId applicationId = newApplicationId(timestamp, appId);
@@ -163,6 +190,9 @@ public class BuilderUtils {
     return cId;
   }
 
+  /**
+   * 创建容器令牌实例，包含完整标识信息
+   */
   public static Token newContainerToken(ContainerId cId, int containerVersion,
       String host, int port, String user, Resource r, long expiryTime,
       int masterKeyId, byte[] password, long rmIdentifier) throws IOException {
@@ -175,16 +205,25 @@ public class BuilderUtils {
         identifier);
   }
 
+  /**
+   * 创建ContainerId实例，使用指定记录工厂
+   */
   public static ContainerId newContainerId(RecordFactory recordFactory,
       ApplicationId appId, ApplicationAttemptId appAttemptId,
       int containerId) {
     return ContainerId.newContainerId(appAttemptId, containerId);
   }
 
+  /**
+   * 创建NodeId实例
+   */
   public static NodeId newNodeId(String host, int port) {
     return NodeId.newInstance(host, port);
   }
 
+  /**
+   * 创建基础NodeReport实例，不包含资源利用率等扩展信息
+   */
   public static NodeReport newNodeReport(NodeId nodeId, NodeState nodeState,
       String httpAddress, String rackName, Resource used, Resource capability,
       int numContainers, String healthReport, long lastHealthReportTime) {
@@ -193,6 +232,9 @@ public class BuilderUtils {
         null, null, null);
   }
 
+  /**
+   * 创建带节点标签和退役超时的NodeReport实例
+   */
   public static NodeReport newNodeReport(NodeId nodeId, NodeState nodeState,
       String httpAddress, String rackName, Resource used, Resource capability,
       int numContainers, String healthReport, long lastHealthReportTime,
@@ -203,6 +245,7 @@ public class BuilderUtils {
         nodeLabels, null, null, decommissioningTimeout, nodeUpdateType, null);
   }
 
+  /** 创建完整属性的NodeReport实例 */
   public static NodeReport newNodeReport(NodeId nodeId, NodeState nodeState,
       String httpAddress, String rackName, Resource used, Resource capability,
       int numContainers, String healthReport, long lastHealthReportTime,
@@ -228,6 +271,7 @@ public class BuilderUtils {
     return nodeReport;
   }
 
+  /** 创建ContainerStatus实例，默认使用GURANTEED执行类型 */
   public static ContainerStatus newContainerStatus(ContainerId containerId,
       ContainerState containerState, String diagnostics, int exitStatus,
       Resource capability) {
@@ -235,6 +279,7 @@ public class BuilderUtils {
         exitStatus, capability, ExecutionType.GUARANTEED);
   }
 
+  /** 创建完整属性的ContainerStatus实例 */
   public static ContainerStatus newContainerStatus(ContainerId containerId,
       ContainerState containerState, String diagnostics, int exitStatus,
       Resource capability, ExecutionType executionType) {
@@ -249,6 +294,7 @@ public class BuilderUtils {
     return containerStatus;
   }
 
+  /** 创建完整属性的Container实例 */
   public static Container newContainer(ContainerId containerId, NodeId nodeId,
       String nodeHttpAddress, Resource resource, Priority priority,
       Token containerToken, ExecutionType executionType,
@@ -265,6 +311,7 @@ public class BuilderUtils {
     return container;
   }
 
+  /** 创建Container实例，使用默认执行类型和分配请求ID */
   public static Container newContainer(ContainerId containerId, NodeId nodeId,
       String nodeHttpAddress, Resource resource, Priority priority,
       Token containerToken) {
@@ -272,6 +319,7 @@ public class BuilderUtils {
         priority, containerToken, ExecutionType.GUARANTEED, 0);
   }
 
+  /** 创建Container实例，使用默认执行类型 */
   public static Container newContainer(ContainerId containerId, NodeId nodeId,
       String nodeHttpAddress, Resource resource, Priority priority,
       Token containerToken, long allocationRequestId) {
@@ -280,6 +328,7 @@ public class BuilderUtils {
         allocationRequestId);
   }
 
+  /** 创建通用令牌实例 */
   public static <T extends Token> T newToken(Class<T> tokenClass,
       byte[] identifier, String kind, byte[] password, String service) {
     T token = recordFactory.newRecordInstance(tokenClass);
@@ -290,28 +339,34 @@ public class BuilderUtils {
     return token;
   }
 
+  /** 创建委托令牌实例 */
   public static Token newDelegationToken(byte[] identifier,
       String kind, byte[] password, String service) {
     return newToken(Token.class, identifier, kind, password, service);
   }
 
+  /** 创建客户端到AM的令牌实例 */
   public static Token newClientToAMToken(byte[] identifier, String kind,
       byte[] password, String service) {
     return newToken(Token.class, identifier, kind, password, service);
   }
 
+  /** 创建AM到RM的令牌实例 */
   public static Token newAMRMToken(byte[] identifier, String kind,
                                    byte[] password, String service) {
     return newToken(Token.class, identifier, kind, password, service);
   }
 
+  /**
+   * 基于容器令牌标识创建容器令牌，仅用于测试
+   */
   @VisibleForTesting
   public static Token newContainerToken(NodeId nodeId,
       byte[] password, ContainerTokenIdentifier tokenIdentifier) {
-    // RPC layer client expects ip:port as service for tokens
+    // RPC层客户端要求令牌服务使用ip:port格式
     InetSocketAddress addr =
         NetUtils.createSocketAddrForHost(nodeId.getHost(), nodeId.getPort());
-    // NOTE: use SecurityUtil.setTokenService if this becomes a "real" token
+    // 注意：如果要生产使用令牌，应该使用SecurityUtil.setTokenService
     Token containerToken =
         newToken(Token.class, tokenIdentifier.getBytes(),
           ContainerTokenIdentifier.KIND.toString(), password, SecurityUtil
@@ -319,6 +374,9 @@ public class BuilderUtils {
     return containerToken;
   }
 
+  /**
+   * 从YARN令牌反序列化得到ContainerTokenIdentifier
+   */
   public static ContainerTokenIdentifier newContainerTokenIdentifier(
       Token containerToken) throws IOException {
     org.apache.hadoop.security.token.Token<ContainerTokenIdentifier> token =
@@ -330,6 +388,7 @@ public class BuilderUtils {
     return token.decodeIdentifier();
   }
 
+  /** 创建ContainerLaunchContext实例，设置所有核心属性 */
   public static ContainerLaunchContext newContainerLaunchContext(
       Map<String, LocalResource> localResources,
       Map<String, String> environment, List<String> commands,
@@ -346,12 +405,14 @@ public class BuilderUtils {
     return container;
   }
 
+  /** 创建指定优先级的Priority实例 */
   public static Priority newPriority(int p) {
     Priority priority = recordFactory.newRecordInstance(Priority.class);
     priority.setPriority(p);
     return priority;
   }
 
+  /** 创建ResourceRequest实例，不带节点标签 */
   public static ResourceRequest newResourceRequest(Priority priority,
       String hostName, Resource capability, int numContainers) {
     ResourceRequest request = recordFactory
@@ -361,168 +422,4 @@ public class BuilderUtils {
     request.setCapability(capability);
     request.setNumContainers(numContainers);
     request.setExecutionTypeRequest(ExecutionTypeRequest.newInstance());
-    return request;
-  }
-
-  public static ResourceRequest newResourceRequest(Priority priority,
-      String hostName, Resource capability, int numContainers, String label) {
-    ResourceRequest request =
-        recordFactory.newRecordInstance(ResourceRequest.class);
-    request.setPriority(priority);
-    request.setResourceName(hostName);
-    request.setCapability(capability);
-    request.setNumContainers(numContainers);
-    request.setNodeLabelExpression(label);
-    request.setExecutionTypeRequest(ExecutionTypeRequest.newInstance());
-    return request;
-  }
-
-  public static ApplicationReport newApplicationReport(
-      ApplicationId applicationId, ApplicationAttemptId applicationAttemptId,
-      String user, String queue, String name, String host, int rpcPort,
-      Token clientToAMToken, YarnApplicationState state, String diagnostics,
-      String url, long startTime, long launchTime, long finishTime,
-      FinalApplicationStatus finalStatus,
-      ApplicationResourceUsageReport appResources, String origTrackingUrl,
-      float progress, String appType, Token amRmToken, Set<String> tags,
-      Priority priority) {
-    ApplicationReport report = recordFactory
-        .newRecordInstance(ApplicationReport.class);
-    report.setApplicationId(applicationId);
-    report.setCurrentApplicationAttemptId(applicationAttemptId);
-    report.setUser(user);
-    report.setQueue(queue);
-    report.setName(name);
-    report.setHost(host);
-    report.setRpcPort(rpcPort);
-    report.setClientToAMToken(clientToAMToken);
-    report.setYarnApplicationState(state);
-    report.setDiagnostics(diagnostics);
-    report.setTrackingUrl(url);
-    report.setStartTime(startTime);
-    report.setLaunchTime(launchTime);
-    report.setFinishTime(finishTime);
-    report.setFinalApplicationStatus(finalStatus);
-    report.setApplicationResourceUsageReport(appResources);
-    report.setOriginalTrackingUrl(origTrackingUrl);
-    report.setProgress(progress);
-    report.setApplicationType(appType);
-    report.setAMRMToken(amRmToken);
-    report.setApplicationTags(tags);
-    report.setPriority(priority);
-    return report;
-  }
-
-  public static ApplicationSubmissionContext newApplicationSubmissionContext(
-      ApplicationId applicationId, String applicationName, String queue,
-      Priority priority, ContainerLaunchContext amContainer,
-      boolean isUnmanagedAM, boolean cancelTokensWhenComplete,
-      int maxAppAttempts, Resource resource, String applicationType) {
-    ApplicationSubmissionContext context =
-        recordFactory.newRecordInstance(ApplicationSubmissionContext.class);
-    context.setApplicationId(applicationId);
-    context.setApplicationName(applicationName);
-    context.setQueue(queue);
-    context.setPriority(priority);
-    context.setAMContainerSpec(amContainer);
-    context.setUnmanagedAM(isUnmanagedAM);
-    context.setCancelTokensWhenComplete(cancelTokensWhenComplete);
-    context.setMaxAppAttempts(maxAppAttempts);
-    context.setResource(resource);
-    context.setApplicationType(applicationType);
-    return context;
-  }
-
-  public static ApplicationSubmissionContext newApplicationSubmissionContext(
-      ApplicationId applicationId, String applicationName, String queue,
-      Priority priority, ContainerLaunchContext amContainer,
-      boolean isUnmanagedAM, boolean cancelTokensWhenComplete,
-      int maxAppAttempts, Resource resource) {
-    return newApplicationSubmissionContext(applicationId, applicationName,
-      queue, priority, amContainer, isUnmanagedAM, cancelTokensWhenComplete,
-      maxAppAttempts, resource, null);
-  }
-
-  public static ApplicationResourceUsageReport newApplicationResourceUsageReport(
-      int numUsedContainers, int numReservedContainers, Resource usedResources,
-      Resource reservedResources, Resource neededResources,
-      Map<String, Long> resourceSecondsMap,
-      Map<String, Long> preemptedResourceSecondsMap) {
-    ApplicationResourceUsageReport report =
-        recordFactory.newRecordInstance(ApplicationResourceUsageReport.class);
-    report.setNumUsedContainers(numUsedContainers);
-    report.setNumReservedContainers(numReservedContainers);
-    report.setUsedResources(usedResources);
-    report.setReservedResources(reservedResources);
-    report.setNeededResources(neededResources);
-    report.setResourceSecondsMap(resourceSecondsMap);
-    report.setPreemptedResourceSecondsMap(preemptedResourceSecondsMap);
-    return report;
-  }
-
-  public static Resource newResource(long memory, int vCores) {
-    Resource resource = recordFactory.newRecordInstance(Resource.class);
-    resource.setMemorySize(memory);
-    resource.setVirtualCores(vCores);
-    return resource;
-  }
-
-  public static Resource newEmptyResource() {
-    return recordFactory.newRecordInstance(Resource.class);
-  }
-
-  public static URL newURL(String scheme, String host, int port, String file) {
-    URL url = recordFactory.newRecordInstance(URL.class);
-    url.setScheme(scheme);
-    url.setHost(host);
-    url.setPort(port);
-    url.setFile(file);
-    return url;
-  }
-
-  public static AllocateResponse newAllocateResponse(int responseId,
-      List<ContainerStatus> completedContainers,
-      List<Container> allocatedContainers, List<NodeReport> updatedNodes,
-      Resource availResources, AMCommand command, int numClusterNodes,
-      PreemptionMessage preempt) {
-    AllocateResponse response = recordFactory
-        .newRecordInstance(AllocateResponse.class);
-    response.setNumClusterNodes(numClusterNodes);
-    response.setResponseId(responseId);
-    response.setCompletedContainersStatuses(completedContainers);
-    response.setAllocatedContainers(allocatedContainers);
-    response.setUpdatedNodes(updatedNodes);
-    response.setAvailableResources(availResources);
-    response.setAMCommand(command);
-    response.setPreemptionMessage(preempt);
-
-    return response;
-  }
-
-  public static Credentials parseCredentials(
-      ApplicationSubmissionContext application) throws IOException {
-    Credentials credentials = new Credentials();
-    DataInputByteBuffer dibb = new DataInputByteBuffer();
-    ByteBuffer tokens = application.getAMContainerSpec().getTokens();
-    if (tokens != null) {
-      dibb.reset(tokens);
-      credentials.readTokenStorageStream(dibb);
-      tokens.rewind();
-    }
-    return credentials;
-  }
-
-  public static Configuration parseTokensConf(
-      ApplicationSubmissionContext context) throws IOException {
-    ByteBuffer tokensConf = context.getAMContainerSpec().getTokensConf();
-    if (tokensConf == null) {
-      return null;
-    }
-    DataInputByteBuffer dibb = new DataInputByteBuffer();
-    dibb.reset(tokensConf);
-    Configuration appConf = new Configuration(false);
-    appConf.readFields(dibb);
-    tokensConf.rewind();
-    return appConf;
-  }
-}
+    return

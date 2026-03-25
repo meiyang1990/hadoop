@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,27 +22,34 @@ import java.io.FilterInputStream;
 import java.io.InputStream;
 
 /**
- * An input stream with length.
+ * 带长度信息的输入流装饰器，用于HDFS DataNode数据块读取场景，包装底层输入流并记录流总长度
  */
 public class LengthInputStream extends FilterInputStream {
 
   private final long length;
 
   /**
-   * Create an stream.
-   * @param in the underlying input stream.
-   * @param length the length of the stream.
+   * 构造带长度信息的装饰输入流
+   * @param in 底层被包装的输入流
+   * @param length 输入流总长度
    */
   public LengthInputStream(InputStream in, long length) {
     super(in);
     this.length = length;
   }
 
-  /** @return the length. */
+  /**
+   * 获取输入流总长度
+   * @return 输入流总长度（字节数）
+   */
   public long getLength() {
     return length;
   }
   
+  /**
+   * 获取被包装的原始输入流
+   * @return 底层原始输入流
+   */
   public InputStream getWrappedStream() {
     return in;
   }

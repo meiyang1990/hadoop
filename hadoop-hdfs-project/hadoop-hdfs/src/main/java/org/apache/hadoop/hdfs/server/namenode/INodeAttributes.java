@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,47 +25,83 @@ import org.apache.hadoop.hdfs.server.namenode.INodeWithAdditionalFields.Permissi
 import org.apache.hadoop.hdfs.server.namenode.XAttrFeature;
 
 /**
- * The attributes of an inode.
+ * 文件系统INode属性接口，定义了INode必须提供的基础属性访问方法。
+ * 包含文件/目录类型、名称、权限、时间戳、扩展属性等核心元数据的访问契约。
  */
 @InterfaceAudience.Private
 public interface INodeAttributes {
 
+  /**
+   * 判断当前INode是否为目录类型。
+   * @return true表示是目录，false表示是文件
+   */
   public boolean isDirectory();
 
   /**
-   * @return null if the local name is null;
-   *         otherwise, return the local name byte array.
+   * 获取INode本地名称的字节数组形式。
+   * @return null如果本地名称为空，否则返回本地名称字节数组
    */
   public byte[] getLocalNameBytes();
 
-  /** @return the user name. */
+  /**
+   * 获取INode所属用户名。
+   * @return 用户名字符串
+   */
   public String getUserName();
 
-  /** @return the group name. */
+  /**
+   * 获取INode所属组名。
+   * @return 组名字符串
+   */
   public String getGroupName();
   
-  /** @return the permission. */
+  /**
+   * 获取INode的文件权限对象。
+   * @return 文件权限对象
+   */
   public FsPermission getFsPermission();
 
-  /** @return the permission as a short. */
+  /**
+   * 获取INode的文件权限短整型表示。
+   * @return 短整型格式的文件权限
+   */
   public short getFsPermissionShort();
   
-  /** @return the permission information as a long. */
+  /**
+   * 获取INode权限信息的长整型打包格式。
+   * @return 长整型打包的用户、组、权限信息
+   */
   public long getPermissionLong();
 
-  /** @return the ACL feature. */
+  /**
+   * 获取INode的ACL特性对象。
+   * @return ACL特性对象，无ACL则返回null
+   */
   public AclFeature getAclFeature();
   
-  /** @return the XAttrs feature. */
+  /**
+   * 获取INode的扩展属性特性对象。
+   * @return 扩展属性特性对象，无扩展属性则返回null
+   */
   public XAttrFeature getXAttrFeature();
 
-  /** @return the modification time. */
+  /**
+   * 获取INode的修改时间戳。
+   * @return 修改时间（毫秒数）
+   */
   public long getModificationTime();
 
-  /** @return the access time. */
+  /**
+   * 获取INode的访问时间戳。
+   * @return 访问时间（毫秒数）
+   */
   public long getAccessTime();
 
-  /** A read-only copy of the inode attributes. */
+  /**
+   * 快照使用的只读INode属性副本抽象类。
+   * 用于保存INode在快照生成时刻的所有属性快照，实现快照的只读特性。
+   * 所有属性均在构造时初始化，后续不可修改。
+   */
   public static abstract class SnapshotCopy implements INodeAttributes {
     private final byte[] name;
     private final long permission;
@@ -73,6 +110,15 @@ public interface INodeAttributes {
     private final long accessTime;
     private XAttrFeature xAttrFeature;
 
+    /**
+     * 从分散的属性构造INode属性快照。
+     * @param name INode名称字节数组
+     * @param permissions 权限状态对象
+     * @param aclFeature ACL特性对象
+     * @param modificationTime 修改时间戳
+     * @param accessTime 访问时间戳
+     * @param xAttrFeature 扩展属性特性对象
+     */
     SnapshotCopy(byte[] name, PermissionStatus permissions,
         AclFeature aclFeature, long modificationTime, long accessTime, 
         XAttrFeature xAttrFeature) {
@@ -87,6 +133,10 @@ public interface INodeAttributes {
       this.xAttrFeature = xAttrFeature;
     }
 
+    /**
+     * 从现有INode对象构造属性快照。
+     * @param inode 源INode对象，提取其所有属性生成只读快照
+     */
     SnapshotCopy(INode inode) {
       this.name = inode.getLocalNameBytes();
       this.permission = inode.getPermissionLong();

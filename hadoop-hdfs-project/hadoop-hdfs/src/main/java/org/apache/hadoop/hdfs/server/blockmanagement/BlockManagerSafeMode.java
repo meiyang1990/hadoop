@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,11 +31,12 @@ import org.apache.hadoop.hdfs.server.namenode.startupprogress.Phase;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StartupProgress.Counter;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.Status;
-import org.apache.hadoop.hdfs.server.namenode.startupprogress.Step;
+等待
+org.apache.hadoop.hdfs.server.namenode.startupprogress.Step;
 import org.apache.hadoop.hdfs.server.namenode.startupprogress.StepType;
 import org.apache.hadoop.hdfs.util.RwLockMode;
 import org.apache.hadoop.net.NetworkTopology;
-import org.apache.hadoop.util.Daemon;
+org.apache.hadoop.util.Daemon;
 
 import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.util.Preconditions;
@@ -56,74 +58,90 @@ import static org.apache.hadoop.hdfs.DFSConfigKeys.DFS_NAMENODE_SAFEMODE_THRESHO
 import static org.apache.hadoop.util.Time.monotonicNow;
 
 /**
- * Block manager safe mode info.
- *
- * During name node startup, counts the number of <em>safe blocks</em>, those
- * that have at least the minimal number of replicas, and calculates the ratio
- * of safe blocks to the total number of blocks in the system, which is the size
- * of blocks. When the ratio reaches the {@link #threshold} and enough live data
- * nodes have registered, it needs to wait for the safe mode {@link #extension}
- * interval. After the extension period has passed, it will not leave safe mode
- * until the safe blocks ratio reaches the {@link #threshold} and enough live
- * data node registered.
+ * HDFS块管理安全模式（SafeMode）状态管理类。
+ * <p>
+ * NameNode启动过程中，统计满足最小副本数要求的"安全块"数量，
+ * 计算安全块占总块数的比例。当安全块比例达到阈值{@link #threshold}、
+ * 且有足够多的存活DataNode注册后，还需要等待额外的{@link #extension}延长时间，
+ * 才能退出安全模式，允许集群对外提供读写服务。
+ * </p>
+ * <p>
+ * 核心职责：负责NameNode启动阶段安全模式的状态转换、阈值检查和退出逻辑管理。
+ * </p>
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 class BlockManagerSafeMode {
+  /**
+   * 安全模式状态枚举，描述安全模式当前所处状态。
+   */
   enum BMSafeModeStatus {
-    PENDING_THRESHOLD, /** Pending on more safe blocks or live datanode. */
-    EXTENSION,         /** In extension period. */
-    OFF                /** Safe mode is off. */
+    PENDING_THRESHOLD, /** 等待更多安全块上报、等待更多DataNode上线，尚未满足退出阈值 */
+    EXTENSION,         /** 已满足退出阈值，正在等待额外延长时间 */
+    OFF                /** 安全模式已退出，集群正常运行 */
   }
 
   static final Logger LOG = LoggerFactory.getLogger(BlockManagerSafeMode.class);
+  /** 启动进度跟踪步骤：等待块上报完成 */
   static final Step STEP_AWAITING_REPORTED_BLOCKS =
       new Step(StepType.AWAITING_REPORTED_BLOCKS);
 
+  /** 所属块管理器实例 */
   private final BlockManager blockManager;
+  /** 所属NameNode命名系统实例 */
   private final Namesystem namesystem;
+  /** 是否启用高可用（HA）模式 */
   private final boolean haEnabled;
+  /** 当前安全模式状态，支持多线程并发访问 */
   private volatile BMSafeModeStatus status = BMSafeModeStatus.OFF;
 
-  /** Safe mode threshold condition %.*/
+  /** 安全块占总块数的退出阈值百分比 */
   private final float threshold;
-  /** Number of blocks needed to satisfy safe mode threshold condition. */
+  /** 满足退出阈值所需的最小安全块数量 */
   private long blockThreshold;
-  /** Total number of blocks. */
+  /** 集群总块数 */
   private long blockTotal;
-  /** Number of safe blocks. */
+  /** 当前已上报满足条件的安全块数量 */
   private long blockSafe;
-  /** Safe mode minimum number of datanodes alive. */
+  /** 退出安全模式所需的最小存活DataNode数量 */
   private final int datanodeThreshold;
-  /** Min replication required by safe mode. */
+  /** 判定一个块为安全块所需的最小副本数 */
   private final int safeReplication;
-  /** Threshold for populating needed replication queues. */
+  /** 初始化复制队列所需的安全块占比阈值 */
   private final float replQueueThreshold;
-  /** Number of blocks needed before populating replication queues. */
+  /** 初始化复制队列所需的最小安全块数量 */
   private long blockReplQueueThreshold;
 
-  /** How long (in ms) is the extension period. */
+  /** 满足阈值后额外等待的延长时间，单位毫秒 */
   @VisibleForTesting
   final long extension;
-  /** Timestamp of the first time when thresholds are met. */
+  /** 第一次满足退出阈值的时间戳 */
   private final AtomicLong reachedTime = new AtomicLong();
-  /** Timestamp of the safe mode initialized. */
+  /** 安全模式初始化时间戳 */
   private long startTime;
-  /** the safe mode monitor thread. */
+  /** 安全模式监控后台线程，用于定时检查是否满足退出条件 */
   private final Daemon smmthread;
 
-  /** time of the last status printout */
+  /** 上一次输出状态日志的时间戳 */
   private long lastStatusReport;
-  /** Counter for tracking startup progress of reported blocks. */
+  /** 启动进度计数器：记录已上报的块数量 */
   private Counter awaitingReportedBlocksCounter;
 
-  /** Keeps track of how many bytes are in Future Generation blocks. */
+  /** 累加记录未来代块（GS大于当前NameNode已知GS）的总字节数 */
   private final LongAdder bytesInFutureBlocks = new LongAdder();
+  /** 累加记录未来代纠删码块组的总字节数 */
   private final LongAdder bytesInFutureECBlockGroups = new LongAdder();
 
-  /** Reports if Name node was started with Rollback option. */
+  /** NameNode是否以回滚模式启动 */
   private final boolean inRollBack;
 
+  /**
+   * 构造安全模式管理器，从配置中加载各类阈值参数。
+   * @param blockManager 所属块管理器
+   * @param namesystem 所属命名系统
+   * @param haEnabled 是否启用HA模式
+   * @param conf Hadoop配置对象
+   */
   BlockManagerSafeMode(BlockManager blockManager, Namesystem namesystem,
       boolean haEnabled, Configuration conf) {
     this.blockManager = blockManager;
@@ -166,8 +184,8 @@ class BlockManagerSafeMode {
   }
 
   /**
-   * Initialize the safe mode information.
-   * @param total initial total blocks
+   * 激活安全模式，初始化总块数并检查是否可以直接退出安全模式。
+   * @param total 初始总块数
    */
   void activate(long total) {
     assert namesystem.hasWriteLock(RwLockMode.BM);
@@ -188,7 +206,8 @@ class BlockManagerSafeMode {
   }
 
   /**
-   * @return true if it stays in start up safe mode else false.
+   * 检查当前是否处于启动安全模式。
+   * @return true表示当前处于安全模式，false表示已退出
    */
   boolean isInSafeMode() {
     if (status != BMSafeModeStatus.OFF) {
@@ -200,8 +219,7 @@ class BlockManagerSafeMode {
   }
 
   /**
-   * The transition of the safe mode state machine.
-   * If safe mode is not currently on, this is a no-op.
+   * 检查安全模式状态，执行状态机转换。安全模式已退出则无操作。
    */
   void checkSafeMode() {
     assert namesystem.hasWriteLock(RwLockMode.BM);
@@ -213,7 +231,7 @@ class BlockManagerSafeMode {
     case PENDING_THRESHOLD:
       if (areThresholdsMet()) {
         if (blockTotal > 0 && extension > 0) {
-          // PENDING_THRESHOLD -> EXTENSION
+          // PENDING_THRESHOLD -> EXTENSION 状态转换
           status = BMSafeModeStatus.EXTENSION;
           reachedTime.set(monotonicNow());
           smmthread.start();
@@ -221,7 +239,7 @@ class BlockManagerSafeMode {
           reportStatus("STATE* Safe mode extension entered.", true);
         } else {
           // TODO: let the smmthread to leave the safemode.
-          // PENDING_THRESHOLD -> OFF
+          // PENDING_THRESHOLD -> OFF 状态转换
           leaveSafeMode(false);
         }
       } else {
@@ -240,10 +258,9 @@ class BlockManagerSafeMode {
   }
 
   /**
-   * Adjust the total number of blocks safe and expected during safe mode.
-   * If safe mode is not currently on, this is a no-op.
-   * @param deltaSafe  the change in number of safe blocks
-   * @param deltaTotal the change in number of total blocks expected
+   * 在安全模式下调整安全块总数和总块数，增量更新统计值。安全模式已退出则无操作。
+   * @param deltaSafe 安全块数量变化量
+   * @param deltaTotal 总块数量变化量
    */
   void adjustBlockTotals(int deltaSafe, int deltaTotal) {
     assert namesystem.hasWriteLock(RwLockMode.BM);
@@ -268,16 +285,12 @@ class BlockManagerSafeMode {
   }
 
   /**
-   * Should we track blocks in safe mode.
-   * <p/>
-   * Never track blocks incrementally in non-HA code.
-   * <p/>
-   * In the HA case, the StandbyNode can be in safemode while the namespace
-   * is modified by the edit log tailer. In this case, the number of total
-   * blocks changes as edits are processed (eg blocks are added and deleted).
-   * However, we don't want to do the incremental tracking during the
-   * startup-time loading process -- only once the initial total has been
-   * set after the image has been loaded.
+   * 检查是否需要增量跟踪安全块统计。
+   * <p>
+   * 非HA模式下从不增量跟踪；HA模式下，Standby节点在加载完镜像后，需要增量跟踪
+   * 因为编辑日志会不断增删块，总块数会动态变化。
+   * </p>
+   * @return true表示需要增量跟踪，false表示不需要
    */
   boolean isSafeModeTrackingBlocks() {
     assert namesystem.hasWriteLock(RwLockMode.BM);
@@ -285,7 +298,8 @@ class BlockManagerSafeMode {
   }
 
   /**
-   * Set total number of blocks.
+   * 设置总块数，同时重新计算块阈值和复制队列阈值。
+   * @param total 总块数
    */
   void setBlockTotal(long total) {
     assert namesystem.hasWriteLock(RwLockMode.BM);
@@ -296,6 +310,10 @@ class BlockManagerSafeMode {
     this.blockReplQueueThreshold = (long) (total * replQueueThreshold);
   }
 
+  /**
+   * 生成安全模式当前状态提示信息，用于Web UI和日志输出，告知用户当前退出进度。
+   * @return 格式化后的状态提示字符串
+   */
   String getSafeModeTip() {
     StringBuilder msg = new StringBuilder();
     boolean isBlockThresholdMet = false;
@@ -356,357 +374,4 @@ class BlockManagerSafeMode {
       break;
     case EXTENSION:
       msg.append("In safe mode extension. ").append(turnOffTip).append("in ")
-          .append(timeToLeaveExtension() / 1000).append(" seconds.");
-      break;
-    case OFF:
-      msg.append(turnOffTip).append("soon.");
-      break;
-    default:
-      assert false : "Non-recognized block manager safe mode status: " + status;
-    }
-    return msg.toString();
-  }
-
-  /**
-   * Leave start up safe mode.
-   *
-   * @param force - true to force exit
-   * @return true if it leaves safe mode successfully else false
-   */
-  boolean leaveSafeMode(boolean force) {
-    assert namesystem.hasWriteLock(RwLockMode.BM) : "Leaving safe mode needs write lock!";
-
-    final long bytesInFuture = getBytesInFuture();
-    if (bytesInFuture > 0) {
-      if (force) {
-        LOG.warn("Leaving safe mode due to forceExit. This will cause a data "
-            + "loss of {} byte(s).", bytesInFuture);
-        bytesInFutureBlocks.reset();
-        bytesInFutureECBlockGroups.reset();
-      } else {
-        LOG.error("Refusing to leave safe mode without a force flag. " +
-            "Exiting safe mode will cause a deletion of {} byte(s). Please " +
-            "use -forceExit flag to exit safe mode forcefully if data loss is" +
-            " acceptable.", bytesInFuture);
-        return false;
-      }
-    } else if (force) {
-      LOG.warn("forceExit used when normal exist would suffice. Treating " +
-          "force exit as normal safe mode exit.");
-    }
-
-    // if not done yet, initialize replication queues.
-    // In the standby, do not populate repl queues
-    if (!blockManager.isPopulatingReplQueues() &&
-        blockManager.shouldPopulateReplQueues()) {
-      blockManager.initializeReplQueues();
-    }
-
-    if (status != BMSafeModeStatus.OFF) {
-      NameNode.stateChangeLog.info("STATE* Safe mode is OFF");
-    }
-    status = BMSafeModeStatus.OFF;
-
-    final long timeInSafemode = monotonicNow() - startTime;
-    NameNode.stateChangeLog.info("STATE* Leaving safe mode after {} secs",
-        timeInSafemode / 1000);
-    NameNode.getNameNodeMetrics().setSafeModeTime(timeInSafemode);
-
-    final NetworkTopology nt = blockManager.getDatanodeManager()
-        .getNetworkTopology();
-    NameNode.stateChangeLog.info("STATE* Network topology has {} racks and {}" +
-        " datanodes", nt.getNumOfRacks(), nt.getNumOfLeaves());
-    NameNode.stateChangeLog.info("STATE* UnderReplicatedBlocks has {} blocks",
-        blockManager.numOfUnderReplicatedBlocks());
-
-    namesystem.startSecretManagerIfNecessary();
-
-    // If startup has not yet completed, end safemode phase.
-    StartupProgress prog = NameNode.getStartupProgress();
-    if (prog.getStatus(Phase.SAFEMODE) != Status.COMPLETE) {
-      prog.endStep(Phase.SAFEMODE,
-          BlockManagerSafeMode.STEP_AWAITING_REPORTED_BLOCKS);
-      prog.endPhase(Phase.SAFEMODE);
-    }
-    namesystem.checkAndProvisionSnapshotTrashRoots();
-    return true;
-  }
-
-  /**
-   * Increment number of safe blocks if the current block is contiguous
-   * and it has reached minimal replication or
-   * if the current block is striped and the number of its actual data blocks
-   * reaches the number of data units specified by the erasure coding policy.
-   * If safe mode is not currently on, this is a no-op.
-   * @param storageNum  current number of replicas or number of internal blocks
-   *                    of a striped block group
-   * @param storedBlock current storedBlock which is either a
-   *                    BlockInfoContiguous or a BlockInfoStriped
-   */
-  synchronized void incrementSafeBlockCount(int storageNum,
-      BlockInfo storedBlock) {
-    assert namesystem.hasWriteLock(RwLockMode.BM);
-    if (status == BMSafeModeStatus.OFF) {
-      return;
-    }
-
-    final int safeNumberOfNodes = storedBlock.isStriped() ?
-        ((BlockInfoStriped)storedBlock).getRealDataBlockNum() : safeReplication;
-    if (storageNum == safeNumberOfNodes) {
-      this.blockSafe++;
-
-      // Report startup progress only if we haven't completed startup yet.
-      StartupProgress prog = NameNode.getStartupProgress();
-      if (prog.getStatus(Phase.SAFEMODE) != Status.COMPLETE) {
-        if (this.awaitingReportedBlocksCounter == null) {
-          this.awaitingReportedBlocksCounter = prog.getCounter(Phase.SAFEMODE,
-              STEP_AWAITING_REPORTED_BLOCKS);
-        }
-        this.awaitingReportedBlocksCounter.increment();
-      }
-
-      checkSafeMode();
-    }
-  }
-
-  /**
-   * Decrement number of safe blocks if the current block is contiguous
-   * and it has just fallen below minimal replication or
-   * if the current block is striped and its actual data blocks has just fallen
-   * below the number of data units specified by erasure coding policy.
-   * If safe mode is not currently on, this is a no-op.
-   */
-  synchronized void decrementSafeBlockCount(BlockInfo b) {
-    assert namesystem.hasWriteLock(RwLockMode.BM);
-    if (status == BMSafeModeStatus.OFF) {
-      return;
-    }
-
-    final int safeNumberOfNodes = b.isStriped() ?
-        ((BlockInfoStriped)b).getRealDataBlockNum() : safeReplication;
-    BlockInfo storedBlock = blockManager.getStoredBlock(b);
-    if (storedBlock.isComplete() &&
-        blockManager.countNodes(b).liveReplicas() == safeNumberOfNodes - 1) {
-      this.blockSafe--;
-      assert blockSafe >= 0;
-      checkSafeMode();
-    }
-  }
-
-  /**
-   * Check if the block report replica has a generation stamp (GS) in future.
-   * If safe mode is not currently on, this is a no-op.
-   *
-   * @param brr block report replica which belongs to no file in BlockManager
-   */
-  void checkBlocksWithFutureGS(BlockReportReplica brr) {
-    assert namesystem.hasWriteLock(RwLockMode.BM);
-    if (status == BMSafeModeStatus.OFF) {
-      return;
-    }
-
-    if (!blockManager.getShouldPostponeBlocksFromFuture() &&
-        !inRollBack && blockManager.isGenStampInFuture(brr)) {
-      if (blockManager.getBlockIdManager().isStripedBlock(brr)) {
-        bytesInFutureECBlockGroups.add(brr.getBytesOnDisk());
-      } else {
-        bytesInFutureBlocks.add(brr.getBytesOnDisk());
-      }
-    }
-  }
-
-  /**
-   * Returns the number of bytes that reside in blocks with Generation Stamps
-   * greater than generation stamp known to Namenode.
-   *
-   * @return Bytes in future
-   */
-  long getBytesInFuture() {
-    return getBytesInFutureBlocks() + getBytesInFutureECBlockGroups();
-  }
-
-  long getBytesInFutureBlocks() {
-    return bytesInFutureBlocks.longValue();
-  }
-
-  long getBytesInFutureECBlockGroups() {
-    return bytesInFutureECBlockGroups.longValue();
-  }
-
-  void close() {
-    assert namesystem.hasWriteLock(RwLockMode.GLOBAL)
-        : "Closing bmSafeMode needs write lock!";
-    try {
-      smmthread.interrupt();
-      smmthread.join(3000);
-    } catch (InterruptedException ignored) {
-    }
-  }
-
-  /**
-   * Get time (counting in milliseconds) left to leave extension period.
-   * It should leave safemode at once if blockTotal = 0 rather than wait
-   * extension time (30s by default).
-   *
-   * Negative value indicates the extension period has passed.
-   */
-  private long timeToLeaveExtension() {
-    return blockTotal > 0 ? reachedTime.get() + extension - monotonicNow() : 0;
-  }
-
-  /**
-   * Returns true if Namenode was started with a RollBack option.
-   *
-   * @param option - StartupOption
-   * @return boolean
-   */
-  private static boolean isInRollBackMode(StartupOption option) {
-    return (option == StartupOption.ROLLBACK) ||
-        (option == StartupOption.ROLLINGUPGRADE &&
-            option.getRollingUpgradeStartupOption() ==
-                RollingUpgradeStartupOption.ROLLBACK);
-  }
-
-  /** Check if we are ready to initialize replication queues. */
-  private void initializeReplQueuesIfNecessary() {
-    assert namesystem.hasWriteLock(RwLockMode.BM);
-    // Whether it has reached the threshold for initializing replication queues.
-    boolean canInitializeReplQueues = blockManager.shouldPopulateReplQueues() &&
-        blockSafe >= blockReplQueueThreshold;
-    if (canInitializeReplQueues &&
-        !blockManager.isPopulatingReplQueues() &&
-        !haEnabled) {
-      blockManager.initializeReplQueues();
-    }
-  }
-
-  /**
-   * @return true if both block and datanode threshold are met else false.
-   */
-  private boolean areThresholdsMet() {
-    assert namesystem.hasWriteLock(RwLockMode.BM);
-    // Calculating the number of live datanodes is time-consuming
-    // in large clusters. Skip it when datanodeThreshold is zero.
-    // We need to evaluate getNumLiveDataNodes only when
-    // (blockSafe >= blockThreshold) is true and hence moving evaluation
-    // of datanodeNum conditional to isBlockThresholdMet as well
-    synchronized (this) {
-      boolean isBlockThresholdMet = (blockSafe >= blockThreshold);
-      boolean isDatanodeThresholdMet = true;
-      if (isBlockThresholdMet && datanodeThreshold > 0) {
-        int datanodeNum = blockManager.getDatanodeManager().
-                getNumLiveDataNodes();
-        isDatanodeThresholdMet = (datanodeNum >= datanodeThreshold);
-      }
-      return isBlockThresholdMet && isDatanodeThresholdMet;
-    }
-  }
-
-  /**
-   * Checks consistency of the class state.
-   * This is costly so only runs if asserts are enabled.
-   */
-  private void doConsistencyCheck() {
-    boolean assertsOn = false;
-    assert assertsOn = true; // set to true if asserts are on
-    if (!assertsOn) {
-      return;
-    }
-
-    int activeBlocks = blockManager.getActiveBlockCount();
-    synchronized (this) {
-      if (blockTotal != activeBlocks &&
-          !(blockSafe >= 0 && blockSafe <= blockTotal)) {
-        LOG.warn("SafeMode is in inconsistent filesystem state. " +
-            "BlockManagerSafeMode data: blockTotal={}, blockSafe={}; " +
-            "BlockManager data: activeBlocks={}",
-            blockTotal, blockSafe, activeBlocks);
-      }
-    }
-  }
-
-  /**
-   * Print status every 20 seconds.
-   */
-  private void reportStatus(String msg, boolean rightNow) {
-    assert namesystem.hasWriteLock(RwLockMode.BM);
-    long curTime = monotonicNow();
-    if(!rightNow && (curTime - lastStatusReport < 20 * 1000)) {
-      return;
-    }
-    NameNode.stateChangeLog.info(msg + " \n" + getSafeModeTip());
-    lastStatusReport = curTime;
-  }
-
-  /**
-   * Periodically check whether it is time to leave safe mode.
-   * This thread starts when the threshold level is reached.
-   */
-  final private class SafeModeMonitor implements Runnable {
-    /** Interval in msec for checking safe mode. */
-    private long recheckInterval;
-
-    private SafeModeMonitor(Configuration conf) {
-      recheckInterval = conf.getLong(
-          DFSConfigKeys.DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_KEY,
-          DFSConfigKeys.DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_DEFAULT);
-      if (recheckInterval < 1) {
-        LOG.warn("Invalid value for " +
-            DFSConfigKeys.DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_KEY +
-            ". Should be greater than 0, but is {}", recheckInterval);
-        recheckInterval = DFSConfigKeys.DFS_NAMENODE_SAFEMODE_RECHECK_INTERVAL_DEFAULT;
-      }
-      LOG.info("Using {} as SafeModeMonitor Interval", recheckInterval);
-    }
-
-    @Override
-    public void run() {
-      while (namesystem.isRunning()) {
-        try {
-          namesystem.writeLock(RwLockMode.GLOBAL);
-          if (status == BMSafeModeStatus.OFF) { // Not in safe mode.
-            break;
-          }
-          if (canLeave()) {
-            // EXTENSION -> OFF
-            leaveSafeMode(false);
-            break;
-          }
-        } finally {
-          namesystem.writeUnlock(RwLockMode.GLOBAL, "leaveSafeMode");
-        }
-
-        try {
-          Thread.sleep(recheckInterval);
-        } catch (InterruptedException ignored) {
-        }
-      }
-
-      if (!namesystem.isRunning()) {
-        LOG.info("NameNode is being shutdown, exit SafeModeMonitor thread");
-      }
-    }
-
-    /**
-     * Check whether the safe mode can be turned off by this monitor.
-     *
-     * Safe mode can be turned off iff
-     * the threshold is reached, and
-     * the extension time has passed.
-     */
-    private boolean canLeave() {
-      if (namesystem.inTransitionToActive()) {
-        return false;
-      } else if (timeToLeaveExtension() > 0) {
-        reportStatus("STATE* Safe mode ON, in safe mode extension.", false);
-        return false;
-      } else if (!areThresholdsMet()) {
-        reportStatus("STATE* Safe mode ON, thresholds not met.", false);
-        return false;
-      } else {
-        return true;
-      }
-    }
-  }
-
-}
+          .append(timeToLeaveExtension() / 1000).append(" seconds

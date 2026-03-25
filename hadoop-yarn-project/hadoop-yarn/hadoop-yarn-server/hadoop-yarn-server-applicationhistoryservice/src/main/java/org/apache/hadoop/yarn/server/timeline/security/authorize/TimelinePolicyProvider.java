@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,12 +27,17 @@ import org.apache.hadoop.yarn.api.ApplicationHistoryProtocolPB;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 /**
+ * 时间线服务器服务授权策略提供者，为YARN时间线服务器协议提供安全访问策略配置
  * {@link PolicyProvider} for YARN timeline server protocols.
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class TimelinePolicyProvider extends PolicyProvider {
 
+  /**
+   * 获取需要进行安全授权的服务列表
+   * @return 需要授权的服务数组
+   */
   @Override
   public Service[] getServices() {
     return new Service[] {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,15 +36,28 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppState;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Contains all the state data that needs to be stored persistently 
- * for an Application
+ * 应用持久化恢复状态数据，存储ResourceManager重启恢复所需的全部应用状态信息
  */
 @Public
 @Unstable
 public abstract class ApplicationStateData {
+  // 存储应用所有尝试的状态数据，按尝试ID索引
   public Map<ApplicationAttemptId, ApplicationAttemptStateData> attempts =
       new HashMap<ApplicationAttemptId, ApplicationAttemptStateData>();
   
+  /**
+   * 创建应用状态数据实例
+   * @param submitTime 应用提交时间
+   * @param startTime 应用启动时间
+   * @param user 提交应用的用户名
+   * @param submissionContext 应用提交上下文
+   * @param state 应用当前状态
+   * @param diagnostics 诊断信息
+   * @param launchTime 应用启动时间
+   * @param finishTime 应用完成时间
+   * @param callerContext 调用上下文信息
+   * @return 新建的应用状态数据实例
+   */
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, String user,
       ApplicationSubmissionContext submissionContext, RMAppState state,
@@ -62,6 +76,20 @@ public abstract class ApplicationStateData {
     return appState;
   }
 
+  /**
+   * 创建带应用超时配置的应用状态数据实例
+   * @param submitTime 应用提交时间
+   * @param startTime 应用启动时间
+   * @param user 提交应用的用户名
+   * @param submissionContext 应用提交上下文
+   * @param state 应用当前状态
+   * @param diagnostics 诊断信息
+   * @param launchTime 应用启动时间
+   * @param finishTime 应用完成时间
+   * @param callerContext 调用上下文信息
+   * @param applicationTimeouts 应用各类超时配置
+   * @return 新建的应用状态数据实例
+   */
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, String user,
       ApplicationSubmissionContext submissionContext, RMAppState state,
@@ -83,6 +111,15 @@ public abstract class ApplicationStateData {
     return appState;
   }
 
+  /**
+   * 创建新提交应用的状态数据实例
+   * @param submitTime 应用提交时间
+   * @param startTime 应用启动时间
+   * @param context 应用提交上下文
+   * @param user 提交应用的用户名
+   * @param callerContext 调用上下文信息
+   * @return 新建的应用状态数据实例
+   */
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, ApplicationSubmissionContext context, String user,
       CallerContext callerContext) {
@@ -90,12 +127,34 @@ public abstract class ApplicationStateData {
         callerContext);
   }
   
+  /**
+   * 创建新提交应用的状态数据实例，无调用上下文
+   * @param submitTime 应用提交时间
+   * @param startTime 应用启动时间
+   * @param context 应用提交上下文
+   * @param user 提交应用的用户名
+   * @return 新建的应用状态数据实例
+   */
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, ApplicationSubmissionContext context, String user) {
     return newInstance(submitTime, startTime, context, user,
         (CallerContext) null);
   }
 
+  /**
+   * 创建带真实用户信息的应用状态数据实例
+   * @param submitTime 应用提交时间
+   * @param startTime 应用启动时间
+   * @param user 提交应用的用户名
+   * @param realUser 代理运行的真实用户名
+   * @param submissionContext 应用提交上下文
+   * @param state 应用当前状态
+   * @param diagnostics 诊断信息
+   * @param launchTime 应用启动时间
+   * @param finishTime 应用完成时间
+   * @param callerContext 调用上下文信息
+   * @return 新建的应用状态数据实例
+   */
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, String user, String realUser,
       ApplicationSubmissionContext submissionContext, RMAppState state,
@@ -110,6 +169,21 @@ public abstract class ApplicationStateData {
     return appState;
   }
 
+  /**
+   * 创建带真实用户信息和超时配置的应用状态数据实例
+   * @param submitTime 应用提交时间
+   * @param startTime 应用启动时间
+   * @param user 提交应用的用户名
+   * @param realUser 代理运行的真实用户名
+   * @param submissionContext 应用提交上下文
+   * @param state 应用当前状态
+   * @param diagnostics 诊断信息
+   * @param launchTime 应用启动时间
+   * @param finishTime 应用完成时间
+   * @param callerContext 调用上下文信息
+   * @param applicationTimeouts 应用各类超时配置
+   * @return 新建的应用状态数据实例
+   */
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, String user, String realUser,
       ApplicationSubmissionContext submissionContext, RMAppState state,
@@ -125,6 +199,16 @@ public abstract class ApplicationStateData {
     return appState;
   }
 
+  /**
+   * 创建带真实用户信息的新提交应用状态数据实例
+   * @param submitTime 应用提交时间
+   * @param startTime 应用启动时间
+   * @param context 应用提交上下文
+   * @param user 提交应用的用户名
+   * @param realUser 代理运行的真实用户名
+   * @param callerContext 调用上下文信息
+   * @return 新建的应用状态数据实例
+   */
   public static ApplicationStateData newInstance(long submitTime,
       long startTime, ApplicationSubmissionContext context, String user,
       String realUser, CallerContext callerContext) {
@@ -132,17 +216,31 @@ public abstract class ApplicationStateData {
         0, 0, callerContext);
   }
 
+  /**
+   * 获取应用已有的尝试次数
+   * @return 应用尝试数量
+   */
   public int getAttemptCount() {
     return attempts.size();
   }
 
+  /**
+   * 根据尝试ID获取对应尝试的状态数据
+   * @param attemptId 应用尝试ID
+   * @return 对应尝试的状态数据
+   */
   public ApplicationAttemptStateData getAttempt(
       ApplicationAttemptId  attemptId) {
     return attempts.get(attemptId);
   }
 
+  /**
+   * 获取应用第一个尝试的尝试ID序号
+   * @return 最小尝试ID序号，无尝试时返回默认值1
+   */
   public int getFirstAttemptId() {
     int min = Integer.MAX_VALUE;
+    // 遍历所有尝试找到最小的尝试ID序号
     for(ApplicationAttemptId attemptId : attempts.keySet()) {
       if (attemptId.getAttemptId() < min) {
         min = attemptId.getAttemptId();
@@ -151,11 +249,15 @@ public abstract class ApplicationStateData {
     return min == Integer.MAX_VALUE ? 1 : min;
   }
 
+  /**
+   * 获取对应Proto序列化对象
+   * @return 应用状态数据的Proto序列化对象
+   */
   public abstract ApplicationStateDataProto getProto();
 
   /**
-   * The time at which the application was received by the Resource Manager
-   * @return submitTime
+   * 获取ResourceManager接收应用的时间
+   * @return 应用提交时间
    */
   @Public
   @Unstable
@@ -166,8 +268,8 @@ public abstract class ApplicationStateData {
   public abstract void setSubmitTime(long submitTime);
 
   /**
-   * Get the <em>start time</em> of the application.
-   * @return <em>start time</em> of the application
+   * 获取应用启动时间
+   * @return 应用启动时间
    */
   @Public
   @Stable
@@ -178,10 +280,9 @@ public abstract class ApplicationStateData {
   public abstract void setStartTime(long startTime);
 
 
-
   /**
-   * Get the <em>launch time</em> of the application.
-   * @return <em>launch time</em> of the application
+   * 获取应用容器启动时间
+   * @return 应用启动时间
    */
   @Public
   @Stable
@@ -192,8 +293,8 @@ public abstract class ApplicationStateData {
   public abstract void setLaunchTime(long launchTime);
 
   /**
-   * The application submitter.
-   * @param user submitter user name.
+   * 设置应用提交用户名
+   * @param user 提交者用户名
    */
   @Public
   @Unstable
@@ -204,9 +305,8 @@ public abstract class ApplicationStateData {
   public abstract String getUser();
   
   /**
-   * The {@link ApplicationSubmissionContext} for the application
-   * {@link ApplicationId} can be obtained from the this
-   * @return ApplicationSubmissionContext
+   * 获取应用提交上下文，包含应用ID等核心信息
+   * @return 应用提交上下文
    */
   @Public
   @Unstable
@@ -218,24 +318,24 @@ public abstract class ApplicationStateData {
       ApplicationSubmissionContext context);
 
   /**
-   * Get the final state of the application.
-   * @return the final state of the application.
+   * 获取应用最终状态
+   * @return 应用状态
    */
   public abstract RMAppState getState();
 
   public abstract void setState(RMAppState state);
 
   /**
-   * Get the diagnostics information for the application master.
-   * @return the diagnostics information for the application master.
+   * 获取应用诊断信息
+   * @return 诊断信息字符串
    */
   public abstract String getDiagnostics();
 
   public abstract void setDiagnostics(String diagnostics);
 
   /**
-   * The finish time of the application.
-   * @return the finish time of the application.,
+   * 获取应用完成时间
+   * @return 应用完成时间
    */
   public abstract long getFinishTime();
 

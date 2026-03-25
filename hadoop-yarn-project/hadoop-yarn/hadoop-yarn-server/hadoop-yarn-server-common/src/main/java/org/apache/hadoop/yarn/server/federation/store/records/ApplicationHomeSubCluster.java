@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -27,15 +28,13 @@ import org.apache.hadoop.yarn.api.records.ApplicationSubmissionContext;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * <p>
- * ApplicationHomeSubCluster is a report of the runtime information of the
- * application that is running in the federated cluster.
+ * 联邦YARN中记录应用归属子集群信息的数据模型，存储应用ID与所在Home子集群的映射关系
  *
  * <p>
- * It includes information such as:
+ * 包含信息如下：
  * <ul>
- * <li>{@link ApplicationId}</li>
- * <li>{@link SubClusterId}</li>
+ * <li>{@link ApplicationId} - 应用唯一标识</li>
+ * <li>{@link SubClusterId} - 应用归属子集群标识</li>
  * </ul>
  *
  */
@@ -43,6 +42,12 @@ import org.apache.hadoop.yarn.util.Records;
 @Unstable
 public abstract class ApplicationHomeSubCluster {
 
+  /**
+   * 创建ApplicationHomeSubCluster实例，仅指定应用ID和归属子集群。
+   * @param appId 应用ID
+   * @param homeSubCluster 归属子集群ID
+   * @return 新建的实例
+   */
   @Private
   @Unstable
   public static ApplicationHomeSubCluster newInstance(ApplicationId appId,
@@ -54,6 +59,13 @@ public abstract class ApplicationHomeSubCluster {
     return appMapping;
   }
 
+  /**
+   * 创建ApplicationHomeSubCluster实例，指定应用ID、创建时间和归属子集群。
+   * @param appId 应用ID
+   * @param createTime 应用创建时间
+   * @param homeSubCluster 归属子集群ID
+   * @return 新建的实例
+   */
   @Private
   @Unstable
   public static ApplicationHomeSubCluster newInstance(ApplicationId appId, long createTime,
@@ -65,6 +77,14 @@ public abstract class ApplicationHomeSubCluster {
     return appMapping;
   }
 
+  /**
+   * 创建ApplicationHomeSubCluster实例，指定全量信息。
+   * @param appId 应用ID
+   * @param createTime 应用创建时间
+   * @param homeSubCluster 归属子集群ID
+   * @param appSubmissionContext 应用提交上下文
+   * @return 新建的实例
+   */
   @Private
   @Unstable
   public static ApplicationHomeSubCluster newInstance(ApplicationId appId, long createTime,
@@ -77,6 +97,13 @@ public abstract class ApplicationHomeSubCluster {
     return appMapping;
   }
 
+  /**
+   * 创建ApplicationHomeSubCluster实例，指定应用ID、归属子集群和应用提交上下文。
+   * @param appId 应用ID
+   * @param homeSubCluster 归属子集群ID
+   * @param appSubmissionContext 应用提交上下文
+   * @return 新建的实例
+   */
   @Private
   @Unstable
   public static ApplicationHomeSubCluster newInstance(ApplicationId appId,
@@ -89,58 +116,54 @@ public abstract class ApplicationHomeSubCluster {
   }
 
   /**
-   * Get the {@link ApplicationId} representing the unique identifier of the
-   * application.
+   * 获取应用唯一标识。
    *
-   * @return the application identifier
+   * @return 应用ID
    */
   @Public
   @Unstable
   public abstract ApplicationId getApplicationId();
 
   /**
-   * Set the {@link ApplicationId} representing the unique identifier of the
-   * application.
+   * 设置应用唯一标识。
    *
-   * @param applicationId the application identifier
+   * @param applicationId 应用ID
    */
   @Private
   @Unstable
   public abstract void setApplicationId(ApplicationId applicationId);
 
   /**
-   * Get the {@link SubClusterId} representing the unique identifier of the home
-   * subcluster in which the ApplicationMaster of the application is running.
+   * 获取应用归属子集群标识，即运行该应用ApplicationMaster的子集群。
    *
-   * @return the home subcluster identifier
+   * @return 归属子集群ID
    */
   @Public
   @Unstable
   public abstract SubClusterId getHomeSubCluster();
 
   /**
-   * Set the {@link SubClusterId} representing the unique identifier of the home
-   * subcluster in which the ApplicationMaster of the application is running.
+   * 设置应用归属子集群标识。
    *
-   * @param homeSubCluster the home subcluster identifier
+   * @param homeSubCluster 归属子集群ID
    */
   @Private
   @Unstable
   public abstract void setHomeSubCluster(SubClusterId homeSubCluster);
 
   /**
-   * Get the create time of the subcluster.
+   * 获取应用创建时间戳。
    *
-   * @return the state of the subcluster
+   * @return 应用创建时间
    */
   @Public
   @Unstable
   public abstract long getCreateTime();
 
   /**
-   * Set the create time of the subcluster.
+   * 设置应用创建时间戳。
    *
-   * @param time the last heartbeat time of the subcluster
+   * @param time 应用创建时间
    */
   @Private
   @Unstable
@@ -148,18 +171,18 @@ public abstract class ApplicationHomeSubCluster {
 
 
   /**
-   * Set Application Submission Context.
+   * 设置应用提交上下文，包含应用提交的全部配置信息。
    *
-   * @param context Application Submission Context.
+   * @param context 应用提交上下文
    */
   @Private
   @Unstable
   public abstract void setApplicationSubmissionContext(ApplicationSubmissionContext context);
 
   /**
-   * Get Application Submission Context.
+   * 获取应用提交上下文。
    *
-   * @return Application Submission Context.
+   * @return 应用提交上下文
    */
   @Private
   @Unstable

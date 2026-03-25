@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,24 +21,37 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint.api;
 import org.apache.hadoop.yarn.api.records.SchedulingRequest;
 
 /**
- * Simple holder class encapsulating a SchedulingRequest
- * with a placement attempt.
+ * YARN 资源调度约束 API 模块：承载带有放置尝试次数的调度请求
+ * 该类用于在调度位置约束计算过程中，包装原始调度请求和当前尝试次数信息
  */
 public class SchedulingRequestWithPlacementAttempt {
 
   private final int placementAttempt;
   private final SchedulingRequest schedulingRequest;
 
+  /**
+   * 构造携带放置尝试次数的调度请求包装对象
+   * @param placementAttempt 当前放置尝试次数
+   * @param schedulingRequest 原始调度请求对象
+   */
   public SchedulingRequestWithPlacementAttempt(int placementAttempt,
       SchedulingRequest schedulingRequest) {
     this.placementAttempt = placementAttempt;
     this.schedulingRequest = schedulingRequest;
   }
 
+  /**
+   * 获取当前放置尝试次数
+   * @return 放置尝试次数
+   */
   public int getPlacementAttempt() {
     return placementAttempt;
   }
 
+  /**
+   * 获取原始调度请求对象
+   * @return 原始调度请求
+   */
   public SchedulingRequest getSchedulingRequest() {
     return schedulingRequest;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +23,7 @@ import org.apache.hadoop.security.authorize.AccessControlList;
 import org.apache.hadoop.yarn.api.records.Priority;
 
 /**
- * PriorityACLGroup will hold all ACL related information per priority.
+ * 存储单个优先级对应的所有访问控制列表ACL相关信息，用于容量调度器的应用优先级ACL管理。
  *
  */
 public class AppPriorityACLGroup implements Comparable<AppPriorityACLGroup> {
@@ -31,6 +32,12 @@ public class AppPriorityACLGroup implements Comparable<AppPriorityACLGroup> {
   private Priority defaultPriority = null;
   private AccessControlList aclList = null;
 
+  /**
+   * 带参构造函数，初始化优先级ACL分组信息。
+   * @param maxPriority 该ACL组允许的最高优先级
+   * @param defaultPriority 该ACL组对应的默认优先级
+   * @param aclList 该优先级分组对应的访问控制列表
+   */
   public AppPriorityACLGroup(Priority maxPriority, Priority defaultPriority,
       AccessControlList aclList) {
     this.setMaxPriority(Priority.newInstance(maxPriority.getPriority()));
@@ -39,11 +46,15 @@ public class AppPriorityACLGroup implements Comparable<AppPriorityACLGroup> {
     this.setACLList(aclList);
   }
 
+  /**
+   * 空构造函数。
+   */
   public AppPriorityACLGroup() {
   }
 
   @Override
   public int compareTo(AppPriorityACLGroup o) {
+    // 按最大优先级进行排序比较
     return getMaxPriority().compareTo(o.getMaxPriority());
   }
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,8 +26,7 @@ import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
 /**
- * Represents an application attempt, and the resources that the attempt is 
- * using.
+ * 调度器使用的应用尝试报告，封装了单次应用尝试正在使用的资源信息，对外提供应用尝试的状态与容器查询
  */
 @Evolving
 @LimitedPrivate("yarn")
@@ -36,6 +36,10 @@ public class SchedulerAppReport {
   private final Collection<RMContainer> reserved;
   private final boolean pending;
   
+  /**
+   * 从调度器应用尝试对象构造应用报告
+   * @param app 调度器中的应用尝试对象
+   */
   public SchedulerAppReport(SchedulerApplicationAttempt app) {
     this.live = app.getLiveContainers();
     this.reserved = app.getReservedContainers();
@@ -43,24 +47,24 @@ public class SchedulerAppReport {
   }
   
   /**
-   * Get the list of live containers
-   * @return All of the live containers
+   * 获取所有运行中容器列表
+   * @return 所有正在运行的容器集合
    */
   public Collection<RMContainer> getLiveContainers() {
     return live;
   }
   
   /**
-   * Get the list of reserved containers
-   * @return All of the reserved containers.
+   * 获取所有预留容器列表
+   * @return 所有已经预留的容器集合
    */
   public Collection<RMContainer> getReservedContainers() {
     return reserved;
   }
   
   /**
-   * Is this application pending?
-   * @return true if it is else false.
+   * 查询应用是否处于待调度状态
+   * @return true表示应用处于待调度，否则返回false
    */
   public boolean isPending() {
     return pending;

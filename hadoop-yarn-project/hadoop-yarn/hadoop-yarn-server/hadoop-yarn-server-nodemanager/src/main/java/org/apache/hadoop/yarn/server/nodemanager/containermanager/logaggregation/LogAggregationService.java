@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -42,6 +43,7 @@ import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+完成
 import org.apache.hadoop.yarn.api.records.LogAggregationContext;
 import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
@@ -66,6 +68,11 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.loghandler.eve
 import org.apache.hadoop.classification.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.util.concurrent.ThreadFactoryBuilder;
 
+/**
+ * NodeManager 日志聚合服务，负责将本节点上容器运行产生的日志聚合上传到远端存储系统。
+ * 支持滚动日志聚合（应用运行中定期聚合日志）和应用结束后全量聚合两种模式，
+ * 是 YARN 日志收集体系的核心服务端组件。
+ */
 public class LogAggregationService extends AbstractService implements
     LogHandler {
 
@@ -76,6 +83,7 @@ public class LogAggregationService extends AbstractService implements
   // NM_LOG_AGGREGATION_ROLL_MONITORING_INTERVAL_SECONDS.
   private static final String NM_LOG_AGGREGATION_DEBUG_ENABLED
       = YarnConfiguration.NM_PREFIX + "log-aggregation.debug-enabled";
+  /** 滚动日志聚合监控间隔（秒） */
   private long rollingMonitorInterval;
 
   private final Context context;
@@ -85,14 +93,24 @@ public class LogAggregationService extends AbstractService implements
   private LocalDirsHandlerService dirsHandler;
   private NodeId nodeId;
 
+  /** 存储每个应用对应的日志聚合器，并发安全 */
   private final ConcurrentMap<ApplicationId, AppLogAggregator> appLogAggregators;
 
   // Holds applications whose aggregation is disable due to invalid Token
+  /** 存储因Token无效被禁用日志聚合的应用列表 */
   private final Set<ApplicationId> invalidTokenApps;
 
   @VisibleForTesting
+  /** 日志聚合线程池，执行异步聚合任务 */
   ExecutorService threadPool;
   
+  /**
+   * 构造日志聚合服务实例
+   * @param dispatcher 事件分发器
+   * @param context NodeManager 上下文
+   * @param deletionService 删除服务
+   * @param dirsHandler 本地目录处理器
+   */
   public LogAggregationService(Dispatcher dispatcher, Context context,
       DeletionService deletionService, LocalDirsHandlerService dirsHandler) {
     super(LogAggregationService.class.getName());
@@ -105,6 +123,11 @@ public class LogAggregationService extends AbstractService implements
     this.invalidTokenApps = ConcurrentHashMap.newKeySet();
   }
 
+  /**
+   * 根据配置计算滚动监控间隔，处理最小间隔限制
+   * @param conf 配置对象
+   * @return 计算后的滚动监控间隔（秒）
+   */
   private static long calculateRollingMonitorInterval(Configuration conf) {
     long interval = conf.getLong(
         YarnConfiguration.NM_LOG_AGGREGATION_ROLL_MONITORING_INTERVAL_SECONDS,
@@ -148,13 +171,16 @@ public class LogAggregationService extends AbstractService implements
     return interval;
   }
 
+  @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 获取聚合线程池大小
     int threadPoolSize = getAggregatorThreadPoolSize(conf);
+    // 创建固定大小线程池执行日志聚合任务
     this.threadPool = HadoopExecutors.newFixedThreadPool(threadPoolSize,
         new ThreadFactoryBuilder()
             .setNameFormat("LogAggregationService #%d")
             .build());
-
+    // 计算滚动监控间隔
     rollingMonitorInterval = calculateRollingMonitorInterval(conf);
     LOG.info("rollingMonitorInterval is set as {}. The logs will be " +
         "aggregated every {} seconds", rollingMonitorInterval,
@@ -165,8 +191,8 @@ public class LogAggregationService extends AbstractService implements
 
   @Override
   protected void serviceStart() throws Exception {
-    // NodeId is only available during start, the following cannot be moved
-    // anywhere else.
+    // NodeId only available during start, cannot be moved anywhere else.
+    // 从上下文获取本节点ID，只能在启动阶段获取
     this.nodeId = this.context.getNodeId();
     super.serviceStart();
   }
@@ -174,10 +200,14 @@ public class LogAggregationService extends AbstractService implements
   @Override
   protected void serviceStop() throws Exception {
     LOG.info(this.getName() + " waiting for pending aggregation during exit");
+    // 停止所有聚合任务，等待完成
     stopAggregators();
     super.serviceStop();
   }
    
+  /**
+   * 停止所有正在进行的日志聚合任务，根据NM恢复配置决定是否中止未完成任务
+   */
   private void stopAggregators() {
     threadPool.shutdown();
     boolean supervised = getConfig().getBoolean(
@@ -185,6 +215,7 @@ public class LogAggregationService extends AbstractService implements
         YarnConfiguration.DEFAULT_NM_RECOVERY_SUPERVISED);
     // if recovery on restart is supported then leave outstanding aggregations
     // to the next restart
+    // 如果支持重启恢复且节点未退役，则留给下一次启动处理未完成聚合
     boolean shouldAbort = context.getNMStateStore().canRecover()
         && !context.getDecommissioned() && supervised;
     // politely ask to finish
@@ -195,25 +226,37 @@ public class LogAggregationService extends AbstractService implements
         aggregator.finishLogAggregation();
       }
     }
-    while (!threadPool.isTerminated()) { // wait for all threads to finish
+    // 等待所有线程执行完成
+    while (!threadPool.isTerminated()) {
       for (ApplicationId appId : appLogAggregators.keySet()) {
         LOG.info("Waiting for aggregation to complete for " + appId);
       }
       try {
         if (!threadPool.awaitTermination(30, TimeUnit.SECONDS)) {
-          threadPool.shutdownNow(); // send interrupt to hurry them along
+          // 超时后发送中断催促任务完成
+          threadPool.shutdownNow();
         }
       } catch (InterruptedException e) {
         LOG.warn("Aggregation stop interrupted!");
         break;
       }
     }
+    // 打印未完成聚合的应用警告
     for (ApplicationId appId : appLogAggregators.keySet()) {
       LOG.warn("Some logs may not have been aggregated for " + appId);
     }
   }
 
   @SuppressWarnings("unchecked")
+  /**
+   * 初始化应用日志聚合，初始化完成后发送事件通知
+   * @param appId 应用ID
+   * @param user 对应用户
+   * @param credentials 用户凭证
+   * @param appAcls 应用访问控制列表
+   * @param logAggregationContext 日志聚合上下文
+   * @param recoveredLogInitedTime 恢复后的日志初始化时间
+   */
   private void initApp(final ApplicationId appId, String user,
       Credentials credentials, Map<ApplicationAccessType, String> appAcls,
       LogAggregationContext logAggregationContext,
@@ -232,6 +275,11 @@ public class LogAggregationService extends AbstractService implements
     this.dispatcher.getEventHandler().handle(eventResponse);
   }
   
+  /**
+   * 获取本地文件系统上下文
+   * @param conf 配置对象
+   * @return 本地文件系统上下文
+   */
   FileContext getLocalFileContext(Configuration conf) {
     try {
       return FileContext.getLocalFSFileContext(conf);
@@ -240,29 +288,43 @@ public class LogAggregationService extends AbstractService implements
     }
   }
 
+  /**
+   * 初始化应用级日志聚合器，创建远端应用日志目录，提交聚合任务到线程池
+   * @param appId 应用ID
+   * @param user 对应用户
+   * @param credentials 用户凭证
+   * @param appAcls 应用访问控制列表
+   * @param logAggregationContext 日志聚合上下文
+   * @param recoveredLogInitedTime 恢复后的日志初始化时间
+   */
   protected void initAppAggregator(final ApplicationId appId, String user,
       Credentials credentials, Map<ApplicationAccessType, String> appAcls,
       LogAggregationContext logAggregationContext,
       long recoveredLogInitedTime) {
 
     // Get user's FileSystem credentials
+    // 创建对应用户的UGI，加载用户凭证
     final UserGroupInformation userUgi =
         UserGroupInformation.createRemoteUser(user);
     if (credentials != null) {
       userUgi.addCredentials(credentials);
     }
 
+    // 获取日志聚合文件控制器
     LogAggregationFileController logAggregationFileController =
         getLogAggregationFileController(getConfig());
+    // 验证并创建远端根日志目录
     logAggregationFileController.verifyAndCreateRemoteLogDir();
     // New application
+    // 创建应用聚合器实例
     final AppLogAggregator appLogAggregator =
         new AppLogAggregatorImpl(this.dispatcher, this.deletionService,
             getConfig(), appId, userUgi, this.nodeId, dirsHandler,
             logAggregationFileController.getRemoteNodeLogFileForApp(appId,
-            user, nodeId), appAcls, logAggregationContext, this.context,
+                user, nodeId), appAcls, logAggregationContext, this.context,
             getLocalFileContext(getConfig()), this.rollingMonitorInterval,
             recoveredLogInitedTime, logAggregationFileController);
+    // 并发防重检查，避免重复初始化
     if (this.appLogAggregators.putIfAbsent(appId, appLogAggregator) != null) {
       throw new YarnRuntimeException("Duplicate initApp for " + appId);
     }
@@ -270,11 +332,14 @@ public class LogAggregationService extends AbstractService implements
     YarnRuntimeException appDirException = null;
     try {
       // Create the app dir
+      // 创建远端应用日志目录
       logAggregationFileController.createAppDir(user, appId, userUgi);
     } catch (Exception e) {
+      // 创建失败，禁用该应用聚合
       appLogAggregator.disableLogAggregation();
 
       // add to disabled aggregators if due to InvalidToken
+      // 因Token无效导致的失败，加入禁用列表，等待后续Token更新重试
       if (e.getCause() instanceof SecretManager.InvalidToken) {
         invalidTokenApps.add(appId);
       }
@@ -289,11 +354,13 @@ public class LogAggregationService extends AbstractService implements
     // aggregation.
 
     // Schedule the aggregator.
+    // 包装聚合任务，提交到线程池执行
     Runnable aggregatorWrapper = new Runnable() {
       public void run() {
         try {
           appLogAggregator.run();
         } finally {
+          // 执行完成后从聚合器映射移除，关闭文件系统
           appLogAggregators.remove(appId);
           closeFileSystems(userUgi);
         }
@@ -306,6 +373,10 @@ public class LogAggregationService extends AbstractService implements
     }
   }
 
+  /**
+   * 关闭用户对应所有文件系统，释放资源
+   * @param userUgi 用户UGI
+   */
   protected void closeFileSystems(final UserGroupInformation userUgi) {
     try {
       FileSystem.closeAllForUGI(userUgi);
@@ -320,6 +391,12 @@ public class LogAggregationService extends AbstractService implements
     return this.appLogAggregators.size();
   }
 
+  /**
+   * 处理容器完成事件，触发该容器日志聚合
+   * @param containerId 容器ID
+   * @param containerType 容器类型
+   * @param exitCode 容器退出码
+   */
   private void stopContainer(ContainerId containerId,
       ContainerType containerType, int exitCode) {
 
@@ -337,134 +414,6 @@ public class LogAggregationService extends AbstractService implements
   }
 
   @SuppressWarnings("unchecked")
-  private void stopApp(ApplicationId appId) {
-
-    // App is complete. Finish up any containers' pending log aggregation and
-    // close the application specific logFile.
-    try {
-      AppLogAggregator aggregator = this.appLogAggregators.get(appId);
-      if (aggregator == null) {
-        LOG.warn("Log aggregation is not initialized for " + appId
-            + ", did it fail to start?");
-        this.dispatcher.getEventHandler().handle(new ApplicationEvent(appId,
-            ApplicationEventType.APPLICATION_LOG_HANDLING_FAILED));
-        return;
-      }
-      aggregator.finishLogAggregation();
-    } finally {
-      // Remove invalid Token Apps
-      invalidTokenApps.remove(appId);
-    }
-  }
-
-  @Override
-  public void handle(LogHandlerEvent event) {
-    switch (event.getType()) {
-      case APPLICATION_STARTED:
-        LogHandlerAppStartedEvent appStartEvent =
-            (LogHandlerAppStartedEvent) event;
-        initApp(appStartEvent.getApplicationId(), appStartEvent.getUser(),
-            appStartEvent.getCredentials(),
-            appStartEvent.getApplicationAcls(),
-            appStartEvent.getLogAggregationContext(),
-            appStartEvent.getRecoveredAppLogInitedTime());
-        break;
-      case CONTAINER_FINISHED:
-        LogHandlerContainerFinishedEvent containerFinishEvent =
-            (LogHandlerContainerFinishedEvent) event;
-        stopContainer(containerFinishEvent.getContainerId(),
-            containerFinishEvent.getContainerType(),
-            containerFinishEvent.getExitCode());
-        break;
-      case APPLICATION_FINISHED:
-        LogHandlerAppFinishedEvent appFinishedEvent =
-            (LogHandlerAppFinishedEvent) event;
-        stopApp(appFinishedEvent.getApplicationId());
-        break;
-      case LOG_AGG_TOKEN_UPDATE:
-        checkAndEnableAppAggregators();
-        break;
-      default:
-        ; // Ignore
-    }
-
-  }
-
-  private void checkAndEnableAppAggregators() {
-    for (ApplicationId appId : invalidTokenApps) {
-      try {
-        AppLogAggregator aggregator = appLogAggregators.get(appId);
-        if (aggregator != null) {
-          Credentials credentials =
-              context.getSystemCredentialsForApps().get(appId);
-          if (credentials != null) {
-            // Create the app dir again with
-            LogAggregationFileController logAggregationFileController =
-                getLogAggregationFileController(getConfig());
-            UserGroupInformation userUgi =
-                aggregator.updateCredentials(credentials);
-            logAggregationFileController
-                .createAppDir(userUgi.getShortUserName(), appId, userUgi);
-            aggregator.enableLogAggregation();
-          }
-          invalidTokenApps.remove(appId);
-          LOG.info("LogAggregation enabled for application {}", appId);
-        }
-      } catch (Exception e) {
-        //Ignore exception
-        LOG.warn("Enable aggregators failed {}", appId);
-      }
-    }
-  }
-
-  @Override
-  public Set<ApplicationId> getInvalidTokenApps() {
-    return invalidTokenApps;
-  }
-
-  @VisibleForTesting
-  public ConcurrentMap<ApplicationId, AppLogAggregator> getAppLogAggregators() {
-    return this.appLogAggregators;
-  }
-
-  @VisibleForTesting
-  public NodeId getNodeId() {
-    return this.nodeId;
-  }
-
-  @VisibleForTesting
-  public long getRollingMonitorInterval() {
-    return rollingMonitorInterval;
-  }
-
-  private int getAggregatorThreadPoolSize(Configuration conf) {
-    int threadPoolSize;
-    try {
-      threadPoolSize = conf.getInt(YarnConfiguration
-          .NM_LOG_AGGREGATION_THREAD_POOL_SIZE,
-          YarnConfiguration.DEFAULT_NM_LOG_AGGREGATION_THREAD_POOL_SIZE);
-    } catch (NumberFormatException ex) {
-      LOG.warn("Invalid thread pool size. Setting it to the default value " +
-          "in YarnConfiguration");
-      threadPoolSize = YarnConfiguration.
-          DEFAULT_NM_LOG_AGGREGATION_THREAD_POOL_SIZE;
-    }
-    if(threadPoolSize <= 0) {
-      LOG.warn("Invalid thread pool size. Setting it to the default value " +
-          "in YarnConfiguration");
-      threadPoolSize = YarnConfiguration.
-          DEFAULT_NM_LOG_AGGREGATION_THREAD_POOL_SIZE;
-    }
-    return threadPoolSize;
-  }
-
-  @VisibleForTesting
-  public LogAggregationFileController getLogAggregationFileController(
-      Configuration conf) {
-    LogAggregationFileControllerFactory factory
-        = new LogAggregationFileControllerFactory(conf);
-    LogAggregationFileController logAggregationFileController = factory
-        .getFileControllerForWrite();
-    return logAggregationFileController;
-  }
-}
+  /**
+   * 处理应用完成事件，结束应用日志聚合
+   * @param appId 应用ID

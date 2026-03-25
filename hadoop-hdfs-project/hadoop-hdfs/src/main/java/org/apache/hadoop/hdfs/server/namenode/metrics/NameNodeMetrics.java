@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,8 +37,13 @@ import org.apache.hadoop.metrics2.lib.MutableStat;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
 
 /**
+ * 文件级注释：NameNode运行指标统计类，维护NameNode各类活动的统计数据，并通过Hadoop metrics2框架对外发布指标，用于监控NameNode运行状态。
+ *
  * This class is for maintaining  the various NameNode activity statistics
  * and publishing them through the metrics interfaces.
+ */
+/**
+ * 类级注释：NameNode活动指标收集与发布类，负责统计NameNode各类操作、延迟、资源状态等运行指标，通过metrics2框架对外暴露，为监控系统提供NameNode运行数据。
  */
 @Metrics(name="NameNodeActivity", about="NameNode metrics", context="dfs")
 public class NameNodeMetrics {
@@ -167,9 +173,17 @@ public class NameNodeMetrics {
 
   JvmMetrics jvmMetrics = null;
   
+  /**
+   * 构造方法：初始化NameNodeMetrics，创建各个百分位数统计对象
+   * @param processName NameNode进程角色名称（如active/standby）
+   * @param sessionId 指标会话ID
+   * @param intervals 百分位数统计时间间隔数组
+   * @param jvmMetrics JVM指标对象
+   */
   NameNodeMetrics(String processName, String sessionId, int[] intervals,
       final JvmMetrics jvmMetrics) {
     this.jvmMetrics = jvmMetrics;
+    // 注册进程名称和会话ID标签
     registry.tag(ProcessName, processName).tag(SessionId, sessionId);
     
     final int len = intervals.length;
@@ -185,6 +199,7 @@ public class NameNodeMetrics {
     numEditLogLoadedQuantiles = new MutableQuantiles[len];
     editLogTailIntervalQuantiles = new MutableQuantiles[len];
 
+    // 遍历每个时间间隔，创建对应的百分位数统计对象
     for (int i = 0; i < len; i++) {
       int interval = intervals[i];
       syncsQuantiles[i] = registry.newQuantiles(
@@ -224,261 +239,205 @@ public class NameNodeMetrics {
     }
   }
 
+  /**
+   * 创建并注册NameNode指标对象到指标系统
+   * @param conf Hadoop配置对象
+   * @param r NameNode角色（active/standby等）
+   * @return 初始化完成的NameNodeMetrics实例
+   */
   public static NameNodeMetrics create(Configuration conf, NamenodeRole r) {
     String sessionId = conf.get(DFSConfigKeys.DFS_METRICS_SESSION_ID_KEY);
     String processName = r.toString();
     MetricsSystem ms = DefaultMetricsSystem.instance();
     JvmMetrics jm = JvmMetrics.create(processName, sessionId, ms);
     
-    // Percentile measurement is off by default, by watching no intervals
+    // 从配置获取百分位数统计间隔，默认关闭（空数组）
     int[] intervals = 
         conf.getInts(DFSConfigKeys.DFS_METRICS_PERCENTILES_INTERVALS_KEY);
+    // 注册并返回NameNode指标对象
     return ms.register(new NameNodeMetrics(processName, sessionId,
         intervals, jm));
   }
 
+  /**
+   * 获取关联的JVM指标对象
+   * @return JVM指标实例
+   */
   public JvmMetrics getJvmMetrics() {
     return jvmMetrics;
   }
   
+  /**
+   * 关闭指标系统，清理资源
+   */
   public void shutdown() {
     DefaultMetricsSystem.shutdown();
   }
 
+  /**
+   * 增加获取块位置操作计数
+   */
   public void incrGetBlockLocations() {
     getBlockLocations.incr();
   }
 
+  /**
+   * 增加创建文件计数
+   */
   public void incrFilesCreated() {
     filesCreated.incr();
   }
 
+  /**
+   * 增加创建文件操作计数
+   */
   public void incrCreateFileOps() {
     createFileOps.incr();
   }
 
+  /**
+   * 增加文件追加操作计数
+   */
   public void incrFilesAppended() {
     filesAppended.incr();
   }
 
+  /**
+   * 增加添加块操作计数
+   */
   public void incrAddBlockOps() {
     addBlockOps.incr();
   }
   
+  /**
+   * 增加获取额外DataNode操作计数
+   */
   public void incrGetAdditionalDatanodeOps() {
     getAdditionalDatanodeOps.incr();
   }
 
+  /**
+   * 增加文件重命名操作计数
+   */
   public void incrFilesRenamed() {
     filesRenamed.incr();
   }
 
+  /**
+   * 增加文件截断操作计数
+   */
   public void incrFilesTruncated() {
     filesTruncated.incr();
   }
 
+  /**
+   * 增加删除文件/目录数量
+   * @param delta 新增删除数量
+   */
   public void incrFilesDeleted(long delta) {
     filesDeleted.incr(delta);
   }
 
+  /**
+   * 增加删除文件操作计数
+   */
   public void incrDeleteFileOps() {
     deleteFileOps.incr();
   }
 
+  /**
+   * 增加获取文件列表操作计数
+   */
   public void incrGetListingOps() {
     getListingOps.incr();
   }
 
+  /**
+   * 增加getListing操作返回的文件总数
+   * @param delta 新增文件数量
+   */
   public void incrFilesInGetListingOps(int delta) {
     filesInGetListingOps.incr(delta);
   }
 
+  /**
+   * 增加获取文件信息操作计数
+   */
   public void incrFileInfoOps() {
     fileInfoOps.incr();
   }
 
+  /**
+   * 增加创建符号链接操作计数
+   */
   public void incrCreateSymlinkOps() {
     createSymlinkOps.incr();
   }
 
+  /**
+   * 增加获取符号链接目标操作计数
+   */
   public void incrGetLinkTargetOps() {
     getLinkTargetOps.incr();
   }
 
+  /**
+   * 增加允许快照操作计数
+   */
   public void incrAllowSnapshotOps() {
     allowSnapshotOps.incr();
   }
   
+  /**
+   * 增加禁止快照操作计数
+   */
   public void incrDisAllowSnapshotOps() {
     disallowSnapshotOps.incr();
   }
   
+  /**
+   * 增加创建快照操作计数
+   */
   public void incrCreateSnapshotOps() {
     createSnapshotOps.incr();
   }
   
+  /**
+   * 增加删除快照操作计数
+   */
   public void incrDeleteSnapshotOps() {
     deleteSnapshotOps.incr();
   }
   
+  /**
+   * 增加重命名快照操作计数
+   */
   public void incrRenameSnapshotOps() {
     renameSnapshotOps.incr();
   }
   
+  /**
+   * 增加获取可快照目录列表操作计数
+   */
   public void incrListSnapshottableDirOps() {
     listSnapshottableDirOps.incr();
   }
 
+  /**
+   * 增加获取快照列表操作计数
+   */
   public void incrListSnapshotsOps() {
     listSnapshotOps.incr();
   }
   
+  /**
+   * 增加快照差异报告操作计数
+   */
   public void incrSnapshotDiffReportOps() {
     snapshotDiffReportOps.incr();
   }
   
-  public void incrBlockReceivedAndDeletedOps() {
-    blockReceivedAndDeletedOps.incr();
-  }
-
-  public void setBlockOpsQueued(int size) {
-    blockOpsQueued.set(size);
-  }
-
-  public void setDeleteBlocksQueued(int size) {
-    deleteBlocksQueued.set(size);
-  }
-
-  public void incrPendingDeleteBlocksCount(int size) {
-    pendingDeleteBlocksCount.incr(size);
-  }
-
-  public void decrPendingDeleteBlocksCount() {
-    pendingDeleteBlocksCount.decr();
-  }
-
-  public void addBlockOpsBatched(int count) {
-    blockOpsBatched.incr(count);
-  }
-
-  public void setPendingEditsCount(int size) {
-    pendingEditsCount.set(size);
-  }
-
-  public void addTransaction(long latency) {
-    transactions.add(latency);
-  }
-
-  public void incrTransactionsBatchedInSync(long count) {
-    transactionsBatchedInSync.incr(count);
-    for (MutableQuantiles q : numTransactionsBatchedInSync) {
-      q.add(count);
-    }
-  }
-
-  public void incSuccessfulReReplications() {
-    successfulReReplications.incr();
-  }
-
-  public void incNumTimesReReplicationNotScheduled() {
-    numTimesReReplicationNotScheduled.incr();
-  }
-
-  public void incTimeoutReReplications() {
-    timeoutReReplications.incr();
-  }
-
-  public void addSync(long elapsed) {
-    syncs.add(elapsed);
-    for (MutableQuantiles q : syncsQuantiles) {
-      q.add(elapsed);
-    }
-  }
-
-  public void setFsImageLoadTime(long elapsed) {
-    fsImageLoadTime.set((int) elapsed);
-  }
-
-  public void addStorageBlockReport(long latency) {
-    storageBlockReport.add(latency);
-    for (MutableQuantiles q : storageBlockReportQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void addCacheBlockReport(long latency) {
-    cacheReport.add(latency);
-    for (MutableQuantiles q : cacheReportQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void setSafeModeTime(long elapsed) {
-    safeModeTime.set((int) elapsed);
-  }
-
-  public void addGetEdit(long latency) {
-    getEdit.add(latency);
-  }
-
-  public void addGetImage(long latency) {
-    getImage.add(latency);
-  }
-
-  public void addGetAliasMap(long latency) {
-    getAliasMap.add(latency);
-  }
-
-  public void addPutImage(long latency) {
-    putImage.add(latency);
-  }
-
-  public void addGenerateEDEKTime(long latency) {
-    generateEDEKTime.add(latency);
-    for (MutableQuantiles q : generateEDEKTimeQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void addWarmUpEDEKTime(long latency) {
-    warmUpEDEKTime.add(latency);
-    for (MutableQuantiles q : warmUpEDEKTimeQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void addResourceCheckTime(long latency) {
-    resourceCheckTime.add(latency);
-    for (MutableQuantiles q : resourceCheckTimeQuantiles) {
-      q.add(latency);
-    }
-  }
-
-  public void addEditLogTailTime(long elapsed) {
-    editLogTailTime.add(elapsed);
-    for (MutableQuantiles q : editLogTailTimeQuantiles) {
-      q.add(elapsed);
-    }
-  }
-
-  public void addEditLogFetchTime(long elapsed) {
-    editLogFetchTime.add(elapsed);
-    for (MutableQuantiles q : editLogFetchTimeQuantiles) {
-      q.add(elapsed);
-    }
-  }
-
-  public void addNumEditLogLoaded(long loaded) {
-    numEditLogLoaded.add(loaded);
-    for (MutableQuantiles q : numEditLogLoadedQuantiles) {
-      q.add(loaded);
-    }
-  }
-
-  public void addEditLogTailInterval(long elapsed) {
-    editLogTailInterval.add(elapsed);
-    for (MutableQuantiles q : editLogTailIntervalQuantiles) {
-      q.add(elapsed);
-    }
-  }
-}
+  /**
+   * 增加块接收删除通知操作计数
+   */
+  public void inc

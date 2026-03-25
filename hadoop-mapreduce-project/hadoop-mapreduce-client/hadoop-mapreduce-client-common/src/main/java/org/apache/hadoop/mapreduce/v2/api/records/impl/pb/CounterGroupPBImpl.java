@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,25 +33,36 @@ import org.apache.hadoop.mapreduce.v2.proto.MRProtos.CounterProto;
 import org.apache.hadoop.mapreduce.v2.proto.MRProtos.StringCounterMapProto;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 
-
-    
+/**
+ * CounterGroup的Protobuf序列化实现，基于ProtoBase实现，用于MapReduce任务指标统计中同类别计数器组的存储与序列化。
+ * 负责维护一组同类型计数器，在RPC通信和持久化中完成内存对象与Protobuf格式的互转。
+ */    
 public class CounterGroupPBImpl extends ProtoBase<CounterGroupProto> implements CounterGroup {
   CounterGroupProto proto = CounterGroupProto.getDefaultInstance();
   CounterGroupProto.Builder builder = null;
   boolean viaProto = false;
   
+  // 内存中存储计数器集合，key为计数器名称，value为计数器实例
   private Map<String, Counter> counters = null;
   
   
+  /**
+   * 构造空的计数器组实例，用于构建新对象。
+   */
   public CounterGroupPBImpl() {
     builder = CounterGroupProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造计数器组实例，用于反序列化。
+   * @param proto 已序列化的CounterGroupProto对象
+   */
   public CounterGroupPBImpl(CounterGroupProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
+  @Override
   public CounterGroupProto getProto() {
       mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -98,6 +110,7 @@ public class CounterGroupPBImpl extends ProtoBase<CounterGroupProto> implements 
     }
     builder.setName((name));
   }
+  
   @Override
   public String getDisplayName() {
     CounterGroupProtoOrBuilder p = viaProto ? proto : builder;
@@ -116,17 +129,22 @@ public class CounterGroupPBImpl extends ProtoBase<CounterGroupProto> implements 
     }
     builder.setDisplayName((displayName));
   }
+  
   @Override
   public Map<String, Counter> getAllCounters() {
     initCounters();
     return this.counters;
   }
+  
   @Override
   public Counter getCounter(String key) {
     initCounters();
     return this.counters.get(key);
   }
   
+  /**
+   * 延迟初始化计数器集合：从Protobuf对象反序列化所有计数器到内存Map。
+   */
   private void initCounters() {
     if (this.counters != null) {
       return;
@@ -135,6 +153,7 @@ public class CounterGroupPBImpl extends ProtoBase<CounterGroupProto> implements 
     List<StringCounterMapProto> list = p.getCountersList();
     this.counters = new HashMap<String, Counter>();
 
+    // 将Protobuf格式的计数器转换为内存对象存入Map
     for (StringCounterMapProto c : list) {
       this.counters.put(c.getKey(), convertFromProtoFormat(c.getValue()));
     }
@@ -148,11 +167,15 @@ public class CounterGroupPBImpl extends ProtoBase<CounterGroupProto> implements 
     this.counters.putAll(counters);
   }
   
+  /**
+   * 将内存中所有计数器转换写入Protobuf Builder，完成序列化准备。
+   */
   private void addContersToProto() {
     maybeInitBuilder();
     builder.clearCounters();
     if (counters == null)
       return;
+    // 自定义Iterable实现，将内存计数器逐个转换为Protobuf格式
     Iterable<StringCounterMapProto> iterable = new Iterable<StringCounterMapProto>() {
       
       @Override
@@ -181,27 +204,40 @@ public class CounterGroupPBImpl extends ProtoBase<CounterGroupProto> implements 
     };
     builder.addAllCounters(iterable);
   }
+  
   @Override
   public void setCounter(String key, Counter val) {
     initCounters();
     this.counters.put(key, val);
   }
+  
   @Override
   public void removeCounter(String key) {
     initCounters();
     this.counters.remove(key);
   }
+  
   @Override
   public void clearCounters() {
     initCounters();
     this.counters.clear();
   }
 
+  /**
+   * 将Protobuf格式的Counter转换为内存PBImpl对象。
+   * @param p Protobuf格式的Counter
+   * @return 内存CounterPBImpl实例
+   */
   private CounterPBImpl convertFromProtoFormat(CounterProto p) {
     return new CounterPBImpl(p);
   }
 
+  /**
+   * 将内存Counter对象转换为Protobuf格式。
+   * @param t 内存Counter对象
+   * @return Protobuf格式的CounterProto
+   */
   private CounterProto convertToProtoFormat(Counter t) {
     return ((CounterPBImpl)t).getProto();
   }
-}  
+}

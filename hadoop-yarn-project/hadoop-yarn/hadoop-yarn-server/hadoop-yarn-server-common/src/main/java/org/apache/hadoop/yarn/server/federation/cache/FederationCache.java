@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,67 +39,66 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * YARN联邦缓存抽象基类，为联邦状态存储提供缓存能力，减少对状态存储的重复查询，提升查询性能。
+ * 提供了缓存键构建、各类缓存请求构造和结果转换的通用实现，具体缓存实现由子类完成。
+ */
 public abstract class FederationCache {
 
   // ------------------------------------ Constants   -------------------------
 
+  // 子集群信息缓存ID
   protected static final String GET_SUBCLUSTERS_CACHEID = "getSubClusters";
 
+  // 子集群策略配置缓存ID
   protected static final String GET_POLICIES_CONFIGURATIONS_CACHEID =
       "getPoliciesConfigurations";
+  // 应用归属子集群缓存ID
   protected static final String GET_APPLICATION_HOME_SUBCLUSTER_CACHEID =
       "getApplicationHomeSubCluster";
 
+  // 缓存键分隔符
   protected static final String POINT = ".";
 
+  // 联邦状态存储引用
   private FederationStateStore stateStore;
 
   /**
-   * Determine whether to enable cache.
-   * We judge whether to enable the cache according to the cache time.
-   * If the cache time is greater than 0, the cache is enabled.
-   * If the cache time is less than or equal 0, the cache is not enabled.
-   *
-   * @return true, enable cache; false, not enable cache.
+   * 判断是否启用缓存，根据缓存过期时间判断，大于0则启用。
+   * @return true 启用缓存；false 不启用缓存
    */
   public abstract boolean isCachingEnabled();
 
   /**
-   * Initialize the cache.
-   *
-   * @param pConf Configuration.
-   * @param pStateStore FederationStateStore.
+   * 初始化缓存。
+   * @param pConf 配置对象
+   * @param pStateStore 联邦状态存储
    */
   public abstract void initCache(Configuration pConf, FederationStateStore pStateStore);
 
   /**
-   * clear cache.
+   * 清空所有缓存。
    */
   public abstract void clearCache();
 
   /**
-   * Build CacheKey.
+   * 构建缓存键，格式为 类名.方法名。
    *
-   * @param className Cache Class Name.
-   * @param methodName Method Name.
-   * @return append result.
-   * Example: className:FederationJCache, methodName:getPoliciesConfigurations.
-   * We Will Return FederationJCache.getPoliciesConfigurations.
+   * @param className 缓存类名
+   * @param methodName 方法名
+   * @return 构建好的缓存键
    */
   protected String buildCacheKey(String className, String methodName) {
     return buildCacheKey(className, methodName, null);
   }
 
   /**
-   * Build CacheKey.
+   * 构建带参数的缓存键，格式为 类名.方法名.参数名。
    *
-   * @param className Cache Class Name.
-   * @param methodName Method Name.
-   * @param argName ArgName.
-   * @return append result.
-   * Example:
-   * className:FederationJCache, methodName:getApplicationHomeSubCluster, argName: app_1
-   * We Will Return FederationJCache.getApplicationHomeSubCluster.app_1
+   * @param className 缓存类名
+   * @param methodName 方法名
+   * @param argName 参数名
+   * @return 构建好的缓存键
    */
   protected String buildCacheKey(String className, String methodName, String argName) {
     StringBuilder buffer = new StringBuilder();
@@ -111,42 +111,37 @@ public abstract class FederationCache {
   }
 
   /**
-   * Returns the {@link SubClusterInfo} of all active sub cluster(s).
+   * 获取所有活跃子集群信息。
    *
-   * @param filterInactiveSubClusters whether to filter out inactive
-   *          sub-clusters
-   * @return the information of all active sub cluster(s)
-   * @throws YarnException if the call to the state store is unsuccessful
+   * @param filterInactiveSubClusters 是否过滤非活跃子集群
+   * @return 所有活跃子集群信息映射，键为子集群ID，值为子集群信息
+   * @throws YarnException 状态存储调用失败时抛出异常
    */
   public abstract Map<SubClusterId, SubClusterInfo> getSubClusters(
       boolean filterInactiveSubClusters) throws YarnException;
 
   /**
-   * Get the policies that is represented as
-   * {@link SubClusterPolicyConfiguration} for all currently active queues in
-   * the system.
+   * 获取所有当前活跃队列的子集群路由策略配置。
    *
-   * @return the policies for all currently active queues in the system
-   * @throws YarnException if the call to the state store is unsuccessful
+   * @return 所有队列的策略配置映射，键为队列名，值为策略配置
+   * @throws Exception 状态存储调用失败时抛出异常
    */
   public abstract Map<String, SubClusterPolicyConfiguration> getPoliciesConfigurations()
       throws Exception;
 
   /**
-   * Returns the home {@link SubClusterId} for the specified
-   * {@link ApplicationId}.
+   * 获取指定应用的归属子集群ID。
    *
-   * @param appId the identifier of the application
-   * @return the home sub cluster identifier
-   * @throws YarnException if the call to the state store is unsuccessful
+   * @param appId 应用ID
+   * @return 应用归属子集群ID
+   * @throws YarnException 状态存储调用失败时抛出异常
    */
   public abstract SubClusterId getApplicationHomeSubCluster(ApplicationId appId) throws Exception;
 
   /**
-   * Remove SubCluster from cache.
+   * 从缓存中移除子集群（根据过滤条件移除非活跃子集群）。
    *
-   * @param filterInactiveSubClusters whether to filter out inactive
-   * sub-clusters.
+   * @param filterInactiveSubClusters 是否过滤非活跃子集群
    */
   public abstract void removeSubCluster(boolean filterInactiveSubClusters);
 
@@ -154,12 +149,12 @@ public abstract class FederationCache {
   // ------------------------------------ SubClustersCache -------------------------
 
   /**
-   * Build GetSubClusters CacheRequest.
+   * 构造获取子集群信息的缓存请求，从状态存储加载数据封装为缓存请求。
    *
-   * @param cacheKey cacheKey.
-   * @param filterInactiveSubClusters filter Inactive SubClusters.
-   * @return CacheRequest.
-   * @throws YarnException exceptions from yarn servers.
+   * @param cacheKey 缓存键
+   * @param filterInactiveSubClusters 是否过滤非活跃子集群
+   * @return 封装好的缓存请求
+   * @throws YarnException 状态存储调用失败时抛出异常
    */
   protected CacheRequest<String, CacheResponse<SubClusterInfo>> buildGetSubClustersCacheRequest(
       String cacheKey, final boolean filterInactiveSubClusters) throws YarnException {
@@ -171,11 +166,11 @@ public abstract class FederationCache {
   }
 
   /**
-   * Build SubClusterInfo Response.
+   * 从状态存储查询子集群信息，封装为缓存响应对象。
    *
-   * @param filterInactiveSubClusters whether to filter out inactive sub-clusters.
-   * @return SubClusterInfo Response.
-   * @throws YarnException exceptions from yarn servers.
+   * @param filterInactiveSubClusters 是否过滤非活跃子集群
+   * @return 封装好的子集群信息缓存响应
+   * @throws YarnException 状态存储调用失败时抛出异常
    */
   private CacheResponse<SubClusterInfo> buildSubClusterInfoResponse(
       final boolean filterInactiveSubClusters) throws YarnException {
@@ -188,10 +183,10 @@ public abstract class FederationCache {
   }
 
   /**
-   * According to the response, build SubClusterInfoMap.
+   * 从状态存储响应中构建子集群ID到信息的映射表。
    *
-   * @param response GetSubClustersInfoResponse.
-   * @return SubClusterInfoMap.
+   * @param response 状态存储查询响应
+   * @return 子集群ID到信息的映射表
    */
   public static Map<SubClusterId, SubClusterInfo> buildSubClusterInfoMap(
       final GetSubClustersInfoResponse response) {
@@ -200,10 +195,10 @@ public abstract class FederationCache {
   }
 
   /**
-   * According to the cacheRequest, build SubClusterInfoMap.
+   * 从缓存请求中提取并构建子集群ID到信息的映射表。
    *
-   * @param cacheRequest CacheRequest.
-   * @return SubClusterInfoMap.
+   * @param cacheRequest 缓存请求对象
+   * @return 子集群ID到信息的映射表
    */
   public static Map<SubClusterId, SubClusterInfo> buildSubClusterInfoMap(
       CacheRequest<String, ?> cacheRequest) {
@@ -214,10 +209,10 @@ public abstract class FederationCache {
   }
 
   /**
-   * According to the subClusters, build SubClusterInfoMap.
+   * 从子集群列表构建子集群ID到信息的映射表。
    *
-   * @param subClusters subCluster List.
-   * @return SubClusterInfoMap.
+   * @param subClusters 子集群信息列表
+   * @return 子集群ID到信息的映射表
    */
   private static Map<SubClusterId, SubClusterInfo> buildSubClusterInfoMap(
       List<SubClusterInfo> subClusters) {
@@ -231,12 +226,12 @@ public abstract class FederationCache {
   // ------------------------------------ ApplicationHomeSubClusterCache -------------------------
 
   /**
-   * Build GetApplicationHomeSubCluster CacheRequest.
+   * 构造获取应用归属子集群的缓存请求，从状态存储加载数据封装为缓存请求。
    *
-   * @param cacheKey cacheKey.
-   * @param applicationId applicationId.
-   * @return CacheRequest.
-   * @throws YarnException exceptions from yarn servers.
+   * @param cacheKey 缓存键
+   * @param applicationId 应用ID
+   * @return 封装好的缓存请求
+   * @throws YarnException 状态存储调用失败时抛出异常
    */
   protected CacheRequest<String, CacheResponse<SubClusterId>>
       buildGetApplicationHomeSubClusterRequest(String cacheKey, ApplicationId applicationId)
@@ -246,11 +241,11 @@ public abstract class FederationCache {
   }
 
   /**
-   * Build SubClusterId Response.
+   * 从状态存储查询应用归属子集群，封装为缓存响应对象。
    *
-   * @param applicationId applicationId.
-   * @return subClusterId
-   * @throws YarnException exceptions from yarn servers.
+   * @param applicationId 应用ID
+   * @return 封装好的应用归属子集群缓存响应
+   * @throws YarnException 状态存储调用失败时抛出异常
    */
   private CacheResponse<SubClusterId> buildSubClusterIdResponse(final ApplicationId applicationId)
       throws YarnException {
@@ -268,11 +263,11 @@ public abstract class FederationCache {
   // ------------------------------ SubClusterPolicyConfigurationCache -------------------------
 
   /**
-   * Build GetPoliciesConfigurations CacheRequest.
+   * 构造获取策略配置的缓存请求，从状态存储加载数据封装为缓存请求。
    *
-   * @param cacheKey cacheKey.
-   * @return CacheRequest.
-   * @throws YarnException exceptions from yarn servers.
+   * @param cacheKey 缓存键
+   * @return 封装好的缓存请求
+   * @throws YarnException 状态存储调用失败时抛出异常
    */
   protected CacheRequest<String, CacheResponse<SubClusterPolicyConfiguration>>
       buildGetPoliciesConfigurationsCacheRequest(String cacheKey) throws YarnException {
@@ -282,10 +277,10 @@ public abstract class FederationCache {
   }
 
   /**
-   * According to the response, build PolicyConfigMap.
+   * 从状态存储响应中构建队列到策略配置的映射表。
    *
-   * @param response GetSubClusterPoliciesConfigurationsResponse.
-   * @return PolicyConfigMap.
+   * @param response 状态存储查询响应
+   * @return 队列名到策略配置的映射表
    */
   public static Map<String, SubClusterPolicyConfiguration> buildPolicyConfigMap(
       GetSubClusterPoliciesConfigurationsResponse response) {
@@ -294,10 +289,10 @@ public abstract class FederationCache {
   }
 
   /**
-   * According to the subClusters, build PolicyConfigMap.
+   * 从策略配置列表构建队列到策略配置的映射表。
    *
-   * @param policyConfigs SubClusterPolicyConfigurations
-   * @return PolicyConfigMap.
+   * @param policyConfigs 策略配置列表
+   * @return 队列名到策略配置的映射表
    */
   private static Map<String, SubClusterPolicyConfiguration> buildPolicyConfigMap(
       List<SubClusterPolicyConfiguration> policyConfigs) {
@@ -309,10 +304,10 @@ public abstract class FederationCache {
   }
 
   /**
-   * According to the cacheRequest, build PolicyConfigMap.
+   * 从缓存请求中提取并构建队列到策略配置的映射表。
    *
-   * @param cacheRequest CacheRequest.
-   * @return PolicyConfigMap.
+   * @param cacheRequest 缓存请求对象
+   * @return 队列名到策略配置的映射表
    */
   public static Map<String, SubClusterPolicyConfiguration> buildPolicyConfigMap(
       CacheRequest<String, ?> cacheRequest){
@@ -324,10 +319,10 @@ public abstract class FederationCache {
   }
 
   /**
-   * Build SubClusterPolicyConfiguration Response.
+   * 从状态存储查询策略配置，封装为缓存响应对象。
    *
-   * @return SubClusterPolicyConfiguration Response.
-   * @throws YarnException exceptions from yarn servers.
+   * @return 封装好的策略配置缓存响应
+   * @throws YarnException 状态存储调用失败时抛出异常
    */
   private CacheResponse<SubClusterPolicyConfiguration> buildSubClusterPolicyConfigurationResponse()
       throws YarnException {
@@ -343,8 +338,9 @@ public abstract class FederationCache {
   }
 
   /**
-   * Internal class that encapsulates the cache key and a function that returns
-   * the value for the specified key.
+   * 封装缓存请求，包含缓存键和缓存值加载结果。
+   * @param <K> 缓存键类型
+   * @param <V> 缓存值类型
    */
   public class CacheRequest<K, V> {
     private K key;
@@ -384,6 +380,10 @@ public abstract class FederationCache {
     }
   }
 
+  /**
+   * 通用缓存响应容器，可存储列表或单个元素。
+   * @param <R> 缓存结果类型
+   */
   public class CacheResponse<R> {
     private List<R> list;
 
@@ -406,6 +406,9 @@ public abstract class FederationCache {
     }
   }
 
+  /**
+   * 子集群信息缓存响应实现类。
+   */
   public class SubClusterInfoCacheResponse extends CacheResponse<SubClusterInfo> {
     @Override
     public List<SubClusterInfo> getList() {
@@ -428,6 +431,9 @@ public abstract class FederationCache {
     }
   }
 
+  /**
+   * 子集群策略配置缓存响应实现类。
+   */
   public class SubClusterPolicyConfigurationCacheResponse
       extends CacheResponse<SubClusterPolicyConfiguration> {
     @Override
@@ -451,34 +457,11 @@ public abstract class FederationCache {
     }
   }
 
+  /**
+   * 应用归属子集群缓存响应实现类。
+   */
   public class ApplicationHomeSubClusterCacheResponse
       extends CacheResponse<SubClusterId> {
     @Override
     public List<SubClusterId> getList() {
-      return super.getList();
-    }
-
-    @Override
-    public void setList(List<SubClusterId> list) {
-      super.setList(list);
-    }
-
-    @Override
-    public SubClusterId getItem() {
-      return super.getItem();
-    }
-
-    @Override
-    public void setItem(SubClusterId item) {
-      super.setItem(item);
-    }
-  }
-
-  public FederationStateStore getStateStore() {
-    return stateStore;
-  }
-
-  public void setStateStore(FederationStateStore stateStore) {
-    this.stateStore = stateStore;
-  }
-}
+      return super

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,31 +38,47 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * Implementation of {@link RegisterDistributedSchedulingAMResponse}.
+ * 文件说明：分布式调度AM注册响应的Protobuf实现类，实现分布式调度场景下ApplicationMaster注册响应的序列化/反序列化
+ * 实现了 {@link RegisterDistributedSchedulingAMResponse} 接口。
  */
 public class RegisterDistributedSchedulingAMResponsePBImpl extends
     RegisterDistributedSchedulingAMResponse {
 
+  // Protobuf协议对象，存储序列化后的响应数据
   YarnServerCommonServiceProtos.RegisterDistributedSchedulingAMResponseProto
       proto =
           YarnServerCommonServiceProtos.
           RegisterDistributedSchedulingAMResponseProto
               .getDefaultInstance();
+  // Protobuf构建器，用于构造修改协议对象
   YarnServerCommonServiceProtos.RegisterDistributedSchedulingAMResponseProto.
       Builder builder = null;
+  // 标识当前数据是否存储在proto对象中，控制本地对象与proto的合并逻辑
   boolean viaProto = false;
 
+  // 容器最大资源限制本地缓存
   private Resource maxContainerResource;
+  // 容器最小资源限制本地缓存
   private Resource minContainerResource;
+  // 容器增量资源配置本地缓存
   private Resource incrContainerResource;
+  // 可调度节点列表本地缓存
   private List<RemoteNode> nodesForScheduling;
+  // 基础AM注册响应本地缓存
   private RegisterApplicationMasterResponse registerApplicationMasterResponse;
 
+  /**
+   * 无参构造函数，初始化Protobuf构建器
+   */
   public RegisterDistributedSchedulingAMResponsePBImpl() {
     builder = YarnServerCommonServiceProtos.
         RegisterDistributedSchedulingAMResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有Protobuf对象构造响应对象
+   * @param proto 已序列化的Protobuf响应对象
+   */
   public RegisterDistributedSchedulingAMResponsePBImpl(
       YarnServerCommonServiceProtos.
           RegisterDistributedSchedulingAMResponseProto proto) {
@@ -69,6 +86,10 @@ public class RegisterDistributedSchedulingAMResponsePBImpl extends
     viaProto = true;
   }
 
+  /**
+   * 获取当前响应的Protobuf协议对象，合并本地修改后返回
+   * @return 合并完成的Protobuf协议对象
+   */
   public YarnServerCommonServiceProtos.
       RegisterDistributedSchedulingAMResponseProto
           getProto() {
@@ -78,6 +99,9 @@ public class RegisterDistributedSchedulingAMResponsePBImpl extends
     return proto;
   }
 
+  /**
+   * 延迟初始化Protobuf构建器，当需要修改对象时确保构建器可用
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = YarnServerCommonServiceProtos.
@@ -86,6 +110,9 @@ public class RegisterDistributedSchedulingAMResponsePBImpl extends
     viaProto = false;
   }
 
+  /**
+   * 将本地缓存的修改合并到Protobuf协议对象
+   */
   private synchronized void mergeLocalToProto() {
     if (viaProto)
       maybeInitBuilder();
@@ -94,6 +121,9 @@ public class RegisterDistributedSchedulingAMResponsePBImpl extends
     viaProto = true;
   }
 
+  /**
+   * 将所有本地缓存的字段合并到Protobuf构建器
+   */
   private synchronized void mergeLocalToBuilder() {
     if (this.nodesForScheduling != null) {
       builder.clearNodesForScheduling();
@@ -177,7 +207,7 @@ public class RegisterDistributedSchedulingAMResponsePBImpl extends
   @Override
   public void setMinContainerResource(Resource minResource) {
     maybeInitBuilder();
-    if (minContainerResource == null) {
+    if (minResource == null) {
       builder.clearMinContainerResource();
     }
     this.minContainerResource = minResource;
@@ -204,7 +234,7 @@ public class RegisterDistributedSchedulingAMResponsePBImpl extends
   @Override
   public void setIncrContainerResource(Resource incrResource) {
     maybeInitBuilder();
-    if (incrContainerResource == null) {
+    if (incrResource == null) {
       builder.clearIncrContainerResource();
     }
     this.incrContainerResource = incrResource;
@@ -285,6 +315,9 @@ public class RegisterDistributedSchedulingAMResponsePBImpl extends
     return nodesForScheduling;
   }
 
+  /**
+   * 从Protobuf对象反序列化初始化可调度节点列表本地缓存
+   */
   private synchronized void initLocalNodesForSchedulingList() {
     YarnServerCommonServiceProtos.
         RegisterDistributedSchedulingAMResponseProtoOrBuilder p =
@@ -299,6 +332,11 @@ public class RegisterDistributedSchedulingAMResponsePBImpl extends
     }
   }
 
+  /**
+   * 将本地RemoteNode列表转换为Protobuf RemoteNodeProto可迭代对象，用于序列化
+   * @param nodeList 本地RemoteNode节点列表
+   * @return 可迭代的Protobuf节点对象
+   */
   private synchronized Iterable<RemoteNodeProto> getNodeIdProtoIterable(
       final List<RemoteNode> nodeList) {
     maybeInitBuilder();

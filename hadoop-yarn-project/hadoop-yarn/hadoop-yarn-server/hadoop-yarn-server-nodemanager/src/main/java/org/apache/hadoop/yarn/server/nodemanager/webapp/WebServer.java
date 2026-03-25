@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -49,6 +50,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * NodeManager Web UI 服务，提供 NodeManager 状态监控和容器管理的HTTP访问入口
+ */
 public class WebServer extends AbstractService {
 
   private static final Logger LOG =
@@ -60,6 +64,13 @@ public class WebServer extends AbstractService {
   private WebApp webApp;
   private int port;
 
+  /**
+   * 构造NodeManager Web服务器实例
+   * @param nmContext NodeManager上下文对象
+   * @param resView NodeManager资源视图
+   * @param aclsManager 应用访问权限管理器
+   * @param dirsHandler 本地目录处理器
+   */
   public WebServer(Context nmContext, ResourceView resView,
       ApplicationACLsManager aclsManager,
       LocalDirsHandlerService dirsHandler) {
@@ -69,19 +80,32 @@ public class WebServer extends AbstractService {
     this.resourceView = resView;
   }
 
+  /**
+   * 配置Jersey REST资源
+   * @return 配置完成的Jersey资源配置对象
+   */
   protected ResourceConfig configure() {
     NMJsonProvider nmJsonProvider = new NMJsonProvider();
 
     ResourceConfig config = new ResourceConfig();
+    // 扫描webapp包下的REST资源
     config.packages("org.apache.hadoop.yarn.server.nodemanager.webapp");
+    // 注册依赖注入绑定
     config.register(new JerseyBinder());
+    // 注册REST服务类
     config.register(NMWebServices.class);
+    // 注册全局异常处理器
     config.register(GenericExceptionHandler.class);
+    // 注册NodeManager JSON序列化提供者
     config.register(nmJsonProvider);
+    // 注册JAXB上下文解析器
     config.register(JAXBContextResolver.class);
     return config;
   }
 
+  /**
+   * Jersey依赖注入绑定类，将NodeManager核心对象注入到REST资源
+   */
   private class JerseyBinder extends AbstractBinder {
     @Override
     protected void configure() {
@@ -95,13 +119,16 @@ public class WebServer extends AbstractService {
   protected void serviceStart() throws Exception {
     Configuration conf = getConfig();
     Map<String, String> params = new HashMap<>();
+    // 终端前端资源参数配置
     Map<String, String> terminalParams = new HashMap<>();
     terminalParams.put("resourceBase", WebServer.class
         .getClassLoader().getResource("TERMINAL").toExternalForm());
     terminalParams.put("dirAllowed", "false");
     terminalParams.put("pathInfoOnly", "true");
+    // 获取Web服务绑定地址
     String bindAddress = WebAppUtils.getWebAppBindURL(conf,
         YarnConfiguration.NM_BIND_HOST, WebAppUtils.getNMWebAppURLWithoutScheme(conf));
+    // 判断是否启用跨域资源共享
     boolean enableCors = conf
         .getBoolean(YarnConfiguration.NM_WEBAPP_ENABLE_CORS_FILTER,
             YarnConfiguration.DEFAULT_NM_WEBAPP_ENABLE_CORS_FILTER);
@@ -110,8 +137,9 @@ public class WebServer extends AbstractService {
           + HttpCrossOriginFilterInitializer.ENABLED_SUFFIX, true);
     }
 
-    // Always load pseudo authentication filter to parse "user.name" in an URL
-    // to identify a HTTP request's user.
+    //  Always load pseudo authentication filter to parse "user.name" in an URL
+    //  to identify a HTTP request's user.
+    // 检查配置中是否已添加认证过滤器初始化器
     boolean hasHadoopAuthFilterInitializer = false;
     String filterInitializerConfKey = "hadoop.http.filter.initializers";
     Class<?>[] initializersClasses = conf.getClasses(filterInitializerConfKey);
@@ -126,27 +154,37 @@ public class WebServer extends AbstractService {
         targets.add(initializer.getName());
       }
     }
+    // 如果未添加认证过滤器，则强制添加
     if (!hasHadoopAuthFilterInitializer) {
       targets.add(AuthenticationFilterInitializer.class.getName());
       conf.set(filterInitializerConfKey, StringUtils.join(",", targets));
     }
+    // 初始化容器Shell WebSocket
     ContainerShellWebSocket.init(nmContext);
     LOG.info("Instantiating NMWebApp at {}.", bindAddress);
     try {
+      // 构建并启动Web应用
       this.webApp = WebApps
           .$for("node", Context.class, this.nmContext, "jersey-ws")
           .at(bindAddress)
+          // 注册容器Shell WebSocket Servlet
           .withServlet("ContainerShellWebSocket", "/container/*",
            ContainerShellWebSocketServlet.class, params, false)
+          // 注册终端前端Servlet
           .withServlet("Terminal", "/terminal/*",
            TerminalServlet.class, terminalParams, false)
           .with(conf)
+          // 配置SPNEGO认证密钥信息
           .withHttpSpnegoPrincipalKey(YarnConfiguration.NM_WEBAPP_SPNEGO_USER_NAME_KEY)
           .withHttpSpnegoKeytabKey(YarnConfiguration.NM_WEBAPP_SPNEGO_KEYTAB_FILE_KEY)
+          // 启用CSRF防护
           .withCSRFProtection(YarnConfiguration.NM_CSRF_PREFIX)
+          // 启用XFS防护
           .withXFSProtection(YarnConfiguration.NM_XFS_PREFIX)
+          // 设置Jersey资源配置
           .withResourceConfig(configure())
           .start(this.nmWebApp);
+      // 获取实际绑定的端口号
       this.port = this.webApp.httpServer().getConnectorAddress(0).getPort();
     } catch (Exception e) {
       String msg = "NMWebapps failed to start.";
@@ -156,6 +194,10 @@ public class WebServer extends AbstractService {
     super.serviceStart();
   }
 
+  /**
+   * 获取Web服务实际绑定的端口号
+   * @return 端口号
+   */
   public int getPort() {
     return this.port;
   }
@@ -169,6 +211,9 @@ public class WebServer extends AbstractService {
     super.serviceStop();
   }
 
+  /**
+   * NodeManager Web应用，负责页面路由和依赖绑定
+   */
   public static class NMWebApp extends WebApp implements YarnWebParams {
 
     private final ResourceView resourceView;
@@ -185,9 +230,11 @@ public class WebServer extends AbstractService {
 
     @Override
     public void setup() {
+      // 绑定核心服务实例到依赖注入容器
       bind(ResourceView.class).toInstance(this.resourceView);
       bind(ApplicationACLsManager.class).toInstance(this.aclsManager);
       bind(LocalDirsHandlerService.class).toInstance(dirsHandler);
+      // 配置页面路由
       route("/", NMController.class, "info");
       route("/node", NMController.class, "node");
       route("/allApplications", NMController.class, "allApplications");

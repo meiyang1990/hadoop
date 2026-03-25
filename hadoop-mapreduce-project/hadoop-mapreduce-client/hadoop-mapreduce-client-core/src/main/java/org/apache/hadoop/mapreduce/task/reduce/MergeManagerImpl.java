@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -62,6 +63,11 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.hadoop.classification.VisibleForTesting;
 
+/**
+ * Reduce阶段合并管理器实现类，负责管理Map输出结果的合并流程，
+ * 支持内存到内存、内存到磁盘、磁盘到磁盘多阶段合并，合理控制内存使用，
+ * 最终生成供Reduce任务消费的有序键值对迭代器。
+ */
 @SuppressWarnings(value={"unchecked"})
 @InterfaceAudience.LimitedPrivate({"MapReduce"})
 @InterfaceStability.Unstable
@@ -84,14 +90,17 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
   
   protected MapOutputFile mapOutputFile;
   
+  // 存储已经过内存合并后的内存Map输出结果
   Set<InMemoryMapOutput<K, V>> inMemoryMergedMapOutputs = 
     new TreeSet<InMemoryMapOutput<K,V>>(new MapOutputComparator<K, V>());
   private IntermediateMemoryToMemoryMerger memToMemMerger;
 
+  // 存储刚拉取完成、尚未合并的内存Map输出结果
   Set<InMemoryMapOutput<K, V>> inMemoryMapOutputs = 
     new TreeSet<InMemoryMapOutput<K,V>>(new MapOutputComparator<K, V>());
   private final MergeThread<InMemoryMapOutput<K,V>, K,V> inMemoryMerger;
   
+  // 存储已经溢出到磁盘的Map输出结果
   Set<CompressAwarePath> onDiskMapOutputs = new TreeSet<CompressAwarePath>();
   private final OnDiskMerger onDiskMerger;
 
@@ -132,6 +141,23 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
   
   private final Progress mergePhase;
 
+  /**
+   * 构造合并管理器，初始化内存限制、合并线程和各类参数
+   * @param reduceId 当前Reduce任务尝试ID
+   * @param jobConf 作业配置
+   * @param localFS 本地文件系统
+   * @param localDirAllocator 本地目录分配器
+   * @param reporter 任务报告器
+   * @param codec 压缩编解码器
+   * @param combinerClass Combiner类
+   * @param combineCollector Combiner输出收集器
+   * @param spilledRecordsCounter 溢出记录计数器
+   * @param reduceCombineInputCounter Combiner输入记录计数器
+   * @param mergedMapOutputsCounter 合并Map输出计数器
+   * @param exceptionReporter 异常报告器
+   * @param mergePhase 合并阶段进度
+   * @param mapOutputFile Map输出文件管理对象
+   */
   public MergeManagerImpl(TaskAttemptID reduceId, JobConf jobConf, 
                       FileSystem localFS,
                       LocalDirAllocator localDirAllocator,  
@@ -238,14 +264,26 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
     this.mergePhase = mergePhase;
   }
   
+  /**
+   * 创建内存合并线程，将内存中多个Map输出合并后溢出到磁盘
+   * @return 内存合并线程实例
+   */
   protected MergeThread<InMemoryMapOutput<K,V>, K,V> createInMemoryMerger() {
     return new InMemoryMerger(this);
   }
 
+  /**
+   * 创建磁盘合并线程，合并多个磁盘上的Map输出文件
+   * @return 磁盘合并线程实例
+   */
   protected MergeThread<CompressAwarePath,K,V> createOnDiskMerger() {
     return new OnDiskMerger(this);
   }
 
+  /**
+   * 获取当前Reduce任务尝试ID
+   * @return Reduce任务尝试ID
+   */
   TaskAttemptID getReduceId() {
     return reduceId;
   }
@@ -265,6 +303,7 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
                                              long requestedSize,
                                              int fetcher
                                              ) throws IOException {
+    // 单个Map输出超过内存限制，直接写到磁盘
     if (requestedSize > maxSingleShuffleLimit) {
       LOG.info(mapId + ": Shuffling to disk since " + requestedSize + 
                " is greater than maxSingleShuffleLimit (" + 
@@ -284,11 +323,12 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
     // current used size < mergeThreshold (merge will not get triggered)
     //
     // To avoid this from happening, we allow exactly one thread to go past
-    // the memory limit. We check (usedMemory > memoryLimit) and not
+    // the memory limit. We check(usedMemory > memoryLimit) and not
     // (usedMemory + requestedSize > memoryLimit). When this thread is done
     // fetching, this will automatically trigger a merge thereby unlocking
     // all the stalled threads
     
+    // 已用内存超过限制，阻塞等待合并释放内存
     if (usedMemory > memoryLimit) {
       LOG.debug(mapId + ": Stalling shuffle since usedMemory (" + usedMemory
           + ") is greater than memoryLimit (" + memoryLimit + ")." + 
@@ -296,7 +336,7 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
       return null;
     }
     
-    // Allow the in-memory shuffle to progress
+    // 内存足够，直接分配内存空间
     LOG.debug(mapId + ": Proceeding with shuffle since usedMemory ("
         + usedMemory + ") is lesser than memoryLimit (" + memoryLimit + ")."
         + "CommitMemory is (" + commitMemory + ")"); 
@@ -304,8 +344,11 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
   }
   
   /**
-   * Unconditional Reserve is used by the Memory-to-Memory thread
-   * @return
+   * 不做内存检查，直接分配内存存放Map输出，供内存-内存合并线程使用
+   * @param mapId Map任务尝试ID
+   * @param requestedSize 请求分配的内存大小
+   * @param primaryMapOutput 是否是原始Map输出（非合并输出）
+   * @return 内存Map输出对象
    */
   private synchronized InMemoryMapOutput<K, V> unconditionalReserve(
       TaskAttemptID mapId, long requestedSize, boolean primaryMapOutput) {
@@ -314,10 +357,18 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
                                       codec, primaryMapOutput);
   }
   
+  /**
+   * 释放已分配的内存空间
+   * @param size 要释放的内存大小
+   */
   synchronized void unreserve(long size) {
     usedMemory -= size;
   }
 
+  /**
+   * 处理拉取完成的内存Map输出，触发合并条件满足时启动合并
+   * @param mapOutput 已完成拉取的内存Map输出
+   */
   public synchronized void closeInMemoryFile(InMemoryMapOutput<K,V> mapOutput) { 
     inMemoryMapOutputs.add(mapOutput);
     LOG.info("closeInMemoryFile -> map-output of size: " + mapOutput.getSize()
@@ -326,7 +377,7 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
 
     commitMemory+= mapOutput.getSize();
 
-    // Can hang if mergeThreshold is really low.
+    // 已提交内存超过合并阈值，启动内存合并溢出到磁盘
     if (commitMemory >= mergeThreshold) {
       LOG.info("Starting inMemoryMerger's merge since commitMemory=" +
           commitMemory + " > mergeThreshold=" + mergeThreshold + 
@@ -337,6 +388,7 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
       commitMemory = 0L;  // Reset commitMemory.
     }
     
+    // 启用内存-内存合并且输出数量达到阈值，启动内存-内存合并
     if (memToMemMerger != null) {
       if (inMemoryMapOutputs.size() >= memToMemMergeOutputsThreshold) { 
         memToMemMerger.startMerge(inMemoryMapOutputs);
@@ -345,6 +397,10 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
   }
   
   
+  /**
+   * 保存内存-内存合并后的输出结果
+   * @param mapOutput 合并后的内存输出
+   */
   public synchronized void closeInMemoryMergedFile(InMemoryMapOutput<K,V> mapOutput) {
     inMemoryMergedMapOutputs.add(mapOutput);
     LOG.info("closeInMemoryMergedFile -> size: " + mapOutput.getSize() + 
@@ -352,536 +408,11 @@ public class MergeManagerImpl<K, V> implements MergeManager<K, V> {
              inMemoryMergedMapOutputs.size());
   }
   
+  /**
+   * 处理溢出到磁盘的Map输出，满足条件时启动磁盘合并
+   * @param file 磁盘文件路径（带压缩信息）
+   */
   public synchronized void closeOnDiskFile(CompressAwarePath file) {
     onDiskMapOutputs.add(file);
     
-    if (onDiskMapOutputs.size() >= (2 * ioSortFactor - 1)) {
-      onDiskMerger.startMerge(onDiskMapOutputs);
-    }
-  }
-  
-  @Override
-  public RawKeyValueIterator close() throws Throwable {
-    // Wait for on-going merges to complete
-    if (memToMemMerger != null) { 
-      memToMemMerger.close();
-    }
-    inMemoryMerger.close();
-    onDiskMerger.close();
-    
-    List<InMemoryMapOutput<K, V>> memory = 
-      new ArrayList<InMemoryMapOutput<K, V>>(inMemoryMergedMapOutputs);
-    inMemoryMergedMapOutputs.clear();
-    memory.addAll(inMemoryMapOutputs);
-    inMemoryMapOutputs.clear();
-    List<CompressAwarePath> disk = new ArrayList<CompressAwarePath>(onDiskMapOutputs);
-    onDiskMapOutputs.clear();
-    return finalMerge(jobConf, rfs, memory, disk);
-  }
-   
-  private class IntermediateMemoryToMemoryMerger 
-  extends MergeThread<InMemoryMapOutput<K, V>, K, V> {
-    
-    public IntermediateMemoryToMemoryMerger(MergeManagerImpl<K, V> manager, 
-                                            int mergeFactor) {
-      super(manager, mergeFactor, exceptionReporter);
-      setName("InMemoryMerger - Thread to do in-memory merge of in-memory " +
-      		    "shuffled map-outputs");
-      setDaemon(true);
-    }
-
-    @Override
-    public void merge(List<InMemoryMapOutput<K, V>> inputs) throws IOException {
-      if (inputs == null || inputs.size() == 0) {
-        return;
-      }
-
-      TaskAttemptID dummyMapId = inputs.get(0).getMapId(); 
-      List<Segment<K, V>> inMemorySegments = new ArrayList<Segment<K, V>>();
-      long mergeOutputSize = 
-        createInMemorySegments(inputs, inMemorySegments, 0);
-      int noInMemorySegments = inMemorySegments.size();
-      
-      InMemoryMapOutput<K, V> mergedMapOutputs = 
-        unconditionalReserve(dummyMapId, mergeOutputSize, false);
-      
-      Writer<K, V> writer = 
-        new InMemoryWriter<K, V>(mergedMapOutputs.getArrayStream());
-      
-      LOG.info("Initiating Memory-to-Memory merge with " + noInMemorySegments +
-               " segments of total-size: " + mergeOutputSize);
-
-      RawKeyValueIterator rIter = 
-        Merger.merge(jobConf, rfs,
-                     (Class<K>)jobConf.getMapOutputKeyClass(),
-                     (Class<V>)jobConf.getMapOutputValueClass(),
-                     inMemorySegments, inMemorySegments.size(),
-                     new Path(reduceId.toString()),
-                     (RawComparator<K>)jobConf.getOutputKeyComparator(),
-                     reporter, null, null, null);
-      Merger.writeFile(rIter, writer, reporter, jobConf);
-      writer.close();
-
-      LOG.info(reduceId +  
-               " Memory-to-Memory merge of the " + noInMemorySegments +
-               " files in-memory complete.");
-
-      // Note the output of the merge
-      closeInMemoryMergedFile(mergedMapOutputs);
-    }
-  }
-  
-  private class InMemoryMerger extends MergeThread<InMemoryMapOutput<K,V>, K,V> {
-    
-    public InMemoryMerger(MergeManagerImpl<K, V> manager) {
-      super(manager, Integer.MAX_VALUE, exceptionReporter);
-      setName
-      ("InMemoryMerger - Thread to merge in-memory shuffled map-outputs");
-      setDaemon(true);
-    }
-    
-    @Override
-    public void merge(List<InMemoryMapOutput<K,V>> inputs) throws IOException {
-      if (inputs == null || inputs.size() == 0) {
-        return;
-      }
-      
-      //name this output file same as the name of the first file that is 
-      //there in the current list of inmem files (this is guaranteed to
-      //be absent on the disk currently. So we don't overwrite a prev. 
-      //created spill). Also we need to create the output file now since
-      //it is not guaranteed that this file will be present after merge
-      //is called (we delete empty files as soon as we see them
-      //in the merge method)
-
-      //figure out the mapId 
-      TaskAttemptID mapId = inputs.get(0).getMapId();
-      TaskID mapTaskId = mapId.getTaskID();
-
-      List<Segment<K, V>> inMemorySegments = new ArrayList<Segment<K, V>>();
-      long mergeOutputSize = 
-        createInMemorySegments(inputs, inMemorySegments,0);
-      int noInMemorySegments = inMemorySegments.size();
-
-      Path outputPath = 
-        mapOutputFile.getInputFileForWrite(mapTaskId,
-                                           mergeOutputSize).suffix(
-                                               Task.MERGED_OUTPUT_PREFIX);
-
-      FSDataOutputStream out =
-          IntermediateEncryptedStream.wrapIfNecessary(jobConf,
-              rfs.create(outputPath), outputPath);
-      Writer<K, V> writer = new Writer<K, V>(jobConf, out,
-          (Class<K>) jobConf.getMapOutputKeyClass(),
-          (Class<V>) jobConf.getMapOutputValueClass(), codec, null, true);
-
-      RawKeyValueIterator rIter = null;
-      CompressAwarePath compressAwarePath;
-      try {
-        LOG.info("Initiating in-memory merge with " + noInMemorySegments + 
-                 " segments...");
-        
-        rIter = Merger.merge(jobConf, rfs,
-                             (Class<K>)jobConf.getMapOutputKeyClass(),
-                             (Class<V>)jobConf.getMapOutputValueClass(),
-                             inMemorySegments, inMemorySegments.size(),
-                             new Path(reduceId.toString()),
-                             (RawComparator<K>)jobConf.getOutputKeyComparator(),
-                             reporter, spilledRecordsCounter, null, null);
-        
-        if (null == combinerClass) {
-          Merger.writeFile(rIter, writer, reporter, jobConf);
-        } else {
-          combineCollector.setWriter(writer);
-          combineAndSpill(rIter, reduceCombineInputCounter);
-        }
-        writer.close();
-        compressAwarePath = new CompressAwarePath(outputPath,
-            writer.getRawLength(), writer.getCompressedLength());
-
-        LOG.info(reduceId +  
-            " Merge of the " + noInMemorySegments +
-            " files in-memory complete." +
-            " Local file is " + outputPath + " of size " + 
-            localFS.getFileStatus(outputPath).getLen());
-      } catch (IOException e) { 
-        //make sure that we delete the ondisk file that we created 
-        //earlier when we invoked cloneFileAttributes
-        localFS.delete(outputPath, true);
-        throw e;
-      }
-
-      // Note the output of the merge
-      closeOnDiskFile(compressAwarePath);
-    }
-
-  }
-  
-  private class OnDiskMerger extends MergeThread<CompressAwarePath,K,V> {
-    
-    public OnDiskMerger(MergeManagerImpl<K, V> manager) {
-      super(manager, ioSortFactor, exceptionReporter);
-      setName("OnDiskMerger - Thread to merge on-disk map-outputs");
-      setDaemon(true);
-    }
-    
-    @Override
-    public void merge(List<CompressAwarePath> inputs) throws IOException {
-      // sanity check
-      if (inputs == null || inputs.isEmpty()) {
-        LOG.info("No ondisk files to merge...");
-        return;
-      }
-      
-      long approxOutputSize = 0;
-      int bytesPerSum = 
-        jobConf.getInt("io.bytes.per.checksum", 512);
-      
-      LOG.info("OnDiskMerger: We have  " + inputs.size() + 
-               " map outputs on disk. Triggering merge...");
-      
-      // 1. Prepare the list of files to be merged. 
-      for (CompressAwarePath file : inputs) {
-        approxOutputSize += localFS.getFileStatus(file).getLen();
-      }
-
-      // add the checksum length
-      approxOutputSize += 
-        ChecksumFileSystem.getChecksumLength(approxOutputSize, bytesPerSum);
-
-      // 2. Start the on-disk merge process
-      Path outputPath = 
-        localDirAllocator.getLocalPathForWrite(inputs.get(0).toString(), 
-            approxOutputSize, jobConf).suffix(Task.MERGED_OUTPUT_PREFIX);
-
-      FSDataOutputStream out =
-          IntermediateEncryptedStream.wrapIfNecessary(jobConf,
-              rfs.create(outputPath), outputPath);
-      Writer<K, V> writer = new Writer<K, V>(jobConf, out,
-          (Class<K>) jobConf.getMapOutputKeyClass(),
-          (Class<V>) jobConf.getMapOutputValueClass(), codec, null, true);
-
-      RawKeyValueIterator iter  = null;
-      CompressAwarePath compressAwarePath;
-      Path tmpDir = new Path(reduceId.toString());
-      try {
-        iter = Merger.merge(jobConf, rfs,
-                            (Class<K>) jobConf.getMapOutputKeyClass(),
-                            (Class<V>) jobConf.getMapOutputValueClass(),
-                            codec, inputs.toArray(new Path[inputs.size()]), 
-                            true, ioSortFactor, tmpDir, 
-                            (RawComparator<K>) jobConf.getOutputKeyComparator(), 
-                            reporter, spilledRecordsCounter, null, 
-                            mergedMapOutputsCounter, null);
-
-        Merger.writeFile(iter, writer, reporter, jobConf);
-        writer.close();
-        compressAwarePath = new CompressAwarePath(outputPath,
-            writer.getRawLength(), writer.getCompressedLength());
-      } catch (IOException e) {
-        localFS.delete(outputPath, true);
-        throw e;
-      }
-
-      closeOnDiskFile(compressAwarePath);
-
-      LOG.info(reduceId +
-          " Finished merging " + inputs.size() + 
-          " map output files on disk of total-size " + 
-          approxOutputSize + "." + 
-          " Local output file is " + outputPath + " of size " +
-          localFS.getFileStatus(outputPath).getLen());
-    }
-  }
-  
-  private void combineAndSpill(
-      RawKeyValueIterator kvIter,
-      Counters.Counter inCounter) throws IOException {
-    JobConf job = jobConf;
-    Reducer combiner = ReflectionUtils.newInstance(combinerClass, job);
-    Class<K> keyClass = (Class<K>) job.getMapOutputKeyClass();
-    Class<V> valClass = (Class<V>) job.getMapOutputValueClass();
-    RawComparator<K> comparator = 
-      (RawComparator<K>)job.getCombinerKeyGroupingComparator();
-    try {
-      CombineValuesIterator values = new CombineValuesIterator(
-          kvIter, comparator, keyClass, valClass, job, Reporter.NULL,
-          inCounter);
-      while (values.more()) {
-        combiner.reduce(values.getKey(), values, combineCollector,
-                        Reporter.NULL);
-        values.nextKey();
-      }
-    } finally {
-      combiner.close();
-    }
-  }
-
-  private long createInMemorySegments(List<InMemoryMapOutput<K,V>> inMemoryMapOutputs,
-                                      List<Segment<K, V>> inMemorySegments, 
-                                      long leaveBytes
-                                      ) throws IOException {
-    long totalSize = 0L;
-    // We could use fullSize could come from the RamManager, but files can be
-    // closed but not yet present in inMemoryMapOutputs
-    long fullSize = 0L;
-    for (InMemoryMapOutput<K,V> mo : inMemoryMapOutputs) {
-      fullSize += mo.getMemory().length;
-    }
-    while(fullSize > leaveBytes) {
-      InMemoryMapOutput<K,V> mo = inMemoryMapOutputs.remove(0);
-      byte[] data = mo.getMemory();
-      long size = data.length;
-      totalSize += size;
-      fullSize -= size;
-      Reader<K,V> reader = new InMemoryReader<K,V>(MergeManagerImpl.this, 
-                                                   mo.getMapId(),
-                                                   data, 0, (int)size, jobConf);
-      inMemorySegments.add(new Segment<K,V>(reader, true, 
-                                            (mo.isPrimaryMapOutput() ? 
-                                            mergedMapOutputsCounter : null)));
-    }
-    return totalSize;
-  }
-
-  class RawKVIteratorReader extends IFile.Reader<K,V> {
-
-    private final RawKeyValueIterator kvIter;
-
-    public RawKVIteratorReader(RawKeyValueIterator kvIter, long size)
-        throws IOException {
-      super(null, null, size, null, spilledRecordsCounter);
-      this.kvIter = kvIter;
-    }
-    public boolean nextRawKey(DataInputBuffer key) throws IOException {
-      if (kvIter.next()) {
-        final DataInputBuffer kb = kvIter.getKey();
-        final int kp = kb.getPosition();
-        final int klen = kb.getLength() - kp;
-        key.reset(kb.getData(), kp, klen);
-        bytesRead += klen;
-        return true;
-      }
-      return false;
-    }
-    public void nextRawValue(DataInputBuffer value) throws IOException {
-      final DataInputBuffer vb = kvIter.getValue();
-      final int vp = vb.getPosition();
-      final int vlen = vb.getLength() - vp;
-      value.reset(vb.getData(), vp, vlen);
-      bytesRead += vlen;
-    }
-    public long getPosition() throws IOException {
-      return bytesRead;
-    }
-
-    public void close() throws IOException {
-      kvIter.close();
-    }
-  }
-
-  @VisibleForTesting
-  final long getMaxInMemReduceLimit() {
-    final float maxRedPer =
-        jobConf.getFloat(MRJobConfig.REDUCE_INPUT_BUFFER_PERCENT, 0f);
-    if (maxRedPer > 1.0 || maxRedPer < 0.0) {
-      throw new RuntimeException(maxRedPer + ": "
-          + MRJobConfig.REDUCE_INPUT_BUFFER_PERCENT
-          + " must be a float between 0 and 1.0");
-    }
-    return (long)(memoryLimit * maxRedPer);
-  }
-
-  private RawKeyValueIterator finalMerge(JobConf job, FileSystem fs,
-                                       List<InMemoryMapOutput<K,V>> inMemoryMapOutputs,
-                                       List<CompressAwarePath> onDiskMapOutputs
-                                       ) throws IOException {
-    LOG.info("finalMerge called with " +
-        inMemoryMapOutputs.size() + " in-memory map-outputs and " +
-        onDiskMapOutputs.size() + " on-disk map-outputs");
-    final long maxInMemReduce = getMaxInMemReduceLimit();
-    // merge config params
-    Class<K> keyClass = (Class<K>)job.getMapOutputKeyClass();
-    Class<V> valueClass = (Class<V>)job.getMapOutputValueClass();
-    boolean keepInputs = job.getKeepFailedTaskFiles();
-    final Path tmpDir = new Path(reduceId.toString());
-    final RawComparator<K> comparator =
-      (RawComparator<K>)job.getOutputKeyComparator();
-
-    // segments required to vacate memory
-    List<Segment<K,V>> memDiskSegments = new ArrayList<Segment<K,V>>();
-    long inMemToDiskBytes = 0;
-    boolean mergePhaseFinished = false;
-    if (inMemoryMapOutputs.size() > 0) {
-      TaskID mapId = inMemoryMapOutputs.get(0).getMapId().getTaskID();
-      inMemToDiskBytes = createInMemorySegments(inMemoryMapOutputs, 
-                                                memDiskSegments,
-                                                maxInMemReduce);
-      final int numMemDiskSegments = memDiskSegments.size();
-      if (numMemDiskSegments > 0 &&
-            ioSortFactor > onDiskMapOutputs.size()) {
-        
-        // If we reach here, it implies that we have less than io.sort.factor
-        // disk segments and this will be incremented by 1 (result of the 
-        // memory segments merge). Since this total would still be 
-        // <= io.sort.factor, we will not do any more intermediate merges,
-        // the merge of all these disk segments would be directly fed to the
-        // reduce method
-        
-        mergePhaseFinished = true;
-        // must spill to disk, but can't retain in-mem for intermediate merge
-        final Path outputPath = 
-          mapOutputFile.getInputFileForWrite(mapId,
-                                             inMemToDiskBytes).suffix(
-                                                 Task.MERGED_OUTPUT_PREFIX);
-        final RawKeyValueIterator rIter = Merger.merge(job, fs,
-            keyClass, valueClass, memDiskSegments, numMemDiskSegments,
-            tmpDir, comparator, reporter, spilledRecordsCounter, null, 
-            mergePhase);
-
-        FSDataOutputStream out =
-            IntermediateEncryptedStream.wrapIfNecessary(job,
-                fs.create(outputPath), outputPath);
-        Writer<K, V> writer = new Writer<K, V>(job, out, keyClass, valueClass,
-            codec, null, true);
-        try {
-          Merger.writeFile(rIter, writer, reporter, job);
-          writer.close();
-          onDiskMapOutputs.add(new CompressAwarePath(outputPath,
-              writer.getRawLength(), writer.getCompressedLength()));
-          writer = null;
-          // add to list of final disk outputs.
-        } catch (IOException e) {
-          if (null != outputPath) {
-            try {
-              fs.delete(outputPath, true);
-            } catch (IOException ie) {
-              // NOTHING
-            }
-          }
-          throw e;
-        } finally {
-          if (null != writer) {
-            writer.close();
-          }
-        }
-        LOG.info("Merged " + numMemDiskSegments + " segments, " +
-                 inMemToDiskBytes + " bytes to disk to satisfy " +
-                 "reduce memory limit");
-        inMemToDiskBytes = 0;
-        memDiskSegments.clear();
-      } else if (inMemToDiskBytes != 0) {
-        LOG.info("Keeping " + numMemDiskSegments + " segments, " +
-                 inMemToDiskBytes + " bytes in memory for " +
-                 "intermediate, on-disk merge");
-      }
-    }
-
-    // segments on disk
-    List<Segment<K,V>> diskSegments = new ArrayList<Segment<K,V>>();
-    long onDiskBytes = inMemToDiskBytes;
-    long rawBytes = inMemToDiskBytes;
-    CompressAwarePath[] onDisk = onDiskMapOutputs.toArray(
-        new CompressAwarePath[onDiskMapOutputs.size()]);
-    for (CompressAwarePath file : onDisk) {
-      long fileLength = fs.getFileStatus(file).getLen();
-      onDiskBytes += fileLength;
-      rawBytes += (file.getRawDataLength() > 0) ? file.getRawDataLength() : fileLength;
-
-      LOG.debug("Disk file: " + file + " Length is " + fileLength);
-      diskSegments.add(new Segment<K, V>(job, fs, file, codec, keepInputs,
-                                         (file.toString().endsWith(
-                                             Task.MERGED_OUTPUT_PREFIX) ?
-                                          null : mergedMapOutputsCounter), file.getRawDataLength()
-                                        ));
-    }
-    LOG.info("Merging " + onDisk.length + " files, " +
-             onDiskBytes + " bytes from disk");
-    Collections.sort(diskSegments, new Comparator<Segment<K,V>>() {
-      public int compare(Segment<K, V> o1, Segment<K, V> o2) {
-        if (o1.getLength() == o2.getLength()) {
-          return 0;
-        }
-        return o1.getLength() < o2.getLength() ? -1 : 1;
-      }
-    });
-
-    // build final list of segments from merged backed by disk + in-mem
-    List<Segment<K,V>> finalSegments = new ArrayList<Segment<K,V>>();
-    long inMemBytes = createInMemorySegments(inMemoryMapOutputs, 
-                                             finalSegments, 0);
-    LOG.info("Merging " + finalSegments.size() + " segments, " +
-             inMemBytes + " bytes from memory into reduce");
-    if (0 != onDiskBytes) {
-      final int numInMemSegments = memDiskSegments.size();
-      diskSegments.addAll(0, memDiskSegments);
-      memDiskSegments.clear();
-      // Pass mergePhase only if there is a going to be intermediate
-      // merges. See comment where mergePhaseFinished is being set
-      Progress thisPhase = (mergePhaseFinished) ? null : mergePhase; 
-      RawKeyValueIterator diskMerge = Merger.merge(
-          job, fs, keyClass, valueClass, codec, diskSegments,
-          ioSortFactor, numInMemSegments, tmpDir, comparator,
-          reporter, false, spilledRecordsCounter, null, thisPhase);
-      diskSegments.clear();
-      if (0 == finalSegments.size()) {
-        return diskMerge;
-      }
-      finalSegments.add(new Segment<K,V>(
-            new RawKVIteratorReader(diskMerge, onDiskBytes), true, rawBytes));
-    }
-    return Merger.merge(job, fs, keyClass, valueClass,
-                 finalSegments, finalSegments.size(), tmpDir,
-                 comparator, reporter, spilledRecordsCounter, null,
-                 null);
-  
-  }
-
-  static class CompressAwarePath extends Path {
-    private long rawDataLength;
-    private long compressedSize;
-
-    public CompressAwarePath(Path path, long rawDataLength, long compressSize) {
-      super(path.toUri());
-      this.rawDataLength = rawDataLength;
-      this.compressedSize = compressSize;
-    }
-
-    public long getRawDataLength() {
-      return rawDataLength;
-    }
-
-    public long getCompressedSize() {
-      return compressedSize;
-    }
-
-    @Override
-    public boolean equals(Object other) {
-      return super.equals(other);
-    }
-
-    @Override
-    public int hashCode() {
-      return super.hashCode();
-    }
-
-    @Override
-    public int compareTo(Path obj) {
-      if (obj instanceof CompressAwarePath) {
-        CompressAwarePath compPath = (CompressAwarePath) obj;
-        int c = Long.compare(this.compressedSize, compPath.compressedSize);
-        // Not returning 0 here so that objects with the same size (but
-        // different paths) are still added to the TreeSet.
-        if (c != 0) {
-          return c;
-        }
-      }
-      return super.compareTo(obj);
-    }
-  }
-
-  @VisibleForTesting
-  OnDiskMerger getOnDiskMerger() {
-    return onDiskMerger;
-  }
-}
+    // 磁盘文件

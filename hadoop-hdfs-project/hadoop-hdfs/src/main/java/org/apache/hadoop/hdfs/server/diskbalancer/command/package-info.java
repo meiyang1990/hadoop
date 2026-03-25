@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,7 @@
  */
 
 /**
- Commands for disk balancer command line tool.
+ * 磁盘均衡器命令行工具的命令实现包
+ * 包含磁盘均衡器所有子命令的具体实现逻辑，负责处理用户命令行输入并执行对应均衡操作
  */
 package org.apache.hadoop.hdfs.server.diskbalancer.command;

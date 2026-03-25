@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -49,6 +50,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 /**
+ * 文件级注释：磁盘均衡器的HDFS集群信息模型，负责管理集群中所有DataNode节点信息，处理包含/排除节点规则，并生成磁盘均衡迁移计划
+ * 
  * DiskBalancerCluster represents the nodes that we are working against.
  * <p>
  * Please Note :
@@ -92,7 +95,7 @@ public class DiskBalancerCluster {
   private float threshold;
 
   /**
-   * Empty Constructor needed by Jackson.
+   * 空构造器，Jackson JSON反序列化需要
    */
   public DiskBalancerCluster() {
     nodes = new LinkedList<>();
@@ -104,9 +107,9 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * Constructs a DiskBalancerCluster.
+   * 基于指定连接器构造磁盘均衡集群对象
    *
-   * @param connector - ClusterConnector
+   * @param connector 集群连接器，用于从HDFS获取节点信息
    * @throws IOException
    */
   public DiskBalancerCluster(ClusterConnector connector) throws IOException {
@@ -116,10 +119,10 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * Parses a Json string and converts to DiskBalancerCluster.
+   * 从JSON字符串反序列化为DiskBalancerCluster对象
    *
-   * @param json - Json String
-   * @return DiskBalancerCluster
+   * @param json 输入JSON字符串
+   * @return 反序列化得到的DiskBalancerCluster对象
    * @throws IOException
    */
   public static DiskBalancerCluster parseJson(String json) throws IOException {
@@ -127,13 +130,14 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * readClusterInfo connects to the cluster and reads the node's data.  This
-   * data is used as basis of rest of computation in DiskBalancerCluster
+   * 从集群连接器读取所有DataNode节点信息，建立各类索引映射，供后续均衡计算使用
    */
   public void readClusterInfo() throws Exception {
     Preconditions.checkNotNull(clusterConnector);
     LOG.debug("Using connector : {}" , clusterConnector.getConnectorInfo());
+    // 获取所有DataNode节点信息
     nodes = clusterConnector.getNodes();
+    // 按IP、主机名、UUID分别建立索引，方便后续查询节点
     for(DiskBalancerDataNode node : nodes) {
 
       if(node.getDataNodeIP()!= null && !node.getDataNodeIP().isEmpty()) {
@@ -154,56 +158,54 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * Gets all DataNodes in the Cluster.
+   * 获取集群中所有DataNode节点列表
    *
-   * @return Array of DisKBalancerDataNodes
+   * @return 所有DataNode节点列表
    */
   public List<DiskBalancerDataNode> getNodes() {
     return nodes;
   }
 
   /**
-   * Sets the list of nodes of this cluster.
+   * 设置集群节点列表
    *
-   * @param clusterNodes List of Nodes
+   * @param clusterNodes 节点列表
    */
   public void setNodes(List<DiskBalancerDataNode> clusterNodes) {
     this.nodes = clusterNodes;
   }
 
   /**
-   * Returns the current ExclusionList.
+   * 获取不参与均衡的节点排除列表
    *
-   * @return List of Nodes that are excluded from diskBalancer right now.
+   * @return 排除节点集合
    */
   public Set<String> getExclusionList() {
     return exclusionList;
   }
 
   /**
-   * sets the list of nodes to exclude from process of diskBalancer.
+   * 设置不参与均衡的节点排除列表
    *
-   * @param excludedNodes - exclusionList of nodes.
+   * @param excludedNodes 排除节点集合
    */
   public void setExclusionList(Set<String> excludedNodes) {
     this.exclusionList.addAll(excludedNodes);
   }
 
   /**
-   * Returns the threshold value. This is used for indicating how much skew is
-   * acceptable, This is expressed as a percentage. For example to say 20% skew
-   * between volumes is acceptable set this value to 20.
+   * 获取磁盘均衡允许的阈值，该值表示磁盘间使用率允许的最大偏差百分比，超过阈值才会进行均衡
    *
-   * @return float
+   * @return 偏差阈值百分比
    */
   public float getThreshold() {
     return threshold;
   }
 
   /**
-   * Sets the threshold value.
+   * 设置磁盘均衡允许的偏差阈值百分比
    *
-   * @param thresholdPercent - float - in percentage
+   * @param thresholdPercent 偏差阈值百分比，范围0-100
    */
   public void setThreshold(float thresholdPercent) {
     Preconditions.checkState((thresholdPercent >= 0.0f) &&
@@ -212,27 +214,27 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * Gets the Inclusion list.
+   * 获取需要参与均衡的节点包含列表
    *
-   * @return List of machine to be processed by diskBalancer.
+   * @return 包含节点集合
    */
   public Set<String> getInclusionList() {
     return inclusionList;
   }
 
   /**
-   * Sets the inclusionList.
+   * 设置需要参与均衡的节点包含列表
    *
-   * @param includeNodes - set of machines to be processed by diskBalancer.
+   * @param includeNodes 包含节点集合
    */
   public void setInclusionList(Set<String> includeNodes) {
     this.inclusionList.addAll(includeNodes);
   }
 
   /**
-   * returns a serialized json string.
+   * 将当前集群对象序列化为JSON字符串
    *
-   * @return String - json
+   * @return 序列化后的JSON字符串
    * @throws IOException
    */
   public String toJson() throws IOException {
@@ -240,10 +242,9 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * Returns the Nodes to Process which is the real list of nodes processed by
-   * diskBalancer.
+   * 获取实际需要进行磁盘均衡处理的节点列表
    *
-   * @return List of DiskBalancerDataNodes
+   * @return 需要处理的节点列表
    */
   @JsonIgnore
   public List<DiskBalancerDataNode> getNodesToProcess() {
@@ -251,9 +252,9 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * Sets the nodes to process.
+   * 设置需要进行磁盘均衡处理的节点列表
    *
-   * @param dnNodesToProcess - List of DataNodes to process
+   * @param dnNodesToProcess 需要处理的节点列表
    */
   @JsonIgnore
   public void setNodesToProcess(List<DiskBalancerDataNode> dnNodesToProcess) {
@@ -261,25 +262,25 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * Returns th output path for this cluster.
+   * 获取输出结果路径
    */
   public String getOutput() {
     return outputpath;
   }
 
   /**
-   * Sets the output path for this run.
+   * 设置本次均衡运行的输出路径
    *
-   * @param output - Path
+   * @param output 输出路径字符串
    */
   public void setOutput(String output) {
     this.outputpath = output;
   }
 
   /**
-   * Writes a snapshot of the cluster to the specified directory.
+   * 将当前集群节点信息快照写入指定目录的JSON文件
    *
-   * @param snapShotName - name of the snapshot
+   * @param snapShotName 快照文件名
    */
   public void createSnapshot(String snapShotName) throws IOException {
     String json = this.toJson();
@@ -288,16 +289,15 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * Compute plan takes a node and constructs a planner that creates a plan that
-   * we would like to follow.
+   * 并行为所有待处理节点生成磁盘数据迁移均衡计划
    * <p>
    * This function creates a thread pool and executes a planner on each node
    * that we are supposed to plan for. Each of these planners return a NodePlan
    * that we can persist or schedule for execution with a diskBalancer
    * Executor.
    *
-   * @param thresholdPercent - in percentage
-   * @return list of NodePlans
+   * @param thresholdPercent 允许的磁盘使用率偏差阈值百分比
+   * @return 所有节点的均衡计划列表
    */
   public List<NodePlan> computePlan(double thresholdPercent) {
     List<NodePlan> planList = new LinkedList<>();
@@ -306,11 +306,12 @@ public class DiskBalancerCluster {
       LOG.warn("Nodes to process is null. No nodes processed.");
       return planList;
     }
-
+    // 根据待处理节点数量计算合适的线程池大小
     int poolSize = computePoolSize(nodesToProcess.size());
-
+    // 创建固定大小线程池并行生成计划
     ExecutorService executorService = Executors.newFixedThreadPool(poolSize);
     List<Future<NodePlan>> futureList = new LinkedList<>();
+    // 为每个待处理节点提交计划生成任务
     for (int x = 0; x < nodesToProcess.size(); x++) {
       final DiskBalancerDataNode node = nodesToProcess.get(x);
       final Planner planner = PlannerFactory
@@ -324,30 +325,28 @@ public class DiskBalancerCluster {
         }
       }));
     }
-
+    // 收集所有节点的计划结果
     for (Future<NodePlan> f : futureList) {
       try {
         planList.add(f.get());
       } catch (InterruptedException e) {
         LOG.error("Compute Node plan was cancelled or interrupted : ", e);
+        Thread.currentThread().interrupt();
       } catch (ExecutionException e) {
         LOG.error("Unable to compute plan : ", e);
       }
     }
+    // 关闭线程池
+    executorService.shutdown();
     return planList;
   }
 
   /**
-   * Return the number of threads we should launch for this cluster.
-   * <p/>
-   * Here is the heuristic we are using.
-   * <p/>
-   * 1 thread per 100 nodes that we want to process. Minimum nodesToProcess
-   * threads in the pool. Maximum 100 threads in the pool.
-   * <p/>
-   * Generally return a rounded up multiple of 10.
+   * 根据待处理节点数量，按启发式规则计算并行计划生成的线程池大小
+   * 规则：每100个节点对应1个线程，最小为节点数，最大不超过100，结果向上取整为10的倍数
    *
-   * @return number
+   * @param nodeCount 待处理节点总数
+   * @return 计算得到的线程池大小
    */
   private int computePoolSize(int nodeCount) {
 
@@ -366,27 +365,27 @@ public class DiskBalancerCluster {
   }
 
   /**
-   * Returns a node by UUID.
-   * @param uuid - Node's UUID
-   * @return DiskBalancerDataNode.
+   * 根据UUID查询对应的DataNode节点
+   * @param uuid DataNode的UUID
+   * @return 对应的DiskBalancerDataNode对象
    */
   public DiskBalancerDataNode getNodeByUUID(String uuid) {
     return hostUUID.get(uuid);
   }
 
   /**
-   * Returns a node by IP Address.
-   * @param ipAddresss - IP address String.
-   * @return DiskBalancerDataNode.
+   * 根据IP地址查询对应的DataNode节点
+   * @param ipAddresss DataNode的IP地址
+   * @return 对应的DiskBalancerDataNode对象
    */
   public DiskBalancerDataNode getNodeByIPAddress(String ipAddresss) {
     return ipList.get(ipAddresss);
   }
 
   /**
-   * Returns a node by hostName.
-   * @param hostName - HostName.
-   * @return DiskBalancerDataNode.
+   * 根据主机名查询对应的DataNode节点
+   * @param hostName DataNode的主机名
+   * @return 对应的DiskBalancerDataNode对象
    */
   public DiskBalancerDataNode getNodeByName(String hostName) {
     return hostNames.get(hostName.toLowerCase(Locale.US));

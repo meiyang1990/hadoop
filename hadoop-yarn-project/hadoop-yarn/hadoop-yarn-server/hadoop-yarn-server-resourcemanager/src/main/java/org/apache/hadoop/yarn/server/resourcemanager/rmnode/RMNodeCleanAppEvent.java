@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,15 +22,26 @@ package org.apache.hadoop.yarn.server.resourcemanager.rmnode;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.NodeId;
 
+/**
+ * RM节点清理已完成应用程序的事件。
+ * 通知RM节点清理指定应用程序在该节点上的所有残留资源。
+ */
 public class RMNodeCleanAppEvent extends RMNodeEvent {
 
+  /** 需要清理的应用程序ID */
   private ApplicationId appId;
 
+  /**
+   * 构造函数，创建清理指定节点上指定应用的事件。
+   * @param nodeId 目标节点ID
+   * @param appId 需要清理的应用程序ID
+   */
   public RMNodeCleanAppEvent(NodeId nodeId, ApplicationId appId) {
     super(nodeId, RMNodeEventType.CLEANUP_APP);
     this.appId = appId;
   }
 
+  /** 获取需要清理的应用程序ID */
   public ApplicationId getAppId() {
     return this.appId;
   }

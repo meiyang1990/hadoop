@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,76 +29,59 @@ import org.apache.hadoop.mapreduce.task.annotation.Checkpointable;
 import java.util.Iterator;
 
 /** 
- * Reduces a set of intermediate values which share a key to a smaller set of
- * values.  
+ * MapReduce Reduce阶段核心抽象基类，对相同key的一组中间值进行归约计算，得到最终输出结果。
  * 
- * <p><code>Reducer</code> implementations 
- * can access the {@link Configuration} for the job via the 
- * {@link JobContext#getConfiguration()} method.</p>
-
- * <p><code>Reducer</code> has 3 primary phases:</p>
+ * <p><code>Reducer</code>实现类可以通过 {@link JobContext#getConfiguration()} 方法获取作业配置信息。</p>
+ *
+ * <p>Reduce处理整体分为3个核心阶段:</p>
  * <ol>
  *   <li>
  *   
- *   <b id="Shuffle">Shuffle</b>
+ *   <b id="Shuffle">混洗阶段</b>
  *   
- *   <p>The <code>Reducer</code> copies the sorted output from each 
- *   {@link Mapper} using HTTP across the network.</p>
+ *   <p>Reducer通过HTTP网络从各个Mapper节点拉取排序后的输出数据。</p>
  *   </li>
  *   
  *   <li>
- *   <b id="Sort">Sort</b>
+ *   <b id="Sort">排序阶段</b>
  *   
- *   <p>The framework merge sorts <code>Reducer</code> inputs by 
- *   <code>key</code>s 
- *   (since different <code>Mapper</code>s may have output the same key).</p>
+ *   <p>MapReduce框架对拉取到的输入数据按key进行合并排序，不同Mapper输出的相同key会被聚合到一起。</p>
  *   
- *   <p>The shuffle and sort phases occur simultaneously i.e. while outputs are
- *   being fetched they are merged.</p>
+ *   <p>混洗和排序阶段是同时进行的，即在拉取数据的同时完成合并。</p>
  *      
- *   <b id="SecondarySort">SecondarySort</b>
+ *   <b id="SecondarySort">二次排序</b>
  *   
- *   <p>To achieve a secondary sort on the values returned by the value 
- *   iterator, the application should extend the key with the secondary
- *   key and define a grouping comparator. The keys will be sorted using the
- *   entire key, but will be grouped using the grouping comparator to decide
- *   which keys and values are sent in the same call to reduce.The grouping 
- *   comparator is specified via 
- *   {@link Job#setGroupingComparatorClass(Class)}. The sort order is
- *   controlled by 
- *   {@link Job#setSortComparatorClass(Class)}.</p>
+ *   <p>如果需要对value迭代器返回的值进行二次排序，应用可以将二级排序键合并到主key中，
+ *   并定义分组比较器。完整key会被用于排序，而分组比较器会决定哪些key-value对被分到同一
+ *   次reduce调用。分组比较器通过 {@link Job#setGroupingComparatorClass(Class)} 指定，
+ *   整体排序顺序通过 {@link Job#setSortComparatorClass(Class)} 控制。</p>
  *   
  *   
- *   For example, say that you want to find duplicate web pages and tag them 
- *   all with the url of the "best" known example. You would set up the job 
- *   like:
+ *   例如需要找出重复网页，并使用"最佳"页面的URL标记所有重复页面，可以按如下方式配置作业:
  *   <ul>
- *     <li>Map Input Key: url</li>
- *     <li>Map Input Value: document</li>
- *     <li>Map Output Key: document checksum, url pagerank</li>
- *     <li>Map Output Value: url</li>
- *     <li>Partitioner: by checksum</li>
- *     <li>OutputKeyComparator: by checksum and then decreasing pagerank</li>
- *     <li>OutputValueGroupingComparator: by checksum</li>
+ *     <li>Map输入键: url</li>
+ *     <li>Map输入值: 文档内容</li>
+ *     <li>Map输出键: 文档校验和 + URL排名</li>
+ *     <li>Map输出值: url</li>
+ *     <li>分区器: 按校验和分区</li>
+ *     <li>输出键比较器: 先按校验和排序，再按排名降序排序</li>
+ *     <li>输出值分组比较器: 仅按校验和分组</li>
  *   </ul>
  *   </li>
  *   
  *   <li>   
- *   <b id="Reduce">Reduce</b>
+ *   <b id="Reduce">归约阶段</b>
  *   
- *   <p>In this phase the 
- *   {@link #reduce(Object, Iterable, org.apache.hadoop.mapreduce.Reducer.Context)}
- *   method is called for each <code>&lt;key, (collection of values)&gt;</code> in
- *   the sorted inputs.</p>
- *   <p>The output of the reduce task is typically written to a 
- *   {@link RecordWriter} via 
- *   {@link Context#write(Object, Object)}.</p>
+ *   <p>该阶段会对排序后输入中的每个 <code>&lt;key, (value集合)&gt;</code> 调用一次 
+ *   {@link #reduce(Object, Iterable, org.apache.hadoop.mapreduce.Reducer.Context)} 方法。</p>
+ *   <p>reduce方法的输出通常会通过 {@link Context#write(Object, Object)} 写入到 
+ *   {@link RecordWriter} 中，最终输出到存储系统。</p>
  *   </li>
  * </ol>
  * 
- * <p>The output of the <code>Reducer</code> is <b>not re-sorted</b>.</p>
+ * <p>Reducer的输出不会再次进行排序。</p>
  * 
- * <p>Example:</p>
+ * <p>示例:</p>
  * <p><blockquote><pre>
  * public class IntSumReducer&lt;Key&gt; extends Reducer&lt;Key,IntWritable,
  *                                                 Key,IntWritable&gt; {
@@ -118,20 +102,32 @@ import java.util.Iterator;
  * @see Mapper
  * @see Partitioner
  */
+/**
+ * MapReduce归约阶段核心抽象基类，负责对相同key的一组中间值进行聚合计算，生成最终输出。
+ * 是所有用户自定义Reducer实现的父类，定义了Reduce任务的生命周期和默认执行逻辑。
+ * @param <KEYIN> 输入key类型
+ * @param <VALUEIN> 输入value类型
+ * @param <KEYOUT> 输出key类型
+ * @param <VALUEOUT> 输出value类型
+ */
 @Checkpointable
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class Reducer<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
 
   /**
-   * The <code>Context</code> passed on to the {@link Reducer} implementations.
+   * 传递给Reducer实现的上下文对象，提供Reducer访问作业运行环境、输出结果的能力。
    */
   public abstract class Context 
     implements ReduceContext<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
   }
 
   /**
-   * Called once at the start of the task.
+   * Reduce任务开始执行前的初始化方法，在整个Reduce任务生命周期仅调用一次。
+   * 用于加载全局资源、初始化自定义变量等准备工作，默认实现为空。
+   * @param context Reduce上下文对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   protected void setup(Context context
                        ) throws IOException, InterruptedException {
@@ -139,9 +135,13 @@ public class Reducer<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
   }
 
   /**
-   * This method is called once for each key. Most applications will define
-   * their reduce class by overriding this method. The default implementation
-   * is an identity function.
+   * 对每一个相同key的value集合执行一次归约计算，是Reducer的核心业务方法。
+   * 用户通常需要覆盖此方法实现自定义归约逻辑，默认实现是直接输出所有输入键值对（恒等函数）。
+   * @param key 聚合后的输入key
+   * @param values 当前key对应的所有value迭代器
+   * @param context Reduce上下文对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   @SuppressWarnings("unchecked")
   protected void reduce(KEYIN key, Iterable<VALUEIN> values, Context context
@@ -152,7 +152,11 @@ public class Reducer<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
   }
 
   /**
-   * Called once at the end of the task.
+   * Reduce任务所有key处理完成后调用的清理方法，在整个Reduce任务生命周期仅调用一次。
+   * 用于关闭资源、输出全局统计信息等收尾工作，默认实现为空。
+   * @param context Reduce上下文对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   protected void cleanup(Context context
                          ) throws IOException, InterruptedException {
@@ -160,22 +164,27 @@ public class Reducer<KEYIN,VALUEIN,KEYOUT,VALUEOUT> {
   }
 
   /**
-   * Advanced application writers can use the 
-   * {@link #run(org.apache.hadoop.mapreduce.Reducer.Context)} method to
-   * control how the reduce task works.
+   * Reduce任务的核心执行驱动方法，控制整个Reduce任务的执行流程。
+   * 高级应用可以覆盖此方法自定义整个Reduce任务的执行逻辑，默认实现按照标准生命周期执行。
+   * @param context Reduce上下文对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public void run(Context context) throws IOException, InterruptedException {
+    // 执行初始化
     setup(context);
     try {
+      // 遍历所有分组key，逐个调用reduce处理
       while (context.nextKey()) {
         reduce(context.getCurrentKey(), context.getValues(), context);
-        // If a back up store is used, reset it
+        // 如果使用了后备存储，重置存储状态
         Iterator<VALUEIN> iter = context.getValues().iterator();
         if(iter instanceof ReduceContext.ValueIterator) {
           ((ReduceContext.ValueIterator<VALUEIN>)iter).resetBackupStore();        
         }
       }
     } finally {
+      // 执行收尾清理
       cleanup(context);
     }
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,19 +23,26 @@ import java.util.Arrays;
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * Similar to {@link EnumCounters} except that the value type is double.
+ * 文件级注释：该类是HDFS工具类，实现了基于枚举类型的double值存储容器，
+ * 类似EnumCounters，但值类型为double，用于按枚举类型分组存储和操作浮点型统计数据。
  *
- * @param <E> the enum type
+ * @param <E> the enum type 用于索引的枚举类型
+ */
+/**
+ * 基于枚举索引的double数组容器，为每个枚举常量维护一个double类型值，
+ * 提供了批量算术运算和修改操作，方便对枚举分组的浮点统计数据进行管理。
+ *
+ * @param <E> 作为索引的枚举类型
  */
 public class EnumDoubles<E extends Enum<E>> {
-  /** The class of the enum. */
+  /** 存储枚举类型的Class对象 */
   private final Class<E> enumClass;
-  /** An array of doubles corresponding to the enum type. */
+  /** 存储double值数组，索引对应枚举的ordinal值 */
   private final double[] doubles;
 
   /**
-   * Construct doubles for the given enum constants.
-   * @param enumClass the enum class.
+   * 构造方法，根据给定枚举类型创建存储容器，初始化所有值为0。
+   * @param enumClass 索引使用的枚举类
    */
   public EnumDoubles(final Class<E> enumClass) {
     final E[] enumConstants = enumClass.getEnumConstants();
@@ -43,55 +51,84 @@ public class EnumDoubles<E extends Enum<E>> {
     this.doubles = new double[enumConstants.length];
   }
   
-  /** @return the value corresponding to e. */
+  /**
+   * 获取指定枚举对应的double值。
+   * @param e 目标枚举实例
+   * @return 对应枚举存储的double值
+   */
   public final double get(final E e) {
     return doubles[e.ordinal()];
   }
 
-  /** Negate all values. */
+  /**
+   * 对所有存储的值取反。
+   */
   public final void negation() {
     for(int i = 0; i < doubles.length; i++) {
       doubles[i] = -doubles[i];
     }
   }
   
-  /** Set e to the given value. */
+  /**
+   * 设置指定枚举对应的double值。
+   * @param e 目标枚举实例
+   * @param value 需要设置的值
+   */
   public final void set(final E e, final double value) {
     doubles[e.ordinal()] = value;
   }
 
-  /** Set the values of this object to that object. */
+  /**
+   * 将当前对象所有值设置为另一个EnumDoubles对应的值。
+   * @param that 源EnumDoubles对象
+   */
   public final void set(final EnumDoubles<E> that) {
     for(int i = 0; i < doubles.length; i++) {
       this.doubles[i] = that.doubles[i];
     }
   }
 
-  /** Reset all values to zero. */
+  /**
+   * 将所有值重置为0.0。
+   */
   public final void reset() {
     for(int i = 0; i < doubles.length; i++) {
       this.doubles[i] = 0.0;
     }
   }
 
-  /** Add the given value to e. */
+  /**
+   * 给指定枚举对应的值增加给定增量。
+   * @param e 目标枚举实例
+   * @param value 需要增加的值
+   */
   public final void add(final E e, final double value) {
     doubles[e.ordinal()] += value;
   }
 
-  /** Add the values of that object to this. */
+  /**
+   * 将另一个EnumDoubles的所有值加到当前对象对应位置。
+   * @param that 需要相加的源EnumDoubles对象
+   */
   public final void add(final EnumDoubles<E> that) {
     for(int i = 0; i < doubles.length; i++) {
       this.doubles[i] += that.doubles[i];
     }
   }
 
-  /** Subtract the given value from e. */
+  /**
+   * 给指定枚举对应的值减去给定值。
+   * @param e 目标枚举实例
+   * @param value 需要减去的值
+   */
   public final void subtract(final E e, final double value) {
     doubles[e.ordinal()] -= value;
   }
 
-  /** Subtract the values of this object from that object. */
+  /**
+   * 将当前对象所有值减去另一个EnumDoubles对应位置的值。
+   * @param that 减数EnumDoubles对象
+   */
   public final void subtract(final EnumDoubles<E> that) {
     for(int i = 0; i < doubles.length; i++) {
       this.doubles[i] -= that.doubles[i];

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,27 +25,49 @@ import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.Epoc
 
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.Epoch;
 
+/**
+ * Epoch记录的Protobuf实现，用于RM恢复场景下存储并序列化 epoch 信息，
+ * 基于Protobuf序列化格式实现，支持持久化存储与网络传输。
+ */
 public class EpochPBImpl extends Epoch {
 
+  // Protobuf对象实例
   EpochProto proto = EpochProto.getDefaultInstance();
+  // Protobuf构建器，用于修改对象时构建实例
   EpochProto.Builder builder = null;
+  // 当前是否使用已构建的proto实例
   boolean viaProto = false;
 
+  /**
+   * 无参构造函数，初始化Builder用于构造新的Epoch对象。
+   */
   public EpochPBImpl() {
     builder = EpochProto.newBuilder();
   }
 
+  /**
+   * 通过现有Protobuf对象构造Epoch封装实例。
+   * @param proto 已有的EpochProto对象
+   */
   public EpochPBImpl(EpochProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的Protobuf实例，用于序列化。
+   * @return 构建完成的EpochProto对象
+   */
   public EpochProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;
     return proto;
   }
 
+  /**
+   * 延迟初始化Builder：如果当前使用的是只读proto实例，
+   * 则基于现有proto构建Builder，准备进行修改操作。
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = EpochProto.newBuilder(proto);

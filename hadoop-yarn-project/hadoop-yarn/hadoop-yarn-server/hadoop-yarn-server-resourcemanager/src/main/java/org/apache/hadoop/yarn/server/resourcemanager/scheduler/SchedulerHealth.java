@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,25 +27,24 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * SchedulerHealth class holds the details of the schedulers operations.
+ * YARN资源调度器健康状态统计类，存储调度器各操作的运行统计详情。
  *
- * <p><code>SchedulerHealth</code> provides clients with information such as:
+ * <p><code>SchedulerHealth</code> 为监控系统提供以下调度运行信息：
  * <ol>
  *   <li>
- *   scheduler's latest timestamp
+ *   最近一次调度运行时间戳
  *   </li>
  *   <li>
- *   resources allocated, reserved, released in the last scheduler run
+ *   最近一次调度运行中分配、预留、释放的资源总量
  *   </li>
  *   <li>
- *   latest allocation, release, reservation, preemption details
+ *   最近一次分配、释放、预留、抢占操作的详细信息
  *   </li>
  *   <li>
- *   count of latest allocation, release, reservation, preemption
+ *   最近一次调度运行中各类操作的计数
  *   </li>
  *   <li>
- *   aggregate count of latest allocation, release, reservation, preemption,
- *   fulfilled reservation
+ *   RM启动以来各类操作的累计计数（含分配、释放、预留、抢占、满足预留）
  *   </li>
  *</ol>
  *
@@ -52,6 +52,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class SchedulerHealth {
 
+  /**
+   * 存储单次调度操作的详细元信息。
+   */
   static public class DetailedInformation {
     long timestamp;
     NodeId nodeId;
@@ -83,15 +86,22 @@ public class SchedulerHealth {
     }
   }
 
+  /**
+   * 调度操作类型枚举。
+   */
   enum Operation {
     ALLOCATION, RELEASE, PREEMPTION, RESERVATION, FULFILLED_RESERVATION
   }
 
+  // 最近一次调度运行时间戳
   private long lastSchedulerRunTime;
+  // 最近一次调度运行中各操作对应的资源总量
   private Map<Operation, Resource> lastSchedulerRunDetails;
+  // 各操作类型最近一次操作的详细信息
   private Map<Operation, DetailedInformation> lastSchedulerHealthDetails;
+  // 最近一次调度运行中各操作的计数
   private Map<Operation, Long> schedulerOperationCounts;
-  // this is for counts since the RM started, never reset
+  // RM启动以来各操作的累计计数，从不重置
   private Map<Operation, Long> schedulerOperationAggregateCounts;
 
   SchedulerHealth() {
@@ -99,6 +109,7 @@ public class SchedulerHealth {
     lastSchedulerHealthDetails = new ConcurrentHashMap<>();
     schedulerOperationCounts = new ConcurrentHashMap<>();
     schedulerOperationAggregateCounts = new ConcurrentHashMap<>();
+    // 初始化所有操作类型的统计数据
     for (Operation op : Operation.values()) {
       lastSchedulerRunDetails.put(op, Resource.newInstance(0, 0));
       schedulerOperationCounts.put(op, 0L);
@@ -109,6 +120,13 @@ public class SchedulerHealth {
 
   }
 
+  /**
+   * 更新最近一次容器分配操作的详细信息。
+   * @param timestamp 操作时间戳
+   * @param nodeId 分配节点ID
+   * @param containerId 分配容器ID
+   * @param queue 所属队列
+   */
   public void updateAllocation(long timestamp, NodeId nodeId,
       ContainerId containerId, String queue) {
     DetailedInformation di =
@@ -116,6 +134,13 @@ public class SchedulerHealth {
     lastSchedulerHealthDetails.put(Operation.ALLOCATION, di);
   }
 
+  /**
+   * 更新最近一次容器释放操作的详细信息。
+   * @param timestamp 操作时间戳
+   * @param nodeId 释放节点ID
+   * @param containerId 释放容器ID
+   * @param queue 所属队列
+   */
   public void updateRelease(long timestamp, NodeId nodeId,
       ContainerId containerId, String queue) {
     DetailedInformation di =
@@ -123,6 +148,13 @@ public class SchedulerHealth {
     lastSchedulerHealthDetails.put(Operation.RELEASE, di);
   }
 
+  /**
+   * 更新最近一次容器抢占操作的详细信息。
+   * @param timestamp 操作时间戳
+   * @param nodeId 抢占节点ID
+   * @param containerId 被抢占容器ID
+   * @param queue 所属队列
+   */
   public void updatePreemption(long timestamp, NodeId nodeId,
       ContainerId containerId, String queue) {
     DetailedInformation di =
@@ -130,6 +162,13 @@ public class SchedulerHealth {
     lastSchedulerHealthDetails.put(Operation.PREEMPTION, di);
   }
 
+  /**
+   * 更新最近一次容器预留操作的详细信息。
+   * @param timestamp 操作时间戳
+   * @param nodeId 预留节点ID
+   * @param containerId 预留容器ID
+   * @param queue 所属队列
+   */
   public void updateReservation(long timestamp, NodeId nodeId,
       ContainerId containerId, String queue) {
     DetailedInformation di =
@@ -137,6 +176,12 @@ public class SchedulerHealth {
     lastSchedulerHealthDetails.put(Operation.RESERVATION, di);
   }
 
+  /**
+   * 更新最近一次调度运行分配和预留的资源总量。
+   * @param timestamp 调度运行时间戳
+   * @param allocated 本次分配的总资源
+   * @param reserved 本次预留的总资源
+   */
   public void updateSchedulerRunDetails(long timestamp, Resource allocated,
       Resource reserved) {
     lastSchedulerRunTime = timestamp;
@@ -144,31 +189,61 @@ public class SchedulerHealth {
     lastSchedulerRunDetails.put(Operation.RESERVATION, reserved);
   }
 
+  /**
+   * 更新最近一次调度运行释放的资源总量。
+   * @param timestamp 调度运行时间戳
+   * @param released 本次释放的总资源
+   */
   public void updateSchedulerReleaseDetails(long timestamp, Resource released) {
     lastSchedulerRunTime = timestamp;
     lastSchedulerRunDetails.put(Operation.RELEASE, released);
   }
 
+  /**
+   * 更新最近一次调度运行释放操作计数。
+   * @param count 本次释放操作次数
+   */
   public void updateSchedulerReleaseCounts(long count) {
     updateCounts(Operation.RELEASE, count);
   }
 
+  /**
+   * 更新最近一次调度运行分配操作计数。
+   * @param count 本次分配操作次数
+   */
   public void updateSchedulerAllocationCounts(long count) {
     updateCounts(Operation.ALLOCATION, count);
   }
 
+  /**
+   * 更新最近一次调度运行预留操作计数。
+   * @param count 本次预留操作次数
+   */
   public void updateSchedulerReservationCounts(long count) {
     updateCounts(Operation.RESERVATION, count);
   }
 
+  /**
+   * 更新最近一次调度运行已满足预留操作计数。
+   * @param count 本次已满足预留操作次数
+   */
   public void updateSchedulerFulfilledReservationCounts(long count) {
     updateCounts(Operation.FULFILLED_RESERVATION, count);
   }
 
+  /**
+   * 更新最近一次调度运行抢占操作计数。
+   * @param count 本次抢占操作次数
+   */
   public void updateSchedulerPreemptionCounts(long count) {
     updateCounts(Operation.PREEMPTION, count);
   }
 
+  /**
+   * 更新指定操作的本次计数和累计计数。
+   * @param op 操作类型
+   * @param count 本次操作次数
+   */
   private void updateCounts(Operation op, long count) {
     schedulerOperationCounts.put(op, count);
     Long tmp = schedulerOperationAggregateCounts.get(op);
@@ -176,9 +251,9 @@ public class SchedulerHealth {
   }
 
   /**
-   * Get the timestamp of the latest scheduler operation.
+   * 获取最近一次调度运行时间戳。
    *
-   * @return the scheduler's latest timestamp
+   * @return 最近调度运行时间戳
    */
   public long getLastSchedulerRunTime() {
     return lastSchedulerRunTime;
@@ -189,27 +264,27 @@ public class SchedulerHealth {
   }
 
   /**
-   * Get the resources allocated in the last scheduler run.
+   * 获取最近一次调度运行分配的总资源。
    *
-   * @return resources allocated
+   * @return 分配总资源
    */
   public Resource getResourcesAllocated() {
     return getResourceDetails(Operation.ALLOCATION);
   }
 
   /**
-   * Get the resources reserved in the last scheduler run.
+   * 获取最近一次调度运行预留的总资源。
    *
-   * @return resources reserved
+   * @return 预留总资源
    */
   public Resource getResourcesReserved() {
     return getResourceDetails(Operation.RESERVATION);
   }
 
   /**
-   * Get the resources released in the last scheduler run.
+   * 获取最近一次调度运行释放的总资源。
    *
-   * @return resources released
+   * @return 释放总资源
    */
   public Resource getResourcesReleased() {
     return getResourceDetails(Operation.RELEASE);
@@ -220,36 +295,36 @@ public class SchedulerHealth {
   }
 
   /**
-   * Get the details of last allocation.
+   * 获取最近一次分配操作的详细信息。
    *
-   * @return last allocation details
+   * @return 最近分配操作详情
    */
   public DetailedInformation getLastAllocationDetails() {
     return getDetailedInformation(Operation.ALLOCATION);
   }
 
   /**
-   * Get the details of last release.
+   * 获取最近一次释放操作的详细信息。
    *
-   * @return last release details
+   * @return 最近释放操作详情
    */
   public DetailedInformation getLastReleaseDetails() {
     return getDetailedInformation(Operation.RELEASE);
   }
 
   /**
-   * Get the details of last reservation.
+   * 获取最近一次预留操作的详细信息。
    *
-   * @return last reservation details
+   * @return 最近预留操作详情
    */
   public DetailedInformation getLastReservationDetails() {
     return getDetailedInformation(Operation.RESERVATION);
   }
 
   /**
-   * Get the details of last preemption.
+   * 获取最近一次抢占操作的详细信息。
    *
-   * @return last preemption details
+   * @return 最近抢占操作详情
    */
   public DetailedInformation getLastPreemptionDetails() {
     return getDetailedInformation(Operation.PREEMPTION);
@@ -260,36 +335,36 @@ public class SchedulerHealth {
   }
 
   /**
-   * Get the count of allocation from the latest scheduler health report.
+   * 获取最近一次调度运行分配操作次数。
    *
-   * @return allocation count
+   * @return 分配操作次数
    */
   public Long getAllocationCount() {
     return getOperationCount(Operation.ALLOCATION);
   }
 
   /**
-   * Get the count of release from the latest scheduler health report.
+   * 获取最近一次调度运行释放操作次数。
    *
-   * @return release count
+   * @return 释放操作次数
    */
   public Long getReleaseCount() {
     return getOperationCount(Operation.RELEASE);
   }
 
   /**
-   * Get the count of reservation from the latest scheduler health report.
+   * 获取最近一次调度运行预留操作次数。
    *
-   * @return reservation count
+   * @return 预留操作次数
    */
   public Long getReservationCount() {
     return getOperationCount(Operation.RESERVATION);
   }
 
   /**
-   * Get the count of preemption from the latest scheduler health report.
+   * 获取最近一次调度运行抢占操作次数。
    *
-   * @return preemption count
+   * @return 抢占操作次数
    */
   public Long getPreemptionCount() {
     return getOperationCount(Operation.PREEMPTION);
@@ -300,45 +375,45 @@ public class SchedulerHealth {
   }
 
   /**
-   * Get the aggregate of all the allocations count.
+   * 获取RM启动以来累计分配操作次数。
    *
-   * @return aggregate allocation count
+   * @return 累计分配次数
    */
   public Long getAggregateAllocationCount() {
     return getAggregateOperationCount(Operation.ALLOCATION);
   }
 
   /**
-   * Get the aggregate of all the release count.
+   * 获取RM启动以来累计释放操作次数。
    *
-   * @return aggregate release count
+   * @return 累计释放次数
    */
   public Long getAggregateReleaseCount() {
     return getAggregateOperationCount(Operation.RELEASE);
   }
 
   /**
-   * Get the aggregate of all the reservations count.
+   * 获取RM启动以来累计预留操作次数。
    *
-   * @return aggregate reservation count
+   * @return 累计预留次数
    */
   public Long getAggregateReservationCount() {
     return getAggregateOperationCount(Operation.RESERVATION);
   }
 
   /**
-   * Get the aggregate of all the preemption count.
+   * 获取RM启动以来累计抢占操作次数。
    *
-   * @return aggregate preemption count
+   * @return 累计抢占次数
    */
   public Long getAggregatePreemptionCount() {
     return getAggregateOperationCount(Operation.PREEMPTION);
   }
 
   /**
-   * Get the aggregate of all the fulfilled reservations count.
+   * 获取RM启动以来累计已满足预留操作次数。
    *
-   * @return aggregate fulfilled reservations count
+   * @return 累计已满足预留次数
    */
   public Long getAggregateFulFilledReservationsCount() {
     return getAggregateOperationCount(Operation.FULFILLED_RESERVATION);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,5 +17,8 @@
  * limitations under the License.
  */
 
-/** Router Web Dao package. **/
+/**
+ * YARN Router Web服务数据访问对象包，提供YARN联邦路由服务Web界面所需
+ * 的数据模型和数据访问能力，封装了前端展示所需的集群、应用信息的数据结构。
+ */
 package org.apache.hadoop.yarn.server.router.webapp.dao;

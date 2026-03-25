@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,25 +22,14 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.domain;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
 
 /**
- * The domain table has column family info. Info stores
- * information about a timeline domain object
- *
- * Example domain table record:
- *
- * <pre>
- * |-------------------------------------------|
- * |  Row       | Column Family                |
- * |  key       | info                         |
- * |-------------------------------------------|
- * | clusterId! | created_time:1521676928000   |
- * | domainI    | description: "domain         |
- * |            | information for XYZ job"     |
- * |            | owners: "user1, yarn"        |
- * |            | readers:                     |
- * |            | "user2,user33 yarn,group2"   |
- * |            |                              |
- * |-------------------------------------------|
- * </pre>
+ * 存储时间线服务域(Domain)信息的HBase表实现，用于管理时间线域的元数据信息（包括创建时间、描述、权限等）。
+ * 域表结构：
+ * <ul>
+ *   <li>RowKey：由集群ID + 域ID拼接而成</li>
+ *   <li>列族：info，存储域的基本元信息</li>
+ *   <li>列：created_time(创建时间)、description(域描述)、owners(所有者列表)、readers(可读用户列表)等</li>
+ * </ul>
+ * 该表是YARN Timeline Service v2存储层的核心表之一，用于支持多租户场景下的时间线数据隔离与权限管理。
  */
 public final class DomainTable extends BaseTable<DomainTable> {
 }

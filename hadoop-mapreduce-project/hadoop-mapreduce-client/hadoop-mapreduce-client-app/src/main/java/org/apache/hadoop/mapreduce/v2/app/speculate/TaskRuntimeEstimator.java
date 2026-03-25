@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -24,15 +25,38 @@ import org.apache.hadoop.mapreduce.v2.api.records.TaskId;
 import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.job.event.TaskAttemptStatusUpdateEvent.TaskAttemptStatus;
 
-
-
+/**
+ * 任务运行时间估算器接口，为MapReduce推测执行提供运行时间预测能力
+ * 核心职责是基于已运行的任务尝试信息，估算任务和任务尝试的剩余运行时间，
+ * 为判断是否需要启动推测执行的备份任务提供决策依据
+ */
 public interface TaskRuntimeEstimator {
+  /**
+   * 将新启动的任务尝试注册到估算器中，开始跟踪其运行状态
+   * @param reportedStatus 任务尝试的初始状态报告
+   * @param timestamp 注册时间戳
+   */
   public void enrollAttempt(TaskAttemptStatus reportedStatus, long timestamp);
 
+  /**
+   * 获取指定任务尝试的注册时间
+   * @param attemptID 目标任务尝试ID
+   * @return 任务尝试的注册时间戳
+   */
   public long attemptEnrolledTime(TaskAttemptId attemptID);
 
+  /**
+   * 更新任务尝试的运行状态信息，用于更新运行时间估算
+   * @param reportedStatus 更新后的任务尝试状态
+   * @param timestamp 更新时间戳
+   */
   public void updateAttempt(TaskAttemptStatus reportedStatus, long timestamp);
 
+  /**
+   * 初始化估算器上下文，传入配置和应用上下文信息
+   * @param conf 作业配置信息
+   * @param context MapReduce应用上下文
+   */
   public void contextualize(Configuration conf, AppContext context);
 
   /**

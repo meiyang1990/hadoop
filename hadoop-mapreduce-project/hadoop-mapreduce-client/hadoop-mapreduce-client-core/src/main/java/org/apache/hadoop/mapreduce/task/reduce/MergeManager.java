@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,34 +27,35 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import java.io.IOException;
 
 /**
- * An interface for a reduce side merge that works with the default Shuffle
- * implementation.
+ * MergeManager 合并管理器接口，定义了Reduce端合并阶段与默认Shuffle实现交互的统一契约
+ * 负责管理Map输出合并过程中的资源分配与结果获取，是合并逻辑的抽象接口
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface MergeManager<K, V> {
   /**
-   * To wait until merge has some freed resources available so that it can
-   * accept shuffled data.  This will be called before a network connection is
-   * established to get the map output.
+   * 等待合并阶段释放出可用资源，用于接收新的Shuffle数据
+   * 在建立网络连接获取Map输出之前调用，确保资源足够后再拉取数据
+   * @throws InterruptedException 等待过程中被中断时抛出
    */
   public void waitForResource() throws InterruptedException;
 
   /**
-   * To reserve resources for data to be shuffled.  This will be called after
-   * a network connection is made to shuffle the data.
-   * @param mapId mapper from which data will be shuffled.
-   * @param requestedSize size in bytes of data that will be shuffled.
-   * @param fetcher id of the map output fetcher that will shuffle the data.
-   * @return a MapOutput object that can be used by shuffle to shuffle data.  If
-   * required resources cannot be reserved immediately, a null can be returned.
+   * 为即将拉取的Shuffle数据预留资源
+   * 在建立网络连接之后调用，预分配资源用于存放即将拉取的Map输出
+   * @param mapId 本次拉取数据所属的Map任务尝试ID
+   * @param requestedSize 本次拉取数据的字节大小
+   * @param fetcher 执行本次拉取的Fetcher编号
+   * @return 预留资源对应的MapOutput对象，如果无法立即预留资源则返回null
+   * @throws IOException 资源预留过程中发生IO错误时抛出
    */
   public MapOutput<K, V> reserve(TaskAttemptID mapId, long requestedSize,
                                  int fetcher) throws IOException;
 
   /**
-   * Called at the end of shuffle.
-   * @return a key value iterator object.
+   * Shuffle阶段结束时调用，完成所有合并操作并返回最终迭代器
+   * @return 可遍历合并后所有键值对的原始迭代器
+   * @throws Throwable 合并过程发生任何错误时抛出
    */
   public RawKeyValueIterator close() throws Throwable;
 }

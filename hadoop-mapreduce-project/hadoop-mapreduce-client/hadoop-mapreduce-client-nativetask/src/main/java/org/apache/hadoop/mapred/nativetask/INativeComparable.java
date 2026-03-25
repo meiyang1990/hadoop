@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,23 +23,20 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Any key type that is comparable at native side must implement this interface.
- *
- * A native comparator function should have the ComparatorPtr type:
+ * 本地任务排序中需要在C++本地层进行比较的键类型，必须实现该接口。
+ * 
+ * 本地比较函数需要满足如下函数签名格式：
  * <code>
  *   typedef int (*ComparatorPtr)(const char * src, uint32_t srcLength,
  *   const char * dest,  uint32_t destLength);
  * </code>
- * Keys are in serialized format at native side. The function has passed in
- * the keys' locations and lengths such that we can compare them in the same
- * logic as their Java comparator.
- *
- * For example, a HiveKey serialized as an int field (containing the length of
- * raw bytes) + raw bytes.
- * When comparing two HiveKeys, we first read the length field and then
- * compare the raw bytes by invoking the BytesComparator provided by our library.
- * We pass the location and length of raw bytes into BytesComparator.
- *
+ * 本地层中键以序列化格式存储，比较函数会传入两个键的内存地址和长度，
+ * 可以实现与Java层比较逻辑一致的比较操作。
+ * 
+ * 例如HiveKey序列化为：int字段（存储原始字节长度） + 原始字节。
+ * 比较两个HiveKey时，先读取长度字段，再调用库提供的BytesComparator比较原始字节，
+ * 将原始字节的地址和长度传入BytesComparator完成比较。
+ * 
  * <code>
  *   int HivePlatform::HiveKeyComparator(const char * src, uint32_t srcLength,
  *   const char * dest, uint32_t destLength) {
@@ -47,6 +45,9 @@ import org.apache.hadoop.classification.InterfaceStability;
  *     return NativeObjectFactory::BytesComparator(src + 4, sl, dest + 4, dl);
  *   }
  * </code>
+ * 
+ * 该接口用于标识可被本地任务框架直接在native层进行排序比较的键类型，
+ * 支持nativetask加速排序过程，避免Java与native层之间的反序列化开销。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving

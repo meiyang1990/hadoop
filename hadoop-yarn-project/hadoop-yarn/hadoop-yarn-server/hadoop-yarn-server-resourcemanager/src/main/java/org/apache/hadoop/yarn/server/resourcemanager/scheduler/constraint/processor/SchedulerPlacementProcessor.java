@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,8 +27,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Forwarding SchedulingRequests to be handled by the scheduler, as long as the
- * scheduler supports SchedulingRequests.
+ * YARN调度器放置约束处理链中的调度器原生放置处理器，
+ * 检查调度器是否支持调度请求，若支持则将调度放置请求转发给调度器处理。
+ * 仅当调度器本身支持SchedulingRequests时，才会转发请求。
  */
 public class SchedulerPlacementProcessor extends AbstractPlacementProcessor {
   private static final Logger LOG =
@@ -36,9 +38,12 @@ public class SchedulerPlacementProcessor extends AbstractPlacementProcessor {
   @Override
   public void allocate(ApplicationAttemptId appAttemptId,
       AllocateRequest request, AllocateResponse response) throws YarnException {
+    // 检查请求中是否包含非空的调度请求
     if (request.getSchedulingRequests() != null
         && !request.getSchedulingRequests().isEmpty()) {
+      // 检查当前调度器是否开启了放置约束支持
       if (!scheduler.placementConstraintEnabled()) {
+        // 构造错误信息，记录警告日志并抛出异常拒绝分配请求
         String message = "Found non empty SchedulingRequest of "
             + "AllocateRequest for application=" + appAttemptId.toString()
             + ", however the configured scheduler="
@@ -49,6 +54,7 @@ public class SchedulerPlacementProcessor extends AbstractPlacementProcessor {
         throw new YarnException(message);
       }
     }
+    // 校验通过，将请求转发给处理链下一个处理器继续处理
     nextAMSProcessor.allocate(appAttemptId, request, response);
   }
 }

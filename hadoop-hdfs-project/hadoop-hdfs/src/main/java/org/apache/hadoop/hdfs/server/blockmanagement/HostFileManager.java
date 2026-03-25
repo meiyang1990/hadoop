@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,6 +33,8 @@ import java.net.URISyntaxException;
 import java.util.HashSet;
 
 /**
+ * 文件级注释：HDFS 允许/排除 DataNode 节点列表文件管理器，负责从配置文件读取并维护集群允许接入和需要排除的 DataNode 信息
+ * <p>
  * This class manages the include and exclude files for HDFS.
  * <p>
  * These files control which DataNodes the NameNode expects to see in the
@@ -56,29 +59,52 @@ public class HostFileManager extends HostConfigManager {
   private HostSet excludes = new HostSet();
 
   @Override
+  /**
+   * 设置当前管理器使用的配置对象
+   * @param conf Hadoop配置对象
+   */
   public void setConf(Configuration conf) {
     this.conf = conf;
   }
 
   @Override
+  /**
+   * 获取当前管理器使用的配置对象
+   * @return Hadoop配置对象
+   */
   public Configuration getConf() {
     return conf;
   }
 
   @Override
+  /**
+   * 从配置文件刷新允许/排除节点列表
+   * @throws IOException 读取文件失败时抛出异常
+   */
   public void refresh() throws IOException {
     refresh(conf.get(DFSConfigKeys.DFS_HOSTS, ""),
         conf.get(DFSConfigKeys.DFS_HOSTS_EXCLUDE, ""));
   }
+
+  /**
+   * 读取指定主机列表文件，解析后生成HostSet集合
+   * @param type 列表类型（included/excluded），用于日志打印
+   * @param filename 主机列表文件路径
+   * @return 解析完成的主机集合
+   * @throws IOException 读取文件失败时抛出异常
+   */
   private static HostSet readFile(String type, String filename)
           throws IOException {
     HostSet res = new HostSet();
     if (!filename.isEmpty()) {
       HashSet<String> entrySet = new HashSet<String>();
+      // 读取文件内容到条目集合
       HostsFileReader.readFileToSet(type, filename, entrySet);
+      // 遍历每个条目解析为地址
       for (String str : entrySet) {
         InetSocketAddress addr = parseEntry(type, filename, str);
         if (addr != null) {
+          // 解析成功则添加到结果集合
           res.add(addr);
         }
       }
@@ -87,18 +113,28 @@ public class HostFileManager extends HostConfigManager {
   }
 
   @VisibleForTesting
+  /**
+   * 解析主机列表文件中的单条条目，转换为InetSocketAddress
+   * @param type 列表类型（included/excluded），用于日志打印
+   * @param fn 主机列表文件路径，用于日志打印
+   * @param line 文件中的条目内容
+   * @return 解析成功返回地址对象，解析/解析失败返回null
+   */
   static InetSocketAddress parseEntry(String type, String fn, String line) {
     try {
+      // 利用URI解析主机名和端口
       URI uri = new URI("dummy", line, null, null, null);
       int port = uri.getPort() == -1 ? 0 : uri.getPort();
       InetSocketAddress addr = new InetSocketAddress(uri.getHost(), port);
       if (addr.isUnresolved()) {
+        // DNS解析失败，记录警告并忽略该条目
         LOG.warn(String.format("Failed to resolve address `%s` in `%s`. " +
                 "Ignoring in the %s list.", line, fn, type));
         return null;
       }
       return addr;
     } catch (URISyntaxException e) {
+      // 语法解析错误，记录警告并忽略该条目
       LOG.warn(String.format("Failed to parse `%s` in `%s`. " + "Ignoring in " +
               "the %s list.", line, fn, type));
     }
@@ -106,11 +142,19 @@ public class HostFileManager extends HostConfigManager {
   }
 
   @Override
+  /**
+   * 获取当前允许接入的主机集合
+   * @return 允许接入的主机集合
+   */
   public synchronized HostSet getIncludes() {
     return includes;
   }
 
   @Override
+  /**
+   * 获取当前需要排除的主机集合
+   * @return 需要排除的主机集合
+   */
   public synchronized HostSet getExcludes() {
     return excludes;
   }
@@ -118,20 +162,40 @@ public class HostFileManager extends HostConfigManager {
   // If the includes list is empty, act as if everything is in the
   // includes list.
   @Override
+  /**
+   * 检查指定DataNode是否在允许接入列表中
+   * @param dn 待检查的DataNode
+   * @return 如果允许列表为空或该节点匹配允许列表返回true，否则返回false
+   */
   public synchronized boolean isIncluded(DatanodeID dn) {
     return includes.isEmpty() || includes.match(dn.getResolvedAddress());
   }
 
   @Override
+  /**
+   * 检查指定DataNode是否在排除列表中
+   * @param dn 待检查的DataNode
+   * @return 如果该节点匹配排除列表返回true，否则返回false
+   */
   public synchronized boolean isExcluded(DatanodeID dn) {
     return isExcluded(dn.getResolvedAddress());
   }
 
+  /**
+   * 根据地址检查节点是否被排除
+   * @param address DataNode解析后的地址
+   * @return 匹配排除列表返回true，否则返回false
+   */
   private boolean isExcluded(InetSocketAddress address) {
     return excludes.match(address);
   }
 
   @Override
+  /**
+   * 获取指定DataNode的升级域，基于文件的配置不支持升级域功能
+   * @param dn 待查询的DataNode
+   * @return 固定返回null
+   */
   public synchronized String getUpgradeDomain(final DatanodeID dn) {
     // The include/exclude files based config doesn't support upgrade domain
     // config.
@@ -139,6 +203,11 @@ public class HostFileManager extends HostConfigManager {
   }
 
   @Override
+  /**
+   * 获取指定DataNode的维护模式过期时间，基于文件的配置不支持维护模式功能
+   * @param dn 待查询的DataNode
+   * @return 固定返回0，表示不在维护模式
+   */
   public long getMaintenanceExpirationTimeInMS(DatanodeID dn) {
     // The include/exclude files based config doesn't support maintenance mode.
     return 0;
@@ -151,11 +220,20 @@ public class HostFileManager extends HostConfigManager {
    * @param excludeFile the path to the new excludes list
    * @throws IOException thrown if there is a problem reading one of the files
    */
+  /**
+   * 从指定文件路径刷新允许和排除节点列表，丢弃旧配置
+   * @param includeFile 允许列表文件路径
+   * @param excludeFile 排除列表文件路径
+   * @throws IOException 读取文件失败时抛出异常
+   */
   private void refresh(String includeFile, String excludeFile)
       throws IOException {
+    // 读取解析允许列表文件
     HostSet newIncludes = readFile("included", includeFile);
+    // 读取解析排除列表文件
     HostSet newExcludes = readFile("excluded", excludeFile);
 
+    // 更新管理器中的列表
     refresh(newIncludes, newExcludes);
   }
 
@@ -164,6 +242,11 @@ public class HostFileManager extends HostConfigManager {
    * old instances are discarded.
    * @param newIncludes the new includes list
    * @param newExcludes the new excludes list
+   */
+  /**
+   * 直接用新的HostSet更新允许和排除列表，丢弃旧配置
+   * @param newIncludes 新的允许列表
+   * @param newExcludes 新的排除列表
    */
   @VisibleForTesting
   void refresh(HostSet newIncludes, HostSet newExcludes) {

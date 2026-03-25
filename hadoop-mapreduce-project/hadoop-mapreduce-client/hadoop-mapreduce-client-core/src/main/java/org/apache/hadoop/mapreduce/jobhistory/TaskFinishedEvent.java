@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,8 +36,8 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 import org.apache.hadoop.yarn.util.SystemClock;
 
 /**
- * Event to record the successful completion of a task
- *
+ * 任务成功完成事件，用于在作业历史中记录任务完成信息
+ * 属于MapReduce作业历史日志系统，记录任务完成时的核心状态数据
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -53,14 +54,14 @@ public class TaskFinishedEvent implements HistoryEvent {
   private long startTime;
 
   /**
-   * Create an event to record the successful completion of a task.
-   * @param id Task ID
-   * @param attemptId Task Attempt ID of the successful attempt for this task
-   * @param finishTime Finish time of the task
-   * @param taskType Type of the task
-   * @param status Status string
-   * @param counters Counters for the task
-   * @param startTs task start time
+   * 构造任务完成事件，记录任务成功完成的相关信息
+   * @param id 任务ID
+   * @param attemptId 当前任务成功运行的尝试ID
+   * @param finishTime 任务完成时间戳
+   * @param taskType 任务类型（Map/Reduce等）
+   * @param status 任务状态字符串
+   * @param counters 任务运行计数器
+   * @param startTs 任务开始时间戳
    */
   public TaskFinishedEvent(TaskID id, TaskAttemptID attemptId, long finishTime,
                            TaskType taskType,
@@ -74,14 +75,31 @@ public class TaskFinishedEvent implements HistoryEvent {
     this.startTime = startTs;
   }
 
+  /**
+   * 构造任务完成事件，自动获取当前时间作为任务开始时间
+   * @param id 任务ID
+   * @param attemptId 当前任务成功运行的尝试ID
+   * @param finishTime 任务完成时间戳
+   * @param taskType 任务类型（Map/Reduce等）
+   * @param status 任务状态字符串
+   * @param counters 任务运行计数器
+   */
   public TaskFinishedEvent(TaskID id, TaskAttemptID attemptId, long finishTime,
           TaskType taskType, String status, Counters counters) {
     this(id, attemptId, finishTime, taskType, status, counters,
         SystemClock.getInstance().getTime());
   }
 
+  /**
+   * 无参构造器，用于反序列化场景
+   */
   TaskFinishedEvent() {}
 
+  /**
+   * 获取Avro序列化后的事件数据对象
+   * 将事件属性转换为Avro格式用于持久化存储
+   * @return Avro格式的事件数据对象
+   */
   public Object getDatum() {
     if (datum == null) {
       datum = new TaskFinished();
@@ -98,6 +116,10 @@ public class TaskFinishedEvent implements HistoryEvent {
     return datum;
   }
 
+  /**
+   * 从Avro数据对象中反序列化恢复事件属性
+   * @param oDatum Avro格式的事件数据对象
+   */
   public void setDatum(Object oDatum) {
     this.datum = (TaskFinished)oDatum;
     this.taskid = TaskID.forName(datum.getTaskid().toString());
@@ -111,38 +133,43 @@ public class TaskFinishedEvent implements HistoryEvent {
     this.counters = EventReader.fromAvro(datum.getCounters());
   }
 
-  /** Gets task id. */
+  /** 获取任务ID */
   public TaskID getTaskId() { return taskid; }
-  /** Gets successful task attempt id. */
+  /** 获取成功完成的任务尝试ID */
   public TaskAttemptID getSuccessfulTaskAttemptId() {
     return successfulAttemptId;
   }
-  /** Gets the task finish time. */
+  /** 获取任务完成时间戳 */
   public long getFinishTime() { return finishTime; }
   /**
-   * Gets the task start time to be reported to ATSv2.
-   * @return task start time
+   * 获取任务开始时间戳，用于上报到ATSv2时间线服务
+   * @return 任务开始时间戳
    */
   public long getStartTime() {
     return startTime;
   }
-  /** Gets task counters. */
+  /** 获取任务运行计数器 */
   public Counters getCounters() { return counters; }
-  /** Gets task type. */
+  /** 获取任务类型 */
   public TaskType getTaskType() {
     return taskType;
   }
   /**
-   * Gets task status.
-   * @return task status
+   * 获取任务状态
+   * @return 任务状态字符串
    */
   public String getTaskStatus() { return status.toString(); }
-  /** Gets event type. */
+  /** 获取事件类型 */
   public EventType getEventType() {
     return EventType.TASK_FINISHED;
   }
 
   @Override
+  /**
+   * 将当前事件转换为YARN时间线服务可识别的事件对象
+   * 用于将作业历史数据上报到YARN时间线服务进行可视化展示
+   * @return YARN时间线事件对象
+   */
   public TimelineEvent toTimelineEvent() {
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
@@ -156,6 +183,11 @@ public class TaskFinishedEvent implements HistoryEvent {
   }
 
   @Override
+  /**
+   * 将任务计数器转换为YARN时间线服务可识别的指标集合
+   * 用于将任务运行指标上报到YARN时间线服务
+   * @return 时间线指标集合
+   */
   public Set<TimelineMetric> getTimelineMetrics() {
     Set<TimelineMetric> jobMetrics = JobHistoryEventUtils
         .countersToTimelineMetric(getCounters(), finishTime);

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,26 +18,30 @@
  */
 package org.apache.hadoop.hdfs.server.balancer;
 
+/**
+ * HDFS数据均衡服务Balancer的JMX管理接口，
+ * 提供Balancer服务运行版本、编译信息等指标的暴露能力，供监控系统集成。
+ */
 public interface BalancerMXBean {
 
   /**
-   * Gets the version of Hadoop.
+   * 获取Hadoop版本信息。
    *
-   * @return the version of Hadoop
+   * @return Hadoop版本字符串
    */
   String getVersion();
 
   /**
-   * Get the version of software running on the Balancer.
+   * 获取当前运行Balancer服务的软件版本信息。
    *
-   * @return a string representing the version.
+   * @return 代表Balancer版本的字符串
    */
   String getSoftwareVersion();
 
   /**
-   * Get the compilation information which contains date, user and branch.
+   * 获取Balancer编译信息，包含编译日期、编译用户、代码分支等信息。
    *
-   * @return the compilation information, as a JSON string.
+   * @return JSON格式的编译信息字符串
    */
   String getCompileInfo();
 

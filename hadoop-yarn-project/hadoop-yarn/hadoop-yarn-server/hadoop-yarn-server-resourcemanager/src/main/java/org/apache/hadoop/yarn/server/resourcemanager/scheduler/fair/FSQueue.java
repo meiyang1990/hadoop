@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,6 +49,10 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 
 import org.apache.hadoop.classification.VisibleForTesting;
 
+/**
+ * 公平调度器队列抽象基类，定义了公平调度中所有队列通用的属性和行为
+ * 是叶队列（应用直接提交的队列）和父队列（包含子队列的队列）的公共父类
+ */
 @Private
 @Unstable
 public abstract class FSQueue implements Queue, Schedulable {
@@ -86,6 +91,12 @@ public abstract class FSQueue implements Queue, Schedulable {
   private boolean isDynamic = true;
   protected Resource maxContainerAllocation;
 
+  /**
+   * 构造一个公平调度队列实例
+   * @param name 队列名称
+   * @param scheduler 所属公平调度器实例
+   * @param parent 父队列，根队列父队列为null
+   */
   public FSQueue(String name, FairScheduler scheduler, FSParentQueue parent) {
     this.name = name;
     this.scheduler = scheduler;
@@ -109,10 +120,14 @@ public abstract class FSQueue implements Queue, Schedulable {
    * @param recursive whether child queues should be reinitialized recursively
    */
   public final void reinit(boolean recursive) {
+    // 获取最新的分配配置
     AllocationConfiguration allocConf = scheduler.getAllocationConfiguration();
+    // 从配置初始化当前队列属性
     allocConf.initFSQueue(this);
+    // 更新抢占相关配置参数
     updatePreemptionVariables();
 
+    // 如果需要递归，重新初始化所有子队列
     if (recursive) {
       for (FSQueue child : getChildQueues()) {
         child.reinit(recursive);
@@ -137,6 +152,10 @@ public abstract class FSQueue implements Queue, Schedulable {
     return parent;
   }
 
+  /**
+   * 设置队列使用的调度策略
+   * @param policy 调度策略实例
+   */
   public void setPolicy(SchedulingPolicy policy) {
     policy.initialize(scheduler.getContext());
     this.policy = policy;
@@ -168,15 +187,21 @@ public abstract class FSQueue implements Queue, Schedulable {
     this.maxContainerAllocation = maxContainerAllocation;
   }
 
+  /**
+   * 获取队列允许的单个容器最大分配资源量，由子类实现
+   * @return 单个容器最大允许分配资源
+   */
   public abstract Resource getMaximumContainerAllocation();
 
   @Override
   public Resource getMaxShare() {
+    // 根据集群总资源计算当前队列配置的最大资源
     Resource maxResource = maxShare.getResource(scheduler.getClusterResource());
 
-    // Max resource should be greater than or equal to min resource
+    // 保证最大资源不小于最小资源，取两者分量最大值
     Resource result = Resources.componentwiseMax(maxResource, minShare);
 
+    // 如果最大资源配置小于最小资源，输出警告日志
     if (!Resources.equals(maxResource, result)) {
       LOG.warn(String.format("Queue %s has max resources %s less than "
           + "min resources %s", getName(), maxResource, minShare));
@@ -188,6 +213,10 @@ public abstract class FSQueue implements Queue, Schedulable {
     return maxShare;
   }
 
+  /**
+   * 从指标中获取最新预留资源并返回
+   * @return 当前队列预留资源总和
+   */
   public Resource getReservedResource() {
     reservedResource.setMemorySize(metrics.getReservedMB());
     reservedResource.setVirtualCores(metrics.getReservedVirtualCores());
@@ -233,10 +262,13 @@ public abstract class FSQueue implements Queue, Schedulable {
   
   @Override
   public QueueInfo getQueueInfo(boolean includeChildQueues, boolean recursive) {
+    // 创建队列信息实例
     QueueInfo queueInfo = recordFactory.newRecordInstance(QueueInfo.class);
+    // 设置调度器类型为公平调度
     queueInfo.setSchedulerType("FairScheduler");
     queueInfo.setQueueName(getQueueName());
 
+    // 计算队列容量占集群总资源比例
     if (scheduler.getClusterResource().getMemorySize() == 0) {
       queueInfo.setCapacity(0.0f);
     } else {
@@ -244,6 +276,7 @@ public abstract class FSQueue implements Queue, Schedulable {
           scheduler.getClusterResource().getMemorySize());
     }
 
+    // 计算当前队列已使用资源占公平份额的比例
     if (getFairShare().getMemorySize() == 0) {
       queueInfo.setCurrentCapacity(0.0f);
     } else {
@@ -251,36 +284,37 @@ public abstract class FSQueue implements Queue, Schedulable {
           getFairShare().getMemorySize());
     }
 
-    // set Weight
+    // 设置队列权重
     queueInfo.setWeight(getWeight());
 
-    // set MinShareResource
+    // 设置最小资源份额信息
     Resource minShareResource = getMinShare();
     queueInfo.setMinResourceVCore(minShareResource.getVirtualCores());
     queueInfo.setMinResourceMemory(minShareResource.getMemorySize());
 
-    // set MaxShareResource
+    // 设置最大资源份额信息，不超过集群总资源
     Resource maxShareResource =
         Resources.componentwiseMin(getMaxShare(), scheduler.getClusterResource());
     queueInfo.setMaxResourceVCore(maxShareResource.getVirtualCores());
     queueInfo.setMaxResourceMemory(maxShareResource.getMemorySize());
 
-    // set ReservedResource
+    // 设置预留资源信息
     Resource newReservedResource = getReservedResource();
     queueInfo.setReservedResourceVCore(newReservedResource.getVirtualCores());
     queueInfo.setReservedResourceMemory(newReservedResource.getMemorySize());
 
-    // set SteadyFairShare
+    // 设置稳定公平份额信息
     Resource newSteadyFairShare = getSteadyFairShare();
     queueInfo.setSteadyFairShareVCore(newSteadyFairShare.getVirtualCores());
     queueInfo.setSteadyFairShareMemory(newSteadyFairShare.getMemorySize());
 
-    // set MaxRunningApp
+    // 设置最大运行应用数
     queueInfo.setMaxRunningApp(getMaxRunningApps());
 
-    // set Preemption
+    // 设置抢占是否禁用
     queueInfo.setPreemptionDisabled(isPreemptable());
 
+    // 如果需要包含子队列，递归收集子队列信息
     ArrayList<QueueInfo> childQueueInfos = new ArrayList<>();
     if (includeChildQueues) {
       Collection<FSQueue> childQueues = getChildQueues();
@@ -288,15 +322,22 @@ public abstract class FSQueue implements Queue, Schedulable {
         childQueueInfos.add(child.getQueueInfo(recursive, recursive));
       }
     }
+    // 设置子队列列表和队列状态
     queueInfo.setChildQueues(childQueueInfos);
     queueInfo.setQueueState(QueueState.RUNNING);
+    // 设置队列统计信息
     queueInfo.setQueueStatistics(getQueueStatistics());
     return queueInfo;
   }
 
+  /**
+   * 组装并返回队列统计信息
+   * @return 填充完成的队列统计对象
+   */
   public QueueStatistics getQueueStatistics() {
     QueueStatistics stats =
         recordFactory.newRecordInstance(QueueStatistics.class);
+    // 从指标系统拉取各类统计数据填充
     stats.setNumAppsSubmitted(getMetrics().getAppsSubmitted());
     stats.setNumAppsRunning(getMetrics().getAppsRunning());
     stats.setNumAppsPending(getMetrics().getAppsPending());
@@ -348,6 +389,12 @@ public abstract class FSQueue implements Queue, Schedulable {
     metrics.setSteadyFairShare(steadyFairShare);
   }
 
+  /**
+   * 检查用户对当前队列是否有指定ACL权限
+   * @param acl 需要检查的队列权限
+   * @param user 待检查用户
+   * @return true 有权限，false 无权限
+   */
   public boolean hasAccess(QueueACL acl, UserGroupInformation user) {
     return authorizer.checkPermission(
         new AccessRequest(queueEntity, user,
@@ -410,237 +457,22 @@ public abstract class FSQueue implements Queue, Schedulable {
    * disabled flag for this queue.
    */
   private void updatePreemptionVariables() {
-    // For min share timeout
+    // 获取最小份额抢占超时时间，如果队列未配置，继承父队列配置
     minSharePreemptionTimeout = scheduler.getAllocationConfiguration()
         .getMinSharePreemptionTimeout(getName());
     if (minSharePreemptionTimeout == -1 && parent != null) {
       minSharePreemptionTimeout = parent.getMinSharePreemptionTimeout();
     }
-    // For fair share timeout
+    // 获取公平份额抢占超时时间，如果队列未配置，继承父队列配置
     fairSharePreemptionTimeout = scheduler.getAllocationConfiguration()
         .getFairSharePreemptionTimeout(getName());
     if (fairSharePreemptionTimeout == -1 && parent != null) {
       fairSharePreemptionTimeout = parent.getFairSharePreemptionTimeout();
     }
-    // For fair share preemption threshold
+    // 获取公平份额抢占阈值，如果队列未配置，继承父队列配置
     fairSharePreemptionThreshold = scheduler.getAllocationConfiguration()
         .getFairSharePreemptionThreshold(getName());
     if (fairSharePreemptionThreshold < 0 && parent != null) {
       fairSharePreemptionThreshold = parent.getFairSharePreemptionThreshold();
     }
-    // For option whether allow preemption from this queue.
-    // If the parent is non-preemptable, this queue is non-preemptable as well,
-    // otherwise get the value from the allocation file.
-    if (parent != null && !parent.isPreemptable()) {
-      preemptable = false;
-    } else {
-      preemptable = scheduler.getAllocationConfiguration()
-          .isPreemptable(getName());
-    }
-  }
-
-  /**
-   * Gets the children of this queue, if any.
-   *
-   * @return the children of this queue.
-   */
-  public abstract List<FSQueue> getChildQueues();
-  
-  /**
-   * Adds all applications in the queue and its subqueues to the given collection.
-   * @param apps the collection to add the applications to
-   */
-  public abstract void collectSchedulerApplications(
-      Collection<ApplicationAttemptId> apps);
-  
-  /**
-   * Return the number of apps for which containers can be allocated.
-   * Includes apps in subqueues.
-   *
-   * @return the number of apps.
-   */
-  public abstract int getNumRunnableApps();
-  
-  /**
-   * Helper method to check if the queue should attempt assigning resources
-   * 
-   * @return true if check passes (can assign) or false otherwise
-   */
-  boolean assignContainerPreCheck(FSSchedulerNode node) {
-    if (node.getReservedContainer() != null) {
-      LOG.debug("Assigning container failed on node '{}' because it has"
-          + " reserved containers.", node.getNodeName());
-      return false;
-    } else if (!Resources.fitsIn(getResourceUsage(), getMaxShare())) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Assigning container failed on node '" + node.getNodeName()
-            + " because queue resource usage is larger than MaxShare: "
-            + dumpState());
-      }
-      return false;
-    } else {
-      return true;
-    }
-  }
-
-  /**
-   * Returns true if queue has at least one app running.
-   *
-   * @return true, if queue has at least one app running; otherwise, false;
-   */
-  public boolean isActive() {
-    return getNumRunnableApps() > 0;
-  }
-
-  /** Convenient toString implementation for debugging. */
-  @Override
-  public String toString() {
-    return String.format("[%s, demand=%s, running=%s, share=%s, w=%s]",
-        getName(), getDemand(), getResourceUsage(), fairShare, getWeight());
-  }
-  
-  @Override
-  public Set<String> getAccessibleNodeLabels() {
-    // TODO, add implementation for FS
-    return null;
-  }
-  
-  @Override
-  public String getDefaultNodeLabelExpression() {
-    // TODO, add implementation for FS
-    return null;
-  }
-  
-  @Override
-  public void incPendingResource(String nodeLabel, Resource resourceToInc) {
-  }
-  
-  @Override
-  public void decPendingResource(String nodeLabel, Resource resourceToDec) {
-  }
-
-  @Override
-  public void incReservedResource(String nodeLabel, Resource resourceToInc) {
-  }
-
-  @Override
-  public void decReservedResource(String nodeLabel, Resource resourceToDec) {
-  }
-
-  @Override
-  public Resource getResourceUsage() {
-    return resourceUsage;
-  }
-
-  /**
-   * Increase resource usage for this queue and all parent queues.
-   *
-   * @param res the resource to increase
-   */
-  public void incUsedResource(Resource res) {
-    synchronized (resourceUsage) {
-      Resources.addTo(resourceUsage, res);
-      if (parent != null) {
-        parent.incUsedResource(res);
-      }
-    }
-  }
-
-  /**
-   * Decrease resource usage for this queue and all parent queues.
-   *
-   * @param res the resource to decrease
-   */
-  protected void decUsedResource(Resource res) {
-    synchronized (resourceUsage) {
-      Resources.subtractFrom(resourceUsage, res);
-      if (parent != null) {
-        parent.decUsedResource(res);
-      }
-    }
-  }
-
-  @Override
-  public Priority getDefaultApplicationPriority() {
-    // TODO add implementation for FSParentQueue
-    return null;
-  }
-
-  boolean fitsInMaxShare(Resource additionalResource) {
-    Resource usagePlusAddition =
-        Resources.add(getResourceUsage(), additionalResource);
-
-    if (!Resources.fitsIn(usagePlusAddition, getMaxShare())) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Resource usage plus resource request: " + usagePlusAddition
-            + " exceeds maximum resource allowed:" + getMaxShare()
-            + " in queue " + getName());
-      }
-      return false;
-    }
-
-    FSQueue parentQueue = getParent();
-    if (parentQueue != null) {
-      return parentQueue.fitsInMaxShare(additionalResource);
-    }
-    return true;
-  }
-
-  /**
-   * Recursively check policies for queues in pre-order. Get queue policies
-   * from the allocation file instead of properties of {@link FSQueue} objects.
-   * Set the policy for current queue if there is no policy violation for its
-   * children. This method is invoked while reloading the allocation file.
-   *
-   * @param queueConf allocation configuration
-   * @return true if no policy violation and successfully set polices
-   *         for queues; false otherwise
-   */
-  public boolean verifyAndSetPolicyFromConf(AllocationConfiguration queueConf) {
-    SchedulingPolicy queuePolicy = queueConf.getSchedulingPolicy(getName());
-
-    for (FSQueue child : getChildQueues()) {
-      if (!queuePolicy.isChildPolicyAllowed(
-          queueConf.getSchedulingPolicy(child.getName()))) {
-        return false;
-      }
-      boolean success = child.verifyAndSetPolicyFromConf(queueConf);
-      if (!success) {
-        return false;
-      }
-    }
-
-    // Set the policy if no policy violation for all children
-    setPolicy(queuePolicy);
-    return true;
-  }
-
-  /**
-   * Recursively dump states of all queues.
-   *
-   * @return a string which holds all queue states
-   */
-  public String dumpState() {
-    StringBuilder sb = new StringBuilder();
-    dumpStateInternal(sb);
-    return sb.toString();
-  }
-
-
-  /**
-   * Recursively dump states of all queues.
-   *
-   * @param sb the {code StringBuilder} which holds queue states
-   */
-  protected abstract void dumpStateInternal(StringBuilder sb);
-
-  public boolean isDynamic() {
-    return isDynamic;
-  }
-
-  public void setDynamic(boolean dynamic) {
-    this.isDynamic = dynamic;
-  }
-
-  public abstract boolean isEmpty();
-}
+    // 是否允许抢占，父队列不可

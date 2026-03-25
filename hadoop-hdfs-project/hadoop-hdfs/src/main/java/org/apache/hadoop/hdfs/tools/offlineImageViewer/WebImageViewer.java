@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,8 +44,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 /**
- * WebImageViewer loads a fsimage and exposes read-only WebHDFS API for its
- * namespace.
+ * 文件级注释：HDFS离线镜像查看Web服务端，加载fsimage文件后对外提供只读的WebHDFS API，
+ * 用于在不启动HDFS集群的情况下查看命名空间内容
+ * 
+ * WebImageViewer加载fsimage镜像文件，对外提供只读的WebHDFS API访问命名空间。
  */
 public class WebImageViewer implements Closeable {
   public static final Logger LOG =
@@ -59,9 +62,19 @@ public class WebImageViewer implements Closeable {
   private final ChannelGroup allChannels;
   private final Configuration conf;
 
+  /**
+   * 构造WebImageViewer实例，使用默认配置
+   * @param address 服务监听地址
+   */
   public WebImageViewer(InetSocketAddress address) {
     this(address, new Configuration());
   }
+
+  /**
+   * 构造WebImageViewer实例，使用指定配置
+   * @param address 服务监听地址
+   * @param conf Hadoop配置对象
+   */
   public WebImageViewer(InetSocketAddress address, Configuration conf) {
     this.address = address;
     this.bossGroup = new NioEventLoopGroup();
@@ -75,13 +88,14 @@ public class WebImageViewer implements Closeable {
   }
 
   /**
-   * Start WebImageViewer and wait until the thread is interrupted.
-   * @param fsimage the fsimage to load.
-   * @throws IOException if failed to load the fsimage.
-   * @throws RuntimeException if security is enabled in configuration.
+   * 启动WebImageViewer服务并阻塞等待中断，加载指定fsimage对外提供服务
+   * @param fsimage fsimage文件路径
+   * @throws IOException 加载fsimage失败时抛出
+   * @throws RuntimeException 配置开启安全认证时抛出
    */
   public void start(String fsimage) throws IOException {
     try {
+      // 不支持安全认证模式，要求使用simple认证
       if (UserGroupInformation.isSecurityEnabled()) {
         throw new RuntimeException(
             "WebImageViewer does not support secure mode. To start in " +
@@ -89,7 +103,9 @@ public class WebImageViewer implements Closeable {
                 CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION +
                 "=simple");
       }
+      // 初始化Netty服务端并加载fsimage
       initServer(fsimage);
+      // 阻塞等待服务关闭
       channel.closeFuture().await();
     } catch (InterruptedException e) {
       LOG.info("Interrupted. Stopping the WebImageViewer.");
@@ -98,19 +114,23 @@ public class WebImageViewer implements Closeable {
   }
 
   /**
-   * Start WebImageViewer.
-   * @param fsimage the fsimage to load.
-   * @throws IOException if fail to load the fsimage.
+   * 初始化Web服务端，加载fsimage并启动HTTP服务
+   * @param fsimage fsimage文件路径
+   * @throws IOException 加载fsimage失败时抛出
+   * @throws InterruptedException 服务绑定端口被中断时抛出
    */
   @VisibleForTesting
   public void initServer(String fsimage)
           throws IOException, InterruptedException {
+    // 加载并解析fsimage为内存命名空间
     final FSImageLoader loader = FSImageLoader.load(fsimage);
 
+    // 设置HTTP请求处理通道初始化器
     bootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
       @Override
       protected void initChannel(SocketChannel ch) throws Exception {
         ChannelPipeline p = ch.pipeline();
+        // 添加HTTP编解码器和业务处理器
         p.addLast(new HttpRequestDecoder(),
           new StringEncoder(),
           new HttpResponseEncoder(),
@@ -118,16 +138,18 @@ public class WebImageViewer implements Closeable {
       }
     });
 
+    // 绑定端口启动服务
     channel = bootstrap.bind(address).sync().channel();
     allChannels.add(channel);
 
+    // 更新实际监听地址（如果指定端口为0会自动分配）
     address = (InetSocketAddress) channel.localAddress();
     LOG.info("WebImageViewer started. Listening on " + address.toString() + ". Press Ctrl+C to stop the viewer.");
   }
 
   /**
-   * Get the listening port.
-   * @return the port WebImageViewer is listening on
+   * 获取服务实际监听端口
+   * @return WebImageViewer监听的端口号
    */
   @VisibleForTesting
   public int getPort() {
@@ -136,6 +158,7 @@ public class WebImageViewer implements Closeable {
 
   @Override
   public void close() {
+    // 关闭所有连接并优雅关闭Netty线程池
     allChannels.close().awaitUninterruptibly();
     bossGroup.shutdownGracefully();
     workerGroup.shutdownGracefully();

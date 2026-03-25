@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,26 +20,24 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity;
 
 /**
- * Scheduling modes, see below for detailed explanations 
+ * 容量调度器的节点分区调度模式枚举，定义不同分区资源分配策略
  */
 public enum SchedulingMode {
   /**
    * <p>
-   * When a node has partition (say partition=x), only application in the queue
-   * can access to partition=x AND requires for partition=x resource can get
-   * chance to allocate on the node.
+   * 当节点存在分区（例如 partition=x）时，仅当队列有权访问分区x，且应用申请分区x资源，才能分配该节点资源。
    * </p>
    * 
    * <p>
-   * When a node has no partition, only application requires non-partitioned
-   * resource can get chance to allocate on the node.
+   * 当节点无分区时，仅申请非分区资源的应用可以分配该节点资源。
    * </p>
+   * 严格遵守分区排他性，不同分区的资源不能混用
    */
   RESPECT_PARTITION_EXCLUSIVITY,
   
   /**
-   * Only used when a node has partition AND the partition isn't an exclusive
-   * partition AND application requires non-partitioned resource.
+   * 仅适用于节点存在分区、且分区不是排他分区，应用申请非分区资源的场景：
+   * 忽略分区排他性，允许非分区资源使用空闲的分区节点资源
    */
   IGNORE_PARTITION_EXCLUSIVITY
 }

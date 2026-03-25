@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -19,20 +20,21 @@ package org.apache.hadoop.hdfs.server.namenode.startupprogress;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * Abstract base of internal data structures used for tracking progress.  For
- * primitive long properties, {@link Long#MIN_VALUE} is used as a sentinel value
- * to indicate that the property is undefined.
+ * NameNode启动进度跟踪的抽象基类，为所有进度跟踪数据结构提供公共基础属性和方法。
+ * 对于基本长整型属性，使用{@link Long#MIN_VALUE}作为标记值，表示属性未定义（未设置）。
+ * 此类是HDFS NameNode启动阶段进度追踪模块的核心基础类。
  */
 @InterfaceAudience.Private
 abstract class AbstractTracking implements Cloneable {
+  // 启动阶段开始时间，Long.MIN_VALUE表示未设置
   long beginTime = Long.MIN_VALUE;
+  // 启动阶段结束时间，Long.MIN_VALUE表示未设置
   long endTime = Long.MIN_VALUE;
 
   /**
-   * Subclass instances may call this method during cloning to copy the values of
-   * all properties stored in this base class.
+   * 基类属性拷贝方法，供子类克隆时调用，将当前基类所有属性拷贝到目标对象。
    * 
-   * @param dest AbstractTracking destination for copying properties
+   * @param dest 接收属性拷贝的目标AbstractTracking对象
    */
   protected void copy(AbstractTracking dest) {
     dest.beginTime = beginTime;

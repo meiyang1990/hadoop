@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,6 +31,8 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
+ * 文件级注释：NameNode启动进度跟踪容器，为NameNode启动过程中各个阶段和步骤提供进度跟踪能力
+ * 
  * StartupProgress is used in various parts of the namenode codebase to indicate
  * startup progress.  Its methods provide ways to indicate begin and end of a
  * {@link Phase} or {@link Step} within a phase.  Additional methods provide ways
@@ -50,25 +53,32 @@ import org.apache.hadoop.classification.InterfaceAudience;
  * a clone of the data.
  */
 @InterfaceAudience.Private
+/**
+ * 类级注释：NameNode启动进度管理器，负责跟踪记录NameNode启动全过程中各个阶段和子步骤的进度、耗时、计数信息
+ * 核心职责：为Web UI和监控系统提供NameNode启动进度查询能力，支持多线程并发更新，启动完成后自动冻结数据
+ */
 public class StartupProgress {
 
   private static final Logger LOG = LoggerFactory.getLogger(StartupProgress.class);
 
-  // package-private for access by StartupProgressView
+  // 存储所有启动阶段的跟踪信息，包访问权限供StartupProgressView读取
   final Map<Phase, PhaseTracking> phases =
     new ConcurrentHashMap<Phase, PhaseTracking>();
 
   /**
+   * 接口级注释：进度计数器接口，提供原子增量操作，允许调用方跟踪长时间任务的完成进度
    * Allows a caller to increment a counter for tracking progress.
    */
   public static interface Counter {
     /**
+     * 方法级注释：原子自增计数器，当前值加1
      * Atomically increments this counter, adding 1 to the current value.
      */
     void increment();
   }
 
   /**
+   * 构造方法级注释：初始化所有预定义启动阶段的跟踪数据结构，创建StartupProgress实例
    * Creates a new StartupProgress by initializing internal data structure for
    * tracking progress of all defined phases.
    */
@@ -79,9 +89,9 @@ public class StartupProgress {
   }
 
   /**
-   * Begins execution of the specified phase.
+   * 方法级注释：标记指定启动阶段开始执行，记录开始时间
    * 
-   * @param phase Phase to begin
+   * @param phase 要开始的启动阶段
    */
   public void beginPhase(Phase phase) {
     if (!isComplete()) {
@@ -91,11 +101,10 @@ public class StartupProgress {
   }
 
   /**
-   * Begins execution of the specified step within the specified phase. This is
-   * a no-op if the phase is already completed.
+   * 方法级注释：标记指定阶段内的指定步骤开始执行，记录开始时间，如果阶段已完成则不操作
    * 
-   * @param phase Phase within which the step should be started
-   * @param step Step to begin
+   * @param phase 步骤所属的启动阶段
+   * @param step 要开始的步骤
    */
   public void beginStep(Phase phase, Step step) {
     if (!isComplete(phase)) {
@@ -105,9 +114,9 @@ public class StartupProgress {
   }
 
   /**
-   * Ends execution of the specified phase.
+   * 方法级注释：标记指定启动阶段执行完成，记录结束时间
    * 
-   * @param phase Phase to end
+   * @param phase 要结束的启动阶段
    */
   public void endPhase(Phase phase) {
     if (!isComplete()) {
@@ -117,11 +126,10 @@ public class StartupProgress {
   }
 
   /**
-   * Ends execution of the specified step within the specified phase. This is
-   * a no-op if the phase is already completed.
+   * 方法级注释：标记指定阶段内的指定步骤执行完成，记录结束时间，如果阶段已完成则不操作
    *
-   * @param phase Phase within which the step should be ended
-   * @param step Step to end
+   * @param phase 步骤所属的启动阶段
+   * @param step 要结束的步骤
    */
   public void endStep(Phase phase, Step step) {
     if (!isComplete(phase)) {
@@ -131,10 +139,10 @@ public class StartupProgress {
   }
 
   /**
-   * Returns the current run status of the specified phase.
+   * 方法级注释：获取指定启动阶段当前的状态
    * 
-   * @param phase Phase to get
-   * @return Status run status of phase
+   * @param phase 要查询的启动阶段
+   * @return 阶段的当前状态（等待/运行中/已完成）
    */
   public Status getStatus(Phase phase) {
     PhaseTracking tracking = phases.get(phase);
@@ -148,17 +156,12 @@ public class StartupProgress {
   }
 
   /**
-   * Returns a counter associated with the specified phase and step.  Typical
-   * usage is to increment a counter within a tight loop.  Callers may use this
-   * method to obtain a counter once and then increment that instance repeatedly
-   * within a loop.  This prevents redundant lookup operations and object
-   * creation within the tight loop.  Incrementing the counter is an atomic
-   * operation, so there is no risk of lost updates even if multiple threads
-   * increment the same counter.
+   * 方法级注释：获取指定阶段和步骤关联的进度计数器，支持多线程原子增量，适合在循环中重复递增
+   * 调用方可以一次性获取计数器实例后重复使用，避免重复查找，提升性能
    * 
-   * @param phase Phase to get
-   * @param step Step to get
-   * @return Counter associated with phase and step
+   * @param phase 计数器所属阶段
+   * @param step 计数器所属步骤
+   * @return 关联指定阶段和步骤的进度计数器
    */
   public Counter getCounter(Phase phase, Step step) {
     if (!isComplete(phase)) {
@@ -180,23 +183,21 @@ public class StartupProgress {
   }
 
   /**
-   * Sets counter to the specified value.
+   * 方法级注释：直接设置指定阶段和步骤的当前计数
    * 
-   * @param phase Phase to set
-   * @param step Step to set
-   * @param count long to set
+   * @param phase 目标阶段
+   * @param step 目标步骤
+   * @param count 要设置的当前计数值
    */
   public void setCount(Phase phase, Step step, long count) {
     lazyInitStep(phase, step).count.set(count);
   }
 
   /**
-   * Sets the optional file name associated with the specified phase.  For
-   * example, this can be used while loading fsimage to indicate the full path to
-   * the fsimage file.
+   * 方法级注释：设置指定阶段关联的可选文件名，例如加载fsimage时设置fsimage的完整路径
    * 
-   * @param phase Phase to set
-   * @param file String file name to set
+   * @param phase 目标阶段
+   * @param file 要设置的文件名
    */
   public void setFile(Phase phase, String file) {
     if (!isComplete()) {
@@ -205,12 +206,10 @@ public class StartupProgress {
   }
 
   /**
-   * Sets the optional size in bytes associated with the specified phase.  For
-   * example, this can be used while loading fsimage to indicate the size of the
-   * fsimage file.
+   * 方法级注释：设置指定阶段关联的可选文件大小（字节），例如加载fsimage时设置fsimage文件大小
    * 
-   * @param phase Phase to set
-   * @param size long to set
+   * @param phase 目标阶段
+   * @param size 要设置的文件大小（字节）
    */
   public void setSize(Phase phase, long size) {
     if (!isComplete()) {
@@ -219,13 +218,11 @@ public class StartupProgress {
   }
 
   /**
-   * Sets the total associated with the specified phase and step.  For example,
-   * this can be used while loading edits to indicate the number of operations to
-   * be applied.
+   * 方法级注释：设置指定阶段和步骤的总任务数，例如加载edits时设置需要应用的操作总数
    * 
-   * @param phase Phase to set
-   * @param step Step to set
-   * @param total long to set
+   * @param phase 目标阶段
+   * @param step 目标步骤
+   * @param total 要设置的总任务数
    */
   public void setTotal(Phase phase, Step step, long total) {
     if (!isComplete(phase)) {
@@ -234,48 +231,41 @@ public class StartupProgress {
   }
 
   /**
-   * Creates a {@link StartupProgressView} containing data cloned from this
-   * StartupProgress.  Subsequent updates to this StartupProgress will not be
-   * shown in the view.  This gives a consistent, unchanging view for callers
-   * that need to perform multiple related read operations.  Calculations that
-   * require aggregation, such as overall percent complete, will not be impacted
-   * by mutations performed in other threads mid-way through the calculation.
+   * 方法级注释：创建当前启动进度的只读快照视图，克隆当前所有跟踪数据
+   * 创建后原进度更新不会影响视图，为读取方提供一致不变的快照，避免计算过程中并发修改导致异常
    * 
-   * @return StartupProgressView containing cloned data
+   * @return 包含当前克隆数据的启动进度视图
    */
   public StartupProgressView createView() {
     return new StartupProgressView(this);
   }
 
   /**
-   * Returns true if the entire startup process has completed, determined by
-   * checking if each phase is complete.
+   * 方法级注释：检查整个NameNode启动过程是否已经全部完成，通过检查所有阶段都已完成来判断
    * 
-   * @return boolean true if the entire startup process has completed
+   * @return 整个启动过程全部完成返回true，否则返回false
    */
   private boolean isComplete() {
     return EnumSet.allOf(Phase.class).stream().allMatch(this::isComplete);
   }
 
   /**
-   * Returns true if the given startup phase has been completed.
+   * 方法级注释：检查指定启动阶段是否已经完成
    *
-   * @param phase Which phase to check for completion
-   * @return boolean true if the given startup phase has completed.
+   * @param phase 要检查的启动阶段
+   * @return 指定阶段已完成返回true，否则返回false
    */
   private boolean isComplete(Phase phase) {
     return getStatus(phase) == Status.COMPLETE;
   }
 
   /**
-   * Lazily initializes the internal data structure for tracking the specified
-   * phase and step.  Returns either the newly initialized data structure or the
-   * existing one.  Initialization is atomic, so there is no risk of lost updates
-   * even if multiple threads attempt to initialize the same step simultaneously.
+   * 方法级注释：延迟初始化指定阶段和步骤的跟踪数据结构，如果已存在则直接返回
+   * 初始化是原子操作，多线程同时初始化同一步骤也不会出现数据丢失问题
    * 
-   * @param phase Phase to initialize
-   * @param step Step to initialize
-   * @return StepTracking newly initialized, or existing if found
+   * @param phase 目标阶段
+   * @param step 目标步骤
+   * @return 初始化完成或已存在的步骤跟踪对象
    */
   private StepTracking lazyInitStep(Phase phase, Step step) {
     ConcurrentMap<Step, StepTracking> steps = phases.get(phase).steps;

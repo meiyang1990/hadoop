@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,6 +36,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSQueue;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+/**
+ * 公平调度器队列信息数据访问对象，封装队列的各项调度信息，供Web UI和REST API返回使用
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlSeeAlso({FairSchedulerLeafQueueInfo.class})
@@ -76,50 +80,71 @@ public class FairSchedulerQueueInfo {
   public FairSchedulerQueueInfo() {
   }
   
+  /**
+   * 从公平调度器队列构造Web API使用的队列信息对象
+   * @param queue 调度队列对象
+   * @param scheduler 公平调度器实例
+   */
   public FairSchedulerQueueInfo(FSQueue queue, FairScheduler scheduler) {
+    // 获取调度分配配置
     AllocationConfiguration allocConf = scheduler.getAllocationConfiguration();
     
     queueName = queue.getName();
     schedulingPolicy = queue.getPolicy().getName();
     
+    // 初始化集群总资源信息
     clusterResources = new ResourceInfo(scheduler.getClusterResource());
     
+    // 初始化AM资源使用和限制
     amUsedResources = new ResourceInfo(queue.getMetrics().getAMResourceUsage());
     amMaxResources = new ResourceInfo(queue.getMetrics().getMaxAMShare());
+    // 初始化队列总资源使用和需求
     usedResources = new ResourceInfo(queue.getResourceUsage());
     demandResources = new ResourceInfo(queue.getDemand());
+    // 计算已用内存占集群总内存比例
     fractionMemUsed = (float)usedResources.getMemorySize() /
         clusterResources.getMemorySize();
 
+    // 初始化稳定公平份额和当前公平份额
     steadyFairResources = new ResourceInfo(queue.getSteadyFairShare());
     fairResources = new ResourceInfo(queue.getFairShare());
+    // 初始化最小资源份额
     minResources = new ResourceInfo(queue.getMinShare());
+    // 初始化最大资源份额（取队列最大份额和集群总资源的较小值）
     maxResources = new ResourceInfo(
         Resources.componentwiseMin(queue.getMaxShare(),
             scheduler.getClusterResource()));
+    // 初始化单个容器最大可分配资源
     maxContainerAllocation =
         new ResourceInfo(scheduler.getMaximumResourceCapability(queueName));
+    // 初始化预留资源
     reservedResources = new ResourceInfo(queue.getReservedResource());
 
+    // 计算稳定公平份额内存占比
     fractionMemSteadyFairShare =
         (float)steadyFairResources.getMemorySize() / clusterResources.getMemorySize();
+    // 计算当前公平份额内存占比
     fractionMemFairShare = (float) fairResources.getMemorySize()
         / clusterResources.getMemorySize();
+    // 计算最大份额内存占比
     fractionMemMaxShare = (float)maxResources.getMemorySize() / clusterResources.getMemorySize();
     
     maxApps = queue.getMaxRunningApps();
 
+    // 获取各类容器统计信息
     allocatedContainers = queue.getMetrics().getAllocatedContainers();
     reservedContainers = queue.getMetrics().getReservedContainers();
     pendingContainers = queue.getMetrics().getPendingContainers();
 
     QueuePath queuePath = new QueuePath(queueName);
+    // 如果队列是可预留的且配置不显示预留队列，直接返回不处理子队列
     if (allocConf.isReservable(queuePath) &&
         !allocConf.getShowReservationAsQueues(queuePath)) {
       return;
     }
 
     preemptable = queue.isPreemptable();
+    // 构造子队列信息列表
     childQueues = getChildQueues(queue, scheduler);
   }
 
@@ -133,6 +158,12 @@ public class FairSchedulerQueueInfo {
     return reservedContainers;
   }
 
+  /**
+   * 构造子队列信息列表
+   * @param queue 父队列
+   * @param scheduler 公平调度器实例
+   * @return 子队列信息列表，如果没有子队列返回null
+   */
   protected FairSchedulerQueueInfoList getChildQueues(FSQueue queue,
                                                       FairScheduler scheduler) {
     // Return null to omit 'childQueues' field from the return value of
@@ -143,6 +174,7 @@ public class FairSchedulerQueueInfo {
       return null;
     }
     FairSchedulerQueueInfoList list = new FairSchedulerQueueInfoList();
+    // 遍历子队列，叶子队列和父队列分别使用对应类型构造
     for (FSQueue child : children) {
       if (child instanceof FSLeafQueue) {
         list.addToQueueInfoList(

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -56,8 +57,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * This is the Document Store Writer implementation for
- * {@link DocumentStoreVendor#COSMOS_DB}.
+ * Azure Cosmos DB 实现的文档存储写入器，负责将时间线数据写入Cosmos DB文档库。
+ * 实现了{@link DocumentStoreWriter}接口，是时间线服务对Cosmos DB的写入层。
  */
 public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
     implements DocumentStoreWriter<TimelineDoc> {
@@ -70,7 +71,7 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
       PerNodeAggTimelineCollectorMetrics.getInstance();
 
   private static AsyncDocumentClient client;
-  // creating thread pool of size equal to number of collection types
+  // 创建与集合类型数量相等大小的线程池
   private ExecutorService executorService =
       Executors.newFixedThreadPool(CollectionType.values().length);
   private Scheduler schedulerForBlockingWork =
@@ -83,14 +84,22 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
   private static final String QUERY_COLLECTION_IF_EXISTS = "SELECT * FROM r " +
       "where r.id = " + ID;
 
+  /**
+   * 构造函数，从配置初始化Cosmos DB写入器。
+   * @param conf Hadoop配置对象
+   */
   public CosmosDBDocumentStoreWriter(Configuration conf) {
     LOG.info("Initializing Cosmos DB DocumentStoreWriter...");
     databaseName = DocumentStoreUtils.getCosmosDBDatabaseName(conf);
     initCosmosDBClient(conf);
   }
 
+  /**
+   * 单例模式初始化Cosmos DB异步客户端，添加JVM关闭钩子。
+   * @param conf Hadoop配置对象
+   */
   private synchronized void initCosmosDBClient(Configuration conf) {
-    // making CosmosDB Async Client Singleton
+    // 保证Cosmos DB异步客户端单例
     if (client == null) {
       LOG.info("Creating Cosmos DB Writer Async Client...");
       client = DocumentStoreUtils.createCosmosDBAsyncClient(conf);
@@ -100,6 +109,7 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
 
   @Override
   public void createDatabase() {
+    // 尝试读取已存在的数据库
     Observable<ResourceResponse<Database>> databaseReadObs =
         client.readDatabase(String.format(DATABASE_LINK, databaseName), null);
 
@@ -108,13 +118,12 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
             .doOnNext(databaseResourceResponse ->
                 LOG.info("Database {} already exists.", databaseName))
             .onErrorResumeNext(throwable -> {
-              // if the database doesn't exists
-              // readDatabase() will result in 404 error
+              // 读取失败则判断是否是404（数据库不存在）
               if (throwable instanceof DocumentClientException) {
                 DocumentClientException de =
                     (DocumentClientException) throwable;
                 if (de.getStatusCode() == 404) {
-                  // if the database doesn't exist, create it.
+                  // 数据库不存在，创建新数据库
                   LOG.info("Creating new Database : {}", databaseName);
 
                   Database dbDefinition = new Database();
@@ -123,13 +132,12 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
                   return client.createDatabase(dbDefinition, null);
                 }
               }
-              // some unexpected failure in reading database happened.
-              // pass the error up.
+              // 非404错误，向上抛出异常
               LOG.error("Reading database : {} if it exists failed.",
                   databaseName, throwable);
               return Observable.error(throwable);
             });
-    // wait for completion
+    // 等待操作完成
     databaseExistenceObs.toCompletable().await();
   }
 
@@ -137,15 +145,16 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
   public void createCollection(final String collectionName) {
     LOG.info("Creating Timeline Collection : {} for Database : {}",
         collectionName, databaseName);
+    // 查询集合是否已存在
     client.queryCollections(String.format(DATABASE_LINK, databaseName),
         new SqlQuerySpec(QUERY_COLLECTION_IF_EXISTS,
             new SqlParameterCollection(
                 new SqlParameter(ID, collectionName))), null)
-        .single() // there should be single page of result
+        .single() // 结果应为单页
         .flatMap((Func1<FeedResponse<DocumentCollection>, Observable<?>>)
             page -> {
             if (page.getResults().isEmpty()) {
-              // if there is no matching collection create one.
+              // 集合不存在，创建新集合
               DocumentCollection collection = new DocumentCollection();
               collection.setId(collectionName);
               LOG.info("Creating collection {}", collectionName);
@@ -153,7 +162,7 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
                   String.format(DATABASE_LINK, databaseName),
                   collection, null);
             } else {
-              // collection already exists, nothing else to be done.
+              // 集合已存在，无需操作
               LOG.info("Collection {} already exists.", collectionName);
               return Observable.empty();
             }
@@ -179,11 +188,17 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
           "Collection : {} under Database {}", timelineDoc.getId(),
           collectionType.getCollectionName(), databaseName, e);
     } finally {
+      // 统计写入延迟和成功率指标
       long latency = Time.monotonicNow() - startTime;
       METRICS.addPutEntitiesLatency(latency, succeeded);
     }
   }
 
+  /**
+   * 更新或插入文档到Cosmos DB，处理冲突重试。
+   * @param collectionType 集合类型
+   * @param timelineDoc 待写入的时间线文档
+   */
   @SuppressWarnings("unchecked")
   private void upsertDocument(final  CollectionType collectionType,
       final TimelineDoc timelineDoc) {
@@ -193,13 +208,16 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
     AccessCondition accessCondition = new AccessCondition();
     StringBuilder eTagStrBuilder = new StringBuilder();
 
+    // 基于已有文档合并更新，获取最新ETag
     final TimelineDoc updatedTimelineDoc = applyUpdatesOnPrevDoc(collectionType,
         timelineDoc, eTagStrBuilder);
 
+    // 设置IfMatch条件，保证并发更新一致性
     accessCondition.setCondition(eTagStrBuilder.toString());
     accessCondition.setType(AccessConditionType.IfMatch);
     requestOptions.setAccessCondition(accessCondition);
 
+    // 异步执行upsert，阻塞等待结果
     ResourceResponse<Document> resourceResponse =
         client.upsertDocument(collectionLink, updatedTimelineDoc,
             requestOptions, true)
@@ -212,18 +230,27 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
             .toBlocking()
             .single();
 
+    // 冲突时重试
     if (resourceResponse.getStatusCode() == 409) {
       LOG.warn("There was a conflict while upserting, hence retrying...",
           resourceResponse);
       upsertDocument(collectionType, updatedTimelineDoc);
     } else if (resourceResponse.getStatusCode() >= 200 && resourceResponse
         .getStatusCode() < 300) {
+      // 写入成功日志
       LOG.debug("Successfully wrote doc with id : {} and type : {} under " +
           "Database : {}", timelineDoc.getId(), timelineDoc.getType(),
           databaseName);
     }
   }
 
+  /**
+   * 读取已有文档合并更新，提取最新ETag。
+   * @param collectionType 集合类型
+   * @param timelineDoc 输入文档
+   * @param eTagStrBuilder 输出参数，存储最新ETag
+   * @return 合并更新后的文档
+   */
   @VisibleForTesting
   @SuppressWarnings("unchecked")
   TimelineDoc applyUpdatesOnPrevDoc(CollectionType collectionType,
@@ -231,12 +258,20 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
     TimelineDoc prevDocument = fetchLatestDoc(collectionType,
         timelineDoc.getId(), eTagStrBuilder);
     if (prevDocument != null) {
+      // 将新文档内容合并到已有文档
       prevDocument.merge(timelineDoc);
       timelineDoc = prevDocument;
     }
     return timelineDoc;
   }
 
+  /**
+   * 从Cosmos DB读取指定ID的最新文档，提取ETag。
+   * @param collectionType 集合类型
+   * @param documentId 文档ID
+   * @param eTagStrBuilder 输出参数，存储文档ETag
+   * @return 读取到的文档，不存在则返回null
+   */
   @VisibleForTesting
   @SuppressWarnings("unchecked")
   TimelineDoc fetchLatestDoc(final CollectionType collectionType,
@@ -244,9 +279,11 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
     final String documentLink = String.format(DOCUMENT_LINK, databaseName,
         collectionType.getCollectionName(), documentId);
     try {
+      // 读取文档
       Document latestDocument = client.readDocument(documentLink, new
           RequestOptions()).toBlocking().single().getResource();
       TimelineDoc timelineDoc;
+      // 根据集合类型反序列化为对应文档类
       switch (collectionType) {
       case FLOW_RUN:
         timelineDoc = (TimelineDoc) latestDocument.toObject(
@@ -260,9 +297,11 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
         timelineDoc = (TimelineDoc) latestDocument.toObject(
             TimelineEntityDocument.class);
       }
+      // 保存ETag用于乐观锁
       eTagStrBuilder.append(latestDocument.getETag());
       return timelineDoc;
     } catch (Exception e) {
+      // 文档不存在视为正常情况，返回null
       LOG.debug("No previous Document found with id : {} for Collection" +
           " : {} under Database : {}", documentId, collectionType
           .getCollectionName(), databaseName);
@@ -279,6 +318,9 @@ public class CosmosDBDocumentStoreWriter<TimelineDoc extends TimelineDocument>
     }
   }
 
+  /**
+   * 添加JVM关闭钩子，退出时关闭线程池。
+   */
   private void addShutdownHook() {
     Runtime.getRuntime().addShutdownHook(new SubjectInheritingThread(() -> {
       if (executorService != null) {

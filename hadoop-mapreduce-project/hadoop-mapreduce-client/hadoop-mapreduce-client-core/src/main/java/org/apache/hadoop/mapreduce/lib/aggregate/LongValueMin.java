@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,9 +25,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that maintain the minimum of 
- * a sequence of long values.
- * 
+ * 长整型最小值聚合器，用于MapReduce聚合框架中维护一组长整型值的最小值
+ * 配合ValueAggregator框架实现分组聚合计算，常用于离线统计场景
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -35,19 +35,15 @@ public class LongValueMin implements ValueAggregator<String> {
   long minVal = Long.MAX_VALUE;
     
   /**
-   *  the default constructor
-   *
+   *  默认构造方法，初始化聚合器并重置状态
    */
   public LongValueMin() {
     reset();
   }
 
   /**
-   * add a value to the aggregator
-   * 
-   * @param val
-   *          an object whose string representation represents a long value.
-   * 
+   * 添加新的待聚合值，更新当前最小值
+   * @param val 待添加的值，其字符串形式表示一个长整型
    */
   public void addNextValue(Object val) {
     long newVal = Long.parseLong(val.toString());
@@ -57,11 +53,8 @@ public class LongValueMin implements ValueAggregator<String> {
   }
     
   /**
-   * add a value to the aggregator
-   * 
-   * @param newVal
-   *          a long value.
-   * 
+   * 添加新的长整型值，更新当前最小值
+   * @param newVal 待添加的长整型值
    */
   public void addNextValue(long newVal) {
     if (this.minVal > newVal) {
@@ -70,30 +63,31 @@ public class LongValueMin implements ValueAggregator<String> {
   }
     
   /**
-   * @return the aggregated value
+   * 获取聚合后的最小值结果
+   * @return 当前聚合得到的最小值
    */
   public long getVal() {
     return this.minVal;
   }
     
   /**
-   * @return the string representation of the aggregated value
+   * 获取聚合结果的字符串表示，用于最终输出报告
+   * @return 最小值的字符串形式
    */
   public String getReport() {
     return ""+minVal;
   }
 
   /**
-   * reset the aggregator
+   * 重置聚合器状态，将最小值恢复为初始最大值
    */
   public void reset() {
     minVal = Long.MAX_VALUE;
   }
 
   /**
-   * @return return an array of one element. The element is a string
-   *         representation of the aggregated value. The return value is
-   *         expected to be used by the a combiner.
+   * 生成Combiner阶段的输出结果，供聚合框架合并map端局部结果
+   * @return 只包含一个元素的列表，元素为当前聚合结果的字符串表示
    */
   public ArrayList<String> getCombinerOutput() {
     ArrayList<String> retv = new ArrayList<String>(1);

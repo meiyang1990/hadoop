@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,17 +24,16 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hdfs.server.namenode.JournalManager;
 
 /**
- * Interface which implementations of {@link JournalManager} can use to report
- * errors on underlying storage directories. This avoids a circular dependency
- * between journal managers and the storage which instantiates them.
+ * HDFS存储错误报告接口，供JournalManager实现类报告底层存储目录的错误。
+ * 通过该接口解耦了日志管理器与其创建者存储模块之间的循环依赖关系。
  */
 @InterfaceAudience.Private
 public interface StorageErrorReporter {
 
   /**
-   * Indicate that some error occurred on the given file.
+   * 报告指定文件发生IO错误。
    * 
-   * @param f the file which had an error.
+   * @param f 发生错误的文件对象
    */
   public void reportErrorOnFile(File f);
 }

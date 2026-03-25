@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,8 +38,8 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
- * A RecordReader that can effect joins of RecordReaders sharing a common key
- * type and partitioning.
+ * 支持对具有相同键类型和分区的多个RecordReader进行关联操作的复合RecordReader
+ * 是MapReduce端连接操作的基础抽象类，负责统一管理多个子Reader，并按键排序组织数据
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -67,10 +68,11 @@ public abstract class CompositeRecordReader<
   protected X value;
 
   /**
-   * Create a RecordReader with <code>capacity</code> children to position
-   * <code>id</code> in the parent reader.
-   * The id of a root CompositeRecordReader is -1 by convention, but relying
-   * on this is not recommended.
+   * 构造一个可容纳指定数量子Reader的复合RecordReader
+   * @param id 当前Reader在父Reader中的位置索引
+   * @param capacity 可容纳的子Reader最大数量
+   * @param cmpcl 键比较器类
+   * @throws IOException 如果初始化失败抛出IO异常
    */
   @SuppressWarnings("unchecked") // Generic array assignment
   public CompositeRecordReader(int id, int capacity,
@@ -96,18 +98,19 @@ public abstract class CompositeRecordReader<
   public void initialize(InputSplit split, TaskAttemptContext context) 
       throws IOException, InterruptedException {
     if (kids != null) {
+      // 遍历初始化所有子Reader
       for (int i = 0; i < kids.length; ++i) {
         kids[i].initialize(((CompositeInputSplit)split).get(i), context);
         if (kids[i].key() == null) {
           continue;
         }
         
-        // get keyclass
+        // 获取键类型，从第一个非空子Reader获取
         if (keyclass == null) {
           keyclass = kids[i].createKey().getClass().
             asSubclass(WritableComparable.class);
         }
-        // create priority queue
+        // 如果优先级队列未初始化则创建
         if (null == q) {
           cmp = WritableComparator.get(keyclass, conf);
           q = new PriorityQueue<ComposableRecordReader<K,?>>(3,
@@ -118,12 +121,12 @@ public abstract class CompositeRecordReader<
                   }
                 });
         }
-        // Explicit check for key class agreement
+        // 检查所有子Reader键类型是否一致
         if (!keyclass.equals(kids[i].key().getClass())) {
           throw new ClassCastException("Child key classes fail to agree");
         }
         
-        // add the kid to priority queue if it has any elements
+        // 将有数据的子Reader加入优先级队列（按键排序）
         if (kids[i].hasNext()) {
           q.add(kids[i]);
         }
@@ -132,7 +135,7 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Return the position in the collector this class occupies.
+   * 获取当前Reader在父Collector中的位置索引
    */
   public int id() {
     return id;
@@ -153,25 +156,24 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Return sorted list of RecordReaders for this composite.
+   * 获取按键排序的子Reader优先级队列
    */
   protected PriorityQueue<ComposableRecordReader<K,?>> getRecordReaderQueue() {
     return q;
   }
 
   /**
-   * Return comparator defining the ordering for RecordReaders in this
-   * composite.
+   * 获取键比较器
    */
   protected WritableComparator getComparator() {
     return cmp;
   }
 
   /**
-   * Add a RecordReader to this collection.
-   * The id() of a RecordReader determines where in the Tuple its
-   * entry will appear. Adding RecordReaders with the same id has
-   * undefined behavior.
+   * 添加子Reader到集合中，子Reader的id决定其输出元组中的位置
+   * @param rr 要添加的可组合RecordReader
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public void add(ComposableRecordReader<K,? extends V> rr) 
       throws IOException, InterruptedException {
@@ -179,10 +181,7 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Collector for join values.
-   * This accumulates values for a given key from the child RecordReaders. If
-   * one or more child RR contain duplicate keys, this will emit the cross
-   * product of the associated values until exhausted.
+   * 连接值收集器，用于收集同一键来自多个子Reader的值，支持生成笛卡尔积
    */
   public class JoinCollector {
     private K key;
@@ -191,8 +190,8 @@ public abstract class CompositeRecordReader<
     private boolean first = true;
 
     /**
-     * Construct a collector capable of handling the specified number of
-     * children.
+     * 构造可处理指定数量子节点的收集器
+     * @param card 子节点数量
      */
     @SuppressWarnings("unchecked") // Generic array assignment
     public JoinCollector(int card) {
@@ -203,7 +202,10 @@ public abstract class CompositeRecordReader<
     }
 
     /**
-     * Register a given iterator at position id.
+     * 在指定位置注册迭代器
+     * @param id 位置索引
+     * @param i 可重置迭代器
+     * @throws IOException IO异常
      */
     public void add(int id, ResetableIterator<X> i)
         throws IOException {
@@ -211,28 +213,28 @@ public abstract class CompositeRecordReader<
     }
 
     /**
-     * Return the key associated with this collection.
+     * 获取当前收集的键
      */
     public K key() {
       return key;
     }
 
     /**
-     * Codify the contents of the collector to be iterated over.
-     * When this is called, all RecordReaders registered for this
-     * key should have added ResetableIterators.
+     * 重置收集器，准备收集新键的值
+     * @param key 当前要收集的键
      */
     public void reset(K key) {
       this.key = key;
       first = true;
       pos = iters.length - 1;
+      // 重置所有迭代器
       for (int i = 0; i < iters.length; ++i) {
         iters[i].reset();
       }
     }
 
     /**
-     * Clear all state information.
+     * 清空收集器所有状态
      */
     public void clear() {
       key = null;
@@ -244,21 +246,24 @@ public abstract class CompositeRecordReader<
     }
 
     /**
-     * Returns false if exhausted or if reset(K) has not been called.
+     * 检查是否还有更多值组合
+     * @return 如果还有未返回的组合返回true，否则false
      */
     public boolean hasNext() {
       return !(pos < 0);
     }
 
     /**
-     * Populate Tuple from iterators.
-     * It should be the case that, given iterators i_1...i_n over values from
-     * sources s_1...s_n sharing key k, repeated calls to next should yield
-     * I x I.
+     * 获取下一个值组合，填充到TupleWritable中
+     * 实现笛卡尔积迭代，每次调用生成一个新的组合
+     * @param val 用于存储结果的元组
+     * @return 是否成功生成下一个组合
+     * @throws IOException IO异常
      */
     @SuppressWarnings("unchecked") // No static type info on Tuples
     protected boolean next(TupleWritable val) throws IOException {
       if (first) {
+        // 第一次迭代，初始化所有位置
         int i = -1;
         for (pos = 0; pos < iters.length; ++pos) {
           if (iters[pos].hasNext() && iters[pos].next((X)val.get(pos))) {
@@ -274,6 +279,7 @@ public abstract class CompositeRecordReader<
         }
         return true;
       }
+      // 回退查找下一个有数据的位置
       while (0 <= pos && !(iters[pos].hasNext() &&
                            iters[pos].next((X)val.get(pos)))) {
         --pos;
@@ -283,11 +289,13 @@ public abstract class CompositeRecordReader<
         return false;
       }
       val.setWritten(pos);
+      // 重放之前位置的值
       for (int i = 0; i < pos; ++i) {
         if (iters[i].replay((X)val.get(i))) {
           val.setWritten(i);
         }
       }
+      // 重置并填充后续位置
       while (pos + 1 < iters.length) {
         ++pos;
         iters[pos].reset();
@@ -299,7 +307,10 @@ public abstract class CompositeRecordReader<
     }
 
     /**
-     * Replay the last Tuple emitted.
+     * 重放最后一次发出的元组
+     * @param val 用于存储结果的元组
+     * @return 是否重放成功
+     * @throws IOException IO异常
      */
     @SuppressWarnings("unchecked") // No static typeinfo on Tuples
     public boolean replay(TupleWritable val) throws IOException {
@@ -318,7 +329,8 @@ public abstract class CompositeRecordReader<
     }
 
     /**
-     * Close all child iterators.
+     * 关闭所有子迭代器
+     * @throws IOException IO异常
      */
     public void close() throws IOException {
       for (int i = 0; i < iters.length; ++i) {
@@ -327,8 +339,10 @@ public abstract class CompositeRecordReader<
     }
 
     /**
-     * Write the next value into key, value as accepted by the operation
-     * associated with this set of RecordReaders.
+     * 刷新收集器，输出下一个符合连接条件的组合
+     * @param value 存储结果的元组
+     * @return 是否输出了有效组合
+     * @throws IOException IO异常
      */
     public boolean flush(TupleWritable value) throws IOException {
       while (hasNext()) {
@@ -342,8 +356,7 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Return the key for the current join or the value at the top of the
-   * RecordReader heap.
+   * 获取当前键，如果收集器有数据则返回收集器的键，否则返回堆顶子Reader的键
    */
   public K key() {
     if (jc.hasNext()) {
@@ -356,7 +369,9 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Clone the key at the top of this RR into the given object.
+   * 将当前堆顶键拷贝到给定对象中
+   * @param key 目标键对象
+   * @throws IOException IO异常
    */
   public void key(K key) throws IOException {
     ReflectionUtils.copy(conf, key(), key);
@@ -367,21 +382,27 @@ public abstract class CompositeRecordReader<
   }
   
   /**
-   * Return true if it is possible that this could emit more values.
+   * 检查是否还有更多数据可以输出
+   * @return 收集器有数据或队列非空返回true，否则false
    */
   public boolean hasNext() {
     return jc.hasNext() || !q.isEmpty();
   }
 
   /**
-   * Pass skip key to child RRs.
+   * 跳过所有小于等于给定键的子Reader数据
+   * @param key 要跳过的键
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public void skip(K key) throws IOException, InterruptedException {
     ArrayList<ComposableRecordReader<K,?>> tmp =
       new ArrayList<ComposableRecordReader<K,?>>();
+    // 弹出所有键小于等于当前键的子Reader
     while (!q.isEmpty() && cmp.compare(q.peek().key(), key) <= 0) {
       tmp.add(q.poll());
     }
+    // 让子Reader跳过当前键，有剩余数据则重新入队
     for (ComposableRecordReader<K,?> rr : tmp) {
       rr.skip(key);
       if (rr.hasNext()) {
@@ -391,14 +412,12 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Obtain an iterator over the child RRs apropos of the value type
-   * ultimately emitted from this join.
+   * 获取对应输出值类型的委托迭代器，由子类实现
    */
   protected abstract ResetableIterator<X> getDelegate();
 
   /**
-   * If key provided matches that of this Composite, give JoinCollector
-   * iterator over values it may emit.
+   * 如果当前键匹配，将当前值迭代器添加到收集器中
    */
   @SuppressWarnings("unchecked") // No values from static EMPTY class
   @Override
@@ -413,13 +432,16 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * For all child RRs offering the key provided, obtain an iterator
-   * at that position in the JoinCollector.
+   * 填充JoinCollector，收集所有匹配当前键的子Reader迭代器
+   * @param iterkey 要匹配的键
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   protected void fillJoinCollector(K iterkey) 
       throws IOException, InterruptedException {
     if (!q.isEmpty()) {
       q.peek().key(iterkey);
+      // 处理所有键匹配当前key的子Reader
       while (0 == cmp.compare(q.peek().key(), iterkey)) {
         ComposableRecordReader<K,?> t = q.poll();
         t.accept(jc, iterkey);
@@ -433,16 +455,16 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Implement Comparable contract (compare key of join or head of heap
-   * with that of another).
+   * 实现Comparable接口，基于当前键比较
    */
   public int compareTo(ComposableRecordReader<K,?> other) {
     return cmp.compare(key(), other.key());
   }
 
   /**
-   * Create a new key common to all child RRs.
-   * @throws ClassCastException if key classes differ.
+   * 创建一个所有子Reader通用的新键实例
+   * @return 新键实例
+   * @throws ClassCastException 如果子Reader键类型不一致抛出异常
    */
   @SuppressWarnings("unchecked")
   protected K createKey() {
@@ -453,7 +475,8 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Create a value to be used internally for joins.
+   * 创建用于存储连接结果的TupleWritable
+   * @return 新元组实例
    */
   protected TupleWritable createTupleWritable() {
     Writable[] vals = new Writable[kids.length];
@@ -470,7 +493,8 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Close all child RRs.
+   * 关闭所有子Reader和收集器
+   * @throws IOException IO异常
    */
   public void close() throws IOException {
     if (kids != null) {
@@ -484,14 +508,12 @@ public abstract class CompositeRecordReader<
   }
 
   /**
-   * Report progress as the minimum of all child RR progress.
+   * 计算整体进度，取所有子Reader进度的最小值
+   * @return 整体进度
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public float getProgress() throws IOException, InterruptedException {
     float ret = 1.0f;
     for (RecordReader<K,? extends Writable> rr : kids) {
-      ret = Math.min(ret, rr.getProgress());
-    }
-    return ret;
-  }
-  
-}
+      ret = Math.min(ret

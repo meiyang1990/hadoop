@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,13 +19,19 @@
 package org.apache.hadoop.hdfs.util;
 
 /**
- * A Holder is simply a wrapper around some other object. This is useful
- * in particular for storing immutable values like boxed Integers in a
- * collection without having to do the &quot;lookup&quot; of the value twice.
+ * 泛型对象持有器，对任意类型对象进行包装。
+ * 主要用于在集合中存储不可变对象（如包装类型Integer）时，
+ * 避免重复查询查找的性能开销，简化可变引用场景开发。
+ * 
+ * @param <T> 被持有对象的类型
  */
 public class Holder<T> {
   public T held;
   
+  /**
+   * 构造方法，创建持有指定对象的Holder实例
+   * @param held 被持有的对象
+   */
   public Holder(T held) {
     this.held = held;
   }

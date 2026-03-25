@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,20 +23,25 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.util.Progressable;
 
+/**
+ * 旧版MapReduce API的作业上下文接口
+ * 扩展新版org.apache.hadoop.mapreduce.JobContext，提供旧版API兼容能力
+ * 用于承载作业运行时的配置信息和进度上报机制
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public interface JobContext extends org.apache.hadoop.mapreduce.JobContext {
   /**
-   * Get the job Configuration
+   * 获取作业的配置对象
    * 
-   * @return JobConf
+   * @return 作业配置对象JobConf
    */
   public JobConf getJobConf();
   
   /**
-   * Get the progress mechanism for reporting progress.
+   * 获取用于上报作业进度的进度机制对象
    * 
-   * @return progress mechanism 
+   * @return 进度上报机制对象
    */
   public Progressable getProgressible();
 }

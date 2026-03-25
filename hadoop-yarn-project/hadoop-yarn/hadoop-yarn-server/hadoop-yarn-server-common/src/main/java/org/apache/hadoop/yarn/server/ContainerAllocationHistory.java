@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,16 +31,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Records the allocation history from YarnRM and provide aggregated insights.
+ * 文件路径：org.apache.hadoop.yarn.server.ContainerAllocationHistory
+ * 所属模块：YARN服务端公共组件
+ * 核心职责：记录YARN ResourceManager的容器分配历史，统计聚合可放宽locality约束的分配延迟信息，用于联邦调度场景的分配分析
+ * 记录Yarn RM的容器分配历史，并提供聚合统计信息
  */
 public class ContainerAllocationHistory {
   private static final Logger LOG = LoggerFactory.getLogger(AMRMClientRelayer.class);
 
   private int maxEntryCount;
 
-  // Allocate timing history <AllocateTimeStamp, AllocateLatency>
+  // 存储可放宽locality约束的分配延迟历史：键为分配时间戳，值为分配延迟（从请求到完成的耗时）
   private Queue<Entry<Long, Long>> relaxableG = new LinkedList<>();
 
+  /**
+   * 构造函数，从配置中加载最大历史条目数
+   * @param conf YARN配置对象
+   */
   public ContainerAllocationHistory(Configuration conf) {
     this.maxEntryCount = conf.getInt(
         YarnConfiguration.FEDERATION_ALLOCATION_HISTORY_MAX_ENTRY,
@@ -47,21 +55,24 @@ public class ContainerAllocationHistory {
   }
 
   /**
-   * Record the allocation history for the container.
+   * 记录一次容器分配的历史条目
    *
-   * @param container to add record for
-   * @param requestSet resource request ask set
-   * @param fulfillTimeStamp time at which allocation happened
-   * @param fulfillLatency time elapsed in allocating since asked
+   * @param container 本次分配得到的容器
+   * @param requestSet 资源请求集合
+   * @param fulfillTimeStamp 分配完成的时间戳
+   * @param fulfillLatency 从请求发起到分配完成的耗时
    */
   public synchronized void addAllocationEntry(Container container,
       ResourceRequestSet requestSet, long fulfillTimeStamp, long fulfillLatency){
+    // 只记录允许放宽ANY位置约束的分配请求
     if (!requestSet.isANYRelaxable()) {
       LOG.info("allocation history ignoring {}, relax locality is false", container);
       return;
     }
+    // 添加新的分配记录到队列
     this.relaxableG.add(new AbstractMap.SimpleEntry<>(
         fulfillTimeStamp, fulfillLatency));
+    // 超过最大存储条目数时，移除最早的一条记录
     if (this.relaxableG.size() > this.maxEntryCount) {
       this.relaxableG.remove();
     }

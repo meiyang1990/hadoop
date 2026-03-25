@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,8 +44,8 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * {@link UsersManager} tracks users in the system and its respective data
- * structures.
+ * 容量调度器叶队列的用户管理器，负责跟踪队列中所有用户的资源使用、应用状态，并计算用户资源限额
+ * 实现了用户级资源限制，保障队列内多个用户的公平资源分配
  */
 @Private
 public class UsersManager implements AbstractUsersManager {
@@ -55,55 +56,74 @@ public class UsersManager implements AbstractUsersManager {
   /*
    * Member declaration for UsersManager class.
    */
+  // 所属的叶队列
   private final AbstractLeafQueue lQueue;
+  // 节点标签管理器，用于获取分区资源总量
   private final RMNodeLabelsManager labelManager;
+  // 资源计算器，用于资源大小计算和比较
   private final ResourceCalculator resourceCalculator;
+  // 存储所有用户对象，key为用户名
   private Map<String, User> users = new ConcurrentHashMap<>();
 
+  // 活跃用户总资源使用统计
   private ResourceUsage totalResUsageForActiveUsers = new ResourceUsage();
+  // 非活跃用户总资源使用统计
   private ResourceUsage totalResUsageForNonActiveUsers = new ResourceUsage();
+  // 活跃用户集合（有运行中应用的用户）
   private Set<String> activeUsersSet = new HashSet<String>();
+  // 非活跃用户集合（仅存在挂起应用或无运行应用的用户）
   private Set<String> nonActiveUsersSet = new HashSet<String>();
 
-  // Summation of consumed ratios for all users in queue
+  // 队列所有用户资源使用率总和，按节点标签分区存储
   private UsageRatios qUsageRatios;
 
-  // To detect whether there is a change in user count for every user-limit
-  // calculation.
+  // 用户状态版本号，用于判断用户限额缓存是否需要重新计算
+  // 用户数量变化后版本号递增，缓存版本不匹配则重新计算
   private long latestVersionOfUsersState = 0;
+  // 活跃用户限额缓存的版本，按节点分区、调度模式存储
   private Map<String, Map<SchedulingMode, Long>> localVersionOfActiveUsersState =
       new HashMap<String, Map<SchedulingMode, Long>>();
+  // 所有用户限额缓存的版本，按节点分区、调度模式存储
   private Map<String, Map<SchedulingMode, Long>> localVersionOfAllUsersState =
       new HashMap<String, Map<SchedulingMode, Long>>();
 
+  // 配置的单个用户最大资源占队列容量百分比
   private volatile float userLimit;
+  // 配置的单个用户资源限额系数，用于上限计算
   private volatile float userLimitFactor;
 
   private WriteLock writeLock;
   private ReadLock readLock;
 
+  // 队列指标统计
   private final QueueMetrics metrics;
+  // 活跃用户总数（有运行中应用的用户）
   private AtomicInteger activeUsers = new AtomicInteger(0);
+  // 仅存在挂起应用的活跃用户数
   private AtomicInteger activeUsersWithOnlyPendingApps = new AtomicInteger(0);
+  // 用户拥有的应用集合，key为用户名
   private Map<String, Set<ApplicationId>> usersApplications =
       new HashMap<String, Set<ApplicationId>>();
 
-  // Pre-computed list of user-limits.
+  // 预计算的活跃用户资源限额缓存，按节点分区、调度模式存储
   @VisibleForTesting
   Map<String, Map<SchedulingMode, Resource>> preComputedActiveUserLimit =
       new HashMap<>();
+  // 预计算的所有用户资源限额缓存，按节点分区、调度模式存储
   @VisibleForTesting
   Map<String, Map<SchedulingMode, Resource>> preComputedAllUserLimit =
       new HashMap<>();
 
+  // 活跃用户权重总和，用于加权均分计算
   private float activeUsersTimesWeights = 0.0f;
+  // 所有用户权重总和，用于加权均分计算
   private float allUsersTimesWeights = 0.0f;
 
   /**
-   * UsageRatios will store the total used resources ratio across all users of
-   * the queue.
+   * 存储按节点标签分区的用户资源使用率总和，线程安全
    */
   static private class UsageRatios {
+    // 按节点标签存储使用率总和
     private Map<String, Float> usageRatios;
     private ReadLock readLock;
     private WriteLock writeLock;
@@ -115,6 +135,11 @@ public class UsersManager implements AbstractUsersManager {
       usageRatios = new HashMap<String, Float>();
     }
 
+    /**
+     * 增加指定分区的使用率总和
+     * @param label 节点分区标签
+     * @param delta 增量值
+     */
     private void incUsageRatio(String label, float delta) {
       writeLock.lock();
       try {
@@ -129,6 +154,11 @@ public class UsersManager implements AbstractUsersManager {
       }
     }
 
+    /**
+     * 获取指定分区的使用率总和
+     * @param label 节点分区标签
+     * @return 使用率总和
+     */
     private float getUsageRatio(String label) {
       readLock.lock();
       try {
@@ -142,6 +172,11 @@ public class UsersManager implements AbstractUsersManager {
       }
     }
 
+    /**
+     * 设置指定分区的使用率总和
+     * @param label 节点分区标签
+     * @param ratio 使用率值
+     */
     private void setUsageRatio(String label, float ratio) {
       writeLock.lock();
       try {
@@ -153,18 +188,25 @@ public class UsersManager implements AbstractUsersManager {
   } /* End of UserRatios class */
 
   /**
-   * User class stores all user related resource usage, application details.
+   * 单个用户的资源使用和应用状态存储，记录用户的资源使用、应用数量、资源限额等信息
    */
   @VisibleForTesting
   public static class User {
+    // 用户资源使用统计
     ResourceUsage userResourceUsage = new ResourceUsage();
+    // 用户名
     String userName = null;
+    // 计算得到的用户资源限额
     volatile Resource userResourceLimit = Resource.newInstance(0, 0);
+    // 用户挂起应用数量
     private volatile AtomicInteger pendingApplications = new AtomicInteger(0);
+    // 用户活跃（运行中）应用数量
     private volatile AtomicInteger activeApplications = new AtomicInteger(0);
 
+    // 用户各分区资源使用率
     private UsageRatios userUsageRatios = new UsageRatios();
     private WriteLock writeLock;
+    // 用户权重，用于加权资源分配
     private float weight;
 
     public User(String name) {
@@ -179,6 +221,13 @@ public class UsersManager implements AbstractUsersManager {
       return userResourceUsage;
     }
 
+    /**
+     * 重置并更新用户资源使用率，返回相对于队列总使用率的增量
+     * @param resourceCalculator 资源计算器
+     * @param resource 分区总资源
+     * @param nodePartition 节点分区
+     * @return 增量值
+     */
     public float setAndUpdateUsageRatio(ResourceCalculator resourceCalculator,
         Resource resource, String nodePartition) {
       writeLock.lock();
@@ -190,6 +239,13 @@ public class UsersManager implements AbstractUsersManager {
       }
     }
 
+    /**
+     * 更新用户资源使用率，返回相对于队列总使用率的增量
+     * @param resourceCalculator 资源计算器
+     * @param resource 分区总资源
+     * @param nodePartition 节点分区
+     * @return 增量值
+     */
     public float updateUsageRatio(ResourceCalculator resourceCalculator,
         Resource resource, String nodePartition) {
       writeLock.lock();
@@ -237,15 +293,25 @@ public class UsersManager implements AbstractUsersManager {
       return getPendingApplications() + getActiveApplications();
     }
 
+    /**
+     * 提交新应用，增加挂起应用计数
+     */
     public void submitApplication() {
       pendingApplications.incrementAndGet();
     }
 
+    /**
+     * 激活应用，从挂起转为活跃
+     */
     public void activateApplication() {
       pendingApplications.decrementAndGet();
       activeApplications.incrementAndGet();
     }
 
+    /**
+     * 完成应用，减少对应状态应用计数
+     * @param wasActive 应用是否为活跃状态
+     */
     public void finishApplication(boolean wasActive) {
       if (wasActive) {
         activeApplications.decrementAndGet();
@@ -287,16 +353,12 @@ public class UsersManager implements AbstractUsersManager {
   } /* End of User class */
 
   /**
-   * UsersManager Constructor.
+   * 构造用户管理器，绑定所属叶队列和依赖组件
    *
-   * @param metrics
-   *          Queue Metrics
-   * @param lQueue
-   *          Leaf Queue Object
-   * @param labelManager
-   *          Label Manager instance
-   * @param resourceCalculator
-   *          rc
+   * @param metrics 队列指标统计
+   * @param lQueue 所属叶队列
+   * @param labelManager 节点标签管理器
+   * @param resourceCalculator 资源计算器
    */
   public UsersManager(QueueMetrics metrics, AbstractLeafQueue lQueue,
       RMNodeLabelsManager labelManager, ResourceCalculator resourceCalculator) {
@@ -312,32 +374,32 @@ public class UsersManager implements AbstractUsersManager {
   }
 
   /**
-   * Get configured user-limit.
-   * @return user limit
+   * 获取配置的单用户资源占比上限百分比
+   * @return 用户资源限制百分比
    */
   public float getUserLimit() {
     return userLimit;
   }
 
   /**
-   * Set configured user-limit.
-   * @param userLimit user limit
+   * 设置配置的单用户资源占比上限百分比
+   * @param userLimit 用户资源限制百分比
    */
   public void setUserLimit(float userLimit) {
     this.userLimit = userLimit;
   }
 
   /**
-   * Get configured user-limit factor.
-   * @return user-limit factor
+   * 获取配置的单用户资源限额系数
+   * @return 用户资源限额系数
    */
   public float getUserLimitFactor() {
     return userLimitFactor;
   }
 
   /**
-   * Set configured user-limit factor.
-   * @param userLimitFactor User Limit factor.
+   * 设置配置的单用户资源限额系数
+   * @param userLimitFactor 用户资源限额系数
    */
   public void setUserLimitFactor(float userLimitFactor) {
     this.userLimitFactor = userLimitFactor;
@@ -349,7 +411,8 @@ public class UsersManager implements AbstractUsersManager {
   }
 
   /**
-   * Force UsersManager to recompute userlimit.
+   * 标记用户状态已变更，触发用户限额缓存重新计算
+   * 处理版本号溢出问题，溢出后重置为0
    */
   public void userLimitNeedsRecompute() {
 
@@ -376,30 +439,29 @@ public class UsersManager implements AbstractUsersManager {
   }
 
   /**
-   * Get user object for given user name.
+   * 根据用户名获取用户对象
    *
-   * @param userName
-   *          User Name
-   * @return User object
+   * @param userName 用户名
+   * @return 用户对象，不存在返回null
    */
   public User getUser(String userName) {
     return users.get(userName);
   }
 
   /**
-   * Remove user.
+   * 移除指定用户
    *
-   * @param userName
-   *          User Name
+   * @param userName 用户名
    */
   public void removeUser(String userName) {
     writeLock.lock();
     try {
       this.users.remove(userName);
 
-      // Remove user from active/non-active list as well.
+      // 同时从活跃/非活跃集合中移除
       activeUsersSet.remove(userName);
       nonActiveUsersSet.remove(userName);
+      // 重新计算权重总和
       activeUsersTimesWeights = sumActiveUsersTimesWeights();
       allUsersTimesWeights = sumAllUsersTimesWeights();
     } finally {
@@ -408,11 +470,10 @@ public class UsersManager implements AbstractUsersManager {
   }
 
   /**
-   * Get and add user if absent.
+   * 获取用户对象，不存在则创建添加
    *
-   * @param userName
-   *          User Name
-   * @return User object
+   * @param userName 用户名
+   * @return 用户对象
    */
   public User getUserAndAddIfAbsent(String userName) {
     writeLock.lock();
@@ -422,7 +483,7 @@ public class UsersManager implements AbstractUsersManager {
         u = new User(userName);
         addUser(userName, u);
 
-        // Add to nonActive list so that resourceUsage could be tracked
+        // 新用户默认添加到非活跃列表，跟踪资源使用
         if (!nonActiveUsersSet.contains(userName)) {
           nonActiveUsersSet.add(userName);
         }
@@ -438,12 +499,15 @@ public class UsersManager implements AbstractUsersManager {
    */
   private void addUser(String userName, User user) {
     this.users.put(userName, user);
+    // 从队列配置加载用户权重
     user.setWeight(getUserWeightFromQueue(userName));
+    // 重新计算所有用户权重总和
     allUsersTimesWeights = sumAllUsersTimesWeights();
   }
 
   /**
-   * @return an ArrayList of UserInfo objects who are active in this queue
+   * 获取队列所有用户的信息列表，用于UI展示
+   * @return 用户信息列表
    */
   public ArrayList<UserInfo> getUsersInfo() {
     readLock.lock();
@@ -460,681 +524,4 @@ public class UsersManager implements AbstractUsersManager {
                 activeUsersSet.contains(user.userName)));
       }
       return usersToReturn;
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  private float getUserWeightFromQueue(String userName) {
-    return lQueue.getUserWeights().getByUser(userName);
-  }
-
-  /**
-   * Get computed user-limit for all ACTIVE users in this queue. If cached data
-   * is invalidated due to resource change, this method also enforce to
-   * recompute user-limit.
-   *
-   * @param userName
-   *          Name of user who has submitted one/more app to given queue.
-   * @param clusterResource
-   *          total cluster resource
-   * @param nodePartition
-   *          partition name
-   * @param schedulingMode
-   *          scheduling mode
-   *          RESPECT_PARTITION_EXCLUSIVITY/IGNORE_PARTITION_EXCLUSIVITY
-   * @return Computed User Limit
-   */
-  public Resource getComputedResourceLimitForActiveUsers(String userName,
-      Resource clusterResource, String nodePartition,
-      SchedulingMode schedulingMode) {
-
-    Map<SchedulingMode, Resource> userLimitPerSchedulingMode;
-
-    writeLock.lock();
-    try {
-      userLimitPerSchedulingMode =
-          preComputedActiveUserLimit.get(nodePartition);
-      if (isRecomputeNeeded(schedulingMode, nodePartition, true)) {
-        // recompute
-        userLimitPerSchedulingMode = reComputeUserLimits(userName,
-            nodePartition, clusterResource, schedulingMode, true);
-
-        // update user count to cache so that we can avoid recompute if no major
-        // changes.
-        setLocalVersionOfUsersState(nodePartition, schedulingMode, true);
-      }
-    } finally {
-      writeLock.unlock();
-    }
-
-    Resource userLimitResource = userLimitPerSchedulingMode.get(schedulingMode);
-    User user = getUser(userName);
-    float weight = (user == null) ? 1.0f : user.getWeight();
-    Resource userSpecificUserLimit =
-        Resources.multiplyAndNormalizeDown(resourceCalculator,
-            userLimitResource, weight, lQueue.getMinimumAllocation());
-
-    if (user != null) {
-      user.setUserResourceLimit(userSpecificUserLimit);
-    }
-
-    LOG.debug("userLimit is fetched. userLimit={}, userSpecificUserLimit={},"
-        + " schedulingMode={}, partition={}", userLimitResource,
-        userSpecificUserLimit, schedulingMode, nodePartition);
-
-    return userSpecificUserLimit;
-  }
-
-  /**
-   * Get computed user-limit for all users in this queue. If cached data is
-   * invalidated due to resource change, this method also enforce to recompute
-   * user-limit.
-   *
-   * @param userName
-   *          Name of user who has submitted one/more app to given queue.
-   * @param clusterResource
-   *          total cluster resource
-   * @param nodePartition
-   *          partition name
-   * @param schedulingMode
-   *          scheduling mode
-   *          RESPECT_PARTITION_EXCLUSIVITY/IGNORE_PARTITION_EXCLUSIVITY
-   * @return Computed User Limit
-   */
-  public Resource getComputedResourceLimitForAllUsers(String userName,
-      Resource clusterResource, String nodePartition,
-      SchedulingMode schedulingMode) {
-
-    Map<SchedulingMode, Resource> userLimitPerSchedulingMode;
-
-    writeLock.lock();
-    try {
-      userLimitPerSchedulingMode = preComputedAllUserLimit.get(nodePartition);
-      if (isRecomputeNeeded(schedulingMode, nodePartition, false)) {
-        // recompute
-        userLimitPerSchedulingMode = reComputeUserLimits(userName,
-            nodePartition, clusterResource, schedulingMode, false);
-
-        // update user count to cache so that we can avoid recompute if no major
-        // changes.
-        setLocalVersionOfUsersState(nodePartition, schedulingMode, false);
-      }
-    } finally {
-      writeLock.unlock();
-    }
-
-    Resource userLimitResource = userLimitPerSchedulingMode.get(schedulingMode);
-    User user = getUser(userName);
-    float weight = (user == null) ? 1.0f : user.getWeight();
-    Resource userSpecificUserLimit =
-        Resources.multiplyAndNormalizeDown(resourceCalculator,
-            userLimitResource, weight, lQueue.getMinimumAllocation());
-
-    LOG.debug("userLimit is fetched. userLimit={}, userSpecificUserLimit={},"
-        + " schedulingMode={}, partition={}", userLimitResource,
-        userSpecificUserLimit, schedulingMode, nodePartition);
-
-    return userSpecificUserLimit;
-  }
-
-  protected long getLatestVersionOfUsersState() {
-    readLock.lock();
-    try {
-      return latestVersionOfUsersState;
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /*
-   * Recompute user-limit under following conditions: 1. cached user-limit does
-   * not exist in local map. 2. Total User count doesn't match with local cached
-   * version.
-   */
-  private boolean isRecomputeNeeded(SchedulingMode schedulingMode,
-      String nodePartition, boolean isActive) {
-    readLock.lock();
-    try {
-      return (getLocalVersionOfUsersState(nodePartition, schedulingMode,
-          isActive) != latestVersionOfUsersState);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /*
-   * Set Local version of user count per label to invalidate cache if needed.
-   */
-  private void setLocalVersionOfUsersState(String nodePartition,
-      SchedulingMode schedulingMode, boolean isActive) {
-    writeLock.lock();
-    try {
-      Map<String, Map<SchedulingMode, Long>> localVersionOfUsersState = (isActive)
-          ? localVersionOfActiveUsersState
-          : localVersionOfAllUsersState;
-
-      Map<SchedulingMode, Long> localVersion = localVersionOfUsersState
-          .get(nodePartition);
-      if (null == localVersion) {
-        localVersion = new HashMap<SchedulingMode, Long>();
-        localVersionOfUsersState.put(nodePartition, localVersion);
-      }
-
-      localVersion.put(schedulingMode, latestVersionOfUsersState);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  /*
-   * Get Local version of user count per label to invalidate cache if needed.
-   */
-  private long getLocalVersionOfUsersState(String nodePartition,
-      SchedulingMode schedulingMode, boolean isActive) {
-    this.readLock.lock();
-    try {
-      Map<String, Map<SchedulingMode, Long>> localVersionOfUsersState = (isActive)
-          ? localVersionOfActiveUsersState
-          : localVersionOfAllUsersState;
-
-      if (!localVersionOfUsersState.containsKey(nodePartition)) {
-        return -1;
-      }
-
-      Map<SchedulingMode, Long> localVersion = localVersionOfUsersState
-          .get(nodePartition);
-      if (!localVersion.containsKey(schedulingMode)) {
-        return -1;
-      }
-
-      return localVersion.get(schedulingMode);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  private Map<SchedulingMode, Resource> reComputeUserLimits(String userName,
-      String nodePartition, Resource clusterResource,
-      SchedulingMode schedulingMode, boolean activeMode) {
-
-    // preselect stored map as per active user-limit or all user computation.
-    Map<String, Map<SchedulingMode, Resource>> computedMap = null;
-    computedMap = (activeMode)
-        ? preComputedActiveUserLimit
-        : preComputedAllUserLimit;
-
-    Map<SchedulingMode, Resource> userLimitPerSchedulingMode = computedMap
-        .get(nodePartition);
-
-    if (userLimitPerSchedulingMode == null) {
-      userLimitPerSchedulingMode = new ConcurrentHashMap<>();
-      computedMap.put(nodePartition, userLimitPerSchedulingMode);
-    }
-
-    // compute user-limit per scheduling mode.
-    Resource computedUserLimit = computeUserLimit(userName, clusterResource,
-        nodePartition, schedulingMode, activeMode);
-
-    // update in local storage
-    userLimitPerSchedulingMode.put(schedulingMode, computedUserLimit);
-
-    computeNumActiveUsersWithOnlyPendingApps();
-
-    return userLimitPerSchedulingMode;
-  }
-
-  // This method is called within the lock.
-  private void computeNumActiveUsersWithOnlyPendingApps() {
-    int numPendingUsers = 0;
-    for (User user : users.values()) {
-      if ((user.getPendingApplications() > 0)
-          && (user.getActiveApplications() <= 0)) {
-        numPendingUsers++;
-      }
-    }
-    activeUsersWithOnlyPendingApps = new AtomicInteger(numPendingUsers);
-  }
-
-  @VisibleForTesting
-  Resource computeUserLimit(String userName, Resource clusterResource,
-      String nodePartition, SchedulingMode schedulingMode, boolean activeUser) {
-    Resource partitionResource = labelManager.getResourceByLabel(nodePartition,
-        clusterResource);
-
-    /*
-     * What is our current capacity?
-     * * It is equal to the max(required, queue-capacity) if we're running
-     * below capacity. The 'max' ensures that jobs in queues with miniscule
-     * capacity (< 1 slot) make progress
-     * * If we're running over capacity, then its (usedResources + required)
-     * (which extra resources we are allocating)
-     */
-    Resource queueCapacity = lQueue.getEffectiveCapacity(nodePartition);
-    Resource originalCapacity = queueCapacity;
-
-    /*
-     * Assume we have required resource equals to minimumAllocation, this can
-     * make sure user limit can continuously increase till queueMaxResource
-     * reached.
-     */
-    Resource required = lQueue.getMinimumAllocation();
-
-    // Allow progress for queues with miniscule capacity
-    queueCapacity = Resources.max(resourceCalculator, partitionResource,
-        queueCapacity, required);
-
-    /*
-     * We want to base the userLimit calculation on
-     * max(queueCapacity, usedResources+required). However, we want
-     * usedResources to be based on the combined ratios of all the users in the
-     * queue so we use consumedRatio to calculate such.
-     * The calculation is dependent on how the resourceCalculator calculates the
-     * ratio between two Resources. DRF Example: If usedResources is greater
-     * than queueCapacity and users have the following [mem,cpu] usages:
-     *
-     * User1: [10%,20%] - Dominant resource is 20%
-     * User2: [30%,10%] - Dominant resource is 30%
-     * Then total consumedRatio is then 20+30=50%. Yes, this value can be
-     * larger than 100% but for the purposes of making sure all users are
-     * getting their fair share, it works.
-     */
-    Resource consumed = Resources.multiplyAndNormalizeUp(resourceCalculator,
-        partitionResource, getUsageRatio(nodePartition),
-        lQueue.getMinimumAllocation());
-    Resource currentCapacity = Resources.lessThan(resourceCalculator,
-        partitionResource, consumed, queueCapacity)
-            ? queueCapacity
-            : Resources.add(consumed, required);
-
-    /*
-     * Never allow a single user to take more than the queue's configured
-     * capacity * user-limit-factor. Also, the queue's configured capacity
-     * should be higher than queue-hard-limit * ulMin
-     */
-    float usersSummedByWeight = activeUsersTimesWeights;
-    Resource resourceUsed = Resources.add(
-                            totalResUsageForActiveUsers.getUsed(nodePartition),
-                            required);
-
-    // For non-activeUser calculation, consider all users count.
-    if (!activeUser) {
-      resourceUsed = currentCapacity;
-      usersSummedByWeight = allUsersTimesWeights;
-    }
-
-    /*
-     * User limit resource is determined by: max(currentCapacity / #activeUsers,
-     * currentCapacity * user-limit-percentage%)
-     */
-    Resource userLimitResource = Resources.max(resourceCalculator,
-        partitionResource,
-        Resources.divideAndCeil(resourceCalculator, resourceUsed,
-            usersSummedByWeight),
-        Resources.divideAndCeil(resourceCalculator,
-            Resources.multiplyAndRoundDown(currentCapacity, getUserLimit()),
-            100));
-
-    // User limit is capped by maxUserLimit
-    // - maxUserLimit = queueCapacity * user-limit-factor
-    // (RESPECT_PARTITION_EXCLUSIVITY)
-    // - maxUserLimit = total-partition-resource (IGNORE_PARTITION_EXCLUSIVITY)
-    //
-    // In IGNORE_PARTITION_EXCLUSIVITY mode, if a queue cannot access a
-    // partition, its guaranteed resource on that partition is 0. And
-    // user-limit-factor computation is based on queue's guaranteed capacity. So
-    // we will not cap user-limit as well as used resource when doing
-    // IGNORE_PARTITION_EXCLUSIVITY allocation.
-    Resource maxUserLimit = Resources.none();
-    if (schedulingMode == SchedulingMode.RESPECT_PARTITION_EXCLUSIVITY) {
-      if (getUserLimitFactor() == -1 ||
-          originalCapacity.equals(Resources.none())) {
-        // If user-limit-factor set to -1, we should disable user limit.
-        //
-        // Also prevent incorrect maxUserLimit due to low queueCapacity
-        // Can happen if dynamic queue has capacity = 0%
-        maxUserLimit = lQueue.
-            getEffectiveMaxCapacityDown(
-                nodePartition, lQueue.getMinimumAllocation());
-      } else {
-        maxUserLimit = Resources.multiplyAndRoundDown(queueCapacity,
-            getUserLimitFactor());
-      }
-    } else if (schedulingMode == SchedulingMode.IGNORE_PARTITION_EXCLUSIVITY) {
-      maxUserLimit = partitionResource;
-    }
-
-    // Cap final user limit with maxUserLimit
-    userLimitResource = Resources
-        .roundUp(resourceCalculator,
-            Resources.min(resourceCalculator, partitionResource,
-                userLimitResource, maxUserLimit),
-            lQueue.getMinimumAllocation());
-
-    if (LOG.isDebugEnabled()) {
-      float weight = lQueue.getUserWeights().getByUser(userName);
-      LOG.debug("User limit computation for " + userName
-          + ",  in queue: " + lQueue.getQueuePath()
-          + ",  userLimitPercent=" + lQueue.getUserLimit()
-          + ",  userLimitFactor=" + lQueue.getUserLimitFactor()
-          + ",  required=" + required
-          + ",  consumed=" + consumed
-          + ",  user-limit-resource=" + userLimitResource
-          + ",  queueCapacity=" + queueCapacity
-          + ",  qconsumed=" + lQueue.getQueueResourceUsage().getUsed()
-          + ",  currentCapacity=" + currentCapacity
-          + ",  activeUsers=" + usersSummedByWeight
-          + ",  clusterCapacity=" + clusterResource
-          + ",  resourceByLabel=" + partitionResource
-          + ",  usageratio=" + getUsageRatio(nodePartition)
-          + ",  Partition=" + nodePartition
-          + ",  resourceUsed=" + resourceUsed
-          + ",  maxUserLimit=" + maxUserLimit
-          + ",  userWeight=" + weight
-      );
-    }
-    return userLimitResource;
-  }
-
-  /**
-   * Update new usage ratio.
-   *
-   * @param partition Node partition
-   * @param clusterResource cluster resource
-   */
-  public void updateUsageRatio(String partition, Resource clusterResource) {
-    writeLock.lock();
-    try {
-      Resource resourceByLabel = labelManager.getResourceByLabel(partition,
-          clusterResource);
-      float consumed = 0;
-      User user;
-      for (Map.Entry<String, User> entry : getUsers().entrySet()) {
-        user = entry.getValue();
-        consumed += user.setAndUpdateUsageRatio(resourceCalculator,
-            resourceByLabel, partition);
-      }
-
-      qUsageRatios.setUsageRatio(partition, consumed);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  /*
-   * Increment Queue Usage Ratio.
-   */
-  private void incQueueUsageRatio(String nodePartition, float delta) {
-    qUsageRatios.incUsageRatio(nodePartition, delta);
-  }
-
-  @Override
-  public void activateApplication(String user, ApplicationId applicationId) {
-
-    this.writeLock.lock();
-    try {
-      User userDesc = getUser(user);
-      if (userDesc != null && userDesc.getActiveApplications() <= 0) {
-        return;
-      }
-
-      Set<ApplicationId> userApps = usersApplications.get(user);
-      if (userApps == null) {
-        userApps = new HashSet<ApplicationId>();
-        usersApplications.put(user, userApps);
-        activeUsers.incrementAndGet();
-        metrics.incrActiveUsers();
-
-        // A user is added to active list. Invalidate user-limit cache.
-        userLimitNeedsRecompute();
-        updateActiveUsersResourceUsage(user);
-        LOG.debug("User {} added to activeUsers, currently: {}",
-            user, activeUsers);
-      }
-      if (userApps.add(applicationId)) {
-        metrics.activateApp(user);
-      }
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  @Override
-  public void deactivateApplication(String user, ApplicationId applicationId) {
-
-    this.writeLock.lock();
-    try {
-      Set<ApplicationId> userApps = usersApplications.get(user);
-      if (userApps != null) {
-        if (userApps.remove(applicationId)) {
-          metrics.deactivateApp(user);
-        }
-        if (userApps.isEmpty()) {
-          usersApplications.remove(user);
-          activeUsers.decrementAndGet();
-          metrics.decrActiveUsers();
-
-          // A user is removed from active list. Invalidate user-limit cache.
-          userLimitNeedsRecompute();
-          updateNonActiveUsersResourceUsage(user);
-          LOG.debug("User {} removed from activeUsers, currently: {}",
-              user, activeUsers);
-        }
-      }
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  @Override
-  public int getNumActiveUsers() {
-    return activeUsers.get() + activeUsersWithOnlyPendingApps.get();
-  }
-
-  float sumActiveUsersTimesWeights() {
-    float count = 0.0f;
-    this.readLock.lock();
-    try {
-      for (String u : activeUsersSet) {
-        count += getUser(u).getWeight();
-      }
-      return count;
-    } finally {
-      this.readLock.unlock();
-    }
-  }
-
-  float sumAllUsersTimesWeights() {
-    float count = 0.0f;
-    this.readLock.lock();
-    try {
-      for (String u : users.keySet()) {
-        count += getUser(u).getWeight();
-      }
-      return count;
-    } finally {
-      this.readLock.unlock();
-    }
-  }
-
-  private void updateActiveUsersResourceUsage(String userName) {
-    this.writeLock.lock();
-    try {
-      // For UT case: We might need to add the user to users list.
-      User user = getUserAndAddIfAbsent(userName);
-      ResourceUsage resourceUsage = user.getResourceUsage();
-      // If User is moved to active list, moved resource usage from non-active
-      // to active list.
-      if (nonActiveUsersSet.contains(userName)) {
-        nonActiveUsersSet.remove(userName);
-        activeUsersSet.add(userName);
-        activeUsersTimesWeights = sumActiveUsersTimesWeights();
-
-        // Update total resource usage of active and non-active after user
-        // is moved from non-active to active.
-        for (String partition : resourceUsage.getExistingNodeLabels()) {
-          totalResUsageForNonActiveUsers.decUsed(partition,
-              resourceUsage.getUsed(partition));
-          totalResUsageForActiveUsers.incUsed(partition,
-              resourceUsage.getUsed(partition));
-        }
-
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("User '" + userName
-              + "' has become active. Hence move user to active list."
-              + "Active users size = " + activeUsersSet.size()
-              + "Non-active users size = " + nonActiveUsersSet.size()
-              + "Total Resource usage for active users="
-              + totalResUsageForActiveUsers.getAllUsed() + "."
-              + "Total Resource usage for non-active users="
-              + totalResUsageForNonActiveUsers.getAllUsed());
-        }
-      }
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  private void updateNonActiveUsersResourceUsage(String userName) {
-    this.writeLock.lock();
-    try {
-
-      // For UT case: We might need to add the user to users list.
-      User user = getUser(userName);
-      if (user == null) return;
-
-      ResourceUsage resourceUsage = user.getResourceUsage();
-      // If User is moved to non-active list, moved resource usage from
-      // non-active to active list.
-      if (activeUsersSet.contains(userName)) {
-        activeUsersSet.remove(userName);
-        nonActiveUsersSet.add(userName);
-        activeUsersTimesWeights = sumActiveUsersTimesWeights();
-
-        // Update total resource usage of active and non-active after user is
-        // moved from active to non-active.
-        for (String partition : resourceUsage.getExistingNodeLabels()) {
-          totalResUsageForActiveUsers.decUsed(partition,
-              resourceUsage.getUsed(partition));
-          totalResUsageForNonActiveUsers.incUsed(partition,
-              resourceUsage.getUsed(partition));
-
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("User '" + userName
-                + "' has become non-active.Hence move user to non-active list."
-                + "Active users size = " + activeUsersSet.size()
-                + "Non-active users size = " + nonActiveUsersSet.size()
-                + "Total Resource usage for active users="
-                + totalResUsageForActiveUsers.getAllUsed() + "."
-                + "Total Resource usage for non-active users="
-                + totalResUsageForNonActiveUsers.getAllUsed());
-          }
-        }
-      }
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  private ResourceUsage getTotalResourceUsagePerUser(String userName) {
-    if (nonActiveUsersSet.contains(userName)) {
-      return totalResUsageForNonActiveUsers;
-    } else if (activeUsersSet.contains(userName)) {
-      return totalResUsageForActiveUsers;
-    } else {
-      LOG.warn("User '" + userName
-          + "' is not present in active/non-active. This is highly unlikely."
-          + "We can consider this user in non-active list in this case.");
-      return totalResUsageForNonActiveUsers;
-    }
-  }
-
-  /**
-   * During container allocate/release, ensure that all user specific data
-   * structures are updated.
-   *
-   * @param userName
-   *          Name of the user
-   * @param resource
-   *          Resource to increment/decrement
-   * @param clusterResource
-   *          Cluster resource (for testing purposes only)
-   * @param nodePartition
-   *          Node label
-   * @param isAllocate
-   *          Indicate whether to allocate or release resource
-   * @return user
-   */
-  public User updateUserResourceUsage(String userName, Resource resource,
-      Resource clusterResource,
-      String nodePartition, boolean isAllocate) {
-    this.writeLock.lock();
-    try {
-
-      // TODO, should use getUser, use this method just to avoid UT failure
-      // which is caused by wrong invoking order, will fix UT separately
-      User user = getUserAndAddIfAbsent(userName);
-
-      // New container is allocated. Invalidate user-limit.
-      updateResourceUsagePerUser(user, resource, nodePartition, isAllocate);
-
-      userLimitNeedsRecompute();
-
-      // Update usage ratios
-      Resource resourceByLabel = labelManager.getResourceByLabel(nodePartition,
-          clusterResource);
-      incQueueUsageRatio(nodePartition, user.updateUsageRatio(
-          resourceCalculator, resourceByLabel, nodePartition));
-
-      return user;
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  private void updateResourceUsagePerUser(User user, Resource resource,
-      String nodePartition, boolean isAllocate) {
-    ResourceUsage totalResourceUsageForUsers = getTotalResourceUsagePerUser(
-        user.userName);
-
-    if (isAllocate) {
-      user.getResourceUsage().incUsed(nodePartition, resource);
-      totalResourceUsageForUsers.incUsed(nodePartition, resource);
-    } else {
-      user.getResourceUsage().decUsed(nodePartition, resource);
-      totalResourceUsageForUsers.decUsed(nodePartition, resource);
-    }
-
-    if (LOG.isDebugEnabled()) {
-      LOG.debug(
-          "User resource is updated." + "Total Resource usage for active users="
-              + totalResUsageForActiveUsers.getAllUsed() + "."
-              + "Total Resource usage for non-active users="
-              + totalResUsageForNonActiveUsers.getAllUsed());
-    }
-  }
-
-  public void updateUserWeights() {
-    this.writeLock.lock();
-    try {
-      for (Map.Entry<String, User> ue : users.entrySet()) {
-        ue.getValue().setWeight(getUserWeightFromQueue(ue.getKey()));
-      }
-      activeUsersTimesWeights = sumActiveUsersTimesWeights();
-      allUsersTimesWeights = sumAllUsersTimesWeights();
-      userLimitNeedsRecompute();
-    } finally {
-      this.writeLock.unlock();
-    }
-  }
-
-  @VisibleForTesting
-  public int getNumActiveUsersWithOnlyPendingApps() {
-    return activeUsersWithOnlyPendingApps.get();
-  }
-
-  @VisibleForTesting
-  void setUsageRatio(String label, float usage) {
-    qUsageRatios.usageRatios.put(label, usage);
-  }
-}
+    } finally

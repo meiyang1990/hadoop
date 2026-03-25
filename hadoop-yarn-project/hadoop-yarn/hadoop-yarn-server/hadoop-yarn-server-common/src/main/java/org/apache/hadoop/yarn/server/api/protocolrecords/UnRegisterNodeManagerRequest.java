@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,9 +23,15 @@ import org.apache.hadoop.yarn.api.records.NodeId;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Node Manager's unregister request.
+ * NodeManager向ResourceManager发起的注销请求协议记录
+ * 用于NodeManager下线时向ResourceManager注销自身节点信息
  */
 public abstract class UnRegisterNodeManagerRequest {
+  /**
+   * 创建NodeManager注销请求实例
+   * @param nodeId 待注销节点ID
+   * @return 注销请求对象
+   */
   public static UnRegisterNodeManagerRequest newInstance(NodeId nodeId) {
     UnRegisterNodeManagerRequest nodeHeartbeatRequest = Records
         .newRecord(UnRegisterNodeManagerRequest.class);
@@ -32,7 +39,15 @@ public abstract class UnRegisterNodeManagerRequest {
     return nodeHeartbeatRequest;
   }
 
+  /**
+   * 获取待注销节点的ID
+   * @return 节点ID
+   */
   public abstract NodeId getNodeId();
 
+  /**
+   * 设置待注销节点的ID
+   * @param nodeId 节点ID
+   */
   public abstract void setNodeId(NodeId nodeId);
 }

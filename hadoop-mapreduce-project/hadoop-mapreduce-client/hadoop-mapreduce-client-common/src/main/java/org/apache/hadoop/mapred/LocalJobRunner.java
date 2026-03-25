@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -76,6 +77,10 @@ import org.apache.hadoop.util.concurrent.SubjectInheritingThread;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 文件描述：本地MapReduce任务运行器，在当前进程内本地执行MapReduce作业，主要用于开发调试
+ * 核心职责：实现单节点本地的MapReduce作业执行逻辑，替代分布式集群完成小作业调试
+ */
 /** Implements MapReduce locally, in-process, for debugging. */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -83,10 +88,12 @@ public class LocalJobRunner implements ClientProtocol {
   public static final Logger LOG =
       LoggerFactory.getLogger(LocalJobRunner.class);
 
+  /** 本地模式下Map任务最大并发数配置项 */
   /** The maximum number of map tasks to run in parallel in LocalJobRunner */
   public static final String LOCAL_MAX_MAPS =
     "mapreduce.local.map.tasks.maximum";
 
+  /** 本地模式下Reduce任务最大并发数配置项 */
   /** The maximum number of reduce tasks to run in parallel in LocalJobRunner */
   public static final String LOCAL_MAX_REDUCES =
     "mapreduce.local.reduce.tasks.maximum";
@@ -104,6 +111,12 @@ public class LocalJobRunner implements ClientProtocol {
 
   private static final String jobDir =  "localRunner/";
 
+  /**
+   * 获取RPC协议版本
+   * @param protocol 协议名称
+   * @param clientVersion 客户端版本
+   * @return 协议版本ID
+   */
   public long getProtocolVersion(String protocol, long clientVersion) {
     return ClientProtocol.versionID;
   }
@@ -115,12 +128,18 @@ public class LocalJobRunner implements ClientProtocol {
         this, protocol, clientVersion, clientMethodsHash);
   }
 
+  /**
+   * 内部作业类，代表本地运行的一个MapReduce作业，同时实现任务心跳协议
+   * 核心职责：管理作业生命周期，调度执行Map和Reduce任务，维护作业状态与进度
+   */
   private class Job extends SubjectInheritingThread implements TaskUmbilicalProtocol {
+    // 系统级作业目录，对应JobTracker的系统目录
     // The job directory on the system: JobClient places job configurations here.
     // This is analogous to JobTracker's system directory.
     private Path systemJobDir;
     private Path systemJobFile;
     
+    // 任务本地作业目录，对应分布式环境中任务的工作目录
     // The job directory for the task.  Analagous to a task's job directory.
     private Path localJobDir;
     private Path localJobFile;
@@ -145,6 +164,12 @@ public class LocalJobRunner implements ClientProtocol {
     
     private LocalDistributedCacheManager localDistributedCacheManager;
 
+    /**
+     * 获取协议版本
+     * @param protocol 协议名称
+     * @param clientVersion 客户端版本
+     * @return 协议版本ID
+     */
     public long getProtocolVersion(String protocol, long clientVersion) {
       return TaskUmbilicalProtocol.versionID;
     }
@@ -156,6 +181,12 @@ public class LocalJobRunner implements ClientProtocol {
           this, protocol, clientVersion, clientMethodsHash);
     }
 
+    /**
+     * 构造本地作业实例，初始化目录、分布式缓存、配置，并启动作业线程
+     * @param jobid 作业ID
+     * @param jobSubmitDir 作业提交目录
+     * @throws IOException 初始化过程IO异常
+     */
     public Job(JobID jobid, String jobSubmitDir) throws IOException {
       this.systemJobDir = new Path(jobSubmitDir);
       this.systemJobFile = new Path(systemJobDir, "job.xml");
@@ -167,11 +198,13 @@ public class LocalJobRunner implements ClientProtocol {
           new Path(conf.getLocalPath(jobDir), user), jobid.toString()));
       this.localJobFile = new Path(this.localJobDir, id + ".xml");
 
+      // 初始化分布式缓存，可能更新配置
       // Manage the distributed cache.  If there are files to be copied,
       // this will trigger localFile to be re-written again.
       localDistributedCacheManager = new LocalDistributedCacheManager();
       localDistributedCacheManager.setup(conf, jobid);
       
+      // 重新写入配置文件（因为分布式缓存可能更新了配置）
       // Write out configuration file.  Instead of copying it from
       // systemJobFile, we re-write it, since setup(), above, may have
       // updated it.
@@ -183,6 +216,7 @@ public class LocalJobRunner implements ClientProtocol {
       }
       this.job = new JobConf(localJobFile);
 
+      // 如果分布式缓存有额外类路径，设置上下文类加载器
       // Job (the current object) is a Thread, so we wrap its class loader.
       if (localDistributedCacheManager.hasLocalClasspaths()) {
         setContextClassLoader(localDistributedCacheManager.makeClassLoader(
@@ -197,6 +231,7 @@ public class LocalJobRunner implements ClientProtocol {
 
       jobs.put(id, this);
 
+      // 如果启用了溢写加密，生成加密密钥存入用户凭证
       if (CryptoUtils.isEncryptedSpillEnabled(job)) {
         try {
           int keyLen = conf.getInt(
@@ -216,13 +251,20 @@ public class LocalJobRunner implements ClientProtocol {
         }
       }
 
+      // 启动作业线程
       this.start();
     }
 
+    /**
+     * 可抛出异常的Runnable抽象基类，用于保存任务执行中抛出的异常
+     */
     protected abstract class RunnableWithThrowable implements Runnable {
       public volatile Throwable storedException;
     }
 
+    /**
+     * Map任务可运行包装类，用于线程池执行单个Map任务
+     */
     /**
      * A Runnable instance that handles a map task to be run by an executor.
      */
@@ -232,6 +274,7 @@ public class LocalJobRunner implements ClientProtocol {
       private final JobID jobId;
       private final JobConf localConf;
 
+      // 共享的Map输出文件引用，供后续Reduce任务获取Map输出位置
       // This is a reference to a shared object passed in by the
       // external context; this delivers state to the reducers regarding
       // where to fetch mapper outputs.
@@ -283,6 +326,13 @@ public class LocalJobRunner implements ClientProtocol {
     }
 
     /**
+     * 为所有Map任务生成可运行包装实例列表
+     * @param taskInfo Map切分信息数组
+     * @param jobId 作业ID
+     * @param mapOutputFiles Map输出文件共享映射表
+     * @return Map任务可运行实例列表
+     */
+    /**
      * Create Runnables to encapsulate map tasks for use by the executor
      * service.
      * @param taskInfo Info about the map task splits
@@ -305,11 +355,15 @@ public class LocalJobRunner implements ClientProtocol {
       return list;
     }
 
+    /**
+     * Reduce任务可运行包装类，用于线程池执行单个Reduce任务
+     */
     protected class ReduceTaskRunnable extends RunnableWithThrowable {
       private final int taskId;
       private final JobID jobId;
       private final JobConf localConf;
 
+      // 共享的Map输出文件引用，用于获取所有Map任务的输出位置
       // This is a reference to a shared object passed in by the
       // external context; this delivers state to the reducers regarding
       // where to fetch mapper outputs.
@@ -356,12 +410,19 @@ public class LocalJobRunner implements ClientProtocol {
             throw new InterruptedException();
           }
         } catch (Throwable t) {
+          // 在主线程上下文重新抛出异常，保存异常引用
           // store this to be rethrown in the initial thread context.
           this.storedException = t;
         }
       }
     }
 
+    /**
+     * 为所有Reduce任务生成可运行包装实例列表
+     * @param jobId 作业ID
+     * @param mapOutputFiles Map输出文件共享映射表
+     * @return Reduce任务可运行实例列表
+     */
     /**
      * Create Runnables to encapsulate reduce tasks for use by the executor
      * service.
@@ -376,681 +437,4 @@ public class LocalJobRunner implements ClientProtocol {
       ArrayList<RunnableWithThrowable> list =
           new ArrayList<RunnableWithThrowable>();
       for (int i = 0; i < this.numReduceTasks; i++) {
-        list.add(new ReduceTaskRunnable(taskId++, jobId, mapOutputFiles));
-      }
-
-      return list;
-    }
-
-    /**
-     * Initialize the counters that will hold partial-progress from
-     * the various task attempts.
-     * @param numMaps the number of map tasks in this job.
-     */
-    private synchronized void initCounters(int numMaps, int numReduces) {
-      // Initialize state trackers for all map tasks.
-      this.partialMapProgress = new float[numMaps];
-      this.mapCounters = new Counters[numMaps];
-      for (int i = 0; i < numMaps; i++) {
-        this.mapCounters[i] = new Counters();
-      }
-
-      this.partialReduceProgress = new float[numReduces];
-      this.reduceCounters = new Counters[numReduces];
-      for (int i = 0; i < numReduces; i++) {
-        this.reduceCounters[i] = new Counters();
-      }
-
-      this.numMapTasks = numMaps;
-      this.numReduceTasks = numReduces;
-    }
-
-    /**
-     * Creates the executor service used to run map tasks.
-     *
-     * @return an ExecutorService instance that handles map tasks
-     */
-    protected synchronized ExecutorService createMapExecutor() {
-
-      // Determine the size of the thread pool to use
-      int maxMapThreads = job.getInt(LOCAL_MAX_MAPS, 1);
-      if (maxMapThreads < 1) {
-        throw new IllegalArgumentException(
-            "Configured " + LOCAL_MAX_MAPS + " must be >= 1");
-      }
-      maxMapThreads = Math.min(maxMapThreads, this.numMapTasks);
-      maxMapThreads = Math.max(maxMapThreads, 1); // In case of no tasks.
-
-      LOG.debug("Starting mapper thread pool executor.");
-      LOG.debug("Max local threads: " + maxMapThreads);
-      LOG.debug("Map tasks to process: " + this.numMapTasks);
-
-      // Create a new executor service to drain the work queue.
-      ThreadFactory tf = new ThreadFactoryBuilder()
-        .setNameFormat("LocalJobRunner Map Task Executor #%d")
-        .build();
-      ExecutorService executor = HadoopExecutors.newFixedThreadPool(
-          maxMapThreads, tf);
-
-      return executor;
-    }
-    
-    /**
-     * Creates the executor service used to run reduce tasks.
-     *
-     * @return an ExecutorService instance that handles reduce tasks
-     */
-    protected synchronized ExecutorService createReduceExecutor() {
-
-      // Determine the size of the thread pool to use
-      int maxReduceThreads = job.getInt(LOCAL_MAX_REDUCES, 1);
-      if (maxReduceThreads < 1) {
-        throw new IllegalArgumentException(
-            "Configured " + LOCAL_MAX_REDUCES + " must be >= 1");
-      }
-      maxReduceThreads = Math.min(maxReduceThreads, this.numReduceTasks);
-      maxReduceThreads = Math.max(maxReduceThreads, 1); // In case of no tasks.
-
-      LOG.debug("Starting reduce thread pool executor.");
-      LOG.debug("Max local threads: " + maxReduceThreads);
-      LOG.debug("Reduce tasks to process: " + this.numReduceTasks);
-
-      // Create a new executor service to drain the work queue.
-      ExecutorService executor = HadoopExecutors.newFixedThreadPool(
-          maxReduceThreads);
-
-      return executor;
-    }
-
-    /** Run a set of tasks and waits for them to complete. */
-    private void runTasks(List<RunnableWithThrowable> runnables,
-        ExecutorService service, String taskType) throws Exception {
-      // Start populating the executor with work units.
-      // They may begin running immediately (in other threads).
-      for (Runnable r : runnables) {
-        service.submit(r);
-      }
-
-      try {
-        service.shutdown(); // Instructs queue to drain.
-
-        // Wait for tasks to finish; do not use a time-based timeout.
-        // (See http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=6179024)
-        LOG.info("Waiting for " + taskType + " tasks");
-        service.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-      } catch (InterruptedException ie) {
-        // Cancel all threads.
-        service.shutdownNow();
-        throw ie;
-      }
-
-      LOG.info(taskType + " task executor complete.");
-
-      // After waiting for the tasks to complete, if any of these
-      // have thrown an exception, rethrow it now in the main thread context.
-      for (RunnableWithThrowable r : runnables) {
-        if (r.storedException != null) {
-          throw new Exception(r.storedException);
-        }
-      }
-    }
-
-    private org.apache.hadoop.mapreduce.OutputCommitter 
-    createOutputCommitter(boolean newApiCommitter, JobID jobId, Configuration conf) throws Exception {
-      org.apache.hadoop.mapreduce.OutputCommitter committer = null;
-
-      LOG.info("OutputCommitter set in config "
-          + conf.get("mapred.output.committer.class"));
-
-      if (newApiCommitter) {
-        org.apache.hadoop.mapreduce.TaskID taskId =
-            new org.apache.hadoop.mapreduce.TaskID(jobId, TaskType.MAP, 0);
-        org.apache.hadoop.mapreduce.TaskAttemptID taskAttemptID =
-            new org.apache.hadoop.mapreduce.TaskAttemptID(taskId, 0);
-        org.apache.hadoop.mapreduce.TaskAttemptContext taskContext = 
-            new TaskAttemptContextImpl(conf, taskAttemptID);
-        OutputFormat outputFormat =
-          ReflectionUtils.newInstance(taskContext.getOutputFormatClass(), conf);
-        committer = outputFormat.getOutputCommitter(taskContext);
-      } else {
-        committer = ReflectionUtils.newInstance(conf.getClass(
-            "mapred.output.committer.class", FileOutputCommitter.class,
-            org.apache.hadoop.mapred.OutputCommitter.class), conf);
-      }
-      LOG.info("OutputCommitter is " + committer.getClass().getName());
-      return committer;
-    }
-
-    @Override
-    public void work() {
-      JobID jobId = profile.getJobID();
-      JobContext jContext = new JobContextImpl(job, jobId);
-      
-      org.apache.hadoop.mapreduce.OutputCommitter outputCommitter = null;
-      try {
-        outputCommitter = createOutputCommitter(conf.getUseNewMapper(), jobId, conf);
-      } catch (Exception e) {
-        LOG.info("Failed to createOutputCommitter", e);
-        return;
-      }
-      
-      try {
-        TaskSplitMetaInfo[] taskSplitMetaInfos = 
-          SplitMetaInfoReader.readSplitMetaInfo(jobId, localFs, conf, systemJobDir);
-
-        int numReduceTasks = job.getNumReduceTasks();
-        outputCommitter.setupJob(jContext);
-        status.setSetupProgress(1.0f);
-
-        Map<TaskAttemptID, MapOutputFile> mapOutputFiles =
-            Collections.synchronizedMap(new HashMap<TaskAttemptID, MapOutputFile>());
-        
-        List<RunnableWithThrowable> mapRunnables = getMapTaskRunnables(
-            taskSplitMetaInfos, jobId, mapOutputFiles);
-              
-        initCounters(mapRunnables.size(), numReduceTasks);
-        ExecutorService mapService = createMapExecutor();
-        runTasks(mapRunnables, mapService, "map");
-
-        try {
-          if (numReduceTasks > 0) {
-            List<RunnableWithThrowable> reduceRunnables = getReduceTaskRunnables(
-                jobId, mapOutputFiles);
-            ExecutorService reduceService = createReduceExecutor();
-            runTasks(reduceRunnables, reduceService, "reduce");
-          }
-        } finally {
-          for (MapOutputFile output : mapOutputFiles.values()) {
-            output.removeAll();
-          }
-        }
-        // delete the temporary directory in output directory
-        outputCommitter.commitJob(jContext);
-        status.setCleanupProgress(1.0f);
-
-        if (killed) {
-          this.status.setRunState(JobStatus.KILLED);
-        } else {
-          this.status.setRunState(JobStatus.SUCCEEDED);
-        }
-
-        JobEndNotifier.localRunnerNotification(job, status);
-      } catch (Throwable t) {
-        try {
-          outputCommitter.abortJob(jContext, 
-            org.apache.hadoop.mapreduce.JobStatus.State.FAILED);
-        } catch (IOException ioe) {
-          LOG.info("Error cleaning up job:" + id);
-        }
-        status.setCleanupProgress(1.0f);
-        if (killed) {
-          this.status.setRunState(JobStatus.KILLED);
-        } else {
-          this.status.setRunState(JobStatus.FAILED);
-        }
-        LOG.warn(id.toString(), t);
-
-        JobEndNotifier.localRunnerNotification(job, status);
-
-      } finally {
-        try {
-          try {
-            // Cleanup distributed cache
-            localDistributedCacheManager.close();
-          } finally {
-            try {
-              fs.delete(systemJobFile.getParent(), true); // delete submit dir
-            } finally {
-              localFs.delete(localJobFile, true);         // delete local copy
-            }
-          }
-        } catch (IOException e) {
-          LOG.warn("Error cleaning up "+id+": "+e);
-        }
-      }
-    }
-
-    // TaskUmbilicalProtocol methods
-
-    @Override
-    public JvmTask getTask(JvmContext context) { return null; }
-    
-    @Override
-    public synchronized AMFeedback statusUpdate(TaskAttemptID taskId,
-        TaskStatus taskStatus) throws IOException, InterruptedException {
-      AMFeedback feedback = new AMFeedback();
-      feedback.setTaskFound(true);
-      if (null == taskStatus) {
-        return feedback;
-      }
-      // Serialize as we would if distributed in order to make deep copy
-      ByteArrayOutputStream baos = new ByteArrayOutputStream();
-      DataOutputStream dos = new DataOutputStream(baos);
-      taskStatus.write(dos);
-      dos.close();
-      taskStatus = TaskStatus.createTaskStatus(taskStatus.getIsMap());
-      taskStatus.readFields(new DataInputStream(
-          new ByteArrayInputStream(baos.toByteArray())));
-      
-      LOG.info(taskStatus.getStateString());
-      int mapTaskIndex = mapIds.indexOf(taskId);
-      if (mapTaskIndex >= 0) {
-        // mapping
-        float numTasks = (float) this.numMapTasks;
-
-        partialMapProgress[mapTaskIndex] = taskStatus.getProgress();
-        mapCounters[mapTaskIndex] = taskStatus.getCounters();
-
-        float partialProgress = 0.0f;
-        for (float f : partialMapProgress) {
-          partialProgress += f;
-        }
-        status.setMapProgress(partialProgress / numTasks);
-      } else {
-        // reducing
-        int reduceTaskIndex = taskId.getTaskID().getId();
-        float numTasks = (float) this.numReduceTasks;
-
-        partialReduceProgress[reduceTaskIndex] = taskStatus.getProgress();
-        reduceCounters[reduceTaskIndex] = taskStatus.getCounters();
-
-        float partialProgress = 0.0f;
-        for (float f : partialReduceProgress) {
-          partialProgress += f;
-        }
-        status.setReduceProgress(partialProgress / numTasks);
-      }
-
-      // ignore phase
-      return feedback;
-    }
-
-    /** Return the current values of the counters for this job,
-     * including tasks that are in progress.
-     */
-    public synchronized Counters getCurrentCounters() {
-      if (null == mapCounters) {
-        // Counters not yet initialized for job.
-        return new Counters();
-      }
-
-      Counters current = new Counters();
-      for (Counters c : mapCounters) {
-        current = Counters.sum(current, c);
-      }
-
-      if (null != reduceCounters && reduceCounters.length > 0) {
-        for (Counters c : reduceCounters) {
-          current = Counters.sum(current, c);
-        }
-      }
-
-      return current;
-    }
-
-    /**
-     * Task is reporting that it is in commit_pending
-     * and it is waiting for the commit Response
-     */
-    public void commitPending(TaskAttemptID taskid,
-                              TaskStatus taskStatus) 
-    throws IOException, InterruptedException {
-      statusUpdate(taskid, taskStatus);
-    }
-
-    @Override
-    public void reportDiagnosticInfo(TaskAttemptID taskid, String trace) {
-      // Ignore for now
-    }
-    
-    @Override
-    public void reportNextRecordRange(TaskAttemptID taskid, 
-        SortedRanges.Range range) throws IOException {
-      LOG.info("Task " + taskid + " reportedNextRecordRange " + range);
-    }
-
-    @Override
-    public boolean canCommit(TaskAttemptID taskid) 
-    throws IOException {
-      return true;
-    }
-    
-    @Override
-    public void done(TaskAttemptID taskId) throws IOException {
-      int taskIndex = mapIds.indexOf(taskId);
-      if (taskIndex >= 0) {                       // mapping
-        status.setMapProgress(1.0f);
-      } else {
-        status.setReduceProgress(1.0f);
-      }
-    }
-
-    @Override
-    public synchronized void fsError(TaskAttemptID taskId, String message) 
-    throws IOException {
-      LOG.error("FSError: "+ message + "from task: " + taskId);
-    }
-
-    @Override
-    public void shuffleError(TaskAttemptID taskId, String message) throws IOException {
-      LOG.error("shuffleError: "+ message + "from task: " + taskId);
-    }
-    
-    public synchronized void fatalError(TaskAttemptID taskId, String msg, boolean fastFail)
-    throws IOException {
-      LOG.error("Fatal: "+ msg + " from task: " + taskId + " fast fail: " + fastFail);
-    }
-    
-    @Override
-    public MapTaskCompletionEventsUpdate getMapCompletionEvents(JobID jobId, 
-        int fromEventId, int maxLocs, TaskAttemptID id) throws IOException {
-      return new MapTaskCompletionEventsUpdate(
-        org.apache.hadoop.mapred.TaskCompletionEvent.EMPTY_ARRAY, false);
-    }
-
-    @Override
-    public void preempted(TaskAttemptID taskId, TaskStatus taskStatus)
-        throws IOException, InterruptedException {
-      // ignore
-    }
-
-    @Override
-    public TaskCheckpointID getCheckpointID(TaskID taskId) {
-      // ignore
-      return null;
-    }
-
-    @Override
-    public void setCheckpointID(TaskID downgrade, TaskCheckpointID cid) {
-      // ignore
-    }
-
-  }
-
-  public LocalJobRunner(Configuration conf) throws IOException {
-    this(new JobConf(conf));
-  }
-
-  @Deprecated
-  public LocalJobRunner(JobConf conf) throws IOException {
-    this.fs = FileSystem.getLocal(conf);
-    this.conf = conf;
-    myMetrics = LocalJobRunnerMetrics.create();
-  }
-
-  // JobSubmissionProtocol methods
-
-  private static int jobid = 0;
-  // used for making sure that local jobs run in different jvms don't
-  // collide on staging or job directories
-  private int randid;
-  
-  public synchronized org.apache.hadoop.mapreduce.JobID getNewJobID() {
-    return new org.apache.hadoop.mapreduce.JobID("local" + randid, ++jobid);
-  }
-
-  public org.apache.hadoop.mapreduce.JobStatus submitJob(
-      org.apache.hadoop.mapreduce.JobID jobid, String jobSubmitDir,
-      Credentials credentials) throws IOException {
-    Job job = new Job(JobID.downgrade(jobid), jobSubmitDir);
-    job.job.setCredentials(credentials);
-    return job.status;
-
-  }
-
-  public void killJob(org.apache.hadoop.mapreduce.JobID id) {
-    jobs.get(JobID.downgrade(id)).killed = true;
-    jobs.get(JobID.downgrade(id)).interrupt();
-  }
-
-  public void setJobPriority(org.apache.hadoop.mapreduce.JobID id,
-      String jp) throws IOException {
-    throw new UnsupportedOperationException("Changing job priority " +
-                      "in LocalJobRunner is not supported.");
-  }
-  
-  /** Throws {@link UnsupportedOperationException} */
-  public boolean killTask(org.apache.hadoop.mapreduce.TaskAttemptID taskId,
-      boolean shouldFail) throws IOException {
-    throw new UnsupportedOperationException("Killing tasks in " +
-    "LocalJobRunner is not supported");
-  }
-
-  public org.apache.hadoop.mapreduce.TaskReport[] getTaskReports(
-      org.apache.hadoop.mapreduce.JobID id, TaskType type) {
-    return new org.apache.hadoop.mapreduce.TaskReport[0];
-  }
-
-  public org.apache.hadoop.mapreduce.JobStatus getJobStatus(
-      org.apache.hadoop.mapreduce.JobID id) {
-    Job job = jobs.get(JobID.downgrade(id));
-    if(job != null)
-      return job.status;
-    else 
-      return null;
-  }
-  
-  public org.apache.hadoop.mapreduce.Counters getJobCounters(
-      org.apache.hadoop.mapreduce.JobID id) {
-    Job job = jobs.get(JobID.downgrade(id));
-
-    return new org.apache.hadoop.mapreduce.Counters(job.getCurrentCounters());
-  }
-
-  public String getFilesystemName() throws IOException {
-    return fs.getUri().toString();
-  }
-  
-  public ClusterMetrics getClusterMetrics() {
-    int numMapTasks = map_tasks.get();
-    int numReduceTasks = reduce_tasks.get();
-    return new ClusterMetrics(numMapTasks, numReduceTasks, numMapTasks,
-        numReduceTasks, 0, 0, 1, 1, jobs.size(), 1, 0, 0);
-  }
-
-  public JobTrackerStatus getJobTrackerStatus() {
-    return JobTrackerStatus.RUNNING;
-  }
-
-  public long getTaskTrackerExpiryInterval() throws IOException, InterruptedException {
-    return 0;
-  }
-
-  /** 
-   * Get all active trackers in cluster. 
-   * @return array of TaskTrackerInfo
-   */
-  public TaskTrackerInfo[] getActiveTrackers() 
-      throws IOException, InterruptedException {
-    return new TaskTrackerInfo[0];
-  }
-
-  /** 
-   * Get all blacklisted trackers in cluster. 
-   * @return array of TaskTrackerInfo
-   */
-  public TaskTrackerInfo[] getBlacklistedTrackers() 
-      throws IOException, InterruptedException {
-    return new TaskTrackerInfo[0];
-  }
-
-  public TaskCompletionEvent[] getTaskCompletionEvents(
-      org.apache.hadoop.mapreduce.JobID jobid
-      , int fromEventId, int maxEvents) throws IOException {
-    return TaskCompletionEvent.EMPTY_ARRAY;
-  }
-  
-  public org.apache.hadoop.mapreduce.JobStatus[] getAllJobs() {return null;}
-
-  
-  /**
-   * Returns the diagnostic information for a particular task in the given job.
-   * To be implemented
-   */
-  public String[] getTaskDiagnostics(
-      org.apache.hadoop.mapreduce.TaskAttemptID taskid) throws IOException{
-	  return new String [0];
-  }
-
-  /**
-   * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getSystemDir()
-   */
-  public String getSystemDir() {
-    Path sysDir = new Path(
-      conf.get(JTConfig.JT_SYSTEM_DIR, "/tmp/hadoop/mapred/system"));  
-    return fs.makeQualified(sysDir).toString();
-  }
-
-  /**
-   * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getQueueAdmins(String)
-   */
-  public AccessControlList getQueueAdmins(String queueName) throws IOException {
-	  return new AccessControlList(" ");// no queue admins for local job runner
-  }
-
-  /**
-   * @see org.apache.hadoop.mapreduce.protocol.ClientProtocol#getStagingAreaDir()
-   */
-  public String getStagingAreaDir() throws IOException {
-    Path stagingRootDir = new Path(conf.get(JTConfig.JT_STAGING_AREA_ROOT, 
-        "/tmp/hadoop/mapred/staging"));
-    UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
-    String user;
-    randid = rand.nextInt(Integer.MAX_VALUE);
-    if (ugi != null) {
-      user = ugi.getShortUserName() + randid;
-    } else {
-      user = "dummy" + randid;
-    }
-    return fs.makeQualified(new Path(stagingRootDir, user+"/.staging")).toString();
-  }
-  
-  public String getJobHistoryDir() {
-    return null;
-  }
-
-  @Override
-  public QueueInfo[] getChildQueues(String queueName) throws IOException {
-    return null;
-  }
-
-  @Override
-  public QueueInfo[] getRootQueues() throws IOException {
-    return null;
-  }
-
-  @Override
-  public QueueInfo[] getQueues() throws IOException {
-    return null;
-  }
-
-
-  @Override
-  public QueueInfo getQueue(String queue) throws IOException {
-    return null;
-  }
-
-  @Override
-  public org.apache.hadoop.mapreduce.QueueAclsInfo[] 
-      getQueueAclsForCurrentUser() throws IOException{
-    return null;
-  }
-
-  /**
-   * Set the max number of map tasks to run concurrently in the LocalJobRunner.
-   * @param job the job to configure
-   * @param maxMaps the maximum number of map tasks to allow.
-   */
-  public static void setLocalMaxRunningMaps(
-      org.apache.hadoop.mapreduce.JobContext job,
-      int maxMaps) {
-    job.getConfiguration().setInt(LOCAL_MAX_MAPS, maxMaps);
-  }
-
-  /**
-   * @return the max number of map tasks to run concurrently in the
-   * LocalJobRunner.
-   */
-  public static int getLocalMaxRunningMaps(
-      org.apache.hadoop.mapreduce.JobContext job) {
-    return job.getConfiguration().getInt(LOCAL_MAX_MAPS, 1);
-  }
-
-
-  /**
-   * Set the max number of reduce tasks to run concurrently in the LocalJobRunner.
-   * @param job the job to configure
-   * @param maxReduces the maximum number of reduce tasks to allow.
-   */
-  public static void setLocalMaxRunningReduces(
-      org.apache.hadoop.mapreduce.JobContext job,
-      int maxReduces) {
-    job.getConfiguration().setInt(LOCAL_MAX_REDUCES, maxReduces);
-  }
-
-  /**
-   * @return the max number of reduce tasks to run concurrently in the
-   * LocalJobRunner.
-   */
-  public static int getLocalMaxRunningReduces(
-      org.apache.hadoop.mapreduce.JobContext job) {
-    return job.getConfiguration().getInt(LOCAL_MAX_REDUCES, 1);
-  }
-
-  @Override
-  public void cancelDelegationToken(Token<DelegationTokenIdentifier> token
-                                       ) throws IOException,
-                                                InterruptedException {
-  }
-
-  @Override
-  public Token<DelegationTokenIdentifier> 
-     getDelegationToken(Text renewer) throws IOException, InterruptedException {
-    return null;
-  }
-
-  @Override
-  public long renewDelegationToken(Token<DelegationTokenIdentifier> token
-                                      ) throws IOException,InterruptedException{
-    return 0;
-  }
-
-  @Override
-  public LogParams getLogFileParams(org.apache.hadoop.mapreduce.JobID jobID,
-      org.apache.hadoop.mapreduce.TaskAttemptID taskAttemptID)
-      throws IOException, InterruptedException {
-    throw new UnsupportedOperationException("Not supported");
-  }
-  
-  static void setupChildMapredLocalDirs(Task t, JobConf conf) {
-    String[] localDirs = conf.getTrimmedStrings(MRConfig.LOCAL_DIR);
-    String jobId = t.getJobID().toString();
-    String taskId = t.getTaskID().toString();
-    boolean isCleanup = t.isTaskCleanupTask();
-    String user = t.getUser();
-    StringBuilder childMapredLocalDir =
-        new StringBuilder(localDirs[0] + Path.SEPARATOR
-            + getLocalTaskDir(user, jobId, taskId, isCleanup));
-    for (int i = 1; i < localDirs.length; i++) {
-      childMapredLocalDir.append("," + localDirs[i] + Path.SEPARATOR
-          + getLocalTaskDir(user, jobId, taskId, isCleanup));
-    }
-    LOG.debug(MRConfig.LOCAL_DIR + " for child : " + childMapredLocalDir);
-    conf.set(MRConfig.LOCAL_DIR, childMapredLocalDir.toString());
-  }
-  
-  static final String TASK_CLEANUP_SUFFIX = ".cleanup";
-  static final String JOBCACHE = "jobcache";
-  
-  static String getLocalTaskDir(String user, String jobid, String taskid,
-      boolean isCleanupAttempt) {
-    String taskDir = jobDir + Path.SEPARATOR + user + Path.SEPARATOR + JOBCACHE
-      + Path.SEPARATOR + jobid + Path.SEPARATOR + taskid;
-    if (isCleanupAttempt) {
-      taskDir = taskDir + TASK_CLEANUP_SUFFIX;
-    }
-    return taskDir;
-  }
-  
-  
-}
+        list.add

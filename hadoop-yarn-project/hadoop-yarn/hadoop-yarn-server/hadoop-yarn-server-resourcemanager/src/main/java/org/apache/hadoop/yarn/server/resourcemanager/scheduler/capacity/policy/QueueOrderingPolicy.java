@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,29 +25,29 @@ import java.util.Iterator;
 import java.util.List;
 
 /**
- * This will be used by
- * {@link org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.ParentQueue}
- * to decide allocation ordering of child queues.
+ * 队列排序策略接口，供容量调度器的父队列对子队列进行容器分配优先级排序
+ * 定义了资源分配时选择子队列的顺序规则，由{@link org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.ParentQueue}使用
  */
 public interface QueueOrderingPolicy {
+  /**
+   * 设置需要排序的子队列列表，初始化策略内部结构
+   * @param queues 待排序的子队列列表
+   */
   void setQueues(List<CSQueue> queues);
 
   /**
-   * Return an iterator over the collection of CSQueues which orders
-   * them for container assignment.
+   * 获取按排序规则排列的子队列迭代器，用于容器分配
    *
-   * Please note that, to avoid queue's set updated during sorting / iterating.
-   * Caller need to make sure parent queue's read lock is properly acquired.
+   * 注意：为了避免排序/迭代过程中子队列集合被修改，调用方必须保证已经正确获取父队列的读锁
    *
-   * @param partition nodePartition
-   *
-   * @return iterator of queues to allocate
+   * @param partition 节点分区标识
+   * @return 按分配优先级排序的子队列迭代器
    */
   Iterator<CSQueue> getAssignmentIterator(String partition);
 
   /**
-   * Returns configuration name (which will be used to set ordering policy
-   * @return configuration name
+   * 获取该排序策略的配置名称，用于配置解析时匹配策略
+   * @return 排序策略的配置名称
    */
   String getConfigName();
 }

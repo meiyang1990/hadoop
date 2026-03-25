@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,44 +25,49 @@ import java.io.Serializable;
 import org.apache.hadoop.hbase.util.Bytes;
 
 /**
- * Encodes a value by interpreting it as a Long and converting it to bytes and
- * decodes a set of bytes as a Long.
+ * Long类型与HBase字节数组的转换器，实现数值编解码、比较、加法运算，支持时间戳反转排序。
+ * 用于YARN时间线服务HBase存储层的数值处理。
  */
 public final class LongConverter implements NumericValueConverter,
     Serializable {
 
   /**
-   * Added because we implement Comparator<Number>.
+   * 序列化版本ID，因实现比较器接口需要。
    */
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 默认构造函数。
+   */
   public LongConverter() {
   }
 
   @Override
   public byte[] encodeValue(Object value) throws IOException {
+    // 检查输入是否为整数类型
     if (!HBaseTimelineSchemaUtils.isIntegralValue(value)) {
       throw new IOException("Expected integral value");
     }
+    // 将整数转换为HBase字节数组
     return Bytes.toBytes(((Number)value).longValue());
   }
 
   @Override
   public Object decodeValue(byte[] bytes) throws IOException {
+    // 输入为空直接返回null
     if (bytes == null) {
       return null;
     }
+    // 将字节数组转换回Long类型
     return Bytes.toLong(bytes);
   }
 
   /**
-   * Compares two numbers as longs. If either number is null, it will be taken
-   * as 0.
+   * 比较两个Number，转换为Long后比较，null视为0。用于排序。
    *
-   * @param num1 the first {@code Long} to compare.
-   * @param num2 the second {@code Long} to compare.
-   * @return -1 if num1 is less than num2, 0 if num1 is equal to num2 and 1 if
-   * num1 is greater than num2.
+   * @param num1 第一个待比较数值
+   * @param num2 第二个待比较数值
+   * @return -1 num1<num2，0 相等，1 num1>num2
    */
   @Override
   public int compare(Number num1, Number num2) {
@@ -71,8 +77,10 @@ public final class LongConverter implements NumericValueConverter,
 
   @Override
   public Number add(Number num1, Number num2, Number...numbers) {
+    // 计算前两个数的和，null视为0
     long sum = ((num1 == null) ? 0L : num1.longValue()) +
         ((num2 == null) ? 0L : num2.longValue());
+    // 遍历累加剩余所有参数
     for (Number num : numbers) {
       sum = sum + ((num == null) ? 0L : num.longValue());
     }
@@ -80,13 +88,11 @@ public final class LongConverter implements NumericValueConverter,
   }
 
   /**
-   * Converts a timestamp into it's inverse timestamp to be used in (row) keys
-   * where we want to have the most recent timestamp in the top of the table
-   * (scans start at the most recent timestamp first).
+   * 反转时间戳，使最新时间在HBase扫描时排在最前面。
+   * 用于降序排序场景，配合HBase顺序扫描实现按时间倒序查询。
    *
-   * @param key value to be inverted so that the latest version will be first in
-   *          a scan.
-   * @return inverted long
+   * @param key 原始时间戳长整型值
+   * @return 反转后的长整型值
    */
   public static long invertLong(long key) {
     return Long.MAX_VALUE - key;

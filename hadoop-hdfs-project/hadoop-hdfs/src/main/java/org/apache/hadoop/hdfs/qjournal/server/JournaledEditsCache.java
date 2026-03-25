@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,33 +44,20 @@ import org.apache.hadoop.util.AutoCloseableLock;
 import org.apache.hadoop.util.Preconditions;
 
 /**
- * An in-memory cache of edits in their serialized form. This is used to serve
- * the {@link Journal#getJournaledEdits(long, int)} call, used by the
- * QJM when {@value DFSConfigKeys#DFS_HA_TAILEDITS_INPROGRESS_KEY} is
- * enabled.
+ * 序列化编辑日志的内存缓存，用于支持QJM的增量获取编辑日志请求
+ * 当启用增量同步尾日志（{@value DFSConfigKeys#DFS_HA_TAILEDITS_INPROGRESS_KEY}）时，
+ * 该缓存用于响应{@link Journal#getJournaledEdits(long, int)}调用，向备用NameNode返回增量编辑日志。
  *
- * <p>When a batch of edits is received by the JournalNode, it is put into this
- * cache via {@link #storeEdits(byte[], long, long, int)}. Edits must be
- * stored contiguously; if a batch of edits is stored that does not align with
- * the previously stored edits, the cache will be cleared before storing new
- * edits to avoid gaps. This decision is made because gaps are only handled
- * when in recovery mode, which the cache is not intended to be used for.
+ * <p>JournalNode收到一批编辑日志后，会通过{@link #storeEdits(byte[], long, long, int)}放入缓存。
+ * 缓存要求存储连续事务ID的编辑日志；如果新写入的批次和之前存储的编辑不连续，缓存会被清空后再存储新批次，
+ * 这是因为缓存设计仅服务正常同步流程，间隙处理仅在恢复模式进行。
  *
- * <p>Batches of edits are stored in a {@link TreeMap} mapping the starting
- * transaction ID of the batch to the data buffer. Upon retrieval, the
- * relevant data buffers are concatenated together and a header is added
- * to construct a fully-formed edit data stream.
+ * <p>编辑批次存储在{@link TreeMap}中，key为批次的起始事务ID，value为序列化后的编辑数据。
+ * 检索请求时，拼接相关数据缓冲区并添加头信息，构造完整的编辑日志流返回。
  *
- * <p>The cache is of a limited size capacity determined by
- * {@value DFSConfigKeys#DFS_JOURNALNODE_EDIT_CACHE_SIZE_KEY}. If the capacity
- * is exceeded after adding a new batch of edits, batches of edits are removed
- * until the total size is less than the capacity, starting from the ones
- * containing the oldest transactions. Transactions range in size, but a
- * decent rule of thumb is that 200 bytes are needed per transaction. Monitoring
- * the {@link JournalMetrics#rpcRequestCacheMissAmount} metric is recommended
- * to determine if the cache is too small; it will indicate both how many
- * cache misses occurred, and how many more transactions would have been
- * needed in the cache to serve the request.
+ * <p>缓存容量由{@value DFSConfigKeys#DFS_JOURNALNODE_EDIT_CACHE_SIZE_KEY}配置决定，单位为字节。
+ * 新增批次后如果超过容量限制，会从最老的事务批次开始删除，直到总容量低于限制。经验规则是每个事务约需200字节，
+ * 建议通过{@link JournalMetrics#rpcRequestCacheMissAmount}指标监控缓存缺失情况，以此判断缓存容量是否足够。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -78,49 +66,48 @@ class JournaledEditsCache {
   private static final int INVALID_LAYOUT_VERSION = 0;
   private static final long INVALID_TXN_ID = -1;
 
-  /** The capacity, in bytes, of this cache. */
+  /** 缓存总容量，单位字节 */
   private final long capacity;
 
   /**
-   * Read/write lock pair wrapped in AutoCloseable; these refer to the same
-   * underlying lock.
+   * 包装为AutoCloseable的读写锁，底层共用同一个锁实例
    */
   private final AutoCloseableLock readLock;
   private final AutoCloseableLock writeLock;
 
-  // ** Start lock-protected fields **
+  // ** 以下字段受读写锁保护 **
 
   /**
-   * Stores the actual data as a mapping of the StartTxnId of a batch of edits
-   * to the serialized batch of edits. Stores only contiguous ranges; that is,
-   * the last transaction ID in one batch is always one less than the first
-   * transaction ID in the next batch. Though the map is protected by the lock,
-   * individual data buffers are immutable and can be accessed without locking.
+   * 存储编辑日志数据：key为批次起始事务ID，value为序列化后的编辑批次数据
+   * 存储的事务一定是连续的，即上一批次的最后事务ID一定比下一批次起始事务ID小1
+   * 整个Map受锁保护，但单个数据缓冲区是不可变的，可在无锁情况下访问
    */
   private final NavigableMap<Long, byte[]> dataMap = new TreeMap<>();
-  /** Stores the layout version currently present in the cache. */
+  /** 当前缓存中编辑日志使用的布局版本 */
   private int layoutVersion = INVALID_LAYOUT_VERSION;
-  /** Stores the serialized version of the header for the current version. */
+  /** 当前布局版本对应的编辑日志头序列化结果 */
   private ByteBuffer layoutHeader;
 
   /**
-   * The lowest/highest transaction IDs present in the cache.
-   * {@value INVALID_TXN_ID} if there are no transactions in the cache.
+   * 缓存中当前存在的事务ID范围，最低和最高事务ID
+   * 如果缓存中没有事务则为{@value INVALID_TXN_ID}
    */
   private long lowestTxnId;
   private long highestTxnId;
   /**
-   * The lowest transaction ID that was ever present in the cache since last
-   * being reset (i.e. since initialization or since reset due to being out of
-   * sync with the Journal). Until the cache size goes above capacity, this is
-   * equal to lowestTxnId.
+   * 自上次缓存重置（初始化或不同步导致清空）以来，缓存曾保存过的最低事务ID
+   * 缓存容量未超出限制时，该值等于lowestTxnId
    */
   private long initialTxnId;
-  /** The current total size of all buffers in this cache. */
+  /** 当前缓存所有缓冲区的总大小 */
   private long totalSize;
 
-  // ** End lock-protected fields **
+  // ** 以上字段受读写锁保护 **
 
+  /**
+   * 构造基于配置的JournaledEdits缓存实例
+   * @param conf Hadoop配置对象
+   */
   JournaledEditsCache(Configuration conf) {
     float fraction = conf.getFloat(DFSConfigKeys.DFS_JOURNALNODE_EDIT_CACHE_SIZE_FRACTION_KEY,
         DFSConfigKeys.DFS_JOURNALNODE_EDIT_CACHE_SIZE_FRACTION_DEFAULT);
@@ -145,79 +132,69 @@ class JournaledEditsCache {
   }
 
   /**
-   * Fetch the data for edits starting at the specific transaction ID, fetching
-   * up to {@code maxTxns} transactions. Populates a list of output buffers
-   * which contains a serialized version of the edits, and returns the count of
-   * edits contained within the serialized buffers. The serialized edits are
-   * prefixed with a standard edit log header containing information about the
-   * layout version. The transactions returned are guaranteed to have contiguous
-   * transaction IDs.
+   * 从缓存检索从指定事务ID开始，最多包含maxTxns个事务的编辑日志
+   * 将序列化后的编辑日志填充到输出缓冲区列表，并返回实际包含的事务数量
+   * 序列化结果前会添加标准编辑日志头，包含布局版本信息，返回的事务ID保证连续
    *
-   * If {@code requestedStartTxn} is higher than the highest transaction which
-   * has been added to this cache, a response with an empty buffer and a
-   * transaction count of 0 will be returned. If {@code requestedStartTxn} is
-   * lower than the lowest transaction currently contained in this cache, or no
-   * transactions have yet been added to the cache, an exception will be thrown.
+   * 如果请求起始事务ID大于缓存中最新事务ID，返回空缓冲区和0个事务
+   * 如果请求起始事务ID小于缓存中最老事务ID，或缓存为空，则抛出异常
    *
-   * @param requestedStartTxn The ID of the first transaction to return. If any
-   *                          transactions are returned, it is guaranteed that
-   *                          the first one will have this ID.
-   * @param maxTxns The maximum number of transactions to return.
-   * @param outputBuffers A list to populate with output buffers. When
-   *                      concatenated, these form a full response.
-   * @return The number of transactions contained within the set of output
-   *         buffers.
-   * @throws IOException If transactions are requested which cannot be served
-   *                     by this cache.
+   * @param requestedStartTxn 要返回的第一个事务ID，返回结果保证第一个事务就是此ID
+   * @param maxTxns 最多返回的事务数量
+   * @param outputBuffers 输出缓冲区列表，拼接后即为完整响应
+   * @return 输出缓冲区包含的事务数量
+   * @throws IOException 无法从缓存满足请求时抛出异常
    */
   int retrieveEdits(long requestedStartTxn, int maxTxns,
       List<ByteBuffer> outputBuffers) throws IOException {
     int txnCount = 0;
 
     try (AutoCloseableLock l = readLock.acquire()) {
+      // 缓存为空或请求起始ID小于最老事务ID，抛出缓存缺失异常
       if (lowestTxnId == INVALID_TXN_ID || requestedStartTxn < lowestTxnId) {
         throw getCacheMissException(requestedStartTxn);
+      // 请求起始ID超过最新事务ID，返回0个事务
       } else if (requestedStartTxn > highestTxnId) {
         return 0;
       }
+      // 添加布局版本头到输出缓冲区
       outputBuffers.add(layoutHeader);
+      // 获取从请求起始事务所在批次开始的所有后续批次迭代器
       Iterator<Map.Entry<Long, byte[]>> incrBuffIter =
           dataMap.tailMap(dataMap.floorKey(requestedStartTxn), true)
               .entrySet().iterator();
       long prevTxn = requestedStartTxn;
       byte[] prevBuf = null;
-      // Stop when maximum transactions reached...
+      // 循环条件：未达到最大事务数 且 还有数据需要处理
       while ((txnCount < maxTxns) &&
-          // ... or there are no more entries ...
           (incrBuffIter.hasNext() || prevBuf != null)) {
         long currTxn;
         byte[] currBuf;
         if (incrBuffIter.hasNext()) {
+          // 读取下一个批次
           Map.Entry<Long, byte[]> ent = incrBuffIter.next();
           currTxn = ent.getKey();
           currBuf = ent.getValue();
         } else {
-          // This accounts for the trailing entry
+          // 处理最后一个批次
           currTxn = highestTxnId + 1;
           currBuf = null;
         }
-        if (prevBuf != null) { // True except for the first loop iteration
+        if (prevBuf != null) { // 第一次迭代不处理，从第二个批次开始
           outputBuffers.add(ByteBuffer.wrap(prevBuf));
-          // if prevTxn < requestedStartTxn, the extra transactions will get
-          // removed after the loop, so don't include them in the txn count
+          // 累加事务数量，如果起始事务在当前批次内，仅累加需要的部分
           txnCount += currTxn - Math.max(requestedStartTxn, prevTxn);
         }
         prevTxn = currTxn;
         prevBuf = currBuf;
       }
-      // Release the lock before doing operations on the buffers (deserializing
-      // to find transaction boundaries, and copying into an output buffer)
+      // 在锁释放后再操作缓冲区（查找事务边界、修改位置限制），减少锁持有时间
     }
-    // Remove extra leading transactions in the first buffer
-    ByteBuffer firstBuf = outputBuffers.get(1); // 0th is the header
+    // 裁剪第一个缓冲区，去掉起始事务之前的多余事务
+    ByteBuffer firstBuf = outputBuffers.get(1); // 第0位是头，第一个数据块从1开始
     firstBuf.position(
         findTransactionPosition(firstBuf.array(), requestedStartTxn));
-    // Remove trailing transactions in the last buffer if necessary
+    // 如果事务总数超过最大限制，裁剪最后一个缓冲区去掉多余事务
     if (txnCount > maxTxns) {
       ByteBuffer lastBuf = outputBuffers.get(outputBuffers.size() - 1);
       int limit =
@@ -230,22 +207,18 @@ class JournaledEditsCache {
   }
 
   /**
-   * Store a batch of serialized edits into this cache. Removes old batches
-   * as necessary to keep the total size of the cache below the capacity.
-   * See the class Javadoc for more info.
+   * 将一批序列化后的编辑日志存储到缓存中
+   * 容量超出限制时会删除最老批次保证总容量不超过配置值，输入异常会优雅处理不抛出异常
+   * 保证JournalNode其他操作可以正常进行
    *
-   * This attempts to always handle malformed inputs gracefully rather than
-   * throwing an exception, to allow the rest of the Journal's operations
-   * to proceed normally.
-   *
-   * @param inputData A buffer containing edits in serialized form
-   * @param newStartTxn The txn ID of the first edit in {@code inputData}
-   * @param newEndTxn The txn ID of the last edit in {@code inputData}
-   * @param newLayoutVersion The version of the layout used to serialize
-   *                         the edits
+   * @param inputData 序列化后的编辑日志数据缓冲区
+   * @param newStartTxn 该批次第一个事务的ID
+   * @param newEndTxn 该批次最后一个事务的ID
+   * @param newLayoutVersion 该批次使用的编辑日志布局版本
    */
   void storeEdits(byte[] inputData, long newStartTxn, long newEndTxn,
       int newLayoutVersion) {
+    // 参数合法性检查
     if (newStartTxn < 0 || newEndTxn < newStartTxn) {
       Journal.LOG.error(String.format("Attempted to cache data of length %d " +
           "with newStartTxn %d and newEndTxn %d",
@@ -253,6 +226,7 @@ class JournaledEditsCache {
       return;
     }
     try (AutoCloseableLock l = writeLock.acquire()) {
+      // 如果布局版本变更，更新版本并清空缓存
       if (newLayoutVersion != layoutVersion) {
         try {
           updateLayoutVersion(newLayoutVersion, newStartTxn);
@@ -262,10 +236,12 @@ class JournaledEditsCache {
               newStartTxn, newEndTxn, newLayoutVersion), ioe);
           return;
         }
+      // 如果缓存为空，初始化缓存从当前批次开始
       } else if (lowestTxnId == INVALID_TXN_ID) {
         Journal.LOG.info("Initializing edits cache starting from txn ID " +
             newStartTxn);
         initialize(newStartTxn);
+      // 如果新批次起始事务不连续，清空缓存避免存储不连续区间
       } else if (highestTxnId + 1 != newStartTxn) {
         // Cache is out of sync; clear to avoid storing noncontiguous regions
         Journal.LOG.error(String.format("Edits cache is out of sync; " +
@@ -275,11 +251,13 @@ class JournaledEditsCache {
         initialize(newStartTxn);
       }
 
+      // 容量不足时，从最老批次开始删除直到能容纳新批次
       while ((totalSize + inputData.length) > capacity && !dataMap.isEmpty()) {
         Map.Entry<Long, byte[]> lowest = dataMap.firstEntry();
         dataMap.remove(lowest.getKey());
         totalSize -= lowest.getValue().length;
       }
+      // 单个批次大小超过整个缓存容量，清空缓存返回
       if (inputData.length > capacity) {
         initialize(INVALID_TXN_ID);
         Journal.LOG.warn(String.format("A single batch of edits was too " +
@@ -292,12 +270,14 @@ class JournaledEditsCache {
             DFSConfigKeys.DFS_JOURNALNODE_EDIT_CACHE_SIZE_FRACTION_KEY, capacity));
         return;
       }
+      // 更新缓存中当前最低事务ID
       if (dataMap.isEmpty()) {
         lowestTxnId = newStartTxn;
       } else {
         lowestTxnId = dataMap.firstKey();
       }
 
+      // 存储新批次，更新最高事务ID和总大小
       dataMap.put(newStartTxn, inputData);
       highestTxnId = newEndTxn;
       totalSize += inputData.length;
@@ -305,14 +285,10 @@ class JournaledEditsCache {
   }
 
   /**
-   * Skip through a given stream of edits until the given transaction ID is
-   * found. Return the number of bytes that appear prior to the given
-   * transaction.
-   *
-   * @param buf A buffer containing a stream of serialized edits
-   * @param txnId The transaction ID to search for
-   * @return The number of bytes appearing in {@code buf} <i>before</i>
-   *         the start of the transaction with ID {@code txnId}.
+   * 在序列化缓冲区中查找指定事务ID的起始位置，返回该事务之前的字节数
+   * @param buf 包含序列化编辑日志的缓冲区
+   * @param txnId 要查找的事务ID
+   * @return 指定事务起始位置之前的字节偏移量
    */
   private int findTransactionPosition(byte[] buf, long txnId)
       throws IOException {
@@ -325,16 +301,14 @@ class JournaledEditsCache {
     while (reader.scanOp() < txnId) {
       previousPos = tracker.getPos();
     }
-    // tracker is backed by a byte[]; position cannot go above an integer
+    // 缓冲区基于字节数组，位置不会超过int范围，直接强转
     return (int) previousPos;
   }
 
   /**
-   * Update the layout version of the cache. This clears out all existing
-   * entries, and populates the new layout version and header for that version.
-   *
-   * @param newLayoutVersion The new layout version to be stored in the cache
-   * @param newStartTxn The new lowest transaction in the cache
+   * 更新缓存的布局版本，清空所有已有条目，生成新版本对应的编辑日志头
+   * @param newLayoutVersion 新的布局版本
+   * @param newStartTxn 缓存中新的最低事务ID
    */
   private void updateLayoutVersion(int newLayoutVersion, long newStartTxn)
       throws IOException {
@@ -350,6 +324,7 @@ class JournaledEditsCache {
     Journal.LOG.info(logMsg.toString());
     initialize(newStartTxn);
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    // 写入新版本对应编辑头到输出流
     EditLogFileOutputStream.writeHeader(newLayoutVersion,
         new DataOutputStream(baos));
     layoutVersion = newLayoutVersion;
@@ -357,75 +332,18 @@ class JournaledEditsCache {
   }
 
   /**
-   * Initialize the cache back to a clear state.
-   *
-   * @param newInitialTxnId The new lowest transaction ID stored in the cache.
-   *                        This should be {@value INVALID_TXN_ID} if the cache
-   *                        is to remain empty at this time.
+   * 重置缓存到清空状态
+   * @param newInitialTxnId 新的初始最低事务ID，如果要保持缓存为空则传{@value INVALID_TXN_ID}
    */
   private void initialize(long newInitialTxnId) {
     dataMap.clear();
     totalSize = 0;
     initialTxnId = newInitialTxnId;
     lowestTxnId = initialTxnId;
-    highestTxnId = INVALID_TXN_ID; // this will be set later
+    highestTxnId = INVALID_TXN_ID; // 之后会更新
   }
 
   /**
-   * Return the underlying data buffer used to store information about the
-   * given transaction ID.
-   *
-   * @param txnId Transaction ID whose containing buffer should be fetched.
-   * @return The data buffer for the transaction
-   */
-  @VisibleForTesting
-  byte[] getRawDataForTests(long txnId) {
-    try (AutoCloseableLock l = readLock.acquire()) {
-      return dataMap.floorEntry(txnId).getValue();
-    }
-  }
-
-  private CacheMissException getCacheMissException(long requestedTxnId) {
-    if (lowestTxnId == INVALID_TXN_ID) {
-      return new CacheMissException(0, "Cache is empty; either it was never " +
-          "written to or the last write overflowed the cache capacity.");
-    } else if (requestedTxnId < initialTxnId) {
-      return new CacheMissException(initialTxnId - requestedTxnId,
-          "Cache started at txn ID %d but requested txns starting at %d.",
-          initialTxnId, requestedTxnId);
-    } else {
-      return new CacheMissException(lowestTxnId - requestedTxnId,
-          "Oldest txn ID available in the cache is %d, but requested txns " +
-              "starting at %d. The cache size (%s) or cache fraction (%s) may need to be " +
-              "increased to hold more transactions (currently %d bytes containing %d " +
-              "transactions)", lowestTxnId, requestedTxnId,
-              DFSConfigKeys.DFS_JOURNALNODE_EDIT_CACHE_SIZE_KEY,
-              DFSConfigKeys.DFS_JOURNALNODE_EDIT_CACHE_SIZE_FRACTION_KEY, capacity,
-          highestTxnId - lowestTxnId + 1);
-    }
-  }
-
-  static class CacheMissException extends IOException {
-
-    private static final long serialVersionUID = 0L;
-
-    private final long cacheMissAmount;
-
-    CacheMissException(long cacheMissAmount, String msgFormat,
-        Object... msgArgs) {
-      super(String.format(msgFormat, msgArgs));
-      this.cacheMissAmount = cacheMissAmount;
-    }
-
-    long getCacheMissAmount() {
-      return cacheMissAmount;
-    }
-
-  }
-
-  @VisibleForTesting
-  long getCapacity() {
-    return capacity;
-  }
-
-}
+   * 测试用方法，获取包含指定事务的数据缓冲区
+   * @param txnId 事务ID
+   * @return 包含该事务

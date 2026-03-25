@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,30 +21,29 @@ package org.apache.hadoop.hdfs.server.blockmanagement;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
+/**
+ * 块放置状态接口，用于描述数据块副本放置是否满足HDFS块放置策略的要求
+ * 是HDFS块放置策略校验结果的抽象，为块放置合规性检查提供统一查询接口
+ */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public interface BlockPlacementStatus {
 
   /**
-   * Boolean value to identify if replicas of this block satisfy requirement of 
-   * placement policy
-   * @return if replicas satisfy placement policy's requirement 
+   * 检查当前块的所有副本放置是否满足块放置策略的要求
+   * @return 如果满足放置策略要求返回true，否则返回false
    */
   public boolean isPlacementPolicySatisfied();
   
   /**
-   * Get description info for log or printed in case replicas are failed to meet
-   * requirement of placement policy
-   * @return description in case replicas are failed to meet requirement of
-   * placement policy
+   * 获取块放置不满足策略要求时的错误描述信息，用于日志输出和用户展示
+   * @return 块放置不符合要求的错误描述文本
    */
   public String getErrorDescription();
 
   /**
-   * Return the number of additional replicas needed to ensure the block
-   * placement policy is satisfied.
-   * @return The number of new replicas needed to satisify the placement policy
-   * or zero if no extra are needed
+   * 获取满足块放置策略要求还需要额外添加的副本数量
+   * @return 满足放置策略还需要新增的副本数量，不需要新增则返回0
    */
   int getAdditionalReplicasRequired();
 

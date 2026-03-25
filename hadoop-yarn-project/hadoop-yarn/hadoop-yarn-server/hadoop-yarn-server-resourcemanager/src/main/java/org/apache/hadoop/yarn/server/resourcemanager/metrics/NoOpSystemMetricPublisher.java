@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,9 +24,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
+
 /**
- * This class does nothing when any of the methods are invoked on
- * SystemMetricsPublisher.
+ * 空操作实现的系统指标发布器，当未启用系统指标发布功能时使用该实现，所有方法均不执行任何操作。
+ * 遵循空对象设计模式，避免对null的判断处理。
  */
 public class NoOpSystemMetricPublisher implements SystemMetricsPublisher{
 

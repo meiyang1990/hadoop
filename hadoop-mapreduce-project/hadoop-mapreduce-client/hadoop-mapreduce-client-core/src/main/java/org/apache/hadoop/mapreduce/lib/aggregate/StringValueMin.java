@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,9 +25,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that maintain the smallest of 
- * a sequence of strings.
- * 
+ * 字符串最小值聚合器，用于在MapReduce聚合任务中维护输入字符串序列的字典序最小值
+ * 是ValueAggregator接口的实现类，用于MapReduce端聚合计算场景
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -35,19 +35,15 @@ public class StringValueMin implements ValueAggregator<String> {
   String minVal = null;
     
   /**
-   *  the default constructor
-   *
+   * 默认构造函数，初始化后重置聚合器状态
    */
   public StringValueMin() {
     reset();
   }
 
   /**
-   * add a value to the aggregator
-   * 
-   * @param val
-   *          a string.
-   * 
+   * 添加新的字符串值，更新当前维护的最小值
+   * @param val 待添加的新值对象
    */
   public void addNextValue(Object val) {
     String newVal = val.toString();
@@ -58,30 +54,31 @@ public class StringValueMin implements ValueAggregator<String> {
     
     
   /**
-   * @return the aggregated value
+   * 获取当前聚合得到的最小值
+   * @return 字典序最小的字符串
    */
   public String getVal() {
     return this.minVal;
   }
     
   /**
-   * @return the string representation of the aggregated value
+   * 获取聚合结果的字符串表示
+   * @return 聚合结果字符串
    */
   public String getReport() {
     return minVal;
   }
 
   /**
-   * reset the aggregator
+   * 重置聚合器状态，清空当前最小值
    */
   public void reset() {
     minVal = null;
   }
 
   /**
-   * @return return an array of one element. The element is a string
-   *         representation of the aggregated value. The return value is
-   *         expected to be used by the a combiner.
+   * 生成供Combiner使用的输出列表
+   * @return 仅包含一个元素的ArrayList，元素为当前聚合得到的最小值字符串
    */
   public ArrayList<String> getCombinerOutput() {
     ArrayList<String> retv = new ArrayList<String>(1);

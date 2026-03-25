@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,17 +31,18 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 
 /**
- * Event to record the change of priority of a job
- *
+ * 作业优先级变更事件，用于在作业历史中记录作业优先级变更的操作
+ * 属于MapReduce作业历史日志体系中的事件类型，用于审计和状态回溯
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class JobPriorityChangeEvent implements HistoryEvent {
   private JobPriorityChange datum = new JobPriorityChange();
 
-  /** Generate an event to record changes in Job priority
-   * @param id Job Id
-   * @param priority The new priority of the job
+  /**
+   * 构造作业优先级变更事件，记录作业ID和变更后的新优先级
+   * @param id 发生优先级变更的作业ID
+   * @param priority 变更后的作业新优先级
    */
   public JobPriorityChangeEvent(JobID id, JobPriority priority) {
     datum.setJobid(new Utf8(id.toString()));
@@ -49,28 +51,36 @@ public class JobPriorityChangeEvent implements HistoryEvent {
 
   JobPriorityChangeEvent() { }
 
+  @Override
   public Object getDatum() { return datum; }
+
+  @Override
   public void setDatum(Object datum) {
     this.datum = (JobPriorityChange)datum;
   }
 
-  /** Get the Job ID */
+  /** 获取发生优先级变更的作业ID */
   public JobID getJobId() {
     return JobID.forName(datum.getJobid().toString());
   }
-  /** Get the job priority */
+
+  /** 获取变更后的作业优先级 */
   public JobPriority getPriority() {
     return JobPriority.valueOf(datum.getPriority().toString());
   }
-  /** Get the event type */
+
+  /** 获取事件类型 */
   public EventType getEventType() {
     return EventType.JOB_PRIORITY_CHANGED;
   }
 
   @Override
   public TimelineEvent toTimelineEvent() {
+    // 创建YARN时间线服务事件对象
     TimelineEvent tEvent = new TimelineEvent();
+    // 设置事件ID为大写的事件类型名称
     tEvent.setId(StringUtils.toUpperCase(getEventType().name()));
+    // 添加优先级信息到事件元数据
     tEvent.addInfo("PRIORITY", getPriority().toString());
     return tEvent;
   }

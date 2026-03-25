@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,103 +33,94 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.apache.hadoop.yarn.server.resourcemanager.security.ReservationsACLsManager;
 
 /**
- * This interface is the one implemented by any system that wants to support
- * Reservations i.e. make {@code Resource} allocations in future. Implementors
- * need to bootstrap all configured {@link Plan}s in the active
- * {@link ResourceScheduler} along with their corresponding
- * {@code ReservationAgent} and {@link SharingPolicy}. It is also responsible
- * for managing the {@link PlanFollower} to ensure the {@link Plan}s are in sync
- * with the {@link ResourceScheduler}.
+ * 预留资源系统核心接口，负责支持未来资源预留功能。
+ * 实现类需要完成以下核心职责：
+ * 1. 完成所有已配置的{@link Plan}、对应{@code ReservationAgent}和{@link SharingPolicy}的初始化
+ * 2. 管理{@link PlanFollower}，保证{@link Plan}和当前{@link ResourceScheduler}状态同步
  */
 @LimitedPrivate("yarn")
 @Unstable
 public interface ReservationSystem extends Recoverable {
 
   /**
-   * Set RMContext for {@link ReservationSystem}. This method should be called
-   * immediately after instantiating a reservation system once.
+   * 设置预留系统的RM上下文对象。
+   * 需要在实例化预留系统后立即调用一次。
    * 
-   * @param rmContext created by {@code ResourceManager}
+   * @param rmContext ResourceManager创建的RM上下文对象
    */
   void setRMContext(RMContext rmContext);
 
   /**
-   * Re-initialize the {@link ReservationSystem}.
+   * 重新初始化预留系统。
    * 
-   * @param conf configuration
-   * @param rmContext current context of the {@code ResourceManager}
-   * @throws YarnException if initialization of the configured plan fails
+   * @param conf 配置对象
+   * @param rmContext ResourceManager当前上下文
+   * @throws YarnException 当已配置计划初始化失败时抛出异常
    */
   void reinitialize(Configuration conf, RMContext rmContext)
       throws YarnException;
 
   /**
-   * Get an existing {@link Plan} that has been initialized.
+   * 获取已初始化的计划实例。
    * 
-   * @param planName the name of the {@link Plan}
-   * @return the {@link Plan} identified by name
+   * @param planName 计划名称
+   * @return 对应名称的计划实例
    * 
    */
   Plan getPlan(String planName);
 
   /**
-   * Return a map containing all the plans known to this ReservationSystem
-   * (useful for UI)
+   * 获取当前预留系统已知的所有计划，主要供UI展示使用。
    * 
-   * @return a Map of Plan names and Plan objects
+   * @return 计划名称-计划实例的映射表
    */
   Map<String, Plan> getAllPlans();
 
   /**
-   * Invokes {@link PlanFollower} to synchronize the specified {@link Plan} with
-   * the {@link ResourceScheduler}
+   * 调用PlanFollower同步指定计划和ResourceScheduler的资源状态。
    * 
-   * @param planName the name of the {@link Plan} to be synchronized
-   * @param shouldReplan replan on reduction of plan capacity if true or
-   *          proportionally scale down reservations if false
+   * @param planName 需要同步的计划名称
+   * @param shouldReplan 如果为true，计划容量缩减时重新规划预留；如果为false，按比例缩减所有预留
    */
   void synchronizePlan(String planName, boolean shouldReplan);
 
   /**
-   * Return the time step (ms) at which the {@link PlanFollower} is invoked
+   * 获取PlanFollower同步调度的时间步长（毫秒）。
    * 
-   * @return the time step (ms) at which the {@link PlanFollower} is invoked
+   * @return PlanFollower调用的时间步长（毫秒）
    */
   long getPlanFollowerTimeStep();
 
   /**
-   * Get a new unique {@link ReservationId}.
+   * 生成一个新的唯一预留ID。
    * 
-   * @return a new unique {@link ReservationId}
+   * @return 新的唯一预留ID
    * 
    */
   ReservationId getNewReservationId();
 
   /**
-   * Get the {@link Queue} that an existing {@link ReservationId} is associated
-   * with.
+   * 获取指定预留ID关联的队列名称。
    * 
-   * @param reservationId the unique id of the reservation
-   * @return the name of the associated Queue
+   * @param reservationId 预留唯一ID
+   * @return 关联队列的名称
    * 
    */
   String getQueueForReservation(ReservationId reservationId);
 
   /**
-   * Set the {@link Queue} that an existing {@link ReservationId} should be
-   * associated with.
+   * 关联指定预留ID和队列。
    * 
-   * @param reservationId the unique id of the reservation
-   * @param queueName the name of Queue to associate the reservation with
+   * @param reservationId 预留唯一ID
+   * @param queueName 需要关联的队列名称
    * 
    */
   void setQueueForReservation(ReservationId reservationId, String queueName);
 
   /**
-   * Get the {@link ReservationsACLsManager} to use to check for the reservation
-   * access on a user.
+   * 获取预留ACL管理器，用于检查用户对预留的访问权限。
    *
-   * @return the reservation ACL manager to use to check reservation ACLs.
+   * @return 用于检查预留ACL的预留ACL管理器
    *
    */
   ReservationsACLsManager getReservationsACLsManager();

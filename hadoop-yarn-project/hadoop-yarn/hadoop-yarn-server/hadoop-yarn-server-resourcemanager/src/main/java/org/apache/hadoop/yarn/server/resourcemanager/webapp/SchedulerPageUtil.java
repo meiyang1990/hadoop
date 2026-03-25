@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,10 +21,20 @@ package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
+/**
+ * YARN ResourceManager 调度器页面工具类，提供调度队列树展开状态持久化相关的前端JS生成能力
+ */
 public class SchedulerPageUtil {
 
+  /**
+   * 调度队列页面HTML块工具类，生成队列展开状态恢复和存储所需的前端JavaScript
+   */
   static class QueueBlockUtil extends HtmlBlock {
 
+    /**
+     * 生成重新打开队列树的JavaScript代码，从URL参数恢复队列展开状态
+     * @param html HTML块构建器
+     */
     private void reopenQueue(Block html) {
       html.
           script().$type("text/javascript").
@@ -33,7 +44,7 @@ public class SchedulerPageUtil {
             "  var tmpCurrentParam = currentParam;",
             "  var queryQueuesString = '';",
             "  if (tmpCurrentParam.length > 1) {",
-            "    // openQueues=q1#q2&param1=value1&param2=value2",
+            "    // 解析URL参数中已展开队列的部分",
             "    tmpCurrentParam = tmpCurrentParam[1];",
             "    if (tmpCurrentParam.indexOf('openQueues=') != -1 ) {",
             "      tmpCurrentParam = tmpCurrentParam.split('openQueues=')[1].split('&')[0];",
@@ -41,7 +52,9 @@ public class SchedulerPageUtil {
             "    }",
             "  }",
             "  if (queryQueuesString != '') {",
+            // 分割队列名称数组，#分隔不同队列
             "    queueArray = queryQueuesString.split('#');",
+            // 遍历所有队列节点，匹配到已展开队列则修改jstree状态
             "    $('#cs .q').each(function() {",
             "      var name = $(this).html();",
             "      if (name != 'root' && $.inArray(name, queueArray) != -1) {",
@@ -49,6 +62,7 @@ public class SchedulerPageUtil {
             "      }",
             "    });",
             "  }",
+            // 绑定节点展开/关闭事件，触发状态更新
             "  $('#cs').bind( {",
             "                  'open_node.jstree' :function(e, data) { storeExpandedQueue(e, data); },",
             "                  'close_node.jstree':function(e, data) { storeExpandedQueue(e, data); }",
@@ -56,6 +70,10 @@ public class SchedulerPageUtil {
             "}").__();
     }
 
+    /**
+     * 生成存储队列展开状态到URL参数的JavaScript代码，用户展开/关闭队列时更新URL
+     * @param html HTML块构建器
+     */
     private void storeExpandedQueue (Block html) {
       html.
           script().$type("text/javascript").
@@ -70,21 +88,20 @@ public class SchedulerPageUtil {
             "      action=ACTION_OPEN;",
             "  }",
             "  queueName = $li.find('.q').html();",
-            "  // http://localhost:8088/cluster/scheduler?openQueues=q1#q2&param1=value1&param2=value2 ",
-            "  //   ==> [http://localhost:8088/cluster/scheduler , openQueues=q1#q2&param1=value1&param2=value2]",
+            "  // 分割URL获取查询参数部分",
             "  var currentParam = window.location.href.split('?');",
             "  var tmpCurrentParam = currentParam;",
             "  var queryString = '';",
             "  if (tmpCurrentParam.length > 1) {",
-            "    // openQueues=q1#q2&param1=value1&param2=value2",
+            "    // 获取查询字符串部分",
             "    tmpCurrentParam = tmpCurrentParam[1];",
             "    currentParam = tmpCurrentParam;",
             "    tmpCurrentParam = tmpCurrentParam.split('&');",
             "    var len = tmpCurrentParam.length;",
             "    var paramExist = false;",
-            "    if (len > 1) {    // Currently no query param are present but in future if any are added for that handling it now",
+            "    if (len > 1) {    // 处理多个查询参数的场景",
             "      queryString = '';",
-            "      for (var i = 0 ; i < len ; i++) {  // searching for param openQueues",
+            "      for (var i = 0 ; i < len ; i++) {  // 遍历查找openQueues参数",
             "        if (tmpCurrentParam[i].substr(0,11) == OPEN_QUEUES + '=') {",
             "          if (action == ACTION_OPEN) {",
             "            tmpCurrentParam[i] = addQueueName(tmpCurrentParam[i],queueName);",
@@ -99,15 +116,15 @@ public class SchedulerPageUtil {
             "        }",
             "        queryString += tmpCurrentParam[i];",
             "      }",
-            "      // If in existing query string OPEN_QUEUES param is not present",
+            "      // 参数不存在，且是展开操作，新增openQueues参数",
             "      if (action == ACTION_OPEN && !paramExist) {",
             "        queryString = currentParam + '&' + OPEN_QUEUES + '=' + queueName;",
             "      }",
             "    } ",
-            "    // Only one param is present in current query string",
+            "    // 只有一个查询参数的场景",
             "    else {",
             "      tmpCurrentParam=tmpCurrentParam[0];",
-            "      // checking if the only param present in query string is OPEN_QUEUES or not and making queryString accordingly",
+            "      // 检查唯一参数是否是openQueues",
             "      if (tmpCurrentParam.substr(0,11) == OPEN_QUEUES + '=') {",
             "        if (action == ACTION_OPEN) {",
             "          queryString = addQueueName(tmpCurrentParam,queueName);",
@@ -123,6 +140,7 @@ public class SchedulerPageUtil {
             "      }",
             "    }",
             "  } else {",
+            "    // URL原本没有任何查询参数，展开操作直接生成参数",
             "    if (action == ACTION_OPEN) {",
             "      tmpCurrentParam = '';",
             "      currentParam = tmpCurrentParam;",
@@ -132,20 +150,25 @@ public class SchedulerPageUtil {
             "  if (queryString != '') {",
             "    queryString = '?' + queryString;",
             "  }",
+            "  // 构建新URL，使用pushState更新浏览器地址不刷新页面",
             "  var url = window.location.protocol + '//' + window.location.host + window.location.pathname + queryString;",
             "  window.history.pushState( { path : url }, '', url);",
             "};",
             "",
+            /**
+             * 从openQueues参数中移除指定队列名称
+             */
             "function removeQueueName(queryString, queueName) {",
             "  queryString = decodeURIComponent(queryString);",
             "  var index = queryString.indexOf(queueName);",
-            "  // Finding if queue is present in query param then only remove it",
+            "  // 队列存在才执行移除",
             "  if (index != -1) {",
-            "    // removing openQueues=",
+            "    // 分割出所有队列名称",
             "    var tmp = queryString.substr(11, queryString.length);",
             "    tmp = tmp.split('#');",
             "    var len = tmp.length;",
             "    var newQueryString = '';",
+            "    // 遍历保留不等于当前队列的名称",
             "    for (var i = 0 ; i < len ; i++) {",
             "      if (tmp[i] != queueName) {",
             "        if (newQueryString != '') {",
@@ -162,6 +185,9 @@ public class SchedulerPageUtil {
             "  return queryString;",
             "}",
             "",
+            /**
+             * 向openQueues参数添加指定队列名称
+             */
             "function addQueueName(queryString, queueName) {",
             "  queueArray = queryString.split('#');",
             "  if ($.inArray(queueArray, queueName) == -1) {",
@@ -171,7 +197,11 @@ public class SchedulerPageUtil {
             "}").__();
     }
 
-    @Override protected void render(Block html) {
+    @Override
+    /**
+     * 渲染HTML块，生成恢复和存储队列展开状态所需JS
+     */
+    protected void render(Block html) {
       reopenQueue(html);
       storeExpandedQueue(html);
     }

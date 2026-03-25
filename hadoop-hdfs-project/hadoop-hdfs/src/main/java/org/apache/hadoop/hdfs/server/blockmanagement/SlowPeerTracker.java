@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -48,10 +49,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
-
 /**
- * This class aggregates information from {@link SlowPeerReports} received via
- * heartbeats.
+ * 文件说明: HDFS数据节点慢节点追踪器，聚合来自各个DataNode心跳上报的慢节点报告，统计被多个DataNode标记为慢节点的异常节点
+ * 核心职责: 收集、过滤和统计慢节点报告，为集群异常节点检测提供数据支持
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -60,43 +60,38 @@ public class SlowPeerTracker {
       LoggerFactory.getLogger(SlowPeerTracker.class);
 
   /**
-   * Time duration after which a report is considered stale. This is
-   * set to DFS_DATANODE_OUTLIERS_REPORT_INTERVAL_KEY * 3 i.e.
-   * maintained for at least two successive reports.
+   * 报告过期时间，超过该时间的报告被视为 stale 无效报告
+   * 取值为数据节点异常报告间隔的3倍，确保至少保留两次连续上报的有效报告
    */
   private final long reportValidityMs;
 
   /**
-   * Timer object for querying the current time. Separated out for
-   * unit testing.
+   * 时间器，用于获取当前单调时间，分离实现方便单元测试
    */
   private final Timer timer;
 
   /**
-   * ObjectWriter to convert JSON reports to String.
+   * JSON序列化对象写入器，用于将慢节点报告转换为JSON字符串输出
    */
   private static final ObjectWriter WRITER = new ObjectMapper().writer();
   /**
-   * Number of nodes to include in JSON report. We will return nodes with
-   * the highest number of votes from peers.
+   * JSON报告中最大返回节点数，返回得票最高（被最多节点标记为慢）的节点
    */
   private volatile int maxNodesToReport;
 
   /**
-   * Information about peers that have reported a node as being slow.
-   * Each outer map entry is a map of (DatanodeId) {@literal ->} (timestamp),
-   * mapping reporting nodes to the timestamp of the last report from
-   * that node.
-   *
-   * DatanodeId could be the DataNodeId or its address. We
-   * don't care as long as the caller uses it consistently.
-   *
-   * Stale reports are not evicted proactively and can potentially
-   * hang around forever.
+   * 所有慢节点报告存储结构：外层key是被标记为慢节点的节点ID，
+   * 内层key是上报该节点为慢的报告节点ID，value存储上报时间和延迟 metrics
+   *  stale报告不会主动清理，仅在查询时过滤
    */
   private final ConcurrentMap<String, ConcurrentMap<String, LatencyWithLastReportTime>>
       allReports;
 
+  /**
+   * 构造SlowPeerTracker实例，从配置初始化参数
+   * @param conf Hadoop配置对象
+   * @param timer 时间器，用于获取当前时间
+   */
   public SlowPeerTracker(Configuration conf, Timer timer) {
     this.timer = timer;
     this.allReports = new ConcurrentHashMap<>();
@@ -109,43 +104,37 @@ public class SlowPeerTracker {
   }
 
   /**
-   * If SlowPeerTracker is enabled, return true, else returns false.
-   *
-   * @return true if slow peer tracking is enabled, else false.
+   * 检查慢节点追踪功能是否启用
+   * @return 始终返回true，表示启用慢节点追踪
    */
   public boolean isSlowPeerTrackerEnabled() {
     return true;
   }
 
   /**
-   * Add a new report. DatanodeIds can be the DataNodeIds or addresses
-   * We don't care as long as the caller is consistent.
-   *
-   * @param slowNode DataNodeId of the peer suspected to be slow.
-   * @param reportingNode DataNodeId of the node reporting on its peer.
-   * @param slowNodeMetrics Aggregate latency metrics of slownode as reported by the
-   *     reporting node.
+   * 添加一条慢节点上报报告
+   * @param slowNode 被怀疑为慢节点的节点ID
+   * @param reportingNode 执行上报的数据节点ID
+   * @param slowNodeMetrics 上报节点统计得到的慢节点延迟指标
    */
   public void addReport(String slowNode, String reportingNode, OutlierMetrics slowNodeMetrics) {
     ConcurrentMap<String, LatencyWithLastReportTime> nodeEntries = allReports.get(slowNode);
 
     if (nodeEntries == null) {
-      // putIfAbsent guards against multiple writers.
+      // putIfAbsent保证并发写入安全
       allReports.putIfAbsent(slowNode, new ConcurrentHashMap<>());
       nodeEntries = allReports.get(slowNode);
     }
 
-    // Replace the existing entry from this node, if any.
+    // 覆盖该上报节点之前的旧报告，保留最新上报
     nodeEntries.put(reportingNode,
         new LatencyWithLastReportTime(timer.monotonicNow(), slowNodeMetrics));
   }
 
   /**
-   * Retrieve the non-expired reports that mark a given DataNode
-   * as slow. Stale reports are excluded.
-   *
-   * @param slowNode target node Id.
-   * @return set of reports which implicate the target node as being slow.
+   * 获取指定节点的所有未过期有效慢节点报告，过滤掉stale报告
+   * @param slowNode 目标慢节点ID
+   * @return 指向该节点的所有有效报告集合
    */
   public Set<SlowPeerLatencyWithReportingNode> getReportsForNode(String slowNode) {
     final ConcurrentMap<String, LatencyWithLastReportTime> nodeEntries =
@@ -159,9 +148,8 @@ public class SlowPeerTracker {
   }
 
   /**
-   * Retrieve all reports for all nodes. Stale reports are excluded.
-   *
-   * @return map from SlowNodeId {@literal ->} (set of nodes reporting peers).
+   * 获取所有节点的所有未过期有效慢节点报告，过滤掉stale报告
+   * @return 慢节点ID -> 有效报告集合 的映射
    */
   public Map<String, SortedSet<SlowPeerLatencyWithReportingNode>> getReportsForAllDataNodes() {
     if (allReports.isEmpty()) {
@@ -172,6 +160,7 @@ public class SlowPeerTracker {
         new HashMap<>();
     final long now = timer.monotonicNow();
 
+    // 遍历所有节点，过滤每个节点的无效报告
     for (Map.Entry<String, ConcurrentMap<String, LatencyWithLastReportTime>> entry
         : allReports.entrySet()) {
       SortedSet<SlowPeerLatencyWithReportingNode> validReports =
@@ -184,16 +173,16 @@ public class SlowPeerTracker {
   }
 
   /**
-   * Filter the given reports to return just the valid ones.
-   *
-   * @param reports Current set of reports.
-   * @param now Current time.
-   * @return Set of valid reports that were created within last reportValidityMs millis.
+   * 过滤输入报告，只保留有效期内的有效报告
+   * @param reports 当前节点的所有上报报告
+   * @param now 当前时间戳
+   * @return 所有未过期的有效报告排序集合
    */
   private SortedSet<SlowPeerLatencyWithReportingNode> filterNodeReports(
       ConcurrentMap<String, LatencyWithLastReportTime> reports, long now) {
     final SortedSet<SlowPeerLatencyWithReportingNode> validReports = new TreeSet<>();
 
+    // 遍历所有上报，检查时间是否在有效期内
     for (Map.Entry<String, LatencyWithLastReportTime> entry : reports.entrySet()) {
       if (now - entry.getValue().getTime() < reportValidityMs) {
         OutlierMetrics outlierMetrics = entry.getValue().getLatency();
@@ -207,9 +196,8 @@ public class SlowPeerTracker {
   }
 
   /**
-   * Retrieve all valid reports as a JSON string.
-   * @return serialized representation of valid reports. null if
-   *         serialization failed.
+   * 将所有有效慢节点报告序列化为JSON字符串
+   * @return 序列化后的JSON字符串，序列化失败返回null
    */
   public String getJson() {
     Collection<SlowPeerJsonReport> validReports = getJsonReports(
@@ -217,16 +205,16 @@ public class SlowPeerTracker {
     try {
       return WRITER.writeValueAsString(validReports);
     } catch (JsonProcessingException e) {
-      // Failed to serialize. Don't log the exception call stack.
+      // 序列化失败，仅打印debug日志不输出栈追踪
       LOG.debug("Failed to serialize statistics" + e);
       return null;
     }
   }
 
   /**
-   * Returns all tracking slow peers.
-   * @param numNodes
-   * @return
+   * 获取得票最多的前N个慢节点ID列表
+   * @param numNodes 需要返回的最大节点数量
+   * @return 慢节点ID列表，按得票从少到多排列
    */
   public List<String> getSlowNodes(int numNodes) {
     Collection<SlowPeerJsonReport> jsonReports = getJsonReports(numNodes);
@@ -241,33 +229,36 @@ public class SlowPeerTracker {
   }
 
   /**
-   * Retrieve reports in a structure for generating JSON, limiting the
-   * output to the top numNodes nodes i.e nodes with the most reports.
-   * @param numNodes number of nodes to return. This is to limit the
-   *                 size of the generated JSON.
+   * 获取得票最多的前N个慢节点的报告结构，用于生成JSON输出
+   * 优先保留被最多节点标记为慢的节点，限制输出数量避免JSON过大
+   * @param numNodes 需要返回的最大节点数量
+   * @return 前N个慢节点的报告集合
    */
   private Collection<SlowPeerJsonReport> getJsonReports(int numNodes) {
     if (allReports.isEmpty()) {
       return Collections.emptyList();
     }
 
+    // 小顶堆，保存topN得票最高的节点，堆顶是当前topN中得票最少的节点
     final PriorityQueue<SlowPeerJsonReport> topNReports = new PriorityQueue<>(allReports.size(),
         (o1, o2) -> Ints.compare(o1.getSlowPeerLatencyWithReportingNodes().size(),
             o2.getSlowPeerLatencyWithReportingNodes().size()));
 
     final long now = timer.monotonicNow();
 
+    // 遍历所有节点，筛选出得票最高的前numNodes个节点
     for (Map.Entry<String, ConcurrentMap<String, LatencyWithLastReportTime>> entry
         : allReports.entrySet()) {
       SortedSet<SlowPeerLatencyWithReportingNode> validReports =
           filterNodeReports(entry.getValue(), now);
       if (!validReports.isEmpty()) {
         if (topNReports.size() < numNodes) {
+          // 堆还没满，直接加入
           topNReports.add(new SlowPeerJsonReport(entry.getKey(), validReports));
         } else if (topNReports.peek() != null
             && topNReports.peek().getSlowPeerLatencyWithReportingNodes().size()
             < validReports.size()) {
-          // Remove the lowest element
+          // 当前节点得票比堆中最少的多，替换堆顶
           topNReports.poll();
           topNReports.add(new SlowPeerJsonReport(entry.getKey(), validReports));
         }
@@ -281,10 +272,17 @@ public class SlowPeerTracker {
     return reportValidityMs;
   }
 
+  /**
+   * 设置JSON报告最大返回节点数，线程安全
+   * @param maxSlowPeersToReport 最大返回节点数
+   */
   public synchronized void setMaxSlowPeersToReport(int maxSlowPeersToReport) {
     this.maxNodesToReport = maxSlowPeersToReport;
   }
 
+  /**
+   * 内部存储类，保存单条上报的时间戳和延迟指标
+   */
   private static class LatencyWithLastReportTime {
     private final Long time;
     private final OutlierMetrics latency;

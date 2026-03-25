@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,8 +30,8 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * This class represent a sub-cluster identifier in the JSON representation
- * of the policy configuration.
+ * YARN联邦策略配置JSON格式中的子集群标识符封装类
+ * 用于在序列化/反序列化策略配置时承载子集群ID信息
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -40,21 +41,32 @@ public class SubClusterIdInfo {
 
   private String id;
 
+  /**
+   * JAXB序列化所需的无参构造方法
+   */
   public SubClusterIdInfo() {
     //JAXB needs this
   }
 
+  /**
+   * 从字符串ID构造子集群标识符信息对象
+   * @param subClusterId 子集群ID字符串
+   */
   public SubClusterIdInfo(String subClusterId) {
     this.id = subClusterId;
   }
 
+  /**
+   * 从SubClusterId对象构造子集群标识符信息对象
+   * @param subClusterId 子集群ID对象
+   */
   public SubClusterIdInfo(SubClusterId subClusterId) {
     this.id = subClusterId.getId();
   }
 
   /**
-   * Get the sub-cluster identifier as {@link SubClusterId}.
-   * @return the sub-cluster id.
+   * 将当前封装的字符串ID转换为SubClusterId对象
+   * @return 转换后的子集群ID对象
    */
   @JsonProperty("id")
   public SubClusterId toId() {
@@ -63,15 +75,17 @@ public class SubClusterIdInfo {
 
   @Override
   public boolean equals(Object obj) {
-
+    // 同一对象直接返回相等
     if (this == obj) {
       return true;
     }
 
+    // 比较对象为null直接返回不相等
     if (obj == null) {
       return false;
     }
 
+    // 类型相同则比较id字段，否则不相等
     if (obj instanceof SubClusterIdInfo) {
       SubClusterIdInfo other = (SubClusterIdInfo) obj;
       return new EqualsBuilder()
@@ -84,11 +98,13 @@ public class SubClusterIdInfo {
 
   @Override
   public int hashCode() {
+    // 基于id字段计算哈希值
     return new HashCodeBuilder().append(this.id).toHashCode();
   }
 
   @Override
   public String toString() {
+    // 直接返回id字符串
     return id;
   }
 }

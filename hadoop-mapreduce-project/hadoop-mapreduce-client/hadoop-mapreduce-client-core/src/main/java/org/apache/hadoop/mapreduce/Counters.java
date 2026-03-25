@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,6 +30,8 @@ import org.apache.hadoop.mapreduce.counters.CounterGroupFactory;
 import org.apache.hadoop.mapreduce.counters.FrameworkCounterGroup;
 
 /**
+ * 文件说明: MapReduce任务计数器容器，负责管理作业/任务运行过程中所有统计计数器
+ * 
  * <p><code>Counters</code> holds per job/task counters, defined either by the
  * Map-Reduce framework or applications. Each <code>Counter</code> can be of
  * any {@link Enum} type.</p>
@@ -40,10 +43,18 @@ import org.apache.hadoop.mapreduce.counters.FrameworkCounterGroup;
 @InterfaceStability.Stable
 public class Counters extends AbstractCounters<Counter, CounterGroup> {
 
+  /**
+   * 框架内置枚举计数器分组实现，将框架分组实现混入CounterGroup接口
+   * @param <T> 枚举类型的计数器key
+   */
   // Mix framework group implementation into CounterGroup interface
   private static class FrameworkGroupImpl<T extends Enum<T>>
       extends FrameworkCounterGroup<T, Counter> implements CounterGroup {
 
+    /**
+     * 构造函数，基于枚举类创建框架计数器分组
+     * @param cls 计数器枚举类
+     */
     FrameworkGroupImpl(Class<T> cls) {
       super(cls);
     }
@@ -59,11 +70,20 @@ public class Counters extends AbstractCounters<Counter, CounterGroup> {
     }
   }
 
+  /**
+   * 通用自定义计数器分组实现，将通用分组实现混入CounterGroup接口
+   */
   // Mix generic group implementation into CounterGroup interface
   // and provide some mandatory group factory methods.
   private static class GenericGroup extends AbstractCounterGroup<Counter>
       implements CounterGroup {
 
+    /**
+     * 构造函数，创建通用自定义计数器分组
+     * @param name 分组名称
+     * @param displayName 分组展示名称
+     * @param limits 计数器数量限制
+     */
     GenericGroup(String name, String displayName, Limits limits) {
       super(name, displayName, limits);
     }
@@ -84,6 +104,10 @@ public class Counters extends AbstractCounters<Counter, CounterGroup> {
     }
   }
 
+  /**
+   * 文件系统计数器分组实现，将文件系统分组实现混入CounterGroup接口
+   * 用于统计各文件系统的IO操作指标
+   */
   // Mix file system group implementation into the CounterGroup interface
   private static class FileSystemGroup extends FileSystemCounterGroup<Counter>
       implements CounterGroup {
@@ -100,7 +124,7 @@ public class Counters extends AbstractCounters<Counter, CounterGroup> {
   }
 
   /**
-   * Provide factory methods for counter group factory implementation.
+   * 计数器分组工厂实现，负责创建不同类型的计数器分组
    * See also the GroupFactory in
    *  {@link org.apache.hadoop.mapred.Counters mapred.Counters}
    */
@@ -130,20 +154,21 @@ public class Counters extends AbstractCounters<Counter, CounterGroup> {
     }
   }
 
+  // 单例分组工厂实例，全局复用
   private static final GroupFactory groupFactory = new GroupFactory();
 
   /**
-   * Default constructor
+   * 默认构造函数，创建空的计数器容器
    */
   public Counters() {
     super(groupFactory);
   }
 
   /**
-   * Construct the Counters object from the another counters object
-   * @param <C> the type of counter
-   * @param <G> the type of counter group
-   * @param counters the old counters object
+   * 拷贝构造函数，基于已有计数器对象创建新的计数器容器
+   * @param <C> 计数器类型
+   * @param <G> 计数器分组类型
+   * @param counters 源计数器对象
    */
   public <C extends Counter, G extends CounterGroupBase<C>>
   Counters(AbstractCounters<C, G> counters) {

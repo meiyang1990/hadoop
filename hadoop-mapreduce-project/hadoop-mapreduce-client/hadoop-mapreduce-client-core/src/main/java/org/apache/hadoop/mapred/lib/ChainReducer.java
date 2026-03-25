@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,33 +26,22 @@ import java.io.IOException;
 import java.util.Iterator;
 
 /**
- * The ChainReducer class allows to chain multiple Mapper classes after a
- * Reducer within the Reducer task.
+ * ChainReducer类实现了在单个Reducer任务中，将多个Mapper类链式串联在Reducer之后执行的能力
  * <p>
- * For each record output by the Reducer, the Mapper classes are invoked in a
- * chained (or piped) fashion, the output of the first becomes the input of the
- * second, and so on until the last Mapper, the output of the last Mapper will
- * be written to the task's output.
+ * 对于Reducer输出的每条记录，链式中的Mapper类会按顺序以流水线方式依次执行：
+ * 前一个Mapper的输出会作为后一个Mapper的输入，直到最后一个Mapper，最终输出才会写入任务输出
  * <p>
- * The key functionality of this feature is that the Mappers in the chain do not
- * need to be aware that they are executed after the Reducer or in a chain.
- * This enables having reusable specialized Mappers that can be combined to
- * perform composite operations within a single task.
+ * 该设计的核心优势在于链式中的Mapper无需感知自己是在Reducer之后还是链式中执行，
+ * 可以复用已有的专用Mapper实现，组合出单个任务内的复合操作，减少磁盘IO开销
  * <p>
- * Special care has to be taken when creating chains that the key/values output
- * by a Mapper are valid for the following Mapper in the chain. It is assumed
- * all Mappers and the Reduce in the chain use maching output and input key and
- * value classes as no conversion is done by the chaining code.
+ * 使用时需要保证链式中前一个组件输出的键值类型和下一个组件的输入类型匹配，链式框架本身不做类型转换
  * <p>
- * Using the ChainMapper and the ChainReducer classes is possible to compose
- * Map/Reduce jobs that look like <code>[MAP+ / REDUCE MAP*]</code>. And
- * immediate benefit of this pattern is a dramatic reduction in disk IO.
+ * 配合ChainMapper使用，可以构建出形如 <code>[MAP+ / REDUCE MAP*]</code> 的组合式MapReduce作业，
+ * 该模式最直接的收益是显著减少磁盘IO开销
  * <p>
- * IMPORTANT: There is no need to specify the output key/value classes for the
- * ChainReducer, this is done by the setReducer or the addMapper for the last
- * element in the chain.
+ * 重要说明：不需要为ChainReducer单独指定输出键值类型，该信息由链式中最后一个元素（setReducer或addMapper）配置
  * <p>
- * ChainReducer usage pattern:
+ * ChainReducer使用示例：
  * <p>
  * <pre>
  * ...
@@ -94,34 +84,25 @@ import java.util.Iterator;
 public class ChainReducer implements Reducer {
 
   /**
-   * Sets the Reducer class to the chain job's JobConf.
+   * 将指定Reducer类设置到链式作业的JobConf中，作为链式的起始组件
    * <p>
-   * It has to be specified how key and values are passed from one element of
-   * the chain to the next, by value or by reference. If a Reducer leverages the
-   * assumed semantics that the key and values are not modified by the collector
-   * 'by value' must be used. If the Reducer does not expect this semantics, as
-   * an optimization to avoid serialization and deserialization 'by reference'
-   * can be used.
+   * 需要指定键值在链式节点间的传递方式：按值传递或按引用传递。
+   * 如果Reducer期望键值不会被后续收集器修改，必须使用按值传递；
+   * 如果不需要该语义保证，可以使用按引用传递优化，避免序列化/反序列化开销
    * <p>
-   * For the added Reducer the configuration given for it,
-   * <code>reducerConf</code>, have precedence over the job's JobConf. This
-   * precedence is in effect when the task is running.
+   * 传入的reducerConf配置优先级高于作业全局的JobConf，任务运行时会优先使用reducerConf的配置
    * <p>
-   * IMPORTANT: There is no need to specify the output key/value classes for the
-   * ChainReducer, this is done by the setReducer or the addMapper for the last
-   * element in the chain.
+   * 重要说明：不需要为ChainReducer单独指定输出键值类型，该信息由链式中最后一个元素配置
    *
-   * @param job              job's JobConf to add the Reducer class.
-   * @param klass            the Reducer class to add.
-   * @param inputKeyClass    reducer input key class.
-   * @param inputValueClass  reducer input value class.
-   * @param outputKeyClass   reducer output key class.
-   * @param outputValueClass reducer output value class.
-   * @param byValue          indicates if key/values should be passed by value
-   * to the next Mapper in the chain, if any.
-   * @param reducerConf      a JobConf with the configuration for the Reducer
-   * class. It is recommended to use a JobConf without default values using the
-   * <code>JobConf(boolean loadDefaults)</code> constructor with FALSE.
+   * @param job              作业的JobConf对象
+   * @param klass            要添加的Reducer类
+   * @param inputKeyClass    Reducer输入键类型
+   * @param inputValueClass  Reducer输入值类型
+   * @param outputKeyClass   Reducer输出键类型
+   * @param outputValueClass Reducer输出值类型
+   * @param byValue          是否按值传递键值给链式中下一个Mapper
+   * @param reducerConf      Reducer专属配置，优先级高于全局作业配置
+   *                         推荐使用不加载默认配置的JobConf(boolean loadDefaults)构造，传入false
    */
   public static <K1, V1, K2, V2> void setReducer(JobConf job,
                            Class<? extends Reducer<K1, V1, K2, V2>> klass,
@@ -138,34 +119,25 @@ public class ChainReducer implements Reducer {
   }
 
   /**
-   * Adds a Mapper class to the chain job's JobConf.
+   * 将指定Mapper类添加到链式作业的JobConf中，串联在已有组件之后
    * <p>
-   * It has to be specified how key and values are passed from one element of
-   * the chain to the next, by value or by reference. If a Mapper leverages the
-   * assumed semantics that the key and values are not modified by the collector
-   * 'by value' must be used. If the Mapper does not expect this semantics, as
-   * an optimization to avoid serialization and deserialization 'by reference'
-   * can be used.
+   * 需要指定键值在链式节点间的传递方式：按值传递或按引用传递。
+   * 如果Mapper期望键值不会被后续收集器修改，必须使用按值传递；
+   * 如果不需要该语义保证，可以使用按引用传递优化，避免序列化/反序列化开销
    * <p>
-   * For the added Mapper the configuration given for it,
-   * <code>mapperConf</code>, have precedence over the job's JobConf. This
-   * precedence is in effect when the task is running.
+   * 传入的mapperConf配置优先级高于作业全局的JobConf，任务运行时会优先使用mapperConf的配置
    * <p>
-   * IMPORTANT: There is no need to specify the output key/value classes for the
-   * ChainMapper, this is done by the addMapper for the last mapper in the chain
-   * .
+   * 重要说明：不需要为ChainMapper单独指定输出键值类型，该信息由链式中最后一个Mapper配置
    *
-   * @param job              chain job's JobConf to add the Mapper class.
-   * @param klass            the Mapper class to add.
-   * @param inputKeyClass    mapper input key class.
-   * @param inputValueClass  mapper input value class.
-   * @param outputKeyClass   mapper output key class.
-   * @param outputValueClass mapper output value class.
-   * @param byValue          indicates if key/values should be passed by value
-   * to the next Mapper in the chain, if any.
-   * @param mapperConf       a JobConf with the configuration for the Mapper
-   * class. It is recommended to use a JobConf without default values using the
-   * <code>JobConf(boolean loadDefaults)</code> constructor with FALSE.
+   * @param job              链式作业的JobConf对象
+   * @param klass            要添加的Mapper类
+   * @param inputKeyClass    Mapper输入键类型
+   * @param inputValueClass  Mapper输入值类型
+   * @param outputKeyClass   Mapper输出键类型
+   * @param outputValueClass Mapper输出值类型
+   * @param byValue          是否按值传递键值给链式中下一个Mapper
+   * @param mapperConf       Mapper专属配置，优先级高于全局作业配置
+   *                         推荐使用不加载默认配置的JobConf(boolean loadDefaults)构造，传入false
    */
   public static <K1, V1, K2, V2> void addMapper(JobConf job,
                            Class<? extends Mapper<K1, V1, K2, V2>> klass,
@@ -183,25 +155,24 @@ public class ChainReducer implements Reducer {
   private Chain chain;
 
   /**
-   * Constructor.
+   * 构造方法，初始化链式执行器
    */
   public ChainReducer() {
     chain = new Chain(false);
   }
 
   /**
-   * Configures the ChainReducer, the Reducer and all the Mappers in the chain.
+   * 配置ChainReducer、内部Reducer以及链式中所有Mapper
    * <p>
-   * If this method is overriden <code>super.configure(...)</code> should be
-   * invoked at the beginning of the overwriter method.
+   * 如果子类重写该方法，必须在重写方法开头调用super.configure(...)
+   * @param job 作业配置对象
    */
   public void configure(JobConf job) {
     chain.configure(job);
   }
 
   /**
-   * Chains the <code>reduce(...)</code> method of the Reducer with the
-   * <code>map(...) </code> methods of the Mappers in the chain.
+   * 执行链式处理：先调用配置的Reducer的reduce方法，再依次调用所有链式Mapper的map方法
    */
   @SuppressWarnings({"unchecked"})
   public void reduce(Object key, Iterator values, OutputCollector output,
@@ -214,10 +185,9 @@ public class ChainReducer implements Reducer {
   }
 
   /**
-   * Closes  the ChainReducer, the Reducer and all the Mappers in the chain.
+   * 关闭ChainReducer、内部Reducer以及链式中所有Mapper，释放资源
    * <p>
-   * If this method is overriden <code>super.close()</code> should be
-   * invoked at the end of the overwriter method.
+   * 如果子类重写该方法，必须在重写方法末尾调用super.close()
    */
   public void close() throws IOException {
     chain.close();

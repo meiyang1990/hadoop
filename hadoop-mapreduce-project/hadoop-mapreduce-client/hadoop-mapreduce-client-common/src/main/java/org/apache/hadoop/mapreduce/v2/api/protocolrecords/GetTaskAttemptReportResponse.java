@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,21 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptReport;
 
+/**
+ * 获取任务尝试报告响应协议接口
+ * 定义了MapReduce客户端向ApplicationMaster获取任务尝试运行报告后
+ * 返回结果的结构规范，属于MR RPC协议层的数据模型
+ */
 public interface GetTaskAttemptReportResponse {
+  /**
+   * 获取查询到的任务尝试运行报告
+   * @return 任务尝试运行报告，包含当前尝试的运行状态、进度、诊断信息等
+   */
   public abstract TaskAttemptReport getTaskAttemptReport();
   
+  /**
+   * 设置任务尝试运行报告
+   * @param taskAttemptReport 需要返回给客户端的任务尝试运行报告
+   */
   public abstract void setTaskAttemptReport(TaskAttemptReport taskAttemptReport);
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,37 +28,27 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A class that can be used to schedule an asynchronous check on a given
- * {@link Checkable}. If the check is successfully scheduled then a
- * {@link ListenableFuture} is returned.
- *
+ * HDFS DataNode 磁盘块检查异步调度接口，用于对可检查对象调度异步健康检查任务，
+ * 异步执行检查避免阻塞DataNode主业务线程，支持获取检查结果。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface AsyncChecker<K, V> {
 
   /**
-   * Schedule an asynchronous check for the given object.
-   *
-   * @param target object to be checked.
-   *
-   * @param context the interpretation of the context depends on the
-   *                target.
-   *
-   * @return returns a {@link Optional of ListenableFuture} that can be used to
-   *         retrieve the result of the asynchronous check.
+   * 为指定可检查对象调度一个异步健康检查任务
+   * @param target 待检查的目标可检查对象
+   * @param context 检查上下文，具体含义由目标对象决定
+   * @return 包含可监听未来结果的Optional对象，如果调度成功返回结果未来对象，否则返回空
    */
   Optional<ListenableFuture<V>> schedule(Checkable<K, V> target, K context);
 
   /**
-   * Cancel all executing checks and wait for them to complete.
-   * First attempts a graceful cancellation, then cancels forcefully.
-   * Waits for the supplied timeout after both attempts.
-   *
-   * See {@link ExecutorService#awaitTermination} for a description of
-   * the parameters.
-   *
-   * @throws InterruptedException
+   * 关闭异步检查器并等待所有正在执行的检查任务完成，先尝试优雅取消所有任务，再强制取消，
+   * 最后等待超时时间确保所有任务退出
+   * @param timeout 等待终止的超时时间
+   * @param timeUnit 超时时间单位
+   * @throws InterruptedException 等待过程中被中断时抛出
    */
   void shutdownAndWait(long timeout, TimeUnit timeUnit)
       throws InterruptedException;

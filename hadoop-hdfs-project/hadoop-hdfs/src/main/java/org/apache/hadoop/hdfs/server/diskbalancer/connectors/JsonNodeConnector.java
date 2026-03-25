@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -32,7 +33,8 @@ import java.net.URL;
 import java.util.List;
 
 /**
- * A connector that understands JSON data cluster models.
+ * 文件级：磁盘均衡器JSON格式集群元数据连接器，从JSON文件读取集群节点信息
+ * 从JSON格式的集群定义文件中读取磁盘均衡器所需的集群节点数据，用于离线分析或测试场景
  */
 public class JsonNodeConnector implements ClusterConnector {
   private static final Logger LOG =
@@ -42,35 +44,37 @@ public class JsonNodeConnector implements ClusterConnector {
   private final URL clusterURI;
 
   /**
-   * Constructs a JsonNodeConnector.
-   * @param clusterURI - A file URL that contains cluster information.
+   * 构造JSON节点连接器，指定集群定义JSON文件的位置
+   * @param clusterURI 存储集群信息的JSON文件URL
    */
   public JsonNodeConnector(URL clusterURI) {
     this.clusterURI = clusterURI;
   }
 
   /**
-   * getNodes function connects to a cluster definition file
-   * and returns nodes defined in that file.
-   *
-   * @return Array of DiskBalancerDataNodes
+   * 从JSON集群定义文件读取所有数据节点信息，返回节点列表供磁盘均衡器使用
+   * @return 磁盘均衡器数据节点列表
+   * @throws Exception 读取文件或解析JSON失败时抛出异常
    */
   @Override
   public List<DiskBalancerDataNode> getNodes() throws Exception {
+    // 检查集群文件URL不为空
     Preconditions.checkNotNull(this.clusterURI);
+    // 从URL获取文件路径
     String dataFilePath = this.clusterURI.getPath();
     LOG.info("Reading cluster info from file : " + dataFilePath);
+    // 解析JSON文件生成集群对象
     DiskBalancerCluster cluster = READER.readValue(new File(dataFilePath));
     String message = String.format("Found %d node(s)",
         cluster.getNodes().size());
     LOG.info(message);
+    // 返回解析得到的节点列表
     return cluster.getNodes();
   }
 
   /**
-   * Returns info about the connector.
-   *
-   * @return String.
+   * 获取当前连接器的描述信息，用于日志和调试
+   * @return 连接器描述字符串
    */
   @Override
   public String getConnectorInfo() {

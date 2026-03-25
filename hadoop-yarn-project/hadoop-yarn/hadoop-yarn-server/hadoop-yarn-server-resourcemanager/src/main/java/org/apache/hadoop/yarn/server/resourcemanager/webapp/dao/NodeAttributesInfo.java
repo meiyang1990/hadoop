@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,8 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.ArrayList;
 
 /**
- * DAO for a list of node attributes info.
+ * YARN RM WebAPI 节点属性信息列表的数据访问对象（DAO）
+ * 用于封装所有节点属性信息，供Web服务序列化为XML/JSON返回给前端
  */
 @XmlRootElement(name = "nodeAttributesInfo")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -35,14 +37,25 @@ public class NodeAttributesInfo {
   private ArrayList<NodeAttributeInfo> nodeAttributesInfo =
       new ArrayList<>();
 
+  /**
+   * JAXB序列化需要的无参构造函数
+   */
   public NodeAttributesInfo() {
     // JAXB needs this
   }
 
+  /**
+   * 添加单个节点属性信息到列表
+   * @param attributeInfo 单个节点属性信息对象
+   */
   public void addNodeAttributeInfo(NodeAttributeInfo attributeInfo) {
     this.nodeAttributesInfo.add(attributeInfo);
   }
 
+  /**
+   * 获取所有节点属性信息列表
+   * @return 节点属性信息集合
+   */
   public ArrayList<NodeAttributeInfo> getNodeAttributesInfo() {
     return nodeAttributesInfo;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -33,7 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Create, read and write to the domain Table.
+ * 时间线服务域表读写操作实现类，负责域表的创建、读写，基于HBase存储时间线服务的域元数据
  */
 public class DomainTableRW extends BaseTableRW<DomainTable> {
   /** domain prefix. */
@@ -49,6 +50,9 @@ public class DomainTableRW extends BaseTableRW<DomainTable> {
   private static final Logger LOG =
       LoggerFactory.getLogger(DomainTableRW.class);
 
+  /**
+   * 构造函数，传入表名配置项和默认表名
+   */
   public DomainTableRW() {
     super(TABLE_NAME_CONF_NAME, DEFAULT_TABLE_NAME);
   }
@@ -61,10 +65,19 @@ public class DomainTableRW extends BaseTableRW<DomainTable> {
    * createTable(org.apache.hadoop.hbase.client.Admin,
    * org.apache.hadoop.conf.Configuration)
    */
+
+  /**
+   * 在HBase中创建域表，完成表结构初始化和预分区
+   * @param admin HBase管理员客户端
+   * @param hbaseConf HBase配置
+   * @throws IOException 创建失败时抛出异常
+   */
   public void createTable(Admin admin, Configuration hbaseConf)
       throws IOException {
 
+    // 从配置中获取表名
     TableName table = getTableName(hbaseConf);
+    // 表已存在时抛出异常，避免覆盖已有数据
     if (admin.tableExists(table)) {
       // do not disable / delete existing table
       // similar to the approach taken by map-reduce jobs when
@@ -73,19 +86,27 @@ public class DomainTableRW extends BaseTableRW<DomainTable> {
           + " already exists.");
     }
 
+    // 创建表描述符
     HTableDescriptor domainTableDescp = new HTableDescriptor(table);
+    // 创建INFO列族描述符
     HColumnDescriptor mappCF =
         new HColumnDescriptor(DomainColumnFamily.INFO.getBytes());
+    // 设置布隆过滤器类型为ROWCOL，优化随机查询性能
     mappCF.setBloomFilterType(BloomType.ROWCOL);
+    // 将INFO列族添加到表描述符
     domainTableDescp.addFamily(mappCF);
 
+    // 设置按前缀拆分的分区策略，按用户名前缀划分Region
     domainTableDescp
         .setRegionSplitPolicyClassName(
             "org.apache.hadoop.hbase.regionserver.KeyPrefixRegionSplitPolicy");
+    // 设置前缀长度，对应用户名前缀长度
     domainTableDescp.setValue("KeyPrefixRegionSplitPolicy.prefix_length",
         TimelineHBaseSchemaConstants.USERNAME_SPLIT_KEY_PREFIX_LENGTH);
+    // 按照用户名前缀预创建分区，创建HBase表
     admin.createTable(domainTableDescp,
         TimelineHBaseSchemaConstants.getUsernameSplits());
+    // 记录表创建结果日志
     LOG.info("Status of table creation for " + table.getNameAsString() + "="
         + admin.tableExists(table));
   }

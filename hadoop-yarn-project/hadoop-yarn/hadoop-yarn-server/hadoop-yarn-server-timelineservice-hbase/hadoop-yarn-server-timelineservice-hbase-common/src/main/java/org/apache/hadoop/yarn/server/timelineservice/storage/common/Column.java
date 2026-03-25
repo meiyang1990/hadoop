@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,37 +21,40 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.common;
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * A Column represents the way to store a fully qualified column in a specific
- * table.
+ * HBase存储中完全限定列的抽象接口，定义了列在特定表中的存储元信息，
+ * 用于YARN时间线服务HBase存储层统一管理不同表的列定义。
+ * 
+ * @param <T> 该列所属的HBase表类型
  */
 public interface Column<T extends BaseTable<T>> {
   /**
-   * Returns column family name(as bytes) associated with this column.
-   * @return a byte array encoding column family for this column qualifier.
+   * 获取该列对应的列族字节数组形式.
+   * @return 列族编码后的字节数组
    */
   byte[] getColumnFamilyBytes();
 
   /**
-   * Get byte representation for this column qualifier.
-   * @return a byte array representing column qualifier.
+   * 获取该列限定符的字节数组形式.
+   * @return 列限定符编码后的字节数组
    */
   byte[] getColumnQualifierBytes();
 
   /**
-   * Returns value converter implementation associated with this column.
-   * @return a {@link ValueConverter} implementation.
+   * 获取该列关联的值转换器，用于列值在Java类型和HBase字节存储之间的转换.
+   * @return 值转换器实例
    */
   ValueConverter getValueConverter();
 
   /**
-   * Return attributed combined with aggregations, if any.
-   * @return an array of Attributes
+   * 获取与聚合操作结合后的属性数组.
+   * @param attributes 输入属性数组
+   * @return 聚合处理后的属性数组
    */
   Attribute[] getCombinedAttrsWithAggr(Attribute... attributes);
 
   /**
-   * Return true if the cell timestamp needs to be supplemented.
-   * @return true if the cell timestamp needs to be supplemented
+   * 判断是否需要对单元格时间戳进行补充.
+   * @return true表示需要补充单元格时间戳，false表示不需要
    */
   boolean supplementCellTimestamp();
 }

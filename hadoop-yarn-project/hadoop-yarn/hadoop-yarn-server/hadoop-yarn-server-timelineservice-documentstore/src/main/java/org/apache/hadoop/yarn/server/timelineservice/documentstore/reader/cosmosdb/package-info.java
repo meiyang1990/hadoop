@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,7 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.documentstore
- * .reader.cosmosdb DocumentStore Reader implementation for CosmosDB.
+ * 时间线服务文档存储的Azure CosmosDB读取器实现包，提供对接CosmosDB文档数据库的时间线数据查询能力。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

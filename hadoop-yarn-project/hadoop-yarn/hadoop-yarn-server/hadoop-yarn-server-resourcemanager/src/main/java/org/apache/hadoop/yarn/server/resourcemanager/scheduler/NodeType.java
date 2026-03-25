@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,10 +20,16 @@
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler;
 
 /**
- * Resource classification.
+ * YARN调度器节点位置类型枚举，用于调度时根据数据位置进行资源分配优化
+ * 按照数据locality层级划分，优先选择距离数据近的节点分配资源
  */
 public enum NodeType {
-  NODE_LOCAL(0), RACK_LOCAL(1), OFF_SWITCH(2);
+  /** 节点本地：数据就在当前节点，延迟最低 */
+  NODE_LOCAL(0),
+  /** 机架本地：数据在同一个机架的其他节点，延迟较低 */
+  RACK_LOCAL(1),
+  /** 跨机架：数据在不同机架，延迟最高 */
+  OFF_SWITCH(2);
 
   private final int index;
 
@@ -31,7 +38,7 @@ public enum NodeType {
   }
 
   /**
-   * @return the index of the node type
+   * @return 获取节点类型的索引值，索引越小优先级越高
    */
   public int getIndex() {
     return index;

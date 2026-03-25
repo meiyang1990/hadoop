@@ -80,6 +80,10 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 
 import org.apache.hadoop.classification.VisibleForTesting;
 
+/**
+ * ApplicationMaster服务实现，处理ApplicationMaster向ResourceManager注册、心跳、资源请求、完成注销等核心RPC请求，
+ * 负责维护AM生命周期和分配资源，通过处理器链扩展支持调度约束等功能
+ */
 @SuppressWarnings("unchecked")
 @Private
 public class ApplicationMasterService extends AbstractService implements
@@ -87,25 +91,46 @@ public class ApplicationMasterService extends AbstractService implements
   private static final Logger LOG = LoggerFactory.
       getLogger(ApplicationMasterService.class);
 
+  // AM存活性监控器
   private final AMLivelinessMonitor amLivelinessMonitor;
+  // YARN调度器引用
   private YarnScheduler rScheduler;
+  // 服务监听地址
   protected InetSocketAddress masterServiceAddress;
+  // RPC服务端实例
   protected Server server;
+  // 记录工厂，用于创建API记录对象
   protected final RecordFactory recordFactory =
       RecordFactoryProvider.getRecordFactory(null);
+  // 存储每个应用尝试的分配响应锁，保证并发注册/分配操作线程安全
   private final ConcurrentMap<ApplicationAttemptId, AllocateResponseLock> responseMap =
       new ConcurrentHashMap<ApplicationAttemptId, AllocateResponseLock>();
+  // 缓存已完成的应用尝试，防止重复处理完成请求
   private final ConcurrentHashMap<ApplicationAttemptId, Boolean>
       finishedAttemptCache = new ConcurrentHashMap<>();
+  // RM上下文对象
   protected final RMContext rmContext;
+  // AM请求处理链，支持多处理器扩展处理AM请求
   private final AMSProcessingChain amsProcessingChain;
+  // 是否开启Timeline Service V2
   private boolean timelineServiceV2Enabled;
 
+  /**
+   * 构造ApplicationMasterService实例
+   * @param rmContext RM上下文
+   * @param scheduler 调度器
+   */
   public ApplicationMasterService(RMContext rmContext,
       YarnScheduler scheduler) {
     this(ApplicationMasterService.class.getName(), rmContext, scheduler);
   }
 
+  /**
+   * 构造ApplicationMasterService实例
+   * @param name 服务名称
+   * @param rmContext RM上下文
+   * @param scheduler 调度器
+   */
   public ApplicationMasterService(String name, RMContext rmContext,
       YarnScheduler scheduler) {
     super(name);
@@ -117,14 +142,20 @@ public class ApplicationMasterService extends AbstractService implements
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 从配置读取服务绑定地址
     masterServiceAddress = conf.getSocketAddr(
         YarnConfiguration.RM_BIND_HOST,
         YarnConfiguration.RM_SCHEDULER_ADDRESS,
         YarnConfiguration.DEFAULT_RM_SCHEDULER_ADDRESS,
         YarnConfiguration.DEFAULT_RM_SCHEDULER_PORT);
+    // 初始化AM请求处理链
     initializeProcessingChain(conf);
   }
 
+  /**
+   * 根据配置添加位置约束处理器
+   * @param conf 配置对象
+   */
   private void addPlacementConstraintHandler(Configuration conf) {
     String placementConstraintsHandler =
         conf.get(YarnConfiguration.RM_PLACEMENT_CONSTRAINTS_HANDLER,
@@ -150,6 +181,10 @@ public class ApplicationMasterService extends AbstractService implements
     }
   }
 
+  /**
+   * 初始化AM请求处理链，加载配置的所有处理器
+   * @param conf 配置对象
+   */
   private void initializeProcessingChain(Configuration conf) {
     amsProcessingChain.init(rmContext, null);
     addPlacementConstraintHandler(conf);
@@ -158,7 +193,7 @@ public class ApplicationMasterService extends AbstractService implements
     if (processors != null) {
       Collections.reverse(processors);
       for (ApplicationMasterServiceProcessor p : processors) {
-        // Ensure only single instance of PlacementProcessor is included
+        // 确保只存在一个位置处理器实例，忽略配置文件中额外添加的位置处理器
         if (p instanceof AbstractPlacementProcessor) {
           LOG.warn("Found PlacementProcessor=" + p.getClass().getCanonicalName()
               + " defined in "
@@ -173,6 +208,11 @@ public class ApplicationMasterService extends AbstractService implements
     }
   }
 
+  /**
+   * 从配置中加载自定义AM处理器列表
+   * @param conf 配置对象
+   * @return 处理器列表
+   */
   protected List<ApplicationMasterServiceProcessor> getProcessorList(
       Configuration conf) {
     return conf.getInstances(
@@ -186,18 +226,18 @@ public class ApplicationMasterService extends AbstractService implements
     YarnRPC rpc = YarnRPC.create(conf);
 
     Configuration serverConf = conf;
-    // If the auth is not-simple, enforce it to be token-based.
+    // 强制启用令牌认证，非简单认证模式下
     serverConf = new Configuration(conf);
     serverConf.set(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION,
         SaslRpcServer.AuthMethod.TOKEN.toString());
     this.server = getServer(rpc, serverConf, masterServiceAddress,
         this.rmContext.getAMRMTokenSecretManager());
-    // TODO more exceptions could be added later.
+    // 添加简洁异常，减少客户端不必要的栈信息
     this.server.addTerseExceptions(
         ApplicationMasterNotRegisteredException.class);
 
-    // Enable service authorization?
+    // 启用服务权限认证
     if (conf.getBoolean(
         CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHORIZATION, 
         false)) {
@@ -212,6 +252,7 @@ public class ApplicationMasterService extends AbstractService implements
     }
 
     this.server.start();
+    // 更新实际绑定地址，处理动态端口分配
     this.masterServiceAddress =
         conf.updateConnectAddr(YarnConfiguration.RM_BIND_HOST,
                                YarnConfiguration.RM_SCHEDULER_ADDRESS,
@@ -223,6 +264,14 @@ public class ApplicationMasterService extends AbstractService implements
     super.serviceStart();
   }
 
+  /**
+   * 创建RPC服务端实例
+   * @param rpc RPC工厂
+   * @param serverConf 服务配置
+   * @param addr 绑定地址
+   * @param secretManager AMRM令牌秘钥管理器
+   * @return RPC服务端实例
+   */
   protected Server getServer(YarnRPC rpc, Configuration serverConf,
       InetSocketAddress addr, AMRMTokenSecretManager secretManager) {
     return rpc.getServer(ApplicationMasterProtocol.class, this, addr,
@@ -231,6 +280,10 @@ public class ApplicationMasterService extends AbstractService implements
             YarnConfiguration.DEFAULT_RM_SCHEDULER_CLIENT_THREAD_COUNT));
   }
 
+  /**
+   * 获取AM请求处理链
+   * @return 处理链实例
+   */
   protected AMSProcessingChain getProcessingChain() {
     return this.amsProcessingChain;
   }
@@ -241,10 +294,14 @@ public class ApplicationMasterService extends AbstractService implements
   }
 
   @Override
+  /**
+   * 处理ApplicationMaster注册请求
+   */
   public RegisterApplicationMasterResponse registerApplicationMaster(
       RegisterApplicationMasterRequest request) throws YarnException,
       IOException {
 
+    // 从RPC上下文获取AMRM令牌，完成请求认证
     AMRMTokenIdentifier amrmTokenIdentifier =
         YarnServerSecurityUtils.authorizeRequest();
     ApplicationAttemptId applicationAttemptId =
@@ -253,6 +310,7 @@ public class ApplicationMasterService extends AbstractService implements
     ApplicationId appID = applicationAttemptId.getApplicationId();
     AllocateResponseLock lock = responseMap.get(applicationAttemptId);
     if (lock == null) {
+      // 缓存不存在该应用尝试，记录审计日志并抛出异常
       RMAuditLogger.logFailure(this.rmContext.getRMApps().get(appID).getUser(),
           AuditConstants.REGISTER_AM, "Application doesn't exist in cache "
               + applicationAttemptId, "ApplicationMasterService",
@@ -261,11 +319,11 @@ public class ApplicationMasterService extends AbstractService implements
       throwApplicationDoesNotExistInCacheException(applicationAttemptId);
     }
 
-    // Allow only one thread in AM to do registerApp at a time.
+    // 同一AM的注册操作串行执行，保证线程安全
     synchronized (lock) {
       AllocateResponse lastResponse = lock.getAllocateResponse();
       if (hasApplicationMasterRegistered(applicationAttemptId)) {
-        // allow UAM re-register if work preservation is enabled
+        // 仅非UAM或未开启容器保留时，拒绝重复注册
         ApplicationSubmissionContext appContext =
             rmContext.getRMApps().get(appID).getApplicationSubmissionContext();
         if (!(appContext.getUnmanagedAM()
@@ -281,16 +339,17 @@ public class ApplicationMasterService extends AbstractService implements
         }
       }
 
+      // 更新存活性监控，标记AM存活
       this.amLivelinessMonitor.receivedPing(applicationAttemptId);
 
-      // Setting the response id to 0 to identify if the
-      // application master is register for the respective attemptid
+      // 设置初始响应ID为0，表示已注册
       lastResponse.setResponseId(0);
       lock.setAllocateResponse(lastResponse);
 
       RegisterApplicationMasterResponse response =
           recordFactory.newRecordInstance(
               RegisterApplicationMasterResponse.class);
+      // 通过处理链处理注册请求
       this.amsProcessingChain.registerApplicationMaster(
           amrmTokenIdentifier.getApplicationAttemptId(), request, response);
       return response;
@@ -298,10 +357,14 @@ public class ApplicationMasterService extends AbstractService implements
   }
 
   @Override
+  /**
+   * 处理ApplicationMaster注销完成请求
+   */
   public FinishApplicationMasterResponse finishApplicationMaster(
       FinishApplicationMasterRequest request) throws YarnException,
       IOException {
 
+    // 认证获取应用尝试ID
     ApplicationAttemptId applicationAttemptId =
         YarnServerSecurityUtils.authorizeRequest().getApplicationAttemptId();
     ApplicationId appId = applicationAttemptId.getApplicationId();
@@ -309,13 +372,11 @@ public class ApplicationMasterService extends AbstractService implements
     RMApp rmApp =
         rmContext.getRMApps().get(applicationAttemptId.getApplicationId());
 
-    // Remove collector address when app get finished.
+    // 开启Timeline V2时，清除应用收集器地址信息
     if (timelineServiceV2Enabled) {
       ((RMAppImpl) rmApp).removeCollectorData();
     }
-    // checking whether the app exits in RMStateStore at first not to throw
-    // ApplicationDoesNotExistInCacheException before and after
-    // RM work-preserving restart.
+    // 若应用最终状态已存储，直接返回成功，避免RM重启后重复报错
     if (rmApp.isAppFinalStateStored()) {
       LOG.info(rmApp.getApplicationId() + " unregistered successfully. ");
       return FinishApplicationMasterResponse.newInstance(true);
@@ -326,7 +387,7 @@ public class ApplicationMasterService extends AbstractService implements
       throwApplicationDoesNotExistInCacheException(applicationAttemptId);
     }
 
-    // Allow only one thread in AM to do finishApp at a time.
+    // 同一AM的完成操作串行执行
     synchronized (lock) {
       if (!hasApplicationMasterRegistered(applicationAttemptId)) {
         String message =
@@ -344,6 +405,7 @@ public class ApplicationMasterService extends AbstractService implements
 
       FinishApplicationMasterResponse response =
           FinishApplicationMasterResponse.newInstance(false);
+      // 仅处理一次完成请求，幂等处理
       if (finishedAttemptCache.putIfAbsent(applicationAttemptId, true)
           == null) {
         this.amsProcessingChain
@@ -352,190 +414,3 @@ public class ApplicationMasterService extends AbstractService implements
       this.amLivelinessMonitor.receivedPing(applicationAttemptId);
       return response;
     }
-  }
-
-  private void throwApplicationDoesNotExistInCacheException(
-      ApplicationAttemptId appAttemptId)
-      throws InvalidApplicationMasterRequestException {
-    String message = "Application doesn't exist in cache "
-        + appAttemptId;
-    LOG.error(message);
-    throw new InvalidApplicationMasterRequestException(message);
-  }
-  
-  /**
-   * @param appAttemptId
-   * @return true if application is registered for the respective attemptid
-   */
-  public boolean hasApplicationMasterRegistered(
-      ApplicationAttemptId appAttemptId) {
-    boolean hasApplicationMasterRegistered = false;
-    AllocateResponseLock lastResponse = responseMap.get(appAttemptId);
-    if (lastResponse != null) {
-      synchronized (lastResponse) {
-        if (lastResponse.getAllocateResponse() != null
-            && lastResponse.getAllocateResponse().getResponseId() >= 0) {
-          hasApplicationMasterRegistered = true;
-        }
-      }
-    }
-    return hasApplicationMasterRegistered;
-  }
-
-  private final static List<Container> EMPTY_CONTAINER_LIST =
-      new ArrayList<Container>();
-  protected static final Allocation EMPTY_ALLOCATION = new Allocation(
-      EMPTY_CONTAINER_LIST, Resources.createResource(0), null, null, null);
-
-  @Override
-  public AllocateResponse allocate(AllocateRequest request)
-      throws YarnException, IOException {
-
-    AMRMTokenIdentifier amrmTokenIdentifier =
-        YarnServerSecurityUtils.authorizeRequest();
-
-    ApplicationAttemptId appAttemptId =
-        amrmTokenIdentifier.getApplicationAttemptId();
-
-    this.amLivelinessMonitor.receivedPing(appAttemptId);
-
-    /* check if its in cache */
-    AllocateResponseLock lock = responseMap.get(appAttemptId);
-    if (lock == null) {
-      String message =
-          "Application attempt " + appAttemptId
-              + " doesn't exist in ApplicationMasterService cache.";
-      LOG.error(message);
-      throw new ApplicationAttemptNotFoundException(message);
-    }
-    synchronized (lock) {
-      AllocateResponse lastResponse = lock.getAllocateResponse();
-      if (!hasApplicationMasterRegistered(appAttemptId)) {
-        String message =
-            "AM is not registered for known application attempt: "
-                + appAttemptId
-                + " or RM had restarted after AM registered. "
-                + " AM should re-register.";
-        throw new ApplicationMasterNotRegisteredException(message);
-      }
-
-      // Normally request.getResponseId() == lastResponse.getResponseId()
-      if (AMRMClientUtils.getNextResponseId(
-          request.getResponseId()) == lastResponse.getResponseId()) {
-        // heartbeat one step old, simply return lastReponse
-        return lastResponse;
-      } else if (request.getResponseId() != lastResponse.getResponseId()) {
-        throw new InvalidApplicationMasterRequestException(AMRMClientUtils
-            .assembleInvalidResponseIdExceptionMessage(appAttemptId,
-                lastResponse.getResponseId(), request.getResponseId()));
-      }
-
-      AllocateResponse response =
-          recordFactory.newRecordInstance(AllocateResponse.class);
-      this.amsProcessingChain.allocate(
-          amrmTokenIdentifier.getApplicationAttemptId(), request, response);
-
-      // update AMRMToken if the token is rolled-up
-      MasterKeyData nextMasterKey =
-          this.rmContext.getAMRMTokenSecretManager().getNextMasterKeyData();
-
-      if (nextMasterKey != null
-          && nextMasterKey.getMasterKey().getKeyId() != amrmTokenIdentifier
-          .getKeyId()) {
-        RMApp app =
-            this.rmContext.getRMApps().get(appAttemptId.getApplicationId());
-        RMAppAttempt appAttempt = app.getRMAppAttempt(appAttemptId);
-        RMAppAttemptImpl appAttemptImpl = (RMAppAttemptImpl)appAttempt;
-        Token<AMRMTokenIdentifier> amrmToken = appAttempt.getAMRMToken();
-        if (nextMasterKey.getMasterKey().getKeyId() !=
-            appAttemptImpl.getAMRMTokenKeyId()) {
-          LOG.info("The AMRMToken has been rolled-over. Send new AMRMToken back"
-              + " to application: " + appAttemptId.getApplicationId());
-          amrmToken = rmContext.getAMRMTokenSecretManager()
-              .createAndGetAMRMToken(appAttemptId);
-          appAttemptImpl.setAMRMToken(amrmToken);
-        }
-        response.setAMRMToken(org.apache.hadoop.yarn.api.records.Token
-            .newInstance(amrmToken.getIdentifier(), amrmToken.getKind()
-                .toString(), amrmToken.getPassword(), amrmToken.getService()
-                .toString()));
-      }
-
-      /*
-       * As we are updating the response inside the lock object so we don't
-       * need to worry about unregister call occurring in between (which
-       * removes the lock object).
-       */
-      response.setResponseId(
-          AMRMClientUtils.getNextResponseId(lastResponse.getResponseId()));
-      lock.setAllocateResponse(response);
-      return response;
-    }
-  }
-
-  public void registerAppAttempt(ApplicationAttemptId attemptId) {
-    AllocateResponse response =
-        recordFactory.newRecordInstance(AllocateResponse.class);
-    // set response id to -1 before application master for the following
-    // attemptID get registered
-    response.setResponseId(AMRMClientUtils.PRE_REGISTER_RESPONSE_ID);
-    LOG.info("Registering app attempt : " + attemptId);
-    responseMap.put(attemptId, new AllocateResponseLock(response));
-    rmContext.getNMTokenSecretManager().registerApplicationAttempt(attemptId);
-  }
-
-  @VisibleForTesting
-  protected boolean setAttemptLastResponseId(ApplicationAttemptId attemptId,
-      int lastResponseId) {
-    AllocateResponseLock lock = responseMap.get(attemptId);
-    if (lock == null || lock.getAllocateResponse() == null) {
-      return false;
-    }
-    lock.getAllocateResponse().setResponseId(lastResponseId);
-    return true;
-  }
-
-  public void unregisterAttempt(ApplicationAttemptId attemptId) {
-    LOG.info("Unregistering app attempt : " + attemptId);
-    responseMap.remove(attemptId);
-    finishedAttemptCache.remove(attemptId);
-    rmContext.getNMTokenSecretManager().unregisterApplicationAttempt(attemptId);
-  }
-
-  public void refreshServiceAcls(Configuration configuration, 
-      PolicyProvider policyProvider) {
-    this.server.refreshServiceAclWithLoadedConfiguration(configuration,
-        policyProvider);
-  }
-  
-  @Override
-  protected void serviceStop() throws Exception {
-    if (this.server != null) {
-      this.server.stop();
-    }
-    responseMap.clear();
-    finishedAttemptCache.clear();
-    super.serviceStop();
-  }
-  
-  public static class AllocateResponseLock {
-    private AllocateResponse response;
-    
-    public AllocateResponseLock(AllocateResponse response) {
-      this.response = response;
-    }
-    
-    public synchronized AllocateResponse getAllocateResponse() {
-      return response;
-    }
-    
-    public synchronized void setAllocateResponse(AllocateResponse response) {
-      this.response = response;
-    }
-  }
-
-  @VisibleForTesting
-  public Server getServer() {
-    return this.server;
-  }
-}

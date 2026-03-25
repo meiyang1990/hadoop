@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -21,16 +22,29 @@ import org.apache.hadoop.mapreduce.v2.api.protocolrecords.CancelDelegationTokenR
 import org.apache.hadoop.security.proto.SecurityProtos.CancelDelegationTokenResponseProto;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 
+/**
+ * 取消代理令牌响应的Protobuf实现类
+ * 基于Protobuf序列化框架，实现了CancelDelegationTokenResponse接口，
+ * 负责封装MapReduce客户端取消代理令牌请求的响应数据
+ */
 public class CancelDelegationTokenResponsePBImpl extends
     ProtoBase<CancelDelegationTokenResponseProto> implements
     CancelDelegationTokenResponse {
 
+  // 存储Protobuf消息对象，默认使用默认实例初始化
   CancelDelegationTokenResponseProto proto = CancelDelegationTokenResponseProto
       .getDefaultInstance();
 
+  /**
+   * 无参构造函数，创建空的取消代理令牌响应对象
+   */
   public CancelDelegationTokenResponsePBImpl() {
   }
 
+  /**
+   * 构造函数，基于已有Protobuf消息对象创建响应对象
+   * @param proto 已序列化的取消代理令牌响应Protobuf消息
+   */
   public CancelDelegationTokenResponsePBImpl(
       CancelDelegationTokenResponseProto proto) {
     this.proto = proto;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,11 +25,19 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.nativetask.INativeComparable;
 
-
+/**
+ * FloatWritable 原生任务序列化器，为原生任务侧提供 FloatWritable 类型的序列化能力，并支持原生比较
+ */
 @InterfaceAudience.Private
 public class FloatWritableSerializer extends DefaultSerializer implements
     INativeComparable {
 
+  /**
+   * 获取 FloatWritable 对象序列化后的固定字节长度
+   * @param w 待计算长度的 FloatWritable 对象
+   * @return 固定长度4字节（float类型占用字节数）
+   * @throws IOException IO异常
+   */
   @Override
   public int getLength(Writable w) throws IOException {
     return 4;

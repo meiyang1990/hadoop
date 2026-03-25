@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -50,7 +51,8 @@ import java.util.stream.Collectors;
 import static org.apache.hadoop.yarn.api.records.ResourceInformation.GPU_URI;
 
 /**
- * Allocate GPU resources according to requirements.
+ * GPU资源分配器，根据容器请求分配节点上的GPU设备。
+ * 管理节点GPU设备的分配、回收和恢复，支持等待正在释放的GPU资源。
  */
 public class GpuResourceAllocator {
   final static Logger LOG = LoggerFactory.
@@ -58,15 +60,22 @@ public class GpuResourceAllocator {
 
   private static final int WAIT_MS_PER_LOOP = 1000;
 
+  // 当前节点允许使用的GPU设备集合
   private Set<GpuDevice> allowedGpuDevices = new TreeSet<>();
+  // 已分配GPU设备映射：GPU设备 -> 分配给的容器ID
   private Map<GpuDevice, ContainerId> usedDevices = new TreeMap<>();
+  // NodeManager上下文，用于获取容器信息和状态存储
   private Context nmContext;
+  // 等待可用GPU资源的最大等待时间
   private final int waitPeriodForResource;
 
+  /**
+   * 构造GPU资源分配器。
+   * @param ctx NodeManager上下文
+   */
   public GpuResourceAllocator(Context ctx) {
     this.nmContext = ctx;
-    // Wait for a maximum of 120 seconds if no available GPU are there which
-    // are yet to be released.
+    // 如果GPU都被占用，等待正在释放的GPU，最大等待120秒
     this.waitPeriodForResource = 120 * WAIT_MS_PER_LOOP;
   }
 
@@ -77,8 +86,8 @@ public class GpuResourceAllocator {
   }
 
   /**
-   * Contains allowed and denied devices.
-   * Denied devices will be useful for cgroups devices module to do blacklisting
+   * 存储GPU分配结果，包含允许容器使用和禁止容器使用的GPU设备。
+   * 禁止列表用于cgroups设备模块做黑名单处理。
    */
   static class GpuAllocation {
     private Set<GpuDevice> allowed = Collections.emptySet();
@@ -103,8 +112,8 @@ public class GpuResourceAllocator {
   }
 
   /**
-   * Add GPU to the allowed list of GPUs.
-   * @param gpuDevice gpu device
+   * 添加一个GPU设备到允许使用列表。
+   * @param gpuDevice GPU设备对象
    */
   public synchronized void addGpu(GpuDevice gpuDevice) {
     allowedGpuDevices.add(gpuDevice);
@@ -115,6 +124,11 @@ public class GpuResourceAllocator {
     return allowedGpuDevices.size() - usedDevices.size();
   }
 
+  /**
+   * 从NM状态存储恢复已分配给容器的GPU设备，用于NodeManager重启后恢复。
+   * @param containerId 容器ID
+   * @throws ResourceHandlerException 恢复失败时抛出异常
+   */
   public synchronized void recoverAssignedGpus(ContainerId containerId)
       throws ResourceHandlerException {
     Container c = nmContext.getContainers().get(containerId);
@@ -125,6 +139,7 @@ public class GpuResourceAllocator {
     }
 
     LOG.info("Starting recovery of GpuDevice for {}.", containerId);
+    // 遍历状态存储中已分配给该容器的GPU资源
     for (Serializable gpuDeviceSerializable : c.getResourceMappings()
         .getAssignedResources(GPU_URI)) {
       if (!(gpuDeviceSerializable instanceof GpuDevice)) {
@@ -136,7 +151,7 @@ public class GpuResourceAllocator {
 
       GpuDevice gpuDevice = (GpuDevice) gpuDeviceSerializable;
 
-      // Make sure it is in allowed GPU device.
+      // 检查GPU是否在允许列表中
       if (!allowedGpuDevices.contains(gpuDevice)) {
         throw new ResourceHandlerException(
             "Try to recover device = " + gpuDevice
@@ -144,7 +159,7 @@ public class GpuResourceAllocator {
                 StringUtils.join(",", allowedGpuDevices));
       }
 
-      // Make sure it is not occupied by anybody else
+      // 检查GPU是否已被其他容器占用
       if (usedDevices.containsKey(gpuDevice)) {
         throw new ResourceHandlerException(
             "Try to recover device id = " + gpuDevice
@@ -152,6 +167,7 @@ public class GpuResourceAllocator {
                 .get(gpuDevice) + ", please double check what happened.");
       }
 
+      // 标记GPU为已分配给当前容器
       usedDevices.put(gpuDevice, containerId);
       LOG.info("ContainerId {} is assigned to GpuDevice {} on recovery.",
           containerId, gpuDevice);
@@ -160,9 +176,9 @@ public class GpuResourceAllocator {
   }
 
   /**
-   * Get number of requested GPUs from resource.
-   * @param requestedResource requested resource
-   * @return #gpus.
+   * 从资源请求中解析出需要的GPU数量。
+   * @param requestedResource 容器请求的资源
+   * @return 请求的GPU数量
    */
   public static int getRequestedGpus(Resource requestedResource) {
     try {
@@ -174,25 +190,23 @@ public class GpuResourceAllocator {
   }
 
   /**
-   * Assign GPU to the specified container.
-   * @param container container to allocate
-   * @return allocation results.
-   * @throws ResourceHandlerException When failed to assign GPUs.
+   * 为指定容器分配GPU资源，等待GPU释放超时后抛出异常。
+   * @param container 需要分配GPU的容器
+   * @return GPU分配结果
+   * @throws ResourceHandlerException 分配失败或等待超时抛出异常
    */
   public GpuAllocation assignGpus(Container container)
       throws ResourceHandlerException {
     GpuAllocation allocation = internalAssignGpus(container);
 
-    // Wait for a maximum of waitPeriodForResource seconds if no
-    // available GPU are there which are yet to be released.
+    // 如果当前没有足够可用GPU，等待正在释放的GPU，最多等待指定时长
     int timeWaiting = 0;
     while (allocation == null) {
       if (timeWaiting >= waitPeriodForResource) {
         break;
       }
 
-      // Sleep for 1 sec to ensure there are some free GPU devices which are
-      // getting released.
+      // 每秒重试一次，等待GPU被释放
       try {
         LOG.info("Container : " + container.getContainerId()
             + " is waiting for free GPU devices.");
@@ -200,7 +214,7 @@ public class GpuResourceAllocator {
         timeWaiting += WAIT_MS_PER_LOOP;
         allocation = internalAssignGpus(container);
       } catch (InterruptedException e) {
-        // On any interrupt, break the loop and continue execution.
+        // 中断后退出等待，继续处理
         Thread.currentThread().interrupt();
         LOG.warn("Interrupted while waiting for available GPU");
         break;
@@ -217,13 +231,20 @@ public class GpuResourceAllocator {
     return allocation;
   }
 
+  /**
+   * 内部GPU分配逻辑，尝试为容器分配请求数量的GPU。
+   * 如果当前可用不足但有正在释放的GPU，返回null让外层等待。
+   * @param container 需要分配GPU的容器
+   * @return 分配结果，返回null表示需要等待GPU释放
+   * @throws ResourceHandlerException 资源不足或存储失败抛出异常
+   */
   private synchronized GpuAllocation internalAssignGpus(Container container)
       throws ResourceHandlerException {
     Resource requestedResource = container.getResource();
     ContainerId containerId = container.getContainerId();
     int numRequestedGpuDevices = getRequestedGpus(requestedResource);
 
-    // Assign GPUs to container if requested some.
+    // 容器请求了GPU才进行分配
     if (numRequestedGpuDevices > 0) {
       if (LOG.isDebugEnabled()) {
         LOG.debug(String.format("Trying to assign %d GPUs to container: %s" +
@@ -232,13 +253,13 @@ public class GpuResourceAllocator {
             getAvailableGpus(), getReleasingGpus()));
       }
       if (numRequestedGpuDevices > getAvailableGpus()) {
-        // If there are some devices which are getting released, wait for few
-        // seconds to get it.
+        // 如果总可用（当前可用+正在释放）足够，返回null让外层等待释放完成
         if (numRequestedGpuDevices <= getReleasingGpus() + getAvailableGpus()) {
           return null;
         }
       }
 
+      // 总可用也不足，直接抛出异常
       if (numRequestedGpuDevices > getAvailableGpus()) {
         throw new ResourceHandlerException(
             "Failed to find enough GPUs, requestor=" + containerId +
@@ -246,8 +267,8 @@ public class GpuResourceAllocator {
                 ", #AvailableGPUs=" + getAvailableGpus());
       }
 
+      // 遍历分配空闲GPU
       Set<GpuDevice> assignedGpus = new TreeSet<>();
-
       for (GpuDevice gpu : allowedGpuDevices) {
         if (!usedDevices.containsKey(gpu)) {
           usedDevices.put(gpu, containerId);
@@ -258,29 +279,37 @@ public class GpuResourceAllocator {
         }
       }
 
-      // Record in state store if we allocated anything
+      // 分配完成后持久化到NM状态存储
       if (!assignedGpus.isEmpty()) {
         try {
-          // Update state store.
           nmContext.getNMStateStore().storeAssignedResources(container, GPU_URI,
               new ArrayList<>(assignedGpus));
         } catch (IOException e) {
+          // 存储失败，回滚分配
           unassignGpus(containerId);
           throw new ResourceHandlerException(e);
         }
       }
 
+      // 允许列表为分配给容器的GPU，禁止列表为剩余所有GPU，用于cgroups黑名单
       return new GpuAllocation(assignedGpus,
           Sets.differenceInTreeSets(allowedGpuDevices, assignedGpus));
     }
+    // 容器未请求GPU，所有GPU都禁止访问
     return new GpuAllocation(null, allowedGpuDevices);
   }
 
+  /**
+   * 获取当前正在被处于终态容器占用，即将释放的GPU数量。
+   * @return 正在释放的GPU数量
+   */
   private synchronized long getReleasingGpus() {
     long releasingGpus = 0;
+    // 遍历所有已分配GPU的容器
     for (ContainerId containerId : ImmutableSet.copyOf(usedDevices.values())) {
       Container container;
       if ((container = nmContext.getContainers().get(containerId)) != null) {
+        // 统计已处于终态容器占用的GPU
         if (container.isContainerInFinalStates()) {
           releasingGpus = releasingGpus + container.getResource()
               .getResourceInformation(ResourceInformation.GPU_URI).getValue();
@@ -291,13 +320,14 @@ public class GpuResourceAllocator {
   }
 
   /**
-   * Clean up all GPUs assigned to containerId.
-   * @param containerId containerId
+   * 回收容器分配的所有GPU设备。
+   * @param containerId 容器ID
    */
   public synchronized void unassignGpus(ContainerId containerId) {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Trying to unassign GPU device from container " + containerId);
     }
+    // 移除该容器分配的所有GPU
     usedDevices.entrySet().removeIf(entry ->
         entry.getValue().equals(containerId));
   }
@@ -307,10 +337,18 @@ public class GpuResourceAllocator {
     return ImmutableMap.copyOf(usedDevices);
   }
 
+  /**
+   * 获取当前节点允许使用的所有GPU列表。
+   * @return 允许使用的GPU列表
+   */
   public synchronized List<GpuDevice> getAllowedGpus() {
     return ImmutableList.copyOf(allowedGpuDevices);
   }
 
+  /**
+   * 获取当前所有已分配的GPU设备信息。
+   * @return 已分配GPU设备列表，包含分配给的容器信息
+   */
   public synchronized List<AssignedGpuDevice> getAssignedGpus() {
     return usedDevices.entrySet().stream()
         .map(e -> {

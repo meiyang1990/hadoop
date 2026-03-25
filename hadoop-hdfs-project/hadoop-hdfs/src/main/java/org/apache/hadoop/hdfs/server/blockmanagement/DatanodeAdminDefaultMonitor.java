@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,6 +41,9 @@ import java.util.List;
 import java.util.Iterator;
 
 /**
+ * 文件说明：数据节点退役/维护状态默认监控器，负责监控正在进行退役或进入维护的节点，
+ * 检查其上所有块是否已经完成足够复制，完成后将节点标记为目标状态。
+ * 由于操作需要持有命名系统锁，每次监控周期的工作量会被限制，避免阻塞其他操作。
  * Checks to see if datanodes have finished DECOMMISSION_INPROGRESS or
  * ENTERING_MAINTENANCE state.
  * <p>
@@ -47,51 +51,41 @@ import java.util.Iterator;
  * the amount of work per monitor tick is limited.
  */
 
-public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
+/**
+ * 类说明：数据节点管理操作默认监控器，继承基础监控类实现数据节点退役/维护的进度监控逻辑，
+ * 核心职责是增量检查待退役/维护节点上的块复制状态，当所有块完成足够复制后完成状态切换。
+ */
+public class DatanodeAdminDefaultMonitor extends DatanodeAdminAdminBase
     implements DatanodeAdminMonitorInterface {
 
   /**
-   * Map containing the DECOMMISSION_INPROGRESS or ENTERING_MAINTENANCE
-   * datanodes that are being tracked so they can be be marked as
-   * DECOMMISSIONED or IN_MAINTENANCE. Even after the node is marked as
-   * IN_MAINTENANCE, the node remains in the map until
-   * maintenance expires checked during a monitor tick.
-   * <p/>
-   * This holds a set of references to the under-replicated blocks on the DN
-   * at the time the DN is added to the map, i.e. the blocks that are
-   * preventing the node from being marked as decommissioned. During a monitor
-   * tick, this list is pruned as blocks becomes replicated.
-   * <p/>
-   * Note also that the reference to the list of under-replicated blocks
-   * will be null on initial add
-   * <p/>
-   * However, this map can become out-of-date since it is not updated by block
-   * reports or other events. Before being finally marking as decommissioned,
-   * another check is done with the actual block map.
+   * 跟踪正在进行退役/进入维护的数据节点，存储每个节点上需要等待复制完成的低冗余块列表。
+   * 节点进入维护后仍会保留在map中，直到维护超时才会移除。
+   * 当节点刚加入时，块列表为null，第一次扫描后才会填充。
+   * 该map可能会过时，最终完成状态切换前会使用实际块映射重新校验。
    */
   private final TreeMap<DatanodeDescriptor, AbstractList<BlockInfo>>
       outOfServiceNodeBlocks;
 
   /**
-   * The maximum number of blocks to check per tick.
+   * 每个监控周期最多检查的块数量，避免单次操作占用锁时间过长。
    */
   private int numBlocksPerCheck;
 
   /**
-   * The number of blocks that have been checked on this tick.
+   * 当前监控周期已经检查的块数量。
    */
   private int numBlocksChecked = 0;
   /**
-   * The number of blocks checked after (re)holding lock.
+   * 当前锁持有周期已经检查的块数量，用于锁让步统计。
    */
   private int numBlocksCheckedPerLock = 0;
   /**
-   * The number of nodes that have been checked on this tick. Used for
-   * statistics.
+   * 当前监控周期已经检查的节点数量，用于统计监控进度。
    */
   private int numNodesChecked = 0;
   /**
-   * The last datanode in outOfServiceNodeBlocks that we've processed.
+   * 循环迭代的上次处理节点，支持分段循环处理多个节点。
    */
   private DatanodeDescriptor iterkey = new DatanodeDescriptor(
       new DatanodeID("", "", "", 0, 0, 0, 0));
@@ -99,10 +93,16 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeAdminDefaultMonitor.class);
 
+  /**
+   * 构造函数：初始化空的退役/维护节点块映射。
+   */
   DatanodeAdminDefaultMonitor() {
     this.outOfServiceNodeBlocks = new TreeMap<>();
   }
 
+  /**
+   * 函数说明：从配置中加载监控参数，包括每个周期最大检查块数，处理过期配置警告。
+   */
   @Override
   protected void processConf() {
     numBlocksPerCheck = conf.getInt(
@@ -127,22 +127,38 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
     LOG.info("Initialized the Default Decommission and Maintenance monitor");
   }
 
+  /**
+   * 函数说明：检查当前周期检查块数是否已经达到配置上限。
+   * @return true表示已达到上限，需要停止当前周期处理
+   */
   private boolean exceededNumBlocksPerCheck() {
     LOG.trace("Processed {} blocks so far this tick", numBlocksChecked);
     return numBlocksChecked >= numBlocksPerCheck;
   }
 
+  /**
+   * 函数说明：停止跟踪指定数据节点的退役/维护进度，将节点移至取消队列。
+   * @param dn 要停止跟踪的数据节点
+   */
   @Override
   public void stopTrackingNode(DatanodeDescriptor dn) {
     getPendingNodes().remove(dn);
     getCancelledNodes().add(dn);
   }
 
+  /**
+   * 函数说明：获取当前正在跟踪的节点数量。
+   * @return 正在跟踪的退役/维护节点数
+   */
   @Override
   public int getTrackedNodeCount() {
     return outOfServiceNodeBlocks.size();
   }
 
+  /**
+   * 函数说明：获取当前周期已经检查的节点数量，用于监控统计。
+   * @return 已检查节点数
+   */
   @Override
   public int getNumNodesChecked() {
     return numNodesChecked;
@@ -170,6 +186,10 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
     // nothing.
   }
 
+  /**
+   * 函数说明：监控线程主运行方法，每个周期执行一次退役/维护节点检查流程。
+   * 获取命名系统全局写锁，按顺序处理取消节点、待处理节点，然后执行块检查。
+   */
   @Override
   public void run() {
     LOG.debug("DatanodeAdminMonitor is running.");
@@ -178,13 +198,11 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
           "decommissioning/maintenance checks.");
       return;
     }
-    // Reset the checked count at beginning of each iteration
+    // 重置当前周期检查计数
     numBlocksChecked = 0;
     numBlocksCheckedPerLock = 0;
     numNodesChecked = 0;
-    // Check decommission or maintenance progress.
-    // dnAdmin.stopMaintenance(dn) needs FSReadLock
-    // since processExtraRedundancyBlock involves storage policy and isSufficient involves bc.
+    // 停止维护操作需要获取FS读锁，这里统一获取全局写锁
     namesystem.writeLock(RwLockMode.GLOBAL);
     try {
       processCancelledNodes();
@@ -205,8 +223,7 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * Pop datanodes off the pending priority queue and into decomNodeBlocks,
-   * subject to the maxConcurrentTrackedNodes limit.
+   * 函数说明：将待处理队列中的节点转移到跟踪映射中，受并发跟踪节点数上限限制。
    */
   private void processPendingNodes() {
     while (!getPendingNodes().isEmpty() &&
@@ -217,11 +234,8 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * Process any nodes which have had their decommission or maintenance mode
-   * cancelled by an administrator.
-   *
-   * This method must be executed under the write lock to prevent the
-   * internal structures being modified concurrently.
+   * 函数说明：处理被管理员取消退役/维护的节点，从跟踪映射中移除这些节点。
+   * 该方法必须在写锁下执行，避免并发修改内部结构。
    */
   private void processCancelledNodes() {
     while(!getCancelledNodes().isEmpty()) {
@@ -230,7 +244,12 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
     }
   }
 
+  /**
+   * 函数说明：核心检查逻辑，循环遍历所有跟踪节点，检查每个节点的块复制进度，
+   * 完成块复制的节点标记为目标状态，维护过期节点停止维护并移除跟踪。
+   */
   private void check() {
+    // 基于上次处理位置创建循环迭代器
     final Iterator<Map.Entry<DatanodeDescriptor, AbstractList<BlockInfo>>>
         it = new CyclicIteration<>(outOfServiceNodeBlocks,
         iterkey).iterator();
@@ -247,58 +266,49 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
       try {
         AbstractList<BlockInfo> blocks = entry.getValue();
         boolean fullScan = false;
+        // 维护已过期，停止跟踪该节点
         if (dn.isMaintenance() && dn.maintenanceExpired()) {
-          // If maintenance expires, stop tracking it.
           dnAdmin.stopMaintenance(dn);
           toRemove.add(dn);
           continue;
         }
+        // 节点已经进入维护且未过期，跳过检查
         if (dn.isInMaintenance()) {
-          // The dn is IN_MAINTENANCE and the maintenance hasn't expired yet.
           continue;
         }
+        // 新加入跟踪的节点，执行全量扫描收集不足复制块
         if (blocks == null) {
-          // This is a newly added datanode, run through its list to schedule
-          // under-replicated blocks for replication and collect the blocks
-          // that are insufficiently replicated for further tracking
           LOG.debug("Newly-added node {}, doing full scan to find " +
               "insufficiently-replicated blocks.", dn);
           blocks = handleInsufficientlyStored(dn);
           outOfServiceNodeBlocks.put(dn, blocks);
           fullScan = true;
         } else {
-          // This is a known datanode, check if its # of insufficiently
-          // replicated blocks has dropped to zero and if it can move
-          // to the next state.
+          // 已跟踪节点，剪枝已经完成复制的块
           LOG.debug("Processing {} node {}", dn.getAdminState(), dn);
           pruneReliableBlocks(dn, blocks);
         }
+        // 检查节点是否健康，不健康节点推迟退役
         final boolean isHealthy = blockManager.isNodeHealthyForDecommissionOrMaintenance(dn);
         if (!isHealthy) {
           unhealthyDns.add(dn);
         }
+        // 所有块都完成复制，进行最终校验
         if (blocks.size() == 0) {
           if (!fullScan) {
-            // If we didn't just do a full scan, need to re-check with the
-            // full block map.
-            //
-            // We've replicated all the known insufficiently replicated
-            // blocks. Re-check with the full block map before finally
-            // marking the datanode as DECOMMISSIONED or IN_MAINTENANCE.
+            // 之前不是全量扫描，需要重新全量扫描校验
             LOG.debug("Node {} has finished replicating current set of "
                 + "blocks, checking with the full block map.", dn);
             blocks = handleInsufficientlyStored(dn);
             outOfServiceNodeBlocks.put(dn, blocks);
           }
-          // If the full scan is clean AND the node liveness is okay,
-          // we can finally mark as DECOMMISSIONED or IN_MAINTENANCE.
+          // 全量扫描后仍然无不足块且节点健康，标记为目标状态
           if (blocks.size() == 0 && isHealthy) {
             if (dn.isDecommissionInProgress()) {
               dnAdmin.setDecommissioned(dn);
               toRemove.add(dn);
             } else if (dn.isEnteringMaintenance()) {
-              // IN_MAINTENANCE node remains in the outOfServiceNodeBlocks to
-              // to track maintenance expiration.
+              // 进入维护状态的节点保留在map中跟踪维护过期
               dnAdmin.setInMaintenance(dn);
             } else {
               isValidState  = false;
@@ -321,8 +331,7 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
               dn, blocks.size(), dn.getAdminState());
         }
       } catch (Exception e) {
-        // Log and postpone to process node when meet exception since it is in
-        // an invalid state.
+        // 处理异常，将节点放回待处理队列延后处理
         LOG.warn("DatanodeAdminMonitor caught exception when processing node "
             + "{}.", dn, e);
         if(isValidState){
@@ -333,12 +342,12 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
         toRemove.add(dn);
         unhealthyDns.remove(dn);
       } finally {
+        // 记录本次处理到的节点，下次循环从这里开始
         iterkey = dn;
       }
     }
 
-    // Having more nodes decommissioning than can be tracked will impact decommissioning
-    // performance due to queueing delay
+    // 超过最大并发跟踪节点数，输出警告并调整队列
     int numTrackedNodes = outOfServiceNodeBlocks.size() - toRemove.size();
     int numQueuedNodes = getPendingNodes().size();
     int numDecommissioningNodes = numTrackedNodes + numQueuedNodes;
@@ -348,15 +357,14 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
               + "{} nodes are currently queued waiting to be decommissioned.",
           numDecommissioningNodes, maxConcurrentTrackedNodes, numQueuedNodes);
 
-      // Re-queue unhealthy nodes to make space for decommissioning healthy nodes
+      // 将不健康节点重新放回等待队列，给健康节点让出跟踪名额
       getUnhealthyNodesToRequeue(unhealthyDns, numDecommissioningNodes).forEach(dn -> {
         getPendingNodes().add(dn);
         outOfServiceNodeBlocks.remove(dn);
       });
     }
 
-    // Remove the datanodes that are DECOMMISSIONED or in service after
-    // maintenance expiration.
+    // 移除已经完成退役或维护过期的节点
     for (DatanodeDescriptor dn : toRemove) {
       Preconditions.checkState(dn.isDecommissioned() || dn.isInService(),
           "Removing node %s that is not yet decommissioned or in service!",
@@ -366,7 +374,9 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * Removes reliable blocks from the block list of a datanode.
+   * 函数说明：从节点的不足复制块列表中移除已经满足冗余要求的块。
+   * @param datanode 目标数据节点
+   * @param blocks 节点的不足复制块列表
    */
   private void pruneReliableBlocks(final DatanodeDescriptor datanode,
                                    AbstractList<BlockInfo> blocks) {
@@ -374,13 +384,10 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * Returns a list of blocks on a datanode that are insufficiently
-   * replicated or require recovery, i.e. requiring recovery and
-   * should prevent decommission or maintenance.
-   * <p/>
-   * As part of this, it also schedules replication/recovery work.
-   *
-   * @return List of blocks requiring recovery
+   * 函数说明：全量扫描数据节点上的所有块，收集不满足冗余要求、需要继续复制的块，
+   * 同时为这些块调度复制任务。
+   * @param datanode 目标数据节点
+   * @return 不满足冗余要求的块列表
    */
   private AbstractList<BlockInfo> handleInsufficientlyStored(
       final DatanodeDescriptor datanode) {
@@ -391,124 +398,13 @@ public class DatanodeAdminDefaultMonitor extends DatanodeAdminMonitorBase
   }
 
   /**
-   * Used while checking if DECOMMISSION_INPROGRESS datanodes can be
-   * marked as DECOMMISSIONED or ENTERING_MAINTENANCE datanodes can be
-   * marked as IN_MAINTENANCE. Combines shared logic of pruneReliableBlocks
-   * and handleInsufficientlyStored.
-   *
-   * @param datanode                    Datanode
-   * @param it                          Iterator over the blocks on the
-   *                                    datanode
-   * @param insufficientList            Return parameter. If it's not null,
-   *                                    will contain the insufficiently
-   *                                    replicated-blocks from the list.
-   * @param pruneReliableBlocks         whether to remove blocks reliable
-   *                                    enough from the iterator
+   * 函数说明：块处理核心逻辑，整合剪枝可靠块和收集不足块的共享逻辑，
+   * 遍历块迭代器，检查每个块的冗余状态，处理块复制调度，统计不足块信息。
+   * @param datanode 目标数据节点
+   * @param it 块迭代器
+   * @param insufficientList 收集不足块的输出列表，可为null表示不收集
+   * @param pruneReliableBlocks 是否需要从迭代器中移除满足冗余要求的块
    */
   private void processBlocksInternal(
       final DatanodeDescriptor datanode,
-      final Iterator<BlockInfo> it,
-      final List<BlockInfo> insufficientList,
-      boolean pruneReliableBlocks) {
-    boolean firstReplicationLog = true;
-    // Low redundancy in UC Blocks only
-    int lowRedundancyBlocksInOpenFiles = 0;
-    LightWeightHashSet<Long> lowRedundancyOpenFiles =
-        new LightWeightLinkedSet<>();
-    // All low redundancy blocks. Includes lowRedundancyOpenFiles.
-    int lowRedundancyBlocks = 0;
-    // All maintenance and decommission replicas.
-    int outOfServiceOnlyReplicas = 0;
-    while (it.hasNext()) {
-      if (insufficientList == null
-          && numBlocksCheckedPerLock >= numBlocksPerCheck) {
-        // During fullscan insufficientlyReplicated will NOT be null, iterator
-        // will be DN's iterator. So should not yield lock, otherwise
-        // ConcurrentModificationException could occur.
-        // Once the fullscan done, iterator will be a copy. So can yield the
-        // lock.
-        // Yielding is required in case of block number is greater than the
-        // configured per-iteration-limit.
-        namesystem.writeUnlock(RwLockMode.GLOBAL, "processBlocksInternal");
-        try {
-          LOG.debug("Yielded lock during decommission/maintenance check");
-          Thread.sleep(0, 500);
-        } catch (InterruptedException ignored) {
-          return;
-        }
-        // reset
-        numBlocksCheckedPerLock = 0;
-        namesystem.writeLock(RwLockMode.GLOBAL);
-      }
-      numBlocksChecked++;
-      numBlocksCheckedPerLock++;
-      final BlockInfo block = it.next();
-      // Remove the block from the list if it's no longer in the block map,
-      // e.g. the containing file has been deleted
-      if (blockManager.blocksMap.getStoredBlock(block) == null) {
-        if (pruneReliableBlocks) {
-          LOG.trace("Removing unknown block {}", block);
-          it.remove();
-        }
-        continue;
-      }
-
-      long bcId = block.getBlockCollectionId();
-      if (bcId == INodeId.INVALID_INODE_ID) {
-        // Orphan block, will be invalidated eventually. Skip.
-        continue;
-      }
-
-      final BlockCollection bc = blockManager.getBlockCollection(block);
-      final NumberReplicas num = blockManager.countNodes(block);
-      final int liveReplicas = num.liveReplicas();
-
-      // Schedule low redundancy blocks for reconstruction
-      // if not already pending.
-      boolean isDecommission = datanode.isDecommissionInProgress();
-      boolean isMaintenance = datanode.isEnteringMaintenance();
-      addReconstructionBlockIfNeeded(isDecommission, block, num, liveReplicas);
-
-      // Even if the block is without sufficient redundancy,
-      // it might not block decommission/maintenance if it
-      // has sufficient redundancy.
-      if (dnAdmin.isSufficient(block, bc, num, isDecommission, isMaintenance)) {
-        if (pruneReliableBlocks) {
-          it.remove();
-        }
-        continue;
-      }
-
-      // We've found a block without sufficient redundancy.
-      if (insufficientList != null) {
-        insufficientList.add(block);
-      }
-      // Log if this is our first time through
-      if (firstReplicationLog) {
-        dnAdmin.logBlockReplicationInfo(block, bc, datanode, num,
-            blockManager.blocksMap.getStorages(block));
-        firstReplicationLog = false;
-      }
-      // Update various counts
-      lowRedundancyBlocks++;
-      if (bc.isUnderConstruction()) {
-        INode ucFile = namesystem.getFSDirectory().getInode(bc.getId());
-        if (!(ucFile instanceof INodeFile) ||
-            !ucFile.asFile().isUnderConstruction()) {
-          LOG.warn("File {} is not under construction. Skipping add to " +
-              "low redundancy open files!", ucFile.getLocalName());
-        } else {
-          lowRedundancyBlocksInOpenFiles++;
-          lowRedundancyOpenFiles.add(ucFile.getId());
-        }
-      }
-      if ((liveReplicas == 0) && (num.outOfServiceReplicas() > 0)) {
-        outOfServiceOnlyReplicas++;
-      }
-    }
-
-    datanode.getLeavingServiceStatus().set(lowRedundancyBlocksInOpenFiles,
-        lowRedundancyOpenFiles, lowRedundancyBlocks,
-        outOfServiceOnlyReplicas);
-  }
-}
+      final Iterator<BlockInfo

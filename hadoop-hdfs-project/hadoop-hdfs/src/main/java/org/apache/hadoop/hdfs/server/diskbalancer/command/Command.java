@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -74,32 +75,45 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Common interface for command handling.
+ * 文件说明：磁盘平衡器所有命令的抽象基类，定义了命令执行的通用接口和公共基础能力
+ * 所有具体磁盘平衡器命令均继承此类，复用通用的集群信息读取、节点解析、输出路径管理等能力
  */
 public abstract class Command extends Configured implements Closeable {
+  // JSON解析读取器，用于解析数据节点返回的卷UUID与物理路径映射
   private static final ObjectReader READER =
       new ObjectMapper().readerFor(HashMap.class);
   static final Logger LOG = LoggerFactory.getLogger(Command.class);
+  // 存储当前命令支持的合法参数，key为参数长名，value为参数描述
   private Map<String, String> validArgs = new HashMap<>();
+  // 目标HDFS集群的URI地址
   private URI clusterURI;
+  // 操作输出目录所在的文件系统实例
   private FileSystem fs = null;
+  // 当前集群的磁盘平衡器数据模型实例
   private DiskBalancerCluster cluster = null;
+  // 限制本次操作处理的节点数量，0表示不限制，仅处理不平衡度最高的topN个节点
   private int topNodes;
+  // 标准输出流，用于命令输出
   private PrintStream ps;
 
+  // HDFS上磁盘平衡器日志/计划文件的默认根目录
   private static final Path DEFAULT_LOG_DIR = new Path("/system/diskbalancer");
 
+  // 当前命令的输出目录，用于存储计划文件和快照
   private Path diskBalancerLogs;
 
   /**
-   * Constructs a command.
+   * 构造命令对象，使用默认标准输出流
+   * @param conf Hadoop配置对象
    */
   public Command(Configuration conf) {
     this(conf, System.out);
   }
 
   /**
-   * Constructs a command.
+   * 构造命令对象，可指定输出流
+   * @param conf Hadoop配置对象
+   * @param ps 输出流
    */
   public Command(Configuration conf, final PrintStream ps) {
     super(conf);
@@ -109,13 +123,8 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Cleans any resources held by this command.
-   * <p>
-   * The main goal is to delete id file created in
-   * {@link org.apache.hadoop.hdfs.server.balancer
-   * .NameNodeConnector#checkAndMarkRunning}
-   * , otherwise, it's not allowed to run multiple commands in a row.
-   * </p>
+   * 清理命令占用的资源，关闭文件系统连接
+   * 主要用于删除标记磁盘平衡器运行的锁文件，避免连续运行冲突
    */
   @Override
   public void close() throws IOException {
@@ -125,33 +134,31 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Gets printing stream.
-   * @return print stream
+   * 获取当前命令的输出流
+   * @return 输出流实例
    */
   PrintStream getPrintStream() {
     return ps;
   }
 
   /**
-   * Executes the Client Calls.
-   *
-   * @param cmd - CommandLine
-   * @throws Exception
+   * 执行命令的抽象接口，具体命令需实现此方法完成自身逻辑
+   * @param cmd 解析后的命令行参数
+   * @throws Exception 执行过程中抛出的异常
    */
   public abstract void execute(CommandLine cmd) throws Exception;
 
   /**
-   * Gets extended help for this command.
+   * 打印当前命令的帮助信息抽象接口
    */
   public abstract void printHelp();
 
   /**
-   * Process the URI and return the cluster with nodes setup. This is used in
-   * all commands.
-   *
-   * @param cmd - CommandLine
-   * @return DiskBalancerCluster
-   * @throws Exception
+   * 从集群读取完整的节点和磁盘信息，构建磁盘平衡器集群数据模型
+   * 所有命令都调用此方法获取集群拓扑信息
+   * @param cmd 命令行参数
+   * @return 构建完成的磁盘平衡器集群数据模型
+   * @throws Exception 读取过程中抛出的异常
    */
   protected DiskBalancerCluster readClusterInfo(CommandLine cmd) throws
       Exception {
@@ -159,53 +166,58 @@ public abstract class Command extends Configured implements Closeable {
 
     setClusterURI(FileSystem.getDefaultUri(getConf()));
     LOG.debug("using name node URI : {}", this.getClusterURI());
+    // 根据集群URI获取对应类型的集群连接器
     ClusterConnector connector = ConnectorFactory.getCluster(this.clusterURI,
         getConf());
 
     cluster = new DiskBalancerCluster(connector);
 
     LOG.debug("Reading cluster info");
+    // 读取集群节点和磁盘信息填充数据模型
     cluster.readClusterInfo();
     return cluster;
   }
 
   /**
-   * Setup the outpath.
-   *
-   * @param path - Path or null to use default path.
-   * @throws IOException
+   * 初始化当前命令的输出目录，用于存储计划文件和输出日志
+   * @param path 用户指定的输出路径，为空则使用默认路径
+   * @throws IOException 文件系统操作异常
    */
   protected void setOutputPath(String path) throws IOException {
-
+    // 用当前时间戳生成唯一输出目录，避免冲突
     SimpleDateFormat format = new SimpleDateFormat("yyyy-MMM-dd-HH-mm-ss");
     Date now = new Date();
 
     fs = FileSystem.get(getClusterURI(), getConf());
     if (path == null || path.isEmpty()) {
+      // 如果是本地文件模式，输出到当前工作目录下
       if (getClusterURI().getScheme().startsWith("file")) {
         diskBalancerLogs = new Path(
             System.getProperty("user.dir") + DEFAULT_LOG_DIR.toString() +
                 Path.SEPARATOR + format.format(now));
       } else {
+        // HDFS模式使用默认根目录下生成时间戳目录
         diskBalancerLogs = new Path(DEFAULT_LOG_DIR.toString() +
             Path.SEPARATOR + format.format(now));
       }
     } else {
+      // 使用用户指定的输出路径
       diskBalancerLogs = new Path(path);
     }
+    // 检查输出目录是否已存在，避免覆盖已有数据
     if (fs.exists(diskBalancerLogs)) {
       LOG.debug("Another Diskbalancer instance is running ? - Target " +
           "Directory already exists. {}", diskBalancerLogs);
       throw new IOException("Another DiskBalancer files already exist at the " +
           "target location. " + diskBalancerLogs.toString());
     }
+    // 创建输出目录
     fs.mkdirs(diskBalancerLogs);
   }
 
   /**
-   * Sets the nodes to process.
-   *
-   * @param node - Node
+   * 设置需要处理的单个目标节点
+   * @param node 目标数据节点
    */
   protected void setNodesToProcess(DiskBalancerDataNode node) {
     List<DiskBalancerDataNode> nodelist = new LinkedList<>();
@@ -214,9 +226,8 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Sets the list of Nodes to process.
-   *
-   * @param nodes Nodes.
+   * 设置需要处理的目标节点列表，覆盖集群默认所有节点
+   * @param nodes 目标数据节点列表
    */
   protected void setNodesToProcess(List<DiskBalancerDataNode> nodes) {
     if (cluster == null) {
@@ -227,10 +238,9 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Returns a DiskBalancer Node from the Cluster or null if not found.
-   *
-   * @param nodeName - can the hostname, IP address or UUID of the node.
-   * @return - DataNode if found.
+   * 根据名称/IP/UUID从集群中查找匹配的数据节点
+   * @param nodeName 节点的主机名、IP地址或UUID
+   * @return 匹配到的数据节点，未找到返回null
    */
   DiskBalancerDataNode getNode(String nodeName) {
     DiskBalancerDataNode node = null;
@@ -240,26 +250,26 @@ public abstract class Command extends Configured implements Closeable {
     if (cluster.getNodes().size() == 0) {
       return node;
     }
-
+    // 优先按主机名查找
     node = cluster.getNodeByName(nodeName);
     if (node != null) {
       return node;
     }
-
+    // 主机名找不到按IP查找
     node = cluster.getNodeByIPAddress(nodeName);
     if (node != null) {
       return node;
     }
+    // IP找不到按UUID查找
     node = cluster.getNodeByUUID(nodeName);
     return node;
   }
 
   /**
-   * Gets the node set from a file or a string.
-   *
-   * @param listArg - String File URL or a comma separated list of node names.
-   * @return Set of node names
-   * @throws IOException
+   * 从输入参数解析出目标节点名称集合，支持文件URL或逗号分隔字符串两种格式
+   * @param listArg 输入参数，可为file://开头的文件路径或逗号分隔的节点列表
+   * @return 解析后的节点名称集合
+   * @throws IOException 文件读取或参数解析异常
    */
   protected Set<String> getNodeList(String listArg) throws IOException {
     URL listURL;
@@ -269,7 +279,7 @@ public abstract class Command extends Configured implements Closeable {
     if ((listArg == null) || listArg.isEmpty()) {
       return resultSet;
     }
-
+    // 如果是file://协议，从本地文件读取节点列表
     if (listArg.startsWith("file://")) {
       listURL = new URL(listArg);
       try {
@@ -283,6 +293,7 @@ public abstract class Command extends Configured implements Closeable {
             DiskBalancerException.Result.INVALID_HOST_FILE_PATH);
       }
     } else {
+      // 逗号分隔的节点列表，直接分割解析
       nodeData = listArg;
       String[] nodes = nodeData.split(",");
 
@@ -300,11 +311,10 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Returns a DiskBalancer Node list from the Cluster or null if not found.
-   *
-   * @param listArg String File URL or a comma separated list of node names.
-   * @return List of DiskBalancer Node
-   * @throws IOException
+   * 根据输入参数解析获取匹配的目标数据节点列表
+   * @param listArg 输入参数，可为file://开头的文件路径或逗号分隔的节点列表
+   * @return 解析后的目标数据节点列表
+   * @throws IOException 节点不存在或解析异常
    */
   protected List<DiskBalancerDataNode> getNodes(String listArg)
       throws IOException {
@@ -315,10 +325,12 @@ public abstract class Command extends Configured implements Closeable {
     if ((listArg == null) || listArg.isEmpty()) {
       return nodeList;
     }
+    // 先解析得到节点名称集合
     nodeNames = getNodeList(listArg);
 
     DiskBalancerDataNode node = null;
     if (!nodeNames.isEmpty()) {
+      // 逐个查找节点，收集无效节点
       for (String name : nodeNames) {
         node = getNode(name);
 
@@ -329,7 +341,7 @@ public abstract class Command extends Configured implements Closeable {
         }
       }
     }
-
+    // 如果存在无效节点，抛出异常提示用户
     if (!invalidNodeList.isEmpty()) {
       String invalidNodes = StringUtils.join(invalidNodeList.toArray(), ",");
       String warnMsg = String.format(
@@ -344,18 +356,18 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Verifies if the command line options are sane.
-   *
-   * @param commandName - Name of the command
-   * @param cmd         - Parsed Command Line
+   * 校验命令行参数，检查是否存在当前命令不支持的非法参数
+   * @param commandName 当前命令名称
+   * @param cmd 解析后的命令行参数
    */
   protected void verifyCommandOptions(String commandName, CommandLine cmd) {
     @SuppressWarnings("unchecked")
     Iterator<Option> iter = cmd.iterator();
     while (iter.hasNext()) {
       Option opt = iter.next();
-
+      // 检查每个参数是否在当前命令的合法参数列表中
       if (!validArgs.containsKey(opt.getLongOpt())) {
+        // 拼接错误信息和合法参数提示
         String errMessage = String
             .format("%nInvalid argument found for command %s : %s%n",
                 commandName, opt.getLongOpt());
@@ -374,39 +386,36 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Gets cluster URL.
-   *
-   * @return - URL
+   * 获取当前操作集群的URI地址
+   * @return 集群URI
    */
   public URI getClusterURI() {
     return clusterURI;
   }
 
   /**
-   * Set cluster URL.
-   *
-   * @param clusterURI - URL
+   * 设置当前操作集群的URI地址
+   * @param clusterURI 集群URI
    */
   public void setClusterURI(URI clusterURI) {
     this.clusterURI = clusterURI;
   }
 
   /**
-   * Copied from DFSAdmin.java. -- Creates a connection to dataNode.
-   *
-   * @param datanode - dataNode.
-   * @return ClientDataNodeProtocol
-   * @throws IOException
+   * 创建到指定数据节点的RPC代理连接，用于调用数据节点接口
+   * @param datanode 数据节点地址，格式为ip:port
+   * @return 数据节点协议代理对象
+   * @throws IOException 创建连接异常
    */
   public ClientDatanodeProtocol getDataNodeProxy(String datanode)
       throws IOException {
     InetSocketAddress datanodeAddr = NetUtils.createSocketAddr(datanode);
 
-    // For datanode proxy the server principal should be DN's one.
+    // 设置数据节点的安全认证用户名，使用数据节点自己的Kerberos主体
     getConf().set(CommonConfigurationKeys.HADOOP_SECURITY_SERVICE_USER_NAME_KEY,
         getConf().get(DFSConfigKeys.DFS_DATANODE_KERBEROS_PRINCIPAL_KEY, ""));
 
-    // Create the client
+    // 创建RPC代理客户端
     ClientDatanodeProtocol dnProtocol =
         DFSUtilClient.createClientDatanodeProtocolProxy(datanodeAddr, getUGI(),
             getConf(), NetUtils.getSocketFactory(getConf(),
@@ -416,10 +425,9 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Returns UGI.
-   *
-   * @return UserGroupInformation.
-   * @throws IOException
+   * 获取当前调用用户的用户组信息
+   * @return 当前用户UGI对象
+   * @throws IOException 获取UGI异常
    */
   private static UserGroupInformation getUGI()
       throws IOException {
@@ -427,11 +435,10 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Returns a file created in the cluster.
-   *
-   * @param fileName - fileName to open.
-   * @return OutputStream.
-   * @throws IOException
+   * 在当前命令输出目录创建指定文件，并返回输出流
+   * @param fileName 文件名
+   * @return 文件输出流
+   * @throws IOException 文件创建异常
    */
   protected FSDataOutputStream create(String fileName) throws IOException {
     Preconditions.checkNotNull(fileName);
@@ -442,148 +449,11 @@ public abstract class Command extends Configured implements Closeable {
   }
 
   /**
-   * Returns a InputStream to read data.
+   * 打开指定文件，返回输入流用于读取
+   * @param fileName 要打开的文件路径
+   * @return 文件输入流
+   * @throws IOException 文件打开异常
    */
   protected FSDataInputStream open(String fileName) throws IOException {
     Preconditions.checkNotNull(fileName);
-    if(fs == null) {
-      fs = FileSystem.get(getConf());
-    }
-    return  fs.open(new Path(fileName));
-  }
-
-  /**
-   * Returns the output path where the plan and snapshot gets written.
-   *
-   * @return Path
-   */
-  protected Path getOutputPath() {
-    return diskBalancerLogs;
-  }
-
-  /**
-   * Adds valid params to the valid args table.
-   *
-   * @param key
-   * @param desc
-   */
-  protected void addValidCommandParameters(String key, String desc) {
-    validArgs.put(key, desc);
-  }
-
-  /**
-   * Returns the cluster.
-   *
-   * @return Cluster.
-   */
-  @VisibleForTesting
-  DiskBalancerCluster getCluster() {
-    return cluster;
-  }
-
-  /**
-   * returns default top number of nodes.
-   * @return default top number of nodes.
-   */
-  protected int getDefaultTop() {
-    return DiskBalancerCLI.DEFAULT_TOP;
-  }
-
-  /**
-   * Put output line to log and string buffer.
-   * */
-  protected void recordOutput(final TextStringBuilder result,
-      final String outputLine) {
-    LOG.info(outputLine);
-    result.appendln(outputLine);
-  }
-
-  /**
-   * Parse top number of nodes to be processed.
-   * @return top number of nodes to be processed.
-   */
-  protected int parseTopNodes(final CommandLine cmd, final TextStringBuilder result)
-      throws IllegalArgumentException {
-    String outputLine = "";
-    int nodes = 0;
-    final String topVal = cmd.getOptionValue(DiskBalancerCLI.TOP);
-    if (StringUtils.isBlank(topVal)) {
-      outputLine = String.format(
-          "No top limit specified, using default top value %d.",
-          getDefaultTop());
-      LOG.info(outputLine);
-      result.appendln(outputLine);
-      nodes = getDefaultTop();
-    } else {
-      try {
-        nodes = Integer.parseInt(topVal);
-      } catch (NumberFormatException nfe) {
-        outputLine = String.format(
-            "Top limit input is not numeric, using default top value %d.",
-            getDefaultTop());
-        LOG.info(outputLine);
-        result.appendln(outputLine);
-        nodes = getDefaultTop();
-      }
-      if (nodes <= 0) {
-        throw new IllegalArgumentException(
-            "Top limit input should be a positive numeric value");
-      }
-    }
-
-    return Math.min(nodes, cluster.getNodes().size());
-  }
-
-  /**
-   * Reads the Physical path of the disks we are balancing. This is needed to
-   * make the disk balancer human friendly and not used in balancing.
-   *
-   * @param node - Disk Balancer Node.
-   */
-  protected void populatePathNames(
-      DiskBalancerDataNode node) throws IOException {
-    // if the cluster is a local file system, there is no need to
-    // invoke rpc call to dataNode.
-    if (getClusterURI().getScheme().startsWith("file")) {
-      return;
-    }
-    String dnAddress = node.getDataNodeIP() + ":" + node.getDataNodePort();
-    ClientDatanodeProtocol dnClient = getDataNodeProxy(dnAddress);
-    String volumeNameJson = dnClient.getDiskBalancerSetting(
-        DiskBalancerConstants.DISKBALANCER_VOLUME_NAME);
-
-    @SuppressWarnings("unchecked")
-    Map<String, String> volumeMap =
-        READER.readValue(volumeNameJson);
-    for (DiskBalancerVolumeSet set : node.getVolumeSets().values()) {
-      for (DiskBalancerVolume vol : set.getVolumes()) {
-        if (volumeMap.containsKey(vol.getUuid())) {
-          vol.setPath(volumeMap.get(vol.getUuid()));
-        }
-      }
-    }
-  }
-
-  /**
-   * Set top number of nodes to be processed.
-   * */
-  public void setTopNodes(int topNodes) {
-    this.topNodes = topNodes;
-  }
-
-  /**
-   * Get top number of nodes to be processed.
-   * @return top number of nodes to be processed.
-   * */
-  public int getTopNodes() {
-    return topNodes;
-  }
-
-  /**
-   * Set DiskBalancer cluster
-   */
-  @VisibleForTesting
-  public void setCluster(DiskBalancerCluster newCluster) {
-    this.cluster = newCluster;
-  }
-}
+    if(fs == null

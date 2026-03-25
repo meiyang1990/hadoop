@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,16 +21,19 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 
 /**
- * Stores config related to cgroups.
+ * 存储cgroups挂载相关配置信息，支持v1和v2混合模式配置
  */
 public class CGroupsMountConfig {
   private final boolean enableMount;
   private final String mountPath;
 
-  // CGroups v2 mount path is only relevant in mixed CGroups v1/v2 mode,
-  // where v2 is mounted alongside with v1.
+  // CGroups v2挂载路径仅在v1/v2混合模式下生效，此时v2和v1分别挂载
   private final String v2MountPath;
 
+  /**
+   * 从Yarn配置中加载cgroups挂载配置
+   * @param conf Hadoop配置对象
+   */
   public CGroupsMountConfig(Configuration conf) {
     this.enableMount = conf.getBoolean(YarnConfiguration.
         NM_LINUX_CONTAINER_CGROUPS_MOUNT, false);
@@ -39,6 +43,11 @@ public class CGroupsMountConfig {
         NM_LINUX_CONTAINER_CGROUPS_V2_MOUNT_PATH, mountPath);
   }
 
+  /**
+   * 检查并确保cgroups挂载路径已配置，未配置则抛出异常
+   * @return 检查通过返回true
+   * @throws ResourceHandlerException 挂载路径未配置时抛出异常
+   */
   public boolean ensureMountPathIsDefined() throws ResourceHandlerException {
     if (mountPath == null) {
       throw new ResourceHandlerException(
@@ -48,26 +57,50 @@ public class CGroupsMountConfig {
     return true;
   }
 
+  /**
+   * 判断挂载路径是否已配置
+   * @return true表示已配置，false表示未配置
+   */
   public boolean isMountPathDefined() {
     return mountPath != null;
   }
 
+  /**
+   * 获取是否启用自动挂载cgroups
+   * @return true表示启用自动挂载
+   */
   public boolean isMountEnabled() {
     return enableMount;
   }
 
+  /**
+   * 判断是否关闭自动挂载但已手动配置了挂载路径
+   * @return true表示关闭自动挂载且配置了手动挂载路径
+   */
   public boolean mountDisabledButMountPathDefined() {
     return !enableMount && mountPath != null;
   }
 
+  /**
+   * 判断是否启用自动挂载且已配置挂载路径
+   * @return true表示启用自动挂载且配置了挂载路径
+   */
   public boolean mountEnabledAndMountPathDefined() {
     return enableMount && mountPath != null;
   }
 
+  /**
+   * 获取cgroups v1挂载路径
+   * @return v1挂载路径
+   */
   public String getMountPath() {
     return mountPath;
   }
 
+  /**
+   * 获取cgroups v2挂载路径
+   * @return v2挂载路径，混合模式下使用
+   */
   public String getV2MountPath() {
     return v2MountPath;
   }

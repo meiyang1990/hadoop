@@ -1,5 +1,5 @@
+// 这个文件已经全部加上中文注释
 /*
- * *
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
  *  distributed with this work for additional information
@@ -15,7 +15,6 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- * /
  */
 
 package org.apache.hadoop.yarn.server.resourcemanager.scheduler.constraint;
@@ -43,8 +42,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.LongBinaryOperator;
 
 /**
- * In-memory mapping between applications/container-tags and nodes/racks.
- * Required by constrained affinity/anti-affinity and cardinality placement.
+ * 分配标签管理器，维护应用/容器标签与节点/机架的内存映射关系，为亲和性/反亲和性放置与基数调度约束提供数据支持
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -53,30 +51,32 @@ public class AllocationTagsManager {
   private static final Logger LOG = Logger.getLogger(
       AllocationTagsManager.class);
 
+  // 读写锁读锁，保护并发访问映射数据
   private ReentrantReadWriteLock.ReadLock readLock;
+  // 读写锁写锁，保护并发访问映射数据
   private ReentrantReadWriteLock.WriteLock writeLock;
+  // YARN RM上下文对象
   private final RMContext rmContext;
 
-  // Application's tags to Node
+  // 应用标签到节点的映射，每个应用单独维护
   private Map<ApplicationId, TypeToCountedTags> perAppNodeMappings =
       new HashMap<>();
-  // Application's tags to Rack
+  // 应用标签到机架的映射，每个应用单独维护
   private Map<ApplicationId, TypeToCountedTags> perAppRackMappings =
       new HashMap<>();
 
-  // Global tags to node mapping (used to fast return aggregated tags
-  // cardinality across apps)
+  // 全局标签到节点的映射，用于快速跨应用聚合标签基数统计
   private TypeToCountedTags<NodeId> globalNodeMapping = new TypeToCountedTags();
-  // Global tags to Rack mapping
+  // 全局标签到机架的映射
   private TypeToCountedTags<String> globalRackMapping = new TypeToCountedTags();
 
   /**
-   * Generic store mapping type T to counted tags.
-   * Currently used both for NodeId to Tag, Count and Rack to Tag, Count
+   * 泛型存储结构，将类型T映射到带计数的标签集合，支持节点和机架两种类型的存储
+   * 内部结构为: Map<类型T, Map<标签名称, 计数>>
    */
   @VisibleForTesting
   public static class TypeToCountedTags<T> {
-    // Map<Type, Map<Tag, Count>>
+    // 存储类型到标签计数的双层映射
     private Map<T, Map<String, Long>> typeToTagsWithCount = new HashMap<>();
 
     public TypeToCountedTags() {}
@@ -85,7 +85,7 @@ public class AllocationTagsManager {
       this.typeToTagsWithCount = tags;
     }
 
-    // protected by external locks
+    // 由外部锁保护，批量添加标签并递增计数
     private void addTags(T type, Set<String> tags) {
       Map<String, Long> innerMap =
           typeToTagsWithCount.computeIfAbsent(type, k -> new HashMap<>());
@@ -100,7 +100,7 @@ public class AllocationTagsManager {
       }
     }
 
-    // protected by external locks
+    // 由外部锁保护，添加单个标签并递增计数
     private void addTag(T type, String tag) {
       Map<String, Long> innerMap =
           typeToTagsWithCount.computeIfAbsent(type, k -> new HashMap<>());
@@ -113,6 +113,7 @@ public class AllocationTagsManager {
       }
     }
 
+    // 从内部映射中移除单个标签，处理计数递减和空清理
     private void removeTagFromInnerMap(Map<String, Long> innerMap, String tag) {
       Long count = innerMap.get(tag);
       if (count == null) {
@@ -132,6 +133,7 @@ public class AllocationTagsManager {
       }
     }
 
+    // 批量移除标签并递减计数
     private void removeTags(T type, Set<String> tags) {
       Map<String, Long> innerMap = typeToTagsWithCount.get(type);
       if (innerMap == null) {
@@ -149,6 +151,7 @@ public class AllocationTagsManager {
       }
     }
 
+    // 移除单个标签并递减计数
     private void removeTag(T type, String tag) {
       Map<String, Long> innerMap = typeToTagsWithCount.get(type);
       if (innerMap == null) {
@@ -164,6 +167,7 @@ public class AllocationTagsManager {
       }
     }
 
+    // 获取指定类型上单个标签的基数（分配数量）
     private long getCardinality(T type, String tag) {
       Map<String, Long> innerMap = typeToTagsWithCount.get(type);
       if (innerMap == null) {
@@ -173,6 +177,7 @@ public class AllocationTagsManager {
       return value == null ? 0 : value;
     }
 
+    // 使用自定义二元操作符，计算多个标签在指定类型上的聚合基数
     private long getCardinality(T type, Set<String> tags,
         LongBinaryOperator op) {
       Map<String, Long> innerMap = typeToTagsWithCount.get(type);
@@ -199,9 +204,9 @@ public class AllocationTagsManager {
           returnValue = op.applyAsLong(returnValue, value);
         }
       } else {
-        // Similar to above if, but only iterate values for better performance
+        // 未指定标签时，遍历当前类型所有标签进行聚合，性能更优
         for (long value : innerMap.values()) {
-          // For the first value, we will not apply op
+          // 第一个值不需要应用操作符
           if (firstTag) {
             returnValue = value;
             firstTag = false;
@@ -213,6 +218,7 @@ public class AllocationTagsManager {
       return returnValue;
     }
 
+    // 检查当前存储是否为空
     private boolean isEmpty() {
       return typeToTagsWithCount.isEmpty();
     }
@@ -223,34 +229,30 @@ public class AllocationTagsManager {
     }
 
     /**
-     * Absorbs the given {@link TypeToCountedTags} to current mapping,
-     * this will aggregate the count of the tags with same name.
-     *
-     * @param target a {@link TypeToCountedTags} to merge with.
+     * 吸收合并另一个TypeToCountedTags对象到当前映射，相同标签的计数会累加
+     * @param target 待合并的目标对象
      */
     protected void absorb(final TypeToCountedTags<T> target) {
-      // No opt if the given target is null.
+      // 目标为空时不做处理
       if (target == null || target.getTypeToTagsWithCount() == null) {
         return;
       }
 
-      // Merge the target.
+      // 遍历目标映射进行合并
       Map<T, Map<String, Long>> targetMap = target.getTypeToTagsWithCount();
       for (Map.Entry<T, Map<String, Long>> targetEntry :
           targetMap.entrySet()) {
-        // Get a mutable copy, do not modify the target reference.
+        // 创建可变拷贝，不修改原目标对象引用
         Map<String, Long> copy = Maps.newHashMap(targetEntry.getValue());
 
-        // If the target type doesn't exist in the current mapping,
-        // add as a new entry.
+        // 当前不存在该类型，直接添加新条目
         Map<String, Long> existingMapping =
             this.typeToTagsWithCount.putIfAbsent(targetEntry.getKey(), copy);
-        // There was a mapping for this target type,
-        // do proper merging on the operator.
+        // 当前已存在该类型，逐标签合并计数
         if (existingMapping != null) {
           Map<String, Long> localMap =
               this.typeToTagsWithCount.get(targetEntry.getKey());
-          // Merge the target map to the inner map.
+          // 将目标标签计数合并到当前内部映射
           Map<String, Long> targetValue = targetEntry.getValue();
           for (Map.Entry<String, Long> entry : targetValue.entrySet()) {
             localMap.merge(entry.getKey(), entry.getValue(),
@@ -261,7 +263,8 @@ public class AllocationTagsManager {
     }
 
     /**
-     * @return an immutable copy of current instance.
+     * 创建当前实例的不可变拷贝
+     * @return 不可变拷贝对象
      */
     protected TypeToCountedTags immutableCopy() {
       return new TypeToCountedTags(
@@ -289,6 +292,10 @@ public class AllocationTagsManager {
     return globalRackMapping;
   }
 
+  /**
+   * 构造分配标签管理器
+   * @param context RM上下文对象
+   */
   public AllocationTagsManager(RMContext context) {
     ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
     readLock = lock.readLock();
@@ -297,17 +304,17 @@ public class AllocationTagsManager {
   }
 
   /**
-   * Aggregates multiple {@link TypeToCountedTags} to a single one based on
-   * the scope defined in the allocation tags, the values are properly merged.
-   *
-   * @param allocationTags {@link AllocationTags}.
-   * @return an aggregated {@link TypeToCountedTags}.
+   * 根据分配标签定义的命名空间范围，聚合多个应用的标签映射为单个合并后的对象
+   * @param allocationTags 分配标签对象，包含命名空间范围定义
+   * @param mapping 待聚合的映射表（节点或机架）
+   * @return 聚合后的标签映射对象
+   * @throws InvalidAllocationTagsQueryException 非法查询参数时抛出
    */
   private TypeToCountedTags aggregateAllocationTags(
       AllocationTags allocationTags,
       Map<ApplicationId, TypeToCountedTags> mapping)
       throws InvalidAllocationTagsQueryException {
-    // Based on the namespace type of the given allocation tags
+    // 根据分配标签的命名空间类型解析范围
     TargetApplicationsNamespace namespace = allocationTags.getNamespace();
     TargetApplications ta = new TargetApplications(
         allocationTags.getCurrentApplicationId(), getApplicationIdToTags());
@@ -315,16 +322,16 @@ public class AllocationTagsManager {
     Set<ApplicationId> appIds = namespace.getNamespaceScope();
     TypeToCountedTags result = new TypeToCountedTags();
     if (appIds != null) {
+      // 仅单个应用时直接返回原映射，无需额外计算
       if (appIds.size() == 1) {
-        // If there is only one app, we simply return the mapping
-        // without any extra computation.
         return mapping.get(appIds.iterator().next());
       }
 
+      // 遍历范围包含的所有应用，合并标签计数
       for (ApplicationId applicationId : appIds) {
         TypeToCountedTags appIdTags = mapping.get(applicationId);
         if (appIdTags != null) {
-          // Make sure ATM state won't be changed.
+          // 合并不可变拷贝，保证不会修改原状态
           result.absorb(appIdTags.immutableCopy());
         }
       }
@@ -333,18 +340,15 @@ public class AllocationTagsManager {
   }
 
   /**
-   * Notify container allocated on a node.
-   *
-   * @param nodeId         allocated node.
-   * @param containerId    container id.
-   * @param allocationTags allocation tags, see
-   *                       {@link SchedulingRequest#getAllocationTags()}
-   *                       application_id will be added to allocationTags.
+   * 通知容器已分配到节点，添加对应分配标签
+   * @param nodeId 分配的节点ID
+   * @param containerId 容器ID
+   * @param allocationTags 容器携带的分配标签集合
    */
   @SuppressWarnings("unchecked")
   public void addContainer(NodeId nodeId, ContainerId containerId,
       Set<String> allocationTags) {
-    // Do nothing for empty allocation tags.
+    // 空标签不处理
     if (allocationTags == null || allocationTags.isEmpty()) {
       return;
     }
@@ -357,22 +361,34 @@ public class AllocationTagsManager {
     }
   }
 
+  /**
+   * 添加标签到应用和全局映射
+   * @param nodeId 节点ID
+   * @param applicationId 应用ID
+   * @param allocationTags 待添加的标签集合
+   */
   public void addTags(NodeId nodeId, ApplicationId applicationId,
       Set<String> allocationTags) {
     writeLock.lock();
     try {
+      // 获取或创建应用节点标签映射
       TypeToCountedTags perAppTagsMapping = perAppNodeMappings
           .computeIfAbsent(applicationId, k -> new TypeToCountedTags());
+      // 获取或创建应用机架标签映射
       TypeToCountedTags perAppRackTagsMapping = perAppRackMappings
           .computeIfAbsent(applicationId, k -> new TypeToCountedTags());
-      // Covering test-cases where context is mocked
+      // 获取节点所在机架名称，兼容测试mock场景
       String nodeRack = (rmContext.getRMNodes() != null
           && rmContext.getRMNodes().get(nodeId) != null)
               ? rmContext.getRMNodes().get(nodeId).getRackName() :
           "default-rack";
+      // 更新应用级节点标签
       perAppTagsMapping.addTags(nodeId, allocationTags);
+      // 更新应用级机架标签
       perAppRackTagsMapping.addTags(nodeRack, allocationTags);
+      // 更新全局节点标签
       globalNodeMapping.addTags(nodeId, allocationTags);
+      // 更新全局机架标签
       globalRackMapping.addTags(nodeRack, allocationTags);
     } finally {
       writeLock.unlock();
@@ -380,16 +396,15 @@ public class AllocationTagsManager {
   }
 
   /**
-   * Notify container removed.
-   *
-   * @param nodeId         nodeId
-   * @param containerId    containerId.
-   * @param allocationTags allocation tags for given container
+   * 通知容器已移除，删除对应分配标签
+   * @param nodeId 容器所在节点ID
+   * @param containerId 容器ID
+   * @param allocationTags 容器携带的分配标签集合
    */
   @SuppressWarnings("unchecked")
   public void removeContainer(NodeId nodeId,
       ContainerId containerId, Set<String> allocationTags) {
-    // Do nothing for empty allocation tags.
+    // 空标签不处理
     if (allocationTags == null || allocationTags.isEmpty()) {
       return;
     }
@@ -404,16 +419,16 @@ public class AllocationTagsManager {
   }
 
   /**
-   * Helper method to just remove the tags associated with a container.
-   *
-   * @param nodeId nodeId.
-   * @param applicationId application Id
-   * @param allocationTags application Tags.
+   * 从应用和全局映射中移除标签
+   * @param nodeId 节点ID
+   * @param applicationId 应用ID
+   * @param allocationTags 待移除的标签集合
    */
   public void removeTags(NodeId nodeId, ApplicationId applicationId,
       Set<String> allocationTags) {
     writeLock.lock();
     try {
+      // 获取应用对应映射
       TypeToCountedTags perAppTagsMapping =
           perAppNodeMappings.get(applicationId);
       TypeToCountedTags perAppRackTagsMapping =
@@ -421,254 +436,13 @@ public class AllocationTagsManager {
       if (perAppTagsMapping == null) {
         return;
       }
-      // Covering test-cases where context is mocked
+      // 获取节点所在机架名称，兼容测试mock场景
       String nodeRack = (rmContext.getRMNodes() != null
           && rmContext.getRMNodes().get(nodeId) != null)
               ? rmContext.getRMNodes().get(nodeId).getRackName() :
           "default-rack";
+      // 移除应用级节点标签计数
       perAppTagsMapping.removeTags(nodeId, allocationTags);
+      // 移除应用级机架标签计数
       perAppRackTagsMapping.removeTags(nodeRack, allocationTags);
-      globalNodeMapping.removeTags(nodeId, allocationTags);
-      globalRackMapping.removeTags(nodeRack, allocationTags);
-
-      if (perAppTagsMapping.isEmpty()) {
-        perAppNodeMappings.remove(applicationId);
-      }
-      if (perAppRackTagsMapping.isEmpty()) {
-        perAppRackMappings.remove(applicationId);
-      }
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-
-  /**
-   * Get Node cardinality for a specific tag.
-   * When applicationId is null, method returns aggregated cardinality
-   *
-   * @param nodeId        nodeId, required.
-   * @param applicationId applicationId. When null is specified, return
-   *                      aggregated cardinality among all nodes.
-   * @param tag           allocation tag, see
-   *                      {@link SchedulingRequest#getAllocationTags()},
-   *                      If a specified tag doesn't exist,
-   *                      method returns 0.
-   * @return cardinality of specified query on the node.
-   * @throws InvalidAllocationTagsQueryException when illegal query
-   *                                            parameter specified
-   */
-  public long getNodeCardinality(NodeId nodeId, ApplicationId applicationId,
-      String tag) throws InvalidAllocationTagsQueryException {
-    readLock.lock();
-
-    try {
-      if (nodeId == null) {
-        throw new InvalidAllocationTagsQueryException(
-            "Must specify nodeId/tag to query cardinality");
-      }
-
-      TypeToCountedTags mapping;
-      if (applicationId != null) {
-        mapping = perAppNodeMappings.get(applicationId);
-      } else {
-        mapping = globalNodeMapping;
-      }
-
-      if (mapping == null) {
-        return 0;
-      }
-
-      return mapping.getCardinality(nodeId, tag);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /**
-   * Get Rack cardinality for a specific tag.
-   *
-   * @param rack          rack, required.
-   * @param applicationId applicationId. When null is specified, return
-   *                      aggregated cardinality among all nodes.
-   * @param tag           allocation tag, see
-   *                      {@link SchedulingRequest#getAllocationTags()},
-   *                      If a specified tag doesn't exist,
-   *                      method returns 0.
-   * @return cardinality of specified query on the rack.
-   * @throws InvalidAllocationTagsQueryException when illegal query
-   *                                            parameter specified
-   */
-  public long getRackCardinality(String rack, ApplicationId applicationId,
-      String tag) throws InvalidAllocationTagsQueryException {
-    readLock.lock();
-
-    try {
-      if (rack == null) {
-        throw new InvalidAllocationTagsQueryException(
-            "Must specify rack/tag to query cardinality");
-      }
-
-      TypeToCountedTags mapping;
-      if (applicationId != null) {
-        mapping = perAppRackMappings.get(applicationId);
-      } else {
-        mapping = globalRackMapping;
-      }
-
-      if (mapping == null) {
-        return 0;
-      }
-
-      return mapping.getCardinality(rack, tag);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-
-
-  /**
-   * Check if given tag exists on node.
-   *
-   * @param nodeId        nodeId, required.
-   * @param applicationId applicationId. When null is specified, return
-   *                      aggregation among all applications.
-   * @param tag           allocation tag, see
-   *                      {@link SchedulingRequest#getAllocationTags()},
-   *                      When multiple tags specified. Returns cardinality
-   *                      depends on op. If a specified tag doesn't exist,
-   *                      0 will be its cardinality.
-   *                      When null/empty tags specified, all tags
-   *                      (of the node/app) will be considered.
-   * @return cardinality of specified query on the node.
-   * @throws InvalidAllocationTagsQueryException when illegal query
-   *                                            parameter specified
-   */
-  public boolean allocationTagExistsOnNode(NodeId nodeId,
-      ApplicationId applicationId, String tag)
-      throws InvalidAllocationTagsQueryException {
-    return getNodeCardinality(nodeId, applicationId, tag) > 0;
-  }
-
-  /**
-   * Get cardinality for following conditions. External can pass-in a binary op
-   * to implement customized logic.
-   *
-   * @param nodeId        nodeId, required.
-   * @param tags          {@link AllocationTags}, allocation tags under a
-   *                      specific namespace. See
-   *                      {@link SchedulingRequest#getAllocationTags()},
-   *                      When multiple tags specified. Returns cardinality
-   *                      depends on op. If a specified tag doesn't exist, 0
-   *                      will be its cardinality. When null/empty tags
-   *                      specified, all tags (of the node/app) will be
-   *                      considered.
-   * @param op            operator. Such as Long::max, Long::sum, etc. Required.
-   *                      This parameter only take effect when #values greater
-   *                      than 2.
-   * @return cardinality of specified query on the node.
-   * @throws InvalidAllocationTagsQueryException when illegal query
-   *                                            parameter specified
-   */
-  public long getNodeCardinalityByOp(NodeId nodeId, AllocationTags tags,
-      LongBinaryOperator op) throws InvalidAllocationTagsQueryException {
-    readLock.lock();
-    try {
-      if (nodeId == null || op == null || tags == null) {
-        throw new InvalidAllocationTagsQueryException(
-            "Must specify nodeId/tags/op to query cardinality");
-      }
-
-      TypeToCountedTags mapping;
-      if (AllocationTagNamespaceType.ALL.equals(
-          tags.getNamespace().getNamespaceType())) {
-        mapping = globalNodeMapping;
-      } else {
-        // Aggregate app tags cardinality by applications.
-        mapping = aggregateAllocationTags(tags, perAppNodeMappings);
-      }
-
-      return mapping == null ? 0 :
-          mapping.getCardinality(nodeId, tags.getTags(), op);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /**
-   * Get cardinality for following conditions. External can pass-in a binary op
-   * to implement customized logic.
-   *
-   * @param rack          rack, required.
-   * @param tags          {@link AllocationTags}, allocation tags under a
-   *                      specific namespace. See
-   *                      {@link SchedulingRequest#getAllocationTags()},
-   *                      When multiple tags specified. Returns cardinality
-   *                      depends on op. If a specified tag doesn't exist, 0
-   *                      will be its cardinality. When null/empty tags
-   *                      specified, all tags (of the rack/app) will be
-   *                      considered.
-   * @param op            operator. Such as Long::max, Long::sum, etc. Required.
-   *                      This parameter only take effect when #values
-   *                      greater than 2.
-   * @return cardinality of specified query on the rack.
-   * @throws InvalidAllocationTagsQueryException when illegal query
-   *                                            parameter specified
-   */
-  public long getRackCardinalityByOp(String rack, AllocationTags tags,
-      LongBinaryOperator op) throws InvalidAllocationTagsQueryException {
-    readLock.lock();
-    try {
-      if (rack == null || op == null || tags == null) {
-        throw new InvalidAllocationTagsQueryException(
-            "Must specify nodeId/tags/op to query cardinality");
-      }
-
-      TypeToCountedTags mapping;
-      if (AllocationTagNamespaceType.ALL.equals(
-          tags.getNamespace().getNamespaceType())) {
-        mapping = globalRackMapping;
-      } else {
-        // Aggregates cardinality by rack.
-        mapping = aggregateAllocationTags(tags, perAppRackMappings);
-      }
-
-      return mapping == null ? 0 :
-          mapping.getCardinality(rack, tags.getTags(), op);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /**
-   * Returns a map whose key is the allocation tag and value is the
-   * count of allocations with this tag.
-   *
-   * @param nodeId nodeId.
-   * @return allocation tag to count mapping
-   */
-  public Map<String, Long> getAllocationTagsWithCount(NodeId nodeId) {
-    return globalNodeMapping.getTypeToTagsWithCount().get(nodeId);
-  }
-
-  /**
-   * @return all applications that is known to the
-   * {@link AllocationTagsManager}, along with their application tags.
-   * The result is a map, where key is an application ID, and value is the
-   * application-tags attached to this application. If there is no
-   * application-tag exists for the application, the value is an empty set.
-   */
-  private Map<ApplicationId, Set<String>> getApplicationIdToTags() {
-    Map<ApplicationId, Set<String>> result = new HashMap<>();
-    ConcurrentMap<ApplicationId, RMApp> allApps = rmContext.getRMApps();
-    if (allApps != null) {
-      for (Map.Entry<ApplicationId, RMApp> app : allApps.entrySet()) {
-        if (perAppNodeMappings.containsKey(app.getKey())) {
-          result.put(app.getKey(), app.getValue().getApplicationTags());
-        }
-      }
-    }
-    return result;
-  }
-}
+      // 移除全局

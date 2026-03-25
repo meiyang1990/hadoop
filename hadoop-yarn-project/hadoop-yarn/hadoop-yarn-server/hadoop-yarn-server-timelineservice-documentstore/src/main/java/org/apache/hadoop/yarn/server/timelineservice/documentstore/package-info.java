@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,9 +19,8 @@
 
 // 包org.apache.hadoop.yarn.server.timelineservice.documentstore包含TimelineService的DocumentStore读写器实现，用于从文档存储中读写文档
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.documentstore
- * contains DocumentStore Reader and Writer Implementation of TimelineService
- * for reading and writing documents from DocumentStore.
+ * 文档存储式时间线服务包，为YARN时间线服务提供基于文档数据库的读写实现，
+ * 支持将应用时间线数据存储在第三方文档型数据库中。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

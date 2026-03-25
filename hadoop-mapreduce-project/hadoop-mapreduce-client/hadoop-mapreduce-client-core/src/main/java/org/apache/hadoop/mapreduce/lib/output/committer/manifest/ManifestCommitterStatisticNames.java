@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,9 +26,9 @@ import org.apache.hadoop.fs.statistics.StoreStatisticNames;
 import static org.apache.hadoop.fs.statistics.StoreStatisticNames.OP_RENAME;
 
 /**
- * Statistic names for committers.
- * Please keep in sync with org.apache.hadoop.fs.s3a.Statistic
- * so that S3A and manifest committers are in sync.
+ * Manifest输出提交器的统计指标名称常量定义。
+ * 需要与S3A的统计定义保持同步，保证云存储和manifest提交器统计指标对齐。
+ * 本类仅存放常量定义，不包含任何业务逻辑。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
@@ -67,58 +68,56 @@ public final class ManifestCommitterStatisticNames {
       "committer_commits" + StoreStatisticNames.SUFFIX_FAILURES;
 
   /**
-   * The number of files in a task. This will be a MeanStatistic.
+   * 单个任务包含文件数量平均值统计。使用MeanStatistic计算。
    */
   public static final String COMMITTER_FILE_COUNT_MEAN =
       "committer_task_file_count";
 
   /**
-   * File Size.
+   * 文件大小平均值统计。
    */
   public static final String COMMITTER_FILE_SIZE_MEAN =
       "committer_task_file_size";
 
   /**
-   * What is a task attempt's directory count.
+   * 单个任务尝试目录数量平均值统计。
    */
   public static final String COMMITTER_TASK_DIRECTORY_COUNT_MEAN =
       "committer_task_directory_count";
 
   /**
-   * What is the depth of a task attempt's directory tree.
+   * 单个任务尝试目录树深度平均值统计。
    */
   public static final String COMMITTER_TASK_DIRECTORY_DEPTH_MEAN =
       "committer_task_directory_depth";
 
   /**
-   * The number of files in a task. This will be a MeanStatistic.
+   * 单个任务包含文件数量平均值统计。使用MeanStatistic计算。
    */
   public static final String COMMITTER_TASK_FILE_COUNT_MEAN =
       "committer_task_file_count";
 
   /**
-   * The number of files in a task. This will be a MeanStatistic.
+   * 单个任务文件大小平均值统计。使用MeanStatistic计算。
    */
   public static final String COMMITTER_TASK_FILE_SIZE_MEAN =
       "committer_task_file_size";
 
   /**
-   * The size of manifest files. This will be a MeanStatistic.
-   * Useful to highlight whether this size is too large and
-   * effort to optimise for file IO and memory consumption
-   * justified.
+   * 任务manifest文件大小平均值统计。使用MeanStatistic计算。
+   * 用于分析manifest文件大小是否过大，指导IO和内存优化。
    */
   public static final String COMMITTER_TASK_MANIFEST_FILE_SIZE =
       "committer_task_manifest_file_size";
 
   /**
-   * A file renamed during the commit operation {@value}.
+   * 提交过程中重命名文件操作次数统计 {@value}.
    */
   public static final String OP_COMMIT_FILE_RENAME =
       "commit_file_rename";
 
   /**
-   * A file rename during the commit operation was recovered from a failure {@value}.
+   * 提交过程中从失败恢复的重命名操作次数统计 {@value}.
    */
   public static final String OP_COMMIT_FILE_RENAME_RECOVERED =
       "commit_file_rename_recovered";
@@ -131,7 +130,7 @@ public final class ManifestCommitterStatisticNames {
       "op_create_one_directory";
 
   /**
-   * A file in the destination directory tree has been deleted.
+   * 删除目标目录树中已有文件操作次数统计
    *  {@value}.
    */
   public static final String OP_DELETE_FILE_UNDER_DESTINATION =
@@ -141,7 +140,7 @@ public final class ManifestCommitterStatisticNames {
   public static final String OP_DIRECTORY_SCAN = "op_directory_scan";
 
   /**
-   * Overall job commit {@value}.
+   * 整体作业提交耗时统计 {@value}.
    */
   public static final String OP_STAGE_JOB_COMMIT = COMMITTER_COMMIT_JOB;
 
@@ -149,28 +148,25 @@ public final class ManifestCommitterStatisticNames {
   public static final String OP_LOAD_ALL_MANIFESTS = "op_load_all_manifests";
 
   /**
-   * Load a task manifest: {@value}.
+   * 加载单个任务manifest文件耗时统计: {@value}.
    */
   public static final String OP_LOAD_MANIFEST = "op_load_manifest";
 
   /**
-   * mkdir failure statistic: {@value}.
-   * This is incremented whenever mkdir() returns false, e.g because
-   * there was a file at the end of the path.
+   * mkdir操作失败统计: {@value}.
+   * 当mkdir()返回false时递增（例如路径已被文件占用）。
    */
   public static final String OP_MKDIRS_RETURNED_FALSE = "op_mkdir_returned_false";
 
   /**
-   * msync statistic: {@value}.
-   * This should be the same as StoreStatisticNames.OP_MSYNC; it's
-   * duplicated just to isolate this committer into a single JAR
-   * for ease of testing.
+   * msync操作统计: {@value}.
+   * 此处与StoreStatisticNames.OP_MSYNC定义保持一致，重复定义是为了将该提交器隔离到独立JAR，便于测试。
    */
   public static final String OP_MSYNC = "op_msync";
 
   /**
-   * Preparing ancestor dirs: {@value}.
-   * Probing for paths being files, and if true: deleting them.
+   * 准备父目录操作耗时统计: {@value}.
+   * 操作包括探测路径是否已被文件占用，如果是则删除该文件。
    */
   public static final String OP_PREPARE_DIR_ANCESTORS = "op_prepare_dir_ancestors";
 
@@ -182,82 +178,82 @@ public final class ManifestCommitterStatisticNames {
   public static final String OP_RENAME_FILE = OP_RENAME;
 
   /**
-   * Save a task manifest: {@value}.
+   * 保存任务manifest文件耗时统计: {@value}.
    */
   public static final String OP_SAVE_TASK_MANIFEST =
       "task_stage_save_task_manifest";
 
   /**
-   * Save a summary file: {@value}.
+   * 保存作业汇总文件耗时统计: {@value}.
    */
   public static final String OP_SAVE_SUMMARY_FILE =
       "task_stage_save_summary_file";
 
   /**
-   * Task abort: {@value}.
+   * 任务中止操作耗时统计: {@value}.
    */
   public static final String OP_STAGE_TASK_ABORT_TASK
       = "task_stage_abort_task";
 
   /**
-   * Job abort: {@value}.
+   * 作业中止操作耗时统计: {@value}.
    */
   public static final String OP_STAGE_JOB_ABORT = "job_stage_abort";
 
   /**
-   * Job cleanup: {@value}.
+   * 作业清理操作耗时统计: {@value}.
    */
   public static final String OP_STAGE_JOB_CLEANUP = "job_stage_cleanup";
 
   /**
-   * Prepare Directories Stage: {@value}.
+   * 准备目标目录阶段耗时统计: {@value}.
    */
   public static final String OP_STAGE_JOB_CREATE_TARGET_DIRS =
       "job_stage_create_target_dirs";
 
   /**
-   * Load Manifest Stage: {@value}.
+   * 加载所有manifest文件阶段耗时统计: {@value}.
    */
   public static final String OP_STAGE_JOB_LOAD_MANIFESTS =
       "job_stage_load_manifests";
 
   /**
-   * Rename files stage duration: {@value}.
+   * 文件重命名阶段耗时统计: {@value}.
    */
   public static final String OP_STAGE_JOB_RENAME_FILES =
       "job_stage_rename_files";
 
 
   /**
-   * Job Setup Stage: {@value}.
+   * 作业初始化阶段耗时统计: {@value}.
    */
   public static final String OP_STAGE_JOB_SETUP = "job_stage_setup";
 
   /**
-   * Job saving _SUCCESS marker Stage: {@value}.
+   * 作业保存_SUCCESS标记阶段耗时统计: {@value}.
    */
   public static final String OP_STAGE_JOB_SAVE_SUCCESS =
       "job_stage_save_success_marker";
 
   /**
-   * Output Validation (within job commit) Stage: {@value}.
+   * 输出结果验证阶段（作业提交内）耗时统计: {@value}.
    */
   public static final String OP_STAGE_JOB_VALIDATE_OUTPUT =
       "job_stage_optional_validate_output";
 
   /**
-   * Task saving manifest file Stage: {@value}.
+   * 任务保存manifest文件阶段耗时统计: {@value}.
    */
   public static final String OP_STAGE_TASK_SAVE_MANIFEST =
       "task_stage_save_manifest";
 
   /**
-   * Task Setup Stage: {@value}.
+   * 任务初始化阶段耗时统计: {@value}.
    */
   public static final String OP_STAGE_TASK_SETUP = "task_stage_setup";
 
   /**
-   * Task Commit Stage: {@value}.
+   * 任务提交阶段耗时统计: {@value}.
    */
   public static final String OP_STAGE_TASK_COMMIT = "task_stage_commit";
 
@@ -268,6 +264,9 @@ public final class ManifestCommitterStatisticNames {
   /** Delete a directory: {@value}. */
   public static final String OP_DELETE_DIR = "op_delete_dir";
 
+  /**
+   * 私有构造方法，禁止实例化此类。
+   */
   private ManifestCommitterStatisticNames() {
   }
 }

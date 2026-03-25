@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,11 +28,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.Schedulable;
 import static java.lang.Math.addExact;
 
 /**
- * Contains logic for computing the fair shares. A {@link Schedulable}'s fair
- * share is {@link Resource} it is entitled to, independent of the current
- * demands and allocations on the cluster. A {@link Schedulable} whose resource
- * consumption lies at or below its fair share will never have its containers
- * preempted.
+ * 公平调度份额计算工具类，包含计算可调度对象公平份额的核心逻辑。
+ * 一个可调度对象的公平份额是它有权获得的资源量，与当前集群需求和分配无关。
+ * 资源占用不超过公平份额的可调度对象，其容器不会被抢占。
  */
 public final class ComputeFairShares {
   
@@ -41,13 +40,11 @@ public final class ComputeFairShares {
   }
 
   /**
-   * Compute fair share of the given schedulables.Fair share is an allocation of
-   * shares considering only active schedulables ie schedulables which have
-   * running apps.
+   * 计算给定可调度对象的瞬时公平份额，仅考虑活跃的可调度对象（即正在运行应用的对象）。
    * 
-   * @param schedulables given schedulables.
-   * @param totalResources totalResources.
-   * @param type type of the resource.
+   * @param schedulables 待计算的可调度对象集合
+   * @param totalResources 集群总资源
+   * @param type 资源类型
    */
   public static void computeShares(
       Collection<? extends Schedulable> schedulables, Resource totalResources,
@@ -56,13 +53,11 @@ public final class ComputeFairShares {
   }
 
   /**
-   * Compute the steady fair share of the given queues. The steady fair
-   * share is an allocation of shares considering all queues, i.e.,
-   * active and inactive.
+   * 计算给定队列的稳定公平份额，同时考虑活跃和非活跃所有队列。
    *
-   * @param queues {@link FSQueue}s whose shares are to be updated.
-   * @param totalResources totalResources.
-   * @param type type of the resource.
+   * @param queues 待更新份额的队列集合
+   * @param totalResources 集群总资源
+   * @param type 资源类型
    */
   public static void computeSteadyShares(
       Collection<? extends FSQueue> queues, Resource totalResources,
@@ -71,62 +66,32 @@ public final class ComputeFairShares {
   }
 
   /**
-   * Given a set of Schedulables and a number of slots, compute their weighted
-   * fair shares. The min and max shares and of the Schedulables are assumed to
-   * be set beforehand. We compute the fairest possible allocation of shares to
-   * the Schedulables that respects their min and max shares.
+   * 给定一组可调度对象和总资源量，计算它们带权重的公平份额。
+   * 可调度对象的最小、最大份额需提前设置好，本方法会计算满足最小最大约束的最公平分配。
    * <p>
-   * To understand what this method does, we must first define what weighted
-   * fair sharing means in the presence of min and max shares. If there
-   * were no minimum or maximum shares, then weighted fair sharing would be
-   * achieved if the ratio of slotsAssigned / weight was equal for each
-   * Schedulable and all slots were assigned. Minimum and maximum shares add a
-   * further twist - Some Schedulables may have a min share higher than their
-   * assigned share or a max share lower than their assigned share.
+   * 算法核心思路：通过二分查找寻找合适的权重-资源比例R，使得满足以下条件且总分配等于总资源：
+   * <ul>
+   * <li>最小份额大于 R*权重 的可调度对象，分配其最小份额</li>
+   * <li>最大份额小于 R*权重 的可调度对象，分配其最大份额</li>
+   * <li>其他可调度对象分配 R*权重 的资源量</li>
+   * </ul>
    * <p>
-   * To deal with these possibilities, we define an assignment of slots as being
-   * fair if there exists a ratio R such that: Schedulables S where S.minShare
-   * {@literal >} R * S.weight are given share S.minShare - Schedulables S
-   * where S.maxShare {@literal <} R * S.weight are given S.maxShare -
-   * All other Schedulables S are assigned share R * S.weight -
-   * The sum of all the shares is totalSlots.
-   * <p>
-   * We call R the weight-to-slots ratio because it converts a Schedulable's
-   * weight to the number of slots it is assigned.
-   * <p>
-   * We compute a fair allocation by finding a suitable weight-to-slot ratio R.
-   * To do this, we use binary search. Given a ratio R, we compute the number of
-   * slots that would be used in total with this ratio (the sum of the shares
-   * computed using the conditions above). If this number of slots is less than
-   * totalSlots, then R is too small and more slots could be assigned. If the
-   * number of slots is more than totalSlots, then R is too large.
-   * <p>
-   * We begin the binary search with a lower bound on R of 0 (which means that
-   * all Schedulables are only given their minShare) and an upper bound computed
-   * to be large enough that too many slots are given (by doubling R until we
-   * use more than totalResources resources). The helper method
-   * resourceUsedWithWeightToResourceRatio computes the total resources used
-   * with a given value of R.
-   * <p>
-   * The running time of this algorithm is linear in the number of Schedulables,
-   * because resourceUsedWithWeightToResourceRatio is linear-time and the
-   * number of iterations of binary search is a constant (dependent on desired
-   * precision).
+   * 通过不断二分迭代逼近最优R值，最终根据得到的R计算每个可调度对象的公平份额。
+   * 算法时间复杂度是线性的，迭代次数固定，保证计算效率。
    */
   private static void computeSharesInternal(
       Collection<? extends Schedulable> allSchedulables,
       Resource totalResources, String type, boolean isSteadyShare) {
-
+    // 存储需要动态计算份额的非固定可调度对象
     Collection<Schedulable> schedulables = new ArrayList<>();
+    // 处理已固定份额的对象，返回这些对象占用的总资源
     long takenResources = handleFixedFairShares(
         allSchedulables, schedulables, isSteadyShare, type);
 
     if (schedulables.isEmpty()) {
       return;
     }
-    // Find an upper bound on R that we can use in our binary search. We start
-    // at R = 1 and double it until we have either used all the resources or we
-    // have met all Schedulables' max shares.
+    // 计算所有可调度对象的最大份额总和，用于后续边界截断
     long totalMaxShare = 0;
     for (Schedulable sched : schedulables) {
       long maxShare = sched.getMaxShare().getResourceValue(type);
@@ -136,16 +101,18 @@ public final class ComputeFairShares {
       }
     }
 
+    // 计算可供动态分配的剩余资源，确保不小于0、不超过总最大份额
     long totalResource = Math.max((totalResources.getResourceValue(type) -
         takenResources), 0);
     totalResource = Math.min(totalMaxShare, totalResource);
 
+    // 不断翻倍R直到总分配超过剩余资源，得到二分查找的上界
     double rMax = 1.0;
     while (resourceUsedWithWeightToResourceRatio(rMax, schedulables, type)
         < totalResource) {
       rMax *= 2.0;
     }
-    // Perform the binary search for up to COMPUTE_FAIR_SHARES_ITERATIONS steps
+    // 执行固定次数的二分查找，逼近最优R值
     double left = 0;
     double right = rMax;
     for (int i = 0; i < COMPUTE_FAIR_SHARES_ITERATIONS; i++) {
@@ -156,12 +123,14 @@ public final class ComputeFairShares {
         right = mid;
         break;
       } else if (plannedResourceUsed < totalResource) {
+        // R偏小，需要增大
         left = mid;
       } else {
+        // R偏大，需要减小
         right = mid;
       }
     }
-    // Set the fair shares based on the value of R we've converged to
+    // 根据收敛得到的R，更新每个可调度对象的公平份额
     for (Schedulable sched : schedulables) {
       Resource target;
 
@@ -176,9 +145,7 @@ public final class ComputeFairShares {
   }
 
   /**
-   * Compute the resources that would be used given a weight-to-resource ratio
-   * w2rRatio, for use in the computeFairShares algorithm as described in
-   * {@link #computeSharesInternal}.
+   * 给定权重-资源比例R，计算该比例下所有可调度对象的总资源占用，用于二分查找。
    */
   private static long resourceUsedWithWeightToResourceRatio(double w2rRatio,
       Collection<? extends Schedulable> schedulables, String type) {
@@ -194,21 +161,21 @@ public final class ComputeFairShares {
   }
 
   /**
-   * Compute the resources assigned to a Schedulable given a particular
-   * weight-to-resource ratio w2rRatio.
+   * 给定权重-资源比例R，计算单个可调度对象的分配资源量。
    */
-  private static long computeShare(Schedulable sched, double w2rRatio,
+  private static long computeShare(Sched ulable sched, double w2rRatio,
       String type) {
     double share = sched.getWeight() * w2rRatio;
+    // 不低于最小份额
     share = Math.max(share, sched.getMinShare().getResourceValue(type));
+    // 不高于最大份额
     share = Math.min(share, sched.getMaxShare().getResourceValue(type));
     return (long) share;
   }
 
   /**
-   * Helper method to handle Schedulabes with fixed fairshares.
-   * Returns the resources taken by fixed fairshare schedulables,
-   * and adds the remaining to the passed nonFixedSchedulables.
+   * 处理固定公平份额的可调度对象，
+   * 返回固定份额对象占用的总资源，并将需要动态计算的对象添加到nonFixedSchedulables集合。
    */
   private static long handleFixedFairShares(
       Collection<? extends Schedulable> schedulables,
@@ -219,8 +186,10 @@ public final class ComputeFairShares {
     for (Schedulable sched : schedulables) {
       long fixedShare = getFairShareIfFixed(sched, isSteadyShare, type);
       if (fixedShare < 0) {
+        // 需要动态计算，加入非固定集合
         nonFixedSchedulables.add(sched);
       } else {
+        // 已经是固定份额，直接设置并累加资源占用
         Resource target;
 
         if (isSteadyShare) {
@@ -237,42 +206,38 @@ public final class ComputeFairShares {
   }
 
   /**
-   * Get the fairshare for the {@link Schedulable} if it is fixed,
-   * -1 otherwise.
-   *
-   * The fairshare is fixed if either the maxShare is 0, weight is 0,
-   * or the Schedulable is not active for instantaneous fairshare.
+   * 如果可调度对象的公平份额是固定的，返回固定值；否则返回-1。
+   * 满足以下任意条件即为固定份额：最大份额为0、权重为0，或瞬时公平份额计算时队列不活跃。
    */
   private static long getFairShareIfFixed(Schedulable sched,
       boolean isSteadyShare, String type) {
 
-    // Check if maxShare is 0
+    // 最大份额为0，固定分配0
     if (sched.getMaxShare().getResourceValue(type) <= 0) {
       return 0;
     }
 
-    // For instantaneous fairshares, check if queue is active
+    // 瞬时份额计算中，不活跃队列固定分配0
     if (!isSteadyShare &&
         (sched instanceof FSQueue) && !((FSQueue)sched).isActive()) {
       return 0;
     }
 
-    // Check if weight is 0
+    // 权重为0，返回最小份额（最小份额小于等于0则返回0）
     if (sched.getWeight() <= 0) {
       long minShare = sched.getMinShare().getResourceValue(type);
       return (minShare <= 0) ? 0 : minShare;
     }
 
+    // 不满足固定条件，返回-1需要动态计算
     return -1;
   }
 
   /**
-   * Safely add two long values. The result will always be a valid long value.
-   * If the addition caused an overflow the return value will be set to
-   * <code>Long.MAX_VALUE</code>.
-   * @param a first long to add
-   * @param b second long to add
-   * @return result of the addition
+   * 安全相加两个long值，溢出时返回Long.MAX_VALUE。
+   * @param a 第一个加数
+   * @param b 第二个加数
+   * @return 相加结果，溢出返回Long.MAX_VALUE
    */
   private static long safeAdd(long a, long b) {
     try {

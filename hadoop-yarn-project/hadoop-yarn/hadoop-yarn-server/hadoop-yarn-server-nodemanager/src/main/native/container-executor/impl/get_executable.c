@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,13 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+
+/**
+ * @file get_executable.c
+ * @brief 不同操作系统下获取容器执行器自身可执行文件绝对路径的实现
+ * @details 由于本程序以setuid权限运行，argv[0]可被恶意代码篡改，因此不能直接使用realpath(argv[0])
+ * 需要通过操作系统提供的安全接口获取可执行文件真实路径，返回值需要后续调用者free释放。
  */
 
 /*
@@ -49,15 +57,22 @@
  * and Ron Gomes, this is pretty generic code.
  */
 
+/**
+ * @brief 从/proc文件系统读取可执行文件路径（通用procfs实现）
+ * @param procfn 要读取的proc符号链接路径
+ * @return 分配的可执行文件绝对路径字符串，需要调用者释放
+ */
 char *__get_exec_readproc(char *procfn) {
   char *filename;
   ssize_t len;
 
+  // 分配存储路径的缓冲区
   filename = malloc(EXECUTOR_PATH_MAX);
   if (!filename) {
     fprintf(ERRORFILE,"cannot allocate memory for filename before readlink: %s\n",strerror(errno));
     exit(OUT_OF_MEMORY);
   }
+  // 读取proc符号链接指向的实际路径
   len = readlink(procfn, filename, EXECUTOR_PATH_MAX);
   if (len == -1) {
     fprintf(ERRORFILE,"Cannot get executable name from %s - %s\n", procfn,
@@ -68,6 +83,7 @@ char *__get_exec_readproc(char *procfn) {
             procfn, filename, EXECUTOR_PATH_MAX);
     exit(TOO_LONG_EXECUTOR_PATH);
   }
+  // 添加字符串结束符
   filename[len] = '\0';
   return filename;
 }
@@ -80,6 +96,11 @@ char *__get_exec_readproc(char *procfn) {
  * many do not reliably have a /proc mounted.
  */
 
+/**
+ * @brief 通过sysctl系统调用向内核查询可执行文件路径（通用BSD实现）
+ * @param mib sysctl查询参数数组
+ * @return 分配的可执行文件绝对路径字符串，需要调用者释放
+ */
 char *__get_exec_sysctl(int *mib)
 {
   char buffer[EXECUTOR_PATH_MAX];
@@ -87,16 +108,19 @@ char *__get_exec_sysctl(int *mib)
   size_t len;
 
   len = sizeof(buffer);
+  // 调用sysctl获取可执行路径
   if (sysctl(mib, 4, buffer, &len, NULL, 0) == -1) {
     fprintf(ERRORFILE,"Cannot get executable name from kernel: %s\n",
       strerror(errno));
     exit(CANNOT_GET_EXECUTABLE_NAME_FROM_KERNEL);
   }
+  // 分配缓冲区保存结果
   filename=malloc(EXECUTOR_PATH_MAX);
   if (!filename) {
     fprintf(ERRORFILE,"cannot allocate memory for filename after sysctl: %s\n",strerror(errno));
     exit(OUT_OF_MEMORY);
   }
+  // 复制结果到分配的缓冲区
   snprintf(filename,EXECUTOR_PATH_MAX,"%s",buffer);
   return filename;
 }
@@ -113,6 +137,11 @@ char *__get_exec_sysctl(int *mib)
 
 #include <libproc.h>
 
+/**
+ * @brief macOS平台获取可执行文件绝对路径实现
+ * @param argv0 原始命令行第一个参数（本实现未使用）
+ * @return 分配的可执行文件绝对路径字符串，需要调用者释放
+ */
 char* get_executable(char *argv0) {
   char *filename;
   pid_t pid;
@@ -123,6 +152,7 @@ char* get_executable(char *argv0) {
     exit(OUT_OF_MEMORY);
   }
   pid = getpid();
+  // 通过libproc接口查询当前进程可执行路径
   if (proc_pidpath(pid,filename,PROC_PIDPATHINFO_MAXSIZE) <= 0) {
     fprintf(ERRORFILE,"Cannot get executable name from pid %u - %s\n", pid,
             strerror(errno));
@@ -133,6 +163,11 @@ char* get_executable(char *argv0) {
 
 #elif defined(__FreeBSD__)
 
+/**
+ * @brief FreeBSD平台获取可执行文件绝对路径实现
+ * @param argv0 原始命令行第一个参数（本实现未使用）
+ * @return 分配的可执行文件绝对路径字符串，需要调用者释放
+ */
 char* get_executable(char *argv0) {
   static int mib[] = {
     CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1
@@ -142,7 +177,11 @@ char* get_executable(char *argv0) {
 
 #elif defined(__linux__)
 
-
+/**
+ * @brief Linux平台获取可执行文件绝对路径实现
+ * @param argv0 原始命令行第一个参数（本实现未使用）
+ * @return 分配的可执行文件绝对路径字符串，需要调用者释放
+ */
 char* get_executable(char *argv0) {
   return __get_exec_readproc("/proc/self/exe");
 }
@@ -151,6 +190,11 @@ char* get_executable(char *argv0) {
 
 /* Only really new NetBSD kernels have KERN_PROC_PATHNAME */
 
+/**
+ * @brief NetBSD平台获取可执行文件绝对路径实现
+ * @param argv0 原始命令行第一个参数（本实现未使用）
+ * @return 分配的可执行文件绝对路径字符串，需要调用者释放
+ */
 char* get_executable(char *argv0) {
   static int mib[] = {
     CTL_KERN, KERN_PROC_ARGS, -1, KERN_PROC_PATHNAME,
@@ -169,6 +213,11 @@ char* get_executable(char *argv0) {
  * doesn't exist on Solaris hasn't read the proc(4) man page.)
  */
 
+/**
+ * @brief Solaris/Illumos平台获取可执行文件绝对路径实现
+ * @param argv0 原始命令行第一个参数（本实现未使用）
+ * @return 分配的可执行文件绝对路径字符串，需要调用者释放
+ */
 char* get_executable(char *argv0) {
   return __get_exec_readproc("/proc/self/path/a.out");
 }
@@ -183,6 +232,11 @@ char* get_executable(char *argv0) {
  * for security reasons.
  */
 
+/**
+ * @brief 通用回退实现：当HADOOP_CONF_DIR为绝对路径时，基于argv0获取路径
+ * @param argv0 原始命令行第一个参数
+ * @return 分配的可执行文件绝对路径字符串，需要调用者释放
+ */
 char* get_executable (char *argv0) {
   char *filename;
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,6 +18,6 @@
  */
 
 /**
- * Utility classes used for Scheduling.
+ * YARN 调度器公共工具包，提供调度相关的通用工具类，供各类具体调度器实现复用
  */
 package org.apache.hadoop.yarn.server.scheduler;

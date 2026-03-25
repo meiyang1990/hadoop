@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,16 +29,18 @@ import org.apache.hadoop.yarn.server.resourcemanager.reservation.Plan;
 import org.apache.hadoop.yarn.server.resourcemanager.reservation.exceptions.PlanningException;
 
 /**
- * A planning algorithm that invokes several other planning algorithms according
- * to a given order. If one of the planners succeeds, the allocation it
- * generates is returned.
+ * YARN预留资源规划代理，按顺序尝试多个规划算法，只要有一个算法规划成功就返回结果。
+ * 用于组合多种规划策略，提升预留资源分配成功率。
  */
 public class TryManyReservationAgents implements ReservationAgent {
 
-  // Planning algorithms
+  // 按顺序保存待尝试的规划算法列表
   private final List<ReservationAgent> algs;
 
-  // Constructor
+  /**
+   * 构造方法，初始化待尝试的规划算法列表
+   * @param algs 待尝试的规划算法列表
+   */
   public TryManyReservationAgents(List<ReservationAgent> algs) {
     this.algs = new LinkedList<ReservationAgent>(algs);
   }
@@ -46,29 +49,30 @@ public class TryManyReservationAgents implements ReservationAgent {
   public boolean createReservation(ReservationId reservationId, String user,
       Plan plan, ReservationDefinition contract) throws PlanningException {
 
-    // Save the planning exception
+    // 保存最后一次规划异常
     PlanningException planningException = null;
 
-    // Try all of the algorithms, in order
+    // 按顺序尝试所有规划算法
     for (ReservationAgent alg : algs) {
 
       try {
+        // 当前算法规划成功，直接返回true
         if (alg.createReservation(reservationId, user, plan, contract)) {
           return true;
         }
       } catch (PlanningException e) {
+        // 记录规划异常
         planningException = e;
       }
 
     }
 
-    // If all of the algorithms failed and one of the algorithms threw an
-    // exception, throw the last planning exception
+    // 所有算法失败，如果存在异常则抛出最后一次异常
     if (planningException != null) {
       throw planningException;
     }
 
-    // If all of the algorithms failed, return false
+    // 所有算法都失败且无异常，返回false
     return false;
 
   }
@@ -77,29 +81,30 @@ public class TryManyReservationAgents implements ReservationAgent {
   public boolean updateReservation(ReservationId reservationId, String user,
       Plan plan, ReservationDefinition contract) throws PlanningException {
 
-    // Save the planning exception
+    // 保存最后一次规划异常
     PlanningException planningException = null;
 
-    // Try all of the algorithms, in order
+    // 按顺序尝试所有规划算法
     for (ReservationAgent alg : algs) {
 
       try {
+        // 当前算法更新成功，直接返回true
         if (alg.updateReservation(reservationId, user, plan, contract)) {
           return true;
         }
       } catch (PlanningException e) {
+        // 记录规划异常
         planningException = e;
       }
 
     }
 
-    // If all of the algorithms failed and one of the algorithms threw an
-    // exception, throw the last planning exception
+    // 所有算法失败，如果存在异常则抛出最后一次异常
     if (planningException != null) {
       throw planningException;
     }
 
-    // If all of the algorithms failed, return false
+    // 所有算法都失败且无异常，返回false
     return false;
 
   }
@@ -107,10 +112,10 @@ public class TryManyReservationAgents implements ReservationAgent {
   @Override
   public boolean deleteReservation(ReservationId reservationId, String user,
       Plan plan) throws PlanningException {
-
+    // 直接委托Plan执行删除操作
     return plan.deleteReservation(reservationId);
-
   }
+
   @Override
   public void init(Configuration conf) {
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,23 +45,27 @@ import java.util.Map;
 import static org.apache.hadoop.yarn.api.records.ResourceInformation.FPGA_URI;
 
 /**
- * This FPGA resource allocator tends to be used by different FPGA vendor's plugin
- * A "type" parameter is taken into consideration when allocation
- * */
+ * 节点管理器上FPGA资源分配器，支持不同FPGA厂商插件，分配时考虑设备类型维度
+ * 负责管理本节点上FPGA设备的分配、回收与恢复
+ */
 public class FpgaResourceAllocator {
 
   static final Logger LOG = LoggerFactory.
       getLogger(FpgaResourceAllocator.class);
 
+  /** 本节点允许使用的所有FPGA设备列表 */
   private List<FpgaDevice> allowedFpgas = new LinkedList<>();
 
   //key is resource type of FPGA, vendor plugin supported ID
+  /** 按类型分组的可用FPGA设备，key为FPGA类型，value为该类型可用设备列表 */
   private Map<String, List<FpgaDevice>> availableFpgas = new HashMap<>();
 
   //key is the container ID
+  /** 容器与已分配FPGA设备的映射，key为容器ID字符串，value为分配给该容器的设备列表 */
   private Map<String, List<FpgaDevice>> containerToFpgaMapping =
       new HashMap<>();
 
+  /** 节点管理器上下文 */
   private Context nmContext;
 
   @VisibleForTesting
@@ -73,6 +78,10 @@ public class FpgaResourceAllocator {
     return allowedFpgas;
   }
 
+  /**
+   * 构造FPGA资源分配器
+   * @param ctx 节点管理器上下文
+   */
   public FpgaResourceAllocator(Context ctx) {
     this.nmContext = ctx;
   }
@@ -106,6 +115,9 @@ public class FpgaResourceAllocator {
     return count;
   }
 
+  /**
+   * FPGA分配结果封装类，包含成功分配和未分配的设备列表
+   */
   public static class FpgaAllocation {
 
     private List<FpgaDevice> allowed = Collections.emptyList();
@@ -146,7 +158,11 @@ public class FpgaResourceAllocator {
     }
   }
 
-  // called once during initialization
+  /**
+   * 初始化时添加FPGA设备，仅调用一次
+   * @param type FPGA设备类型
+   * @param list 待添加的设备列表
+   */
   public synchronized void addFpgaDevices(String type, List<FpgaDevice> list) {
     availableFpgas.putIfAbsent(type, new LinkedList<>());
     List<FpgaDevice> fpgaDevices = new LinkedList<>();
@@ -164,6 +180,13 @@ public class FpgaResourceAllocator {
     LOG.info("Added a list of FPGA Devices: " + allowedFpgas);
   }
 
+  /**
+   * 更新已分配FPGA设备的IPID和比特流哈希信息
+   * @param requestor 请求容器ID
+   * @param device 待更新的FPGA设备
+   * @param newIPID 新的IPID
+   * @param newHash 新的aocx文件哈希
+   */
   public synchronized void updateFpga(String requestor,
       FpgaDevice device, String newIPID, String newHash) {
     device.setIPID(newIPID);
@@ -174,7 +197,7 @@ public class FpgaResourceAllocator {
   }
 
   /**
-   * Assign {@link FpgaAllocation} with preferred IPID, if no, with random FPGAs
+   * 分配FPGA设备，优先分配匹配比特流哈希的设备，不足时分配任意可用设备
    * @param type vendor plugin supported FPGA device type
    * @param count requested FPGA slot count
    * @param container container id
@@ -198,6 +221,7 @@ public class FpgaResourceAllocator {
       // Allocate devices with matching IP first, then any device is ok
       List<FpgaDevice> assignedFpgas = new LinkedList<>();
       int matchIPCount = 0;
+      // 优先分配比特流哈希匹配的设备，减少重复编程开销
       for (int i = 0; i < currentAvailableFpga.size(); i++) {
         String deviceIPIDhash = currentAvailableFpga.get(i).getAocxHash();
         if (deviceIPIDhash != null &&
@@ -207,6 +231,7 @@ public class FpgaResourceAllocator {
           matchIPCount++;
         }
       }
+      // 不足时分配剩余任意设备
       int remaining = (int) count - matchIPCount;
       while (remaining > 0) {
         assignedFpgas.add(currentAvailableFpga.remove(0));
@@ -216,24 +241,31 @@ public class FpgaResourceAllocator {
       // Record in state store if we allocated anything
       if (!assignedFpgas.isEmpty()) {
         try {
+          // 将分配信息持久化到节点状态存储，支持节点重启恢复
           nmContext.getNMStateStore().storeAssignedResources(container,
               FPGA_URI, new LinkedList<>(assignedFpgas));
         } catch (IOException e) {
-          // failed, give the allocation back
+          // 持久化失败，回滚分配
           currentAvailableFpga.addAll(assignedFpgas);
           throw new ResourceHandlerException(e);
         }
 
-        // update state store success, update internal used FPGAs
+        // 持久化成功，更新本地分配映射
         containerToFpgaMapping.putIfAbsent(requestor, new LinkedList<>());
         containerToFpgaMapping.get(requestor).addAll(assignedFpgas);
       }
 
       return new FpgaAllocation(assignedFpgas, currentAvailableFpga);
     }
+    // 请求数量为0，返回空分配结果
     return new FpgaAllocation(null, allowedFpgas);
   }
 
+  /**
+   * 节点重启后从状态存储恢复已分配FPGA设备
+   * @param containerId 待恢复的容器ID
+   * @throws ResourceHandlerException 恢复失败时抛出异常
+   */
   public synchronized void recoverAssignedFpgas(ContainerId containerId) throws ResourceHandlerException {
     Container c = nmContext.getContainers().get(containerId);
     if (null == c) {
@@ -250,14 +282,14 @@ public class FpgaResourceAllocator {
                 + " is not FpgaDevice type, this shouldn't happen");
       }
 
-      // Make sure it is in allowed FPGA device.
+      // 校验设备在当前节点允许列表中
       if (!allowedFpgas.contains(fpgaDevice)) {
         throw new ResourceHandlerException("Try to recover FpgaDevice = " + fpgaDevice
             + " however it is not in allowed device list:" + StringUtils
             .join(";", allowedFpgas));
       }
 
-      // Make sure it is not occupied by anybody else
+      // 校验设备未被其他容器占用
       Iterator<Map.Entry<String, List<FpgaDevice>>> iterator =
           getUsedFpga().entrySet().iterator();
       while (iterator.hasNext()) {
@@ -266,20 +298,26 @@ public class FpgaResourceAllocator {
               + " however it is already assigned to others");
         }
       }
+      // 添加到容器分配映射
       getUsedFpga().putIfAbsent(containerId.toString(), new LinkedList<>());
       getUsedFpga().get(containerId.toString()).add((FpgaDevice) fpgaDevice);
-      // remove them from available list
+      // 从可用列表移除已恢复设备
       getAvailableFpga().get(((FpgaDevice) fpgaDevice).getType()).remove(fpgaDevice);
     }
   }
 
+  /**
+   * 容器退出后清理FPGA设备分配，将设备归还可用列表
+   * @param requestor 容器ID字符串
+   */
   public synchronized void cleanupAssignFpgas(String requestor) {
     List<FpgaDevice> usedFpgas = containerToFpgaMapping.get(requestor);
     if (usedFpgas != null) {
       for (FpgaDevice device : usedFpgas) {
-        // Add back to availableFpga
+        // 将设备归还对应类型的可用列表
         availableFpgas.get(device.getType()).add(device);
       }
+      // 移除容器分配映射
       containerToFpgaMapping.remove(requestor);
     }
   }

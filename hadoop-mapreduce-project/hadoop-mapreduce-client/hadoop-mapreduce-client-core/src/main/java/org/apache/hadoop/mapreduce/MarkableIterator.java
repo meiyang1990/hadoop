@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,20 +26,23 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * <code>MarkableIterator</code> is a wrapper iterator class that 
- * implements the {@link MarkableIteratorInterface}.
+ * 文件描述: 可标记迭代器包装类，提供支持标记/重置位置的迭代器能力，
+ *           用于MapReduce阶段中需要回溯迭代位置的场景
  * 
+ * 可标记迭代器，包装底层实现了{@link MarkableIteratorInterface}的迭代器，
+ * 提供标记、重置迭代位置的能力
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public class MarkableIterator<VALUE> 
   implements MarkableIteratorInterface<VALUE> {
 
+  // 被包装的底层可标记迭代器
   MarkableIteratorInterface<VALUE> baseIterator;
 
   /**
-   * Create a new iterator layered on the input iterator
-   * @param itr underlying iterator that implements MarkableIteratorInterface
+   * 构造可标记迭代器，包装传入的底层迭代器
+   * @param itr 底层迭代器，必须实现MarkableIteratorInterface接口
    */
   public MarkableIterator(Iterator<VALUE> itr)  {
     if (!(itr instanceof MarkableIteratorInterface)) {

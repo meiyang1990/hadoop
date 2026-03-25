@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,9 +22,13 @@ package org.apache.hadoop.mapreduce.lib.output;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-// Counters used by Task classes
+/**
+ * 文件输出格式计数器枚举，定义FileOutputFormat使用的统计指标，
+ * 用于MapReduce任务输出字节数的监控统计。
+ */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public enum FileOutputFormatCounter {
+  /** 任务输出写入的总字节数计数器 */
   BYTES_WRITTEN
 }

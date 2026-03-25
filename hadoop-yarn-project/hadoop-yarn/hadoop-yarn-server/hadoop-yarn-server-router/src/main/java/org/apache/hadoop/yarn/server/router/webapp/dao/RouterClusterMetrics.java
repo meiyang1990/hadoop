@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,17 +29,22 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * YARN Router联邦集群聚合指标数据对象，用于在Web UI展示聚合后的集群指标信息。
+ * 聚合多个子RM的集群指标，统一对外提供联邦层面的集群监控数据。
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class RouterClusterMetrics {
 
+  // 1MB对应的字节数
   protected static final long BYTES_IN_MB = 1024 * 1024;
   private static final Logger LOG = LoggerFactory.getLogger(RouterClusterMetrics.class);
 
-  // webPageTitlePrefix
+  // 网页标题前缀，标识联邦集群页面
   private String webPageTitlePrefix = "Federation";
 
-  // Application Information.
+  // 应用状态指标
   private String appsSubmitted = "N/A";
   private String appsCompleted = "N/A";
   private String appsPending = "N/A";
@@ -46,31 +52,31 @@ public class RouterClusterMetrics {
   private String appsFailed = "N/A";
   private String appsKilled = "N/A";
 
-  // Memory Information.
+  // 内存资源指标
   private String totalMemory = "N/A";
   private String reservedMemory = "N/A";
   private String availableMemory = "N/A";
   private String allocatedMemory = "N/A";
   private String pendingMemory = "N/A";
 
-  // VirtualCores Information.
+  // CPU核心指标
   private String reservedVirtualCores = "N/A";
   private String availableVirtualCores = "N/A";
   private String allocatedVirtualCores = "N/A";
   private String pendingVirtualCores = "N/A";
   private String totalVirtualCores = "N/A";
 
-  // Resources Information.
+  // 通用资源指标
   private String usedResources = "N/A";
   private String totalResources = "N/A";
   private String reservedResources = "N/A";
   private String allocatedContainers = "N/A";
 
-  // Resource Percent Information.
+  // 资源利用率指标
   private String utilizedMBPercent = "N/A";
   private String utilizedVirtualCoresPercent = "N/A";
 
-  // Node Information.
+  // 节点状态指标
   private String activeNodes = "N/A";
   private String decommissioningNodes = "N/A";
   private String decommissionedNodes = "N/A";
@@ -83,32 +89,41 @@ public class RouterClusterMetrics {
 
   }
 
+  /**
+   * 构造函数，从单个RM的指标信息转换生成Router聚合指标。
+   * @param metrics 单个RM的集群指标信息
+   */
   public RouterClusterMetrics(ClusterMetricsInfo metrics) {
     if (metrics != null) {
-      // Application Information Conversion.
+      // 转换应用指标信息
       conversionApplicationInformation(metrics);
 
-      // Memory Information Conversion.
+      // 转换内存指标信息
       conversionMemoryInformation(metrics);
 
-      // Resources Information Conversion.
+      // 转换资源指标信息
       conversionResourcesInformation(metrics);
 
-      // Percent Information Conversion.
+      // 转换资源利用率指标
       conversionResourcesPercent(metrics);
 
-      // Node Information Conversion.
+      // 转换节点指标信息
       conversionNodeInformation(metrics);
     }
   }
 
+  /**
+   * 构造函数，从单个RM的指标信息构造，并指定网页标题前缀。
+   * @param metrics 单个RM的集群指标信息
+   * @param webPageTitlePrefix 网页标题前缀
+   */
   public RouterClusterMetrics(ClusterMetricsInfo metrics,
       String webPageTitlePrefix) {
     this(metrics);
     this.webPageTitlePrefix = webPageTitlePrefix;
   }
 
-  // Get Key Metric Information
+  // Getters for all metric fields
   public String getAppsSubmitted() {
     return appsSubmitted;
   }
@@ -225,10 +240,13 @@ public class RouterClusterMetrics {
     return shutdownNodes;
   }
 
-  // Metric Information Conversion
+  /**
+   * 转换应用状态指标信息。
+   * @param metrics 源RM集群指标信息
+   */
   public void conversionApplicationInformation(ClusterMetricsInfo metrics) {
     try {
-      // Application Information.
+      // 提取各状态应用数量
       this.appsSubmitted = String.valueOf(metrics.getAppsSubmitted());
       this.appsCompleted = String.valueOf(metrics.getAppsCompleted() +
            metrics.getAppsFailed() + metrics.getAppsKilled());
@@ -241,10 +259,13 @@ public class RouterClusterMetrics {
     }
   }
 
-  // Metric Memory Information
+  /**
+   * 转换内存资源指标信息。
+   * @param metrics 源RM集群指标信息
+   */
   public void conversionMemoryInformation(ClusterMetricsInfo metrics) {
     try {
-      // Memory Information.
+      // 将MB转换为友好格式的字节描述
       this.totalMemory = StringUtils.byteDesc(metrics.getTotalMB() * BYTES_IN_MB);
       this.reservedMemory = StringUtils.byteDesc(metrics.getReservedMB() * BYTES_IN_MB);
       this.availableMemory = StringUtils.byteDesc(metrics.getAvailableMB() * BYTES_IN_MB);
@@ -255,23 +276,28 @@ public class RouterClusterMetrics {
     }
   }
 
-  // ResourcesInformation Conversion
+  /**
+   * 转换通用资源指标信息，支持跨资源分区的指标聚合。
+   * @param metrics 源RM集群指标信息
+   */
   public void conversionResourcesInformation(ClusterMetricsInfo metrics) {
     try {
-      // Parse resource information from metrics.
+      // 声明资源指标变量
       Resource metricUsedResources;
       Resource metricTotalResources;
       Resource metricReservedResources;
 
       int metricAllocatedContainers;
+      // 若支持跨分区指标聚合，则从跨分区聚合结果获取数据
       if (metrics.getCrossPartitionMetricsAvailable()) {
         metricAllocatedContainers = metrics.getTotalAllocatedContainersAcrossPartition();
         metricUsedResources = metrics.getTotalUsedResourcesAcrossPartition().getResource();
         metricTotalResources = metrics.getTotalClusterResourcesAcrossPartition().getResource();
         metricReservedResources = metrics.getTotalReservedResourcesAcrossPartition().getResource();
-        // getTotalUsedResourcesAcrossPartition includes reserved resources.
+        // 跨分区已用资源包含预留资源，减去预留资源得到实际已用
         Resources.subtractFrom(metricUsedResources, metricReservedResources);
       } else {
+        // 不支持跨分区则从普通指标提取数据
         metricAllocatedContainers = metrics.getContainersAllocated();
         metricUsedResources = Resource.newInstance(metrics.getAllocatedMB(),
             (int) metrics.getAllocatedVirtualCores());
@@ -281,7 +307,7 @@ public class RouterClusterMetrics {
             (int) metrics.getReservedVirtualCores());
       }
 
-      // Convert to standard format.
+      // 格式化为UI可展示的字符串
       usedResources = metricUsedResources.getFormattedString();
       totalResources = metricTotalResources.getFormattedString();
       reservedResources = metricReservedResources.getFormattedString();
@@ -292,7 +318,10 @@ public class RouterClusterMetrics {
     }
   }
 
-  // ResourcesPercent Conversion
+  /**
+   * 转换资源利用率指标信息。
+   * @param metrics 源RM集群指标信息
+   */
   public void conversionResourcesPercent(ClusterMetricsInfo metrics) {
     try {
       this.utilizedMBPercent = String.valueOf(metrics.getUtilizedMBPercent());
@@ -302,7 +331,10 @@ public class RouterClusterMetrics {
     }
   }
 
-  // NodeInformation Conversion
+  /**
+   * 转换节点状态指标信息。
+   * @param metrics 源RM集群指标信息
+   */
   public void conversionNodeInformation(ClusterMetricsInfo metrics) {
     try {
       this.activeNodes = String.valueOf(metrics.getActiveNodes());

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,7 +24,8 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import java.util.concurrent.Callable;
 
 /**
- * A task interface to provision a volume to expected state.
+ * YARN CSI存储卷供应器接口，定义了将存储卷制备到目标状态的异步任务规范。
+ * 用于YARN集成CSI标准，为应用容器动态制备存储卷。
  */
 @Private
 @Unstable

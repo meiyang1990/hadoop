@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,25 +22,23 @@ package org.apache.hadoop.yarn.server.nodemanager.nodelabels;
 import java.util.Set;
 
 /**
- * Interface which will be responsible for fetching node descriptors,
- * a node descriptor could be a
- * {@link org.apache.hadoop.yarn.api.records.NodeLabel} or a
- * {@link org.apache.hadoop.yarn.api.records.NodeAttribute}.
+ * 节点描述符提供者接口，负责获取当前节点的描述信息。
+ * 节点描述符可以是{@link org.apache.hadoop.yarn.api.records.NodeLabel}节点标签
+ * 或{@link org.apache.hadoop.yarn.api.records.NodeAttribute}节点属性。
  */
 public interface NodeDescriptorsProvider<T> {
 
   /**
-   * Provides the descriptors. The provider is expected to give same
-   * descriptors continuously until there is a change.
-   * If null is returned then an empty set is assumed by the caller.
+   * 获取当前节点适用的描述符集合。提供者在描述符发生变更前应返回一致的结果，
+   * 如果返回null，调用方会默认作为空集合处理。
    *
-   * @return Set of node descriptors applicable for a node
+   * @return 当前节点适用的描述符集合
    */
   Set<T> getDescriptors();
 
   /**
-   * Sets a set of descriptors to the provider.
-   * @param descriptors node descriptors.
+   * 设置当前节点的描述符集合到提供者
+   * @param descriptors 节点描述符集合
    */
   void setDescriptors(Set<T> descriptors);
 }

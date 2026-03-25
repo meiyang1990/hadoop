@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,26 +31,24 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * This class is used to store assigned resource to a single container by
- * resource types.
- *
- * Assigned resource could be list of String
- *
- * For example, we can assign container to:
+ * 按资源类型存储单个容器分配的资源映射关系
+ * 
+ * 分配的资源可以是字符串列表形式，例如：
  * "numa": ["numa0"]
  * "gpu": ["0", "1", "2", "3"]
  * "fpga": ["1", "3"]
- *
- * This will be used for NM restart container recovery.
+ * 
+ * 该类主要用于NodeManager重启时的容器恢复场景，持久化保存容器资源分配信息
  */
 public class ResourceMappings {
 
+  // 按资源类型存储分配的资源信息
   private Map<String, AssignedResources> assignedResourcesMap = new HashMap<>();
 
   /**
-   * Get all resource mappings.
-   * @param resourceType resourceType
-   * @return map of resource mapping
+   * 获取指定资源类型的已分配资源列表
+   * @param resourceType 资源类型
+   * @return 已分配资源列表，不存在对应类型时返回空列表
    */
   public List<Serializable> getAssignedResources(String resourceType) {
     AssignedResources ar = assignedResourcesMap.get(resourceType);
@@ -60,10 +59,10 @@ public class ResourceMappings {
   }
 
   /**
-   * Adds the resources for a given resource type.
+   * 添加指定资源类型的已分配资源
    *
-   * @param resourceType Resource Type
-   * @param assigned Assigned resources to add
+   * @param resourceType 资源类型
+   * @param assigned 待添加的已分配资源对象
    */
   public void addAssignedResources(String resourceType,
       AssignedResources assigned) {
@@ -71,20 +70,35 @@ public class ResourceMappings {
   }
 
   /**
-   * Stores resources assigned to a container for a given resource type.
+   * 存储容器某一资源类型下分配的具体资源信息，支持序列化
    */
   public static class AssignedResources implements Serializable {
     private static final long serialVersionUID = -1059491941955757926L;
+    // 存储已分配的资源列表，所有资源都需要可序列化
     private List<Serializable> resources = Collections.emptyList();
 
+    /**
+     * 获取不可修改的已分配资源列表
+     * @return 不可修改的已分配资源列表
+     */
     public List<Serializable> getAssignedResources() {
       return Collections.unmodifiableList(resources);
     }
 
+    /**
+     * 更新已分配资源列表
+     * @param list 新的已分配资源列表
+     */
     public void updateAssignedResources(List<Serializable> list) {
       this.resources = new ArrayList<>(list);
     }
 
+    /**
+     * 从字节数组反序列化恢复AssignedResources对象
+     * @param bytes 序列化后的字节数组
+     * @return 反序列化得到的AssignedResources对象
+     * @throws IOException 反序列化失败时抛出异常
+     */
     @SuppressWarnings("unchecked")
     public static AssignedResources fromBytes(byte[] bytes)
         throws IOException {
@@ -99,6 +113,11 @@ public class ResourceMappings {
       return ar;
     }
 
+    /**
+     * 将当前AssignedResources对象序列化为字节数组
+     * @return 序列化后的字节数组
+     * @throws IOException 序列化失败时抛出异常
+     */
     public byte[] toBytes() throws IOException {
       final byte[] bytes;
       try {

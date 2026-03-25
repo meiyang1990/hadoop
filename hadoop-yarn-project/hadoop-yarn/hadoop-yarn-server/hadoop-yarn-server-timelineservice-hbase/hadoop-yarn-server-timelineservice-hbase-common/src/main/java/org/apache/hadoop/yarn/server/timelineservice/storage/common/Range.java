@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,7 +22,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Encapsulates a range with start and end indices.
+ * YARN时间线服务HBase存储层的范围封装类，封装带起始和结束索引的区间。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -30,14 +31,13 @@ public class Range {
   private final int endIdx;
 
   /**
-   * Defines a range from start index (inclusive) to end index (exclusive).
+   * 构造一个左闭右开区间 [start, end)。
    *
-   * @param start
-   *          Starting index position
-   * @param end
-   *          Ending index position (exclusive)
+   * @param start 起始索引（包含）
+   * @param end 结束索引（不包含）
    */
   public Range(int start, int end) {
+    // 参数合法性校验，要求0 <= 起始 <= 结束
     if (start < 0 || end < start) {
       throw new IllegalArgumentException(
           "Invalid range, required that: 0 <= start <= end; start=" + start
@@ -48,14 +48,26 @@ public class Range {
     this.endIdx = end;
   }
 
+  /**
+   * 获取区间起始索引。
+   * @return 起始索引值
+   */
   public int start() {
     return startIdx;
   }
 
+  /**
+   * 获取区间结束索引。
+   * @return 结束索引值
+   */
   public int end() {
     return endIdx;
   }
 
+  /**
+   * 获取区间长度。
+   * @return 区间包含的元素个数
+   */
   public int length() {
     return endIdx - startIdx;
   }

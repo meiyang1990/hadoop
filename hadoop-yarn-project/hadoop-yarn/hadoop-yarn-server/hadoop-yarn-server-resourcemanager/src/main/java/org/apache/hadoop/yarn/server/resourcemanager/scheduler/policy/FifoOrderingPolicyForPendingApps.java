@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,27 +26,31 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 /**
- * This ordering policy is used for pending applications only.
- * An OrderingPolicy which orders SchedulableEntities by
+ * 待处理应用的FIFO排序策略，仅用于排序待调度应用
+ * 按照以下优先级对可调度实体排序：
  * <ul>
- * <li>Recovering application
- * <li>Priority of an application
- * <li>Input order
+ * <li>正在恢复的应用优先</li>
+ * <li>应用优先级高的优先</li>
+ * <li>先提交的应用优先</li>
  * </ul>
  * <p>
- * Example : If schedulableEntities with E1(true,1,1) E2(true,2,2) E3(true,3,3)
- * E4(false,4,4) E5(false,4,5) are added. The ordering policy assignment
- * iterator is in the order of E3(true,3,3) E2(true,2,2) E1(true,1,1)
- * E5(false,5,5) E4(false,4,4)
+ * 示例：若添加了 E1(true,1,1) E2(true,2,2) E3(true,3,3) E4(false,4,4) E5(false,4,5)
+ * 排序后迭代顺序为：E3(true,3,3) E2(true,2,2) E1(true,1,1) E5(false,5,5) E4(false,4,4)
  */
 public class FifoOrderingPolicyForPendingApps<S extends SchedulableEntity>
     extends AbstractComparatorOrderingPolicy<S> {
 
+  /**
+   * 构造FIFO排序策略，初始化多级别比较器和并发排序集合
+   */
   public FifoOrderingPolicyForPendingApps() {
     List<Comparator<SchedulableEntity>> comparators =
         new ArrayList<Comparator<SchedulableEntity>>();
+    // 第一级：正在恢复的应用优先
     comparators.add(new RecoveryComparator());
+    // 第二级：高优先级应用优先
     comparators.add(new PriorityComparator());
+    // 第三级：先提交的应用优先（FIFO顺序）
     comparators.add(new FifoComparator());
     this.comparator = new CompoundComparator(comparators);
     this.schedulableEntities = new ConcurrentSkipListSet<S>(comparator);

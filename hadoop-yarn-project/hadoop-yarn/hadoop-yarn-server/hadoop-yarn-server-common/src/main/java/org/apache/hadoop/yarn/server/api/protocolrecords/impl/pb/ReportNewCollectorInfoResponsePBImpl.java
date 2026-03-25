@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,28 +25,45 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.ReportNewCollectorInfoR
 
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
+/**
+ * 上报新日志聚合收集器信息响应的Protobuf实现类
+ */
 @Private
 @Unstable
 public class ReportNewCollectorInfoResponsePBImpl extends
     ReportNewCollectorInfoResponse {
 
+  // Protobuf协议对象，通过已有proto实例构建时使用
   private ReportNewCollectorInfoResponseProto proto =
       ReportNewCollectorInfoResponseProto.getDefaultInstance();
 
+  // Protobuf构建器，新建对象时使用
   private ReportNewCollectorInfoResponseProto.Builder builder = null;
 
+  // 标识当前是否通过proto实例而非构建器持有数据
   private boolean viaProto = false;
 
+  /**
+   * 构造空响应对象，使用构建器初始化
+   */
   public ReportNewCollectorInfoResponsePBImpl() {
     builder = ReportNewCollectorInfoResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有proto实例构造响应对象
+   * @param proto 已构建完成的proto响应实例
+   */
   public ReportNewCollectorInfoResponsePBImpl(
       ReportNewCollectorInfoResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前对象对应的proto实例，按需构建
+   * @return 构建完成的proto响应实例
+   */
   public ReportNewCollectorInfoResponseProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;

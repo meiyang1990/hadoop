@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,8 +32,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/*
- * DAO object to display application allocation detailed information.
+/**
+ * YARN RM Web UI 应用资源分配详情的数据访问对象(DAO)
+ * 用于封装应用分配信息，序列化后返回给前端展示
  */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -49,6 +51,11 @@ public class AppAllocationInfo {
   AppAllocationInfo() {
   }
 
+  /**
+   * 从调度器的AppAllocation构造Web DAO对象
+   * @param allocation 调度器中的应用分配原始信息
+   * @param groupBy 分组维度，用于子分配信息分组
+   */
   AppAllocationInfo(AppAllocation allocation,
       RMWSConsts.ActivitiesGroupBy groupBy) {
     this.children = new ArrayList<>();
@@ -57,13 +64,16 @@ public class AppAllocationInfo {
     this.appPriority = allocation.getPriority() == null ?
         null : allocation.getPriority().getPriority();
     this.timestamp = allocation.getTime();
+    // 转换时间戳为可读日期字符串
     this.dateTime = new Date(allocation.getTime()).toString();
     this.allocationState = allocation.getActivityState().name();
     this.diagnostic = allocation.getDiagnostic();
+    // 按请求优先级+请求ID分组聚合所有分配尝试节点
     Map<String, List<ActivityNode>> requestToActivityNodes =
         allocation.getAllocationAttempts().stream().collect(Collectors
             .groupingBy((e) -> e.getRequestPriority() + "_" + e
                 .getAllocationRequestId(), Collectors.toList()));
+    // 遍历分组，转换为前端可用的子请求分配信息
     for (List<ActivityNode> requestActivityNodes : requestToActivityNodes
         .values()) {
       AppRequestAllocationInfo requestAllocationInfo =

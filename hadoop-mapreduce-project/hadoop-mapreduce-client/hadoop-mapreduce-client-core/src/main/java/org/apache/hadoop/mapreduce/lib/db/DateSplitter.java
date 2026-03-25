@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,9 +36,8 @@ import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.MRJobConfig;
 
 /**
- * Implement DBSplitter over date/time values.
- * Make use of logic from IntegerSplitter, since date/time are just longs
- * in Java.
+ * 基于日期/时间类型的数据库数据分片实现类，用于数据驱动的数据库输入分片
+ * 复用IntegerSplitter的分片逻辑，因为日期时间在Java中本质就是long类型
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -45,67 +45,80 @@ public class DateSplitter extends IntegerSplitter {
 
   private static final Logger LOG = LoggerFactory.getLogger(DateSplitter.class);
 
+  /**
+   * 对日期类型列进行数据分片，生成多个输入分片
+   * @param conf 作业配置对象
+   * @param results 包含查询最小、最大值结果集
+   * @param colName 用于分片的日期列名
+   * @return 分片后的输入分片列表
+   * @throws SQLException 数据库查询异常
+   */
   public List<InputSplit> split(Configuration conf, ResultSet results, String colName)
       throws SQLException {
 
     long minVal;
     long maxVal;
 
+    // 获取日期列的SQL数据类型
     int sqlDataType = results.getMetaData().getColumnType(1);
+    // 将最小日期转换为时间戳long值
     minVal = resultSetColToLong(results, 1, sqlDataType);
+    // 将最大日期转换为时间戳long值
     maxVal = resultSetColToLong(results, 2, sqlDataType);
 
     String lowClausePrefix = colName + " >= ";
     String highClausePrefix = colName + " < ";
 
+    // 从配置获取map任务数量，默认1个
     int numSplits = conf.getInt(MRJobConfig.NUM_MAPS, 1);
     if (numSplits < 1) {
       numSplits = 1;
     }
 
     if (minVal == Long.MIN_VALUE && maxVal == Long.MIN_VALUE) {
-      // The range of acceptable dates is NULL to NULL. Just create a single split.
+      // 所有日期都是NULL，直接生成一个NULL分片
       List<InputSplit> splits = new ArrayList<InputSplit>();
       splits.add(new DataDrivenDBInputFormat.DataDrivenDBInputSplit(
           colName + " IS NULL", colName + " IS NULL"));
       return splits;
     }
 
-    // Gather the split point integers
+    // 计算分片分界点
     List<Long> splitPoints = split(numSplits, minVal, maxVal);
     List<InputSplit> splits = new ArrayList<InputSplit>();
 
-    // Turn the split points into a set of intervals.
+    // 生成分片，处理纳秒精度
     long start = splitPoints.get(0);
     Date startDate = longToDate(start, sqlDataType);
     if (sqlDataType == Types.TIMESTAMP) {
-      // The lower bound's nanos value needs to match the actual lower-bound nanos.
+      // 保留原始下界的纳秒值
       try {
         ((java.sql.Timestamp) startDate).setNanos(results.getTimestamp(1).getNanos());
       } catch (NullPointerException npe) {
-        // If the lower bound was NULL, we'll get an NPE; just ignore it and don't set nanos.
+        // 下界为NULL，忽略NPE，不设置纳秒
       }
     }
 
+    // 遍历所有分界点生成分片
     for (int i = 1; i < splitPoints.size(); i++) {
       long end = splitPoints.get(i);
       Date endDate = longToDate(end, sqlDataType);
 
       if (i == splitPoints.size() - 1) {
         if (sqlDataType == Types.TIMESTAMP) {
-          // The upper bound's nanos value needs to match the actual upper-bound nanos.
+          // 保留原始上界的纳秒值
           try {
             ((java.sql.Timestamp) endDate).setNanos(results.getTimestamp(2).getNanos());
           } catch (NullPointerException npe) {
-            // If the upper bound was NULL, we'll get an NPE; just ignore it and don't set nanos.
+            // 上界为NULL，忽略NPE，不设置纳秒
           }
         }
-        // This is the last one; use a closed interval.
+        // 最后一个分片使用闭区间
         splits.add(new DataDrivenDBInputFormat.DataDrivenDBInputSplit(
             lowClausePrefix + dateToString(startDate),
             colName + " <= " + dateToString(endDate)));
       } else {
-        // Normal open-interval case.
+        // 普通分片使用左闭右开区间
         splits.add(new DataDrivenDBInputFormat.DataDrivenDBInputSplit(
             lowClausePrefix + dateToString(startDate),
             highClausePrefix + dateToString(endDate)));
@@ -116,7 +129,7 @@ public class DateSplitter extends IntegerSplitter {
     }
 
     if (minVal == Long.MIN_VALUE || maxVal == Long.MIN_VALUE) {
-      // Add an extra split to handle the null case that we saw.
+      // 存在NULL值，额外添加一个NULL分片
       splits.add(new DataDrivenDBInputFormat.DataDrivenDBInputSplit(
           colName + " IS NULL", colName + " IS NULL"));
     }
@@ -124,12 +137,14 @@ public class DateSplitter extends IntegerSplitter {
     return splits;
   }
 
-  /** Retrieve the value from the column in a type-appropriate manner and return
-      its timestamp since the epoch. If the column is null, then return Long.MIN_VALUE.
-      This will cause a special split to be generated for the NULL case, but may also
-      cause poorly-balanced splits if most of the actual dates are positive time
-      since the epoch, etc.
-    */
+  /**
+   * 从结果集取出日期列，转换为自纪元以来的时间戳，NULL值返回Long.MIN_VALUE
+   * @param rs 结果集对象
+   * @param colNum 列序号
+   * @param sqlDataType SQL数据类型
+   * @return 时间戳long值，NULL返回Long.MIN_VALUE
+   * @throws SQLException 数据库读取异常
+   */
   private long resultSetColToLong(ResultSet rs, int colNum, int sqlDataType) throws SQLException {
     try {
       switch (sqlDataType) {
@@ -143,13 +158,18 @@ public class DateSplitter extends IntegerSplitter {
         throw new SQLException("Not a date-type field");
       }
     } catch (NullPointerException npe) {
-      // null column. return minimum long value.
+      // 空值，返回Long.MIN_VALUE标识
       LOG.warn("Encountered a NULL date in the split column. Splits may be poorly balanced.");
       return Long.MIN_VALUE;
     }
   }
 
-  /**  Parse the long-valued timestamp into the appropriate SQL date type. */
+  /**
+   * 将long时间戳转换为对应SQL日期类型的Date对象
+   * @param val 时间戳long值
+   * @param sqlDataType SQL数据类型
+   * @return 对应类型的Date对象
+   */
   private Date longToDate(long val, int sqlDataType) {
     switch (sqlDataType) {
     case Types.DATE:
@@ -164,11 +184,9 @@ public class DateSplitter extends IntegerSplitter {
   }
 
   /**
-   * Given a Date 'd', format it as a string for use in a SQL date
-   * comparison operation.
-   * @param d the date to format.
-   * @return the string representing this date in SQL with any appropriate
-   * quotation characters, etc.
+   * 将日期对象格式化为SQL可识别的日期字符串
+   * @param d 待格式化日期
+   * @return 带单引号的SQL日期字符串
    */
   protected String dateToString(Date d) {
     return "'" + d.toString() + "'";

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that sums up 
- * a sequence of long values.
+ * 长整型数值求和聚合器，为旧版MapReduce API提供对长整型序列求和的聚合能力
+ * 继承新版MapReduce聚合器实现，兼容旧版API接口
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -31,5 +32,3 @@ public class LongValueSum
     extends org.apache.hadoop.mapreduce.lib.aggregate.LongValueSum 
     implements ValueAggregator<String> {
 }
-
-

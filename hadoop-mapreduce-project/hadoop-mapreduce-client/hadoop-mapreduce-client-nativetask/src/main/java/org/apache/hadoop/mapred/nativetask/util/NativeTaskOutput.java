@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,82 +26,112 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapred.TaskID;
 
 /**
- * base class of output files manager.
+ * 本地任务输出文件管理器接口，为Native MapReduce任务管理本地磁盘上的各类输出文件
+ * 负责生成、获取Map输出、Spill溢出、Reduce输入等各类文件路径，为Native任务本地磁盘IO提供路径管理
  */
 @InterfaceAudience.Private
 public interface NativeTaskOutput {
 
   /**
-   * Return the path to local map output file created earlier
+   * 获取之前创建的本地Map输出文件路径
+   * @return 本地Map输出文件路径
+   * @throws IOException IO异常
    */
   public Path getOutputFile() throws IOException;
 
   /**
-   * Create a local map output file name.
+   * 创建并获取用于写入的本地Map输出文件路径
    * 
-   * @param size the size of the file
+   * @param size 文件预估大小
+   * @return 可写入的本地Map输出文件路径
+   * @throws IOException IO异常
    */
   public Path getOutputFileForWrite(long size) throws IOException;
 
   /**
-   * Return the path to a local map output index file created earlier
+   * 获取之前创建的本地Map输出索引文件路径
+   * @return 本地Map输出索引文件路径
+   * @throws IOException IO异常
    */
   public Path getOutputIndexFile() throws IOException;
 
   /**
-   * Create a local map output index file name.
+   * 创建并获取用于写入的本地Map输出索引文件路径
    * 
-   * @param size the size of the file
+   * @param size 文件预估大小
+   * @return 可写入的本地Map输出索引文件路径
+   * @throws IOException IO异常
    */
   public Path getOutputIndexFileForWrite(long size) throws IOException;
 
   /**
-   * Return a local map spill file created earlier.
+   * 获取之前创建的指定序号的本地Map Spill溢出文件路径
    * 
-   * @param spillNumber the number
+   * @param spillNumber Spill文件序号
+   * @return 对应序号的Spill溢出文件路径
+   * @throws IOException IO异常
    */
   public Path getSpillFile(int spillNumber) throws IOException;
 
   /**
-   * Create a local map spill file name.
+   * 创建并获取用于写入的指定序号的本地Map Spill溢出文件路径
    * 
-   * @param spillNumber the number
-   * @param size the size of the file
+   * @param spillNumber Spill文件序号
+   * @param size 文件预估大小
+   * @return 可写入的对应序号Spill溢出文件路径
+   * @throws IOException IO异常
    */
   public Path getSpillFileForWrite(int spillNumber, long size) throws IOException;
 
   /**
-   * Return a local map spill index file created earlier
+   * 获取之前创建的指定序号的本地Map Spill溢出索引文件路径
    * 
-   * @param spillNumber the number
+   * @param spillNumber Spill文件序号
+   * @return 对应序号的Spill溢出索引文件路径
+   * @throws IOException IO异常
    */
   public Path getSpillIndexFile(int spillNumber) throws IOException;
 
   /**
-   * Create a local map spill index file name.
+   * 创建并获取用于写入的指定序号的本地Map Spill溢出索引文件路径
    * 
-    r* @param spillNumber the number
-   * @param size the size of the file
+   * @param spillNumber Spill文件序号
+   * @param size 文件预估大小
+   * @return 可写入的对应序号Spill溢出索引文件路径
+   * @throws IOException IO异常
    */
   public Path getSpillIndexFileForWrite(int spillNumber, long size) throws IOException;
 
   /**
-   * Return a local reduce input file created earlier
+   * 获取之前创建的对应Map任务的本地Reduce输入文件路径
    * 
-   * @param mapId a map task id
+   * @param mapId Map任务ID
+   * @return 对应Map输出的Reduce输入文件路径
+   * @throws IOException IO异常
    */
   public Path getInputFile(int mapId) throws IOException;
 
   /**
-   * Create a local reduce input file name.
+   * 创建并获取用于写入的对应Map任务的本地Reduce输入文件路径
    * 
-   * @param mapId a map task id
-   * @param size the size of the file
+   * @param mapId Map任务ID
+   * @param size 文件预估大小
+   * @param conf Hadoop配置对象
+   * @return 可写入的对应Map输出的Reduce输入文件路径
+   * @throws IOException IO异常
    */
   public Path getInputFileForWrite(TaskID mapId, long size, Configuration conf) throws IOException;
 
-  /** Removes all of the files related to a task. */
+  /**
+   * 删除当前任务相关的所有临时输出文件
+   * @throws IOException IO异常
+   */
   public void removeAll() throws IOException;
 
+  /**
+   * 获取指定分区的输出文件名称
+   * @param partition 分区编号
+   * @return 对应分区的输出文件名称
+   */
   public String getOutputName(int partition);
 }

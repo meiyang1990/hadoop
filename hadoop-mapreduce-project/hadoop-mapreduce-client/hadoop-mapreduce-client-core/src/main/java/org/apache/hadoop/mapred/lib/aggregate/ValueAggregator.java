@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,7 +23,9 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This interface defines the minimal protocol for value aggregators.
+ * 文件说明：MapReduce旧版API中值聚合器接口，定义了聚合计算的基础协议
+ * 核心作用：为MapReduce聚合框架提供统一的聚合器接口规范，用于对相同key的多个value进行聚合计算
+ * 对应新版mapreduce API中的同名接口，保持旧版API兼容性
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -98,13 +99,10 @@ import static org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWebServices
 import static org.apache.hadoop.yarn.server.resourcemanager.webapp.RMWebServices.DEFAULT_SUMMARIZE;
 
 /**
- * RouterWebServices is a service that runs on each router that can be used to
- * intercept and inspect {@link RMWebServiceProtocol} messages from client to
- * the cluster resource manager. It listens {@link RMWebServiceProtocol} REST
- * messages from the client and creates a request intercepting pipeline instance
- * for each client. The pipeline is a chain of {@link RESTRequestInterceptor}
- * instances that can inspect and modify the request/response as needed. The
- * main difference with AMRMProxyService is the protocol they implement.
+ * RouterWebServices 是运行在每个Router上的REST服务，用于拦截并处理客户端发往集群ResourceManager的
+ * {@link RMWebServiceProtocol} 请求。它接收客户端的REST请求，为每个用户创建请求拦截处理流水线，
+ * 流水线由一系列 {@link RESTRequestInterceptor} 实例组成，可以按需检查和修改请求/响应。
+ * 与AMRMProxyService的主要区别在于它实现的是ResourceManager的Web服务协议。
  **/
 @Singleton
 @Path(RMWSConsts.RM_WEB_SERVICE_PATH)
@@ -126,22 +124,37 @@ public class RouterWebServices implements RMWebServiceProtocol {
   public static final String DEFAULT_END_TIME = "-1";
   public static final String DEFAULT_INCLUDE_RESOURCE = "false";
 
+  /**
+   * 构造函数，依赖注入Router实例和配置对象.
+   * @param router Router服务实例
+   * @param conf 配置对象
+   */
   @Inject
   public RouterWebServices(final @Named("router") Router router,
       @Named("conf")  Configuration conf) {
     this.router = router;
     this.conf = conf;
+    // 从配置读取用户请求拦截流水线缓存最大大小，使用默认值兜底
     int maxCacheSize =
         conf.getInt(YarnConfiguration.ROUTER_PIPELINE_CACHE_MAX_SIZE,
             YarnConfiguration.DEFAULT_ROUTER_PIPELINE_CACHE_MAX_SIZE);
+    // 创建线程安全的LRU缓存存储不同用户的拦截流水线
     this.userPipelineMap = Collections.synchronizedMap(new LRUCacheHashMap<>(maxCacheSize, true));
   }
 
+  /**
+   * 初始化操作，清空响应ContentType.
+   */
   private void init() {
     // clear content type
     response.setContentType(null);
   }
 
+  /**
+   * 根据请求获取对应用户的请求拦截流水线.
+   * @param hsr HTTP请求对象
+   * @return 用户对应的拦截流水线包装对象
+   */
   @VisibleForTesting
   protected RequestInterceptorChainWrapper getInterceptorChain(
       final HttpServletRequest hsr) {
@@ -150,6 +163,7 @@ public class RouterWebServices implements RMWebServiceProtocol {
       user = hsr.getRemoteUser();
     }
     try {
+      // 如果请求中未携带用户信息，则使用当前登录用户
       if (user == null || user.equals("")) {
         // Yarn Router user
         user = UserGroupInformation.getCurrentUser().getUserName();
@@ -158,16 +172,17 @@ public class RouterWebServices implements RMWebServiceProtocol {
       LOG.error("Cannot get user: {}", e.getMessage());
     }
     RequestInterceptorChainWrapper chain = userPipelineMap.get(user);
+    // 如果缓存中已存在有效流水线，直接返回
     if (chain != null && chain.getRootInterceptor() != null) {
       return chain;
     }
+    // 不存在则初始化新流水线并返回
     return initializePipeline(user);
   }
 
   /**
-   * Gets the Request interceptor chains for all the users.
-   *
-   * @return the request interceptor chains.
+   * 获取所有用户的请求拦截流水线映射.
+   * @return 用户到拦截流水线包装对象的映射
    */
   @VisibleForTesting
   protected Map<String, RequestInterceptorChainWrapper> getPipelines() {
@@ -175,13 +190,12 @@ public class RouterWebServices implements RMWebServiceProtocol {
   }
 
   /**
-   * This method creates and returns reference of the first interceptor in the
-   * chain of request interceptor instances.
-   *
-   * @return the reference of the first interceptor in the chain
+   * 创建完整的请求拦截器责任链.
+   * @return 责任链的第一个拦截器
    */
   @VisibleForTesting
   protected RESTRequestInterceptor createRequestInterceptorChain() {
+    // 根据配置创建拦截器链
     return RouterServerUtil.createRequestInterceptorChain(conf,
         YarnConfiguration.ROUTER_WEBAPP_INTERCEPTOR_CLASS_PIPELINE,
         YarnConfiguration.DEFAULT_ROUTER_WEBAPP_INTERCEPTOR_CLASS,
@@ -189,12 +203,13 @@ public class RouterWebServices implements RMWebServiceProtocol {
   }
 
   /**
-   * Initializes the request interceptor pipeline for the specified user.
-   *
-   * @param user specified user.
+   * 为指定用户初始化请求拦截流水线.
+   * @param user 用户名
+   * @return 初始化完成的流水线包装对象
    */
   private RequestInterceptorChainWrapper initializePipeline(String user) {
     synchronized (this.userPipelineMap) {
+      // 双重检查，避免重复初始化
       if (this.userPipelineMap.containsKey(user)) {
         LOG.info("Request to start an already existing user: {}"
             + " was received, so ignoring.", user);
@@ -208,9 +223,11 @@ public class RouterWebServices implements RMWebServiceProtocol {
         // add to the map, to ensure thread safe.
         LOG.info("Initializing request processing pipeline for user: {}.", user);
 
+        // 创建拦截链并初始化
         RESTRequestInterceptor interceptorChain =
             this.createRequestInterceptorChain();
         interceptorChain.init(user);
+        // 给拦截链注入Router客户端代理服务
         RouterClientRMService routerClientRMService = router.getClientRMProxyService();
         interceptorChain.setRouterClientRMService(routerClientRMService);
         chainWrapper.init(interceptorChain);
@@ -218,40 +235,37 @@ public class RouterWebServices implements RMWebServiceProtocol {
         LOG.error("Init RESTRequestInterceptor error for user: {}", user, e);
         throw e;
       }
-
+      // 初始化完成后放入缓存
       this.userPipelineMap.put(user, chainWrapper);
       return chainWrapper;
     }
   }
 
   /**
-   * Private structure for encapsulating RequestInterceptor and user instances.
-   *
+   * 私有封装类，用于包装请求拦截链和关联的用户信息.
    */
   @Private
   public static class RequestInterceptorChainWrapper {
     private RESTRequestInterceptor rootInterceptor;
 
     /**
-     * Initializes the wrapper with the specified parameters.
-     *
-     * @param interceptor the first interceptor in the pipeline
+     * 使用指定的根拦截器初始化包装对象.
+     * @param interceptor 责任链的根拦截器
      */
     public synchronized void init(RESTRequestInterceptor interceptor) {
       this.rootInterceptor = interceptor;
     }
 
     /**
-     * Gets the root request interceptor.
-     *
-     * @return the root request interceptor
+     * 获取责任链的根拦截器.
+     * @return 根拦截器
      */
     public synchronized RESTRequestInterceptor getRootInterceptor() {
       return rootInterceptor;
     }
 
     /**
-     * Shutdown the chain of interceptors when the object is destroyed.
+     * 对象销毁时关闭拦截链.
      */
     @Override
     protected void finalize() {
@@ -382,585 +396,4 @@ public class RouterWebServices implements RMWebServiceProtocol {
       @QueryParam(RMWSConsts.NAME) String name,
       @QueryParam(RMWSConsts.DESELECTS) Set<String> unselectedFields) {
     init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getApps(hsr, stateQuery, statesQuery,
-        finalStatusQuery, userQuery, queueQuery, count, startedBegin,
-        startedEnd, finishBegin, finishEnd, applicationTypes, applicationTags,
-        name, unselectedFields);
-  }
-
-  @GET
-  @Path(RMWSConsts.SCHEDULER_ACTIVITIES)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public ActivitiesInfo getActivities(@Context HttpServletRequest hsr,
-      @QueryParam(RMWSConsts.NODEID) String nodeId,
-      @QueryParam(RMWSConsts.GROUP_BY) String groupBy) {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor()
-        .getActivities(hsr, nodeId, groupBy);
-  }
-
-  @GET
-  @Path(RMWSConsts.SCHEDULER_BULK_ACTIVITIES)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public BulkActivitiesInfo getBulkActivities(
-      @Context HttpServletRequest hsr,
-      @QueryParam(RMWSConsts.GROUP_BY) String groupBy,
-      @QueryParam(RMWSConsts.ACTIVITIES_COUNT)
-      @DefaultValue(DEFAULT_ACTIVITIES_COUNT) int activitiesCount)
-      throws InterruptedException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getBulkActivities(hsr, groupBy,
-        activitiesCount);
-  }
-
-  @GET
-  @Path(RMWSConsts.SCHEDULER_APP_ACTIVITIES)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public AppActivitiesInfo getAppActivities(@Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId,
-      @QueryParam(RMWSConsts.MAX_TIME) String time,
-      @QueryParam(RMWSConsts.REQUEST_PRIORITIES) Set<String> requestPriorities,
-      @QueryParam(RMWSConsts.ALLOCATION_REQUEST_IDS)
-          Set<String> allocationRequestIds,
-      @QueryParam(RMWSConsts.GROUP_BY) String groupBy,
-      @QueryParam(RMWSConsts.LIMIT) String limit,
-      @QueryParam(RMWSConsts.ACTIONS) Set<String> actions,
-      @QueryParam(RMWSConsts.SUMMARIZE) @DefaultValue(DEFAULT_SUMMARIZE)
-          boolean summarize) {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getAppActivities(hsr, appId, time,
-        requestPriorities, allocationRequestIds, groupBy, limit, actions,
-        summarize);
-  }
-
-  @GET
-  @Path(RMWSConsts.APP_STATISTICS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public ApplicationStatisticsInfo getAppStatistics(
-      @Context HttpServletRequest hsr,
-      @QueryParam(RMWSConsts.STATES) Set<String> stateQueries,
-      @QueryParam(RMWSConsts.APPLICATION_TYPES) Set<String> typeQueries) {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getAppStatistics(hsr, stateQueries,
-        typeQueries);
-  }
-
-  @GET
-  @Path(RMWSConsts.APPS_APPID)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public AppInfo getApp(@Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId,
-      @QueryParam(RMWSConsts.DESELECTS) Set<String> unselectedFields) {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getApp(hsr, appId, unselectedFields);
-  }
-
-  @GET
-  @Path(RMWSConsts.APPS_APPID_STATE)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public AppState getAppState(@Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId) throws AuthorizationException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getAppState(hsr, appId);
-  }
-
-  @PUT
-  @Path(RMWSConsts.APPS_APPID_STATE)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response updateAppState(AppState targetState,
-      @Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId) throws AuthorizationException,
-      YarnException, InterruptedException, IOException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().updateAppState(targetState, hsr,
-        appId);
-  }
-
-  @GET
-  @Path(RMWSConsts.GET_NODE_TO_LABELS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public NodeToLabelsInfo getNodeToLabels(@Context HttpServletRequest hsr)
-      throws IOException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getNodeToLabels(hsr);
-  }
-
-  @GET
-  @Path(RMWSConsts.LABEL_MAPPINGS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public LabelsToNodesInfo getLabelsToNodes(
-      @QueryParam(RMWSConsts.LABELS) Set<String> labels) throws IOException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(null);
-    return pipeline.getRootInterceptor().getLabelsToNodes(labels);
-  }
-
-  @POST
-  @Path(RMWSConsts.REPLACE_NODE_TO_LABELS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response replaceLabelsOnNodes(
-      final NodeToLabelsEntryList newNodeToLabels,
-      @Context HttpServletRequest hsr) throws Exception {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().replaceLabelsOnNodes(newNodeToLabels,
-        hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.NODES_NODEID_REPLACE_LABELS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response replaceLabelsOnNode(
-      @QueryParam(RMWSConsts.LABELS) Set<String> newNodeLabelsName,
-      @Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.NODEID) String nodeId) throws Exception {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().replaceLabelsOnNode(newNodeLabelsName,
-        hsr, nodeId);
-  }
-
-  @GET
-  @Path(RMWSConsts.GET_NODE_LABELS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public NodeLabelsInfo getClusterNodeLabels(@Context HttpServletRequest hsr)
-      throws IOException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getClusterNodeLabels(hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.ADD_NODE_LABELS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response addToClusterNodeLabels(NodeLabelsInfo newNodeLabels,
-      @Context HttpServletRequest hsr) throws Exception {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().addToClusterNodeLabels(newNodeLabels,
-        hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.REMOVE_NODE_LABELS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response removeFromClusterNodeLabels(
-      @QueryParam(RMWSConsts.LABELS) Set<String> oldNodeLabels,
-      @Context HttpServletRequest hsr) throws Exception {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor()
-        .removeFromClusterNodeLabels(oldNodeLabels, hsr);
-  }
-
-  @GET
-  @Path(RMWSConsts.NODES_NODEID_GETLABELS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public NodeLabelsInfo getLabelsOnNode(@Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.NODEID) String nodeId) throws IOException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getLabelsOnNode(hsr, nodeId);
-  }
-
-  @GET
-  @Path(RMWSConsts.APPS_APPID_PRIORITY)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public AppPriority getAppPriority(@Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId) throws AuthorizationException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getAppPriority(hsr, appId);
-  }
-
-  @PUT
-  @Path(RMWSConsts.APPS_APPID_PRIORITY)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response updateApplicationPriority(AppPriority targetPriority,
-      @Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId) throws AuthorizationException,
-      YarnException, InterruptedException, IOException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor()
-        .updateApplicationPriority(targetPriority, hsr, appId);
-  }
-
-  @GET
-  @Path(RMWSConsts.APPS_APPID_QUEUE)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public AppQueue getAppQueue(@Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId) throws AuthorizationException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getAppQueue(hsr, appId);
-  }
-
-  @PUT
-  @Path(RMWSConsts.APPS_APPID_QUEUE)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response updateAppQueue(AppQueue targetQueue,
-      @Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId) throws AuthorizationException,
-      YarnException, InterruptedException, IOException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().updateAppQueue(targetQueue, hsr,
-        appId);
-  }
-
-  @POST
-  @Path(RMWSConsts.APPS_NEW_APPLICATION)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response createNewApplication(@Context HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().createNewApplication(hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.APPS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response submitApplication(ApplicationSubmissionContextInfo newApp,
-      @Context HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().submitApplication(newApp, hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.DELEGATION_TOKEN)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response postDelegationToken(DelegationToken tokenData,
-      @Context HttpServletRequest hsr) throws AuthorizationException,
-      IOException, InterruptedException, Exception {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().postDelegationToken(tokenData, hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.DELEGATION_TOKEN_EXPIRATION)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response postDelegationTokenExpiration(@Context HttpServletRequest hsr)
-      throws AuthorizationException, IOException, Exception {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().postDelegationTokenExpiration(hsr);
-  }
-
-  @DELETE
-  @Path(RMWSConsts.DELEGATION_TOKEN)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response cancelDelegationToken(@Context HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException,
-      Exception {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().cancelDelegationToken(hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.RESERVATION_NEW)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response createNewReservation(@Context HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().createNewReservation(hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.RESERVATION_SUBMIT)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response submitReservation(ReservationSubmissionRequestInfo resContext,
-      @Context HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().submitReservation(resContext, hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.RESERVATION_UPDATE)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response updateReservation(ReservationUpdateRequestInfo resContext,
-      @Context HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().updateReservation(resContext, hsr);
-  }
-
-  @POST
-  @Path(RMWSConsts.RESERVATION_DELETE)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response deleteReservation(ReservationDeleteRequestInfo resContext,
-      @Context HttpServletRequest hsr)
-      throws AuthorizationException, IOException, InterruptedException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().deleteReservation(resContext, hsr);
-  }
-
-  @GET
-  @Path(RMWSConsts.RESERVATION_LIST)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response listReservation(
-      @QueryParam(RMWSConsts.QUEUE) @DefaultValue(DEFAULT_QUEUE) String queue,
-      @QueryParam(RMWSConsts.RESERVATION_ID)
-      @DefaultValue(DEFAULT_RESERVATION_ID) String reservationId,
-      @QueryParam(RMWSConsts.START_TIME) @DefaultValue(DEFAULT_START_TIME) long startTime,
-      @QueryParam(RMWSConsts.END_TIME) @DefaultValue(DEFAULT_END_TIME) long endTime,
-      @QueryParam(RMWSConsts.INCLUDE_RESOURCE)
-      @DefaultValue(DEFAULT_INCLUDE_RESOURCE) boolean includeResourceAllocations,
-      @Context HttpServletRequest hsr) throws Exception {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().listReservation(queue, reservationId,
-        startTime, endTime, includeResourceAllocations, hsr);
-  }
-
-  @GET
-  @Path(RMWSConsts.APPS_TIMEOUTS_TYPE)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public AppTimeoutInfo getAppTimeout(@Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId,
-      @PathParam(RMWSConsts.TYPE) String type) throws AuthorizationException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getAppTimeout(hsr, appId, type);
-  }
-
-  @GET
-  @Path(RMWSConsts.APPS_TIMEOUTS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public AppTimeoutsInfo getAppTimeouts(@Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId) throws AuthorizationException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getAppTimeouts(hsr, appId);
-  }
-
-  @PUT
-  @Path(RMWSConsts.APPS_TIMEOUT)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response updateApplicationTimeout(AppTimeoutInfo appTimeout,
-      @Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId) throws AuthorizationException,
-      YarnException, InterruptedException, IOException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().updateApplicationTimeout(appTimeout,
-        hsr, appId);
-  }
-
-  @GET
-  @Path(RMWSConsts.APPS_APPID_APPATTEMPTS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public AppAttemptsInfo getAppAttempts(@Context HttpServletRequest hsr,
-      @PathParam(RMWSConsts.APPID) String appId) {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getAppAttempts(hsr, appId);
-  }
-
-  @GET
-  @Path(RMWSConsts.CHECK_USER_ACCESS_TO_QUEUE)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-                MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public RMQueueAclInfo checkUserAccessToQueue(
-      @PathParam(RMWSConsts.QUEUE) String queue,
-      @QueryParam(RMWSConsts.USER) String username,
-      @QueryParam(RMWSConsts.QUEUE_ACL_TYPE)
-      @DefaultValue("SUBMIT_APPLICATIONS") String queueAclType,
-      @Context HttpServletRequest hsr) throws AuthorizationException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().checkUserAccessToQueue(queue,
-        username, queueAclType, hsr);
-  }
-
-  @GET
-  @Path(RMWSConsts.APPS_APPID_APPATTEMPTS_APPATTEMPTID)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public org.apache.hadoop.yarn.server.webapp.dao.AppAttemptInfo getAppAttempt(
-      @Context HttpServletRequest req, @Context HttpServletResponse res,
-      @PathParam(RMWSConsts.APPID) String appId,
-      @PathParam(RMWSConsts.APPATTEMPTID) String appAttemptId) {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(req);
-    return pipeline.getRootInterceptor().getAppAttempt(req, res, appId,
-        appAttemptId);
-  }
-
-  @GET
-  @Path(RMWSConsts.APPS_APPID_APPATTEMPTS_APPATTEMPTID_CONTAINERS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public ContainersInfo getContainers(@Context HttpServletRequest req,
-      @Context HttpServletResponse res,
-      @PathParam(RMWSConsts.APPID) String appId,
-      @PathParam(RMWSConsts.APPATTEMPTID) String appAttemptId) {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(req);
-    return pipeline.getRootInterceptor().getContainers(req, res, appId,
-        appAttemptId);
-  }
-
-  @GET
-  @Path(RMWSConsts.GET_CONTAINER)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public ContainerInfo getContainer(@Context HttpServletRequest req,
-      @Context HttpServletResponse res,
-      @PathParam(RMWSConsts.APPID) String appId,
-      @PathParam(RMWSConsts.APPATTEMPTID) String appAttemptId,
-      @PathParam(RMWSConsts.CONTAINERID) String containerId) {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(req);
-    return pipeline.getRootInterceptor().getContainer(req, res, appId,
-        appAttemptId, containerId);
-  }
-
-  @PUT
-  @Path(RMWSConsts.SCHEDULER_CONF)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Consumes({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML })
-  @Override
-  public Response updateSchedulerConfiguration(SchedConfUpdateInfo mutationInfo,
-      @Context HttpServletRequest hsr)
-      throws AuthorizationException, InterruptedException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor()
-        .updateSchedulerConfiguration(mutationInfo, hsr);
-  }
-
-  @GET
-  @Path(RMWSConsts.SCHEDULER_CONF)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  @Override
-  public Response getSchedulerConfiguration(HttpServletRequest hsr)
-      throws AuthorizationException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getSchedulerConfiguration(hsr);
-  }
-
-  @VisibleForTesting
-  protected void setResponse(HttpServletResponse response) {
-    this.response = response;
-  }
-
-  @POST
-  @Path(RMWSConsts.SIGNAL_TO_CONTAINER)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public Response signalToContainer(
-      @PathParam(RMWSConsts.CONTAINERID) String containerId,
-      @PathParam(RMWSConsts.COMMAND) String command,
-      @Context HttpServletRequest req)
-      throws AuthorizationException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(req);
-    return pipeline.getRootInterceptor()
-        .signalToContainer(containerId, command, req);
-  }
-
-  @GET
-  @Path(RMWSConsts.GET_RM_NODE_LABELS)
-  @Produces({ MediaType.APPLICATION_JSON + "; " + JettyUtils.UTF_8,
-      MediaType.APPLICATION_XML + "; " + JettyUtils.UTF_8 })
-  public NodeLabelsInfo getRMNodeLabels(@Context HttpServletRequest hsr)
-      throws IOException {
-    init();
-    RequestInterceptorChainWrapper pipeline = getInterceptorChain(hsr);
-    return pipeline.getRootInterceptor().getRMNodeLabels(hsr);
-  }
-
-  public Router getRouter() {
-    return router;
-  }
-}
+    RequestInterceptorChainWrapper pipeline

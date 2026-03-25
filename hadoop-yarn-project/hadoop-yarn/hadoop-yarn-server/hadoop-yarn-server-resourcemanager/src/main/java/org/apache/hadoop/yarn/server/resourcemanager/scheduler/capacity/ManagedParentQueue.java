@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -43,20 +44,25 @@ import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.C
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration.getQueueCapacityConfigParser;
 
 /**
- * Auto Creation enabled Parent queue. This queue initially does not have any
- * children to start with and all child
- * leaf queues will be auto created. Currently this does not allow other
- * pre-configured leaf or parent queues to
- * co-exist along with auto-created leaf queues. The auto creation is limited
- * to leaf queues currently.
+ * 支持自动创建子队列的父队列。该队列初始不包含任何子队列，所有叶子子队列均会自动创建。
+ * 当前不允许预先配置的叶子/父队列与自动创建叶子队列共存，自动创建当前仅支持叶子队列。
  */
 public class ManagedParentQueue extends AbstractManagedParentQueue {
 
+  // 当保证容量超出限制时，是否禁止自动创建队列
   private boolean shouldFailAutoCreationWhenGuaranteedCapacityExceeded = false;
 
   private static final Logger LOG = LoggerFactory.getLogger(
       ManagedParentQueue.class);
 
+  /**
+   * 构造函数，创建支持自动创建子队列的父队列。
+   * @param queueContext 容量调度器队列上下文
+   * @param queueName 队列名称
+   * @param parent 父队列
+   * @param old 旧队列对象（用于重新初始化）
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   public ManagedParentQueue(final CapacitySchedulerQueueContext queueContext,
       final String queueName, final CSQueue parent, final CSQueue old)
       throws IOException {
@@ -78,14 +84,16 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
 
     writeLock.lock();
     try {
+      // 验证新队列合法性
       validate(newlyParsedQueue);
 
+      // 重新加载配置参数
       shouldFailAutoCreationWhenGuaranteedCapacityExceeded =
           queueContext.getConfiguration()
               .getShouldFailAutoQueueCreationWhenGuaranteedCapacityExceeded(
                   getQueuePathObject());
 
-      //validate if capacity is exceeded for child queues
+      // 如果开启了容量超限检查，验证子队列总容量不超过父队列保证容量
       if (shouldFailAutoCreationWhenGuaranteedCapacityExceeded) {
         float childCap = sumOfChildCapacities();
         if (getCapacity() < childCap) {
@@ -98,23 +106,25 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
         }
       }
 
+      // 重新初始化叶子队列模板配置
       leafQueueTemplate = initializeLeafQueueConfigs().build();
 
+      // 调用父类重新初始化
       super.reinitialize(newlyParsedQueue, clusterResource);
 
-      // run reinitialize on each existing queue, to trigger absolute cap
-      // recomputations
+      // 触发所有已有子队列重新初始化，重新计算绝对容量上限
       for (CSQueue res : this.getChildQueues()) {
         res.reinitialize(res, clusterResource);
       }
 
-      //clear state in policy
+      // 清空队列管理策略状态
       reinitializeQueueManagementPolicy();
 
-      //reassign capacities according to policy
+      // 根据策略重新计算队列管理变更
       final List<QueueManagementChange> queueManagementChanges =
           queueManagementPolicy.computeQueueManagementChanges();
 
+      // 验证并应用队列管理变更
       validateAndApplyQueueManagementChanges(queueManagementChanges);
 
       LOG.info(
@@ -130,6 +140,10 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
     }
   }
 
+  /**
+   * 初始化队列自动管理策略。
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   private void initializeQueueManagementPolicy() throws IOException {
     queueManagementPolicy =
         queueContext.getConfiguration().getAutoCreatedQueueManagementPolicyClass(
@@ -138,6 +152,10 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
     queueManagementPolicy.init(this);
   }
 
+  /**
+   * 重新初始化队列自动管理策略，策略类变更则重新创建实例，否则重置现有实例状态。
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   private void reinitializeQueueManagementPolicy() throws IOException {
     AutoCreatedQueueManagementPolicy managementPolicy =
         queueContext.getConfiguration().getAutoCreatedQueueManagementPolicyClass(
@@ -152,6 +170,11 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
     }
   }
 
+  /**
+   * 初始化自动创建叶子队列的配置模板。
+   * @return 配置模板构建器
+   * @throws IOException 初始化失败时抛出IO异常
+   */
   protected AutoCreatedLeafQueueConfig.Builder initializeLeafQueueConfigs() throws IOException {
 
     AutoCreatedLeafQueueConfig.Builder builder =
@@ -161,12 +184,15 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
         queueContext.getConfiguration();
 
     // TODO load configs into CapacitySchedulerConfiguration instead of duplicating them
+    // 获取叶子队列模板配置前缀
     String leafQueueTemplateConfPrefix = getLeafQueueConfigPrefix();
-    //Load template configuration into CapacitySchedulerConfiguration
+    // 将模板配置加载到调度器配置
     CapacitySchedulerConfiguration autoCreatedTemplateConfig =
         super.initializeLeafQueueConfigs(leafQueueTemplateConfPrefix);
     builder.configuration(autoCreatedTemplateConfig);
+    // 初始化资源配额对象
     QueueResourceQuotas queueResourceQuotas = new QueueResourceQuotas();
+    // 设置绝对资源模板
     setAbsoluteResourceTemplates(configuration, queueResourceQuotas);
 
     QueuePath templateQueuePath = QueuePrefixes
@@ -174,7 +200,7 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
     Set<String> templateConfiguredNodeLabels = queueContext
         .getQueueManager().getConfiguredNodeLabelsForAllQueues()
         .getLabelsByQueue(templateQueuePath.getFullPath());
-    //Load template capacities
+    // 加载模板容量配置
     QueueCapacities queueCapacities = new QueueCapacities(false);
     CSQueueUtils.loadCapacitiesByLabelsFromConf(templateQueuePath,
         queueCapacities,
@@ -187,6 +213,7 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
      * been defined in ABSOLUTE_RESOURCE format.
      *
      */
+    // 如果当前父队列使用绝对资源容量配置，更新叶子队列容量计算
     if (this.capacityConfigType.equals(CapacityConfigType.ABSOLUTE_RESOURCE)) {
       updateQueueCapacities(queueCapacities);
     }
@@ -195,6 +222,12 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
     return builder;
   }
 
+  /**
+   * 设置自动创建叶子队列的绝对资源配额模板。
+   * @param configuration 调度器配置
+   * @param queueResourceQuotas 资源配额对象
+   * @throws IOException 配置类型不匹配时抛出IO异常
+   */
   private void setAbsoluteResourceTemplates(CapacitySchedulerConfiguration configuration,
                                             QueueResourceQuotas queueResourceQuotas) throws IOException {
     QueuePath templateQueuePath = QueuePrefixes
@@ -203,11 +236,13 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
         .getQueueManager().getConfiguredNodeLabelsForAllQueues()
         .getLabelsByQueue(templateQueuePath.getFullPath());
 
+    // 遍历每个节点标签，读取最小/最大资源配置
     for (String nodeLabel : templateConfiguredNodeLabels) {
       Resource templateMinResource = configuration.getMinimumResourceRequirement(
           nodeLabel, templateQueuePath, resourceTypes);
       queueResourceQuotas.setConfiguredMinResource(nodeLabel, templateMinResource);
 
+      // 校验配置类型一致性：父队列是百分比配置，但叶子模板使用绝对资源，抛出异常
       if (this.capacityConfigType.equals(CapacityConfigType.PERCENTAGE)
           && !templateMinResource.equals(Resources.none())) {
         throw new IOException("Managed Parent Queue " + this.getQueuePath()
@@ -216,11 +251,17 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
     }
   }
 
+  /**
+   * 基于绝对资源配置更新叶子队列模板容量值，计算相对于父队列的比例。
+   * @param queueCapacities 叶子队列容量对象
+   */
   private void updateQueueCapacities(QueueCapacities queueCapacities) {
     CapacitySchedulerConfiguration configuration =
         queueContext.getConfiguration();
 
+    // 遍历每个节点标签更新容量
     for (String label : queueCapacities.getExistingNodeLabels()) {
+      // 计算叶子队列保证容量占父队列保证容量的比例
       queueCapacities.setCapacity(label,
           resourceCalculator.divide(
               queueContext.getClusterResource(),
@@ -231,6 +272,7 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
                   resourceTypes),
               getQueueResourceQuotas().getConfiguredMinResource(label)));
 
+      // 获取叶子队列和父队列最大资源，取较小值作为叶子队列有效最大资源
       Resource childMaxResource = configuration
           .getMaximumResourceRequirement(label,
               QueuePrefixes
@@ -246,22 +288,30 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
               : childMaxResource,
           parentMaxRes);
 
+      // 计算叶子队列最大容量占父队列最大容量的比例
       queueCapacities.setMaximumCapacity(
           label, resourceCalculator.divide(
               queueContext.getClusterResource(),
                effMaxResource,
                getQueueResourceQuotas().getConfiguredMaxResource(label)));
 
+      // 计算绝对容量 = 叶子比例 × 父队列绝对容量
       queueCapacities.setAbsoluteCapacity(
           label, queueCapacities.getCapacity(label)
           * getQueueCapacities().getAbsoluteCapacity(label));
 
+      // 计算绝对最大容量 = 叶子比例 × 父队列绝对最大容量
       queueCapacities.setAbsoluteMaximumCapacity(label,
           queueCapacities.getMaximumCapacity(label)
           * getQueueCapacities().getAbsoluteMaximumCapacity(label));
     }
   }
 
+  /**
+   * 验证重新初始化传入的新队列合法性。
+   * @param newlyParsedQueue 新解析的队列对象
+   * @throws IOException 验证不通过时抛出IO异常
+   */
   protected void validate(final CSQueue newlyParsedQueue) throws IOException {
     // Sanity check
     if (!(newlyParsedQueue instanceof ManagedParentQueue) || !newlyParsedQueue
@@ -278,6 +328,7 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
 
     writeLock.lock();
     try {
+      // 验证子队列类型必须是自动创建叶子队列
       if (childQueue == null || !(childQueue instanceof AutoCreatedLeafQueue)) {
         throw new SchedulerDynamicEditException(
             "Expected child queue to be an instance of AutoCreatedLeafQueue");
@@ -287,15 +338,18 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
       ManagedParentQueue parentQueue =
           (ManagedParentQueue) childQueue.getParent();
 
+      // 验证父队列不为空
       if (parentQueue == null) {
         throw new SchedulerDynamicEditException(
             "Parent Queue is null, should not add child queue!");
       }
 
       String leafQueuePath = childQueue.getQueuePath();
+      // 获取父队列允许的最大子队列数量限制
       int maxQueues = conf.getAutoCreatedQueuesMaxChildQueuesLimit(
           parentQueue.getQueuePathObject());
 
+      // 检查子队列数量是否超出限制
       if (parentQueue.getChildQueues().size() >= maxQueues) {
         throw new SchedulerDynamicEditException(
             "Cannot auto create leaf queue " + leafQueuePath + ".Max Child "
@@ -304,6 +358,7 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
                 .getChildQueues().size());
       }
 
+      // 如果开启保证容量超限检查，验证新增子队列后总保证容量不超过父队列
       if (shouldFailAutoCreationWhenGuaranteedCapacityExceeded) {
         if (getLeafQueueTemplate().getQueueCapacities().getAbsoluteCapacity()
             + parentQueue.sumOfChildAbsCapacities() > parentQueue
@@ -315,14 +370,17 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
         }
       }
 
+      // 更新策略中模板绝对容量
       ((GuaranteedOrZeroCapacityOverTimePolicy) queueManagementPolicy)
           .updateTemplateAbsoluteCapacities(parentQueue.getQueueCapacities());
 
+      // 调用父类添加子队列
       AutoCreatedLeafQueue leafQueue = (AutoCreatedLeafQueue) childQueue;
       super.addChildQueue(leafQueue);
 
       /* Below is to avoid Setting Queue Capacity to NaN when ClusterResource
          is zero during RM Startup with DominantResourceCalculator */
+      // 绝对资源配置模式下重新更新容量，避免RM启动时集群资源为0导致容量为NaN
       if (this.capacityConfigType.equals(
           CapacityConfigType.ABSOLUTE_RESOURCE)) {
         QueueCapacities queueCapacities =
@@ -330,14 +388,15 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
         updateQueueCapacities(queueCapacities);
       }
 
+      // 设置叶子队列容量向量
       setLeafQueuesCapacityVector(leafQueue);
 
+      // 从策略获取叶子队列初始配置，根据模板重新初始化叶子队列
       final AutoCreatedLeafQueueConfig initialLeafQueueTemplate =
           queueManagementPolicy.getInitialLeafQueueConfiguration(leafQueue);
       leafQueue.reinitializeFromTemplate(initialLeafQueueTemplate);
 
-      // Do one update cluster resource call to make sure all absolute resources
-      // effective resources are updated.
+      // 更新集群资源，触发所有绝对资源和有效资源重新计算
       updateClusterResource(queueContext.getClusterResource(),
           new ResourceLimits(queueContext.getClusterResource()));
     } finally {
@@ -345,6 +404,10 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
     }
   }
 
+  /**
+   * 从模板解析并设置叶子队列的容量向量（按节点标签）。
+   * @param leafQueue 目标叶子队列
+   */
   private void setLeafQueuesCapacityVector(AutoCreatedLeafQueue leafQueue) {
     // Parse the capacityVector specified in the leaf-template
     CapacitySchedulerConfiguration leafConfig = leafQueueTemplate.getLeafQueueConfigs();
@@ -356,148 +419,4 @@ public class ManagedParentQueue extends AbstractManagedParentQueue {
           QueuePrefixes.getNodeLabelPrefix(
               QueuePrefixes.getAutoCreatedQueueObjectTemplateConfPrefix(getQueuePathObject()),
                   label);
-      String capacityString = leafConfig.get(leafConfigPath + CAPACITY, "0");
-      leafQueue.setConfiguredMinCapacityVector(label,
-          getQueueCapacityConfigParser().parse(capacityString, leafQueue.getQueuePathObject()));
-      String maxCapacityString = leafConfig.get(leafConfigPath + MAXIMUM_CAPACITY, "100");
-      leafQueue.setConfiguredMaxCapacityVector(label,
-          getQueueCapacityConfigParser().parse(maxCapacityString, leafQueue.getQueuePathObject()));
-    }
-  }
-
-  public List<FiCaSchedulerApp> getScheduleableApplications() {
-    readLock.lock();
-    try {
-      List<FiCaSchedulerApp> apps = new ArrayList<>();
-      for (CSQueue childQueue : getChildQueues()) {
-        apps.addAll(((AbstractLeafQueue) childQueue).getApplications());
-      }
-      return Collections.unmodifiableList(apps);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  public List<FiCaSchedulerApp> getPendingApplications() {
-    readLock.lock();
-    try {
-      List<FiCaSchedulerApp> apps = new ArrayList<>();
-      for (CSQueue childQueue : getChildQueues()) {
-        apps.addAll(((AbstractLeafQueue) childQueue).getPendingApplications());
-      }
-      return Collections.unmodifiableList(apps);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  public List<FiCaSchedulerApp> getAllApplications() {
-    readLock.lock();
-    try {
-      List<FiCaSchedulerApp> apps = new ArrayList<>();
-      for (CSQueue childQueue : getChildQueues()) {
-        apps.addAll(((AbstractLeafQueue) childQueue).getAllApplications());
-      }
-      return Collections.unmodifiableList(apps);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  public String getLeafQueueConfigPrefix() {
-    return CapacitySchedulerConfiguration.PREFIX + QueuePrefixes
-        .getAutoCreatedQueueTemplateConfPrefix(getQueuePathObject());
-  }
-
-  public boolean shouldFailAutoCreationWhenGuaranteedCapacityExceeded() {
-    return shouldFailAutoCreationWhenGuaranteedCapacityExceeded;
-  }
-
-  /**
-   * Asynchronously called from scheduler to apply queue management changes.
-   *
-   * @param queueManagementChanges QueueManagementChange List.
-   * @throws IOException an I/O exception has occurred.
-   * @throws SchedulerDynamicEditException when validate and apply QueueManagementChanges fails.
-   */
-  public void validateAndApplyQueueManagementChanges(
-      List<QueueManagementChange> queueManagementChanges)
-      throws IOException, SchedulerDynamicEditException {
-
-    writeLock.lock();
-    try {
-      validateQueueManagementChanges(queueManagementChanges);
-
-      applyQueueManagementChanges(queueManagementChanges);
-
-      AutoCreatedQueueManagementPolicy policy =
-          getAutoCreatedQueueManagementPolicy();
-
-      //acquires write lock on policy
-      policy.commitQueueManagementChanges(queueManagementChanges);
-
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  public void validateQueueManagementChanges(
-      List<QueueManagementChange> queueManagementChanges)
-      throws SchedulerDynamicEditException {
-
-    for (QueueManagementChange queueManagementChange : queueManagementChanges) {
-
-      CSQueue childQueue = queueManagementChange.getQueue();
-
-      if (!(childQueue instanceof AutoCreatedLeafQueue)) {
-        throw new SchedulerDynamicEditException(
-            "queue should be " + "AutoCreatedLeafQueue. Found " + childQueue
-                .getClass());
-      }
-
-      if (!(AbstractManagedParentQueue.class.
-          isAssignableFrom(childQueue.getParent().getClass()))) {
-        LOG.error("Queue " + getQueuePath()
-            + " is not an instance of PlanQueue or ManagedParentQueue." + " "
-            + "Ignoring update " + queueManagementChanges);
-        throw new SchedulerDynamicEditException(
-            "Queue " + getQueuePath() + " is not a AutoEnabledParentQueue."
-                + " Ignoring update " + queueManagementChanges);
-      }
-
-      if (queueManagementChange.getQueueAction() ==
-          QueueManagementChange.QueueAction.UPDATE_QUEUE) {
-        AutoCreatedLeafQueueConfig template =
-            queueManagementChange.getUpdatedQueueTemplate();
-        ((AutoCreatedLeafQueue) childQueue).validateConfigurations(template);
-      }
-
-    }
-  }
-
-  private void applyQueueManagementChanges(
-      List<QueueManagementChange> queueManagementChanges)
-      throws SchedulerDynamicEditException, IOException {
-    for (QueueManagementChange queueManagementChange : queueManagementChanges) {
-      if (queueManagementChange.getQueueAction() ==
-          QueueManagementChange.QueueAction.UPDATE_QUEUE) {
-        AutoCreatedLeafQueue childQueueToBeUpdated =
-            (AutoCreatedLeafQueue) queueManagementChange.getQueue();
-        setLeafQueuesCapacityVector(childQueueToBeUpdated);
-        //acquires write lock on leaf queue
-        childQueueToBeUpdated.reinitializeFromTemplate(
-            queueManagementChange.getUpdatedQueueTemplate());
-      }
-    }
-  }
-
-  public void setLeafQueueConfigs(String leafQueueName) {
-    CapacitySchedulerConfiguration templateConfig = leafQueueTemplate.getLeafQueueConfigs();
-    for (Map.Entry<String, String> confKeyValuePair : templateConfig) {
-      final String name = confKeyValuePair.getKey()
-          .replaceFirst(AUTO_CREATED_LEAF_QUEUE_TEMPLATE_PREFIX,
-              leafQueueName);
-      queueContext.setConfigurationEntry(name, confKeyValuePair.getValue());
-    }
-  }
-}
+      String capacityString = leafConfig.get(

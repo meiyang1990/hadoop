@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,8 +19,14 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager;
 
+/**
+ * NodesListManager节点列表管理器的事件类型枚举，定义节点状态变化相关的事件类型
+ */
 public enum NodesListManagerEventType {
+  /** 节点变为可用状态 */
   NODE_USABLE,
+  /** 节点变为不可用状态 */
   NODE_UNUSABLE,
+  /** 节点正在退役中 */
   NODE_DECOMMISSIONING
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,25 +21,24 @@ package org.apache.hadoop.mapred;
 import java.io.InputStream;
 
 /**
- * <code>RamManager</code> manages a memory pool of a configured limit.
+ * 内存池管理器接口，负责管理固定上限的Map任务内存池，为MapReduce shuffle阶段提供内存分配与回收能力
  */
 interface RamManager {
   /**
-   * Reserve memory for data coming through the given input-stream.
+   * 为指定输入流的数据处理预留内存空间
    * 
-   * @param requestedSize size of memory requested
-   * @param in input stream
-   * @throws InterruptedException
-   * @return <code>true</code> if memory was allocated immediately, 
-   *         else <code>false</code>
+   * @param requestedSize 请求分配的内存大小
+   * @param in 需要处理数据的输入流
+   * @throws InterruptedException 内存等待过程中被中断时抛出
+   * @return <code>true</code> 如果内存立即分配成功，<code>false</code> 如果需要等待内存释放
    */
   boolean reserve(int requestedSize, InputStream in) 
   throws InterruptedException;
   
   /**
-   * Return memory to the pool.
+   * 将使用完毕的内存归还到内存池
    * 
-   * @param requestedSize size of memory returned to the pool
+   * @param requestedSize 需要归还的内存大小
    */
   void unreserve(int requestedSize);
 }

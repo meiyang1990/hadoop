@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,7 +28,9 @@ import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.RecordReader;
 
 /**
- * Additional operations required of a RecordReader to participate in a join.
+ * 文件级注释：MapReduce连接操作中可组合RecordReader接口，定义了参与多数据源连接操作所需的额外方法
+ * 定义了参与MapReduce连接操作的RecordReader需要实现的额外能力，
+ * 支持对多个输入数据源按key进行归并连接，是MapReduce端连接功能的核心接口。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -36,34 +39,42 @@ public interface ComposableRecordReader<K extends WritableComparable,
     extends RecordReader<K,V>, Comparable<ComposableRecordReader<K,?>> {
 
   /**
-   * Return the position in the collector this class occupies.
+   * 获取当前RecordReader在连接集合中的索引位置
+   * @return 集合中的位置编号
    */
   int id();
 
   /**
-   * Return the key this RecordReader would supply on a call to next(K,V)
+   * 获取当前RecordReader迭代到的key对象
+   * @return 当前key对象
    */
   K key();
 
   /**
-   * Clone the key at the head of this RecordReader into the object provided.
+   * 将当前RecordReader头部的key克隆到提供的对象中
+   * @param key 接收克隆数据的目标key对象
+   * @throws IOException IO异常
    */
   void key(K key) throws IOException;
 
   /**
-   * Returns true if the stream is not empty, but provides no guarantee that
-   * a call to next(K,V) will succeed.
+   * 检查当前流是否还有可读取的key-value对，仅作非空判断，不保证next调用一定成功
+   * @return 流非空返回true，否则返回false
    */
   boolean hasNext();
 
   /**
-   * Skip key-value pairs with keys less than or equal to the key provided.
+   * 跳过所有key小于等于指定key的记录
+   * @param key 目标key，所有小于等于它的记录都会被跳过
+   * @throws IOException IO异常
    */
   void skip(K key) throws IOException;
 
   /**
-   * While key-value pairs from this RecordReader match the given key, register
-   * them with the JoinCollector provided.
+   * 将所有与给定key匹配的当前RecordReader中的记录注册到JoinCollector，用于连接操作
+   * @param jc 连接收集器，用于收集相同key的多源记录
+   * @param key 待匹配的目标key
+   * @throws IOException IO异常
    */
   void accept(CompositeRecordReader.JoinCollector jc, K key) throws IOException;
 }

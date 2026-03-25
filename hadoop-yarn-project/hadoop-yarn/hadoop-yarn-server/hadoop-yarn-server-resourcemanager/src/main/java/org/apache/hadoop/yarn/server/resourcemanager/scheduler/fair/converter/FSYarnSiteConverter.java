@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,48 +30,63 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairSchedule
 import org.apache.hadoop.yarn.util.resource.DominantResourceCalculator;
 
 /**
- * Converts a Fair Scheduler site configuration to Capacity Scheduler
- * site configuration.
+ * 将公平调度器（Fair Scheduler）的Yarn站点配置转换为容量调度器（Capacity Scheduler）配置。
+ * 用于配置迁移场景，将现有公平调度器配置自动转换为容量调度器可用格式。
  *
  */
 public class FSYarnSiteConverter {
   private boolean preemptionEnabled;
   private boolean sizeBasedWeight;
 
+  /**
+   * 转换公平调度器站点配置到容量调度器站点配置。
+   * @param conf 原公平调度器配置对象
+   * @param yarnSiteConfig 目标Yarn站点配置对象，转换结果写入此对象
+   * @param drfUsed 是否使用DRF（主导资源公平）资源计算策略
+   * @param enableAsyncScheduler 是否启用异步调度
+   * @param userPercentage 是否按用户百分比分配资源
+   * @param preemptionMode 抢占策略模式
+   */
   @SuppressWarnings({"deprecation", "checkstyle:linelength"})
   public void convertSiteProperties(Configuration conf,
       Configuration yarnSiteConfig, boolean drfUsed,
       boolean enableAsyncScheduler, boolean userPercentage,
       FSConfigToCSConfigConverterParams.PreemptionMode preemptionMode) {
+    // 修改调度器实现类为容量调度器
     yarnSiteConfig.set(YarnConfiguration.RM_SCHEDULER,
         CapacityScheduler.class.getCanonicalName());
 
+    // 如果源配置启用了持续调度，转换异步调度配置
     if (conf.getBoolean(
         FairSchedulerConfiguration.CONTINUOUS_SCHEDULING_ENABLED,
         FairSchedulerConfiguration.DEFAULT_CONTINUOUS_SCHEDULING_ENABLED)) {
       yarnSiteConfig.setBoolean(
           CapacitySchedulerConfiguration.SCHEDULE_ASYNCHRONOUSLY_ENABLE, enableAsyncScheduler);
+      // 读取调度间隔配置
       int interval = conf.getInt(
           FairSchedulerConfiguration.CONTINUOUS_SCHEDULING_SLEEP_MS,
           FairSchedulerConfiguration.DEFAULT_CONTINUOUS_SCHEDULING_SLEEP_MS);
+      // 写入容量调度器对应配置项
       yarnSiteConfig.setInt(PREFIX +
           "schedule-asynchronously.scheduling-interval-ms", interval);
     }
 
-    // This should be always true to trigger cs auto
-    // refresh queue.
+    // 必须开启RM调度器监视器，以支持容量调度器队列自动刷新
     yarnSiteConfig.setBoolean(
         YarnConfiguration.RM_SCHEDULER_ENABLE_MONITORS, true);
 
+    // 如果源配置启用了抢占，转换抢占相关配置
     if (conf.getBoolean(FairSchedulerConfiguration.PREEMPTION,
         FairSchedulerConfiguration.DEFAULT_PREEMPTION)) {
       preemptionEnabled = true;
 
+      // 添加比例容量抢占策略到监视器策略列表
       String policies = addMonitorPolicy(ProportionalCapacityPreemptionPolicy.
           class.getCanonicalName(), yarnSiteConfig);
       yarnSiteConfig.set(YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES,
           policies);
 
+      // 转换抢占前等待时间配置
       int waitTimeBeforeKill = conf.getInt(
           FairSchedulerConfiguration.WAIT_TIME_BEFORE_KILL,
           FairSchedulerConfiguration.DEFAULT_WAIT_TIME_BEFORE_KILL);
@@ -78,6 +94,7 @@ public class FSYarnSiteConverter {
           CapacitySchedulerConfiguration.PREEMPTION_WAIT_TIME_BEFORE_KILL,
           waitTimeBeforeKill);
 
+      // 转换饥饿检查间隔配置
       long waitBeforeNextStarvationCheck = conf.getLong(
           FairSchedulerConfiguration.WAIT_TIME_BEFORE_NEXT_STARVATION_CHECK_MS,
           FairSchedulerConfiguration.DEFAULT_WAIT_TIME_BEFORE_NEXT_STARVATION_CHECK_MS);
@@ -85,24 +102,27 @@ public class FSYarnSiteConverter {
           CapacitySchedulerConfiguration.PREEMPTION_MONITORING_INTERVAL,
           waitBeforeNextStarvationCheck);
     } else {
+      // 源配置未开启抢占时，如果模式为NO_POLICY则清空抢占策略
       if (preemptionMode ==
           FSConfigToCSConfigConverterParams.PreemptionMode.NO_POLICY) {
         yarnSiteConfig.set(YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES, "");
       }
     }
 
-    // For auto created queue's auto deletion.
+    // 处理自动创建队列的自动删除策略
     if (!userPercentage) {
+      // 添加自动队列删除策略到监视器策略列表
       String policies = addMonitorPolicy(AutoCreatedQueueDeletionPolicy.
           class.getCanonicalName(), yarnSiteConfig);
       yarnSiteConfig.set(YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES,
           policies);
 
-      // Set the expired for deletion interval to 10s, consistent with fs.
+      // 设置队列过期删除间隔为10秒，与公平调度器默认行为一致
       yarnSiteConfig.setInt(CapacitySchedulerConfiguration.
           AUTO_CREATE_CHILD_QUEUE_EXPIRED_TIME, 10);
     }
 
+    // 转换多容器分配开关配置
     if (conf.getBoolean(FairSchedulerConfiguration.ASSIGN_MULTIPLE,
         FairSchedulerConfiguration.DEFAULT_ASSIGN_MULTIPLE)) {
       yarnSiteConfig.setBoolean(
@@ -112,11 +132,12 @@ public class FSYarnSiteConverter {
           CapacitySchedulerConfiguration.ASSIGN_MULTIPLE_ENABLED, false);
     }
 
-    // Make auto cs conf refresh enabled.
+    // 必须开启容量调度器配置自动刷新策略
     yarnSiteConfig.set(YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES,
         addMonitorPolicy(QueueConfigurationAutoRefreshPolicy
             .class.getCanonicalName(), yarnSiteConfig));
 
+    // 转换每次心跳最大分配容器数配置，仅当非默认值时写入
     int maxAssign = conf.getInt(FairSchedulerConfiguration.MAX_ASSIGN,
         FairSchedulerConfiguration.DEFAULT_MAX_ASSIGN);
     if (maxAssign != FairSchedulerConfiguration.DEFAULT_MAX_ASSIGN) {
@@ -125,6 +146,7 @@ public class FSYarnSiteConverter {
           maxAssign);
     }
 
+    // 转换节点局部性延迟阈值，仅当非默认值时写入
     float localityThresholdNode = conf.getFloat(
         FairSchedulerConfiguration.LOCALITY_THRESHOLD_NODE,
         FairSchedulerConfiguration.DEFAULT_LOCALITY_THRESHOLD_NODE);
@@ -134,6 +156,7 @@ public class FSYarnSiteConverter {
           localityThresholdNode);
     }
 
+    // 转换机架局部性附加延迟阈值，仅当非默认值时写入
     float localityThresholdRack = conf.getFloat(
         FairSchedulerConfiguration.LOCALITY_THRESHOLD_RACK,
         FairSchedulerConfiguration.DEFAULT_LOCALITY_THRESHOLD_RACK);
@@ -144,30 +167,47 @@ public class FSYarnSiteConverter {
           localityThresholdRack);
     }
 
+    // 记录是否开启基于任务大小的权重调整
     if (conf.getBoolean(FairSchedulerConfiguration.SIZE_BASED_WEIGHT,
         FairSchedulerConfiguration.DEFAULT_SIZE_BASED_WEIGHT)) {
       sizeBasedWeight = true;
     }
 
+    // 如果启用DRF策略，设置容量调度器资源计算器为主导资源计算器
     if (drfUsed) {
       yarnSiteConfig.set(
           CapacitySchedulerConfiguration.RESOURCE_CALCULATOR_CLASS,
           DominantResourceCalculator.class.getCanonicalName());
     }
 
+    // 如果要求启用异步调度，设置对应配置项
     if (enableAsyncScheduler) {
       yarnSiteConfig.setBoolean(CapacitySchedulerConfiguration.SCHEDULE_ASYNCHRONOUSLY_ENABLE, true);
     }
   }
 
+  /**
+   * 获取转换后是否启用抢占。
+   * @return 抢占是否启用
+   */
   public boolean isPreemptionEnabled() {
     return preemptionEnabled;
   }
 
+  /**
+   * 获取转换后是否启用基于大小的权重。
+   * @return 是否启用基于大小的权重
+   */
   public boolean isSizeBasedWeight() {
     return sizeBasedWeight;
   }
 
+  /**
+   * 向现有监视器策略列表添加新的策略类名。
+   * @param policyName 要添加的策略全类名
+   * @param yarnSiteConfig Yarn站点配置对象
+   * @return 更新后的策略列表字符串
+   */
   private String addMonitorPolicy(String policyName,
       Configuration yarnSiteConfig) {
     String policies =

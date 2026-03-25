@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,9 +17,7 @@
  * limitations under the License.
  */
 /**
- * Package used for auxiliary services manifest records. To the extent
- * possible, the format matches the YARN service framework service
- * specification.
+ * NodeManager容器管理器的记录数据类型包，用于存储辅助服务元数据记录，格式尽可能与YARN服务框架规范对齐。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
@@ -26,4 +25,3 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.records;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
-

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,6 +35,8 @@ import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /** 
+ * 文件级注释：SequenceFile二进制输出格式实现，将原始二进制格式的键值对写入SequenceFile文件
+ * 兼容旧版MapRed API，用于输出二进制格式的SequenceFile结果文件
  * An {@link OutputFormat} that writes keys, values to 
  * {@link SequenceFile}s in binary(raw) format
  */
@@ -43,6 +46,7 @@ public class SequenceFileAsBinaryOutputFormat
  extends SequenceFileOutputFormat <BytesWritable,BytesWritable> {
 
   /** 
+   * 内部工具类，用于支持原始二进制数据追加，封装值字节适配逻辑
    * Inner class used for appendRaw
    */
   static protected class WritableValueBytes extends org.apache.hadoop.mapreduce
@@ -57,12 +61,9 @@ public class SequenceFileAsBinaryOutputFormat
   }
 
   /**
-   * Set the key class for the {@link SequenceFile}
-   * <p>This allows the user to specify the key class to be different 
-   * from the actual class ({@link BytesWritable}) used for writing </p>
-   * 
-   * @param conf the {@link JobConf} to modify
-   * @param theClass the SequenceFile output key class.
+   * 设置输出SequenceFile的键类型，允许指定与实际写入类(BytesWritable)不同的元数据类型
+   * @param conf 作业配置对象
+   * @param theClass SequenceFile输出的键类
    */
   static public void setSequenceFileOutputKeyClass(JobConf conf, 
                                                    Class<?> theClass) {
@@ -71,12 +72,9 @@ public class SequenceFileAsBinaryOutputFormat
   }
 
   /**
-   * Set the value class for the {@link SequenceFile}
-   * <p>This allows the user to specify the value class to be different 
-   * from the actual class ({@link BytesWritable}) used for writing </p>
-   * 
-   * @param conf the {@link JobConf} to modify
-   * @param theClass the SequenceFile output key class.
+   * 设置输出SequenceFile的值类型，允许指定与实际写入类(BytesWritable)不同的元数据类型
+   * @param conf 作业配置对象
+   * @param theClass SequenceFile输出的值类
    */
   static public void setSequenceFileOutputValueClass(JobConf conf, 
                                                      Class<?> theClass) {
@@ -85,9 +83,9 @@ public class SequenceFileAsBinaryOutputFormat
   }
 
   /**
-   * Get the key class for the {@link SequenceFile}
-   * 
-   * @return the key class of the {@link SequenceFile}
+   * 获取输出SequenceFile配置的键类型，默认回退到作业输出键类
+   * @param conf 作业配置对象
+   * @return SequenceFile输出的键类
    */
   static public Class<? extends WritableComparable> getSequenceFileOutputKeyClass(JobConf conf) { 
     return conf.getClass(org.apache.hadoop.mapreduce.lib.output.
@@ -97,9 +95,9 @@ public class SequenceFileAsBinaryOutputFormat
   }
 
   /**
-   * Get the value class for the {@link SequenceFile}
-   * 
-   * @return the value class of the {@link SequenceFile}
+   * 获取输出SequenceFile配置的值类型，默认回退到作业输出值类
+   * @param conf 作业配置对象
+   * @return SequenceFile输出的值类
    */
   static public Class<? extends Writable> getSequenceFileOutputValueClass(JobConf conf) { 
     return conf.getClass(org.apache.hadoop.mapreduce.lib.output.
@@ -112,21 +110,23 @@ public class SequenceFileAsBinaryOutputFormat
              getRecordWriter(FileSystem ignored, JobConf job,
                              String name, Progressable progress)
     throws IOException {
-    // get the path of the temporary output file 
+    // 获取任务输出文件的路径
     Path file = FileOutputFormat.getTaskOutputPath(job, name);
     
     FileSystem fs = file.getFileSystem(job);
     CompressionCodec codec = null;
     CompressionType compressionType = CompressionType.NONE;
+    // 检查是否开启输出压缩
     if (getCompressOutput(job)) {
-      // find the kind of compression to do
+      // 获取压缩类型
       compressionType = getOutputCompressionType(job);
 
-      // find the right codec
+      // 获取压缩编码类
       Class<? extends CompressionCodec> codecClass = getOutputCompressorClass(job,
 	  DefaultCodec.class);
       codec = ReflectionUtils.newInstance(codecClass, job);
     }
+    // 创建SequenceFile写入器
     final SequenceFile.Writer out = 
       SequenceFile.createWriter(fs, job, file,
                     getSequenceFileOutputKeyClass(job),
@@ -135,15 +135,18 @@ public class SequenceFileAsBinaryOutputFormat
                     codec,
                     progress);
 
+    // 返回RecordWriter实现，处理二进制键值对写入
     return new RecordWriter<BytesWritable, BytesWritable>() {
         
         private WritableValueBytes wvaluebytes = new WritableValueBytes();
 
         public void write(BytesWritable bkey, BytesWritable bvalue)
           throws IOException {
-
+          // 重置值字节包装器
           wvaluebytes.reset(bvalue);
+          // 以原始二进制格式追加键值对
           out.appendRaw(bkey.getBytes(), 0, bkey.getLength(), wvaluebytes);
+          // 清空包装器引用避免内存泄漏
           wvaluebytes.reset(null);
         }
 
@@ -159,6 +162,7 @@ public class SequenceFileAsBinaryOutputFormat
   public void checkOutputSpecs(FileSystem ignored, JobConf job) 
             throws IOException {
     super.checkOutputSpecs(ignored, job);
+    // 检查不支持的记录压缩类型
     if (getCompressOutput(job) && 
         getOutputCompressionType(job) == CompressionType.RECORD ){
         throw new InvalidJobConfException("SequenceFileAsBinaryOutputFormat "

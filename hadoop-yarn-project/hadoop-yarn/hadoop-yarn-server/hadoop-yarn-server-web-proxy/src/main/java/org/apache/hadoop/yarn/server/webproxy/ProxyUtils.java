@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,7 +33,7 @@ import java.io.PrintWriter;
 import java.util.EnumSet;
 
 /**
- * Class containing general purpose proxy utilities
+ * YARN Web 代理通用工具类，提供页面生成、重定向、错误响应等通用能力
  */
 public class ProxyUtils {
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -41,33 +42,38 @@ public class ProxyUtils {
       "This filter only works for HTTP/HTTPS";
   public static final String LOCATION = "Location";
 
+  /**
+   * Hamltet 标签占位类，用于结束标签链
+   */
   public static class __ implements Hamlet.__ {
     //Empty
   }
 
+  /**
+   * 自定义HTML页面生成类，基于Hamlet框架构造代理服务响应页面
+   */
   public static class Page extends Hamlet {
     Page(PrintWriter out) {
       super(out, 0, false);
     }
 
+    /**
+     * 创建根HTML标签
+     * @return 根HTML标签实例
+     */
     public HTML<ProxyUtils.__> html() {
       return new HTML<>("html", null, EnumSet.of(EOpt.ENDTAG));
     }
   }
   
   /**
-   * Handle redirects with a status code that can in future support verbs other
-   * than GET, thus supporting full REST functionality.
+   * 发送HTTP重定向响应，支持REST全功能，返回带跳转链接的HTML页面
    * <p>
-   * The target URL is included in the redirect text returned
-   * <p>
-   * At the end of this method, the output stream is closed.
-   * 
-   * @param request request (hence: the verb and any other information
-   * relevant to a redirect)
-   * @param response the response
-   * @param target the target URL -unencoded
-   *
+   * 方法结束后会关闭响应输出流
+   * @param request  HTTP请求对象，包含请求方法等信息
+   * @param response HTTP响应对象，用于输出重定向结果
+   * @param target   重定向目标URL（未编码）
+   * @throws IOException 输出响应失败时抛出
    */
   public static void sendRedirect(HttpServletRequest request,
       HttpServletResponse response,
@@ -77,11 +83,16 @@ public class ProxyUtils {
           request.getMethod(), 
           request.getRequestURI(),
           target);
+    // 编码重定向URL
     String location = response.encodeRedirectURL(target);
+    // 设置302 FOUND状态码
     response.setStatus(HttpServletResponse.SC_FOUND);
+    // 设置Location重定向头
     response.setHeader(LOCATION, location);
+    // 设置内容类型为HTML
     response.setContentType(MimeType.HTML);
     PrintWriter writer = response.getWriter();
+    // 生成带跳转链接的HTML页面
     Page p = new Page(writer);
     p.html()
         .head().title("Moved").__()
@@ -96,15 +107,18 @@ public class ProxyUtils {
 
 
   /**
-   * Output 404 with appropriate message.
-   * @param resp the http response.
-   * @param message the message to include on the page.
-   * @throws IOException on any error.
+   * 输出404 Not Found错误响应页面
+   * @param resp HTTP响应对象
+   * @param message 404页面显示的错误信息
+   * @throws IOException 输出响应失败时抛出
    */
   public static void notFound(HttpServletResponse resp, String message)
       throws IOException {
+    // 设置404状态码
     resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+    // 设置内容类型为HTML
     resp.setContentType(MimeType.HTML);
+    // 生成仅包含错误信息的简单HTML页面
     Page p = new Page(resp.getWriter());
     p.html().
         h1(message).
@@ -112,9 +126,9 @@ public class ProxyUtils {
   }
 
   /**
-   * Reject any request that isn't from an HTTP servlet
-   * @param req request
-   * @throws ServletException if the request is of the wrong type
+   * 校验并拒绝非HTTP请求，仅保留HTTP/HTTPS请求
+   * @param req 入站请求对象
+   * @throws ServletException 请求不是HTTP请求时抛出
    */
   public static void rejectNonHttpRequests(ServletRequest req) throws
       ServletException {

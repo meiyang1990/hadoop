@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,13 +31,22 @@ import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
- * Base class for Composite joins returning Tuples of arbitrary Writables.
+ * MapReduce关联操作记录读取器的基类，用于多数据源关联计算，返回包含任意Writable类型的元组结果。
+ * 是MapReduce端连接操作的核心基础组件，负责将多个已排序输入分片按key进行归并关联。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public abstract class JoinRecordReader<K extends WritableComparable<?>>
     extends CompositeRecordReader<K,Writable,TupleWritable> {
 
+  /**
+   * 构造关联操作记录读取器
+   * @param id 分片编号
+   * @param conf 作业配置对象
+   * @param capacity 关联输入的数量
+   * @param cmpcl key比较器类型，用于排序归并
+   * @throws IOException IO异常
+   */
   public JoinRecordReader(int id, Configuration conf, int capacity,
       Class<? extends WritableComparator> cmpcl) throws IOException {
     super(id, capacity, cmpcl);
@@ -44,14 +54,17 @@ public abstract class JoinRecordReader<K extends WritableComparable<?>>
   }
 
   /**
-   * Emit the next set of key, value pairs as defined by the child
-   * RecordReaders and operation associated with this composite RR.
+   * 获取下一个关联后的key-value对，根据当前关联操作类型（内连接、外连接等）输出结果
+   * @return 是否还有下一个结果
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public boolean nextKeyValue() 
       throws IOException, InterruptedException {
     if (key == null) {
       key = createKey();
     }
+    // 尝试从关联收集器取出结果
     if (jc.flush(value)) {
       ReflectionUtils.copy(conf, jc.key(), key);
       return true;
@@ -60,9 +73,11 @@ public abstract class JoinRecordReader<K extends WritableComparable<?>>
     if (value == null) {
       value = createValue();
     }
+    // 获取记录读取器优先级队列（按key排序）
     final PriorityQueue<ComposableRecordReader<K,?>> q = 
             getRecordReaderQueue();
     K iterkey = createKey();
+    // 遍历队列收集相同key的所有记录
     while (q != null && !q.isEmpty()) {
       fillJoinCollector(iterkey);
       jc.reset(iterkey);
@@ -75,20 +90,24 @@ public abstract class JoinRecordReader<K extends WritableComparable<?>>
     return false;
   }
 
+  /**
+   * 创建存储关联结果的TupleWritable对象
+   * @return 空的结果元组对象
+   */
   public TupleWritable createValue() {
     return createTupleWritable();
   }
 
   /**
-   * Return an iterator wrapping the JoinCollector.
+   * 获取包装JoinCollector的迭代器，用于遍历关联结果
+   * @return 可重置的结果迭代器
    */
   protected ResetableIterator<TupleWritable> getDelegate() {
     return new JoinDelegationIterator();
   }
 
   /**
-   * Since the JoinCollector is effecting our operation, we need only
-   * provide an iterator proxy wrapping its operation.
+   * 关联收集器的迭代器代理，直接复用JoinCollector的现有逻辑，提供标准迭代器接口
    */
   protected class JoinDelegationIterator
       implements ResetableIterator<TupleWritable> {

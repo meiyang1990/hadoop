@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,9 +32,9 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.RegisterDistributedSche
 import org.apache.hadoop.yarn.server.nodemanager.recovery.NMStateStoreService;
 
 /**
- * Implements the RequestInterceptor interface and provides common functionality
- * which can can be used and/or extended by other concrete interceptor classes.
- *
+ * 文件说明：AMRMProxy请求拦截器抽象基类，实现了RequestInterceptor接口，
+ * 提供责任链模式的基础基础设施，具体拦截器可继承此类扩展自定义处理逻辑。
+ * 核心职责：维护责任链引用，提供通用生命周期方法转发，为分布式调度请求提供默认实现。
  */
 public abstract class AbstractRequestInterceptor implements
     RequestInterceptor {
@@ -42,7 +43,7 @@ public abstract class AbstractRequestInterceptor implements
   private RequestInterceptor nextInterceptor;
 
   /**
-   * Sets the {@link RequestInterceptor} in the chain.
+   * 设置责任链中的下一个拦截器
    */
   @Override
   public void setNextInterceptor(RequestInterceptor nextInterceptor) {
@@ -50,7 +51,7 @@ public abstract class AbstractRequestInterceptor implements
   }
 
   /**
-   * Sets the {@link Configuration}.
+   * 设置配置对象，同时转发给下一个拦截器
    */
 
   @Override
@@ -62,7 +63,7 @@ public abstract class AbstractRequestInterceptor implements
   }
 
   /**
-   * Gets the {@link Configuration}.
+   * 获取当前配置对象
    */
   @Override
   public Configuration getConf() {
@@ -70,10 +71,11 @@ public abstract class AbstractRequestInterceptor implements
   }
 
   /**
-   * Initializes the {@link RequestInterceptor}.
+   * 初始化拦截器，同时转发初始化给下一个拦截器
    */
   @Override
   public void init(AMRMProxyApplicationContext appContext) {
+    // 检查拦截器是否重复初始化，保证单次初始化
     Preconditions.checkState(this.appContext == null,
         "init is called multiple times on this interceptor: "
             + this.getClass().getName());
@@ -84,7 +86,7 @@ public abstract class AbstractRequestInterceptor implements
   }
 
   /**
-   * Recover {@link RequestInterceptor} state from store.
+   * 从状态存储恢复拦截器状态，同时转发恢复操作给下一个拦截器
    */
   @Override
   public void recover(Map<String, byte[]> recoveredDataMap) {
@@ -94,7 +96,7 @@ public abstract class AbstractRequestInterceptor implements
   }
 
   /**
-   * Disposes the {@link RequestInterceptor}.
+   * 关闭拦截器，同时转发关闭操作给下一个拦截器
    */
   @Override
   public void shutdown() {
@@ -104,7 +106,7 @@ public abstract class AbstractRequestInterceptor implements
   }
 
   /**
-   * Gets the next {@link RequestInterceptor} in the chain.
+   * 获取责任链中的下一个拦截器
    */
   @Override
   public RequestInterceptor getNextInterceptor() {
@@ -112,20 +114,19 @@ public abstract class AbstractRequestInterceptor implements
   }
 
   /**
-   * Gets the {@link AMRMProxyApplicationContext}.
+   * 获取当前AMRMProxy应用上下文
    */
   public AMRMProxyApplicationContext getApplicationContext() {
     return this.appContext;
   }
 
   /**
-   * Default implementation that invokes the distributed scheduling version
-   * of the register method.
+   * 分布式调度分配请求默认处理实现，转发给责任链下一个拦截器处理
    *
-   * @param request ApplicationMaster allocate request
-   * @return Distribtued Scheduler Allocate Response
-   * @throws YarnException if fails
-   * @throws IOException if fails
+   * @param request 分布式调度分配请求
+   * @return 分布式调度分配响应
+   * @throws YarnException  yarn处理异常
+   * @throws IOException IO异常
    */
   @Override
   public DistributedSchedulingAllocateResponse allocateForDistributedScheduling(
@@ -136,13 +137,12 @@ public abstract class AbstractRequestInterceptor implements
   }
 
   /**
-   * Default implementation that invokes the distributed scheduling version
-   * of the allocate method.
+   * 分布式调度AM注册请求默认处理实现，转发给责任链下一个拦截器处理
    *
-   * @param request ApplicationMaster registration request
-   * @return Distributed Scheduler Register Response
-   * @throws YarnException if fails
-   * @throws IOException if fails
+   * @param request AM注册请求
+   * @return 分布式调度AM注册响应
+   * @throws YarnException yarn处理异常
+   * @throws IOException IO异常
    */
   @Override
   public RegisterDistributedSchedulingAMResponse
@@ -154,9 +154,9 @@ public abstract class AbstractRequestInterceptor implements
   }
 
   /**
-   * A helper method for getting NM state store.
+   * 获取NodeManager状态存储服务实例
    *
-   * @return the NMSS instance
+   * @return NM状态存储实例，上下文不存在时返回null
    */
   public NMStateStoreService getNMStateStore() {
     if (this.appContext == null || this.appContext.getNMContext() == null) {

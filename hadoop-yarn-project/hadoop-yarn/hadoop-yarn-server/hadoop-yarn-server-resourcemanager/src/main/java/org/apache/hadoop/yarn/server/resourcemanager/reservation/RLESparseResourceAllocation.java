@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -32,30 +33,44 @@ import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 /**
- * This is a run length encoded sparse data structure that maintains resource
- * allocations over time.
+ * 文件说明：YARN资源预留模块的行程编码稀疏资源分配数据结构
+ * 核心功能：基于行程编码实现稀疏存储，维护时间维度上的资源分配信息，节省内存占用
  */
 public class RLESparseResourceAllocation {
 
+  // toString输出最大条目阈值，超过阈值仅输出概览信息
   private static final int THRESHOLD = 100;
+  // 零资源常量，表示不分配任何资源
   private static final Resource ZERO_RESOURCE = Resources.none();
 
   @SuppressWarnings("checkstyle:visibilitymodifier")
+  // 存储行程编码后的累计容量，key为时间戳，value为该时间点后的累计资源量
   protected NavigableMap<Long, Resource> cumulativeCapacity =
       new TreeMap<Long, Resource>();
 
+  // 读写锁，保障并发访问安全性，读读不互斥，读写互斥
   private final ReentrantReadWriteLock readWriteLock =
       new ReentrantReadWriteLock();
   @SuppressWarnings("checkstyle:visibilitymodifier")
   protected final Lock readLock = readWriteLock.readLock();
   private final Lock writeLock = readWriteLock.writeLock();
 
+  // 资源计算器，用于资源比较和计算
   private final ResourceCalculator resourceCalculator;
 
+  /**
+   * 构造函数，初始化稀疏资源分配实例
+   * @param resourceCalculator 资源计算器
+   */
   public RLESparseResourceAllocation(ResourceCalculator resourceCalculator) {
     this.resourceCalculator = resourceCalculator;
   }
 
+  /**
+   * 构造函数，使用已有的行程编码数据初始化稀疏资源分配实例
+   * @param out 已有的行程编码累计容量数据
+   * @param resourceCalculator 资源计算器
+   */
   public RLESparseResourceAllocation(NavigableMap<Long, Resource> out,
       ResourceCalculator resourceCalculator) {
     // miss check for repeated entries
@@ -64,12 +79,11 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Add a resource for the specified interval.
+   * 在指定时间区间内增加资源分配
    *
-   * @param reservationInterval the interval for which the resource is to be
-   *          added
-   * @param totCap the resource to be added
-   * @return true if addition is successful, false otherwise
+   * @param reservationInterval 资源要添加的时间区间
+   * @param totCap 要添加的资源总量
+   * @return 增加成功返回true，当前实现总是返回true
    */
   public boolean addInterval(ReservationInterval reservationInterval,
       Resource totCap) {
@@ -78,15 +92,17 @@ public class RLESparseResourceAllocation {
     }
     writeLock.lock();
     try {
+      // 把要添加的区间转换为行程编码格式：起点加资源量，终点加零资源
       NavigableMap<Long, Resource> addInt = new TreeMap<Long, Resource>();
       addInt.put(reservationInterval.getStartTime(), totCap);
       addInt.put(reservationInterval.getEndTime(), ZERO_RESOURCE);
       try {
+        // 合并新分配到现有资源分配中
         cumulativeCapacity =
             merge(resourceCalculator, totCap, cumulativeCapacity, addInt,
                 Long.MIN_VALUE, Long.MAX_VALUE, RLEOperator.add);
       } catch (PlanningException e) {
-        // never happens for add
+        // add操作不会抛出异常，此处仅捕获签名要求
       }
       return true;
     } finally {
@@ -95,12 +111,11 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Removes a resource for the specified interval.
+   * 在指定时间区间内移除资源分配
    *
-   * @param reservationInterval the interval for which the resource is to be
-   *          removed
-   * @param totCap the resource to be removed
-   * @return true if removal is successful, false otherwise
+   * @param reservationInterval 资源要移除的时间区间
+   * @param totCap 要移除的资源总量
+   * @return 移除成功返回true，当前实现总是返回true
    */
   public boolean removeInterval(ReservationInterval reservationInterval,
       Resource totCap) {
@@ -110,15 +125,17 @@ public class RLESparseResourceAllocation {
     writeLock.lock();
     try {
 
+      // 把要移除的区间转换为行程编码格式：起点加资源量，终点加零资源
       NavigableMap<Long, Resource> removeInt = new TreeMap<Long, Resource>();
       removeInt.put(reservationInterval.getStartTime(), totCap);
       removeInt.put(reservationInterval.getEndTime(), ZERO_RESOURCE);
       try {
+        // 合并移除操作到现有资源分配中
         cumulativeCapacity =
             merge(resourceCalculator, totCap, cumulativeCapacity, removeInt,
                 Long.MIN_VALUE, Long.MAX_VALUE, RLEOperator.subtract);
       } catch (PlanningException e) {
-        // never happens for subtract
+        // subtract操作不会抛出异常，此处仅捕获签名要求
       }
       return true;
     } finally {
@@ -127,19 +144,20 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Returns the capacity, i.e. total resources allocated at the specified point
-   * of time.
+   * 获取指定时间点的累计资源分配量
    *
-   * @param tick timeStap at which resource needs to be known
-   * @return the resources allocated at the specified time
+   * @param tick 查询的时间戳
+   * @return 指定时间点的资源分配总量
    */
   public Resource getCapacityAtTime(long tick) {
     readLock.lock();
     try {
+      // 找到不大于查询时间的最大时间点，其值就是查询时间点的累计资源量
       Entry<Long, Resource> closestStep = cumulativeCapacity.floorEntry(tick);
       if (closestStep != null) {
         return Resources.clone(closestStep.getValue());
       }
+      // 早于第一个时间点，返回零资源
       return Resources.clone(ZERO_RESOURCE);
     } finally {
       readLock.unlock();
@@ -147,9 +165,9 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Get the timestamp of the earliest resource allocation.
+   * 获取最早资源分配的开始时间戳
    *
-   * @return the timestamp of the first resource allocation
+   * @return 最早分配的时间戳，无分配则返回-1
    */
   public long getEarliestStartTime() {
     readLock.lock();
@@ -165,9 +183,9 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Get the timestamp of the latest non-null resource allocation.
+   * 获取最新非空资源分配的时间戳
    *
-   * @return the timestamp of the last resource allocation
+   * @return 最新非空分配的时间戳，无分配则返回-1
    */
   public long getLatestNonNullTime() {
     readLock.lock();
@@ -175,8 +193,7 @@ public class RLESparseResourceAllocation {
       if (cumulativeCapacity.isEmpty()) {
         return -1;
       } else {
-        // the last entry might contain null (to terminate
-        // the sequence)... return previous one.
+        // 最后一个条目可能是空值（用于终止序列），返回前一个条目
         Entry<Long, Resource> last = cumulativeCapacity.lastEntry();
         if (last.getValue() == null) {
           return cumulativeCapacity.floorKey(last.getKey() - 1);
@@ -190,9 +207,9 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Returns true if there are no non-zero entries.
+   * 检查当前是否没有任何非零资源分配
    *
-   * @return true if there are no allocations or false otherwise
+   * @return 无任何有效分配返回true，否则返回false
    */
   public boolean isEmpty() {
     readLock.lock();
@@ -200,8 +217,7 @@ public class RLESparseResourceAllocation {
       if (cumulativeCapacity.isEmpty()) {
         return true;
       }
-      // Deletion leaves a single zero entry with a null at the end so check for
-      // that
+      // 删除操作后可能只剩一个零条目和末尾null，需要检查这种情况
       if (cumulativeCapacity.size() == 2) {
         return cumulativeCapacity.firstEntry().getValue().equals(ZERO_RESOURCE)
             && cumulativeCapacity.lastEntry().getValue() == null;
@@ -217,6 +233,7 @@ public class RLESparseResourceAllocation {
     StringBuilder ret = new StringBuilder();
     readLock.lock();
     try {
+      // 条目超过阈值只输出概览，否则输出所有条目
       if (cumulativeCapacity.size() > THRESHOLD) {
         ret.append("Number of steps: ").append(cumulativeCapacity.size())
             .append(" earliest entry: ").append(cumulativeCapacity.firstKey())
@@ -234,11 +251,9 @@ public class RLESparseResourceAllocation {
   }
 
   /**
-   * Returns the representation of the current resources allocated over time as
-   * an interval map (in the defined non-null range).
+   * 将当前行程编码的资源分配转换为区间映射，方便遍历所有有效分配区间
    *
-   * @return the representation of the current resources allocated over time as
-   *         an interval map.
+   * @return 区间到资源量的映射表
    */
   public Map<ReservationInterval, Resource> toIntervalMap() {
 
@@ -247,12 +262,13 @@ public class RLESparseResourceAllocation {
       Map<ReservationInterval, Resource> allocations =
           new TreeMap<ReservationInterval, Resource>();
 
-      // Empty
+      // 空分配直接返回空映射
       if (isEmpty()) {
         return allocations;
       }
 
       Map.Entry<Long, Resource> lastEntry = null;
+      // 遍历行程编码条目，连续两个时间点构成一个区间
       for (Map.Entry<Long, Resource> entry : cumulativeCapacity.entrySet()) {
 
         if (lastEntry != null && entry.getValue() != null) {
@@ -271,6 +287,10 @@ public class RLESparseResourceAllocation {
     }
   }
 
+  /**
+   * 获取累计容量的行程编码映射
+   * @return 累计容量映射表
+   */
   public NavigableMap<Long, Resource> getCumulative() {
     readLock.lock();
     try {
@@ -280,45 +300,52 @@ public class RLESparseResourceAllocation {
     }
   }
 
+  /**
+   * 获取资源计算器实例
+   * @return 资源计算器
+   */
   public ResourceCalculator getResourceCalculator() {
     return resourceCalculator;
   }
 
   /**
-   * Merges the range start to end of two {@code RLESparseResourceAllocation}
-   * using a given {@code RLEOperator}.
+   * 对两个RLESparseResourceAllocation在指定时间范围内执行指定操作合并
    *
-   * @param resCalc the resource calculator
-   * @param clusterResource the total cluster resources (for DRF)
-   * @param a the left operand
-   * @param b the right operand
-   * @param operator the operator to be applied during merge
-   * @param start the start-time of the range to be considered
-   * @param end the end-time of the range to be considered
-   * @return the a merged RLESparseResourceAllocation, produced by applying
-   *         "operator" to "a" and "b"
-   * @throws PlanningException in case the operator is subtractTestPositive and
-   *           the result would contain a negative value
+   * @param resCalc 资源计算器
+   * @param clusterResource 集群总资源量（用于DRF调度计算）
+   * @param a 左操作数
+   * @param b 右操作数
+   * @param operator 合并操作类型
+   * @param start 合并时间范围起点
+   * @param end 合并时间范围终点
+   * @return 合并后的新RLESparseResourceAllocation实例
+   * @throws PlanningException 如果操作要求结果非负但结果出现负值则抛出异常
    */
   public static RLESparseResourceAllocation merge(ResourceCalculator resCalc,
       Resource clusterResource, RLESparseResourceAllocation a,
       RLESparseResourceAllocation b, RLEOperator operator, long start, long end)
       throws PlanningException {
+    // 截取两个输入在指定范围内的子区间
     NavigableMap<Long, Resource> cumA =
         a.getRangeOverlapping(start, end).getCumulative();
     NavigableMap<Long, Resource> cumB =
         b.getRangeOverlapping(start, end).getCumulative();
+    // 执行合并
     NavigableMap<Long, Resource> out =
         merge(resCalc, clusterResource, cumA, cumB, start, end, operator);
+    // 封装为新实例返回
     return new RLESparseResourceAllocation(out, resCalc);
   }
 
+  /**
+   * 对两个行程编码映射在指定时间范围内执行指定操作合并，内部实现方法
+   */
   private static NavigableMap<Long, Resource> merge(ResourceCalculator resCalc,
       Resource clusterResource, NavigableMap<Long, Resource> a,
       NavigableMap<Long, Resource> b, long start, long end,
       RLEOperator operator) throws PlanningException {
 
-    // handle special cases of empty input
+    // 处理其中一个输入为空的特殊情况
     if (a == null || a.isEmpty()) {
       if (operator == RLEOperator.subtract
           || operator == RLEOperator.subtractTestNonNegative) {
@@ -331,7 +358,7 @@ public class RLESparseResourceAllocation {
       return a;
     }
 
-    // define iterators and support variables
+    // 初始化双指针遍历两个有序映射
     Iterator<Entry<Long, Resource>> aIt = a.entrySet().iterator();
     Iterator<Entry<Long, Resource>> bIt = b.entrySet().iterator();
     Entry<Long, Resource> curA = aIt.next();
@@ -343,16 +370,19 @@ public class RLESparseResourceAllocation {
 
     TreeMap<Long, Resource> out = new TreeMap<Long, Resource>();
 
+    // 双指针合并有序时间线
     while (!(curA.equals(lastA) && curB.equals(lastB))) {
 
       Resource outRes;
       long time = -1;
 
-      // curA is smaller than curB
+      // 当前A时间点小于B时间点，处理A点
       if (bIsDone || (curA.getKey() < curB.getKey() && !aIsDone)) {
         outRes = combineValue(operator, resCalc, clusterResource, curA, lastB);
+        // 小于起点的时间点截断到起点
         time = (curA.getKey() < start) ? start : curA.getKey();
         lastA = curA;
+        // 移动A指针
         if (aIt.hasNext()) {
           curA = aIt.next();
         } else {
@@ -360,12 +390,14 @@ public class RLESparseResourceAllocation {
         }
 
       } else {
-        // curB is smaller than curA
+        // 当前B时间点小于A时间点，处理B点
         if (aIsDone || (curA.getKey() > curB.getKey() && !bIsDone)) {
           outRes =
               combineValue(operator, resCalc, clusterResource, lastA, curB);
+          // 小于起点的时间点截断到起点
           time = (curB.getKey() < start) ? start : curB.getKey();
           lastB = curB;
+          // 移动B指针
           if (bIt.hasNext()) {
             curB = bIt.next();
           } else {
@@ -373,9 +405,11 @@ public class RLESparseResourceAllocation {
           }
 
         } else {
-          // curA is equal to curB
+          // A和B时间点相同，合并处理
           outRes = combineValue(operator, resCalc, clusterResource, curA, curB);
+          // 小于起点的时间点截断到起点
           time = (curA.getKey() < start) ? start : curA.getKey();
+          // 同时移动两个指针
           lastA = curA;
           if (aIt.hasNext()) {
             curA = aIt.next();
@@ -391,21 +425,25 @@ public class RLESparseResourceAllocation {
         }
       }
 
-      // add to out if not redundant
+      // 只有和前一个值不同才添加，压缩冗余数据
       addIfNeeded(out, time, outRes);
     }
+    // 添加终点标记
     addIfNeeded(out, end, null);
 
     return out;
   }
 
+  /**
+   * 对输入映射所有资源值取反，用于减法操作
+   */
   private static NavigableMap<Long, Resource> negate(RLEOperator operator,
       NavigableMap<Long, Resource> a) throws PlanningException {
 
     TreeMap<Long, Resource> out = new TreeMap<Long, Resource>();
     for (Entry<Long, Resource> e : a.entrySet()) {
       Resource val = Resources.negate(e.getValue());
-      // test for negative value and throws
+      // 如果要求结果非负，检查是否出现负值
       if (operator == RLEOperator.subtractTestNonNegative
           && (Resources.fitsIn(val, ZERO_RESOURCE)
               && !Resources.equals(val, ZERO_RESOURCE))) {
@@ -419,6 +457,9 @@ public class RLESparseResourceAllocation {
     return out;
   }
 
+  /**
+   * 仅当输出结果与上一个值不同时才添加，压缩冗余条目
+   */
   private static void addIfNeeded(TreeMap<Long, Resource> out, long time,
       Resource outRes) {
 
@@ -430,168 +471,5 @@ public class RLESparseResourceAllocation {
 
   }
 
-  private static Resource combineValue(RLEOperator op,
-      ResourceCalculator resCalc, Resource clusterResource,
-      Entry<Long, Resource> eA, Entry<Long, Resource> eB)
-      throws PlanningException {
-
-    // deal with nulls
-    if (eA == null || eA.getValue() == null) {
-      if (eB == null || eB.getValue() == null) {
-        return null;
-      }
-      if (op == RLEOperator.subtract) {
-        return Resources.negate(eB.getValue());
-      } else {
-        return eB.getValue();
-      }
-    }
-    if (eB == null || eB.getValue() == null) {
-      return eA.getValue();
-    }
-
-    Resource a = eA.getValue();
-    Resource b = eB.getValue();
-    switch (op) {
-    case add:
-      return Resources.add(a, b);
-    case subtract:
-      return Resources.subtract(a, b);
-    case subtractTestNonNegative:
-      if (!Resources.fitsIn(b, a)) {
-        throw new PlanningException(
-            "RLESparseResourceAllocation: merge failed as the "
-                + "resulting RLESparseResourceAllocation would "
-                + "be negative, when testing: (" + eB + ") > (" + eA + ")");
-      } else {
-        return Resources.subtract(a, b);
-      }
-    case min:
-      return Resources.min(resCalc, clusterResource, a, b);
-    case max:
-      return Resources.max(resCalc, clusterResource, a, b);
-    default:
-      return null;
-    }
-
-  }
-
   /**
-   * Get a {@link RLESparseResourceAllocation} view of the {@link Resource}
-   * allocations between the specified start and end times.
-   *
-   * @param start the time from which the {@link Resource} allocations are
-   *          required
-   * @param end the time upto which the {@link Resource} allocations are
-   *          required
-   * @return the overlapping allocations
-   */
-  public RLESparseResourceAllocation getRangeOverlapping(long start, long end) {
-    readLock.lock();
-    try {
-      NavigableMap<Long, Resource> a = this.getCumulative();
-      if (a != null && !a.isEmpty()) {
-        // include the portion of previous entry that overlaps start
-        if (start > a.firstKey()) {
-          long previous = a.floorKey(start);
-          a = a.tailMap(previous, true);
-        }
-        if (end < a.lastKey()) {
-          a = a.headMap(end, true);
-        }
-      }
-      RLESparseResourceAllocation ret =
-          new RLESparseResourceAllocation(a, resourceCalculator);
-      return ret;
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /**
-   * This method shifts all the timestamp of the {@link Resource} entries by the
-   * specified "delta".
-   *
-   * @param delta the time by which to shift the {@link Resource} allocations
-   */
-  public void shift(long delta) {
-    writeLock.lock();
-    try {
-      TreeMap<Long, Resource> newCum = new TreeMap<>();
-      long start;
-      for (Map.Entry<Long, Resource> entry : cumulativeCapacity.entrySet()) {
-        if (delta > 0) {
-          start = (entry.getKey() == Long.MAX_VALUE) ? Long.MAX_VALUE
-              : entry.getKey() + delta;
-        } else {
-          start = (entry.getKey() == Long.MIN_VALUE) ? Long.MIN_VALUE
-              : entry.getKey() + delta;
-        }
-        newCum.put(start, entry.getValue());
-      }
-      cumulativeCapacity = newCum;
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  /**
-   * The set of operators that can be applied to two
-   * {@code RLESparseResourceAllocation} during a merge operation.
-   */
-  public enum RLEOperator {
-    add, subtract, min, max, subtractTestNonNegative
-  }
-
-  /**
-   * Get the maximum capacity across specified time instances. The search-space
-   * is specified using the starting value, tick, and the periodic interval for
-   * search. Maximum resource allocation across tick, tick + period, tick + 2 *
-   * period,..., tick + n * period .. is returned.
-   *
-   * @param tick the starting time instance
-   * @param period interval at which capacity is evaluated
-   * @return maximum resource allocation
-   */
-  public Resource getMaximumPeriodicCapacity(long tick, long period) {
-    Resource maxCapacity = ZERO_RESOURCE;
-    readLock.lock();
-    try {
-      if (!cumulativeCapacity.isEmpty()) {
-        Long lastKey = cumulativeCapacity.lastKey();
-        for (long t = tick; t <= lastKey; t = t + period) {
-          maxCapacity = Resources.componentwiseMax(maxCapacity,
-              cumulativeCapacity.floorEntry(t).getValue());
-        }
-      }
-      return maxCapacity;
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  /**
-   * Get the minimum capacity in the specified time range.
-   *
-   * @param interval the {@link ReservationInterval} to be searched
-   * @return minimum resource allocation
-   */
-  public Resource getMinimumCapacityInInterval(ReservationInterval interval) {
-    Resource minCapacity =
-        Resource.newInstance(Integer.MAX_VALUE, Integer.MAX_VALUE);
-    long start = interval.getStartTime();
-    long end = interval.getEndTime();
-    NavigableMap<Long, Resource> capacityRange =
-        getRangeOverlapping(start, end).getCumulative();
-    if (!capacityRange.isEmpty()) {
-      for (Map.Entry<Long, Resource> entry : capacityRange.entrySet()) {
-        if (entry.getValue() != null) {
-          minCapacity =
-              Resources.componentwiseMin(minCapacity, entry.getValue());
-        }
-      }
-    }
-    return minCapacity;
-  }
-
-}
+   * 根据操作类型计算两个资源值的

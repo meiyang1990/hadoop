@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.nodemanager.webapp.jsonprovider contains classes
- * for handling json response format mostly to provide backward-compatibility with jersey1.
+ * NodeManager Web UI JSON响应处理包，提供兼容Jersey1的JSON序列化实现，
+ * 主要用于向后兼容，为NodeManager Web接口提供统一格式的JSON输出。
  */
 
 package org.apache.hadoop.yarn.server.nodemanager.webapp.jsonprovider;
-

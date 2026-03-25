@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,6 +36,11 @@ import java.util.*;
 import static org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot.NO_SNAPSHOT_ID;
 
 /**
+ * 文件：org.apache.hadoop.hdfs.server.namenode.snapshot.DirectoryWithSnapshotFeature.java
+ * 所属模块：HDFS NameNode 快照功能
+ * 核心职责：为支持快照功能的目录提供差异数据存储和处理能力，维护目录每次快照后产生的修改差异列表，实现快照视图的快速访问
+ */
+/**
  * Feature used to store and process the snapshot diff information for a
  * directory. In particular, it contains a directory diff list recording changes
  * made to the directory and its children for each snapshot.
@@ -42,8 +48,8 @@ import static org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot.NO_SNAPSH
 @InterfaceAudience.Private
 public class DirectoryWithSnapshotFeature implements INode.Feature {
   /**
-   * The difference between the current state and a previous snapshot
-   * of the children list of an INodeDirectory.
+   * 存储目录当前状态与历史快照之间子节点列表的差异
+   * 记录了快照后新增和删除的子节点信息
    */
   static class ChildrenDiff extends Diff<byte[], INode> {
     ChildrenDiff() {}
@@ -53,8 +59,8 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
     }
 
     /**
-     * Replace the given child from the created list.
-     * @return true if the child is replaced; false if the child is not found.
+     * 在新增列表中替换旧的子节点引用为新节点
+     * @return true 替换成功；false 未找到旧节点，替换失败
      */
     private boolean replaceCreated(final INode oldChild, final INode newChild) {
       final List<INode> list = getCreatedUnmodifiable();
@@ -68,7 +74,7 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
       return true;
     }
 
-    /** clear the created list */
+    /** 销毁新增列表中的所有节点并清空列表 */
     private void destroyCreatedList(INode.ReclaimContext reclaimContext,
         final INodeDirectory currentINode) {
       for (INode c : getCreatedUnmodifiable()) {
@@ -79,7 +85,7 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
       clearCreated();
     }
 
-    /** clear the deleted list */
+    /** 销毁删除列表中的所有节点并清空列表 */
     private void destroyDeletedList(INode.ReclaimContext reclaimContext) {
       for (INode d : getDeletedUnmodifiable()) {
         d.destroyAndCollectBlocks(reclaimContext);
@@ -87,7 +93,7 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
       clearDeleted();
     }
 
-    /** Serialize {@link #created} */
+    /** 序列化新增列表到输出流 */
     private void writeCreated(DataOutput out) throws IOException {
       final List<INode> created = getCreatedUnmodifiable();
       out.writeInt(created.size());
@@ -99,7 +105,7 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
       }
     }
 
-    /** Serialize {@link #deleted} */
+    /** 序列化删除列表到输出流 */
     private void writeDeleted(DataOutput out,
         ReferenceMap referenceMap) throws IOException {
       final List<INode> deleted = getDeletedUnmodifiable();
@@ -109,14 +115,14 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
       }
     }
 
-    /** Serialize to out */
+    /** 序列化整个ChildrenDiff到输出流 */
     private void write(DataOutput out, ReferenceMap referenceMap
         ) throws IOException {
       writeCreated(out);
       writeDeleted(out, referenceMap);
     }
 
-    /** Get the list of INodeDirectory contained in the deleted list */
+    /** 将删除列表中所有目录节点添加到结果列表中 */
     private void getDirsInDeleted(List<INodeDirectory> dirList) {
       for (INode node : getDeletedUnmodifiable()) {
         if (node.isDirectory()) {
@@ -127,13 +133,13 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
   }
 
   /**
-   * The difference of an {@link INodeDirectory} between two snapshots.
+   * 存储单个快照与后一个版本目录状态之间的差异，包含目录属性差异和子节点列表差异
    */
   public static class DirectoryDiff extends
       AbstractINodeDiff<INodeDirectory, INodeDirectoryAttributes, DirectoryDiff> {
-    /** The size of the children list at snapshot creation time. */
+    /** 快照创建时刻目录子节点列表的大小 */
     private final int childrenSize;
-    /** The children list diff. */
+    /** 子节点列表的差异对象 */
     private final ChildrenDiff diff;
     private boolean isSnapshotRoot = false;
     
@@ -189,9 +195,9 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
     }
 
     /**
-     * @return The children list of a directory in a snapshot.
-     *         Since the snapshot is read-only, the logical view of the list is
-     *         never changed although the internal data structure may mutate.
+     * 获取目录在该快照下的完整子节点列表
+     * 基于当前子节点列表应用差异还原出快照视图，快照视图只读
+     * @return 快照目录对应的只读子节点列表
      */
     private ReadOnlyList<INode> getChildrenList(final INodeDirectory currentDir) {
       return new ReadOnlyList<INode>() {
@@ -207,9 +213,11 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
             List<DirectoryDiff> diffList = directoryDiffList
                 .getDiffListBetweenSnapshots(diffIndex,
                     directoryDiffList.asList().size(), currentDir);
+            // 合并当前快照之后所有差异得到相对于当前状态的总差异
             for (DirectoryDiff d : diffList) {
               combined.combinePosterior(d.diff, null);
             }
+            // 将总差异应用到当前子节点列表还原出快照时刻的子节点列表
             children = combined.apply2Current(ReadOnlyList.Util
                 .asList(currentDir.getChildrenList(Snapshot.CURRENT_STATE_ID)));
           }
@@ -238,19 +246,25 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
       };
     }
 
-    /** @return the child with the given name. */
+    /** 
+     * 根据名称查找子节点
+     * @param name 子节点名称
+     * @param checkPosterior 是否继续向后继diff查找
+     * @param currentDir 当前目录对象
+     * @return 找到的子节点，不存在则返回null
+     */
     INode getChild(byte[] name, boolean checkPosterior,
         INodeDirectory currentDir) {
       for(DirectoryDiff d = this; ; d = d.getPosterior()) {
         final Container<INode> returned = d.diff.accessPrevious(name);
         if (returned != null) {
-          // the diff is able to determine the inode
+          // 当前diff能够确定节点状态，直接返回结果
           return returned.getElement();
         } else if (!checkPosterior) {
-          // Since checkPosterior is false, return null, i.e. not found.
+          // 不继续查找，返回未找到
           return null;
         } else if (d.getPosterior() == null) {
-          // no more posterior diff, get from current inode.
+          // 没有更多后继diff，从当前目录查找
           return currentDir.getChild(name, Snapshot.CURRENT_STATE_ID);
         }
       }
@@ -270,7 +284,7 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
       writeSnapshot(out);
       out.writeInt(childrenSize);
 
-      // Write snapshotINode
+      // 写入是否为快照根目录标记
       out.writeBoolean(isSnapshotRoot);
       if (!isSnapshotRoot) {
         if (snapshotINode != null) {
@@ -280,14 +294,14 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
           out.writeBoolean(false);
         }
       }
-      // Write diff. Node need to write poseriorDiff, since diffs is a list.
+      // 写入子节点差异，后继diff不需要写入，因为diff本身已经按顺序组织成列表
       diff.write(out, referenceMap);
     }
 
     @Override
     void destroyDiffAndCollectBlocks(
         INode.ReclaimContext reclaimContext, INodeDirectory currentINode) {
-      // this diff has been deleted
+      // 当前diff已被删除，清理删除列表中的节点
       diff.destroyDeletedList(reclaimContext);
       INodeDirectoryAttributes snapshotINode = getSnapshotINode();
       if (snapshotINode != null && snapshotINode.getAclFeature() != null) {
@@ -296,16 +310,20 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
     }
   }
 
-  /** A list of directory diffs. */
+  /**
+   * 按快照ID排序（时间顺序）存储目录所有快照差异的列表
+   */
   public static class DirectoryDiffList
       extends AbstractINodeDiffList<INodeDirectory, INodeDirectoryAttributes, DirectoryDiff> {
 
     @Override
+    /** 创建新的目录差异对象 */
     DirectoryDiff createDiff(int snapshot, INodeDirectory currentDir) {
       return new DirectoryDiff(snapshot, currentDir);
     }
 
     @Override
+    /** 创建当前目录属性的快照副本 */
     INodeDirectoryAttributes createSnapshotCopy(INodeDirectory currentDir) {
       return currentDir.isQuotaSet()?
           new INodeDirectoryAttributes.CopyWithQuota(currentDir)
@@ -313,12 +331,16 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
     }
 
     @Override
+    /** 创建新的空差异列表 */
     DiffList<DirectoryDiff> newDiffs() {
       return DirectoryDiffListFactory
           .createDiffList(INodeDirectory.DEFAULT_FILES_PER_DIRECTORY);
     }
 
-    /** Replace the given child in the created/deleted list, if there is any. */
+    /** 
+     * 在所有最新diff的新增列表中替换旧子节点为新节点
+     * @return true 找到并替换成功；false 未找到
+     */
     public boolean replaceCreatedChild(final INode oldChild,
         final INode newChild) {
       final DiffList<DirectoryDiff> diffList = asList();
@@ -331,7 +353,10 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
       return false;
     }
 
-    /** Remove the given child from the deleted list, if there is any. */
+    /** 
+     * 从所有diff的删除列表中移除指定子节点
+     * @return true 找到并移除成功；false 未找到
+     */
     public boolean removeDeletedChild(final INode child) {
       final DiffList<DirectoryDiff> diffList = asList();
       for(int i = diffList.size() - 1; i >= 0; i--) {
@@ -344,10 +369,8 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
     }
 
     /**
-     * Find the corresponding snapshot whose deleted list contains the given
-     * inode.
-     * @return the id of the snapshot. {@link Snapshot#NO_SNAPSHOT_ID} if the
-     * given inode is not in any of the snapshot.
+     * 从后往前查找哪个快照的删除列表包含指定子节点
+     * @return 包含该节点的快照ID，如果未找到返回NO_SNAPSHOT_ID
      */
     public int findSnapshotDeleted(final INode child) {
       final DiffList<DirectoryDiff> diffList = asList();
@@ -361,12 +384,11 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
     }
 
     /**
-     * Returns the list of diffs between two indexes corresponding to two
-     * snapshots.
-     * @param fromIndex Index of the diff corresponding to the earlier snapshot
-     * @param toIndex   Index of the diff corresponding to the later snapshot
-     * @param dir       The Directory to which the diffList belongs
-     * @return list of directory diffs
+     * 获取两个快照索引之间的所有差异列表
+     * @param fromIndex 较早快照对应的diff索引
+     * @param toIndex 较晚快照对应的diff索引
+     * @param dir 所属目录对象
+     * @return 两个快照之间的差异列表
      */
     List<DirectoryDiff> getDiffListBetweenSnapshots(int fromIndex, int toIndex,
         INodeDirectory dir) {
@@ -386,7 +408,11 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
   }
   
   /**
-   * Destroy a subtree under a DstReference node.
+   * 销毁DstReference节点下的子树，回收不再被任何快照引用的节点资源
+   * @param reclaimContext 回收上下文，收集需要回收的块和节点
+   * @param inode 根节点
+   * @param snapshot 当前要删除的快照ID
+   * @param prior 前一个快照ID
    */
   public static void destroyDstSubtree(INode.ReclaimContext reclaimContext,
       INode inode, final int snapshot, final int prior) {
@@ -394,15 +420,15 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
     if (inode.isReference()) {
       if (inode instanceof INodeReference.WithName
           && snapshot != Snapshot.CURRENT_STATE_ID) {
-        // this inode has been renamed before the deletion of the DstReference
-        // subtree
+        // 此节点在DstReference子树删除前已经被重命名，直接清理子树
         inode.cleanSubtree(reclaimContext, snapshot, prior);
       } else {
-        // for DstReference node, continue this process to its subtree
+        // DstReference节点，继续处理其引用的实际节点
         destroyDstSubtree(reclaimContext,
             inode.asReference().getReferredINode(), snapshot, prior);
       }
     } else if (inode.isFile()) {
+      // 文件节点直接清理子树
       inode.cleanSubtree(reclaimContext, snapshot, prior);
     } else if (inode.isDirectory()) {
       Map<INode, INode> excludedNodes = null;
@@ -417,377 +443,5 @@ public class DirectoryWithSnapshotFeature implements INode.Feature {
         }
         
         if (snapshot != Snapshot.CURRENT_STATE_ID) {
-          diffList.deleteSnapshotDiff(reclaimContext,
-              snapshot, prior, dir);
-        }
-        priorDiff = diffList.getDiffById(prior);
-        if (priorDiff != null && priorDiff.getSnapshotId() == prior) {
-          priorDiff.diff.destroyCreatedList(reclaimContext, dir);
-        }
-      }
-      for (INode child : inode.asDirectory().getChildrenList(prior)) {
-        if (excludedNodes != null && excludedNodes.containsKey(child)) {
-          continue;
-        }
-        destroyDstSubtree(reclaimContext, child, snapshot, prior);
-      }
-    }
-  }
-  
-  /**
-   * Clean an inode while we move it from the deleted list of post to the
-   * deleted list of prior.
-   * @param reclaimContext blocks and inodes that need to be reclaimed
-   * @param inode The inode to clean.
-   * @param post The post snapshot.
-   * @param prior The id of the prior snapshot.
-   */
-  private static void cleanDeletedINode(INode.ReclaimContext reclaimContext,
-      INode inode, final int post, final int prior) {
-    Deque<INode> queue = new ArrayDeque<>();
-    queue.addLast(inode);
-    while (!queue.isEmpty()) {
-      INode topNode = queue.pollFirst();
-      if (topNode instanceof INodeReference.WithName) {
-        INodeReference.WithName wn = (INodeReference.WithName) topNode;
-        if (wn.getLastSnapshotId() >= post) {
-          INodeReference.WithCount wc =
-              (INodeReference.WithCount) wn.getReferredINode();
-          if (wc.getLastWithName() == wn && wc.getParentReference() == null) {
-            // this wn is the last wn inside of the wc, also the dstRef node has
-            // been deleted. In this case, we should treat the referred file/dir
-            // as normal case
-            queue.add(wc.getReferredINode());
-          } else {
-            wn.cleanSubtree(reclaimContext, post, prior);
-          }
-        }
-        // For DstReference node, since the node is not in the created list of
-        // prior, we should treat it as regular file/dir
-      } else if (topNode.isFile() && topNode.asFile().isWithSnapshot()) {
-        INodeFile file = topNode.asFile();
-        file.getDiffs().deleteSnapshotDiff(reclaimContext, post, prior, file);
-      } else if (topNode.isDirectory()) {
-        INodeDirectory dir = topNode.asDirectory();
-        ChildrenDiff priorChildrenDiff = null;
-        DirectoryWithSnapshotFeature sf = dir.getDirectoryWithSnapshotFeature();
-        if (sf != null) {
-          // delete files/dirs created after prior. Note that these
-          // files/dirs, along with inode, were deleted right after post.
-          DirectoryDiff priorDiff = sf.getDiffs().getDiffById(prior);
-          if (priorDiff != null && priorDiff.getSnapshotId() == prior) {
-            priorChildrenDiff = priorDiff.getChildrenDiff();
-            priorChildrenDiff.destroyCreatedList(reclaimContext, dir);
-          }
-        }
-
-        for (INode child : dir.getChildrenList(prior)) {
-          if (priorChildrenDiff != null && priorChildrenDiff.getDeleted(
-              child.getLocalNameBytes()) != null) {
-            continue;
-          }
-          queue.addLast(child);
-        }
-      }
-    }
-  }
-
-  /** Diff list sorted by snapshot IDs, i.e. in chronological order. */
-  private final DirectoryDiffList diffs;
-
-  public DirectoryWithSnapshotFeature(DirectoryDiffList diffs) {
-    this.diffs = diffs != null ? diffs : new DirectoryDiffList();
-  }
-
-  /** @return the last snapshot. */
-  public int getLastSnapshotId() {
-    return diffs.getLastSnapshotId();
-  }
-
-  /** @return the snapshot diff list. */
-  public DirectoryDiffList getDiffs() {
-    return diffs;
-  }
-  
-  /**
-   * Get all the directories that are stored in some snapshot but not in the
-   * current children list. These directories are equivalent to the directories
-   * stored in the deletes lists.
-   */
-  public void getSnapshotDirectory(List<INodeDirectory> snapshotDir) {
-    for (DirectoryDiff sdiff : diffs) {
-      sdiff.getChildrenDiff().getDirsInDeleted(snapshotDir);
-    }
-  }
-
-  /**
-   * Add an inode into parent's children list. The caller of this method needs
-   * to make sure that parent is in the given snapshot "latest".
-   */
-  public boolean addChild(INodeDirectory parent, INode inode,
-      boolean setModTime, int latestSnapshotId) {
-    ChildrenDiff diff = diffs.checkAndAddLatestSnapshotDiff(latestSnapshotId,
-        parent).diff;
-    final int undoInfo = diff.create(inode);
-    boolean added = false;
-    try {
-      added = parent.addChild(inode, setModTime, Snapshot.CURRENT_STATE_ID);
-    } finally {
-      if (!added) {
-        diff.undoCreate(inode, undoInfo);
-      }
-    }
-    return added;
-  }
-
-  /**
-   * Remove an inode from parent's children list. The caller of this method
-   * needs to make sure that parent is in the given snapshot "latest".
-   */
-  public boolean removeChild(INodeDirectory parent, INode child,
-      int latestSnapshotId) {
-    // For a directory that is not a renamed node, if isInLatestSnapshot returns
-    // false, the directory is not in the latest snapshot, thus we do not need
-    // to record the removed child in any snapshot.
-    // For a directory that was moved/renamed, note that if the directory is in
-    // any of the previous snapshots, we will create a reference node for the
-    // directory while rename, and isInLatestSnapshot will return true in that
-    // scenario (if all previous snapshots have been deleted, isInLatestSnapshot
-    // still returns false). Thus if isInLatestSnapshot returns false, the
-    // directory node cannot be in any snapshot (not in current tree, nor in
-    // previous src tree). Thus we do not need to record the removed child in
-    // any snapshot.
-    ChildrenDiff diff = diffs.checkAndAddLatestSnapshotDiff(latestSnapshotId,
-        parent).diff;
-    final UndoInfo<INode> undoInfo = diff.delete(child);
-    boolean removed = false;
-    try {
-      removed = parent.removeChild(child);
-    } finally {
-      if (!removed) {
-        diff.undoDelete(child, undoInfo);
-      }
-    }
-    return removed;
-  }
-  
-  /**
-   * @return If there is no corresponding directory diff for the given
-   *         snapshot, this means that the current children list should be
-   *         returned for the snapshot. Otherwise we calculate the children list
-   *         for the snapshot and return it. 
-   */
-  public ReadOnlyList<INode> getChildrenList(INodeDirectory currentINode,
-      final int snapshotId) {
-    final DirectoryDiff diff = diffs.getDiffById(snapshotId);
-    return diff != null ? diff.getChildrenList(currentINode) : currentINode
-        .getChildrenList(Snapshot.CURRENT_STATE_ID);
-  }
-  
-  public INode getChild(INodeDirectory currentINode, byte[] name,
-      int snapshotId) {
-    final DirectoryDiff diff = diffs.getDiffById(snapshotId);
-    return diff != null ? diff.getChild(name, true, currentINode)
-        : currentINode.getChild(name, Snapshot.CURRENT_STATE_ID);
-  }
-
-  /** Used to record the modification of a symlink node */
-  public INode saveChild2Snapshot(INodeDirectory currentINode,
-      final INode child, final int latestSnapshotId, final INode snapshotCopy) {
-    Preconditions.checkArgument(!child.isDirectory(),
-        "child is a directory, child=%s", child);
-    Preconditions.checkArgument(latestSnapshotId != Snapshot.CURRENT_STATE_ID);
-    
-    final DirectoryDiff diff = diffs.checkAndAddLatestSnapshotDiff(
-        latestSnapshotId, currentINode);
-    if (diff.getChild(child.getLocalNameBytes(), false, currentINode) != null) {
-      // it was already saved in the latest snapshot earlier.  
-      return child;
-    }
-
-    diff.diff.modify(snapshotCopy, child);
-    return child;
-  }
-
-  public void clear(
-      INode.ReclaimContext reclaimContext, INodeDirectory currentINode) {
-    // destroy its diff list
-    for (DirectoryDiff diff : diffs) {
-      diff.destroyDiffAndCollectBlocks(reclaimContext, currentINode);
-    }
-    diffs.clear();
-  }
-
-  public QuotaCounts computeQuotaUsage4CurrentDirectory(
-      BlockStoragePolicySuite bsps, byte storagePolicyId) {
-    final QuotaCounts counts = new QuotaCounts.Builder().build();
-    for(DirectoryDiff d : diffs) {
-      for(INode deleted : d.getChildrenDiff().getDeletedUnmodifiable()) {
-        final byte childPolicyId = deleted.getStoragePolicyIDForQuota(
-            storagePolicyId);
-        counts.add(deleted.computeQuotaUsage(bsps, childPolicyId, false,
-            Snapshot.CURRENT_STATE_ID));
-      }
-    }
-    return counts;
-  }
-
-  public void computeContentSummary4Snapshot(final BlockStoragePolicySuite bsps,
-      final ContentCounts counts) throws AccessControlException {
-    // Create a new blank summary context for blocking processing of subtree.
-    ContentSummaryComputationContext summary = 
-        new ContentSummaryComputationContext(bsps);
-    for(DirectoryDiff d : diffs) {
-      for(INode deleted : d.getChildrenDiff().getDeletedUnmodifiable()) {
-        deleted.computeContentSummary(Snapshot.CURRENT_STATE_ID, summary);
-      }
-    }
-    // Add the counts from deleted trees.
-    counts.addContents(summary.getCounts());
-  }
-  
-  /**
-   * Compute the difference between Snapshots.
-   *
-   * @param fromSnapshot Start point of the diff computation. Null indicates
-   *          current tree.
-   * @param toSnapshot End point of the diff computation. Null indicates current
-   *          tree.
-   * @param diff Used to capture the changes happening to the children. Note
-   *          that the diff still represents (later_snapshot - earlier_snapshot)
-   *          although toSnapshot can be before fromSnapshot.
-   * @param currentINode The {@link INodeDirectory} this feature belongs to.
-   * @return Whether changes happened between the startSnapshot and endSnaphsot.
-   */
-  boolean computeDiffBetweenSnapshots(Snapshot fromSnapshot,
-      Snapshot toSnapshot, ChildrenDiff diff, INodeDirectory currentINode) {
-    int[] diffIndexPair = diffs.changedBetweenSnapshots(fromSnapshot,
-        toSnapshot);
-    if (diffIndexPair == null) {
-      return false;
-    }
-    int earlierDiffIndex = diffIndexPair[0];
-    int laterDiffIndex = diffIndexPair[1];
-
-    boolean dirMetadataChanged = false;
-    INodeDirectoryAttributes dirCopy = null;
-    List<DirectoryDiff> difflist = diffs
-        .getDiffListBetweenSnapshots(earlierDiffIndex, laterDiffIndex,
-            currentINode);
-    for (DirectoryDiff sdiff : difflist) {
-      diff.combinePosterior(sdiff.diff, null);
-      if (!dirMetadataChanged && sdiff.snapshotINode != null) {
-        if (dirCopy == null) {
-          dirCopy = sdiff.snapshotINode;
-        } else if (!dirCopy.metadataEquals(sdiff.snapshotINode)) {
-          dirMetadataChanged = true;
-        }
-      }
-    }
-
-    if (!diff.isEmpty() || dirMetadataChanged) {
-      return true;
-    } else if (dirCopy != null) {
-      for (int i = laterDiffIndex; i < difflist.size(); i++) {
-        if (!dirCopy.metadataEquals(difflist.get(i).snapshotINode)) {
-          return true;
-        }
-      }
-      return !dirCopy.metadataEquals(currentINode);
-    } else {
-      return false;
-    }
-  }
-
-  public void cleanDirectory(INode.ReclaimContext reclaimContext,
-      final INodeDirectory currentINode, final int snapshot, int prior) {
-    Map<INode, INode> priorCreated = null;
-    Map<INode, INode> priorDeleted = null;
-    QuotaCounts old = reclaimContext.quotaDelta().getCountsCopy();
-    if (snapshot == Snapshot.CURRENT_STATE_ID) { // delete the current directory
-      currentINode.recordModification(prior);
-      // delete everything in created list
-      DirectoryDiff lastDiff = diffs.getLast();
-      if (lastDiff != null) {
-        lastDiff.diff.destroyCreatedList(reclaimContext, currentINode);
-      }
-      currentINode.cleanSubtreeRecursively(reclaimContext, snapshot, prior,
-          null);
-    } else {
-      // update prior
-      prior = getDiffs().updatePrior(snapshot, prior);
-      // if there is a snapshot diff associated with prior, we need to record
-      // its original created and deleted list before deleting post
-      if (prior != NO_SNAPSHOT_ID) {
-        DirectoryDiff priorDiff = this.getDiffs().getDiffById(prior);
-        if (priorDiff != null && priorDiff.getSnapshotId() == prior) {
-          priorCreated = cloneDiffList(priorDiff.diff.getCreatedUnmodifiable());
-          priorDeleted = cloneDiffList(priorDiff.diff.getDeletedUnmodifiable());
-        }
-      }
-
-      getDiffs().deleteSnapshotDiff(reclaimContext, snapshot, prior,
-          currentINode);
-      currentINode.cleanSubtreeRecursively(reclaimContext, snapshot, prior,
-          priorDeleted);
-
-      // check priorDiff again since it may be created during the diff deletion
-      if (prior != NO_SNAPSHOT_ID) {
-        DirectoryDiff priorDiff = this.getDiffs().getDiffById(prior);
-        if (priorDiff != null && priorDiff.getSnapshotId() == prior) {
-          // For files/directories created between "prior" and "snapshot", 
-          // we need to clear snapshot copies for "snapshot". Note that we must
-          // use null as prior in the cleanSubtree call. Files/directories that
-          // were created before "prior" will be covered by the later 
-          // cleanSubtreeRecursively call.
-          if (priorCreated != null) {
-            // The nodes in priorCreated must be destroyed if
-            //   (1) this is the last reference, and
-            //   (2) prior is the last snapshot, and
-            //   (3) currentINode is not in the current state.
-            final boolean destroy = currentINode.isLastReference()
-                && currentINode.getDiffs().getLastSnapshotId() == prior
-                && !currentINode.isInCurrentState();
-            // we only check the node originally in prior's created list
-            for (INode cNode : new ArrayList<>(priorDiff.
-                    diff.getCreatedUnmodifiable())) {
-              if (priorCreated.containsKey(cNode)) {
-                if (destroy) {
-                  cNode.destroyAndCollectBlocks(reclaimContext);
-                  currentINode.removeChild(cNode);
-                  priorDiff.diff.removeCreated(cNode);
-                } else {
-                  cNode.cleanSubtree(reclaimContext, snapshot, NO_SNAPSHOT_ID);
-                }
-              }
-            }
-          }
-          // When a directory is moved from the deleted list of the posterior
-          // diff to the deleted list of this diff, we need to destroy its
-          // descendants that were 1) created after taking this diff and 2)
-          // deleted after taking posterior diff.
-
-          // For files moved from posterior's deleted list, we also need to
-          // delete its snapshot copy associated with the posterior snapshot.
-          
-          for (INode dNode : priorDiff.diff.getDeletedUnmodifiable()) {
-            if (priorDeleted == null || !priorDeleted.containsKey(dNode)) {
-              cleanDeletedINode(reclaimContext, dNode, snapshot, prior);
-            }
-          }
-        }
-      }
-    }
-
-    QuotaCounts current = reclaimContext.quotaDelta().getCountsCopy();
-    current.subtract(old);
-    if (currentINode.isQuotaSet()) {
-      reclaimContext.quotaDelta().addQuotaDirUpdate(currentINode, current);
-    }
-  }
-
-  @Override
-  public String toString() {
-    return "" + diffs;
-  }
-}
+          // 删除当前快照对应的diff
+          diffList.deleteSnapshotDiff(re

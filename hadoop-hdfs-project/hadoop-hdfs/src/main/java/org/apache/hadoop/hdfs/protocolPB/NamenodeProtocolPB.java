@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,15 +26,20 @@ import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * Protocol that a secondary NameNode uses to communicate with the NameNode.
- * It's used to get part of the name node state
+ * 备用NameNode（SecondaryNameNode）与主NameNode通信的Protobuf协议接口
+ * 用于从主NameNode获取部分元数据状态，支持检查点操作
  * 
- * Note: This extends the protocolbuffer service based interface to
- * add annotations required for security.
+ * 该接口基于Protobuf生成的服务接口扩展，添加安全认证所需的注解
+ */
+/**
+ * Kerberos认证配置：指定服务端和客户端的Principal配置键
  */
 @KerberosInfo(
     serverPrincipal = DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY,
     clientPrincipal = DFSConfigKeys.DFS_NAMENODE_KERBEROS_PRINCIPAL_KEY)
+/**
+ * RPC协议信息配置：指定协议名称和版本号
+ */
 @ProtocolInfo(protocolName = 
     "org.apache.hadoop.hdfs.server.protocol.NamenodeProtocol",
     protocolVersion = 1)

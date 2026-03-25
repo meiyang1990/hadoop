@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,6 +24,9 @@ import static org.apache.hadoop.yarn.webapp.YarnWebParams.ENTITY_STRING;
 import org.apache.hadoop.yarn.webapp.SubView;
 import org.apache.hadoop.yarn.webapp.log.AggregatedLogsBlock;
 
+/**
+ * 应用历史服务聚合日志页面，用于展示已完成应用/容器的聚合日志
+ */
 public class AHSLogsPage extends AHSView {
   /*
    * (non-Javadoc)
@@ -33,20 +37,24 @@ public class AHSLogsPage extends AHSView {
    */
   @Override
   protected void preHead(Page.HTML<__> html) {
+    // 从请求参数获取日志实体标识
     String logEntity = $(ENTITY_STRING);
+    // 如果实体标识为空，尝试从容器ID参数获取
     if (logEntity == null || logEntity.isEmpty()) {
       logEntity = $(CONTAINER_ID);
     }
+    // 如果仍未获取到，设置默认值UNKNOWN
     if (logEntity == null || logEntity.isEmpty()) {
       logEntity = "UNKNOWN";
     }
+    // 调用父类通用preHead处理
     commonPreHead(html);
   }
 
   /**
-   * The content of this page is the AggregatedLogsBlock
+   * 获取页面内容区块，本页面内容由聚合日志区块提供
    * 
-   * @return AggregatedLogsBlock.class
+   * @return 聚合日志区块类
    */
   @Override
   protected Class<? extends SubView> content() {

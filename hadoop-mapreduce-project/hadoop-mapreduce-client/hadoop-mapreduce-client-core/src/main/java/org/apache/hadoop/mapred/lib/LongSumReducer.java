@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,25 +32,35 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.io.LongWritable;
 
 /** 
- * A {@link Reducer} that sums long values. 
+ * 对相同key的所有Long类型值进行求和的Reducer实现，是MapReduce中常用的聚合类工具
+ * @param <K> 输入输出key的类型，不做修改直接输出
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class LongSumReducer<K> extends MapReduceBase
     implements Reducer<K, LongWritable, K, LongWritable> {
 
+  /**
+   * 对同一个key对应的所有LongWritable值累加求和，并输出key和最终总和
+   * @param key 输入的聚合key
+   * @param values 当前key对应的所有LongWritable值迭代器
+   * @param output 结果输出收集器
+   * @param reporter 任务进度报告器
+   * @throws IOException 输出过程IO异常
+   */
   public void reduce(K key, Iterator<LongWritable> values,
                      OutputCollector<K, LongWritable> output,
                      Reporter reporter)
     throws IOException {
 
-    // sum all values for this key
+    // 初始化累加和为0
     long sum = 0;
+    // 遍历所有值累加求和
     while (values.hasNext()) {
       sum += values.next().get();
     }
 
-    // output sum
+    // 输出当前key的求和结果
     output.collect(key, new LongWritable(sum));
   }
 

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,19 +38,14 @@ import java.io.IOException;
 import java.util.concurrent.*;
 
 /**
- * Multithreaded implementation for {@link MapRunnable}.
+ * 文件说明：MapRunnable接口的多线程实现类
  * <p>
- * It can be used instead of the default implementation,
- * of {@link org.apache.hadoop.mapred.MapRunner}, when the Map
- * operation is not CPU bound in order to improve throughput.
+ * 当Map操作不是CPU密集型任务时，可以使用该实现代替默认的MapRunner实现，提升Map阶段整体吞吐量
  * <p>
- * Map implementations using this MapRunnable must be thread-safe.
+ * 使用该MapRunnable的用户自定义Mapper必须是线程安全的
  * <p>
- * The Map-Reduce job has to be configured to use this MapRunnable class (using
- * the JobConf.setMapRunnerClass method) and
- * the number of threads the thread-pool can use with the
- * <code>mapred.map.multithreadedrunner.threads</code> property, its default
- * value is 10 threads.
+ * 使用方式需要通过JobConf.setMapRunnerClass方法配置该类，
+ * 并且可通过<code>mapred.map.multithreadedrunner.threads</code>配置线程池大小，默认值为10
  * <p>
  */
 @InterfaceAudience.Public
@@ -67,8 +63,13 @@ public class MultithreadedMapRunner<K1, V1, K2, V2>
   private volatile RuntimeException runtimeException;
   private boolean incrProcCount;
 
+  /**
+   * 配置多线程MapRunner，初始化线程池和Mapper实例
+   * @param jobConf 作业配置对象
+   */
   @SuppressWarnings("unchecked")
   public void configure(JobConf jobConf) {
+    // 从配置读取线程数，默认10
     int numberOfThreads =
       jobConf.getInt(MultithreadedMapper.NUM_THREADS, 10);
     if (LOG.isDebugEnabled()) {
@@ -77,14 +78,14 @@ public class MultithreadedMapRunner<K1, V1, K2, V2>
     }
 
     this.job = jobConf;
-    //increment processed counter only if skipping feature is enabled
-    this.incrProcCount = SkipBadRecords.getMapperMaxSkipRecords(job)>0 && 
-      SkipBadRecords.getAutoIncrMapperProcCount(job);
+    // 仅在跳过坏记录功能开启时，才递增处理记录计数器
+    this.incrProcCount = SkipBadRecords.getMapperMaxSkipRecords(jobConf)>0 && 
+      SkipBadRecords.getAutoIncrMapperProcCount(jobConf);
+    // 通过反射实例化用户自定义Mapper
     this.mapper = ReflectionUtils.newInstance(jobConf.getMapperClass(),
         jobConf);
 
-    // Creating a threadpool of the configured size to execute the Mapper
-    // map method in parallel.
+    // 创建固定大小线程池，用于并行执行Mapper的map方法
     executorService = new HadoopThreadPoolExecutor(numberOfThreads,
         numberOfThreads,
                                              0L, TimeUnit.MILLISECONDS,
@@ -93,8 +94,7 @@ public class MultithreadedMapRunner<K1, V1, K2, V2>
   }
 
   /**
-   * A blocking array queue that replaces offer and add, which throws on a full
-   * queue, to a put, which waits on a full queue.
+   * 自定义阻塞队列，修改默认offer/add操作行为：当队列满时阻塞等待，而非直接抛出异常
    */
   private static class BlockingArrayQueue extends ArrayBlockingQueue<Runnable> {
  
@@ -115,42 +115,44 @@ public class MultithreadedMapRunner<K1, V1, K2, V2>
     }
   }
 
+  /**
+   * 检查工作线程是否抛出异常，如果存在异常，在主线程重新抛出，保持默认实现的错误语义
+   * @throws IOException 工作线程抛出的IO异常
+   * @throws RuntimeException 工作线程抛出的运行时异常
+   */
   private void checkForExceptionsFromProcessingThreads()
       throws IOException, RuntimeException {
-    // Checking if a Mapper.map within a Runnable has generated an
-    // IOException. If so we rethrow it to force an abort of the Map
-    // operation thus keeping the semantics of the default
-    // implementation.
     if (ioException != null) {
       throw ioException;
     }
 
-    // Checking if a Mapper.map within a Runnable has generated a
-    // RuntimeException. If so we rethrow it to force an abort of the Map
-    // operation thus keeping the semantics of the default
-    // implementation.
     if (runtimeException != null) {
       throw runtimeException;
     }
   }
 
+  /**
+   * 执行Map阶段，多线程并行处理输入记录
+   * @param input 输入记录读取器
+   * @param output 输出收集器
+   * @param reporter 作业报告器
+   * @throws IOException 读取输入或处理记录时IO异常
+   */
   public void run(RecordReader<K1, V1> input, OutputCollector<K2, V2> output,
                   Reporter reporter)
     throws IOException {
     try {
-      // allocate key & value instances these objects will not be reused
-      // because execution of Mapper.map is not serialized.
+      // 每个键值对创建新实例，因为并发执行无法复用对象
       K1 key = input.createKey();
       V1 value = input.createValue();
 
       while (input.next(key, value)) {
-
+        // 提交map任务到线程池
         executorService.execute(new MapperInvokeRunable(key, value, output,
                                 reporter));
-
+        // 检查是否已有工作线程抛出异常
         checkForExceptionsFromProcessingThreads();
-
-        // Allocate new key & value instances as mapper is running in parallel
+        // 创建新的键值对实例，供下一个任务使用
         key = input.createKey();
         value = input.createValue();
       }
@@ -159,34 +161,24 @@ public class MultithreadedMapRunner<K1, V1, K2, V2>
         LOG.debug("Finished dispatching all Mappper.map calls, job "
                   + job.getJobName());
       }
-
-      // Graceful shutdown of the Threadpool, it will let all scheduled
-      // Runnables to end.
+      // 关闭线程池，不再接受新任务，等待已提交任务执行完成
       executorService.shutdown();
 
       try {
-
-        // Now waiting for all Runnables to end.
+        // 等待所有任务执行完成，每100ms检查一次
         while (!executorService.awaitTermination(100, TimeUnit.MILLISECONDS)) {
           if (LOG.isDebugEnabled()) {
             LOG.debug("Awaiting all running Mappper.map calls to finish, job "
                       + job.getJobName());
           }
-
-          // NOTE: while Mapper.map dispatching has concluded there are still
-          // map calls in progress and exceptions would be thrown.
+          // 等待过程中仍检查是否有异常抛出
           checkForExceptionsFromProcessingThreads();
-
         }
-
-        // NOTE: it could be that a map call has had an exception after the
-        // call for awaitTermination() returing true. And edge case but it
-        // could happen.
+        // 终止后仍需检查异常，处理刚好在终止后发生异常的边界情况
         checkForExceptionsFromProcessingThreads();
 
       } catch (IOException ioEx) {
-        // Forcing a shutdown of all thread of the threadpool and rethrowing
-        // the IOException
+        // 强制中断所有线程，重新抛出异常
         executorService.shutdownNow();
         throw ioEx;
       } catch (InterruptedException iEx) {
@@ -194,13 +186,14 @@ public class MultithreadedMapRunner<K1, V1, K2, V2>
       }
 
     } finally {
+      // 关闭Mapper实例
       mapper.close();
     }
   }
 
 
   /**
-   * Runnable to execute a single Mapper.map call from a forked thread.
+   * 单个map任务执行单元，封装单个输入键值对的map调用，在线程池中执行
    */
   private class MapperInvokeRunable implements Runnable {
     private K1 key;
@@ -209,13 +202,11 @@ public class MultithreadedMapRunner<K1, V1, K2, V2>
     private Reporter reporter;
 
     /**
-     * Collecting all required parameters to execute a Mapper.map call.
-     * <p>
-     *
-     * @param key
-     * @param value
-     * @param output
-     * @param reporter
+     * 构造单个map任务执行单元
+     * @param key 输入键
+     * @param value 输入值
+     * @param output 输出收集器
+     * @param reporter 作业报告器
      */
     public MapperInvokeRunable(K1 key, V1 value,
                                OutputCollector<K2, V2> output,
@@ -227,32 +218,26 @@ public class MultithreadedMapRunner<K1, V1, K2, V2>
     }
 
     /**
-     * Executes a Mapper.map call with the given Mapper and parameters.
-     * <p>
-     * This method is called from the thread-pool thread.
-     *
+     * 执行单个map调用，捕获异常并保存到外层对象
      */
     public void run() {
       try {
-        // map pair to output
+        // 调用Mapper处理当前键值对
         MultithreadedMapRunner.this.mapper.map(key, value, output, reporter);
+        // 如果开启坏记录跳过功能，递增已处理记录计数器
         if(incrProcCount) {
           reporter.incrCounter(SkipBadRecords.COUNTER_GROUP, 
               SkipBadRecords.COUNTER_MAP_PROCESSED_RECORDS, 1);
         }
       } catch (IOException ex) {
-        // If there is an IOException during the call it is set in an instance
-        // variable of the MultithreadedMapRunner from where it will be
-        // rethrown.
+        // 保存IO异常，供主线程检查重抛
         synchronized (MultithreadedMapRunner.this) {
           if (MultithreadedMapRunner.this.ioException == null) {
             MultithreadedMapRunner.this.ioException = ex;
           }
         }
       } catch (RuntimeException ex) {
-        // If there is a RuntimeException during the call it is set in an
-        // instance variable of the MultithreadedMapRunner from where it will be
-        // rethrown.
+        // 保存运行时异常，供主线程检查重抛
         synchronized (MultithreadedMapRunner.this) {
           if (MultithreadedMapRunner.this.runtimeException == null) {
             MultithreadedMapRunner.this.runtimeException = ex;

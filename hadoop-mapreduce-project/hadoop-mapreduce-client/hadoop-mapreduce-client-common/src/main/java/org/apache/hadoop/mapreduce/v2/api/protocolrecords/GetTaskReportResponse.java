@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,20 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskReport;
 
+/**
+ * 获取任务报告响应接口，定义MapReduce应用master获取任务报告响应的结构
+ * 用于MR客户端向MR ApplicationMaster请求单个任务运行报告后的响应封装
+ */
 public interface GetTaskReportResponse {
+  /**
+   * 获取请求返回的任务报告对象
+   * @return 包含任务运行状态、进度、指标等信息的任务报告
+   */
   public abstract TaskReport getTaskReport();
   
+  /**
+   * 设置响应中的任务报告对象
+   * @param taskReport 要返回给请求端的任务报告
+   */
   public abstract void setTaskReport(TaskReport taskReport);
 }

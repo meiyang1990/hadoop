@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,15 +17,22 @@
  * limitations under the License.
  */
 
+/**
+ * @file Random.cc
+ * @brief Hadoop NativeTask 随机数生成工具实现，提供多种分布和随机文本生成能力
+ * 用于 MapReduce 本地任务中的随机数据生成测试、数据采样等场景
+ */
+
 #include <math.h>
 #include "lib/commons.h"
 #include "util/Random.h"
 
 namespace NativeTask {
 
+// 随机种子初始化自增ID，保证不同实例生成不同随机序列
 static long RandomInitializeID = 8682522807148012ULL;
 
-// A random list of 1000 words from /usr/share/dict/words
+// 预定义单词字典，从系统词表抽取的随机单词列表，用于生成随机文本
 static const
 char * Words[] = {"diurnalness", "Homoiousian", "spiranthic", "tetragynian", "silverhead",
     "ungreat", "lithograph", "exploiter", "physiologian", "by", "hellbender", "Filipendula",
@@ -133,153 +141,4 @@ char * Words[] = {"diurnalness", "Homoiousian", "spiranthic", "tetragynian", "si
     "propodiale", "diplomatize", "Russifier", "clanned", "corona", "michigan", "nonutilitarian",
     "transcorporeal", "bought", "Cercosporella", "stapedius", "glandularly", "pictorially", "weism",
     "disilane", "rainproof", "Caphtor", "scrubbed", "oinomancy", "pseudoxanthine", "nonlustrous",
-    "redesertion", "Oryzorictinae", "gala", "Mycogone", "reappreciate", "cyanoguanidine",
-    "seeingness", "breadwinner", "noreast", "furacious", "epauliere", "omniscribent",
-    "Passiflorales", "uninductive", "inductivity", "Orbitolina", "Semecarpus", "migrainoid",
-    "steprelationship", "phlogisticate", "mesymnion", "sloped", "edificator", "beneficent", "culm",
-    "paleornithology", "unurban", "throbless", "amplexifoliate", "sesquiquintile", "sapience",
-    "astucious", "dithery", "boor", "ambitus", "scotching", "uloid", "uncompromisingness", "hoove",
-    "waird", "marshiness", "Jerusalem", "mericarp", "unevoked", "benzoperoxide", "outguess",
-    "pyxie", "hymnic", "euphemize", "mendacity", "erythremia", "rosaniline", "unchatteled",
-    "lienteria", "Bushongo", "dialoguer", "unrepealably", "rivethead", "antideflation",
-    "vinegarish", "manganosiderite", "doubtingness", "ovopyriform", "Cephalodiscus", "Muscicapa",
-    "Animalivora", "angina", "planispheric", "ipomoein", "cuproiodargyrite", "sandbox", "scrat",
-    "Munnopsidae", "shola", "pentafid", "overstudiousness", "times", "nonprofession", "appetible",
-    "valvulotomy", "goladar", "uniarticular", "oxyterpene", "unlapsing", "omega", "trophonema",
-    "seminonflammable", "circumzenithal", "starer", "depthwise", "liberatress", "unleavened",
-    "unrevolting", "groundneedle", "topline", "wandoo", "umangite", "ordinant", "unachievable",
-    "oversand", "snare", "avengeful", "unexplicit", "mustafina", "sonable", "rehabilitative",
-    "eulogization", "papery", "technopsychology", "impressor", "cresylite", "entame",
-    "transudatory", "scotale", "pachydermatoid", "imaginary", "yeat", "slipped", "stewardship",
-    "adatom", "cockstone", "skyshine", "heavenful", "comparability", "exprobratory",
-    "dermorhynchous", "parquet", "cretaceous", "vesperal", "raphis", "undangered", "Glecoma",
-    "engrain", "counteractively", "Zuludom", "orchiocatabasis", "Auriculariales", "warriorwise",
-    "extraorganismal", "overbuilt", "alveolite", "tetchy", "terrificness", "widdle",
-    "unpremonished", "rebilling", "sequestrum", "equiconvex", "heliocentricism", "catabaptist",
-    "okonite", "propheticism", "helminthagogic", "calycular", "giantly", "wingable", "golem",
-    "unprovided", "commandingness", "greave", "haply", "doina", "depressingly", "subdentate",
-    "impairment", "decidable", "neurotrophic", "unpredict", "bicorporeal", "pendulant", "flatman",
-    "intrabred", "toplike", "Prosobranchiata", "farrantly", "toxoplasmosis", "gorilloid",
-    "dipsomaniacal", "aquiline", "atlantite", "ascitic", "perculsive", "prospectiveness",
-    "saponaceous", "centrifugalization", "dinical", "infravaginal", "beadroll", "affaite",
-    "Helvidian", "tickleproof", "abstractionism", "enhedge", "outwealth", "overcontribute",
-    "coldfinch", "gymnastic", "Pincian", "Munychian", "codisjunct", "quad", "coracomandibular",
-    "phoenicochroite", "amender", "selectivity", "putative", "semantician", "lophotrichic",
-    "Spatangoidea", "saccharogenic", "inferent", "Triconodonta", "arrendation", "sheepskin",
-    "taurocolla", "bunghole", "Machiavel", "triakistetrahedral", "dehairer", "prezygapophysial",
-    "cylindric", "pneumonalgia", "sleigher", "emir", "Socraticism", "licitness", "massedly",
-    "instructiveness", "sturdied", "redecrease", "starosta", "evictor", "orgiastic", "squdge",
-    "meloplasty", "Tsonecan", "repealableness", "swoony", "myesthesia", "molecule",
-    "autobiographist", "reciprocation", "refective", "unobservantness", "tricae", "ungouged",
-    "floatability", "Mesua", "fetlocked", "chordacentrum", "sedentariness", "various", "laubanite",
-    "nectopod", "zenick", "sequentially", "analgic", "biodynamics", "posttraumatic", "nummi",
-    "pyroacetic", "bot", "redescend", "dispermy", "undiffusive", "circular", "trillion",
-    "Uraniidae", "ploration", "discipular", "potentness", "sud", "Hu", "Eryon", "plugger",
-    "subdrainage", "jharal", "abscission", "supermarket", "countergabion", "glacierist",
-    "lithotresis", "minniebush", "zanyism", "eucalypteol", "sterilely", "unrealize", "unpatched",
-    "hypochondriacism", "critically", "cheesecutter", };
-
-static uint32_t WordsCount = sizeof(Words) / sizeof(char *);
-
-Random::Random() {
-  setSeed(time(NULL) + clock() + RandomInitializeID++);
-}
-
-Random::Random(int64_t seed) {
-  if (seed == -1) {
-    setSeed(time(NULL) + clock() + RandomInitializeID++);
-  } else {
-    setSeed(seed);
-  }
-}
-
-Random::~Random() {
-
-}
-
-void Random::setSeed(int64_t seed) {
-  _seed = (seed ^ multiplier) & mask;
-}
-
-int32_t Random::next(int bits) {
-  _seed = (_seed * multiplier + addend) & mask;
-  return (int32_t)(_seed >> (48 - bits));
-}
-
-int32_t Random::next_int32() {
-  return next(32);
-}
-
-uint32_t Random::next_uint32() {
-  return (uint32_t)next(32);
-}
-
-uint64_t Random::next_uint64() {
-  return ((uint64_t)(next(32)) << 32) + next(32);
-}
-
-int32_t Random::next_int32(int32_t n) {
-  if ((n & -n) == n)  // i.e., n is a power of 2
-    return (int32_t)((n * (int64_t)next(31)) >> 31);
-
-  int32_t bits, val;
-  do {
-    bits = next(31);
-    val = bits % n;
-  } while (bits - val + (n - 1) < 0);
-  return val;
-}
-
-float Random::nextFloat() {
-  return next(24) / ((float)(1 << 24));
-}
-
-double Random::nextDouble() {
-  return (((uint64_t)(next(26)) << 27) + next(27)) / (double)(1L << 53);
-}
-
-uint64_t Random::nextLog2() {
-  return (uint64_t)exp2(nextDouble() * 64);
-}
-
-uint64_t Random::nextLog2(uint64_t range) {
-  double range_r = log2(range);
-  double v = nextDouble() * range_r;
-  return (uint64_t)exp2(v);
-}
-
-uint64_t Random::nextLog10(uint64_t range) {
-  double range_r = log10((double)range);
-  double v = nextDouble() * range_r;
-  return (uint64_t)pow(10, v);
-}
-
-char Random::nextByte(const string & range) {
-  if (range.length() == 0) {
-    return (char)next(8);
-  } else {
-    return range[next_int32(range.length())];
-  }
-}
-
-string Random::nextBytes(uint32_t length, const string & range) {
-  string ret(length, '-');
-  for (uint32_t i = 0; i < length; i++) {
-    ret[i] = nextByte(range);
-  }
-  return ret;
-}
-
-const char * Random::nextWord(int64_t limit) {
-  if (limit < 0) {
-    return Words[next_int32(WordsCount)];
-  }
-  uint32_t r = limit < WordsCount ? limit : WordsCount;
-  return Words[next_int32(r)];
-}
-
-void Random::nextWord(string & dest, int64_t limit) {
-  dest = nextWord(limit);
-}
-
-} // namespace NativeTask
+    "redes

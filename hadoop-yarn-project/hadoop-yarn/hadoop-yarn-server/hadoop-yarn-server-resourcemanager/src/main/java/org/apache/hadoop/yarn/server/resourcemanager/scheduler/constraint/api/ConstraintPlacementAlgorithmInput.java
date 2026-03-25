@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,11 +23,15 @@ import org.apache.hadoop.yarn.api.records.SchedulingRequest;
 import java.util.Collection;
 
 /**
- * This encapsulates an input to the Constraint Placement Algorithm. At the
- * very least it must consist of a collection of SchedulerRequests.
+ * 约束放置算法输入接口，封装YARN容器放置约束算法所需的输入数据
+ * 至少需要包含待调度的调度请求集合
  */
 public interface ConstraintPlacementAlgorithmInput {
 
+  /**
+   * 获取待调度的调度请求集合
+   * @return 调度请求集合
+   */
   Collection<SchedulingRequest> getSchedulingRequests();
 
 }

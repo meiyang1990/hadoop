@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+/**
+ * YARN联邦路由策略配置数据访问对象包，提供策略配置的序列化/反序列化数据模型。
+ * 本包包含用于持久化和传输联邦路由策略配置的DAO类，支持策略配置的存储与解析。
  */
 /** DAO objects for serializing/deserializing policy configurations. **/
 package org.apache.hadoop.yarn.server.federation.policies.dao;

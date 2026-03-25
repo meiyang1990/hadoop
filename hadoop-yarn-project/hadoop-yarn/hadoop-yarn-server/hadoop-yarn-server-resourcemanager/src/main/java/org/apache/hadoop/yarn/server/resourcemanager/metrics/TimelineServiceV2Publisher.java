@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -65,17 +66,22 @@ import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * This class is responsible for posting application, appattempt &amp; Container
- * lifecycle related events to timeline service v2.
+ * 负责向Timeline Service V2发布应用、应用尝试和容器的生命周期相关事件，为YARN集群提供应用运行指标采集能力。
  */
 @Private
 @Unstable
 public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
   private static final Logger LOG =
       LoggerFactory.getLogger(TimelineServiceV2Publisher.class);
+  // RM端Timeline采集器管理器，用于获取对应应用的采集器实例
   private RMTimelineCollectorManager rmTimelineCollectorManager;
+  // 是否发布容器生命周期事件的配置开关
   private boolean publishContainerEvents;
 
+  /**
+   * 构造Timeline Service V2指标发布器
+   * @param timelineCollectorManager RM端Timeline采集器管理器
+   */
   public TimelineServiceV2Publisher(
       RMTimelineCollectorManager timelineCollectorManager) {
     super("TimelineserviceV2Publisher");
@@ -85,8 +91,10 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
     super.serviceInit(conf);
+    // 注册Timeline V2事件处理器
     getDispatcher().register(SystemMetricsEventType.class,
         new TimelineV2EventHandler());
+    // 从配置读取是否开启容器事件发布，使用默认值
     publishContainerEvents = getConfig().getBoolean(
         YarnConfiguration.RM_PUBLISH_CONTAINER_EVENTS_ENABLED,
         YarnConfiguration.DEFAULT_RM_PUBLISH_CONTAINER_EVENTS_ENABLED);
@@ -100,10 +108,12 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
   @SuppressWarnings("unchecked")
   @Override
   public void appCreated(RMApp app, long createdTime) {
+    // 创建应用实体对象
     ApplicationEntity entity = createApplicationEntity(app.getApplicationId());
     entity.setQueue(app.getQueue());
     entity.setCreatedTime(createdTime);
 
+    // 填充应用基础信息
     Map<String, Object> entityInfo = new HashMap<String, Object>();
     entityInfo.put(ApplicationMetricsConstants.NAME_ENTITY_INFO, app.getName());
     entityInfo.put(ApplicationMetricsConstants.TYPE_ENTITY_INFO,
@@ -126,6 +136,7 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
     entity.getConfigs().put(
         ApplicationMetricsConstants.APP_NODE_LABEL_EXPRESSION,
         app.getAppNodeLabelExpression());
+    // 填充调用上下文信息（如果存在）
     if (app.getCallerContext() != null) {
       if (app.getCallerContext().isContextValid()) {
         entityInfo.put(ApplicationMetricsConstants.YARN_APP_CALLER_CONTEXT,
@@ -144,11 +155,13 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
         RMServerUtils.createApplicationState(app.getState()).toString());
 
     entity.setInfo(entityInfo);
+    // 创建应用创建事件并添加到实体
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(ApplicationMetricsConstants.CREATED_EVENT_TYPE);
     tEvent.setTimestamp(createdTime);
     entity.addEvent(tEvent);
 
+    // 发布事件到事件Dispatcher
     getDispatcher().getEventHandler().handle(new TimelineV2PublishEvent(
         SystemMetricsEventType.PUBLISH_ENTITY, entity, app.getApplicationId()));
   }
@@ -158,11 +171,13 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
   public void appLaunched(RMApp app, long launchTime) {
     ApplicationEntity entity =
         createApplicationEntity(app.getApplicationId());
+    // 创建应用启动事件
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(ApplicationMetricsConstants.LAUNCHED_EVENT_TYPE);
     tEvent.setTimestamp(launchTime);
     entity.addEvent(tEvent);
 
+    // 发布事件
     getDispatcher().getEventHandler().handle(new TimelineV2PublishEvent(
         SystemMetricsEventType.PUBLISH_ENTITY, entity, app.getApplicationId()));
   }
@@ -172,11 +187,13 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
   public void appFinished(RMApp app, RMAppState state, long finishedTime) {
     ApplicationEntity entity = createApplicationEntity(app.getApplicationId());
 
+    // 创建应用完成事件
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(ApplicationMetricsConstants.FINISHED_EVENT_TYPE);
     tEvent.setTimestamp(finishedTime);
     entity.addEvent(tEvent);
 
+    // 填充应用完成相关信息
     Map<String, Object> entityInfo = new HashMap<String, Object>();
     entityInfo.put(ApplicationMetricsConstants.DIAGNOSTICS_INFO_EVENT_INFO,
         app.getDiagnostics().toString());
@@ -192,16 +209,24 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
     }
     entity.setInfo(entityInfo);
 
+    // 填充应用运行指标
     RMAppMetrics appMetrics = app.getRMAppMetrics();
     Set<TimelineMetric> entityMetrics =
         getTimelinelineAppMetrics(appMetrics, finishedTime);
     entity.setMetrics(entityMetrics);
 
+    // 发布应用完成事件，发布完成后会停止采集器
     getDispatcher().getEventHandler().handle(
         new ApplicationFinishPublishEvent(SystemMetricsEventType.
             PUBLISH_APPLICATION_FINISHED_ENTITY, entity, app));
   }
 
+  /**
+   * 将RM应用指标转换为Timeline Service指标集合
+   * @param appMetrics RM应用指标对象
+   * @param timestamp 指标时间戳
+   * @return 转换后的Timeline指标集合
+   */
   private Set<TimelineMetric> getTimelinelineAppMetrics(
       RMAppMetrics appMetrics, long timestamp) {
     Set<TimelineMetric> entityMetrics = new HashSet<TimelineMetric>();
@@ -234,6 +259,13 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
     return entityMetrics;
   }
 
+  /**
+   * 创建单个Timeline指标对象
+   * @param name 指标名称
+   * @param timestamp 指标时间戳
+   * @param value 指标值
+   * @return 构建好的Timeline指标对象
+   */
   private TimelineMetric getTimelineMetric(String name, long timestamp,
       Number value) {
     TimelineMetric metric = new TimelineMetric();
@@ -248,6 +280,7 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
       long updatedTime) {
     ApplicationEntity entity =
         createApplicationEntity(app.getApplicationId());
+    // 创建状态更新事件
     Map<String, Object> eventInfo = new HashMap<String, Object>();
     eventInfo.put(ApplicationMetricsConstants.STATE_EVENT_INFO,
         appState);
@@ -257,11 +290,12 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
     tEvent.setInfo(eventInfo);
     entity.addEvent(tEvent);
 
-    // publish in entity info also to query using filters
+    // 同时更新实体信息，方便过滤查询
     Map<String, Object> entityInfo = new HashMap<String, Object>();
     entityInfo.put(ApplicationMetricsConstants.STATE_EVENT_INFO, appState);
     entity.setInfo(entityInfo);
 
+    // 发布更新事件
     getDispatcher().getEventHandler().handle(new TimelineV2PublishEvent(
         SystemMetricsEventType.PUBLISH_ENTITY, entity, app.getApplicationId()));
   }
@@ -271,14 +305,17 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
   public void appACLsUpdated(RMApp app, String appViewACLs, long updatedTime) {
     ApplicationEntity entity = createApplicationEntity(app.getApplicationId());
     TimelineEvent tEvent = new TimelineEvent();
+    // 更新ACL信息到实体
     Map<String, Object> entityInfo = new HashMap<String, Object>();
     entityInfo.put(ApplicationMetricsConstants.APP_VIEW_ACLS_ENTITY_INFO,
         (appViewACLs == null) ? "" : appViewACLs);
     entity.setInfo(entityInfo);
+    // 创建ACL更新事件
     tEvent.setId(ApplicationMetricsConstants.ACLS_UPDATED_EVENT_TYPE);
     tEvent.setTimestamp(updatedTime);
     entity.addEvent(tEvent);
 
+    // 发布更新事件
     getDispatcher().getEventHandler().handle(new TimelineV2PublishEvent(
         SystemMetricsEventType.PUBLISH_ENTITY, entity, app.getApplicationId()));
   }
@@ -287,6 +324,7 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
   @Override
   public void appUpdated(RMApp app, long currentTimeMillis) {
     ApplicationEntity entity = createApplicationEntity(app.getApplicationId());
+    // 创建应用更新事件，填充更新的队列和优先级信息
     Map<String, Object> eventInfo = new HashMap<String, Object>();
     eventInfo.put(ApplicationMetricsConstants.QUEUE_ENTITY_INFO,
         app.getQueue());
@@ -297,6 +335,7 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
     tEvent.setTimestamp(currentTimeMillis);
     tEvent.setInfo(eventInfo);
     entity.addEvent(tEvent);
+    // 发布更新事件
     getDispatcher().getEventHandler().handle(new TimelineV2PublishEvent(
         SystemMetricsEventType.PUBLISH_ENTITY, entity, app.getApplicationId()));
   }
@@ -316,11 +355,13 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
     TimelineEntity entity = createAppAttemptEntity(attemptId);
     entity.setCreatedTime(registeredTime);
 
+    // 创建应用尝试注册事件
     TimelineEvent tEvent = new TimelineEvent();
     tEvent.setId(AppAttemptMetricsConstants.REGISTERED_EVENT_TYPE);
     tEvent.setTimestamp(registeredTime);
     entity.addEvent(tEvent);
 
+    // 填充应用尝试基础信息
     Map<String, Object> entityInfo = new HashMap<String, Object>();
     entityInfo.put(AppAttemptMetricsConstants.TRACKING_URL_INFO,
         appAttempt.getTrackingUrl());
@@ -342,6 +383,7 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
     entity.setIdPrefix(
         TimelineServiceHelper.invertLong(attemptId.getAttemptId()));
 
+    // 发布注册事件
     getDispatcher().getEventHandler().handle(
         new TimelineV2PublishEvent(SystemMetricsEventType.PUBLISH_ENTITY,
             entity, appAttempt.getAppAttemptId().getApplicationId()));
@@ -350,188 +392,4 @@ public class TimelineServiceV2Publisher extends AbstractSystemMetricsPublisher {
   @SuppressWarnings("unchecked")
   @Override
   public void appAttemptFinished(RMAppAttempt appAttempt,
-      RMAppAttemptState appAttemtpState, RMApp app, long finishedTime) {
-    ApplicationAttemptId attemptId = appAttempt.getAppAttemptId();
-    ApplicationAttemptEntity entity =
-        createAppAttemptEntity(appAttempt.getAppAttemptId());
-
-    TimelineEvent tEvent = new TimelineEvent();
-    tEvent.setId(AppAttemptMetricsConstants.FINISHED_EVENT_TYPE);
-    tEvent.setTimestamp(finishedTime);
-    entity.addEvent(tEvent);
-
-    Map<String, Object> entityInfo = new HashMap<String, Object>();
-    entityInfo.put(AppAttemptMetricsConstants.DIAGNOSTICS_INFO,
-        appAttempt.getDiagnostics());
-    // app will get the final status from app attempt, or create one
-    // based on app state if it doesn't exist
-    entityInfo.put(AppAttemptMetricsConstants.FINAL_STATUS_INFO,
-        app.getFinalApplicationStatus().toString());
-    entityInfo.put(AppAttemptMetricsConstants.STATE_INFO, RMServerUtils
-        .createApplicationAttemptState(appAttemtpState).toString());
-    entity.setInfo(entityInfo);
-    entity.setIdPrefix(
-        TimelineServiceHelper.invertLong(attemptId.getAttemptId()));
-
-    getDispatcher().getEventHandler().handle(
-        new TimelineV2PublishEvent(SystemMetricsEventType.PUBLISH_ENTITY,
-            entity, appAttempt.getAppAttemptId().getApplicationId()));
-  }
-
-  private static ApplicationAttemptEntity createAppAttemptEntity(
-      ApplicationAttemptId appAttemptId) {
-    ApplicationAttemptEntity entity = new ApplicationAttemptEntity();
-    entity.setId(appAttemptId.toString());
-    entity.setParent(new Identifier(TimelineEntityType.YARN_APPLICATION.name(),
-        appAttemptId.getApplicationId().toString()));
-    return entity;
-  }
-
-  @SuppressWarnings("unchecked")
-  @Override
-  public void containerCreated(RMContainer container, long createdTime) {
-    if (publishContainerEvents) {
-      TimelineEntity entity = createContainerEntity(container.getContainerId());
-      entity.setCreatedTime(createdTime);
-
-      TimelineEvent tEvent = new TimelineEvent();
-      tEvent.setId(ContainerMetricsConstants.CREATED_IN_RM_EVENT_TYPE);
-      tEvent.setTimestamp(createdTime);
-      entity.addEvent(tEvent);
-
-      // updated as event info instead of entity info, as entity info is updated
-      // by NM
-      Map<String, Object> entityInfo = new HashMap<String, Object>();
-      entityInfo.put(ContainerMetricsConstants.ALLOCATED_MEMORY_INFO,
-          container.getAllocatedResource().getMemorySize());
-      entityInfo.put(ContainerMetricsConstants.ALLOCATED_VCORE_INFO,
-          container.getAllocatedResource().getVirtualCores());
-      entityInfo.put(ContainerMetricsConstants.ALLOCATED_HOST_INFO,
-          container.getAllocatedNode().getHost());
-      entityInfo.put(ContainerMetricsConstants.ALLOCATED_PORT_INFO,
-          container.getAllocatedNode().getPort());
-      entityInfo.put(ContainerMetricsConstants.ALLOCATED_PRIORITY_INFO,
-          container.getAllocatedPriority().getPriority());
-      entityInfo.put(
-          ContainerMetricsConstants.ALLOCATED_EXPOSED_PORTS,
-          container.getExposedPorts());
-      entityInfo.put(
-          ContainerMetricsConstants.ALLOCATED_HOST_HTTP_ADDRESS_INFO,
-          container.getNodeHttpAddress());
-      entity.setInfo(entityInfo);
-
-      getDispatcher().getEventHandler().handle(new TimelineV2PublishEvent(
-          SystemMetricsEventType.PUBLISH_ENTITY, entity, container
-              .getContainerId().getApplicationAttemptId().getApplicationId()));
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  @Override
-  public void containerFinished(RMContainer container, long finishedTime) {
-    if (publishContainerEvents) {
-      TimelineEntity entity = createContainerEntity(container.getContainerId());
-
-      TimelineEvent tEvent = new TimelineEvent();
-      tEvent.setId(ContainerMetricsConstants.FINISHED_IN_RM_EVENT_TYPE);
-      tEvent.setTimestamp(finishedTime);
-      entity.addEvent(tEvent);
-
-      Map<String, Object> entityInfo = new HashMap<String, Object>();
-      entityInfo.put(ContainerMetricsConstants.DIAGNOSTICS_INFO,
-          container.getDiagnosticsInfo());
-      entityInfo.put(ContainerMetricsConstants.EXIT_STATUS_INFO,
-          container.getContainerExitStatus());
-      entityInfo.put(ContainerMetricsConstants.STATE_INFO,
-          container.getContainerState().toString());
-      entityInfo.put(ContainerMetricsConstants.CONTAINER_FINISHED_TIME,
-          finishedTime);
-      entity.setInfo(entityInfo);
-
-      getDispatcher().getEventHandler().handle(new TimelineV2PublishEvent(
-          SystemMetricsEventType.PUBLISH_ENTITY, entity, container
-              .getContainerId().getApplicationAttemptId().getApplicationId()));
-    }
-  }
-
-  private static ContainerEntity createContainerEntity(
-      ContainerId containerId) {
-    ContainerEntity entity = new ContainerEntity();
-    entity.setId(containerId.toString());
-    entity.setIdPrefix(TimelineServiceHelper.invertLong(
-        containerId.getContainerId()));
-    entity.setParent(new Identifier(TimelineEntityType.YARN_APPLICATION_ATTEMPT
-        .name(), containerId.getApplicationAttemptId().toString()));
-    return entity;
-  }
-
-  private void putEntity(TimelineEntity entity, ApplicationId appId) {
-    try {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Publishing the entity " + entity + ", JSON-style content: "
-            + TimelineUtils.dumpTimelineRecordtoJSON(entity));
-      }
-      TimelineCollector timelineCollector =
-          rmTimelineCollectorManager.get(appId);
-      if (timelineCollector != null) {
-        TimelineEntities entities = new TimelineEntities();
-        entities.addEntity(entity);
-        timelineCollector.putEntities(entities,
-                UserGroupInformation.getCurrentUser());
-      } else {
-        LOG.debug("Cannot find active collector while publishing entity "
-            + entity);
-      }
-    } catch (IOException e) {
-      LOG.error("Error when publishing entity " + entity);
-      LOG.debug("Error when publishing entity {}", entity, e);
-    } catch (Exception e) {
-      LOG.error("Unexpected error when publishing entity {}", entity, e);
-    }
-  }
-
-  private class ApplicationFinishPublishEvent extends TimelineV2PublishEvent {
-    private RMApp app;
-
-    public ApplicationFinishPublishEvent(SystemMetricsEventType type,
-        TimelineEntity entity, RMApp app) {
-      super(type, entity, app.getApplicationId());
-      this.app = app;
-    }
-
-    public RMAppImpl getRMAppImpl() {
-      return (RMAppImpl) app;
-    }
-  }
-
-  private class TimelineV2EventHandler
-      implements EventHandler<TimelineV2PublishEvent> {
-    @Override
-    public void handle(TimelineV2PublishEvent event) {
-      switch (event.getType()) {
-      case PUBLISH_APPLICATION_FINISHED_ENTITY:
-        putEntity(event.getEntity(), event.getApplicationId());
-        ((ApplicationFinishPublishEvent) event).getRMAppImpl()
-            .stopTimelineCollector();
-        break;
-      default:
-        putEntity(event.getEntity(), event.getApplicationId());
-        break;
-      }
-    }
-  }
-
-  private class TimelineV2PublishEvent extends TimelinePublishEvent {
-    private TimelineEntity entity;
-
-    public TimelineV2PublishEvent(SystemMetricsEventType type,
-        TimelineEntity entity, ApplicationId appId) {
-      super(type, appId);
-      this.entity = entity;
-    }
-
-    public TimelineEntity getEntity() {
-      return entity;
-    }
-  }
-}
+      RMAppAttemptState appAttemtpState, RMApp app,

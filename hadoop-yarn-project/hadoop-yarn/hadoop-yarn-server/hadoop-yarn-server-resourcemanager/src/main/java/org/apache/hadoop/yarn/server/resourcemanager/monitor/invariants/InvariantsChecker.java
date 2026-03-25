@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,15 +26,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Abstract invariant checker, that setup common context for invariants
- * checkers.
+ * 抽象不变量检查器基类，为所有具体不变量检查器提供公共上下文和基础能力，
+ * 用于在YARN调度过程中验证调度系统状态是否满足预期不变量条件。
  */
 public abstract class InvariantsChecker implements SchedulingEditPolicy {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(InvariantsChecker.class);
+  // 配置项：是否在违反不变量时抛出异常
   public static final String THROW_ON_VIOLATION =
       "yarn.resourcemanager.invariant-checker.throw-on-violation";
+  // 配置项：不变量检查的监控间隔（毫秒）
   public static final String INVARIANT_MONITOR_INTERVAL =
       "yarn.resourcemanager.invariant-checker.monitor-interval";
 
@@ -49,8 +52,10 @@ public abstract class InvariantsChecker implements SchedulingEditPolicy {
     this.conf = config;
     this.context = rmContext;
     this.scheduler = scheduler;
+    // 从配置加载是否抛出异常的设置，默认不抛出仅日志警告
     this.throwOnInvariantViolation =
         conf.getBoolean(InvariantsChecker.THROW_ON_VIOLATION, false);
+    // 从配置加载监控间隔，默认1秒检查一次
     this.monitoringInterval =
         conf.getLong(InvariantsChecker.INVARIANT_MONITOR_INTERVAL, 1000L);
 
@@ -69,6 +74,11 @@ public abstract class InvariantsChecker implements SchedulingEditPolicy {
     return this.getClass().getSimpleName();
   }
 
+  /**
+   * 根据配置决定是抛出异常还是仅记录警告日志，处理不变量违反事件。
+   * @param message 违反不变量的描述信息
+   * @throws InvariantViolationException 如果配置开启了抛出异常则抛出该异常
+   */
   public void logOrThrow(String message) throws InvariantViolationException {
     if (getThrowOnInvariantViolation()) {
       throw new InvariantViolationException(message);

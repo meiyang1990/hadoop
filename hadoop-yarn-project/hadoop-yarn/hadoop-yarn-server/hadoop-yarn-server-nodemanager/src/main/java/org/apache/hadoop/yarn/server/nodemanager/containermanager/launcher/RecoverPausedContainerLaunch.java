@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,14 +38,25 @@ import java.io.IOException;
 import java.io.InterruptedIOException;
 
 /**
- * This is a ContainerLaunch which has been recovered after an NM restart for
- * pause containers (for rolling upgrades)
+ * 用于在NodeManager重启后（滚动升级场景）恢复已暂停容器的启动器
+ * 处理滚动升级过程中暂停容器的恢复与清理逻辑
  */
 public class RecoverPausedContainerLaunch extends ContainerLaunch {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       RecoveredContainerLaunch.class);
 
+  /**
+   * 构造恢复暂停容器的启动器实例
+   * @param context NodeManager上下文
+   * @param configuration 配置对象
+   * @param dispatcher 事件分发器
+   * @param exec 容器执行器
+   * @param app 所属应用
+   * @param container 待恢复容器
+   * @param dirsHandler 本地目录处理器
+   * @param containerManager 容器管理器实例
+   */
   public RecoverPausedContainerLaunch(Context context,
       Configuration configuration, Dispatcher dispatcher,
       ContainerExecutor exec, Application app, Container container,
@@ -55,26 +67,31 @@ public class RecoverPausedContainerLaunch extends ContainerLaunch {
   }
 
   /**
-   * Cleanup the paused container by issuing a kill on it.
+   * 清理已暂停容器，通过发送kill命令回收容器资源
    */
   @SuppressWarnings("unchecked")
   @Override
   public Integer call() {
+    // 默认返回容器丢失退出码
     int retCode = ContainerExecutor.ExitCode.LOST.getExitCode();
     ContainerId containerId = container.getContainerId();
     String appIdStr =
         containerId.getApplicationAttemptId().getApplicationId().toString();
     String containerIdStr = containerId.toString();
 
+    // 发送恢复暂停容器事件更新容器状态
     dispatcher.getEventHandler().handle(new ContainerEvent(containerId,
         ContainerEventType.RECOVER_PAUSED_CONTAINER));
     boolean interrupted = false;
     try {
+      // 定位容器PID文件
       File pidFile = locatePidFile(appIdStr, containerIdStr);
       if (pidFile != null) {
         String pidPathStr = pidFile.getPath();
         pidFilePath = new Path(pidPathStr);
+        // 激活容器，关联PID文件
         exec.activateContainer(containerId, pidFilePath);
+        // 重新获取容器，执行清理操作
         retCode = exec.reacquireContainer(
             new ContainerReacquisitionContext.Builder()
                 .setContainer(container)
@@ -92,9 +109,12 @@ public class RecoverPausedContainerLaunch extends ContainerLaunch {
       LOG.error("Unable to kill the paused container " + containerIdStr, e);
     } finally {
       if (!interrupted) {
+        // 标记容器启动完成
         this.completed.set(true);
+        // 停用容器，解除关联
         exec.deactivateContainer(containerId);
         try {
+          // 持久化存储容器退出状态
           getContext().getNMStateStore()
               .storeContainerCompleted(containerId, retCode);
         } catch (IOException e) {
@@ -103,6 +123,7 @@ public class RecoverPausedContainerLaunch extends ContainerLaunch {
       }
     }
 
+    // 非零退出码，发送容器失败退出事件
     if (retCode != 0) {
       LOG.warn("Recovered container exited with a non-zero exit code "
           + retCode);
@@ -113,6 +134,7 @@ public class RecoverPausedContainerLaunch extends ContainerLaunch {
       return retCode;
     }
 
+    // 恢复成功，发送容器成功退出事件
     LOG.info("Recovered container " + containerId + " succeeded");
     dispatcher.getEventHandler().handle(
         new ContainerEvent(containerId,
@@ -120,8 +142,15 @@ public class RecoverPausedContainerLaunch extends ContainerLaunch {
     return 0;
   }
 
+  /**
+   * 在所有可读本地目录中查找容器PID文件
+   * @param appIdStr 应用ID字符串
+   * @param containerIdStr 容器ID字符串
+   * @return 找到的PID文件对象，未找到返回null
+   */
   private File locatePidFile(String appIdStr, String containerIdStr) {
     String pidSubpath= getPidFileSubpath(appIdStr, containerIdStr);
+    // 遍历所有可读本地目录查找PID文件
     for (String dir : getContext().getLocalDirsHandler().
         getLocalDirsForRead()) {
       File pidFile = new File(dir, pidSubpath);

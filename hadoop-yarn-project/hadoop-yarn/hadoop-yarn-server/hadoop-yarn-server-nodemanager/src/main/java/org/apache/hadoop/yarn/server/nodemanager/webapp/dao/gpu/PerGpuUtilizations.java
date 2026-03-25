@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,17 +27,18 @@ import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
 
 /**
- * GPU utilizations
+ * 单块GPU的利用率信息，供NodeManager WebUI展示GPU资源使用数据
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 @XmlRootElement(name = "utilization")
 public class PerGpuUtilizations {
+  // GPU整体利用率百分比
   private float overallGpuUtilization;
 
   /**
-   * Overall percent GPU utilization
-   * @return utilization
+   * 获取GPU整体利用率
+   * @return 利用率百分比(0-100)
    */
   @XmlJavaTypeAdapter(PerGpuDeviceInformation.StrToFloatBeforeSpaceAdapter.class)
   @XmlElement(name = "gpu_util")

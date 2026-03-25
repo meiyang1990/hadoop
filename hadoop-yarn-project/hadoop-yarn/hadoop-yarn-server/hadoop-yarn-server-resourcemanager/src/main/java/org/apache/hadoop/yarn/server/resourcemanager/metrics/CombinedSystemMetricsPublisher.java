@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,11 +29,16 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptS
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 
 /**
- * A metrics publisher that can publish for a collection of publishers.
+ * 组合模式系统指标发布器，将指标发布事件转发给所有注册的子发布器，支持多发布器同时工作。
  */
 public class CombinedSystemMetricsPublisher implements SystemMetricsPublisher {
+  // 存储所有待转发的子指标发布器集合
   private Collection<SystemMetricsPublisher> publishers;
 
+  /**
+   * 构造组合发布器，持有多个子发布器实例。
+   * @param publishers 子发布器集合
+   */
   public CombinedSystemMetricsPublisher(Collection<SystemMetricsPublisher>
       publishers) {
     this.publishers = publishers;
@@ -111,4 +117,3 @@ public class CombinedSystemMetricsPublisher implements SystemMetricsPublisher {
     }
   }
 }
-

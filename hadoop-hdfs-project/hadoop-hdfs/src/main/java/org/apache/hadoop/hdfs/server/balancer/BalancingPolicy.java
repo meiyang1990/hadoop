@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,48 +26,71 @@ import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.hdfs.util.EnumDoubles;
 
 /**
- * Balancing policy.
- * Since a datanode may contain multiple block pools,
- * {@link Pool} implies {@link Node}
- * but NOT the other way around
+ * HDFS数据均衡策略抽象基类，定义均衡判定标准和容量利用率计算逻辑。
+ * 由于一个DataNode可能包含多个块池，块池级别均衡包含节点级别均衡，反之不成立。
+ * 本类提供两种具体均衡策略：按整个DataNode均衡、按DataNode内每个块池分别均衡。
  */
 @InterfaceAudience.Private
 abstract class BalancingPolicy {
+  // 按存储类型分类统计总容量
   final EnumCounters<StorageType> totalCapacities
       = new EnumCounters<StorageType>(StorageType.class);
+  // 按存储类型分类统计已用空间
   final EnumCounters<StorageType> totalUsedSpaces
       = new EnumCounters<StorageType>(StorageType.class);
+  // 按存储类型分类统计集群平均利用率
   final EnumDoubles<StorageType> avgUtilizations
       = new EnumDoubles<StorageType>(StorageType.class);
 
+  /**
+   * 重置所有统计计数器，用于重新计算均衡信息。
+   */
   void reset() {
     totalCapacities.reset();
     totalUsedSpaces.reset();
     avgUtilizations.reset();
   }
 
-  /** Get the policy name. */
+  /**
+   * 获取当前均衡策略的名称。
+   * @return 策略名称字符串
+   */
   abstract String getName();
 
-  /** Accumulate used space and capacity. */
+  /**
+   * 根据数据节点存储报告累计统计全局容量和已用空间。
+   * @param r 数据节点存储报告
+   */
   abstract void accumulateSpaces(DatanodeStorageReport r);
 
+  /**
+   * 根据累计统计结果计算各存储类型的集群平均利用率。
+   */
   void initAvgUtilization() {
     for(StorageType t : StorageType.asList()) {
       final long capacity = totalCapacities.get(t);
       if (capacity > 0L) {
+        // 利用率计算：已用空间 * 100 / 总容量
         final double avg  = totalUsedSpaces.get(t)*100.0/capacity;
         avgUtilizations.set(t, avg);
       }
     }
   }
 
+  /**
+   * 获取指定存储类型的集群平均利用率。
+   * @param t 存储类型
+   * @return 平均利用率（百分比）
+   */
   double getAvgUtilization(StorageType t) {
     return avgUtilizations.get(t);
   }
 
-  /** @return the utilization of a particular storage type of a datanode;
-   *          or return null if the datanode does not have such storage type.
+  /**
+   * 计算指定数据节点指定存储类型的利用率。
+   * @param r 数据节点存储报告
+   * @param t 目标存储类型
+   * @return 利用率（百分比），如果节点不包含该存储类型则返回null
    */
   abstract Double getUtilization(DatanodeStorageReport r, StorageType t);
   
@@ -76,7 +100,12 @@ abstract class BalancingPolicy {
         + "." + getClass().getSimpleName();
   }
 
-  /** Get all {@link BalancingPolicy} instances*/
+  /**
+   * 根据策略名称解析得到对应的均衡策略实例。
+   * @param s 策略名称字符串
+   * @return 匹配的均衡策略实例
+   * @throws IllegalArgumentException 无法匹配策略时抛出异常
+   */
   static BalancingPolicy parse(String s) {
     final BalancingPolicy [] all = {BalancingPolicy.Node.INSTANCE,
                                     BalancingPolicy.Pool.INSTANCE};
@@ -88,9 +117,11 @@ abstract class BalancingPolicy {
   }
 
   /**
-   * Cluster is balanced if each node is balanced.
+   * 节点级别均衡策略：只要每个DataNode整体利用率符合均衡阈值，集群就认为均衡。
+   * 按整个DataNode的所有存储聚合计算利用率，不区分块池。
    */
   static class Node extends BalancingPolicy {
+    /** 单例实例 */
     static final Node INSTANCE = new Node();
     private Node() {}
 
@@ -123,9 +154,11 @@ abstract class BalancingPolicy {
   }
 
   /**
-   * Cluster is balanced if each pool in each node is balanced.
+   * 块池级别均衡策略：只有每个DataNode上每个块池的利用率都符合均衡阈值，集群才认为均衡。
+   * 联邦场景下每个DataNode会服务多个块池，该策略保证块池层面的数据分布均衡。
    */
   static class Pool extends BalancingPolicy {
+    /** 单例实例 */
     static final Pool INSTANCE = new Pool();
     private Pool() {}
 
@@ -138,12 +171,10 @@ abstract class BalancingPolicy {
     void accumulateSpaces(DatanodeStorageReport r) {
       for(StorageReport s : r.getStorageReports()) {
         final StorageType t = s.getStorage().getStorageType();
-        // Use s.getRemaining() + s.getBlockPoolUsed() instead of
-        // s.getCapacity() here to avoid moving blocks towards nodes with
-        // little actual available space.
-        // The util is computed as blockPoolUsed/(remaining+blockPoolUsed),
-        // which means nodes with more remaining space and less blockPoolUsed
-        // will serve as the recipient during the balancing process.
+        // 使用剩余空间 + 块池已用空间作为总容量，而非整个存储容量。
+        // 这样可以避免把块往实际剩余空间不足的节点移动，保证利用率计算符合块池实际占用情况：
+        // 利用率 = 块池已用空间 / (剩余可用空间 + 块池已用空间)
+        // 最终会优先把块迁移到剩余空间多、块池占用少的节点
         totalCapacities.add(t, s.getRemaining() + s.getBlockPoolUsed());
         totalUsedSpaces.add(t, s.getBlockPoolUsed());
       }

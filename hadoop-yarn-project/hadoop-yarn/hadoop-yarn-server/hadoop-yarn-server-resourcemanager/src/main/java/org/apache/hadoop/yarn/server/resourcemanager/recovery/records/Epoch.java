@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,26 +25,44 @@ import org.apache.hadoop.yarn.proto.YarnServerResourceManagerRecoveryProtos.Epoc
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The epoch information of RM for work-preserving restart.
- * Epoch is incremented each time RM restart. It's used for assuring
- * uniqueness of <code>ContainerId</code>.
+ * YARN ResourceManager 保活重启功能中的纪元信息记录类。
+ * 每次RM重启都会递增纪元编号，用于保证全局ContainerId的唯一性。
+ * 在RM重启后，新生成的ContainerId会基于新的纪元编号，不会和重启前的ContainerId重复。
  */
 @Private
 @Unstable
 public abstract class Epoch {
 
+  /**
+   * 创建一个新的Epoch实例，设置指定的纪元序列号。
+   * @param sequenceNumber 纪元序列号
+   * @return 初始化完成的Epoch实例
+   */
   public static Epoch newInstance(long sequenceNumber) {
     Epoch epoch = Records.newRecord(Epoch.class);
     epoch.setEpoch(sequenceNumber);
     return epoch;
   }
 
+  /**
+   * 获取当前纪元序列号。
+   * @return 纪元序列号
+   */
   public abstract long getEpoch();
 
+  /**
+   * 设置纪元序列号。
+   * @param sequenceNumber 要设置的纪元序列号
+   */
   public abstract void setEpoch(long sequenceNumber);
 
+  /**
+   * 获取当前Epoch的ProtoBuf序列化对象。
+   * @return ProtoBuf格式的Epoch对象
+   */
   public abstract EpochProto getProto();
 
+  @Override
   public String toString() {
     return String.valueOf(getEpoch());
   }

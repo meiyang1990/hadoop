@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,6 +19,10 @@
 
 package org.apache.hadoop.hdfs.web.resources;
 
+/**
+ * HDFS Web API 获取Delegation Token请求的service参数封装类.
+ * 用于在REST接口中解析和承载请求参数中的目标服务标识，支持跨服务获取token场景
+ */
 public class TokenServiceParam extends StringParam {
 
   /** Parameter name */
@@ -28,8 +33,8 @@ public class TokenServiceParam extends StringParam {
   private static final StringParam.Domain DOMAIN = new StringParam.Domain(NAME, null);
 
   /**
-   * Constructor.
-   * @param str a string representation of the parameter value.
+   * 构造方法，根据输入字符串构造service参数对象.
+   * @param str 参数值字符串
    */
   public TokenServiceParam(final String str) {
     super(DOMAIN, str == null || str.equals(DEFAULT)? null: str);

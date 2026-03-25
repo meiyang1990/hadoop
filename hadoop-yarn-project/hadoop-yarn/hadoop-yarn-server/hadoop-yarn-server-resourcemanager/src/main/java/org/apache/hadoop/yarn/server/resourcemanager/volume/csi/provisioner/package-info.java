@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,8 @@
  */
 
 /**
- * This package contains the volume provisioning classes.
+ * YARN CSI存储卷配置包，提供CSI标准存储卷的制备相关实现类
+ * 用于支持YARN容器动态请求和使用外部CSI存储卷
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

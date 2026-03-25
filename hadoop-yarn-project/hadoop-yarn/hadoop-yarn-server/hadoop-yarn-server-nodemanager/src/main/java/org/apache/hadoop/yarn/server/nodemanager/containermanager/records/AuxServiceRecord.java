@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
@@ -28,7 +29,7 @@ import java.util.Date;
 import java.util.Objects;
 
 /**
- * An Service resource has the following attributes.
+ *  NodeManager辅助服务信息记录类，用于序列化输出辅助服务信息供API查询返回
  **/
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
@@ -44,7 +45,7 @@ public class AuxServiceRecord {
   private AuxServiceConfiguration configuration = new AuxServiceConfiguration();
 
   /**
-   * A unique service name.
+   * 设置辅助服务名称，返回当前实例支持链式调用
    **/
   public AuxServiceRecord name(String n) {
     this.name = n;
@@ -70,7 +71,7 @@ public class AuxServiceRecord {
   }
 
   /**
-   * Version of the service.
+   * 设置辅助服务版本，返回当前实例支持链式调用
    */
   public AuxServiceRecord version(String v) {
     this.version = v;
@@ -87,7 +88,7 @@ public class AuxServiceRecord {
   }
 
   /**
-   * Description of the service.
+   * 设置辅助服务描述，返回当前实例支持链式调用
    */
   public AuxServiceRecord description(String d) {
     this.description = d;
@@ -95,7 +96,7 @@ public class AuxServiceRecord {
   }
 
   /**
-   * The time when the service was created, e.g. 2016-03-16T01:01:49.000Z.
+   * 设置辅助服务启动时间，返回当前实例支持链式调用
    **/
   public AuxServiceRecord launchTime(Date time) {
     this.launchTime = time == null ? null : (Date) time.clone();
@@ -111,9 +112,7 @@ public class AuxServiceRecord {
     this.launchTime = time == null ? null : (Date) time.clone();
   }
   /**
-   * Config properties of an service. Configurations provided at the
-   * service/global level are available to all the components. Specific
-   * properties can be overridden at the component level.
+   * 设置辅助服务配置信息，返回当前实例支持链式调用
    **/
   public AuxServiceRecord configuration(AuxServiceConfiguration conf) {
     this.configuration = conf;
@@ -163,8 +162,7 @@ public class AuxServiceRecord {
   }
 
   /**
-   * Convert the given object to string with each line indented by 4 spaces
-   * (except the first line).
+   * 将对象转换为带缩进的字符串，方便格式化输出
    */
   private String toIndentedString(java.lang.Object o) {
     if (o == null) {

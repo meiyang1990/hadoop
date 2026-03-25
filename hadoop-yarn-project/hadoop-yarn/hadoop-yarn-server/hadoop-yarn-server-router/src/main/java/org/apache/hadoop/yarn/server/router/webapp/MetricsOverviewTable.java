@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -37,6 +38,10 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * YARN联邦Router WebUI指标概览表格渲染组件，负责聚合展示整个联邦集群或指定子集群的指标信息。
+ * 包含应用指标、节点指标、调度器指标三类数据的聚合展示。
+ */
 public class MetricsOverviewTable extends RouterBlock {
 
   private final Router router;
@@ -49,42 +54,23 @@ public class MetricsOverviewTable extends RouterBlock {
 
   @Override
   protected void render(Block html) {
-    // Initialize page styles
+    // 初始化页面样式
     html.style(".metrics {margin-bottom:5px}");
 
-    // get routerClusterMetrics Info
+    // 获取聚合后的Router集群指标信息
     ClusterMetricsInfo routerClusterMetricsInfo = getRouterClusterMetricsInfo();
     RouterClusterMetrics routerClusterMetrics = new RouterClusterMetrics(routerClusterMetricsInfo);
 
-    // metrics div
+    // 创建指标容器div
     Hamlet.DIV<Hamlet> div = html.div().$class("metrics");
     try {
+      // 初始化联邦集群应用指标表格
       initFederationClusterAppsMetrics(div, routerClusterMetrics);
+      // 初始化联邦集群节点指标表格
       initFederationClusterNodesMetrics(div, routerClusterMetrics);
+      // 获取所有可用子集群信息
       List<SubClusterInfo> subClusters = getSubClusterInfoList();
-      initFederationClusterSchedulersMetrics(div, routerClusterMetrics, subClusters);
-    } catch (Exception e) {
-      LOG.error("MetricsOverviewTable init error.", e);
-    }
-    div.__();
-  }
-
-  protected void render(Block html, String subClusterId) {
-    // Initialize page styles
-    html.style(".metrics {margin-bottom:5px}");
-
-    // get subClusterId ClusterMetrics Info
-    ClusterMetricsInfo clusterMetricsInfo =
-        getClusterMetricsInfoBySubClusterId(subClusterId);
-    RouterClusterMetrics routerClusterMetrics =
-        new RouterClusterMetrics(clusterMetricsInfo, subClusterId);
-
-    // metrics div
-    Hamlet.DIV<Hamlet> div = html.div().$class("metrics");
-    try {
-      initFederationClusterAppsMetrics(div, routerClusterMetrics);
-      initFederationClusterNodesMetrics(div, routerClusterMetrics);
-      Collection<SubClusterInfo> subClusters = getSubClusterInfoList(subClusterId);
+      // 初始化联邦集群调度器指标表格
       initFederationClusterSchedulersMetrics(div, routerClusterMetrics, subClusters);
     } catch (Exception e) {
       LOG.error("MetricsOverviewTable init error.", e);
@@ -93,18 +79,49 @@ public class MetricsOverviewTable extends RouterBlock {
   }
 
   /**
-   * Init Federation Cluster Apps Metrics.
-   * Contains App information, resource usage information.
+   * 渲染指定子集群的指标概览表格。
+   * @param html HTML块对象
+   * @param subClusterId 目标子集群ID
+   */
+  protected void render(Block html, String subClusterId) {
+    // 初始化页面样式
+    html.style(".metrics {margin-bottom:5px}");
+
+    // 获取指定子集群的指标信息
+    ClusterMetricsInfo clusterMetricsInfo =
+        getClusterMetricsInfoBySubClusterId(subClusterId);
+    RouterClusterMetrics routerClusterMetrics =
+        new RouterClusterMetrics(clusterMetricsInfo, subClusterId);
+
+    // 创建指标容器div
+    Hamlet.DIV<Hamlet> div = html.div().$class("metrics");
+    try {
+      // 初始化子集群应用指标表格
+      initFederationClusterAppsMetrics(div, routerClusterMetrics);
+      // 初始化子集群节点指标表格
+      initFederationClusterNodesMetrics(div, routerClusterMetrics);
+      // 获取指定子集群信息
+      Collection<SubClusterInfo> subClusters = getSubClusterInfoList(subClusterId);
+      // 初始化子集群调度器指标表格
+      initFederationClusterSchedulersMetrics(div, routerClusterMetrics, subClusters);
+    } catch (Exception e) {
+      LOG.error("MetricsOverviewTable init error.", e);
+    }
+    div.__();
+  }
+
+  /**
+   * 初始化联邦集群应用指标表格，包含应用数量、容器、资源使用等信息。
    *
-   * @param div data display div.
-   * @param metrics data metric information.
+   * @param div 数据展示容器div
+   * @param metrics 聚合后的集群指标数据
    */
   private void initFederationClusterAppsMetrics(Hamlet.DIV<Hamlet> div,
       RouterClusterMetrics metrics) {
     div.h3(metrics.getWebPageTitlePrefix() + " Cluster Metrics").
         table("#metricsoverview").
         thead().$class("ui-widget-header").
-        // Initialize table header information
+        // 初始化表头信息
         tr().
         th().$class("ui-state-default").__("Apps Submitted").__().
         th().$class("ui-state-default").__("Apps Pending").__().
@@ -118,7 +135,7 @@ public class MetricsOverviewTable extends RouterBlock {
         th().$class("ui-state-default").__("Physical VCores Used %").__().
         __().
         __().
-        // Initialize table data information
+        // 初始化表格数据
         tbody().$class("ui-widget-content").
         tr().
         td(metrics.getAppsSubmitted()).
@@ -136,17 +153,17 @@ public class MetricsOverviewTable extends RouterBlock {
   }
 
   /**
-   * Init Federation Cluster Nodes Metrics.
+   * 初始化联邦集群节点指标表格，包含不同状态节点的数量统计。
    *
-   * @param div data display div.
-   * @param metrics data metric information.
+   * @param div 数据展示容器div
+   * @param metrics 聚合后的集群指标数据
    */
   private void initFederationClusterNodesMetrics(Hamlet.DIV<Hamlet> div,
       RouterClusterMetrics metrics) {
     div.h3(metrics.getWebPageTitlePrefix() + " Cluster Nodes Metrics").
         table("#nodemetricsoverview").
         thead().$class("ui-widget-header").
-        // Initialize table header information
+        // 初始化表头信息
         tr().
         th().$class("ui-state-default").__("Active Nodes").__().
         th().$class("ui-state-default").__("Decommissioning Nodes").__().
@@ -157,7 +174,7 @@ public class MetricsOverviewTable extends RouterBlock {
         th().$class("ui-state-default").__("Shutdown Nodes").__().
         __().
         __().
-        // Initialize table data information
+        // 初始化表格数据
         tbody().$class("ui-widget-content").
         tr().
         td().a(url("nodes"), String.valueOf(metrics.getActiveNodes())).__().
@@ -178,14 +195,14 @@ public class MetricsOverviewTable extends RouterBlock {
   }
 
   /**
-   * Init Federation Cluster SchedulersMetrics.
+   * 初始化联邦集群调度器指标表格，聚合展示各个子集群的调度器信息。
    *
-   * @param div data display div.
-   * @param metrics data metric information.
-   * @param subclusters active subcluster List.
-   * @throws YarnException yarn error.
-   * @throws IOException io error.
-   * @throws InterruptedException interrupt error.
+   * @param div 数据展示容器div
+   * @param metrics 聚合后的集群指标数据
+   * @param subclusters 活跃子集群列表
+   * @throws YarnException YARN异常
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   private void initFederationClusterSchedulersMetrics(Hamlet.DIV<Hamlet> div,
       RouterClusterMetrics metrics, Collection<SubClusterInfo> subclusters)
@@ -210,10 +227,10 @@ public class MetricsOverviewTable extends RouterBlock {
         __().
         tbody().$class("ui-widget-content");
 
+    // 检查YARN联邦是否启用
     boolean isEnabled = isYarnFederationEnabled();
 
-    // If Federation mode is not enabled or there is currently no SubCluster available,
-    // each column in the list should be displayed as N/A
+    // 如果未启用联邦或没有可用子集群，显示N/A
     if (!isEnabled) {
       initLocalClusterOverViewTable(fsMetricsScheduleTr);
     } else if (subclusters != null && !subclusters.isEmpty()) {
@@ -226,25 +243,25 @@ public class MetricsOverviewTable extends RouterBlock {
   }
 
   /**
-   * We display Scheduler information for local cluster.
+   * 初始化本地集群（非联邦模式）的调度器概览表格。
    *
-   * @param fsMetricsScheduleTr MetricsScheduleTr.
+   * @param fsMetricsScheduleTr 表格tbody对象
    */
   private void initLocalClusterOverViewTable(
       Hamlet.TBODY<Hamlet.TABLE<Hamlet.DIV<Hamlet>>> fsMetricsScheduleTr) {
-    // configuration
+    // 获取配置
     Configuration config = this.router.getConfig();
     Client client = RouterWebServiceUtil.createJerseyClient(config);
     String webAppAddress = WebAppUtils.getRMWebAppURLWithScheme(config);
 
-    // Get the name of the local cluster.
+    // 获取本地集群名称
     String localClusterName = config.get(YarnConfiguration.RM_CLUSTER_ID, UNAVAILABLE);
     SchedulerOverviewInfo schedulerOverviewInfo =
         getSchedulerOverviewInfo(webAppAddress, config, client);
     if (schedulerOverviewInfo != null) {
       RouterSchedulerMetrics rsMetrics =
           new RouterSchedulerMetrics(localClusterName, schedulerOverviewInfo);
-      // Basic information
+      // 展示调度器指标数据
       showRouterSchedulerMetricsData(rsMetrics, fsMetricsScheduleTr);
     } else {
       showRouterSchedulerMetricsData(localClusterName, fsMetricsScheduleTr);
@@ -252,37 +269,37 @@ public class MetricsOverviewTable extends RouterBlock {
   }
 
   /**
-   * We display Scheduler information for multiple subClusters.
+   * 初始化联邦模式下多个子集群的调度器概览表格。
    *
-   * @param metrics RouterClusterMetrics.
-   * @param fsMetricsScheduleTr MetricsScheduleTr.
-   * @param subClusters subCluster list.
+   * @param metrics Router集群聚合指标
+   * @param fsMetricsScheduleTr 表格tbody对象
+   * @param subClusters 子集群列表
    */
   private void initSubClusterOverViewTable(RouterClusterMetrics metrics,
       Hamlet.TBODY<Hamlet.TABLE<Hamlet.DIV<Hamlet>>> fsMetricsScheduleTr,
       Collection<SubClusterInfo> subClusters) {
 
-    // configuration
+    // 获取配置
     Configuration config = this.router.getConfig();
 
     Client client = RouterWebServiceUtil.createJerseyClient(config);
 
-    // Traverse all SubClusters to get cluster information.
+    // 遍历所有子集群获取调度信息
     for (SubClusterInfo subcluster : subClusters) {
-      // We need to make sure subCluster is not null
+      // 确保子集群ID不为空
       if (subcluster != null && subcluster.getSubClusterId() != null) {
-        // Call the RM interface to obtain schedule information
+        // 构造子集群RM Web服务地址
         String webAppAddress =  WebAppUtils.getHttpSchemePrefix(config) +
             subcluster.getRMWebServiceAddress();
+        // 调用子集群RM接口获取调度概览信息
         SchedulerOverviewInfo schedulerOverviewInfo =
             getSchedulerOverviewInfo(webAppAddress, config, client);
 
-        // If schedulerOverviewInfo is not null,
-        // We will display information from rsMetrics, otherwise we will not display information.
+        // 获取成功则展示该子集群调度信息
         if (schedulerOverviewInfo != null) {
           RouterSchedulerMetrics rsMetrics =
               new RouterSchedulerMetrics(subcluster, metrics, schedulerOverviewInfo);
-          // Basic information
+          // 展示调度器指标数据
           showRouterSchedulerMetricsData(rsMetrics, fsMetricsScheduleTr);
         }
       }
@@ -292,12 +309,12 @@ public class MetricsOverviewTable extends RouterBlock {
   }
 
   /**
-   * Get SchedulerOverview information based on webAppAddress.
+   * 从指定RM Web地址获取调度器概览信息。
    *
-   * @param webAppAddress webAppAddress.
-   * @param config configuration.
-   * @param client jersey Client.
-   * @return SchedulerOverviewInfo.
+   * @param webAppAddress RM Web服务地址
+   * @param config 配置对象
+   * @param client Jersey客户端
+   * @return 调度器概览信息，失败返回null
    */
   private SchedulerOverviewInfo getSchedulerOverviewInfo(String webAppAddress,
       Configuration config, Client client) {
@@ -315,14 +332,14 @@ public class MetricsOverviewTable extends RouterBlock {
   }
 
   /**
-   * Show RouterSchedulerMetricsData.
+   * 在表格中添加一行调度器指标数据。
    *
-   * @param rsMetrics routerSchedulerMetrics.
-   * @param fsMetricsScheduleTr MetricsScheduleTr.
+   * @param rsMetrics 调度器指标数据
+   * @param fsMetricsScheduleTr 表格tbody对象
    */
   private void showRouterSchedulerMetricsData(RouterSchedulerMetrics rsMetrics,
       Hamlet.TBODY<Hamlet.TABLE<Hamlet.DIV<Hamlet>>> fsMetricsScheduleTr) {
-    // Basic information
+    // 添加一行指标数据
     fsMetricsScheduleTr.tr().
         td(rsMetrics.getSubCluster()).
         td(rsMetrics.getSchedulerType()).
@@ -337,10 +354,10 @@ public class MetricsOverviewTable extends RouterBlock {
   }
 
   /**
-   * Show RouterSchedulerMetricsData.
+   * 在表格中添加一行占位数据（全部为N/A），用于数据不可用场景。
    *
-   * @param subClusterId subClusterId.
-   * @param fsMetricsScheduleTr MetricsScheduleTr.
+   * @param subClusterId 子集群ID
+   * @param fsMetricsScheduleTr 表格tbody对象
    */
   private void showRouterSchedulerMetricsData(String subClusterId,
       Hamlet.TBODY<Hamlet.TABLE<Hamlet.DIV<Hamlet>>> fsMetricsScheduleTr) {

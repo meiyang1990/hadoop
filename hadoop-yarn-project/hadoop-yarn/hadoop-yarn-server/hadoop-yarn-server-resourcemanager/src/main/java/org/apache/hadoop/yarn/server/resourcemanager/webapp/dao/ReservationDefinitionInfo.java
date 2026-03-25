@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,7 +27,8 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 /**
- * Simple class that represent a reservation definition.
+ * YARN RM WebAPI 预约定义信息数据访问对象，用于封装预约定义信息并支持XML/JSON序列化
+ * 供Web页面和REST API返回预约定义数据使用
  */
 @XmlRootElement(name = "reservation-definition")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -50,10 +52,17 @@ public class ReservationDefinitionInfo {
   @XmlElement(name = "recurrence-expression")
   private String recurrenceExpression;
 
+  /**
+   * 无参构造函数，供JAXB序列化框架使用
+   */
   public ReservationDefinitionInfo() {
 
   }
 
+  /**
+   * 根据API层的ReservationDefinition构造Web层DTO对象
+   * @param definition API层预约定义实例
+   */
   public ReservationDefinitionInfo(ReservationDefinition definition) {
     arrival = definition.getArrival();
     deadline = definition.getDeadline();
@@ -63,6 +72,10 @@ public class ReservationDefinitionInfo {
     recurrenceExpression = definition.getRecurrenceExpression();
   }
 
+  /**
+   * 获取预约开始时间
+   * @return 预约开始时间戳
+   */
   public long getArrival() {
     return arrival;
   }
@@ -71,6 +84,10 @@ public class ReservationDefinitionInfo {
     this.arrival = arrival;
   }
 
+  /**
+   * 获取预约结束时间
+   * @return 预约结束时间戳
+   */
   public long getDeadline() {
     return deadline;
   }
@@ -79,6 +96,10 @@ public class ReservationDefinitionInfo {
     this.deadline = deadline;
   }
 
+  /**
+   * 获取预约资源请求信息
+   * @return 预约资源请求DTO对象
+   */
   public ReservationRequestsInfo getReservationRequests() {
     return reservationRequests;
   }
@@ -88,6 +109,10 @@ public class ReservationDefinitionInfo {
     this.reservationRequests = reservationRequests;
   }
 
+  /**
+   * 获取预约名称
+   * @return 预约名称字符串
+   */
   public String getReservationName() {
     return reservationName;
   }
@@ -96,6 +121,10 @@ public class ReservationDefinitionInfo {
     this.reservationName = reservationName;
   }
 
+  /**
+   * 获取预约优先级
+   * @return 优先级数值
+   */
   public int getPriority() {
     return priority;
   }
@@ -104,6 +133,10 @@ public class ReservationDefinitionInfo {
     this.priority = priority;
   }
 
+  /**
+   * 获取周期预约重复执行表达式
+   * @return 周期表达式字符串
+   */
   public String getRecurrenceExpression() {
     return recurrenceExpression;
   }

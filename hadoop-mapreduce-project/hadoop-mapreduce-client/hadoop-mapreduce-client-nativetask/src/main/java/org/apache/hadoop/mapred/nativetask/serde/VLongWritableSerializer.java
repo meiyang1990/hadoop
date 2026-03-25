@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,6 +22,10 @@ package org.apache.hadoop.mapred.nativetask.serde;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.mapred.nativetask.INativeComparable;
 
+/**
+ * VLongWritable 类型的原生任务序列化器
+ * 继承默认序列化实现，实现原生可比较接口，为MapReduce原生任务提供VLongWritable类型的序列化与排序支持
+ */
 @InterfaceAudience.Private
 public class VLongWritableSerializer extends DefaultSerializer implements
     INativeComparable {

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,9 +32,9 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/*
- * DAO object to display node information in allocation tree.
- * It corresponds to "ActivityNode" class.
+/**
+ * YARN ResourceManager Web UI 调度活动分配树节点信息DAO
+ * 对应调度核心的ActivityNode类，用于封装节点信息返回给前端展示
  */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -52,9 +53,19 @@ public class ActivityNodeInfo {
 
   protected List<ActivityNodeInfo> children;
 
+  /**
+   * 无参构造函数，供JAXB序列化使用
+   */
   ActivityNodeInfo() {
   }
 
+  /**
+   * 构造单个活动节点信息对象
+   * @param name 活动节点名称
+   * @param activityState 分配状态
+   * @param diagnostic 诊断信息
+   * @param nId 节点ID
+   */
   public ActivityNodeInfo(String name, ActivityState activityState,
       String diagnostic, NodeId nId) {
     this.name = name;
@@ -63,6 +74,12 @@ public class ActivityNodeInfo {
     setNodeId(nId);
   }
 
+  /**
+   * 构造分组后的活动节点信息对象
+   * @param groupActivityState 分组整体分配状态
+   * @param groupDiagnostic 分组诊断信息
+   * @param groupNodeIds 分组包含的节点ID列表
+   */
   public ActivityNodeInfo(ActivityState groupActivityState,
       String groupDiagnostic, List<String> groupNodeIds) {
     this.allocationState = groupActivityState.name();
@@ -71,6 +88,11 @@ public class ActivityNodeInfo {
     this.nodeIds = groupNodeIds;
   }
 
+  /**
+   * 从核心层ActivityNode构造Web DAO对象，根据分组规则处理子节点
+   * @param node 核心层活动节点
+   * @param groupBy 分组维度配置
+   */
   ActivityNodeInfo(ActivityNode node,
       RMWSConsts.ActivitiesGroupBy groupBy) {
     this.name = node.getName();
@@ -80,23 +102,32 @@ public class ActivityNodeInfo {
     this.diagnostic = node.getDiagnostic();
     this.requestPriority = node.getRequestPriority();
     this.allocationRequestId = node.getAllocationRequestId();
-    // only consider grouping for request type
+    // 仅对请求类型节点按分组规则聚合子节点
     if (node.isRequestType()) {
       this.children = ActivitiesUtils
           .getRequestActivityNodeInfos(node.getChildren(), groupBy);
     } else {
+      // 非请求类型节点递归转换所有子节点
       this.children = node.getChildren().stream()
           .map(e -> new ActivityNodeInfo(e, groupBy))
           .collect(Collectors.toList());
     }
   }
 
+  /**
+   * 设置节点ID，转换为字符串格式
+   * @param nId YARN节点ID
+   */
   public void setNodeId(NodeId nId) {
     if (nId != null && !Strings.isNullOrEmpty(nId.getHost())) {
       this.nodeId = nId.toString();
     }
   }
 
+  /**
+   * 根据节点类型设置对应优先级
+   * @param node 核心层活动节点
+   */
   private void setPriority(ActivityNode node) {
     if (node.isAppType()) {
       this.appPriority = node.getAppPriority();

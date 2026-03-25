@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,63 +26,67 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * The record reader breaks the data into key/value pairs for input to the
- * {@link Mapper}.
- * @param <KEYIN>
- * @param <VALUEIN>
+ * 文件名称: RecordReader.java
+ * 所属模块: MapReduce 核心计算模块
+ * 核心职责: 定义输入数据读取的抽象接口，将输入分片拆分为可供Mapper处理的键值对
+ */
+/**
+ * 记录读取器抽象接口，负责将输入分片数据拆分为键值对，提供给Mapper阶段处理
+ * @param <KEYIN> 输入键类型
+ * @param <VALUEIN> 输入值类型
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public abstract class RecordReader<KEYIN, VALUEIN> implements Closeable {
 
   /**
-   * Called once at initialization.
-   * @param split the split that defines the range of records to read
-   * @param context the information about the task
-   * @throws IOException
-   * @throws InterruptedException
+   * 记录读取器初始化方法，在读取开始前调用一次
+   * @param split 要读取的输入分片，定义了需要读取的记录范围
+   * @param context Map任务上下文，包含任务相关配置和信息
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public abstract void initialize(InputSplit split,
                                   TaskAttemptContext context
                                   ) throws IOException, InterruptedException;
 
   /**
-   * Read the next key, value pair.
-   * @return true if a key/value pair was read
-   * @throws IOException
-   * @throws InterruptedException
+   * 读取下一个键值对
+   * @return 成功读取到键值对返回true，读取完成返回false
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public abstract 
   boolean nextKeyValue() throws IOException, InterruptedException;
 
   /**
-   * Get the current key
-   * @return the current key or null if there is no current key
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取当前读取到的键
+   * @return 当前键，无当前键时返回null
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public abstract
   KEYIN getCurrentKey() throws IOException, InterruptedException;
   
   /**
-   * Get the current value.
-   * @return the object that was read
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取当前读取到的值
+   * @return 当前读取到的值对象
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public abstract 
   VALUEIN getCurrentValue() throws IOException, InterruptedException;
   
   /**
-   * The current progress of the record reader through its data.
-   * @return a number between 0.0 and 1.0 that is the fraction of the data read
-   * @throws IOException
-   * @throws InterruptedException
+   * 获取当前记录读取器的读取进度
+   * @return 已读取数据占比，范围在0.0到1.0之间
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
    */
   public abstract float getProgress() throws IOException, InterruptedException;
   
   /**
-   * Close the record reader.
+   * 关闭记录读取器，释放资源
    */
   public abstract void close() throws IOException;
 }

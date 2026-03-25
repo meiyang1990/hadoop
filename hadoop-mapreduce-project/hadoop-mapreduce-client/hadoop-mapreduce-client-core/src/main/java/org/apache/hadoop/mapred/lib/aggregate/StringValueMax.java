@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,8 +23,8 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that maintain the biggest of 
- * a sequence of strings.
+ * 字符串最大值聚合器，为旧版MapReduce API提供适配，维护字符串序列中的最大值
+ * 用于MapReduce聚合计算场景，基于字典序比较得到字符串最大值
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable

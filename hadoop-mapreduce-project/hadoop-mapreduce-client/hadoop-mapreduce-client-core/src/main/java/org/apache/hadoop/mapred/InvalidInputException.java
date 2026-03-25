@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,21 +26,21 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class wraps a list of problems with the input, so that the user
- * can get a list of problems together instead of finding and fixing them one 
- * by one.
+ * 输入数据合法性检查异常，聚合所有输入错误一次性返回给用户，
+ * 避免用户逐个发现修复问题，提升错误排查效率。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class InvalidInputException extends IOException {
  
   private static final long serialVersionUID = 1L;
+  // 存储所有输入错误异常列表
   private List<IOException> problems;
   
   /**
-   * Create the exception with the given list.
-   * The first element of the list is used as the init cause value.
-   * @param probs the list of problems to report. this list is not copied.
+   * 基于输入错误列表构造异常对象
+   * 使用列表中第一个异常作为根异常初始化异常链
+   * @param probs 需要报告的输入错误列表，不会拷贝该列表直接持有引用
    */
   public InvalidInputException(List<IOException> probs) {
     problems = probs;
@@ -49,22 +50,25 @@ public class InvalidInputException extends IOException {
   }
   
   /**
-   * Get the complete list of the problems reported.
-   * @return the list of problems, which must not be modified
+   * 获取所有输入错误的完整列表
+   * @return 输入错误列表，不允许修改
    */
   public List<IOException> getProblems() {
     return problems;
   }
   
   /**
-   * Get a summary message of the problems found.
-   * @return the concatenated messages from all of the problems.
+   * 聚合所有输入错误的消息，生成汇总异常信息
+   * @return 所有异常消息拼接后的汇总字符串
    */
+  @Override
   public String getMessage() {
     StringBuilder result = new StringBuilder();
     Iterator<IOException> itr = problems.iterator();
+    // 遍历所有错误异常拼接消息
     while(itr.hasNext()) {
       result.append(itr.next().getMessage());
+      // 非最后一个错误添加换行分隔
       if (itr.hasNext()) {
         result.append("\n");
       }

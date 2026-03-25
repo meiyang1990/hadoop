@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -19,16 +20,16 @@
 package org.apache.hadoop.yarn.server.router.webapp;
 
 /**
- * HTTP verbs.
+ * 定义YARN Router Web服务支持的HTTP请求方法枚举。
  **/
 public enum HTTPMethods {
 
-  /* to retrieve resource representation/information */
+  /** 获取资源信息/表示 */
   GET,
-  /* to update existing resource */
+  /** 更新已有资源 */
   PUT,
-  /* to delete resources */
+  /** 删除资源 */
   DELETE,
-  /* to create new subordinate resources */
+  /** 创建新的子资源 */
   POST
 }

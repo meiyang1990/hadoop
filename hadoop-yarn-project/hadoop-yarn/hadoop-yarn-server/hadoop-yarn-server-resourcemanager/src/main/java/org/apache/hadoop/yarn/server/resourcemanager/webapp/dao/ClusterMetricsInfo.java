@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,6 +29,9 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceScheduler
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.ParentQueue;
 
+/**
+ * YARN ResourceManager Web UI 集群指标数据访问对象，封装集群整体运行指标信息，供REST API返回。
+ */
 @XmlRootElement(name = "clusterMetrics")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class ClusterMetricsInfo {
@@ -88,15 +92,26 @@ public class ClusterMetricsInfo {
   private int rmEventQueueSize;
   private int schedulerEventQueueSize;
 
+  /** JAXB要求的无参构造方法 */
   public ClusterMetricsInfo() {
   } // JAXB needs this
 
+  /**
+   * 从ResourceManager构造集群指标信息对象
+   * @param rm ResourceManager实例
+   */
   public ClusterMetricsInfo(final ResourceManager rm) {
     this(rm.getResourceScheduler());
   }
 
+  /**
+   * 从资源调度器构造集群指标信息对象
+   * @param rs 资源调度器实例
+   */
   public ClusterMetricsInfo(final ResourceScheduler rs) {
+    // 获取根队列指标
     QueueMetrics metrics = rs.getRootQueueMetrics();
+    // 获取集群整体指标
     ClusterMetrics clusterMetrics = ClusterMetrics.getMetrics();
 
     this.appsSubmitted = metrics.getAppsSubmitted();
@@ -120,42 +135,56 @@ public class ClusterMetricsInfo {
     this.containersPending = metrics.getPendingContainers();
     this.containersReserved = metrics.getReservedContainers();
 
+    // 容量调度器特殊处理，计算跨分区指标
     if (rs instanceof CapacityScheduler) {
       CapacityScheduler cs = (CapacityScheduler) rs;
+      // 计算总内存容量 = 可用 + 已分配 + 已预留
       this.totalMB = availableMB + allocatedMB + reservedMB;
+      // 计算总vCore容量 = 可用 + 已分配 + 已预留
       this.totalVirtualCores =
           availableVirtualCores + allocatedVirtualCores + reservedVirtualCores;
       // TODO, add support of other schedulers to get total used resources
       // across partition.
+      // 根队列存在且使用信息不为空，收集跨分区指标
       if (cs.getRootQueue() != null
           && cs.getRootQueue().getQueueResourceUsage() != null
           && cs.getRootQueue().getQueueResourceUsage().getAllUsed() != null) {
+        // 封装所有分区总已用资源
         totalUsedResourcesAcrossPartition = new ResourceInfo(
             cs.getRootQueue().getQueueResourceUsage().getAllUsed());
+        // 封装所有分区总集群资源
         totalClusterResourcesAcrossPartition = new ResourceInfo(
             cs.getClusterResource());
+        // 封装所有分区总预留资源
         totalReservedResourcesAcrossPartition = new ResourceInfo(
             cs.getRootQueue().getQueueResourceUsage().getAllReserved());
+        // 获取所有分区分配容器总数
         totalAllocatedContainersAcrossPartition =
             ((ParentQueue) cs.getRootQueue()).getNumContainers();
+        // 标记跨分区指标已可用
         crossPartitionMetricsAvailable = true;
       }
     } else {
+      // 非容量调度器，总容量只计算可用+已分配
       this.totalMB = availableMB + allocatedMB;
       this.totalVirtualCores = availableVirtualCores + allocatedVirtualCores;
     }
     long baseMem = this.totalMB;
+    // 计算内存利用率百分比，总容量为0时返回0
     this.utilizedMBPercent = baseMem <= 0 ? 0 :
         (int) (clusterMetrics.getUtilizedMB() * 100 / baseMem);
     long baseCores = this.totalVirtualCores;
+    // 计算vCore利用率百分比，总容量为0时返回0
     this.utilizedVirtualCoresPercent = baseCores <= 0 ? 0 :
         (int) (clusterMetrics.getUtilizedVirtualCores() * 100 /
             baseCores);
     // Scheduler Busy is in usec per sec, so to get percent divide by 10^4
     // Set to -1 if disabled.
+    // 计算调度器CPU占用百分比，单位为微秒/秒，除以10000得到百分比，禁用时返回-1
     this.rmSchedulerBusyPercent =
         clusterMetrics.getRmEventProcMonitorEnable() ?
         (int)(clusterMetrics.getRmEventProcCPUAvg() / 10000L) : -1;
+    // 获取各类节点状态数量
     this.activeNodes = clusterMetrics.getNumActiveNMs();
     this.lostNodes = clusterMetrics.getNumLostNMs();
     this.unhealthyNodes = clusterMetrics.getUnhealthyNMs();
@@ -163,13 +192,19 @@ public class ClusterMetricsInfo {
     this.decommissionedNodes = clusterMetrics.getNumDecommisionedNMs();
     this.rebootedNodes = clusterMetrics.getNumRebootedNMs();
     this.shutdownNodes = clusterMetrics.getNumShutdownNMs();
+    // 汇总计算总节点数
     this.totalNodes = activeNodes + lostNodes + decommissionedNodes
         + rebootedNodes + unhealthyNodes + decommissioningNodes + shutdownNodes;
+    // 获取每秒分配容器数
     this.containerAssignedPerSecond = clusterMetrics
         .getContainerAssignedPerSecond();
+    // 获取RM事件队列大小
     this.rmEventQueueSize = clusterMetrics.getRmEventQueueSize();
+    // 获取调度器事件队列大小
     this.schedulerEventQueueSize = clusterMetrics.getSchedulerEventQueueSize();
+    // 获取已用vCore总数
     this.utilizedVirtualCores = clusterMetrics.getUtilizedVirtualCores();
+    this.utilizedMB = clusterMetrics.getUtilizedMB();
   }
 
   public int getAppsSubmitted() {

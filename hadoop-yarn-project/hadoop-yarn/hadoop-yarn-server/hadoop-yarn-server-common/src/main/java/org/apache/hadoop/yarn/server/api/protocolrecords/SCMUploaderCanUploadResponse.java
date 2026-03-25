@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,10 +24,8 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
  * <p>
- * The response from the SharedCacheManager to the NodeManager that indicates
- * whether the NodeManager can upload the resource to the shared cache. If it is
- * not accepted by SCM, the NodeManager should not upload it to the shared
- * cache.
+ * 共享缓存管理器(SCM)返回给NodeManager的响应，通知NodeManager是否可以将资源上传到共享缓存。
+ * 如果SCM不允许上传，NodeManager不应将资源上传到共享缓存。
  * </p>
  */
 @Private
@@ -34,18 +33,16 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 public abstract class SCMUploaderCanUploadResponse {
 
   /**
-   * Get whether or not the node manager can upload the resource to the shared
-   * cache.
+   * 获取NodeManager是否可以将资源上传到共享缓存
    *
-   * @return boolean True if the resource can be uploaded, false otherwise.
+   * @return boolean 允许上传返回true，否则返回false
    */
   public abstract boolean getUploadable();
 
   /**
-   * Set whether or not the node manager can upload the resource to the shared
-   * cache.
+   * 设置NodeManager是否可以将资源上传到共享缓存
    *
-   * @param b True if the resource can be uploaded, false otherwise.
+   * @param b 允许上传传true，否则传false
    */
   public abstract void setUploadable(boolean b);
 

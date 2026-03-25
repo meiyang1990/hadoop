@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,59 +28,56 @@ import org.apache.hadoop.yarn.security.AMRMTokenIdentifier;
 import org.apache.hadoop.yarn.server.nodemanager.Context;
 
 /**
- * Interface that can be used by the interceptor plugins to get the information
- * about one application.
- *
+ * AMRMProxy应用上下文接口，供拦截器插件获取单个应用的相关信息。
+ * 该接口为AMRMProxy的拦截扩展机制提供了统一的应用信息访问入口。
  */
 public interface AMRMProxyApplicationContext {
 
   /**
-   * Gets the configuration object instance.
-   * @return the configuration object.
+   * 获取当前节点的配置对象。
+   * @return 配置对象实例
    */
   Configuration getConf();
 
   /**
-   * Gets the application attempt identifier.
-   * @return the application attempt identifier.
+   * 获取当前应用尝试的唯一标识。
+   * @return 应用尝试标识
    */
   ApplicationAttemptId getApplicationAttemptId();
 
   /**
-   * Gets the application submitter.
-   * @return the application submitter
+   * 获取提交该应用的用户名。
+   * @return 应用提交用户名
    */
   String getUser();
 
   /**
-   * Gets the application's AMRMToken that is issued by the RM.
-   * @return the application's AMRMToken that is issued by the RM.
+   * 获取ResourceManager颁发给本应用的原始AMRM令牌。
+   * @return RM颁发的AMRM令牌
    */
   Token<AMRMTokenIdentifier> getAMRMToken();
 
   /**
-   * Gets the application's local AMRMToken issued by the proxy service.
-   * @return the application's local AMRMToken issued by the proxy service.
+   * 获取AMRMProxy服务为本应用颁发的本地AMRM令牌。
+   * @return AMRMProxy颁发的本地AMRM令牌
    */
   Token<AMRMTokenIdentifier> getLocalAMRMToken();
 
   /**
-   * Gets the NMContext object.
-   * @return the NMContext.
+   * 获取NodeManager的全局上下文对象。
+   * @return NodeManager上下文
    */
   Context getNMContext();
 
   /**
-   * Gets the credentials of this application.
-   *
-   * @return the credentials.
+   * 获取当前应用的凭证信息。
+   * @return 应用凭证
    */
   Credentials getCredentials();
 
   /**
-   * Gets the registry client.
-   *
-   * @return the registry.
+   * 获取服务注册中心客户端操作实例。
+   * @return 注册中心操作客户端
    */
   RegistryOperations getRegistryClient();
 

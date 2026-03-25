@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -44,16 +45,23 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
- * A device framework plugin which supports NEC Vector Engine.
+ * NEC Vector Engine（向量引擎）设备插件，支持YARN对NEC VE设备的发现和调度管理。
+ * 实现了DevicePlugin和DevicePluginScheduler接口，提供设备发现和分配能力。
  *
  */
 public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
+  /** 环境变量名：Hadoop公共主目录 */
   private static final String HADOOP_COMMON_HOME = "HADOOP_COMMON_HOME";
+  /** 环境变量名：设备发现脚本路径 */
   private static final String ENV_SCRIPT_PATH = "NEC_VE_GET_SCRIPT_PATH";
+  /** 环境变量名：设备发现脚本名称 */
   private static final String ENV_SCRIPT_NAME = "NEC_VE_GET_SCRIPT_NAME";
+  /** 环境变量名：是否使用udev进行设备发现 */
   private static final String ENV_USE_UDEV = "NEC_USE_UDEV";
+  /** 默认设备发现脚本名称 */
   private static final String DEFAULT_SCRIPT_NAME = "nec-ve-get.py";
   private static final Logger LOG = LoggerFactory.getLogger(NECVEPlugin.class);
+  /** 默认脚本搜索路径数组 */
   private static final String[] DEFAULT_BINARY_SEARCH_DIRS = new String[]{
       "/usr/bin", "/bin", "/opt/nec/ve/bin"};
 
@@ -61,13 +69,25 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
   private boolean useUdev;
   private VEDeviceDiscoverer discoverer;
 
+  /** 命令执行器工厂，用于执行外部设备发现脚本，支持测试注入 */
   private Function<String[], CommandExecutor>
       commandExecutorProvider = this::createCommandExecutor;
 
+  /**
+   * 默认构造函数，使用系统环境和默认配置初始化插件。
+   * @throws ResourceHandlerException 初始化失败时抛出异常
+   */
   public NECVEPlugin() throws ResourceHandlerException {
     this(System::getenv, DEFAULT_BINARY_SEARCH_DIRS, new UdevUtil());
   }
 
+  /**
+   * 测试用构造函数，支持注入依赖进行单元测试。
+   * @param envProvider 环境变量获取函数
+   * @param scriptPaths 脚本搜索路径数组
+   * @param udev udev工具实例
+   * @throws ResourceHandlerException 初始化失败时抛出异常
+   */
   @VisibleForTesting
   NECVEPlugin(Function<String, String> envProvider, String[] scriptPaths,
       UdevUtil udev) throws ResourceHandlerException {
@@ -81,6 +101,13 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
     }
   }
 
+  /**
+   * 通过外部脚本方式初始化插件，查找设备发现脚本路径。
+   * 按优先级依次从环境变量、HADOOP_COMMON_HOME、默认搜索路径查找脚本。
+   * @param envProvider 环境变量获取函数
+   * @param scriptPaths 脚本搜索路径数组
+   * @throws ResourceHandlerException 未找到可用脚本时抛出异常
+   */
   private void scriptBasedInit(Function<String, String> envProvider,
       String[] scriptPaths) throws ResourceHandlerException {
     String binaryName = DEFAULT_SCRIPT_NAME;
@@ -91,7 +118,7 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
     }
     LOG.info("Use {} as script name.", binaryName);
 
-    // Try to find the script based on an environment variable, if set
+    // 1. 优先从环境变量指定路径查找脚本
     boolean found = false;
     String envBinaryPath = envProvider.apply(ENV_SCRIPT_PATH);
     if (envBinaryPath != null) {
@@ -99,9 +126,9 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
       found = binaryPath != null;
     }
 
-    // Try $HADOOP_COMMON_HOME
+    // 2. 环境变量未找到，尝试从$HADOOP_COMMON_HOME查找
     if (!found) {
-      // print a warning only if the env variable was defined
+      // 仅当环境变量设置过但找不到时打印警告
       if (envBinaryPath != null) {
         LOG.warn("Script {} does not exist, falling back " +
             "to $HADOOP_COMMON_HOME/sbin/DevicePluginScript/", envBinaryPath);
@@ -111,7 +138,7 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
       found = binaryPath != null;
     }
 
-    // Try the default search directories
+    // 3. HADOOP_COMMON_HOME未找到，尝试默认搜索路径
     if (!found) {
       LOG.info("Script not found under" +
           " $HADOOP_COMMON_HOME/sbin/DevicePluginScript/," +
@@ -121,7 +148,7 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
       found = binaryPath != null;
     }
 
-    // Script not found
+    // 所有路径都未找到脚本，抛出异常
     if (!found) {
       LOG.error("Script not found in "
           + Arrays.toString(scriptPaths));
@@ -132,6 +159,7 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
 
   @Override
   public DeviceRegisterRequest getRegisterRequestInfo() {
+    // 注册资源名为nec.com/ve，对应NEC VE设备资源
     return DeviceRegisterRequest.Builder.newInstance()
         .setResourceName("nec.com/ve").build();
   }
@@ -140,18 +168,22 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
   public Set<Device> getDevices() {
     Set<Device> devices = null;
 
+    // 根据配置选择设备发现方式
     if (useUdev) {
       try {
+        // 使用udev枚举/dev下的VE设备
         devices = discoverer.getDevicesFromPath("/dev");
       } catch (IOException e) {
         LOG.error("Error during scanning devices", e);
       }
     } else {
+      // 使用外部脚本发现设备
       CommandExecutor executor =
           commandExecutorProvider.apply(new String[]{this.binaryPath});
       try {
         executor.execute();
         String output = executor.getOutput();
+        // 解析脚本输出获取设备信息
         devices = parseOutput(output);
       } catch (IOException e) {
         LOG.error("Error during executing external binary", e);
@@ -169,14 +201,16 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
   @Override
   public DeviceRuntimeSpec onDevicesAllocated(Set<Device> set,
       YarnRuntimeType yarnRuntimeType) {
+    // 不需要额外运行时配置，返回null即可
     return null;
   }
 
   /**
-   * Parses the output of the external Python script.
+   * 解析外部Python设备发现脚本的输出，提取设备信息。
+   * 输出格式示例：id=0, dev=/dev/ve0, state=ONLINE, busId=0000:65:00.0, major=243, minor=0
    *
-   * Sample line:
-   * id=0, dev=/dev/ve0, state=ONLINE, busId=0000:65:00.0, major=243, minor=0
+   * @param output 脚本输出字符串
+   * @return 解析得到的可用设备集合
    */
   private Set<Device> parseOutput(String output) {
     Set<Device> devices = new HashSet<>();
@@ -187,7 +221,7 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
     for (String line : lines) {
       Device.Builder builder = Device.Builder.newInstance();
 
-      // map key --> builder calls
+      // 构建键值对到DeviceBuilder方法的映射
       Map<String, Consumer<String>> builderInvocations =
           getBuilderInvocationsMap(builder);
 
@@ -204,12 +238,15 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
 
         Consumer<String> builderInvocation = builderInvocations.get(key);
         if (builderInvocation != null) {
+          // 调用对应方法设置设备属性
           builderInvocation.accept(value);
         } else {
+          // 忽略未知属性，打印警告
           LOG.warn("Unknown key {}, ignored", key);
         }
       }// for key value pairs
       Device device = builder.build();
+      // 只添加健康状态的设备到可用集合
       if (device.isHealthy()) {
         devices.add(device);
       } else {
@@ -222,13 +259,14 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
 
   @Override
   public void onDevicesReleased(Set<Device> releasedDevices) {
-    // nop
+    // 设备释放后无需额外处理，空实现
   }
 
   @Override
   public Set<Device> allocateDevices(Set<Device> availableDevices, int count,
       Map<String, String> env) {
-    // Can consider topology, utilization.etc
+    // 简单轮询分配策略：按顺序分配前count个可用设备
+    // 未来可扩展考虑拓扑、利用率等因素优化分配
     Set<Device> allocated = new HashSet<>();
     int number = 0;
     for (Device d : availableDevices) {
@@ -241,11 +279,21 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
     return allocated;
   }
 
+  /**
+   * 创建Shell命令执行器实例。
+   * @param command 要执行的命令数组
+   * @return 命令执行器实例
+   */
   private CommandExecutor createCommandExecutor(String[] command) {
     return new Shell.ShellCommandExecutor(
         command);
   }
 
+  /**
+   * 从环境变量指定路径获取脚本，验证路径有效性和可执行权限。
+   * @param envBinaryPath 环境变量指定的脚本路径
+   * @return 验证通过返回路径，否则返回null
+   */
   private String getScriptFromEnvSetting(String envBinaryPath) {
     LOG.info("Checking script path: {}", envBinaryPath);
     File f = new File(envBinaryPath);
@@ -270,6 +318,12 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
     return envBinaryPath;
   }
 
+  /**
+   * 从$HADOOP_COMMON_HOME目录查找设备发现脚本。
+   * @param envProvider 环境变量获取函数
+   * @param binaryName 脚本名称
+   * @return 找到返回脚本路径，否则返回null
+   */
   private String getScriptFromHadoopCommon(
       Function<String, String> envProvider, String binaryName) {
     String scriptPath = null;
@@ -290,6 +344,12 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
     return scriptPath;
   }
 
+  /**
+   * 从默认搜索路径数组查找设备发现脚本。
+   * @param binaryName 脚本名称
+   * @param scriptPaths 搜索路径数组
+   * @return 找到返回脚本绝对路径，否则返回null
+   */
   private String getScriptFromSearchDirs(String binaryName,
       String[] scriptPaths) {
     String scriptPath = null;
@@ -306,6 +366,12 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
     return scriptPath;
   }
 
+  /**
+   * 创建设备属性键到DeviceBuilder setter方法的映射表。
+   * 用于快速解析键值对输出。
+   * @param builder Device构建器实例
+   * @return 属性映射表
+   */
   private Map<String, Consumer<String>> getBuilderInvocationsMap(
       Device.Builder builder) {
     Map<String, Consumer<String>> builderInvocations = new HashMap<>();
@@ -326,17 +392,29 @@ public class NECVEPlugin implements DevicePlugin, DevicePluginScheduler {
     return builderInvocations;
   }
 
+  /**
+   * 设置命令执行器工厂，用于单元测试注入mock执行器。
+   * @param provider 命令执行器工厂
+   */
   @VisibleForTesting
   void setCommandExecutorProvider(
       Function<String[], CommandExecutor> provider) {
     this.commandExecutorProvider = provider;
   }
 
+  /**
+   * 设置设备发现器，用于单元测试注入mock发现器。
+   * @param veDeviceDiscoverer 设备发现器实例
+   */
   @VisibleForTesting
   void setVeDeviceDiscoverer(VEDeviceDiscoverer veDeviceDiscoverer) {
     this.discoverer = veDeviceDiscoverer;
   }
 
+  /**
+   * 获取设备发现脚本路径，用于单元测试。
+   * @return 脚本路径
+   */
   @VisibleForTesting
   String getBinaryPath() {
     return binaryPath;

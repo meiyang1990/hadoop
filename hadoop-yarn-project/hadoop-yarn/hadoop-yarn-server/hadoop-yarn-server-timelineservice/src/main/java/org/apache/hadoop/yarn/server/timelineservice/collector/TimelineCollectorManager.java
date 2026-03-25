@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -41,9 +42,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class that manages adding and removing collectors and their lifecycle. It
- * provides thread safety access to the collectors inside.
- *
+ * 时间线收集器管理器，负责管理所有应用收集器的生命周期（添加/移除/启停），
+ * 提供线程安全的收集器访问能力，同时负责定时持久化写入时间线数据。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -58,11 +58,13 @@ public class TimelineCollectorManager extends CompositeService {
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 创建时间线写入器实例
     writer = createTimelineWriter(conf);
+    // 初始化写入器
     writer.init(conf);
-    // create a single dedicated thread for flushing the writer on a periodic
-    // basis
+    // 创建单线程定时任务线程池，用于定期刷新写入器缓冲区
     writerFlusher = Executors.newSingleThreadScheduledExecutor();
+    // 从配置读取刷新间隔（单位：秒）
     flushInterval = conf.getInt(
         YarnConfiguration.
         TIMELINE_SERVICE_WRITER_FLUSH_INTERVAL_SECONDS,
@@ -71,7 +73,11 @@ public class TimelineCollectorManager extends CompositeService {
     super.serviceInit(conf);
   }
 
+  /**
+   * 根据配置创建时间线写入器实例，支持自定义实现类。
+   */
   private TimelineWriter createTimelineWriter(final Configuration conf) {
+    // 从配置获取写入器实现类名
     String timelineWriterClassName = conf.get(
         YarnConfiguration.TIMELINE_SERVICE_WRITER_CLASS,
             YarnConfiguration.DEFAULT_TIMELINE_SERVICE_WRITER_CLASS);
@@ -79,6 +85,7 @@ public class TimelineCollectorManager extends CompositeService {
     try {
       Class<?> timelineWriterClazz = Class.forName(timelineWriterClassName);
       if (TimelineWriter.class.isAssignableFrom(timelineWriterClazz)) {
+        // 通过反射实例化写入器
         return (TimelineWriter) ReflectionUtils.newInstance(
             timelineWriterClazz, conf);
       } else {
@@ -95,15 +102,17 @@ public class TimelineCollectorManager extends CompositeService {
   protected void serviceStart() throws Exception {
     super.serviceStart();
     if (writer != null) {
+      // 启动时间线写入器
       writer.start();
     }
-    // schedule the flush task
+    // 启动定时刷新任务，按固定间隔执行
     writerFlusher.scheduleAtFixedRate(new WriterFlushTask(writer),
         flushInterval, flushInterval, TimeUnit.SECONDS);
+    // 标记刷新线程已运行
     writerFlusherRunning = true;
   }
 
-  // access to this map is synchronized with the map itself
+  // 应用ID到对应收集器的映射，使用同步包装保证线程安全
   private final Map<ApplicationId, TimelineCollector> collectors =
       Collections.synchronizedMap(
           new HashMap<ApplicationId, TimelineCollector>());
@@ -117,14 +126,13 @@ public class TimelineCollectorManager extends CompositeService {
   }
 
   /**
-   * Put the collector into the collection if an collector mapped by id does
-   * not exist.
+   * 如果应用对应收集器不存在，则添加新收集器到集合中。
+   * 会完成收集器的初始化、启动流程。
    *
-   * @param appId Application Id for which collector needs to be put.
-   * @param collector timeline collector to be put.
-   * @throws YarnRuntimeException if there  was any exception in initializing
-   *                              and starting the app level service
-   * @return the collector associated with id after the potential put.
+   * @param appId 应用ID
+   * @param collector 待添加的时间线收集器
+   * @throws YarnRuntimeException 收集器初始化启动失败时抛出
+   * @return 添加后集合中对应应用的收集器（可能是已存在的）
    */
   public TimelineCollector putIfAbsent(ApplicationId appId,
       TimelineCollector collector) {
@@ -133,14 +141,14 @@ public class TimelineCollectorManager extends CompositeService {
       collectorInTable = collectors.get(appId);
       if (collectorInTable == null) {
         try {
-          // initialize, start, and add it to the collection so it can be
-          // cleaned up when the parent shuts down
+          // 初始化收集器，设置写入器并启动服务，后续父服务关闭时会统一清理
           collector.init(getConfig());
           collector.setWriter(writer);
           collector.start();
           collectors.put(appId, collector);
           LOG.info("the collector for {} was added", appId);
           collectorInTable = collector;
+          // 添加完成后的回调处理
           postPut(appId, collectorInTable);
         } catch (Exception e) {
           throw new YarnRuntimeException(e);
@@ -153,31 +161,30 @@ public class TimelineCollectorManager extends CompositeService {
   }
 
   /**
-   * Callback handler for the timeline collector manager when a collector has
-   * been added into the collector map.
-   * @param appId Application id of the collector.
-   * @param collector The actual timeline collector that has been added.
+   * 收集器添加到集合后的回调处理方法。
+   * @param appId 应用ID
+   * @param collector 已添加的时间线收集器
    */
   public void postPut(ApplicationId appId, TimelineCollector collector) {
     doPostPut(appId, collector);
+    // 标记收集器已就绪，可以开始聚合数据
     collector.setReadyToAggregate();
   }
 
   /**
-   * A template method that will be called by
-   * {@link  #postPut(ApplicationId, TimelineCollector)}.
-   * @param appId Application id of the collector.
-   * @param collector The actual timeline collector that has been added.
+   * 模板方法，供子类扩展实现添加后的自定义逻辑。
+   * @param appId 应用ID
+   * @param collector 已添加的时间线收集器
    */
   protected void doPostPut(ApplicationId appId, TimelineCollector collector) {
   }
 
   /**
-   * Removes the collector for the specified id. The collector is also stopped
-   * as a result. If the collector does not exist, no change is made.
+   * 移除指定应用的收集器，并停止收集器服务。
+   * 如果收集器不存在则不做任何操作。
    *
-   * @param appId Application Id to remove.
-   * @return whether it was removed successfully
+   * @param appId 待移除的应用ID
+   * @return 是否成功移除
    */
   public boolean remove(ApplicationId appId) {
     TimelineCollector collector = collectors.remove(appId);
@@ -185,8 +192,9 @@ public class TimelineCollectorManager extends CompositeService {
       LOG.error("the collector for {} does not exist!", appId);
     } else {
       synchronized (collector) {
+        // 移除后的回调处理
         postRemove(appId, collector);
-        // stop the service to do clean up
+        // 停止服务执行清理
         collector.stop();
       }
       LOG.info("The collector service for {} was removed", appId);
@@ -199,20 +207,19 @@ public class TimelineCollectorManager extends CompositeService {
   }
 
   /**
-   * Returns the collector for the specified id.
+   * 根据应用ID获取对应的时间线收集器。
    *
-   * @param appId Application Id for which we need to get the collector.
-   * @return the collector or null if it does not exist
+   * @param appId 应用ID
+   * @return 对应收集器，不存在则返回null
    */
   public TimelineCollector get(ApplicationId appId) {
     return collectors.get(appId);
   }
 
   /**
-   * Returns whether the collector for the specified id exists in this
-   * collection.
-   * @param appId Application Id.
-   * @return true if collector for the app id is found, false otherwise.
+   * 判断指定应用是否已有对应的收集器。
+   * @param appId 应用ID
+   * @return 存在返回true，否则返回false
    */
   public boolean containsTimelineCollector(ApplicationId appId) {
     return collectors.containsKey(appId);
@@ -220,6 +227,7 @@ public class TimelineCollectorManager extends CompositeService {
 
   @Override
   protected void serviceStop() throws Exception {
+    // 先停止所有收集器服务
     if (collectors != null && collectors.size() > 0) {
       synchronized (collectors) {
         for (TimelineCollector c : collectors.values()) {
@@ -227,19 +235,17 @@ public class TimelineCollectorManager extends CompositeService {
         }
       }
     }
-    // stop the flusher first
+    // 优先停止定时刷新线程
     if (writerFlusher != null) {
       writerFlusher.shutdown();
       writerFlusherRunning = false;
       if (!writerFlusher.awaitTermination(30, TimeUnit.SECONDS)) {
-        // in reality it should be ample time for the flusher task to finish
-        // even if it times out, writers may be able to handle closing in this
-        // situation fine
-        // proceed to close the writer
+        // 即使超时也继续关闭写入器，大部分写入器可以处理这种情况
         LOG.warn("failed to stop the flusher task in time. " +
             "will still proceed to close the writer.");
       }
     }
+    // 关闭时间线写入器
     if (writer != null) {
       writer.close();
     }
@@ -252,7 +258,7 @@ public class TimelineCollectorManager extends CompositeService {
   }
 
   /**
-   * Task that invokes the flush operation on the timeline writer.
+   * 定时任务，负责触发时间线写入器的刷新操作，将缓冲区数据持久化。
    */
   private static class WriterFlushTask implements Runnable {
     private final TimelineWriter writer;
@@ -263,15 +269,12 @@ public class TimelineCollectorManager extends CompositeService {
 
     public void run() {
       try {
-        // synchronize on the writer object to avoid flushing timeline
-        // entities placed on the buffer by synchronous putEntities
-        // requests.
+        // 对写入器对象加锁，避免与同步写入请求冲突，保证数据一致性
         synchronized (writer) {
           writer.flush();
         }
       } catch (Throwable th) {
-        // we need to handle all exceptions or subsequent execution may be
-        // suppressed
+        // 捕获所有异常，避免异常导致后续定时任务被取消
         LOG.error("exception during timeline writer flush!", th);
       }
     }

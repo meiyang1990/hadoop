@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -26,31 +27,34 @@ import org.apache.hadoop.yarn.server.federation.store.records.SubClusterIdInfo;
 import org.apache.hadoop.yarn.server.federation.store.records.SubClusterInfo;
 
 /**
- * This implements a policy that interprets "weights" as a ordered list of
- * preferences among sub-clusters. Highest weight among active subclusters is
- * chosen.
+ * YARN联邦优先级路由策略实现，将子集群权重作为优先级，从活跃子集群中选择权重最高的子集群路由应用提交请求。
  */
 public class PriorityRouterPolicy extends AbstractRouterPolicy {
 
   @Override
   protected SubClusterId chooseSubCluster(
       String queue, Map<SubClusterId, SubClusterInfo> preSelectSubclusters) throws YarnException {
-    // This finds the sub-cluster with the highest weight among the
-    // currently active ones.
+    // 获取当前路由策略配置的各子集群权重
     Map<SubClusterIdInfo, Float> weights = getPolicyInfo().getRouterPolicyWeights();
+    // 存储最终选中的子集群ID
     SubClusterId chosen = null;
+    // 记录当前找到的最大权重，初始化为最小浮点值
     Float currentBest = Float.MIN_VALUE;
+    // 遍历所有预选的活跃子集群，找出权重最高的子集群
     for (SubClusterId id : preSelectSubclusters.keySet()) {
       SubClusterIdInfo idInfo = new SubClusterIdInfo(id);
+      // 检查子集群是否有权重配置，且权重高于当前最优值
       if (weights.containsKey(idInfo) && weights.get(idInfo) > currentBest) {
         currentBest = weights.get(idInfo);
         chosen = id;
       }
     }
+    // 未找到符合条件的活跃子集群，抛出异常
     if (chosen == null) {
       throw new FederationPolicyException(
           "No Active Subcluster with weight vector greater than zero.");
     }
+    // 返回选中的权重最高的子集群ID
     return chosen;
   }
 }

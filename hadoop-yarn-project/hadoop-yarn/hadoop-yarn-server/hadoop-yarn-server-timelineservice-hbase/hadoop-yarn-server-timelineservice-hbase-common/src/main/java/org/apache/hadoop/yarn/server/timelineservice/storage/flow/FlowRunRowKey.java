@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,7 +28,7 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.LongConverte
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.Separator;
 
 /**
- * Represents a rowkey for the flow run table.
+ * 表示流运行表(HBase)的RowKey结构，封装了流运行RowKey的各个组成部分与编解码逻辑
  */
 public class FlowRunRowKey {
   private final String clusterId;
@@ -37,6 +38,13 @@ public class FlowRunRowKey {
   private final FlowRunRowKeyConverter flowRunRowKeyConverter =
       new FlowRunRowKeyConverter();
 
+  /**
+   * 构造流运行RowKey对象
+   * @param clusterId 集群ID
+   * @param userId 用户ID
+   * @param flowName 流名称
+   * @param flowRunId 流运行ID
+   */
   public FlowRunRowKey(String clusterId, String userId, String flowName,
       Long flowRunId) {
     this.clusterId = clusterId;
@@ -62,10 +70,8 @@ public class FlowRunRowKey {
   }
 
   /**
-   * Constructs a row key for the entity table as follows: {
-   * clusterId!userId!flowName!Inverted Flow Run Id}.
-   *
-   * @return byte array with the row key
+   * 构造HBase存储用的字节数组RowKey
+   * @return 字节数组形式的RowKey
    */
   public byte[] getRowKey() {
     return flowRunRowKeyConverter.encode(this);
@@ -73,36 +79,31 @@ public class FlowRunRowKey {
 
 
   /**
-   * Given the raw row key as bytes, returns the row key as an object.
-   * @param rowKey Byte representation of row key.
-   * @return A <cite>FlowRunRowKey</cite> object.
+   * 从字节数组解析出流运行RowKey对象
+   * @param rowKey 字节形式的RowKey
+   * @return 解析后的FlowRunRowKey对象
    */
   public static FlowRunRowKey parseRowKey(byte[] rowKey) {
     return new FlowRunRowKeyConverter().decode(rowKey);
   }
 
   /**
-   * Constructs a row key for the flow run table as follows:
-   * {@code clusterId!userId!flowName!Flow Run Id}.
-   * @return String representation of row key
+   * 获取字符串形式的RowKey
+   * @return 字符串形式的RowKey
    */
   public String getRowKeyAsString() {
     return flowRunRowKeyConverter.encodeAsString(this);
   }
 
   /**
-   * Given the encoded row key as string, returns the row key as an object.
-   * @param encodedRowKey String representation of row key.
-   * @return A <cite>FlowRunRowKey</cite> object.
+   * 从字符串解析出流运行RowKey对象
+   * @param encodedRowKey 字符串形式的RowKey
+   * @return 解析后的FlowRunRowKey对象
    */
   public static FlowRunRowKey parseRowKeyFromString(String encodedRowKey) {
     return new FlowRunRowKeyConverter().decodeFromString(encodedRowKey);
   }
 
-  /**
-   * returns the Flow Key as a verbose String output.
-   * @return String
-   */
   @Override
   public String toString() {
     StringBuilder flowKeyStr = new StringBuilder();
@@ -116,10 +117,7 @@ public class FlowRunRowKey {
   }
 
   /**
-   * Encodes and decodes row key for flow run table.
-   * The row key is of the form : clusterId!userId!flowName!flowrunId.
-   * flowrunId is a long and rest are strings.
-   * <p>
+   * 流运行RowKey编解码器，实现字节数组/字符串与FlowRunRowKey对象的互相转换
    */
   final private static class FlowRunRowKeyConverter implements
       KeyConverter<FlowRunRowKey>, KeyConverterToString<FlowRunRowKey> {
@@ -128,72 +126,51 @@ public class FlowRunRowKey {
     }
 
     /**
-     * The flow run row key is of the form clusterId!userId!flowName!flowrunId
-     * with each segment separated by !. The sizes below indicate sizes of each
-     * one of these segments in sequence. clusterId, userId and flowName are
-     * strings. flowrunId is a long hence 8 bytes in size. Strings are variable
-     * in size (i.e. end whenever separator is encountered). This is used while
-     * decoding and helps in determining where to split.
+     * 各段大小定义：前三个字段是变长字符串，最后flowRunId是固定8字节long
      */
     private static final int[] SEGMENT_SIZES = {Separator.VARIABLE_SIZE,
         Separator.VARIABLE_SIZE, Separator.VARIABLE_SIZE, Bytes.SIZEOF_LONG };
 
-    /*
-     * (non-Javadoc)
-     *
-     * Encodes FlowRunRowKey object into a byte array with each component/field
-     * in FlowRunRowKey separated by Separator#QUALIFIERS. This leads to an flow
-     * run row key of the form clusterId!userId!flowName!flowrunId If flowRunId
-     * in passed FlowRunRowKey object is null (and the fields preceding it i.e.
-     * clusterId, userId and flowName are not null), this returns a row key
-     * prefix of the form clusterId!userName!flowName! flowRunId is inverted
-     * while encoding as it helps maintain a descending order for flow keys in
-     * flow run table.
-     *
-     * @see
-     * org.apache.hadoop.yarn.server.timelineservice.storage.common
-     * .KeyConverter#encode(java.lang.Object)
+    /**
+     * 将FlowRunRowKey对象编码为字节数组RowKey
+     * 格式为 clusterId!userId!flowName!反转后的flowRunId
+     * 反转flowRunId实现降序排列，保证新运行排在前面
+     * @see org.apache.hadoop.yarn.server.timelineservice.storage.common.KeyConverter#encode(java.lang.Object)
      */
     @Override
     public byte[] encode(FlowRunRowKey rowKey) {
+      // 编码前三个字符串字段并拼接
       byte[] first =
           Separator.QUALIFIERS.join(Separator.encode(rowKey.getClusterId(),
               Separator.SPACE, Separator.TAB, Separator.QUALIFIERS), Separator
               .encode(rowKey.getUserId(), Separator.SPACE, Separator.TAB,
                   Separator.QUALIFIERS), Separator.encode(rowKey.getFlowName(),
               Separator.SPACE, Separator.TAB, Separator.QUALIFIERS));
+      // flowRunId为空时返回前缀，用于前缀扫描
       if (rowKey.getFlowRunId() == null) {
         return Separator.QUALIFIERS.join(first, Separator.EMPTY_BYTES);
       } else {
-        // Note that flowRunId is a long, so we can't encode them all at the
-        // same
-        // time.
+        // 反转flowRunId实现降序，转换为字节后拼接
         byte[] second =
             Bytes.toBytes(LongConverter.invertLong(rowKey.getFlowRunId()));
         return Separator.QUALIFIERS.join(first, second);
       }
     }
 
-    /*
-     * (non-Javadoc)
-     *
-     * Decodes an flow run row key of the form
-     * clusterId!userId!flowName!flowrunId represented in byte format and
-     * converts it into an FlowRunRowKey object. flowRunId is inverted while
-     * decoding as it was inverted while encoding.
-     *
-     * @see
-     * org.apache.hadoop.yarn.server.timelineservice.storage.common
-     * .KeyConverter#decode(byte[])
+    /**
+     * 将字节数组RowKey解码为FlowRunRowKey对象
+     * @see org.apache.hadoop.yarn.server.timelineservice.storage.common.KeyConverter#decode(byte[])
      */
     @Override
     public FlowRunRowKey decode(byte[] rowKey) {
+      // 按分隔符和段大小拆分RowKey
       byte[][] rowKeyComponents =
           Separator.QUALIFIERS.split(rowKey, SEGMENT_SIZES);
       if (rowKeyComponents.length != 4) {
         throw new IllegalArgumentException("the row key is not valid for "
             + "a flow run");
       }
+      // 解码前三个字符串字段
       String clusterId =
           Separator.decode(Bytes.toString(rowKeyComponents[0]),
               Separator.QUALIFIERS, Separator.TAB, Separator.SPACE);
@@ -203,23 +180,32 @@ public class FlowRunRowKey {
       String flowName =
           Separator.decode(Bytes.toString(rowKeyComponents[2]),
               Separator.QUALIFIERS, Separator.TAB, Separator.SPACE);
+      // 反转还原得到原始flowRunId
       Long flowRunId =
           LongConverter.invertLong(Bytes.toLong(rowKeyComponents[3]));
       return new FlowRunRowKey(clusterId, userId, flowName, flowRunId);
     }
 
+    /**
+     * 将FlowRunRowKey编码为字符串形式
+     */
     @Override
     public String encodeAsString(FlowRunRowKey key) {
       if (key.clusterId == null || key.userId == null || key.flowName == null
           || key.flowRunId == null) {
         throw new IllegalArgumentException();
       }
+      // 拼接并转义各字段
       return TimelineReaderUtils.joinAndEscapeStrings(new String[] {
           key.clusterId, key.userId, key.flowName, key.flowRunId.toString()});
     }
 
+    /**
+     * 从字符串解析出FlowRunRowKey对象
+     */
     @Override
     public FlowRunRowKey decodeFromString(String encodedRowKey) {
+      // 拆分字符串，处理转义
       List<String> split = TimelineReaderUtils.split(encodedRowKey);
       if (split == null || split.size() != 4) {
         throw new IllegalArgumentException(

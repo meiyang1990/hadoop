@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -32,11 +33,31 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.yarn.event.EventHandler;
 import org.apache.hadoop.yarn.util.Clock;
 
+/**
+ * Map任务尝试实现类，兼容旧版MapReduce API，负责维护Map任务尝试的状态和数据
+ * 继承TaskAttemptImpl，实现Map任务远端执行对象的构造
+ */
 @SuppressWarnings("rawtypes")
 public class MapTaskAttemptImpl extends TaskAttemptImpl {
 
+  // 存储当前Map任务处理的数据分片元信息
   private final TaskSplitMetaInfo splitInfo;
 
+  /**
+   * 构造Map任务尝试实例，初始化分片信息并调用父类构造
+   * @param taskId YARN格式的任务ID
+   * @param attempt 尝试编号
+   * @param eventHandler 事件处理器，用于处理任务状态变更事件
+   * @param jobFile 作业描述文件路径
+   * @param partition 分区编号
+   * @param splitInfo 数据分片元信息
+   * @param conf 作业配置
+   * @param taskAttemptListener 任务尝试监听器
+   * @param jobToken 作业认证令牌
+   * @param credentials 作业凭证信息
+   * @param clock 时钟工具
+   * @param appContext MR应用上下文
+   */
   public MapTaskAttemptImpl(TaskId taskId, int attempt, 
       EventHandler eventHandler, Path jobFile, 
       int partition, TaskSplitMetaInfo splitInfo, JobConf conf,
@@ -50,6 +71,10 @@ public class MapTaskAttemptImpl extends TaskAttemptImpl {
     this.splitInfo = splitInfo;
   }
 
+  /**
+   * 创建用于NodeManager上远程执行的MapTask实例
+   * @return 可远程执行的旧版MapTask对象
+   */
   @Override
   public Task createRemoteTask() {
     //job file name is set in TaskAttempt, setting it null here

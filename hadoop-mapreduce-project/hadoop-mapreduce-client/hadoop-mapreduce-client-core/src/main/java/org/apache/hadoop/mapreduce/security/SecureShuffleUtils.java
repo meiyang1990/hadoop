@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,11 +36,8 @@ import org.apache.hadoop.mapreduce.security.token.JobTokenSecretManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
- * 
- * utilities for generating kyes, hashes and verifying them for shuffle
- *
+ * MapReduce Shuffle阶段安全工具类，提供密钥生成、哈希计算与验证功能，保障Shuffle数据传输安全
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -47,12 +45,16 @@ public class SecureShuffleUtils {
   private static final Logger LOG =
       LoggerFactory.getLogger(SecureShuffleUtils.class);
   
+  // HTTP请求头：URL哈希标识，用于验证请求完整性
   public static final String HTTP_HEADER_URL_HASH = "UrlHash";
+  // HTTP响应头：响应哈希标识，用于验证响应完整性
   public static final String HTTP_HEADER_REPLY_URL_HASH = "ReplyHash";
   
   /**
-   * Base64 encoded hash of msg
-   * @param msg
+   * 对消息生成Base64编码的哈希值
+   * @param msg 待计算哈希的原始消息
+   * @param key 用于计算HMAC的密钥
+   * @return Base64编码后的哈希字符串
    */
   public static String generateHash(byte[] msg, SecretKey key) {
     return new String(Base64.encodeBase64(generateByteHash(msg, key)), 
@@ -60,17 +62,21 @@ public class SecureShuffleUtils {
   }
   
   /**
-   * calculate hash of msg
-   * @param msg
-   * @return
+   * 计算消息的原始二进制哈希值
+   * @param msg 待计算哈希的原始消息
+   * @param key 用于计算HMAC的密钥
+   * @return 二进制哈希结果
    */
   private static byte[] generateByteHash(byte[] msg, SecretKey key) {
     return JobTokenSecretManager.computeHash(msg, key);
   }
   
   /**
-   * verify that hash equals to HMacHash(msg)
-   * @return true if is the same
+   * 验证给定哈希值与消息计算出的哈希是否一致
+   * @param hash 待验证的哈希值
+   * @param msg 原始消息
+   * @param key 用于计算HMAC的密钥
+   * @return true 哈希一致，false 哈希不一致
    */
   private static boolean verifyHash(byte[] hash, byte[] msg, SecretKey key) {
     byte[] msg_hash = generateByteHash(msg, key);
@@ -78,11 +84,11 @@ public class SecureShuffleUtils {
   }
   
   /**
-   * Aux util to calculate hash of a String
-   * @param enc_str
-   * @param key
-   * @return Base64 encodedHash
-   * @throws IOException
+   * 对输入字符串计算并生成Base64编码的哈希值
+   * @param enc_str 待计算哈希的输入字符串
+   * @param key 用于计算HMAC的密钥
+   * @return Base64编码后的哈希字符串
+   * @throws IOException 编码异常
    */
   public static String hashFromString(String enc_str, SecretKey key) 
   throws IOException {
@@ -90,10 +96,11 @@ public class SecureShuffleUtils {
   }
   
   /**
-   * verify that base64Hash is same as HMacHash(msg)  
-   * @param base64Hash (Base64 encoded hash)
-   * @param msg
-   * @throws IOException if not the same
+   * 验证Base64编码的哈希与消息计算结果是否一致，不一致则抛出异常
+   * @param base64Hash Base64编码的待验证哈希
+   * @param msg 原始消息
+   * @param key 用于计算HMAC的密钥
+   * @throws IOException 验证失败时抛出异常
    */
   public static void verifyReply(String base64Hash, String msg, SecretKey key)
   throws IOException {
@@ -107,37 +114,40 @@ public class SecureShuffleUtils {
   }
   
   /**
-   * Shuffle specific utils - build string for encoding from URL
-   * @param url
-   * @return string for encoding
+   * 从URL对象构造用于哈希计算的原始消息字符串
+   * @param url 输入URL对象
+   * @return 用于哈希计算的拼接消息字符串
    */
   public static String buildMsgFrom(URL url) {
     return buildMsgFrom(url.getPath(), url.getQuery(), url.getPort());
   }
+
   /**
-   * Shuffle specific utils - build string for encoding from URL
-   * @param request
-   * @return string for encoding
+   * 从HttpServletRequest对象构造用于哈希计算的原始消息字符串
+   * @param request HTTP请求对象
+   * @return 用于哈希计算的拼接消息字符串
    */
   public static String buildMsgFrom(HttpServletRequest request ) {
     return buildMsgFrom(request.getRequestURI(), request.getQueryString(),
         request.getLocalPort());
   }
+  
   /**
-   * Shuffle specific utils - build string for encoding from URL
-   * @param uri_path
-   * @param uri_query
-   * @return string for encoding
+   * 从URI路径、查询参数、端口拼接构造用于哈希计算的原始消息字符串
+   * @param uri_path URI路径
+   * @param uri_query URI查询参数
+   * @param port 服务端口
+   * @return 拼接完成的消息字符串
    */
   private static String buildMsgFrom(String uri_path, String uri_query, int port) {
     return String.valueOf(port) + uri_path + "?" + uri_query;
   }
 
   /**
-   * byte array to Hex String
+   * 将字节数组转换为十六进制字符串
    * 
-   * @param ba
-   * @return string with HEX value of the key
+   * @param ba 输入字节数组
+   * @return 字节数组对应的十六进制字符串
    */
   public static String toHex(byte[] ba) {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();

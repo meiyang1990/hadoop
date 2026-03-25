@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,20 +31,38 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * ShuffleConsumerPlugin for serving Reducers.  It may shuffle MOF files from
- * either the built-in ShuffleHandler or from a 3rd party AuxiliaryService.
- *
+ * 文件说明：MapReduce Reduce任务Shuffle阶段消费插件接口
+ * 
+ * Shuffle消费插件接口定义，为Reduce任务提供Map输出拉取消费能力
+ * 支持从内置ShuffleHandler或第三方辅助服务拉取Map输出文件（MOF）
  */
 @InterfaceAudience.LimitedPrivate("mapreduce")
 @InterfaceStability.Unstable
 public interface ShuffleConsumerPlugin<K, V> {
 
+  /**
+   * 初始化插件，传入上下文环境配置
+   * @param context 插件运行上下文，包含Reduce任务所有运行参数
+   */
   public void init(Context<K, V> context);
 
+  /**
+   * 执行Shuffle拉取与合并流程，返回合并后的排序键值对迭代器
+   * @return 合并排序后的键值对迭代器，供Reduce任务读取处理
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   public RawKeyValueIterator run() throws IOException, InterruptedException;
 
+  /**
+   * 关闭插件，清理临时资源
+   */
   public void close();
 
+  /**
+   * Shuffle消费插件上下文类，保存插件运行所需的全部上下文参数
+   * 为插件提供Reduce任务运行环境信息与统计计数器
+   */
   @InterfaceAudience.LimitedPrivate("mapreduce")
   @InterfaceStability.Unstable
   public static class Context<K,V> {
@@ -69,6 +88,30 @@ public interface ShuffleConsumerPlugin<K, V> {
     private final MapOutputFile mapOutputFile;
     private final Map<TaskAttemptID, MapOutputFile> localMapFiles;
 
+    /**
+     * 构造上下文对象，初始化所有参数
+     * @param reduceId Reduce任务尝试ID
+     * @param jobConf 作业配置对象
+     * @param localFS 本地文件系统
+     * @param umbilical 任务与TaskTracker通信协议
+     * @param localDirAllocator 本地目录分配器，用于管理临时磁盘空间
+     * @param reporter 任务进度报告器
+     * @param codec Map输出压缩编解码器
+     * @param combinerClass Combiner合并类
+     * @param combineCollector Combiner输出收集器
+     * @param spilledRecordsCounter 溢写记录计数器
+     * @param reduceCombineInputCounter Combiner输入记录计数器
+     * @param shuffledMapsCounter 完成Shuffle的Map任务计数器
+     * @param reduceShuffleBytes Shuffle拉取字节数计数器
+     * @param failedShuffleCounter 失败Shuffle拉取次数计数器
+     * @param mergedMapOutputsCounter 合并Map输出数计数器
+     * @param status 任务状态对象
+     * @param copyPhase 拷贝阶段进度对象
+     * @param mergePhase 合并阶段进度对象
+     * @param reduceTask 当前Reduce任务对象
+     * @param mapOutputFile Map输出文件管理对象
+     * @param localMapFiles 本地Map输出文件映射表
+     */
     public Context(org.apache.hadoop.mapreduce.TaskAttemptID reduceId,
                    JobConf jobConf, FileSystem localFS,
                    TaskUmbilicalProtocol umbilical,

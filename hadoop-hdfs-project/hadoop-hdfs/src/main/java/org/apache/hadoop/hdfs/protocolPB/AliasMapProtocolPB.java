@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -24,8 +25,16 @@ import org.apache.hadoop.ipc.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**
+ * 文件级注释：HDFS Provided存储别名映射协议Protobuf RPC接口定义
+ * 本文件定义了NameNode与DataNode之间针对Provided存储别名映射查询的RPC协议PB接口，
+ * 用于DataNode从NameNode获取文件路径与实际存储位置的映射关系，支持外部提供存储访问。
+ * 
  * Protocol between the Namenode and the Datanode to read the AliasMap
  * used for Provided storage.
+ */
+/**
+ * 别名映射协议PB接口，为NameNode和DataNode之间的别名映射查询提供基于Protobuf的阻塞RPC接口
+ * 核心职责：为Provided存储路径别名查询提供RPC协议定义，实现跨节点的映射信息访问
  */
 @ProtocolInfo(
     protocolName =

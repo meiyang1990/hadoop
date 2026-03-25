@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,30 +30,29 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility class to validate the inputs to
- * {@code FederationApplicationHomeSubClusterStore}, allows a fail fast
- * mechanism for invalid user inputs.
- *
+ * 应用归属子集群存储输入参数校验工具类，为联邦状态存储提供快速失败的输入校验能力。
+ * 负责校验对FederationApplicationHomeSubClusterStore所有操作的入参合法性。
  */
 public final class FederationApplicationHomeSubClusterStoreInputValidator {
 
   private static final Logger LOG = LoggerFactory
       .getLogger(FederationApplicationHomeSubClusterStoreInputValidator.class);
 
+  /**
+   * 工具类不允许实例化。
+   */
   private FederationApplicationHomeSubClusterStoreInputValidator() {
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link AddApplicationHomeSubClusterRequest}
-   * for adding a new application is valid or not.
+   * 校验添加应用归属子集群请求入参合法性。
    *
-   * @param request the {@link AddApplicationHomeSubClusterRequest} to validate
-   *          against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 添加应用归属子集群请求
+   * @throws FederationStateStoreInvalidInputException 入参非法时抛出异常
    */
   public static void validate(AddApplicationHomeSubClusterRequest request)
       throws FederationStateStoreInvalidInputException {
+    // 校验请求对象不为空
     if (request == null) {
       String message = "Missing AddApplicationHomeSubCluster Request."
           + " Please try again by specifying"
@@ -61,21 +61,19 @@ public final class FederationApplicationHomeSubClusterStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate ApplicationHomeSubCluster info
+    // 校验应用归属子集群信息合法性
     checkApplicationHomeSubCluster(request.getApplicationHomeSubCluster());
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link UpdateApplicationHomeSubClusterRequest}
-   * for updating an application is valid or not.
+   * 校验更新应用归属子集群请求入参合法性。
    *
-   * @param request the {@link UpdateApplicationHomeSubClusterRequest} to
-   *          validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 更新应用归属子集群请求
+   * @throws FederationStateStoreInvalidInputException 入参非法时抛出异常
    */
   public static void validate(UpdateApplicationHomeSubClusterRequest request)
       throws FederationStateStoreInvalidInputException {
+    // 校验请求对象不为空
     if (request == null) {
       String message = "Missing UpdateApplicationHomeSubCluster Request."
           + " Please try again by specifying"
@@ -84,21 +82,19 @@ public final class FederationApplicationHomeSubClusterStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate ApplicationHomeSubCluster info
+    // 校验应用归属子集群信息合法性
     checkApplicationHomeSubCluster(request.getApplicationHomeSubCluster());
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link GetApplicationHomeSubClusterRequest}
-   * for querying application's information is valid or not.
+   * 校验查询应用归属子集群请求入参合法性。
    *
-   * @param request the {@link GetApplicationHomeSubClusterRequest} to validate
-   *          against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 查询应用归属子集群请求
+   * @throws FederationStateStoreInvalidInputException 入参非法时抛出异常
    */
   public static void validate(GetApplicationHomeSubClusterRequest request)
       throws FederationStateStoreInvalidInputException {
+    // 校验请求对象不为空
     if (request == null) {
       String message = "Missing GetApplicationHomeSubCluster Request."
           + " Please try again by specifying an Application Id information.";
@@ -106,21 +102,19 @@ public final class FederationApplicationHomeSubClusterStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate application Id
+    // 校验应用ID合法性
     checkApplicationId(request.getApplicationId());
   }
 
   /**
-   * Quick validation on the input to check some obvious fail conditions (fail
-   * fast). Check if the provided {@link DeleteApplicationHomeSubClusterRequest}
-   * for deleting an application is valid or not.
+   * 校验删除应用归属子集群请求入参合法性。
    *
-   * @param request the {@link DeleteApplicationHomeSubClusterRequest} to
-   *          validate against
-   * @throws FederationStateStoreInvalidInputException if the request is invalid
+   * @param request 删除应用归属子集群请求
+   * @throws FederationStateStoreInvalidInputException 入参非法时抛出异常
    */
   public static void validate(DeleteApplicationHomeSubClusterRequest request)
       throws FederationStateStoreInvalidInputException {
+    // 校验请求对象不为空
     if (request == null) {
       String message = "Missing DeleteApplicationHomeSubCluster Request."
           + " Please try again by specifying"
@@ -129,22 +123,21 @@ public final class FederationApplicationHomeSubClusterStoreInputValidator {
       throw new FederationStateStoreInvalidInputException(message);
     }
 
-    // validate application Id
+    // 校验应用ID合法性
     checkApplicationId(request.getApplicationId());
   }
 
   /**
-   * Validate if the ApplicationHomeSubCluster info are present or not.
+   * 校验应用归属子集群信息合法性。
    *
-   * @param applicationHomeSubCluster the information of the application to be
-   *          verified
-   * @throws FederationStateStoreInvalidInputException if the SubCluster Info
-   *           are invalid
+   * @param applicationHomeSubCluster 应用归属子集群信息
+   * @throws FederationStateStoreInvalidInputException 信息非法时抛出异常
    */
   private static void checkApplicationHomeSubCluster(
       ApplicationHomeSubCluster applicationHomeSubCluster)
 
       throws FederationStateStoreInvalidInputException {
+    // 校验对象不为空
     if (applicationHomeSubCluster == null) {
       String message = "Missing ApplicationHomeSubCluster Info."
           + " Please try again by specifying"
@@ -152,21 +145,20 @@ public final class FederationApplicationHomeSubClusterStoreInputValidator {
       LOG.warn(message);
       throw new FederationStateStoreInvalidInputException(message);
     }
-    // validate application Id
+    // 校验应用ID合法性
     checkApplicationId(applicationHomeSubCluster.getApplicationId());
 
-    // validate subcluster Id
+    // 调用通用工具校验子集群ID合法性
     FederationMembershipStateStoreInputValidator
         .checkSubClusterId(applicationHomeSubCluster.getHomeSubCluster());
 
   }
 
   /**
-   * Validate if the application id is present or not.
+   * 校验应用ID合法性。
    *
-   * @param appId the id of the application to be verified
-   * @throws FederationStateStoreInvalidInputException if the application Id is
-   *           invalid
+   * @param appId 应用ID
+   * @throws FederationStateStoreInvalidInputException 应用ID非法时抛出异常
    */
   private static void checkApplicationId(ApplicationId appId)
       throws FederationStateStoreInvalidInputException {

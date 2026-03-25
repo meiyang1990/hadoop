@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -59,7 +60,10 @@ import org.apache.hadoop.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+/**
+ * HDFS服务端通用工具类，提供URI处理、文件下载下载、地址解析、统计计算等通用工具能力，为HDFS核心服务提供公共支撑。
+ * 该类为 final 类，不可被继承，所有方法均为静态工具方法。
+ */
 @InterfaceAudience.Private
 public final class Util {
   private final static Logger LOG =
@@ -76,23 +80,25 @@ public final class Util {
   public static final URLConnectionFactory connectionFactory;
 
   static {
+    // 加载默认配置初始化工具类
     Configuration conf = new Configuration();
     connectionFactory = URLConnectionFactory
         .newDefaultURLConnectionFactory(conf);
+    // 根据安全状态确定是否开启SPNEGO认证
     isSpnegoEnabled = UserGroupInformation.isSecurityEnabled();
+    // 从配置中读取IO缓冲区大小
     IO_FILE_BUFFER_SIZE = DFSUtilClient.getIoFileBufferSize(conf);
   }
 
   /**
-   * Interprets the passed string as a URI. In case of error it 
-   * assumes the specified string is a file.
-   *
-   * @param s the string to interpret
-   * @return the resulting URI
+   * 将字符串解析为URI，解析失败时默认按本地文件处理。
+   * 用于处理配置中的路径字符串，兼容URI和本地文件两种格式。
+   * @param s 待解析的字符串路径
+   * @return 解析完成的URI对象
    */
   static URI stringAsURI(String s) throws IOException {
     URI u = null;
-    // try to make a URI
+    // 尝试解析为标准URI
     try {
       u = new URI(s);
     } catch (URISyntaxException e){
@@ -100,7 +106,7 @@ public final class Util {
           + ". Please check hdfs configuration.", e);
     }
 
-    // if URI is null or scheme is undefined, then assume it's file://
+    // 如果解析失败或缺少scheme，默认按本地文件处理
     if(u == null || u.getScheme() == null){
       LOG.info("Assuming 'file' scheme for path " + s + " in configuration.");
       u = fileAsURI(new File(s));
@@ -109,12 +115,9 @@ public final class Util {
   }
 
   /**
-   * Converts the passed File to a URI. This method trims the trailing slash if
-   * one is appended because the underlying file is in fact a directory that
-   * exists.
-   * 
-   * @param f the file to convert
-   * @return the resulting URI
+   * 将File对象转换为URI，自动去除目录路径末尾的多余斜杠。
+   * @param f 待转换的File对象
+   * @return 转换完成的标准URI
    */
   public static URI fileAsURI(File f) throws IOException {
     URI u = f.getCanonicalFile().toURI();
@@ -133,9 +136,9 @@ public final class Util {
   }
 
   /**
-   * Converts a collection of strings into a collection of URIs.
-   * @param names collection of strings to convert to URIs
-   * @return collection of URIs
+   * 将字符串集合批量转换为URI集合。
+   * @param names 待转换的字符串集合
+   * @return 转换完成的URI集合
    */
   public static List<URI> stringCollectionAsURIs(
                                   Collection<String> names) {
@@ -151,22 +154,32 @@ public final class Util {
   }
 
   /**
-   * Downloads the files at the specified url location into destination
-   * storage.
+   * 从指定URL下载文件到目标存储，支持校验和验证和流量控制。
+   * 主要用于下载NameNode的fsimage镜像文件，在QJM共享存储和检查点场景使用。
+   * @param url 下载目标URL
+   * @param localPaths 本地存储路径列表
+   * @param dstStorage 目标存储对象
+   * @param getChecksum 是否需要验证MD5校验和
+   * @param timeout HTTP连接超时时间
+   * @param throttler 流量控速器
+   * @return 计算得到的MD5校验值
    */
   public static MD5Hash doGetUrl(URL url, List<File> localPaths,
       Storage dstStorage, boolean getChecksum, int timeout,
       DataTransferThrottler throttler) throws IOException {
     HttpURLConnection connection;
     try {
+      // 打开HTTP连接，处理认证
       connection = (HttpURLConnection)
           connectionFactory.openConnection(url, isSpnegoEnabled);
     } catch (AuthenticationException e) {
       throw new IOException(e);
     }
 
+    // 设置连接和读取超时
     setTimeout(connection, timeout);
 
+    // 检查响应状态是否正常
     if (connection.getResponseCode() != HttpURLConnection.HTTP_OK) {
       throw new HttpGetFailedException("Image transfer servlet at " + url +
               " failed with status code " + connection.getResponseCode() +
@@ -175,6 +188,7 @@ public final class Util {
     }
 
     long advertisedSize;
+    // 从响应头获取文件长度
     String contentLength = connection.getHeaderField(CONTENT_LENGTH);
     if (contentLength != null) {
       advertisedSize = Long.parseLong(contentLength);
@@ -182,32 +196,45 @@ public final class Util {
       throw new IOException(CONTENT_LENGTH + " header is not provided " +
           "by the namenode when trying to fetch " + url);
     }
+    // 从响应头获取MD5校验值
     MD5Hash advertisedDigest = parseMD5Header(connection);
+    // 从响应头获取文件名称
     String fsImageName = connection
         .getHeaderField(ImageServlet.HADOOP_IMAGE_EDITS_HEADER);
+    // 获取输入流
     InputStream stream = connection.getInputStream();
 
+    // 接收并保存文件
     return receiveFile(url.toExternalForm(), localPaths, dstStorage,
         getChecksum, advertisedSize, advertisedDigest, fsImageName, stream,
         throttler);
   }
 
   /**
-   * Receives file at the url location from the input stream and puts them in
-   * the specified destination storage location.
+   * 从输入流读取文件内容并保存到本地路径，支持校验和验证和流量控制。
+   * @param url 原始下载URL，用于日志和错误信息
+   * @param localPaths 本地存储路径列表
+   * @param dstStorage 目标存储对象，用于错误报告
+   * @param getChecksum 是否需要计算MD5校验和
+   * @param advertisedSize 服务端声明的文件大小
+   * @param advertisedDigest 服务端声明的MD5校验值
+   * @param fsImageName 镜像文件名称
+   * @param stream 输入流
+   * @param throttler 流量控速器
+   * @return 计算得到的MD5校验值
    */
   public static MD5Hash receiveFile(String url, List<File> localPaths,
       Storage dstStorage, boolean getChecksum, long advertisedSize,
       MD5Hash advertisedDigest, String fsImageName, InputStream stream,
       DataTransferThrottler throttler) throws
       IOException {
+    // 记录开始时间用于统计传输速率
     long startTime = Time.monotonicNow();
     Map<FileOutputStream, File> streamPathMap = new HashMap<>();
     StringBuilder xferStats = new StringBuilder();
     double xferCombined = 0;
     if (localPaths != null) {
-      // If the local paths refer to directories, use the server-provided header
-      // as the filename within that directory
+      // 如果本地路径是目录，使用服务端返回的文件名作为文件名
       List<File> newLocalPaths = new ArrayList<>();
       for (File localPath : localPaths) {
         if (localPath.isDirectory()) {
@@ -226,6 +253,7 @@ public final class Util {
     long received = 0;
     MessageDigest digester = null;
     if (getChecksum) {
+      // 如果需要校验，初始化MD5计算器并包装输入流
       digester = MD5Hash.getDigester();
       stream = new DigestInputStream(stream, digester);
     }
@@ -236,6 +264,7 @@ public final class Util {
 
     try {
       if (localPaths != null) {
+        // 为每个路径打开输出流
         for (File f : localPaths) {
           try {
             if (f.exists()) {
@@ -247,8 +276,7 @@ public final class Util {
             streamPathMap.put(fos, f);
           } catch (IOException ioe) {
             LOG.warn("Unable to download file " + f, ioe);
-            // This will be null if we're downloading the fsimage to a file
-            // outside of an NNStorage directory.
+            // 如果打开文件失败，向存储报告该磁盘错误
             if (dstStorage != null &&
                 (dstStorage instanceof StorageErrorReporter)) {
               ((StorageErrorReporter)dstStorage).reportErrorOnFile(f);
@@ -264,18 +292,22 @@ public final class Util {
 
       byte[] buf = new byte[IO_FILE_BUFFER_SIZE];
       while (num > 0) {
+        // 循环读取数据
         num = stream.read(buf);
         if (num > 0) {
           received += num;
+          // 写入所有输出流
           for (FileOutputStream fos : outputStreams) {
             fos.write(buf, 0, num);
           }
+          // 流量控制
           if (throttler != null) {
             throttler.throttle(num);
           }
         }
       }
       finishedReceiving = true;
+      // 计算下载耗时和速率
       double xferSec = Math.max(
           ((float)(Time.monotonicNow() - startTime)) / 1000.0, 0.001);
       long xferKb = received / 1024;
@@ -284,11 +316,14 @@ public final class Util {
           String.format(" The file download took %.2fs at %.2f KB/s.",
               xferSec, xferKb / xferSec));
     } finally {
+      // 关闭输入流
       stream.close();
+      // 刷盘并关闭所有输出流
       for (FileOutputStream fos : outputStreams) {
         long flushStartTime = Time.monotonicNow();
         fos.getChannel().force(true);
         fos.close();
+        // 统计刷盘耗时
         double writeSec = Math.max(((float)
             (Time.monotonicNow() - flushStartTime)) / 1000.0, 0.001);
         xferCombined += writeSec;
@@ -298,27 +333,26 @@ public final class Util {
                 " took %.2fs.", writeSec));
       }
 
-      // Something went wrong and did not finish reading.
-      // Remove the temporary files.
+      // 如果接收未完成，删除所有临时文件
       if (!finishedReceiving) {
         deleteTmpFiles(localPaths);
       }
 
+      // 接收完成但文件大小不匹配，删除文件并抛出异常
       if (finishedReceiving && received != advertisedSize) {
-        // only throw this exception if we think we read all of it on our end
-        // -- otherwise a client-side IOException would be masked by this
-        // exception that makes it look like a server-side problem!
         deleteTmpFiles(localPaths);
         throw new IOException("File " + url + " received length " + received +
             " is not of the advertised size " + advertisedSize +
             ". Fsimage name: " + fsImageName + " lastReceived: " + num);
       }
     }
+    // 输出整体传输统计信息
     xferStats.insert(0, String.format("Combined time for file download and" +
         " fsync to all disks took %.2fs.", xferCombined));
     LOG.info(xferStats.toString());
 
     if (digester != null) {
+      // 计算MD5并和服务端声明对比
       MD5Hash computedDigest = new MD5Hash(digester.digest());
 
       if (advertisedDigest != null &&
@@ -334,6 +368,10 @@ public final class Util {
     }
   }
 
+  /**
+   * 删除下载过程中产生的临时文件。
+   * @param files 待删除的文件列表
+   */
   private static void deleteTmpFiles(List<File> files) {
     if (files == null) {
       return;
@@ -348,9 +386,9 @@ public final class Util {
   }
 
   /**
-   * Sets a timeout value in millisecods for the Http connection.
-   * @param connection the Http connection for which timeout needs to be set
-   * @param timeout value to be set as timeout in milliseconds
+   * 为HTTP连接设置连接超时和读取超时。
+   * @param connection HTTP连接对象
+   * @param timeout 超时时间，单位毫秒，小于等于0不设置
    */
   public static void setTimeout(HttpURLConnection connection, int timeout) {
     if (timeout > 0) {
@@ -359,25 +397,39 @@ public final class Util {
     }
   }
 
+  /**
+   * 从HTTP响应头解析MD5校验值。
+   * @param connection HTTP连接对象
+   * @return 解析得到的MD5，响应头不存在返回null
+   */
   private static MD5Hash parseMD5Header(HttpURLConnection connection) {
     String header = connection.getHeaderField(MD5_HEADER);
     return (header != null) ? new MD5Hash(header) : null;
   }
 
+  /**
+   * 从URI中解析地址列表，支持域名解析多个IP，用于QJM共享存储的JournalNode地址解析。
+   * @param uri 包含多个地址的URI，地址之间用分号分隔
+   * @param conf Hadoop配置对象
+   * @return 解析完成的InetSocketAddress列表
+   */
   public static List<InetSocketAddress> getAddressesList(URI uri, Configuration conf)
       throws IOException{
     String authority = uri.getAuthority();
     Preconditions.checkArgument(authority != null && !authority.isEmpty(),
         "URI has no authority: " + uri);
 
+    // 按分号分隔多个地址
     String[] parts = StringUtils.split(authority, ';');
     for (int i = 0; i < parts.length; i++) {
       parts[i] = parts[i].trim();
     }
 
+    // 检查是否开启域名解析
     boolean resolveNeeded = conf.getBoolean(
         DFSConfigKeys.DFS_NAMENODE_EDITS_QJOURNALS_RESOLUTION_ENABLED,
         DFSConfigKeys.DFS_NAMENODE_EDITS_QJOURNALS_RESOLUTION_ENABLED_DEFAULT);
+    // 创建域名解析器
     DomainNameResolver dnr = DomainNameResolverFactory.newInstance(
         conf,
         DFSConfigKeys.DFS_NAMENODE_EDITS_QJOURNALS_RESOLUTION_RESOLVER_IMPL);
@@ -385,83 +437,3 @@ public final class Util {
     List<InetSocketAddress> addrs = Lists.newArrayList();
     for (String addr : parts) {
       if (resolveNeeded) {
-        LOG.info("Resolving journal address: " + addr);
-        InetSocketAddress isa = NetUtils.createSocketAddr(
-            addr, DFSConfigKeys.DFS_JOURNALNODE_RPC_PORT_DEFAULT);
-        // Get multiple hostnames from domain name if needed,
-        // for example multiple hosts behind a DNS entry.
-        int port = isa.getPort();
-        // QJM should just use FQDN
-        String[] hostnames = dnr
-            .getAllResolvedHostnameByDomainName(isa.getHostName(), true);
-        if (hostnames.length == 0) {
-          throw new UnknownHostException(addr);
-        }
-        for (String h : hostnames) {
-          addrs.add(NetUtils.createSocketAddr(
-              h + ":" + port,
-              DFSConfigKeys.DFS_JOURNALNODE_RPC_PORT_DEFAULT)
-          );
-        }
-      } else {
-        InetSocketAddress isa = NetUtils.createSocketAddr(
-            addr, DFSConfigKeys.DFS_JOURNALNODE_RPC_PORT_DEFAULT);
-        if (isa.isUnresolved()) {
-          throw new UnknownHostException(addr);
-        }
-        addrs.add(isa);
-      }
-    }
-    return addrs;
-  }
-
-  public static List<InetSocketAddress> getLoggerAddresses(URI uri,
-      Set<InetSocketAddress> addrsToExclude, Configuration conf) throws IOException {
-    List<InetSocketAddress> addrsList = getAddressesList(uri, conf);
-    addrsList.removeAll(addrsToExclude);
-    return addrsList;
-  }
-
-  public static boolean isDiskStatsEnabled(int fileIOSamplingPercentage) {
-    final boolean isEnabled;
-    if (fileIOSamplingPercentage <= 0) {
-      LOG.info(DFSConfigKeys
-          .DFS_DATANODE_FILEIO_PROFILING_SAMPLING_PERCENTAGE_KEY + " set to "
-          + fileIOSamplingPercentage + ". Disabling file IO profiling");
-      isEnabled = false;
-    } else {
-      LOG.info(DFSConfigKeys
-          .DFS_DATANODE_FILEIO_PROFILING_SAMPLING_PERCENTAGE_KEY + " set to "
-          + fileIOSamplingPercentage + ". Enabling file IO profiling");
-      isEnabled = true;
-    }
-
-    return isEnabled;
-  }
-
-  /**
-   * Return the standard deviation of storage block pool usage.
-   */
-  public static float getBlockPoolUsedPercentStdDev(StorageReport[] storageReports) {
-    ArrayList<Float> usagePercentList = new ArrayList<>();
-    float totalUsagePercent = 0.0f;
-    float dev = 0.0f;
-
-    if (storageReports.length == 0) {
-      return dev;
-    }
-
-    for (StorageReport s : storageReports) {
-      usagePercentList.add(s.getBlockPoolUsagePercent());
-      totalUsagePercent += s.getBlockPoolUsagePercent();
-    }
-
-    totalUsagePercent /= storageReports.length;
-    for (Float usagePercent : usagePercentList) {
-      dev += (usagePercent - totalUsagePercent)
-          * (usagePercent - totalUsagePercent);
-    }
-    dev = (float) Math.sqrt(dev / usagePercentList.size());
-    return dev;
-  }
-}

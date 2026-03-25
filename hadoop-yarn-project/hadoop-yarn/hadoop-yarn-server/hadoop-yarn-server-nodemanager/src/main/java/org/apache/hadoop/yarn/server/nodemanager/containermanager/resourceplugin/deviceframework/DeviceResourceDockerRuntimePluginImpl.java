@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -40,9 +41,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Bridge DevicePlugin and the hooks related to lunch Docker container.
- * When launching Docker container, DockerLinuxContainerRuntime will invoke
- * this class's methods which get needed info back from DevicePlugin.
+ * 设备框架与Docker容器启动流程的桥接实现，连接DevicePlugin和Docker容器启动钩子
+ * 当启动Docker容器时，DockerLinuxContainerRuntime会调用此类方法，从DevicePlugin获取所需配置信息
  * */
 public class DeviceResourceDockerRuntimePluginImpl
     implements DockerCommandPlugin {
@@ -55,13 +55,19 @@ public class DeviceResourceDockerRuntimePluginImpl
   private DevicePluginAdapter devicePluginAdapter;
 
   private int maxCacheSize = 100;
-  // LRU to avoid memory leak if getCleanupDockerVolumesCommand not invoked.
+  // LRU缓存，防止清理卷命令未调用时发生内存泄漏
   private Map<ContainerId, Set<Device>> cachedAllocation =
       Collections.synchronizedMap(new LRUCacheHashMap(maxCacheSize, true));
 
   private Map<ContainerId, DeviceRuntimeSpec> cachedSpec =
       Collections.synchronizedMap(new LRUCacheHashMap<>(maxCacheSize, true));
 
+  /**
+   * 构造函数，初始化Docker运行时插件
+   * @param resourceName 资源名称
+   * @param devicePlugin 对应的设备插件实例
+   * @param devicePluginAdapter 设备插件适配器
+   */
   public DeviceResourceDockerRuntimePluginImpl(String resourceName,
       DevicePlugin devicePlugin, DevicePluginAdapter devicePluginAdapter) {
     this.resourceName = resourceName;
@@ -74,9 +80,11 @@ public class DeviceResourceDockerRuntimePluginImpl
       Container container) throws ContainerExecutionException {
     String containerId = container.getContainerId().toString();
     LOG.debug("Try to update docker run command for: {}", containerId);
+    // 检查容器是否请求了当前类型的设备，无请求则直接返回
     if(!requestedDevice(resourceName, container)) {
       return;
     }
+    // 获取设备插件生成的运行时规范
     DeviceRuntimeSpec deviceRuntimeSpec = getRuntimeSpec(container);
     if (deviceRuntimeSpec == null) {
       LOG.warn("The device plugin: "
@@ -85,11 +93,11 @@ public class DeviceResourceDockerRuntimePluginImpl
           + containerId);
       return;
     }
-    // handle runtime
+    // 添加容器运行时配置
     dockerRunCommand.addRuntime(deviceRuntimeSpec.getContainerRuntime());
     LOG.debug("Handle docker container runtime type: {} for container: {}",
         deviceRuntimeSpec.getContainerRuntime(), containerId);
-    // handle device mounts
+    // 处理设备挂载配置
     Set<MountDeviceSpec> deviceMounts = deviceRuntimeSpec.getDeviceMounts();
     LOG.debug("Handle device mounts: {} for container: {}", deviceMounts,
         containerId);
@@ -98,7 +106,7 @@ public class DeviceResourceDockerRuntimePluginImpl
           mountDeviceSpec.getDevicePathInHost(),
           mountDeviceSpec.getDevicePathInContainer());
     }
-    // handle volume mounts
+    // 处理数据卷挂载配置
     Set<MountVolumeSpec> mountVolumeSpecs = deviceRuntimeSpec.getVolumeMounts();
     LOG.debug("Handle volume mounts: {} for container: {}", mountVolumeSpecs,
         containerId);
@@ -113,7 +121,7 @@ public class DeviceResourceDockerRuntimePluginImpl
             mountVolumeSpec.getMountPath());
       }
     }
-    // handle envs
+    // 添加环境变量配置
     dockerRunCommand.addEnv(deviceRuntimeSpec.getEnvs());
     LOG.debug("Handle envs: {} for container: {}",
         deviceRuntimeSpec.getEnvs(), containerId);
@@ -122,16 +130,20 @@ public class DeviceResourceDockerRuntimePluginImpl
   @Override
   public DockerVolumeCommand getCreateDockerVolumeCommand(Container container)
       throws ContainerExecutionException {
+    // 检查容器是否请求了当前类型的设备，无请求则直接返回
     if(!requestedDevice(resourceName, container)) {
       return null;
     }
+    // 获取设备插件生成的运行时规范
     DeviceRuntimeSpec deviceRuntimeSpec = getRuntimeSpec(container);
     if (deviceRuntimeSpec == null) {
       return null;
     }
+    // 遍历卷声明，查找需要创建的Docker卷
     Set<VolumeSpec> volumeClaims = deviceRuntimeSpec.getVolumeSpecs();
     for (VolumeSpec volumeSec: volumeClaims) {
       if (volumeSec.getVolumeOperation().equals(VolumeSpec.CREATE)) {
+        // 构造Docker卷创建命令
         DockerVolumeCommand command = new DockerVolumeCommand(
             DockerVolumeCommand.VOLUME_CREATE_SUB_COMMAND);
         command.setDriverName(volumeSec.getVolumeDriver());
@@ -147,11 +159,13 @@ public class DeviceResourceDockerRuntimePluginImpl
   @Override
   public DockerVolumeCommand getCleanupDockerVolumesCommand(Container container)
       throws ContainerExecutionException {
-
+    // 检查容器是否请求了当前类型的设备，无请求则直接返回
     if(!requestedDevice(resourceName, container)) {
       return null;
     }
+    // 获取已分配给容器的设备
     Set<Device> allocated = getAllocatedDevices(container);
+    // 通知设备插件设备已释放，执行清理逻辑
     try {
       devicePlugin.onDevicesReleased(allocated);
     } catch (Exception e) {
@@ -159,45 +173,62 @@ public class DeviceResourceDockerRuntimePluginImpl
           + devicePlugin.getClass() + "for container: "
           + container.getContainerId().toString(), e);
     }
-    // remove cache
+    // 清除缓存信息
     ContainerId containerId = container.getContainerId();
     cachedAllocation.remove(containerId);
     cachedSpec.remove(containerId);
     return null;
   }
 
+  /**
+   * 检查容器是否请求了指定类型的设备
+   * @param resName 资源名称
+   * @param container 容器实例
+   * @return 是否请求了该类型设备
+   */
   protected boolean requestedDevice(String resName, Container container) {
     return DeviceMappingManager.
         getRequestedDeviceCount(resName, container.getResource()) > 0;
   }
 
   private Set<Device> getAllocatedDevices(Container container) {
-    // get allocated devices
+    // 获取已分配设备集合
     Set<Device> allocated;
     ContainerId containerId = container.getContainerId();
+    // 先查询缓存
     allocated = cachedAllocation.get(containerId);
     if (allocated != null) {
       return allocated;
     }
+    // 缓存未命中，从设备映射管理器获取
     allocated = devicePluginAdapter
         .getDeviceMappingManager()
         .getAllocatedDevices(resourceName, containerId);
     LOG.debug("Get allocation from deviceMappingManager: {}, {} for"
         + " container: {}", allocated, resourceName, containerId);
+    // 写入缓存
     cachedAllocation.put(containerId, allocated);
     return allocated;
   }
 
+  /**
+   * 获取容器的设备运行时规范，从缓存或设备插件获取
+   * @param container 容器实例
+   * @return 设备运行时规范
+   */
   public synchronized DeviceRuntimeSpec getRuntimeSpec(Container container) {
     ContainerId containerId = container.getContainerId();
+    // 先查询缓存
     DeviceRuntimeSpec deviceRuntimeSpec = cachedSpec.get(containerId);
     if (deviceRuntimeSpec == null) {
+      // 缓存未命中，获取已分配设备
       Set<Device> allocated = getAllocatedDevices(container);
       if (allocated == null || allocated.size() == 0) {
         LOG.error("Cannot get allocation for container:" + containerId);
         return null;
       }
       try {
+        // 调用设备插件生成Docker运行时的配置规范
         deviceRuntimeSpec = devicePlugin.onDevicesAllocated(allocated,
             YarnRuntimeType.RUNTIME_DOCKER);
       } catch (Exception e) {
@@ -210,6 +241,7 @@ public class DeviceResourceDockerRuntimePluginImpl
             + containerId + ", please check plugin logic");
         return null;
       }
+      // 写入缓存
       cachedSpec.put(containerId, deviceRuntimeSpec);
     }
     return deviceRuntimeSpec;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,36 +35,45 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 import org.apache.hadoop.yarn.util.SystemClock;
 
 /**
- * Event to record successful task completion
+ * 任务尝试完成事件，用于记录任务尝试执行完成的相关信息到作业历史
  *
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class TaskAttemptFinishedEvent  implements HistoryEvent {
 
+  // Avro序列化对象
   private TaskAttemptFinished datum = null;
 
+  // 任务尝试ID
   private TaskAttemptID attemptId;
+  // 任务类型（Map/Reduce等
   private TaskType taskType;
+  // 任务状态
   private String taskStatus;
+  // 任务尝试完成时间戳
   private long finishTime;
+  // 任务运行所在机架名
   private String rackName;
+  // 任务运行所在主机名
   private String hostname;
+  // 任务尝试最终状态字符串
   private String state;
+  // 任务尝试执行计数器
   private Counters counters;
+  // 任务尝试开始时间戳，用于YARN时间线服务v2
   private long startTime;
 
   /**
-   * Create an event to record successful finishes for setup and cleanup
-   * attempts.
-   * @param id Attempt ID
-   * @param taskType Type of task
-   * @param taskStatus Status of task
-   * @param finishTime Finish time of attempt
-   * @param hostname Host where the attempt executed
-   * @param state State string
-   * @param counters Counters for the attempt
-   * @param startTs Task start time to be used for writing entity to ATSv2.
+   * 构造任务尝试完成事件，用于记录任务尝试执行完成信息
+   * @param id 任务尝试ID
+   * @param taskType 任务类型
+   * @param taskStatus 任务状态
+   * @param finishTime 任务尝试完成时间
+   * @param hostname 任务尝试运行的主机名
+   * @param state 任务尝试状态字符串
+   * @param counters 任务尝试执行计数器
+   * @param startTs 任务尝试开始时间，用于写入ATSv2
    */
   public TaskAttemptFinishedEvent(TaskAttemptID id, 
       TaskType taskType, String taskStatus, 
@@ -80,6 +90,17 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
     this.startTime = startTs;
   }
 
+  /**
+   * 构造任务尝试完成事件，自动获取当前时间作为开始时间
+   * @param id 任务尝试ID
+   * @param taskType 任务类型
+   * @param taskStatus 任务状态
+   * @param finishTime 任务尝试完成时间
+   * @param rackName 任务尝试运行的机架名
+   * @param hostname 任务尝试运行的主机名
+   * @param state 任务尝试状态字符串
+   * @param counters 任务尝试执行计数器
+   */
   public TaskAttemptFinishedEvent(TaskAttemptID id, TaskType taskType,
       String taskStatus, long finishTime, String rackName, String hostname,
       String state, Counters counters) {
@@ -89,6 +110,10 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
 
   TaskAttemptFinishedEvent() {}
 
+  /**
+   * 获取用于序列化的Avro数据对象，构造并填充事件数据
+   * @return Avro格式的事件数据对象
+   */
   public Object getDatum() {
     if (datum == null) {
       datum = new TaskAttemptFinished();
@@ -106,6 +131,11 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
     }
     return datum;
   }
+
+  /**
+   * 从Avro数据对象反序列化，恢复事件信息
+   * @param oDatum Avro格式的事件数据对象
+   */
   public void setDatum(Object oDatum) {
     this.datum = (TaskAttemptFinished)oDatum;
     this.attemptId = TaskAttemptID.forName(datum.getAttemptId().toString());
@@ -118,43 +148,46 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
     this.counters = EventReader.fromAvro(datum.getCounters());
   }
 
-  /** Gets the task ID. */
+  /** 获取任务ID */
   public TaskID getTaskId() { return attemptId.getTaskID(); }
-  /** Gets the task attempt id. */
+  /** 获取任务尝试ID */
   public TaskAttemptID getAttemptId() {
     return attemptId;
   }
-  /** Gets the task type. */
+  /** 获取任务类型 */
   public TaskType getTaskType() {
     return taskType;
   }
-  /** Gets the task status. */
+  /** 获取任务状态 */
   public String getTaskStatus() { return taskStatus.toString(); }
-  /** Gets the attempt finish time. */
+  /** 获取任务尝试完成时间 */
   public long getFinishTime() { return finishTime; }
   /**
-   * Gets the task attempt start time to be used while publishing to ATSv2.
-   * @return task attempt start time.
+   * 获取任务尝试开始时间，用于发布到ATSv2
+   * @return 任务尝试开始时间戳
    */
   public long getStartTime() {
     return startTime;
   }
-  /** Gets the host where the attempt executed. */
+  /** 获取任务尝试运行的主机名 */
   public String getHostname() { return hostname.toString(); }
   
-  /** Gets the rackname where the attempt executed. */
+  /** 获取任务尝试运行的机架名 */
   public String getRackName() {
     return rackName == null ? null : rackName.toString();
   }
   
   /**
-   * Gets the state string.
-   * @return task attempt state.
+   * 获取任务尝试状态字符串
+   * @return 任务尝试状态
    */
   public String getState() { return state.toString(); }
-  /** Gets the counters for the attempt. */
+  /** 获取任务尝试执行计数器 */
   Counters getCounters() { return counters; }
-  /** Gets the event type. */
+  /**
+   * 获取事件类型，根据任务类型返回MAP或REDUCE尝试完成类型
+   * @return 事件类型枚举
+   */
   public EventType getEventType() {
     // Note that the task type can be setup/map/reduce/cleanup but the 
     // attempt-type can only be map/reduce.
@@ -163,6 +196,10 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
            : EventType.REDUCE_ATTEMPT_FINISHED;
   }
 
+  /**
+   * 将当前事件转换为YARN时间线服务事件格式
+   * @return 时间线服务事件对象
+   */
   @Override
   public TimelineEvent toTimelineEvent() {
     TimelineEvent tEvent = new TimelineEvent();
@@ -177,6 +214,10 @@ public class TaskAttemptFinishedEvent  implements HistoryEvent {
     return tEvent;
   }
 
+  /**
+   * 将任务计数器转换为YARN时间线服务指标集合
+   * @return 时间线服务指标集合
+   */
   @Override
   public Set<TimelineMetric> getTimelineMetrics() {
     Set<TimelineMetric> metrics = JobHistoryEventUtils

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -22,15 +23,27 @@ import java.util.List;
 
 import org.apache.hadoop.yarn.api.protocolrecords.SignalContainerRequest;
 
+/**
+ * 容器管理器信号容器事件，承载向一批容器发送信号的请求
+ */
 public class CMgrSignalContainersEvent extends ContainerManagerEvent {
 
+  // 需要发送信号的容器请求列表
   private List<SignalContainerRequest> containerToSignal;
 
+  /**
+   * 构造信号容器事件
+   * @param containerToSignal 需要发送信号的容器请求列表
+   */
   public CMgrSignalContainersEvent(List<SignalContainerRequest> containerToSignal) {
     super(ContainerManagerEventType.SIGNAL_CONTAINERS);
     this.containerToSignal = containerToSignal;
   }
 
+  /**
+   * 获取所有需要发送信号的容器请求列表
+   * @return 需要发送信号的容器请求列表
+   */
   public List<SignalContainerRequest> getContainersToSignal() {
     return this.containerToSignal;
   }

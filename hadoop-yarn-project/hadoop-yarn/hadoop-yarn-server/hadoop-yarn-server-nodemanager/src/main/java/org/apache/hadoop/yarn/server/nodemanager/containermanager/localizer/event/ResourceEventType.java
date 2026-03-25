@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,18 +21,18 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.eve
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalizedResource;
 
 /**
- * Events delivered to {@link LocalizedResource}. Each of these
- * events is a subclass of {@link ResourceEvent}.
+ * 资源本地化事件类型枚举，定义了所有发往{@link LocalizedResource}的事件类型
+ * 所有具体事件都是{@link ResourceEvent}的子类
  */
 public enum ResourceEventType {
-  /** See {@link ResourceRequestEvent} */
+  /** 资源本地化请求事件，对应{@link ResourceRequestEvent} */
   REQUEST,
-  /** See {@link ResourceLocalizedEvent} */ 
+  /** 资源本地化完成事件，对应{@link ResourceLocalizedEvent} */ 
   LOCALIZED,
-  /** See {@link ResourceReleaseEvent} */
+  /** 资源释放事件，对应{@link ResourceReleaseEvent} */
   RELEASE,
-  /** See {@link ResourceFailedLocalizationEvent} */
+  /** 资源本地化失败事件，对应{@link ResourceFailedLocalizationEvent} */
   LOCALIZATION_FAILED,
-  /** See {@link ResourceRecoveredEvent} */
+  /** 资源恢复完成事件，对应{@link ResourceRecoveredEvent} */
   RECOVERED
 }

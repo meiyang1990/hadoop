@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,24 +23,44 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlRootElement;
 
+/**
+ * YARN RM队列访问ACL检查结果数据对象，用于Web API返回权限检查结果信息
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class RMQueueAclInfo {
+  // 是否允许访问队列
   private Boolean allowed;
+  // 提交访问请求的用户
   private String user;
+  // 诊断信息，用于说明拒绝访问的原因
   private String diagnostics;
+  // 目标子集群ID（联邦场景使用）
   private String subClusterId;
 
   public RMQueueAclInfo() {
     
   }
 
+  /**
+   * 构造队列ACL检查结果对象
+   * @param allowed 是否允许访问
+   * @param user 请求访问的用户
+   * @param diagnostics 诊断信息
+   */
   public RMQueueAclInfo(boolean allowed, String user, String diagnostics) {
     this.allowed = allowed;
     this.user = user;
     this.diagnostics = diagnostics;
   }
 
+  /**
+   * 构造支持联邦子集群的队列ACL检查结果对象
+   * @param allowed 是否允许访问
+   * @param user 请求访问的用户
+   * @param diagnostics 诊断信息
+   * @param subClusterId 目标子集群ID
+   */
   public RMQueueAclInfo(boolean allowed, String user, String diagnostics, String subClusterId) {
     this.allowed = allowed;
     this.user = user;

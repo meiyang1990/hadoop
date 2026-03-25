@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,7 +22,16 @@ import java.io.DataInput;
 import java.io.InputStream;
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 原生任务数据输入流抽象基类
+ * 继承自Java标准输入流，并实现DataInput接口，为原生任务缓冲处理提供统一的数据输入抽象
+ */
 @InterfaceAudience.Private
 public abstract class DataInputStream extends InputStream implements DataInput {
+  
+  /**
+   * 检查当前输入流中是否还有未读取的数据
+   * @return 如果存在未读取数据返回true，否则返回false
+   */
   public abstract boolean hasUnReadData();
 }

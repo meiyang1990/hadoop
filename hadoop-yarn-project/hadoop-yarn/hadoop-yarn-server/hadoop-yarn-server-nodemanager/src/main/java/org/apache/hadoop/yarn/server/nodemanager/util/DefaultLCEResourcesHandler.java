@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements. See the NOTICE file
@@ -25,6 +26,11 @@ import org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 默认Linux容器执行器资源处理器，已废弃。
+ * 提供不使用cgroups进行资源限制的默认实现，是LCEResourcesHandler接口的默认实现。
+ * 该类已被标记为废弃，不再推荐使用。
+ */
 @Deprecated
 public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
 
@@ -36,6 +42,10 @@ public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
   public DefaultLCEResourcesHandler() {
   }
   
+  /**
+   * 设置节点配置信息。
+   * @param conf Hadoop配置对象
+   */
   public void setConf(Configuration conf) {
         this.conf = conf;
   }
@@ -45,6 +55,11 @@ public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
     return  conf;
   }
   
+  /**
+   * 初始化资源处理器，绑定到Linux容器执行器。
+   * 本实现为空实现，不执行任何初始化操作。
+   * @param lce Linux容器执行器实例
+   */
   public void init(LinuxContainerExecutor lce) {
   }
 
@@ -52,12 +67,29 @@ public class DefaultLCEResourcesHandler implements LCEResourcesHandler {
    * LCE Resources Handler interface
    */
   
+  /**
+   * 容器执行前的资源准备工作。
+   * 本实现为空实现，不执行任何操作。
+   * @param containerId 容器ID
+   * @param containerResource 容器申请的资源
+   */
   public void preExecute(ContainerId containerId, Resource containerResource) {
   }
   
+  /**
+   * 容器执行后的资源清理工作。
+   * 本实现为空实现，不执行任何操作。
+   * @param containerId 容器ID
+   */
   public void postExecute(ContainerId containerId) {
   }
   
+  /**
+   * 获取传递给容器执行器的资源参数选项。
+   * 返回禁用cgroups的标识，告知LCE不使用cgroups进行资源限制。
+   * @param containerId 容器ID
+   * @return 资源选项字符串，标识不使用cgroups
+   */
   public String getResourcesOption(ContainerId containerId) {
     return "cgroups=none";
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,18 +23,14 @@ import java.util.Formatter;
 import java.util.LinkedList;
 
 /**
- * LsImageVisitor displays the blocks of the namespace in a format very similar
- * to the output of ls/lsr.  Entries are marked as directories or not,
- * permissions listed, replication, username and groupname, along with size,
- * modification date and full path.
- *
- * Note: A significant difference between the output of the lsr command
- * and this image visitor is that this class cannot sort the file entries;
- * they are listed in the order they are stored within the fsimage file. 
- * Therefore, the output of this class cannot be directly compared to the
- * output of the lsr command.
+ * HDFS fsimage离线查看器的ls格式输出访问器，以类似ls/lsr命令的格式展示命名空间中的文件目录信息。
+ * 输出包含条目类型（目录/文件）、权限、副本数、用户名、组名、文件大小、修改时间和完整路径。
+ * 
+ * 注意：本工具输出与实际lsr命令输出的一个重要差异是无法对条目进行排序，
+ * 条目输出顺序与fsimage文件中的存储顺序一致，因此不能直接与在线lsr命令输出对比。
  */
 class LsImageVisitor extends TextWriterImageVisitor {
+  // 存储解析过程中的元素栈，跟踪当前在fsimage树中的位置
   final private LinkedList<ImageElement> elemQ = new LinkedList<ImageElement>();
 
   private int numBlocks;
@@ -46,20 +43,32 @@ class LsImageVisitor extends TextWriterImageVisitor {
   private String path;
   private String linkTarget;
 
+  // 当前是否正在处理一个INode节点
   private boolean inInode = false;
   final private StringBuilder sb = new StringBuilder();
   final private Formatter formatter = new Formatter(sb);
 
+  /**
+   * 构造函数，将结果输出到指定文件
+   * @param filename 输出文件名
+   * @throws IOException 打开文件失败时抛出异常
+   */
   public LsImageVisitor(String filename) throws IOException {
     super(filename);
   }
 
+  /**
+   * 构造函数，可指定是否输出到屏幕
+   * @param filename 输出文件名
+   * @param printToScreen 是否同时打印到屏幕
+   * @throws IOException 打开文件失败时抛出异常
+   */
   public LsImageVisitor(String filename, boolean printToScreen) throws IOException {
     super(filename, printToScreen);
   }
 
   /**
-   * Start a new line of output, reset values.
+   * 初始化新一行输出，重置所有INode信息字段
    */
   private void newLine() {
     numBlocks = 0;
@@ -70,64 +79,89 @@ class LsImageVisitor extends TextWriterImageVisitor {
     inInode = true;
   }
 
-  /**
-   * All the values have been gathered.  Print them to the console in an
-   * ls-style format.
-   */
+  // 格式化输出宽度常量
   private final static int widthRepl = 2;  
   private final static int widthUser = 8; 
   private final static int widthGroup = 10; 
   private final static int widthSize = 10;
   private final static int widthMod = 10;
+  // ls格式输出模板
   private final static String lsStr = " %" + widthRepl + "s %" + widthUser + 
                                        "s %" + widthGroup + "s %" + widthSize +
                                        "d %" + widthMod + "s %s";
+  /**
+   * 收集完INode所有信息后，按照ls格式输出一行数据
+   * @throws IOException 写入输出失败时抛出异常
+   */
   private void printLine() throws IOException {
+    // 添加条目类型标记：d表示目录，-表示文件
     sb.append(numBlocks < 0 ? "d" : "-");
+    // 添加权限字符串
     sb.append(perms);
 
+    // 如果是符号链接，拼接目标路径
     if (0 != linkTarget.length()) {
       path = path + " -> " + linkTarget; 
     }
+    // 按照固定格式格式化输出各个字段
     formatter.format(lsStr, replication > 0 ? replication : "-",
                            username, group, filesize, modTime, path);
     sb.append("\n");
 
+    // 写入结果并清空字符串Builder
     write(sb.toString());
-    sb.setLength(0); // clear string builder
+    sb.setLength(0);
 
+    // 标记INode处理完成
     inInode = false;
   }
 
+  /**
+   * 访问开始处理，初始化操作
+   */
   @Override
   void start() throws IOException {}
 
+  /**
+   * 访问正常完成，执行收尾操作
+   */
   @Override
   void finish() throws IOException {
     super.finish();
   }
 
+  /**
+   * 访问异常中断处理，输出提示信息
+   */
   @Override
   void finishAbnormally() throws IOException {
     System.out.println("Input ended unexpectedly.");
     super.finishAbnormally();
   }
 
+  /**
+   * 离开闭合元素时的处理逻辑
+   */
   @Override
   void leaveEnclosingElement() throws IOException {
+    // 弹出当前处理的元素
     ImageElement elem = elemQ.pop();
 
+    // 如果离开的是INode元素，则输出整行信息
     if(elem == ImageElement.INODE)
       printLine();
   }
 
-  // Maintain state of location within the image tree and record
-  // values needed to display the inode in ls-style format.
+  /**
+   * 处理当前元素，维护解析状态并收集INode输出所需的字段信息
+   */
   @Override
   void visit(ImageElement element, String value) throws IOException {
     if(inInode) {
+      // 根据元素类型保存对应字段值
       switch(element) {
       case INODE_PATH:
+        // 根路径特殊处理
         if(value.equals("")) path = "/";
         else path = value;
         break;
@@ -153,26 +187,37 @@ class LsImageVisitor extends TextWriterImageVisitor {
         linkTarget = value;
         break;
       default:
-        // This is OK.  We're not looking for all the values.
+        // 不需要处理未关心的元素，跳过即可
         break;
       }
     }
   }
 
+  /**
+   * 进入闭合元素时的处理逻辑
+   */
   @Override
   void visitEnclosingElement(ImageElement element) throws IOException {
+    // 将元素压入栈，维护当前解析位置
     elemQ.push(element);
+    // 如果进入INode元素，初始化新行准备收集信息
     if(element == ImageElement.INODE)
       newLine();
   }
 
+  /**
+   * 进入带键值的闭合元素时的处理逻辑
+   */
   @Override
   void visitEnclosingElement(ImageElement element,
       ImageElement key, String value) throws IOException {
+    // 将元素压入栈，维护当前解析位置
     elemQ.push(element);
     if(element == ImageElement.INODE)
+      // 如果进入INode元素，初始化新行准备收集信息
       newLine();
     else if (element == ImageElement.BLOCKS)
+      // 保存块数量信息，负数标识目录
       numBlocks = Integer.parseInt(value);
   }
 }

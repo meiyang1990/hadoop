@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -21,17 +22,30 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.launcher;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.container.Container;
 
+/**
+ * 容器启动器事件，封装容器启动/停止相关事件，用于NodeManager容器状态机驱动
+ */
 public class ContainersLauncherEvent
     extends AbstractEvent<ContainersLauncherEventType>{
 
+  // 关联的目标容器
   private final Container container;
 
+  /**
+   * 构造容器启动器事件
+   * @param container 目标容器
+   * @param eventType 事件类型
+   */
   public ContainersLauncherEvent(Container container,
       ContainersLauncherEventType eventType) {
     super(eventType);
     this.container = container;
   }
 
+  /**
+   * 获取事件关联的目标容器
+   * @return 目标容器实例
+   */
   public Container getContainer() {
     return container;
   }

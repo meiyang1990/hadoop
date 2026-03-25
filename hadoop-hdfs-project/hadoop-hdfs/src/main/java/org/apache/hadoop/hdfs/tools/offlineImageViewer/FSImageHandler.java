@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -55,27 +56,42 @@ import static org.apache.hadoop.hdfs.server.datanode.web.webhdfs.WebHdfsHandler.
 import static org.apache.hadoop.hdfs.server.datanode.web.webhdfs.WebHdfsHandler.WEBHDFS_PREFIX_LENGTH;
 
 /**
- * Implement the read-only WebHDFS API for fsimage.
+ * 为离线fsimage文件提供只读WebHDFS API实现，支持通过HTTP接口查询fsimage中的文件系统元数据
  */
 class FSImageHandler extends SimpleChannelInboundHandler<HttpRequest> {
   public static final Logger LOG =
       LoggerFactory.getLogger(FSImageHandler.class);
+  // fsimage加载器实例，负责实际查询fsimage元数据
   private final FSImageLoader image;
+  // 维护所有活跃连接的通道组
   private final ChannelGroup activeChannels;
 
+  /**
+   * 通道激活时，将当前连接加入活跃连接组
+   */
   @Override
   public void channelActive(ChannelHandlerContext ctx) throws Exception {
     activeChannels.add(ctx.channel());
   }
 
+  /**
+   * 构造FSImageHandler，绑定fsimage加载器和活跃连接组
+   * @param image fsimage加载器实例
+   * @param activeChannels 活跃连接组
+   * @throws IOException 初始化异常
+   */
   FSImageHandler(FSImageLoader image, ChannelGroup activeChannels) throws IOException {
     this.image = image;
     this.activeChannels = activeChannels;
   }
 
+  /**
+   * 处理HTTP请求，解析请求参数并转发对应操作，返回JSON格式响应
+   */
   @Override
   public void channelRead0(ChannelHandlerContext ctx, HttpRequest request)
       throws Exception {
+    // 仅支持GET方法，非GET请求返回错误
     if (request.method() != HttpMethod.GET) {
       DefaultHttpResponse resp = new DefaultHttpResponse(HTTP_1_1,
           METHOD_NOT_ALLOWED);
@@ -84,44 +100,55 @@ class FSImageHandler extends SimpleChannelInboundHandler<HttpRequest> {
       return;
     }
 
+    // 解析请求URL参数
     QueryStringDecoder decoder = new QueryStringDecoder(request.uri());
-    // check path. throw exception if path doesn't start with WEBHDFS_PREFIX
+    // 检查并提取请求路径，路径不合法则抛出异常
     String path = getPath(decoder);
+    // 提取操作参数op
     final String op = getOp(decoder);
-    // check null op
+    // op参数必须存在，否则抛出参数异常
     if (op == null) {
       throw new IllegalArgumentException("Param op must be specified.");
     }
 
     final String content;
+    // 根据op分发不同查询操作
     switch (op) {
     case "GETFILESTATUS":
+      // 查询指定路径文件状态信息
       content = image.getFileStatus(path);
       break;
     case "LISTSTATUS":
+      // 列出指定目录下所有文件状态
       content = image.listStatus(path);
       break;
     case "GETACLSTATUS":
+      // 查询指定路径ACL权限信息
       content = image.getAclStatus(path);
       break;
     case "GETXATTRS":
+      // 获取指定路径扩展属性
       List<String> names = getXattrNames(decoder);
       String encoder = getEncoder(decoder);
       content = image.getXAttrs(path, names, encoder);
       break;
     case "LISTXATTRS":
+      // 列出指定路径所有扩展属性名称
       content = image.listXAttrs(path);
       break;
     case "GETCONTENTSUMMARY":
+      // 获取指定路径存储空间使用汇总信息
       content = image.getContentSummary(path);
       break;
     default:
+      // op参数不合法，抛出参数异常
       throw new IllegalArgumentException("Invalid value for webhdfs parameter"
           + " \"op\"");
     }
 
     LOG.info("op=" + op + " target=" + path);
 
+    // 构造成功JSON响应并返回客户端
     DefaultFullHttpResponse resp = new DefaultFullHttpResponse(HTTP_1_1,
         HttpResponseStatus.OK, Unpooled.wrappedBuffer(content
             .getBytes(StandardCharsets.UTF_8)));
@@ -136,17 +163,24 @@ class FSImageHandler extends SimpleChannelInboundHandler<HttpRequest> {
     ctx.flush();
   }
 
+  /**
+   * 处理请求过程中抛出的异常，根据异常类型返回对应HTTP错误响应
+   */
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
           throws Exception {
+    // 将非异常包装为异常，统一处理
     Exception e = cause instanceof Exception ? (Exception) cause : new
         Exception(cause);
+    // 将异常序列化为JSON格式
     final String output = JsonUtil.toJsonString(e);
     ByteBuf content = Unpooled.wrappedBuffer(output.getBytes(StandardCharsets.UTF_8));
+    // 默认返回500错误
     final DefaultFullHttpResponse resp = new DefaultFullHttpResponse(
             HTTP_1_1, INTERNAL_SERVER_ERROR, content);
 
     resp.headers().set(CONTENT_TYPE, APPLICATION_JSON_UTF8);
+    // 根据异常类型调整HTTP响应状态码
     if (e instanceof IllegalArgumentException) {
       resp.setStatus(BAD_REQUEST);
     } else if (e instanceof FileNotFoundException) {
@@ -159,23 +193,44 @@ class FSImageHandler extends SimpleChannelInboundHandler<HttpRequest> {
     ctx.write(resp).addListener(ChannelFutureListener.CLOSE);
   }
 
+  /**
+   * 从请求参数中获取op参数，转为大写格式
+   * @param decoder URL查询参数解码器
+   * @return op参数值，不存在则返回null
+   */
   private static String getOp(QueryStringDecoder decoder) {
     Map<String, List<String>> parameters = decoder.parameters();
     return parameters.containsKey("op")
         ? StringUtils.toUpperCase(parameters.get("op").get(0)) : null;
   }
 
+  /**
+   * 从请求参数中获取扩展属性名称列表
+   * @param decoder URL查询参数解码器
+   * @return 扩展属性名称列表
+   */
   private static List<String> getXattrNames(QueryStringDecoder decoder) {
     Map<String, List<String>> parameters = decoder.parameters();
     return parameters.get("xattr.name");
   }
 
+  /**
+   * 从请求参数中获取编码格式参数
+   * @param decoder URL查询参数解码器
+   * @return 编码格式参数，不存在则返回null
+   */
   private static String getEncoder(QueryStringDecoder decoder) {
     Map<String, List<String>> parameters = decoder.parameters();
     return parameters.containsKey("encoding") ? parameters.get("encoding").get(
         0) : null;
   }
 
+  /**
+   * 从请求路径中提取HDFS文件路径，验证前缀是否合法
+   * @param decoder URL查询参数解码器
+   * @return HDFS文件路径
+   * @throws FileNotFoundException 路径前缀不合法时抛出
+   */
   private static String getPath(QueryStringDecoder decoder)
           throws FileNotFoundException {
     String path = decoder.path();

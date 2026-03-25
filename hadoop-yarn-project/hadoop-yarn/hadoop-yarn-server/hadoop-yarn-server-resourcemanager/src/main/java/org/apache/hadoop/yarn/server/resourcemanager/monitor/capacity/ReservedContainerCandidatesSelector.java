@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,6 +36,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * 为预留容器抢占资源选择待抢占容器的选择器
+ * 功能：为等待分配的预留容器查找可抢占的容器候选，满足预留容器的资源需求
+ */
 public class ReservedContainerCandidatesSelector
     extends PreemptionCandidatesSelector {
   private static final Logger LOG =
@@ -43,7 +48,7 @@ public class ReservedContainerCandidatesSelector
   private PreemptableResourceCalculator preemptableAmountCalculator;
 
   /**
-   * A temporary data structure to remember what to preempt on a node
+   * 临时数据结构，保存一个节点上的抢占信息，包括抢占成本和选中的待抢占容器
    */
   private static class NodeForPreemption {
     private float preemptionCost;
@@ -58,6 +63,10 @@ public class ReservedContainerCandidatesSelector
     }
   }
 
+  /**
+   * 构造预留容器抢占候选选择器
+   * @param preemptionContext 容量调度抢占上下文
+   */
   ReservedContainerCandidatesSelector(
       CapacitySchedulerPreemptionContext preemptionContext) {
     super(preemptionContext);
@@ -66,16 +75,23 @@ public class ReservedContainerCandidatesSelector
   }
 
   @Override
+  /**
+   * 选择满足预留容器资源需求的待抢占容器候选
+   * @param selectedCandidates 已选中的待抢占容器集合
+   * @param clusterResource 集群总资源
+   * @param totalPreemptedResourceAllowed 允许抢占的总资源配额
+   * @return 本次新增的待抢占容器集合
+   */
   public Map<ApplicationAttemptId, Set<RMContainer>> selectCandidates(
       Map<ApplicationAttemptId, Set<RMContainer>> selectedCandidates,
       Resource clusterResource,
       Resource totalPreemptedResourceAllowed) {
     Map<ApplicationAttemptId, Set<RMContainer>> curCandidates = new HashMap<>();
-    // Calculate how much resources we need to preempt
+    // 计算各队列需要抢占获取的资源量
     preemptableAmountCalculator.computeIdealAllocation(clusterResource,
         totalPreemptedResourceAllowed);
 
-    // Get queue to preemptable resource by partition
+    // 按队列、分区组织需要抢占获取的资源量
     Map<String, Map<String, Resource>> queueToPreemptableResourceByPartition =
         new HashMap<>();
     for (String leafQueue : preemptionContext.getLeafQueueNames()) {
@@ -85,11 +101,12 @@ public class ReservedContainerCandidatesSelector
                   leafQueue, clusterResource));
     }
 
-    // Get list of nodes for preemption, ordered by preemption cost
+    // 获取可满足预留容器需求的节点，按抢占成本排序
     List<NodeForPreemption> nodesForPreemption = getNodesForPreemption(
         queueToPreemptableResourceByPartition, selectedCandidates,
         totalPreemptedResourceAllowed);
 
+    // 遍历所有符合条件的节点，收集待抢占容器
     for (NodeForPreemption nfp : nodesForPreemption) {
       RMContainer reservedContainer = nfp.schedulerNode.getReservedContainer();
       if (null == reservedContainer) {
@@ -101,7 +118,7 @@ public class ReservedContainerCandidatesSelector
           selectedCandidates, totalPreemptedResourceAllowed, false);
       if (null != preemptionResult) {
         for (RMContainer c : preemptionResult.selectedContainers) {
-          // Add to preemptMap
+          // 添加到待抢占映射表
           CapacitySchedulerPreemptionUtils.addToPreemptMap(selectedCandidates,
               curCandidates, c.getApplicationAttemptId(), c);
 
@@ -115,6 +132,13 @@ public class ReservedContainerCandidatesSelector
     return curCandidates;
   }
 
+  /**
+   * 从按队列-分区组织的抢占资源表中获取指定队列指定分区的可抢占资源量
+   * @param queueName 队列名称
+   * @param partitionName 分区名称
+   * @param queueToPreemptableResourceByPartition 按队列-分区组织的可抢占资源表
+   * @return 指定队列分区的可抢占资源量，不存在则返回null
+   */
   private Resource getPreemptableResource(String queueName,
       String partitionName,
       Map<String, Map<String, Resource>> queueToPreemptableResourceByPartition) {
@@ -128,6 +152,16 @@ public class ReservedContainerCandidatesSelector
     return preemptable;
   }
 
+  /**
+   * 尝试从指定队列分区抢占指定大小的资源，检查配额是否足够
+   * @param queueName 目标队列名称
+   * @param partitionName 分区名称
+   * @param queueToPreemptableResourceByPartition 可抢占资源配额表
+   * @param required 需要抢占的资源量
+   * @param totalPreemptionAllowed 全局允许抢占总资源配额
+   * @param readOnly 是否仅检查不扣减配额
+   * @return 是否可以抢占该资源
+   */
   private boolean tryToPreemptFromQueue(String queueName, String partitionName,
       Map<String, Map<String, Resource>> queueToPreemptableResourceByPartition,
       Resource required, Resource totalPreemptionAllowed, boolean readOnly) {
@@ -153,16 +187,14 @@ public class ReservedContainerCandidatesSelector
   }
 
 
-
   /**
-   * Try to check if we can preempt resources for reserved container in given node
-   * @param node
-   * @param queueToPreemptableResourceByPartition it's a map of
-   *                 <queueName, <partition, preemptable-resource>>
-   * @param readOnly do we want to modify preemptable resource after we selected
-   *                 candidates
-   * @return NodeForPreemption if it's possible to preempt containers on the node
-   * to satisfy reserved resource
+   * 检查指定节点是否可以通过抢占容器满足预留容器的资源需求，收集待抢占容器
+   * @param node 目标节点
+   * @param queueToPreemptableResourceByPartition 按队列-分区组织的可抢占资源表
+   * @param selectedCandidates 已选中的待抢占容器集合
+   * @param totalPreemptionAllowed 全局允许抢占总资源配额
+   * @param readOnly 是否仅检查不修改配额
+   * @return 若可以满足需求返回包含选中容器的NodeForPreemption，否则返回null
    */
   private NodeForPreemption getPreemptionCandidatesOnNode(
       FiCaSchedulerNode node,
@@ -181,40 +213,38 @@ public class ReservedContainerCandidatesSelector
     Map<ContainerId, RMContainer> killableContainers =
         node.getKillableContainers();
 
-    // Sort running container by launch time, we preferred to preempt recent
-    // launched preempt container
+    // 按容器ID降序排序，优先抢占新启动的容器
     Collections.sort(sortedRunningContainers, new Comparator<RMContainer>() {
       @Override public int compare(RMContainer o1, RMContainer o2) {
         return -1 * o1.getContainerId().compareTo(o2.getContainerId());
       }
     });
 
-    // First check: can we preempt containers to allocate the
-    // reservedContainer?
+    // 标记是否可以通过抢占满足预留容器需求
     boolean canAllocateReservedContainer = false;
 
-    // At least, we can get available + killable resources from this node
+    // 当前节点可用资源 = 空闲资源 + 已标记可杀死资源
     Resource cur = Resources.add(available, node.getTotalKillableResources());
     String partition = node.getPartition();
 
-    // Avoid preempt any container if required <= available + killable
+    // 如果现有可用+可杀死资源已经能满足需求，不需要抢占新容器
     if (Resources.fitsIn(rc, reservedContainer.getReservedResource(), cur)) {
       return null;
     }
 
-    // Extra cost of am container preemption
+    // AM容器抢占额外成本，这里策略是不抢占AM，所以恒为0
     float amPreemptionCost = 0f;
 
+    // 遍历所有运行容器，收集可抢占容器
     for (RMContainer c : sortedRunningContainers) {
       String containerQueueName = c.getQueueName();
 
-      // Skip container if it is already marked killable
+      // 跳过已经标记为可杀死的容器
       if (killableContainers.containsKey(c.getContainerId())) {
         continue;
       }
 
-      // An alternative approach is add a "penalty cost" if AM container is
-      // selected. Here for safety, avoid preempt AM container in any cases
+      // 安全策略：永远不抢占ApplicationMaster容器
       if (c.isAMContainer()) {
         LOG.debug("Skip selecting AM container on host={} AM container={}",
             node.getNodeID(), c.getContainerId());
@@ -222,13 +252,12 @@ public class ReservedContainerCandidatesSelector
         continue;
       }
 
-      // Can we preempt container c?
-      // Check if we have quota to preempt this container
+      // 检查队列和全局配额是否允许抢占该容器
       boolean canPreempt = tryToPreemptFromQueue(containerQueueName, partition,
           queueToPreemptableResourceByPartition, c.getAllocatedResource(),
           totalPreemptionAllowed, readOnly);
 
-      // If we can, add to selected container, and change resource accordingly.
+      // 若允许抢占，添加到选中列表，更新资源统计
       if (canPreempt) {
         if (!CapacitySchedulerPreemptionUtils.isContainerAlreadySelected(c,
             selectedCandidates)) {
@@ -238,6 +267,7 @@ public class ReservedContainerCandidatesSelector
           Resources.addTo(totalSelected, c.getAllocatedResource());
         }
         Resources.addTo(cur, c.getAllocatedResource());
+        // 检查累计资源是否已经满足预留容器需求
         if (Resources.fitsIn(rc,
             reservedContainer.getReservedResource(), cur)) {
           canAllocateReservedContainer = true;
@@ -246,16 +276,15 @@ public class ReservedContainerCandidatesSelector
       }
     }
 
+    // 无法满足预留容器需求，回滚配额变更返回null
     if (!canAllocateReservedContainer) {
       if (!readOnly) {
-        // Revert queue preemption quotas
+        // 回滚队列抢占配额
         for (RMContainer c : selectedContainers) {
           Resource res = getPreemptableResource(c.getQueueName(), partition,
               queueToPreemptableResourceByPartition);
           if (null == res) {
-            // This shouldn't happen in normal cases, one possible cause is
-            // container moved to different queue while executing preemption logic.
-            // Ignore such failures.
+            // 容器可能在抢占过程中移动到了其他队列，忽略该错误
             continue;
           }
           Resources.addTo(res, c.getAllocatedResource());
@@ -264,23 +293,31 @@ public class ReservedContainerCandidatesSelector
       return null;
     }
 
+    // 计算抢占成本：已选资源/需求资源，越接近1成本越低
     float ratio = Resources.ratio(rc, totalSelected,
         reservedContainer.getReservedResource());
 
-    // Compute preemption score
+    // 构造抢占节点信息返回
     NodeForPreemption nfp = new NodeForPreemption(ratio + amPreemptionCost,
         node, selectedContainers);
 
     return nfp;
   }
 
+  /**
+   * 获取所有包含预留容器且可通过抢占满足资源需求的节点，按抢占成本排序
+   * @param queueToPreemptableResourceByPartition 按队列-分区组织的可抢占资源表
+   * @param selectedCandidates 已选中的待抢占容器集合
+   * @param totalPreemptionAllowed 全局允许抢占总资源配额
+   * @return 按抢占成本升序排序的可抢占节点列表
+   */
   private List<NodeForPreemption> getNodesForPreemption(
       Map<String, Map<String, Resource>> queueToPreemptableResourceByPartition,
       Map<ApplicationAttemptId, Set<RMContainer>> selectedCandidates,
       Resource totalPreemptionAllowed) {
     List<NodeForPreemption> nfps = new ArrayList<>();
 
-    // get nodes have reserved container
+    // 遍历所有节点，筛选出有预留容器且可以抢占满足需求的节点
     for (FiCaSchedulerNode node : preemptionContext.getScheduler()
         .getAllNodes()) {
       if (node.getReservedContainer() != null) {
@@ -288,14 +325,12 @@ public class ReservedContainerCandidatesSelector
             queueToPreemptableResourceByPartition, selectedCandidates,
             totalPreemptionAllowed, true);
         if (null != nfp) {
-          // Null means we cannot preempt containers on the node to satisfy
-          // reserved container
           nfps.add(nfp);
         }
       }
     }
 
-    // Return sorted node-for-preemptions (by cost)
+    // 按抢占成本升序排序，成本低的优先抢占
     Collections.sort(nfps, new Comparator<NodeForPreemption>() {
       @Override
       public int compare(NodeForPreemption o1, NodeForPreemption o2) {

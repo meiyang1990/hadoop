@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -42,77 +43,44 @@ import java.util.Map;
 import java.util.Set;
 import java.net.URL;
 
-
 /**
- * Class that exposes information about queues maintained by the Hadoop
- * Map/Reduce framework.
+ * MapReduce队列管理器，负责管理系统中所有作业队列的配置、层级结构和访问权限。
  * <p>
- * The Map/Reduce framework can be configured with one or more queues,
- * depending on the scheduler it is configured with. While some
- * schedulers work only with one queue, some schedulers support multiple
- * queues. Some schedulers also support the notion of queues within
- * queues - a feature called hierarchical queues.
- * <p>
- * Queue names are unique, and used as a key to lookup queues. Hierarchical
- * queues are named by a 'fully qualified name' such as q1:q2:q3, where
- * q2 is a child queue of q1 and q3 is a child queue of q2.
- * <p>
- * Leaf level queues are queues that contain no queues within them. Jobs
- * can be submitted only to leaf level queues.
- * <p>
- * Queues can be configured with various properties. Some of these
- * properties are common to all schedulers, and those are handled by this
- * class. Schedulers might also associate several custom properties with
- * queues. These properties are parsed and maintained per queue by the
- * framework. If schedulers need more complicated structure to maintain
- * configuration per queue, they are free to not use the facilities
- * provided by the framework, but define their own mechanisms. In such cases,
- * it is likely that the name of the queue will be used to relate the
- * common properties of a queue with scheduler specific properties.
- * <p>
- * Information related to a queue, such as its name, properties, scheduling
- * information and children are exposed by this class via a serializable
- * class called {@link JobQueueInfo}.
- * <p>
- * Queues are configured in the configuration file mapred-queues.xml.
- * To support backwards compatibility, queues can also be configured
- * in mapred-site.xml. However, when configured in the latter, there is
- * no support for hierarchical queues.
+ * 支持单级队列（兼容旧版配置）和层级队列，队列名称使用冒号分隔层级（如q1:q2:q3），
+ * 仅允许向叶子队列提交作业，支持访问控制列表(ACL)进行权限管理，支持队列配置热刷新。
+ * 队列配置默认从mapred-queues.xml读取，兼容旧版mapred-site.xml的单级队列配置。
+ * </p>
  */
 @InterfaceAudience.Private
 public class QueueManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(QueueManager.class);
 
-  // Map of a queue name and Queue object
+  // 存储所有叶子队列的映射，key为队列全名称，value为Queue对象
   private Map<String, Queue> leafQueues = new HashMap<String,Queue>();
+  // 存储所有队列（包括内部非叶子队列和叶子队列）的映射，key为队列全名称，value为Queue对象
   private Map<String, Queue> allQueues = new HashMap<String, Queue>();
   public static final String QUEUE_CONF_FILE_NAME = "mapred-queues.xml";
   static final String QUEUE_CONF_DEFAULT_FILE_NAME = "mapred-queues-default.xml";
 
-  //Prefix in configuration for queue related keys
+  // 配置中队列相关属性的前缀
   static final String QUEUE_CONF_PROPERTY_NAME_PREFIX = "mapred.queue.";
 
-  //Resource in which queue acls are configured.
+  // 层级队列的根节点
   private Queue root = null;
   
-  // represents if job and queue acls are enabled on the mapreduce cluster
+  // 标记MapReduce集群是否开启作业和队列ACL权限检查
   private boolean areAclsEnabled = false;
 
   /**
-   * Factory method to create an appropriate instance of a queue
-   * configuration parser.
+   * 根据配置创建对应的队列配置解析器实例。
    * <p>
-   * Returns a parser that can parse either the deprecated property
-   * style queue configuration in mapred-site.xml, or one that can
-   * parse hierarchical queues in mapred-queues.xml. First preference
-   * is given to configuration in mapred-site.xml. If no queue
-   * configuration is found there, then a parser that can parse
-   * configuration in mapred-queues.xml is created.
-   *
-   * @param conf Configuration instance that determines which parser
-   *             to use.
-   * @return Queue configuration parser
+   * 优先解析mapred-site.xml中的旧版单级队列配置，若不存在则解析mapred-queues.xml中的层级队列配置
+   * </p>
+   * @param conf 集群配置对象，用于判断使用哪种解析器
+   * @param reloadConf 是否需要重新加载配置
+   * @param areAclsEnabled 是否开启ACL权限检查
+   * @return 队列配置解析器实例
    */
   static QueueConfigurationParser getQueueConfigurationParser(
     Configuration conf, boolean reloadConf, boolean areAclsEnabled) {
@@ -155,15 +123,9 @@ public class QueueManager {
   }
 
   /**
-   * Construct a new QueueManager using configuration specified in the passed
-   * in {@link org.apache.hadoop.conf.Configuration} object.
-   * <p>
-   * This instance supports queue configuration specified in mapred-site.xml,
-   * but without support for hierarchical queues. If no queue configuration
-   * is found in mapred-site.xml, it will then look for site configuration
-   * in mapred-queues.xml supporting hierarchical queues.
-   *
-   * @param clusterConf    mapreduce cluster configuration
+   * 使用传入的集群配置构造QueueManager实例。
+   * 优先读取mapred-site.xml中的单级队列配置，不存在则读取mapred-queues.xml中的层级队列配置
+   * @param clusterConf MapReduce集群配置对象
    */
   public QueueManager(Configuration clusterConf) {
     areAclsEnabled = clusterConf.getBoolean(MRConfig.MR_ACLS_ENABLED, false);
@@ -171,13 +133,9 @@ public class QueueManager {
   }
 
   /**
-   * Create an instance that supports hierarchical queues, defined in
-   * the passed in configuration file.
-   * <p>
-   * This is mainly used for testing purposes and should not called from
-   * production code.
-   *
-   * @param confFile File where the queue configuration is found.
+   * 使用指定配置文件构造支持层级队列的QueueManager实例，仅用于测试。
+   * @param confFile 队列配置文件路径
+   * @param areAclsEnabled 是否开启ACL权限检查
    */
   QueueManager(String confFile, boolean areAclsEnabled) {
     this.areAclsEnabled = areAclsEnabled;
@@ -187,18 +145,16 @@ public class QueueManager {
   }
 
   /**
-   * Initialize the queue-manager with the queue hierarchy specified by the
-   * given {@link QueueConfigurationParser}.
-   * 
-   * @param cp
+   * 使用解析后的队列层次结构初始化QueueManager，填充内部队列缓存。
+   * @param cp 已完成解析的队列配置解析器
    */
   private void initialize(QueueConfigurationParser cp) {
     this.root = cp.getRoot();
     leafQueues.clear();
     allQueues.clear();
-    //At this point we have root populated
-    //update data structures leafNodes.
+    // 获取根节点下所有叶子队列，更新缓存
     leafQueues = getRoot().getLeafQueues();
+    // 将所有内部队列和叶子队列加入全量队列缓存
     allQueues.putAll(getRoot().getInnerQueues());
     allQueues.putAll(leafQueues);
 
@@ -206,31 +162,19 @@ public class QueueManager {
   }
 
   /**
-   * Return the set of leaf level queues configured in the system to
-   * which jobs are submitted.
-   * <p>
-   * The number of queues configured should be dependent on the Scheduler
-   * configured. Note that some schedulers work with only one queue, whereas
-   * others can support multiple queues.
-   *
-   * @return Set of queue names.
+   * 获取系统中所有可提交作业的叶子队列名称集合。
+   * @return 叶子队列名称集合
    */
   public synchronized Set<String> getLeafQueueNames() {
     return leafQueues.keySet();
   }
 
   /**
-   * Return true if the given user is part of the ACL for the given
-   * {@link QueueACL} name for the given queue.
-   * <p>
-   * An operation is allowed if all users are provided access for this
-   * operation, or if either the user or any of the groups specified is
-   * provided access.
-   *
-   * @param queueName Queue on which the operation needs to be performed.
-   * @param qACL      The queue ACL name to be checked
-   * @param ugi       The user and groups who wish to perform the operation.
-   * @return true     if the operation is allowed, false otherwise.
+   * 检查指定用户对指定队列的指定操作是否有权限。
+   * @param queueName 目标队列名称
+   * @param qACL 需要检查的队列操作权限类型
+   * @param ugi 操作用户的用户组信息
+   * @return 有权限返回true，否则返回false
    */
   public synchronized boolean hasAccess(
     String queueName, QueueACL qACL, UserGroupInformation ugi) {
@@ -262,15 +206,14 @@ public class QueueManager {
       return false;
     }
 
-    // Check if user is part of the ACL
+    // 检查用户是否在ACL允许列表中
     return acl.isUserAllowed(ugi);
   }
 
   /**
-   * Checks whether the given queue is running or not.
-   *
-   * @param queueName name of the queue
-   * @return true, if the queue is running.
+   * 检查指定叶子队列是否处于RUNNING运行状态。
+   * @param queueName 队列名称
+   * @return 队列存在且处于RUNNING状态返回true，否则返回false
    */
   synchronized boolean isRunning(String queueName) {
     Queue q = leafQueues.get(queueName);
@@ -281,15 +224,9 @@ public class QueueManager {
   }
 
   /**
-   * Set a generic Object that represents scheduling information relevant
-   * to a queue.
-   * <p>
-   * A string representation of this Object will be used by the framework
-   * to display in user facing applications like the JobTracker web UI and
-   * the hadoop CLI.
-   *
-   * @param queueName queue for which the scheduling information is to be set.
-   * @param queueInfo scheduling information for this queue.
+   * 为指定队列设置调度器相关信息。
+   * @param queueName 目标队列名称
+   * @param queueInfo 调度器相关的调度信息对象
    */
   public synchronized void setSchedulerInfo(
     String queueName,
@@ -300,10 +237,9 @@ public class QueueManager {
   }
 
   /**
-   * Return the scheduler information configured for this queue.
-   *
-   * @param queueName queue for which the scheduling information is required.
-   * @return The scheduling information for this queue.
+   * 获取指定队列的调度器相关信息。
+   * @param queueName 目标队列名称
+   * @return 调度信息对象，队列不存在则返回null
    */
   public synchronized Object getSchedulerInfo(String queueName) {
     if (allQueues.get(queueName) != null) {
@@ -322,41 +258,27 @@ public class QueueManager {
           + "Retaining existing configuration throughout the system.";
 
   /**
-   * Refresh acls, state and scheduler properties for the configured queues.
-   * <p>
-   * This method reloads configuration related to queues, but does not
-   * support changes to the list of queues or hierarchy. The expected usage
-   * is that an administrator can modify the queue configuration file and
-   * fire an admin command to reload queue configuration. If there is a
-   * problem in reloading configuration, then this method guarantees that
-   * existing queue configuration is untouched and in a consistent state.
-   * 
-   * @param schedulerRefresher
-   * @throws IOException when queue configuration file is invalid.
+   * 刷新队列的ACL、状态和调度属性，不支持修改队列层级结构。
+   * 刷新失败时保证原有配置保持不变和一致。
+   * @param conf 最新集群配置对象
+   * @param schedulerRefresher 调度器刷新回调，用于通知调度器刷新自身配置
+   * @throws IOException 队列层级变更或调度器刷新失败时抛出异常
    */
   synchronized void refreshQueues(Configuration conf,
       QueueRefresher schedulerRefresher)
       throws IOException {
 
-    // Create a new configuration parser using the passed conf object.
+    // 使用新配置创建解析器
     QueueConfigurationParser cp =
         getQueueConfigurationParser(conf, true, areAclsEnabled);
 
-    /*
-     * (1) Validate the refresh of properties owned by QueueManager. As of now,
-     * while refreshing queue properties, we only check that the hierarchy is
-     * the same w.r.t queue names, ACLs and state for each queue and don't
-     * support adding new queues or removing old queues
-     */
+    // 检查队列层级结构是否和原来一致，不允许刷新时修改层级
     if (!root.isHierarchySameAs(cp.getRoot())) {
       LOG.warn(MSG_REFRESH_FAILURE_WITH_CHANGE_OF_HIERARCHY);
       throw new IOException(MSG_REFRESH_FAILURE_WITH_CHANGE_OF_HIERARCHY);
     }
 
-    /*
-     * (2) QueueManager owned properties are validated. Now validate and
-     * refresh the properties of scheduler in a single step.
-     */
+    // 调用调度器回调刷新自身配置
     if (schedulerRefresher != null) {
       try {
         schedulerRefresher.refreshQueues(cp.getRoot().getJobQueueInfo().getChildren());
@@ -372,24 +294,21 @@ public class QueueManager {
       }
     }
 
-    /*
-     * (3) Scheduler has validated and refreshed its queues successfully, now
-     * refresh the properties owned by QueueManager
-     */
-
-    // First copy the scheduling information recursively into the new
-    // queue-hierarchy. This is done to retain old scheduling information. This
-    // is done after scheduler refresh and not before it because during refresh,
-    // schedulers may wish to change their scheduling info objects too.
+    // 复制原有调度信息到新的队列层次结构
     cp.getRoot().copySchedulingInfo(this.root);
 
-    // Now switch roots.
+    // 切换到新配置，更新内部缓存
     initialize(cp);
 
     LOG.info("Queue configuration is refreshed successfully.");
   }
 
-  // this method is for internal use only
+  /**
+   * 拼接队列属性的完整配置键名。
+   * @param queue 队列名称
+   * @param property 属性名称
+   * @return 完整配置键名
+   */
   public static final String toFullPropertyName(
     String queue,
     String property) {
@@ -397,10 +316,8 @@ public class QueueManager {
   }
 
   /**
-   * Return an array of {@link JobQueueInfo} objects for all the
-   * queues configurated in the system.
-   *
-   * @return array of JobQueueInfo objects.
+   * 获取系统中所有队列的JobQueueInfo信息数组。
+   * @return 所有队列的JobQueueInfo数组
    */
   synchronized JobQueueInfo[] getJobQueueInfos() {
     ArrayList<JobQueueInfo> queueInfoList = new ArrayList<JobQueueInfo>();
@@ -414,12 +331,10 @@ public class QueueManager {
       new JobQueueInfo[queueInfoList.size()]);
   }
 
-
   /**
-   * Return {@link JobQueueInfo} for a given queue.
-   *
-   * @param queue name of the queue
-   * @return JobQueueInfo for the queue, null if the queue is not found.
+   * 获取指定队列的JobQueueInfo信息。
+   * @param queue 队列名称
+   * @return 队列的JobQueueInfo，队列不存在返回null
    */
   synchronized JobQueueInfo getJobQueueInfo(String queue) {
     if (allQueues.containsKey(queue)) {
@@ -430,13 +345,8 @@ public class QueueManager {
   }
 
   /**
-   * JobQueueInfo for all the queues.
-   * <p>
-   * Contribs can use this data structure to either create a hierarchy or for
-   * traversing.
-   * They can also use this to refresh properties in case of refreshQueues
-   *
-   * @return a map for easy navigation.
+   * 获取所有队列名称到JobQueueInfo的映射，方便遍历和导航。
+   * @return 队列名称到JobQueueInfo的映射
    */
   synchronized Map<String, JobQueueInfo> getJobQueueInfoMapping() {
     Map<String, JobQueueInfo> m = new HashMap<String, JobQueueInfo>();
@@ -449,16 +359,14 @@ public class QueueManager {
   }
 
   /**
-   * Generates the array of QueueAclsInfo object.
-   * <p>
-   * The array consists of only those queues for which user has acls.
-   *
-   * @return QueueAclsInfo[]
-   * @throws java.io.IOException
+   * 获取当前用户拥有操作权限的所有队列的ACL信息数组。
+   * @param ugi 当前用户的用户组信息
+   * @return 用户有权限的队列ACL信息数组
+   * @throws IOException
    */
   synchronized QueueAclsInfo[] getQueueAcls(UserGroupInformation ugi)
     throws IOException {
-    //List of all QueueAclsInfo objects , this list is returned
+    // 存储所有用户有权限的队列ACL信息
     ArrayList<QueueAclsInfo> queueAclsInfolist =
       new ArrayList<QueueAclsInfo>();
     QueueACL[] qAcls = QueueACL.values();
@@ -474,8 +382,7 @@ public class QueueManager {
         }
       }
       if (operationsAllowed != null) {
-        //There is atleast 1 operation supported for queue <queueName>
-        //, hence initialize queueAclsInfo
+        // 当前用户至少有一个操作权限，添加到结果列表
         queueAclsInfo = new QueueAclsInfo(
           queueName, operationsAllowed.toArray
             (new String[operationsAllowed.size()]));
@@ -486,42 +393,37 @@ public class QueueManager {
       new QueueAclsInfo[queueAclsInfolist.size()]);
   }
 
- 
- 
-
   /**
-   * Return if ACLs are enabled for the Map/Reduce system
-   *
-   * @return true if ACLs are enabled.
+   * 获取当前集群是否开启ACL权限检查。
+   * @return 开启返回true，否则返回false
    */
   boolean areAclsEnabled() {
     return areAclsEnabled;
   }
 
   /**
-   * Used only for test.
-   *
-   * @return
+   * 获取队列层级结构的根节点，仅用于测试。
+   * @return 根队列对象
    */
   Queue getRoot() {
     return root;
   }
 
-  
   /**
-   * Dumps the configuration of hierarchy of queues
-   * @param out the writer object to which dump is written
+   * 将队列层次结构配置导出为JSON格式写入指定输出流。
+   * @param out 输出Writer
+   * @param conf 集群配置
    * @throws IOException
    */
   static void dumpConfiguration(Writer out,Configuration conf) throws IOException {
     dumpConfiguration(out, null,conf);
   }
   
-  /***
-   * Dumps the configuration of hierarchy of queues with 
-   * the xml file path given. It is to be used directly ONLY FOR TESTING.
-   * @param out the writer object to which dump is written to.
-   * @param configFile the filename of xml file
+  /**
+   * 将指定配置文件中的队列层次结构导出为JSON格式，仅用于测试。
+   * @param out 输出Writer
+   * @param configFile 队列配置文件路径
+   * @param conf 集群配置
    * @throws IOException
    */
   static void dumpConfiguration(Writer out, String configFile,
@@ -548,68 +450,4 @@ public class QueueManager {
     dumpGenerator.writeFieldName("queues");
     dumpGenerator.writeStartArray();
     dumpConfiguration(dumpGenerator,parser.getRoot().getChildren());
-    dumpGenerator.writeEndArray();
-    dumpGenerator.writeEndObject();
-    dumpGenerator.flush();
-  }
-
-  /**
-   * method to perform depth-first search and write the parameters of every 
-   * queue in JSON format.
-   * @param dumpGenerator JsonGenerator object which takes the dump and flushes
-   *  to a writer object
-   * @param rootQueues the top-level queues
-   * @throws JsonGenerationException
-   * @throws IOException
-   */
-  private static void dumpConfiguration(JsonGenerator dumpGenerator,
-      Set<Queue> rootQueues) throws JsonGenerationException, IOException {
-    for (Queue queue : rootQueues) {
-      dumpGenerator.writeStartObject();
-      dumpGenerator.writeStringField("name", queue.getName());
-      dumpGenerator.writeStringField("state", queue.getState().toString());
-      AccessControlList submitJobList = null;
-      AccessControlList administerJobsList = null;
-      if (queue.getAcls() != null) {
-        submitJobList =
-          queue.getAcls().get(toFullPropertyName(queue.getName(),
-              QueueACL.SUBMIT_JOB.getAclName()));
-        administerJobsList =
-          queue.getAcls().get(toFullPropertyName(queue.getName(),
-              QueueACL.ADMINISTER_JOBS.getAclName()));
-      }
-      String aclsSubmitJobValue = " ";
-      if (submitJobList != null ) {
-        aclsSubmitJobValue = submitJobList.getAclString();
-      }
-      dumpGenerator.writeStringField("acl_submit_job", aclsSubmitJobValue);
-      String aclsAdministerValue = " ";
-      if (administerJobsList != null) {
-        aclsAdministerValue = administerJobsList.getAclString();
-      }
-      dumpGenerator.writeStringField("acl_administer_jobs",
-          aclsAdministerValue);
-      dumpGenerator.writeFieldName("properties");
-      dumpGenerator.writeStartArray();
-      if (queue.getProperties() != null) {
-        for (Map.Entry<Object, Object>property :
-          queue.getProperties().entrySet()) {
-          dumpGenerator.writeStartObject();
-          dumpGenerator.writeStringField("key", (String)property.getKey());
-          dumpGenerator.writeStringField("value", (String)property.getValue());
-          dumpGenerator.writeEndObject();
-        }
-      }
-      dumpGenerator.writeEndArray();
-      Set<Queue> childQueues = queue.getChildren();
-      dumpGenerator.writeFieldName("children");
-      dumpGenerator.writeStartArray();
-      if (childQueues != null && childQueues.size() > 0) {
-        dumpConfiguration(dumpGenerator, childQueues);
-      }
-      dumpGenerator.writeEndArray();
-      dumpGenerator.writeEndObject();
-    }
-  }
-
-}
+    dumpGenerator.writeEnd

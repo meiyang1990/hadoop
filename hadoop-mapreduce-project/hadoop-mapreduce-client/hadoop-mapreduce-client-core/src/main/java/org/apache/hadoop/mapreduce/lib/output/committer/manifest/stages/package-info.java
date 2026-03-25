@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,11 @@
  */
 
 /**
- * Intermediate manifest committer.
+ * 中间清单提交器的阶段实现包
  *
- * The individual and aggregate stages of the task and job commit process.
+ * 该包包含任务和作业提交流程中各个独立与聚合阶段的核心实现，
+ * 基于分阶段设计拆解作业提交流程，为基于清单文件的输出提交器
+ * 提供可复用、可扩展的阶段化执行能力，支持文件输出的原子提交。
  */
 
 @InterfaceAudience.Private

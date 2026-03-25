@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,14 +31,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This creates the timeline schema for storing application timeline
- * information. Each backend has to implement the {@link SchemaCreator} for
- * creating the schema in its backend and should be configured in yarn-site.xml.
+ * 时间线服务存储模式创建工具，负责初始化应用时间线信息存储结构。
+ * 不同存储后端需要自行实现{@link SchemaCreator}接口，并通过yarn-site.xml配置指定实现类。
+ * 本类作为命令行入口，根据配置调用对应后端的模式创建逻辑完成初始化。
  */
 public class TimelineSchemaCreator extends Configured implements Tool {
   private static final Logger LOG =
       LoggerFactory.getLogger(TimelineSchemaCreator.class);
 
+  /**
+   * 命令行入口，启动时间线存储模式创建流程。
+   */
   public static void main(String[] args) {
     try {
       int status = ToolRunner.run(new YarnConfiguration(),
@@ -54,18 +58,26 @@ public class TimelineSchemaCreator extends Configured implements Tool {
     return createTimelineSchema(args, conf);
   }
 
+  /**
+   * 根据配置加载对应后端的模式创建实现，执行时间线存储模式初始化。
+   */
   @VisibleForTesting
   int createTimelineSchema(String[] args, Configuration conf) throws Exception {
+    // 从配置中读取模式创建实现类名称
     String schemaCreatorClassName = conf.get(
         YarnConfiguration.TIMELINE_SERVICE_SCHEMA_CREATOR_CLASS,
         YarnConfiguration.DEFAULT_TIMELINE_SERVICE_SCHEMA_CREATOR_CLASS);
     LOG.info("Using {} for creating Timeline Service Schema ",
         schemaCreatorClassName);
     try {
+      // 加载实现类
       Class<?> schemaCreatorClass = Class.forName(schemaCreatorClassName);
+      // 检查类是否实现了SchemaCreator接口
       if (SchemaCreator.class.isAssignableFrom(schemaCreatorClass)) {
+        // 反射实例化实现类并初始化配置
         SchemaCreator schemaCreator = (SchemaCreator) ReflectionUtils
             .newInstance(schemaCreatorClass, conf);
+        // 调用后端实现创建存储模式
         schemaCreator.createTimelineSchema(args);
         return 0;
       } else {

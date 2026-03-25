@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,7 +37,8 @@ import static org.apache.hadoop.fs.statistics.StoreStatisticNames.STORE_IO_RATE_
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.*;
 
 /**
- * Constants internal to the manifest committer.
+ * Manifest输出提交器内部使用的常量定义类，包含统计项名称、格式字符串、不兼容文件系统配置等。
+ * 所有常量均为全局共享，不允许实例化此类。
  */
 @InterfaceAudience.Private
 public final class InternalConstants {
@@ -44,11 +46,11 @@ public final class InternalConstants {
   }
 
   /**
-   * Durations.
+   * 耗时统计名称数组，收集各个阶段和操作的执行时长统计。
    */
   public static final String[] DURATION_STATISTICS = {
 
-      /* Job stages. */
+      /* 作业生命周期各个阶段统计 */
       OP_STAGE_JOB_ABORT,
       OP_STAGE_JOB_CLEANUP,
       OP_STAGE_JOB_COMMIT,
@@ -59,7 +61,7 @@ public final class InternalConstants {
       OP_STAGE_JOB_SETUP,
       OP_STAGE_JOB_VALIDATE_OUTPUT,
 
-      /* Task stages. */
+      /* 任务生命周期各个阶段统计 */
 
       OP_STAGE_TASK_ABORT_TASK,
       OP_STAGE_TASK_COMMIT,
@@ -67,7 +69,7 @@ public final class InternalConstants {
       OP_STAGE_TASK_SCAN_DIRECTORY,
       OP_STAGE_TASK_SETUP,
 
-      /* Lower level store/fs operations. */
+      /* 底层文件系统操作统计 */
       OP_COMMIT_FILE_RENAME,
       OP_CREATE_DIRECTORIES,
       OP_CREATE_ONE_DIRECTORY,
@@ -96,7 +98,7 @@ public final class InternalConstants {
   };
 
   /**
-   * Counters.
+   * 计数器名称数组，收集各个计数类型指标统计。
    */
   public static final String[] COUNTER_STATISTICS = {
       COMMITTER_BYTES_COMMITTED_COUNT,
@@ -112,27 +114,26 @@ public final class InternalConstants {
   };
 
   /**
-   * Error string from ABFS connector on timeout.
+   * ABFS存储连接器超时错误标识字符串。
    */
   public static final String OPERATION_TIMED_OUT = "OperationTimedOut";
 
   /**
-   * Format string for task attempt names.
+   * 任务尝试日志名称格式字符串。
    */
   public static final String NAME_FORMAT_TASK_ATTEMPT = "[Task-Attempt %s]";
 
   /**
-   * Format string for job attempt names.
+   * 作业尝试日志名称格式字符串。
    */
   public static final String NAME_FORMAT_JOB_ATTEMPT = "[Job-Attempt %s]";
 
-  /** Schemas of filesystems we know to not work with this committer. */
+  /** 不兼容当前Manifest提交器的文件系统schema集合 */
   public static final Set<String> UNSUPPORTED_FS_SCHEMAS =
       ImmutableSet.of("s3a", "wasb");
 
   /**
-   * Interval in milliseconds between save retries.
-   * Value {@value} milliseconds.
+   * 保存重试时的间隔时间，单位为毫秒，默认值500ms。
    */
   public static final int SAVE_SLEEP_INTERVAL = 500;
 

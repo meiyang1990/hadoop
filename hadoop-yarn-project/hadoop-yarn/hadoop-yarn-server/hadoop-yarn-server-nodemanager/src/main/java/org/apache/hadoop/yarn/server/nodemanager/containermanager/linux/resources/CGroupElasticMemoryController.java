@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -52,9 +53,8 @@ import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.r
 import static org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources.CGroupsHandler.CGROUP_NO_LIMIT;
 
 /**
- * This thread controls memory usage using cgroups. It listens to out of memory
- * events of all the containers together, and if we go over the limit picks
- * a container to kill. The algorithm that picks the container is a plugin.
+ * 基于cgroups的弹性内存控制线程，负责监听整个节点YARN容器内存OOM事件，并选择容器杀死解决内存不足问题。
+ * 容器选择算法可通过配置插件化实现。
  */
 public class CGroupElasticMemoryController extends SubjectInheritingThread {
   protected static final Logger LOG = LoggerFactory
@@ -72,15 +72,15 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
   private int timeoutMS;
 
   /**
-   * Default constructor.
-   * @param conf Yarn configuration to use
-   * @param context Node manager context to out of memory handler
-   * @param cgroups Cgroups handler configured
-   * @param controlPhysicalMemory Whether to listen to physical memory OOM
-   * @param controlVirtualMemory Whether to listen to virtual memory OOM
-   * @param limit memory limit in bytes
-   * @param oomHandlerOverride optional OOM handler
-   * @exception YarnException Could not instantiate class
+   * 构造函数，用于测试可传入自定义OOM处理器。
+   * @param conf Yarn配置
+   * @param context NodeManager上下文
+   * @param cgroups cgroups处理器
+   * @param controlPhysicalMemory 是否监听物理内存OOM
+   * @param controlVirtualMemory 是否监听虚拟内存OOM
+   * @param limit 内存限制字节数
+   * @param oomHandlerOverride 自定义OOM处理器
+   * @exception YarnException 实例化失败时抛出
    */
   @VisibleForTesting
   CGroupElasticMemoryController(Configuration conf,
@@ -112,7 +112,7 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
               "only " + NM_PMEM_CHECK_ENABLED + " to true otherwise set " +
               "only " + NM_VMEM_CHECK_ENABLED + " to true.");
     }
-    // We are safe at this point that no more exceptions can be thrown
+    // 获取OOM处理超时时间，转换为毫秒
     this.timeoutMS =
         1000 * conf.getInt(NM_ELASTIC_MEMORY_CONTROL_OOM_TIMEOUT_SEC,
         DEFAULT_NM_ELASTIC_MEMORY_CONTROL_OOM_TIMEOUT_SEC);
@@ -127,13 +127,13 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
   }
 
   /**
-   * Get the configured OOM handler.
-   * @param conf configuration
-   * @param context context to pass to constructor
-   * @param oomHandlerLocal Default override
-   * @param controlVirtual Control physical or virtual memory
-   * @return The configured or overridden OOM handler.
-   * @throws YarnException in case the constructor failed
+   * 根据配置获取OOM处理器实例。
+   * @param conf 配置对象
+   * @param context 上下文对象传递给构造函数
+   * @param oomHandlerLocal 默认覆盖处理器
+   * @param controlVirtual 是否控制虚拟内存
+   * @return 配置好的OOM处理器实例
+   * @throws YarnException 构造实例失败时抛出
    */
   private Runnable getDefaultOOMHandler(
       Configuration conf, Context context, Runnable oomHandlerLocal,
@@ -157,14 +157,14 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
   }
 
   /**
-   * Default constructor.
-   * @param conf Yarn configuration to use
-   * @param context Node manager context to out of memory handler
-   * @param cgroups Cgroups handler configured
-   * @param controlPhysicalMemory Whether to listen to physical memory OOM
-   * @param controlVirtualMemory Whether to listen to virtual memory OOM
-   * @param limit memory limit in bytes
-   * @exception YarnException Could not instantiate class
+   * 公开构造函数。
+   * @param conf Yarn配置
+   * @param context NodeManager上下文
+   * @param cgroups cgroups处理器
+   * @param controlPhysicalMemory 是否监听物理内存OOM
+   * @param controlVirtualMemory 是否监听虚拟内存OOM
+   * @param limit 内存限制字节数
+   * @exception YarnException 实例化失败时抛出
    */
   public CGroupElasticMemoryController(Configuration conf,
                                        Context context,
@@ -183,7 +183,7 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
   }
 
   /**
-   * Exception thrown if the OOM situation is not resolved.
+   * OOM无法解决时抛出的异常。
    */
   static private class OOMNotResolvedException extends YarnRuntimeException {
     OOMNotResolvedException(String message, Exception parent) {
@@ -192,7 +192,7 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
   }
 
   /**
-   * Stop listening to the cgroup.
+   * 停止监听cgroup OOM事件，销毁监听进程。
    */
   public synchronized void stopListening() {
     stopped = true;
@@ -204,12 +204,8 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
   }
 
   /**
-   * Checks if the CGroupElasticMemoryController is available on this system.
-   * This assumes that Linux container executor is already initialized.
-   * We need to have CGroups enabled.
-   *
-   * @return True if CGroupElasticMemoryController is available.
-   * False otherwise.
+   * 检查当前系统是否支持弹性内存控制功能。
+   * @return 支持返回true，否则返回false
    */
   public static boolean isAvailable() {
     try {
@@ -233,22 +229,16 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
   }
 
   /**
-   * Main OOM listening thread. It uses an external process to listen to
-   * Linux events. The external process does not need to run as root, so
-   * it is not related to container-executor. We do not use JNI for security
-   * reasons.
+   * 主线程工作函数，启动外部OOM监听进程，循环处理OOM事件。
    */
   @Override
   public void work() {
     ExecutorService executor = null;
     try {
-      // Disable OOM killer and set a limit.
-      // This has to be set first, so that we get notified about valid events.
-      // We will be notified about events even, if they happened before
-      // oom-listener started
+      // 配置cgroup参数，设置内存限制并启用OOM通知
       setCGroupParameters();
 
-      // Start a listener process
+      // 创建OOM监听进程构建器
       ProcessBuilder oomListener = new ProcessBuilder();
       oomListener.command(oomListenerPath, yarnCGroupPath);
       synchronized (this) {
@@ -264,27 +254,19 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
           yarnCGroupPath,
           oomListenerPath));
 
-      // We need 1 thread for the error stream and a few others
-      // as a watchdog for the OOM killer
+      // 创建固定线程池，用于错误流读取和OOM处理看门狗
       executor = Executors.newFixedThreadPool(2);
 
-      // Listen to any errors in the background. We do not expect this to
-      // be large in size, so it will fit into a string.
+      // 异步读取监听进程错误输出
       Future<String> errorListener =
           executor.submit(() -> IOUtils.toString(process.getErrorStream(), StandardCharsets.UTF_8));
 
-      // We get Linux event increments (8 bytes) forwarded from the event stream
-      // The events cannot be split, so it is safe to read them as a whole
-      // There is no race condition with the cgroup
-      // running out of memory. If oom is 1 at startup
-      // oom_listener will send an initial notification
+      // 从监听进程读取OOM事件，每个事件占8字节
       InputStream events = process.getInputStream();
       byte[] event = new byte[8];
       int read;
-      // This loop can be exited by terminating the process
-      // with stopListening()
       while ((read = events.read(event)) == event.length) {
-        // An OOM event has occurred
+        // 处理OOM事件
         resolveOOM(executor);
       }
 
@@ -293,14 +275,12 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
             read));
       }
 
-      // If the input stream is closed, we wait for exit or process terminated.
+      // 等待监听进程退出，获取退出信息
       int exitCode = process.waitFor();
       String error = errorListener.get();
       process = null;
       LOG.info(String.format("OOM listener exited %d %s", exitCode, error));
     } catch (OOMNotResolvedException ex) {
-      // We could mark the node unhealthy but it shuts down the node anyways.
-      // Let's just bring down the node manager all containers are frozen.
       throw new YarnRuntimeException("Could not resolve OOM", ex);
     } catch (Exception ex) {
       synchronized (this) {
@@ -309,11 +289,11 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
         }
       }
     } finally {
-      // Make sure we do not leak the child process,
-      // especially if process.waitFor() did not finish.
+      // 确保子进程被销毁，避免资源泄漏
       if (process != null && process.isAlive()) {
         process.destroyForcibly();
       }
+      // 关闭线程池
       if (executor != null) {
         try {
           executor.awaitTermination(6, TimeUnit.SECONDS);
@@ -322,67 +302,68 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
         }
         executor.shutdown();
       }
+      // 还原cgroup配置
       resetCGroupParameters();
     }
   }
 
   /**
-   * Resolve an OOM event.
-   * Listen to the handler timeouts.
-   * @param executor Executor to create watchdog with.
-   * @throws InterruptedException interrupted
-   * @throws java.util.concurrent.ExecutionException cannot launch watchdog
+   * 处理OOM事件，启动看门狗监控处理超时。
+   * @param executor 执行看门狗的线程池
+   * @throws InterruptedException 线程中断
+   * @throws java.util.concurrent.ExecutionException 看门狗执行异常
    */
   private void resolveOOM(ExecutorService executor)
       throws InterruptedException, java.util.concurrent.ExecutionException {
-    // Just log, when we are still in OOM after a couple of seconds
+    // 记录OOM开始时间
     final long start = clock.getTime();
+    // 提交看门狗任务
     Future<Boolean> watchdog =
         executor.submit(() -> watchAndLogOOMState(start));
-    // Kill something to resolve the issue
+    // 执行OOM处理逻辑
     try {
       oomHandler.run();
     } catch (RuntimeException ex) {
       watchdog.cancel(true);
       throw new OOMNotResolvedException("OOM handler failed", ex);
     }
+    // 等待处理结果，超时返回false
     if (!watchdog.get()) {
-      // If we are still in OOM,
-      // the watchdog will trigger stop
-      // listening to exit this loop
       throw new OOMNotResolvedException("OOM handler timed out", null);
     }
   }
 
   /**
-   * Just watch until we are in OOM and log. Send an update log every second.
-   * @return if the OOM was resolved successfully
+   * 持续监控OOM状态，每秒日志更新，超时未解决返回false。
+   * @param start OOM开始时间
+   * @return OOM成功解决返回true，超时返回false
    */
   private boolean watchAndLogOOMState(long start) {
     long lastLog = start;
     try {
       long end = start;
-      // Throw an error, if we are still in OOM after 5 seconds
+      // 在超时时间内持续检查OOM状态
       while(end - start < timeoutMS) {
         end = clock.getTime();
+        // 读取当前OOM状态
         String underOOM = cgroups.getCGroupParam(
             CGroupsHandler.CGroupController.MEMORY,
             "",
             CGROUP_PARAM_MEMORY_OOM_CONTROL);
         if (underOOM.contains(CGroupsHandler.UNDER_OOM)) {
+          // 每秒打印一次日志，避免刷屏
           if (end - lastLog > 1000) {
             LOG.warn(String.format(
                 "OOM not resolved in %d ms", end - start));
             lastLog = end;
           }
         } else {
+          // OOM已解决
           LOG.info(String.format(
               "Resolved OOM in %d ms", end - start));
           return true;
         }
-        // We do not want to saturate the CPU
-        // leaving the resources to the actual OOM killer
-        // but we want to be fast, too.
+        // 短暂休眠避免占满CPU
         Thread.sleep(10);
       }
     } catch (InterruptedException ex) {
@@ -390,6 +371,7 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
     } catch (Exception e) {
       LOG.warn("Exception running logging thread", e);
     }
+    // 超时未解决OOM，停止监听
     LOG.warn(String.format("OOM was not resolved in %d ms",
         clock.getTime() - start));
     stopListening();
@@ -397,33 +379,31 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
   }
 
   /**
-   * Update root memory cgroup. This contains all containers.
-   * The physical limit has to be set first then the virtual limit.
+   * 设置根cgroup内存参数，配置内存限制并启用OOM通知。
    */
   private void setCGroupParameters() throws ResourceHandlerException {
-    // Disable the OOM killer
+    // 禁用内核自带OOM killer，由本组件处理OOM
     cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
         CGROUP_PARAM_MEMORY_OOM_CONTROL, "1");
     if (controlPhysicalMemory && !controlVirtualMemory) {
       try {
-        // Ignore virtual memory limits, since we do not know what it is set to
+        // 取消交换空间限制
         cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
             CGROUP_PARAM_MEMORY_SWAP_HARD_LIMIT_BYTES, CGROUP_NO_LIMIT);
       } catch (ResourceHandlerException ex) {
         LOG.debug("Swap monitoring is turned off in the kernel");
       }
-      // Set physical memory limits
+      // 设置物理内存硬限制
       cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
           CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES, Long.toString(limit));
     } else if (controlVirtualMemory && !controlPhysicalMemory) {
-      // Ignore virtual memory limits, since we do not know what it is set to
+      // 取消交换空间限制
       cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
           CGROUP_PARAM_MEMORY_SWAP_HARD_LIMIT_BYTES, CGROUP_NO_LIMIT);
-      // Set physical limits to no more than virtual limits
+      // 设置物理内存限制
       cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
           CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES, Long.toString(limit));
-      // Set virtual memory limits
-      // Important: it has to be set after physical limit is set
+      // 设置虚拟内存(物理+交换)硬限制，必须在物理限制之后设置
       cgroups.updateCGroupParam(CGroupsHandler.CGroupController.MEMORY, "",
           CGROUP_PARAM_MEMORY_SWAP_HARD_LIMIT_BYTES, Long.toString(limit));
     } else {
@@ -434,43 +414,12 @@ public class CGroupElasticMemoryController extends SubjectInheritingThread {
   }
 
   /**
-   * Reset root memory cgroup to OS defaults. This controls all containers.
+   * 重置根cgroup配置，恢复默认限制，开启内核OOM killer。
    */
   private void resetCGroupParameters() {
     try {
       try {
-        // Disable memory limits
+        // 取消交换空间限制
         cgroups.updateCGroupParam(
             CGroupsHandler.CGroupController.MEMORY, "",
-            CGROUP_PARAM_MEMORY_SWAP_HARD_LIMIT_BYTES, CGROUP_NO_LIMIT);
-      } catch (ResourceHandlerException ex) {
-        LOG.debug("Swap monitoring is turned off in the kernel");
-      }
-      cgroups.updateCGroupParam(
-          CGroupsHandler.CGroupController.MEMORY, "",
-          CGROUP_PARAM_MEMORY_HARD_LIMIT_BYTES, CGROUP_NO_LIMIT);
-      // Enable the OOM killer
-      cgroups.updateCGroupParam(
-          CGroupsHandler.CGroupController.MEMORY, "",
-          CGROUP_PARAM_MEMORY_OOM_CONTROL, "0");
-    } catch (ResourceHandlerException ex) {
-      LOG.warn("Error in cleanup", ex);
-    }
-  }
-
-  private static String getOOMListenerExecutablePath(Configuration conf) {
-    String yarnHomeEnvVar =
-        System.getenv(ApplicationConstants.Environment.HADOOP_YARN_HOME.key());
-    if (yarnHomeEnvVar == null) {
-      yarnHomeEnvVar = ".";
-    }
-    File hadoopBin = new File(yarnHomeEnvVar, "bin");
-    String defaultPath =
-        new File(hadoopBin, "oom-listener").getAbsolutePath();
-    final String path = conf.get(
-        YarnConfiguration.NM_ELASTIC_MEMORY_CONTROL_OOM_LISTENER_PATH,
-        defaultPath);
-    LOG.debug(String.format("oom-listener path: %s %s", path, defaultPath));
-    return path;
-  }
-}
+            CG

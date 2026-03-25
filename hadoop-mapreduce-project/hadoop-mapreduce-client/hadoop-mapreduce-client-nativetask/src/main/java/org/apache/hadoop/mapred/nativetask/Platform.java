@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,14 +29,11 @@ import org.apache.hadoop.mapred.nativetask.serde.INativeSerializer;
 import org.apache.hadoop.mapred.nativetask.serde.NativeSerialization;
 
 /**
- * Base class for platforms. A platform is a framework running on top of
- * MapReduce, like Hadoop, Hive, Pig, Mahout. Each framework defines its
- * own key type and value type across a MapReduce job. For each platform,
- * we should implement serializers such that we could communicate data with
- * native side and native comparators so our native output collectors could
- * sort them and write out. We've already provided the {@link HadoopPlatform}
- * that supports all key types of Hadoop and users could implement their custom
- * platform.
+ * MapReduce原生任务平台抽象基类。
+ * 平台指运行在MapReduce之上的计算框架（如Hive、Pig、Mahout等），
+ * 每个框架定义了自己的键值类型规范，本类为不同框架提供统一扩展接口，
+ * 用于注册序列化器、支持原生排序和原生侧数据交互。
+ * Hadoop已经提供{@link HadoopPlatform}支持原生Hadoop键类型，用户可以自定义实现适配自己的框架。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -43,26 +41,31 @@ public abstract class Platform {
   private final NativeSerialization serialization;
   protected Set<String> keyClassNames = new HashSet<String>();
 
+  /**
+   * 构造函数，获取原生序列化管理器实例
+   */
   public Platform() {
     this.serialization = NativeSerialization.getInstance();
   }
 
   /**
-   * initialize a platform, where we should call registerKey
+   * 初始化平台，注册当前平台支持的所有键类型和对应序列化器
+   * @throws IOException 初始化失败时抛出IO异常
    */
   public abstract void init() throws IOException;
 
   /**
-   * @return name of a Platform, useful for logs and debug
+   * 获取平台名称，用于日志输出和调试
+   * @return 平台名称字符串
    */
   public abstract String name();
 
 
   /**
-   * associate a key class with its serializer and platform
-   *
-   * @param keyClassName map out key class name
-   * @param key          key serializer class
+   * 注册键类型，将键类与对应序列化器绑定到当前平台
+   * @param keyClassName 输出键类全限定名
+   * @param key 键序列化器类
+   * @throws IOException 注册失败时抛出IO异常
    */
   protected void registerKey(String keyClassName, Class<?> key) throws IOException {
     serialization.register(keyClassName, key);
@@ -70,31 +73,23 @@ public abstract class Platform {
   }
 
   /**
-   * whether a platform supports a specific key should at least satisfy two conditions
-   *
-   * 1. the key belongs to the platform
-   * 2. the associated serializer must implement {@link INativeComparable} interface
-   *
-   *
-   * @param keyClassName map out put key class name
-   * @param serializer   serializer associated with key via registerKey
-   * @param job          job configuration
-   * @return             true if the platform has implemented native comparators of the key and
-   *                     false otherwise
+   * 判断当前平台是否支持指定键的原生处理
+   * 需要满足两个条件：1、键属于当前平台；2、对应序列化器实现了{@link INativeComparable}接口支持原生排序
+   * @param keyClassName 输出键类全限定名
+   * @param serializer   通过registerKey注册的对应序列化器
+   * @param job          作业配置对象
+   * @return             当前平台实现了该键的原生比较器返回true，否则返回false
    */
   protected abstract boolean support(String keyClassName,
       INativeSerializer<?> serializer, JobConf job);
 
 
   /**
-   * whether it's the platform that has defined a custom Java comparator
-   *
-   * NativeTask doesn't support custom Java comparators
-   * (set with mapreduce.job.output.key.comparator.class)
-   * but a platform (e.g Pig) could also set that conf and implement native
-   * comparators so we shouldn't bail out.
-   *
-   * @param keyComparator comparator set with mapreduce.job.output.key.comparator.class
+   * 判断自定义Java比较器是否是当前平台定义的
+   * 原生任务默认不支持用户自定义Java比较器（通过mapreduce.job.output.key.comparator.class配置），
+   * 但部分平台（如Pig）会设置该配置并同时实现原生比较器，这种情况下不应该中断任务执行
+   * @param keyComparator 配置中指定的键比较器类
+   * @return 是当前平台定义的返回true，否则返回false
    */
   protected abstract boolean define(Class<?> keyComparator);
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,62 +26,79 @@ import org.apache.hadoop.hdfs.server.namenode.NameNode.OperationCategory;
 import org.apache.hadoop.ipc.StandbyException;
 
 /**
- * Context that is to be used by {@link HAState} for getting/setting the
- * current state and performing required operations.
+ * HDFS高可用(HA)场景下NameNode状态上下文接口，为HAState提供状态管理、服务启停和操作校验能力
+ * 定义了NameNode在Active/Standby状态切换过程中需要执行的核心操作契约，供具体NameNode实现
  */
 @InterfaceAudience.Private
 public interface HAContext {
-  /** Set the state of the context to given {@code state} */
+  /**
+   * 将上下文当前状态设置为指定HA状态
+   * @param state 目标HA状态
+   */
   public void setState(HAState state);
   
-  /** Get the state from the context */
+  /**
+   * 获取上下文当前的HA状态
+   * @return 当前HA状态
+   */
   public HAState getState();
   
-  /** Start the services required in active state */
+  /**
+   * 启动Active状态NameNode所需的核心服务
+   * @throws IOException 启动服务失败时抛出异常
+   */
   public void startActiveServices() throws IOException;
   
-  /** Stop the services when exiting active state */
+  /**
+   * 退出Active状态时停止对应核心服务
+   * @throws IOException 停止服务失败时抛出异常
+   */
   public void stopActiveServices() throws IOException;
   
-  /** Start the services required in standby state */
+  /**
+   * 启动Standby状态NameNode所需的核心服务
+   * @throws IOException 启动服务失败时抛出异常
+   */
   public void startStandbyServices() throws IOException;
 
-  /** Prepare to exit the standby state */
+  /**
+   * 退出Standby状态前的准备工作
+   * @throws ServiceFailedException 准备失败时抛出异常
+   */
   public void prepareToStopStandbyServices() throws ServiceFailedException;
 
-  /** Stop the services when exiting standby state */
+  /**
+   * 退出Standby状态时停止对应核心服务
+   * @throws IOException 停止服务失败时抛出异常
+   */
   public void stopStandbyServices() throws IOException;
 
   /**
-   * Take a write-lock on the underlying namesystem
-   * so that no concurrent state transitions or edits
-   * can be made.
+   * 对底层命名系统加写锁，防止并发状态转换和编辑操作，保证状态切换的线程安全
    */
   void writeLock();
 
   /**
-   * Unlock the lock taken by {@link #writeLock()}
+   * 释放writeLock()获取的写锁
    */
   void writeUnlock();
 
   /**
-   * Verify that the given operation category is allowed in the current state.
-   * This is to allow NN implementations (eg BackupNode) to override it with
-   * node-specific handling.
+   * 校验当前HA状态是否允许执行指定类别的操作
+   * 允许不同NameNode实现（如BackupNode）自定义节点专属的校验逻辑
    * 
-   * If the operation which is being checked will be taking the FSNS lock, it's
-   * advisable to check the operation category both immediately before and after
-   * taking the lock. This is because clients rely on the StandbyException
-   * thrown by this method in order to trigger client failover, and if a client
-   * first tries to contact the Standby NN, it could block for a long time if
-   * the Standby is holding the lock for a while, e.g. when performing a
-   * checkpoint. See HDFS-4591 for more details.
+   * 对于需要获取FSNS锁的操作，建议在获取锁前后各校验一次。这是因为客户端依赖此方法抛出的
+   * StandbyException触发故障转移，如果客户端先连接到StandbyNameNode，若Standby正在执行
+   * Checkpoint长时间持有锁，会导致客户端长时间阻塞。更多细节见HDFS-4591
+   * 
+   * @param op 待校验的操作类别（读/写）
+   * @throws StandbyException 当前状态不允许该操作时抛出异常
    */
   void checkOperation(OperationCategory op) throws StandbyException;
 
   /**
-   * @return true if the node should allow stale reads (ie reads
-   * while the namespace is not up to date)
+   * 判断节点是否允许过时读（即在命名空间数据不是最新时允许读操作）
+   * @return true表示允许过时读，false表示不允许
    */
   boolean allowStaleReads();
 }

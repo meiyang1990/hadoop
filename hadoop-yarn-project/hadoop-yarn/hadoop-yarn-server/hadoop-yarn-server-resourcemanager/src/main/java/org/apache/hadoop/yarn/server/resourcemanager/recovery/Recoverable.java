@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,6 +20,15 @@ package org.apache.hadoop.yarn.server.resourcemanager.recovery;
 
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.RMState;
 
+/**
+ * 可恢复接口，定义YARN ResourceManager重启后恢复状态的统一规范
+ * 所有需要从持久化状态中恢复数据的组件都需要实现该接口
+ */
 public interface Recoverable {
+  /**
+   * 从持久化存储中恢复组件状态
+   * @param state ResourceManager恢复后的全局状态对象
+   * @throws Exception 恢复过程中抛出的异常
+   */
   public void recover(RMState state) throws Exception;
 }

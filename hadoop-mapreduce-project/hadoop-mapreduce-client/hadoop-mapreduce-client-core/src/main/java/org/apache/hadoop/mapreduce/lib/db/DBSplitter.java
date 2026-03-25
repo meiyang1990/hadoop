@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,20 +29,22 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.InputSplit;
 
 /**
- * DBSplitter will generate DBInputSplits to use with DataDrivenDBInputFormat.
- * DataDrivenDBInputFormat needs to interpolate between two values that
- * represent the lowest and highest valued records to import. Depending
- * on the data-type of the column, this requires different behavior.
- * DBSplitter implementations should perform this for a data type or family
- * of data types.
+ * 文件说明: MapReduce关系型数据库数据导入模块的分片分割接口，针对不同数据类型实现不同的分片逻辑
+ *
+ * 接口功能描述: 为DataDrivenDBInputFormat生成数据库输入分片。
+ * DataDrivenDBInputFormat需要根据拆分列的最小值和最大值进行分片插值，
+ * 不同数据类型的拆分逻辑不同，本接口定义了通用的拆分行为，不同数据类型通过实现本接口提供对应拆分逻辑。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface DBSplitter {
   /**
-   * Given a ResultSet containing one record (and already advanced to that record)
-   * with two columns (a low value, and a high value, both of the same type), determine
-   * a set of splits that span the given values.
+   * 根据拆分列的最小最大值范围，生成一组覆盖全范围的输入分片
+   * @param conf Hadoop作业配置对象
+   * @param results 包含拆分列最小、最大值的结果集，已经定位到目标记录，包含两列分别对应低值和高值，且类型一致
+   * @param colName 用于拆分的列名
+   * @return 生成的输入分片列表
+   * @throws SQLException 当从ResultSet读取数据出错时抛出
    */
   List<InputSplit> split(Configuration conf, ResultSet results, String colName) throws SQLException;
 }

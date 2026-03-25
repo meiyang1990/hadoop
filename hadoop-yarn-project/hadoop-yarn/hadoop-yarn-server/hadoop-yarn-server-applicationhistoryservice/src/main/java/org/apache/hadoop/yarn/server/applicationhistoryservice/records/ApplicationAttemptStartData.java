@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,13 +26,20 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * The class contains the fields that can be determined when
- * <code>RMAppAttempt</code> starts, and that need to be stored persistently.
+ * 应用尝试启动数据记录，保存RMAppAttempt启动时确定的、需要持久化存储的信息，供应用历史服务使用。
  */
 @Public
 @Unstable
 public abstract class ApplicationAttemptStartData {
 
+  /**
+   * 创建并初始化应用尝试启动数据实例，设置所有必填字段。
+   * @param appAttemptId 应用尝试ID
+   * @param host 应用尝试的监听主机地址
+   * @param rpcPort 应用尝试的RPC服务端口
+   * @param masterContainerId 应用尝试的AM容器ID
+   * @return 初始化完成的应用尝试启动数据实例
+   */
   @Public
   @Unstable
   public static ApplicationAttemptStartData newInstance(

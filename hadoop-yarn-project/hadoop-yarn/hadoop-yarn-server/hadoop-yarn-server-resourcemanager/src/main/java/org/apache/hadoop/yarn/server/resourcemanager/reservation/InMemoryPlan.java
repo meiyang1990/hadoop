@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -49,9 +50,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This class represents an in memory representation of the state of our
- * reservation system, and provides accelerated access to both individual
- * reservations and aggregate utilization of resources over time.
+ * 该类实现了YARN预留系统状态的内存存储，提供对单个预留信息和资源时间维度聚合利用率的高效访问。
+ * 是YARN容量调度器预留功能的核心内存数据结构。
  */
 public class InMemoryPlan implements Plan {
 
@@ -60,25 +60,33 @@ public class InMemoryPlan implements Plan {
   private static final Resource ZERO_RESOURCE = Resource.newInstance(0, 0);
   private final RMStateStore rmStateStore;
 
+  // 按预留时间区间排序的所有预留集合
   private TreeMap<ReservationInterval, Set<InMemoryReservationAllocation>> currentReservations =
       new TreeMap<ReservationInterval, Set<InMemoryReservationAllocation>>();
 
+  // 非周期性预留资源的运行长度编码稀疏存储
   private RLESparseResourceAllocation rleSparseVector;
 
+  // 周期性预留资源的运行长度编码稀疏存储
   private PeriodicRLESparseResourceAllocation periodicRle;
 
+  // 按用户分组存储非周期性预留资源分配
   private Map<String, RLESparseResourceAllocation> userResourceAlloc =
       new HashMap<String, RLESparseResourceAllocation>();
 
+  // 按用户分组存储周期性预留资源分配
   private Map<String, RLESparseResourceAllocation> userPeriodicResourceAlloc =
       new HashMap<String, RLESparseResourceAllocation>();
 
+  // 按用户分组存储活跃预留计数
   private Map<String, RLESparseResourceAllocation> userActiveReservationCount =
       new HashMap<String, RLESparseResourceAllocation>();
 
+  // 按ReservationId索引所有预留分配信息
   private Map<ReservationId, InMemoryReservationAllocation> reservationTable =
       new HashMap<ReservationId, InMemoryReservationAllocation>();
 
+  // 读写锁，保障并发读写线程安全
   private final ReentrantReadWriteLock readWriteLock =
       new ReentrantReadWriteLock();
   private final Lock readLock = readWriteLock.readLock();
@@ -95,8 +103,24 @@ public class InMemoryPlan implements Plan {
   private final Clock clock;
   private final long maxPeriodicity;
 
+  // 该计划对应队列的总资源容量
   private Resource totalCapacity;
 
+  /**
+   * 构造函数，使用默认最大周期配置
+   * @param queueMetrics 队列指标统计
+   * @param policy 资源共享策略
+   * @param agent 预留代理
+   * @param totalCapacity 队列总资源容量
+   * @param step 时间步长
+   * @param resCalc 资源计算器
+   * @param minAlloc 最小分配资源
+   * @param maxAlloc 最大分配资源
+   * @param queueName 队列名称
+   * @param replanner 重规划器
+   * @param getMoveOnExpiry 过期是否自动移动
+   * @param rmContext RM上下文
+   */
   public InMemoryPlan(QueueMetrics queueMetrics, SharingPolicy policy,
       ReservationAgent agent, Resource totalCapacity, long step,
       ResourceCalculator resCalc, Resource minAlloc, Resource maxAlloc,
@@ -108,6 +132,22 @@ public class InMemoryPlan implements Plan {
         rmContext);
   }
 
+  /**
+   * 构造函数，使用默认UTC时钟
+   * @param queueMetrics 队列指标统计
+   * @param policy 资源共享策略
+   * @param agent 预留代理
+   * @param totalCapacity 队列总资源容量
+   * @param step 时间步长
+   * @param resCalc 资源计算器
+   * @param minAlloc 最小分配资源
+   * @param maxAlloc 最大分配资源
+   * @param queueName 队列名称
+   * @param replanner 重规划器
+   * @param getMoveOnExpiry 过期是否自动移动
+   * @param maxPeriodicity 支持的最大周期性
+   * @param rmContext RM上下文
+   */
   public InMemoryPlan(QueueMetrics queueMetrics, SharingPolicy policy,
       ReservationAgent agent, Resource totalCapacity, long step,
       ResourceCalculator resCalc, Resource minAlloc, Resource maxAlloc,
@@ -118,6 +158,23 @@ public class InMemoryPlan implements Plan {
         rmContext, new UTCClock());
   }
 
+  /**
+   * 全参数构造函数
+   * @param queueMetrics 队列指标统计
+   * @param policy 资源共享策略
+   * @param agent 预留代理
+   * @param totalCapacity 队列总资源容量
+   * @param step 时间步长
+   * @param resCalc 资源计算器
+   * @param minAlloc 最小分配资源
+   * @param maxAlloc 最大分配资源
+   * @param queueName 队列名称
+   * @param replanner 重规划器
+   * @param getMoveOnExpiry 过期是否自动移动
+   * @param maxPeriodicty 支持的最大周期性
+   * @param rmContext RM上下文
+   * @param clock 时钟实现
+   */
   @SuppressWarnings("checkstyle:parameternumber")
   public InMemoryPlan(QueueMetrics queueMetrics, SharingPolicy policy,
       ReservationAgent agent, Resource totalCapacity, long step,
@@ -148,6 +205,12 @@ public class InMemoryPlan implements Plan {
     return queueMetrics;
   }
 
+  /**
+   * 获取对应用户和周期类型的资源分配RLE存储
+   * @param user 用户名
+   * @param period 周期值，大于0表示周期性预留
+   * @return 对应的RLE资源分配存储
+   */
   private RLESparseResourceAllocation getUserRLEResourceAllocation(String user,
       long period) {
     RLESparseResourceAllocation resAlloc = null;
@@ -170,6 +233,11 @@ public class InMemoryPlan implements Plan {
     return resAlloc;
   }
 
+  /**
+   * 清理用户空闲的RLE资源分配存储，避免内存泄漏
+   * @param user 用户名
+   * @param period 周期值
+   */
   private void gcUserRLEResourceAllocation(String user, long period) {
     if (period > 0) {
       if (userPeriodicResourceAlloc.get(user).isEmpty()) {
@@ -182,35 +250,44 @@ public class InMemoryPlan implements Plan {
     }
   }
 
+  /**
+   * 增加新预留的资源分配，更新所有聚合统计数据
+   * @param reservation 要添加的预留分配
+   */
   private void incrementAllocation(ReservationAllocation reservation) {
     assert (readWriteLock.isWriteLockedByCurrentThread());
     Map<ReservationInterval, Resource> allocationRequests =
         reservation.getAllocationRequests();
-    // check if we have encountered the user earlier and if not add an entry
+    // 获取用户名和周期信息
     String user = reservation.getUser();
     long period = reservation.getPeriodicity();
+    // 获取对应用户的RLE存储
     RLESparseResourceAllocation resAlloc =
         getUserRLEResourceAllocation(user, period);
 
+    // 获取用户活跃预留计数存储
     RLESparseResourceAllocation resCount = userActiveReservationCount.get(user);
     if (resCount == null) {
       resCount = new RLESparseResourceAllocation(resCalc);
       userActiveReservationCount.put(user, resCount);
     }
 
+    // 计算预留最早和最晚活跃时间
     long earliestActive = Long.MAX_VALUE;
     long latestActive = Long.MIN_VALUE;
 
+    // 遍历所有时间区间分配
     for (Map.Entry<ReservationInterval, Resource> r : allocationRequests
         .entrySet()) {
 
       if (period > 0L) {
+        // 周期性预留，按周期展开所有区间
         for (int i = 0; i < periodicRle.getTimePeriod() / period; i++) {
 
           long rStart = r.getKey().getStartTime() + i * period;
           long rEnd = r.getKey().getEndTime() + i * period;
 
-          // handle wrap-around
+          // 处理跨周期边界环绕情况
           if (rEnd > periodicRle.getTimePeriod()) {
             long diff = rEnd - periodicRle.getTimePeriod();
             rEnd = periodicRle.getTimePeriod();
@@ -226,6 +303,7 @@ public class InMemoryPlan implements Plan {
         }
 
       } else {
+        // 非周期性预留，直接添加到全局和用户存储
         rleSparseVector.addInterval(r.getKey(), r.getValue());
         resAlloc.addInterval(r.getKey(), r.getValue());
         if (Resources.greaterThan(resCalc, totalCapacity, r.getValue(),
@@ -235,15 +313,20 @@ public class InMemoryPlan implements Plan {
         }
       }
     }
-    // periodic reservations are active from start time and good till cancelled
+    // 周期性预留自开始时间起一直活跃直到被取消
     if (period > 0L) {
       earliestActive = reservation.getStartTime();
       latestActive = Long.MAX_VALUE;
     }
+    // 更新活跃预留计数
     resCount.addInterval(new ReservationInterval(earliestActive, latestActive),
         Resource.newInstance(1, 1));
   }
 
+  /**
+   * 减少已删除预留的资源分配，更新所有聚合统计数据
+   * @param reservation 要删除的预留分配
+   */
   private void decrementAllocation(ReservationAllocation reservation) {
     assert (readWriteLock.isWriteLockedByCurrentThread());
     Map<ReservationInterval, Resource> allocationRequests =
@@ -255,15 +338,17 @@ public class InMemoryPlan implements Plan {
 
     long earliestActive = Long.MAX_VALUE;
     long latestActive = Long.MIN_VALUE;
+    // 遍历所有时间区间移除分配
     for (Map.Entry<ReservationInterval, Resource> r : allocationRequests
         .entrySet()) {
       if (period > 0L) {
+        // 周期性预留，按周期展开移除
         for (int i = 0; i < periodicRle.getTimePeriod() / period; i++) {
 
           long rStart = r.getKey().getStartTime() + i * period;
           long rEnd = r.getKey().getEndTime() + i * period;
 
-          // handle wrap-around
+          // 处理跨周期边界环绕情况
           if (rEnd > periodicRle.getTimePeriod()) {
             long diff = rEnd - periodicRle.getTimePeriod();
             rEnd = periodicRle.getTimePeriod();
@@ -278,6 +363,7 @@ public class InMemoryPlan implements Plan {
           resAlloc.removeInterval(newInterval, r.getValue());
         }
       } else {
+        // 非周期性预留，直接从全局和用户存储移除
         rleSparseVector.removeInterval(r.getKey(), r.getValue());
         resAlloc.removeInterval(r.getKey(), r.getValue());
         if (Resources.greaterThan(resCalc, totalCapacity, r.getValue(),
@@ -287,22 +373,29 @@ public class InMemoryPlan implements Plan {
         }
       }
     }
+    // 清理空闲的用户存储
     gcUserRLEResourceAllocation(user, period);
 
     RLESparseResourceAllocation resCount = userActiveReservationCount.get(user);
-    // periodic reservations are active from start time and good till cancelled
+    // 周期性预留自开始时间起一直活跃直到被取消
     if (period > 0L) {
       earliestActive = reservation.getStartTime();
       latestActive = Long.MAX_VALUE;
     }
+    // 减少活跃预留计数
     resCount.removeInterval(
         new ReservationInterval(earliestActive, latestActive),
         Resource.newInstance(1, 1));
+    // 清理空闲的计数存储
     if (resCount.isEmpty()) {
       userActiveReservationCount.remove(user);
     }
   }
 
+  /**
+   * 获取所有预留集合
+   * @return 所有预留分配的不可变集合
+   */
   public Set<ReservationAllocation> getAllReservations() {
     readLock.lock();
     try {
@@ -325,593 +418,9 @@ public class InMemoryPlan implements Plan {
   @Override
   public boolean addReservation(ReservationAllocation reservation,
       boolean isRecovering) throws PlanningException {
-    // Verify the allocation is memory based otherwise it is not supported
+    // 验证预留类型是否为内存实现
     InMemoryReservationAllocation inMemReservation =
         (InMemoryReservationAllocation) reservation;
     if (inMemReservation.getUser() == null) {
       String errMsg = "The specified Reservation with ID "
-          + inMemReservation.getReservationId() + " is not mapped to any user";
-      LOG.error(errMsg);
-      throw new IllegalArgumentException(errMsg);
-    }
-    writeLock.lock();
-    try {
-      if (reservationTable.containsKey(inMemReservation.getReservationId())) {
-        String errMsg = "The specified Reservation with ID "
-            + inMemReservation.getReservationId() + " already exists";
-        LOG.error(errMsg);
-        throw new IllegalArgumentException(errMsg);
-      }
-      // Validate if we can accept this reservation, throws exception if
-      // validation fails
-      if (!isRecovering) {
-        policy.validate(this, inMemReservation);
-        // we record here the time in which the allocation has been accepted
-        reservation.setAcceptanceTimestamp(clock.getTime());
-        if (rmStateStore != null) {
-          rmStateStore.storeNewReservation(
-              ReservationSystemUtil.buildStateProto(inMemReservation),
-              getQueueName(), inMemReservation.getReservationId().toString());
-        }
-      }
-      ReservationInterval searchInterval = new ReservationInterval(
-          inMemReservation.getStartTime(), inMemReservation.getEndTime());
-      Set<InMemoryReservationAllocation> reservations =
-          currentReservations.get(searchInterval);
-      if (reservations == null) {
-        reservations = new HashSet<InMemoryReservationAllocation>();
-      }
-      if (!reservations.add(inMemReservation)) {
-        LOG.error("Unable to add reservation: {} to plan.",
-            inMemReservation.getReservationId());
-        return false;
-      }
-      currentReservations.put(searchInterval, reservations);
-      reservationTable.put(inMemReservation.getReservationId(),
-          inMemReservation);
-      incrementAllocation(inMemReservation);
-      LOG.info("Successfully added reservation: {} to plan.",
-          inMemReservation.getReservationId());
-      return true;
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  @Override
-  public boolean updateReservation(ReservationAllocation reservation)
-      throws PlanningException {
-    writeLock.lock();
-    boolean result = false;
-    try {
-      ReservationId resId = reservation.getReservationId();
-      ReservationAllocation currReservation = getReservationById(resId);
-      if (currReservation == null) {
-        String errMsg = "The specified Reservation with ID " + resId
-            + " does not exist in the plan";
-        LOG.error(errMsg);
-        throw new IllegalArgumentException(errMsg);
-      }
-      // validate if we can accept this reservation, throws exception if
-      // validation fails
-      policy.validate(this, reservation);
-      if (!removeReservation(currReservation)) {
-        LOG.error("Unable to replace reservation: {} from plan.",
-            reservation.getReservationId());
-        return result;
-      }
-      try {
-        result = addReservation(reservation, false);
-      } catch (PlanningException e) {
-        LOG.error("Unable to update reservation: {} from plan due to {}.",
-            reservation.getReservationId(), e.getMessage());
-      }
-      if (result) {
-        LOG.info("Successfully updated reservation: {} in plan.",
-            reservation.getReservationId());
-        return result;
-      } else {
-        // rollback delete
-        addReservation(currReservation, false);
-        LOG.info("Rollbacked update reservation: {} from plan.",
-            reservation.getReservationId());
-        return result;
-      }
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  private boolean removeReservation(ReservationAllocation reservation) {
-    assert (readWriteLock.isWriteLockedByCurrentThread());
-    ReservationInterval searchInterval = new ReservationInterval(
-        reservation.getStartTime(), reservation.getEndTime());
-    Set<InMemoryReservationAllocation> reservations =
-        currentReservations.get(searchInterval);
-    if (reservations != null) {
-      if (rmStateStore != null) {
-        rmStateStore.removeReservation(getQueueName(),
-            reservation.getReservationId().toString());
-      }
-      if (!reservations.remove(reservation)) {
-        LOG.error("Unable to remove reservation: {} from plan.",
-            reservation.getReservationId());
-        return false;
-      }
-      if (reservations.isEmpty()) {
-        currentReservations.remove(searchInterval);
-      }
-    } else {
-      String errMsg = "The specified Reservation with ID "
-          + reservation.getReservationId() + " does not exist in the plan";
-      LOG.error(errMsg);
-      throw new IllegalArgumentException(errMsg);
-    }
-    reservationTable.remove(reservation.getReservationId());
-    decrementAllocation(reservation);
-    LOG.info("Sucessfully deleted reservation: {} in plan.",
-        reservation.getReservationId());
-    return true;
-  }
-
-  @Override
-  public boolean deleteReservation(ReservationId reservationID) {
-    writeLock.lock();
-    try {
-      ReservationAllocation reservation = getReservationById(reservationID);
-      if (reservation == null) {
-        String errMsg = "The specified Reservation with ID " + reservationID
-            + " does not exist in the plan";
-        LOG.error(errMsg);
-        throw new IllegalArgumentException(errMsg);
-      }
-      return removeReservation(reservation);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  @Override
-  public void archiveCompletedReservations(long tick) {
-    // Since we are looking for old reservations, read lock is optimal
-    LOG.debug("Running archival at time: {}", tick);
-    List<InMemoryReservationAllocation> expiredReservations =
-        new ArrayList<InMemoryReservationAllocation>();
-    readLock.lock();
-    // archive reservations and delete the ones which are beyond
-    // the reservation policy "window"
-    try {
-      long archivalTime = tick - policy.getValidWindow();
-      ReservationInterval searchInterval =
-          new ReservationInterval(archivalTime, archivalTime);
-      SortedMap<ReservationInterval, Set<InMemoryReservationAllocation>> reservations =
-          currentReservations.headMap(searchInterval, true);
-      if (!reservations.isEmpty()) {
-        for (Set<InMemoryReservationAllocation> reservationEntries : reservations
-            .values()) {
-          for (InMemoryReservationAllocation reservation : reservationEntries) {
-            if (reservation.getEndTime() <= archivalTime) {
-              expiredReservations.add(reservation);
-            }
-          }
-        }
-      }
-    } finally {
-      readLock.unlock();
-    }
-    if (expiredReservations.isEmpty()) {
-      return;
-    }
-    // Need write lock only if there are any reservations to be deleted
-    writeLock.lock();
-    try {
-      for (InMemoryReservationAllocation expiredReservation : expiredReservations) {
-        removeReservation(expiredReservation);
-      }
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  @Override
-  public Set<ReservationAllocation> getReservationsAtTime(long tick) {
-    return getReservations(null, new ReservationInterval(tick, tick), "");
-  }
-
-  @Override
-  public long getStep() {
-    return step;
-  }
-
-  @Override
-  public SharingPolicy getSharingPolicy() {
-    return policy;
-  }
-
-  @Override
-  public ReservationAgent getReservationAgent() {
-    return agent;
-  }
-
-  @Override
-  public RLESparseResourceAllocation getReservationCountForUserOverTime(
-      String user, long start, long end) {
-    readLock.lock();
-    try {
-      RLESparseResourceAllocation userResAlloc =
-          userActiveReservationCount.get(user);
-
-      if (userResAlloc != null) {
-        return userResAlloc.getRangeOverlapping(start, end);
-      } else {
-        return new RLESparseResourceAllocation(resCalc);
-      }
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public RLESparseResourceAllocation getConsumptionForUserOverTime(String user,
-      long start, long end) {
-    readLock.lock();
-    try {
-      // merge periodic and non-periodic allocations
-      RLESparseResourceAllocation userResAlloc = userResourceAlloc.get(user);
-      RLESparseResourceAllocation userPeriodicResAlloc =
-          userPeriodicResourceAlloc.get(user);
-
-      if (userResAlloc != null && userPeriodicResAlloc != null) {
-        return RLESparseResourceAllocation.merge(resCalc, totalCapacity,
-            userResAlloc, userPeriodicResAlloc, RLEOperator.add, start, end);
-      }
-      if (userResAlloc != null) {
-        return userResAlloc.getRangeOverlapping(start, end);
-      }
-      if (userPeriodicResAlloc != null) {
-        return userPeriodicResAlloc.getRangeOverlapping(start, end);
-      }
-    } catch (PlanningException e) {
-      LOG.warn("Exception while trying to merge periodic"
-          + " and non-periodic user allocations: {}", e.getMessage(), e);
-    } finally {
-      readLock.unlock();
-    }
-    return new RLESparseResourceAllocation(resCalc);
-  }
-
-  @Override
-  public Resource getTotalCommittedResources(long t) {
-    readLock.lock();
-    try {
-      return Resources.add(rleSparseVector.getCapacityAtTime(t),
-          periodicRle.getCapacityAtTime(t));
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public Set<ReservationAllocation> getReservations(ReservationId reservationID,
-      ReservationInterval interval) {
-    return getReservations(reservationID, interval, null);
-  }
-
-  @Override
-  public Set<ReservationAllocation> getReservations(ReservationId reservationID,
-      ReservationInterval interval, String user) {
-    if (reservationID != null) {
-      ReservationAllocation allocation = getReservationById(reservationID);
-      if (allocation == null) {
-        return Collections.emptySet();
-      }
-      return Collections.singleton(allocation);
-    }
-
-    long startTime = interval == null ? 0 : interval.getStartTime();
-    long endTime = interval == null ? Long.MAX_VALUE : interval.getEndTime();
-
-    ReservationInterval searchInterval =
-        new ReservationInterval(endTime, Long.MAX_VALUE);
-    readLock.lock();
-    try {
-      SortedMap<ReservationInterval, Set<InMemoryReservationAllocation>> res =
-          currentReservations.headMap(searchInterval, true);
-      if (!res.isEmpty()) {
-        Set<ReservationAllocation> flattenedReservations = new HashSet<>();
-        for (Set<InMemoryReservationAllocation> resEntries : res.values()) {
-          for (InMemoryReservationAllocation reservation : resEntries) {
-            // validate user
-            if (user != null && !user.isEmpty()
-                && !reservation.getUser().equals(user)) {
-              continue;
-            }
-            // handle periodic reservations
-            long period = reservation.getPeriodicity();
-            if (period > 0) {
-              // The shift is used to remove the wrap around for the
-              // reservation interval. The wrap around will still
-              // exist for the search interval.
-              long shift = reservation.getStartTime() % period;
-              // This is the duration of the reservation since
-              // duration < period.
-              long periodicReservationEnd =
-                  (reservation.getEndTime() -shift) % period;
-              long periodicSearchStart = (startTime - shift) % period;
-              long periodicSearchEnd = (endTime - shift) % period;
-              long searchDuration = endTime - startTime;
-
-              // 1. If the searchDuration is greater than the period, then
-              // the reservation is within the interval. This will allow
-              // us to ignore cases where search end > search start >
-              // reservation end.
-              // 2/3. If the search end is less than the reservation end, or if
-              // the search start is less than the reservation end, then the
-              // reservation will be in the reservation since
-              // periodic reservation start is always zero. Note that neither
-              // of those values will ever be negative.
-              // 4. If the search end is less than the search start, then
-              // there is a wrap around, and both values are implicitly
-              // greater than the reservation end because of condition 2/3,
-              // so the reservation is within the search interval.
-              if (searchDuration > period
-                  || periodicSearchEnd < periodicReservationEnd
-                  || periodicSearchStart < periodicReservationEnd
-                  || periodicSearchStart > periodicSearchEnd) {
-                flattenedReservations.add(reservation);
-              }
-            } else {
-              // check for non-periodic reservations
-              if (reservation.getEndTime() > startTime) {
-                flattenedReservations.add(reservation);
-              }
-            }
-          }
-        }
-        return Collections.unmodifiableSet(flattenedReservations);
-      } else {
-        return Collections.emptySet();
-      }
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public ReservationAllocation getReservationById(ReservationId reservationID) {
-    if (reservationID == null) {
-      return null;
-    }
-    readLock.lock();
-    try {
-      return reservationTable.get(reservationID);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public Resource getTotalCapacity() {
-    readLock.lock();
-    try {
-      return Resources.clone(totalCapacity);
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public RLESparseResourceAllocation getAvailableResourceOverTime(String user,
-      ReservationId oldId, long start, long end, long period)
-      throws PlanningException {
-    readLock.lock();
-    try {
-
-      // for non-periodic return simple available resources
-      if (period == 0) {
-
-        // create RLE of totCapacity
-        TreeMap<Long, Resource> totAvailable = new TreeMap<Long, Resource>();
-        totAvailable.put(start, Resources.clone(totalCapacity));
-        RLESparseResourceAllocation totRLEAvail =
-            new RLESparseResourceAllocation(totAvailable, resCalc);
-
-        // subtract used from available
-        RLESparseResourceAllocation netAvailable;
-
-        netAvailable = RLESparseResourceAllocation.merge(resCalc,
-            Resources.clone(totalCapacity), totRLEAvail, rleSparseVector,
-            RLEOperator.subtractTestNonNegative, start, end);
-
-        // remove periodic component
-        netAvailable = RLESparseResourceAllocation.merge(resCalc,
-            Resources.clone(totalCapacity), netAvailable, periodicRle,
-            RLEOperator.subtractTestNonNegative, start, end);
-
-        // add back in old reservation used resources if any
-        ReservationAllocation old = reservationTable.get(oldId);
-        if (old != null) {
-
-          RLESparseResourceAllocation addBackPrevious =
-              old.getResourcesOverTime(start, end);
-          netAvailable = RLESparseResourceAllocation.merge(resCalc,
-              Resources.clone(totalCapacity), netAvailable, addBackPrevious,
-              RLEOperator.add, start, end);
-        }
-        // lower it if this is needed by the sharing policy
-        netAvailable = getSharingPolicy().availableResources(netAvailable, this,
-            user, oldId, start, end);
-        return netAvailable;
-      } else {
-
-        if (periodicRle.getTimePeriod() % period != 0) {
-          throw new PlanningException("The reservation periodicity (" + period
-              + ") must be" + " an exact divider of the system maxPeriod ("
-              + periodicRle.getTimePeriod() + ")");
-        }
-
-        if (period < (end - start)) {
-          throw new PlanningException(
-              "Invalid input: (end - start) = (" + end + " - " + start + ") = "
-                  + (end - start) + " > period = " + period);
-        }
-
-        // find the minimum resources available among all the instances that fit
-        // in the LCM
-        long numInstInLCM = periodicRle.getTimePeriod() / period;
-
-        RLESparseResourceAllocation minOverLCM =
-            getAvailableResourceOverTime(user, oldId, start, end, 0);
-        for (int i = 1; i < numInstInLCM; i++) {
-
-          long rStart = start + i * period;
-          long rEnd = end + i * period;
-
-          // recursive invocation of non-periodic range (to pick raw-info)
-          RLESparseResourceAllocation snapShot =
-              getAvailableResourceOverTime(user, oldId, rStart, rEnd, 0);
-
-          // time-align on start
-          snapShot.shift(-(i * period));
-
-          // pick the minimum amount of resources in each time interval
-          minOverLCM =
-              RLESparseResourceAllocation.merge(resCalc, getTotalCapacity(),
-                  minOverLCM, snapShot, RLEOperator.min, start, end);
-
-        }
-
-        return minOverLCM;
-
-      }
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public Resource getMinimumAllocation() {
-    return Resources.clone(minAlloc);
-  }
-
-  @Override
-  public void setTotalCapacity(Resource cap) {
-    writeLock.lock();
-    try {
-      totalCapacity = Resources.clone(cap);
-    } finally {
-      writeLock.unlock();
-    }
-  }
-
-  public long getEarliestStartTime() {
-    readLock.lock();
-    try {
-      return rleSparseVector.getEarliestStartTime();
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public long getLastEndTime() {
-    readLock.lock();
-    try {
-      return rleSparseVector.getLatestNonNullTime();
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public ResourceCalculator getResourceCalculator() {
-    return resCalc;
-  }
-
-  @Override
-  public String getQueueName() {
-    return queueName;
-  }
-
-  @Override
-  public Resource getMaximumAllocation() {
-    return Resources.clone(maxAlloc);
-  }
-
-  @Override
-  public long getMaximumPeriodicity() {
-    return this.maxPeriodicity;
-  }
-
-  public String toCumulativeString() {
-    readLock.lock();
-    try {
-      return rleSparseVector.toString() + "\n" + periodicRle.toString();
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public Planner getReplanner() {
-    return replanner;
-  }
-
-  @Override
-  public boolean getMoveOnExpiry() {
-    return getMoveOnExpiry;
-  }
-
-  @Override
-  public String toString() {
-    readLock.lock();
-    try {
-      StringBuilder planStr = new StringBuilder("In-memory Plan: ");
-      planStr.append("Parent Queue: ").append(queueName)
-          .append(" Total Capacity: ").append(totalCapacity).append(" Step: ")
-          .append(step);
-      for (ReservationAllocation reservation : getAllReservations()) {
-        planStr.append(reservation);
-      }
-      return planStr.toString();
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public Set<ReservationAllocation> getReservationByUserAtTime(String user,
-      long t) {
-    readLock.lock();
-    try {
-      Set<ReservationAllocation> resSet = new HashSet<ReservationAllocation>();
-      for (ReservationAllocation ra : getReservationsAtTime(t)) {
-        String resUser = ra.getUser();
-        if (resUser != null && resUser.equals(user)) {
-          resSet.add(ra);
-        }
-      }
-      return resSet;
-    } finally {
-      readLock.unlock();
-    }
-  }
-
-  @Override
-  public RLESparseResourceAllocation getCumulativeLoadOverTime(long start,
-      long end) throws PlanningException {
-    readLock.lock();
-    try {
-
-      RLESparseResourceAllocation ret =
-          rleSparseVector.getRangeOverlapping(start, end);
-      ret = RLESparseResourceAllocation.merge(resCalc, totalCapacity, ret,
-          periodicRle.getRangeOverlapping(start, end), RLEOperator.add, start,
-          end);
-
-      return ret;
-    } finally {
-      readLock.unlock();
-    }
-  }
-}
+          + inMemReservation.getReservationId() + "

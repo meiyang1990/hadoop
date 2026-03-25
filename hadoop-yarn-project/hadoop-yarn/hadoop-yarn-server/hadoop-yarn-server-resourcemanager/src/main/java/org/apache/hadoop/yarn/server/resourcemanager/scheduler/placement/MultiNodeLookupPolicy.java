@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,44 +26,41 @@ import java.util.Iterator;
 import java.util.Set;
 
 /**
- * <p>
- * This class has the following functionality.
- *
- * <p>
- * Provide an interface for MultiNodeLookupPolicy so that different placement
- * allocator can choose nodes based on need.
- * </p>
+ * YARN多节点查找策略接口，为不同的容器放置分配器提供可扩展的节点选择机制，
+ * 允许根据实际需求自定义节点排序与选择算法。
+ * 
+ * @param <N> 泛型类型，必须是SchedulerNode或其子类
  */
 public interface MultiNodeLookupPolicy<N extends SchedulerNode> {
   /**
-   * Get iterator of preferred node depends on requirement and/or availability.
+   * 根据需求和可用状态获取偏好节点的迭代器
    *
    * @param nodes
-   *          List of Nodes
+   *          待选节点集合
    * @param partition
-   *          node label
+   *          节点标签分区
    *
-   * @return iterator of preferred node
+   * @return 排序后的偏好节点迭代器
    */
   Iterator<N> getPreferredNodeIterator(Collection<N> nodes, String partition);
 
   /**
-   * Refresh working nodes set for re-ordering based on the algorithm selected.
+   * 添加节点集合，并根据所选算法重新排序刷新分区对应的工作节点集合
    *
    * @param nodes
-   *          a collection working nm's.
+   *          新增的工作节点集合
    * @param partition
-   *          node label
+   *          节点标签分区
    */
   void addAndRefreshNodesSet(Collection<N> nodes, String partition);
 
   /**
-   * Get sorted nodes per partition.
+   * 获取指定分区排序后的节点集合
    *
    * @param partition
-   *          node label
+   *          节点标签分区
    *
-   * @return collection of sorted nodes
+   * @return 排序后的节点集合
    */
   Set<N> getNodesPerPartition(String partition);
 

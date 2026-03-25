@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,6 +39,10 @@ import org.apache.hadoop.mapreduce.v2.proto.MRProtos.TaskStateProto;
 import org.apache.hadoop.mapreduce.v2.util.MRProtoUtils;
 import org.apache.hadoop.yarn.api.records.impl.pb.ProtoBase;
 
+/**
+ * TaskReport的Protobuf实现，基于ProtoBase封装，用于MapReduce协议中任务报告的序列化与反序列化
+ * 维护任务运行状态、进度、计数器、诊断信息等任务执行信息
+ */
 public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements TaskReport {
   TaskReportProto proto = TaskReportProto.getDefaultInstance();
   TaskReportProto.Builder builder = null;
@@ -51,15 +56,23 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
   private List<String> diagnostics = null;
   private String status;
 
+  /**
+   * 构造空的TaskReportPBImpl，初始化Builder
+   */
   public TaskReportPBImpl() {
     builder = TaskReportProto.newBuilder();
   }
 
+  /**
+   * 基于已有的TaskReportProto构造TaskReportPBImpl
+   * @param proto 已构造完成的TaskReportProto对象
+   */
   public TaskReportPBImpl(TaskReportProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
+  @Override
   public TaskReportProto getProto() {
       mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -67,6 +80,9 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
     return proto;
   }
 
+  /**
+   * 将本地缓存的Java对象合并到Proto Builder中
+   */
   private void mergeLocalToBuilder() {
     if (this.taskId != null) {
       builder.setTaskId(convertToProtoFormat(this.taskId));
@@ -86,6 +102,9 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
     }
   }
 
+  /**
+   * 将本地修改合并生成最终的Proto对象
+   */
   private void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -94,6 +113,9 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
     viaProto = true;
   }
 
+  /**
+   * 如果当前基于Proto读取，初始化Builder用于修改
+   */
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = TaskReportProto.newBuilder(proto);
@@ -137,6 +159,9 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
     this.rawCounters = rCounters;
   }
 
+  /**
+   * 将旧API格式的原始计数器转换为YARN新API格式
+   */
   private void convertRawCountersToCounters() {
     if (this.counters == null && this.rawCounters != null) {
       this.counters = TypeConverter.toYarn(rawCounters);
@@ -244,6 +269,9 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
     return this.runningAttempts.size();
   }
   
+  /**
+   * 从Proto中懒加载初始化正在运行的尝试尝试列表
+   */
   private void initRunningAttempts() {
     if (this.runningAttempts != null) {
       return;
@@ -265,6 +293,9 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
     this.runningAttempts.addAll(runningAttempts);
   }
   
+  /**
+   * 将本地内存中的运行尝试列表写入Proto Builder
+   */
   private void addRunningAttemptsToProto() {
     maybeInitBuilder();
     builder.clearRunningAttempts();
@@ -349,6 +380,9 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
     return this.diagnostics.size();
   }
   
+  /**
+   * 从Proto中懒加载初始化诊断信息列表
+   */
   private void initDiagnostics() {
     if (this.diagnostics != null) {
       return;
@@ -370,6 +404,9 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
     this.diagnostics.addAll(diagnostics);
   }
   
+  /**
+   * 将本地内存中的诊断信息写入Proto Builder
+   */
   private void addDiagnosticsToProto() {
     maybeInitBuilder();
     builder.clearDiagnostics();
@@ -393,38 +430,62 @@ public class TaskReportPBImpl extends ProtoBase<TaskReportProto> implements Task
     this.diagnostics.clear();
   }
 
+  /**
+   * 将Protobuf格式Counters转换为Java对象
+   */
   private CountersPBImpl convertFromProtoFormat(CountersProto p) {
     return new CountersPBImpl(p);
   }
 
+  /**
+   * 将Java对象格式Counters转换为Protobuf格式
+   */
   private CountersProto convertToProtoFormat(Counters t) {
     return ((CountersPBImpl)t).getProto();
   }
 
+  /**
+   * 将Protobuf格式TaskId转换为Java对象
+   */
   private TaskIdPBImpl convertFromProtoFormat(TaskIdProto p) {
     return new TaskIdPBImpl(p);
   }
 
+  /**
+   * 将Java对象格式TaskId转换为Protobuf格式
+   */
   private TaskIdProto convertToProtoFormat(TaskId t) {
     return ((TaskIdPBImpl)t).getProto();
   }
 
+  /**
+   * 将枚举TaskState转换为Protobuf枚举格式
+   */
   private TaskStateProto convertToProtoFormat(TaskState e) {
     return MRProtoUtils.convertToProtoFormat(e);
   }
 
+  /**
+   * 将Protobuf枚举格式TaskState转换为Java枚举
+   */
   private TaskState convertFromProtoFormat(TaskStateProto e) {
     return MRProtoUtils.convertFromProtoFormat(e);
   }
 
+  /**
+   * 将Protobuf格式TaskAttemptId转换为Java对象
+   */
   private TaskAttemptIdPBImpl convertFromProtoFormat(TaskAttemptIdProto p) {
     return new TaskAttemptIdPBImpl(p);
   }
 
+  /**
+   * 将Java对象格式TaskAttemptId转换为Protobuf格式
+   */
   private TaskAttemptIdProto convertToProtoFormat(TaskAttemptId t) {
     return ((TaskAttemptIdPBImpl)t).getProto();
   }
 
 
 
-}  
+}

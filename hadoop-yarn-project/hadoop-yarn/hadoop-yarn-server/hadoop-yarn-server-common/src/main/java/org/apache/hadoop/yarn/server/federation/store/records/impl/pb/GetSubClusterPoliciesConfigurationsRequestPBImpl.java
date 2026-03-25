@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,30 +26,44 @@ import org.apache.hadoop.yarn.server.federation.store.records.GetSubClusterPolic
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of
- * {@link GetSubClusterPoliciesConfigurationsRequest}.
+ * 获取子集群策略配置请求的Protocol Buffer实现，基于Protobuf序列化框架实现。
+ * 对应{@link GetSubClusterPoliciesConfigurationsRequest}接口。
  */
 @Private
 @Unstable
 public class GetSubClusterPoliciesConfigurationsRequestPBImpl
     extends GetSubClusterPoliciesConfigurationsRequest {
 
+  // 存储ProtoBuf实例，viaProto为true时直接使用该实例
   private GetSubClusterPoliciesConfigurationsRequestProto proto =
       GetSubClusterPoliciesConfigurationsRequestProto.getDefaultInstance();
+  // ProtoBuf构建器，修改请求内容时使用
   private GetSubClusterPoliciesConfigurationsRequestProto.Builder builder =
       null;
+  // 标记当前是否直接使用proto实例，false表示正在通过builder修改
   private boolean viaProto = false;
 
+  /**
+   * 构造空的请求对象，初始化Builder用于构建请求。
+   */
   public GetSubClusterPoliciesConfigurationsRequestPBImpl() {
     builder = GetSubClusterPoliciesConfigurationsRequestProto.newBuilder();
   }
 
+  /**
+   * 基于已有Proto实例构造请求对象。
+   * @param proto 已构造完成的Proto请求实例
+   */
   public GetSubClusterPoliciesConfigurationsRequestPBImpl(
       GetSubClusterPoliciesConfigurationsRequestProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前请求对应的Proto实例，合并本地修改后返回。
+   * @return 序列化完成的Proto请求实例
+   */
   public GetSubClusterPoliciesConfigurationsRequestProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -56,6 +71,7 @@ public class GetSubClusterPoliciesConfigurationsRequestPBImpl
     return proto;
   }
 
+  // 将本地builder的修改合并到proto实例中
   private void mergeLocalToProto() {
     if (viaProto) {
       maybeInitBuilder();
@@ -64,6 +80,7 @@ public class GetSubClusterPoliciesConfigurationsRequestPBImpl
     viaProto = true;
   }
 
+  // 按需初始化builder，若当前基于现有proto则从proto创建builder
   private void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder =

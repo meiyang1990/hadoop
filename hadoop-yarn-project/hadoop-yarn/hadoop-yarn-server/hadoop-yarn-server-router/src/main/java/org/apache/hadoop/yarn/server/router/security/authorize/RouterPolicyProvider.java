@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements. See the NOTICE file
@@ -26,17 +27,22 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.server.api.ResourceManagerAdministrationProtocolPB;
 
 /**
- * {@link PolicyProvider} for YARN Router server protocols.
+ * YARN Router服务端协议的权限策略提供者，为Router各个RPC协议提供访问控制规则定义。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public class RouterPolicyProvider extends PolicyProvider {
 
+  // 单例实例，使用volatile保证双重检查锁定的可见性
   private static volatile RouterPolicyProvider routerPolicyProvider = null;
 
   private RouterPolicyProvider() {
   }
 
+  /**
+   * 获取RouterPolicyProvider单例实例，使用双重检查锁定实现线程安全的延迟初始化。
+   * @return RouterPolicyProvider单例对象
+   */
   @InterfaceAudience.Private
   @InterfaceStability.Unstable
   public static RouterPolicyProvider getInstance() {
@@ -50,6 +56,7 @@ public class RouterPolicyProvider extends PolicyProvider {
     return routerPolicyProvider;
   }
 
+  // 定义Router需要授权的RPC服务列表，每个服务关联配置项和协议接口
   private static final Service[] ROUTER_SERVICES = new Service[] {
       new Service(
           YarnConfiguration.YARN_SECURITY_SERVICE_AUTHORIZATION_APPLICATIONCLIENT_PROTOCOL,

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  *  Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,4 +17,9 @@
  * limitations under the License.
  */
 
+/**
+ * 全局策略生成器的应用清理器模块，提供联邦YARN集群中过期应用的清理策略生成与执行能力。
+ * 该包下包含实现跨集群全局应用生命周期清理的核心类，负责清理联邦环境中已经完成/超时的应用，
+ * 维持联邦集群的元数据一致性和存储利用率。
+ */
 package org.apache.hadoop.yarn.server.globalpolicygenerator.applicationcleaner;

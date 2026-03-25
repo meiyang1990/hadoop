@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,17 +25,12 @@ import org.apache.hadoop.mapred.Counters.Counter;
 import org.apache.hadoop.util.Progressable;
 
 /** 
- * A facility for Map-Reduce applications to report progress and update 
- * counters, status information etc.
+ * MapReduce旧API接口，为MapReduce应用提供任务进度上报、计数器更新、状态更新能力。
  * 
- * <p>{@link Mapper} and {@link Reducer} can use the <code>Reporter</code>
- * provided to report progress or just indicate that they are alive. In 
- * scenarios where the application takes significant amount of time to
- * process individual key/value pairs, this is crucial since the framework 
- * might assume that the task has timed-out and kill that task.
- *
- * <p>Applications can also update {@link Counters} via the provided 
- * <code>Reporter</code> .</p>
+ * <p>Mapper和Reducer可以通过Reporter上报进度，或声明任务仍在正常运行。
+ * 当处理单个键值对需要较长时间时，该机制非常关键，可避免框架误判任务超时并杀死任务。
+ * 
+ * <p>应用也可以通过Reporter更新全局计数器，统计任务运行指标。</p>
  * 
  * @see Progressable
  * @see Counters
@@ -44,7 +40,7 @@ import org.apache.hadoop.util.Progressable;
 public interface Reporter extends Progressable {
   
   /**
-   * A constant of Reporter type that does nothing.
+   * 空实现的Reporter常量，所有操作都不执行任何逻辑，用于不需要上报能力的场景。
    */
   public static final Reporter NULL = new Reporter() {
       public void setStatus(String s) {
@@ -71,63 +67,58 @@ public interface Reporter extends Progressable {
     };
 
   /**
-   * Set the status description for the task.
+   * 设置当前任务的状态描述信息。
    * 
-   * @param status brief description of the current status.
+   * @param status 当前状态的简要描述
    */
   public abstract void setStatus(String status);
   
   /**
-   * Get the {@link Counter} of the given group with the given name.
+   * 根据枚举类型获取对应计数器对象。
    * 
-   * @param name counter name
-   * @return the <code>Counter</code> of the given group/name.
+   * @param name 枚举类型的计数器名称
+   * @return 对应分组/名称的计数器对象
    */
   public abstract Counter getCounter(Enum<?> name);
 
   /**
-   * Get the {@link Counter} of the given group with the given name.
+   * 根据分组和名称获取对应计数器对象。
    * 
-   * @param group counter group
-   * @param name counter name
-   * @return the <code>Counter</code> of the given group/name.
+   * @param group 计数器分组名称
+   * @param name 计数器名称
+   * @return 对应分组/名称的计数器对象
    */
   public abstract Counter getCounter(String group, String name);
   
   /**
-   * Increments the counter identified by the key, which can be of
-   * any {@link Enum} type, by the specified amount.
+   * 根据枚举标识，将对应计数器增加指定数值。
    * 
-   * @param key key to identify the counter to be incremented. The key can be
-   *            be any <code>Enum</code>. 
-   * @param amount A non-negative amount by which the counter is to 
-   *               be incremented.
+   * @param key 用于标识计数器的枚举类型
+   * @param amount 需要增加的数值，非负
    */
   public abstract void incrCounter(Enum<?> key, long amount);
   
   /**
-   * Increments the counter identified by the group and counter name
-   * by the specified amount.
+   * 根据分组和计数器名称，将对应计数器增加指定数值。
    * 
-   * @param group name to identify the group of the counter to be incremented.
-   * @param counter name to identify the counter within the group.
-   * @param amount A non-negative amount by which the counter is to 
-   *               be incremented.
+   * @param group 计数器分组名称
+   * @param counter 计数器名称
+   * @param amount 需要增加的数值，非负
    */
   public abstract void incrCounter(String group, String counter, long amount);
   
   /**
-   * Get the {@link InputSplit} object for a map.
+   * 获取当前Map任务对应的输入分片对象。
    * 
-   * @return the <code>InputSplit</code> that the map is reading from.
-   * @throws UnsupportedOperationException if called outside a mapper
+   * @return 当前Map任务正在读取的输入分片
+   * @throws UnsupportedOperationException 如果在Reduce端调用该方法会抛出异常
    */
   public abstract InputSplit getInputSplit() 
     throws UnsupportedOperationException;
   
   /**
-   * Get the progress of the task. Progress is represented as a number between
-   * 0 and 1 (inclusive).
+   * 获取当前任务的进度。进度范围是0到1之间（包含边界）。
+   * @return 当前任务进度值
    */
   public float getProgress();
 }

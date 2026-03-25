@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -54,28 +55,33 @@ import org.slf4j.LoggerFactory;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * Extends the AbstractRequestInterceptor class and provides an implementation
- * that simply forwards the AM requests to the cluster resource manager.
- *
+ * DefaultRequestInterceptor是AMRMProxy请求拦截链的最终实现，
+ * 核心职责是将ApplicationMaster的请求直接转发给集群ResourceManager。
+ * 作为拦截链的最后一环，不支持设置后续拦截器。
  */
 public final class DefaultRequestInterceptor extends
     AbstractRequestInterceptor {
   private static final Logger LOG = LoggerFactory
       .getLogger(DefaultRequestInterceptor.class);
+  // ResourceManager客户端代理
   private ApplicationMasterProtocol rmClient;
+  // 代理用户，用于代表ApplicationMaster发起请求
   private UserGroupInformation user = null;
 
   @Override
   public void init(AMRMProxyApplicationContext appContext) {
     super.init(appContext);
     try {
+      // 创建代表当前应用尝试的代理用户
       user =
           UserGroupInformation.createProxyUser(appContext
               .getApplicationAttemptId().toString(), UserGroupInformation
               .getCurrentUser());
+      // 添加AMRM身份认证令牌
       user.addToken(appContext.getAMRMToken());
       final Configuration conf = this.getConf();
 
+      // 创建ResourceManager客户端
       rmClient = createRMClient(appContext, conf);
     } catch (IOException e) {
       String message =
@@ -92,15 +98,25 @@ public final class DefaultRequestInterceptor extends
     }
   }
 
+  /**
+   * 根据是否启用分布式调度创建对应类型的RM客户端代理。
+   * @param appContext AMRMProxy应用上下文
+   * @param conf 配置信息
+   * @return RM客户端代理实例
+   * @throws IOException IO异常
+   * @throws InterruptedException 中断异常
+   */
   private ApplicationMasterProtocol createRMClient(
       AMRMProxyApplicationContext appContext, final Configuration conf)
       throws IOException, InterruptedException {
     if (appContext.getNMContext().isDistributedSchedulingEnabled()) {
+      // 分布式调度模式，使用服务端RM代理创建分布式调度协议客户端
       return user.doAs((PrivilegedExceptionAction<DistributedSchedulingAMProtocol>) () -> {
         setAMRMTokenService(conf);
         return ServerRMProxy.createRMProxy(conf, DistributedSchedulingAMProtocol.class);
       });
     } else {
+      // 普通调度模式，使用客户端RM代理创建标准AM协议客户端
       return user.doAs(
           (PrivilegedExceptionAction<ApplicationMasterProtocol>) () -> {
             setAMRMTokenService(conf);
@@ -115,6 +131,7 @@ public final class DefaultRequestInterceptor extends
       final RegisterApplicationMasterRequest request)
       throws YarnException, IOException {
     LOG.info("Forwarding registration request to the real YARN RM");
+    // 转发注册请求到RM
     return rmClient.registerApplicationMaster(request);
   }
 
@@ -122,7 +139,9 @@ public final class DefaultRequestInterceptor extends
   public AllocateResponse allocate(final AllocateRequest request)
       throws YarnException, IOException {
     LOG.debug("Forwarding allocate request to the real YARN RM");
+    // 转发资源分配请求到RM
     AllocateResponse allocateResponse = rmClient.allocate(request);
+    // 如果RM返回了新的AMRM令牌，更新当前用户的令牌信息
     if (allocateResponse.getAMRMToken() != null) {
       YarnServerSecurityUtils.updateAMRMToken(allocateResponse.getAMRMToken(),
           this.user, getConf());
@@ -136,10 +155,12 @@ public final class DefaultRequestInterceptor extends
   registerApplicationMasterForDistributedScheduling
       (RegisterApplicationMasterRequest request) throws YarnException,
       IOException {
+    // 检查分布式调度是否启用
     if (getApplicationContext().getNMContext()
         .isDistributedSchedulingEnabled()) {
       LOG.info("Forwarding registerApplicationMasterForDistributedScheduling" +
           "request to the real YARN RM");
+      // 转发分布式调度注册请求到RM
       return ((DistributedSchedulingAMProtocol)rmClient)
           .registerApplicationMasterForDistributedScheduling(request);
     } else {
@@ -153,11 +174,14 @@ public final class DefaultRequestInterceptor extends
       throws YarnException, IOException {
     LOG.debug("Forwarding allocateForDistributedScheduling request" +
         "to the real YARN RM");
+    // 检查分布式调度是否启用
     if (getApplicationContext().getNMContext()
         .isDistributedSchedulingEnabled()) {
+      // 转发分布式调度分配请求到RM
       DistributedSchedulingAllocateResponse allocateResponse =
           ((DistributedSchedulingAMProtocol)rmClient)
               .allocateForDistributedScheduling(request);
+      // 如果RM返回了新的AMRM令牌，更新当前用户的令牌信息
       if (allocateResponse.getAllocateResponse().getAMRMToken() != null) {
         YarnServerSecurityUtils.updateAMRMToken(
             allocateResponse.getAllocateResponse().getAMRMToken(), this.user,
@@ -175,22 +199,30 @@ public final class DefaultRequestInterceptor extends
       IOException {
     LOG.info("Forwarding finish application request to "
         + "the real YARN Resource Manager");
+    // 转发应用完成请求到RM
     return rmClient.finishApplicationMaster(request);
   }
 
   @Override
   public void setNextInterceptor(RequestInterceptor next) {
+    // DefaultRequestInterceptor是拦截链最后一环，不允许设置后续拦截器，直接抛出异常
     throw new YarnRuntimeException(
         "setNextInterceptor is being called on DefaultRequestInterceptor,"
             + "which should be the last one in the chain "
             + "Check if the interceptor pipeline configuration is correct");
   }
 
+  /**
+   * 供测试用，设置RM客户端代理实例。
+   * 自动适配非分布式调度客户端，包装为分布式调度协议实现。
+   * @param rmClient RM客户端实例
+   */
   @VisibleForTesting
   public void setRMClient(final ApplicationMasterProtocol rmClient) {
     if (rmClient instanceof DistributedSchedulingAMProtocol) {
       this.rmClient = rmClient;
     } else {
+      // 包装普通RM客户端，实现分布式调度协议接口，不支持分布式调度方法
       this.rmClient = new DistributedSchedulingAMProtocol() {
         @Override
         public RegisterApplicationMasterResponse registerApplicationMaster
@@ -231,8 +263,14 @@ public final class DefaultRequestInterceptor extends
     }
   }
 
+  /**
+   * 更新当前用户AMRM令牌的服务地址，确保令牌指向正确的RM服务。
+   * @param conf 配置信息
+   * @throws IOException IO异常
+   */
   private static void setAMRMTokenService(final Configuration conf)
       throws IOException {
+    // 遍历当前用户所有令牌，更新AMRM令牌的服务地址
     for (org.apache.hadoop.security.token.Token<? extends TokenIdentifier> token : UserGroupInformation
         .getCurrentUser().getTokens()) {
       if (token.getKind().equals(AMRMTokenIdentifier.KIND_NAME)) {
@@ -241,24 +279,34 @@ public final class DefaultRequestInterceptor extends
     }
   }
 
+  /**
+   * 根据配置构造AMRM令牌对应的服务标识，支持HA模式多RM场景。
+   * HA模式下会拼接所有RM实例的服务地址作为令牌服务名。
+   * @param conf 配置信息
+   * @param address RM地址配置项
+   * @param defaultAddr 默认地址
+   * @param defaultPort 默认端口
+   * @return 令牌服务标识
+   */
   @InterfaceStability.Unstable
   public static Text getTokenService(Configuration conf, String address,
       String defaultAddr, int defaultPort) {
     if (HAUtil.isHAEnabled(conf)) {
-      // Build a list of service addresses to form the service name
+      // HA模式，收集所有RM实例的服务地址
       ArrayList<String> services = new ArrayList<>();
       YarnConfiguration yarnConf = new YarnConfiguration(conf);
       for (String rmId : HAUtil.getRMHAIds(conf)) {
-        // Set RM_ID to get the corresponding RM_ADDRESS
+        // 设置当前RM ID，获取对应RM的地址
         yarnConf.set(YarnConfiguration.RM_HA_ID, rmId);
         services.add(SecurityUtil.buildTokenService(
             yarnConf.getSocketAddr(address, defaultAddr, defaultPort))
             .toString());
       }
+      // 用逗号拼接所有RM服务地址
       return new Text(Joiner.on(',').join(services));
     }
 
-    // Non-HA case - no need to set RM_ID
+    // 非HA模式，直接构造单RM服务标识
     return SecurityUtil.buildTokenService(conf.getSocketAddr(address,
         defaultAddr, defaultPort));
   }

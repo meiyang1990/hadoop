@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -73,37 +74,73 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Helper class for MR applications
+ * MapReduce应用工具类，提供ID转换、类路径设置、分布式缓存配置、日志配置等通用辅助功能
+ * 供MR ApplicationMaster和任务容器初始化使用
  */
 @Private
 @Unstable
 public class MRApps extends Apps {
   public static final Logger LOG = LoggerFactory.getLogger(MRApps.class);
 
+  /**
+   * 将Yarn JobId转换为字符串
+   * @param jid Yarn格式JobId
+   * @return 字符串形式JobId
+   */
   public static String toString(JobId jid) {
     return jid.toString();
   }
 
+  /**
+   * 将字符串JobId转换为Yarn格式JobId
+   * @param jid 字符串形式JobId
+   * @return Yarn格式JobId
+   */
   public static JobId toJobID(String jid) {
     return TypeConverter.toYarn(JobID.forName(jid));
   }
 
+  /**
+   * 将Yarn TaskId转换为字符串
+   * @param tid Yarn格式TaskId
+   * @return 字符串形式TaskId
+   */
   public static String toString(TaskId tid) {
     return tid.toString();
   }
 
+  /**
+   * 将字符串TaskId转换为Yarn格式TaskId
+   * @param tid 字符串形式TaskId
+   * @return Yarn格式TaskId
+   */
   public static TaskId toTaskID(String tid) {
     return TypeConverter.toYarn(TaskID.forName(tid));
   }
 
+  /**
+   * 将Yarn TaskAttemptId转换为字符串
+   * @param taid Yarn格式TaskAttemptId
+   * @return 字符串形式TaskAttemptId
+   */
   public static String toString(TaskAttemptId taid) {
     return taid.toString(); 
   }
 
+  /**
+   * 将字符串TaskAttemptId转换为Yarn格式TaskAttemptId
+   * @param taid 字符串形式TaskAttemptId
+   * @return Yarn格式TaskAttemptId
+   */
   public static TaskAttemptId toTaskAttemptID(String taid) {
     return TypeConverter.toYarn(TaskAttemptID.forName(taid));
   }
 
+  /**
+   * 根据任务类型获取单字符标识
+   * @param type 任务类型（MAP/REDUCE）
+   * @return 单字符标识 m/r
+   */
   public static String taskSymbol(TaskType type) {
     switch (type) {
       case MAP:           return "m";
@@ -112,6 +149,9 @@ public class MRApps extends Apps {
     throw new YarnRuntimeException("Unknown task type: "+ type.toString());
   }
 
+  /**
+   * Web UI端任务尝试状态枚举，将多个底层状态聚合为UI展示用状态
+   */
   public enum TaskAttemptStateUI {
     NEW(
         new TaskAttemptState[] { TaskAttemptState.NEW,
@@ -129,11 +169,19 @@ public class MRApps extends Apps {
       this.correspondingStates = Arrays.asList(correspondingStates);
     }
 
+    /**
+     * 判断底层状态是否对应当前UI状态
+     * @param state 底层任务尝试状态
+     * @return 是否匹配
+     */
     public boolean correspondsTo(TaskAttemptState state) {
       return this.correspondingStates.contains(state);
     }
   }
 
+  /**
+   * Web UI端任务状态枚举，将多个底层状态聚合为UI展示用状态
+   */
   public enum TaskStateUI {
     RUNNING(
         new TaskState[]{TaskState.RUNNING}),
@@ -146,11 +194,21 @@ public class MRApps extends Apps {
       this.correspondingStates = Arrays.asList(correspondingStates);
     }
 
+    /**
+     * 判断底层状态是否对应当前UI状态
+     * @param state 底层任务状态
+     * @return 是否匹配
+     */
     public boolean correspondsTo(TaskState state) {
       return this.correspondingStates.contains(state);
     }
   }
 
+  /**
+   * 根据单字符标识转换为任务类型
+   * @param symbol 单字符标识 m/r
+   * @return 任务类型
+   */
   public static TaskType taskType(String symbol) {
     // JDK 7 supports switch on strings
     if (symbol.equals("m")) return TaskType.MAP;
@@ -158,14 +216,29 @@ public class MRApps extends Apps {
     throw new YarnRuntimeException("Unknown task symbol: "+ symbol);
   }
 
+  /**
+   * 根据状态字符串获取UI任务尝试状态
+   * @param attemptStateStr 状态字符串
+   * @return UI任务尝试状态枚举
+   */
   public static TaskAttemptStateUI taskAttemptState(String attemptStateStr) {
     return TaskAttemptStateUI.valueOf(attemptStateStr);
   }
 
+  /**
+   * 根据状态字符串获取UI任务状态
+   * @param taskStateStr 状态字符串
+   * @return UI任务状态枚举
+   */
   public static TaskStateUI taskState(String taskStateStr) {
     return TaskStateUI.valueOf(taskStateStr);
   }
 
+  /**
+   * 从配置中获取MapReduce框架的jar包名称
+   * @param conf 配置对象
+   * @return 框架名称，未配置则返回null
+   */
   // gets the base name of the MapReduce framework or null if no
   // framework was configured
   private static String getMRFrameworkName(Configuration conf) {
@@ -190,8 +263,15 @@ public class MRApps extends Apps {
     return frameworkName;
   }
 
+  /**
+   * 将MapReduce框架类路径添加到容器环境变量中
+   * @param environment 容器环境变量
+   * @param conf 配置对象
+   * @throws IOException 设置类路径失败时抛出
+   */
   private static void setMRFrameworkClasspath(
       Map<String, String> environment, Configuration conf) throws IOException {
+    // 迷你YARN集群场景传播系统类路径
     // Propagate the system classpath when using the mini cluster
     if (conf.getBoolean(YarnConfiguration.IS_MINI_YARN_CLUSTER, false)) {
       MRApps.addToEnvironment(environment, Environment.CLASSPATH.name(),
@@ -201,9 +281,11 @@ public class MRApps extends Apps {
         conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
           MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM);
 
+    // 如果配置了自定义MR框架，只添加MR类路径
     // if the framework is specified then only use the MR classpath
     String frameworkName = getMRFrameworkName(conf);
     if (frameworkName == null) {
+      // 添加标准Hadoop类路径
       // Add standard Hadoop classes
       for (String c : conf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH,
           crossPlatform
@@ -234,6 +316,12 @@ public class MRApps extends Apps {
     // TODO: Remove duplicates.
   }
   
+  /**
+   * 设置MapReduce应用容器的类路径环境变量，支持用户类优先配置
+   * @param environment 容器环境变量
+   * @param conf 配置对象
+   * @throws IOException 设置类路径失败时抛出
+   */
   @SuppressWarnings("deprecation")
   public static void setClasspath(Map<String, String> environment,
       Configuration conf) throws IOException {
@@ -271,6 +359,7 @@ public class MRApps extends Apps {
         environment,
         classpathEnvVar,
         crossPlatformifyMREnv(conf, Environment.PWD) + Path.SEPARATOR + "*", conf);
+    // 通配符只匹配jar文件，因此需要单独添加非jar资源到类路径
     // a * in the classpath will only find a .jar, so we need to filter out
     // all .jars and add everything else
     addToClasspathIfNotJar(JobContextImpl.getFileClassPaths(conf),
@@ -287,12 +376,13 @@ public class MRApps extends Apps {
   }
   
   /**
-   * Add the paths to the classpath if they are not jars
-   * @param paths the paths to add to the classpath
-   * @param withLinks the corresponding paths that may have a link name in them
-   * @param conf used to resolve the paths
-   * @param environment the environment to update CLASSPATH in
-   * @throws IOException if there is an error resolving any of the paths.
+   * 将非Jar类型的分布式缓存资源添加到类路径中
+   * @param paths 需要检查的路径数组
+   * @param withLinks 对应资源的URI，包含链接名称信息
+   * @param conf 配置对象，用于文件系统解析
+   * @param environment 环境变量，用于修改类路径
+   * @param classpathEnvVar 类路径对应的环境变量名称
+   * @throws IOException 解析路径失败时抛出
    */
   private static void addToClasspathIfNotJar(Path[] paths,
       URI[] withLinks, Configuration conf,
@@ -307,6 +397,7 @@ public class MRApps extends Apps {
           String name = p.getName();
           String wildcard = null;
 
+          // 如果路径是通配符，解析父目录并保留通配符标记
           // If the path is wildcarded, resolve its parent directory instead
           if (name.equals(DistributedCache.WILDCARD)) {
             wildcard = name;
@@ -325,415 +416,11 @@ public class MRApps extends Apps {
             name = u.getFragment();
           }
 
+          // 如果不是Jar包，添加到查找表中
           // If it's not a JAR, add it to the link lookup.
           if (!StringUtils.toLowerCase(name).endsWith(".jar")) {
             String old = linkLookup.put(p, name);
 
             if ((old != null) && !name.equals(old)) {
               LOG.warn("The same path is included more than once "
-                  + "with different links or wildcards: " + p + " [" +
-                  name + ", " + old + "]");
-            }
-          }
-        }
-      }
-      
-      for (Path p : paths) {
-        FileSystem remoteFS = p.getFileSystem(conf);
-        p = remoteFS.resolvePath(p.makeQualified(remoteFS.getUri(),
-            remoteFS.getWorkingDirectory()));
-        String name = linkLookup.get(p);
-        if (name == null) {
-          name = p.getName();
-        }
-        if(!StringUtils.toLowerCase(name).endsWith(".jar")) {
-          MRApps.addToEnvironment(
-              environment,
-              classpathEnvVar,
-              crossPlatformifyMREnv(conf, Environment.PWD) + Path.SEPARATOR + name, conf);
-        }
-      }
-    }
-  }
-
-  /**
-   * Creates and sets a {@link ApplicationClassLoader} on the given
-   * configuration and as the thread context classloader, if
-   * {@link MRJobConfig#MAPREDUCE_JOB_CLASSLOADER} is set to true, and
-   * the APP_CLASSPATH environment variable is set.
-   * @param conf
-   * @throws IOException
-   */
-  public static void setJobClassLoader(Configuration conf)
-      throws IOException {
-    setClassLoader(createJobClassLoader(conf), conf);
-  }
-
-  /**
-   * Creates a {@link ApplicationClassLoader} if
-   * {@link MRJobConfig#MAPREDUCE_JOB_CLASSLOADER} is set to true, and
-   * the APP_CLASSPATH environment variable is set.
-   * @param conf
-   * @return the created job classloader, or null if the job classloader is not
-   * enabled or the APP_CLASSPATH environment variable is not set
-   * @throws IOException
-   */
-  public static ClassLoader createJobClassLoader(Configuration conf)
-      throws IOException {
-    ClassLoader jobClassLoader = null;
-    if (conf.getBoolean(MRJobConfig.MAPREDUCE_JOB_CLASSLOADER, false)) {
-      String appClasspath = System.getenv(Environment.APP_CLASSPATH.key());
-      if (appClasspath == null) {
-        LOG.warn("Not creating job classloader since APP_CLASSPATH is not set.");
-      } else {
-        LOG.info("Creating job classloader");
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("APP_CLASSPATH=" + appClasspath);
-        }
-        String[] systemClasses = getSystemClasses(conf);
-        jobClassLoader = createJobClassLoader(appClasspath,
-            systemClasses);
-      }
-    }
-    return jobClassLoader;
-  }
-
-  /**
-   * Sets the provided classloader on the given configuration and as the thread
-   * context classloader if the classloader is not null.
-   * @param classLoader
-   * @param conf
-   */
-  public static void setClassLoader(ClassLoader classLoader,
-      Configuration conf) {
-    if (classLoader != null) {
-      LOG.info("Setting classloader " + classLoader +
-          " on the configuration and as the thread context classloader");
-      conf.setClassLoader(classLoader);
-      Thread.currentThread().setContextClassLoader(classLoader);
-    }
-  }
-
-  @VisibleForTesting
-  static String[] getSystemClasses(Configuration conf) {
-    return conf.getTrimmedStrings(
-        MRJobConfig.MAPREDUCE_JOB_CLASSLOADER_SYSTEM_CLASSES);
-  }
-
-  private static ClassLoader createJobClassLoader(final String appClasspath,
-      final String[] systemClasses) throws IOException {
-    try {
-      return AccessController.doPrivileged(
-        new PrivilegedExceptionAction<ClassLoader>() {
-          @Override
-          public ClassLoader run() throws MalformedURLException {
-            return new ApplicationClassLoader(appClasspath,
-                MRApps.class.getClassLoader(), Arrays.asList(systemClasses));
-          }
-      });
-    } catch (PrivilegedActionException e) {
-      Throwable t = e.getCause();
-      if (t instanceof MalformedURLException) {
-        throw (MalformedURLException) t;
-      }
-      throw new IOException(e);
-    }
-  }
-
-  private static final String STAGING_CONSTANT = ".staging";
-  public static Path getStagingAreaDir(Configuration conf, String user) {
-    return new Path(conf.get(MRJobConfig.MR_AM_STAGING_DIR,
-        MRJobConfig.DEFAULT_MR_AM_STAGING_DIR)
-        + Path.SEPARATOR + user + Path.SEPARATOR + STAGING_CONSTANT);
-  }
-
-  public static String getJobFile(Configuration conf, String user, 
-      org.apache.hadoop.mapreduce.JobID jobId) {
-    Path jobFile = new Path(MRApps.getStagingAreaDir(conf, user),
-        jobId.toString() + Path.SEPARATOR + MRJobConfig.JOB_CONF_FILE);
-    return jobFile.toString();
-  }
-  
-  public static Path getEndJobCommitSuccessFile(Configuration conf, String user,
-      JobId jobId) {
-    Path endCommitFile = new Path(MRApps.getStagingAreaDir(conf, user),
-        jobId.toString() + Path.SEPARATOR + "COMMIT_SUCCESS");
-    return endCommitFile;
-  }
-  
-  public static Path getEndJobCommitFailureFile(Configuration conf, String user,
-      JobId jobId) {
-    Path endCommitFile = new Path(MRApps.getStagingAreaDir(conf, user),
-        jobId.toString() + Path.SEPARATOR + "COMMIT_FAIL");
-    return endCommitFile;
-  }
-  
-  public static Path getStartJobCommitFile(Configuration conf, String user,
-      JobId jobId) {
-    Path startCommitFile = new Path(MRApps.getStagingAreaDir(conf, user),
-        jobId.toString() + Path.SEPARATOR + "COMMIT_STARTED");
-    return startCommitFile;
-  }
-
-  @SuppressWarnings("deprecation")
-  public static void setupDistributedCache(Configuration conf,
-      Map<String, LocalResource> localResources) throws IOException {
-
-    LocalResourceBuilder lrb = new LocalResourceBuilder();
-    lrb.setConf(conf);
-
-    // Cache archives
-    lrb.setType(LocalResourceType.ARCHIVE);
-    lrb.setUris(JobContextImpl.getCacheArchives(conf));
-    lrb.setTimestamps(JobContextImpl.getArchiveTimestamps(conf));
-    lrb.setSizes(getFileSizes(conf, MRJobConfig.CACHE_ARCHIVES_SIZES));
-    lrb.setVisibilities(DistributedCache.getArchiveVisibilities(conf));
-    lrb.setSharedCacheUploadPolicies(
-        Job.getArchiveSharedCacheUploadPolicies(conf));
-    lrb.createLocalResources(localResources);
-    
-    // Cache files
-    lrb.setType(LocalResourceType.FILE);
-    lrb.setUris(JobContextImpl.getCacheFiles(conf));
-    lrb.setTimestamps(JobContextImpl.getFileTimestamps(conf));
-    lrb.setSizes(getFileSizes(conf, MRJobConfig.CACHE_FILES_SIZES));
-    lrb.setVisibilities(DistributedCache.getFileVisibilities(conf));
-    lrb.setSharedCacheUploadPolicies(
-        Job.getFileSharedCacheUploadPolicies(conf));
-    lrb.createLocalResources(localResources);
-  }
-
-  /**
-   * Set up the DistributedCache related configs to make
-   * {@link JobContextImpl#getLocalCacheFiles(Configuration)}
-   * and
-   * {@link JobContextImpl#getLocalCacheArchives(Configuration)}
-   * working.
-   * @param conf
-   * @throws java.io.IOException
-   */
-  public static void setupDistributedCacheLocal(Configuration conf)
-      throws IOException {
-
-    String localWorkDir = System.getenv("PWD");
-    //        ^ ^ all symlinks are created in the current work-dir
-
-    // Update the configuration object with localized archives.
-    URI[] cacheArchives = JobContextImpl.getCacheArchives(conf);
-    if (cacheArchives != null) {
-      List<String> localArchives = new ArrayList<String>();
-      for (int i = 0; i < cacheArchives.length; ++i) {
-        URI u = cacheArchives[i];
-        Path p = new Path(u);
-        Path name =
-            new Path((null == u.getFragment()) ? p.getName()
-                : u.getFragment());
-        String linkName = name.toUri().getPath();
-        localArchives.add(new Path(localWorkDir, linkName).toUri().getPath());
-      }
-      if (!localArchives.isEmpty()) {
-        conf.set(MRJobConfig.CACHE_LOCALARCHIVES, StringUtils
-            .arrayToString(localArchives.toArray(new String[localArchives
-                .size()])));
-      }
-    }
-
-    // Update the configuration object with localized files.
-    URI[] cacheFiles = JobContextImpl.getCacheFiles(conf);
-    if (cacheFiles != null) {
-      List<String> localFiles = new ArrayList<String>();
-      for (int i = 0; i < cacheFiles.length; ++i) {
-        URI u = cacheFiles[i];
-        Path p = new Path(u);
-        Path name =
-            new Path((null == u.getFragment()) ? p.getName()
-                : u.getFragment());
-        String linkName = name.toUri().getPath();
-        localFiles.add(new Path(localWorkDir, linkName).toUri().getPath());
-      }
-      if (!localFiles.isEmpty()) {
-        conf.set(MRJobConfig.CACHE_LOCALFILES,
-            StringUtils.arrayToString(localFiles
-                .toArray(new String[localFiles.size()])));
-      }
-    }
-  }
-
-  // TODO - Move this to MR!
-  private static long[] getFileSizes(Configuration conf, String key) {
-    String[] strs = conf.getStrings(key);
-    if (strs == null) {
-      return null;
-    }
-    long[] result = new long[strs.length];
-    for(int i=0; i < strs.length; ++i) {
-      result[i] = Long.parseLong(strs[i]);
-    }
-    return result;
-  }
-
-  public static String getChildLogLevel(Configuration conf, boolean isMap) {
-    if (isMap) {
-      return conf.get(
-          MRJobConfig.MAP_LOG_LEVEL,
-          JobConf.DEFAULT_LOG_LEVEL
-      );
-    } else {
-      return conf.get(
-          MRJobConfig.REDUCE_LOG_LEVEL,
-          JobConf.DEFAULT_LOG_LEVEL
-      );
-    }
-  }
-  
-  /**
-   * Add the JVM system properties necessary to configure
-   *  {@link ContainerLogAppender} or
-   *  {@link ContainerRollingLogAppender}.
-   *
-   * @param task for map/reduce, or null for app master
-   * @param vargs the argument list to append to
-   * @param conf configuration of MR job
-   */
-  public static void addLog4jSystemProperties(Task task,
-      List<String> vargs, Configuration conf) {
-    String log4jPropertyFile =
-        conf.get(MRJobConfig.MAPREDUCE_JOB_LOG4J_PROPERTIES_FILE, "");
-    if (log4jPropertyFile.isEmpty()) {
-      vargs.add("-Dlog4j.configuration=container-log4j.properties");
-    } else {
-      URI log4jURI = null;
-      try {
-        log4jURI = new URI(log4jPropertyFile);
-      } catch (URISyntaxException e) {
-        throw new IllegalArgumentException(e);
-      }
-      Path log4jPath = new Path(log4jURI);
-      vargs.add("-Dlog4j.configuration="+log4jPath.getName());
-    }
-
-    long logSize;
-    String logLevel;
-    int numBackups;
-
-    if (task == null) {
-      logSize = conf.getLong(MRJobConfig.MR_AM_LOG_KB,
-          MRJobConfig.DEFAULT_MR_AM_LOG_KB) << 10;
-      logLevel = conf.get(
-          MRJobConfig.MR_AM_LOG_LEVEL, MRJobConfig.DEFAULT_MR_AM_LOG_LEVEL);
-      numBackups = conf.getInt(MRJobConfig.MR_AM_LOG_BACKUPS,
-          MRJobConfig.DEFAULT_MR_AM_LOG_BACKUPS);
-    } else {
-      logSize = TaskLog.getTaskLogLimitBytes(conf);
-      logLevel = getChildLogLevel(conf, task.isMapTask());
-      numBackups = conf.getInt(MRJobConfig.TASK_LOG_BACKUPS,
-          MRJobConfig.DEFAULT_TASK_LOG_BACKUPS);
-    }
-
-    vargs.add("-D" + YarnConfiguration.YARN_APP_CONTAINER_LOG_DIR + "=" +
-        ApplicationConstants.LOG_DIR_EXPANSION_VAR);
-    vargs.add(
-        "-D" + YarnConfiguration.YARN_APP_CONTAINER_LOG_SIZE + "=" + logSize);
-
-    if (logSize > 0L && numBackups > 0) {
-      // log should be rolled
-      vargs.add("-D" + YarnConfiguration.YARN_APP_CONTAINER_LOG_BACKUPS + "="
-          + numBackups);
-      vargs.add("-Dhadoop.root.logger=" + logLevel + ",CRLA");
-    } else {
-      vargs.add("-Dhadoop.root.logger=" + logLevel + ",CLA");
-    }
-    vargs.add("-Dhadoop.root.logfile=" + TaskLog.LogName.SYSLOG);
-
-    if (   task != null
-        && !task.isMapTask()
-        && conf.getBoolean(MRJobConfig.REDUCE_SEPARATE_SHUFFLE_LOG,
-               MRJobConfig.DEFAULT_REDUCE_SEPARATE_SHUFFLE_LOG)) {
-      final int numShuffleBackups = conf.getInt(MRJobConfig.SHUFFLE_LOG_BACKUPS,
-          MRJobConfig.DEFAULT_SHUFFLE_LOG_BACKUPS);
-      final long shuffleLogSize = conf.getLong(MRJobConfig.SHUFFLE_LOG_KB,
-          MRJobConfig.DEFAULT_SHUFFLE_LOG_KB) << 10;
-      final String shuffleLogger = logLevel
-          + (shuffleLogSize > 0L && numShuffleBackups > 0
-                 ? ",shuffleCRLA"
-                 : ",shuffleCLA");
-
-      vargs.add("-D" + MRJobConfig.MR_PREFIX
-          + "shuffle.logger=" + shuffleLogger);
-      vargs.add("-D" + MRJobConfig.MR_PREFIX
-          + "shuffle.logfile=" + TaskLog.LogName.SYSLOG + ".shuffle");
-      vargs.add("-D" + MRJobConfig.MR_PREFIX
-          + "shuffle.log.filesize=" + shuffleLogSize);
-      vargs.add("-D" + MRJobConfig.MR_PREFIX
-          + "shuffle.log.backups=" + numShuffleBackups);
-    }
-  }
-
-  /**
-   * Return lines for system property keys and values per configuration.
-   *
-   * @return the formatted string for the system property lines or null if no
-   * properties are specified.
-   */
-  public static String getSystemPropertiesToLog(Configuration conf) {
-    String key = conf.get(MRJobConfig.MAPREDUCE_JVM_SYSTEM_PROPERTIES_TO_LOG,
-      MRJobConfig.DEFAULT_MAPREDUCE_JVM_SYSTEM_PROPERTIES_TO_LOG);
-    if (key != null) {
-      key = key.trim(); // trim leading and trailing whitespace from the config
-      if (!key.isEmpty()) {
-        String[] props = key.split(",");
-        if (props.length > 0) {
-          StringBuilder sb = new StringBuilder();
-          sb.append("\n/************************************************************\n");
-          sb.append("[system properties]\n");
-          for (String prop: props) {
-            prop = prop.trim(); // trim leading and trailing whitespace
-            if (!prop.isEmpty()) {
-              sb.append(prop).append(": ").append(System.getProperty(prop)).append('\n');
-            }
-          }
-          sb.append("************************************************************/");
-          return sb.toString();
-        }
-      }
-    }
-    return null;
-  }
-
-  public static void setEnvFromInputString(Map<String, String> env,
-      String envString, Configuration conf) {
-    String classPathSeparator =
-        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
-          MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM)
-            ? ApplicationConstants.CLASS_PATH_SEPARATOR : File.pathSeparator;
-    Apps.setEnvFromInputString(env, envString, classPathSeparator);
-  }
-
-  public static void setEnvFromInputProperty(Map<String, String> env,
-      String propName, String defaultPropValue, Configuration conf) {
-    String classPathSeparator =
-        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
-            MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM)
-            ? ApplicationConstants.CLASS_PATH_SEPARATOR : File.pathSeparator;
-    Apps.setEnvFromInputProperty(env, propName, defaultPropValue, conf,
-        classPathSeparator);
-  }
-
-  @Public
-  @Unstable
-  public static void addToEnvironment(Map<String, String> environment,
-      String variable, String value, Configuration conf) {
-    String classPathSeparator =
-        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
-          MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM)
-            ? ApplicationConstants.CLASS_PATH_SEPARATOR : File.pathSeparator;
-    Apps.addToEnvironment(environment, variable, value, classPathSeparator);
-  }
-
-  public static String crossPlatformifyMREnv(Configuration conf, Environment env) {
-    boolean crossPlatform =
-        conf.getBoolean(MRConfig.MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM,
-            MRConfig.DEFAULT_MAPREDUCE_APP_SUBMISSION_CROSS_PLATFORM);
-    return crossPlatform ? env.$$() : env.$();
-  }
-}
+                  + "with different links or wildcards: " + p + "

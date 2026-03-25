@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,26 +36,32 @@ import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.records.NodeLabel;
 
 /**
- * Provides base implementation of NodeDescriptorsProvider with Timer and
+ * 文件：AbstractNodeDescriptorsProvider.java
+ * 所属模块：YARN NodeManager 节点标签模块
+ * 核心职责：提供节点描述符提供者的抽象基类，封装了定时拉取节点描述符的通用逻辑，子类只需实现具体拉取逻辑即可
+ * 
+ * Provides base Implementation of NodeDescriptorsProvider with Timer and
  * expects subclass to provide TimerTask which can fetch node descriptors.
  */
 public abstract class AbstractNodeDescriptorsProvider<T>
     extends AbstractService implements NodeDescriptorsProvider<T> {
+  // 禁用定时拉取的标识值
   public static final long DISABLE_NODE_DESCRIPTORS_PROVIDER_FETCH_TIMER = -1;
 
-  // Delay after which timer task are triggered to fetch node descriptors.
-  // Default interval is -1 means it is an one time task, each implementation
-  // will override this value from configuration.
+  // 定时拉取节点描述符的间隔时间，-1表示仅执行一次拉取，子类可通过配置覆盖该值
   private long intervalTime = -1;
 
-  // Timer used to schedule node descriptors fetching
+  // 用于调度定时拉取任务的定时器
   private Timer scheduler;
 
+  // 读写锁，保证节点描述符并发读写的线程安全
   protected Lock readLock = null;
   protected Lock writeLock = null;
 
+  // 子类实现的定时拉取任务实例
   protected TimerTask timerTask;
 
+  // 存储当前节点描述符集合，使用不可修改集合保证线程安全
   private Set<T> nodeDescriptors = Collections
       .unmodifiableSet(new HashSet<>(0));
 
@@ -62,16 +69,25 @@ public abstract class AbstractNodeDescriptorsProvider<T>
     super(name);
   }
 
+  /**
+   * 获取定时拉取间隔时间
+   * @return 间隔时间（毫秒）
+   */
   public long getIntervalTime() {
     return intervalTime;
   }
 
+  /**
+   * 设置定时拉取间隔时间
+   * @param intervalMS 间隔时间（毫秒）
+   */
   public void setIntervalTime(long intervalMS) {
     this.intervalTime = intervalMS;
   }
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 初始化读写锁，用于节点描述符的并发访问控制
     ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
     readLock = readWriteLock.readLock();
     writeLock = readWriteLock.writeLock();
@@ -80,21 +96,23 @@ public abstract class AbstractNodeDescriptorsProvider<T>
 
   @Override
   protected void serviceStart() throws Exception {
+    // 创建子类实现的定时拉取任务
     timerTask = createTimerTask();
+    // 启动时先执行一次拉取
     timerTask.run();
     long taskInterval = getIntervalTime();
+    // 如果未禁用定时拉取，则启动周期调度
     if (taskInterval != DISABLE_NODE_DESCRIPTORS_PROVIDER_FETCH_TIMER) {
       scheduler =
           new Timer("DistributedNodeDescriptorsRunner-Timer", true);
-      // Start the timer task and then periodically at the configured interval
-      // time. Illegal values for intervalTime is handled by timer api
+      // 按配置的间隔时间周期性调度拉取任务，非法参数会由Timer API自行处理
       scheduler.schedule(timerTask, taskInterval, taskInterval);
     }
     super.serviceStart();
   }
 
   /**
-   * terminate the timer
+   * 服务停止时终止定时器，清理资源
    * @throws Exception
    */
   @Override
@@ -107,12 +125,14 @@ public abstract class AbstractNodeDescriptorsProvider<T>
   }
 
   /**
-   * method for subclasses to cleanup.
+   * 留给子类实现的清理方法，用于子类自定义资源清理
+   * @throws Exception
    */
   protected abstract void cleanUp() throws Exception ;
 
   /**
-   * @return Returns output from provider.
+   * 获取当前节点描述符集合（线程安全读操作）
+   * @return 当前节点描述符集合
    */
   @Override
   public Set<T> getDescriptors() {
@@ -124,6 +144,10 @@ public abstract class AbstractNodeDescriptorsProvider<T>
     }
   }
 
+  /**
+   * 更新节点描述符集合（线程安全写操作）
+   * @param descriptorsSet 新的节点描述符集合
+   */
   @Override
   public void setDescriptors(Set<T> descriptorsSet) {
     writeLock.lock();
@@ -135,16 +159,9 @@ public abstract class AbstractNodeDescriptorsProvider<T>
   }
 
   /**
-   * Method used to determine if or not node descriptors fetching script is
-   * configured and whether it is fit to run. Returns true if following
-   * conditions are met:
-   *
-   * <ol>
-   * <li>Path to the script is not empty</li>
-   * <li>The script file exists</li>
-   * </ol>
-   *
-   * @throws IOException
+   * 验证节点描述符拉取脚本配置是否合法：脚本路径非空、文件存在且有可执行权限
+   * @param scriptPath 脚本文件路径
+   * @throws IOException 配置不合法时抛出异常
    */
   protected void verifyConfiguredScript(String scriptPath)
       throws IOException {
@@ -165,6 +182,11 @@ public abstract class AbstractNodeDescriptorsProvider<T>
     }
   }
 
+  /**
+   * 将分区标签字符串转换为NodeLabel集合
+   * @param partitionNodeLabel 分区标签字符串
+   * @return 包含该标签的NodeLabel集合
+   */
   static Set<NodeLabel> convertToNodeLabelSet(String partitionNodeLabel) {
     if (null == partitionNodeLabel) {
       return null;
@@ -175,9 +197,8 @@ public abstract class AbstractNodeDescriptorsProvider<T>
   }
 
   /**
-   * Used only by tests to access the timer task directly
-   *
-   * @return the timer task
+   * 仅用于测试，获取当前定时任务实例
+   * @return 定时任务实例
    */
   TimerTask getTimerTask() {
     return timerTask;
@@ -189,9 +210,8 @@ public abstract class AbstractNodeDescriptorsProvider<T>
   }
 
   /**
-   * Creates a timer task which be scheduled periodically by the provider,
-   * and the task is responsible to update node descriptors to the provider.
-   * @return a timer task.
+   * 抽象方法，由子类创建具体的定时拉取任务实例，任务负责更新节点描述符
+   * @return 定时拉取任务实例
    */
   public abstract TimerTask createTimerTask();
 }

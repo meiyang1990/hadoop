@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,6 +29,11 @@ import org.apache.hadoop.mapreduce.lib.chain.Chain.ChainBlockingQueue;
 import java.io.IOException;
 
 /**
+ * 文件级注释：
+ * ChainReducer 实现了Reduce任务内部的Reducer后串联多个Mapper的执行模式，
+ * 允许将Reducer的输出依次经过多个Mapper处理后再输出，减少MapReduce作业的磁盘IO，
+ * 支持构建 [MAP+ / REDUCE MAP*] 形式的复合作业，提升执行效率。
+ *
  * The ChainReducer class allows to chain multiple Mapper classes after a
  * Reducer within the Reducer task.
  * 
@@ -89,7 +95,8 @@ public class ChainReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT> extends
     Reducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {
 
   /**
-   * Sets the {@link Reducer} class to the chain job.
+   * 向作业设置ChainReducer需要执行的核心Reducer，将其加入链式处理流程。
+   * 传入的Reducer配置优先级高于作业全局配置，任务运行时生效。
    * 
    * <p>
    * The key and values are passed from one element of the chain to the next, by
@@ -117,7 +124,7 @@ public class ChainReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT> extends
    *          reducer output value class.
    * @param reducerConf
    *          a configuration for the Reducer class. It is recommended to use a
-   *          Configuration without default values using the
+   *          configuration without default values using the
    *          <code>Configuration(boolean loadDefaults)</code> constructor with
    *          FALSE.
    */
@@ -133,7 +140,8 @@ public class ChainReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT> extends
   }
 
   /**
-   * Adds a {@link Mapper} class to the chain reducer.
+   * 向ChainReducer的链式流程中添加一个Mapper，放在Reducer之后执行。
+   * 传入的Mapper配置优先级高于作业全局配置，任务运行时生效。
    * 
    * <p>
    * The key and values are passed from one element of the chain to the next, by
@@ -161,7 +169,7 @@ public class ChainReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT> extends
    *          mapper output value class.
    * @param mapperConf
    *          a configuration for the Mapper class. It is recommended to use a
-   *          Configuration without default values using the
+   *          configuration without default values using the
    *          <code>Configuration(boolean loadDefaults)</code> constructor with
    *          FALSE.
    */
@@ -177,44 +185,50 @@ public class ChainReducer<KEYIN, VALUEIN, KEYOUT, VALUEOUT> extends
 
   private Chain chain;
 
+  /**
+   * 初始化链式处理环境，构建Chain实例并加载配置。
+   */
   protected void setup(Context context) {
     chain = new Chain(false);
     chain.setup(context.getConfiguration());
   }
 
+  /**
+   * ChainReducer主执行方法，按顺序初始化并启动链式处理流程，协调所有Reducer和Mapper的并发执行。
+   */
   public void run(Context context) throws IOException, InterruptedException {
     setup(context);
 
-    // if no reducer is set, just do nothing
+    // 未设置Reducer时直接返回，不执行任何处理
     if (chain.getReducer() == null) {
       return;
     }
     int numMappers = chain.getAllMappers().size();
-    // if there are no mappers in chain, run the reducer
+    // 没有串联Mapper时，直接执行Reducer后输出结果
     if (numMappers == 0) {
       chain.runReducer(context);
       return;
     }
 
-    // add reducer and all mappers with proper context
+    // 声明链式处理各环节的输入输出阻塞队列
     ChainBlockingQueue<Chain.KeyValuePair<?, ?>> inputqueue;
     ChainBlockingQueue<Chain.KeyValuePair<?, ?>> outputqueue;
-    // add reducer
+    // 添加Reducer到链式处理，创建其输出队列
     outputqueue = chain.createBlockingQueue();
     chain.addReducer(context, outputqueue);
-    // add all mappers except last one
+    // 添加除最后一个Mapper外的所有串联Mapper，每个Mapper的输出作为下一个的输入
     for (int i = 0; i < numMappers - 1; i++) {
       inputqueue = outputqueue;
       outputqueue = chain.createBlockingQueue();
       chain.addMapper(inputqueue, outputqueue, context, i);
     }
-    // add last mapper
+    // 添加最后一个Mapper，直接输出到任务上下文
     chain.addMapper(outputqueue, context, numMappers - 1);
 
-    // start all threads
+    // 启动所有链式处理的工作线程
     chain.startAllThreads();
     
-    // wait for all threads
+    // 等待所有线程执行完成，结束处理
     chain.joinAllThreads();
   }
 }

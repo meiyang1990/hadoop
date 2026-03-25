@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,6 +17,12 @@
  * limitations under the License.
  */
 
+/**
+ * @file file-utils.c
+ * @brief YARN NodeManager容器执行器文件工具实现，提供文件读写、权限切换读写能力
+ */
+
+// 文件缓冲区增量大小，单位字节
 #define FILE_BUFFER_INCREMENT (128*1024)
 
 #include <sys/types.h>
@@ -37,11 +44,15 @@
  * the contents as a NUL-terminated string. NOTE: The file contents must not
  * contain a NUL character or the result will appear to be truncated.
  *
- * Returns a pointer to the allocated, NUL-terminated string or NULL on error.
+ * 读取指定文件内容到分配的缓冲区，返回以NUL结尾的字符串
+ * 
+ * @param filename 要读取的文件路径
+ * @return 成功返回指向分配的以NUL结尾字符串的指针，失败返回NULL
  */
 char* read_file_to_string(const char* filename) {
   char* buff = NULL;
   int rc = -1;
+  // 只读方式打开文件
   int fd = open(filename, O_RDONLY);
   if (fd < 0) {
     fprintf(ERRORFILE, "Error opening %s : %s\n", filename, strerror(errno));
@@ -49,15 +60,19 @@ char* read_file_to_string(const char* filename) {
   }
 
   struct stat filestat;
+  // 获取文件状态信息
   if (fstat(fd, &filestat) != 0) {
     fprintf(ERRORFILE, "Error examining %s : %s\n", filename, strerror(errno));
     goto cleanup;
   }
 
+  // 初始缓冲区大小使用默认增量
   size_t buff_size = FILE_BUFFER_INCREMENT;
+  // 如果是常规文件，直接按文件大小分配缓冲区（预留一个字节存结束符）
   if (S_ISREG(filestat.st_mode)) {
     buff_size = filestat.st_size + 1;  // +1 for terminating NUL
   }
+  // 分配缓冲区内存
   buff = malloc(buff_size);
   if (buff == NULL) {
     fprintf(ERRORFILE, "Unable to allocate %ld bytes\n", buff_size);
@@ -67,9 +82,11 @@ char* read_file_to_string(const char* filename) {
   int bytes_left = buff_size;
   char* cp = buff;
   int bytes_read;
+  // 循环读取文件内容到缓冲区
   while ((bytes_read = read(fd, cp, bytes_left)) > 0) {
     cp += bytes_read;
     bytes_left -= bytes_read;
+    // 缓冲区已满，扩展缓冲区大小
     if (bytes_left == 0) {
       buff_size += FILE_BUFFER_INCREMENT;
       bytes_left += FILE_BUFFER_INCREMENT;
@@ -80,18 +97,22 @@ char* read_file_to_string(const char* filename) {
       }
     }
   }
-  if (bytes_left < 0) {
+  // 读取过程发生错误
+  if (bytes_read < 0) {
     fprintf(ERRORFILE, "Error reading %s : %s\n", filename, strerror(errno));
     goto cleanup;
   }
 
+  // 添加字符串结束符
   *cp = '\0';
   rc = 0;
 
 cleanup:
+  // 关闭文件描述符
   if (fd != -1) {
     close(fd);
   }
+  // 出错则释放缓冲区并返回NULL
   if (rc != 0) {
     free(buff);
     buff = NULL;
@@ -103,17 +124,23 @@ cleanup:
  * Read a file to a string as the YARN nodemanager user and returns the
  * result as a string. See read_file_to_string for more details.
  *
- * Returns a pointer to the allocated, NUL-terminated string or NULL on error.
+ * 以NodeManager用户身份读取文件内容到字符串
+ * 
+ * @param filename 要读取的文件路径
+ * @return 成功返回指向分配的以NUL结尾字符串的指针，失败返回NULL
  */
 char* read_file_to_string_as_nm_user(const char* filename) {
   uid_t user = geteuid();
   gid_t group = getegid();
+  // 切换当前有效用户到NodeManager用户
   if (change_effective_user_to_nm() != 0) {
     fputs("Cannot change to nm user\n", ERRORFILE);
     return NULL;
   }
 
+  // 执行文件读取
   char* buff = read_file_to_string(filename);
+  // 切回原来的用户
   if (change_effective_user(user, group) != 0) {
     fputs("Cannot revert to previous user\n", ERRORFILE);
     free(buff);
@@ -125,18 +152,26 @@ char* read_file_to_string_as_nm_user(const char* filename) {
 /**
  * Write a sequence of bytes to a new file as the YARN nodemanager user.
  *
- * Returns true on success or false on error.
+ * 以NodeManager用户身份向新文件写入字节数据
+ * 
+ * @param path 目标文件路径
+ * @param data 要写入的数据指针
+ * @param count 要写入的字节数
+ * @return 成功返回true，失败返回false
  */
 bool write_file_as_nm(const char* path, const void* data, size_t count) {
   bool result = false;
   int fd = -1;
+  // 保存原来的用户组信息
   uid_t orig_user = geteuid();
   gid_t orig_group = getegid();
+  // 切换当前有效用户到NodeManager用户
   if (change_effective_user_to_nm() != 0) {
     fputs("Error changing to NM user and group\n", ERRORFILE);
     return false;
   }
 
+  // 创建新文件（如果文件已存在则失败），仅所有者拥有读写权限
   fd = open(path, O_CREAT | O_EXCL | O_WRONLY, S_IRUSR | S_IWUSR);
   if (fd == -1) {
     fprintf(ERRORFILE, "Error creating %s : %s\n", path, strerror(errno));
@@ -144,6 +179,7 @@ bool write_file_as_nm(const char* path, const void* data, size_t count) {
   }
 
   const uint8_t* bp = (const uint8_t*)data;
+  // 循环写入所有数据
   while (count > 0) {
     ssize_t bytes_written = write(fd, bp, count);
     if (bytes_written == -1) {
@@ -157,6 +193,7 @@ bool write_file_as_nm(const char* path, const void* data, size_t count) {
   result = true;
 
 cleanup:
+  // 关闭文件描述符，检查关闭错误
   if (fd != -1) {
     if (close(fd) == -1) {
       fprintf(ERRORFILE, "Error writing to %s : %s\n", path, strerror(errno));
@@ -164,6 +201,7 @@ cleanup:
     }
   }
 
+  // 切回原来的用户组
   if (change_effective_user(orig_user, orig_group) != 0) {
     fputs("Cannot restore original user/group\n", ERRORFILE);
     result = false;

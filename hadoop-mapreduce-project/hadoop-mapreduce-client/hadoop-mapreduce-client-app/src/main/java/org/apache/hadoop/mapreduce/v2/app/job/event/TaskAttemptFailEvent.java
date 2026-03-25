@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,23 +21,25 @@ package org.apache.hadoop.mapreduce.v2.app.job.event;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
+/**
+ * 任务尝试失败事件，用于通知作业任务尝试执行失败，并携带是否快速失败的标记
+ */
 public class TaskAttemptFailEvent extends TaskAttemptEvent {
+  // 是否快速失败，快速失败表示任务失败后不重试，直接标记任务失败
   private boolean fastFail;
 
   /**
-   * Create a new TaskAttemptFailEvent, with task fastFail disabled.
-   *
-   * @param id the id of the task attempt
+   * 创建任务尝试失败事件，默认不开启快速失败
+   * @param id 失败任务尝试的ID
    */
   public TaskAttemptFailEvent(TaskAttemptId id) {
     this(id, false);
   }
 
   /**
-   * Create a new TaskAttemptFailEvent.
-   *
-   * @param id the id of the task attempt
-   * @param fastFail should the task fastFail or not.
+   * 创建任务尝试失败事件，可指定是否开启快速失败
+   * @param id 失败任务尝试的ID
+   * @param fastFail 是否开启快速失败，true表示失败后不重试
    */
   public TaskAttemptFailEvent(TaskAttemptId id, boolean fastFail) {
     super(id, TaskAttemptEventType.TA_FAILMSG);
@@ -44,8 +47,8 @@ public class TaskAttemptFailEvent extends TaskAttemptEvent {
   }
 
   /**
-   * Check if task should fast fail or retry
-   * @return boolean value where true indicates the task should not retry
+   * 获取是否开启快速失败标记
+   * @return true表示任务失败后不重试，false表示允许重试
    */
   public boolean isFastFail() {
     return fastFail;

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,10 +23,19 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.server.api.ContainerLogContext;
 
+/**
+ * 基于日志大小限制的容器日志聚合策略，仅对非日志超限被杀的容器执行日志聚合
+ */
 @Private
 public class LimitSizeContainerLogAggregationPolicy extends
     AbstractContainerLogAggregationPolicy {
+  /**
+   * 判断是否需要对当前容器执行日志聚合
+   * @param logContext 容器日志上下文，包含容器退出信息
+   * @return true 需要聚合，false 不需要聚合
+   */
   public boolean shouldDoLogAggregation(ContainerLogContext logContext) {
+    // 仅当容器不是因为日志超限被杀死时，才执行日志聚合
     return logContext.getExitCode()
         != ContainerExitStatus.KILLED_FOR_EXCESS_LOGS;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,24 +23,43 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Diagnostic keys in the manifests.
+ * 文件输出提交器清单文件的诊断信息键常量定义。
+ * 存储输出提交过程中各类诊断数据的key，用于_SUCCESS文件和故障排查。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class DiagnosticKeys {
   /**
-   * Attribute added to diagnostics in _SUCCESS file.
+   * 提交操作使用的Kerberos用户主体，添加到_SUCCESS文件的诊断属性中。
    */
   public static final String PRINCIPAL = "principal";
+  /**
+   * 当前所处的提交阶段
+   */
   public static final String STAGE = "stage";
+  /**
+   * 异常类型名称
+   */
   public static final String EXCEPTION = "exception";
+  /**
+   * 异常堆栈信息
+   */
   public static final String STACKTRACE = "stacktrace";
+  /**
+   * JVM总内存大小
+   */
   public static final String TOTAL_MEMORY = "total.memory";
+  /**
+   * JVM空闲内存大小
+   */
   public static final String FREE_MEMORY = "free.memory";
+  /**
+   * JVM堆内存使用量
+   */
   public static final String HEAP_MEMORY = "heap.memory";
 
 
-  /** Directory where manifests were renamed: {@value}. */
+  /** 重命名后的清单文件所在目录键名: {@value}. */
   public static final String MANIFESTS = "manifests";
 
   private DiagnosticKeys() {

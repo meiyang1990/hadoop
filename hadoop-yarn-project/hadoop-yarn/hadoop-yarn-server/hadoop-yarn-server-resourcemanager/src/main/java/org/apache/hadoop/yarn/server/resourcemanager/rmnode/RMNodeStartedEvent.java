@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,13 +27,27 @@ import org.apache.hadoop.yarn.server.api.protocolrecords.LogAggregationReport;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NMContainerStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 
+/**
+ * YARN ResourceManager 节点启动事件，封装NodeManager上线时携带的各类状态信息
+ */
 public class RMNodeStartedEvent extends RMNodeEvent {
 
+  // NodeManager节点状态信息
   private final NodeStatus nodeStatus;
+  // NodeManager上当前所有容器的状态列表
   private List<NMContainerStatus> containerStatuses;
+  // NodeManager上当前运行的应用ID列表
   private List<ApplicationId> runningApplications;
+  // 各应用的日志聚合状态报告列表
   private List<LogAggregationReport> logAggregationReportsForApps;
 
+  /**
+   * 构造RM节点启动事件，存储NodeManager启动上报的各类状态信息
+   * @param nodeId 启动的NodeManager节点ID
+   * @param containerReports NodeManager上所有容器的状态列表
+   * @param runningApplications NodeManager上当前运行的应用ID列表
+   * @param nodeStatus NodeManager节点整体状态信息
+   */
   public RMNodeStartedEvent(NodeId nodeId,
       List<NMContainerStatus> containerReports,
       List<ApplicationId> runningApplications,
@@ -43,22 +58,42 @@ public class RMNodeStartedEvent extends RMNodeEvent {
     this.nodeStatus = nodeStatus;
   }
 
+  /**
+   * 获取NodeManager上报的所有容器状态列表
+   * @return 容器状态列表
+   */
   public List<NMContainerStatus> getNMContainerStatuses() {
     return this.containerStatuses;
   }
   
+  /**
+   * 获取NodeManager上当前运行的应用ID列表
+   * @return 运行应用ID列表
+   */
   public List<ApplicationId> getRunningApplications() {
     return runningApplications;
   }
 
+  /**
+   * 获取NodeManager节点整体状态信息
+   * @return 节点状态对象
+   */
   public NodeStatus getNodeStatus() {
     return nodeStatus;
   }
 
+  /**
+   * 获取各应用的日志聚合状态报告列表
+   * @return 日志聚合报告列表
+   */
   public List<LogAggregationReport> getLogAggregationReportsForApps() {
     return this.logAggregationReportsForApps;
   }
 
+  /**
+   * 设置各应用的日志聚合状态报告列表
+   * @param logAggregationReportsForApps 日志聚合报告列表
+   */
   public void setLogAggregationReportsForApps(
       List<LogAggregationReport> logAggregationReportsForApps) {
     this.logAggregationReportsForApps = logAggregationReportsForApps;

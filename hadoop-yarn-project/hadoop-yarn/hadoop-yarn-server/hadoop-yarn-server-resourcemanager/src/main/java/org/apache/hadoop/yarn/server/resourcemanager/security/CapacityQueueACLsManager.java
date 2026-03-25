@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -33,13 +34,18 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This is the implementation of {@link QueueACLsManager} based on the
- * {@link CapacityScheduler}.
+ * 基于容量调度器(CapacityScheduler)实现的队列访问权限ACL管理器
+ * 实现了{@link QueueACLsManager}接口，为容量调度器提供队列访问权限检查能力
  */
 public class CapacityQueueACLsManager extends QueueACLsManager {
   private static final Logger LOG = LoggerFactory
       .getLogger(CapacityQueueACLsManager.class);
 
+  /**
+   * 构造容量调度器ACL管理器
+   * @param scheduler 资源调度器实例
+   * @param conf Hadoop配置对象
+   */
   public CapacityQueueACLsManager(ResourceScheduler scheduler,
       Configuration conf) {
     super(scheduler, conf);
@@ -48,28 +54,29 @@ public class CapacityQueueACLsManager extends QueueACLsManager {
   @Override
   public boolean checkAccess(UserGroupInformation callerUGI, QueueACL acl,
       RMApp app, String remoteAddress, List<String> forwardedAddresses) {
+    // ACL未开启，直接允许访问
     if (!isACLsEnable) {
       return true;
     }
 
+    // 获取应用所在队列
     CSQueue queue = ((CapacityScheduler) scheduler).getQueue(app.getQueue());
     if (queue == null) {
+      // 队列名称模糊匹配到多个队列，拒绝访问
       if (((CapacityScheduler) scheduler).isAmbiguous(app.getQueue())) {
         LOG.error("Queue " + app.getQueue() + " is ambiguous for "
             + app.getApplicationId());
-        // if we cannot decide which queue to submit we should deny access
+        // 无法确定目标队列时拒绝访问
         return false;
       }
 
-      // The application exists but the associated queue does not exist.
-      // This may be due to a queue that is not defined when the RM restarts.
-      // At this point we choose to log the fact and allow users to access
-      // and view the apps in a removed queue. This should only happen on
-      // application recovery.
+      // 应用存在但关联队列不存在，通常是RM重启后该队列已被删除
+      // 应用恢复场景下允许用户访问查看已删除队列中的应用
       LOG.error("Queue " + app.getQueue() + " does not exist for "
           + app.getApplicationId());
       return true;
     }
+    // 调用授权器检查权限并返回结果
     return authorizer.checkPermission(
         new AccessRequest(queue.getPrivilegedEntity(), callerUGI,
             SchedulerUtils.toAccessType(acl), app.getApplicationId().toString(),
@@ -81,27 +88,25 @@ public class CapacityQueueACLsManager extends QueueACLsManager {
   public boolean checkAccess(UserGroupInformation callerUGI, QueueACL acl,
       RMApp app, String remoteAddress, List<String> forwardedAddresses,
       String targetQueue) {
+    // ACL未开启，直接允许访问
     if (!isACLsEnable) {
       return true;
     }
 
-    // Based on the discussion in YARN-5554 detail on why there are two
-    // versions:
-    // The access check inside these calls is currently scheduler dependent.
-    // This is due to the extra parameters needed for the CS case which are not
-    // in the version defined in the YarnScheduler interface. The second
-    // version is added for the moving the application case. The check has
-    // extra logging to distinguish between the queue not existing in the
-    // application move request case and the real access denied case.
+    // 该重载方法用于应用移动场景，因容量调度器需要额外目标队列参数，故新增此版本
+    // 详情可参考YARN-5554讨论
     CapacityScheduler cs = ((CapacityScheduler) scheduler);
+    // 获取移动目标队列
     CSQueue queue = cs.getQueue(targetQueue);
     if (queue == null) {
+      // 目标队列不存在或模糊匹配，记录警告日志并拒绝访问
       LOG.warn("Target queue " + targetQueue
           + (cs.isAmbiguous(targetQueue) ? " is ambiguous while trying to move "
               : " does not exist while trying to move ")
           + app.getApplicationId());
       return false;
     }
+    // 调用授权器检查权限并返回结果
     return authorizer.checkPermission(
         new AccessRequest(queue.getPrivilegedEntity(), callerUGI,
             SchedulerUtils.toAccessType(acl), app.getApplicationId().toString(),

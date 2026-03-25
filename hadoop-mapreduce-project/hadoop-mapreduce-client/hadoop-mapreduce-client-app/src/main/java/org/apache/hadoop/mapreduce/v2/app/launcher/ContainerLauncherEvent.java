@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -23,15 +24,32 @@ import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.Token;
 import org.apache.hadoop.yarn.event.AbstractEvent;
 
+/**
+ * 容器启动器事件，封装MapReduce任务尝试容器启动相关的事件信息
+ * 用于在MapReduce ApplicationMaster内部传递容器调度事件，继承YARN的通用事件模型
+ */
 public class ContainerLauncherEvent 
     extends AbstractEvent<ContainerLauncher.EventType> {
 
+  // 关联的任务尝试ID
   private TaskAttemptId taskAttemptID;
+  // YARN容器ID
   private ContainerId containerID;
+  // NodeManager容器管理服务地址
   private String containerMgrAddress;
+  // 容器访问令牌，用于身份认证
   private Token containerToken;
+  // 是否需要转储容器线程堆栈（用于故障诊断）
   private boolean dumpContainerThreads;
 
+  /**
+   * 构造容器启动事件，默认不转储容器线程
+   * @param taskAttemptID 关联的任务尝试ID
+   * @param containerID YARN容器ID
+   * @param containerMgrAddress NodeManager容器管理服务地址
+   * @param containerToken 容器访问令牌
+   * @param type 事件类型
+   */
   public ContainerLauncherEvent(TaskAttemptId taskAttemptID, 
       ContainerId containerID,
       String containerMgrAddress,
@@ -41,6 +59,15 @@ public class ContainerLauncherEvent
         false);
   }
 
+  /**
+   * 构造容器启动事件，完整参数构造
+   * @param taskAttemptID 关联的任务尝试ID
+   * @param containerID YARN容器ID
+   * @param containerMgrAddress NodeManager容器管理服务地址
+   * @param containerToken 容器访问令牌
+   * @param type 事件类型
+   * @param dumpContainerThreads 是否转储容器线程堆栈用于故障诊断
+   */
   public ContainerLauncherEvent(TaskAttemptId taskAttemptID,
       ContainerId containerID,
       String containerMgrAddress,
@@ -55,22 +82,42 @@ public class ContainerLauncherEvent
     this.dumpContainerThreads = dumpContainerThreads;
   }
 
+  /**
+   * 获取事件关联的任务尝试ID
+   * @return 任务尝试ID
+   */
   public TaskAttemptId getTaskAttemptID() {
     return this.taskAttemptID;
   }
 
+  /**
+   * 获取事件关联的YARN容器ID
+   * @return YARN容器ID
+   */
   public ContainerId getContainerID() {
     return containerID;
   }
 
+  /**
+   * 获取NodeManager容器管理服务地址
+   * @return NodeManager服务地址
+   */
   public String getContainerMgrAddress() {
     return containerMgrAddress;
   }
 
+  /**
+   * 获取容器访问令牌
+   * @return 容器访问令牌
+   */
   public Token getContainerToken() {
     return containerToken;
   }
 
+  /**
+   * 获取是否需要转储容器线程堆栈标志
+   * @return true表示需要转储用于故障诊断，false不需要
+   */
   public boolean getDumpContainerThreads() {
     return dumpContainerThreads;
   }

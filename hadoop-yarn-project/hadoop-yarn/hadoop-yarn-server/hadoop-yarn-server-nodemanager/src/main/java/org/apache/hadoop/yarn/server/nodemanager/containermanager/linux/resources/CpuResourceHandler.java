@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -16,14 +17,14 @@
  * limitations under the License.
  */
 
-
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.linux.resources;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * Resource handler for cpu resources.
+ * YARN NodeManager 节点上的 CPU 资源处理器接口，负责管理分配给容器的CPU资源。
+ * 基于Linux cgroups实现容器CPU资源的隔离与限制，继承ResourceHandler通用资源处理接口。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

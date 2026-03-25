@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -30,7 +31,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * DeletionTasks are supplied to the {@link DeletionService} for deletion.
+ * 抽象删除任务基类，定义了删除任务的通用结构和依赖管理逻辑，提交给{@link DeletionService}执行清理操作。
  */
 public abstract class DeletionTask implements Runnable {
 
@@ -51,12 +52,12 @@ public abstract class DeletionTask implements Runnable {
   private boolean success;
 
   /**
-   * Deletion task with taskId and default values.
+   * 构造删除任务，使用默认的依赖计数和后继任务集合。
    *
-   * @param taskId              the ID of the task, if previously set.
-   * @param deletionService     the {@link DeletionService}.
-   * @param user                the user associated with the delete.
-   * @param deletionTaskType    the {@link DeletionTaskType}.
+   * @param taskId              删除任务ID，恢复场景下可传入已有ID
+   * @param deletionService     所属删除服务
+   * @param user                本次删除对应用户
+   * @param deletionTaskType    删除任务类型
    */
   public DeletionTask(int taskId, DeletionService deletionService, String user,
       DeletionTaskType deletionTaskType) {
@@ -65,14 +66,14 @@ public abstract class DeletionTask implements Runnable {
   }
 
   /**
-   * Deletion task with taskId and user supplied values.
+   * 完整构造删除任务，允许传入自定义的依赖计数和后继任务集合（用于恢复场景）。
    *
-   * @param taskId              the ID of the task, if previously set.
-   * @param deletionService     the {@link DeletionService}.
-   * @param user                the user associated with the delete.
-   * @param numberOfPendingPredecessorTasks  Number of pending tasks.
-   * @param successorTaskSet    the list of successor DeletionTasks
-   * @param deletionTaskType    the {@link DeletionTaskType}.
+   * @param taskId              删除任务ID，恢复场景下可传入已有ID
+   * @param deletionService     所属删除服务
+   * @param user                本次删除对应用户
+   * @param numberOfPendingPredecessorTasks 未完成前驱任务计数
+   * @param successorTaskSet    后继任务集合
+   * @param deletionTaskType    删除任务类型
    */
   public DeletionTask(int taskId, DeletionService deletionService, String user,
       AtomicInteger numberOfPendingPredecessorTasks,
@@ -87,72 +88,72 @@ public abstract class DeletionTask implements Runnable {
   }
 
   /**
-   * Get the taskId for the DeletionTask.
+   * 获取删除任务ID。
    *
-   * @return the taskId.
+   * @return 任务ID
    */
   public int getTaskId() {
     return taskId;
   }
 
   /**
-   * Set the taskId for the DeletionTask.
+   * 设置删除任务ID。
    *
-   * @param taskId the taskId.
+   * @param taskId 任务ID
    */
   public void setTaskId(int taskId) {
     this.taskId = taskId;
   }
 
   /**
-   * The the user assoicated with the DeletionTask.
+   * 获取本次删除对应用户。
    *
-   * @return the user name.
+   * @return 用户名
    */
   public String getUser() {
     return user;
   }
 
   /**
-   * Get the {@link DeletionService} for this DeletionTask.
+   * 获取所属删除服务。
    *
-   * @return the {@link DeletionService}.
+   * @return 删除服务实例
    */
   public DeletionService getDeletionService() {
     return deletionService;
   }
 
   /**
-   * Get the {@link DeletionTaskType} for this DeletionTask.
+   * 获取删除任务类型。
    *
-   * @return the {@link DeletionTaskType}.
+   * @return 删除任务类型
    */
   public DeletionTaskType getDeletionTaskType() {
     return deletionTaskType;
   }
 
   /**
-   * Set the DeletionTask run status.
+   * 设置删除任务执行结果状态。
    *
-   * @param success the status of the running DeletionTask.
+   * @param success 执行是否成功
    */
   public synchronized void setSuccess(boolean success) {
     this.success = success;
   }
 
   /**
-   * Return the DeletionTask run status.
+   * 获取删除任务执行结果状态。
    *
-   * @return the status of the running DeletionTask.
+   * @return 执行是否成功
    */
   public synchronized boolean getSucess() {
     return this.success;
   }
 
   /**
-   * Return the list of successor tasks for the DeletionTask.
+   * 获取所有后继任务数组。
    *
-   * @return the list of successor tasks.
+   * @return 后继任务数组
    */
   public synchronized DeletionTask[] getSuccessorTasks() {
     DeletionTask[] successors = new DeletionTask[successorTaskSet.size()];
@@ -160,22 +161,17 @@ public abstract class DeletionTask implements Runnable {
   }
 
   /**
-   * Convert the DeletionTask to the Protobuf representation for storing in the
-   * state store and recovery.
+   * 将删除任务转换为Protobuf格式，用于NM状态存储和恢复。
    *
-   * @return the protobuf representation of the DeletionTask.
+   * @return 删除任务的Protobuf表示
    */
   public abstract DeletionServiceDeleteTaskProto convertDeletionTaskToProto();
 
   /**
-   * Add a dependent DeletionTask.
+   * 添加任务依赖，当前任务是后继任务的前驱，必须在删除任务提交前完成依赖定义。
+   * 如果任务依赖关系为：任务2、任务3必须在任务1完成后执行，则任务2、任务3需要添加为任务1的后继任务。
    *
-   * If there is a task dependency between say tasks 1,2,3 such that
-   * task2 and task3 can be started only after task1 then we should define
-   * task2 and task3 as successor tasks for task1.
-   * Note:- Task dependency should be defined prior to calling delete.
-   *
-   * @param successorTask the DeletionTask the depends on this DeletionTask.
+   * @param successorTask 依赖当前任务的后继删除任务
    */
   public synchronized void addDeletionTaskDependency(
       DeletionTask successorTask) {
@@ -185,51 +181,53 @@ public abstract class DeletionTask implements Runnable {
   }
 
   /**
-   * Increments and returns pending predecessor task count.
+   * 增加未完成前驱任务计数并返回结果。
    *
-   * @return the number of pending predecessor DeletionTasks.
+   * @return 更新后的未完成前驱任务数
    */
   public int incrementAndGetPendingPredecessorTasks() {
     return numberOfPendingPredecessorTasks.incrementAndGet();
   }
 
   /**
-   * Decrements and returns pending predecessor task count.
+   * 减少未完成前驱任务计数并返回结果。
    *
-   * @return the number of pending predecessor DeletionTasks.
+   * @return 更新后的未完成前驱任务数
    */
   public int decrementAndGetPendingPredecessorTasks() {
     return numberOfPendingPredecessorTasks.decrementAndGet();
   }
 
   /**
-   * Removes the DeletionTask from the state store and validates that successor
-   * tasks have been scheduled and completed.
-   *
-   * This is called when:
-   * 1) Current deletion task ran and finished.
-   * 2) When directly called by predecessor task if one of the
-   * dependent tasks of it has failed marking its success = false.
+   * 当前删除任务完成后的处理逻辑：从状态存储删除任务记录，处理后继任务调度。
+   * 触发场景：1) 当前任务执行完成；2) 前驱任务失败直接标记当前任务失败并触发完成处理
    */
   synchronized void deletionTaskFinished() {
     try {
+      // 从NM状态存储中删除该任务记录
       NMStateStoreService stateStore = deletionService.getStateStore();
       stateStore.removeDeletionTask(taskId);
     } catch (IOException e) {
       LOG.error("Unable to remove deletion task " + taskId
           + " from state store", e);
     }
+    // 遍历所有后继任务，更新依赖计数并调度可执行任务
     Iterator<DeletionTask> successorTaskI = this.successorTaskSet.iterator();
     while (successorTaskI.hasNext()) {
       DeletionTask successorTask = successorTaskI.next();
+      // 如果当前任务失败，标记所有后继任务失败
       if (!success) {
         successorTask.setSuccess(success);
       }
+      // 后继任务未完成前驱计数减一
       int count = successorTask.decrementAndGetPendingPredecessorTasks();
+      // 所有前驱都已完成，调度后继任务
       if (count == 0) {
         if (successorTask.getSucess()) {
+          // 所有前驱成功，提交后继任务执行
           successorTask.deletionService.delete(successorTask);
         } else {
+          // 存在前驱失败，直接触发后继任务完成流程
           successorTask.deletionTaskFinished();
         }
       }
@@ -237,20 +235,24 @@ public abstract class DeletionTask implements Runnable {
   }
 
   /**
-   * Return the Protobuf builder with the base DeletionTask attributes.
+   * 获取填充了基础属性的Protobuf Builder，供子类实现convertDeletionTaskToProto使用。
    *
-   * @return pre-populated Buidler with the base attributes.
+   * @return 已填充基础属性的Protobuf Builder
    */
   DeletionServiceDeleteTaskProto.Builder getBaseDeletionTaskProtoBuilder() {
     DeletionServiceDeleteTaskProto.Builder builder =
         DeletionServiceDeleteTaskProto.newBuilder();
+    // 填充任务ID
     builder.setId(getTaskId());
+    // 填充用户信息
     if (getUser() != null) {
       builder.setUser(getUser());
     }
+    // 计算删除时间（加上调试延迟）
     builder.setDeletionTime(System.currentTimeMillis() +
         TimeUnit.MILLISECONDS.convert(getDeletionService().getDebugDelay(),
             TimeUnit.SECONDS));
+    // 填充所有后继任务ID
     for (DeletionTask successor : getSuccessorTasks()) {
       builder.addSuccessorIds(successor.getTaskId());
     }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with this
@@ -15,4 +16,9 @@
  * the License.
  */
 
+/**
+ * YARN服务端核心根包，包含YARN所有服务端实现的顶层公共能力，
+ * 涵盖ResourceManager全局资源调度、NodeManager节点资源管理等核心服务的基础支撑。
+ * 该包下的各个子模块共同实现了YARN集群资源管理与任务调度的核心服务端逻辑。
+ */
 package org.apache.hadoop.yarn.server;

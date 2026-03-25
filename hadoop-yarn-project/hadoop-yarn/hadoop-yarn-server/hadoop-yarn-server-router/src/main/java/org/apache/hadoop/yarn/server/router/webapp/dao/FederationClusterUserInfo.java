@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,23 +27,43 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 联邦集群用户信息数据访问对象，聚合多个子集群的用户信息，
+ * 用于Router联邦模式下Web UI展示全集群维度的用户资源统计信息。
+ */
 @XmlRootElement
 @XmlAccessorType(XmlAccessType.FIELD)
 public class FederationClusterUserInfo extends ClusterUserInfo {
+  // 所有子集群的用户信息列表
   @XmlElement(name = "subCluster")
   private List<ClusterUserInfo> list = new ArrayList<>();
 
+  /**
+   * JAXB反序列化需要的无参构造方法。
+   */
   public FederationClusterUserInfo() {
   } // JAXB needs this
 
+  /**
+   * 构造方法，使用指定子集群用户信息列表初始化联邦用户信息。
+   * @param list 子集群用户信息列表
+   */
   public FederationClusterUserInfo(ArrayList<ClusterUserInfo> list) {
     this.list = list;
   }
 
+  /**
+   * 获取所有子集群的用户信息列表。
+   * @return 子集群用户信息列表
+   */
   public List<ClusterUserInfo> getList() {
     return list;
   }
 
+  /**
+   * 设置子集群用户信息列表。
+   * @param list 子集群用户信息列表
+   */
   public void setList(List<ClusterUserInfo> list) {
     this.list = list;
   }

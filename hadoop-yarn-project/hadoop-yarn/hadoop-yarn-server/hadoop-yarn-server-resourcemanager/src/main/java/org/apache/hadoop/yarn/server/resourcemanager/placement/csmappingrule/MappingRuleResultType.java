@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,26 +19,28 @@
 
 package org.apache.hadoop.yarn.server.resourcemanager.placement.csmappingrule;
 
+/**
+ * 容量调度器映射规则结果类型枚举，定义了映射规则匹配应用后可能产生的所有结果类型。
+ * 用于YARN容量调度器的应用队列放置规则，指示规则匹配后的处理动作。
+ */
 public enum MappingRuleResultType {
   /**
-   * Represents a result where we simply ignore the current rule
-   * and move onto the next one.
+   * 跳过当前规则，继续匹配下一条规则。
    */
   SKIP,
 
   /**
-   * Represents a result where the application gets rejected.
+   * 拒绝该应用提交。
    */
   REJECT,
 
   /**
-   * Represents a result where the application gets placed into a queue.
+   * 将应用放置到匹配到的指定队列。
    */
   PLACE,
 
   /**
-   * Special placement, which means the application is to be placed to the
-   * queue marked by %default variable.
+   * 将应用放置到通过%default变量标记的默认队列。
    */
   PLACE_TO_DEFAULT
 }

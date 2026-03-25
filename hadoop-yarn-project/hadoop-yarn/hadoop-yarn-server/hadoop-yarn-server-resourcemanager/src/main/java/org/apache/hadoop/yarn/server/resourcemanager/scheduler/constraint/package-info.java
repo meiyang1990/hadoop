@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,9 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.resourcemanager.scheduler.placement
- * contains classes related to scheduling containers using placement
- * constraints.
+ * YARN ResourceManager 调度约束包，包含基于位置约束进行容器调度的相关实现类，
+ * 用于支持应用指定容器放置策略（如节点分区、放置位置限制等调度约束能力）。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

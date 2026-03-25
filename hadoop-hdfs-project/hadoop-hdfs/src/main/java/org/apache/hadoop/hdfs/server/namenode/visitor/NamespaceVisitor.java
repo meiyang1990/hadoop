@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -29,39 +30,65 @@ import org.apache.hadoop.hdfs.server.namenode.snapshot.Snapshot;
 import java.util.Iterator;
 
 /**
- * For visiting namespace trees.
+ * HDFS命名空间树访问器接口，定义了遍历HDFS文件系统目录树（含快照）的统一访问契约
+ * 实现访问者模式，对不同类型INode提供不同的访问处理逻辑
  */
 public interface NamespaceVisitor {
-  /** For visiting any {@link INode}. */
+  /**
+   * 通用INode访问器接口，所有INode类型访问的顶层抽象
+   */
   interface INodeVisitor {
     INodeVisitor DEFAULT = new INodeVisitor() {};
 
-    /** Visiting the given {@link INode}. */
+    /**
+     * 访问指定INode节点
+     * @param iNode 待访问的INode节点
+     * @param snapshot 快照ID，CURRENT_STATE_ID表示当前状态
+     */
     default void visit(INode iNode, int snapshot) {
     }
   }
 
-  /** @return the default (non-recursive) {@link INodeVisitor}. */
+  /**
+   * 获取默认非递归INode访问器实例
+   * @return 默认访问器实例
+   */
   default INodeVisitor getDefaultVisitor() {
     return INodeVisitor.DEFAULT;
   }
 
-  /** Visiting the given {@link INodeFile}. */
+  /**
+   * 访问文件INode节点
+   * @param file 待访问的文件INode
+   * @param snapshot 快照ID
+   */
   default void visitFile(INodeFile file, int snapshot) {
     getDefaultVisitor().visit(file, snapshot);
   }
 
-  /** Visiting the given {@link INodeSymlink}. */
+  /**
+   * 访问符号链接INode节点
+   * @param symlink 待访问的符号链接INode
+   * @param snapshot 快照ID
+   */
   default void visitSymlink(INodeSymlink symlink, int snapshot) {
     getDefaultVisitor().visit(symlink, snapshot);
   }
 
-  /** Visiting the given {@link INodeReference} (non-recursively). */
+  /**
+   * 非递归访问引用INode节点
+   * @param ref 待访问的引用INode
+   * @param snapshot 快照ID
+   */
   default void visitReference(INodeReference ref, int snapshot) {
     getDefaultVisitor().visit(ref, snapshot);
   }
 
-  /** First visit the given {@link INodeReference} and then the referred. */
+  /**
+   * 递归访问引用INode节点，先访问引用自身，再访问被引用的目标节点
+   * @param ref 待访问的引用INode
+   * @param snapshot 快照ID
+   */
   default void visitReferenceRecursively(INodeReference ref, int snapshot) {
     visitReference(ref, snapshot);
 
@@ -71,23 +98,34 @@ public interface NamespaceVisitor {
     postVisitReferred(referred);
   }
 
-  /** Right before visiting the given referred {@link INode}. */
+  /**
+   * 访问被引用INode之前的回调钩子
+   * @param referred 即将被访问的被引用INode
+   */
   default void preVisitReferred(INode referred) {
   }
 
-  /** Right after visiting the given referred {@link INode}. */
+  /**
+   * 访问被引用INode之后的回调钩子
+   * @param referred 刚刚访问完成的被引用INode
+   */
   default void postVisitReferred(INode referred) {
   }
 
-  /** Visiting the given {@link INodeDirectory} (non-recursively). */
+  /**
+   * 非递归访问目录INode节点
+   * @param dir 待访问的目录INode
+   * @param snapshot 快照ID
+   */
   default void visitDirectory(INodeDirectory dir, int snapshot) {
     getDefaultVisitor().visit(dir, snapshot);
   }
 
   /**
-   * First visit the given {@link INodeDirectory};
-   * then the children;
-   * and then, if snapshottable, the snapshots. */
+   * 递归访问目录INode节点，访问顺序：目录自身 -> 子节点 -> 如果是可快照目录则访问所有快照
+   * @param dir 待访问的目录INode
+   * @param snapshot 快照ID
+   */
   default void visitDirectoryRecursively(INodeDirectory dir, int snapshot) {
     visitDirectory(dir, snapshot);
     visitSubs(getChildren(dir, snapshot));
@@ -103,39 +141,37 @@ public interface NamespaceVisitor {
   }
 
   /**
-   * Right before visiting the given sub {@link Element}.
-   * The sub element may be a child of an {@link INodeDirectory}
-   * or a snapshot in {@link DirectorySnapshottableFeature}.
-   *
-   * @param sub the element to be visited.
-   * @param index the index of the sub element.
-   * @param isLast is the sub element the last element?
+   * 访问子元素之前的回调钩子
+   * 子元素可以是目录的子节点，也可以是可快照目录下的快照
+   * @param sub 待访问的子元素
+   * @param index 子元素在列表中的索引
+   * @param isLast 是否是最后一个子元素
    */
   default void preVisitSub(Element sub, int index, boolean isLast) {
   }
 
   /**
-   * Right after visiting the given sub {@link Element}.
-   * The sub element may be a child of an {@link INodeDirectory}
-   * or a snapshot in {@link DirectorySnapshottableFeature}.
-   *
-   * @param sub the element just visited.
-   * @param index the index of the sub element.
-   * @param isLast is the sub element the last element?
+   * 访问子元素之后的回调钩子
+   * 子元素可以是目录的子节点，也可以是可快照目录下的快照
+   * @param sub 刚刚访问完成的子元素
+   * @param index 子元素在列表中的索引
+   * @param isLast 是否是最后一个子元素
    */
   default void postVisitSub(Element sub, int index, boolean isLast) {
   }
 
-  /** Visiting a {@link DirectorySnapshottableFeature}. */
+  /**
+   * 访问可快照目录特性对象
+   * @param dir 所属目录INode
+   * @param snapshottable 可快照特性对象
+   */
   default void visitSnapshottable(INodeDirectory dir,
       DirectorySnapshottableFeature snapshottable) {
   }
 
   /**
-   * Visiting the sub {@link Element}s recursively.
-   *
-   * @param subs the children of an {@link INodeDirectory}
-   *             or the snapshots in {@link DirectorySnapshottableFeature}.
+   * 递归遍历所有子元素
+   * @param subs 待遍历的子元素集合，可以是目录子节点或目录快照
    */
   default void visitSubs(Iterable<Element> subs) {
     if (subs == null) {
@@ -152,7 +188,12 @@ public interface NamespaceVisitor {
     }
   }
 
-  /** @return the children as {@link Element}s. */
+  /**
+   * 将指定目录在对应快照下的子节点转换为Element可迭代集合
+   * @param dir 目标目录
+   * @param snapshot 快照ID
+   * @return 子节点Element可迭代集合
+   */
   static Iterable<Element> getChildren(INodeDirectory dir, int snapshot) {
     final Iterator<INode> i = dir.getChildrenList(snapshot).iterator();
     return new Iterable<Element>() {
@@ -178,7 +219,11 @@ public interface NamespaceVisitor {
     };
   }
 
-  /** @return the snapshots as {@link Element}s. */
+  /**
+   * 将可快照目录的所有快照转换为Element可迭代集合
+   * @param snapshottable 可快照特性对象
+   * @return 快照根节点Element可迭代集合
+   */
   static Iterable<Element> getSnapshots(
       DirectorySnapshottableFeature snapshottable) {
     final Iterator<DirectoryWithSnapshotFeature.DirectoryDiff> i
@@ -222,7 +267,9 @@ public interface NamespaceVisitor {
     };
   }
 
-  /** Snapshot and INode. */
+  /**
+   * 元素封装类，绑定INode节点与对应的快照ID，用于统一遍历当前节点和快照节点
+   */
   class Element {
     private final int snapshotId;
     private final INode inode;

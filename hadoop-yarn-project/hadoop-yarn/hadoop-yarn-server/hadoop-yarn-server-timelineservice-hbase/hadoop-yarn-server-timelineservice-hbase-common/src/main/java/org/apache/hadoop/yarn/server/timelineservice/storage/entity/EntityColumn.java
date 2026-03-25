@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,27 +28,27 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.ValueConvert
 import org.apache.hadoop.yarn.server.timelineservice.storage.flow.Attribute;
 
 /**
- * Identifies fully qualified columns for the {@link EntityTable}.
+ * Entity表（存储时间线实体的HBase表）的列定义枚举，定义了该表所有全限定列的标识。
  */
 public enum EntityColumn implements Column<EntityTable> {
 
   /**
-   * Identifier for the entity.
+   * 实体唯一标识列。
    */
   ID(EntityColumnFamily.INFO, "id"),
 
   /**
-   * The type of entity.
+   * 实体类型列。
    */
   TYPE(EntityColumnFamily.INFO, "type"),
 
   /**
-   * When the entity was created.
+   * 实体创建时间列。
    */
   CREATED_TIME(EntityColumnFamily.INFO, "created_time", new LongConverter()),
 
   /**
-   * The version of the flow that this entity belongs to.
+   * 实体所属流的版本列。
    */
   FLOW_VERSION(EntityColumnFamily.INFO, "flow_version");
 
@@ -56,23 +57,34 @@ public enum EntityColumn implements Column<EntityTable> {
   private final byte[] columnQualifierBytes;
   private final ValueConverter valueConverter;
 
+  /**
+   * 构造EntityColumn，使用默认通用值转换器。
+   * @param columnFamily 所属列族
+   * @param columnQualifier 列名
+   */
   EntityColumn(ColumnFamily<EntityTable> columnFamily,
       String columnQualifier) {
     this(columnFamily, columnQualifier, GenericConverter.getInstance());
   }
 
+  /**
+   * 构造EntityColumn，指定自定义值转换器。
+   * @param columnFamily 所属列族
+   * @param columnQualifier 列名
+   * @param converter 值转换器
+   */
   EntityColumn(ColumnFamily<EntityTable> columnFamily,
       String columnQualifier, ValueConverter converter) {
     this.columnFamily = columnFamily;
     this.columnQualifier = columnQualifier;
-    // Future-proof by ensuring the right column prefix hygiene.
+    // 提前处理列名格式，保证列前缀符合规范，向前兼容未来扩展
     this.columnQualifierBytes =
         Bytes.toBytes(Separator.SPACE.encode(columnQualifier));
     this.valueConverter = converter;
   }
 
   /**
-   * @return the column name value
+   * @return 列限定符字符串
    */
   private String getColumnQualifier() {
     return columnQualifier;
@@ -80,6 +92,7 @@ public enum EntityColumn implements Column<EntityTable> {
 
   @Override
   public byte[] getColumnQualifierBytes() {
+    // 返回拷贝避免外部修改内部数组
     return columnQualifierBytes.clone();
   }
 

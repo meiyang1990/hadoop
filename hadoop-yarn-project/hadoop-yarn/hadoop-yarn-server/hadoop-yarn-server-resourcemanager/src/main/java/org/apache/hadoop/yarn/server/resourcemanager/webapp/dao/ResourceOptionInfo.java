@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,7 +26,8 @@ import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.yarn.api.records.ResourceOption;
 
 /**
- * A JAXB representation of a {link ResourceOption}.
+ * ResourceOption的数据访问对象，用于YARN ResourceManager Web UI中资源选项信息的序列化传输。
+ * 将{@link ResourceOption}封装为JAXB可识别的格式，供Web接口返回XML/JSON数据。
  */
 @XmlRootElement(name = "resourceOption")
 @XmlAccessorType(XmlAccessType.NONE)
@@ -36,13 +38,17 @@ public class ResourceOptionInfo {
   @XmlElement(name = "overCommitTimeout")
   private int overCommitTimeout;
 
-  /** Internal resource option for caching. */
+  /** 缓存原始ResourceOption对象，避免重复构建 */
   private ResourceOption resourceOption;
 
 
   public ResourceOptionInfo() {
   } // JAXB needs this
 
+  /**
+   * 从ResourceOption构造ResourceOptionInfo对象，转换为Web DAO格式。
+   * @param resourceOption 原始资源选项对象
+   */
   public ResourceOptionInfo(ResourceOption resourceOption) {
     if (resourceOption != null) {
       this.resource = new ResourceInfo(resourceOption.getResource());
@@ -50,6 +56,10 @@ public class ResourceOptionInfo {
     }
   }
 
+  /**
+   * 获取或懒构建原始ResourceOption对象。
+   * @return 转换后的原始ResourceOption实例
+   */
   public ResourceOption getResourceOption() {
     if (resourceOption == null) {
       resourceOption = ResourceOption.newInstance(

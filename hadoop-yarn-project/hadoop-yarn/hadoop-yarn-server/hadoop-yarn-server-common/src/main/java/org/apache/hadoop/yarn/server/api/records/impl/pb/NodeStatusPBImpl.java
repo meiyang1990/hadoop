@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,26 +48,49 @@ import org.apache.hadoop.yarn.server.api.records.OpportunisticContainersStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeHealthStatus;
 import org.apache.hadoop.yarn.server.api.records.NodeStatus;
 
+/**
+ * NodeStatus的Protobuf序列化实现，基于PB实现NodeStatus对象与Proto格式互转
+ * 用于NodeManager向ResourceManager上报节点状态信息
+ */
 public class NodeStatusPBImpl extends NodeStatus {
+  // PB协议对象实例
   NodeStatusProto proto = NodeStatusProto.getDefaultInstance();
+  // PB构建器实例
   NodeStatusProto.Builder builder = null;
+  // 当前是否通过proto对象构建标记
   boolean viaProto = false;
   
+  // 节点ID缓存
   private NodeId nodeId = null;
+  // 容器状态列表缓存
   private List<ContainerStatus> containers = null;
+  // 节点健康状态缓存
   private NodeHealthStatus nodeHealthStatus = null;
+  // 需要保持活跃的应用ID列表缓存
   private List<ApplicationId> keepAliveApplications = null;
+  // 资源扩容容器列表缓存
   private List<Container> increasedContainers = null;
 
+  /**
+   * 默认构造函数，初始化PB构建器
+   */
   public NodeStatusPBImpl() {
     builder = NodeStatusProto.newBuilder();
   }
 
+  /**
+   * 基于已有proto对象构造NodeStatus
+   * @param proto PB协议节点状态对象
+   */
   public NodeStatusPBImpl(NodeStatusProto proto) {
     this.proto = proto;
     viaProto = true;
   }
   
+  /**
+   * 获取当前对象对应的PB协议对象，合并本地缓存到PB
+   * @return PB协议格式的NodeStatusProto
+   */
   public synchronized NodeStatusProto getProto() {
     mergeLocalToProto();
     proto = viaProto ? proto : builder.build();
@@ -74,6 +98,9 @@ public class NodeStatusPBImpl extends NodeStatus {
     return proto;
   }
 
+  /**
+   * 将本地缓存的各对象字段合并到PB构建器
+   */
   private synchronized void mergeLocalToBuilder() {
     if (this.nodeId != null) {
       builder.setNodeId(convertToProtoFormat(this.nodeId));
@@ -92,6 +119,9 @@ public class NodeStatusPBImpl extends NodeStatus {
     }
   }
 
+  /**
+   * 将本地缓存合并到最终proto对象
+   */
   private synchronized void mergeLocalToProto() {
     if (viaProto) 
       maybeInitBuilder();
@@ -101,6 +131,9 @@ public class NodeStatusPBImpl extends NodeStatus {
     viaProto = true;
   }
 
+  /**
+   * 按需初始化PB构建器，如果当前基于proto则从proto创建构建器
+   */
   private synchronized void maybeInitBuilder() {
     if (viaProto || builder == null) {
       builder = NodeStatusProto.newBuilder(proto);
@@ -108,11 +141,15 @@ public class NodeStatusPBImpl extends NodeStatus {
     viaProto = false;
   }
     
+  /**
+   * 将本地容器状态列表添加到PB构建器
+   */
   private synchronized void addContainersToProto() {
     maybeInitBuilder();
     builder.clearContainersStatuses();
     if (containers == null)
       return;
+    // 将API对象转为Proto对象的可迭代适配器
     Iterable<ContainerStatusProto> iterable = new Iterable<ContainerStatusProto>() {
       @Override
       public Iterator<ContainerStatusProto> iterator() {
@@ -142,11 +179,15 @@ public class NodeStatusPBImpl extends NodeStatus {
     builder.addAllContainersStatuses(iterable);
   }
   
+  /**
+   * 将本地保活应用列表添加到PB构建器
+   */
   private synchronized void addKeepAliveApplicationsToProto() {
     maybeInitBuilder();
     builder.clearKeepAliveApplications();
     if (keepAliveApplications == null)
       return;
+    // 将API对象转为Proto对象的可迭代适配器
     Iterable<ApplicationIdProto> iterable = new Iterable<ApplicationIdProto>() {
       @Override
       public Iterator<ApplicationIdProto> iterator() {
@@ -176,12 +217,16 @@ public class NodeStatusPBImpl extends NodeStatus {
     builder.addAllKeepAliveApplications(iterable);
   }
 
+  /**
+   * 将本地扩容容器列表添加到PB构建器
+   */
   private synchronized void addIncreasedContainersToProto() {
     maybeInitBuilder();
     builder.clearIncreasedContainers();
     if (increasedContainers == null) {
       return;
     }
+    // 将API对象转为Proto对象的可迭代适配器
     Iterable<ContainerProto> iterable = new
         Iterable<ContainerProto>() {
       @Override
@@ -284,6 +329,9 @@ public class NodeStatusPBImpl extends NodeStatus {
     this.keepAliveApplications = appIds;
   }
 
+  /**
+   * 从Proto初始化容器状态列表到本地缓存
+   */
   private synchronized void initContainers() {
     if (this.containers != null) {
       return;
@@ -298,6 +346,9 @@ public class NodeStatusPBImpl extends NodeStatus {
     
   }
   
+  /**
+   * 从Proto初始化保活应用列表到本地缓存
+   */
   private synchronized void initKeepAliveApplications() {
     if (this.keepAliveApplications != null) {
       return;
@@ -425,66 +476,78 @@ public class NodeStatusPBImpl extends NodeStatus {
         convertToProtoFormat(opportunisticContainersStatus));
   }
 
+  /**
+   * NodeId API对象转PB Proto格式
+   */
   private NodeIdProto convertToProtoFormat(NodeId nodeId) {
     return ((NodeIdPBImpl)nodeId).getProto();
   }
   
+  /**
+   * NodeId PB Proto格式转API对象
+   */
   private NodeId convertFromProtoFormat(NodeIdProto proto) {
     return new NodeIdPBImpl(proto);
   }
 
+  /**
+   * NodeHealthStatus API对象转PB Proto格式
+   */
   private NodeHealthStatusProto convertToProtoFormat(
       NodeHealthStatus healthStatus) {
     return ((NodeHealthStatusPBImpl) healthStatus).getProto();
   }
 
+  /**
+   * NodeHealthStatus PB Proto格式转API对象
+   */
   private NodeHealthStatus convertFromProtoFormat(NodeHealthStatusProto proto) {
     return new NodeHealthStatusPBImpl(proto);
   }
 
+  /**
+   * ContainerStatus PB Proto格式转API对象
+   */
   private ContainerStatusPBImpl convertFromProtoFormat(ContainerStatusProto c) {
     return new ContainerStatusPBImpl(c);
   }
   
+  /**
+   * ContainerStatus API对象转PB Proto格式
+   */
   private ContainerStatusProto convertToProtoFormat(ContainerStatus c) {
     return ((ContainerStatusPBImpl)c).getProto();
   }
   
+  /**
+   * ApplicationId PB Proto格式转API对象
+   */
   private ApplicationIdPBImpl convertFromProtoFormat(ApplicationIdProto c) {
     return new ApplicationIdPBImpl(c);
   }
   
+  /**
+   * ApplicationId API对象转PB Proto格式
+   */
   private ApplicationIdProto convertToProtoFormat(ApplicationId c) {
     return ((ApplicationIdPBImpl)c).getProto();
   }
 
+  /**
+   * ResourceUtilization API对象转PB Proto格式
+   */
   private YarnProtos.ResourceUtilizationProto convertToProtoFormat(
       ResourceUtilization r) {
     return ((ResourceUtilizationPBImpl) r).getProto();
   }
 
+  /**
+   * ResourceUtilization PB Proto格式转API对象
+   */
   private ResourceUtilizationPBImpl convertFromProtoFormat(
       YarnProtos.ResourceUtilizationProto p) {
     return new ResourceUtilizationPBImpl(p);
   }
 
-  private OpportunisticContainersStatusProto convertToProtoFormat(
-      OpportunisticContainersStatus r) {
-    return ((OpportunisticContainersStatusPBImpl) r).getProto();
-  }
-
-  private OpportunisticContainersStatus convertFromProtoFormat(
-      OpportunisticContainersStatusProto p) {
-    return new OpportunisticContainersStatusPBImpl(p);
-  }
-
-  private ContainerPBImpl convertFromProtoFormat(
-      ContainerProto c) {
-    return new ContainerPBImpl(c);
-  }
-
-  private ContainerProto convertToProtoFormat(
-      Container c) {
-    return ((ContainerPBImpl)c).getProto();
-  }
-}
+  /**
+   * OpportunisticContainersStatus API对象转

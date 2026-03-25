@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -53,16 +54,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * <p>The DistributedScheduler runs on the NodeManager and is modeled as an
- * <code>AMRMProxy</code> request interceptor. It is responsible for the
- * following:</p>
+ * <p>分布式调度器运行在NodeManager上，作为AMRMProxy的请求拦截器实现。
+ * 核心职责如下：</p>
  * <ul>
- *   <li>Intercept <code>ApplicationMasterProtocol</code> calls and unwrap the
- *   response objects to extract instructions from the
- *   <code>ClusterMonitor</code> running on the ResourceManager to aid in making
- *   distributed scheduling decisions.</li>
- *   <li>Call the <code>OpportunisticContainerAllocator</code> to allocate
- *   containers for the outstanding OPPORTUNISTIC container requests.</li>
+ *   <li>拦截ApplicationMasterProtocol调用，从RM侧ClusterMonitor响应中提取调度指令，辅助本节点做出分布式调度决策</li>
+ *   <li>调用OpportunisticContainerAllocator为待处理的机会型容器请求分配资源</li>
  * </ul>
  */
 public final class DistributedScheduler extends AbstractRequestInterceptor {
@@ -76,8 +72,7 @@ public final class DistributedScheduler extends AbstractRequestInterceptor {
   private OpportunisticContainerContext oppContainerContext =
       new OpportunisticContainerContext();
 
-  // Mapping of NodeId to NodeTokens. Populated either from RM response or
-  // generated locally if required.
+  // NodeId到NMToken的映射，从RM响应填充，或按需在本地生成
   private Map<NodeId, NMToken> nodeTokens = new HashMap<>();
   private ApplicationAttemptId applicationAttemptId;
   private OpportunisticContainerAllocator containerAllocator;
@@ -85,6 +80,10 @@ public final class DistributedScheduler extends AbstractRequestInterceptor {
   private String appSubmitter;
   private long rmIdentifier;
 
+  /**
+   * 初始化分布式调度拦截器，从应用上下文提取所需参数。
+   * @param applicationContext AMRMProxy应用上下文
+   */
   public void init(AMRMProxyApplicationContext applicationContext) {
     super.init(applicationContext);
     initLocal(applicationContext.getNMContext().getNodeStatusUpdater()
@@ -105,7 +104,7 @@ public final class DistributedScheduler extends AbstractRequestInterceptor {
     this.nmSecretManager = nmSecretManager;
     this.appSubmitter = appSubmitter;
 
-    // Overrides the Generator to decrement container id.
+    // 覆盖容器ID生成器，递减生成容器ID
     this.oppContainerContext.setContainerIdGenerator(
         new OpportunisticContainerAllocator.ContainerIdGenerator() {
           @Override
@@ -116,15 +115,12 @@ public final class DistributedScheduler extends AbstractRequestInterceptor {
   }
 
   /**
-   * Route register call to the corresponding distributed scheduling method viz.
-   * registerApplicationMasterForDistributedScheduling, and return response to
-   * the caller after stripping away Distributed Scheduling information.
+   * 路由应用注册请求到分布式调度注册方法，提取去除分布式调度信息后的标准响应返回。
    *
-   * @param request
-   *          registration request
-   * @return Allocate Response
-   * @throws YarnException YarnException
-   * @throws IOException IOException
+   * @param request 注册请求
+   * @return 标准注册响应
+   * @throws YarnException Yarn异常
+   * @throws IO异常
    */
   @Override
   public RegisterApplicationMasterResponse registerApplicationMaster
@@ -135,19 +131,17 @@ public final class DistributedScheduler extends AbstractRequestInterceptor {
   }
 
   /**
-   * Route allocate call to the allocateForDistributedScheduling method and
-   * return response to the caller after stripping away Distributed Scheduling
-   * information.
+   * 路由资源分配请求到分布式调度分配方法，提取去除分布式调度信息后的标准响应返回。
    *
-   * @param request
-   *          allocation request
-   * @return Allocate Response
-   * @throws YarnException YarnException
-   * @throws IOException IOException
+   * @param request 分配请求
+   * @return 标准分配响应
+   * @throws YarnException Yarn异常
+   * @throws IOException IO异常
    */
   @Override
   public AllocateResponse allocate(AllocateRequest request) throws
       YarnException, IOException {
+    // 包装为分布式调度专用请求
     DistributedSchedulingAllocateRequest distRequest = RECORD_FACTORY
         .newRecordInstance(DistributedSchedulingAllocateRequest.class);
     distRequest.setAllocateRequest(request);
@@ -158,44 +152,57 @@ public final class DistributedScheduler extends AbstractRequestInterceptor {
   public FinishApplicationMasterResponse finishApplicationMaster
       (FinishApplicationMasterRequest request) throws YarnException,
       IOException {
+    // 直接透传完成请求给下一个拦截器
     return getNextInterceptor().finishApplicationMaster(request);
   }
 
   /**
-   * Adds all the newly allocated Containers to the allocate Response.
-   * Additionally, in case the NMToken for one of the nodes does not exist, it
-   * generates one and adds it to the response.
+   * 将本节点分配的机会型容器加入分配响应，对缺失NMToken的分配容器本地生成令牌。
+   * @param response 原始分配响应
+   * @param nmTokens RM返回的NM令牌列表
+   * @param allocatedContainers 本节点分配的容器列表
    */
   private void updateAllocateResponse(AllocateResponse response,
       List<NMToken> nmTokens, List<Container> allocatedContainers) {
     List<NMToken> newTokens = new ArrayList<>();
     if (allocatedContainers.size() > 0) {
+      // 将本节点分配的容器加入响应
       response.getAllocatedContainers().addAll(allocatedContainers);
+      // 为缺失NMToken的容器生成本地令牌
       for (Container alloc : allocatedContainers) {
         if (!nodeTokens.containsKey(alloc.getNodeId())) {
           newTokens.add(nmSecretManager.generateNMToken(appSubmitter, alloc));
         }
       }
+      // 合并RM返回的令牌和本地生成的令牌
       List<NMToken> retTokens = new ArrayList<>(nmTokens);
       retTokens.addAll(newTokens);
       response.setNMTokens(retTokens);
     }
   }
 
+  /**
+   * 从RM注册响应中更新调度参数。
+   * @param registerResponse RM分布式调度注册响应
+   */
   private void updateParameters(
       RegisterDistributedSchedulingAMResponse registerResponse) {
+    // 如果增量资源为空，使用最小容器资源作为增量
     Resource incrementResource = registerResponse.getIncrContainerResource();
     if (incrementResource == null) {
       incrementResource = registerResponse.getMinContainerResource();
     }
+    // 更新资源分配参数
     oppContainerContext.updateAllocationParams(
         registerResponse.getMinContainerResource(),
         registerResponse.getMaxContainerResource(),
         incrementResource,
         registerResponse.getContainerTokenExpiryInterval());
 
+    // 重置容器ID计数器起始值
     oppContainerContext.getContainerIdGenerator()
         .resetContainerIdCounter(registerResponse.getContainerIdStart());
+    // 更新可调度节点列表
     setNodeList(registerResponse.getNodesForScheduling());
   }
 
@@ -210,8 +217,10 @@ public final class DistributedScheduler extends AbstractRequestInterceptor {
       throws YarnException, IOException {
     LOG.info("Forwarding registration request to the" +
         "Distributed Scheduler Service on YARN RM");
+    // 转发请求到下一个拦截器处理
     RegisterDistributedSchedulingAMResponse dsResp = getNextInterceptor()
         .registerApplicationMasterForDistributedScheduling(request);
+    // 从响应提取参数更新本地调度上下文
     updateParameters(dsResp);
     return dsResp;
   }
@@ -221,37 +230,38 @@ public final class DistributedScheduler extends AbstractRequestInterceptor {
       DistributedSchedulingAllocateRequest request)
       throws YarnException, IOException {
 
-    // Partition requests to GUARANTEED and OPPORTUNISTIC.
+    // 将容器请求按类型分区：保证型和机会型
     OpportunisticContainerAllocator.PartitionedResourceRequests
         partitionedAsks = containerAllocator
         .partitionAskList(request.getAllocateRequest().getAskList());
 
-    // Allocate OPPORTUNISTIC containers.
+    // 本地分配机会型容器
     List<Container> allocatedContainers =
         containerAllocator.allocateContainers(
             request.getAllocateRequest().getResourceBlacklistRequest(),
             partitionedAsks.getOpportunistic(), applicationAttemptId,
             oppContainerContext, rmIdentifier, appSubmitter);
 
-    // Prepare request for sending to RM for scheduling GUARANTEED containers.
+    // 重组请求：仅保留保证型请求转发给RM，已分配的机会型容器本地下发
     request.setAllocatedContainers(allocatedContainers);
     request.getAllocateRequest().setAskList(partitionedAsks.getGuaranteed());
 
     LOG.debug("Forwarding allocate request to the" +
           "Distributed Scheduler Service on YARN RM");
 
+    // 转发重组后的请求给RM
     DistributedSchedulingAllocateResponse dsResp =
         getNextInterceptor().allocateForDistributedScheduling(request);
 
-    // Update host to nodeId mapping
+    // 更新可调度节点列表
     setNodeList(dsResp.getNodesForScheduling());
+    // 缓存RM返回的NM令牌
     List<NMToken> nmTokens = dsResp.getAllocateResponse().getNMTokens();
     for (NMToken nmToken : nmTokens) {
       nodeTokens.put(nmToken.getNodeId(), nmToken);
     }
 
-    // Check if we have NM tokens for all the allocated containers. If not
-    // generate one and update the response.
+    // 补全NMToken，将本地分配的容器加入响应
     updateAllocateResponse(
         dsResp.getAllocateResponse(), nmTokens, allocatedContainers);
 

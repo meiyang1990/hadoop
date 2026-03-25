@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -79,6 +80,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * 文件级注释：作业历史文件管理器，为MapReduce历史服务器提供线程安全的历史文件访问、索引维护和生命周期管理能力
+ * 负责：历史文件从中间目录移动到完成目录、索引缓存维护、过期历史文件清理、作业查询等核心功能
+ */
+/**
  * This class provides a way to interact with history files in a thread safe
  * manor.
  */
@@ -90,6 +95,7 @@ public class HistoryFileManager extends AbstractService {
   private static final Logger SUMMARY_LOG =
       LoggerFactory.getLogger(JobSummary.class);
 
+  /** 历史文件状态枚举，描述作业历史文件当前所处的位置和状态 */
   private enum HistoryInfoState {
     IN_INTERMEDIATE, IN_DONE, DELETED, MOVE_FAILED
   };
@@ -97,6 +103,10 @@ public class HistoryFileManager extends AbstractService {
   private static String DONE_BEFORE_SERIAL_TAIL = JobHistoryUtils
       .doneSubdirsBeforeSerialTail();
 
+  /**
+   * 序列号索引类，维护序列号到时间戳目录的映射，加速按作业ID的查询
+   * 采用LRU策略淘汰最旧的索引条目，控制内存占用
+   */
   /**
    * Maps between a serial number (generated based on jobId) and the timestamp
    * component(s) to which it belongs. Facilitates jobId based searches. If a
@@ -111,10 +121,16 @@ public class HistoryFileManager extends AbstractService {
       this.maxSize = maxSize;
     }
 
+    /**
+     * 添加序列号到时间戳目录的映射关系
+     * @param serialPart 序列号部分
+     * @param timestampPart 时间戳目录部分
+     */
     public synchronized void add(String serialPart, String timestampPart) {
       if (!cache.containsKey(serialPart)) {
         cache.put(serialPart, new HashSet<String>());
         if (cache.size() > maxSize) {
+          // 缓存超过最大容量，移除最早的条目
           String key = cache.firstKey();
           LOG.error("Dropping " + key
               + " from the SerialNumberIndex. We will no "
@@ -127,6 +143,11 @@ public class HistoryFileManager extends AbstractService {
       datePartSet.add(timestampPart);
     }
 
+    /**
+     * 移除序列号和对应时间戳目录的映射
+     * @param serialPart 序列号部分
+     * @param timeStampPart 时间戳目录部分
+     */
     public synchronized void remove(String serialPart, String timeStampPart) {
       if (cache.containsKey(serialPart)) {
         Set<String> set = cache.get(serialPart);
@@ -137,6 +158,11 @@ public class HistoryFileManager extends AbstractService {
       }
     }
 
+    /**
+     * 根据序列号查询对应的时间戳目录集合
+     * @param serialPart 序列号部分
+     * @return 时间戳目录集合，不存在则返回null
+     */
     public synchronized Set<String> get(String serialPart) {
       Set<String> found = cache.get(serialPart);
       if (found != null) {
@@ -146,6 +172,10 @@ public class HistoryFileManager extends AbstractService {
     }
   }
 
+  /**
+   * 带O(1)大小统计的JobId到HistoryFileInfo映射封装
+   * 用于作业列表缓存，优化size()操作性能，允许轻微的大小统计不一致（不影响业务逻辑）
+   */
   /**
    * Wrapper around {@link ConcurrentSkipListMap} that maintains size along
    * side for O(1) size() implementation for use in JobListCache.
@@ -162,6 +192,12 @@ public class HistoryFileManager extends AbstractService {
       mapSize = new AtomicInteger();
     }
 
+    /**
+     * 不存在时插入，原子更新大小统计
+     * @param key 作业ID
+     * @param value 历史文件信息
+     * @return 已存在则返回旧值，否则返回null
+     */
     public HistoryFileInfo putIfAbsent(JobId key, HistoryFileInfo value) {
       HistoryFileInfo ret = cache.putIfAbsent(key, value);
       if (ret == null) {
@@ -170,6 +206,11 @@ public class HistoryFileManager extends AbstractService {
       return ret;
     }
 
+    /**
+     * 移除指定作业ID的记录，原子更新大小统计
+     * @param key 作业ID
+     * @return 被移除的历史文件信息，不存在则返回null
+     */
     public HistoryFileInfo remove(JobId key) {
       HistoryFileInfo ret = cache.remove(key);
       if (ret != null) {
@@ -179,6 +220,10 @@ public class HistoryFileManager extends AbstractService {
     }
 
     /**
+     * 返回缓存记录的大小，可能与实际大小略有偏差
+     * @return 记录的缓存大小
+     */
+    /**
      * Returns the recorded size of the internal map. Note that this could be out
      * of sync with the actual size of the map
      * @return "recorded" size
@@ -187,19 +232,36 @@ public class HistoryFileManager extends AbstractService {
       return mapSize.get();
     }
 
+    /**
+     * 根据作业ID获取历史文件信息
+     * @param key 作业ID
+     * @return 历史文件信息
+     */
     public HistoryFileInfo get(JobId key) {
       return cache.get(key);
     }
 
+    /**
+     * 获取可导航的作业ID集合
+     * @return 可导航的作业ID集合
+     */
     public NavigableSet<JobId> navigableKeySet() {
       return cache.navigableKeySet();
     }
 
+    /**
+     * 获取所有历史文件信息集合
+     * @return 所有历史文件信息集合
+     */
     public Collection<HistoryFileInfo> values() {
       return cache.values();
     }
   }
 
+  /**
+   * 作业列表缓存类，维护已发现作业的缓存，基于容量和时间清理旧条目
+   * 控制内存占用，避免缓存无限增长
+   */
   static class JobListCache {
     private JobIdHistoryFileInfoMap cache;
     private int maxSize;
@@ -211,6 +273,11 @@ public class HistoryFileManager extends AbstractService {
       this.cache = new JobIdHistoryFileInfoMap();
     }
 
+    /**
+     * 如果不存在则添加作业到缓存，缓存超容时清理旧条目
+     * @param fileInfo 历史文件信息
+     * @return 已存在则返回旧值，否则返回null
+     */
     public HistoryFileInfo addIfAbsent(HistoryFileInfo fileInfo) {
       JobId jobId = fileInfo.getJobId();
       if (LOG.isDebugEnabled()) {
@@ -225,10 +292,11 @@ public class HistoryFileManager extends AbstractService {
         // should be rather large, and we would rather have performance over
         // keeping the cache size exactly at the maximum.
         Iterator<JobId> keys = cache.navigableKeySet().iterator();
+        // 过期时间截止点，超过该时间的作业会被清理
         long cutoff = System.currentTimeMillis() - maxAge;
 
-        // MAPREDUCE-6436: In order to reduce the number of logs written
-        // in case of a lot of move pending histories.
+        // MAPREDUCE-6436: 减少移动中历史文件的日志输出，仅记录第一个和总数
+        // 统计待清理但保留的移动中状态历史数量
         JobId firstInIntermediateKey = null;
         int inIntermediateCount = 0;
         JobId firstMoveFailedKey = null;
@@ -241,6 +309,7 @@ public class HistoryFileManager extends AbstractService {
             if (firstValue.isMovePending()) {
               if (firstValue.didMoveFail() &&
                   firstValue.jobIndexInfo.getFinishTime() <= cutoff) {
+                // 移动失败且已过期，清理缓存并删除文件
                 cache.remove(key);
                 // Now lets try to delete it
                 try {
@@ -250,6 +319,7 @@ public class HistoryFileManager extends AbstractService {
                       " that could not be moved to done.", e);
                 }
               } else {
+                // 移动未完成，暂不清理，统计数量用于日志
                 if (firstValue.didMoveFail()) {
                   if (moveFailedCount == 0) {
                     firstMoveFailedKey = key;
@@ -263,12 +333,12 @@ public class HistoryFileManager extends AbstractService {
                 }
               }
             } else {
+              // 已完成且缓存超容，清理最旧的条目
               cache.remove(key);
             }
           }
         }
-        // Log output only for first jobhisotry in pendings to restrict
-        // the total number of logs.
+        // 仅输出汇总日志，避免日志爆炸
         if (inIntermediateCount > 0) {
           LOG.warn("Waiting to remove IN_INTERMEDIATE state histories " +
                   "(e.g. " + firstInIntermediateKey + ") from JobListCache " +
@@ -285,6 +355,10 @@ public class HistoryFileManager extends AbstractService {
       return old;
     }
 
+    /**
+     * 从缓存中删除指定作业
+     * @param fileInfo 历史文件信息
+     */
     public void delete(HistoryFileInfo fileInfo) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Removing from cache " + fileInfo);
@@ -292,23 +366,44 @@ public class HistoryFileManager extends AbstractService {
       cache.remove(fileInfo.getJobId());
     }
 
+    /**
+     * 获取所有缓存的历史文件信息
+     * @return 所有历史文件信息集合
+     */
     public Collection<HistoryFileInfo> values() {
       return new ArrayList<HistoryFileInfo>(cache.values());
     }
 
+    /**
+     * 根据作业ID获取缓存的历史文件信息
+     * @param jobId 作业ID
+     * @return 历史文件信息
+     */
     public HistoryFileInfo get(JobId jobId) {
       return cache.get(jobId);
     }
 
+    /**
+     * 判断缓存是否已满
+     * @return true 缓存大小达到或超过最大值，否则false
+     */
     public boolean isFull() {
       return cache.size() >= maxSize;
     }
 
+    /**
+     * 获取当前缓存大小
+     * @return 缓存记录数
+     */
     public int size() {
       return cache.size();
     }
   }
 
+  /**
+   * 中间目录下用户目录包装类，用于目录修改时间检测和懒扫描
+   * 仅当目录修改时间变化时才重新扫描，提升性能
+   */
   /**
    * This class represents a user dir in the intermediate done directory.  This
    * is mostly for locking purposes. 
@@ -317,24 +412,22 @@ public class HistoryFileManager extends AbstractService {
     long modTime = 0;
     private long scanTime = 0;
 
+    /**
+     * 如果目录有修改则执行扫描，发现新的历史文件
+     * 适配云存储修改时间截断的特性，增加额外检测逻辑
+     * @param fs 用户目录文件状态
+     */
     public synchronized void scanIfNeeded(FileStatus fs) {
       long newModTime = fs.getModificationTime();
-      // MAPREDUCE-6680: In some Cloud FileSystem, like Azure FS or S3, file's
-      // modification time is truncated into seconds. In that case,
-      // modTime == newModTime doesn't means no file update in the directory,
-      // so we need to have additional check.
-      // Note: modTime (X second Y millisecond) could be casted to X second or
-      // X+1 second.
-      // MAPREDUCE-7101: Some Cloud FileSystems do not currently update the
-      // modification time of directories. For these, we scan every time if
-      // the 'alwaysScan' is true.
+      // MAPREDUCE-6680: 云存储修改时间通常截断到秒级，需要额外处理
+      // MAPREDUCE-7101: 部分云存储不更新目录修改时间，支持强制每次扫描
       boolean alwaysScan = conf.getBoolean(
           JHAdminConfig.MR_HISTORY_ALWAYS_SCAN_USER_DIR,
           JHAdminConfig.DEFAULT_MR_HISTORY_ALWAYS_SCAN_USER_DIR);
       if (alwaysScan || modTime != newModTime
           || (scanTime/1000) == (modTime/1000)
           || (scanTime/1000 + 1) == (modTime/1000)) {
-        // reset scanTime before scanning happens
+        // 扫描前重置扫描时间
         scanTime = System.currentTimeMillis();
         Path p = fs.getPath();
         try {
@@ -349,888 +442,12 @@ public class HistoryFileManager extends AbstractService {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Scan not needed of " + fs.getPath());
         }
-        // reset scanTime
+        // 重置扫描时间
         scanTime = System.currentTimeMillis();
       }
     }
   }
 
-  public class HistoryFileInfo {
-    private Path historyFile;
-    private Path confFile;
-    private Path summaryFile;
-    private JobIndexInfo jobIndexInfo;
-    private volatile HistoryInfoState state;
-
-    @VisibleForTesting
-    protected HistoryFileInfo(Path historyFile, Path confFile,
-        Path summaryFile, JobIndexInfo jobIndexInfo, boolean isInDone) {
-      this.historyFile = historyFile;
-      this.confFile = confFile;
-      this.summaryFile = summaryFile;
-      this.jobIndexInfo = jobIndexInfo;
-      state = isInDone ? HistoryInfoState.IN_DONE
-          : HistoryInfoState.IN_INTERMEDIATE;
-    }
-
-    @VisibleForTesting
-    boolean isMovePending() {
-      return state == HistoryInfoState.IN_INTERMEDIATE
-          || state == HistoryInfoState.MOVE_FAILED;
-    }
-
-    @VisibleForTesting
-    boolean didMoveFail() {
-      return state == HistoryInfoState.MOVE_FAILED;
-    }
-
-    /**
-     * @return true if the files backed by this were deleted.
-     */
-    public boolean isDeleted() {
-      return state == HistoryInfoState.DELETED;
-    }
-
-    @Override
-    public String toString() {
-      return "HistoryFileInfo jobID " + getJobId()
-             + " historyFile = " + historyFile;
-    }
-
-    @VisibleForTesting
-    synchronized void moveToDone() throws IOException {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("moveToDone: " + historyFile);
-      }
-      if (!isMovePending()) {
-        // It was either deleted or is already in done. Either way do nothing
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Move no longer pending");
-        }
-        return;
-      }
-      try {
-        long completeTime = jobIndexInfo.getFinishTime();
-        if (completeTime == 0) {
-          completeTime = System.currentTimeMillis();
-        }
-        JobId jobId = jobIndexInfo.getJobId();
-
-        if (historyFile == null) {
-          LOG.info("No file for job-history with " + jobId + " found in cache!");
-        }
-
-        if (confFile == null) {
-          LOG.info("No file for jobConf with " + jobId + " found in cache!");
-        }
-
-        if (summaryFile == null || !intermediateDoneDirFc.util().exists(
-            summaryFile)) {
-          LOG.info("No summary file for job: " + jobId);
-        } else {
-          String jobSummaryString = getJobSummary(intermediateDoneDirFc,
-              summaryFile);
-          SUMMARY_LOG.info(jobSummaryString);
-          LOG.info("Deleting JobSummary file: [" + summaryFile + "]");
-          intermediateDoneDirFc.delete(summaryFile, false);
-          summaryFile = null;
-        }
-
-        Path targetDir = canonicalHistoryLogPath(jobId, completeTime);
-        addDirectoryToSerialNumberIndex(targetDir);
-        makeDoneSubdir(targetDir);
-        if (historyFile != null) {
-          Path toPath = doneDirFc.makeQualified(new Path(targetDir, historyFile
-              .getName()));
-          if (!toPath.equals(historyFile)) {
-            moveToDoneNow(historyFile, toPath);
-            historyFile = toPath;
-          }
-        }
-        if (confFile != null) {
-          Path toPath = doneDirFc.makeQualified(new Path(targetDir, confFile
-              .getName()));
-          if (!toPath.equals(confFile)) {
-            moveToDoneNow(confFile, toPath);
-            confFile = toPath;
-          }
-        }
-        state = HistoryInfoState.IN_DONE;
-      } catch (Throwable t) {
-        LOG.error("Error while trying to move a job to done", t);
-        this.state = HistoryInfoState.MOVE_FAILED;
-      } finally {
-        notifyAll();
-      }
-    }
-
-    /**
-     * Parse a job from the JobHistoryFile, if the underlying file is not going
-     * to be deleted and the number of tasks associated with the job is not
-     * greater than maxTasksForLoadedJob.
-     * 
-     * @return null if the underlying job history file was deleted, or
-     *         an {@link UnparsedJob} object representing a partially parsed job
-     *           if the job tasks exceeds the configured maximum, or
-     *         a {@link CompletedJob} representing a fully parsed job.
-     * @throws IOException
-     *           if there is an error trying to read the file if parsed.
-     */
-    public synchronized Job loadJob() throws IOException {
-      if(isOversized()) {
-        return new UnparsedJob(maxTasksForLoadedJob, jobIndexInfo, this);
-      } else {
-        return new CompletedJob(conf, jobIndexInfo.getJobId(), historyFile,
-            false, jobIndexInfo.getUser(), this, aclsMgr);
-      }
-    }
-
-    /**
-     * Return the history file.
-     * @return the history file.
-     */
-    public synchronized Path getHistoryFile() {
-      return historyFile;
-    }
-    
-    protected synchronized void delete() throws IOException {
-      try {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("deleting " + historyFile + " and " + confFile);
-        }
-        state = HistoryInfoState.DELETED;
-        doneDirFc.delete(doneDirFc.makeQualified(historyFile), false);
-        doneDirFc.delete(doneDirFc.makeQualified(confFile), false);
-      } finally {
-        notifyAll();
-      }
-    }
-
-    public JobIndexInfo getJobIndexInfo() {
-      return jobIndexInfo;
-    }
-
-    public JobId getJobId() {
-      return jobIndexInfo.getJobId();
-    }
-
-    public synchronized Path getConfFile() {
-      return confFile;
-    }
-    
-    public synchronized Configuration loadConfFile() throws IOException {
-      FileContext fc = FileContext.getFileContext(confFile.toUri(), conf);
-      Configuration jobConf = new Configuration(false);
-      jobConf.addResource(fc.open(confFile), confFile.toString(), true);
-      return jobConf;
-    }
-
-    private boolean isOversized() {
-      final int totalTasks = jobIndexInfo.getNumReduces() +
-          jobIndexInfo.getNumMaps();
-      return (maxTasksForLoadedJob > 0) && (totalTasks > maxTasksForLoadedJob);
-    }
-
-    public synchronized void waitUntilMoved() {
-      while (isMovePending() && !didMoveFail()) {
-        try {
-          wait();
-        } catch (InterruptedException e) {
-          LOG.warn("Waiting has been interrupted");
-          throw new RuntimeException(e);
-        }
-      }
-    }
-  }
-
-  private SerialNumberIndex serialNumberIndex = null;
-  protected JobListCache jobListCache = null;
-
-  // Maintains a list of known done subdirectories.
-  private final Set<Path> existingDoneSubdirs = Collections
-      .synchronizedSet(new HashSet<Path>());
-
   /**
-   * Maintains a mapping between intermediate user directories and the last
-   * known modification time.
-   */
-  private ConcurrentMap<String, UserLogDir> userDirModificationTimeMap = 
-    new ConcurrentHashMap<String, UserLogDir>();
-
-  private JobACLsManager aclsMgr;
-
-  @VisibleForTesting
-  Configuration conf;
-
-  private String serialNumberFormat;
-
-  private Path doneDirPrefixPath = null; // folder for completed jobs
-  private FileContext doneDirFc; // done Dir FileContext
-
-  private Path intermediateDoneDirPath = null; // Intermediate Done Dir Path
-  private FileContext intermediateDoneDirFc; // Intermediate Done Dir
-                                             // FileContext
-  @VisibleForTesting
-  protected ThreadPoolExecutor moveToDoneExecutor = null;
-  private long maxHistoryAge = 0;
-
-  /**
-   * The maximum number of tasks allowed for a job to be loaded.
-   */
-  private int maxTasksForLoadedJob = -1;
-
-  public HistoryFileManager() {
-    super(HistoryFileManager.class.getName());
-  }
-
-  @Override
-  protected void serviceInit(Configuration conf) throws Exception {
-    this.conf = conf;
-
-    int serialNumberLowDigits = 3;
-    serialNumberFormat = ("%0"
-        + (JobHistoryUtils.SERIAL_NUMBER_DIRECTORY_DIGITS + serialNumberLowDigits)
-        + "d");
-
-    long maxFSWaitTime = conf.getLong(
-        JHAdminConfig.MR_HISTORY_MAX_START_WAIT_TIME,
-        JHAdminConfig.DEFAULT_MR_HISTORY_MAX_START_WAIT_TIME);
-    createHistoryDirs(SystemClock.getInstance(), 10 * 1000, maxFSWaitTime);
-
-    maxTasksForLoadedJob = conf.getInt(
-        JHAdminConfig.MR_HS_LOADED_JOBS_TASKS_MAX,
-        JHAdminConfig.DEFAULT_MR_HS_LOADED_JOBS_TASKS_MAX);
-
-    this.aclsMgr = new JobACLsManager(conf);
-
-    maxHistoryAge = conf.getLong(JHAdminConfig.MR_HISTORY_MAX_AGE_MS,
-        JHAdminConfig.DEFAULT_MR_HISTORY_MAX_AGE);
-    
-    jobListCache = createJobListCache();
-
-    serialNumberIndex = new SerialNumberIndex(conf.getInt(
-        JHAdminConfig.MR_HISTORY_DATESTRING_CACHE_SIZE,
-        JHAdminConfig.DEFAULT_MR_HISTORY_DATESTRING_CACHE_SIZE));
-
-    int numMoveThreads = conf.getInt(
-        JHAdminConfig.MR_HISTORY_MOVE_THREAD_COUNT,
-        JHAdminConfig.DEFAULT_MR_HISTORY_MOVE_THREAD_COUNT);
-    moveToDoneExecutor = createMoveToDoneThreadPool(numMoveThreads);
-    super.serviceInit(conf);
-  }
-
-  protected ThreadPoolExecutor createMoveToDoneThreadPool(int numMoveThreads) {
-    ThreadFactory tf = new ThreadFactoryBuilder().setNameFormat(
-        "MoveIntermediateToDone Thread #%d").build();
-    return new HadoopThreadPoolExecutor(numMoveThreads, numMoveThreads,
-        1, TimeUnit.HOURS, new LinkedBlockingQueue<Runnable>(), tf);
-  }
-
-  @VisibleForTesting
-  void createHistoryDirs(Clock clock, long intervalCheckMillis,
-      long timeOutMillis) throws IOException {
-    long start = clock.getTime();
-    boolean done = false;
-    int counter = 0;
-    while (!done &&
-        ((timeOutMillis == -1) || (clock.getTime() - start < timeOutMillis))) {
-      done = tryCreatingHistoryDirs(counter++ % 3 == 0); // log every 3 attempts, 30sec
-      if (done) {
-        break;
-      }
-      try {
-        Thread.sleep(intervalCheckMillis);
-      } catch (InterruptedException ex) {
-        throw new YarnRuntimeException(ex);
-      }
-    }
-    if (!done) {
-      throw new YarnRuntimeException("Timed out '" + timeOutMillis+
-              "ms' waiting for FileSystem to become available");
-    }
-  }
-
-  /**
-   * Check if the NameNode is still not started yet as indicated by the
-   * exception type and message.
-   * DistributedFileSystem returns a RemoteException with a message stating
-   * SafeModeException in it. So this is only way to check it is because of
-   * being in safe mode. In addition, Name Node may have not started yet, in
-   * which case, the message contains "NameNode still not started".
-   */
-  private boolean isNameNodeStillNotStarted(Exception ex) {
-    String nameNodeNotStartedMsg = NameNode.composeNotStartedMessage(
-        HdfsServerConstants.NamenodeRole.NAMENODE);
-    return ex.toString().contains("SafeModeException") ||
-        (ex instanceof RetriableException && ex.getMessage().contains(
-            nameNodeNotStartedMsg));
-  }
-
-  /**
-   * Returns TRUE if the history dirs were created, FALSE if they could not
-   * be created because the FileSystem is not reachable or in safe mode and
-   * throws and exception otherwise.
-   */
-  @VisibleForTesting
-  boolean tryCreatingHistoryDirs(boolean logWait) throws IOException {
-    boolean succeeded = true;
-    String doneDirPrefix = JobHistoryUtils.
-        getConfiguredHistoryServerDoneDirPrefix(conf);
-    try {
-      doneDirPrefixPath = FileContext.getFileContext(conf).makeQualified(
-          new Path(doneDirPrefix));
-      doneDirFc = FileContext.getFileContext(doneDirPrefixPath.toUri(), conf);
-      doneDirFc.setUMask(JobHistoryUtils.HISTORY_DONE_DIR_UMASK);
-      mkdir(doneDirFc, doneDirPrefixPath, new FsPermission(
-          JobHistoryUtils.HISTORY_DONE_DIR_PERMISSION));
-    } catch (ConnectException ex) {
-      if (logWait) {
-        LOG.info("Waiting for FileSystem at " +
-            doneDirPrefixPath.toUri().getAuthority()  + "to be available");
-      }
-      succeeded = false;
-    } catch (IOException e) {
-      if (isNameNodeStillNotStarted(e)) {
-        succeeded = false;
-        if (logWait) {
-          LOG.info("Waiting for FileSystem at " +
-              doneDirPrefixPath.toUri().getAuthority() +
-              "to be out of safe mode");
-        }
-      } else {
-        throw new YarnRuntimeException("Error creating done directory: ["
-            + doneDirPrefixPath + "]", e);
-      }
-    }
-    if (succeeded) {
-      String intermediateDoneDirPrefix = JobHistoryUtils.
-          getConfiguredHistoryIntermediateDoneDirPrefix(conf);
-      try {
-        intermediateDoneDirPath = FileContext.getFileContext(conf).makeQualified(
-            new Path(intermediateDoneDirPrefix));
-        intermediateDoneDirFc = FileContext.getFileContext(
-            intermediateDoneDirPath.toUri(), conf);
-        mkdir(intermediateDoneDirFc, intermediateDoneDirPath, new FsPermission(
-            JobHistoryUtils.HISTORY_INTERMEDIATE_DONE_DIR_PERMISSIONS.toShort()));
-      } catch (ConnectException ex) {
-        succeeded = false;
-        if (logWait) {
-          LOG.info("Waiting for FileSystem at " +
-              intermediateDoneDirPath.toUri().getAuthority() +
-              "to be available");
-        }
-      } catch (IOException e) {
-        if (isNameNodeStillNotStarted(e)) {
-          succeeded = false;
-          if (logWait) {
-            LOG.info("Waiting for FileSystem at " +
-                intermediateDoneDirPath.toUri().getAuthority() +
-                "to be out of safe mode");
-          }
-        } else {
-          throw new YarnRuntimeException(
-              "Error creating intermediate done directory: ["
-              + intermediateDoneDirPath + "]", e);
-        }
-      }
-    }
-    return succeeded;
-  }
-
-  @Override
-  public void serviceStop() throws Exception {
-    ShutdownThreadsHelper.shutdownExecutorService(moveToDoneExecutor);
-    super.serviceStop();
-  }
-
-  protected JobListCache createJobListCache() {
-    return new JobListCache(conf.getInt(
-        JHAdminConfig.MR_HISTORY_JOBLIST_CACHE_SIZE,
-        JHAdminConfig.DEFAULT_MR_HISTORY_JOBLIST_CACHE_SIZE), maxHistoryAge);
-  }
-
-  private void mkdir(FileContext fc, Path path, FsPermission fsp)
-      throws IOException {
-    if (!fc.util().exists(path)) {
-      try {
-        fc.mkdir(path, fsp, true);
-
-        FileStatus fsStatus = fc.getFileStatus(path);
-        LOG.info("Perms after creating " + fsStatus.getPermission().toShort()
-            + ", Expected: " + fsp.toShort());
-        if (fsStatus.getPermission().toShort() != fsp.toShort()) {
-          LOG.info("Explicitly setting permissions to : " + fsp.toShort()
-              + ", " + fsp);
-          fc.setPermission(path, fsp);
-        }
-      } catch (FileAlreadyExistsException e) {
-        LOG.info("Directory: [" + path + "] already exists.");
-      }
-    }
-  }
-
-  protected HistoryFileInfo createHistoryFileInfo(Path historyFile,
-      Path confFile, Path summaryFile, JobIndexInfo jobIndexInfo,
-      boolean isInDone) {
-    return new HistoryFileInfo(
-        historyFile, confFile, summaryFile, jobIndexInfo, isInDone);
-  }
-
-  /**
-   * Populates index data structures. Should only be called at initialization
-   * times.
-   */
-  @SuppressWarnings("unchecked")
-  void initExisting() throws IOException {
-    LOG.info("Initializing Existing Jobs...");
-    List<FileStatus> timestampedDirList = findTimestampedDirectories();
-    // Sort first just so insertion is in a consistent order
-    Collections.sort(timestampedDirList);
-    LOG.info("Found " + timestampedDirList.size() + " directories to load");
-    for (FileStatus fs : timestampedDirList) {
-      // TODO Could verify the correct format for these directories.
-      addDirectoryToSerialNumberIndex(fs.getPath());
-    }
-    final double maxCacheSize = (double) jobListCache.maxSize;
-    int prevCacheSize = jobListCache.size();
-    for (int i= timestampedDirList.size() - 1;
-        i >= 0 && !jobListCache.isFull(); i--) {
-      FileStatus fs = timestampedDirList.get(i); 
-      addDirectoryToJobListCache(fs.getPath());
-
-      int currCacheSize = jobListCache.size();
-      if((currCacheSize - prevCacheSize)/maxCacheSize >= 0.05) {
-        LOG.info(currCacheSize * 100.0 / maxCacheSize +
-            "% of cache is loaded.");
-      }
-      prevCacheSize = currCacheSize;
-    }
-    final double loadedPercent = maxCacheSize == 0.0 ?
-        100 : prevCacheSize * 100.0 / maxCacheSize;
-    LOG.info("Existing job initialization finished. " +
-        loadedPercent + "% of cache is occupied.");
-  }
-
-  private void removeDirectoryFromSerialNumberIndex(Path serialDirPath) {
-    String serialPart = serialDirPath.getName();
-    String timeStampPart = JobHistoryUtils
-        .getTimestampPartFromPath(serialDirPath.toString());
-    if (timeStampPart == null) {
-      LOG.warn("Could not find timestamp portion from path: "
-          + serialDirPath.toString() + ". Continuing with next");
-      return;
-    }
-    if (serialPart == null) {
-      LOG.warn("Could not find serial portion from path: "
-          + serialDirPath.toString() + ". Continuing with next");
-      return;
-    }
-    serialNumberIndex.remove(serialPart, timeStampPart);
-  }
-
-  private void addDirectoryToSerialNumberIndex(Path serialDirPath) {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Adding " + serialDirPath + " to serial index");
-    }
-    String serialPart = serialDirPath.getName();
-    String timestampPart = JobHistoryUtils
-        .getTimestampPartFromPath(serialDirPath.toString());
-    if (timestampPart == null) {
-      LOG.warn("Could not find timestamp portion from path: " + serialDirPath
-          + ". Continuing with next");
-      return;
-    }
-    if (serialPart == null) {
-      LOG.warn("Could not find serial portion from path: "
-          + serialDirPath.toString() + ". Continuing with next");
-    } else {
-      serialNumberIndex.add(serialPart, timestampPart);
-    }
-  }
-
-  private void addDirectoryToJobListCache(Path path) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Adding " + path + " to job list cache.");
-    }
-    List<FileStatus> historyFileList = scanDirectoryForHistoryFiles(path,
-        doneDirFc);
-    for (FileStatus fs : historyFileList) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Adding in history for " + fs.getPath());
-      }
-      JobIndexInfo jobIndexInfo = FileNameIndexUtils.getIndexInfo(fs.getPath()
-          .getName());
-      String confFileName = JobHistoryUtils
-          .getIntermediateConfFileName(jobIndexInfo.getJobId());
-      String summaryFileName = JobHistoryUtils
-          .getIntermediateSummaryFileName(jobIndexInfo.getJobId());
-      HistoryFileInfo fileInfo = createHistoryFileInfo(fs.getPath(), new Path(fs
-          .getPath().getParent(), confFileName), new Path(fs.getPath()
-          .getParent(), summaryFileName), jobIndexInfo, true);
-      jobListCache.addIfAbsent(fileInfo);
-    }
-  }
-
-  @VisibleForTesting
-  protected static List<FileStatus> scanDirectory(Path path, FileContext fc,
-      PathFilter pathFilter) throws IOException {
-    path = fc.makeQualified(path);
-    List<FileStatus> jhStatusList = new ArrayList<FileStatus>();
-    try {
-      RemoteIterator<FileStatus> fileStatusIter = fc.listStatus(path);
-      while (fileStatusIter.hasNext()) {
-        FileStatus fileStatus = fileStatusIter.next();
-        Path filePath = fileStatus.getPath();
-        if (fileStatus.isFile() && pathFilter.accept(filePath)) {
-          jhStatusList.add(fileStatus);
-        }
-      }
-    } catch (FileNotFoundException fe) {
-      LOG.error("Error while scanning directory " + path, fe);
-    }
-    return jhStatusList;
-  }
-
-  protected List<FileStatus> scanDirectoryForHistoryFiles(Path path,
-      FileContext fc) throws IOException {
-    return scanDirectory(path, fc, JobHistoryUtils.getHistoryFileFilter());
-  }
-  
-  /**
-   * Finds all history directories with a timestamp component by scanning the
-   * filesystem. Used when the JobHistory server is started.
-   * 
-   * @return list of history directories
-   */
-  protected List<FileStatus> findTimestampedDirectories() throws IOException {
-    List<FileStatus> fsList = JobHistoryUtils.localGlobber(doneDirFc,
-        doneDirPrefixPath, DONE_BEFORE_SERIAL_TAIL);
-    return fsList;
-  }
-
-  /**
-   * Scans the intermediate directory to find user directories. Scans these for
-   * history files if the modification time for the directory has changed. Once
-   * it finds history files it starts the process of moving them to the done 
-   * directory.
-   * 
-   * @throws IOException
-   *           if there was a error while scanning
-   */
-  void scanIntermediateDirectory() throws IOException {
-    if (UserGroupInformation.isSecurityEnabled()) {
-      UserGroupInformation.getLoginUser().checkTGTAndReloginFromKeytab();
-    }
-
-    // TODO it would be great to limit how often this happens, except in the
-    // case where we are looking for a particular job.
-    List<FileStatus> userDirList = JobHistoryUtils.localGlobber(
-        intermediateDoneDirFc, intermediateDoneDirPath, "");
-    LOG.debug("Scanning intermediate dirs");
-    for (FileStatus userDir : userDirList) {
-      String name = userDir.getPath().getName();
-      UserLogDir dir = userDirModificationTimeMap.get(name);
-      if(dir == null) {
-        dir = new UserLogDir();
-        UserLogDir old = userDirModificationTimeMap.putIfAbsent(name, dir);
-        if(old != null) {
-          dir = old;
-        }
-      }
-      dir.scanIfNeeded(userDir);
-    }
-  }
-
-  /**
-   * Scans the specified path and populates the intermediate cache.
-   * 
-   * @param absPath
-   * @throws IOException
-   */
-  private void scanIntermediateDirectory(final Path absPath) throws IOException {
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Scanning intermediate dir " + absPath);
-    }
-    List<FileStatus> fileStatusList = scanDirectoryForHistoryFiles(absPath,
-        intermediateDoneDirFc);
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Found " + fileStatusList.size() + " files");
-    }
-    for (FileStatus fs : fileStatusList) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("scanning file: "+ fs.getPath());
-      }
-      JobIndexInfo jobIndexInfo = FileNameIndexUtils.getIndexInfo(fs.getPath()
-          .getName());
-      String confFileName = JobHistoryUtils
-          .getIntermediateConfFileName(jobIndexInfo.getJobId());
-      String summaryFileName = JobHistoryUtils
-          .getIntermediateSummaryFileName(jobIndexInfo.getJobId());
-      HistoryFileInfo fileInfo = createHistoryFileInfo(fs.getPath(), new Path(fs
-          .getPath().getParent(), confFileName), new Path(fs.getPath()
-          .getParent(), summaryFileName), jobIndexInfo, false);
-
-      final HistoryFileInfo old = jobListCache.addIfAbsent(fileInfo);
-      if (old == null || old.didMoveFail()) {
-        final HistoryFileInfo found = (old == null) ? fileInfo : old;
-        long cutoff = System.currentTimeMillis() - maxHistoryAge;
-        if(found.getJobIndexInfo().getFinishTime() <= cutoff) {
-          try {
-            found.delete();
-          } catch (IOException e) {
-            LOG.warn("Error cleaning up a HistoryFile that is out of date.", e);
-          }
-        } else {
-          if (LOG.isDebugEnabled()) {
-            LOG.debug("Scheduling move to done of " +found);
-          }
-
-          moveToDoneExecutor.execute(new Runnable() {
-            @Override
-            public void run() {
-              try {
-                found.moveToDone();
-              } catch (IOException e) {
-                LOG.info("Failed to process fileInfo for job: " + 
-                    found.getJobId(), e);
-              }
-            }
-          });
-        }
-      } else if (!old.isMovePending()) {
-        //This is a duplicate so just delete it
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Duplicate: deleting");
-        }
-        fileInfo.delete();
-      }
-    }
-  }
-
-  /**
-   * Searches the job history file FileStatus list for the specified JobId.
-   * 
-   * @param fileStatusList
-   *          fileStatus list of Job History Files.
-   * @param jobId
-   *          The JobId to find.
-   * @return A FileInfo object for the jobId, null if not found.
-   * @throws IOException
-   */
-  private HistoryFileInfo getJobFileInfo(List<FileStatus> fileStatusList,
-      JobId jobId) throws IOException {
-    for (FileStatus fs : fileStatusList) {
-      JobIndexInfo jobIndexInfo = FileNameIndexUtils.getIndexInfo(fs.getPath()
-          .getName());
-      if (jobIndexInfo.getJobId().equals(jobId)) {
-        String confFileName = JobHistoryUtils
-            .getIntermediateConfFileName(jobIndexInfo.getJobId());
-        String summaryFileName = JobHistoryUtils
-            .getIntermediateSummaryFileName(jobIndexInfo.getJobId());
-        HistoryFileInfo fileInfo = createHistoryFileInfo(fs.getPath(), new Path(
-            fs.getPath().getParent(), confFileName), new Path(fs.getPath()
-            .getParent(), summaryFileName), jobIndexInfo, true);
-        return fileInfo;
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Scans old directories known by the idToDateString map for the specified
-   * jobId. If the number of directories is higher than the supported size of
-   * the idToDateString cache, the jobId will not be found.
-   * 
-   * @param jobId
-   *          the jobId.
-   * @return
-   * @throws IOException
-   */
-  private HistoryFileInfo scanOldDirsForJob(JobId jobId) throws IOException {
-    String boxedSerialNumber = JobHistoryUtils.serialNumberDirectoryComponent(
-        jobId, serialNumberFormat);
-    Set<String> dateStringSet = serialNumberIndex.get(boxedSerialNumber);
-    if (dateStringSet == null) {
-      return null;
-    }
-    for (String timestampPart : dateStringSet) {
-      Path logDir = canonicalHistoryLogPath(jobId, timestampPart);
-      List<FileStatus> fileStatusList = scanDirectoryForHistoryFiles(logDir,
-          doneDirFc);
-      HistoryFileInfo fileInfo = getJobFileInfo(fileStatusList, jobId);
-      if (fileInfo != null) {
-        return fileInfo;
-      }
-    }
-    return null;
-  }
-
-  public Collection<HistoryFileInfo> getAllFileInfo() throws IOException {
-    scanIntermediateDirectory();
-    return jobListCache.values();
-  }
-
-  public HistoryFileInfo getFileInfo(JobId jobId) throws IOException {
-    // FileInfo available in cache.
-    HistoryFileInfo fileInfo = jobListCache.get(jobId);
-    if (fileInfo != null) {
-      return fileInfo;
-    }
-    // OK so scan the intermediate to be sure we did not lose it that way
-    scanIntermediateDirectory();
-    fileInfo = jobListCache.get(jobId);
-    if (fileInfo != null) {
-      return fileInfo;
-    }
-
-    // Intermediate directory does not contain job. Search through older ones.
-    fileInfo = scanOldDirsForJob(jobId);
-    if (fileInfo != null) {
-      return fileInfo;
-    }
-    return null;
-  }
-
-  private void moveToDoneNow(final Path src, final Path target)
-      throws IOException {
-    LOG.info("Moving " + src.toString() + " to " + target.toString());
-    try {
-      intermediateDoneDirFc.rename(src, target, Options.Rename.NONE);
-    } catch (FileNotFoundException e) {
-      if (doneDirFc.util().exists(target)) {
-        LOG.info("Source file " + src.toString() + " not found, but target "
-            + "file " + target.toString() + " already exists. Move already "
-            + "happened.");
-      } else {
-        throw e;
-      }
-    }
-  }
-
-  private String getJobSummary(FileContext fc, Path path) throws IOException {
-    Path qPath = fc.makeQualified(path);
-    FSDataInputStream in = null;
-    String jobSummaryString = null;
-    try {
-      in = fc.open(qPath);
-      jobSummaryString = in.readUTF();
-    } finally {
-      if (in != null) {
-        in.close();
-      }
-    }
-    return jobSummaryString;
-  }
-
-  private void makeDoneSubdir(Path path) throws IOException {
-    try {
-      doneDirFc.getFileStatus(path);
-      existingDoneSubdirs.add(path);
-    } catch (FileNotFoundException fnfE) {
-      try {
-        FsPermission fsp = new FsPermission(
-            JobHistoryUtils.HISTORY_DONE_DIR_PERMISSION);
-        doneDirFc.mkdir(path, fsp, true);
-        FileStatus fsStatus = doneDirFc.getFileStatus(path);
-        LOG.info("Perms after creating " + fsStatus.getPermission().toShort()
-            + ", Expected: " + fsp.toShort());
-        if (fsStatus.getPermission().toShort() != fsp.toShort()) {
-          LOG.info("Explicitly setting permissions to : " + fsp.toShort()
-              + ", " + fsp);
-          doneDirFc.setPermission(path, fsp);
-        }
-        existingDoneSubdirs.add(path);
-      } catch (FileAlreadyExistsException faeE) { // Nothing to do.
-      }
-    }
-  }
-
-  private Path canonicalHistoryLogPath(JobId id, String timestampComponent) {
-    return new Path(doneDirPrefixPath, JobHistoryUtils.historyLogSubdirectory(
-        id, timestampComponent, serialNumberFormat));
-  }
-
-  private Path canonicalHistoryLogPath(JobId id, long millisecondTime) {
-    String timestampComponent = JobHistoryUtils
-        .timestampDirectoryComponent(millisecondTime);
-    return new Path(doneDirPrefixPath, JobHistoryUtils.historyLogSubdirectory(
-        id, timestampComponent, serialNumberFormat));
-  }
-
-  private long getEffectiveTimestamp(long finishTime, FileStatus fileStatus) {
-    if (finishTime == 0) {
-      return fileStatus.getModificationTime();
-    }
-    return finishTime;
-  }
-
-  private void deleteJobFromDone(HistoryFileInfo fileInfo) throws IOException {
-    jobListCache.delete(fileInfo);
-    fileInfo.delete();
-  }
-
-  List<FileStatus> getHistoryDirsForCleaning(long cutoff) throws IOException {
-      return JobHistoryUtils.
-        getHistoryDirsForCleaning(doneDirFc, doneDirPrefixPath, cutoff);
-  }
-
-  /**
-   * Clean up older history files.
-   * 
-   * @throws IOException
-   *           on any error trying to remove the entries.
-   */
-  @SuppressWarnings("unchecked")
-  void clean() throws IOException {
-    long cutoff = System.currentTimeMillis() - maxHistoryAge;
-    boolean halted = false;
-    List<FileStatus> serialDirList = getHistoryDirsForCleaning(cutoff);
-    // Sort in ascending order. Relies on YYYY/MM/DD/Serial
-    Collections.sort(serialDirList);
-    for (FileStatus serialDir : serialDirList) {
-      List<FileStatus> historyFileList = scanDirectoryForHistoryFiles(
-          serialDir.getPath(), doneDirFc);
-      for (FileStatus historyFile : historyFileList) {
-        JobIndexInfo jobIndexInfo = FileNameIndexUtils.getIndexInfo(historyFile
-            .getPath().getName());
-        long effectiveTimestamp = getEffectiveTimestamp(
-            jobIndexInfo.getFinishTime(), historyFile);
-        if (effectiveTimestamp <= cutoff) {
-          HistoryFileInfo fileInfo = this.jobListCache.get(jobIndexInfo
-              .getJobId());
-          if (fileInfo == null) {
-            String confFileName = JobHistoryUtils
-                .getIntermediateConfFileName(jobIndexInfo.getJobId());
-
-            fileInfo = createHistoryFileInfo(historyFile.getPath(), new Path(
-                historyFile.getPath().getParent(), confFileName), null,
-                jobIndexInfo, true);
-          }
-          deleteJobFromDone(fileInfo);
-        } else {
-          halted = true;
-          break;
-        }
-      }
-      if (!halted) {
-        deleteDir(serialDir);
-        removeDirectoryFromSerialNumberIndex(serialDir.getPath());
-        existingDoneSubdirs.remove(serialDir.getPath());
-      } else {
-        break; // Don't scan any more directories.
-      }
-    }
-  }
-  
-  protected boolean deleteDir(FileStatus serialDir)
-      throws AccessControlException, FileNotFoundException,
-      UnsupportedFileSystemException, IOException {
-    return doneDirFc.delete(doneDirFc.makeQualified(serialDir.getPath()), true);
-  }
-
-  // for test
-  @VisibleForTesting
-  void setMaxHistoryAge(long newValue){
-    maxHistoryAge=newValue;
-  }
-}
+   * 单个作业历史文件信息封装，维护文件路径、索引信息和当前状态
+   * 提供移动作业到完成目录、加载作业

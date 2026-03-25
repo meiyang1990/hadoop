@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -23,105 +24,103 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.http.HttpConfig;
 
 /**
- * Stores Job History configuration keys that can be set by administrators of
- * the Job History server.
+ * 存放MapReduce作业历史服务器（Job History Server）可配置参数的常量类，
+ * 定义了所有支持管理员配置的历史服务配置键和默认值，供整个历史服务模块统一使用。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class JHAdminConfig {
-  /** The prefix to all Job History configuration properties.*/
+  /** 所有作业历史配置属性的公共前缀 */
   public static final String MR_HISTORY_PREFIX = "mapreduce.jobhistory.";
   
-  /** host:port address for History Server API.*/
+  /** 历史服务器API服务的主机:端口地址配置键 */
   public static final String MR_HISTORY_ADDRESS = MR_HISTORY_PREFIX + "address";
   public static final int DEFAULT_MR_HISTORY_PORT = 10020;
   public static final String DEFAULT_MR_HISTORY_ADDRESS = "0.0.0.0:" +
       DEFAULT_MR_HISTORY_PORT;
+  /** 历史服务绑定网卡地址配置键 */
   public static final String MR_HISTORY_BIND_HOST = MR_HISTORY_PREFIX
       + "bind-host";
 
-  /** The address of the History server admin interface. */
+  /** 历史服务器管理接口地址配置键 */
   public static final String JHS_ADMIN_ADDRESS = MR_HISTORY_PREFIX
       + "admin.address";
   public static final int DEFAULT_JHS_ADMIN_PORT = 10033;
   public static final String DEFAULT_JHS_ADMIN_ADDRESS = "0.0.0.0:"
       + DEFAULT_JHS_ADMIN_PORT;
 
-  /** ACL of who can be admin of Job history server. */
+  /** 允许访问历史服务器管理接口的ACL配置键 */
   public static final String JHS_ADMIN_ACL = MR_HISTORY_PREFIX + "admin.acl";
   public static final String DEFAULT_JHS_ADMIN_ACL = "*";
   
-  /** If history cleaning should be enabled or not.*/
+  /** 是否启用历史文件清理功能配置键 */
   public static final String MR_HISTORY_CLEANER_ENABLE = 
     MR_HISTORY_PREFIX + "cleaner.enable";
   
-  /** Run the History Cleaner every X ms.*/
+  /** 历史清理器运行间隔（毫秒）配置键 */
   public static final String MR_HISTORY_CLEANER_INTERVAL_MS = 
     MR_HISTORY_PREFIX + "cleaner.interval-ms";
   public static final long DEFAULT_MR_HISTORY_CLEANER_INTERVAL_MS = 
     1 * 24 * 60 * 60 * 1000l; //1 day
 
-  /** Always scan user dir, irrespective of dir modification time.*/
+  /** 是否强制每次都扫描用户目录，忽略目录修改时间判断配置键 */
   public static final String MR_HISTORY_ALWAYS_SCAN_USER_DIR =
       MR_HISTORY_PREFIX + "always-scan-user-dir";
   public static final boolean DEFAULT_MR_HISTORY_ALWAYS_SCAN_USER_DIR =
       false;
 
-  /** The number of threads to handle client API requests.*/
+  /** 处理客户端API请求的线程数配置键 */
   public static final String MR_HISTORY_CLIENT_THREAD_COUNT = 
     MR_HISTORY_PREFIX + "client.thread-count";
   public static final int DEFAULT_MR_HISTORY_CLIENT_THREAD_COUNT = 10;
   
   /**
-   * Size of the date string cache. Effects the number of directories
-   * which will be scanned to find a job.
+   * 日期字符串缓存大小配置键，该大小会影响查找作业时需要扫描的目录数量。
    */
   public static final String MR_HISTORY_DATESTRING_CACHE_SIZE = 
     MR_HISTORY_PREFIX + "datestring.cache.size";
   public static final int DEFAULT_MR_HISTORY_DATESTRING_CACHE_SIZE = 200000;
   
-  /** Path where history files should be stored for DONE jobs. **/
+  /** 已完成作业历史文件存储路径配置键 */
   public static final String MR_HISTORY_DONE_DIR =
     MR_HISTORY_PREFIX + "done-dir";
 
   /**
-   * Maximum time the History server will wait for the FileSystem for History
-   * files to become available. Default value is -1, forever.
+   * 历史服务器启动时，等待历史文件文件系统就绪的最大等待时间，默认值-1表示永久等待。
    */
   public static final String MR_HISTORY_MAX_START_WAIT_TIME =
       MR_HISTORY_PREFIX + "maximum-start-wait-time-millis";
   public static final long DEFAULT_MR_HISTORY_MAX_START_WAIT_TIME = -1;
   /**
-   *  Path where history files should be stored after a job finished and before
-   *  they are pulled into the job history server.
-   **/
+   *  作业完成后、被移入历史服务器正式目录前，历史文件存储的中间目录路径配置键。
+   */
   public static final String MR_HISTORY_INTERMEDIATE_DONE_DIR =
     MR_HISTORY_PREFIX + "intermediate-done-dir";
+  /** 中间用户完成目录权限配置键 */
   public static final String MR_HISTORY_INTERMEDIATE_USER_DONE_DIR_PERMISSIONS =
       MR_HISTORY_PREFIX + "intermediate-user-done-dir.permissions";
   public static final short
       DEFAULT_MR_HISTORY_INTERMEDIATE_USER_DONE_DIR_PERMISSIONS = 0770;
   
-  /** Size of the job list cache.*/
+  /** 作业列表缓存大小配置键 */
   public static final String MR_HISTORY_JOBLIST_CACHE_SIZE =
     MR_HISTORY_PREFIX + "joblist.cache.size";
   public static final int DEFAULT_MR_HISTORY_JOBLIST_CACHE_SIZE = 20000;
 
-  /** The location of the Kerberos keytab file.*/
+  /** Kerberos认证keytab文件路径配置键 */
   public static final String MR_HISTORY_KEYTAB = MR_HISTORY_PREFIX + "keytab";
   
-  /** Size of the loaded job cache.*/
+  /** 已加载作业缓存大小（作业数）配置键 */
   public static final String MR_HISTORY_LOADED_JOB_CACHE_SIZE = 
     MR_HISTORY_PREFIX + "loadedjobs.cache.size";
   public static final int DEFAULT_MR_HISTORY_LOADED_JOB_CACHE_SIZE = 5;
 
-  /** Size of the loaded job cache (in tasks).*/
+  /** 已加载作业缓存大小（任务数）配置键 */
   public static final String MR_HISTORY_LOADED_TASKS_CACHE_SIZE =
       MR_HISTORY_PREFIX + "loadedtasks.cache.size";
 
   /**
-   * The maximum age of a job history file before it is deleted from the history
-   * server.
+   * 历史文件被删除前允许保留的最长时间配置键。
    */
   public static final String MR_HISTORY_MAX_AGE_MS =
     MR_HISTORY_PREFIX + "max-age-ms";
@@ -129,105 +128,102 @@ public class JHAdminConfig {
     7 * 24 * 60 * 60 * 1000L; //1 week
   
   /**
-   * Scan for history files to more from intermediate done dir to done dir
-   * every X ms.
+   * 从中间目录移动历史文件到正式目录的扫描间隔（毫秒）配置键。
    */
   public static final String MR_HISTORY_MOVE_INTERVAL_MS = 
     MR_HISTORY_PREFIX + "move.interval-ms";
   public static final long DEFAULT_MR_HISTORY_MOVE_INTERVAL_MS = 
     3 * 60 * 1000l; //3 minutes
   
-  /** The number of threads used to move files.*/
+  /** 移动历史文件使用的线程数配置键 */
   public static final String MR_HISTORY_MOVE_THREAD_COUNT = 
     MR_HISTORY_PREFIX + "move.thread-count";
   public static final int DEFAULT_MR_HISTORY_MOVE_THREAD_COUNT = 3;
   
-  /** The Kerberos principal for the history server.*/
+  /** 历史服务器Kerberos主体名称配置键 */
   public static final String MR_HISTORY_PRINCIPAL = 
     MR_HISTORY_PREFIX + "principal";
   
-  /** To enable https in MR history server */
+  /** 历史服务器HTTP策略配置键，用于控制是否启用HTTPS */
   public static final String MR_HS_HTTP_POLICY = MR_HISTORY_PREFIX
       + "http.policy";
   public static String DEFAULT_MR_HS_HTTP_POLICY =
           HttpConfig.Policy.HTTP_ONLY.name();
   
-  /**The address the history server webapp is on.*/
+  /** 历史服务器Web服务HTTP地址配置键 */
   public static final String MR_HISTORY_WEBAPP_ADDRESS =
     MR_HISTORY_PREFIX + "webapp.address";
   public static final int DEFAULT_MR_HISTORY_WEBAPP_PORT = 19888;
   public static final String DEFAULT_MR_HISTORY_WEBAPP_ADDRESS =
     "0.0.0.0:" + DEFAULT_MR_HISTORY_WEBAPP_PORT;
   
-  /**The https address the history server webapp is on.*/
+  /** 历史服务器Web服务HTTPS地址配置键 */
   public static final String MR_HISTORY_WEBAPP_HTTPS_ADDRESS =
       MR_HISTORY_PREFIX + "webapp.https.address";
   public static final int DEFAULT_MR_HISTORY_WEBAPP_HTTPS_PORT = 19890;
   public static final String DEFAULT_MR_HISTORY_WEBAPP_HTTPS_ADDRESS =
       "0.0.0.0:" + DEFAULT_MR_HISTORY_WEBAPP_HTTPS_PORT;
   
-  /**The kerberos principal to be used for spnego filter for history server*/
+  /** SPNEGO认证使用的Kerberos主体名称配置键 */
   public static final String MR_WEBAPP_SPNEGO_USER_NAME_KEY =
       MR_HISTORY_PREFIX + "webapp.spnego-principal";
   
-  /** The kerberos keytab to be used for spnego filter for history server*/
+  /** SPNEGO认证使用的Kerberos keytab文件路径配置键 */
   public static final String MR_WEBAPP_SPNEGO_KEYTAB_FILE_KEY =
       MR_HISTORY_PREFIX + "webapp.spnego-keytab-file";
 
   /*
-   * HS Service Authorization
+   * 历史服务安全授权相关配置
    */
+  /** 历史服务客户端协议ACL配置键 */
   public static final String MR_HS_SECURITY_SERVICE_AUTHORIZATION =
       "security.mrhs.client.protocol.acl";
+  /** 历史服务管理刷新协议ACL配置键 */
   public static final String MR_HS_SECURITY_SERVICE_AUTHORIZATION_ADMIN_REFRESH =
       "security.mrhs.admin.refresh.protocol.acl";
 
   /**
-   * The HistoryStorage class to use to cache history data.
+   * 用于缓存历史数据的HistoryStorage实现类配置键。
    */
   public static final String MR_HISTORY_STORAGE =
     MR_HISTORY_PREFIX + "store.class";
 
   /**
-   * Enable the history server to store server state and recover server state
-   * upon startup.
+   * 是否启用历史服务器状态恢复功能，启动时恢复服务状态配置键。
    */
   public static final String MR_HS_RECOVERY_ENABLE =
       MR_HISTORY_PREFIX + "recovery.enable";
   public static final boolean DEFAULT_MR_HS_RECOVERY_ENABLE = false;
 
   /**
-   * The HistoryServerStateStoreService class to store and recover server state
+   * 存储和恢复服务状态的HistoryServerStateStoreService实现类配置键。
    */
   public static final String MR_HS_STATE_STORE =
       MR_HISTORY_PREFIX + "recovery.store.class";
 
   /**
-   * The URI where server state will be stored when
-   * HistoryServerFileSystemStateStoreService is configured as the state store
+   * 当使用HDFS作为状态存储时，服务状态存储URI配置键。
    */
   public static final String MR_HS_FS_STATE_STORE_URI =
       MR_HISTORY_PREFIX + "recovery.store.fs.uri";
 
   /**
-   * The local path where server state will be stored when
-   * HistoryServerLeveldbStateStoreService is configured as the state store
+   * 当使用LevelDB作为状态存储时，服务状态存储本地路径配置键。
    */
   public static final String MR_HS_LEVELDB_STATE_STORE_PATH =
       MR_HISTORY_PREFIX + "recovery.store.leveldb.path";
 
-  /** Whether to use fixed ports with the minicluster. */
+  /** 迷你集群是否使用固定端口配置键 */
   public static final String MR_HISTORY_MINICLUSTER_FIXED_PORTS = MR_HISTORY_PREFIX
        + "minicluster.fixed.ports";
   
   /**
-   * Default is false to be able to run tests concurrently without port
-   * conflicts.
+   * 默认值为false，允许并发运行测试，避免端口冲突。
    */
   public static boolean DEFAULT_MR_HISTORY_MINICLUSTER_FIXED_PORTS = false;
 
   /**
-   * Number of characters allowed for job name in Job History Server web page.
+   * 历史服务器Web页面显示作业名称允许的最大字符数配置键。
    */
   public static final String MR_HS_JOBNAME_LIMIT = MR_HISTORY_PREFIX
       + "jobname.limit";
@@ -235,42 +231,48 @@ public class JHAdminConfig {
 
 
   /**
-   * CSRF settings.
+   * CSRF防护配置前缀。
    */
   public static final String MR_HISTORY_CSRF_PREFIX = MR_HISTORY_PREFIX +
                                                       "webapp.rest-csrf.";
+  /** CSRF防护是否启用配置键 */
   public static final String MR_HISTORY_CSRF_ENABLED = MR_HISTORY_CSRF_PREFIX +
                                                        "enabled";
+  /** CSRF自定义请求头配置键 */
   public static final String MR_HISTORY_CSRF_CUSTOM_HEADER =
       MR_HISTORY_CSRF_PREFIX + "custom-header";
+  /** CSRF防护需要忽略的请求方法配置键 */
   public static final String MR_HISTORY_METHODS_TO_IGNORE =
       MR_HISTORY_CSRF_PREFIX + "methods-to-ignore";
 
   /**
-   * XFS settings.
+   * X-Frame-Options配置前缀。
    */
   public static final String MR_HISTORY_XFS_PREFIX = MR_HISTORY_PREFIX +
       "webapp.xfs-filter.";
+  /** X-Frame-Options选项值配置键 */
   public static final String MR_HISTORY_XFS_OPTIONS = MR_HISTORY_XFS_PREFIX +
       "xframe-options";
 
   /**
-   * CORS settings.
+   * CORS跨域资源共享配置。
    */
+  /** 是否启用CORS过滤器配置键 */
   public static final String MR_HISTORY_ENABLE_CORS_FILTER = MR_HISTORY_PREFIX +
       "webapp.cross-origin.enabled";
   public static final boolean DEFAULT_MR_HISTORY_ENABLE_CORS_FILTER = false;
 
   /**
-   * Settings for .jhist file format.
+   * .jhist历史文件格式配置。
    */
+  /** 历史文件格式配置键 */
   public static final String MR_HS_JHIST_FORMAT =
       MR_HISTORY_PREFIX + "jhist.format";
   public static final String DEFAULT_MR_HS_JHIST_FORMAT =
       "binary";
 
   /**
-   * The maximum number of tasks for a job to be loaded in Job History Server.
+   * 历史服务器允许加载单个作业的最大任务数配置键。
    */
   public static final String MR_HS_LOADED_JOBS_TASKS_MAX =
       MR_HISTORY_PREFIX + "loadedjob.tasks.max";

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,24 +27,26 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.ManifestCommitterStatisticNames.OP_STAGE_TASK_SETUP;
 
 /**
- * Stage to set up task.
- * This creates the task attempt directory, after verifying
- * that the job attempt dir exists (i.e. this is invoked
- * after the job is started and before any cleanup.
- * Argument passed in is task name:only for logging.
+ * 任务准备阶段，负责MapReduce任务尝试的目录初始化工作
+ * 执行流程：先确认作业尝试目录已存在，再创建当前任务尝试的工作目录
+ * 该阶段在作业启动后、任务实际执行前被调用，入参仅用于日志输出
  */
 public class SetupTaskStage extends
     AbstractJobOrTaskStage<String, Path> {
 
+  /**
+   * 构造任务准备阶段实例
+   * @param stageConfig 阶段配置信息
+   */
   public SetupTaskStage(final StageConfig stageConfig) {
     super(true, stageConfig, OP_STAGE_TASK_SETUP, false);
   }
 
   /**
-   * Set up a task.
-   * @param name task name (for logging)
-   * @return task attempt directory
-   * @throws IOException IO failure.
+   * 执行任务准备逻辑，创建任务尝试工作目录
+   * @param name 任务名称，仅用于日志输出
+   * @return 创建好的任务尝试目录路径
+   * @throws IOException IO操作失败时抛出
    */
   @Override
   protected Path executeStage(final String name) throws IOException {

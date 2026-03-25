@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,9 +21,13 @@ package org.apache.hadoop.hdfs.tools.offlineImageViewer;
 import java.io.IOException;
 
 /**
- * Signals that a snapshot is ignored.
+ * 离线FSImage查看工具中，用于表示当前快照被忽略的异常
+ * 当离线镜像处理过程中需要跳过某个快照时抛出该异常
  */
 public class IgnoreSnapshotException extends IOException {
+  /**
+   * 构造无参数的忽略快照异常实例
+   */
   public IgnoreSnapshotException() {
   }
 }

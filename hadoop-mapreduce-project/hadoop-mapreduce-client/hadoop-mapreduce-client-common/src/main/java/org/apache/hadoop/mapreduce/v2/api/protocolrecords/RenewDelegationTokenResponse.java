@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,11 +23,20 @@ import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
 /**
- * The response to a renewDelegationToken call to the {@code ResourceManager}.
+ * 刷新委托令牌请求到ResourceManager后的响应接口
+ * 封装了刷新令牌后获取到的新过期时间信息
  */
 @Public
 @Evolving
 public interface RenewDelegationTokenResponse {
+  /**
+   * 获取刷新后的委托令牌下一次过期时间戳
+   * @return 过期时间戳，单位为毫秒
+   */
   long getNextExpirationTime();
+  /**
+   * 设置刷新后的委托令牌下一次过期时间戳
+   * @param expTime 过期时间戳，单位为毫秒
+   */
   void setNextExpirationTime(long expTime);
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -53,6 +54,9 @@ import org.apache.hadoop.yarn.webapp.view.InfoBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * RM Web UI 应用详情页面区块，扩展通用AppBlock实现ResourceManager侧特定的应用信息渲染逻辑
+ */
 public class RMAppBlock extends AppBlock{
 
   private final ResourceManager rm;
@@ -68,32 +72,41 @@ public class RMAppBlock extends AppBlock{
 
   @Override
   protected void render(Block html) {
+    // 调用父类渲染逻辑
     super.render(html);
   }
 
   @Override
   protected void createApplicationMetricsTable(Block html){
+    // 从RM上下文获取当前应用对象
     RMApp rmApp = this.rm.getRMContext().getRMApps().get(appID);
+    // 获取应用整体指标
     RMAppMetrics appMetrics = rmApp == null ? null : rmApp.getRMAppMetrics();
     // Get attempt metrics and fields, it is possible currentAttempt of RMApp is
     // null. In that case, we will assume resource preempted and number of Non
     // AM container preempted on that attempt is 0
     RMAppAttemptMetrics attemptMetrics;
+    // 尝试获取当前应用尝试的指标
     if (rmApp == null || null == rmApp.getCurrentAppAttempt()) {
       attemptMetrics = null;
     } else {
       attemptMetrics = rmApp.getCurrentAppAttempt().getRMAppAttemptMetrics();
     }
+    // 获取当前尝试被抢占的资源
     Resource attemptResourcePreempted =
         attemptMetrics == null ? Resources.none() : attemptMetrics
           .getResourcePreempted();
+    // 获取当前尝试被抢占的非AM容器数量
     int attemptNumNonAMContainerPreempted =
         attemptMetrics == null ? 0 : attemptMetrics
           .getNumNonAMContainersPreempted();
+    // 创建信息块容器div
     DIV<Hamlet> pdiv = html.
         __(InfoBlock.class).
         div(_INFO_WRAP);
+    // 清空原有信息，设置标题
     info("Application Overview").clear();
+    // 构建应用指标表格，依次添加各类抢占资源和聚合分配信息
     info("Application Metrics")
         .__("Total Resource Preempted:",
           appMetrics == null ? "N/A" : appMetrics.getResourcePreempted())
@@ -114,6 +127,7 @@ public class RMAppBlock extends AppBlock{
             appMetrics == null ? "N/A" : StringHelper.getResourceSecondsString(
                 appMetrics.getPreemptedResourceSecondsMap()));
 
+    // 闭合div标签
     pdiv.__();
   }
 
@@ -121,7 +135,7 @@ public class RMAppBlock extends AppBlock{
   protected void generateApplicationTable(Block html,
       UserGroupInformation callerUGI,
       Collection<ApplicationAttemptReport> attempts) {
-    // Application Attempt Table
+    // 创建应用尝试列表表格表头
     Hamlet.TBODY<Hamlet.TABLE<Hamlet>> tbody =
         html.table("#attempts").thead().tr().th(".id", "Attempt ID")
             .th(".started", "Started").th(".node", "Node").th(".logs", "Logs")
@@ -130,32 +144,43 @@ public class RMAppBlock extends AppBlock{
             .th(".rmBlacklistednodes", "Nodes blacklisted by the RM for the"
                 + " app", "Nodes blacklisted by the system").__().__().tbody();
 
+    // 从RM上下文获取当前应用
     RMApp rmApp = this.rm.getRMContext().getRMApps().get(this.appID);
     if (rmApp == null) {
       return;
     }
+    // 初始化前端表格需要的JSON数据
     StringBuilder attemptsTableData = new StringBuilder("[\n");
+    // 遍历所有应用尝试报告
     for (final ApplicationAttemptReport appAttemptReport : attempts) {
+      // 从RM应用获取对应尝试对象
       RMAppAttempt rmAppAttempt =
           rmApp.getRMAppAttempt(appAttemptReport.getApplicationAttemptId());
       if (rmAppAttempt == null) {
         continue;
       }
+      // 构建应用尝试信息对象
       AppAttemptInfo attemptInfo =
           new AppAttemptInfo(this.rm, rmAppAttempt, true, rmApp.getUser(),
               WebAppUtils.getHttpSchemePrefix(conf));
+      // 获取应用拉黑的节点列表
       Set<String> nodes = rmAppAttempt.getBlacklistedNodes();
       // nodes which are blacklisted by the application
       String appBlacklistedNodesCount = String.valueOf(nodes.size());
       // nodes which are blacklisted by the RM for AM launches
+      // 获取RM拉黑的节点数量
       String rmBlacklistedNodesCount =
           String.valueOf(rmAppAttempt.getAMBlacklistManager()
             .getBlacklistUpdates().getBlacklistAdditions().size());
+      // 获取节点HTTP地址
       String nodeLink = attemptInfo.getNodeHttpAddress();
+      // 补全HTTP协议前缀
       if (nodeLink != null) {
         nodeLink = WebAppUtils.getHttpSchemePrefix(conf) + nodeLink;
       }
+      // 获取日志链接
       String logsLink = attemptInfo.getLogsLink();
+      // 拼接当前行JSON数据，添加链接和转义处理
       attemptsTableData
           .append("[\"<a href='")
           .append(url("appattempt", rmAppAttempt.getAppAttemptId().toString()))
@@ -174,19 +199,24 @@ public class RMAppBlock extends AppBlock{
           .append("\"").append(appBlacklistedNodesCount).append("\",")
           .append("\"").append(rmBlacklistedNodesCount).append("\"],\n");
     }
+    // 移除最后一行多余的逗号
     if (attemptsTableData.charAt(attemptsTableData.length() - 2) == ',') {
       attemptsTableData.delete(attemptsTableData.length() - 2,
           attemptsTableData.length() - 1);
     }
+    // 闭合JSON数组
     attemptsTableData.append("]");
+    // 将JSON数据注入页面脚本供前端表格使用
     html.script().$type("text/javascript")
         .__("var attemptsTableData=" + attemptsTableData).__();
 
+    // 闭合表格标签
     tbody.__().__();
   }
 
   @Override
   protected LogAggregationStatus getLogAggregationStatus() {
+    // 从RM获取应用日志聚合状态
     RMApp rmApp = this.rm.getRMContext().getRMApps().get(appID);
     if (rmApp == null) {
       return null;
@@ -198,6 +228,7 @@ public class RMAppBlock extends AppBlock{
   protected ContainerReport getContainerReport(
       final GetContainerReportRequest request)
       throws YarnException, IOException {
+    // 调用RM客户端服务获取容器报告
     return rm.getClientRMService().getContainerReport(request)
         .getContainerReport();
   }
@@ -206,6 +237,7 @@ public class RMAppBlock extends AppBlock{
   protected List<ApplicationAttemptReport> getApplicationAttemptsReport(
       final GetApplicationAttemptsRequest request)
       throws YarnException, IOException {
+    // 调用RM客户端服务获取应用尝试列表报告
     return rm.getClientRMService().getApplicationAttempts(request)
         .getApplicationAttemptList();
   }
@@ -214,6 +246,7 @@ public class RMAppBlock extends AppBlock{
   protected ApplicationReport getApplicationReport(
       final GetApplicationReportRequest request)
       throws YarnException, IOException {
+    // 调用RM客户端服务获取应用报告
     return rm.getClientRMService().getApplicationReport(request)
         .getApplicationReport();
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,29 +35,48 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.LongBinaryOperator;
 
+/**
+ * 本地分配标签管理器，负责在单次调度 placement 周期内维护临时分配标签，
+ * 用于放置算法计算过程中跟踪待分配容器的标签计数，最终在放置周期结束后清理临时数据
+ */
 class LocalAllocationTagsManager extends AllocationTagsManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(LocalAllocationTagsManager.class);
 
+  /** 全局全局标签管理器引用，负责持久化维护已分配容器标签计数 */
   private final AllocationTagsManager tagsManager;
 
+  /** 应用 -> 节点 -> 标签 -> 临时计数 三级映射，存储单次放置周期内的临时标签计数 */
   // Application's Temporary containers mapping
   private Map<ApplicationId, Map<NodeId, Map<String, AtomicInteger>>>
       appTempMappings = new HashMap<>();
 
+  /**
+   * 构造方法，依赖全局标签管理器
+   * @param allocationTagsManager 全局标签管理器实例
+   */
   LocalAllocationTagsManager(
       AllocationTagsManager allocationTagsManager) {
     super(null);
     this.tagsManager = allocationTagsManager;
   }
 
+  /**
+   * 添加临时分配标签，更新本地临时计数并同步到全局标签管理器
+   * @param nodeId 节点ID
+   * @param applicationId 应用ID
+   * @param allocationTags 需要添加的分配标签集合
+   */
   void addTempTags(NodeId nodeId,
       ApplicationId applicationId, Set<String> allocationTags) {
+    // 获取或创建应用对应的临时映射
     Map<NodeId, Map<String, AtomicInteger>> appTempMapping =
         appTempMappings.computeIfAbsent(applicationId, k -> new HashMap<>());
+    // 获取或创建节点对应的临时标签映射
     Map<String, AtomicInteger> containerTempMapping =
         appTempMapping.computeIfAbsent(nodeId, k -> new HashMap<>());
+    // 遍历标签，递增临时计数
     for (String tag : allocationTags) {
       containerTempMapping.computeIfAbsent(tag,
           k -> new AtomicInteger(0)).incrementAndGet();
@@ -65,17 +85,27 @@ class LocalAllocationTagsManager extends AllocationTagsManager {
       LOG.debug("Added TEMP container with tags=["
           + StringUtils.join(allocationTags, ",") + "]");
     }
+    // 同步添加到全局标签管理器，用于Placement阶段的约束计算
     tagsManager.addTags(nodeId, applicationId, allocationTags);
   }
 
+  /**
+   * 移除临时分配标签，递减本地临时计数并从全局标签管理器移除
+   * @param nodeId 节点ID
+   * @param applicationId 应用ID
+   * @param allocationTags 需要移除的分配标签集合
+   */
   void removeTempTags(NodeId nodeId, ApplicationId applicationId,
       Set<String> allocationTags) {
+    // 获取应用对应的临时映射
     Map<NodeId, Map<String, AtomicInteger>> appTempMapping =
         appTempMappings.get(applicationId);
     if (appTempMapping != null) {
+      // 获取节点对应的临时标签映射
       Map<String, AtomicInteger> containerTempMap =
           appTempMapping.get(nodeId);
       if (containerTempMap != null) {
+        // 遍历标签，递减计数，计数归零后移除标签
         for (String tag : allocationTags) {
           AtomicInteger count = containerTempMap.get(tag);
           if (count != null) {
@@ -92,14 +122,13 @@ class LocalAllocationTagsManager extends AllocationTagsManager {
   }
 
   /**
-   * Method removes temporary containers associated with an application
-   * Used by the placement algorithm to clean temporary tags at the end of
-   * a placement cycle.
+   * 清理应用本次放置周期产生的所有临时标签，在放置周期结束后调用
    * @param applicationId Application Id.
    */
   public void cleanTempContainers(ApplicationId applicationId) {
 
     if (!appTempMappings.get(applicationId).isEmpty()) {
+      // 遍历节点和标签，逐个从全局管理器移除对应计数的临时标签
       appTempMappings.get(applicationId).entrySet().stream().forEach(nodeE -> {
         nodeE.getValue().entrySet().stream().forEach(tagE -> {
           for (int i = 0; i < tagE.getValue().get(); i++) {
@@ -108,6 +137,7 @@ class LocalAllocationTagsManager extends AllocationTagsManager {
           }
         });
       });
+      // 移除本地临时映射
       appTempMappings.remove(applicationId);
       LOG.debug("Removed TEMP containers of app={}", applicationId);
     }

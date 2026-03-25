@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,13 +24,17 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
- * Request class to obtain information about a sub-cluster identified by its
- * {@link SubClusterId}.
+ * YARN联邦状态存储获取子集群信息的请求类，通过子集群唯一标识符获取指定子集群的详细信息。
  */
 @Private
 @Unstable
 public abstract class GetSubClusterInfoRequest {
 
+  /**
+   * 创建一个获取指定子集群信息的请求实例。
+   * @param subClusterId 目标子集群的唯一标识符
+   * @return 初始化完成的请求对象
+   */
   @Private
   @Unstable
   public static GetSubClusterInfoRequest newInstance(
@@ -41,20 +46,18 @@ public abstract class GetSubClusterInfoRequest {
   }
 
   /**
-   * Get the {@link SubClusterId} representing the unique identifier of the
-   * subcluster.
+   * 获取要查询的目标子集群唯一标识符。
    *
-   * @return the subcluster identifier
+   * @return 子集群标识符
    */
   @Public
   @Unstable
   public abstract SubClusterId getSubClusterId();
 
   /**
-   * Set the {@link SubClusterId} representing the unique identifier of the
-   * subcluster.
+   * 设置要查询的目标子集群唯一标识符。
    *
-   * @param subClusterId the subcluster identifier
+   * @param subClusterId 子集群标识符
    */
   @Public
   @Unstable

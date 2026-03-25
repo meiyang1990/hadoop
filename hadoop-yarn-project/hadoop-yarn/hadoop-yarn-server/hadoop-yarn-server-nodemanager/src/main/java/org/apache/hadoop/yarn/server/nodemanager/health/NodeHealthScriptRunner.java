@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,29 +37,35 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * The class which provides functionality of checking the health of the node
- * using the configured node health script and reporting back to the service
- * for which the health checker has been asked to report.
+ * 节点健康检查脚本运行器，通过执行用户配置的外部健康检查脚本定期检测NodeManager节点健康状态，并将结果上报给健康检查服务
  */
 public class NodeHealthScriptRunner extends TimedHealthReporterService {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(NodeHealthScriptRunner.class);
 
-  /** Absolute path to the health script. */
+  /** 健康检查脚本的绝对路径 */
   private String nodeHealthScript;
-  /** Time after which the script should be timed out. */
+  /** 脚本执行超时时间 */
   private long scriptTimeout;
-  /** ShellCommandExecutor used to execute monitoring script. */
+  /** 用于执行监控脚本的Shell命令执行器 */
   private ShellCommandExecutor commandExecutor = null;
 
-  /** Pattern used for searching in the output of the node health script. */
+  /** 健康检查脚本输出中错误标识的匹配模式：行首为ERROR */
   private static final String ERROR_PATTERN = "ERROR";
 
-  /** Time out error message. */
+  /** 脚本超时错误提示信息 */
   static final String NODE_HEALTH_SCRIPT_TIMED_OUT_MSG =
       "Node health script timed out";
 
+  /**
+   * 私有构造函数，创建节点健康检查脚本运行器实例
+   * @param scriptName 健康检查脚本路径
+   * @param checkInterval 健康检查间隔时间（毫秒）
+   * @param timeout 脚本执行超时时间（毫秒）
+   * @param scriptArgs 脚本执行参数数组
+   * @param runBeforeStartup 是否在NodeManager启动前执行首次检查
+   */
   private NodeHealthScriptRunner(String scriptName, long checkInterval,
       long timeout, String[] scriptArgs, boolean runBeforeStartup) {
     super(NodeHealthScriptRunner.class.getName(), checkInterval,
@@ -68,8 +75,15 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
     setTimerTask(new NodeHealthMonitorExecutor(scriptArgs));
   }
 
+  /**
+   * 根据配置创建节点健康检查脚本运行器实例
+   * @param scriptName 健康检查脚本名称
+   * @param conf Yarn配置对象
+   * @return 创建完成的运行器实例，如果配置不合法则返回null
+   */
   public static NodeHealthScriptRunner newInstance(String scriptName,
       Configuration conf) {
+    // 从配置中读取脚本路径
     String nodeHealthScriptsConfig = String.format(
         YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_PATH_TEMPLATE, scriptName);
     String nodeHealthScript = conf.get(nodeHealthScriptsConfig);
@@ -77,12 +91,13 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
       return null;
     }
 
-    // Determine check interval ms
+    // 读取并计算健康检查间隔（毫秒）
     String checkIntervalMsConfig = String.format(
         YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_INTERVAL_MS_TEMPLATE,
         scriptName);
     long checkIntervalMs = conf.getLong(checkIntervalMsConfig, 0L);
     if (checkIntervalMs == 0L) {
+      // 若未配置脚本专属间隔，使用全局默认间隔
       checkIntervalMs = conf.getLong(
           YarnConfiguration.NM_HEALTH_CHECK_INTERVAL_MS,
           YarnConfiguration.DEFAULT_NM_HEALTH_CHECK_INTERVAL_MS);
@@ -92,16 +107,18 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
           "interval-ms can not be set to a negative number.");
     }
 
+    // 读取是否在NodeManager启动前执行检查的配置
     boolean runBeforeStartup = conf.getBoolean(
         YarnConfiguration.NM_HEALTH_CHECK_RUN_BEFORE_STARTUP,
         YarnConfiguration.DEFAULT_NM_HEALTH_CHECK_RUN_BEFORE_STARTUP);
 
-    // Determine time out
+    // 读取并计算脚本超时时间
     String scriptTimeoutConfig = String.format(
         YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_TIMEOUT_MS_TEMPLATE,
         scriptName);
     long scriptTimeout = conf.getLong(scriptTimeoutConfig, 0L);
     if (scriptTimeout == 0L) {
+      // 若未配置脚本专属超时，使用全局默认超时
       scriptTimeout = conf.getLong(
           YarnConfiguration.NM_HEALTH_CHECK_TIMEOUT_MS,
           YarnConfiguration.DEFAULT_NM_HEALTH_CHECK_TIMEOUT_MS);
@@ -111,7 +128,7 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
           "timeout can only be set to a positive number.");
     }
 
-    // Determine script arguments
+    // 读取脚本执行参数
     String scriptArgsConfig = String.format(
         YarnConfiguration.NM_HEALTH_CHECK_SCRIPT_OPTS_TEMPLATE,
         scriptName);
@@ -121,22 +138,33 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
         checkIntervalMs, scriptTimeout, scriptArgs, runBeforeStartup);
   }
 
+  /**
+   * 健康检查执行结果状态枚举
+   */
   private enum HealthCheckerExitStatus {
+    /** 检查成功，节点健康 */
     SUCCESS,
+    /** 脚本执行超时 */
     TIMED_OUT,
+    /** 脚本执行返回非零退出码 */
     FAILED_WITH_EXIT_CODE,
+    /** 脚本执行抛出异常 */
     FAILED_WITH_EXCEPTION,
+    /** 脚本输出包含ERROR信息 */
     FAILED
   }
 
 
   /**
-   * Class which is used by the {@link Timer} class to periodically execute the
-   * node health script.
+   * 定时任务类，由Timer调度定期执行外部健康检查脚本
    */
   private class NodeHealthMonitorExecutor extends TimerTask {
     private String exceptionStackTrace = "";
 
+    /**
+     * 构造执行器，组装脚本命令
+     * @param args 脚本执行参数
+     */
     NodeHealthMonitorExecutor(String[] args) {
       ArrayList<String> execScript = new ArrayList<String>();
       execScript.add(nodeHealthScript);
@@ -151,17 +179,18 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
     public void run() {
       HealthCheckerExitStatus status = HealthCheckerExitStatus.SUCCESS;
       try {
+        // 执行健康检查脚本
         commandExecutor.execute();
       } catch (ExitCodeException e) {
-        // ignore the exit code of the script
+        // 脚本返回非零退出码，默认标记为失败（Windows平台特殊处理超时判断）
         status = HealthCheckerExitStatus.FAILED_WITH_EXIT_CODE;
-        // On Windows, we will not hit the Stream closed IOException
-        // thrown by stdout buffered reader for timeout event.
+        // Windows平台需要额外判断是否超时
         if (Shell.WINDOWS && commandExecutor.isTimedOut()) {
           status = HealthCheckerExitStatus.TIMED_OUT;
         }
       } catch (Exception e) {
         LOG.warn("Caught exception : " + e.getMessage());
+        // 根据是否超时标记对应状态
         if (!commandExecutor.isTimedOut()) {
           status = HealthCheckerExitStatus.FAILED_WITH_EXCEPTION;
         } else {
@@ -169,49 +198,38 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
         }
         exceptionStackTrace = StringUtils.stringifyException(e);
       } finally {
+        // 如果执行成功，检查输出中是否包含ERROR行
         if (status == HealthCheckerExitStatus.SUCCESS) {
           if (hasErrors(commandExecutor.getOutput())) {
             status = HealthCheckerExitStatus.FAILED;
           }
         }
+        // 根据检查结果上报节点健康状态
         reportHealthStatus(status);
       }
     }
 
     /**
-     * Method which is used to parse output from the node health monitor and
-     * send to the report address.
-     *
-     * The timed out script or script which causes IOException output is
-     * ignored.
-     *
-     * The node is marked unhealthy if
-     * <ol>
-     * <li>The node health script times out</li>
-     * <li>The node health scripts output has a line which begins
-     * with ERROR</li>
-     * <li>An exception is thrown while executing the script</li>
-     * </ol>
-     * If the script throws {@link IOException} or {@link ExitCodeException} the
-     * output is ignored and node is left remaining healthy, as script might
-     * have syntax error.
-     *
-     * @param status
+     * 根据检查结果更新节点健康状态并上报
+     * @param status 健康检查结果状态
      */
     void reportHealthStatus(HealthCheckerExitStatus status) {
       switch (status) {
       case SUCCESS:
       case FAILED_WITH_EXIT_CODE:
-        // see Javadoc above - we don't report bad health intentionally
+        // 成功或脚本非零退出码不标记节点不健康，遵循文档约定
         setHealthyWithoutReport();
         break;
       case TIMED_OUT:
+        // 脚本超时，标记节点不健康并上报超时信息
         setUnhealthyWithReport(NODE_HEALTH_SCRIPT_TIMED_OUT_MSG);
         break;
       case FAILED_WITH_EXCEPTION:
+        // 执行异常，标记节点不健康并上报异常栈
         setUnhealthyWithReport(exceptionStackTrace);
         break;
       case FAILED:
+        // 输出包含ERROR，标记节点不健康并上报脚本完整输出
         setUnhealthyWithReport(commandExecutor.getOutput());
         break;
       default:
@@ -221,10 +239,9 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
     }
 
     /**
-     * Method to check if the output string has line which begins with ERROR.
-     *
-     * @param output the output of the node health script to process
-     * @return true if output string has error pattern in it.
+     * 检查脚本输出是否包含以ERROR开头的行，判断是否存在健康问题
+     * @param output 健康检查脚本输出
+     * @return true 存在错误，false 无错误
      */
     private boolean hasErrors(String output) {
       String[] splits = output.split("\n");
@@ -239,6 +256,7 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
 
   @Override
   public void serviceStop() throws Exception {
+    // 服务停止时销毁仍在运行的脚本进程
     if (commandExecutor != null) {
       Process p = commandExecutor.getProcess();
       if (p != null) {
@@ -249,16 +267,10 @@ public class NodeHealthScriptRunner extends TimedHealthReporterService {
   }
 
   /**
-   * Method used to determine whether the {@link NodeHealthScriptRunner}
-   * should be started or not.<p>
-   * Returns true if following conditions are met:
-   *
-   * <ol>
-   * <li>Path to Node health check script is not empty</li>
-   * <li>Node health check script file exists</li>
-   * </ol>
-   *
-   * @return true if node health monitoring service can be started.
+   * 检查健康检查脚本配置是否合法、文件是否存在且可执行，判断是否需要启动该脚本检查
+   * @param script 脚本名称
+   * @param healthScript 脚本路径
+   * @return true 可以启动检查，false 不启动
    */
   static boolean shouldRun(String script, String healthScript) {
     if (healthScript == null || healthScript.trim().isEmpty()) {

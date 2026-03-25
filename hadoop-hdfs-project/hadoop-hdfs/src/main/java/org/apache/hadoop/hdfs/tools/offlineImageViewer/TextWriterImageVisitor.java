@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,15 +26,10 @@ import java.nio.file.Paths;
 
 
 /**
- * TextWriterImageProcessor mixes in the ability for ImageVisitor
- * implementations to easily write their output to a text file.
- *
- * Implementing classes should be sure to call the super methods for the
- * constructors, finish and finishAbnormally methods, in order that the
- * underlying file may be opened and closed correctly.
- *
- * Note, this class does not add newlines to text written to file or (if
- * enabled) screen.  This is the implementing class' responsibility.
+ * 离线FsImage镜像查看工具的文本写入抽象访问者基类，为具体实现类提供基础的文本文件输出能力
+ * 核心职责：封装输出文件的打开、关闭和写入逻辑，子类只需负责按格式生成输出内容，无需处理IO
+ * 子类必须正确调用父类的构造方法、finish和finishAbnormally方法，以保证文件正确打开和关闭
+ * 本类不会自动在输出内容后添加换行符，换行处理由具体实现类负责
  */
 abstract class TextWriterImageVisitor extends ImageVisitor {
   private boolean printToScreen = false;
@@ -41,27 +37,28 @@ abstract class TextWriterImageVisitor extends ImageVisitor {
   final private OutputStreamWriter fw;
 
   /**
-   * Create a processor that writes to the file named.
+   * 构造仅输出到指定文件的文本写入访问者
    *
-   * @param filename Name of file to write output to
+   * @param filename 输出文件路径
    */
   public TextWriterImageVisitor(String filename) throws IOException {
     this(filename, false);
   }
 
   /**
-   * Create a processor that writes to the file named and may or may not
-   * also output to the screen, as specified.
+   * 构造可同时输出到文件和屏幕的文本写入访问者
    *
-   * @param filename Name of file to write output to
-   * @param printToScreen Mirror output to screen?
+   * @param filename 输出文件路径
+   * @param printToScreen 是否同时将输出镜像到控制台打印
    */
   public TextWriterImageVisitor(String filename, boolean printToScreen)
          throws IOException {
     super();
     this.printToScreen = printToScreen;
+    // 打开输出文件，使用UTF-8编码
     fw = new OutputStreamWriter(Files.newOutputStream(Paths.get(filename)),
         StandardCharsets.UTF_8);
+    // 标记文件已打开，可以写入
     okToWrite = true;
   }
   
@@ -70,6 +67,7 @@ abstract class TextWriterImageVisitor extends ImageVisitor {
    */
   @Override
   void finish() throws IOException {
+    // 正常完成访问流程，关闭输出流
     close();
   }
 
@@ -78,11 +76,12 @@ abstract class TextWriterImageVisitor extends ImageVisitor {
    */
   @Override
   void finishAbnormally() throws IOException {
+    // 异常终止访问流程，依然关闭输出流保证资源释放
     close();
   }
 
   /**
-   * Close output stream and prevent further writing
+   * 关闭输出流，禁止后续写入操作，释放IO资源
    */
   private void close() throws IOException {
     fw.close();
@@ -90,20 +89,24 @@ abstract class TextWriterImageVisitor extends ImageVisitor {
   }
 
   /**
-   * Write parameter to output file (and possibly screen).
+   * 将指定文本写入输出文件，若开启屏幕镜像则同步打印到控制台
    *
-   * @param toWrite Text to write to file
+   * @param toWrite 待写入的文本内容
    */
   protected void write(String toWrite) throws IOException  {
+    // 检查文件是否处于可写入状态
     if(!okToWrite)
       throw new IOException("file not open for writing.");
 
+    // 如果开启屏幕镜像，输出到控制台
     if(printToScreen)
       System.out.print(toWrite);
 
     try {
+      // 写入文本到输出文件
       fw.write(toWrite);
     } catch (IOException e) {
+      // 写入失败后标记不可再写入
       okToWrite = false;
       throw e;
     }

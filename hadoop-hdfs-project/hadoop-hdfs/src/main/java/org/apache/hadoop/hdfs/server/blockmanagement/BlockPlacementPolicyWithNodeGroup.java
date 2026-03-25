@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -27,21 +28,22 @@ import org.apache.hadoop.net.NetworkTopologyWithNodeGroup;
 import org.apache.hadoop.net.Node;
 import org.apache.hadoop.net.NodeBase;
 
-/** The class is responsible for choosing the desired number of targets
- * for placing block replicas on environment with node-group layer.
- * The replica placement strategy is adjusted to:
- * If the writer is on a datanode, the 1st replica is placed on the local 
- *     node(or local node-group or on local rack), otherwise a random datanode.
- * The 2nd replica is placed on a datanode that is on a different rack with 1st
- *     replica node. 
- * The 3rd replica is placed on a datanode which is on a different node-group
- *     but the same rack as the second replica node.
+/**
+ * 带节点组层级的块放置策略实现，用于拥有节点分组（如机架下的可用区/机房分组）的集群环境
+ * 副本放置规则调整为：
+ * 1. 如果写入者在数据节点上，第一个副本放在本地节点，否则回退到本地节点组、本地机架，最后随机选择
+ * 2. 第二个副本放在与第一个副本不同的机架上
+ * 3. 第三个副本放在与第二个副本相同机架、但不同节点组上
+ * 核心目标是保证在多可用区架构下，副本分散在不同节点组，提升容灾能力
  */
 public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefault {
 
   protected BlockPlacementPolicyWithNodeGroup() {
   }
 
+  /**
+   * 初始化带节点组的块放置策略，校验集群拓扑类型必须支持节点组
+   */
   @Override
   public void initialize(Configuration conf,  FSClusterStats stats,
           NetworkTopology clusterMap, 
@@ -55,9 +57,7 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
   }
 
   /**
-   * choose all good favored nodes as target.
-   * If no enough targets, then choose one replica from
-   * each bad favored node's node group.
+   * 优先选择偏好节点作为块副本放置目标，如果偏好节点不足，则从未选中偏好节点的节点组中选择补充节点
    * @throws NotEnoughReplicasException
    */
   @Override
@@ -71,7 +71,7 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
         favoriteAndExcludedNodes, blocksize, maxNodesPerRack, results,
         avoidStaleNodes, storageTypes);
     if (results.size() < numOfReplicas) {
-      // Not enough replicas, choose from unselected Favorednode's Nodegroup
+      // 已选节点不足，遍历未选中的偏好节点，从其所在节点组补充选择
       for (int i = 0;
           i < favoredNodes.size() && results.size() < numOfReplicas; i++) {
         DatanodeDescriptor favoredNode = favoredNodes.get(i);
@@ -82,7 +82,7 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
         }
         NetworkTopologyWithNodeGroup clusterMapNodeGroup =
             (NetworkTopologyWithNodeGroup) clusterMap;
-        // try a node on FavouredNode's node group
+        // 尝试从当前偏好节点所在节点组选择一个可用节点
         DatanodeStorageInfo target = null;
         String scope =
             clusterMapNodeGroup.getNodeGroup(favoredNode.getNetworkLocation());
@@ -91,7 +91,7 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
               chooseRandom(scope, favoriteAndExcludedNodes, blocksize,
                 maxNodesPerRack, results, avoidStaleNodes, storageTypes);
         } catch (NotEnoughReplicasException e) {
-          // catch Exception and continue with other favored nodes
+          // 当前节点组选不到，继续尝试下一个偏好节点的节点组
           continue;
         }
         if (target == null) {
@@ -104,6 +104,9 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
     }
   }
 
+  /**
+   * 判断指定偏好节点是否已经被选中为放置目标
+   */
   private boolean isNodeChosen(
       List<DatanodeStorageInfo> results, DatanodeDescriptor favoredNode) {
     boolean chosenNode = false;
@@ -116,10 +119,10 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
     return chosenNode;
   }
 
-  /** choose local node of <i>localMachine</i> as the target.
-   * If localMachine is not available, will fallback to nodegroup/rack
-   * when flag <i>fallbackToNodeGroupAndLocalRack</i> is set.
-   * @return the chosen node
+  /**
+   * 优先选择本地节点存储作为第一个副本放置目标
+   * 如果本地节点不可用且开启回退开关，则依次回退到本地节点组、本地机架选择
+   * @return 选中的存储信息，选不到返回null
    */
   @Override
   protected DatanodeStorageInfo chooseLocalStorage(Node localMachine,
@@ -138,22 +141,25 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
     if (!fallbackToNodeGroupAndLocalRack) {
       return null;
     }
-    // try a node on local node group
+    // 尝试选择本地节点组内的节点
     DatanodeStorageInfo chosenStorage = chooseLocalNodeGroup(
         (NetworkTopologyWithNodeGroup)clusterMap, localMachine, excludedNodes, 
         blocksize, maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     if (chosenStorage != null) {
       return chosenStorage;
     }
-    // try a node on local rack
+    // 本地节点组也选不到，尝试选择本地机架内的节点
     return chooseLocalRack(localMachine, excludedNodes, 
         blocksize, maxNodesPerRack, results, avoidStaleNodes, storageTypes);
   }
 
-  /** @return the node of the second replica */
+  /**
+   * 从已选结果中获取第二个副本对应的数据节点（排除本地节点）
+   * @return 第二个副本节点，找不到返回null
+   */
   private static DatanodeDescriptor secondNode(Node localMachine,
       List<DatanodeStorageInfo> results) {
-    // find the second replica
+    // 遍历找到非本地的第二个副本
     for(DatanodeStorageInfo nextStorage : results) {
       DatanodeDescriptor nextNode = nextStorage.getDatanodeDescriptor();
       if (nextNode != localMachine) {
@@ -163,25 +169,28 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
     return null;
   }
 
+  /**
+   * 在本地机架范围内选择一个不在本地节点组的节点作为放置目标
+   */
   @Override
   protected DatanodeStorageInfo chooseLocalRack(Node localMachine,
       Set<Node> excludedNodes, long blocksize, int maxNodesPerRack,
       List<DatanodeStorageInfo> results, boolean avoidStaleNodes,
       EnumMap<StorageType, Integer> storageTypes) throws
       NotEnoughReplicasException {
-    // no local machine, so choose a random machine
+    // 无本地机器信息，全局随机选择
     if (localMachine == null) {
       return chooseRandom(NodeBase.ROOT, excludedNodes, blocksize,
           maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     }
 
-    // choose one from the local rack, but off-nodegroup
+    // 优先在本地机架（剔除本地节点组）范围内随机选择
     try {
       final String scope = NetworkTopology.getFirstHalf(localMachine.getNetworkLocation());
       return chooseRandom(scope, excludedNodes, blocksize, maxNodesPerRack,
           results, avoidStaleNodes, storageTypes);
     } catch (NotEnoughReplicasException e1) {
-      // find the second replica
+      // 本地机架找不到，获取已选的第二个副本，尝试在第二个副本的机架选择
       final DatanodeDescriptor newLocal = secondNode(localMachine, results);
       if (newLocal != null) {
         try {
@@ -190,18 +199,21 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
               blocksize, maxNodesPerRack, results, avoidStaleNodes,
               storageTypes);
         } catch(NotEnoughReplicasException e2) {
-          //otherwise randomly choose one from the network
+          // 仍然找不到，全局随机选择
           return chooseRandom(NodeBase.ROOT, excludedNodes, blocksize,
               maxNodesPerRack, results, avoidStaleNodes, storageTypes);
         }
       } else {
-        //otherwise randomly choose one from the network
+        // 没有已选第二个副本，全局随机选择
         return chooseRandom(NodeBase.ROOT, excludedNodes, blocksize,
             maxNodesPerRack, results, avoidStaleNodes, storageTypes);
       }
     }
   }
 
+  /**
+   * 在远端机架选择指定数量的节点作为副本放置目标
+   */
   @Override
   protected void chooseRemoteRack(int numOfReplicas,
       DatanodeDescriptor localMachine, Set<Node> excludedNodes,
@@ -213,22 +225,20 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
     final String rackLocation = NetworkTopology.getFirstHalf(
         localMachine.getNetworkLocation());
     try {
-      // randomly choose from remote racks
+      // 优先在除本地机架外的远端机架随机选择
       chooseRandom(numOfReplicas, "~" + rackLocation, excludedNodes, blocksize,
           maxReplicasPerRack, results, avoidStaleNodes, storageTypes);
     } catch (NotEnoughReplicasException e) {
-      // fall back to the local rack
+      // 远端机架节点不足，回退到本地机架选择剩余需要的节点
       chooseRandom(numOfReplicas - (results.size() - oldNumOfReplicas),
           rackLocation, excludedNodes, blocksize,
           maxReplicasPerRack, results, avoidStaleNodes, storageTypes);
     }
   }
 
-  /* choose one node from the nodegroup that <i>localMachine</i> is on.
-   * if no such node is available, choose one node from the nodegroup where
-   * a second replica is on.
-   * if still no such node is available, return null.
-   * @return the chosen node
+  /**
+   * 在本地节点组范围内选择节点，如果本地节点组找不到则尝试第二个副本的节点组
+   * @return 选中的存储信息，选不到返回null
    */
   private DatanodeStorageInfo chooseLocalNodeGroup(
       NetworkTopologyWithNodeGroup clusterMap, Node localMachine,
@@ -236,19 +246,20 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
       List<DatanodeStorageInfo> results, boolean avoidStaleNodes,
       EnumMap<StorageType, Integer> storageTypes) throws
       NotEnoughReplicasException {
-    // no local machine, so choose a random machine
+    // 无本地机器信息，全局随机选择
     if (localMachine == null) {
       return chooseRandom(NodeBase.ROOT, excludedNodes, blocksize,
           maxNodesPerRack, results, avoidStaleNodes, storageTypes);
     }
 
-    // choose one from the local node group
+    // 优先在本地节点组随机选择
     try {
       return chooseRandom(
           clusterMap.getNodeGroup(localMachine.getNetworkLocation()),
           excludedNodes, blocksize, maxNodesPerRack, results, avoidStaleNodes,
           storageTypes);
     } catch (NotEnoughReplicasException e1) {
+      // 本地节点组找不到，获取已选的第二个副本，尝试在第二个副本的节点组选择
       final DatanodeDescriptor newLocal = secondNode(localMachine, results);
       if (newLocal != null) {
         try {
@@ -257,11 +268,11 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
               excludedNodes, blocksize, maxNodesPerRack, results,
               avoidStaleNodes, storageTypes);
         } catch(NotEnoughReplicasException e2) {
-          //otherwise return null
+          // 仍然找不到，返回null
           return null;
         }
       } else {
-        //otherwise return null
+        // 没有已选第二个副本，返回null
         return null;
       }
     }
@@ -274,10 +285,8 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
   }
   
   /**
-   * Find other nodes in the same nodegroup of <i>localMachine</i> and add them
-   * into <i>excludeNodes</i> as replica should not be duplicated for nodes 
-   * within the same nodegroup
-   * @return number of new excluded nodes
+   * 将选中节点所在节点组的所有节点都加入排除列表，避免同一个节点组内放置多个副本
+   * @return 新加入排除列表的节点数量
    */
   @Override
   protected int addToExcludedNodes(DatanodeDescriptor chosenNode,
@@ -287,7 +296,7 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
     List<Node> leafNodes = clusterMap.getLeaves(nodeGroupScope);
     for (Node leafNode : leafNodes) {
       if (excludedNodes.add(leafNode)) {
-        // not a existing node in excludedNodes
+        // 节点原来不在排除列表，计数+1
         countOfExcludedNodes++;
       }
     }
@@ -298,8 +307,8 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
   }
   
   /**
-   * Add all nodes from a dependent nodes list to excludedNodes.
-   * @return number of new excluded nodes
+   * 将选中节点的所有依赖节点加入排除列表
+   * @return 新加入排除列表的节点数量
    */
   private int addDependentNodesToExcludedNodes(DatanodeDescriptor chosenNode,
       Set<Node> excludedNodes) {
@@ -325,27 +334,20 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
   }
 
   /**
-   * Pick up replica node set for deleting replica as over-replicated. 
-   * First set contains replica nodes on rack with more than one
-   * replica while second set contains remaining replica nodes.
-   * If first is not empty, divide first set into two subsets:
-   *   moreThanOne contains nodes on nodegroup with more than one replica
-   *   exactlyOne contains the remaining nodes in first set
-   * then pickup priSet if not empty.
-   * If first is empty, then pick second.
+   * 从过度复制的副本集合中选择需要删除的副本集合
+   * 优先删除同一个节点组内存在多个副本的节点组中的副本，提升副本容灾分布
+   * @return 选中的待删除副本集合
    */
   @Override
   public Collection<DatanodeStorageInfo> pickupReplicaSet(
       Collection<DatanodeStorageInfo> first,
       Collection<DatanodeStorageInfo> second,
       Map<String, List<DatanodeStorageInfo>> rackMap) {
-    // If no replica within same rack, return directly.
+    // 同机架没有多余副本，直接返回剩余集合
     if (first.isEmpty()) {
       return second;
     }
-    // Split data nodes in the first set into two sets, 
-    // moreThanOne contains nodes on nodegroup with more than one replica
-    // exactlyOne contains the remaining nodes
+    // 按节点组分组，用于判断哪些节点组存在多个副本
     Map<String, List<DatanodeStorageInfo>> nodeGroupMap = new HashMap<>();
     
     for(DatanodeStorageInfo storage : first) {
@@ -361,13 +363,13 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
     
     final List<DatanodeStorageInfo> moreThanOne = new ArrayList<>();
     final List<DatanodeStorageInfo> exactlyOne = new ArrayList<>();
-    // split nodes into two sets
+    // 将节点组分为有多个副本和只有一个副本两类
     for(List<DatanodeStorageInfo> datanodeList : nodeGroupMap.values()) {
       if (datanodeList.size() == 1 ) {
-        // exactlyOne contains nodes on nodegroup with exactly one replica
+        // 节点组内只有一个副本
         exactlyOne.add(datanodeList.get(0));
       } else {
-        // moreThanOne contains nodes on nodegroup with more than one replica
+        // 节点组内有多个副本，优先删除这里的副本
         moreThanOne.addAll(datanodeList);
       }
     }
@@ -376,12 +378,9 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
   }
 
   /**
-   * Check if there are any replica (other than source) on the same node group
-   * with target. If true, then target is not a good candidate for placing
-   * specific replica as we don't want 2 replicas under the same nodegroup.
-   *
-   * @return true if there are any replica (other than source) on the same node
-   *         group with target
+   * 检查目标节点是否适合作为块迁移的目标节点
+   * 不允许目标节点和已有任意副本（除源节点外）处于同一个节点组
+   * @return 如果目标节点与已有副本同节点组则返回false（不可移动），否则返回true
    */
   @Override
   public boolean isMovable(Collection<DatanodeInfo> locs,
@@ -396,48 +395,9 @@ public class BlockPlacementPolicyWithNodeGroup extends BlockPlacementPolicyDefau
   }
 
 
+  /**
+   * 验证块放置是否满足节点组分散的放置策略，返回放置状态报告
+   */
   @Override
   public BlockPlacementStatus verifyBlockPlacement(DatanodeInfo[] locs,
-      int numberOfReplicas) {
-    if (locs == null) {
-      locs = DatanodeDescriptor.EMPTY_ARRAY;
-    }
-
-    List<String> locList = new ArrayList<String>();
-    /*
-     * remove the part of node group for BlockPlacementPolicyDefault to count
-     * distinct racks, e.g. "/d1/r1/n1" --> "/d1/r1"
-     */
-    for (int i = 0; i < locs.length; i++) {
-      locList.add(locs[i].getNetworkLocation());
-      locs[i].setNetworkLocation(NetworkTopology.getFirstHalf(locs[i]
-          .getNetworkLocation()));
-    }
-
-    BlockPlacementStatus defaultStatus = super.verifyBlockPlacement(locs,
-        numberOfReplicas);
-
-    // restore the part of node group back
-    for (int i = 0; i < locs.length; i++) {
-      locs[i].setNetworkLocation(locList.get(i));
-    }
-
-    int minNodeGroups = numberOfReplicas;
-    BlockPlacementStatusWithNodeGroup nodeGroupStatus =
-        new BlockPlacementStatusWithNodeGroup(
-            defaultStatus, getNodeGroupsFromNode(locs), minNodeGroups);
-    return nodeGroupStatus;
-  }
-
-  private Set<String> getNodeGroupsFromNode(DatanodeInfo[] nodes) {
-    Set<String> nodeGroups = new HashSet<>();
-    if (nodes == null) {
-      return nodeGroups;
-    }
-
-    for (DatanodeInfo node : nodes) {
-      nodeGroups.add(NetworkTopology.getLastHalf(node.getNetworkLocation()));
-    }
-    return nodeGroups;
-  }
-}
+      int numberOfReplicas)

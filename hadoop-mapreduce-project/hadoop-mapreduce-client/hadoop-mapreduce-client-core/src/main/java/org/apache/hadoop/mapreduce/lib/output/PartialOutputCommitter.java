@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,18 +25,19 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 /**
- * Interface for an {@link org.apache.hadoop.mapreduce.OutputCommitter}
- * implementing partial commit of task output, as during preemption.
+ * 文件说明：Partial输出提交器接口，定义任务输出部分提交的能力，主要用于任务抢占场景
+ *
+ * 接口说明：支持OutputCommitter实现任务输出的部分提交，适用于任务被抢占后需要处理已有输出的场景，
+ * 允许清理任务之前执行产生的部分提交输出，为任务重新执行准备干净环境。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface PartialOutputCommitter {
 
   /**
-   * Remove all previously committed outputs from prior executions of this task.
-   * @param context Context for cleaning up previously promoted output.
-   * @throws IOException If cleanup fails, then the state of the task my not be
-   *                     well defined.
+   * 清理当前任务之前执行产生的所有已部分提交输出
+   * @param context 任务尝试上下文，用于获取任务信息和配置
+   * @throws IOException 清理失败时抛出异常，此时任务状态可能未正确定义
    */
   public void cleanUpPartialOutputForTask(TaskAttemptContext context)
     throws IOException;

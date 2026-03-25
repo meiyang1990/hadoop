@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,25 +21,24 @@ package org.apache.hadoop.hdfs.server.namenode;
 import org.apache.hadoop.classification.InterfaceAudience;
 
 /**
- * Implementers of this class represent a NN resource whose availability can be
- * checked. A resource can be either "required" or "redundant". All required
- * resources must be available for the NN to continue operating. The NN will
- * continue to operate as long as *any* redundant resource is available.
+ * NameNode可检查资源接口，定义资源可用性检查和资源必要性判断的统一契约。
+ * 该接口用于对NameNode运行依赖的各类资源进行健康检查，根据资源性质分为必需资源和冗余资源：
+ * 所有必需资源必须可用，NameNode才能继续运行；只要存在任意一个冗余资源可用，NameNode即可继续运行。
  */
 @InterfaceAudience.Private
 interface CheckableNameNodeResource {
   
   /**
-   * Is this resource currently available. 
+   * 检查当前资源是否可用。
    * 
-   * @return true if and only if the resource in question is available.  
+   * @return true 资源可用，false 资源不可用
    */
   public boolean isResourceAvailable();
   
   /**
-   * Is this resource required.
+   * 判断当前资源是否为NameNode运行的必需资源。
    * 
-   * @return true if and only if the resource in question is required for NN operation.
+   * @return true 是必需资源，false 是冗余资源
    */
   public boolean isRequired();
 

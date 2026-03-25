@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -38,10 +39,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This is a DAO class for the configuration of parameters for federation
- * policies. This generalizes several possible configurations as two lists of
- * {@link SubClusterIdInfo} and corresponding weights as a {@link Float}. The
- * interpretation of the weight is left to the logic in the policy.
+ * YARN联邦权重策略配置数据访问对象，存储路由器和AMRM代理的子集群权重配置，以及负载均衡系数。
+ * 权重的具体解释由对应策略实现决定，本类仅负责数据存储和序列化。
  */
 
 @InterfaceAudience.Private
@@ -52,28 +51,30 @@ public class WeightedPolicyInfo {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(WeightedPolicyInfo.class);
+  // Jackson JSON序列化/反序列化工具实例
   private static ObjectMapper mapper = new ObjectMapper();
   @JsonProperty("routerPolicyWeights")
+  // 路由器路由策略的子集群权重映射
   private Map<SubClusterIdInfo, Float> routerPolicyWeights = new HashMap<>();
   @JsonProperty("amrmPolicyWeights")
+  // AMRM代理策略的子集群权重映射
   private Map<SubClusterIdInfo, Float> amrmPolicyWeights = new HashMap<>();
   @JsonProperty("headroomAlpha")
+  // 空闲资源权重系数，平衡静态权重和动态负载的影响
   private float headroomAlpha;
 
   public WeightedPolicyInfo() {
-    // JAXB needs this
+    // JAXB需要无参构造函数
   }
 
   /**
-   * Deserializes a {@link WeightedPolicyInfo} from a byte UTF-8 JSON
-   * representation.
+   * 从UTF-8编码的ByteBuffer反序列化生成WeightedPolicyInfo对象。
    *
-   * @param bb the input byte representation.
+   * @param bb 存储JSON格式配置的字节缓冲区
    *
-   * @return the {@link WeightedPolicyInfo} represented.
+   * @return 反序列化得到的WeightedPolicyInfo实例
    *
-   * @throws FederationPolicyInitializationException if a deserialization error
-   *           occurs.
+   * @throws FederationPolicyInitializationException 反序列化失败时抛出
    */
   public static WeightedPolicyInfo fromByteBuffer(ByteBuffer bb)
       throws FederationPolicyInitializationException {
@@ -84,9 +85,13 @@ public class WeightedPolicyInfo {
     }
 
     try {
+      // 分配字节数组存储缓冲区数据
       final byte[] bytes = new byte[bb.remaining()];
+      // 读取缓冲区内容到字节数组
       bb.get(bytes);
+      // 转换为UTF-8编码的JSON字符串
       String params = new String(bytes, StandardCharsets.UTF_8);
+      // Jackson反序列化得到对象
       return mapper.readValue(params, WeightedPolicyInfo.class);
     } catch (JsonProcessingException j) {
       throw new FederationPolicyInitializationException(j);
@@ -94,18 +99,18 @@ public class WeightedPolicyInfo {
   }
 
   /**
-   * Getter of the router weights.
+   * 获取路由器路由策略的子集群权重映射。
    *
-   * @return the router weights.
+   * @return 路由器策略权重映射
    */
   public Map<SubClusterIdInfo, Float> getRouterPolicyWeights() {
     return routerPolicyWeights;
   }
 
   /**
-   * Setter method for Router weights.
+   * 设置路由器路由策略的子集群权重映射。
    *
-   * @param policyWeights the router weights.
+   * @param policyWeights 路由器策略权重映射
    */
   public void setRouterPolicyWeights(
       Map<SubClusterIdInfo, Float> policyWeights) {
@@ -113,31 +118,29 @@ public class WeightedPolicyInfo {
   }
 
   /**
-   * Getter for AMRMProxy weights.
+   * 获取AMRM代理策略的子集群权重映射。
    *
-   * @return the AMRMProxy weights.
+   * @return AMRM代理策略权重映射
    */
   public Map<SubClusterIdInfo, Float> getAMRMPolicyWeights() {
     return amrmPolicyWeights;
   }
 
   /**
-   * Setter method for ARMRMProxy weights.
+   * 设置AMRM代理策略的子集群权重映射。
    *
-   * @param policyWeights the amrmproxy weights.
+   * @param policyWeights AMRM代理策略权重映射
    */
   public void setAMRMPolicyWeights(Map<SubClusterIdInfo, Float> policyWeights) {
     this.amrmPolicyWeights = policyWeights;
   }
 
   /**
-   * Converts the policy into a byte array representation in the input
-   * {@link ByteBuffer}.
+   * 将当前WeightedPolicyInfo序列化为UTF-8编码的ByteBuffer。
    *
-   * @return byte array representation of this policy configuration.
+   * @return 存储JSON格式配置的字节缓冲区
    *
-   * @throws FederationPolicyInitializationException if a serialization error
-   *           occurs.
+   * @throws FederationPolicyInitializationException 序列化失败时抛出
    */
   public ByteBuffer toByteBuffer()
       throws FederationPolicyInitializationException {
@@ -146,7 +149,9 @@ public class WeightedPolicyInfo {
           "JSONJAXBContext should not be null.");
     }
     try {
+      // 序列化为JSON字符串
       String value = mapper.writeValueAsString(this);
+      // 转换为UTF-8字节数组并包装为ByteBuffer
       return ByteBuffer.wrap(value.getBytes(StandardCharsets.UTF_8));
     } catch (JsonProcessingException j) {
       throw new FederationPolicyInitializationException(j);
@@ -155,7 +160,7 @@ public class WeightedPolicyInfo {
 
   @Override
   public boolean equals(Object other) {
-
+    // 空值和类型检查
     if (other == null || !other.getClass().equals(this.getClass())) {
       return false;
     }
@@ -166,49 +171,43 @@ public class WeightedPolicyInfo {
     Map<SubClusterIdInfo, Float> otherRouterWeights =
         otherPolicy.getRouterPolicyWeights();
 
+    // 比较AMRM权重集合是否相等
     boolean amrmWeightsMatch =
         otherAMRMWeights != null && getAMRMPolicyWeights() != null
             && CollectionUtils.isEqualCollection(otherAMRMWeights.entrySet(),
                 getAMRMPolicyWeights().entrySet());
 
+    // 比较路由器权重集合是否相等
     boolean routerWeightsMatch =
         otherRouterWeights != null && getRouterPolicyWeights() != null
             && CollectionUtils.isEqualCollection(otherRouterWeights.entrySet(),
                 getRouterPolicyWeights().entrySet());
 
+    // 两个权重集合都相等才返回true
     return amrmWeightsMatch && routerWeightsMatch;
   }
 
   @Override
   public int hashCode() {
+    // 基于两个权重映射计算哈希值
     return 31 * amrmPolicyWeights.hashCode() + routerPolicyWeights.hashCode();
   }
 
   /**
-   * Return the parameter headroomAlpha, used by policies that balance
-   * weight-based and load-based considerations in their decisions.
+   * 获取空闲资源权重系数headroomAlpha，该系数用于平衡静态权重和动态负载在路由决策中的占比。
+   * 系数越接近1，决策越依赖当前子集群实际可用空闲资源；越接近0，决策越依赖静态权重，忽略当前负载。
    *
-   * For policies that use this parameter, values close to 1 indicate that most
-   * of the decision should be based on currently observed headroom from various
-   * sub-clusters, values close to zero, indicate that the decision should be
-   * mostly based on weights and practically ignore current load.
-   *
-   * @return the value of headroomAlpha.
+   * @return headroomAlpha系数值
    */
   public float getHeadroomAlpha() {
     return headroomAlpha;
   }
 
   /**
-   * Set the parameter headroomAlpha, used by policies that balance weight-based
-   * and load-based considerations in their decisions.
+   * 设置空闲资源权重系数headroomAlpha，该系数用于平衡静态权重和动态负载在路由决策中的占比。
+   * 系数越接近1，决策越依赖当前子集群实际可用空闲资源；越接近0，决策越依赖静态权重，忽略当前负载。
    *
-   * For policies that use this parameter, values close to 1 indicate that most
-   * of the decision should be based on currently observed headroom from various
-   * sub-clusters, values close to zero, indicate that the decision should be
-   * mostly based on weights and practically ignore current load.
-   *
-   * @param headroomAlpha the value to use for balancing.
+   * @param headroomAlpha 平衡系数值
    */
   public void setHeadroomAlpha(float headroomAlpha) {
     this.headroomAlpha = headroomAlpha;
@@ -217,6 +216,7 @@ public class WeightedPolicyInfo {
   @Override
   public String toString() {
     try {
+      // 序列化为JSON字符串返回
       return mapper.writeValueAsString(this);
     } catch (JsonProcessingException e) {
       e.printStackTrace();

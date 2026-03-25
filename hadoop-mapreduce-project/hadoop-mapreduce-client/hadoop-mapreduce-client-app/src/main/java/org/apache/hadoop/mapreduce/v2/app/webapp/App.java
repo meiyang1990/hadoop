@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -23,28 +24,51 @@ import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.job.Job;
 import org.apache.hadoop.mapreduce.v2.app.job.Task;
 
+/**
+ * MapReduce Application Web UI 上下文持有类，用于在Web页面渲染过程中共享当前请求关联的应用、作业和任务信息
+ */
 public class App {
   final AppContext context;
   private Job job;
   private Task task;
 
+  /**
+   * 构造函数，注入应用上下文
+   * @param ctx MapReduce应用上下文，包含整个应用的全局信息
+   */
   @Inject
   public App(AppContext ctx) {
     context = ctx;
   }
 
+  /**
+   * 设置当前请求关联的作业对象
+   * @param job 作业实例对象
+   */
   void setJob(Job job) {
     this.job = job;
   }
 
+  /**
+   * 获取当前请求关联的作业对象
+   * @return 当前作业实例
+   */
   public Job getJob() {
     return job;
   }
 
+  /**
+   * 设置当前请求关联的任务对象
+   * @param task 任务实例对象
+   */
   void setTask(Task task) {
     this.task = task;
   }
 
+  /**
+   * 获取当前请求关联的任务对象
+   * @return 当前任务实例
+   */
   public Task getTask() {
     return task;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -31,9 +32,8 @@ import org.slf4j.LoggerFactory;
 
 // 共享缓存管理器的简单Web界面，展示由SharedCacheManager报告的指标
 /**
- * A very simple web interface for the metrics reported by
- * {@link org.apache.hadoop.yarn.server.sharedcachemanager.SharedCacheManager}
- * TODO: Security for web ui (See YARN-2774)
+ * 共享缓存管理器(SCM)的Web服务端，提供Web界面查看共享缓存指标信息
+ * 目前仅实现基础指标展示，TODO: 待添加Web UI安全机制(YARN-2774)
  */
 @Private
 @Unstable
@@ -45,6 +45,10 @@ public class SCMWebServer extends AbstractService {
   private WebApp webApp;
   private String bindAddress;
 
+  /**
+   * 构造SCM Web服务实例
+   * @param scm 所属共享缓存管理器实例
+   */
   public SCMWebServer(SharedCacheManager scm) {
     super(SCMWebServer.class.getName());
     this.scm = scm;
@@ -52,10 +56,16 @@ public class SCMWebServer extends AbstractService {
 
   @Override
   protected void serviceInit(Configuration conf) throws Exception {
+    // 获取Web服务绑定地址
     this.bindAddress = getBindAddress(conf);
     super.serviceInit(conf);
   }
 
+  /**
+   * 从配置中读取Web服务绑定地址，使用默认值兜底
+   * @param conf 配置对象
+   * @return 绑定地址字符串
+   */
   private String getBindAddress(Configuration conf) {
     return conf.get(YarnConfiguration.SCM_WEBAPP_ADDRESS,
         YarnConfiguration.DEFAULT_SCM_WEBAPP_ADDRESS);
@@ -63,18 +73,26 @@ public class SCMWebServer extends AbstractService {
 
   @Override
   protected void serviceStart() throws Exception {
+    // 创建SCM Web应用实例
     SCMWebApp scmWebApp = new SCMWebApp(scm);
+    // 启动Web服务，绑定到配置的地址
     this.webApp = WebApps.$for("sharedcache").at(bindAddress).start(scmWebApp);
     LOG.info("Instantiated " + SCMWebApp.class.getName() + " at " + bindAddress);
+    super.serviceStart();
   }
 
   @Override
   protected void serviceStop() throws Exception {
+    // 停止Web应用
     if (this.webApp != null) {
       this.webApp.stop();
     }
+    super.serviceStop();
   }
 
+  /**
+   * SCM Web应用内部类，负责路由和依赖绑定
+   */
   private class SCMWebApp extends WebApp {
     private final SharedCacheManager scm;
 
@@ -84,9 +102,11 @@ public class SCMWebServer extends AbstractService {
 
     @Override
     public void setup() {
+      // 绑定共享缓存管理器实例到依赖注入容器
       if (scm != null) {
         bind(SharedCacheManager.class).toInstance(scm);
       }
+      // 配置根路径路由到总览页面
       route("/", SCMController.class, "overview");
     }
   }

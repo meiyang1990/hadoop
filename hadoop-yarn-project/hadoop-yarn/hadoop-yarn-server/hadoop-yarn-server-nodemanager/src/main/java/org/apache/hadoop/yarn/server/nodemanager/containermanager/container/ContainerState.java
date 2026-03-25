@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -19,15 +20,13 @@
 package org.apache.hadoop.yarn.server.nodemanager.containermanager.container;
 
 /**
- * States used by the container state machine.
+ * 容器状态机使用的容器状态枚举，定义了NodeManager中容器生命周期的所有可能状态。
+ * 对枚举进行增删改后，请同步更新：
+ * 1. ContainerImpl::getContainerSubState() 方法
+ * 2. ContainerSubState 类文档
+ * 3. yarn_protos.proto 协议文档
  */
 public enum ContainerState {
-  // NOTE: In case of future additions / deletions / modifications to this
-  //       enum, please ensure that the following are also correspondingly
-  //       updated:
-  //       1. ContainerImpl::getContainerSubState().
-  //       2. the doc in the ContainerSubState class.
-  //       3. the doc in the yarn_protos.proto file.
   NEW, LOCALIZING, LOCALIZATION_FAILED, SCHEDULED, RUNNING, RELAUNCHING,
   REINITIALIZING, REINITIALIZING_AWAITING_KILL,
   EXITED_WITH_SUCCESS, EXITED_WITH_FAILURE, KILLING,

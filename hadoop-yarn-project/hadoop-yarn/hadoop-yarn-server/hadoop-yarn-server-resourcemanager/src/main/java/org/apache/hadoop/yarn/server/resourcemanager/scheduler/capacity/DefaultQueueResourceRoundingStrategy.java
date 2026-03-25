@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,12 +23,17 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCap
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.QueueCapacityVector.ResourceUnitCapacityType;
 
 /**
- * The default rounding strategy for resource calculation. Uses floor for all types except WEIGHT,
- * which is always the last type to consider, therefore it is safe to round up.
+ * 默认队列资源舍入策略，用于容量调度器的资源计算。
+ * 除了最后处理的权重类型资源使用四舍五入外，所有其他类型资源使用向下取整。
  */
 public class DefaultQueueResourceRoundingStrategy implements QueueResourceRoundingStrategy {
+  // 存储优先级列表中最后处理的资源容量类型
   private final ResourceUnitCapacityType lastCapacityType;
 
+  /**
+   * 构造默认舍入策略，根据容量类型优先级确定最后处理的资源类型
+   * @param capacityTypePrecedence 容量类型处理优先级数组
+   */
   public DefaultQueueResourceRoundingStrategy(
       ResourceUnitCapacityType[] capacityTypePrecedence) {
     if (capacityTypePrecedence.length == 0) {
@@ -39,9 +45,11 @@ public class DefaultQueueResourceRoundingStrategy implements QueueResourceRoundi
 
   @Override
   public double getRoundedResource(double resourceValue, QueueCapacityVectorEntry capacityVectorEntry) {
+    // 如果是最后处理的资源类型，使用四舍五入
     if (capacityVectorEntry.getVectorResourceType().equals(lastCapacityType)) {
       return Math.round(resourceValue);
     } else {
+      // 其他资源类型使用向下取整
       return Math.floor(resourceValue);
     }
   }

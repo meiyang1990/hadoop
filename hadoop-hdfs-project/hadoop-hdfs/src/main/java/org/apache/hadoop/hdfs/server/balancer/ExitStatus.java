@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,18 +19,27 @@
 package org.apache.hadoop.hdfs.server.balancer;
 
 /**
- * Exit status - The values associated with each exit status is directly mapped
- * to the process's exit code in command line.
+ * HDFS数据均衡器进程退出状态枚举
+ * 每个退出状态对应的数据值，会直接作为命令行进程的退出码返回
  */
 public enum ExitStatus {
+  /** 均衡执行成功，退出码0 */
   SUCCESS(0),
+  /** 均衡正在执行中，退出码1 */
   IN_PROGRESS(1),
+  /** 已有均衡实例正在运行，退出码-1 */
   ALREADY_RUNNING(-1),
+  /** 没有需要移动的数据块，退出码-2 */
   NO_MOVE_BLOCK(-2),
+  /** 均衡执行无进展，退出码-3 */
   NO_MOVE_PROGRESS(-3),
+  /** IO异常导致退出，退出码-4 */
   IO_EXCEPTION(-4),
+  /** 非法参数导致退出，退出码-5 */
   ILLEGAL_ARGUMENTS(-5),
+  /** 执行被中断，退出码-6 */
   INTERRUPTED(-6),
+  /** 存在未完成的升级无法执行均衡，退出码-7 */
   UNFINALIZED_UPGRADE(-7);
 
   private final int code;
@@ -38,7 +48,10 @@ public enum ExitStatus {
     this.code = code;
   }
   
-  /** @return the command line exit code. */
+  /** 
+   * 获取对应当前退出状态的命令行退出码
+   * @return 命令行进程退出码
+   */
   public int getExitCode() {
     return code;
   }

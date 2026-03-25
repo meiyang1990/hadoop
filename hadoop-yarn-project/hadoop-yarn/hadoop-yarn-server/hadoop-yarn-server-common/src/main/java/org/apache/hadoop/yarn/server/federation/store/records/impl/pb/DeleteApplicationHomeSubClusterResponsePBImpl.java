@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,29 +26,43 @@ import org.apache.hadoop.yarn.server.federation.store.records.DeleteApplicationH
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of
- * {@link DeleteApplicationHomeSubClusterResponse}.
+ * 文件说明：YARN联邦存储删除应用归属子集群响应的Protocol Buffer实现类，基于PB序列化协议实现响应对象
+ * 实现了 {@link DeleteApplicationHomeSubClusterResponse} 接口。
  */
 @Private
 @Unstable
 public class DeleteApplicationHomeSubClusterResponsePBImpl
     extends DeleteApplicationHomeSubClusterResponse {
 
+  // PB协议的响应对象实例
   private DeleteApplicationHomeSubClusterResponseProto proto =
       DeleteApplicationHomeSubClusterResponseProto.getDefaultInstance();
+  // PB构建器，用于构造响应对象
   private DeleteApplicationHomeSubClusterResponseProto.Builder builder = null;
+  // 标识当前是否已经构建为完成的proto对象
   private boolean viaProto = false;
 
+  /**
+   * 构造函数，初始化PB构建器用于创建响应对象。
+   */
   public DeleteApplicationHomeSubClusterResponsePBImpl() {
     builder = DeleteApplicationHomeSubClusterResponseProto.newBuilder();
   }
 
+  /**
+   * 构造函数，基于已有的proto对象包装实现。
+   * @param proto 已构建完成的PB响应proto对象
+   */
   public DeleteApplicationHomeSubClusterResponsePBImpl(
       DeleteApplicationHomeSubClusterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前响应对应的PB proto对象，懒加载构建。
+   * @return 构建完成的PB proto对象
+   */
   public DeleteApplicationHomeSubClusterResponseProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;

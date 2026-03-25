@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,8 +39,7 @@ import org.apache.hadoop.util.StringUtils;
 
 
 /**
- * Static functions for dealing with files of the same format
- * that the Unix "md5sum" utility writes.
+ * 处理Unix md5sum工具格式的MD5校验文件工具类，提供MD5校验文件的读写、验证、重命名等功能
  */
 public abstract class MD5FileUtils {
   private static final Logger LOG = LoggerFactory.getLogger(
@@ -50,14 +50,15 @@ public abstract class MD5FileUtils {
     Pattern.compile("([0-9a-f]{32}) [ \\*](.+)");
   
   /**
-   * Verify that the previously saved md5 for the given file matches
-   * expectedMd5.
-   * @throws IOException 
+   * 验证给定数据文件对应的存储MD5校验值是否与预期一致
+   * @param dataFile 待验证的数据文件
+   * @param expectedMD5 预期正确的MD5校验值
+   * @throws IOException 当校验不匹配或读取校验文件失败时抛出异常
    */
   public static void verifySavedMD5(File dataFile, MD5Hash expectedMD5)
       throws IOException {
     MD5Hash storedHash = readStoredMd5ForFile(dataFile);
-    // Check the hash itself
+    // 检查MD5值是否匹配
     if (!expectedMD5.equals(storedHash)) {
       throw new IOException(
           "File " + dataFile + " did not match stored MD5 checksum " +
@@ -66,11 +67,10 @@ public abstract class MD5FileUtils {
   }
   
   /**
-   * Read the md5 file stored alongside the given data file
-   * and match the md5 file content.
-   * @param md5File the file containing md5 data
-   * @return a matcher with two matched groups
-   *   where group(1) is the md5 string and group(2) is the data file path.
+   * 读取MD5校验文件，将内容匹配到正则提取组
+   * @param md5File MD5校验文件
+   * @return 匹配后的Matcher对象，group(1)为MD5字符串，group(2)为数据文件路径
+   * @throws IOException 读取文件或内容格式不匹配时抛出异常
    */
   private static Matcher readStoredMd5(File md5File) throws IOException {
     BufferedReader reader =
@@ -78,12 +78,14 @@ public abstract class MD5FileUtils {
             Files.newInputStream(md5File.toPath()), StandardCharsets.UTF_8));
     String md5Line;
     try {
+      // 读取MD5文件第一行
       md5Line = reader.readLine();
       if (md5Line == null) { md5Line = ""; }
       md5Line = md5Line.trim();
     } catch (IOException ioe) {
       throw new IOException("Error reading md5 file at " + md5File, ioe);
     } finally {
+      // 关闭流并记录日志
       IOUtils.cleanupWithLogger(LOG, reader);
     }
     
@@ -96,9 +98,10 @@ public abstract class MD5FileUtils {
   }
 
   /**
-   * Read the md5 checksum stored alongside the given data file.
-   * @param dataFile the file containing data
-   * @return the checksum stored in dataFile.md5
+   * 读取指定数据文件对应的同目录.md5文件中的MD5校验值
+   * @param dataFile 目标数据文件
+   * @return 存储在dataFile.md5中的MD5校验值，若校验文件不存在返回null
+   * @throws IOException 读取文件或校验失败时抛出异常
    */
   public static MD5Hash readStoredMd5ForFile(File dataFile) throws IOException {
     final File md5File = getDigestFileForFile(dataFile);
@@ -110,8 +113,7 @@ public abstract class MD5FileUtils {
     String storedHash = matcher.group(1);
     File referencedFile = new File(matcher.group(2));
 
-    // Sanity check: Make sure that the file referenced in the .md5 file at
-    // least has the same name as the file we expect
+    // 合理性检查：确保MD5文件中记录的文件名与实际数据文件名一致
     if (!referencedFile.getName().equals(dataFile.getName())) {
       throw new IOException(
           "MD5 file at " + md5File + " references file named " +
@@ -122,13 +124,17 @@ public abstract class MD5FileUtils {
   }
   
   /**
-   * Read dataFile and compute its MD5 checksum.
+   * 计算指定文件内容的MD5校验值
+   * @param dataFile 待计算的目标文件
+   * @return 计算得到的MD5校验值对象
+   * @throws IOException 读取文件失败时抛出异常
    */
   public static MD5Hash computeMd5ForFile(File dataFile) throws IOException {
     InputStream in = Files.newInputStream(dataFile.toPath());
     try {
       MessageDigest digester = MD5Hash.getDigester();
       DigestInputStream dis = new DigestInputStream(in, digester);
+      // 读取整个文件更新摘要
       IOUtils.copyBytes(dis, new IOUtils.NullOutputStream(), 128*1024);
       
       return new MD5Hash(digester.digest());
@@ -138,10 +144,10 @@ public abstract class MD5FileUtils {
   }
 
   /**
-   * Save the ".md5" file that lists the md5sum of another file.
-   * @param dataFile the original file whose md5 was computed
-   * @param digest the computed digest
-   * @throws IOException
+   * 为指定数据文件保存MD5校验值到同目录.md5文件中，遵循md5sum格式
+   * @param dataFile 原始数据文件
+   * @param digest 计算得到的MD5摘要
+   * @throws IOException 写入文件失败时抛出异常
    */
   public static void saveMD5File(File dataFile, MD5Hash digest)
       throws IOException {
@@ -149,11 +155,18 @@ public abstract class MD5FileUtils {
     saveMD5File(dataFile, digestString);
   }
 
+  /**
+   * 实际执行写入MD5校验文件的操作，使用原子输出流保证写入安全
+   * @param dataFile 原始数据文件
+   * @param digestString 十六进制格式的MD5字符串
+   * @throws IOException 写入文件失败时抛出异常
+   */
   private static void saveMD5File(File dataFile, String digestString)
       throws IOException {
     File md5File = getDigestFileForFile(dataFile);
     String md5Line = digestString + " *" + dataFile.getName() + "\n";
 
+    // 使用原子输出流，避免写入中途失败导致文件损坏
     AtomicFileOutputStream afos = new AtomicFileOutputStream(md5File);
     afos.write(md5Line.getBytes(StandardCharsets.UTF_8));
     afos.close();
@@ -163,6 +176,12 @@ public abstract class MD5FileUtils {
     }
   }
 
+  /**
+   * 将原数据文件对应的MD5校验文件重命名为对应新数据文件的名称，更新内容后保存，删除原校验文件
+   * @param oldDataFile 原数据文件
+   * @param newDataFile 新数据文件
+   * @throws IOException 读取、写入或删除文件失败时抛出异常
+   */
   public static void renameMD5File(File oldDataFile, File newDataFile)
       throws IOException {
     final File fromFile = getDigestFileForFile(oldDataFile);
@@ -170,17 +189,20 @@ public abstract class MD5FileUtils {
       throw new FileNotFoundException(fromFile + " does not exist.");
     }
 
+    // 读取原MD5值，保存到对应新文件的MD5文件中
     final String digestString = readStoredMd5(fromFile).group(1);
     saveMD5File(newDataFile, digestString);
 
+    // 删除原MD5校验文件，删除失败记录警告日志
     if (!fromFile.delete()) {
       LOG.warn("deleting  " + fromFile.getAbsolutePath() + " FAILED");
     }
   }
 
   /**
-   * @return a reference to the file with .md5 suffix that will
-   * contain the md5 checksum for the given data file.
+   * 获取给定数据文件对应的MD5校验文件对象，路径为同目录+原文件名+.md5后缀
+   * @param file 原始数据文件
+   * @return 对应的MD5校验文件对象
    */
   public static File getDigestFileForFile(File file) {
     return new File(file.getParentFile(), file.getName() + MD5_SUFFIX);

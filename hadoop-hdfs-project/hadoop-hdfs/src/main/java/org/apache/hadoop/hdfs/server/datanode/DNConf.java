@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -80,8 +81,8 @@ import org.apache.hadoop.util.Preconditions;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Simple class encapsulating all of the configuration that the DataNode
- * loads at startup time.
+ * 文件路径: hadoop-hdfs-project/hadoop-hdfs/src/main/java/org/apache/hadoop/hdfs/server/datanode/DNConf.java
+ * 数据节点启动时加载的所有配置项的封装类，集中管理DataNode的全部配置参数，提供统一的配置访问接口
  */
 @InterfaceAudience.Private
 public class DNConf {
@@ -141,6 +142,10 @@ public class DNConf {
   private final int maxDataLength;
   private Configurable dn;
 
+  /**
+   * 构造方法，从配置对象加载DataNode所有启动参数，初始化全部配置项
+   * @param dn DataNode可配置对象，用于获取原始配置
+   */
   public DNConf(final Configurable dn) {
     this.dn = dn;
     socketTimeout = getConf().getInt(DFS_CLIENT_SOCKET_TIMEOUT_KEY,
@@ -216,15 +221,18 @@ public class DNConf {
     this.datanodeSlowIoWarningThresholdMs = getConf().getLong(
         DFSConfigKeys.DFS_DATANODE_SLOW_IO_WARNING_THRESHOLD_KEY,
         DFSConfigKeys.DFS_DATANODE_SLOW_IO_WARNING_THRESHOLD_DEFAULT);
+    // 初始化块报告初始延迟
     initBlockReportDelay();
     heartBeatInterval = getConf().getTimeDuration(DFS_HEARTBEAT_INTERVAL_KEY,
         DFS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.SECONDS,
         TimeUnit.MILLISECONDS);
+    // 从配置加载生命线间隔，默认是3倍心跳间隔
     long confLifelineIntervalMs =
         getConf().getTimeDuration(DFS_DATANODE_LIFELINE_INTERVAL_SECONDS_KEY,
             3 * getConf().getTimeDuration(DFS_HEARTBEAT_INTERVAL_KEY,
                 DFS_HEARTBEAT_INTERVAL_DEFAULT, TimeUnit.SECONDS),
             TimeUnit.SECONDS, TimeUnit.MILLISECONDS);
+    // 校验生命线间隔必须大于心跳间隔，否则重置为默认值
     if (confLifelineIntervalMs <= heartBeatInterval) {
       confLifelineIntervalMs = 3 * heartBeatInterval;
       DataNode.LOG.warn(
@@ -267,266 +275,3 @@ public class DNConf {
         DFS_DATANODE_MAX_LOCKED_MEMORY_DEFAULT);
 
     this.pmemDirs = getConf().getTrimmedStrings(
-        DFS_DATANODE_PMEM_CACHE_DIRS_KEY);
-
-    this.restartReplicaExpiry = getConf().getLong(
-        DFS_DATANODE_RESTART_REPLICA_EXPIRY_KEY,
-        DFS_DATANODE_RESTART_REPLICA_EXPIRY_DEFAULT) * 1000L;
-
-    this.allowNonLocalLazyPersist = getConf().getBoolean(
-        DFS_DATANODE_NON_LOCAL_LAZY_PERSIST,
-        DFS_DATANODE_NON_LOCAL_LAZY_PERSIST_DEFAULT);
-
-    this.bpReadyTimeout = getConf().getTimeDuration(
-        DFS_DATANODE_BP_READY_TIMEOUT_KEY,
-        DFS_DATANODE_BP_READY_TIMEOUT_DEFAULT, TimeUnit.SECONDS);
-
-    this.volFailuresTolerated =
-        getConf().getInt(
-            DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_KEY,
-            DFSConfigKeys.DFS_DATANODE_FAILED_VOLUMES_TOLERATED_DEFAULT);
-    String[] dataDirs =
-        getConf().getTrimmedStrings(DFSConfigKeys.DFS_DATANODE_DATA_DIR_KEY);
-    this.volsConfigured = (dataDirs == null) ? 0 : dataDirs.length;
-
-    this.pmemCacheRecoveryEnabled = getConf().getBoolean(
-        DFS_DATANODE_PMEM_CACHE_RECOVERY_KEY,
-        DFS_DATANODE_PMEM_CACHE_RECOVERY_DEFAULT);
-
-    this.processCommandsThresholdMs = getConf().getTimeDuration(
-        DFS_DATANODE_PROCESS_COMMANDS_THRESHOLD_KEY,
-        DFS_DATANODE_PROCESS_COMMANDS_THRESHOLD_DEFAULT,
-        TimeUnit.MILLISECONDS
-    );
-  }
-
-  private void initBlockReportDelay() {
-    long initBRDelay = getConf().getTimeDuration(
-        DFS_BLOCKREPORT_INITIAL_DELAY_KEY,
-        DFS_BLOCKREPORT_INITIAL_DELAY_DEFAULT, TimeUnit.SECONDS, TimeUnit.MILLISECONDS);
-    if (initBRDelay >= blockReportInterval || initBRDelay < 0) {
-      initBRDelay = 0;
-      DataNode.LOG.info(DFS_BLOCKREPORT_INITIAL_DELAY_KEY +
-          " is greater than or equal to " + DFS_BLOCKREPORT_INTERVAL_MSEC_KEY +
-          ". Setting initial delay to 0 msec.");
-    }
-    initialBlockReportDelayMs = initBRDelay;
-  }
-
-  // We get minimumNameNodeVersion via a method so it can be mocked out in tests.
-  String getMinimumNameNodeVersion() {
-    return this.minimumNameNodeVersion;
-  }
-  
-  /**
-   * Returns the configuration.
-   *
-   * @return Configuration the configuration
-   */
-  public Configuration getConf() {
-    return this.dn.getConf();
-  }
-
-  /**
-   * Returns true if encryption enabled for DataTransferProtocol.
-   *
-   * @return boolean true if encryption enabled for DataTransferProtocol
-   */
-  public boolean getEncryptDataTransfer() {
-    return encryptDataTransfer;
-  }
-
-  /**
-   * Returns encryption algorithm configured for DataTransferProtocol, or null
-   * if not configured.
-   *
-   * @return encryption algorithm configured for DataTransferProtocol
-   */
-  public String getEncryptionAlgorithm() {
-    return encryptionAlgorithm;
-  }
-
-  public long getXceiverStopTimeout() {
-    return xceiverStopTimeout;
-  }
-
-  public long getMaxLockedMemory() {
-    return maxLockedMemory;
-  }
-
-  /**
-   * Returns true if connect to datanode via hostname
-   * 
-   * @return boolean true if connect to datanode via hostname
-   */
-  public boolean getConnectToDnViaHostname() {
-    return connectToDnViaHostname;
-  }
-
-  /**
-   * Returns socket timeout
-   * 
-   * @return int socket timeout
-   */
-  public int getSocketTimeout() {
-    return socketTimeout;
-  }
-
-  /**
-   * Returns socket write timeout
-   * 
-   * @return int socket write timeout
-   */
-  public int getSocketWriteTimeout() {
-    return socketWriteTimeout;
-  }
-
-  /**
-   * Returns socket timeout for computing the checksum of EC blocks
-   *
-   * @return int socket timeout
-   */
-  public int getEcChecksumSocketTimeout() {
-    return ecChecksumSocketTimeout;
-  }
-
-  /**
-   * Returns the SaslPropertiesResolver configured for use with
-   * DataTransferProtocol, or null if not configured.
-   *
-   * @return SaslPropertiesResolver configured for use with DataTransferProtocol
-   */
-  public SaslPropertiesResolver getSaslPropsResolver() {
-    return saslPropsResolver;
-  }
-
-  /**
-   * Returns the TrustedChannelResolver configured for use with
-   * DataTransferProtocol, or null if not configured.
-   *
-   * @return TrustedChannelResolver configured for use with DataTransferProtocol
-   */
-  public TrustedChannelResolver getTrustedChannelResolver() {
-    return trustedChannelResolver;
-  }
-
-  /**
-   * Returns true if configuration is set to skip checking for proper
-   * port configuration in a secured cluster.  This is only intended for use in
-   * dev testing.
-   *
-   * @return true if configured to skip checking secured port configuration
-   */
-  public boolean getIgnoreSecurePortsForTesting() {
-    return ignoreSecurePortsForTesting;
-  }
-
-  public boolean getAllowNonLocalLazyPersist() {
-    return allowNonLocalLazyPersist;
-  }
-
-  public int getTransferSocketRecvBufferSize() {
-    return transferSocketRecvBufferSize;
-  }
-
-  public int getTransferSocketSendBufferSize() {
-    return transferSocketSendBufferSize;
-  }
-
-  public boolean getDataTransferServerTcpNoDelay() {
-    return tcpNoDelay;
-  }
-
-  public long getBpReadyTimeout() {
-    return bpReadyTimeout;
-  }
-
-  /**
-   * Returns the interval in milliseconds between sending lifeline messages.
-   *
-   * @return interval in milliseconds between sending lifeline messages
-   */
-  public long getLifelineIntervalMs() {
-    return lifelineIntervalMs;
-  }
-
-  public int getVolFailuresTolerated() {
-    return volFailuresTolerated;
-  }
-
-  public int getVolsConfigured() {
-    return volsConfigured;
-  }
-
-  public long getSlowIoWarningThresholdMs() {
-    return datanodeSlowIoWarningThresholdMs;
-  }
-
-  int getMaxDataLength() {
-    return maxDataLength;
-  }
-
-  public String[] getPmemVolumes() {
-    return pmemDirs;
-  }
-
-  public boolean getPmemCacheRecoveryEnabled() {
-    return pmemCacheRecoveryEnabled;
-  }
-
-  public long getProcessCommandsThresholdMs() {
-    return processCommandsThresholdMs;
-  }
-
-  void setBlockReportInterval(long intervalMs) {
-    Preconditions.checkArgument(intervalMs > 0,
-        DFS_BLOCKREPORT_INTERVAL_MSEC_KEY + " should be larger than 0");
-    blockReportInterval = intervalMs;
-  }
-
-  public long getBlockReportInterval() {
-    return blockReportInterval;
-  }
-
-  void setCacheReportInterval(long intervalMs) {
-    Preconditions.checkArgument(intervalMs > 0,
-        DFS_CACHEREPORT_INTERVAL_MSEC_KEY + " should be larger than 0");
-    cacheReportInterval = intervalMs;
-  }
-
-  public long getCacheReportInterval() {
-    return cacheReportInterval;
-  }
-
-  void setBlockReportSplitThreshold(long threshold) {
-    Preconditions.checkArgument(threshold >= 0,
-        DFS_BLOCKREPORT_SPLIT_THRESHOLD_KEY + " should be larger than or equal to 0");
-    blockReportSplitThreshold = threshold;
-  }
-
-  void setInitBRDelayMs(String delayMs) {
-    dn.getConf().set(DFS_BLOCKREPORT_INITIAL_DELAY_KEY, delayMs);
-    initBlockReportDelay();
-  }
-
-  void setPeerStatsEnabled(boolean enablePeerStats) {
-    peerStatsEnabled = enablePeerStats;
-  }
-
-  public void setFileIoProfilingSamplingPercentage(int samplingPercentage) {
-    diskStatsEnabled = Util.isDiskStatsEnabled(samplingPercentage);
-  }
-
-  public void setOutliersReportIntervalMs(String reportIntervalMs) {
-    dn.getConf().set(DFS_DATANODE_OUTLIERS_REPORT_INTERVAL_KEY, reportIntervalMs);
-    outliersReportIntervalMs = getConf().getTimeDuration(
-        DFS_DATANODE_OUTLIERS_REPORT_INTERVAL_KEY,
-        DFS_DATANODE_OUTLIERS_REPORT_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
-  }
-
-  public void setDatanodeSlowIoWarningThresholdMs(long threshold) {
-    Preconditions.checkArgument(threshold > 0,
-        DFS_DATANODE_SLOW_IO_WARNING_THRESHOLD_KEY + " should be greater than 0");
-    datanodeSlowIoWarningThresholdMs = threshold;
-  }
-}

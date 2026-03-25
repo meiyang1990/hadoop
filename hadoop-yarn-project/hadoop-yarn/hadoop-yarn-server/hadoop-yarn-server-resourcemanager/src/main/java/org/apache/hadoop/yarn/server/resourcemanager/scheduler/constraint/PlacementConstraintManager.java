@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * *
  *  Licensed to the Apache Software Foundation (ASF) under one
@@ -29,132 +30,118 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.resource.PlacementConstraint;
 
 /**
- * Interface for storing and retrieving placement constraints (see
- * {@link PlacementConstraint}).
+ * YARN 容器放置约束管理器接口，负责存储和管理应用级、全局级的容器放置约束规则。
+ * 为YARN调度器提供统一的约束查询入口，支持应用级和集群管理员全局配置的放置约束。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
 public interface PlacementConstraintManager {
 
   /**
-   * Register all placement constraints of an application.
+   * 注册整个应用的所有放置约束规则。
    *
-   * @param appId the application ID
-   * @param constraintMap the map of allocation tags to constraints for this
-   *          application
+   * @param appId 应用ID
+   * @param constraintMap 该应用的分配标签集合到对应放置约束的映射
    */
   void registerApplication(ApplicationId appId,
       Map<Set<String>, PlacementConstraint> constraintMap);
 
   /**
-   * Add a placement constraint for a given application and a given set of
-   * (source) allocation tags. The constraint will be used on Scheduling
-   * Requests that carry this set of allocation tags.
-   * TODO: Support merge and not only replace when adding a constraint.
+   * 为指定应用和指定分配标签集合添加一个放置约束规则。
+   * 该约束会被携带对应标签的调度请求使用。
+   * TODO: 当前仅支持替换，后续需要支持约束合并
    *
-   * @param appId the application ID
-   * @param sourceTags the set of allocation tags that will enable this
-   *          constraint
-   * @param placementConstraint the constraint
-   * @param replace if true, an existing constraint for these tags will be
-   *          replaced by the given one
+   * @param appId 应用ID
+   * @param sourceTags 触发该约束的分配标签集合
+   * @param placementConstraint 要添加的放置约束
+   * @param replace 是否替换已存在的同标签约束
    */
   void addConstraint(ApplicationId appId, Set<String> sourceTags,
       PlacementConstraint placementConstraint, boolean replace);
 
   /**
-   * Add a placement constraint that will be used globally. These constraints
-   * are added by the cluster administrator.
-   * TODO: Support merge and not only replace when adding a constraint.
+   * 添加全局级放置约束规则，整个集群所有应用生效。
+   * 这类约束由集群管理员配置添加。
+   * TODO: 当前仅支持替换，后续需要支持约束合并
    *
-   * @param sourceTags the allocation tags that will enable this constraint
-   * @param placementConstraint the constraint
-   * @param replace if true, an existing constraint for these tags will be
-   *          replaced by the given one
+   * @param sourceTags 触发该约束的分配标签集合
+   * @param placementConstraint 要添加的放置约束
+   * @param replace 是否替换已存在的同标签约束
    */
   void addGlobalConstraint(Set<String> sourceTags,
       PlacementConstraint placementConstraint, boolean replace);
 
   /**
-   * Retrieve all constraints for a given application, along with the allocation
-   * tags that enable each constraint.
+   * 获取指定应用的所有放置约束规则，包含对应触发的分配标签集合。
    *
-   * @param appId the application ID
-   * @return the constraints for this application with the associated tags
+   * @param appId 应用ID
+   * @return 该应用的分配标签集合到约束的映射
    */
   Map<Set<String>, PlacementConstraint> getConstraints(ApplicationId appId);
 
   /**
-   * Retrieve the placement constraint that is associated with a set of
-   * allocation tags for a given application.
+   * 根据应用ID和分配标签集合获取对应的放置约束规则。
    *
-   * @param appId the application ID
-   * @param sourceTags the allocation tags that enable this constraint
-   * @return the constraint
+   * @param appId 应用ID
+   * @param sourceTags 触发约束的分配标签集合
+   * @return 对应放置约束
    */
   PlacementConstraint getConstraint(ApplicationId appId,
       Set<String> sourceTags);
 
   /**
-   * Retrieve a global constraint that is associated with a given set of
-   * allocation tags.
+   * 根据分配标签集合获取对应的全局放置约束规则。
    *
-   * @param sourceTags the allocation tags that enable this constraint
-   * @return the constraint
+   * @param sourceTags 触发约束的分配标签集合
+   * @return 对应全局放置约束
    */
   PlacementConstraint getGlobalConstraint(Set<String> sourceTags);
 
   /**
-   * Consider all levels of constraints (scheduling request, app, cluster) and
-   * return a merged constraint.
+   * 合并调度请求级、应用级、全局级三个层级的约束，返回合并后的最终放置约束。
    *
-   * @param applicationId application ID
-   * @param sourceTags a set of source allocation tags
-   * @param schedulingRequestConstraint placement constraint at scheduling
-   *          request level
-   * @return a merged placement constraint
+   * @param applicationId 应用ID
+   * @param sourceTags 触发约束的源分配标签集合
+   * @param schedulingRequestConstraint 调度请求级的放置约束
+   * @return 合并后的最终放置约束
    */
   PlacementConstraint getMultilevelConstraint(ApplicationId applicationId,
       Set<String> sourceTags, PlacementConstraint schedulingRequestConstraint);
 
   /**
-   * Remove the constraints that correspond to a given application.
+   * 注销应用，移除该应用所有的放置约束规则。
    *
-   * @param appId the application that will be removed.
+   * @param appId 要注销的应用ID
    */
   void unregisterApplication(ApplicationId appId);
 
   /**
-   * Remove a global constraint that is associated with the given allocation
-   * tags.
+   * 移除指定分配标签对应的全局放置约束规则。
    *
-   * @param sourceTags the allocation tags
+   * @param sourceTags 对应分配标签集合
    */
   void removeGlobalConstraint(Set<String> sourceTags);
 
   /**
-   * Returns the number of currently registered applications in the Placement
-   * Constraint Manager.
+   * 获取当前已注册的应用数量。
    *
-   * @return number of registered applications.
+   * @return 已注册应用数量
    */
   int getNumRegisteredApplications();
 
   /**
-   * Returns the number of global constraints registered in the Placement
-   * Constraint Manager.
+   * 获取当前已注册的全局约束数量。
    *
-   * @return number of global constraints.
+   * @return 全局约束数量
    */
   int getNumGlobalConstraints();
 
   /**
-   * Validate a placement constraint and the set of allocation tags that will
-   * enable it.
+   * 校验放置约束和对应的触发分配标签是否合法。
    *
-   * @param sourceTags the associated allocation tags
-   * @param placementConstraint the constraint
-   * @return true if constraint and tags are valid
+   * @param sourceTags 关联的分配标签集合
+   * @param placementConstraint 待校验的放置约束
+   * @return 合法返回true，否则返回false
    */
   default boolean validateConstraint(Set<String> sourceTags,
       PlacementConstraint placementConstraint) {

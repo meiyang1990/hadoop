@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -14,6 +15,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ */
+/**
+ * YARN 应用时间线服务核心包，提供应用生命周期指标与事件数据的存储、查询能力
+ * 用于保存已完成和运行中应用的历史信息，支撑YARN应用监控与历史审计
  */
 @InterfaceAudience.Private
 package org.apache.hadoop.yarn.server.timeline;

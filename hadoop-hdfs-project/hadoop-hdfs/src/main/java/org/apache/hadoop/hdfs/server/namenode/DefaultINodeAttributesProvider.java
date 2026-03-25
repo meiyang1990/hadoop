@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,24 +19,37 @@
 package org.apache.hadoop.hdfs.server.namenode;
 
 /**
- * A default implementation of the INodeAttributesProvider
- *
+ * HDFS INode属性提供器的默认实现，直接返回INode自带的原生属性，不做额外修改
+ * 为NameNode提供默认的INode属性获取能力，支持扩展自定义属性提供器
  */
 public class DefaultINodeAttributesProvider extends INodeAttributeProvider {
 
+  /** 默认单例实例，供NameNode直接使用 */
   public static INodeAttributeProvider DEFAULT_PROVIDER =
       new DefaultINodeAttributesProvider();
 
+  /**
+   * 启动属性提供器，默认实现无操作
+   */
   @Override
   public void start() {
     // NO-OP
   }
 
+  /**
+   * 停止属性提供器，默认实现无操作
+   */
   @Override
   public void stop() {
     // NO-OP
   }
 
+  /**
+   * 获取INode的属性信息，默认实现直接返回原始INode属性
+   * @param pathElements 路径分段数组
+   * @param inode 原始INode属性
+   * @return 原始INode属性
+   */
   @Override
   public INodeAttributes getAttributes(String[] pathElements,
       INodeAttributes inode) {

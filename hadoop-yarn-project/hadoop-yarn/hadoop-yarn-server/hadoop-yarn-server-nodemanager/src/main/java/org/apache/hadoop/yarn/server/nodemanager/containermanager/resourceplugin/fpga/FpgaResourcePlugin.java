@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,6 +37,10 @@ import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.resourceplugin.ResourcePlugin;
 import org.apache.hadoop.yarn.server.nodemanager.webapp.dao.NMResourceInfo;
 
+/**
+ * FPGA资源插件实现类，为NodeManager提供FPGA异构资源管理能力
+ * 负责初始化FPGA相关组件、创建资源处理器和节点资源更新处理器，对接不同厂商的FPGA设备
+ */
 public class FpgaResourcePlugin implements ResourcePlugin {
   private static final Logger LOG = LoggerFactory.
       getLogger(FpgaResourcePlugin.class);
@@ -46,6 +51,11 @@ public class FpgaResourcePlugin implements ResourcePlugin {
   private FpgaNodeResourceUpdateHandler fpgaNodeResourceUpdateHandler = null;
   private FpgaDiscoverer fpgaDiscoverer;
 
+  /**
+   * 根据配置创建对应厂商的FPGA插件实例
+   * @param conf YARN配置对象
+   * @return 初始化完成的FPGA厂商插件实例
+   */
   private AbstractFpgaVendorPlugin createFpgaVendorPlugin(Configuration conf) {
     String vendorPluginClass = conf.get(YarnConfiguration.NM_FPGA_VENDOR_PLUGIN,
         YarnConfiguration.DEFAULT_NM_FPGA_VENDOR_PLUGIN);
@@ -67,11 +77,13 @@ public class FpgaResourcePlugin implements ResourcePlugin {
 
   @Override
   public void initialize(Context context) throws YarnException {
-    // Get vendor plugin from configuration
+    // 从配置加载厂商插件
     this.vendorPlugin = createFpgaVendorPlugin(context.getConf());
+    // 初始化FPGA设备发现器
     fpgaDiscoverer = new FpgaDiscoverer();
     fpgaDiscoverer.setResourceHanderPlugin(vendorPlugin);
     fpgaDiscoverer.initialize(context.getConf());
+    // 创建节点资源更新处理器
     fpgaNodeResourceUpdateHandler =
         new FpgaNodeResourceUpdateHandler(fpgaDiscoverer);
   }
@@ -80,6 +92,7 @@ public class FpgaResourcePlugin implements ResourcePlugin {
   public ResourceHandler createResourceHandler(
       Context nmContext, CGroupsHandler cGroupsHandler,
       PrivilegedOperationExecutor privilegedOperationExecutor) {
+    // 单例模式创建FPGA资源处理器
     if (fpgaResourceHandler == null) {
       fpgaResourceHandler = new FpgaResourceHandlerImpl(nmContext,
           cGroupsHandler, privilegedOperationExecutor, vendorPlugin,

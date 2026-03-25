@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,16 @@ package org.apache.hadoop.mapreduce.v2.app.job.event;
 
 import org.apache.hadoop.mapreduce.v2.api.records.JobId;
 
+/**
+ * 作业初始化完成事件，标识MapReduce作业的初始化阶段已完成
+ * 用于通知作业状态机从初始化阶段进入任务调度执行阶段
+ */
 public class JobSetupCompletedEvent extends JobEvent {
 
+  /**
+   * 构造作业初始化完成事件
+   * @param jobID 完成初始化的作业ID
+   */
   public JobSetupCompletedEvent(JobId jobID) {
     super(jobID, JobEventType.JOB_SETUP_COMPLETED);
   }

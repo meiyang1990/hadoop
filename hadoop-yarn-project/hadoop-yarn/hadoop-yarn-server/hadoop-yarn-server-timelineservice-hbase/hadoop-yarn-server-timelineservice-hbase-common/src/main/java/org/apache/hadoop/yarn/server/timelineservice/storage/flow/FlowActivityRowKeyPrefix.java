@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,27 +21,27 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.flow;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.RowKeyPrefix;
 
 /**
- * A prefix partial rowkey for flow activities.
+ * 流活动HBase行键前缀实现，用于范围扫描查询流活动数据
  */
 public class FlowActivityRowKeyPrefix extends FlowActivityRowKey implements
     RowKeyPrefix<FlowActivityRowKey> {
 
   /**
-   * Constructs a row key prefix for the flow activity table as follows:
-   * {@code clusterId!dayTimestamp!}.
+   * 构造基于集群ID和日期的流活动行键前缀，格式为 clusterId!dayTimestamp!
+   * 用于按日期范围扫描特定集群的流活动
    *
-   * @param clusterId Cluster Id.
-   * @param dayTs Start of the day timestamp.
+   * @param clusterId 集群ID
+   * @param dayTs 当日起始时间戳
    */
   public FlowActivityRowKeyPrefix(String clusterId, Long dayTs) {
     super(clusterId, dayTs, null, null, false);
   }
 
   /**
-   * Constructs a row key prefix for the flow activity table as follows:
-   * {@code clusterId!}.
+   * 构造基于集群ID的流活动行键前缀，格式为 clusterId!
+   * 用于扫描特定集群下的所有流活动
    *
-   * @param clusterId identifying the cluster
+   * @param clusterId 集群标识
    */
   public FlowActivityRowKeyPrefix(String clusterId) {
     super(clusterId, null, null, null, false);
@@ -53,6 +54,7 @@ public class FlowActivityRowKeyPrefix extends FlowActivityRowKey implements
    * org.apache.hadoop.yarn.server.timelineservice.storage.application.
    * RowKeyPrefix#getRowKeyPrefix()
    */
+  @Override
   public byte[] getRowKeyPrefix() {
     return super.getRowKey();
   }

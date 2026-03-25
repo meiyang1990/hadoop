@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,6 +36,10 @@ import org.apache.hadoop.io.compress.CompressionCodec;
 import org.apache.hadoop.io.compress.CompressionCodecFactory;
 
 /**
+ * 文件级注释：HDFS NameNode FSImage镜像文件压缩支持容器类
+ * 负责管理FSImage压缩使用的编解码器，提供压缩头读写、输入输出流封装能力
+ * 支持无压缩和配置指定编解码器两种模式，实现FSImage文件的压缩存储与读取
+ *
  * Simple container class that handles support for compressed fsimage files.
  */
 @InterfaceAudience.Private
@@ -45,33 +50,41 @@ public class FSImageCompression {
   private CompressionCodec imageCodec;
 
   /**
+   * 创建无压缩（NOOP）实例
    * Create a "noop" compression - i.e. uncompressed
    */
   private FSImageCompression() {
   }
 
   /**
+   * 使用指定编解码器创建压缩实例
    * Create compression using a particular codec
    */
   private FSImageCompression(CompressionCodec codec) {
     imageCodec = codec;
   }
 
+  /**
+   * 获取当前使用的压缩编解码器
+   * @return 压缩编解码器实例，无压缩时返回null
+   */
   public CompressionCodec getImageCodec() {
     return imageCodec;
   }
 
   /**
-   * Create a "noop" compression - i.e. uncompressed
+   * 创建无压缩（不启用压缩）的FSImage压缩实例
+   * @return 无压缩FSImage压缩实例
    */
   static FSImageCompression createNoopCompression() {
     return new FSImageCompression();
   }
 
   /**
-   * Create a compression instance based on the user's configuration in the given
-   * Configuration object.
-   * @throws IOException if the specified codec is not available.
+   * 根据Hadoop配置创建FSImage压缩实例，从配置中读取是否压缩和编解码器配置
+   * @param conf Hadoop配置对象
+   * @return 压缩实例
+   * @throws IOException 指定编解码器不可用时抛出异常
    */
   static FSImageCompression createCompression(Configuration conf)
     throws IOException {
@@ -90,8 +103,11 @@ public class FSImageCompression {
   }
 
   /**
-   * Create a compression instance using the codec specified by
-   * <code>codecClassName</code>
+   * 使用指定编解码器类名创建压缩实例
+   * @param conf Hadoop配置对象
+   * @param codecClassName 编解码器全类名
+   * @return 压缩实例
+   * @throws IOException 指定编解码器不可用时抛出异常
    */
   static FSImageCompression createCompression(Configuration conf,
                                                       String codecClassName)
@@ -107,9 +123,11 @@ public class FSImageCompression {
   }
 
   /**
-   * Create a compression instance based on a header read from an input stream.
-   * @throws IOException if the specified codec is not available or the
-   * underlying IO fails.
+   * 从输入流读取压缩头信息，创建对应压缩实例
+   * @param conf Hadoop配置对象
+   * @param in 输入流，用于读取压缩头
+   * @return 对应压缩实例
+   * @throws IOException IO错误或编解码器不可用时抛出异常
    */
   static FSImageCompression readCompressionHeader(
     Configuration conf, DataInput in) throws IOException
@@ -125,12 +143,11 @@ public class FSImageCompression {
   }
   
   /**
-   * Unwrap a compressed input stream by wrapping it with a decompressor based
-   * on this codec. If this instance represents no compression, simply adds
-   * buffering to the input stream.
-   * @return a buffered stream that provides uncompressed data
-   * @throws IOException If the decompressor cannot be instantiated or an IO
-   * error occurs.
+   * 对输入流解压包装，返回可读取解压后数据的输入流
+   * 无压缩时仅添加缓冲处理
+   * @param is 原始输入流
+   * @return 包装后可读取解压数据的数据流
+   * @throws IOException 解压实例创建失败或IO错误时抛出异常
    */
   DataInputStream unwrapInputStream(InputStream is) throws IOException {
     if (imageCodec != null) {
@@ -141,25 +158,21 @@ public class FSImageCompression {
   }
 
   /**
-   * Write out a header to the given stream that indicates the chosen
-   * compression codec, and return the same stream wrapped with that codec.
-   * If no codec is specified, simply adds buffering to the stream, so that
-   * the returned stream is always buffered.
-   * 
-   * @param os The stream to write header to and wrap. This stream should
-   * be unbuffered.
-   * @return A stream wrapped with the specified compressor, or buffering
-   * if compression is not enabled.
-   * @throws IOException if an IO error occurs or the compressor cannot be
-   * instantiated
+   * 写入压缩头信息，并对输出流进行压缩包装，返回压缩后的输出流
+   * 无压缩时仅添加缓冲处理，保证返回流始终带缓冲
+   * @param os 原始输出流，要求为无缓冲
+   * @return 包装后的压缩输出流（无压缩时为带缓冲输出流）
+   * @throws IOException IO错误或压缩实例创建失败时抛出异常
    */
   DataOutputStream writeHeaderAndWrapStream(OutputStream os)
   throws IOException {
     DataOutputStream dos = new DataOutputStream(os);
 
+    // 写入是否启用压缩的标志位
     dos.writeBoolean(imageCodec != null);
 
     if (imageCodec != null) {
+      // 写入编解码器类名供读取时恢复
       String codecClassName = imageCodec.getClass().getCanonicalName();
       Text.writeString(dos, codecClassName);
 

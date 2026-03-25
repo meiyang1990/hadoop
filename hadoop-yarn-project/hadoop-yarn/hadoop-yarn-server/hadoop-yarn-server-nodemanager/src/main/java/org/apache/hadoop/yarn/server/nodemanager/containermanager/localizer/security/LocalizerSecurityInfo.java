@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -30,6 +31,9 @@ import org.apache.hadoop.security.token.TokenInfo;
 import org.apache.hadoop.security.token.TokenSelector;
 import org.apache.hadoop.yarn.server.nodemanager.api.LocalizationProtocolPB;
 
+/**
+ * 本地化协议RPC安全信息实现，负责为NodeManager本地化协议提供Token选择器
+ */
 public class LocalizerSecurityInfo extends SecurityInfo {
 
   private static final Logger LOG =
@@ -42,10 +46,12 @@ public class LocalizerSecurityInfo extends SecurityInfo {
 
   @Override
   public TokenInfo getTokenInfo(Class<?> protocol, Configuration conf) {
+    // 仅处理本地化PB协议，非目标协议返回null
     if (!protocol
         .equals(LocalizationProtocolPB.class)) {
       return null;
     }
+    // 返回自定义TokenInfo，提供本地化Token选择器
     return new TokenInfo() {
 
       @Override

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -55,74 +56,110 @@ import org.apache.hadoop.yarn.event.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * MapReduce推测执行的默认实现类，负责周期性检测慢任务并发起推测执行。
+ * 核心职责是：根据任务运行时数据识别拖慢整体作业的慢任务，在集群资源允许的情况下启动推测副本，
+ * 由先完成的任务提供最终结果，从而提升作业整体运行效率。
+ * 继承AbstractService实现服务生命周期管理，实现Speculator接口对接框架推测执行流程。
+ */
 public class DefaultSpeculator extends AbstractService implements
     Speculator {
 
+  // 推测不执行的标记值：任务运行在预期时间内，无需推测
   private static final long ON_SCHEDULE = Long.MIN_VALUE;
+  // 推测不执行的标记值：该任务已经在进行推测执行，无需重复发起
   private static final long ALREADY_SPECULATING = Long.MIN_VALUE + 1;
+  // 推测不执行的标记值：任务启动时间太短，尚未积累足够运行数据
   private static final long TOO_NEW = Long.MIN_VALUE + 2;
+  // 推测不执行的标记值：任务进度正常，无需推测
   private static final long PROGRESS_IS_GOOD = Long.MIN_VALUE + 3;
+  // 推测不执行的标记值：任务当前未处于运行状态
   private static final long NOT_RUNNING = Long.MIN_VALUE + 4;
+  // 推测不执行的标记值：新推测任务完成时间预估晚于现有任务，无需推测
   private static final long TOO_LATE_TO_SPECULATE = Long.MIN_VALUE + 5;
 
+  // 未发起推测后，下一次检测的最小间隔时间（毫秒）
   private long soonestRetryAfterNoSpeculate;
+  // 发起推测后，下一次检测的最小间隔时间（毫秒）
   private long soonestRetryAfterSpeculate;
+  // 允许进行推测执行的运行中任务占总运行任务的比例上限
   private double proportionRunningTasksSpeculatable;
+  // 允许进行推测执行的任务占该类型总任务的比例上限
   private double proportionTotalTasksSpeculatable;
+  // 允许同时进行推测执行的最小任务数量
   private int  minimumAllowedSpeculativeTasks;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DefaultSpeculator.class);
 
+  // 存储当前正在运行的任务集合，key为任务ID，value标记是否运行
   private final ConcurrentMap<TaskId, Boolean> runningTasks
       = new ConcurrentHashMap<TaskId, Boolean>();
 
-  // Used to track any TaskAttempts that aren't heart-beating for a while, so
-  // that we can aggressively speculate instead of waiting for task-timeout.
+  // 存储任务尝试的运行历史统计数据，用于检测心跳停止的拖慢任务
   private final ConcurrentMap<TaskAttemptId, TaskAttemptHistoryStatistics>
       runningTaskAttemptStatistics = new ConcurrentHashMap<TaskAttemptId,
           TaskAttemptHistoryStatistics>();
-  // Regular heartbeat from tasks is every 3 secs. So if we don't get a
-  // heartbeat in 9 secs (3 heartbeats), we simulate a heartbeat with no change
-  // in progress.
+  // 心跳超时阈值，超过该时间未收到心跳则视为任务卡住，主动触发检测（毫秒）
   private static final long MAX_WAITTING_TIME_FOR_HEARTBEAT = 9 * 1000;
 
-  // These are the current needs, not the initial needs.  For each job, these
-  //  record the number of attempts that exist and that are actively
-  //  waiting for a container [as opposed to running or finished]
+  // 存储每个作业当前还需要的Map容器数量，用于判断是否有空闲资源发起推测
   private final ConcurrentMap<JobId, AtomicInteger> mapContainerNeeds
       = new ConcurrentHashMap<JobId, AtomicInteger>();
+  // 存储每个作业当前还需要的Reduce容器数量，用于判断是否有空闲资源发起推测
   private final ConcurrentMap<JobId, AtomicInteger> reduceContainerNeeds
       = new ConcurrentHashMap<JobId, AtomicInteger>();
 
+  // 存储已经发起过推测执行的任务集合
   private final Set<TaskId> mayHaveSpeculated = new HashSet<TaskId>();
 
   private final Configuration conf;
   private AppContext context;
+  // 后台检测线程，周期性扫描任务寻找推测机会
   private Thread speculationBackgroundThread = null;
+  // 服务停止标记
   private volatile boolean stopped = false;
+  // 任务运行时间估算器，用于估算任务剩余运行时间和新推测任务的运行时间
   private TaskRuntimeEstimator estimator;
 
+  // 控制后台扫描的阻塞队列，用于唤醒等待中的后台线程
   private BlockingQueue<Object> scanControl = new LinkedBlockingQueue<Object>();
 
   private final Clock clock;
 
   private final EventHandler<Event> eventHandler;
 
+  /**
+   * 构造默认推测执行器，使用应用上下文提供的时钟。
+   * @param conf 作业配置
+   * @param context 应用上下文
+   */
   public DefaultSpeculator(Configuration conf, AppContext context) {
     this(conf, context, context.getClock());
   }
 
+  /**
+   * 构造默认推测执行器，允许传入自定义时钟（用于测试）。
+   * @param conf 作业配置
+   * @param context 应用上下文
+   * @param clock 时钟实现
+   */
   public DefaultSpeculator(Configuration conf, AppContext context, Clock clock) {
     this(conf, context, getEstimator(conf, context), clock);
   }
   
+  /**
+   * 通过反射从配置中创建任务运行时间估算器实例。
+   * @param conf 作业配置
+   * @param context 应用上下文
+   * @return 配置指定的任务运行时间估算器实例，默认使用LegacyTaskRuntimeEstimator
+   */
   static private TaskRuntimeEstimator getEstimator
       (Configuration conf, AppContext context) {
     TaskRuntimeEstimator estimator;
     
     try {
-      // "yarn.mapreduce.job.task.runtime.estimator.class"
+      // 从配置中获取估算器实现类
       Class<? extends TaskRuntimeEstimator> estimatorClass
           = conf.getClass(MRJobConfig.MR_AM_TASK_ESTIMATOR,
                           LegacyTaskRuntimeEstimator.class,
@@ -151,6 +188,13 @@ public class DefaultSpeculator extends AbstractService implements
   return estimator;
   }
 
+  /**
+   * 完整构造方法，允许注入自定义估算器和时钟，主要供测试使用。
+   * @param conf 作业配置
+   * @param context 应用上下文
+   * @param estimator 任务运行时间估算器实例
+   * @param clock 时钟实现
+   */
   // This constructor is designed to be called by other constructors.
   //  However, it's public because we do use it in the test cases.
   // Normally we figure out our own estimator.
@@ -164,6 +208,7 @@ public class DefaultSpeculator extends AbstractService implements
     this.estimator = estimator;
     this.clock = clock;
     this.eventHandler = context.getEventHandler();
+    // 从配置加载推测执行相关参数
     this.soonestRetryAfterNoSpeculate =
         conf.getLong(MRJobConfig.SPECULATIVE_RETRY_AFTER_NO_SPECULATE,
                 MRJobConfig.DEFAULT_SPECULATIVE_RETRY_AFTER_NO_SPECULATE);
@@ -187,8 +232,13 @@ public class DefaultSpeculator extends AbstractService implements
   //  processing events from the event queue and one for periodically
   //  looking for speculation opportunities
 
+  /**
+   * 服务启动方法，启动后台推测检测线程。
+   * @throws Exception 启动异常
+   */
   @Override
   protected void serviceStart() throws Exception {
+    // 后台线程核心逻辑：周期性扫描任务寻找推测机会
     Runnable speculationBackgroundCore
         = new Runnable() {
             @Override
@@ -196,7 +246,9 @@ public class DefaultSpeculator extends AbstractService implements
               while (!stopped && !Thread.currentThread().isInterrupted()) {
                 long backgroundRunStartTime = clock.getTime();
                 try {
+                  // 执行一次推测检测，返回本次发起的推测任务数量
                   int speculations = computeSpeculations();
+                  // 根据本次是否发起推测，计算下次检测的最小等待时间
                   long mininumRecomp
                       = speculations > 0 ? soonestRetryAfterSpeculate
                                          : soonestRetryAfterNoSpeculate;
@@ -209,6 +261,7 @@ public class DefaultSpeculator extends AbstractService implements
                         + " speculations.  Sleeping " + wait + " milliseconds.");
                   }
 
+                  // 阻塞等待，等待超时或被唤醒后进行下一轮检测
                   Object pollResult
                       = scanControl.poll(wait, TimeUnit.MILLISECONDS);
                 } catch (InterruptedException e) {
@@ -220,6 +273,7 @@ public class DefaultSpeculator extends AbstractService implements
               }
             }
           };
+    // 创建并启动后台线程
     speculationBackgroundThread = new SubjectInheritingThread
         (speculationBackgroundCore, "DefaultSpeculator background processing");
     speculationBackgroundThread.start();
@@ -227,6 +281,10 @@ public class DefaultSpeculator extends AbstractService implements
     super.serviceStart();
   }
 
+  /**
+   * 服务停止方法，中断并退出后台检测线程。
+   * @throws Exception 停止异常
+   */
   @Override
   protected void serviceStop()throws Exception {
       stopped = true;
@@ -237,19 +295,30 @@ public class DefaultSpeculator extends AbstractService implements
     super.serviceStop();
   }
 
+  /**
+   * 处理任务尝试状态更新事件。
+   * @param status 任务尝试最新状态
+   */
   @Override
   public void handleAttempt(TaskAttemptStatus status) {
     long timestamp = clock.getTime();
     statusUpdate(status, timestamp);
   }
 
-  // This section is not part of the Speculator interface; it's used only for
+  // This is not part of the Speculator interface; it's used only for
   //  testing
+  /**
+   * 检测事件队列是否为空，仅供测试使用。
+   * @return 队列是否为空
+   */
   public boolean eventQueueEmpty() {
     return scanControl.isEmpty();
   }
 
   // This interface is intended to be used only for test cases.
+  /**
+   * 主动触发一次推测扫描，仅供调试和测试使用。
+   */
   public void scanForSpeculations() {
     LOG.info("We got asked to run a debug speculation scan.");
     // debug
@@ -265,6 +334,11 @@ public class DefaultSpeculator extends AbstractService implements
 
   // This section contains the code that gets run for a SpeculatorEvent
 
+  /**
+   * 获取对应作业对应任务类型的容器需求计数器。
+   * @param taskID 任务ID
+   * @return 容器需求原子计数器
+   */
   private AtomicInteger containerNeed(TaskId taskID) {
     JobId jobID = taskID.getJobId();
     TaskType taskType = taskID.getTaskType();
@@ -282,6 +356,10 @@ public class DefaultSpeculator extends AbstractService implements
     return result;
   }
 
+  /**
+   * 根据事件类型分发处理推测执行相关事件。
+   * @param event 推测执行事件
+   */
   private synchronized void processSpeculatorEvent(SpeculatorEvent event) {
     switch (event.getType()) {
       case ATTEMPT_STATUS_UPDATE:
@@ -290,6 +368,7 @@ public class DefaultSpeculator extends AbstractService implements
 
       case TASK_CONTAINER_NEED_UPDATE:
       {
+        // 更新作业容器需求数量
         AtomicInteger need = containerNeed(event.getTaskID());
         need.addAndGet(event.containersNeededChange());
         break;
@@ -297,6 +376,7 @@ public class DefaultSpeculator extends AbstractService implements
 
       case ATTEMPT_START:
       {
+        // 注册新启动的任务尝试到估算器
         LOG.info("ATTEMPT_START " + event.getTaskID());
         estimator.enrollAttempt
             (event.getReportedStatus(), event.getTimestamp());
@@ -305,6 +385,7 @@ public class DefaultSpeculator extends AbstractService implements
       
       case JOB_CREATE:
       {
+        // 作业创建时初始化估算器
         LOG.info("JOB_CREATE " + event.getJobID());
         estimator.contextualize(getConfig(), context);
         break;
@@ -313,12 +394,10 @@ public class DefaultSpeculator extends AbstractService implements
   }
 
   /**
-   * Absorbs one TaskAttemptStatus
+   * 更新任务尝试运行状态，将最新状态合并到推测数据中。
    *
-   * @param reportedStatus the status report that we got from a task attempt
-   *        that we want to fold into the speculation data for this job
-   * @param timestamp the time this status corresponds to.  This matters
-   *        because statuses contain progress.
+   * @param reportedStatus 任务尝试最新状态报告
+   * @param timestamp 状态报告对应的时间戳
    */
   protected void statusUpdate(TaskAttemptStatus reportedStatus, long timestamp) {
 
@@ -338,13 +417,16 @@ public class DefaultSpeculator extends AbstractService implements
       return;
     }
 
+    // 更新估算器中的任务尝试数据
     estimator.updateAttempt(reportedStatus, timestamp);
 
+    // 根据任务状态更新运行集合
     if (stateString.equals(TaskAttemptState.RUNNING.name())) {
       runningTasks.putIfAbsent(taskID, Boolean.TRUE);
     } else {
       runningTasks.remove(taskID, Boolean.TRUE);
       if (!stateString.equals(TaskAttemptState.STARTING.name())) {
+        // 任务结束，清理历史统计数据
         runningTaskAttemptStatistics.remove(attemptID);
       }
     }
@@ -352,277 +434,4 @@ public class DefaultSpeculator extends AbstractService implements
 
 /*   *************************************************************    */
 
-// This is the code section that runs periodically and adds speculations for
-//  those jobs that need them.
-
-
-  // This can return a few magic values for tasks that shouldn't speculate:
-  //  returns ON_SCHEDULE if thresholdRuntime(taskID) says that we should not
-  //     considering speculating this task
-  //  returns ALREADY_SPECULATING if that is true.  This has priority.
-  //  returns TOO_NEW if our companion task hasn't gotten any information
-  //  returns PROGRESS_IS_GOOD if the task is sailing through
-  //  returns NOT_RUNNING if the task is not running
-  //
-  // All of these values are negative.  Any value that should be allowed to
-  //  speculate is 0 or positive.
-  private long speculationValue(TaskId taskID, long now) {
-    Job job = context.getJob(taskID.getJobId());
-    Task task = job.getTask(taskID);
-    Map<TaskAttemptId, TaskAttempt> attempts = task.getAttempts();
-    long acceptableRuntime = Long.MIN_VALUE;
-    long result = Long.MIN_VALUE;
-
-    if (!mayHaveSpeculated.contains(taskID)) {
-      acceptableRuntime = estimator.thresholdRuntime(taskID);
-      if (acceptableRuntime == Long.MAX_VALUE) {
-        return ON_SCHEDULE;
-      }
-    }
-
-    TaskAttemptId runningTaskAttemptID = null;
-
-    int numberRunningAttempts = 0;
-
-    for (TaskAttempt taskAttempt : attempts.values()) {
-      if (taskAttempt.getState() == TaskAttemptState.RUNNING
-          || taskAttempt.getState() == TaskAttemptState.STARTING) {
-        if (++numberRunningAttempts > 1) {
-          return ALREADY_SPECULATING;
-        }
-        runningTaskAttemptID = taskAttempt.getID();
-
-        long estimatedRunTime = estimator.estimatedRuntime(runningTaskAttemptID);
-
-        long taskAttemptStartTime
-            = estimator.attemptEnrolledTime(runningTaskAttemptID);
-        if (taskAttemptStartTime > now) {
-          // This background process ran before we could process the task
-          //  attempt status change that chronicles the attempt start
-          return TOO_NEW;
-        }
-
-        long estimatedEndTime = estimatedRunTime + taskAttemptStartTime;
-
-        long estimatedReplacementEndTime
-            = now + estimator.estimatedNewAttemptRuntime(taskID);
-
-        float progress = taskAttempt.getProgress();
-        TaskAttemptHistoryStatistics data =
-            runningTaskAttemptStatistics.get(runningTaskAttemptID);
-        if (data == null) {
-          runningTaskAttemptStatistics.put(runningTaskAttemptID,
-            new TaskAttemptHistoryStatistics(estimatedRunTime, progress, now));
-        } else {
-          if (estimatedRunTime == data.getEstimatedRunTime()
-              && progress == data.getProgress()) {
-            // Previous stats are same as same stats
-            if (data.notHeartbeatedInAWhile(now)
-                || estimator.hasStagnatedProgress(runningTaskAttemptID, now)) {
-              // Stats have stagnated for a while, simulate heart-beat.
-              TaskAttemptStatus taskAttemptStatus = new TaskAttemptStatus();
-              taskAttemptStatus.id = runningTaskAttemptID;
-              taskAttemptStatus.progress = progress;
-              taskAttemptStatus.taskState = taskAttempt.getState();
-              // Now simulate the heart-beat
-              handleAttempt(taskAttemptStatus);
-            }
-          } else {
-            // Stats have changed - update our data structure
-            data.setEstimatedRunTime(estimatedRunTime);
-            data.setProgress(progress);
-            data.resetHeartBeatTime(now);
-          }
-        }
-
-        if (estimatedEndTime < now) {
-          return PROGRESS_IS_GOOD;
-        }
-
-        if (estimatedReplacementEndTime >= estimatedEndTime) {
-          return TOO_LATE_TO_SPECULATE;
-        }
-
-        result = estimatedEndTime - estimatedReplacementEndTime;
-      }
-    }
-
-    // If we are here, there's at most one task attempt.
-    if (numberRunningAttempts == 0) {
-      return NOT_RUNNING;
-    }
-
-
-
-    if (acceptableRuntime == Long.MIN_VALUE) {
-      acceptableRuntime = estimator.thresholdRuntime(taskID);
-      if (acceptableRuntime == Long.MAX_VALUE) {
-        return ON_SCHEDULE;
-      }
-    }
-
-    return result;
-  }
-
-  //Add attempt to a given Task.
-  protected void addSpeculativeAttempt(TaskId taskID) {
-    LOG.info
-        ("DefaultSpeculator.addSpeculativeAttempt -- we are speculating " + taskID);
-    eventHandler.handle(new TaskEvent(taskID, TaskEventType.T_ADD_SPEC_ATTEMPT));
-    mayHaveSpeculated.add(taskID);
-  }
-
-  @Override
-  public void handle(SpeculatorEvent event) {
-    processSpeculatorEvent(event);
-  }
-
-
-  private int maybeScheduleAMapSpeculation() {
-    return maybeScheduleASpeculation(TaskType.MAP);
-  }
-
-  private int maybeScheduleAReduceSpeculation() {
-    return maybeScheduleASpeculation(TaskType.REDUCE);
-  }
-
-  private int maybeScheduleASpeculation(TaskType type) {
-    int successes = 0;
-
-    long now = clock.getTime();
-
-    ConcurrentMap<JobId, AtomicInteger> containerNeeds
-        = type == TaskType.MAP ? mapContainerNeeds : reduceContainerNeeds;
-
-    for (ConcurrentMap.Entry<JobId, AtomicInteger> jobEntry : containerNeeds.entrySet()) {
-      // This race conditon is okay.  If we skip a speculation attempt we
-      //  should have tried because the event that lowers the number of
-      //  containers needed to zero hasn't come through, it will next time.
-      // Also, if we miss the fact that the number of containers needed was
-      //  zero but increased due to a failure it's not too bad to launch one
-      //  container prematurely.
-      if (jobEntry.getValue().get() > 0) {
-        continue;
-      }
-
-      int numberSpeculationsAlready = 0;
-      int numberRunningTasks = 0;
-
-      // loop through the tasks of the kind
-      Job job = context.getJob(jobEntry.getKey());
-
-      Map<TaskId, Task> tasks = job.getTasks(type);
-
-      int numberAllowedSpeculativeTasks
-          = (int) Math.max(minimumAllowedSpeculativeTasks,
-              proportionTotalTasksSpeculatable * tasks.size());
-
-      TaskId bestTaskID = null;
-      long bestSpeculationValue = -1L;
-
-      // this loop is potentially pricey.
-      // TODO track the tasks that are potentially worth looking at
-      for (Map.Entry<TaskId, Task> taskEntry : tasks.entrySet()) {
-        long mySpeculationValue = speculationValue(taskEntry.getKey(), now);
-
-        if (mySpeculationValue == ALREADY_SPECULATING) {
-          ++numberSpeculationsAlready;
-        }
-
-        if (mySpeculationValue != NOT_RUNNING) {
-          ++numberRunningTasks;
-        }
-
-        if (mySpeculationValue > bestSpeculationValue) {
-          bestTaskID = taskEntry.getKey();
-          bestSpeculationValue = mySpeculationValue;
-        }
-      }
-      numberAllowedSpeculativeTasks
-          = (int) Math.max(numberAllowedSpeculativeTasks,
-              proportionRunningTasksSpeculatable * numberRunningTasks);
-
-      // If we found a speculation target, fire it off
-      if (bestTaskID != null
-          && numberAllowedSpeculativeTasks > numberSpeculationsAlready) {
-        addSpeculativeAttempt(bestTaskID);
-        ++successes;
-      }
-    }
-
-    return successes;
-  }
-
-  private int computeSpeculations() {
-    // We'll try to issue one map and one reduce speculation per job per run
-    return maybeScheduleAMapSpeculation() + maybeScheduleAReduceSpeculation();
-  }
-
-  static class TaskAttemptHistoryStatistics {
-
-    private long estimatedRunTime;
-    private float progress;
-    private long lastHeartBeatTime;
-
-    public TaskAttemptHistoryStatistics(long estimatedRunTime, float progress,
-        long nonProgressStartTime) {
-      this.estimatedRunTime = estimatedRunTime;
-      this.progress = progress;
-      resetHeartBeatTime(nonProgressStartTime);
-    }
-
-    public long getEstimatedRunTime() {
-      return this.estimatedRunTime;
-    }
-
-    public float getProgress() {
-      return this.progress;
-    }
-
-    public void setEstimatedRunTime(long estimatedRunTime) {
-      this.estimatedRunTime = estimatedRunTime;
-    }
-
-    public void setProgress(float progress) {
-      this.progress = progress;
-    }
-
-    public boolean notHeartbeatedInAWhile(long now) {
-      if (now - lastHeartBeatTime <= MAX_WAITTING_TIME_FOR_HEARTBEAT) {
-        return false;
-      } else {
-        resetHeartBeatTime(now);
-        return true;
-      }
-    }
-
-    public void resetHeartBeatTime(long lastHeartBeatTime) {
-      this.lastHeartBeatTime = lastHeartBeatTime;
-    }
-  }
-
-  @VisibleForTesting
-  public long getSoonestRetryAfterNoSpeculate() {
-    return soonestRetryAfterNoSpeculate;
-  }
-
-  @VisibleForTesting
-  public long getSoonestRetryAfterSpeculate() {
-    return soonestRetryAfterSpeculate;
-  }
-
-  @VisibleForTesting
-  public double getProportionRunningTasksSpeculatable() {
-    return proportionRunningTasksSpeculatable;
-  }
-
-  @VisibleForTesting
-  public double getProportionTotalTasksSpeculatable() {
-    return proportionTotalTasksSpeculatable;
-  }
-
-  @VisibleForTesting
-  public int getMinimumAllowedSpeculativeTasks() {
-    return minimumAllowedSpeculativeTasks;
-  }
-}
+// This is

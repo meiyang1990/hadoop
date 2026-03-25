@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,17 +39,42 @@ import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.Credentials;
 
 /**
+ * @file org/apache/hadoop/mapreduce/lib/chain/ChainReduceContextImpl.java
+ * @brief 链式Reduce处理的ReduceContext包装实现，属于MapReduce链式计算模块
+ * 
+ * 该类为ChainReducer提供自定义上下文实现，将大部分方法委托给原始ReduceContext，
+ * 仅覆盖配置获取和输出写入相关方法，支持链式处理中每个Reducer阶段使用独立配置
+ * 和自定义输出接收器。
+ */
+/**
  * A simple wrapper class that delegates most of its functionality to the
  * underlying context, but overrides the methods to do with record writer and
  * configuration
  */
+/**
+ * 链式Reduce处理的ReduceContext包装类
+ * 职责：将大部分方法委托给原始上下文，仅替换配置和输出写入逻辑，支持链式Reduce管道中多阶段处理
+ * @param <KEYIN> 输入Key类型
+ * @param <VALUEIN> 输入Value类型
+ * @param <KEYOUT> 输出Key类型
+ * @param <VALUEOUT> 输出Value类型
+ */
 class ChainReduceContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
     ReduceContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> {
 
+  // 原始基础ReduceContext，大部分方法委托给它处理
   private final ReduceContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> base;
+  // 当前阶段使用的自定义RecordWriter，用于输出当前Reduce阶段结果
   private final RecordWriter<KEYOUT, VALUEOUT> rw;
+  // 当前阶段使用的自定义配置
   private final Configuration conf;
 
+  /**
+   * 构造ChainReduceContextImpl包装实例
+   * @param base 原始基础ReduceContext
+   * @param output 当前阶段使用的自定义RecordWriter
+   * @param conf 当前阶段使用的自定义配置
+   */
   public ChainReduceContextImpl(
       ReduceContext<KEYIN, VALUEIN, KEYOUT, VALUEOUT> base,
       RecordWriter<KEYOUT, VALUEOUT> output, Configuration conf) {
@@ -98,6 +124,9 @@ class ChainReduceContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
   }
 
   @Override
+  /**
+   * 使用当前阶段自定义RecordWriter写入输出键值对
+   */
   public void write(KEYOUT key, VALUEOUT value) throws IOException,
       InterruptedException {
     rw.write(key, value);
@@ -145,6 +174,9 @@ class ChainReduceContextImpl<KEYIN, VALUEIN, KEYOUT, VALUEOUT> implements
   }
 
   @Override
+  /**
+   * 返回当前Reduce阶段自定义配置
+   */
   public Configuration getConfiguration() {
     return conf;
   }

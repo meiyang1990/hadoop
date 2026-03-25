@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,28 +26,42 @@ import org.apache.hadoop.yarn.server.federation.store.records.DeleteReservationH
 import org.apache.hadoop.thirdparty.protobuf.TextFormat;
 
 /**
- * Protocol buffer based implementation of
- * {@link DeleteReservationHomeSubClusterResponse}.
+ * 文件说明：基于Protocol Buffer实现的{@link DeleteReservationHomeSubClusterResponse}，
+ * 用于YARN联邦状态存储中删除预约宿主子集群操作响应的PB序列化实现
  */
 @Private
 @Unstable
 public class DeleteReservationHomeSubClusterResponsePBImpl
     extends DeleteReservationHomeSubClusterResponse {
+  // 存储Protocol Buffer消息实例，通过默认实例初始化
   private DeleteReservationHomeSubClusterResponseProto proto =
       DeleteReservationHomeSubClusterResponseProto.getDefaultInstance();
+  // Protocol Buffer构建器，用于构造消息对象
   private DeleteReservationHomeSubClusterResponseProto.Builder builder = null;
+  // 标识当前是否通过proto实例存储数据
   private boolean viaProto = false;
 
+  /**
+   * 构造函数，初始化PB构建器
+   */
   public DeleteReservationHomeSubClusterResponsePBImpl() {
     builder = DeleteReservationHomeSubClusterResponseProto.newBuilder();
   }
 
+  /**
+   * 基于已有PB实例构造响应对象
+   * @param proto 已有的PB响应proto实例
+   */
   public DeleteReservationHomeSubClusterResponsePBImpl(
       DeleteReservationHomeSubClusterResponseProto proto) {
     this.proto = proto;
     viaProto = true;
   }
 
+  /**
+   * 获取当前响应对应的PB实例，自动完成构建转换
+   * @return 序列化可用的PB响应实例
+   */
   public DeleteReservationHomeSubClusterResponseProto getProto() {
     proto = viaProto ? proto : builder.build();
     viaProto = true;

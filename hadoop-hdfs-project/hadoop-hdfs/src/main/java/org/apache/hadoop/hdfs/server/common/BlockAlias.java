@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,12 +23,17 @@ import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.hdfs.protocol.Block;
 
 /**
- * Interface used to load provided blocks.
+ * HDFS数据块别名接口，提供获取实际数据块对象的统一抽象。
+ * 用于在需要对数据块做包装或别名映射的场景中，统一提供访问原始数据块的能力。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
 public interface BlockAlias {
 
+  /**
+   * 获取当前别名对应的实际数据块对象。
+   * @return 实际数据块实例
+   */
   Block getBlock();
 
 }

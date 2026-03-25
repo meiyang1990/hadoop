@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -36,21 +37,22 @@ import org.apache.hadoop.hdfs.server.common.StorageInfo;
 
 import org.apache.hadoop.util.Preconditions;
 
+/**
+ * NameNode版本升级/回滚工具类，提供HDFS元数据版本升级、确认升级、回滚的核心工具方法
+ */
 public abstract class NNUpgradeUtil {
   
   private static final Logger LOG =
       LoggerFactory.getLogger(NNUpgradeUtil.class);
   
   /**
-   * Return true if this storage dir can roll back to the previous storage
-   * state, false otherwise. The NN will refuse to run the rollback operation
-   * unless at least one JM or fsimage storage directory can roll back.
-   * 
-   * @param storage the storage info for the current state
-   * @param prevStorage the storage info for the previous (unupgraded) state
-   * @param targetLayoutVersion the layout version we intend to roll back to
-   * @return true if this JM can roll back, false otherwise.
-   * @throws IOException in the event of error
+   * 检查当前存储目录是否支持回滚到指定版本
+   * @param sd 目标存储目录
+   * @param storage 当前版本存储信息
+   * @param prevStorage 上一版本存储信息
+   * @param targetLayoutVersion 期望回滚到的目标布局版本
+   * @return 如果支持回滚返回true，否则返回false
+   * @throws IOException 读取存储信息时发生IO异常
    */
   static boolean canRollBack(StorageDirectory sd, StorageInfo storage,
       StorageInfo prevStorage, int targetLayoutVersion) throws IOException {
@@ -58,12 +60,12 @@ public abstract class NNUpgradeUtil {
     if (!prevDir.exists()) {  // use current directory then
       LOG.info("Storage directory " + sd.getRoot()
                + " does not contain previous fs state.");
-      // read and verify consistency with other directories
+      // 读取并校验和其他目录的一致性
       storage.readProperties(sd);
       return false;
     }
 
-    // read and verify consistency of the prev dir
+    // 读取并校验上一版本目录的一致性
     prevStorage.readPreviousVersionProperties(sd);
 
     if (prevStorage.getLayoutVersion() != targetLayoutVersion) {
@@ -79,11 +81,9 @@ public abstract class NNUpgradeUtil {
   }
 
   /**
-   * Finalize the upgrade. The previous dir, if any, will be renamed and
-   * removed. After this is completed, rollback is no longer allowed.
-   * 
-   * @param sd the storage directory to finalize
-   * @throws IOException in the event of error
+   * 完成版本升级确认，删除升级前的旧版本数据，执行后无法再回滚升级
+   * @param sd 需要确认升级的存储目录
+   * @throws IOException 处理目录/文件时发生IO异常
    */
   static void doFinalize(StorageDirectory sd) throws IOException {
     File prevDir = sd.getPreviousDir();
@@ -96,35 +96,31 @@ public abstract class NNUpgradeUtil {
     Preconditions.checkState(sd.getCurrentDir().exists(),
         "Current directory must exist.");
     final File tmpDir = sd.getFinalizedTmp();
-    // rename previous to tmp and remove
+    // 先将旧版本目录重命名为临时目录，再删除
     NNStorage.rename(prevDir, tmpDir);
     NNStorage.deleteDir(tmpDir);
     LOG.info("Finalize upgrade for " + sd.getRoot()+ " is complete.");
   }
   
   /**
-   * Perform any steps that must succeed across all storage dirs/JournalManagers
-   * involved in an upgrade before proceeding onto the actual upgrade stage. If
-   * a call to any JM's or local storage dir's doPreUpgrade method fails, then
-   * doUpgrade will not be called for any JM. The existing current dir is
-   * renamed to previous.tmp, and then a new, empty current dir is created.
-   *
-   * @param conf configuration for creating {@link EditLogFileOutputStream}
-   * @param sd the storage directory to perform the pre-upgrade procedure.
-   * @throws IOException in the event of error
+   * 执行升级前的准备工作，所有存储目录准备成功后才会开始实际升级
+   * 将当前目录重命名为previous.tmp，创建新的空当前目录，并硬链接 edits 文件到新目录
+   * @param conf 配置对象，用于创建输出流
+   * @param sd 需要准备升级的存储目录
+   * @throws IOException 执行目录操作/文件链接时发生IO异常
    */
   static void doPreUpgrade(Configuration conf, StorageDirectory sd)
       throws IOException {
     LOG.info("Starting upgrade of storage directory " + sd.getRoot());
 
-    // rename current to tmp
+    // 将当前目录重命名为临时目录
     renameCurToTmp(sd);
 
     final Path curDir = sd.getCurrentDir().toPath();
     final Path tmpDir = sd.getPreviousTmp().toPath();
 
     Files.walkFileTree(tmpDir,
-      /* do not follow links */ Collections.<FileVisitOption>emptySet(),
+      /* 不跟随符号链接 */ Collections.<FileVisitOption>emptySet(),
         1, new SimpleFileVisitor<Path>() {
 
           @Override
@@ -135,7 +131,7 @@ public abstract class NNUpgradeUtil {
 
             if (Files.isRegularFile(file)
                 && name.startsWith(NNStorage.NameNodeFile.EDITS.getName())) {
-
+              // 对edits文件创建硬链接到新的当前目录，避免复制节省空间
               Path newFile = curDir.resolve(name);
               Files.createLink(newFile, file);
             }
@@ -147,8 +143,9 @@ public abstract class NNUpgradeUtil {
   }
 
   /**
-   * Rename the existing current dir to previous.tmp, and create a new empty
-   * current dir.
+   * 将当前已有目录重命名为previous.tmp，新建空的当前目录，用于升级准备
+   * @param sd 目标存储目录
+   * @throws IOException 目录重命名/创建时发生IO异常，或者前置检查不通过
    */
   public static void renameCurToTmp(StorageDirectory sd) throws IOException {
     File curDir = sd.getCurrentDir();
@@ -163,7 +160,7 @@ public abstract class NNUpgradeUtil {
         "Previous.tmp directory must not exist for preupgrade."
             + "Consider restarting for recovery.");
 
-    // rename current to tmp
+    // 将当前目录重命名为临时目录
     NNStorage.rename(curDir, tmpDir);
 
     if (!curDir.mkdir()) {
@@ -172,20 +169,16 @@ public abstract class NNUpgradeUtil {
   }
   
   /**
-   * Perform the upgrade of the storage dir to the given storage info. The new
-   * storage info is written into the current directory, and the previous.tmp
-   * directory is renamed to previous.
-   * 
-   * @param sd the storage directory to upgrade
-   * @param storage info about the new upgraded versions.
-   * @throws IOException in the event of error
+   * 执行实际的版本升级，写入新版本存储信息，将临时目录重命名为previous目录保留回滚能力
+   * @param sd 目标存储目录
+   * @param storage 升级后的新版本存储信息
+   * @throws IOException 写入信息/重命名目录时发生IO异常
    */
   public static void doUpgrade(StorageDirectory sd, Storage storage)
       throws IOException {
     LOG.info("Performing upgrade of storage directory " + sd.getRoot());
     try {
-      // Write the version file, since saveFsImage only makes the
-      // fsimage_<txid>, and the directory is otherwise empty.
+      // 写入版本信息文件，fsimage生成不会自动生成版本文件
       storage.writeProperties(sd);
 
       File prevDir = sd.getPreviousDir();
@@ -195,7 +188,7 @@ public abstract class NNUpgradeUtil {
       Preconditions.checkState(tmpDir.exists(),
           "previous.tmp directory must exist for upgrade.");
 
-      // rename tmp to previous
+      // 将升级前临时目录重命名为previous，保留用于回滚
       NNStorage.rename(tmpDir, prevDir);
     } catch (IOException ioe) {
       LOG.error("Unable to rename temp to previous for " + sd.getRoot(), ioe);
@@ -204,11 +197,9 @@ public abstract class NNUpgradeUtil {
   }
 
   /**
-   * Perform rollback of the storage dir to the previous state. The existing
-   * current dir is removed, and the previous dir is renamed to current.
-   * 
-   * @param sd the storage directory to roll back.
-   * @throws IOException in the event of error
+   * 执行版本回滚，删除当前新版本目录，将旧版本目录重命名为当前目录恢复状态
+   * @param sd 需要回滚的存储目录
+   * @throws IOException 目录操作时发生IO异常，或者前置检查不通过
    */
   static void doRollBack(StorageDirectory sd)
       throws IOException {
@@ -221,16 +212,16 @@ public abstract class NNUpgradeUtil {
     Preconditions.checkState(!tmpDir.exists(),
         "removed.tmp directory must not exist for rollback."
             + "Consider restarting for recovery.");
-    // rename current to tmp
+    // 将当前新版本目录重命名为临时目录
     File curDir = sd.getCurrentDir();
     Preconditions.checkState(curDir.exists(),
         "Current directory must exist for rollback.");
 
     NNStorage.rename(curDir, tmpDir);
-    // rename previous to current
+    // 将旧版本目录重命名为当前目录，完成回滚
     NNStorage.rename(prevDir, curDir);
 
-    // delete tmp dir
+    // 删除存储新版本的临时目录
     NNStorage.deleteDir(tmpDir);
     LOG.info("Rollback of " + sd.getRoot() + " is complete.");
   }

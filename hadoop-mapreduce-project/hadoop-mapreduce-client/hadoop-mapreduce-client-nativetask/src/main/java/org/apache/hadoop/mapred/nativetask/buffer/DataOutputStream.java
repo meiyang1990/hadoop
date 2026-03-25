@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,17 +24,24 @@ import java.io.OutputStream;
 
 import org.apache.hadoop.classification.InterfaceAudience;
 
+/**
+ * 原生任务输出数据流抽象基类
+ * 为NativeTask模块的缓冲区输出提供统一抽象接口，继承自标准OutputStream和DataOutput，
+ * 增加了缓冲区空间检查和未刷新数据检查能力，供不同具体输出实现扩展。
+ */
 @InterfaceAudience.Private
 public abstract class DataOutputStream extends OutputStream implements DataOutput {
   /**
-   * Check whether this buffer has enough space to store length of bytes
-   * 
-   * @param length length of bytes
+   * 检查当前缓冲区是否有足够空间容纳指定长度的数据
+   * @param length 需要存储的数据字节长度
+   * @return true 空间不足，false 空间足够
+   * @throws IOException IO异常
    */
   public abstract boolean shortOfSpace(int length) throws IOException;
 
   /**
-   * Check whether there is unflushed data stored in the stream
+   * 检查流中是否存在尚未刷新到下游的数据
+   * @return true 存在未刷新数据，false 不存在未刷新数据
    */
   public abstract boolean hasUnFlushedData();
 }

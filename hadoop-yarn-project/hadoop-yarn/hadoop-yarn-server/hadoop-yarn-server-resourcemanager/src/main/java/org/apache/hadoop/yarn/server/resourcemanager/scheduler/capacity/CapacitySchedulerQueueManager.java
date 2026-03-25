@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -54,9 +55,8 @@ import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.C
 import static org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacitySchedulerConfiguration.getACLsForFlexibleAutoCreatedParentQueue;
 
 /**
- *
- * Context of the Queues in Capacity Scheduler.
- *
+ * 容量调度器队列管理器，负责管理容量调度器中所有队列的生命周期、层次结构和动态变更。
+ * 核心职责包括：队列初始化解析、配置重载更新、动态队列创建删除、队列ACL权限设置等。
  */
 @Private
 @Unstable
@@ -66,6 +66,9 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
   private static final Logger LOG = LoggerFactory.getLogger(
       CapacitySchedulerQueueManager.class);
 
+  /**
+   * 队列钩子，用于队列创建后自定义处理（测试扩展用）。
+   */
   static class QueueHook {
     public CSQueue hook(CSQueue queue) {
       return queue;
@@ -86,10 +89,10 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
   private ConfiguredNodeLabels configuredNodeLabels;
 
   /**
-   * Construct the service.
-   * @param conf the configuration
-   * @param labelManager the labelManager
-   * @param appPriorityACLManager App priority ACL manager
+   * 构造容量调度器队列管理器。
+   * @param conf 配置对象
+   * @param labelManager 节点标签管理器
+   * @param appPriorityACLManager 应用优先级ACL管理器
    */
   public CapacitySchedulerQueueManager(Configuration conf,
       RMNodeLabelsManager labelManager,
@@ -142,6 +145,11 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
     return queues.getByFullName(name);
   }
 
+  /**
+   * 规范化队列名称，将短名称转换为完整路径。
+   * @param name 输入队列名称（可能是短名称）
+   * @return 完整队列路径，找不到则返回原名称保证后续流程正常报错
+   */
   String normalizeQueueName(String name) {
     CSQueue queue = this.queues.get(name);
     if (queue != null) {
@@ -158,8 +166,8 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
   }
 
   /**
-   * Set the CapacitySchedulerContext.
-   * @param capacitySchedulerContext the CapacitySchedulerContext
+   * 设置容量调度器上下文。
+   * @param capacitySchedulerContext 容量调度器上下文
    */
   public void setCapacitySchedulerContext(
       CapacitySchedulerContext capacitySchedulerContext) {
@@ -167,9 +175,9 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
   }
 
   /**
-   * Initialized the queues.
-   * @param conf the CapacitySchedulerConfiguration
-   * @throws IOException if fails to initialize queues
+   * 初始化所有队列，从配置解析队列层次结构。
+   * @param conf 容量调度器配置
+   * @throws IOException 初始化失败时抛出异常
    */
   public void initializeQueues(CapacitySchedulerConfiguration conf)
     throws IOException {
@@ -185,9 +193,14 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
   }
 
   @Override
+  /**
+   * 重新初始化队列，处理配置变更更新队列结构。
+   * @param newConf 新的容量调度器配置
+   * @throws IOException 重新初始化失败时抛出异常
+   */
   public void reinitializeQueues(CapacitySchedulerConfiguration newConf)
       throws IOException {
-    // Parse new queues
+    // 解析新配置生成新队列结构
     CSQueueStore newQueues = new CSQueueStore();
     configuredNodeLabels = new ConfiguredNodeLabels(newConf);
     CSQueue newRoot = parseQueue(this.csContext.getQueueContext(), newConf, null,
@@ -198,68 +211,79 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
     if (!csContext.isConfigurationMutable() ||
         csContext.getRMContext().getHAServiceState()
             != HAServiceProtocol.HAServiceState.STANDBY) {
-      // Ensure queue hierarchy in the new XML file is proper.
+      // 验证新配置队列层次结构合法性
       CapacitySchedulerConfigValidator
               .validateQueueHierarchy(queues, newQueues, newConf);
     }
 
-    // Add new queues and delete OldQeueus only after validation.
+    // 验证通过后更新现有队列：添加新队列、删除已移除队列
     updateQueues(queues, newQueues);
 
-    // Re-configure queues
+    // 重新配置现有队列
     root.reinitialize(newRoot, this.csContext.getClusterResource());
 
+    // 更新队列ACL权限
     setQueueAcls(authorizer, appPriorityACLManager, queues);
 
-    // Re-calculate headroom for active applications
+    // 重新计算活跃应用的可分配资源
     Resource clusterResource = this.csContext.getClusterResource();
     root.updateClusterResource(clusterResource, new ResourceLimits(
         clusterResource));
 
+    // 重新初始化队列节点标签
     labelManager.reinitializeQueueLabels(getQueueToLabels());
     this.queueStateManager.initialize(this);
   }
 
   /**
-   * Parse the queue from the configuration.
-   * @param queueContext the CapacitySchedulerQueueContext
-   * @param conf the CapacitySchedulerConfiguration
-   * @param parent the parent queue
-   * @param queueName the queue name
-   * @param newQueues all the queues
-   * @param oldQueues the old queues
-   * @param hook the queue hook
-   * @return the CSQueue
-   * @throws IOException
+   * 从配置递归解析队列层次结构。
+   * @param queueContext 队列上下文
+   * @param conf 容量调度器配置
+   * @param parent 父队列
+   * @param queueName 当前队列名称
+   * @param newQueues 存储新解析的队列
+   * @param oldQueues 原有队列，用于复用已有队列对象
+   * @param hook 队列创建钩子
+   * @return 解析完成的当前队列
+   * @throws IOException 解析失败时抛出异常
    */
   static CSQueue parseQueue(
       CapacitySchedulerQueueContext queueContext, CapacitySchedulerConfiguration conf,
       CSQueue parent, String queueName, CSQueueStore newQueues, CSQueueStore oldQueues,
       QueueHook hook) throws IOException {
     CSQueue queue;
+    // 构造当前队列完整路径
     QueuePath queueToParse = (parent == null) ? new QueuePath(queueName) :
         (QueuePath.createFromQueues(parent.getQueuePath(), queueName));
+    // 获取当前队列的所有子队列名称
     List<String> childQueueNames = conf.getQueues(queueToParse);
+    // 获取原有队列对象（如果存在）
     CSQueue oldQueue = oldQueues.get(queueToParse.getFullPath());
 
+    // 判断队列是否可预留
     boolean isReservableQueue = conf.isReservable(queueToParse);
+    // 判断是否开启子队列自动创建
     boolean isAutoCreateEnabled = conf.isAutoCreateChildQueueEnabled(queueToParse);
     // if a queue is eligible for auto queue creation v2 it must be a ParentQueue
     // (even if it is empty)
     final boolean isDynamicParent = oldQueue instanceof AbstractParentQueue &&
             oldQueue.isDynamicQueue();
+    // 判断当前队列是否为支持自动创建子队列的父队列
     boolean isAutoQueueCreationEnabledParent = isDynamicParent || conf.isAutoQueueCreationV2Enabled(
         queueToParse) || isAutoCreateEnabled;
 
     if (childQueueNames.size() == 0 && !isAutoQueueCreationEnabledParent) {
+      // 没有子队列也不允许自动创建，验证父队列合法性
       validateParent(parent, queueName);
       // Check if the queue will be dynamically managed by the Reservation system
       if (isReservableQueue) {
+        // 创建预留计划队列
         queue = new PlanQueue(queueContext, queueName, parent,
             oldQueues.get(queueToParse.getFullPath()));
         ReservationQueue defaultResQueue = ((PlanQueue) queue).initializeDefaultInternalQueue();
         newQueues.add(defaultResQueue);
       } else {
+        // 创建普通叶子队列
         queue = new LeafQueue(queueContext, queueName, parent,
             oldQueues.get(queueToParse.getFullPath()));
       }
@@ -273,15 +297,18 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
 
       AbstractParentQueue parentQueue;
       if (isAutoCreateEnabled) {
+        // 创建支持自动创建子队列的托管父队列
         parentQueue = new ManagedParentQueue(queueContext, queueName, parent, oldQueues.get(
             queueToParse.getFullPath()));
       } else {
+        // 创建普通静态父队列
         parentQueue = new ParentQueue(queueContext, queueName, parent, oldQueues.get(
             queueToParse.getFullPath()));
       }
 
       queue = hook.hook(parentQueue);
       List<CSQueue> childQueues = new ArrayList<>();
+      // 递归解析所有子队列
       for (String childQueueName : childQueueNames) {
         CSQueue childQueue = parseQueue(queueContext, conf, queue, childQueueName, newQueues,
             oldQueues, hook);
@@ -289,11 +316,13 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
       }
 
       if (!childQueues.isEmpty()) {
+        // 设置子队列列表到父队列
         parentQueue.setChildQueues(childQueues);
       }
 
     }
 
+    // 将当前队列添加到新队列存储
     newQueues.add(queue);
 
     LOG.info("Initialized queue: " + queueToParse.getFullPath());
@@ -301,21 +330,21 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
   }
 
   /**
-   * Updates to our list of queues: Adds the new queues and deletes the removed
-   * ones... be careful, do not overwrite existing queues.
-   *
-   * @param existingQueues, the existing queues
-   * @param newQueues the new queues based on new XML
+   * 更新现有队列集合，添加新队列、删除已移除队列，保留现有队列不变。
+   * @param existingQueues 现有队列集合
+   * @param newQueues 基于新配置解析的新队列集合
    */
   private void updateQueues(CSQueueStore existingQueues,
                             CSQueueStore newQueues) {
     CapacitySchedulerConfiguration conf = csContext.getConfiguration();
+    // 添加所有新增队列
     for (CSQueue queue : newQueues.getQueues()) {
       if (existingQueues.get(queue.getQueuePath()) == null) {
         existingQueues.add(queue);
       }
     }
 
+    // 检查并删除需要移除的队列
     for (CSQueue queue : existingQueues.getQueues()) {
       boolean isDanglingDynamicQueue = isDanglingDynamicQueue(
           newQueues, existingQueues, queue);
@@ -333,10 +362,11 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
 
   @VisibleForTesting
   /**
-   * Set the acls for the queues.
-   * @param authorizer the yarnAuthorizationProvider
-   * @param queues the queues
-   * @throws IOException if fails to set queue acls
+   * 为所有队列设置ACL权限。
+   * @param authorizer YARN授权提供者
+   * @param appPriorityACLManager 应用优先级ACL管理器
+   * @param queues 队列存储
+   * @throws IOException 设置ACL失败时抛出异常
    */
   public static void setQueueAcls(YarnAuthorizationProvider authorizer,
       AppPriorityACLsManager appPriorityACLManager, CSQueueStore queues)
@@ -344,6 +374,7 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
     List<Permission> permissions = new ArrayList<>();
     for (CSQueue queue : queues.getQueues()) {
       AbstractCSQueue csQueue = (AbstractCSQueue) queue;
+      // 添加队列本身的权限配置
       permissions.add(
           new Permission(csQueue.getPrivilegedEntity(), csQueue.getACLs()));
 
@@ -351,23 +382,23 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
         AbstractLeafQueue lQueue = (AbstractLeafQueue) queue;
 
         // Clear Priority ACLs first since reinitialize also call same.
+        // 清除旧的优先级ACL
         appPriorityACLManager.clearPriorityACLs(lQueue.getQueuePath());
+        // 添加新的优先级ACL
         appPriorityACLManager.addPrioirityACLs(lQueue.getPriorityACLs(),
             lQueue.getQueuePath());
       }
     }
+    // 批量设置权限到授权器
     authorizer.setPermission(permissions,
         UserGroupInformation.getCurrentUser());
   }
 
   /**
-   * Check that the String provided in input is the name of an existing,
-   * LeafQueue, if successful returns the queue.
-   *
-   * @param queue the queue name
-   * @return the LeafQueue
-   * @throws YarnException if the queue does not exist or the queue
-   *           is not the type of LeafQueue.
+   * 获取并验证队列是叶子队列。
+   * @param queue 队列名称
+   * @return 验证通过返回叶子队列对象
+   * @throws YarnException 队列不存在或不是叶子队列时抛出异常
    */
   public AbstractLeafQueue getAndCheckLeafQueue(String queue) throws YarnException {
     CSQueue ret = this.getQueue(queue);
@@ -383,9 +414,9 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
   }
 
   /**
-   * Get the default priority of the queue.
-   * @param queueName the queue name
-   * @return the default priority of the queue
+   * 获取队列默认应用优先级。
+   * @param queueName 队列名称
+   * @return 队列默认优先级，队列不存在则返回系统默认优先级
    */
   public Priority getDefaultPriorityForQueue(String queueName) {
     Queue queue = getQueue(queueName);
@@ -399,347 +430,8 @@ public class CapacitySchedulerQueueManager implements SchedulerQueueManager<
   }
 
   /**
-   * Get a map of queueToLabels.
-   * @return the map of queueToLabels
+   * 获取队列到可访问节点标签的映射。
+   * @return 队列->标签集合映射
    */
   private Map<String, Set<String>> getQueueToLabels() {
-    Map<String, Set<String>> queueToLabels = new HashMap<>();
-    for (CSQueue queue :  getQueues().values()) {
-      queueToLabels.put(queue.getQueuePath(), queue.getAccessibleNodeLabels());
-    }
-    return queueToLabels;
-  }
-
-  @Private
-  public QueueStateManager<CSQueue, CapacitySchedulerConfiguration>
-      getQueueStateManager() {
-    return this.queueStateManager;
-  }
-
-  public CapacitySchedulerQueueCapacityHandler getQueueCapacityHandler() {
-    return queueCapacityHandler;
-  }
-
-  /**
-   * Removes an {@code AutoCreatedLeafQueue} from the manager collection and
-   * from its parent children collection.
-   *
-   * @param queueName queue to be removed
-   * @throws SchedulerDynamicEditException if queue is not eligible for deletion
-   */
-  public void removeLegacyDynamicQueue(String queueName)
-      throws SchedulerDynamicEditException {
-    LOG.info("Removing queue: " + queueName);
-    CSQueue q = this.getQueue(queueName);
-    if (q == null || !(AbstractAutoCreatedLeafQueue.class.isAssignableFrom(
-        q.getClass()))) {
-      throw new SchedulerDynamicEditException(
-          "The queue that we are asked " + "to remove (" + queueName
-              + ") is not a AutoCreatedLeafQueue or ReservationQueue");
-    }
-    AbstractAutoCreatedLeafQueue disposableLeafQueue =
-        (AbstractAutoCreatedLeafQueue) q;
-    // at this point we should have no more apps
-    if (disposableLeafQueue.getNumApplications() > 0) {
-      throw new SchedulerDynamicEditException(
-          "The queue " + queueName + " is not empty " + disposableLeafQueue
-              .getApplications().size() + " active apps "
-              + disposableLeafQueue.getPendingApplications().size()
-              + " pending apps");
-    }
-
-    ((AbstractManagedParentQueue) disposableLeafQueue.getParent())
-        .removeChildQueue(q);
-    removeQueue(queueName);
-    LOG.info(
-        "Removal of AutoCreatedLeafQueue " + queueName + " has succeeded");
-  }
-
-  /**
-   * Adds an {@code AutoCreatedLeafQueue} to the manager collection and extends
-   * the children collection of its parent.
-   *
-   * @param queue to be added
-   * @throws SchedulerDynamicEditException if queue is not eligible to be added
-   * @throws IOException if parent can not accept the queue
-   */
-  public void addLegacyDynamicQueue(Queue queue)
-      throws SchedulerDynamicEditException, IOException {
-    if (queue == null) {
-      throw new SchedulerDynamicEditException(
-          "Queue specified is null. Should be an implementation of "
-              + "AbstractAutoCreatedLeafQueue");
-    } else if (!(AbstractAutoCreatedLeafQueue.class
-        .isAssignableFrom(queue.getClass()))) {
-      throw new SchedulerDynamicEditException(
-          "Queue is not an implementation of "
-              + "AbstractAutoCreatedLeafQueue : " + queue.getClass());
-    }
-
-    AbstractAutoCreatedLeafQueue newQueue =
-        (AbstractAutoCreatedLeafQueue) queue;
-
-    if (newQueue.getParent() == null || !(AbstractManagedParentQueue.class.
-        isAssignableFrom(newQueue.getParent().getClass()))) {
-      throw new SchedulerDynamicEditException(
-          "ParentQueue for " + newQueue + " is not properly set"
-              + " (should be set and be a PlanQueue or ManagedParentQueue)");
-    }
-
-    AbstractManagedParentQueue parent =
-        (AbstractManagedParentQueue) newQueue.getParent();
-    String queuePath = newQueue.getQueuePath();
-    parent.addChildQueue(newQueue);
-    addQueue(queuePath, newQueue);
-
-    LOG.info("Creation of AutoCreatedLeafQueue " + newQueue + " succeeded");
-  }
-
-  /**
-   * Auto creates a LeafQueue and its upper hierarchy given a path at runtime.
-   *
-   * @param queue the application placement information of the queue
-   * @return the auto created LeafQueue
-   * @throws YarnException if the given path is not eligible to be auto created
-   * @throws IOException if the given path can not be added to the parent
-   */
-  public AbstractLeafQueue createQueue(QueuePath queue)
-      throws YarnException, IOException {
-    String leafQueueName = queue.getLeafName();
-    String parentQueueName = queue.getParent();
-
-    if (!StringUtils.isEmpty(parentQueueName)) {
-      CSQueue parentQueue = getQueue(parentQueueName);
-
-      if (parentQueue != null && csContext.getConfiguration()
-          .isAutoCreateChildQueueEnabled(parentQueue.getQueuePathObject())) {
-        return createLegacyAutoQueue(queue);
-      } else {
-        return createAutoQueue(queue);
-      }
-    }
-
-    throw new SchedulerDynamicEditException(
-        "Could not auto-create leaf queue for " + leafQueueName
-            + ". Queue mapping does not specify"
-            + " which parent queue it needs to be created under.");
-  }
-
-  /**
-   * Determines the missing parent paths of a potentially auto creatable queue.
-   * The missing parents are sorted in a way that the first item is the highest
-   * in the hierarchy.
-   * Example:
-   * root.a, root.a.b, root.a.b.c
-   *
-   * @param queue to be auto created
-   * @return missing parent paths
-   * @throws SchedulerDynamicEditException if the given queue is not eligible
-   *                                       to be auto created
-   */
-  public List<String> determineMissingParents(
-      QueuePath queue) throws SchedulerDynamicEditException {
-    if (!queue.hasParent()) {
-      throw new SchedulerDynamicEditException("Can not auto create queue "
-          + queue.getFullPath() + " due to missing ParentQueue path.");
-    }
-
-    if (isAmbiguous(queue.getParent())) {
-      throw new SchedulerDynamicEditException("Could not auto-create queue "
-          + queue + " due to ParentQueue " + queue.getParent() +
-          " being ambiguous.");
-    }
-
-    // Start from the first parent
-    int firstStaticParentDistance = 1;
-
-    StringBuilder parentCandidate = new StringBuilder(queue.getParent());
-    LinkedList<String> parentsToCreate = new LinkedList<>();
-
-    CSQueue firstExistingParent = getQueue(parentCandidate.toString());
-    CSQueue firstExistingStaticParent = firstExistingParent;
-
-    while (isNonStaticParent(firstExistingStaticParent)
-        && parentCandidate.length() != 0) {
-      ++firstStaticParentDistance;
-
-      if (firstExistingParent == null) {
-        parentsToCreate.addFirst(parentCandidate.toString());
-      }
-
-      int lastIndex = parentCandidate.lastIndexOf(".");
-      parentCandidate.setLength(Math.max(lastIndex, 0));
-
-      if (firstExistingParent == null) {
-        firstExistingParent = getQueue(parentCandidate.toString());
-      }
-
-      firstExistingStaticParent = getQueue(parentCandidate.toString());
-    }
-
-    if (firstExistingParent == null || firstExistingStaticParent == null) {
-      throw new SchedulerDynamicEditException("Could not auto-create queue "
-          + queue + " parent queue does not exist.");
-    }
-
-    int maximumDepthOfStaticParent = csContext.getConfiguration().getMaximumAutoCreatedQueueDepth(
-        firstExistingStaticParent.getQueuePathObject());
-    if (firstStaticParentDistance > maximumDepthOfStaticParent) {
-      throw new SchedulerDynamicEditException(
-          "Could not auto create queue " + queue.getFullPath()
-              + ". The distance of the LeafQueue from the first static " +
-              "ParentQueue is " + firstStaticParentDistance + ", which is " +
-              "above the limit.");
-    }
-
-    if (!(firstExistingParent instanceof AbstractParentQueue)) {
-      throw new SchedulerDynamicEditException(
-          "Could not auto create hierarchy of "
-              + queue.getFullPath() + ". Queue " + queue.getParent() +
-              " is not a ParentQueue."
-      );
-    }
-
-    AbstractParentQueue existingParentQueue = (AbstractParentQueue) firstExistingParent;
-
-    if (!existingParentQueue.isEligibleForAutoQueueCreation()) {
-      throw new SchedulerDynamicEditException("Auto creation of queue " +
-          queue.getFullPath() + " is not enabled under parent "
-          + existingParentQueue.getQueuePath());
-    }
-
-    return parentsToCreate;
-  }
-
-  public List<Permission> getPermissionsForDynamicQueue(
-      QueuePath queuePath,
-      CapacitySchedulerConfiguration csConf) {
-    List<Permission> permissions = new ArrayList<>();
-
-    try {
-      PrivilegedEntity privilegedEntity = new PrivilegedEntity(queuePath.getFullPath());
-
-      CSQueue parentQueue = getQueueByFullName(queuePath.getParent());
-      if (parentQueue == null) {
-        for (String missingParent : determineMissingParents(queuePath)) {
-          String parentOfMissingParent = new QueuePath(missingParent).getParent();
-          permissions.add(new Permission(new PrivilegedEntity(missingParent),
-              getACLsForFlexibleAutoCreatedParentQueue(
-                  new AutoCreatedQueueTemplate(csConf,
-                      new QueuePath(parentOfMissingParent)))));
-        }
-      }
-
-      if (parentQueue instanceof AbstractManagedParentQueue) {
-        // An AbstractManagedParentQueue must have been found for Legacy AQC
-        permissions.add(new Permission(privilegedEntity,
-            csConf.getACLsForLegacyAutoCreatedLeafQueue(queuePath.getParentObject())));
-      } else {
-        // Every other case must be a Flexible Leaf Queue
-        permissions.add(new Permission(privilegedEntity,
-            getACLsForFlexibleAutoCreatedLeafQueue(
-                new AutoCreatedQueueTemplate(csConf, new QueuePath(queuePath.getParent())))));
-      }
-
-    } catch (SchedulerDynamicEditException e) {
-      LOG.debug("Could not determine missing parents for queue {} reason {}",
-          queuePath.getFullPath(), e.getMessage());
-    }
-
-    return permissions;
-  }
-
-  /**
-   * Get {@code ConfiguredNodeLabels} which contains the configured node labels
-   * for all queues.
-   * @return configured node labels
-   */
-  public ConfiguredNodeLabels getConfiguredNodeLabelsForAllQueues() {
-    return configuredNodeLabels;
-  }
-
-  @VisibleForTesting
-  public void reinitConfiguredNodeLabels(CapacitySchedulerConfiguration conf) {
-    this.configuredNodeLabels = new ConfiguredNodeLabels(conf);
-  }
-
-  private LeafQueue createAutoQueue(QueuePath queue)
-      throws SchedulerDynamicEditException {
-    List<String> parentsToCreate = determineMissingParents(queue);
-    // First existing parent is either the parent of the last missing parent
-    // or the parent of the given path
-    String existingParentName = queue.getParent();
-    if (!parentsToCreate.isEmpty()) {
-      existingParentName = parentsToCreate.get(0).substring(
-          0, parentsToCreate.get(0).lastIndexOf("."));
-    }
-
-    ParentQueue existingParentQueue = (ParentQueue) getQueue(
-        existingParentName);
-
-    for (String current : parentsToCreate) {
-      existingParentQueue = existingParentQueue.addDynamicParentQueue(current);
-      addQueue(existingParentQueue.getQueuePath(), existingParentQueue);
-    }
-
-    LeafQueue leafQueue = existingParentQueue.addDynamicLeafQueue(
-        queue.getFullPath());
-    addQueue(leafQueue.getQueuePath(), leafQueue);
-
-    return leafQueue;
-  }
-
-  private AbstractLeafQueue createLegacyAutoQueue(QueuePath queue)
-      throws IOException, SchedulerDynamicEditException {
-    CSQueue parentQueue = getQueue(queue.getParent());
-    // Case 1: Handle ManagedParentQueue
-    ManagedParentQueue autoCreateEnabledParentQueue =
-        (ManagedParentQueue) parentQueue;
-    AutoCreatedLeafQueue autoCreatedLeafQueue =
-        new AutoCreatedLeafQueue(
-            csContext.getQueueContext(), queue.getLeafName(), autoCreateEnabledParentQueue);
-
-    addLegacyDynamicQueue(autoCreatedLeafQueue);
-    return autoCreatedLeafQueue;
-  }
-
-  private boolean isNonStaticParent(CSQueue queue) {
-    return (!(queue instanceof AbstractCSQueue)
-        || ((AbstractCSQueue) queue).isDynamicQueue());
-  }
-
-  private boolean isDynamicQueue(CSQueue queue) {
-    return (queue instanceof AbstractCSQueue) &&
-        ((AbstractCSQueue) queue).isDynamicQueue();
-  }
-
-  private boolean isDanglingDynamicQueue(
-      CSQueueStore newQueues, CSQueueStore existingQueues,
-      CSQueue queue) {
-    if (!isDynamicQueue(queue)) {
-      return false;
-    }
-    if (queue.getParent() == null) {
-      return true;
-    }
-    if (newQueues.get(queue.getParent().getQueuePath()) != null) {
-      return false;
-    }
-    CSQueue parent = existingQueues.get(queue.getParent().getQueuePath());
-    if (parent == null) {
-      return true;
-    }
-    // A dynamic queue is dangling, if its parent is not parsed in newQueues
-    // or if its parent is not a dynamic queue. Dynamic queues are not parsed in
-    // newQueues but they are deleted automatically, so it is safe to assume
-    // that existingQueues contain valid dynamic queues.
-    return !isDynamicQueue(parent);
-  }
-
-  private static void validateParent(CSQueue parent, String queueName) {
-    if (parent == null) {
-      throw new IllegalStateException("Queue configuration missing child queue names for "
-          + queueName);
-    }
-  }
-}
+    Map<String

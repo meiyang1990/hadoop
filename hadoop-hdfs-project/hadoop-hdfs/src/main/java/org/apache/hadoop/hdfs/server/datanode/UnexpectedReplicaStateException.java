@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,20 +26,33 @@ import org.apache.hadoop.hdfs.protocol.ExtendedBlock;
 import org.apache.hadoop.hdfs.server.common.HdfsServerConstants.ReplicaState;
 
 /**
- * Exception indicating that the replica is in an unexpected state
+ * 数据节点副本状态异常类，当数据块副本处于预期之外的状态时抛出该异常
+ * 用于在数据节点副本管理过程中标记状态不匹配错误
  */
 public class UnexpectedReplicaStateException extends IOException {
   private static final long serialVersionUID = 1L;
 
+  /**
+   * 构造无信息的异常实例
+   */
   public UnexpectedReplicaStateException() {
     super();
   }
 
+  /**
+   * 构造包含块信息和预期状态的异常实例
+   * @param b 发生状态异常的数据块
+   * @param expectedState 预期的副本状态
+   */
   public UnexpectedReplicaStateException(ExtendedBlock b,
       ReplicaState expectedState) {
     super("Replica " + b + " is not in expected state " + expectedState);
   }
   
+  /**
+   * 构造包含自定义错误信息的异常实例
+   * @param msg 自定义错误信息
+   */
   public UnexpectedReplicaStateException(String msg) {
     super(msg);
   }

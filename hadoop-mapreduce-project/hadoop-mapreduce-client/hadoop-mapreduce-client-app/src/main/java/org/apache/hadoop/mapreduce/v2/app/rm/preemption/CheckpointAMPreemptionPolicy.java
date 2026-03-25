@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -46,30 +47,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * This policy works in combination with an implementation of task
- * checkpointing. It computes the tasks to be preempted in response to the RM
- * request for preemption. For strict requests, it maps containers to
- * corresponding tasks; for fungible requests, it attempts to pick the best
- * containers to preempt (reducers in reverse allocation order). The
- * TaskAttemptListener will interrogate this policy when handling a task
- * heartbeat to check whether the task should be preempted or not. When handling
- * fungible requests, the policy discount the RM ask by the amount of currently
- * in-flight preemptions (i.e., tasks that are checkpointing).
- *
- * This class it is also used to maintain the list of checkpoints for existing
- * tasks. Centralizing this functionality here, allows us to have visibility on
- * preemption and checkpoints in a single location, thus coordinating preemption
- * and checkpoint management decisions in a single policy.
+ * 结合任务检查点机制实现的ApplicationMaster抢占策略，负责响应RM的抢占请求，选择并标记需要被抢占的任务容器。
+ * 同时统一维护任务检查点信息，协调抢占操作和检查点管理，仅支持Reduce任务的抢占和检查点。
+ * 对严格抢占请求直接处理指定容器，对可协商抢占请求按反向分配顺序选择足够满足资源需求的Reduce容器抢占。
  */
 public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
 
-  // task attempts flagged for preemption
+  // 待抢占的任务尝试集合
   private final Set<TaskAttemptId> toBePreempted;
 
+  // 已统计过的抢占任务尝试集合，用于避免重复计数
   private final Set<TaskAttemptId> countedPreemptions;
 
+  // 任务ID对应检查点ID的映射表，维护已完成检查点
   private final Map<TaskId,TaskCheckpointID> checkpoints;
 
+  // 正在进行中的可抢占任务尝试对应资源，用于扣除已发起的抢占资源
   private final Map<TaskAttemptId,Resource> pendingFlexiblePreemptions;
 
   @SuppressWarnings("rawtypes")
@@ -96,16 +89,25 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
   }
 
   @Override
+  /**
+   * 初始化抢占策略，获取应用上下文的事件处理器
+   * @param context 应用上下文
+   */
   public void init(AppContext context) {
     this.eventHandler = context.getEventHandler();
   }
 
   @Override
+  /**
+   * 处理ResourceManager发送的抢占请求，分别处理严格抢占和可协商抢占
+   * @param ctxt 抢占策略上下文，提供容器和任务映射查询
+   * @param preemptionRequests RM发送的抢占请求消息
+   */
   public void preempt(Context ctxt, PreemptionMessage preemptionRequests) {
 
     if (preemptionRequests != null) {
 
-      // handling non-negotiable preemption
+      // 处理不可协商的严格抢占请求
 
       StrictPreemptionContract cStrict = preemptionRequests.getStrictContract();
       if (cStrict != null
@@ -115,13 +117,13 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
             preemptionRequests.getStrictContract().getContainers().size() +
             " containers to kill");
 
-        // handle strict preemptions. These containers are non-negotiable
+        // 遍历处理每个需要被抢占的容器
         for (PreemptionContainer c :
             preemptionRequests.getStrictContract().getContainers()) {
           ContainerId reqCont = c.getId();
           TaskAttemptId reqTask = ctxt.getTaskAttempt(reqCont);
           if (reqTask != null) {
-            // ignore requests for preempting containers running maps
+            // 仅抢占Reduce任务容器，不抢占Map任务
             if (org.apache.hadoop.mapreduce.v2.api.records.TaskType.REDUCE
                 .equals(reqTask.getTaskId().getTaskType())) {
               toBePreempted.add(reqTask);
@@ -133,7 +135,7 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
         }
       }
 
-      // handling negotiable preemption
+      // 处理可协商的灵活抢占请求
       PreemptionContract cNegot = preemptionRequests.getContract();
       if (cNegot != null
           && cNegot.getResourceRequest() != null
@@ -146,14 +148,11 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
             " resourceReq, " +
             preemptionRequests.getContract().getContainers().size() +
             " containers");
-        // handle fungible preemption. Here we only look at the total amount of
-        // resources to be preempted and pick enough of our containers to
-        // satisfy that. We only support checkpointing for reducers for now.
+        // 当前仅支持Reduce任务检查点，只抢占Reduce容器
         List<PreemptionResourceRequest> reqResources =
           preemptionRequests.getContract().getResourceRequest();
 
-        // compute the total amount of pending preemptions (to be discounted
-        // from current request)
+        // 计算当前正在处理中的抢占资源总量，用于从本次请求中扣除
         int pendingPreemptionRam = 0;
         int pendingPreemptionCores = 0;
         for (Resource r : pendingFlexiblePreemptions.values()) {
@@ -161,11 +160,11 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
           pendingPreemptionCores += r.getVirtualCores();
         }
 
-        // discount preemption request based on currently pending preemption
+        // 根据正在处理中的抢占，扣除本次需要抢占的资源量
         for (PreemptionResourceRequest rr : reqResources) {
           ResourceRequest reqRsrc = rr.getResourceRequest();
           if (!ResourceRequest.ANY.equals(reqRsrc.getResourceName())) {
-            // For now, only respond to aggregate requests and ignore locality
+            // 当前仅处理聚合请求，忽略位置相关请求
             continue;
           }
 
@@ -176,20 +175,18 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
           int reqCores = reqRsrc.getCapability().getVirtualCores();
           int totalCoresToRelease = reqCont * reqCores;
 
-          // remove
+          // 扣除已经在处理中的抢占内存
           if (pendingPreemptionRam > 0) {
-            // if goes negative we simply exit
             totalMemoryToRelease -= pendingPreemptionRam;
-            // decrement pending resources if zero or negatve we will
-            // ignore it while processing next PreemptionResourceRequest
             pendingPreemptionRam -= totalMemoryToRelease;
           }
+          // 扣除已经在处理中的抢占核数
           if (pendingPreemptionCores > 0) {
             totalCoresToRelease -= pendingPreemptionCores;
             pendingPreemptionCores -= totalCoresToRelease;
           }
 
-          // reverse order of allocation (for now)
+          // 获取所有运行中的Reduce容器，按分配逆序排序（后分配先抢占）
           List<Container> listOfCont = ctxt.getContainers(TaskType.REDUCE);
           Collections.sort(listOfCont, new Comparator<Container>() {
             @Override
@@ -198,9 +195,10 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
             }
           });
 
-          // preempt reducers first
+          // 依次选择容器抢占，直到满足资源需求
           for (Container cont : listOfCont) {
             if (totalMemoryToRelease <= 0 && totalCoresToRelease<=0) {
+              // 资源需求已满足，退出选择
               break;
             }
             TaskAttemptId reduceId = ctxt.getTaskAttempt(cont.getId());
@@ -210,25 +208,32 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
             if (!toBePreempted.contains(reduceId)) {
               totalMemoryToRelease -= cMem;
               totalCoresToRelease -= cCores;
-                toBePreempted.add(reduceId);
-                pendingFlexiblePreemptions.put(reduceId, cont.getResource());
+              toBePreempted.add(reduceId);
+              pendingFlexiblePreemptions.put(reduceId, cont.getResource());
             }
             LOG.info("ResourceRequest:" + reqRsrc + " satisfied preempting "
                 + reduceId);
           }
-          // if map was preemptable we would do add them to toBePreempted here
         }
       }
     }
   }
 
   @Override
+  /**
+   * 处理容器失败事件，清理对应任务的抢占标记和检查点
+   * @param attemptID 失败的任务尝试ID
+   */
   public void handleFailedContainer(TaskAttemptId attemptID) {
     toBePreempted.remove(attemptID);
     checkpoints.remove(attemptID.getTaskId());
   }
 
   @Override
+  /**
+   * 处理容器完成事件，清理对应任务的抢占标记和待处理抢占记录
+   * @param attemptID 完成的任务尝试ID
+   */
   public void handleCompletedContainer(TaskAttemptId attemptID){
     LOG.info(" task completed:" + attemptID);
     toBePreempted.remove(attemptID);
@@ -236,6 +241,11 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
   }
 
   @Override
+  /**
+   * 判断指定任务尝试是否需要被抢占，如果需要则更新计数器
+   * @param yarnAttemptID 待检查的任务尝试ID
+   * @return true表示需要抢占，false表示不需要
+   */
   public boolean isPreempted(TaskAttemptId yarnAttemptID) {
     if (toBePreempted.contains(yarnAttemptID)) {
       updatePreemptionCounters(yarnAttemptID);
@@ -245,16 +255,30 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
   }
 
   @Override
+  /**
+   * 处理成功抢占的报告，本策略不处理该事件
+   * @param taskAttemptID 已成功抢占的任务尝试ID
+   */
   public void reportSuccessfulPreemption(TaskAttemptId taskAttemptID) {
     // ignore
   }
 
   @Override
+  /**
+   * 获取指定任务的检查点ID
+   * @param taskId 任务ID
+   * @return 任务对应的检查点ID，如果不存在则返回null
+   */
   public TaskCheckpointID getCheckpointID(TaskId taskId) {
     return checkpoints.get(taskId);
   }
 
   @Override
+  /**
+   * 设置指定任务的检查点ID，并更新检查点相关计数器
+   * @param taskId 任务ID
+   * @param cid 检查点ID
+   */
   public void setCheckpointID(TaskId taskId, TaskCheckpointID cid) {
     checkpoints.put(taskId, cid);
     if (cid != null) {
@@ -263,6 +287,11 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
   }
 
   @SuppressWarnings({ "unchecked" })
+  /**
+   * 更新检查点相关作业计数器，包括检查点数量、检查点字节数、检查点耗时
+   * @param taskId 生成检查点的任务ID
+   * @param cid 新生成的检查点ID
+   */
   private void updateCheckpointCounters(TaskId taskId, TaskCheckpointID cid) {
     JobCounterUpdateEvent jce = new JobCounterUpdateEvent(taskId.getJobId());
     jce.addCounterUpdate(JobCounter.CHECKPOINTS, 1);
@@ -277,6 +306,10 @@ public class CheckpointAMPreemptionPolicy implements AMPreemptionPolicy {
   }
 
   @SuppressWarnings({ "unchecked" })
+  /**
+   * 更新抢占请求计数器，避免同一个任务重复计数
+   * @param yarnAttemptID 被抢占的任务尝试ID
+   */
   private void updatePreemptionCounters(TaskAttemptId yarnAttemptID) {
     if (!countedPreemptions.contains(yarnAttemptID)) {
       countedPreemptions.add(yarnAttemptID);

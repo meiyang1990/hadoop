@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -21,11 +22,13 @@ package org.apache.hadoop.yarn.server.resourcemanager.webapp;
 import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 /**
- * Renders a block for the applications with metrics information.
+ * YARN ResourceManager Web UI 应用列表区块，渲染带指标信息的应用列表页面区块
  */
 class AppsBlockWithMetrics extends HtmlBlock {
   @Override public void render(Block html) {
+    // 渲染指标概览表格
     html.__(MetricsOverviewTable.class);
+    // 渲染ResourceManager应用列表区块
     html.__(RMAppsBlock.class);
   }
 }

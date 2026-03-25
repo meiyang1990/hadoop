@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,16 +19,25 @@
 #ifndef RUNC_RUNC_CONFIG_H
 #define RUNC_RUNC_CONFIG_H
 
-// Section for all runC config keys
+/**
+ * @file runc_config.h
+ * @brief YARN NodeManager runC 容器执行器配置项定义
+ *
+ * 定义了使用 runC 启动隔离容器时所需的所有配置键和默认值，
+ * 用于支持基于 runC 的轻量级容器运行时，提供比 Docker 更轻量的容器隔离能力
+ */
+
+// runC 配置块在配置文件中的根节点名称
 #define CONTAINER_EXECUTOR_CFG_RUNC_SECTION "runc"
 
-// Configuration for top-level directory of runtime database
-// Ideally this should be configured to a tmpfs or other RAM-based filesystem.
+// 运行时数据库根目录配置键，建议配置到 tmpfs 等内存文件系统提升性能
 #define RUNC_RUN_ROOT_KEY    "runc.run-root"
+// runC 运行时根目录默认值
 #define DEFAULT_RUNC_ROOT    "/run/yarn-container-executor"
 
-// Configuration for the path to the runC executable on the host
+// 宿主机上 runC 可执行文件路径配置键
 #define RUNC_BINARY_KEY      "runc.binary"
+// runC 可执行文件默认路径
 #define DEFAULT_RUNC_BINARY  "/usr/bin/runc"
 
 #endif /* RUNC_RUNC_CONFIG_H */

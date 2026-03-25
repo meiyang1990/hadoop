@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,7 +29,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 
 /**
- * Represents an HDFS block that is mapped to persistent memory by the DataNode.
+ * 文件级注释：HDFS DataNode 持久化内存（PMEM）块映射实现类，表示一个被映射到持久化内存的HDFS数据块
+ * 实现了MappableBlock接口，负责维护持久化内存中映射块的元信息，并提供资源释放能力
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -36,10 +38,19 @@ public class NativePmemMappedBlock implements MappableBlock {
   private static final Logger LOG =
       LoggerFactory.getLogger(NativePmemMappedBlock.class);
 
+  // 持久化内存中块映射的起始地址
   private long pmemMappedAddress = -1L;
+  // 映射块的字节长度
   private long length;
+  // 块唯一标识，用于定位块
   private ExtendedBlockId key;
 
+  /**
+   * 构造函数：创建一个持久化内存映射块实例
+   * @param pmemMappedAddress 持久化内存映射起始地址
+   * @param length 映射块长度
+   * @param key 块唯一标识
+   */
   NativePmemMappedBlock(long pmemMappedAddress, long length,
       ExtendedBlockId key) {
     assert length > 0;
@@ -49,36 +60,53 @@ public class NativePmemMappedBlock implements MappableBlock {
   }
 
   @Override
+  /**
+   * 获取映射块的字节长度
+   * @return 映射块长度
+   */
   public long getLength() {
     return length;
   }
 
   @Override
+  /**
+   * 获取映射块在持久化内存中的起始地址
+   * @return 持久化内存映射起始地址
+   */
   public long getAddress() {
     return pmemMappedAddress;
   }
 
   @Override
+  /**
+   * 获取当前块的唯一标识
+   * @return 扩展块ID
+   */
   public ExtendedBlockId getKey() {
     return key;
   }
 
   @Override
+  /**
+   * 关闭并释放持久化内存映射资源：取消内存映射并删除缓存文件
+   */
   public void close() {
+    // 仅处理已映射的块
     if (pmemMappedAddress != -1L) {
       try {
+        // 获取当前块在PMEM缓存中的文件路径
         String cacheFilePath =
             PmemVolumeManager.getInstance().getCachePath(key);
-        // Current libpmem will report error when pmem_unmap is called with
-        // length not aligned with page size, although the length is returned
-        // by pmem_map_file.
+        // 调用原生方法取消持久化内存映射
         boolean success =
             NativeIO.POSIX.Pmem.unmapBlock(pmemMappedAddress, length);
         if (!success) {
           throw new IOException("Failed to unmap the mapped file from " +
               "pmem address: " + pmemMappedAddress);
         }
+        // 标记地址为无效，表示已释放
         pmemMappedAddress = -1L;
+        // 删除本地缓存文件
         FsDatasetUtil.deleteMappedFile(cacheFilePath);
         LOG.info("Successfully uncached one replica:{} from persistent memory"
             + ", [cached path={}, length={}]", key, cacheFilePath, length);

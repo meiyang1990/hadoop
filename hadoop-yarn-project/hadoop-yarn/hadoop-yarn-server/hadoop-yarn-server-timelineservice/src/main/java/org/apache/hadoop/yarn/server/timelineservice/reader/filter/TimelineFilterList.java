@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -26,18 +27,14 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * Implementation of {@link TimelineFilter} that represents an ordered list of
- * timeline filters which will then be evaluated with a specified boolean
- * operator {@link Operator#AND} or {@link Operator#OR}. Since you can use
- * timeline filter lists as children of timeline filter lists, you can create a
- * hierarchy of filters to be evaluated.
+ * 时间线服务过滤器列表实现，维护有序过滤器集合，通过指定逻辑操作符（AND/OR）对所有过滤器进行组合求值，
+ * 支持嵌套过滤器列表以构建层级过滤条件，实现复杂的组合过滤逻辑。
  */
 @Private
 @Unstable
 public class TimelineFilterList extends TimelineFilter {
   /**
-   * Specifies how filters in the filter list will be evaluated. AND means all
-   * the filters should match and OR means atleast one should match.
+   * 定义过滤器列表中多个条件的逻辑操作符，AND要求所有条件匹配，OR要求至少一个条件匹配。
    */
   @Private
   @Unstable
@@ -49,18 +46,34 @@ public class TimelineFilterList extends TimelineFilter {
   private Operator operator;
   private List<TimelineFilter> filterList = new ArrayList<TimelineFilter>();
 
+  /**
+   * 使用默认AND操作符构造过滤器列表。
+   * @param filters 要包含的过滤器数组
+   */
   public TimelineFilterList(TimelineFilter...filters) {
     this(Operator.AND, filters);
   }
 
+  /**
+   * 使用默认AND操作符构造空过滤器列表。
+   */
   public TimelineFilterList() {
     this(Operator.AND);
   }
 
+  /**
+   * 使用指定操作符构造空过滤器列表。
+   * @param op 逻辑操作符
+   */
   public TimelineFilterList(Operator op) {
     this.operator = op;
   }
 
+  /**
+   * 使用指定操作符和过滤器数组构造过滤器列表。
+   * @param op 逻辑操作符
+   * @param filters 要包含的过滤器数组
+   */
   public TimelineFilterList(Operator op, TimelineFilter...filters) {
     this.operator = op;
     this.filterList = new ArrayList<TimelineFilter>(Arrays.asList(filters));
@@ -72,27 +85,35 @@ public class TimelineFilterList extends TimelineFilter {
   }
 
   /**
-   * Get the filter list.
+   * 获取当前过滤器列表包含的所有过滤器。
    *
-   * @return filterList
+   * @return 过滤器列表
    */
   public List<TimelineFilter> getFilterList() {
     return filterList;
   }
 
   /**
-   * Get the operator.
+   * 获取当前使用的逻辑操作符。
    *
-   * @return operator
+   * @return 逻辑操作符
    */
   public Operator getOperator() {
     return operator;
   }
 
+  /**
+   * 设置逻辑操作符。
+   * @param op 要设置的操作符
+   */
   public void setOperator(Operator op) {
     operator = op;
   }
 
+  /**
+   * 向过滤器列表添加一个新的过滤器。
+   * @param filter 要添加的过滤器
+   */
   public void addFilter(TimelineFilter filter) {
     filterList.add(filter);
   }

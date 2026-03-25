@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,6 +26,10 @@ import org.apache.hadoop.mapreduce.v2.app.AppContext;
 import org.apache.hadoop.mapreduce.v2.app.webapp.App;
 import org.apache.hadoop.yarn.util.Times;
 
+/**
+ * MapReduce应用信息数据访问对象，用于Web界面序列化输出应用基本信息。
+ * 存储应用ID、名称、提交用户、启动时间和运行时长等核心信息，支持XML/JSON序列化。
+ */
 @XmlRootElement(name = "info")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppInfo {
@@ -35,9 +40,17 @@ public class AppInfo {
   protected long startedOn;
   protected long elapsedTime;
 
+  /**
+   * 空构造函数，供JAXB序列化框架使用。
+   */
   public AppInfo() {
   }
 
+  /**
+   * 从应用上下文构造应用信息对象，提取并封装应用基本信息。
+   * @param app Web应用封装对象
+   * @param context 应用上下文，包含应用核心状态信息
+   */
   public AppInfo(App app, AppContext context) {
     this.appId = context.getApplicationID().toString();
     this.name = context.getApplicationName().toString();

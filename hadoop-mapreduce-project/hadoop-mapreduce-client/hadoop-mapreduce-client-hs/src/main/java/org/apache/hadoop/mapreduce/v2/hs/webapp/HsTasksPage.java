@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -33,13 +34,18 @@ import org.apache.hadoop.mapreduce.v2.util.MRApps;
 import org.apache.hadoop.yarn.webapp.SubView;
 
 /**
- * A page showing the tasks for a given application.
+ * 历史服务器中展示指定应用所有任务列表的页面
+ * 用于在历史服务器Web UI中呈现已完成应用的任务信息
  */
 public class HsTasksPage extends HsView {
 
   /*
    * (non-Javadoc)
    * @see org.apache.hadoop.mapreduce.v2.hs.webapp.HsView#preHead(org.apache.hadoop.yarn.webapp.hamlet.Hamlet.HTML)
+   */
+  /**
+   * 页面头渲染前的初始化配置，设置页面所需的JS组件参数和样式
+   * @param html 页面HTML对象
    */
   @Override protected void preHead(Page.HTML<__> html) {
     commonPreHead(html);
@@ -53,16 +59,17 @@ public class HsTasksPage extends HsView {
   }
   
   /**
-   * The content of this page is the TasksBlock
-   * @return HsTasksBlock.class
+   * 获取页面内容区块，本页内容为任务列表区块
+   * @return 任务列表区块类对象
    */
   @Override protected Class<? extends SubView> content() {
     return HsTasksBlock.class;
   }
 
   /**
-   * @return the end of the JS map that is the jquery datatable configuration
-   * for the tasks table.
+   * 生成任务列表DataTable jQuery组件的初始化配置JSON
+   * 根据任务类型动态调整表格列配置，适配Map和Reduce任务不同的列结构
+   * @return 表格初始化配置的JSON字符串
    */
   private String tasksTableInit() {
     TaskType type = null;
@@ -80,19 +87,25 @@ public class HsTasksPage extends HsView {
     .append(", 'mRender': parseHadoopID }")
 
     .append(", {'sType':'numeric', 'aTargets': [ 4")
+    // 根据任务类型调整耗时列位置
     .append(type == TaskType.REDUCE ? ", 9, 10, 11, 12" : ", 7")
     .append(" ], 'mRender': renderHadoopElapsedTime }")
 
     .append("\n, {'sType':'numeric', 'aTargets': [ 2, 3, 5")
+    // 根据任务类型调整日期列位置
     .append(type == TaskType.REDUCE ? ", 6, 7, 8" : ", 6")
     .append(" ], 'mRender': renderHadoopDate }]")
 
-    // Sort by id upon page load
+    // 页面加载后默认按任务ID升序排序
     .append("\n, aaSorting: [[0, 'asc']]")
     .append("}");
     return b.toString();
   }
   
+  /**
+   * 生成任务列表表格初始化后，用于添加列搜索功能的JS代码
+   * @return 包含表格搜索事件绑定逻辑的JS代码字符串
+   */
   private String jobsPostTableInit() {
     return "var asInitVals = new Array();\n" +
            "$('tfoot input').keyup( function () \n{"+

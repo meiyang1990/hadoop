@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -28,17 +29,16 @@ import org.apache.hadoop.hdfs.protocol.Block;
 import org.apache.hadoop.hdfs.server.common.BlockAlias;
 
 /**
- * An abstract class used to read and write block maps for provided blocks.
+ * HDFS提供块（Provided Blocks）的别名映射抽象基类，用于管理外部存储提供的块与HDFS原生块的映射关系。
+ * 定义了读写别名映射的统一抽象接口，支持不同存储介质的具体实现。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public abstract class BlockAliasMap<T extends BlockAlias> {
 
   /**
-   * ImmutableIterator is an Iterator that does not support the remove
-   * operation. This could inherit {@link java.util.Enumeration} but Iterator
-   * is supported by more APIs and Enumeration's javadoc even suggests using
-   * Iterator instead.
+   * 不支持remove操作的不可变迭代器，用于遍历提供块的别名列表。
+   * 遵循提供存储的只读特性，禁止修改迭代过程中的集合。
    */
   public abstract class ImmutableIterator implements Iterator<T> {
     public void remove() {
@@ -48,66 +48,74 @@ public abstract class BlockAliasMap<T extends BlockAlias> {
   }
 
   /**
-   * An abstract class that is used to read {@link BlockAlias}es
-   * for provided blocks.
+   * 提供块别名映射的读取器抽象基类，定义了查询和遍历别名映射的接口。
    */
   public static abstract class Reader<U extends BlockAlias>
       implements Iterable<U>, Closeable {
 
     /**
-     * reader options.
+     * 别名映射读取器配置选项的标记接口，用于扩展不同实现的配置参数。
      */
     public interface Options { }
 
     /**
-     * @param ident block to resolve
-     * @return BlockAlias corresponding to the provided block.
-     * @throws IOException
+     * 根据HDFS块标识解析对应的块别名信息。
+     * @param ident 需要解析的HDFS块对象
+     * @return 解析得到的块别名，如果不存在则返回空Optional
+     * @throws IOException 解析过程中发生IO异常时抛出
      */
     public abstract Optional<U> resolve(Block ident) throws IOException;
   }
 
   /**
-   * Returns a reader to the alias map.
-   * @param opts reader options
-   * @param blockPoolID block pool id to use
-   * @return {@link Reader} to the alias map. If a Reader for the blockPoolID
-   * cannot be created, this will return null.
-   * @throws IOException
+   * 获取指定块池的别名映射读取器。
+   * @param opts 读取器配置选项
+   * @param blockPoolID 目标块池ID
+   * @return 指定块池的别名映射读取器，如果无法创建则返回null
+   * @throws IOException 获取读取器过程中发生IO异常时抛出
    */
   public abstract Reader<T> getReader(Reader.Options opts, String blockPoolID)
       throws IOException;
 
   /**
-   * An abstract class used as a writer for the provided block map.
+   * 提供块别名映射的写入器抽象基类，定义了存储别名映射的接口。
    */
   public static abstract class Writer<U extends BlockAlias>
       implements Closeable {
     /**
-     * writer options.
+     * 别名映射写入器配置选项的标记接口，用于扩展不同实现的配置参数。
      */
     public interface Options { }
 
+    /**
+     * 将一个块别名信息存储到别名映射中。
+     * @param token 需要存储的块别名对象
+     * @throws IOException 存储过程中发生IO异常时抛出
+     */
     public abstract void store(U token) throws IOException;
 
   }
 
   /**
-   * Returns the writer for the alias map.
-   * @param opts writer options.
-   * @param blockPoolID block pool id to use
-   * @return {@link Writer} to the alias map.
-   * @throws IOException
+   * 获取指定块池的别名映射写入器。
+   * @param opts 写入器配置选项
+   * @param blockPoolID 目标块池ID
+   * @return 指定块池的别名映射写入器
+   * @throws IOException 获取写入器过程中发生IO异常时抛出
    */
   public abstract Writer<T> getWriter(Writer.Options opts, String blockPoolID)
       throws IOException;
 
   /**
-   * Refresh the alias map.
-   * @throws IOException
+   * 刷新别名映射，重新加载最新的映射数据。
+   * @throws IOException 刷新过程中发生IO异常时抛出
    */
   public abstract void refresh() throws IOException;
 
+  /**
+   * 关闭别名映射，释放占用的资源。
+   * @throws IOException 关闭过程中发生IO异常时抛出
+   */
   public abstract void close() throws IOException;
 
 }

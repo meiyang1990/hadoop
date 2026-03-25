@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -71,7 +72,7 @@ import org.apache.hadoop.yarn.util.timeline.TimelineUtils;
 import org.apache.hadoop.classification.VisibleForTesting;
 
 /**
- * The launch of the AM itself.
+ * ApplicationMaster启动器，负责在NodeManager上启动/清理ApplicationMaster容器。
  */
 public class AMLauncher implements Runnable {
 
@@ -90,6 +91,13 @@ public class AMLauncher implements Runnable {
   @SuppressWarnings("rawtypes")
   private final EventHandler handler;
 
+  /**
+   * 构造AM启动器实例。
+   * @param rmContext ResourceManager上下文
+   * @param application 应用尝试实例
+   * @param eventType 操作类型（启动/清理）
+   * @param conf Yarn配置
+   */
   public AMLauncher(RMContext rmContext, RMAppAttempt application,
       AMLauncherEventType eventType, Configuration conf) {
     this.application = application;
@@ -108,16 +116,24 @@ public class AMLauncher implements Runnable {
     containerMgrProxy = getContainerMgrProxy(masterContainerID);
   }
 
+  /**
+   * 执行ApplicationMaster启动流程。
+   * @throws IOException IO异常
+   * @throws YarnException Yarn异常
+   */
   private void launch() throws IOException, YarnException {
+    // 连接目标NodeManager
     connect();
     ContainerId masterContainerID = masterContainer.getId();
     ApplicationSubmissionContext applicationContext =
         application.getSubmissionContext();
     LOG.info("Setting up container " + masterContainer
         + " for AM " + application.getAppAttemptId());
+    // 创建AM容器启动上下文
     ContainerLaunchContext launchContext =
         createAMContainerLaunchContext(applicationContext, masterContainerID);
 
+    // 构造启动容器请求
     StartContainerRequest scRequest =
         StartContainerRequest.newInstance(launchContext,
           masterContainer.getContainerToken());
@@ -126,8 +142,10 @@ public class AMLauncher implements Runnable {
     StartContainersRequest allRequests =
         StartContainersRequest.newInstance(list);
 
+    // 发送启动请求给NodeManager
     StartContainersResponse response =
         containerMgrProxy.startContainers(allRequests);
+    // 处理启动失败情况
     if (response.getFailedRequests() != null
         && response.getFailedRequests().containsKey(masterContainerID)) {
       Throwable t =
@@ -139,15 +157,24 @@ public class AMLauncher implements Runnable {
     }
   }
 
+  /**
+   * 清理已经分配的ApplicationMaster容器。
+   * @throws IOException IO异常
+   * @throws YarnException Yarn异常
+   */
   private void cleanup() throws IOException, YarnException {
+    // 连接目标NodeManager
     connect();
     ContainerId containerId = masterContainer.getId();
     List<ContainerId> containerIds = new ArrayList<ContainerId>();
     containerIds.add(containerId);
+    // 构造停止容器请求
     StopContainersRequest stopRequest =
         StopContainersRequest.newInstance(containerIds);
+    // 发送停止请求给NodeManager
     StopContainersResponse response =
         containerMgrProxy.stopContainers(stopRequest);
+    // 处理停止失败情况
     if (response.getFailedRequests() != null
         && response.getFailedRequests().containsKey(containerId)) {
       Throwable t = response.getFailedRequests().get(containerId).deSerialize();
@@ -155,30 +182,39 @@ public class AMLauncher implements Runnable {
     }
   }
 
-  // Protected. For tests.
+  /**
+   * 获取目标NodeManager的容器管理协议代理。
+   * @param containerId AM容器ID
+   * @return NodeManager容器管理协议代理
+   */
   protected ContainerManagementProtocol getContainerMgrProxy(
       final ContainerId containerId) {
 
     final NodeId node = masterContainer.getNodeId();
+    // 构造NodeManager连接地址
     final InetSocketAddress containerManagerConnectAddress =
         NetUtils.createSocketAddrForHost(node.getHost(), node.getPort());
 
     final YarnRPC rpc = getYarnRPC();
 
+    // 创建远程用户用于认证
     UserGroupInformation currentUser =
         UserGroupInformation.createRemoteUser(containerId
             .getApplicationAttemptId().toString());
 
+    // 获取应用提交用户
     String user =
         rmContext.getRMApps()
             .get(containerId.getApplicationAttemptId().getApplicationId())
             .getUser();
+    // 创建NMToken用于NodeManager认证
     org.apache.hadoop.yarn.api.records.Token token =
         rmContext.getNMTokenSecretManager().createNMToken(
             containerId.getApplicationAttemptId(), node, user);
     currentUser.addToken(ConverterUtils.convertFromYarn(token,
         containerManagerConnectAddress));
 
+    // 创建NM代理并返回
     return NMProxy.createNMProxy(conf, ContainerManagementProtocol.class,
         currentUser, rpc, containerManagerConnectAddress);
   }
@@ -188,11 +224,18 @@ public class AMLauncher implements Runnable {
     return YarnRPC.create(conf);  // TODO: Don't create again and again.
   }
 
+  /**
+   * 创建并完善AM容器启动上下文，添加令牌、环境变量等信息。
+   * @param applicationMasterContext 应用提交上下文
+   * @param containerID AM容器ID
+   * @return 完善后的启动上下文
+   * @throws IOException IO异常
+   */
   private ContainerLaunchContext createAMContainerLaunchContext(
       ApplicationSubmissionContext applicationMasterContext,
       ContainerId containerID) throws IOException {
 
-    // Construct the actual Container
+    // 获取用户提交的AM容器规格
     ContainerLaunchContext container =
         applicationMasterContext.getAMContainerSpec();
 
@@ -200,9 +243,9 @@ public class AMLauncher implements Runnable {
       throw new IOException(containerID +
             " has been cleaned before launched");
     }
-    // Finalize the container
+    // 添加各类安全令牌
     setupTokens(container, containerID);
-    // set the flow context optionally for timeline service v.2
+    // 设置时间线服务V2的流上下文环境变量
     setFlowContext(container);
 
     return container;
@@ -214,9 +257,10 @@ public class AMLauncher implements Runnable {
       ContainerLaunchContext container, ContainerId containerID)
       throws IOException {
     Map<String, String> environment = container.getEnvironment();
+    // 设置应用Web代理基础路径环境变量
     environment.put(ApplicationConstants.APPLICATION_WEB_PROXY_BASE_ENV,
         application.getWebProxyBase());
-    // Set AppSubmitTime to be consumable by the AM.
+    // 设置应用提交时间环境变量供AM读取
     ApplicationId applicationId =
         application.getAppAttemptId().getApplicationId();
     environment.put(
@@ -225,6 +269,7 @@ public class AMLauncher implements Runnable {
             .get(applicationId)
             .getSubmitTime()));
 
+    // 读取用户提交的凭证
     Credentials credentials = new Credentials();
     DataInputByteBuffer dibb = new DataInputByteBuffer();
     ByteBuffer tokens = container.getTokens();
@@ -235,18 +280,19 @@ public class AMLauncher implements Runnable {
       tokens.rewind();
     }
 
-    // Add AMRMToken
+    // 添加AMRM令牌，用于AM和RM通信认证
     Token<AMRMTokenIdentifier> amrmToken = createAndSetAMRMToken();
     if (amrmToken != null) {
       credentials.addToken(amrmToken.getService(), amrmToken);
     }
 
-    // Setup Keystore and Truststore
+    // 如果启用HTTPS，生成密钥库和信任库凭据
     String httpsPolicy = conf.get(YarnConfiguration.RM_APPLICATION_HTTPS_POLICY,
         YarnConfiguration.DEFAULT_RM_APPLICATION_HTTPS_POLICY);
     if (httpsPolicy.equals("LENIENT") || httpsPolicy.equals("STRICT")) {
       ProxyCA proxyCA = rmContext.getProxyCAManager().getProxyCA();
       try {
+        // 生成AM专用密钥库
         String kPass = proxyCA.generateKeyStorePassword();
         byte[] keyStore = proxyCA.createChildKeyStore(applicationId, kPass);
         credentials.addSecretKey(
@@ -254,6 +300,7 @@ public class AMLauncher implements Runnable {
         credentials.addSecretKey(
             AMSecretKeys.YARN_APPLICATION_AM_KEYSTORE_PASSWORD,
             kPass.getBytes(StandardCharsets.UTF_8));
+        // 生成AM专用信任库
         String tPass = proxyCA.generateKeyStorePassword();
         byte[] trustStore = proxyCA.getChildTrustStore(tPass);
         credentials.addSecretKey(
@@ -266,22 +313,25 @@ public class AMLauncher implements Runnable {
       }
     }
 
+    // 将更新后的凭证写回容器启动上下文
     DataOutputBuffer dob = new DataOutputBuffer();
     credentials.writeTokenStorageToStream(dob);
     container.setTokens(ByteBuffer.wrap(dob.getData(), 0, dob.getLength()));
   }
 
+  /**
+   * 设置时间线服务V2所需的流上下文环境变量。
+   * @param container AM容器启动上下文
+   */
   private void setFlowContext(ContainerLaunchContext container) {
+    // 仅在时间线服务V2启用时处理
     if (timelineServiceV2Enabled) {
       Map<String, String> environment = container.getEnvironment();
       ApplicationId applicationId =
           application.getAppAttemptId().getApplicationId();
       RMApp app = rmContext.getRMApps().get(applicationId);
 
-      // initialize the flow in the environment with default values for those
-      // that do not specify the flow tags
-      // flow name: app name (or app id if app name is missing),
-      // flow version: "1", flow run id: start time
+      // 设置默认流标签
       setFlowTags(environment, TimelineUtils.FLOW_NAME_TAG_PREFIX,
           TimelineUtils.generateDefaultFlowName(app.getName(), applicationId));
       setFlowTags(environment, TimelineUtils.FLOW_VERSION_TAG_PREFIX,
@@ -289,8 +339,7 @@ public class AMLauncher implements Runnable {
       setFlowTags(environment, TimelineUtils.FLOW_RUN_ID_TAG_PREFIX,
           String.valueOf(app.getStartTime()));
 
-      // Set flow context info: the flow context is received via the application
-      // tags
+      // 从应用标签中解析并设置用户自定义流上下文
       for (String tag : app.getApplicationTags()) {
         String[] parts = tag.split(":", 2);
         if (parts.length != 2 || parts[1].isEmpty()) {
@@ -325,29 +374,37 @@ public class AMLauncher implements Runnable {
 
   @VisibleForTesting
   protected Token<AMRMTokenIdentifier> createAndSetAMRMToken() {
+    // 创建AMRM令牌
     Token<AMRMTokenIdentifier> amrmToken =
         this.rmContext.getAMRMTokenSecretManager().createAndGetAMRMToken(
           application.getAppAttemptId());
+    // 将令牌保存到应用尝试实例中
     ((RMAppAttemptImpl)application).setAMRMToken(amrmToken);
     return amrmToken;
   }
 
   @SuppressWarnings("unchecked")
+  @Override
   public void run() {
+    // 根据事件类型执行对应操作
     switch (eventType) {
     case LAUNCH:
       try {
         LOG.info("Launching master" + application.getAppAttemptId());
+        // 执行启动流程
         launch();
+        // 发送启动完成事件
         handler.handle(new RMAppAttemptEvent(application.getAppAttemptId(),
             RMAppAttemptEventType.LAUNCHED, System.currentTimeMillis()));
       } catch(Exception ie) {
+        // 处理启动失败
         onAMLaunchFailed(masterContainer.getId(), ie);
       }
       break;
     case CLEANUP:
       try {
         LOG.info("Cleaning master " + application.getAppAttemptId());
+        // 执行清理流程
         cleanup();
       } catch(IOException ie) {
         LOG.info("Error cleaning master ", ie);
@@ -355,6 +412,7 @@ public class AMLauncher implements Runnable {
         StringBuilder sb = new StringBuilder("Container ");
         sb.append(masterContainer.getId().toString())
             .append(" is not handled by this NodeManager");
+        // 容器已经被NodeManager杀死的错误忽略，其他错误记录日志
         if (!e.getMessage().contains(sb.toString())) {
           // Ignoring if container is already killed by Node Manager.
           LOG.info("Error cleaning master ", e);
@@ -369,6 +427,7 @@ public class AMLauncher implements Runnable {
 
   private void parseAndThrowException(Throwable t) throws YarnException,
       IOException {
+    // 根据异常类型分类抛出
     if (t instanceof YarnException) {
       throw (YarnException) t;
     } else if (t instanceof InvalidToken) {
@@ -380,10 +439,8 @@ public class AMLauncher implements Runnable {
 
   @SuppressWarnings("unchecked")
   protected void onAMLaunchFailed(ContainerId containerId, Exception ie) {
+    // 记录启动失败日志
     String message = "Error launching " + application.getAppAttemptId()
             + ". Got exception: " + StringUtils.stringifyException(ie);
     LOG.info(message);
-    handler.handle(new RMAppAttemptEvent(application
-           .getAppAttemptId(), RMAppAttemptEventType.LAUNCH_FAILED, message));
-  }
-}
+    // 发送AM启动失败事件，触发后续重试/失败处理流程

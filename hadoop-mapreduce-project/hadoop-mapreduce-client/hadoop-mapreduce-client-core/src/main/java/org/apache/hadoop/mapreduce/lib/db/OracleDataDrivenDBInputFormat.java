@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,8 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 
 /**
- * A InputFormat that reads input data from an SQL table in an Oracle db.
+ * Oracle数据库专用的数据驱动DBInputFormat实现，用于从Oracle数据库读取MapReduce输入数据。
+ * 针对Oracle数据库的数据类型特性做了分片逻辑优化，特别是日期类型的分片处理。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
@@ -38,7 +40,9 @@ public class OracleDataDrivenDBInputFormat<T extends DBWritable>
     extends DataDrivenDBInputFormat<T> implements Configurable {
 
   /**
-   * @return the DBSplitter implementation to use to divide the table/query into InputSplits.
+   * 根据数据类型获取对应的分片器，针对Oracle日期类型提供专用实现。
+   * @param sqlDataType 分片字段的SQL数据类型
+   * @return 适配对应数据类型的分片器实例
    */
   @Override
   protected DBSplitter getSplitter(int sqlDataType) {
@@ -53,6 +57,13 @@ public class OracleDataDrivenDBInputFormat<T extends DBWritable>
     }
   }
 
+  /**
+   * 创建Oracle专用的数据库记录读取器，使用Oracle特定的实现读取数据。
+   * @param split 数据库分片信息
+   * @param conf 作业配置对象
+   * @return Oracle专用的记录读取器实例
+   * @throws IOException 创建连接或读取配置失败时抛出
+   */
   @Override
   protected RecordReader<LongWritable, T> createDBRecordReader(DBInputSplit split,
       Configuration conf) throws IOException {
@@ -62,7 +73,7 @@ public class OracleDataDrivenDBInputFormat<T extends DBWritable>
     Class<T> inputClass = (Class<T>) (dbConf.getInputClass());
 
     try {
-      // Use Oracle-specific db reader
+      // 使用Oracle专用的记录读取器实现
       return new OracleDataDrivenDBRecordReader<T>(split, inputClass,
           conf, createConnection(), dbConf, dbConf.getInputConditions(),
           dbConf.getInputFieldNames(), dbConf.getInputTableName());

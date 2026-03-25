@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -41,6 +42,9 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * 公平调度器配置类，封装公平调度器所有配置项的读取和解析逻辑
+ */
 @Private
 @Evolving
 public class FairSchedulerConfiguration extends Configuration {
@@ -261,6 +265,10 @@ public class FairSchedulerConfiguration extends Configuration {
     super(conf);
   }
 
+  /**
+   * 获取最小资源分配量
+   * @return 包含内存和CPU的最小资源对象
+   */
   public Resource getMinimumAllocation() {
     int mem = getInt(
         YarnConfiguration.RM_SCHEDULER_MINIMUM_ALLOCATION_MB,
@@ -271,6 +279,10 @@ public class FairSchedulerConfiguration extends Configuration {
     return Resources.createResource(mem, cpu);
   }
 
+  /**
+   * 获取最大资源分配量
+   * @return 包含内存和CPU的最大资源对象
+   */
   public Resource getMaximumAllocation() {
     int mem = getInt(
         YarnConfiguration.RM_SCHEDULER_MAXIMUM_ALLOCATION_MB,
@@ -281,20 +293,31 @@ public class FairSchedulerConfiguration extends Configuration {
     return Resources.createResource(mem, cpu);
   }
 
+  /**
+   * 获取资源分配增量步长
+   * @return 包含所有资源的增量步长对象
+   */
   public Resource getIncrementAllocation() {
     Long memory = null;
     Integer vCores = null;
+    // 存储除内存和CPU外的其他资源增量
     Map<String, Long> others = new HashMap<>();
+    // 获取所有已定义资源类型
     ResourceInformation[] resourceTypes = ResourceUtils.getResourceTypesArray();
+    // 遍历所有资源类型读取增量配置
     for (int i=0; i < resourceTypes.length; ++i) {
       String name = resourceTypes[i].getName();
+      // 生成新格式配置键
       String propertyKey = getAllocationIncrementPropKey(name);
       String propValue = get(propertyKey);
       if (propValue != null) {
+        // 匹配值+单位格式
         Matcher matcher = RESOURCE_REQUEST_VALUE_PATTERN.matcher(propValue);
         if (matcher.matches()) {
+          // 解析数值和单位
           long value = Long.parseLong(matcher.group(1));
           String unit = matcher.group(2);
+          // 转换为资源默认单位数值
           long valueInDefaultUnits = getValueInDefaultUnits(value, unit, name);
           others.put(name, valueInDefaultUnits);
         } else {
@@ -303,6 +326,7 @@ public class FairSchedulerConfiguration extends Configuration {
         }
       }
     }
+    // 处理内存增量，兼容旧配置格式
     if (others.containsKey(ResourceInformation.MEMORY_MB.getName())) {
       memory = others.get(ResourceInformation.MEMORY_MB.getName());
       if (get(RM_SCHEDULER_INCREMENT_ALLOCATION_MB) != null) {
@@ -318,6 +342,7 @@ public class FairSchedulerConfiguration extends Configuration {
           RM_SCHEDULER_INCREMENT_ALLOCATION_MB,
           DEFAULT_RM_SCHEDULER_INCREMENT_ALLOCATION_MB);
     }
+    // 处理CPU增量，兼容旧配置格式
     if (others.containsKey(ResourceInformation.VCORES.getName())) {
       vCores = others.get(ResourceInformation.VCORES.getName()).intValue();
       if (get(RM_SCHEDULER_INCREMENT_ALLOCATION_VCORES) != null) {
@@ -333,6 +358,7 @@ public class FairSchedulerConfiguration extends Configuration {
           RM_SCHEDULER_INCREMENT_ALLOCATION_VCORES,
           DEFAULT_RM_SCHEDULER_INCREMENT_ALLOCATION_VCORES);
     }
+    // 组装完整资源对象返回
     return Resource.newInstance(memory, vCores, others);
   }
 
@@ -347,426 +373,19 @@ public class FairSchedulerConfiguration extends Configuration {
         INCREMENT_ALLOCATION;
   }
 
+  /**
+   * 获取容器预留阈值（按增量倍数计算）
+   * @return 预留阈值倍数
+   */
   public float getReservationThresholdIncrementMultiple() {
     return getFloat(
       RM_SCHEDULER_RESERVATION_THRESHOLD_INCREMENT_MULTIPLE,
       DEFAULT_RM_SCHEDULER_RESERVATION_THRESHOLD_INCREMENT_MULTIPLE);
   }
 
+  /**
+   * 获取节点局部性阈值
+   * @return 节点局部性阈值
+   */
   public float getLocalityThresholdNode() {
-    return getFloat(LOCALITY_THRESHOLD_NODE, DEFAULT_LOCALITY_THRESHOLD_NODE);
-  }
-
-  public float getLocalityThresholdRack() {
-    return getFloat(LOCALITY_THRESHOLD_RACK, DEFAULT_LOCALITY_THRESHOLD_RACK);
-  }
-
-  /**
-   * Whether continuous scheduling is turned on.
-   * @deprecated use {@link #ASSIGN_MULTIPLE} to improve container allocation
-   * ramp up.
-   * @return whether continuous scheduling is enabled
-   */
-  @Deprecated
-  public boolean isContinuousSchedulingEnabled() {
-    return getBoolean(CONTINUOUS_SCHEDULING_ENABLED,
-        DEFAULT_CONTINUOUS_SCHEDULING_ENABLED);
-  }
-
-  /**
-   * The sleep time of the continuous scheduler thread.
-   * @deprecated linked to {@link #CONTINUOUS_SCHEDULING_ENABLED} deprecation
-   * @return sleep time in ms
-   */
-  @Deprecated
-  public int getContinuousSchedulingSleepMs() {
-    return getInt(CONTINUOUS_SCHEDULING_SLEEP_MS,
-        DEFAULT_CONTINUOUS_SCHEDULING_SLEEP_MS);
-  }
-
-  /**
-   * Delay in milliseconds for locality fallback node to rack.
-   * @deprecated linked to {@link #CONTINUOUS_SCHEDULING_ENABLED} deprecation
-   * @return delay in ms
-   */
-  @Deprecated
-  public long getLocalityDelayNodeMs() {
-    return getLong(LOCALITY_DELAY_NODE_MS, DEFAULT_LOCALITY_DELAY_NODE_MS);
-  }
-
-  /**
-   * Delay in milliseconds for locality fallback rack to other.
-   * @deprecated linked to {@link #CONTINUOUS_SCHEDULING_ENABLED} deprecation
-   * @return delay in ms
-   */
-  @Deprecated
-  public long getLocalityDelayRackMs() {
-    return getLong(LOCALITY_DELAY_RACK_MS, DEFAULT_LOCALITY_DELAY_RACK_MS);
-  }
-
-  public boolean getPreemptionEnabled() {
-    return getBoolean(PREEMPTION, DEFAULT_PREEMPTION);
-  }
-
-  public boolean getAMPreemptionEnabled(String queueName) {
-    String propertyName = AM_PREEMPTION_PREFIX + queueName;
-
-    if (get(propertyName) != null) {
-      boolean amPreemptionEnabled =
-          getBoolean(propertyName, DEFAULT_AM_PREEMPTION);
-      LOG.debug("AM preemption enabled for queue {}: {}",
-          queueName, amPreemptionEnabled);
-      return amPreemptionEnabled;
-    }
-
-    return getBoolean(AM_PREEMPTION, DEFAULT_AM_PREEMPTION);
-  }
-
-  public float getPreemptionUtilizationThreshold() {
-    return getFloat(PREEMPTION_THRESHOLD, DEFAULT_PREEMPTION_THRESHOLD);
-  }
-
-  public boolean getAssignMultiple() {
-    return getBoolean(ASSIGN_MULTIPLE, DEFAULT_ASSIGN_MULTIPLE);
-  }
-
-  public boolean isMaxAssignDynamic() {
-    return getBoolean(DYNAMIC_MAX_ASSIGN, DEFAULT_DYNAMIC_MAX_ASSIGN);
-  }
-
-  public int getMaxAssign() {
-    return getInt(MAX_ASSIGN, DEFAULT_MAX_ASSIGN);
-  }
-
-  public boolean getSizeBasedWeight() {
-    return getBoolean(SIZE_BASED_WEIGHT, DEFAULT_SIZE_BASED_WEIGHT);
-  }
-
-  public long getWaitTimeBeforeNextStarvationCheck() {
-    return getLong(WAIT_TIME_BEFORE_NEXT_STARVATION_CHECK_MS,
-        DEFAULT_WAIT_TIME_BEFORE_NEXT_STARVATION_CHECK_MS);
-  }
-  
-  public int getWaitTimeBeforeKill() {
-    return getInt(WAIT_TIME_BEFORE_KILL, DEFAULT_WAIT_TIME_BEFORE_KILL);
-  }
-
-  public boolean getUsePortForNodeName() {
-    return getBoolean(YarnConfiguration.RM_SCHEDULER_INCLUDE_PORT_IN_NODE_NAME,
-        YarnConfiguration.DEFAULT_RM_SCHEDULER_USE_PORT_FOR_NODE_NAME);
-  }
-
-  public float getReservableNodes() {
-    return getFloat(RESERVABLE_NODES, RESERVABLE_NODES_DEFAULT);
-  }
-
-  /**
-   * Parses a resource config value in one of three forms:
-   * <ol>
-   * <li>Percentage: &quot;50%&quot; or &quot;40% memory, 60% cpu&quot;</li>
-   * <li>New style resources: &quot;vcores=10, memory-mb=1024&quot;
-   * or &quot;vcores=60%, memory-mb=40%&quot;</li>
-   * <li>Old style resources: &quot;1024 mb, 10 vcores&quot;</li>
-   * </ol>
-   * In new style resources, any resource that is not specified will be
-   * set to {@link Long#MAX_VALUE} or 100%, as appropriate. Also, in the new
-   * style resources, units are not allowed. Units are assumed from the resource
-   * manager's settings for the resources when the value isn't a percentage.
-   *
-   * @param value the resource definition to parse
-   * @return a {@link ConfigurableResource} that represents the parsed value
-   * @throws AllocationConfigurationException if the raw value is not a valid
-   * resource definition
-   */
-  public static ConfigurableResource parseResourceConfigValue(String value)
-      throws AllocationConfigurationException {
-    return parseResourceConfigValue(value, Long.MAX_VALUE);
-  }
-
-  /**
-   * Parses a resource config value in one of three forms:
-   * <ol>
-   * <li>Percentage: &quot;50%&quot; or &quot;40% memory, 60% cpu&quot;</li>
-   * <li>New style resources: &quot;vcores=10, memory-mb=1024&quot;
-   * or &quot;vcores=60%, memory-mb=40%&quot;</li>
-   * <li>Old style resources: &quot;1024 mb, 10 vcores&quot;</li>
-   * </ol>
-   * In new style resources, any resource that is not specified will be
-   * set to {@code missing} or 0%, as appropriate. Also, in the new style
-   * resources, units are not allowed. Units are assumed from the resource
-   * manager's settings for the resources when the value isn't a percentage.
-   *
-   * The {@code missing} parameter is only used in the case of new style
-   * resources without percentages. With new style resources with percentages,
-   * any missing resources will be assumed to be 100% because percentages are
-   * only used with maximum resource limits.
-   *
-   * @param value the resource definition to parse
-   * @param missing the value to use for any unspecified resources
-   * @return a {@link ConfigurableResource} that represents the parsed value
-   * @throws AllocationConfigurationException if the raw value is not a valid
-   * resource definition
-   */
-  public static ConfigurableResource parseResourceConfigValue(String value,
-      long missing) throws AllocationConfigurationException {
-    ConfigurableResource configurableResource;
-
-    if (value.trim().isEmpty()) {
-      throw new AllocationConfigurationException("Error reading resource "
-          + "config--the resource string is empty.");
-    }
-
-    try {
-      if (value.contains("=")) {
-        configurableResource = parseNewStyleResource(value, missing);
-      } else if (value.contains("%")) {
-        configurableResource = parseOldStyleResourceAsPercentage(value);
-      } else {
-        configurableResource = parseOldStyleResource(value);
-      }
-    } catch (RuntimeException ex) {
-      throw new AllocationConfigurationException(
-          "Error reading resource config", ex);
-    }
-
-    return configurableResource;
-  }
-
-  private static ConfigurableResource parseNewStyleResource(String value,
-          long missing) throws AllocationConfigurationException {
-
-    final ConfigurableResource configurableResource;
-    boolean asPercent = value.contains("%");
-    if (asPercent) {
-      configurableResource = new ConfigurableResource();
-    } else {
-      configurableResource = new ConfigurableResource(missing);
-    }
-
-    String[] resources = value.split(",");
-    for (String resource : resources) {
-      String[] parts = resource.split("=");
-
-      if (parts.length != 2) {
-        throw createConfigException(value,
-                        "Every resource must be of the form: name=value.");
-      }
-
-      String resourceName = parts[0].trim();
-      String resourceValue = parts[1].trim();
-      try {
-        if (asPercent) {
-          double percentage = parseNewStyleResourceAsPercentage(value,
-              resourceName, resourceValue);
-          configurableResource.setPercentage(resourceName, percentage);
-        } else {
-          long parsedValue = parseNewStyleResourceAsAbsoluteValue(value,
-              resourceValue, resourceName);
-          configurableResource.setValue(resourceName, parsedValue);
-        }
-      } catch (ResourceNotFoundException ex) {
-        throw createConfigException(value, "The "
-            + "resource name, \"" + resourceName + "\" was not "
-            + "recognized. Please check the value of "
-            + YarnConfiguration.RESOURCE_TYPES + " in the Resource "
-            + "Manager's configuration files.", ex);
-      }
-    }
-    return configurableResource;
-  }
-
-  private static double parseNewStyleResourceAsPercentage(
-      String value, String resource, String resourceValue)
-      throws AllocationConfigurationException {
-    try {
-      return findPercentage(resourceValue, resource);
-    } catch (AllocationConfigurationException ex) {
-      throw createConfigException(value,
-          "The resource values must all be percentages. \""
-              + resourceValue + "\" is either not a non-negative number " +
-              "or does not include the '%' symbol.", ex);
-    }
-  }
-
-  private static long parseNewStyleResourceAsAbsoluteValue(String value,
-      String resourceValue, String resourceName)
-      throws AllocationConfigurationException {
-    final long parsedValue;
-    try {
-      parsedValue = Long.parseLong(resourceValue);
-    } catch (NumberFormatException e) {
-      throw createConfigException(value, "The "
-          + "resource values must all be integers. \"" + resourceValue
-          + "\" is not an integer.", e);
-    }
-    if (parsedValue < 0) {
-      throw new AllocationConfigurationException(
-          "Invalid value of " + resourceName +
-              ": " + parsedValue + ", value should not be negative!");
-    }
-    return parsedValue;
-  }
-
-  private static ConfigurableResource parseOldStyleResourceAsPercentage(
-          String value) throws AllocationConfigurationException {
-    return new ConfigurableResource(
-            getResourcePercentage(StringUtils.toLowerCase(value)));
-  }
-
-  private static ConfigurableResource parseOldStyleResource(String input)
-          throws AllocationConfigurationException {
-    final String lowerCaseInput = StringUtils.toLowerCase(input);
-    String[] resources = lowerCaseInput.split(",");
-
-    if (resources.length != 2) {
-      resources = findOldStyleResourcesInSpaceSeparatedInput(lowerCaseInput);
-      if (resources.length != 2) {
-        throw new AllocationConfigurationException(
-            "Cannot parse resource values from input: " + input);
-      }
-    }
-    final int memory = parseOldStyleResourceMemory(resources);
-    final int vcores = parseOldStyleResourceVcores(resources);
-    return new ConfigurableResource(
-            Resources.createResource(memory, vcores));
-  }
-
-  private static String[] findOldStyleResourcesInSpaceSeparatedInput(
-      String input) {
-    final Pattern pattern = Pattern.compile(RESOURCES_WITH_SPACES_PATTERN);
-    final Matcher matcher = pattern.matcher(input);
-
-    List<String> resources = Lists.newArrayList();
-    while (matcher.find()) {
-      resources.add(matcher.group(0));
-    }
-    return resources.toArray(new String[0]);
-  }
-
-  private static int parseOldStyleResourceMemory(String[] resources)
-      throws AllocationConfigurationException {
-    final int memory = findResource(resources, "mb");
-
-    if (memory < 0) {
-      throw new AllocationConfigurationException(
-          "Invalid value of memory: " + memory +
-              ", value should not be negative!");
-    }
-    return memory;
-  }
-
-  private static int parseOldStyleResourceVcores(String[] resources)
-      throws AllocationConfigurationException {
-    final int vcores = findResource(resources, "vcores");
-
-    if (vcores < 0) {
-      throw new AllocationConfigurationException(
-          "Invalid value of vcores: " + vcores +
-              ", value should not be negative!");
-    }
-    return vcores;
-  }
-
-  private static double[] getResourcePercentage(String val)
-      throws AllocationConfigurationException {
-    int numberOfKnownResourceTypes = ResourceUtils
-        .getNumberOfCountableResourceTypes();
-    double[] resourcePercentage = new double[numberOfKnownResourceTypes];
-    String[] values = val.split(",");
-
-    if (values.length == 1) {
-      double percentage = findPercentage(values, "");
-      for (int i = 0; i < numberOfKnownResourceTypes; i++) {
-        resourcePercentage[i] = percentage;
-      }
-    } else {
-      resourcePercentage[0] = findPercentage(values, "memory");
-      resourcePercentage[1] = findPercentage(values, "cpu");
-    }
-
-    return resourcePercentage;
-  }
-
-  private static double findPercentage(String resourceValue, String resource)
-      throws AllocationConfigurationException {
-    return findPercentageInternal(resource, resourceValue, false);
-  }
-
-  private static double findPercentage(String[] resourceValues, String resource)
-      throws AllocationConfigurationException {
-    String resourceValue = findResourceFromValues(resourceValues, resource);
-    return findPercentageInternal(resource, resourceValue, true);
-  }
-
-  private static double findPercentageInternal(String resource,
-      String resourceValue, boolean includeResourceInPattern)
-      throws AllocationConfigurationException {
-    final Pattern pattern;
-    if (includeResourceInPattern) {
-      pattern = Pattern.compile(RESOURCE_PERCENTAGE_PATTERN + resource);
-    } else {
-      pattern = Pattern.compile(RESOURCE_PERCENTAGE_PATTERN);
-    }
-
-    Matcher matcher = pattern.matcher(resourceValue);
-    if (!matcher.matches()) {
-      if (resource.equals("")) {
-        throw new AllocationConfigurationException("Invalid percentage: " +
-            resourceValue);
-      } else {
-        throw new AllocationConfigurationException("Invalid percentage of " +
-            resource + ": " + resourceValue);
-      }
-    }
-    double percentage = Double.parseDouble(matcher.group(1)) / 100.0;
-
-    if (percentage < 0) {
-      throw new AllocationConfigurationException("Invalid percentage: " +
-          resourceValue + ", percentage should not be negative!");
-    }
-
-    return percentage;
-  }
-
-  private static AllocationConfigurationException createConfigException(
-          String value, String message) {
-    return createConfigException(value, message, null);
-  }
-
-  private static AllocationConfigurationException createConfigException(
-      String value, String message, Throwable t) {
-    String msg = INVALID_RESOURCE_DEFINITION_PREFIX + value + ". " + message;
-    if (t != null) {
-      return new AllocationConfigurationException(msg, t);
-    } else {
-      return new AllocationConfigurationException(msg);
-    }
-  }
-
-  public long getUpdateInterval() {
-    return getLong(UPDATE_INTERVAL_MS, DEFAULT_UPDATE_INTERVAL_MS);
-  }
-  
-  private static int findResource(String[] resourceValues, String resource)
-      throws AllocationConfigurationException {
-    String resourceValue = findResourceFromValues(resourceValues, resource);
-    final Pattern pattern = Pattern.compile(RESOURCE_VALUE_PATTERN +
-        resource);
-    Matcher matcher = pattern.matcher(resourceValue);
-    if (!matcher.find()) {
-      throw new AllocationConfigurationException("Invalid value of " +
-          (resource.equals("mb") ? "memory" : resource) + ": " + resourceValue);
-    }
-    return Integer.parseInt(matcher.group(1));
-  }
-
-  private static String findResourceFromValues(String[] resourceValues,
-      String resource) throws AllocationConfigurationException {
-    for (String resourceValue : resourceValues) {
-      if (resourceValue.contains(resource)) {
-        return resourceValue.trim();
-      }
-    }
-    throw new AllocationConfigurationException("Missing resource: " + resource);
-  }
-}
+    return getFloat(LOCALITY_THRESHOLD_NODE

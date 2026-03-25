@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -20,8 +21,20 @@ package org.apache.hadoop.mapreduce.v2.api.protocolrecords;
 
 import org.apache.hadoop.mapreduce.v2.api.records.TaskAttemptId;
 
+/**
+ * 获取任务尝试诊断信息请求接口
+ * 定义了客户端向MR应用Master查询指定任务尝试诊断日志信息的请求结构
+ */
 public interface GetDiagnosticsRequest {
+  /**
+   * 获取请求对应的任务尝试ID
+   * @return 需要查询诊断信息的任务尝试ID
+   */
   public abstract TaskAttemptId getTaskAttemptId();
   
+  /**
+   * 设置需要查询诊断信息的任务尝试ID
+   * @param taskAttemptId 需要查询的任务尝试ID
+   */
   public abstract void setTaskAttemptId(TaskAttemptId taskAttemptId);
 }

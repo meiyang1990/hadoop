@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -39,25 +40,41 @@ import org.apache.hadoop.yarn.webapp.view.HtmlBlock;
 
 import com.google.inject.Inject;
 
+/**
+ * NodeManager Web UI 所有应用页面，展示当前节点上运行的所有应用列表
+ */
 public class AllApplicationsPage extends NMView {
 
   @Override protected void preHead(Page.HTML<__> html) {
+    // 执行通用预处理
     commonPreHead(html);
+    // 设置页面标题
     setTitle("Applications running on this node");
+    // 设置DataTable组件ID
     set(DATATABLES_ID, "applications");
+    // 初始化应用列表DataTable
     set(initID(DATATABLES, "applications"), appsTableInit());
+    // 设置表格样式
     setTableStyles(html, "applications");
   }
 
+  /**
+   * 生成应用列表表格的DataTable初始化配置
+   * @return DataTable初始化配置JSON字符串
+   */
   private String appsTableInit() {
     return tableInit().
-        // Sort by id upon page load
+        // 页面加载后按应用ID升序排序
         append(", aaSorting: [[0, 'asc']]").
-        // applicationid, applicationstate
+        // 定义列配置：应用ID列、应用状态列
         append(", aoColumns:[").append(getApplicationsIdColumnDefs())
         .append(", null]} ").toString();
   }
 
+  /**
+   * 生成应用ID列的DataTable列定义
+   * @return 应用ID列配置JSON字符串
+   */
   private String getApplicationsIdColumnDefs() {
     StringBuilder sb = new StringBuilder();
     return sb.append("{'sType':'natural', 'aTargets': [0]")
@@ -66,12 +83,17 @@ public class AllApplicationsPage extends NMView {
 
   @Override
   protected Class<? extends SubView> content() {
+    // 返回应用列表内容块类
     return AllApplicationsBlock.class;
   }
 
+  /**
+   * 所有应用列表内容块，负责渲染当前节点应用列表HTML
+   */
   public static class AllApplicationsBlock extends HtmlBlock implements
       YarnWebParams {
 
+    // NodeManager上下文，保存节点全局信息
     private final Context nmContext;
 
     @Inject
@@ -81,7 +103,7 @@ public class AllApplicationsPage extends NMView {
 
     @Override
     protected void render(Block html) {
-
+      // 构建应用列表表格框架和表头
       TBODY<TABLE<BODY<Hamlet>>> tableBody =
         html
           .body()
@@ -93,16 +115,22 @@ public class AllApplicationsPage extends NMView {
                 .__()
                .__()
                .tbody();
+      // 遍历当前节点所有应用，逐行渲染
       for (Entry<ApplicationId, Application> entry : this.nmContext
           .getApplications().entrySet()) {
+        // 构造应用信息视图对象
         AppInfo info = new AppInfo(entry.getValue());
+        // 添加表格行
         tableBody
           .tr()
+            // 应用ID列，添加应用详情链接
             .td().a(url("application", info.getId()), info.getId()).__()
+            // 应用状态列
             .td().__(info.getState())
             .__()
           .__();
       }
+      // 闭合表格标签
       tableBody.__().__().__();
     }
   }

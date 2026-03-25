@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,8 @@ import org.slf4j.LoggerFactory;
 import java.util.Set;
 
 /**
- * The scheduler key for a group of {@link ResourceRequest}.
+ * YARN调度器中对一组资源请求分组的唯一键。
+ * 基于基础调度请求键扩展，增加了资源大小和执行类型维度。
  *
  * TODO: after YARN-7631 is fixed by adding Resource and ExecType into
  * SchedulerRequestKey, then we can directly use that.
@@ -40,15 +42,15 @@ public class ResourceRequestSetKey extends SchedulerRequestKey {
   private static final Logger LOG =
       LoggerFactory.getLogger(ResourceRequestSetKey.class);
 
-  // More ResourceRequest key fields on top of SchedulerRequestKey
+  // 在SchedulerRequestKey基础上扩展更多资源请求键字段
   private final Resource resource;
   private final ExecutionType execType;
 
   /**
-   * Create the key object from a {@link ResourceRequest}.
+   * 从资源请求对象构造分组键。
    *
-   * @param rr Resource request object
-   * @throws YarnException if fails
+   * @param rr 资源请求对象
+   * @throws YarnException 如果资源请求缺少必要字段时抛出
    */
   public ResourceRequestSetKey(ResourceRequest rr) throws YarnException {
     this(rr.getAllocationRequestId(), rr.getPriority(), rr.getCapability(),
@@ -63,12 +65,12 @@ public class ResourceRequestSetKey extends SchedulerRequestKey {
   }
 
   /**
-   * Create the key object from member objects.
+   * 从各维度成员构造分组键。
    *
-   * @param allocationRequestId allocate request id of the ask
-   * @param priority the priority of the ask
-   * @param resource the resource size of the ask
-   * @param execType the execution type of the ask
+   * @param allocationRequestId 分配请求ID
+   * @param priority 资源请求优先级
+   * @param resource 请求的资源量
+   * @param execType 容器执行类型
    */
   public ResourceRequestSetKey(long allocationRequestId, Priority priority,
       Resource resource, ExecutionType execType) {
@@ -132,15 +134,16 @@ public class ResourceRequestSetKey extends SchedulerRequestKey {
   }
 
   /**
-   * Extract the corresponding ResourceRequestSetKey for an allocated container
-   * from a given set. Return null if not found.
+   * 从给定键集合中提取匹配已分配容器的分组键。未找到匹配返回null。
+   * 精确匹配失败时，如果分配请求ID非零，会按分配请求ID做模糊匹配。
    *
-   * @param container the allocated container
-   * @param keys the set of keys to look from
-   * @return ResourceRequestSetKey
+   * @param container 已分配的容器对象
+   * @param keys 待查找的分组键集合
+   * @return 匹配的ResourceRequestSetKey，未找到返回null
    */
   public static ResourceRequestSetKey extractMatchingKey(Container container,
       Set<ResourceRequestSetKey> keys) {
+    // 基于容器信息构造待匹配分组键
     ResourceRequestSetKey resourceRequestSetKey = new ResourceRequestSetKey(
         container.getAllocationRequestId(), container.getPriority(),
         container.getResource(), container.getExecutionType());
@@ -148,6 +151,7 @@ public class ResourceRequestSetKey extends SchedulerRequestKey {
       return resourceRequestSetKey;
     }
 
+    // 精确匹配失败，按非零分配请求ID模糊匹配
     if (container.getAllocationRequestId() > 0) {
       // If no exact match, look for the one with the same (non-zero)
       // allocationRequestId
@@ -161,6 +165,7 @@ public class ResourceRequestSetKey extends SchedulerRequestKey {
       }
     }
 
+    // 未找到匹配，输出调试日志
     if (LOG.isDebugEnabled()) {
       LOG.debug("not match found for container {}.", container.getId());
       for (ResourceRequestSetKey candidate : keys) {

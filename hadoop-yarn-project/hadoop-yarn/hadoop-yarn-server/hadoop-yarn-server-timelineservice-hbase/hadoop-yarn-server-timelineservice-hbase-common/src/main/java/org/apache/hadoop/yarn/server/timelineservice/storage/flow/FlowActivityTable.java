@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,13 +22,10 @@ package org.apache.hadoop.yarn.server.timelineservice.storage.flow;
 import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
 
 /**
- * The flow activity table has column family info
- * Stores the daily activity record for flows
- * Useful as a quick lookup of what flows were
- * running on a given day
- *
- * Example flow activity table record:
- *
+ * 流活动HBase表定义，用于存储流每日活动记录，支持快速查询指定日期运行的流。
+ * 该表可以快速检索某一天内有哪些流在运行，常用于时间线服务的流活动查询。
+ * <p>
+ * 表结构示例：
  * <pre>
  * |-------------------------------------------|
  * |  Row key   | Column Family                |
@@ -40,6 +38,9 @@ import org.apache.hadoop.yarn.server.timelineservice.storage.common.BaseTable;
  * | flowName   |                              |
  * |-------------------------------------------|
  * </pre>
+ */
+/**
+ * 流活动表实现，继承自通用表基类，定义了YARN时间线服务中流活动存储结构。
  */
 public final class FlowActivityTable extends BaseTable<FlowActivityTable> {
 }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,6 +36,9 @@ import org.apache.hadoop.yarn.webapp.util.WebAppUtils;
 
 import static org.apache.hadoop.yarn.util.StringHelper.PATH_JOINER;
 
+/**
+ * YARN ResourceManager Web UI 应用尝试信息数据访问对象，封装应用尝试的基础信息用于Web展示
+ */
 @XmlRootElement(name = "appAttempt")
 @XmlAccessorType(XmlAccessType.FIELD)
 public class AppAttemptInfo {
@@ -55,6 +59,14 @@ public class AppAttemptInfo {
   public AppAttemptInfo() {
   }
 
+  /**
+   * 从RM应用尝试对象构造应用尝试信息，填充各类展示字段
+   * @param rm ResourceManager实例
+   * @param attempt RM应用尝试对象
+   * @param hasAccess 用户是否有权限访问该应用
+   * @param user 用户名，用于日志链接构造
+   * @param schemePrefix HTTP/HTTPS协议前缀，用于日志链接构造
+   */
   public AppAttemptInfo(ResourceManager rm, RMAppAttempt attempt,
       Boolean hasAccess, String user, String schemePrefix) {
     this.startTime = 0;
@@ -65,6 +77,7 @@ public class AppAttemptInfo {
     this.blacklistedNodes = "";
     this.exportPorts = "";
     if (attempt != null) {
+      // 填充应用尝试基础标识信息
       this.id = attempt.getAppAttemptId().getAttemptId();
       this.startTime = attempt.getStartTime();
       this.finishedTime = attempt.getFinishTime();
@@ -72,12 +85,15 @@ public class AppAttemptInfo {
       this.appAttemptId = attempt.getAppAttemptId().toString();
       Container masterContainer = attempt.getMasterContainer();
       if (masterContainer != null && hasAccess) {
+        // 填充AM容器所在节点信息
         this.containerId = masterContainer.getId().toString();
         this.nodeHttpAddress = masterContainer.getNodeHttpAddress();
         this.nodeId = masterContainer.getNodeId().toString();
 
+        // 获取日志服务器配置，构造日志链接
         Configuration conf = rm.getRMContext().getYarnConfiguration();
         String logServerUrl = conf.get(YarnConfiguration.YARN_LOG_SERVER_URL);
+        // 已完成的应用尝试使用聚合日志服务器链接
         if ((this.appAttemptState == RMAppAttemptState.FAILED ||
             this.appAttemptState == RMAppAttemptState.FINISHED ||
             this.appAttemptState == RMAppAttemptState.KILLED) &&
@@ -87,16 +103,20 @@ public class AppAttemptInfo {
                masterContainer.getId().toString(),
                masterContainer.getId().toString(), user);
         } else {
+          // 运行中应用直接链接到NodeManager的运行日志
           this.logsLink = WebAppUtils.getRunningLogURL(schemePrefix
                + masterContainer.getNodeHttpAddress(),
                masterContainer.getId().toString(), user);
         }
+        // 序列化导出端口信息为JSON
         Gson gson = new Gson();
         this.exportPorts = gson.toJson(masterContainer.getExposedPorts());
 
+        // 收集系统拉黑的节点列表
         nodesBlacklistedBySystem =
             StringUtils.join(attempt.getAMBlacklistManager()
               .getBlacklistUpdates().getBlacklistAdditions(), ", ");
+        // 收集调度层拉黑的节点列表
         if (rm.getResourceScheduler() instanceof AbstractYarnScheduler) {
           AbstractYarnScheduler ayScheduler =
               (AbstractYarnScheduler) rm.getResourceScheduler();

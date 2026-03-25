@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -25,22 +26,25 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.yarn.util.Records;
 
 /**
+ * 联邦状态存储查询所有已提交应用归属子集群的响应封装
+ * 
  * <p>
- * The response sent by <code>Federation state
- * store</code> to a query for the home subcluster of all submitted
- * applications.
- *
- * <p>
- * The response includes the mapping details, i.e.:
+ * 响应包含所有应用与归属子集群的映射信息，具体包括：
  * <ul>
- * <li>{@code ApplicationId}</li>
- * <li>{@code SubClusterId}</li>
+ * <li>应用编号 {@code ApplicationId}</li>
+ * <li>子集群编号 {@code SubClusterId}</li>
  * </ul>
  */
 @Private
 @Unstable
 public abstract class GetApplicationsHomeSubClusterResponse {
 
+  /**
+   * 创建查询所有应用归属子集群响应实例，设置映射列表。
+   * 
+   * @param appsHomeSubClusters 应用归属子集群映射列表
+   * @return 完整的查询响应对象
+   */
   @Private
   @Unstable
   public static GetApplicationsHomeSubClusterResponse newInstance(
@@ -52,21 +56,18 @@ public abstract class GetApplicationsHomeSubClusterResponse {
   }
 
   /**
-   * Get the {@link ApplicationHomeSubCluster} list representing the mapping of
-   * all submitted applications to it's home sub-cluster.
+   * 获取所有已提交应用到归属子集群的映射列表。
    *
-   * @return the mapping of all submitted application to it's home sub-cluster.
+   * @return 应用与归属子集群的映射列表
    */
   @Public
   @Unstable
   public abstract List<ApplicationHomeSubCluster> getAppsHomeSubClusters();
 
   /**
-   * Set the {@link ApplicationHomeSubCluster} list representing the mapping of
-   * all submitted applications to it's home sub-cluster.
+   * 设置所有已提交应用到归属子集群的映射列表。
    *
-   * @param appsHomeSubClusters the mapping of all submitted application to it's
-   *          home sub-cluster.
+   * @param appsHomeSubClusters 应用与归属子集群的映射列表
    */
   @Private
   @Unstable

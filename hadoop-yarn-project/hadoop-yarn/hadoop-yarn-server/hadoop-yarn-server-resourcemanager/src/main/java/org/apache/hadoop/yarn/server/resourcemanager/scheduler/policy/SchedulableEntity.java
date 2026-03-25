@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -21,57 +22,54 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.policy;
 import org.apache.hadoop.yarn.api.records.Priority;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ResourceUsage;
 
-
 /**
- * A SchedulableEntity is a process to be scheduled.
- * for example, an application / application attempt
+ * YARN调度器可调度实体接口，定义所有可被调度单元需要实现的公共方法
+ * 典型实现包括应用、应用尝试等需要分配资源的调度单元
  */
 public interface SchedulableEntity {
   
   /**
-   * Id - each entity must have a unique id.
-   * @return id.
+   * 获取可调度实体唯一ID
+   * @return 实体唯一ID
    */
   public String getId();
   
   /**
-   * Compare the passed SchedulableEntity to this one for input order.
-   * Input order is implementation defined and should reflect the 
-   * correct ordering for first-in first-out processing.
+   * 按输入顺序比较两个可调度实体，用于先进先出排序
+   * 具体排序规则由实现类定义
    *
-   * @param other SchedulableEntity.
-   * @return correct ordering.
+   * @param other 待比较的另一个可调度实体
+   * @return 比较结果，小于0表示当前实体在前，大于0表示另一个实体在前，等于0表示顺序相同
    */
   public int compareInputOrderTo(SchedulableEntity other);
   
   /**
-   * View of Resources wanted and consumed by the entity.
-   * @return ResourceUsage.
+   * 获取当前实体的资源使用情况视图，包含已分配和请求的资源
+   * @return 资源使用对象
    */
   public ResourceUsage getSchedulingResourceUsage();
   
   /**
-   * Get the priority of the application.
-   * @return priority of the application.
+   * 获取当前应用的优先级
+   * @return 应用优先级
    */
   public Priority getPriority();
 
   /**
-   * Whether application was running before RM restart.
-   * @return true, application was running before RM restart;
-   * otherwise false.
+   * 判断该实体是否是RM重启前正在运行、正在恢复的应用
+   * @return true 表示应用正在恢复，false 表示是新启动的应用
    */
   public boolean isRecovering();
 
   /**
-   * Get partition corresponding to this entity.
-   * @return partition node label.
+   * 获取该实体对应的节点分区（节点标签）
+   * @return 分区节点标签
    */
   String getPartition();
 
   /**
-   * Start time of the job.
-   * @return start time
+   * 获取作业的启动时间戳
+   * @return 启动时间戳（毫秒）
    */
   long getStartTime();
 }

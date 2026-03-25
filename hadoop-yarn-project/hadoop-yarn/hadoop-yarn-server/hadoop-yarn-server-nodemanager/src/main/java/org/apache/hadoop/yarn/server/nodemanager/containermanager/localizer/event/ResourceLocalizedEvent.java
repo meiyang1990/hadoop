@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -20,11 +21,22 @@ package org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.eve
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.yarn.server.nodemanager.containermanager.localizer.LocalResourceRequest;
 
+/**
+ * 资源本地化完成事件，通知资源本地化已完成并携带本地化后的资源信息
+ */
 public class ResourceLocalizedEvent extends ResourceEvent {
 
+  // 本地化后资源的大小
   private final long size;
+  // 本地化后资源在本地文件系统的路径
   private final Path location;
 
+  /**
+   * 构造资源本地化完成事件
+   * @param rsrc 对应的资源请求
+   * @param location 本地化后资源的本地路径
+   * @param size 本地化资源大小
+   */
   public ResourceLocalizedEvent(LocalResourceRequest rsrc, Path location,
       long size) {
     super(rsrc, ResourceEventType.LOCALIZED);
@@ -32,10 +44,18 @@ public class ResourceLocalizedEvent extends ResourceEvent {
     this.location = location;
   }
 
+  /**
+   * 获取本地化资源的本地路径
+   * @return 本地化资源路径
+   */
   public Path getLocation() {
     return location;
   }
 
+  /**
+   * 获取本地化资源的大小
+   * @return 本地化资源大小，单位字节
+   */
   public long getSize() {
     return size;
   }

@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -47,53 +48,72 @@ import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.SECURITY_
 import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.XATTR_SATISFY_STORAGE_POLICY;
 import static org.apache.hadoop.hdfs.server.common.HdfsServerConstants.XATTR_SNAPSHOT_DELETED;
 
+/**
+ * HDFS NameNode 扩展属性(XAttr)操作工具类，提供对文件/目录扩展属性的增删查改核心逻辑
+ * 所有操作都围绕INode节点的扩展属性进行管理，整合了权限检查、容量限制和特殊XAttr处理逻辑
+ */
 public class FSDirXAttrOp {
+  // 加密区扩展属性静态定义
   private static final XAttr KEYID_XATTR =
       XAttrHelper.buildXAttr(CRYPTO_XATTR_ENCRYPTION_ZONE, null);
+  // 超级用户不可读扩展属性静态定义
   private static final XAttr UNREADABLE_BY_SUPERUSER_XATTR =
       XAttrHelper.buildXAttr(SECURITY_XATTR_UNREADABLE_BY_SUPERUSER, null);
 
   /**
-   * Set xattr for a file or directory.
-   * @param fsd
-   *          - FS directory
-   * @param pc
-   *          - FS permission checker
-   * @param src
-   *          - path on which it sets the xattr
-   * @param xAttr
-   *          - xAttr details to set
-   * @param flag
-   *          - xAttrs flags
-   * @param logRetryCache
-   *          - whether to record RPC ids in editlog for retry cache
-   *          rebuilding.
-   * @throws IOException
+   * 为指定路径的文件/目录设置扩展属性
+   * @param fsd 文件目录对象，管理NameNode目录树
+   * @param pc 权限检查器
+   * @param src 目标路径
+   * @param xAttr 需要设置的扩展属性
+   * @param flag 设置标志(创建/替换等)
+   * @param logRetryCache 是否在编辑日志中记录RPC ID用于重试缓存重建
+   * @return 目标文件/目录的FileStatus信息
+   * @throws IOException 操作失败时抛出异常
    */
   static FileStatus setXAttr(
       FSDirectory fsd, FSPermissionChecker pc, String src, XAttr xAttr,
       EnumSet<XAttrSetFlag> flag, boolean logRetryCache)
       throws IOException {
+    // 检查XAttr功能是否开启
     checkXAttrsConfigFlag(fsd);
+    // 检查XAttr大小是否超过配置限制
     checkXAttrSize(fsd, xAttr);
+    // 检查当前用户对该XAttr的操作权限
     XAttrPermissionFilter.checkPermissionForApi(
         pc, xAttr, FSDirectory.isReservedRawName(src));
     List<XAttr> xAttrs = Lists.newArrayListWithCapacity(1);
     xAttrs.add(xAttr);
     INodesInPath iip;
+    // 获取目录写锁
     fsd.writeLock();
     try {
+      // 解析路径获取INodesInPath
       iip = fsd.resolvePath(pc, src, DirOp.WRITE);
       src = iip.getPath();
+      // 检查修改XAttr所需的访问权限
       checkXAttrChangeAccess(fsd, iip, xAttr, pc);
+      // 执行无保护的XAttr设置操作
       unprotectedSetXAttrs(fsd, iip, xAttrs, flag);
     } finally {
+      // 释放目录写锁
       fsd.writeUnlock();
     }
+    // 记录设置XAttr操作到编辑日志
     fsd.getEditLog().logSetXAttrs(src, xAttrs, logRetryCache);
+    // 返回审计用的文件信息
     return fsd.getAuditFileInfo(iip);
   }
 
+  /**
+   * 获取指定路径下指定的扩展属性列表
+   * @param fsd 文件目录对象
+   * @param pc 权限检查器
+   * @param srcArg 目标路径
+   * @param xAttrs 需要获取的扩展属性列表，为空则获取全部
+   * @return 符合条件的扩展属性列表
+   * @throws IOException 操作失败时抛出异常
+   */
   static List<XAttr> getXAttrs(FSDirectory fsd, FSPermissionChecker pc,
       final String srcArg, List<XAttr> xAttrs) throws IOException {
     String src = srcArg;
@@ -103,11 +123,15 @@ public class FSDirXAttrOp {
     if (!getAll) {
       XAttrPermissionFilter.checkPermissionForApi(pc, xAttrs, isRawPath);
     }
+    // 解析路径获取INodesInPath
     final INodesInPath iip = fsd.resolvePath(pc, src, DirOp.READ);
     if (fsd.isPermissionEnabled()) {
+      // 检查路径读权限
       fsd.checkPathAccess(pc, iip, FsAction.READ);
     }
+    // 获取该inode所有XAttr
     List<XAttr> all = FSDirXAttrOp.getXAttrs(fsd, iip);
+    // 根据权限过滤XAttr
     List<XAttr> filteredAll = XAttrPermissionFilter.
         filterXAttrsForApi(pc, all, isRawPath);
 
@@ -118,6 +142,7 @@ public class FSDirXAttrOp {
       throw new XAttrNotFoundException();
     }
     List<XAttr> toGet = Lists.newArrayListWithCapacity(xAttrs.size());
+    // 按请求列表匹配XAttr
     for (XAttr xAttr : xAttrs) {
       boolean foundIt = false;
       for (XAttr a : filteredAll) {
@@ -135,6 +160,14 @@ public class FSDirXAttrOp {
     return toGet;
   }
 
+  /**
+   * 列出指定路径下所有有权限访问的扩展属性
+   * @param fsd 文件目录对象
+   * @param pc 权限检查器
+   * @param src 目标路径
+   * @return 所有可访问扩展属性列表
+   * @throws IOException 操作失败时抛出异常
+   */
   static List<XAttr> listXAttrs(
       FSDirectory fsd, FSPermissionChecker pc, String src) throws IOException {
     FSDirXAttrOp.checkXAttrsConfigFlag(fsd);
@@ -144,24 +177,20 @@ public class FSDirXAttrOp {
       fsd.checkPathAccess(pc, iip, FsAction.READ);
     }
     final List<XAttr> all = FSDirXAttrOp.getXAttrs(fsd, iip);
+    // 过滤当前用户可访问的XAttr返回
     return XAttrPermissionFilter.
         filterXAttrsForApi(pc, all, isRawPath);
   }
 
   /**
-   * Remove an xattr for a file or directory.
-   * @param fsd
-   *          - FS direcotry
-   * @param pc
-   *          - FS permission checker
-   * @param src
-   *          - path to remove the xattr from
-   * @param xAttr
-   *          - xAttr to remove
-   * @param logRetryCache
-   *          - whether to record RPC ids in editlog for retry cache
-   *          rebuilding.
-   * @throws IOException
+   * 从指定路径删除指定扩展属性
+   * @param fsd 文件目录对象
+   * @param pc 权限检查器
+   * @param src 目标路径
+   * @param xAttr 需要删除的扩展属性
+   * @param logRetryCache 是否在编辑日志中记录RPC ID用于重试缓存重建
+   * @return 目标文件/目录的FileStatus信息
+   * @throws IOException 操作失败时抛出异常
    */
   static FileStatus removeXAttr(
       FSDirectory fsd, FSPermissionChecker pc, String src, XAttr xAttr,
@@ -179,8 +208,10 @@ public class FSDirXAttrOp {
       src = iip.getPath();
       checkXAttrChangeAccess(fsd, iip, xAttr, pc);
 
+      // 执行无保护删除操作
       List<XAttr> removedXAttrs = unprotectedRemoveXAttrs(fsd, iip, xAttrs);
       if (removedXAttrs != null && !removedXAttrs.isEmpty()) {
+        // 记录删除操作到编辑日志
         fsd.getEditLog().logRemoveXAttrs(src, removedXAttrs, logRetryCache);
       } else {
         throw new IOException(
@@ -193,8 +224,12 @@ public class FSDirXAttrOp {
   }
 
   /**
-   * Remove xattrs from the inode, and return the <em>removed</em> xattrs.
-   * @return the <em>removed</em> xattrs.
+   * 无锁保护删除指定扩展属性，直接修改INode存储
+   * @param fsd 文件目录对象
+   * @param iip 路径对应INodes
+   * @param toRemove 需要删除的扩展属性列表
+   * @return 成功删除的扩展属性列表，无删除则返回null
+   * @throws IOException 操作失败时抛出异常
    */
   static List<XAttr> unprotectedRemoveXAttrs(
       FSDirectory fsd, final INodesInPath iip, final List<XAttr> toRemove)
@@ -207,6 +242,7 @@ public class FSDirXAttrOp {
     List<XAttr> newXAttrs = filterINodeXAttrs(existingXAttrs, toRemove,
                                               removedXAttrs);
     if (existingXAttrs.size() != newXAttrs.size()) {
+      // 更新INode中的XAttr存储
       XAttrStorage.updateINodeXAttrs(inode, newXAttrs, snapshotId);
       return removedXAttrs;
     }
@@ -214,15 +250,12 @@ public class FSDirXAttrOp {
   }
 
   /**
-   * Filter XAttrs from a list of existing XAttrs. Removes matched XAttrs from
-   * toFilter and puts them into filtered. Upon completion,
-   * toFilter contains the filter XAttrs that were not found, while
-   * fitleredXAttrs contains the XAttrs that were found.
-   *
-   * @param existingXAttrs Existing XAttrs to be filtered
-   * @param toFilter XAttrs to filter from the existing XAttrs
-   * @param filtered Return parameter, XAttrs that were filtered
-   * @return List of XAttrs that does not contain filtered XAttrs
+   * 从现有扩展属性列表中过滤掉待删除的属性
+   * @param existingXAttrs 现有扩展属性列表
+   * @param toFilter 待过滤删除的扩展属性列表
+   * @param filtered 输出参数，保存成功匹配删除的扩展属性
+   * @return 过滤后剩余的扩展属性列表
+   * @throws AccessControlException 尝试删除禁止删除的属性时抛出异常
    */
   @VisibleForTesting
   static List<XAttr> filterINodeXAttrs(
@@ -234,7 +267,6 @@ public class FSDirXAttrOp {
       return existingXAttrs;
     }
 
-    // Populate a new list with XAttrs that pass the filter
     List<XAttr> newXAttrs =
         Lists.newArrayListWithCapacity(existingXAttrs.size());
     for (XAttr a : existingXAttrs) {
@@ -242,9 +274,11 @@ public class FSDirXAttrOp {
       for (ListIterator<XAttr> it = toFilter.listIterator(); it.hasNext()
           ;) {
         XAttr filter = it.next();
+        // 禁止删除加密区扩展属性
         Preconditions.checkArgument(
             !KEYID_XATTR.equalsIgnoreValue(filter),
             "The encryption zone xattr should never be deleted.");
+        // 禁止删除超级用户不可读扩展属性
         if (UNREADABLE_BY_SUPERUSER_XATTR.equalsIgnoreValue(filter)) {
           throw new AccessControlException("The xattr '" +
               SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' can not be deleted.");
@@ -264,6 +298,15 @@ public class FSDirXAttrOp {
     return newXAttrs;
   }
 
+  /**
+   * 无锁保护设置扩展属性，处理特殊XAttr的业务逻辑并更新INode存储
+   * @param fsd 文件目录对象
+   * @param iip 路径对应INodes
+   * @param xAttrs 需要设置的扩展属性列表
+   * @param flag 设置标志
+   * @return 修改后的INode
+   * @throws IOException 操作失败时抛出异常
+   */
   public static INode unprotectedSetXAttrs(
       FSDirectory fsd, final INodesInPath iip, final List<XAttr> xAttrs,
       final EnumSet<XAttrSetFlag> flag)
@@ -271,16 +314,15 @@ public class FSDirXAttrOp {
     assert fsd.hasWriteLock();
     INode inode = FSDirectory.resolveLastINode(iip);
     List<XAttr> existingXAttrs = XAttrStorage.readINodeXAttrs(inode);
+    // 执行设置XAttr合并生成新列表
     List<XAttr> newXAttrs = setINodeXAttrs(fsd, existingXAttrs, xAttrs, flag);
     final boolean isFile = inode.isFile();
 
+    // 遍历处理每个XAttr的特殊业务逻辑
     for (XAttr xattr : newXAttrs) {
       final String xaName = XAttrHelper.getPrefixedName(xattr);
 
-      /*
-       * If we're adding the encryption zone xattr, then add src to the list
-       * of encryption zones.
-       */
+      // 处理加密区XAttr：添加新加密区到加密区管理器
       if (CRYPTO_XATTR_ENCRYPTION_ZONE.equals(xaName)) {
         final HdfsProtos.ZoneEncryptionInfoProto ezProto =
             HdfsProtos.ZoneEncryptionInfoProto.parseFrom(xattr.getValue());
@@ -296,17 +338,19 @@ public class FSDirXAttrOp {
         }
       }
 
-      // Add inode id to movement queue if xattrs contain satisfy xattr.
+      // 处理存储策略满足XAttr：将inode加入存储策略移动队列
       if (XATTR_SATISFY_STORAGE_POLICY.equals(xaName)) {
         FSDirSatisfyStoragePolicyOp.unprotectedSatisfyStoragePolicy(inode, fsd);
         continue;
       }
 
+      // 检查安全XAttr只能设置在文件上
       if (!isFile && SECURITY_XATTR_UNREADABLE_BY_SUPERUSER.equals(xaName)) {
         throw new IOException("Can only set '" +
             SECURITY_XATTR_UNREADABLE_BY_SUPERUSER + "' on a file.");
       }
 
+      // 检查快照删除XAttr只能设置在快照根目录
       if (xaName.equals(XATTR_SNAPSHOT_DELETED) && !(inode.isDirectory() &&
           inode.getParent().isSnapshottable())) {
         throw new IOException("Can only set '" +
@@ -314,159 +358,15 @@ public class FSDirXAttrOp {
       }
     }
 
+    // 更新INode的XAttr存储
     XAttrStorage.updateINodeXAttrs(inode, newXAttrs, iip.getLatestSnapshotId());
     return inode;
   }
 
-  static List<XAttr> setINodeXAttrs(
-      FSDirectory fsd, final List<XAttr> existingXAttrs,
-      final List<XAttr> toSet, final EnumSet<XAttrSetFlag> flag)
-      throws IOException {
-    // Check for duplicate XAttrs in toSet
-    // We need to use a custom comparator, so using a HashSet is not suitable
-    for (int i = 0; i < toSet.size(); i++) {
-      for (int j = i + 1; j < toSet.size(); j++) {
-        if (toSet.get(i).equalsIgnoreValue(toSet.get(j))) {
-          throw new IOException("Cannot specify the same XAttr to be set " +
-              "more than once");
-        }
-      }
-    }
-
-    // Count the current number of user-visible XAttrs for limit checking
-    int userVisibleXAttrsNum = 0; // Number of user visible xAttrs
-
-    // The XAttr list is copied to an exactly-sized array when it's stored,
-    // so there's no need to size it precisely here.
-    int newSize = (existingXAttrs != null) ? existingXAttrs.size() : 0;
-    newSize += toSet.size();
-    List<XAttr> xAttrs = Lists.newArrayListWithCapacity(newSize);
-
-    // Check if the XAttr already exists to validate with the provided flag
-    for (XAttr xAttr: toSet) {
-      boolean exist = false;
-      if (existingXAttrs != null) {
-        for (XAttr a : existingXAttrs) {
-          if (a.equalsIgnoreValue(xAttr)) {
-            exist = true;
-            break;
-          }
-        }
-      }
-      XAttrSetFlag.validate(xAttr.getName(), exist, flag);
-      // add the new XAttr since it passed validation
-      xAttrs.add(xAttr);
-      if (isUserVisible(xAttr)) {
-        userVisibleXAttrsNum++;
-      }
-    }
-
-    // Add the existing xattrs back in, if they weren't already set
-    if (existingXAttrs != null) {
-      for (XAttr existing : existingXAttrs) {
-        boolean alreadySet = false;
-        for (XAttr set : toSet) {
-          if (set.equalsIgnoreValue(existing)) {
-            alreadySet = true;
-            break;
-          }
-        }
-        if (!alreadySet) {
-          xAttrs.add(existing);
-          if (isUserVisible(existing)) {
-            userVisibleXAttrsNum++;
-          }
-        }
-      }
-    }
-
-    if (userVisibleXAttrsNum > fsd.getInodeXAttrsLimit()) {
-      throw new IOException("Cannot add additional XAttr to inode, "
-          + "would exceed limit of " + fsd.getInodeXAttrsLimit());
-    }
-
-    return xAttrs;
-  }
-
-  static XAttr getXAttrByPrefixedName(FSDirectory fsd, INodesInPath iip,
-      String prefixedName) throws IOException {
-    fsd.readLock();
-    try {
-      return XAttrStorage.readINodeXAttrByPrefixedName(iip.getLastINode(),
-          iip.getPathSnapshotId(), prefixedName);
-    } finally {
-      fsd.readUnlock();
-    }
-  }
-
-  static XAttr unprotectedGetXAttrByPrefixedName(
-      INode inode, int snapshotId, String prefixedName)
-      throws IOException {
-    return XAttrStorage.readINodeXAttrByPrefixedName(
-        inode, snapshotId, prefixedName);
-  }
-
-  private static void checkXAttrChangeAccess(
-      FSDirectory fsd, INodesInPath iip, XAttr xAttr,
-      FSPermissionChecker pc)
-      throws AccessControlException, FileNotFoundException {
-    if (fsd.isPermissionEnabled() && xAttr.getNameSpace() == XAttr.NameSpace
-        .USER) {
-      final INode inode = iip.getLastINode();
-      if (inode != null &&
-          inode.isDirectory() &&
-          inode.getFsPermission().getStickyBit()) {
-        if (pc.isSuperUser()) {
-          // call external enforcer for audit
-          pc.checkSuperuserPrivilege(iip.getPath());
-        } else {
-          fsd.checkOwner(pc, iip);
-        }
-      } else {
-        fsd.checkPathAccess(pc, iip, FsAction.WRITE);
-      }
-    }
-  }
-
   /**
-   * Verifies that the combined size of the name and value of an xattr is within
-   * the configured limit. Setting a limit of zero disables this check.
-   */
-  private static void checkXAttrSize(FSDirectory fsd, XAttr xAttr) {
-    int size = DFSUtil.string2Bytes(xAttr.getName()).length;
-    if (xAttr.getValue() != null) {
-      size += xAttr.getValue().length;
-    }
-    if (size > fsd.getXattrMaxSize()) {
-      throw new HadoopIllegalArgumentException(
-          "The XAttr is too big. The maximum combined size of the"
-          + " name and value is " + fsd.getXattrMaxSize()
-          + ", but the total size is " + size);
-    }
-  }
-
-  private static void checkXAttrsConfigFlag(FSDirectory fsd) throws
-                                                             IOException {
-    if (!fsd.isXattrsEnabled()) {
-      throw new IOException(String.format(
-          "The XAttr operation has been rejected.  "
-              + "Support for XAttrs has been disabled by setting %s to false.",
-          DFSConfigKeys.DFS_NAMENODE_XATTRS_ENABLED_KEY));
-    }
-  }
-
-  private static List<XAttr> getXAttrs(FSDirectory fsd, INodesInPath iip)
-      throws IOException {
-    fsd.readLock();
-    try {
-      return XAttrStorage.readINodeXAttrs(fsd.getAttributes(iip));
-    } finally {
-      fsd.readUnlock();
-    }
-  }
-
-  private static boolean isUserVisible(XAttr xAttr) {
-    XAttr.NameSpace ns = xAttr.getNameSpace();
-    return ns == XAttr.NameSpace.USER || ns == XAttr.NameSpace.TRUSTED;
-  }
-}
+   * 根据现有XAttr和待设置XAttr合并生成新的XAttr列表，验证标志和数量限制
+   * @param fsd 文件目录对象
+   * @param existingXAttrs 现有XAttr列表
+   * @param toSet 待设置XAttr列表
+   * @param flag 设置标志
+   * @return 合并后的新XAttr

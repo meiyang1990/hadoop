@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,7 @@ import org.apache.hadoop.yarn.api.records.timelineservice.TimelineEvent;
 import org.apache.hadoop.yarn.api.records.timelineservice.TimelineMetric;
 
 /**
- * Event to record start of a task attempt
+ * 作业历史事件，用于记录MapReduce应用Master(AM)启动事件
  * 
  */
 @InterfaceAudience.Private
@@ -41,20 +42,22 @@ public class AMStartedEvent implements HistoryEvent {
   private long submitTime;
 
   /**
-   * Create an event to record the start of an MR AppMaster
+   * 构造AM启动事件，用于记录MR AppMaster的启动信息
    * 
    * @param appAttemptId
-   *          the application attempt id.
+   *          应用尝试ID
    * @param startTime
-   *          the start time of the AM.
+   *          AM启动时间
    * @param containerId
-   *          the containerId of the AM.
+   *          AM运行所在容器ID
    * @param nodeManagerHost
-   *          the node on which the AM is running.
+   *          AM运行所在NodeManager主机地址
    * @param nodeManagerPort
-   *          the port on which the AM is running.
+   *          AM运行所在NodeManager服务端口
    * @param nodeManagerHttpPort
-   *          the httpPort for the node running the AM.
+   *          AM运行所在NodeManager HTTP服务端口
+   * @param submitTime
+   *          作业提交时间
    */
   public AMStartedEvent(ApplicationAttemptId appAttemptId, long startTime,
       ContainerId containerId, String nodeManagerHost, int nodeManagerPort,
@@ -64,22 +67,24 @@ public class AMStartedEvent implements HistoryEvent {
   }
 
   /**
-   * Create an event to record the start of an MR AppMaster
+   * 构造AM启动事件，可指定关闭时强制作业状态，用于记录MR AppMaster的启动信息
    *
    * @param appAttemptId
-   *          the application attempt id.
+   *          应用尝试ID
    * @param startTime
-   *          the start time of the AM.
+   *          AM启动时间
    * @param containerId
-   *          the containerId of the AM.
+   *          AM运行所在容器ID
    * @param nodeManagerHost
-   *          the node on which the AM is running.
+   *          AM运行所在NodeManager主机地址
    * @param nodeManagerPort
-   *          the port on which the AM is running.
+   *          AM运行所在NodeManager服务端口
    * @param nodeManagerHttpPort
-   *          the httpPort for the node running the AM.
+   *          AM运行所在NodeManager HTTP服务端口
    * @param forcedJobStateOnShutDown
-   *          the state to force the job into
+   *          AM关闭时强制作业设置的状态
+   * @param submitTime
+   *          作业提交时间
    */
   public AMStartedEvent(ApplicationAttemptId appAttemptId, long startTime,
       ContainerId containerId, String nodeManagerHost, int nodeManagerPort,
@@ -98,16 +103,25 @@ public class AMStartedEvent implements HistoryEvent {
   AMStartedEvent() {
   }
 
+  /**
+   * 获取事件的Avro序列化数据对象
+   * @return Avro序列化的AM启动事件数据
+   */
   public Object getDatum() {
     return datum;
   }
 
+  /**
+   * 设置事件的Avro序列化数据对象
+   * @param datum Avro序列化的AM启动事件数据
+   */
   public void setDatum(Object datum) {
     this.datum = (AMStarted) datum;
   }
 
   /**
-   * @return the ApplicationAttemptId
+   * 获取应用尝试ID
+   * @return 应用尝试ID
    */
   public ApplicationAttemptId getAppAttemptId() {
     return ApplicationAttemptId.fromString(
@@ -115,61 +129,74 @@ public class AMStartedEvent implements HistoryEvent {
   }
 
   /**
-   * @return the start time for the MRAppMaster
+   * 获取AM启动时间
+   * @return AM启动时间戳
    */
   public long getStartTime() {
     return datum.getStartTime();
   }
 
   /**
-   * @return the ContainerId for the MRAppMaster.
+   * 获取AM运行容器ID
+   * @return AM运行所在容器ID
    */
   public ContainerId getContainerId() {
     return ContainerId.fromString(datum.getContainerId().toString());
   }
 
   /**
-   * @return the node manager host.
+   * 获取AM运行所在NodeManager主机地址
+   * @return NodeManager主机地址
    */
   public String getNodeManagerHost() {
     return datum.getNodeManagerHost().toString();
   }
 
   /**
-   * @return the node manager port.
+   * 获取AM运行所在NodeManager服务端口
+   * @return NodeManager服务端口
    */
   public int getNodeManagerPort() {
     return datum.getNodeManagerPort();
   }
   
   /**
-   * @return the http port for the tracker.
+   * 获取AM运行所在NodeManager HTTP服务端口
+   * @return NodeManager HTTP服务端口
    */
   public int getNodeManagerHttpPort() {
     return datum.getNodeManagerHttpPort();
   }
 
   /**
-   * @return the state to force the job into
+   * 获取AM关闭时强制设置的作业状态
+   * @return 强制作业状态字符串
    */
   public String getForcedJobStateOnShutDown() {
     return this.forcedJobStateOnShutDown;
   }
 
   /**
-   * @return the submit time for the Application(Job)
+   * 获取应用(作业)提交时间
+   * @return 应用提交时间戳
    */
   public long getSubmitTime() {
     return this.submitTime;
   }
 
-  /** Get the attempt id */
-
+  /**
+   * 获取事件类型，返回AM_STARTED事件类型
+   * @return 事件类型枚举值
+   */
   @Override
   public EventType getEventType() {
     return EventType.AM_STARTED;
   }
 
+  /**
+   * 将当前事件转换为YARN时间线服务事件格式
+   * @return 转换后的时间线事件对象
+   */
   @Override
   public TimelineEvent toTimelineEvent() {
     TimelineEvent tEvent = new TimelineEvent();
@@ -185,6 +212,10 @@ public class AMStartedEvent implements HistoryEvent {
     return tEvent;
   }
 
+  /**
+   * 获取事件对应的时间线指标集合，本事件无指标
+   * @return 总是返回null
+   */
   @Override
   public Set<TimelineMetric> getTimelineMetrics() {
     return null;

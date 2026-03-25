@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -23,8 +24,8 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This is used to track task completion events on 
- * job tracker. 
+ * 文件说明：MapReduce v1 API 任务完成事件类，用于在JobTracker端追踪任务完成状态变更
+ * 继承自新版本org.apache.hadoop.mapreduce.TaskCompletionEvent，兼容旧版API
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
@@ -33,55 +34,49 @@ public class TaskCompletionEvent
   @InterfaceAudience.Public
   @InterfaceStability.Stable
   /**
-   *  Task Completion Statuses
+   * 任务完成状态枚举，定义任务执行结束后的所有可能状态
    */
   static public enum Status {
     /**
-     * Task Event Attempt failed but there are attempts remaining.
+     * 任务尝试失败，但仍有剩余重试次数，可继续重试
      */
     FAILED,
     /**
-     * Task Event was killed.
+     * 任务被系统主动杀死
      */
     KILLED,
     /**
-     * Task Event was successful.
+     * 任务执行成功完成
      */
     SUCCEEDED,
     /**
-     * Used to Override a previously successful event status.
-     * Example:  Map attempt runs and a SUCCEEDED event is sent. Later a task
-     * is retroactively failed due to excessive fetch failure during shuffle
-     * phase. When the retroactive attempt failure occurs, an OBSOLETE event is
-     * sent for the map attempt indicating the prior event is no longer valid.
+     * 标记之前成功的事件已失效，例如：Map任务执行成功后，因shuffle阶段拉取失败被判定为失败，原成功事件标记为OBSOLETE
      */
     OBSOLETE,
     /**
-     * Task Event attempt failed and no further attempts exist.
-     * reached MAX attempts. When a reducer receives a TIPFAILED event it
-     * gives up trying to shuffle data from that map task.
+     * 任务尝试已达到最大重试次数，整体任务失败，Reduce端收到该事件后会停止从该Map任务拉取数据
      */
     TIPFAILED
   }
   
+  // 空任务完成事件数组，用于返回空结果场景
   public static final TaskCompletionEvent[] EMPTY_ARRAY = 
 	    new TaskCompletionEvent[0];
   /**
-   * Default constructor for Writable.
-   *
+   * Writable序列化默认构造函数
    */
   public TaskCompletionEvent() {
     super();
   }
 
   /**
-   * Constructor. eventId should be created externally and incremented
-   * per event for each job. 
-   * @param eventId event id, event id should be unique and assigned in
-   *  incrementally, starting from 0. 
-   * @param taskId task id
-   * @param status task's status 
-   * @param taskTrackerHttp task tracker's host:port for http. 
+   * 构造任务完成事件对象
+   * @param eventId 事件ID，每个作业内递增唯一，从0开始
+   * @param taskId 任务尝试ID
+   * @param idWithinJob 任务在作业中的编号
+   * @param isMap 是否为Map任务
+   * @param status 任务完成状态
+   * @param taskTrackerHttp TaskTracker的HTTP地址（host:port格式）
    */
   public TaskCompletionEvent(int eventId, 
                              TaskAttemptID taskId,
@@ -93,6 +88,11 @@ public class TaskCompletionEvent
           TaskCompletionEvent.Status.valueOf(status.name()), taskTrackerHttp);
   }
 
+  /**
+   * 将新版TaskCompletionEvent对象降级转换为旧版API对象，兼容旧版接口
+   * @param event 新版API的任务完成事件对象
+   * @return 转换后的旧版API任务完成事件对象
+   */
   @Private
   public static TaskCompletionEvent downgrade(
     org.apache.hadoop.mapreduce.TaskCompletionEvent event) {
@@ -102,9 +102,9 @@ public class TaskCompletionEvent
       event.getTaskTrackerHttp());
   }
   /**
-   * Returns task id. 
-   * @return task id
-   * @deprecated use {@link #getTaskAttemptId()} instead.
+   * 获取任务ID
+   * @return 任务ID字符串
+   * @deprecated 已废弃，请使用{@link #getTaskAttemptId()}方法
    */
   @Deprecated
   public String getTaskId() {
@@ -112,25 +112,25 @@ public class TaskCompletionEvent
   }
   
   /**
-   * Returns task id. 
-   * @return task id
+   * 获取任务尝试ID
+   * @return 旧版API的任务尝试ID对象
    */
   public TaskAttemptID getTaskAttemptId() {
     return TaskAttemptID.downgrade(super.getTaskAttemptId());
   }
   
   /**
-   * Returns {@link Status}
-   * @return task completion status
+   * 获取任务完成状态
+   * @return 任务完成状态枚举值
    */
   public Status getTaskStatus() {
     return Status.valueOf(super.getStatus().name());
   }
   
   /**
-   * Sets task id. 
-   * @param taskId
-   * @deprecated use {@link #setTaskAttemptId(TaskAttemptID)} instead.
+   * 设置任务ID
+   * @param taskId 任务ID字符串
+   * @deprecated 已废弃，请使用{@link #setTaskAttemptId(TaskAttemptID)}方法
    */
   @Deprecated
   public void setTaskId(String taskId) {
@@ -138,9 +138,9 @@ public class TaskCompletionEvent
   }
 
   /**
-   * Sets task id.
-   * @param taskId
-   * @deprecated use {@link #setTaskAttemptId(TaskAttemptID)} instead.
+   * 设置任务尝试ID
+   * @param taskId 任务尝试ID对象
+   * @deprecated 已废弃，请使用{@link #setTaskAttemptId(TaskAttemptID)}方法
    */
   @Deprecated
   public void setTaskID(TaskAttemptID taskId) {
@@ -148,16 +148,16 @@ public class TaskCompletionEvent
   }
 
   /**
-   * Sets task id. 
-   * @param taskId
+   * 设置任务尝试ID
+   * @param taskId 任务尝试ID对象
    */
   protected void setTaskAttemptId(TaskAttemptID taskId) {
     super.setTaskAttemptId(taskId);
   }
   
   /**
-   * Set task status. 
-   * @param status
+   * 设置任务完成状态
+   * @param status 任务完成状态枚举值
    */
   @Private
   public void setTaskStatus(Status status) {
@@ -166,8 +166,8 @@ public class TaskCompletionEvent
   }
   
   /**
-   * Set the task completion time
-   * @param taskCompletionTime time (in millisec) the task took to complete
+   * 设置任务运行总时长
+   * @param taskCompletionTime 任务运行耗时，单位毫秒
    */
   @Private
   public void setTaskRunTime(int taskCompletionTime) {
@@ -175,8 +175,8 @@ public class TaskCompletionEvent
   }
 
   /**
-   * set event Id. should be assigned incrementally starting from 0. 
-   * @param eventId
+   * 设置事件ID，需从0开始递增分配
+   * @param eventId 事件ID
    */
   @Private
   public void setEventId(int eventId) {
@@ -184,8 +184,8 @@ public class TaskCompletionEvent
   }
 
   /**
-   * Set task tracker http location. 
-   * @param taskTrackerHttp
+   * 设置TaskTracker的HTTP访问地址
+   * @param taskTrackerHttp TaskTracker的HTTP地址（host:port格式）
    */
   @Private
   public void setTaskTrackerHttp(String taskTrackerHttp) {

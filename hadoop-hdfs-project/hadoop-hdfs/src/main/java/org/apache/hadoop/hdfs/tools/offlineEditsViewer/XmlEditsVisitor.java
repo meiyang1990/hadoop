@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -35,10 +36,8 @@ import org.apache.hadoop.hdfs.server.namenode.FSEditLogOp;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
-
 /**
- * An XmlEditsVisitor walks over an EditLog structure and writes out
- * an equivalent XML document that contains the EditLog's components.
+ * XML格式Edits日志访问者，用于遍历编辑日志结构，将Edits日志内容输出为等价的XML文档，供离线分析使用。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable
@@ -51,27 +50,35 @@ public class XmlEditsVisitor implements OfflineEditsVisitor {
   private final static String XML_INDENTATION_NUM ="2";
 
   /**
-   * Create a processor that writes to the file named and may or may not
-   * also output to the screen, as specified.
+   * 构造XML格式Edits日志访问者，初始化SAX转换工厂与处理器，准备写入输出流
    *
-   * @param out output stream to write
-   * @throws IOException on any error
+   * @param out 输出流，用于写入生成的XML文档
+   * @throws IOException 初始化过程中发生IO或SAX错误时抛出
    */
   public XmlEditsVisitor(OutputStream out)
       throws IOException {
     this.out = out;
     try {
+      // 创建安全的SAX转换工厂实例
       factory = org.apache.hadoop.util.XMLUtils.newSecureSAXTransformerFactory();
+      // 创建转换器处理器
       TransformerHandler handler = factory.newTransformerHandler();
+      // 设置XML输出方法
       handler.getTransformer().setOutputProperty(OutputKeys.METHOD, "xml");
+      // 设置输出编码为UTF-8
       handler.getTransformer().setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+      // 开启XML缩进格式化
       handler.getTransformer().setOutputProperty(OutputKeys.INDENT, "yes");
+      // 设置缩进空格数为2
       handler.getTransformer().setOutputProperty(XML_INDENTATION_PROP,
               XML_INDENTATION_NUM);
+      // 设置XML为独立文档
       handler.getTransformer().setOutputProperty(OutputKeys.STANDALONE, "yes");
+      // 设置输出结果指向传入的输出流
       handler.setResult(new StreamResult(out));
       contentHandler = handler;
       
+      // 开始XML文档，写入根元素EDITS
       contentHandler.startDocument();
       contentHandler.startElement("", "", "EDITS", new AttributesImpl());
     } catch (TransformerConfigurationException e) {
@@ -82,15 +89,18 @@ public class XmlEditsVisitor implements OfflineEditsVisitor {
   }
 
   /**
-   * Start visitor (initialization)
+   * 访问器初始化，写入Edits日志版本号到XML
    */
   @Override
   public void start(int version) throws IOException {
     try {
+      // 开始EDITS_VERSION元素
       contentHandler.startElement("", "", "EDITS_VERSION", new AttributesImpl());
       StringBuilder bld = new StringBuilder();
       bld.append(version);
+      // 写入版本号字符串
       addString(bld.toString());
+      // 结束EDITS_VERSION元素
       contentHandler.endElement("", "", "EDITS_VERSION");
     }
     catch (SAXException e) {
@@ -98,6 +108,11 @@ public class XmlEditsVisitor implements OfflineEditsVisitor {
     }
   }
 
+  /**
+   * 将字符串转换为字符数组并通过SAX内容处理器输出
+   * @param str 要输出的字符串
+   * @throws SAXException SAX处理错误时抛出
+   */
   public void addString(String str) throws SAXException {
     int slen = str.length();
     char arr[] = new char[slen];
@@ -106,28 +121,36 @@ public class XmlEditsVisitor implements OfflineEditsVisitor {
   }
   
   /**
-   * Finish visitor
+   * 关闭访问器，完成XML文档写入，关闭输出流
    */
   @Override
   public void close(Throwable error) throws IOException {
     try {
+      // 结束根元素EDITS
       contentHandler.endElement("", "", "EDITS");
+      // 如果处理过程存在错误，写入错误信息到XML
       if (error != null) {
         String msg = error.getMessage();
         XMLUtils.addSaxString(contentHandler, "ERROR",
             (msg == null) ? "null" : msg);
       }
+      // 结束XML文档
       contentHandler.endDocument();
     }
     catch (SAXException e) {
       throw new IOException("SAX error: " + e.getMessage());
     }
+    // 关闭输出流
     out.close();
   }
 
+  /**
+   * 将单个编辑日志操作输出为XML格式
+   */
   @Override
   public void visitOp(FSEditLogOp op) throws IOException {
     try {
+      // 调用操作自身的XML输出方法写入XML节点
       op.outputToXml(contentHandler);
     }
     catch (SAXException e) {

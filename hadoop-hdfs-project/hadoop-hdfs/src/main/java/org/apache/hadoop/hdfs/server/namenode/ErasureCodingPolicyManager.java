@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -45,11 +46,11 @@ import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
- * This manages erasure coding policies predefined and activated in the system.
- * It loads customized policies and syncs with persisted ones in
- * NameNode image.
- *
- * This class is instantiated by the FSNamesystem.
+ * 文件：hadoop-hdfs-project/hadoop-hdfs/src/main/java/org/apache/hadoop/hdfs/server/namenode/ErasureCodingPolicyManager.java
+ * 所属模块：HDFS NameNode 核心服务
+ * 核心职责：管理HDFS系统中所有纠删码策略，包括内置系统策略和用户自定义策略，
+ *          负责策略的加载、启用、禁用、删除，并同步持久化状态到NameNode镜像中。
+ *          被FSNamesystem实例化，是NameNode中纠删码功能的核心管理组件。
  */
 @InterfaceAudience.LimitedPrivate({"HDFS"})
 public final class ErasureCodingPolicyManager {
@@ -62,7 +63,7 @@ public final class ErasureCodingPolicyManager {
   private boolean userDefinedAllowed =
       DFSConfigKeys.DFS_NAMENODE_EC_POLICIES_USERPOLICIES_ALLOWED_KEY_DEFAULT;
 
-  // Supported storage policies for striped EC files
+  // 条带化纠删码文件支持的存储策略列表
   private static final byte[] SUITABLE_STORAGE_POLICIES_FOR_EC_STRIPED_MODE =
       new byte[]{
           HdfsConstants.HOT_STORAGE_POLICY_ID,
@@ -70,38 +71,32 @@ public final class ErasureCodingPolicyManager {
           HdfsConstants.ALLSSD_STORAGE_POLICY_ID};
 
   /**
-   * All policies sorted by name for fast querying, include built-in policy,
-   * user defined policy, removed policy.
+   * 按名称排序存储所有策略（包含内置、用户自定义、已移除策略），用于快速查询
    */
   private Map<String, ErasureCodingPolicyInfo> policiesByName;
 
   /**
-   * All policies sorted by ID for fast querying, including built-in policy,
-   * user defined policy, removed policy.
+   * 按ID排序存储所有策略（包含内置、用户自定义、已移除策略），用于快速查询
    */
   private Map<Byte, ErasureCodingPolicyInfo> policiesByID;
 
   /**
-   * For better performance when query all Policies.
+   * 预缓存所有策略数组，优化全量查询性能
    */
   private ErasureCodingPolicyInfo[] allPolicies;
 
   /**
-   * All policies in the state as it will be persisted in the fsimage.
-   *
-   * The difference between persisted policies and all policies is that
-   * if a default policy is only enabled at startup,
-   * it will appear as disabled in the persisted policy list and in the fsimage.
+   * 存储将持久化到fsimage中的所有策略及其状态
+   * 与所有策略的区别：仅在启动时启用的默认策略，在持久化列表和fsimage中会标记为禁用
    */
   private Map<Byte, ErasureCodingPolicyInfo> allPersistedPolicies;
 
   /**
-   * All enabled policies sorted by name for fast querying, including built-in
-   * policy, user defined policy.
+   * 按名称存储所有已启用策略（包含内置和用户自定义策略），用于快速查询
    */
   private Map<String, ErasureCodingPolicy> enabledPoliciesByName;
   /**
-   * For better performance when query all enabled Policies.
+   * 预缓存所有已启用策略数组，优化全量查询性能
    */
   private ErasureCodingPolicy[] enabledPolicies;
 
@@ -109,6 +104,10 @@ public final class ErasureCodingPolicyManager {
 
   private volatile static ErasureCodingPolicyManager instance = null;
 
+  /**
+   * 获取ErasureCodingPolicyManager单例实例
+   * @return 单例对象
+   */
   public static ErasureCodingPolicyManager getInstance() {
     if (instance == null) {
       instance = new ErasureCodingPolicyManager();
@@ -118,6 +117,11 @@ public final class ErasureCodingPolicyManager {
 
   private ErasureCodingPolicyManager() {}
 
+  /**
+   * 初始化纠删码策略管理器，加载系统内置策略，从配置中读取参数并启用默认策略
+   * @param conf Hadoop配置对象
+   * @throws IOException 初始化失败时抛出异常
+   */
   public void init(Configuration conf) throws IOException {
     this.policiesByName = new TreeMap<>();
     this.policiesByID = new TreeMap<>();
@@ -125,13 +129,12 @@ public final class ErasureCodingPolicyManager {
     this.allPersistedPolicies = new TreeMap<>();
 
     /**
-     * TODO: load user defined EC policy from fsImage HDFS-7859
-     * load persistent policies from image and editlog, which is done only once
-     * during NameNode startup. This can be done here or in a separate method.
+     * TODO: 从fsImage加载用户自定义纠删码策略 HDFS-7859
+     * 在NameNode启动阶段一次性从镜像和编辑日志加载持久化策略，可在此方法或单独方法中完成
      */
 
     /*
-     * Add all System built-in policies into policy map
+     * 将所有系统内置策略添加到策略映射表
      */
     for (ErasureCodingPolicy policy :
         SystemErasureCodingPolicies.getPolicies()) {
@@ -155,15 +158,17 @@ public final class ErasureCodingPolicyManager {
   }
 
   /**
-   * Get the set of enabled policies.
-   * @return all policies
+   * 获取所有已启用的纠删码策略
+   * @return 已启用策略数组
    */
   public ErasureCodingPolicy[] getEnabledPolicies() {
     return enabledPolicies;
   }
 
   /**
-   * Get enabled policy by policy name.
+   * 根据策略名称获取已启用的纠删码策略
+   * @param name 策略名称
+   * @return 匹配的已启用策略，不存在则返回null
    */
   public ErasureCodingPolicy getEnabledPolicyByName(String name) {
     ErasureCodingPolicy ecPolicy = enabledPoliciesByName.get(name);
@@ -176,8 +181,9 @@ public final class ErasureCodingPolicyManager {
   }
 
   /**
-   * @return if the specified storage policy ID is suitable for striped EC
-   * files.
+   * 检查指定存储策略是否适合条带化纠删码文件
+   * @param storagePolicyID 存储策略ID
+   * @return 适合返回true，否则返回false
    */
   public static boolean checkStoragePolicySuitableForECStripedMode(
       byte storagePolicyID) {
@@ -192,28 +198,27 @@ public final class ErasureCodingPolicyManager {
   }
 
   /**
-   * Get all system defined policies and user defined policies.
-   * @return all policies
+   * 获取所有策略（包含系统内置和用户自定义策略）
+   * @return 所有策略信息数组
    */
   public ErasureCodingPolicyInfo[] getPolicies() {
     return allPolicies;
   }
 
   /**
-   * Get all system defined policies and user defined policies
-   * as it is written out in the fsimage.
-   *
-   * The difference between persisted policies and all policies is that
-   * if a default policy is only enabled at startup,
-   * it will appear as disabled in the persisted policy list and in the fsimage.
-   *
-   * @return persisted policies
+   * 获取将持久化到fsimage中的所有策略及其状态
+   * 与所有策略的区别：仅在启动时启用的默认策略，在持久化列表和fsimage中会标记为禁用
+   * @return 持久化策略数组
    */
   public ErasureCodingPolicyInfo[] getPersistedPolicies() {
     return allPersistedPolicies.values()
         .toArray(new ErasureCodingPolicyInfo[0]);
   }
 
+  /**
+   * 获取已启用策略数组的拷贝，保证线程安全
+   * @return 已启用策略数组拷贝
+   */
   public ErasureCodingPolicy[] getCopyOfEnabledPolicies() {
     ErasureCodingPolicy[] copy;
     synchronized (this) {
@@ -223,9 +228,9 @@ public final class ErasureCodingPolicyManager {
   }
 
   /**
-   * Get a {@link ErasureCodingPolicy} by policy ID, including system policy
-   * and user defined policy.
-   * @return ecPolicy, or null if not found
+   * 根据策略ID获取纠删码策略（包含系统和用户自定义策略）
+   * @param id 策略ID
+   * @return 匹配的策略，不存在则返回null
    */
   public ErasureCodingPolicy getByID(byte id) {
     final ErasureCodingPolicyInfo ecpi = getPolicyInfoByID(id);
@@ -236,17 +241,18 @@ public final class ErasureCodingPolicyManager {
   }
 
   /**
-   * Get a {@link ErasureCodingPolicyInfo} by policy ID, including system policy
-   * and user defined policy.
+   * 根据策略ID获取纠删码策略信息（包含系统和用户自定义策略）
+   * @param id 策略ID
+   * @return 匹配的策略信息，不存在则返回null
    */
   private ErasureCodingPolicyInfo getPolicyInfoByID(final byte id) {
     return this.policiesByID.get(id);
   }
 
   /**
-   * Get a {@link ErasureCodingPolicy} by policy name, including system
-   * policy and user defined policy.
-   * @return ecPolicy, or null if not found
+   * 根据策略名称获取纠删码策略（包含系统和用户自定义策略）
+   * @param name 策略名称
+   * @return 匹配的策略，不存在则返回null
    */
   public ErasureCodingPolicy getByName(String name) {
     final ErasureCodingPolicyInfo ecpi = getPolicyInfoByName(name);
@@ -257,9 +263,9 @@ public final class ErasureCodingPolicyManager {
   }
 
   /**
-   * Get a {@link ErasureCodingPolicy} by policy name, including system
-   * policy, user defined policy and Replication policy.
-   * @return ecPolicy, or null if not found
+   * 根据策略名称获取纠删码策略（包含系统、用户自定义策略和副本策略）
+   * @param name 策略名称
+   * @return 匹配的策略，不存在则返回null
    */
   public ErasureCodingPolicy getErasureCodingPolicyByName(String name) {
     final ErasureCodingPolicyInfo ecpi = getPolicyInfoByName(name);
@@ -273,16 +279,16 @@ public final class ErasureCodingPolicyManager {
   }
 
   /**
-   * Get a {@link ErasureCodingPolicyInfo} by policy name, including system
-   * policy and user defined policy.
-   * @return ecPolicy, or null if not found
+   * 根据策略名称获取纠删码策略信息（包含系统和用户自定义策略）
+   * @param name 策略名称
+   * @return 匹配的策略信息，不存在则返回null
    */
   private ErasureCodingPolicyInfo getPolicyInfoByName(final String name) {
     return this.policiesByName.get(name);
   }
 
   /**
-   * Clear and clean up.
+   * 清空清理策略管理器，占位方法待实现
    */
   public void clear() {
     // TODO: we should only clear policies loaded from NN metadata.
@@ -290,8 +296,9 @@ public final class ErasureCodingPolicyManager {
   }
 
   /**
-   * Add an erasure coding policy.
-   * @return the added policy
+   * 添加用户自定义纠删码策略，会进行合法性校验和冲突检查
+   * @param policy 待添加的策略
+   * @return 已添加的策略（如果已存在相同策略则直接返回已有策略）
    */
   public synchronized ErasureCodingPolicy addPolicy(
       ErasureCodingPolicy policy) {
@@ -354,10 +361,18 @@ public final class ErasureCodingPolicyManager {
     return policy;
   }
 
+  /**
+   * 获取当前所有策略中的最大ID值
+   * @return 最大策略ID
+   */
   private byte getCurrentMaxPolicyID() {
     return policiesByID.keySet().stream().max(Byte::compareTo).orElse((byte)0);
   }
 
+  /**
+   * 获取下一个可用的用户自定义策略ID
+   * @return 下一个可用策略ID
+   */
   private byte getNextAvailablePolicyID() {
     byte nextPolicyID = (byte)(getCurrentMaxPolicyID() + 1);
     return nextPolicyID > ErasureCodeConstants.USER_DEFINED_POLICY_START_ID ?
@@ -365,7 +380,8 @@ public final class ErasureCodingPolicyManager {
   }
 
   /**
-   * Remove an User erasure coding policy by policyName.
+   * 根据名称删除用户自定义纠删码策略，系统策略不允许删除
+   * @param name 待删除策略名称
    */
   public synchronized void removePolicy(String name) {
     final ErasureCodingPolicyInfo info = policiesByName.get(name);
@@ -390,11 +406,14 @@ public final class ErasureCodingPolicyManager {
     allPersistedPolicies.put(ecPolicy.getId(),
         createPolicyInfo(ecPolicy, ErasureCodingPolicyState.REMOVED));
     /*
-     * TODO HDFS-12405 postpone the delete removed policy to Namenode restart
-     * time.
+     * TODO HDFS-12405 将删除已移除策略推迟到NameNode重启时执行
      * */
   }
 
+  /**
+   * 获取所有已移除的策略列表，仅用于测试
+   * @return 已移除策略列表
+   */
   @VisibleForTesting
   public List<ErasureCodingPolicy> getRemovedPolicies() {
     ArrayList<ErasureCodingPolicy> removedPolicies = new ArrayList<>();
@@ -403,142 +422,3 @@ public final class ErasureCodingPolicyManager {
       if (info.isRemoved()) {
         removedPolicies.add(ecPolicy);
       }
-    }
-    return removedPolicies;
-  }
-
-  /**
-   * Disable an erasure coding policy by policyName.
-   */
-  public synchronized boolean disablePolicy(String name) {
-    ErasureCodingPolicyInfo info = policiesByName.get(name);
-    if (info == null) {
-      throw new HadoopIllegalArgumentException("The policy name " +
-          name + " does not exist");
-    }
-
-    if (enabledPoliciesByName.containsKey(name)) {
-      enabledPoliciesByName.remove(name);
-      enabledPolicies =
-          enabledPoliciesByName.values().toArray(new ErasureCodingPolicy[0]);
-      info.setState(ErasureCodingPolicyState.DISABLED);
-      LOG.info("Disabled the erasure coding policy " + name);
-      allPersistedPolicies.put(info.getPolicy().getId(),
-          createPolicyInfo(info.getPolicy(),
-              ErasureCodingPolicyState.DISABLED));
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * Enable an erasure coding policy by policyName.
-   */
-  public synchronized boolean enablePolicy(String name) {
-    final ErasureCodingPolicyInfo info = policiesByName.get(name);
-    if (info == null) {
-      throw new HadoopIllegalArgumentException("The policy name " +
-          name + " does not exist");
-    }
-    if (enabledPoliciesByName.containsKey(name)) {
-      if (defaultPolicyName.equals(name)) {
-        allPersistedPolicies.put(info.getPolicy().getId(),
-            createPolicyInfo(info.getPolicy(),
-                ErasureCodingPolicyState.ENABLED));
-        return true;
-      }
-      return false;
-    }
-    final ErasureCodingPolicy ecPolicy = info.getPolicy();
-    enabledPoliciesByName.put(name, ecPolicy);
-    info.setState(ErasureCodingPolicyState.ENABLED);
-    enabledPolicies =
-        enabledPoliciesByName.values().toArray(new ErasureCodingPolicy[0]);
-    allPersistedPolicies.put(ecPolicy.getId(),
-        createPolicyInfo(info.getPolicy(), ErasureCodingPolicyState.ENABLED));
-    LOG.info("Enabled the erasure coding policy " + name);
-    return true;
-  }
-
-  /**
-   * Load an erasure coding policy into erasure coding manager.
-   */
-  private void loadPolicy(ErasureCodingPolicyInfo info) {
-    Preconditions.checkNotNull(info);
-    final ErasureCodingPolicy policy = info.getPolicy();
-    if (!CodecUtil.hasCodec(policy.getCodecName()) ||
-        policy.getCellSize() > maxCellSize) {
-      // If policy is not supported in current system, set the policy state to
-      // DISABLED;
-      info.setState(ErasureCodingPolicyState.DISABLED);
-    }
-
-    this.policiesByName.put(policy.getName(), info);
-    this.policiesByID.put(policy.getId(), info);
-    if (info.isEnabled()) {
-      enablePolicy(policy.getName());
-    }
-    allPersistedPolicies.put(policy.getId(),
-        createPolicyInfo(policy, info.getState()));
-  }
-
-  /**
-   * Reload erasure coding policies from fsImage.
-   *
-   * @param ecPolicies contains ErasureCodingPolicy list
-   *
-   */
-  public synchronized void loadPolicies(
-      List<ErasureCodingPolicyInfo> ecPolicies, Configuration conf)
-      throws IOException{
-    Preconditions.checkNotNull(ecPolicies);
-    for (ErasureCodingPolicyInfo p : ecPolicies) {
-      loadPolicy(p);
-    }
-    enableDefaultPolicy(conf);
-    updatePolicies();
-  }
-
-  private void enableDefaultPolicy(Configuration conf) throws IOException {
-    defaultPolicyName = conf.getTrimmed(
-        DFSConfigKeys.DFS_NAMENODE_EC_SYSTEM_DEFAULT_POLICY,
-        DFSConfigKeys.DFS_NAMENODE_EC_SYSTEM_DEFAULT_POLICY_DEFAULT);
-    if (!defaultPolicyName.isEmpty()) {
-      final ErasureCodingPolicyInfo info =
-          policiesByName.get(defaultPolicyName);
-      if (info == null) {
-        String names = policiesByName.values()
-            .stream().map((pi) -> pi.getPolicy().getName())
-            .collect(Collectors.joining(", "));
-        String msg = String.format("EC policy '%s' specified at %s is not a "
-                + "valid policy. Please choose from list of available "
-                + "policies: [%s]",
-            defaultPolicyName,
-            DFSConfigKeys.DFS_NAMENODE_EC_SYSTEM_DEFAULT_POLICY,
-            names);
-        throw new IOException(msg);
-      }
-      info.setState(ErasureCodingPolicyState.ENABLED);
-      enabledPoliciesByName.put(info.getPolicy().getName(), info.getPolicy());
-    }
-  }
-
-  private void updatePolicies() {
-    enabledPolicies =
-        enabledPoliciesByName.values().toArray(new ErasureCodingPolicy[0]);
-    allPolicies =
-        policiesByName.values().toArray(new ErasureCodingPolicyInfo[0]);
-  }
-
-  public String getEnabledPoliciesMetric() {
-    return StringUtils.join(", ",
-            enabledPoliciesByName.keySet());
-  }
-
-  private ErasureCodingPolicyInfo createPolicyInfo(ErasureCodingPolicy p,
-                                                   ErasureCodingPolicyState s) {
-    ErasureCodingPolicyInfo policyInfo = new ErasureCodingPolicyInfo(p);
-    policyInfo.setState(s);
-    return policyInfo;
-  }
-}

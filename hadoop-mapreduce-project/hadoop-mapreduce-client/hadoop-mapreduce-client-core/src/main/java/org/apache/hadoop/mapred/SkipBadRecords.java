@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -24,52 +25,33 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 /**
- * Utility class for skip bad records functionality. It contains various 
- * settings related to skipping of bad records.
+ * MapReduce坏记录跳过功能工具类，定义了坏记录跳过相关的所有配置参数与访问方法。
  * 
- * <p>Hadoop provides an optional mode of execution in which the bad records
- * are detected and skipped in further attempts.
+ * <p>Hadoop提供可选执行模式，当任务多次失败时，会自动检测并跳过导致崩溃的坏记录，
+ * 保证任务能够完成，仅损失少量数据。适用于用户业务逻辑或第三方库存在bug，无法修复
+ * 且允许少量数据丢失的场景。</p>
  * 
- * <p>This feature can be used when map/reduce tasks crashes deterministically on 
- * certain input. This happens due to bugs in the map/reduce function. The usual
- * course would be to fix these bugs. But sometimes this is not possible; 
- * perhaps the bug is in third party libraries for which the source code is 
- * not available. Due to this, the task never reaches to completion even with 
- * multiple attempts and complete data for that task is lost.</p>
- *  
- * <p>With this feature, only a small portion of data is lost surrounding 
- * the bad record, which may be acceptable for some user applications.
- * see {@link SkipBadRecords#setMapperMaxSkipRecords(Configuration, long)}</p>
- * 
- * <p>The skipping mode gets kicked off after certain no of failures 
- * see {@link SkipBadRecords#setAttemptsToStartSkipping(Configuration, int)}</p>
- *  
- * <p>In the skipping mode, the map/reduce task maintains the record range which 
- * is getting processed at all times. Before giving the input to the
- * map/reduce function, it sends this record range to the Task tracker.
- * If task crashes, the Task tracker knows which one was the last reported
- * range. On further attempts that range get skipped.</p>
+ * <p>工作原理：开启跳过模式后，任务处理前会向TaskTracker上报当前即将处理的记录范围，
+ * 如果任务崩溃，TaskTracker会记录该范围，后续重试时直接跳过该范围，保证任务能完成。</p>
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
 public class SkipBadRecords {
   
   /**
-   * Special counters which are written by the application and are 
-   * used by the framework for detecting bad records. For detecting bad records 
-   * these counters must be incremented by the application.
+   * 坏记录检测计数器组名称，用于框架检测坏记录，应用需要递增该组下对应计数器。
    */
   public static final String COUNTER_GROUP = "SkippingTaskCounters";
   
   /**
-   * Number of processed map records.
+   * Map端已处理记录计数器名称。
    * @see SkipBadRecords#getAutoIncrMapperProcCount(Configuration)
    */
   public static final String COUNTER_MAP_PROCESSED_RECORDS = 
     "MapProcessedRecords";
   
   /**
-   * Number of processed reduce groups.
+   * Reduce端已处理分组计数器名称。
    * @see SkipBadRecords#getAutoIncrReducerProcCount(Configuration)
    */
   public static final String COUNTER_REDUCE_PROCESSED_GROUPS = 
@@ -88,32 +70,22 @@ public class SkipBadRecords {
     JobContext.REDUCE_SKIP_MAXGROUPS;
   
   /**
-   * Get the number of Task attempts AFTER which skip mode 
-   * will be kicked off. When skip mode is kicked off, the 
-   * tasks reports the range of records which it will process 
-   * next to the TaskTracker. So that on failures, TT knows which 
-   * ones are possibly the bad records. On further executions, 
-   * those are skipped.
-   * Default value is 2.
+   * 获取触发跳过模式所需的任务失败重试次数，失败次数超过该值后会开启跳过模式。
+   * 默认值为2。
    * 
-   * @param conf the configuration
-   * @return attemptsToStartSkipping no of task attempts
+   * @param conf 配置对象
+   * @return 触发跳过模式的任务尝试次数
    */
   public static int getAttemptsToStartSkipping(Configuration conf) {
     return conf.getInt(ATTEMPTS_TO_START_SKIPPING, 2);
   }
 
   /**
-   * Set the number of Task attempts AFTER which skip mode 
-   * will be kicked off. When skip mode is kicked off, the 
-   * tasks reports the range of records which it will process 
-   * next to the TaskTracker. So that on failures, TT knows which 
-   * ones are possibly the bad records. On further executions, 
-   * those are skipped.
-   * Default value is 2.
+   * 设置触发跳过模式所需的任务失败重试次数，失败次数超过该值后会开启跳过模式。
+   * 默认值为2。
    * 
-   * @param conf the configuration
-   * @param attemptsToStartSkipping no of task attempts
+   * @param conf 配置对象
+   * @param attemptsToStartSkipping 触发跳过模式的任务尝试次数
    */
   public static void setAttemptsToStartSkipping(Configuration conf, 
       int attemptsToStartSkipping) {
@@ -121,35 +93,26 @@ public class SkipBadRecords {
   }
 
   /**
-   * Get the flag which if set to true, 
-   * {@link SkipBadRecords#COUNTER_MAP_PROCESSED_RECORDS} is incremented 
-   * by MapRunner after invoking the map function. This value must be set to 
-   * false for applications which process the records asynchronously 
-   * or buffer the input records. For example streaming. 
-   * In such cases applications should increment this counter on their own.
-   * Default value is true.
+   * 获取Map端处理记录计数器是否自动递增标记。
+   * 如果为true，MapRunner会在调用map函数后自动递增COUNTER_MAP_PROCESSED_RECORDS。
+   * 如果应用异步处理或缓冲输入记录（如Hadoop Streaming），需要设为false，由应用自行递增计数器。
+   * 默认值为true。
    * 
-   * @param conf the configuration
-   * @return <code>true</code> if auto increment 
-   *                       {@link SkipBadRecords#COUNTER_MAP_PROCESSED_RECORDS}.
-   *         <code>false</code> otherwise.
+   * @param conf 配置对象
+   * @return true表示自动递增，false表示应用自行递增
    */
   public static boolean getAutoIncrMapperProcCount(Configuration conf) {
     return conf.getBoolean(AUTO_INCR_MAP_PROC_COUNT, true);
   }
   
   /**
-   * Set the flag which if set to true, 
-   * {@link SkipBadRecords#COUNTER_MAP_PROCESSED_RECORDS} is incremented 
-   * by MapRunner after invoking the map function. This value must be set to 
-   * false for applications which process the records asynchronously 
-   * or buffer the input records. For example streaming. 
-   * In such cases applications should increment this counter on their own.
-   * Default value is true.
+   * 设置Map端处理记录计数器是否自动递增标记。
+   * 如果为true，MapRunner会在调用map函数后自动递增COUNTER_MAP_PROCESSED_RECORDS。
+   * 如果应用异步处理或缓冲输入记录（如Hadoop Streaming），需要设为false，由应用自行递增计数器。
+   * 默认值为true。
    * 
-   * @param conf the configuration
-   * @param autoIncr whether to auto increment 
-   *        {@link SkipBadRecords#COUNTER_MAP_PROCESSED_RECORDS}.
+   * @param conf 配置对象
+   * @param autoIncr true表示自动递增，false表示应用自行递增
    */
   public static void setAutoIncrMapperProcCount(Configuration conf, 
       boolean autoIncr) {
@@ -157,35 +120,26 @@ public class SkipBadRecords {
   }
   
   /**
-   * Get the flag which if set to true, 
-   * {@link SkipBadRecords#COUNTER_REDUCE_PROCESSED_GROUPS} is incremented 
-   * by framework after invoking the reduce function. This value must be set to 
-   * false for applications which process the records asynchronously 
-   * or buffer the input records. For example streaming. 
-   * In such cases applications should increment this counter on their own.
-   * Default value is true.
+   * 获取Reduce端处理分组计数器是否自动递增标记。
+   * 如果为true，框架会在调用reduce函数后自动递增COUNTER_REDUCE_PROCESSED_GROUPS。
+   * 如果应用异步处理或缓冲输入分组（如Hadoop Streaming），需要设为false，由应用自行递增计数器。
+   * 默认值为true。
    * 
-   * @param conf the configuration
-   * @return <code>true</code> if auto increment 
-   *                    {@link SkipBadRecords#COUNTER_REDUCE_PROCESSED_GROUPS}.
-   *         <code>false</code> otherwise.
+   * @param conf 配置对象
+   * @return true表示自动递增，false表示应用自行递增
    */
   public static boolean getAutoIncrReducerProcCount(Configuration conf) {
     return conf.getBoolean(AUTO_INCR_REDUCE_PROC_COUNT, true);
   }
   
   /**
-   * Set the flag which if set to true, 
-   * {@link SkipBadRecords#COUNTER_REDUCE_PROCESSED_GROUPS} is incremented 
-   * by framework after invoking the reduce function. This value must be set to 
-   * false for applications which process the records asynchronously 
-   * or buffer the input records. For example streaming. 
-   * In such cases applications should increment this counter on their own.
-   * Default value is true.
+   * 设置Reduce端处理分组计数器是否自动递增标记。
+   * 如果为true，框架会在调用reduce函数后自动递增COUNTER_REDUCE_PROCESSED_GROUPS。
+   * 如果应用异步处理或缓冲输入分组（如Hadoop Streaming），需要设为false，由应用自行递增计数器。
+   * 默认值为true。
    * 
-   * @param conf the configuration
-   * @param autoIncr whether to auto increment 
-   *        {@link SkipBadRecords#COUNTER_REDUCE_PROCESSED_GROUPS}.
+   * @param conf 配置对象
+   * @param autoIncr true表示自动递增，false表示应用自行递增
    */
   public static void setAutoIncrReducerProcCount(Configuration conf, 
       boolean autoIncr) {
@@ -193,13 +147,11 @@ public class SkipBadRecords {
   }
   
   /**
-   * Get the directory to which skipped records are written. By default it is 
-   * the sub directory of the output _logs directory.
-   * User can stop writing skipped records by setting the value null.
+   * 获取被跳过记录的输出目录路径，跳过的坏记录会写入该目录。
+   * 默认输出到作业输出目录下_logs/skip子目录，设置为null可关闭跳过记录写入。
    * 
-   * @param conf the configuration.
-   * @return path skip output directory. Null is returned if this is not set 
-   * and output directory is also not set.
+   * @param conf 配置对象
+   * @return 跳过记录输出路径，未配置且无作业输出路径时返回null
    */
   public static Path getSkipOutputPath(Configuration conf) {
     String name =  conf.get(OUT_PATH);
@@ -215,12 +167,11 @@ public class SkipBadRecords {
   }
   
   /**
-   * Set the directory to which skipped records are written. By default it is 
-   * the sub directory of the output _logs directory.
-   * User can stop writing skipped records by setting the value null.
+   * 设置被跳过记录的输出目录路径，跳过的坏记录会写入该目录。
+   * 默认输出到作业输出目录下_logs/skip子目录，设置为null可关闭跳过记录写入。
    * 
-   * @param conf the configuration.
-   * @param path skip output directory path
+   * @param conf 配置对象
+   * @param path 跳过记录输出路径
    */
   public static void setSkipOutputPath(JobConf conf, Path path) {
     String pathStr = null;
@@ -233,38 +184,26 @@ public class SkipBadRecords {
   }
   
   /**
-   * Get the number of acceptable skip records surrounding the bad record PER 
-   * bad record in mapper. The number includes the bad record as well.
-   * To turn the feature of detection/skipping of bad records off, set the 
-   * value to 0.
-   * The framework tries to narrow down the skipped range by retrying  
-   * until this threshold is met OR all attempts get exhausted for this task. 
-   * Set the value to Long.MAX_VALUE to indicate that framework need not try to 
-   * narrow down. Whatever records(depends on application) get skipped are 
-   * acceptable.
-   * Default value is 0.
+   * 获取Mapper端单个坏记录允许跳过的最大记录数（包含坏记录本身）。
+   * 设置为0可关闭坏记录检测跳过功能；设置为Long.MAX_VALUE表示无需缩小跳过范围，接受任意范围跳过。
+   * 框架会通过多次重试逐步缩小跳过范围，直到满足该阈值或用尽重试次数。
+   * 默认值为0。
    * 
-   * @param conf the configuration
-   * @return maxSkipRecs acceptable skip records.
+   * @param conf 配置对象
+   * @return 允许跳过的最大记录数
    */
   public static long getMapperMaxSkipRecords(Configuration conf) {
     return conf.getLong(MAPPER_MAX_SKIP_RECORDS, 0);
   }
   
   /**
-   * Set the number of acceptable skip records surrounding the bad record PER 
-   * bad record in mapper. The number includes the bad record as well.
-   * To turn the feature of detection/skipping of bad records off, set the 
-   * value to 0.
-   * The framework tries to narrow down the skipped range by retrying  
-   * until this threshold is met OR all attempts get exhausted for this task. 
-   * Set the value to Long.MAX_VALUE to indicate that framework need not try to 
-   * narrow down. Whatever records(depends on application) get skipped are 
-   * acceptable.
-   * Default value is 0.
+   * 设置Mapper端单个坏记录允许跳过的最大记录数（包含坏记录本身）。
+   * 设置为0可关闭坏记录检测跳过功能；设置为Long.MAX_VALUE表示无需缩小跳过范围，接受任意范围跳过。
+   * 框架会通过多次重试逐步缩小跳过范围，直到满足该阈值或用尽重试次数。
+   * 默认值为0。
    * 
-   * @param conf the configuration
-   * @param maxSkipRecs acceptable skip records.
+   * @param conf 配置对象
+   * @param maxSkipRecs 允许跳过的最大记录数
    */
   public static void setMapperMaxSkipRecords(Configuration conf, 
       long maxSkipRecs) {
@@ -272,38 +211,26 @@ public class SkipBadRecords {
   }
   
   /**
-   * Get the number of acceptable skip groups surrounding the bad group PER 
-   * bad group in reducer. The number includes the bad group as well.
-   * To turn the feature of detection/skipping of bad groups off, set the 
-   * value to 0.
-   * The framework tries to narrow down the skipped range by retrying  
-   * until this threshold is met OR all attempts get exhausted for this task. 
-   * Set the value to Long.MAX_VALUE to indicate that framework need not try to 
-   * narrow down. Whatever groups(depends on application) get skipped are 
-   * acceptable.
-   * Default value is 0.
+   * 获取Reducer端单个坏分组允许跳过的最大分组数（包含坏分组本身）。
+   * 设置为0可关闭坏分组检测跳过功能；设置为Long.MAX_VALUE表示无需缩小跳过范围，接受任意范围跳过。
+   * 框架会通过多次重试逐步缩小跳过范围，直到满足该阈值或用尽重试次数。
+   * 默认值为0。
    * 
-   * @param conf the configuration
-   * @return maxSkipGrps acceptable skip groups.
+   * @param conf 配置对象
+   * @return 允许跳过的最大分组数
    */
   public static long getReducerMaxSkipGroups(Configuration conf) {
     return conf.getLong(REDUCER_MAX_SKIP_GROUPS, 0);
   }
   
   /**
-   * Set the number of acceptable skip groups surrounding the bad group PER 
-   * bad group in reducer. The number includes the bad group as well.
-   * To turn the feature of detection/skipping of bad groups off, set the 
-   * value to 0.
-   * The framework tries to narrow down the skipped range by retrying  
-   * until this threshold is met OR all attempts get exhausted for this task. 
-   * Set the value to Long.MAX_VALUE to indicate that framework need not try to 
-   * narrow down. Whatever groups(depends on application) get skipped are 
-   * acceptable.
-   * Default value is 0.
+   * 设置Reducer端单个坏分组允许跳过的最大分组数（包含坏分组本身）。
+   * 设置为0可关闭坏分组检测跳过功能；设置为Long.MAX_VALUE表示无需缩小跳过范围，接受任意范围跳过。
+   * 框架会通过多次重试逐步缩小跳过范围，直到满足该阈值或用尽重试次数。
+   * 默认值为0。
    * 
-   * @param conf the configuration
-   * @param maxSkipGrps acceptable skip groups.
+   * @param conf 配置对象
+   * @param maxSkipGrps 允许跳过的最大分组数
    */
   public static void setReducerMaxSkipGroups(Configuration conf, 
       long maxSkipGrps) {

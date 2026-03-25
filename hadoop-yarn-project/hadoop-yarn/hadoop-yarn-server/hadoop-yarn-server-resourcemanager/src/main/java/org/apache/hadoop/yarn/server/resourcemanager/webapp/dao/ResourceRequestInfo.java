@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -30,7 +31,7 @@ import javax.xml.bind.annotation.XmlRootElement;
 import java.util.Set;
 
 /**
- * Simple class representing a resource request.
+ * YARN RM WebAPI 资源请求信息数据访问对象，用于封装资源请求信息供Web前端展示/接口返回。
  */
 @XmlRootElement(name = "resourceRequests")
 @XmlAccessorType(XmlAccessType.FIELD)
@@ -59,9 +60,16 @@ public class ResourceRequestInfo {
   @XmlElement(name = "allocationTags")
   private Set<String> allocationTags;
 
+  /**
+   * 无参构造函数，供JAXB序列化使用。
+   */
   public ResourceRequestInfo() {
   }
 
+  /**
+   * 从ResourceRequest构造资源请求信息对象。
+   * @param request 原始资源请求对象
+   */
   public ResourceRequestInfo(ResourceRequest request) {
     priority = request.getPriority().getPriority();
     allocationRequestId = request.getAllocationRequestId();
@@ -76,6 +84,10 @@ public class ResourceRequestInfo {
     }
   }
 
+  /**
+   * 从SchedulingRequest构造资源请求信息对象。
+   * @param request 原始调度请求对象
+   */
   public ResourceRequestInfo(SchedulingRequest request) {
     priority = request.getPriority().getPriority();
     allocationRequestId = request.getAllocationRequestId();

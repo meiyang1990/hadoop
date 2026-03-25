@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -38,11 +39,9 @@ import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.Ab
 import static org.apache.hadoop.mapreduce.lib.output.committer.manifest.files.AbstractManifestData.verify;
 
 /**
- * A directory entry in the task manifest.
- * Uses shorter field names for smaller files.
- * Hash and equals are on dir name only.
- * Can be serialized as a java object, json object
- * or hadoop writable.
+ * 任务清单文件中的目录条目实体，用于记录作业输出过程中创建的目录信息
+ * 使用短JSON字段名减小清单文件体积，仅基于目录路径计算哈希和相等性判断
+ * 支持Java序列化、JSON序列化和Hadoop Writable三种序列化方式
  */
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
@@ -51,37 +50,34 @@ public final class DirEntry implements Serializable, Writable {
   private static final long serialVersionUID = 5658520530209859765L;
 
   /**
-   * Destination directory.
+   * 目标目录路径，JSON字段名使用短名'd'减小文件体积
    */
   @JsonProperty("d")
   private String dir;
 
   /**
-   * Type of dest entry as found when probed for in task commit.
+   * 目录状态类型，任务提交探测时获取的条目状态，JSON字段名使用短名't'减小文件体积
    */
   @JsonProperty("t")
   private int type;
 
   /**
-   * Level in the treewalk.
+   * 目录在遍历树中的层级，JSON字段名使用短名'l'减小文件体积
    */
   @JsonProperty("l")
   private int level;
 
   /**
-   * Constructor for use by jackson/writable.
-   * Do Not Delete.
+   * 无参构造器，供Jackson序列化/反序列化和Writable机制使用，不得删除
    */
   private DirEntry() {
   }
 
   /**
-   * Construct an entry.
-   *
-   * @param dir destination path.
-   * @param type type of dest entry
-   * @param level Level in the treewalk.
-   *
+   * 构造目录条目对象
+   * @param dir 目标目录路径字符串
+   * @param type 目录状态类型编号
+   * @param level 目录在遍历树中的层级
    */
   public DirEntry(
       final String dir,
@@ -93,12 +89,10 @@ public final class DirEntry implements Serializable, Writable {
   }
 
   /**
-   * Construct an entry.
-   *
-   * @param dir destination path.
-   * @param type type of dest entry
-   * @param level Level in the treewalk.
-   *
+   * 构造目录条目对象，接收Path类型参数
+   * @param dir 目标目录路径
+   * @param type 目录状态类型编号
+   * @param level 目录在遍历树中的层级
    */
   public DirEntry(
       final Path dir,
@@ -115,6 +109,10 @@ public final class DirEntry implements Serializable, Writable {
     return dir;
   }
 
+  /**
+   * 获取反序列化后的目标目录Path对象，该字段不参与JSON序列化
+   * @return 目标目录Path对象
+   */
   @JsonIgnore
   public Path getDestPath() {
     return unmarshallPath(dir);
@@ -136,15 +134,28 @@ public final class DirEntry implements Serializable, Writable {
     return level;
   }
 
+  /**
+   * 获取目录状态枚举，该字段不参与JSON序列化
+   * @return 目录状态枚举
+   */
   @JsonIgnore
   public EntryStatus getStatus() {
     return EntryStatus.toEntryStatus(type);
   }
 
+  /**
+   * 设置目录状态，该字段不参与JSON序列化
+   * @param status 目录状态枚举
+   */
   @JsonIgnore
   public void setStatus(EntryStatus status) {
     setType(status.ordinal());
   }
+
+  /**
+   * 验证当前目录条目的数据合法性，检查必填字段是否符合要求
+   * @throws IOException 验证失败时抛出异常
+   */
   public void validate() throws IOException {
     final String s = toString();
     verify(dir != null && dir.length() > 0,
@@ -181,6 +192,11 @@ public final class DirEntry implements Serializable, Writable {
     return Objects.hash(dir);
   }
 
+  /**
+   * 将目录条目写入Hadoop序列化输出
+   * @param out 数据输出流
+   * @throws IOException 写入失败时抛出异常
+   */
   @Override
   public void write(final DataOutput out) throws IOException {
     out.writeUTF(dir);
@@ -188,6 +204,11 @@ public final class DirEntry implements Serializable, Writable {
     out.writeInt(level);
   }
 
+  /**
+   * 从Hadoop序列化输入读取目录条目数据
+   * @param in 数据输入流
+   * @throws IOException 读取失败时抛出异常
+   */
   @Override
   public void readFields(final DataInput in) throws IOException {
     dir = in.readUTF();
@@ -196,22 +217,22 @@ public final class DirEntry implements Serializable, Writable {
   }
 
   /**
-   * A directory entry.
-   * @param dest destination path.
-   * @param type type
-   * @param level Level in the treewalk.
-   * @return an entry
+   * 工厂方法：创建目录条目，接收Path类型参数和状态类型编号
+   * @param dest 目标目录路径
+   * @param type 目录状态类型编号
+   * @param level 目录在遍历树中的层级
+   * @return 新的目录条目对象
    */
   public static DirEntry dirEntry(Path dest, int type, int level) {
     return new DirEntry(dest, type, level);
   }
 
   /**
-   * A directory entry.
-   * @param dest destination path.
-   * @param type type
-   * @param level Level in the treewalk.
-   * @return an entry
+   * 工厂方法：创建目录条目，接收Path类型参数和状态枚举
+   * @param dest 目标目录路径
+   * @param type 目录状态枚举
+   * @param level 目录在遍历树中的层级
+   * @return 新的目录条目对象
    */
   public static DirEntry dirEntry(Path dest, EntryStatus type, int level) {
     return dirEntry(dest, type.ordinal(), level);

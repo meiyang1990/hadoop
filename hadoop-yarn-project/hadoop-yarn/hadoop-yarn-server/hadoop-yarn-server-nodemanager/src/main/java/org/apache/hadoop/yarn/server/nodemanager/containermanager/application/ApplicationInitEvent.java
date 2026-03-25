@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
 * Licensed to the Apache Software Foundation (ASF) under one
 * or more contributor license agreements.  See the NOTICE file
@@ -24,16 +25,33 @@ import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ApplicationAccessType;
 import org.apache.hadoop.yarn.api.records.LogAggregationContext;
 
+/**
+ * 应用初始化事件，NodeManager容器管理器中触发应用启动的事件，
+ * 携带应用权限配置和日志聚合上下文信息。
+ */
 public class ApplicationInitEvent extends ApplicationEvent {
 
+  // 应用访问权限配置表，键为访问类型，值为授权用户/组
   private final Map<ApplicationAccessType, String> applicationACLs;
+  // 日志聚合上下文，包含日志聚合相关配置
   private final LogAggregationContext logAggregationContext;  
 
+  /**
+   * 构造应用初始化事件，不指定日志聚合上下文
+   * @param appId 应用ID
+   * @param acls 应用访问权限配置
+   */
   public ApplicationInitEvent(ApplicationId appId,
       Map<ApplicationAccessType, String> acls) {
     this(appId, acls, null);
   }
 
+  /**
+   * 构造应用初始化事件，指定完整配置
+   * @param appId 应用ID
+   * @param acls 应用访问权限配置
+   * @param logAggregationContext 日志聚合上下文
+   */
   public ApplicationInitEvent(ApplicationId appId,
       Map<ApplicationAccessType, String> acls,
       LogAggregationContext logAggregationContext) {
@@ -42,10 +60,18 @@ public class ApplicationInitEvent extends ApplicationEvent {
     this.logAggregationContext = logAggregationContext;
   }
 
+  /**
+   * 获取应用访问权限配置
+   * @return 应用访问权限配置表
+   */
   public Map<ApplicationAccessType, String> getApplicationACLs() {
     return this.applicationACLs;
   }
 
+  /**
+   * 获取日志聚合上下文
+   * @return 日志聚合上下文配置
+   */
   public LogAggregationContext getLogAggregationContext() {
     return this.logAggregationContext;
   }

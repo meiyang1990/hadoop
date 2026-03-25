@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -25,17 +26,25 @@ import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
 
 /**
- * Order {@link FSAppAttempt} objects by priority and then by submit time, as
- * in the default scheduler in Hadoop.
+ * FIFO调度器应用比较器，按照优先级 -> 提交时间 -> 应用ID的顺序对公平调度器中的应用进行排序
+ * 实现Hadoop默认调度器的排序规则，用于FIFO调度策略下的应用排序。
  */
 @Private
 @Unstable
 public class FifoAppComparator implements Comparator<FSAppAttempt>, Serializable {
-  private static final long serialVersionUID = 3428835083489547918L;
+  private static final long serialVersionUID = 34288350833489547918L;
 
+  /**
+   * 比较两个公平调度应用尝试的排序优先级
+   * @param a1 第一个应用尝试
+   * @param a2 第二个应用尝试
+   * @return 比较结果，负数表示a1优先，正数表示a2优先，0表示相等
+   */
   public int compare(FSAppAttempt a1, FSAppAttempt a2) {
+    // 首先比较应用优先级
     int res = a1.getPriority().compareTo(a2.getPriority());
     if (res == 0) {
+      // 优先级相同则比较提交时间，更早提交的排在前面
       if (a1.getStartTime() < a2.getStartTime()) {
         res = -1;
       } else {
@@ -43,7 +52,7 @@ public class FifoAppComparator implements Comparator<FSAppAttempt>, Serializable
       }
     }
     if (res == 0) {
-      // If there is a tie, break it by app ID to get a deterministic order
+      // 如果优先级和提交时间都相同，通过应用ID breaking tie，保证排序结果确定性
       res = a1.getApplicationId().compareTo(a2.getApplicationId());
     }
     return res;

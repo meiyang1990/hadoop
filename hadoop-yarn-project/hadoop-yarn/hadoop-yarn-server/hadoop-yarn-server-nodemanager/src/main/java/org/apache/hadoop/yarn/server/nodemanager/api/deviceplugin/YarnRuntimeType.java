@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -18,16 +19,16 @@
 
 package org.apache.hadoop.yarn.server.nodemanager.api.deviceplugin;
 
-
 /**
- * YarnRuntime parameter enum for {@link DevicePlugin}.
- * It's passed into {@code onDevicesAllocated}.
- * Device plugin could populate {@link DeviceRuntimeSpec}
- * based on which YARN container runtime will use.
+ * 设备插件使用的YARN容器运行时类型枚举
+ * 该枚举会传入{@code onDevicesAllocated}方法，设备插件可根据当前实际使用的运行时类型
+ * 生成对应{@link DeviceRuntimeSpec}，指导YARN完成设备在对应容器运行时下的配置
  * */
 public enum YarnRuntimeType {
 
+  /** 默认容器运行时 */
   RUNTIME_DEFAULT("default"),
+  /** Docker容器运行时 */
   RUNTIME_DOCKER("docker");
 
   private final String name;
@@ -36,6 +37,10 @@ public enum YarnRuntimeType {
     this.name = n;
   }
 
+  /**
+   * 获取运行时名称字符串
+   * @return 运行时名称
+   */
   public String getName() {
     return name;
   }

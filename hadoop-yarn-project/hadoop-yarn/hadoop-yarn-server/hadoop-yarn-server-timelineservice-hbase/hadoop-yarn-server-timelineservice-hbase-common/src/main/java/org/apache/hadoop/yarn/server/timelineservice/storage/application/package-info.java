@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,8 +18,8 @@
  */
 
 /**
- * Package org.apache.hadoop.yarn.server.timelineservice.storage.application
- * contains classes related to implementation for application table.
+ * 时间线服务HBase存储层的应用信息表相关实现包，
+ * 包含YARN应用状态信息存储到HBase应用表所需的表结构定义、读写操作等核心类。
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

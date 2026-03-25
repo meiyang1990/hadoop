@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -22,11 +23,17 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 
 /**
- * This class implements a value aggregator that computes the 
- * histogram of a sequence of strings.
+ * 文件说明：MapReduce旧API版的值直方图聚合器，为兼容旧mapred API实现包装类
+ * 
+ * 该类继承新版本{@link org.apache.hadoop.mapreduce.lib.aggregate.ValueHistogram}实现，
+ * 实现旧mapred API的ValueAggregator接口，用于统计字符串序列中不同值的出现频率分布，
+ * 生成输入值的直方图统计结果。
  */
 @InterfaceAudience.Public
 @InterfaceStability.Stable
+/**
+ * 值直方图聚合器，兼容旧版MapReduce API，用于统计输入字符串的频率分布
+ */
 public class ValueHistogram 
     extends org.apache.hadoop.mapreduce.lib.aggregate.ValueHistogram 
     implements ValueAggregator<String> {

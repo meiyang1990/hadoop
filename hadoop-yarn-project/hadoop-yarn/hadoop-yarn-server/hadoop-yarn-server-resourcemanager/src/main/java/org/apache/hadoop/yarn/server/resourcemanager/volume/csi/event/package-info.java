@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -17,7 +18,7 @@
  */
 
 /**
- * This package contains volume related events.
+ * CSI存储卷相关事件定义包，YARN CSI存储功能中各类存储卷操作事件的定义都在此包中
  */
 @InterfaceAudience.Private
 @InterfaceStability.Unstable

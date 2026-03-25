@@ -1,3 +1,4 @@
+// 这个文件已经全部加上中文注释
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with this
@@ -23,19 +24,15 @@ import org.apache.hadoop.yarn.server.federation.policies.dao.WeightedPolicyInfo;
 import org.apache.hadoop.yarn.server.federation.policies.router.UniformRandomRouterPolicy;
 
 /**
- * This class represents a simple implementation of a {@code
- * FederationPolicyManager}.
- *
- * It combines the basic policies: {@link UniformRandomRouterPolicy} and
- * {@link BroadcastAMRMProxyPolicy}, which are designed to work together and
- * "spread" the load among sub-clusters uniformly.
- *
- * This simple policy might impose heavy load on the RMs and return more
- * containers than a job requested as all requests are (replicated and)
- * broadcasted.
+ * YARN联邦环境下的均匀广播策略管理器，实现了FederationPolicyManager接口。
+ * 组合均匀随机路由策略和广播AMRM代理策略，将作业负载均匀分散到各个子集群。
+ * 该策略会将所有请求广播到所有子集群，可能会对RM造成较大负载，返回超出请求的容器数量。
  */
 public class UniformBroadcastPolicyManager extends AbstractPolicyManager {
 
+  /**
+   * 构造函数，硬编码绑定路由策略和AMRM代理策略。
+   */
   public UniformBroadcastPolicyManager() {
     // this structurally hard-codes two compatible policies for Router and
     // AMRMProxy.
